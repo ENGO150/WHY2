@@ -10,4 +10,5 @@ files += src/encrypter.c
 files += include/encrypter.h
 
 main:
+	@echo Compiling...
 	cc $(files) -o out/why2
