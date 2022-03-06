@@ -5,7 +5,7 @@
 #define KEY_LENGTH 50
 
 char*
-encryptText(char *from)
+encryptText(char *text)
 {
     srand(time(0)); //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
 
