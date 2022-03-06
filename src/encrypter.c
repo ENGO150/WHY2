@@ -17,8 +17,7 @@ encryptText(char *from)
     for (int i = 0; i < KEY_LENGTH; i++)
     {
         //SET numberBuffer TO RANDOM NUMBER BETWEEN 0 AND 52
-        numberBuffer = rand() % 52;
-        numberBuffer++;
+        numberBuffer = (rand() % 52) + 1;
         
         //GET CHAR FROM numberBuffer
         if (numberBuffer > 26)
