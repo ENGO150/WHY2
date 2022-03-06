@@ -11,4 +11,4 @@ files += include/encrypter.h
 
 main:
 	@echo Compiling...
-	cc $(files) -o out/why2
+	cc $(files) -lm -o out/why2
