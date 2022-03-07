@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 #define KEY_LENGTH 50
 
@@ -12,6 +13,8 @@ encryptText(char *text)
 
     //VARIABLES
     char *key = malloc(KEY_LENGTH);
+    char *returningText;
+    char *textBuffer;
     int textKeyChain[strlen(text)];
     int numberBuffer;
 
@@ -59,6 +62,38 @@ encryptText(char *text)
         }
     }
 
-    exit(0);
-    return NULL;
+    numberBuffer = 0;
+
+    //COUNT REQUIRED SIZE FOR returningText
+    for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
+    {
+        numberBuffer += floor(log10(abs(textKeyChain[i]))) + 1;
+
+        //CHECK FOR MINUS
+        if (textKeyChain[i] > 0) numberBuffer++;
+    }
+
+    //ALLOCATE returningText (WITH THE SEPARATORS)
+    returningText = malloc(numberBuffer + (sizeof(textKeyChain) / sizeof(int) - 1));
+
+    //LOAD returningText
+    for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
+    {
+        textBuffer = malloc(10);
+
+        sprintf(textBuffer, "%d", textKeyChain[i]);
+
+        strcat(returningText, textBuffer);
+
+        if (i != (sizeof(textKeyChain) / sizeof(int) - 1))
+        {
+            strcat(returningText, ".");
+        }
+    }
+
+    //DEALLOCATION
+    free(key);
+    free(textBuffer);
+    
+    return returningText;
 }
