@@ -4,10 +4,10 @@ all: main
 files = src/test/main.c
 
 # Source files
-files += src/encrypter.c
+files += src/*.c
 
 # Header files
-files += include/encrypter.h
+files += include/*.h
 
 main:
 	@echo Compiling...
