@@ -63,9 +63,9 @@ encryptText(char *text, char *keyNew)
         numberBuffer = i;
 
         //CHECK, IF numberBuffer ISN'T GREATER THAN KEY_LENGTH AND CUT UNUSED LENGTH
-        while (numberBuffer >= 50)
+        while (numberBuffer >= KEY_LENGTH)
         {
-            numberBuffer -= 50;
+            numberBuffer -= KEY_LENGTH;
         }
 
         //FILL textKeyChain
