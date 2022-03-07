@@ -26,7 +26,7 @@ encryptText(char *text, char *keyNew)
     {
         if (strlen(keyNew) != KEY_LENGTH)
         {
-            fprintf(stderr, "Educba Training");
+            fprintf(stderr, "Key must be 50 characters long!\n");
             exit(INVALID_KEY);
         }
 
