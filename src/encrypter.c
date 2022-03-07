@@ -30,7 +30,7 @@ encryptText(char *text, char *keyNew)
             exit(INVALID_KEY);
         }
 
-        key = keyNew;
+        strcpy(key, keyNew);
 
         goto skipKey;
     }
