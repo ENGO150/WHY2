@@ -62,6 +62,12 @@ encryptText(char *text)
         }
     }
 
+    //ACTUALLY ENCRYPT TEXT
+    for (int i = 0; i < strlen(text); i++)
+    {
+        textKeyChain[i] -= (int) text[i];
+    }
+
     numberBuffer = 0;
 
     //COUNT REQUIRED SIZE FOR returningText
