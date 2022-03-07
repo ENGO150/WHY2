@@ -8,8 +8,10 @@
 
 #define KEY_LENGTH 50
 
+#define INVALID_KEY 1
+
 char*
-encryptText(char *text)
+encryptText(char *text, char *keyNew)
 {
     srand(time(0)); //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
 
@@ -19,6 +21,19 @@ encryptText(char *text)
     char *textBuffer;
     int textKeyChain[strlen(text)];
     int numberBuffer;
+
+    if (keyNew != NULL)
+    {
+        if (strlen(keyNew) != KEY_LENGTH)
+        {
+            fprintf(stderr, "Educba Training");
+            exit(INVALID_KEY);
+        }
+
+        key = keyNew;
+
+        goto skipKey;
+    }
 
     //LOAD KEY
     for (int i = 0; i < KEY_LENGTH; i++)
@@ -39,6 +54,8 @@ encryptText(char *text)
     }
 
     printf("Your key is: %s\n!!! SAVE IT SOMEWHERE !!!\n\n", key);
+
+    skipKey:
 
     //LOAD textKeyChain
     for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)

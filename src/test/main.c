@@ -4,9 +4,11 @@
 #include "../../include/decrypter.h"
 
 int
-main(int args, char * argv[])
+main(int args, char *argv[])
 {
-    char *text = encryptText("ENGO WAS HERE");
+    char *text = encryptText("Pepa smrdi.", NULL);
+
+    printf("%s\n", text);
 
     text = decryptText(text, "someRandomKeyLulw");
 
