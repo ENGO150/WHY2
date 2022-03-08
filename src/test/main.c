@@ -6,12 +6,10 @@
 int
 main(int args, char *argv[])
 {
-    char *text = encryptText("Pepa smrdi.", NULL);
-
+    char *text = encryptText("Pepa smrdí.", "dsadhagsdhuhasvbdzgavdgasvgzduasvgzdavdhbashudbuas");
     printf("%s\n", text);
 
-    text = decryptText(text, "someRandomKeyLulw");
-
+    text = decryptText(text, "dsadhagsdhuhasvbdzgavdgasvgzduasvgzdavdhbashudbuas");
     printf("%s\n", text);
     return 0;
 }
