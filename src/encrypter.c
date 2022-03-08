@@ -120,7 +120,6 @@ encryptText(char *text, char *keyNew)
 
     //DEALLOCATION
     free(key);
-    free(textBuffer);
     
     return returningText;
 }
