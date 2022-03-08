@@ -6,9 +6,7 @@
 #include <time.h>
 #include <math.h>
 
-#define KEY_LENGTH 50
-
-#define INVALID_KEY 1
+#include "../include/flags.h"
 
 char*
 encryptText(char *text, char *keyNew)
@@ -112,7 +110,7 @@ encryptText(char *text, char *keyNew)
 
         if (i != (sizeof(textKeyChain) / sizeof(int) - 1))
         {
-            strcat(returningText, ".");
+            strcat(returningText, ENCRYPTION_SEPARATOR_STRING);
         }
 
         free(textBuffer);
