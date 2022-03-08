@@ -114,6 +114,8 @@ encryptText(char *text, char *keyNew)
         {
             strcat(returningText, ".");
         }
+
+        free(textBuffer);
     }
 
     //DEALLOCATION
