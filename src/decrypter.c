@@ -4,11 +4,17 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "../include/flags.h"
+
 char *decryptText(char *text, char *key)
 {
-    //CONSTS
-    const int KEY_LENGTH = strlen(key);
-
+    //CHECK FOR INVALID key
+    if (strlen(key) != KEY_LENGTH)
+    {
+        fprintf(stderr, "Key must be 50 characters long!\n");
+        exit(INVALID_KEY);
+    }
+    
     //VARIABLES
     char *returningText;
     int numberBuffer;
@@ -19,7 +25,7 @@ char *decryptText(char *text, char *key)
     //GET LENTGH OF returningText AND textKeyChain
     for (int i = 0; i < strlen(text); i++)
     {
-        if (text[i] == '.') numberBuffer++;
+        if (text[i] == ENCRYPTION_SEPARATOR) numberBuffer++;
     }
 
     //SET LENGTH
@@ -59,7 +65,7 @@ char *decryptText(char *text, char *key)
         //GET LENGTH OF EACH CHARACTER
         for (int j = 0; j < strlen(text); j++)
         {
-            if (text[j] == '.') break;
+            if (text[j] == ENCRYPTION_SEPARATOR) break;
 
             numberBuffer++;
         }
