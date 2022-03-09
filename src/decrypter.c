@@ -6,7 +6,8 @@
 
 #include "../include/flags.h"
 
-char *decryptText(char *text, char *key)
+char*
+decryptText(char *text, char *key)
 {
     //CHECK FOR INVALID key
     if (strlen(key) != KEY_LENGTH)
