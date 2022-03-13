@@ -23,7 +23,7 @@ decryptText(char *text, char *key)
 
     numberBuffer = 1;
 
-    //GET LENTGH OF returningText AND textKeyChain
+    //GET LENGHT OF returningText AND textKeyChain
     for (int i = 0; i < strlen(text); i++)
     {
         if (text[i] == ENCRYPTION_SEPARATOR) numberBuffer++;
