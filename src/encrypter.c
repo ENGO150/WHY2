@@ -102,7 +102,7 @@ encryptText(char *text, char *keyNew)
     //LOAD returningText
     for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
     {
-        textBuffer = malloc(10);
+        textBuffer = malloc(floor(log10(abs(textKeyChain[i]))));
 
         sprintf(textBuffer, "%d", textKeyChain[i]);
 
