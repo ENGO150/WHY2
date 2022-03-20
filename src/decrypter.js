@@ -80,4 +80,4 @@ module.exports = (text, key) => {
 
         returningText = returningText.join("");
         return { exitCode: 0, value: returningText };
-    },
+    }
