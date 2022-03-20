@@ -12,26 +12,32 @@ This project is made 'like a library', so compiling is useless... :)
 
 ## Using in Your projects 
 
-To **encrypt** text, use function `encryptText()` from file `include/encrypter.h`.
+To **encrypt** text, use function `encrypt()` from file `./index.js`.
 
-To **decrypt** text, use function `decryptText()` from file `include/decrypter.h`.
+To **decrypt** text, use function `decrypt()` from file `./index.js`.
 
-Jump to [examples](#examples) if you're not sure, how to use.
+~~Jump to [examples](#examples) if you're not sure, how to use.~~
 
 ## Example of code
 
 - Encryption:
-    ```c
+    ```js
+    const { encrypt, decrypt } = require("WHY2-Encryption-System");
     //FIRST VARIANT
-    char *yourText = encryptText("Put here text, you want encrypt...", "tzXlZGxkhfYOvRthqokDrmGFyDMylgmeIlrJTpVAwuqrLjABXM"); //The second thing is Your **key**. (The key must be 50 characters long!)
+    var yourText = encryptText("Put here text, you want encrypt...", "tzXlZGxkhfYOvRthqokDrmGFyDMylgmeIlrJTpVAwuqrLjABXM"); //The second thing is Your **key**. (The key must be atleast 50 characters long!)
 
     //SECOND VARIANT
-    char *yourText = encryptText("Put here text, you want encrypt...", NULL); //See? You don't have to use Your key. Program will automatically generate one for you. It will be printed out, so save it somewhere.
+    var yourText = encryptText("Put here text, you want encrypt..."); //See? You don't have to use Your key. Program will automatically generate one for you.
     ```
+**WARNING!** The key from encryption will be printed out along the text value as an object
+_Note: exit codes
+`-2` - invalid key
+`0` - operation completed successfully
+`-1` - operation failed, description available using error property_
 
 - Decryption:
-    ```c
-    char *yourText = decryptText("158.-83.9388.-14.57.8419.113.-98.10576", "tzXlZGxkhfYOvRthqokDrmGFyDMylgmeIlrJTpVAwuqrLjABXM"); //First parameter is Your encrypted text, the second is key you want to use for decryption it.
+    ```js
+    char *yourText = decryptText("158.-83.9388.-14.57.8419.113.-98.10576", "tzXlZGxkhfYOvRthqokDrmGFyDMylgmeIlrJTpVAwuqrLjABXM"); //First parameter is Your encrypted text, the second is key you want to use for decryption.
     ```
 
 ## Example programs
