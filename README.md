@@ -2,8 +2,6 @@
 
 *Yeah.*
 
-This project is made 'like a library', so compiling is useless... :)
-
 ### Table of contents
 
   - [Using in Your projects](#using-in-your-projects)
@@ -22,7 +20,7 @@ To **decrypt** text, use function `decrypt()` from file `./index.js`.
 
 - Encryption:
     ```js
-    const { encrypt, decrypt } = require("WHY2-Encryption-System");
+    const { encrypt, decrypt } = require("why2-encryption-system.js");
     //FIRST VARIANT
     var yourText = encryptText("Put here text, you want encrypt...", "tzXlZGxkhfYOvRthqokDrmGFyDMylgmeIlrJTpVAwuqrLjABXM"); //The second thing is Your **key**. (The key must be atleast 50 characters long!)
 
