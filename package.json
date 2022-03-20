@@ -1,0 +1,24 @@
+{
+  "name": "why2-encryption-system.js",
+  "version": "1.0.0",
+  "description": "Node.js wrapper for encryption system WHY2 made by ENGO150 in C lang.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ENGO150/WHY2-Encryption-System.git#nodejs-wrapper"
+  },
+  "keywords": [
+    "why2",
+    "decrypter",
+    "encrypter"
+  ],
+  "author": "Šebestíček & ENGO150",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ENGO150/WHY2-Encryption-System/issues"
+  },
+  "homepage": "https://github.com/ENGO150/WHY2-Encryption-System/tree/nodejs-wrapper#readme"
+}
