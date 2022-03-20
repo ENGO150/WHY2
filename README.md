@@ -27,10 +27,10 @@ To **decrypt** text, use function `decrypt()` from file `./index.js`.
     //SECOND VARIANT
     var yourText = encryptText("Put here text, you want encrypt..."); //See? You don't have to use Your key. Program will automatically generate one for you.
     ```
-**WARNING!** The key from encryption will be printed out along the text value as an object
-_Note: exit codes
-`-2` - invalid key
-`0` - operation completed successfully
+**WARNING!** The key from encryption will be printed out along the text value as an object \
+_Note: exit codes \
+`-2` - invalid key \
+`0` - operation completed successfully \
 `-1` - operation failed, description available using error property_
 
 - Decryption:
