@@ -9,6 +9,8 @@ This project is made 'like a library', so compiling is useless... :)
   - [Using in Your projects](#using-in-your-projects)
   - [Example of code](#example-of-code)
   - [Example programs](#example-programs)
+  - WHY2 in another languages
+    - [JavaScript](#javascript)
 
 ## Using in Your projects 
 
@@ -37,3 +39,7 @@ Jump to [examples](#examples) if you're not sure, how to use.
 ## Example programs
 
 Uhm... There aren't any examples (for now)... I will maybe create some... Later...
+
+## JavaScript
+
+Yes, yes, yes... One awesome [guy](https://github.com/SebestikCZ) guy created this. You can found the JS remake [>> HERE <<](https://github.com/ENGO150/WHY2-Encryption-System/tree/js). Thanks, Sebestik <3
