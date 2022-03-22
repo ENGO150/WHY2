@@ -42,4 +42,4 @@ Uhm... There aren't any examples (for now)... I will maybe create some... Later.
 
 ## JavaScript
 
-Yes, yes, yes... One awesome [guy](https://github.com/SebestikCZ) guy created this. You can found the JS remake [>> HERE <<](https://github.com/ENGO150/WHY2-Encryption-System/tree/js). Thanks, Sebestik <3
+All right... One awesome [guy](https://github.com/SebestikCZ) invented this. You can found the JS remake [>> RIGHT HERE <<](https://github.com/ENGO150/WHY2-Encryption-System/tree/js). Thanks, [@SebestikCZ](https://github.com/SebestikCZ) <3
