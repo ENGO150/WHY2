@@ -38,8 +38,8 @@ Jump to [examples](#examples) if you're not sure, how to use.
 
 ## Example programs
 
-Uhm... There aren't any examples (for now)... I will maybe create some... Later...
+Uhm... There aren't any examples (for now)... We will maybe create some... Later...
 
 ## JavaScript
 
-All right... One awesome [guy](https://github.com/SebestikCZ) invented this. You can found the JS remake [>> RIGHT HERE <<](https://github.com/ENGO150/WHY2-Encryption-System/tree/js). Thanks, [@SebestikCZ](https://github.com/SebestikCZ) <3
+You can found the JS remake [>> RIGHT HERE <<](https://github.com/ENDev-WHY2/WHY2-Encryption-System/tree/js). Thanks, [@SebestikCZ](https://github.com/SebestikCZ) <3
