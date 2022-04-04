@@ -6,11 +6,27 @@
 #include <time.h>
 #include <math.h>
 
+#include <curl/curl.h>
+
 #include "../include/flags.h"
 
 char*
 encryptText(char *text, char *keyNew)
 {
+    //CHECK FOR ACTIVE VERSION
+    
+    //CURL VARIABLES
+    CURL *curl = curl_easy_init();
+    FILE *fileBuffer = fopen("file" ,"w");
+    
+    //DOWNLOAD versions.json
+    curl_easy_setopt(curl, CURLOPT_URL, "https://raw.githubusercontent.com/ENDev-WHY2/WHY2-Encryption-System/c/versions.json");
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fileBuffer);
+
+    //CLEANUP
+    curl_easy_cleanup(curl);
+    fclose(fileBuffer);
+
     srand(time(0)); //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
 
     //VARIABLES
