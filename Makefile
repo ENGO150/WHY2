@@ -10,5 +10,8 @@ files += src/*.c
 files += include/*.h
 
 main:
+	@echo Removing versions.json
+	rm version.json
+
 	@echo Compiling...
-	cc $(files) -ljson-c -lm -o out/why2
+	cc $(files) -ljson-c -lcurl -lm -o out/why2
