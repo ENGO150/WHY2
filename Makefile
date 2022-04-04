@@ -11,4 +11,4 @@ files += include/*.h
 
 main:
 	@echo Compiling...
-	cc $(files) -lm -o out/why2
+	cc $(files) -ljson-c -lm -o out/why2
