@@ -11,7 +11,7 @@ files += include/*.h
 
 main:
 	@echo Removing versions.json
-	rm version.json
+	rm versions.json
 
 	@echo Compiling...
 	cc $(files) -ljson-c -lcurl -lm -o out/why2
