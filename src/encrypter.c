@@ -5,8 +5,10 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <unistd.h>
 
 #include <curl/curl.h>
+#include <json-c/json.h>
 
 #include "../include/flags.h"
 
@@ -16,7 +18,7 @@ encryptText(char *text, char *keyNew)
     //CHECK FOR ACTIVE VERSION
     
     //CURL VARIABLES
-    CURL *curl = curl_easy_init();
+    /*CURL *curl = curl_easy_init();
     FILE *fileBuffer = fopen("versions.json" ,"w");
     
     //DOWNLOAD versions.json
@@ -25,7 +27,37 @@ encryptText(char *text, char *keyNew)
 
     //CLEANUP
     curl_easy_cleanup(curl);
-    fclose(fileBuffer);
+    fclose(fileBuffer);*/
+
+    //JSON VARIABLES
+    FILE *jsonFile = fopen("versions.json", "r");
+	char buffer[256];
+	char lineBuffer[64];
+	struct json_object *parsedJson;
+	struct json_object *active;
+
+    //LOAD jsonFile
+	while (fgets(lineBuffer, sizeof(lineBuffer), jsonFile) != NULL)
+    {
+        strcat(buffer, lineBuffer);
+    }
+
+    //CLEANUP
+	fclose(jsonFile);
+
+    //GET
+	parsedJson = json_tokener_parse(buffer);
+	json_object_object_get_ex(parsedJson, "active", &active);
+
+    if (strcmp(VERSION, json_object_get_string(active)) != 0)
+    {
+        fprintf(stderr, "Your version isn't latest! This release could be unsafe!\n");
+
+        //WAIT FOR 5 SECONDS
+        sleep(5);
+    }
+
+    //TODO: Output fix
 
     srand(time(0)); //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
 
