@@ -1,5 +1,5 @@
 {
-    "active": "v1.0",
+    "active": "v1.1",
 
-    "deprecated": []
+    "deprecated": ["v1.0"]
 }

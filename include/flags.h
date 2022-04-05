@@ -7,6 +7,6 @@
 
 #define INVALID_KEY 1
 
-#define VERSION "v1.0"
+#define VERSION "v1.1"
 
 #endif
