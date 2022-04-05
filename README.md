@@ -14,6 +14,8 @@ This project is made 'like a library', so compiling is useless... :)
 
 ## Using in Your projects 
 
+! DO NOT CLONE THIS REPOSITORY, USE [RELEASES](https://github.com/ENDev-WHY2/WHY2-Encryption-System/releases) INSTEAD  > releases, that have `(C)` in the name < !
+
 To **encrypt** text, use function `encryptText()` from file `include/encrypter.h`.
 
 To **decrypt** text, use function `decryptText()` from file `include/decrypter.h`.
