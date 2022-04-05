@@ -57,8 +57,6 @@ encryptText(char *text, char *keyNew)
         sleep(5);
     }
 
-    //TODO: Output fix
-
     srand(time(0)); //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
 
     //VARIABLES
