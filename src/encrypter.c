@@ -18,7 +18,7 @@ encryptText(char *text, char *keyNew)
     //CHECK FOR ACTIVE VERSION
     
     //CURL VARIABLES
-    /*CURL *curl = curl_easy_init();
+    CURL *curl = curl_easy_init();
     FILE *fileBuffer = fopen("versions.json" ,"w");
     
     //DOWNLOAD versions.json
@@ -27,7 +27,7 @@ encryptText(char *text, char *keyNew)
 
     //CLEANUP
     curl_easy_cleanup(curl);
-    fclose(fileBuffer);*/
+    fclose(fileBuffer);
 
     //JSON VARIABLES
     FILE *jsonFile = fopen("versions.json", "r");
