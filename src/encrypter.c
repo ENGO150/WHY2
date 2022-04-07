@@ -33,20 +33,20 @@ encryptText(char *text, char *keyNew)
     fclose(fileBuffer);
 
     //JSON VARIABLES
-    FILE *jsonFile = fopen(VERSIONS_NAME, "r");
+    fileBuffer = fopen(VERSIONS_NAME, "r");
 	char buffer[256];
 	char lineBuffer[64];
 	struct json_object *parsedJson;
 	struct json_object *active;
 
     //LOAD jsonFile
-	while (fgets(lineBuffer, sizeof(lineBuffer), jsonFile) != NULL)
+	while (fgets(lineBuffer, sizeof(lineBuffer), fileBuffer) != NULL)
     {
         strcat(buffer, lineBuffer);
     }
 
     //CLEANUP
-	fclose(jsonFile);
+	fclose(fileBuffer);
 
     //GET
 	parsedJson = json_tokener_parse(buffer);
