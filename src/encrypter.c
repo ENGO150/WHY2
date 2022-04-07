@@ -19,10 +19,10 @@ encryptText(char *text, char *keyNew)
     
     //CURL VARIABLES
     CURL *curl = curl_easy_init();
-    FILE *fileBuffer = fopen("versions.json", "w");
+    FILE *fileBuffer = fopen(VERSIONS_NAME, "w");
     
     //GET versions.json
-    curl_easy_setopt(curl, CURLOPT_URL, "https://raw.githubusercontent.com/ENDev-WHY2/WHY2-Encryption-System/c/versions.json");
+    curl_easy_setopt(curl, CURLOPT_URL, VERSIONS_URL);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fileBuffer);
 
     //DOWNLOAD versions.json
@@ -33,7 +33,7 @@ encryptText(char *text, char *keyNew)
     fclose(fileBuffer);
 
     //JSON VARIABLES
-    FILE *jsonFile = fopen("versions.json", "r");
+    FILE *jsonFile = fopen(VERSIONS_NAME, "r");
 	char buffer[256];
 	char lineBuffer[64];
 	struct json_object *parsedJson;
