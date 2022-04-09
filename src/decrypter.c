@@ -10,9 +10,9 @@ char*
 decryptText(char *text, char *key)
 {
     //CHECK FOR INVALID key
-    if (strlen(key) != KEY_LENGTH)
+    if (strlen(key) < KEY_LENGTH)
     {
-        fprintf(stderr, "Key must be 50 characters long!\n");
+        fprintf(stderr, "Key must be at least 50 characters long!\n");
         exit(INVALID_KEY);
     }
     

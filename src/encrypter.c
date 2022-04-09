@@ -71,9 +71,9 @@ encryptText(char *text, char *keyNew)
 
     if (keyNew != NULL)
     {
-        if (strlen(keyNew) != KEY_LENGTH)
+        if (strlen(keyNew) < KEY_LENGTH)
         {
-            fprintf(stderr, "Key must be 50 characters long!\n");
+            fprintf(stderr, "Key must be at least 50 characters long!\n");
             exit(INVALID_KEY);
         }
 
