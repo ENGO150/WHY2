@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Remove versions.json
+rm -f versions.json
+
 # Build project
 make
 
