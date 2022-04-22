@@ -39,6 +39,15 @@ checkVersion()
         strcat(buffer, lineBuffer);
     }
 
+    //CHECK FOR TEXT IN buffer
+    if (strcmp(buffer, "") == 0)
+    {
+        fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n");
+
+        //WAIT FOR 5 SECONDS
+        sleep(5);
+    }
+
     //CLEANUP
 	fclose(fileBuffer);
 
