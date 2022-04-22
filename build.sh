@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Remove versions.json
 rm -f versions.json
