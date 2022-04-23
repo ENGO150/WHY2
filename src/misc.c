@@ -64,7 +64,8 @@ checkVersion()
     }
 }
 
-int countIntLength(int number)
+int
+countIntLength(int number)
 {
     int returning = 1;
     int buffer = 10;
