@@ -63,3 +63,25 @@ checkVersion()
         sleep(5);
     }
 }
+
+int countIntLength(int number)
+{
+    int returning = 1;
+    int buffer = 10;
+
+    //CHECK FOR NEGATIVE NUMBER
+    if (number < 0)
+    {
+        returning++;
+        number *= -1;
+    }
+
+    //COUNT LENGTH
+    while (buffer <= number)
+    {
+        buffer *= 10;
+        returning++;
+    }
+
+    return returning;
+}
