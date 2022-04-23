@@ -7,7 +7,7 @@
 
 #define INVALID_KEY 1
 
-#define VERSION "v1.1"
+#define VERSION "v2.0"
 #define VERSIONS_URL "https://raw.githubusercontent.com/ENGO150/WHY2/master/versions.json"
 #define VERSIONS_NAME "versions.json"
 
