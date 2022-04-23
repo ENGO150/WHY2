@@ -95,9 +95,6 @@ encryptText(char *text, char *keyNew)
     for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
     {
         numberBuffer += countIntLength(textKeyChain[i]);
-
-        //CHECK FOR MINUS
-        if (textKeyChain[i] < 0) numberBuffer++;
     }
 
     //ALLOCATE returningText (WITH THE SEPARATORS)
