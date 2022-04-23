@@ -94,7 +94,7 @@ encryptText(char *text, char *keyNew)
     //COUNT REQUIRED SIZE FOR returningText
     for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
     {
-        numberBuffer += floor(log10(abs(textKeyChain[i]))) + 1;
+        numberBuffer += countIntLength(textKeyChain[i]);
 
         //CHECK FOR MINUS
         if (textKeyChain[i] < 0) numberBuffer++;
@@ -106,7 +106,7 @@ encryptText(char *text, char *keyNew)
     //LOAD returningText
     for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
     {
-        textBuffer = malloc(floor(log10(abs(textKeyChain[i]))));
+        textBuffer = malloc(countIntLength(textKeyChain[i]));
 
         sprintf(textBuffer, "%d", textKeyChain[i]);
 
