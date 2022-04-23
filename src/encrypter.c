@@ -102,6 +102,7 @@ encryptText(char *text, char *keyNew)
 
     //ALLOCATE returningText (WITH THE SEPARATORS)
     returningText = malloc(numberBuffer + (sizeof(textKeyChain) / sizeof(int) - 1));
+    strcpy(returningText, "");
 
     //LOAD returningText
     for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
