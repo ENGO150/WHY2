@@ -14,8 +14,6 @@ This project is made 'like a library', so compiling is useless... :)
 
 ## Using in Your projects 
 
-! DO NOT CLONE THIS REPOSITORY, USE [RELEASES](https://github.com/ENDev-WHY2/WHY2-Encryption-System/releases) INSTEAD  > releases, that have `(C)` in the name < !
-
 Run `configure.sh` and you'll be good to go.
 
 To **encrypt** text, use function `encryptText()` from file `include/encrypter.h`.
@@ -29,7 +27,7 @@ Jump to [examples](#examples) if you're not sure, how to use.
 - Encryption:
     ```c
     //FIRST VARIANT
-    char *yourText = encryptText("Put here text, you want encrypt...", "tzXlZGxkhfYOvRthqokDrmGFyDMylgmeIlrJTpVAwuqrLjABXM"); //The second thing is Your **key**. (The key must be 50 characters long!)
+    char *yourText = encryptText("Put here text, you want encrypt...", "tzXlZGxkhfYOvRthqokDrmGFyDMylgmeIlrJTpVAwuqrLjABXM"); //The second thing is Your **key**. (The key must be at least 50 characters long!)
 
     //SECOND VARIANT
     char *yourText = encryptText("Put here text, you want encrypt...", NULL); //See? You don't have to use Your key. Program will automatically generate one for you. It will be printed out, so save it somewhere.
