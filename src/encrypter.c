@@ -97,7 +97,7 @@ encryptText(char *text, char *keyNew)
         numberBuffer += floor(log10(abs(textKeyChain[i]))) + 1;
 
         //CHECK FOR MINUS
-        if (textKeyChain[i] > 0) numberBuffer++;
+        if (textKeyChain[i] < 0) numberBuffer++;
     }
 
     //ALLOCATE returningText (WITH THE SEPARATORS)
@@ -122,6 +122,6 @@ encryptText(char *text, char *keyNew)
 
     //DEALLOCATION
     free(key);
-    
+
     return returningText;
 }
