@@ -35,8 +35,8 @@ encryptText(char *text, char *keyNew)
         strcpy(key, keyNew);
 
         //REDEFINE KEY_LENGTH
-        /*#undef KEY_LENGTH
-        #define KEY_LENGTH strlen(key)*/
+        #undef KEY_LENGTH
+        #define KEY_LENGTH strlen(key)
 
         goto skipKey;
     }
