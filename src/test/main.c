@@ -7,10 +7,10 @@
 int
 main(int args, char *argv[])
 {
-    char *text = encryptText("Pepa smrdí.", "ZwBFjJmaRIikSJvhFPbZIRNFbjQRNyiOuLTexhgOpObHzyQgNT");
+    char *text = encryptText("Pepa smrdí.", "lZwOBFvjJEmaYRIaKsALKLkSeJvXhFPbZIRNFbjQRNyiOuLTexhgOpObHzyQgNT");
     printf("%s\n", text);
 
-    text = decryptText(text, "ZwBFjJmaRIikSJvhFPbZIRNFbjQRNyiOuLTexhgOpObHzyQgNT");
+    text = decryptText(text, "lZwOBFvjJEmaYRIaKsALKLkSeJvXhFPbZIRNFbjQRNyiOuLTexhgOpObHzyQgNT");
     printf("%s\n", text);
 
 	free(text);
