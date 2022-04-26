@@ -15,7 +15,11 @@ decryptText(char *text, char *key)
         fprintf(stderr, "Key must be at least %d characters long!\n", KEY_LENGTH);
         exit(INVALID_KEY);
     }
-    
+
+    //REDEFINE KEY_LENGTH
+    #undef KEY_LENGTH
+    #define KEY_LENGTH strlen(key)
+
     //VARIABLES
     char *returningText;
     int numberBuffer;
