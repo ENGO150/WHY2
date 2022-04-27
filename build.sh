@@ -1,12 +1,39 @@
 #!/bin/bash
 
-# Remove versions.json
+####################
+
+# Remove previous output & versions.json
+rm -rf out/*
 rm -f versions.json
 
-# Build project
-make
+# Variables
+files="
+      src/test/main.c
 
-# Check for 'debug' flag
+      src/*.c
+      include/*.h
+      "
+
+compiler="cc"
+output="out/why2"
+flags="-ljson-c -lcurl"
+
+# Check for debug flag
 if [ "$1" == "debug" ]; then
-    ./out/why2
+    flags="$flags -g"
+    echo "Using debug flag"
 fi
+
+###
+echo "Using '$compiler' as default compiler. (Flags: $flags)"
+echo "Compiling..."
+###
+
+# Compile
+$compiler $files $flags -o $output
+
+###
+echo "Output generated as '$output'"
+###
+
+
