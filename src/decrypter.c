@@ -84,5 +84,8 @@ decryptText(char *text, char *key)
         returningText[i] = (char) textKeyChain[i];
     }
 
+    //DEALLOCATION
+    free(textKeyChain);
+
     return returningText;
 }
