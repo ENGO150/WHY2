@@ -64,6 +64,35 @@ checkVersion()
     }
 }
 
+void
+generateTextKeyChain(char key[], int *textKeyChain, int textKeyChainSize)
+{
+    int numberBuffer;
+    
+    for (int i = 0; i < textKeyChainSize; i++)
+    {
+        numberBuffer = i;
+
+        //CHECK, IF numberBuffer ISN'T GREATER THAN KEY_LENGTH AND CUT UNUSED LENGTH
+        while (numberBuffer >= KEY_LENGTH)
+        {
+            numberBuffer -= KEY_LENGTH;
+        }
+
+        //FILL textKeyChain
+        if ((numberBuffer + 1) % 3 == 0)
+        {
+            textKeyChain[i] = key[numberBuffer] * key[numberBuffer + 1];
+        } else if ((numberBuffer + 1) % 2 == 0)
+        {
+            textKeyChain[i] = key[numberBuffer] - key[numberBuffer + 1];
+        } else
+        {
+            textKeyChain[i] = key[numberBuffer] + key[numberBuffer + 1];
+        }
+    }
+}
+
 int
 countIntLength(int number)
 {
