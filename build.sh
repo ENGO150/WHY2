@@ -32,6 +32,11 @@ echo "Compiling..."
 # Compile
 $compiler $files $flags -o $output
 
+if [[ $? -ne 0 ]]; then
+    echo -e "\nCompilation failed. Did you run 'configure.sh' first?" 
+    exit 1
+fi
+
 ###
 echo "Output generated as '$output'"
 ###
