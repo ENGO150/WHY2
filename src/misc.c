@@ -42,7 +42,7 @@ checkVersion()
     //CHECK FOR TEXT IN buffer
     if (strcmp(buffer, "") == 0)
     {
-        fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n");
+        fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n\n");
 
         //WAIT FOR 5 SECONDS
         sleep(5);
@@ -57,7 +57,7 @@ checkVersion()
 
     if (strcmp(VERSION, json_object_get_string(active)) != 0)
     {
-        fprintf(stderr, "Your version isn't latest! This release could be unsafe!\n");
+        fprintf(stderr, "Your version isn't latest! This release could be unsafe! (%s/%s)\n\n", VERSION, json_object_get_string(active));
 
         //WAIT FOR 5 SECONDS
         sleep(5);
