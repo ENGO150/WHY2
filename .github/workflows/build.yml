@@ -1,0 +1,45 @@
+name: Build WHY2
+
+on:
+  push:
+    branches: [ development ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os:  [ ubuntu-latest ]
+        include:
+          - os: ubuntu-latest
+            output: out/why2
+            configure: configure.sh
+            build: build.sh
+            
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: development
+
+      - if: matrix.os == 'ubuntu-latest'
+        name: Update packages
+        run: | 
+          sudo apt update 
+          sudo apt upgrade
+
+      - name: Permissions
+        run: |
+          chmod +x ${{ matrix.configure }}
+          chmod +x ${{ matrix.build }}
+
+      - name: Praparating
+        run: ./${{ matrix.configure }}
+
+      - name: Build WHY2
+        run: ./${{ matrix.build }}
+
+      - name: Test
+        run: ./${{ matrix.output }}
