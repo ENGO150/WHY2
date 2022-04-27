@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #include "../include/flags.h"
+#include "../include/misc.h"
 
 char*
 decryptText(char *text, char *key)
@@ -22,10 +23,9 @@ decryptText(char *text, char *key)
 
     //VARIABLES
     char *returningText;
-    int numberBuffer;
+    int numberBuffer = 1;
     char *textBuffer;
-
-    numberBuffer = 1;
+    int textKeyChainLength;
 
     //GET LENGTH OF returningText AND textKeyChain
     for (int i = 0; i < strlen(text); i++)
@@ -33,34 +33,14 @@ decryptText(char *text, char *key)
         if (text[i] == ENCRYPTION_SEPARATOR) numberBuffer++;
     }
 
-    //SET LENGTH
+    //SET LENGTH (numberBuffer)
     returningText = malloc(numberBuffer);
-    int textKeyChain[numberBuffer];
+    int *textKeyChain = malloc(numberBuffer * sizeof(int));
     int encryptedTextKeyChain[numberBuffer];
+    textKeyChainLength = numberBuffer;
 
     //LOAD textKeyChain
-    for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
-    {
-        numberBuffer = i;
-
-        //CHECK, IF numberBuffer ISN'T GREATER THAN KEY_LENGTH AND CUT UNUSED LENGTH
-        while (numberBuffer >= KEY_LENGTH)
-        {
-            numberBuffer -= KEY_LENGTH;
-        }
-
-        //FILL textKeyChain
-        if ((numberBuffer + 1) % 3 == 0)
-        {
-            textKeyChain[i] = key[numberBuffer] * key[numberBuffer + 1];
-        } else if ((numberBuffer + 1) % 2 == 0)
-        {
-            textKeyChain[i] = key[numberBuffer] - key[numberBuffer + 1];
-        } else
-        {
-            textKeyChain[i] = key[numberBuffer] + key[numberBuffer + 1];
-        }
-    }
+    generateTextKeyChain(key, textKeyChain, numberBuffer);
 
     //LOAD encryptedTextKeyChain
     for (int i = 0; i < (sizeof(encryptedTextKeyChain) / sizeof(int)); i++)
@@ -92,13 +72,13 @@ decryptText(char *text, char *key)
     }
 
     //DECRYPT TEXT
-    for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
+    for (int i = 0; i < textKeyChainLength; i++)
     {
         textKeyChain[i] -= encryptedTextKeyChain[i];
     }
 
     //LOAD returningText
-    for (int i = 0; i < sizeof(textKeyChain) / sizeof(int); i++)
+    for (int i = 0; i < textKeyChainLength; i++)
     {
         returningText[i] = (char) textKeyChain[i];
     }
