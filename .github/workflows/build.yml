@@ -39,7 +39,7 @@ jobs:
         run: ./${{ matrix.configure }}
 
       - name: Build WHY2
-        run: ./${{ matrix.build }}
+        run: ./${{ matrix.build }} force
 
       - name: Test
         run: ./${{ matrix.output }}
