@@ -21,8 +21,8 @@ encryptText(char *text, char *keyNew)
     char *key = malloc(KEY_LENGTH);
     char *returningText;
     char *textBuffer;
-    int textKeyChain[strlen(text)];
-    int numberBuffer;
+    int *textKeyChain = malloc(strlen(text) * sizeof(int));
+    int numberBuffer = 0;
 
     if (keyNew != NULL)
     {
@@ -64,28 +64,7 @@ encryptText(char *text, char *keyNew)
     skipKey:
 
     //LOAD textKeyChain
-    for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
-    {
-        numberBuffer = i;
-
-        //CHECK, IF numberBuffer ISN'T GREATER THAN KEY_LENGTH AND CUT UNUSED LENGTH
-        while (numberBuffer >= KEY_LENGTH)
-        {
-            numberBuffer -= KEY_LENGTH;
-        }
-
-        //FILL textKeyChain
-        if ((numberBuffer + 1) % 3 == 0)
-        {
-            textKeyChain[i] = key[numberBuffer] * key[numberBuffer + 1];
-        } else if ((numberBuffer + 1) % 2 == 0)
-        {
-            textKeyChain[i] = key[numberBuffer] - key[numberBuffer + 1];
-        } else
-        {
-            textKeyChain[i] = key[numberBuffer] + key[numberBuffer + 1];
-        }
-    }
+    generateTextKeyChain(key, textKeyChain, strlen(text));
 
     //ACTUALLY ENCRYPT TEXT
     for (int i = 0; i < strlen(text); i++)
@@ -93,20 +72,18 @@ encryptText(char *text, char *keyNew)
         textKeyChain[i] -= (int) text[i];
     }
 
-    numberBuffer = 0;
-
     //COUNT REQUIRED SIZE FOR returningText
-    for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
+    for (int i = 0; i < strlen(text); i++)
     {
         numberBuffer += countIntLength(textKeyChain[i]);
     }
 
     //ALLOCATE returningText (WITH THE SEPARATORS)
-    returningText = malloc(numberBuffer + (sizeof(textKeyChain) / sizeof(int) - 1));
+    returningText = malloc(numberBuffer + strlen(text) - 1);
     strcpy(returningText, "");
 
     //LOAD returningText
-    for (int i = 0; i < (sizeof(textKeyChain) / sizeof(int)); i++)
+    for (int i = 0; i < strlen(text); i++)
     {
         textBuffer = malloc(countIntLength(textKeyChain[i]));
 
@@ -114,7 +91,7 @@ encryptText(char *text, char *keyNew)
 
         strcat(returningText, textBuffer);
 
-        if (i != (sizeof(textKeyChain) / sizeof(int) - 1))
+        if (i != strlen(text) - 1)
         {
             strcat(returningText, ENCRYPTION_SEPARATOR_STRING);
         }
