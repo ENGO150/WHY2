@@ -10,7 +10,7 @@ elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
     COMMAND="sudo apt install libjson-c3 && sudo apt install curl"
 else
     # 'Unsupported' distro
-    echo "It seems you are using unsupported distribution... Don't worry, just install https://github.com/json-c/json-c and you'll be fine."
+    echo "It seems you are using unsupported distribution... Don't worry, just install https://github.com/json-c/json-c (+ CURL if you haven't installed it already) and you'll be fine."
 fi
 
 # Execute COMMAND
