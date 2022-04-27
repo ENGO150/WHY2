@@ -26,6 +26,7 @@ decryptText(char *text, char *key)
     int numberBuffer = 1;
     char *textBuffer;
     int textKeyChainLength;
+    int *textKeyChain;
 
     //GET LENGTH OF returningText AND textKeyChain
     for (int i = 0; i < strlen(text); i++)
@@ -35,7 +36,7 @@ decryptText(char *text, char *key)
 
     //SET LENGTH (numberBuffer)
     returningText = malloc(numberBuffer);
-    int *textKeyChain = malloc(numberBuffer * sizeof(int));
+    textKeyChain = malloc(numberBuffer * sizeof(int));
     int encryptedTextKeyChain[numberBuffer];
     textKeyChainLength = numberBuffer;
 
