@@ -5,7 +5,7 @@ DISTRO=$(lsb_release -is)
 
 if [[ $(id -u) != "0" ]] && [[ $1 != "force" ]]; then
     echo "You must run this script as root! (To skip this, run with 'force' arg: \"./configure.sh force\")"
-    exit
+    exit 1
 fi
 
 # Get COMMAND
