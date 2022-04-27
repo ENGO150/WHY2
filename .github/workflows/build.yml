@@ -36,7 +36,7 @@ jobs:
           chmod +x ${{ matrix.build }}
 
       - name: Praparating
-        run: ./${{ matrix.configure }} force
+        run: sudo ./${{ matrix.configure }}
 
       - name: Build WHY2
         run: ./${{ matrix.build }}
