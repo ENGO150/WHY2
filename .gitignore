@@ -1,3 +1,5 @@
 .vscode/
 .ccls-cache/
 out/
+
+versions.json
