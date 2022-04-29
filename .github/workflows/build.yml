@@ -42,4 +42,4 @@ jobs:
         run: ./${{ matrix.build }}
 
       - name: Test
-        run: ./${{ matrix.output }}
+        run: sudo ./${{ matrix.output }}
