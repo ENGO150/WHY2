@@ -8,9 +8,17 @@
 
 #include "../include/flags.h"
 
+#define CLEAR_SCREEN "\e[1;1H\e[2J"
+#define NOT_FOUND_TRIES 10
+
+#define DOWNLOAD_FAILED 1
+
 void
 checkVersion()
 {
+    //FILE-CHECK VARIABLES
+    int notFoundBuffer = 0;
+
     //REMOVE versions.json
     if (access(VERSIONS_NAME, F_OK) == 0)
     {
@@ -31,6 +39,20 @@ checkVersion()
     //CLEANUP
     curl_easy_cleanup(curl);
     fclose(fileBuffer);
+
+    while (access(VERSIONS_NAME, R_OK) != 0)
+    {
+        notFoundBuffer++;
+
+        if (notFoundBuffer == NOT_FOUND_TRIES)
+        {
+            fprintf(stderr, "%s'%s' not found!\n", CLEAR_SCREEN, VERSIONS_NAME);
+            exit(DOWNLOAD_FAILED);
+        }
+
+        printf("%s'%s' not found (%dx)! Trying again in a second.\n", CLEAR_SCREEN, VERSIONS_NAME, notFoundBuffer);
+        sleep(1);
+    }
 
     //JSON VARIABLES
     fileBuffer = fopen(VERSIONS_NAME, "r");
