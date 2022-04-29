@@ -9,7 +9,7 @@
 #define TEST_KEY "lZwOBFvjJEmaYRIaKsALKLkSeJvXhFPbZIRNFbjQRNyiOuLTexhgOpObHzyQgNT"
 
 int
-main(int args, char *argv[])
+main(int argc, char *argv[])
 {
     char *text = encryptText(TEST_TEXT, TEST_KEY);
     text = decryptText(text, TEST_KEY);
