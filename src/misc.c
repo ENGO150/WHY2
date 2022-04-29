@@ -11,6 +11,12 @@
 void
 checkVersion()
 {
+    //REMOVE versions.json
+    if (access(VERSIONS_NAME, F_OK) == 0)
+    {
+        remove(VERSIONS_NAME);
+    }
+
     //CURL VARIABLES
     CURL *curl = curl_easy_init();
     FILE *fileBuffer = fopen(VERSIONS_NAME, "w");

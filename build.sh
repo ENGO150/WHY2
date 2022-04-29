@@ -2,9 +2,8 @@
 
 ####################
 
-# Remove previous output & versions.json
+# Remove previous output
 rm -rf out/*
-rm -f versions.json
 
 # Variables
 files="
