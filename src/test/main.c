@@ -11,6 +11,12 @@
 int
 main(int argc, char *argv[])
 {
+    if (argc == 2 && strcmp(argv[1], "skipCheck") == 0)
+    {
+        #undef SKIP_CHECK
+        #define SKIP_CHECK 0
+    }
+
     char *text = encryptText(TEST_TEXT, TEST_KEY);
     text = decryptText(text, TEST_KEY);
 
