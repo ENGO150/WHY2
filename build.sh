@@ -18,7 +18,7 @@ output="out/why2"
 flags="-ljson-c -lcurl"
 
 # Check for debug flag
-if [[ "$1" == "debug" ]]; then
+if [[ "$*" == "debug" ]]; then
     flags="$flags -g"
     echo "Using debug flag"
 fi
