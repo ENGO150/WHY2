@@ -24,11 +24,11 @@ jobs:
         with:
           ref: development
 
-#     - if: matrix.os == 'ubuntu-latest'
-#       name: Update packages
-#       run: | 
-#         sudo apt update 
-#         sudo apt upgrade
+      - if: matrix.os == 'ubuntu-latest'
+        name: Update packages
+        run: | 
+          sudo apt update 
+          sudo apt upgrade
 
       - name: Permissions
         run: |
