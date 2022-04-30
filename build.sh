@@ -15,7 +15,7 @@ files="
 
 compiler="cc"
 output="out/why2"
-flags="-ljson-c -lcurl"
+flags="-Wall -ljson-c -lcurl"
 
 # Check for debug flag
 if [[ "$*" == "debug" ]]; then
