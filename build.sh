@@ -27,12 +27,14 @@ if [[ "$1" == "test" ]]; then ########## TEST ##########
         echo "Using debug flag"
     fi
 
+    flags="$flags -lwhy2"
+
     ###
     echo "Compiling... (Flags: $flags)"
     ###
 
     # Compile
-    $compiler -lwhy2 $testFile $flags -o $output
+    $compiler $testFile $flags -o $output
 
     # Compilation failed
     if [[ $? -ne 0 ]]; then
@@ -52,7 +54,7 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     if [[ ! -d $includeDirectory ]]; then
         mkdir $includeDirectory
     fi
-    
+
     cp $includeFiles $includeDirectory
 
     ###
