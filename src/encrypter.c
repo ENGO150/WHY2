@@ -1,4 +1,4 @@
-#include "../include/encrypter.h"
+#include <why2/encrypter.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,8 +6,8 @@
 #include <time.h>
 #include <math.h>
 
-#include "../include/flags.h"
-#include "../include/misc.h"
+#include <why2/flags.h>
+#include <why2/misc.h>
 
 char*
 encryptText(char *text, char *keyNew)

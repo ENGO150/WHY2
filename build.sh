@@ -32,7 +32,7 @@ if [[ "$1" == "test" ]]; then ########## TEST ##########
     ###
 
     # Compile
-    $compiler $testFile $sourceFiles $includeFiles $flags -o $output
+    $compiler -lwhy2 $testFile $flags -o $output
 
     # Compilation failed
     if [[ $? -ne 0 ]]; then

@@ -1,4 +1,4 @@
-#include "../include/misc.h"
+#include <why2/misc.h>
 
 #include <string.h>
 #include <unistd.h>
@@ -6,7 +6,7 @@
 #include <curl/curl.h>
 #include <json-c/json.h>
 
-#include "../include/flags.h"
+#include <why2/flags.h>
 
 #define CLEAR_SCREEN "\e[1;1H\e[2J"
 #define NOT_FOUND_TRIES 10

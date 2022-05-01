@@ -1,11 +1,11 @@
-#include "../include/decrypter.h"
+#include <why2/decrypter.h>
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
-#include "../include/flags.h"
-#include "../include/misc.h"
+#include <why2/flags.h>
+#include <why2/misc.h>
 
 char*
 decryptText(char *text, char *key)

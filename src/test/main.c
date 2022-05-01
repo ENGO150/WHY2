@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../../include/encrypter.h"
-#include "../../include/decrypter.h"
+#include <why2/encrypter.h>
+#include <why2/decrypter.h>
 
 #define TEST_TEXT "Pepa smrdí."
 #define TEST_KEY "lZwOBFvjJEmaYRIaKsALKLkSeJvXhFPbZIRNFbjQRNyiOuLTexhgOpObHzyQgNT"
