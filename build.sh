@@ -45,6 +45,17 @@ if [[ "$1" == "test" ]]; then ########## TEST ##########
     ###
 elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     ###
+    echo "Installing header files..."
+    ###
+
+    # Create why2 directory
+    if [[ ! -d $includeDirectory ]]; then
+        mkdir $includeDirectory
+    fi
+    
+    cp $includeFiles $includeDirectory
+
+    ###
     echo "Using '$compiler' as default compiler."
     ###
 
@@ -65,16 +76,10 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     $compiler $flags -o $installOutput *.o
 
     ###
-    echo "Installing..."
+    echo "Installing library..."
     ###
 
-    # Create why2 directory
-    if [[ ! -d $includeDirectory ]]; then
-        mkdir $includeDirectory
-    fi
-
     mv $installOutput /usr/lib/
-    cp $includeFiles $includeDirectory
 
     # Compilation failed
     if [[ $? -ne 0 ]]; then
