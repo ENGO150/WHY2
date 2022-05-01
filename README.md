@@ -20,9 +20,9 @@ Run 'build.sh install' with root permissions to install WHY2 on your system.
 
 Run `configure.sh` and you'll be good to go.
 
-To **encrypt** text, use function `encryptText()` from file `include/encrypter.h`.
+To **encrypt** text, use function `encryptText()` from file `<why2/encrypter.h>` (`include/encrypter.h`).
 
-To **decrypt** text, use function `decryptText()` from file `include/decrypter.h`.
+To **decrypt** text, use function `decryptText()` from file `<why2/decrypter.h>` (`include/decrypter.h`).
 
 Jump to [examples](#examples) if you're not sure, how to use.
 
