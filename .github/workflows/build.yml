@@ -38,8 +38,11 @@ jobs:
       - name: Praparating
         run: sudo ./${{ matrix.configure }}
 
-      - name: Build WHY2
-        run: ./${{ matrix.build }}
+      - name: Install WHY2
+        run: sudo ./${{ matrix.build }} install
+
+      - name: Build WHY2 (Test)
+        run: ./${{ matrix.build }} test
 
       - name: Test
         run: ./${{ matrix.output }} skipCheck
