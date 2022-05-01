@@ -2,16 +2,20 @@
 
 *Yeah.*
 
-This project is made 'like a library', so compiling is useless... :)
-
 ### Table of contents
 
+  - [Installation](#installation)
   - [Using in Your projects](#using-in-your-projects)
   - [Example of code](#example-of-code)
   - [Example programs](#example-programs)
   - WHY2 in another languages
     - [JavaScript](#javascript)
 
+## Installation
+
+Run 'build.sh install' with root permissions to install WHY2 on your system.
+
+`sudo ./build.sh install`
 ## Using in Your projects 
 
 Run `configure.sh` and you'll be good to go.
