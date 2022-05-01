@@ -85,7 +85,7 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
 
     # Compilation failed
     if [[ $? -ne 0 ]]; then
-        echo -e "\nCompilation failed. Did you run 'build.sh' with sudo?" 
+        echo -e "\nCompilation failed. Did you run 'configure.sh' first and 'build.sh' with sudo?" 
         exit 1
     fi
 
