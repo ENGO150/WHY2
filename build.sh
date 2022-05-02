@@ -94,10 +94,15 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     ###
 
     rm -rf *.o
-else ########## ERR ##########
-    ###
-    echo "You have to enter 'test' or 'install' as arguments."
-    ###
+else ########## ELSE ##########
+    if [[ "$1" == "installTest" ]]; then ########## INSTALL & TEST ##########
+        ./build.sh install
+        ./build.sh test
+    else ########## ERR ##########
+        ###
+        echo "You have to enter 'test' or 'install' as arguments."
+        ###
 
-    exit 1
+        exit 1
+    fi
 fi
