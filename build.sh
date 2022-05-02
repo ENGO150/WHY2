@@ -63,7 +63,7 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     echo "Using '$compiler' as default compiler."
     ###
 
-    flags="-Wall -fPIC -ljson-c -c"
+    flags="-Wall -fPIC -c"
 
     ###
     echo "Compiling... (Flags: $flags)"
@@ -71,7 +71,7 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
 
     $compiler $flags $sourceFiles
 
-    flags="-Wall -ljson-c -shared"
+    flags="-Wall -shared"
 
     ###
     echo "Compiling library... (Flags: $flags)"
