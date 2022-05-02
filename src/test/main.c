@@ -4,6 +4,7 @@
 
 #include <why2/encrypter.h>
 #include <why2/decrypter.h>
+#include <why2/flags.h>
 
 #define TEST_TEXT "Pepa smrdí."
 #define TEST_KEY "lZwOBFvjJEmaYRIaKsALKLkSeJvXhFPbZIRNFbjQRNyiOuLTexhgOpObHzyQgNT"
@@ -13,8 +14,7 @@ main(int argc, char *argv[])
 {
     if (argc == 2 && strcmp(argv[1], "skipCheck") == 0)
     {
-        #undef SKIP_CHECK
-        #define SKIP_CHECK 0
+        setSkipCheck(1);
     }
 
     char *text = encryptText(TEST_TEXT, TEST_KEY);

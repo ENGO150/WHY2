@@ -16,7 +16,7 @@
 void
 checkVersion()
 {
-    if (SKIP_CHECK) return;
+    if (getSkipCheck()) return;
 
     //FILE-CHECK VARIABLES
     int notFoundBuffer = 0;
