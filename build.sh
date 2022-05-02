@@ -71,7 +71,7 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
 
     $compiler $flags $sourceFiles
 
-    flags="-Wall -shared"
+    flags="-Wall -ljson-c -shared"
 
     ###
     echo "Compiling library... (Flags: $flags)"
