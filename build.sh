@@ -46,16 +46,18 @@ if [[ "$1" == "test" ]]; then ########## TEST ##########
     echo "Output generated as '$output'"
     ###
 elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
-    ###
-    echo "Installing header files..."
-    ###
+    if [[ "$2" != "lib" ]]; then
+        ###
+        echo "Installing header files..."
+        ###
 
-    # Create why2 directory
-    if [[ ! -d $includeDirectory ]]; then
-        mkdir $includeDirectory
+        # Create why2 directory
+        if [[ ! -d $includeDirectory ]]; then
+            mkdir $includeDirectory
+        fi
+
+        cp $includeFiles $includeDirectory
     fi
-
-    cp $includeFiles $includeDirectory
 
     ###
     echo "Using '$compiler' as default compiler."
