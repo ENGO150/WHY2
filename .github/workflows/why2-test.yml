@@ -89,4 +89,4 @@ jobs:
         run: cc ${{ matrix.test }}.c -lwhy2 -Wall -ljson-c -lcurl -o ${{ matrix.test }}
 
       - name: Run test
-        run: ./${{ matrix.test }}g
+        run: ./${{ matrix.test }}
