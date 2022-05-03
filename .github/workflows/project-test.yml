@@ -1,4 +1,4 @@
-name: Test WHY2
+name: Test WHY2 as project
 
 on:
   push:
@@ -14,9 +14,9 @@ jobs:
         os:  [ ubuntu-latest ]
         include:
           - os: ubuntu-latest
-            output: out/why2
             configure: configure.sh
             build: build.sh
+            test: test
             
     steps:
       - name: Checkout repository
@@ -41,8 +41,8 @@ jobs:
       - name: Install WHY2
         run: sudo ./${{ matrix.build }} install
 
-      - name: Build WHY2 (Test)
-        run: ./${{ matrix.build }} test
+      - name: Download WHY2 test project
+        run: wget -O ${{ matrix.test }}.c https://gist.githubusercontent.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw/380d6737dd9b455e35e0cedc52946db34aa4550b/WHY2%2520Example%2520App
 
-      - name: Test
-        run: ./${{ matrix.output }} skipCheck
+      - name: Build WHY2 project
+        run: cc ${{ matrix.test }}.c -lwhy2 -Wall -ljson-c -lcurl -o ${{ matrix.test }}
