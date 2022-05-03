@@ -83,7 +83,7 @@ jobs:
         run: sudo ./${{ matrix.build }} install
 
       - name: Download WHY2 test project
-        run: wget -O ${{ matrix.test }}.c https://gist.githubusercontent.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw/380d6737dd9b455e35e0cedc52946db34aa4550b/WHY2%2520Example%2520App
+        run: wget -O ${{ matrix.test }}.c https://gist.github.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw
 
       - name: Build WHY2 project
         run: cc ${{ matrix.test }}.c -lwhy2 -Wall -ljson-c -lcurl -o ${{ matrix.test }}
