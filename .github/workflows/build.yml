@@ -51,5 +51,5 @@ jobs:
         run: |
           mkdir test && cd test
           wget -O main.c https://gist.githubusercontent.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw/380d6737dd9b455e35e0cedc52946db34aa4550b/WHY2%2520Example%2520App
-          cc main.c -lwhy2 -lcurl -ljson-c -o main
+          gcc main.c -lwhy2 -lcurl -ljson-c -o main
           ./main
