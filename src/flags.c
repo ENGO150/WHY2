@@ -9,3 +9,13 @@ void setSkipCheck(int skipCheckNew)
 {
     skipCheck = skipCheckNew;
 }
+
+int getKeyLength()
+{
+    return keyLength;
+}
+
+void setKeyLength(int keyLengthNew)
+{
+    keyLength = keyLengthNew;
+}
