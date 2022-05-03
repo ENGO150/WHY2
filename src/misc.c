@@ -103,10 +103,10 @@ generateTextKeyChain(char key[], int *textKeyChain, int textKeyChainSize)
     {
         numberBuffer = i;
 
-        //CHECK, IF numberBuffer ISN'T GREATER THAN KEY_LENGTH AND CUT UNUSED LENGTH
-        while (numberBuffer >= KEY_LENGTH)
+        //CHECK, IF numberBuffer ISN'T GREATER THAN keyLength AND CUT UNUSED LENGTH
+        while (numberBuffer >= getKeyLength())
         {
-            numberBuffer -= KEY_LENGTH;
+            numberBuffer -= getKeyLength();
         }
 
         //FILL textKeyChain

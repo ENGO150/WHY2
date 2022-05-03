@@ -11,15 +11,14 @@ char*
 decryptText(char *text, char *key)
 {
     //CHECK FOR INVALID key
-    if (strlen(key) < KEY_LENGTH)
+    if (strlen(key) < getKeyLength())
     {
-        fprintf(stderr, "Key must be at least %d characters long!\n", KEY_LENGTH);
+        fprintf(stderr, "Key must be at least %d characters long!\n", getKeyLength());
         exit(INVALID_KEY);
     }
 
-    //REDEFINE KEY_LENGTH
-    #undef KEY_LENGTH
-    #define KEY_LENGTH strlen(key)
+    //REDEFINE keyLength
+    setKeyLength(strlen(key));
 
     //VARIABLES
     char *returningText;

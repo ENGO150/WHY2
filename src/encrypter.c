@@ -18,7 +18,7 @@ encryptText(char *text, char *keyNew)
     srand(time(0)); //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
 
     //VARIABLES
-    char *key = malloc(KEY_LENGTH);
+    char *key = malloc(getKeyLength());
     char *returningText;
     char *textBuffer;
     int *textKeyChain = malloc(strlen(text) * sizeof(int));
@@ -26,23 +26,22 @@ encryptText(char *text, char *keyNew)
 
     if (keyNew != NULL)
     {
-        if (strlen(keyNew) < KEY_LENGTH)
+        if (strlen(keyNew) < getKeyLength())
         {
-            fprintf(stderr, "Key must be at least %d characters long!\n", KEY_LENGTH);
+            fprintf(stderr, "Key must be at least %d characters long!\n", getKeyLength());
             exit(INVALID_KEY);
         }
 
         strcpy(key, keyNew);
 
-        //REDEFINE KEY_LENGTH
-        #undef KEY_LENGTH
-        #define KEY_LENGTH strlen(key)
+        //REDEFINE keyLength
+        setKeyLength(strlen(key));
 
         goto skipKey;
     }
 
     //LOAD KEY
-    for (int i = 0; i < KEY_LENGTH; i++)
+    for (int i = 0; i < getKeyLength(); i++)
     {
         //SET numberBuffer TO RANDOM NUMBER BETWEEN 0 AND 52
         numberBuffer = (rand() % 52) + 1;
