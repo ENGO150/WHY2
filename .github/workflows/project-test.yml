@@ -46,3 +46,6 @@ jobs:
 
       - name: Build WHY2 project
         run: cc ${{ matrix.test }}.c -lwhy2 -Wall -ljson-c -lcurl -o ${{ matrix.test }}
+
+      - name: Run test
+        run: ./${{ matrix.test }}
