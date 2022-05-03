@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  test-why2:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -46,3 +46,47 @@ jobs:
 
       - name: Test
         run: ./${{ matrix.output }} skipCheck
+
+  test-project:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os:  [ ubuntu-latest ]
+        include:
+          - os: ubuntu-latest
+            configure: configure.sh
+            build: build.sh
+            test: test
+            
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: development
+
+      - if: matrix.os == 'ubuntu-latest'
+        name: Update packages
+        run: | 
+          sudo apt update 
+          sudo apt upgrade
+
+      - name: Permissions
+        run: |
+          chmod +x ${{ matrix.configure }}
+          chmod +x ${{ matrix.build }}
+
+      - name: Praparating
+        run: sudo ./${{ matrix.configure }}
+
+      - name: Install WHY2
+        run: sudo ./${{ matrix.build }} install
+
+      - name: Download WHY2 test project
+        run: wget -O ${{ matrix.test }}.c https://gist.githubusercontent.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw/380d6737dd9b455e35e0cedc52946db34aa4550b/WHY2%2520Example%2520App
+
+      - name: Build WHY2 project
+        run: cc ${{ matrix.test }}.c -lwhy2 -Wall -ljson-c -lcurl -o ${{ matrix.test }}
+
+      - name: Run test
+        run: ./${{ matrix.test }}g
