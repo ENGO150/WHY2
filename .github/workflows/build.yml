@@ -50,5 +50,6 @@ jobs:
       - name: Test WHY2 as project
         run: |
           mkdir test && cd test
-          curl -o main.c https://gist.githubusercontent.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw/bfb5399607585561a97fc25e9468d03ece860c1c/WHY2%2520Example%2520App && cc main.c -lwhy2 -lcurl -ljson-c -o main
+          wget -O main.c https://gist.githubusercontent.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw/bfb5399607585561a97fc25e9468d03ece860c1c/WHY2%2520Example%2520App
+          cc main.c -lwhy2 -lcurl -ljson-c -o main
           ./main
