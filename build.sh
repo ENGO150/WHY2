@@ -27,7 +27,7 @@ if [[ "$1" == "test" ]]; then ########## TEST ##########
         echo "Using debug flag"
     fi
 
-    flags="$flags -lwhy2"
+    flags="-lwhy2 $flags"
 
     ###
     echo "Compiling... (Flags: $flags)"
