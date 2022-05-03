@@ -79,16 +79,18 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
 
     $compiler $flags -o $installOutput *.o
 
-    ###
-    echo "Installing library..."
-    ###
+    if [[ "$2" != "lib" ]]; then
+        ###
+        echo "Installing library..."
+        ###
 
-    mv $installOutput /usr/lib/
+        mv $installOutput /usr/lib/
 
-    # Compilation failed
-    if [[ $? -ne 0 ]]; then
-        echo -e "\nCompilation failed. Did you run 'configure.sh' first and 'build.sh' with sudo?" 
-        exit 1
+        # Compilation failed
+        if [[ $? -ne 0 ]]; then
+            echo -e "\nCompilation failed. Did you run 'configure.sh' first and 'build.sh' with sudo?" 
+            exit 1
+        fi
     fi
 
     ###
