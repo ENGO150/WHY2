@@ -46,3 +46,10 @@ jobs:
 
       - name: Test
         run: ./${{ matrix.output }} skipCheck
+
+      - name: Test WHY2 as project
+        run: |
+          mkdir test && cd test
+          curl -o main.c https://gist.githubusercontent.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw/bc75020ae0b649414b68143754aae61c5367ee38/C
+          cc main.c -lwhy2 -o main
+          ./main
