@@ -109,7 +109,7 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     echo "Installing why2-app..."
     ###
 
-    cp $appOutput /usr/bin/why2
+    mv $appOutput /usr/bin/why2
 
     ###
     echo "Finished! Cleaning up..."
