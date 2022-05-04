@@ -17,14 +17,14 @@ static int keyLength = 50;
 static int skipCheck = 0;
 static int noOutput = 0;
 
-//FUNCTIONS
+//GETTERS
 int getSkipCheck();
-void setSkipCheck(int skipCheckNew);
-
 int getKeyLength();
-void setKeyLength(int keyLengthNew);
-
 int getNoOutput();
+
+//SETTERS
+void setSkipCheck(int skipCheckNew);
+void setKeyLength(int keyLengthNew);
 void setNoOutput(int noOutputNew);
 
 #endif
