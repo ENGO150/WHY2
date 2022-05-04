@@ -17,6 +17,7 @@ jobs:
             output: out/why2-test
             configure: configure.sh
             build: build.sh
+            app: why2
             
     steps:
       - name: Checkout repository
@@ -45,7 +46,9 @@ jobs:
         run: ./${{ matrix.build }} test
 
       - name: Test
-        run: ./${{ matrix.output }} skipCheck
+        run: |
+          ./${{ matrix.output }} skipCheck
+          ${{ app }}
 
   test-project:
     runs-on: ${{ matrix.os }}
