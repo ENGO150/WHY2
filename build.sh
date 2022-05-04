@@ -10,11 +10,17 @@ testFile="src/lib/test/main.c"
 sourceFiles="src/lib/*.c"
 includeFiles="include/*.h"
 
+appFile="src/app/main.c"
+
 compiler="cc"
+
 testOutput="out/why2-test"
+appOutput="out/why2-app"
+
 installOutput="libwhy2.so"
-flags="-Wall -ljson-c -lcurl"
 includeDirectory="/usr/include/why2"
+
+flags="-Wall -ljson-c -lcurl"
 
 if [[ "$1" == "test" ]]; then ########## TEST ##########
     ###
@@ -98,13 +104,42 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     ###
 
     rm -rf *.o
+elif [[ "$1" == "app" ]]; then ########## BUILD APP ##########
+    ###
+    echo "Using '$compiler' as default compiler."
+    ###
+
+    flags="-Wall"
+
+    # Check for debug flag
+    if [[ "$2" == "debug" ]]; then ########## TEST & DEBUG ##########
+        flags="$flags -g"
+        echo "Using debug flag"
+    fi
+
+    ###
+    echo "Compiling... (Flags: $flags)"
+    ###
+
+    # Compile
+    $compiler $appFile $flags -o $appOutput
+
+    # Compilation failed
+    if [[ $? -ne 0 ]]; then
+        echo -e "\nCompilation failed." 
+        exit 1
+    fi
+
+    ###
+    echo "Output generated as '$appOutput'"
+    ###
 else ########## ELSE ##########
     if [[ "$1" == "installTest" ]]; then ########## INSTALL & TEST ##########
         ./build.sh install
         ./build.sh test
     else ########## ERR ##########
         ###
-        echo "You have to enter 'test' or 'install' as arguments."
+        echo "You have to enter 'install', 'test' or 'app' as arguments. (Or 'installTest' for install & test)"
         ###
 
         exit 1
