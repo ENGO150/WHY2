@@ -100,6 +100,18 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     fi
 
     ###
+    echo "Compiling why2-app..."
+    ###
+    
+    ./build.sh app
+
+    ###
+    echo "Installing why2-app..."
+    ###
+
+    cp $appOutput /usr/bin/why2
+
+    ###
     echo "Finished! Cleaning up..."
     ###
 
