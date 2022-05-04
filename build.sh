@@ -6,12 +6,12 @@
 rm -rf out/*
 
 # Variables
-testFile="src/test/main.c"
-sourceFiles="src/*.c"
+testFile="src/lib/test/main.c"
+sourceFiles="src/lib/*.c"
 includeFiles="include/*.h"
 
 compiler="cc"
-output="out/why2"
+testOutput="out/why2-test"
 installOutput="libwhy2.so"
 flags="-Wall -ljson-c -lcurl"
 includeDirectory="/usr/include/why2"
@@ -34,7 +34,7 @@ if [[ "$1" == "test" ]]; then ########## TEST ##########
     ###
 
     # Compile
-    $compiler $testFile $flags -o $output
+    $compiler $testFile $flags -o $testOutput
 
     # Compilation failed
     if [[ $? -ne 0 ]]; then
@@ -43,7 +43,7 @@ if [[ "$1" == "test" ]]; then ########## TEST ##########
     fi
 
     ###
-    echo "Output generated as '$output'"
+    echo "Output generated as '$testOutput'"
     ###
 elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     if [[ "$2" != "lib" ]]; then
