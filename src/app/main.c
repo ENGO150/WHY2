@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <why2/encrypter.h>
 #include <why2/flags.h>
@@ -8,6 +9,7 @@
 int main(void)
 {
     setNoOutput(1);
+    char *encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL);
 
     printf
     (
@@ -19,8 +21,9 @@ int main(void)
         "If you'd like to know more about WHY2 Encryption System, please visit: https://github.com/ENGO150/WHY2/wiki \n"
         "Thank you so much for supporting this project!\n"
 
-        , TEXT_TO_ENCRYPT, encryptText(TEXT_TO_ENCRYPT, NULL)
+        , TEXT_TO_ENCRYPT, encryptedText
     );
 
+    free(encryptedText);
     return 0;
 }
