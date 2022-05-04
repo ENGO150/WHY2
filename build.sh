@@ -109,13 +109,13 @@ elif [[ "$1" == "app" ]]; then ########## BUILD APP ##########
     echo "Using '$compiler' as default compiler."
     ###
 
-    flags="-Wall"
-
     # Check for debug flag
     if [[ "$2" == "debug" ]]; then ########## TEST & DEBUG ##########
         flags="$flags -g"
         echo "Using debug flag"
     fi
+
+    flags="-lwhy2 $flags"
 
     ###
     echo "Compiling... (Flags: $flags)"
