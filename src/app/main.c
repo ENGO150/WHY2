@@ -9,6 +9,8 @@
 int main(void)
 {
     setNoOutput(1);
+    setSkipCheck(1);
+
     char *encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL);
 
     printf
