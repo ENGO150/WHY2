@@ -58,7 +58,7 @@ encryptText(char *text, char *keyNew)
         key[i] = (char) numberBuffer;
     }
 
-    if (!noOutput) printf("Your key is: %s\n!!! SAVE IT SOMEWHERE !!!\n\n", key);
+    if (!getNoOutput()) printf("Your key is: %s\n!!! SAVE IT SOMEWHERE !!!\n\n", key);
 
     skipKey:
 
