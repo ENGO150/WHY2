@@ -13,7 +13,9 @@
 
 //VARIABLES
 static int keyLength = 50;
+
 static int skipCheck = 0;
+static int noOutput = 0;
 
 //FUNCTIONS
 int getSkipCheck();
@@ -21,5 +23,8 @@ void setSkipCheck(int skipCheckNew);
 
 int getKeyLength();
 void setKeyLength(int keyLengthNew);
+
+int getNoOutput();
+void setNoOutput(int noOutputNew);
 
 #endif

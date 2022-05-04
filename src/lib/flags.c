@@ -19,3 +19,13 @@ void setKeyLength(int keyLengthNew)
 {
     keyLength = keyLengthNew;
 }
+
+int getNoOutput()
+{
+    return noOutput;
+}
+
+void setNoOutput(int noOutputNew)
+{
+    noOutput = noOutputNew;
+}
