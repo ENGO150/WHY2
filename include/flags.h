@@ -23,13 +23,13 @@
 
 #define DEPRECATED __attribute__((deprecated))
 
-typedef struct
+typedef struct inputFlag
 {
     int skipCheck;
     int noOutput;
 } inputFlags;
 
-typedef struct
+typedef struct outputFlag
 {
     char *outputText;
     char *usedKey;
