@@ -21,6 +21,8 @@
 
 #define NOT_FOUND_TRIES 10 //NUMBER OF TRIES FOR DOWNLOADING versions.json
 
+#define DEPRECATED __attribute__((deprecated))
+
 //VARIABLES
 static int keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS <
 
