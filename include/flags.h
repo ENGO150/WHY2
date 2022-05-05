@@ -23,6 +23,12 @@
 
 #define DEPRECATED __attribute__((deprecated))
 
+struct inputFlags
+{
+    int skipCheck;
+    int noOutput;
+};
+
 //VARIABLES
 static int keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS <
 
