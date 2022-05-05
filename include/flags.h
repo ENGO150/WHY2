@@ -6,10 +6,20 @@
 #define ENCRYPTION_SEPARATOR_STRING "." //SAME AS ENCRYPTION_SEPARATOR BUT AS STRING
 
 #define INVALID_KEY 1 //EXIT VALUE FOR INVALID KEY
+#define DOWNLOAD_FAILED 1 //EXIT VALUE FOR versions.json DOWNLOAD FAILED
 
 #define VERSION "v3.2" //VERSION OF CURRENT BUILD     > DO NOT TOUCH THIS <
 #define VERSIONS_URL "https://raw.githubusercontent.com/ENGO150/WHY2/stable/versions.json" //URL FOR GETTING versions.json
 #define VERSIONS_NAME "versions.json" //do I have to explain this?
+
+#define TEST_TEXT "Pepa smrdí." //TEST TEXT FOR ENCRYPTION IN why2-test BINARY
+#define TEST_KEY "lZwOBFvjJEmaYRIaKsALKLkSeJvXhFPbZIRNFbjQRNyiOuLTexhgOpObHzyQgNT" //TEST KEY FOR ENCRYPTION IN why2-test BINARY
+
+#define TEXT_TO_ENCRYPT "Some text yk" //THIS TEXT WILL BE ENCRYPTED IN why2-app BINARY
+
+#define CLEAR_SCREEN "\e[1;1H\e[2J" //TEXT FOR UNIX CLEAR SCREEN
+
+#define NOT_FOUND_TRIES 10 //NUMBER OF TRIES FOR DOWNLOADING versions.json
 
 //VARIABLES
 static int keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS <

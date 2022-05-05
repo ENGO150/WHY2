@@ -4,8 +4,6 @@
 #include <why2/encrypter.h>
 #include <why2/flags.h>
 
-#define TEXT_TO_ENCRYPT "Some text yk"
-
 int main(void)
 {
     setNoOutput(1);

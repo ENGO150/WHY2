@@ -6,9 +6,6 @@
 #include <why2/decrypter.h>
 #include <why2/flags.h>
 
-#define TEST_TEXT "Pepa smrdí."
-#define TEST_KEY "lZwOBFvjJEmaYRIaKsALKLkSeJvXhFPbZIRNFbjQRNyiOuLTexhgOpObHzyQgNT"
-
 int
 main(int argc, char *argv[])
 {

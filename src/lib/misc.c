@@ -8,11 +8,6 @@
 
 #include <why2/flags.h>
 
-#define CLEAR_SCREEN "\e[1;1H\e[2J"
-#define NOT_FOUND_TRIES 10
-
-#define DOWNLOAD_FAILED 1
-
 void
 checkVersion()
 {
