@@ -23,11 +23,17 @@
 
 #define DEPRECATED __attribute__((deprecated))
 
-struct inputFlags
+typedef struct
 {
     int skipCheck;
     int noOutput;
-};
+} inputFlags;
+
+typedef struct
+{
+    char *outputText;
+    char *usedKey;
+} *outputFlags;
 
 //VARIABLES
 static int keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS <
