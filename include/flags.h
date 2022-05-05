@@ -26,17 +26,17 @@
 //VARIABLES
 static int keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS <
 
-static int skipCheck = 0; //BOOLEAN FOR SKIPPING VERSION CHECK
-static int noOutput = 0; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
+DEPRECATED static int skipCheck = 0; //BOOLEAN FOR SKIPPING VERSION CHECK
+DEPRECATED static int noOutput = 0; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
 
 //GETTERS
-int getSkipCheck();
 int getKeyLength();
-int getNoOutput();
+DEPRECATED int getSkipCheck();
+DEPRECATED int getNoOutput();
 
 //SETTERS
-void setSkipCheck(int skipCheckNew);
 void setKeyLength(int keyLengthNew);
-void setNoOutput(int noOutputNew);
+DEPRECATED void setSkipCheck(int skipCheckNew);
+DEPRECATED void setNoOutput(int noOutputNew);
 
 #endif
