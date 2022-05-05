@@ -52,7 +52,7 @@ if [[ "$1" == "test" ]]; then ########## TEST ##########
     echo "Output generated as '$testOutput'"
     ###
 elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
-    if [[ "$2" != "lib" ]]; then
+    if [[ "$2" == "include" ]]; then
         ###
         echo "Installing header files..."
         ###
@@ -63,6 +63,8 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
         fi
 
         cp $includeFiles $includeDirectory
+
+        exit
     fi
 
     ###
@@ -85,18 +87,16 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
 
     $compiler $flags -o $installOutput *.o
 
-    if [[ "$2" != "lib" ]]; then
-        ###
-        echo "Installing library..."
-        ###
+    ###
+    echo "Installing library..."
+    ###
 
-        mv $installOutput /usr/lib/
+    mv $installOutput /usr/lib/
 
-        # Compilation failed
-        if [[ $? -ne 0 ]]; then
-            echo -e "\nCompilation failed. Did you run 'configure.sh' first and 'build.sh' with sudo?" 
-            exit 1
-        fi
+    # Compilation failed
+    if [[ $? -ne 0 ]]; then
+        echo -e "\nCompilation failed. Did you run 'configure.sh' first and 'build.sh' with sudo?" 
+        exit 1
     fi
 
     ###
