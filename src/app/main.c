@@ -6,10 +6,13 @@
 
 int main(void)
 {
-    setNoOutput(1);
-    setSkipCheck(1);
+    inputFlags flags =
+    {
+        1, //SKIP CHECK
+        1 //NO OUTPUT
+    };
 
-    char *encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL);
+    outputFlags encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL, flags);
 
     printf
     (
@@ -21,9 +24,8 @@ int main(void)
         "If you'd like to know more about WHY2 Encryption System, please visit: https://github.com/ENGO150/WHY2/wiki \n"
         "Thank you so much for supporting this project!\n"
 
-        , TEXT_TO_ENCRYPT, encryptedText
+        , TEXT_TO_ENCRYPT, encryptedText.outputText
     );
 
-    free(encryptedText);
     return 0;
 }

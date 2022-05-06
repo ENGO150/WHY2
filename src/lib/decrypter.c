@@ -7,8 +7,7 @@
 #include <why2/flags.h>
 #include <why2/misc.h>
 
-char*
-decryptText(char *text, char *key)
+outputFlags decryptText(char *text, char *key, inputFlags flags)
 {
     //CHECK FOR INVALID key
     if (strlen(key) < getKeyLength())
@@ -83,8 +82,15 @@ decryptText(char *text, char *key)
         returningText[i] = (char) textKeyChain[i];
     }
 
+    //LOAD output
+    outputFlags output =
+    {
+        returningText, //DECRYPTED TEXT
+        key //USED KEY
+    };
+
     //DEALLOCATION
     free(textKeyChain);
 
-    return returningText;
+    return output;
 }

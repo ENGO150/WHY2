@@ -6,18 +6,18 @@
 #include <why2/decrypter.h>
 #include <why2/flags.h>
 
-int
-main(int argc, char *argv[])
+int main(void)
 {
-    if (argc == 2 && strcmp(argv[1], "skipCheck") == 0)
+    inputFlags flags =
     {
-        setSkipCheck(1);
-    }
+        1, //SKIP CHECK
+        0, //NO OUTPUT
+    };
 
-    char *text = encryptText(TEST_TEXT, TEST_KEY);
-    text = decryptText(text, TEST_KEY);
+    outputFlags encrypted = encryptText(TEST_TEXT, TEST_KEY, flags);
+    encrypted = decryptText(encrypted.outputText, TEST_KEY, flags);
 
-    if (strcmp(text, TEST_TEXT) == 0)
+    if (strcmp(encrypted.outputText, TEST_TEXT) == 0)
     {
         printf("Test successful!\n");
     }
@@ -27,6 +27,5 @@ main(int argc, char *argv[])
         exit(1);
     }
 
-	free(text);
     return 0;
 }

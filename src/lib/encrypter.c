@@ -9,8 +9,7 @@
 #include <why2/flags.h>
 #include <why2/misc.h>
 
-char*
-encryptText(char *text, char *keyNew)
+outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
 {
     //CHECK FOR ACTIVE VERSION
     checkVersion();
@@ -58,8 +57,6 @@ encryptText(char *text, char *keyNew)
         key[i] = (char) numberBuffer;
     }
 
-    if (!getNoOutput()) printf("Your key is: %s\n!!! SAVE IT SOMEWHERE !!!\n\n", key);
-
     skipKey:
 
     //LOAD textKeyChain
@@ -98,8 +95,15 @@ encryptText(char *text, char *keyNew)
         free(textBuffer);
     }
 
+    //LOAD output
+    outputFlags output =
+    {
+        returningText, //ENCRYPTED TEXT
+        key //GENERATED/USED KEY
+    };
+
     //DEALLOCATION
     free(key);
 
-    return returningText;
+    return output;
 }
