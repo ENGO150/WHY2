@@ -12,7 +12,7 @@
 outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
 {
     //CHECK FOR ACTIVE VERSION
-    checkVersion();
+    if (!flags.skipCheck) checkVersion(flags);
 
     srand(time(0)); //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
 
