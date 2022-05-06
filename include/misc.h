@@ -1,7 +1,9 @@
 #ifndef WHY2_MISC_H
 #define WHY2_MISC_H
 
-void checkVersion(); //THIS FUNCTION CHECKS IF LATEST VERSION OF WHY2 IS USED
+#include <why2/flags.h>
+
+void checkVersion(inputFlags flags); //THIS FUNCTION CHECKS IF LATEST VERSION OF WHY2 IS USED
 void generateTextKeyChain(char key[], int *textKeyChain, int textKeyChainSize); //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
 int countIntLength(int number); //RETURNS LENGTH OF number
 

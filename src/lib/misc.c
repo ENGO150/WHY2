@@ -8,10 +8,9 @@
 
 #include <why2/flags.h>
 
-void
-checkVersion()
+void checkVersion(inputFlags flags)
 {
-    if (getSkipCheck()) return;
+    if (flags.skipCheck) return;
 
     //FILE-CHECK VARIABLES
     int notFoundBuffer = 0;
@@ -43,11 +42,11 @@ checkVersion()
 
         if (notFoundBuffer == NOT_FOUND_TRIES)
         {
-            fprintf(stderr, "%s'%s' not found!\n", CLEAR_SCREEN, VERSIONS_NAME);
+            if (!flags.noOutput) fprintf(stderr, "%s'%s' not found!\n", CLEAR_SCREEN, VERSIONS_NAME);
             exit(DOWNLOAD_FAILED);
         }
 
-        printf("%s'%s' not found (%dx)! Trying again in a second.\n", CLEAR_SCREEN, VERSIONS_NAME, notFoundBuffer);
+        if (!flags.noOutput) printf("%s'%s' not found (%dx)! Trying again in a second.\n", CLEAR_SCREEN, VERSIONS_NAME, notFoundBuffer);
         sleep(1);
     }
 
@@ -67,7 +66,7 @@ checkVersion()
     //CHECK FOR TEXT IN buffer
     if (strcmp(buffer, "") == 0)
     {
-        fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n\n");
+        if (!flags.noOutput) fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n\n");
 
         //WAIT FOR 5 SECONDS
         sleep(5);
@@ -82,7 +81,7 @@ checkVersion()
 
     if (strcmp(VERSION, json_object_get_string(active)) != 0)
     {
-        fprintf(stderr, "Your version isn't latest! This release could be unsafe! (%s/%s)\n\n", VERSION, json_object_get_string(active));
+        if (!flags.noOutput) fprintf(stderr, "Your version isn't latest! This release could be unsafe! (%s/%s)\n\n", VERSION, json_object_get_string(active));
 
         //WAIT FOR 5 SECONDS
         sleep(5);
