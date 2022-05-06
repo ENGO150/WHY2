@@ -52,18 +52,18 @@ if [[ "$1" == "test" ]]; then ########## TEST ##########
     echo "Output generated as '$testOutput'"
     ###
 elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
+    ###
+    echo "Installing header files..."
+    ###
+
+    # Create why2 directory
+    if [[ ! -d $includeDirectory ]]; then
+        mkdir $includeDirectory
+    fi
+
+    cp $includeFiles $includeDirectory
+
     if [[ "$2" == "include" ]]; then
-        ###
-        echo "Installing header files..."
-        ###
-
-        # Create why2 directory
-        if [[ ! -d $includeDirectory ]]; then
-            mkdir $includeDirectory
-        fi
-
-        cp $includeFiles $includeDirectory
-
         exit
     fi
 
