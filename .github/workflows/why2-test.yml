@@ -47,7 +47,7 @@ jobs:
 
       - name: Test
         run: |
-          ./${{ matrix.output }} skipCheck
+          ./${{ matrix.output }}
           ${{ matrix.app }}
 
   test-project:
