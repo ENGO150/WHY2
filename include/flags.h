@@ -25,14 +25,14 @@
 
 typedef struct input
 {
-    int skipCheck;
-    int noOutput;
+    int skipCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
+    int noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
 } inputFlags;
 
 typedef struct output
 {
-    char *outputText;
-    char *usedKey;
+    char *outputText; //VARIABLE FOR ENCRYPTED/DECRYPTED TEXT
+    char *usedKey; //VARIABLE FOR USED/GENERATED KEY
 } outputFlags;
 
 //VARIABLES
