@@ -88,8 +88,7 @@ void checkVersion(inputFlags flags)
     }
 }
 
-void
-generateTextKeyChain(char key[], int *textKeyChain, int textKeyChainSize)
+void generateTextKeyChain(char key[], int *textKeyChain, int textKeyChainSize)
 {
     int numberBuffer;
     
@@ -117,8 +116,13 @@ generateTextKeyChain(char key[], int *textKeyChain, int textKeyChainSize)
     }
 }
 
-int
-countIntLength(int number)
+void deallocateOutput(outputFlags flags)
+{
+    free(flags.outputText);
+    free(flags.usedKey);
+}
+
+int countIntLength(int number)
 {
     int returning = 1;
     int buffer = 10;
