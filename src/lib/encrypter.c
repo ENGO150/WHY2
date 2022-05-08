@@ -27,7 +27,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     {
         if (strlen(keyNew) < getKeyLength())
         {
-            fprintf(stderr, "Key must be at least %d characters long!\n", getKeyLength());
+            if (!flags.noOutput) fprintf(stderr, "Key must be at least %d characters long!\n", getKeyLength());
             exit(INVALID_KEY);
         }
 

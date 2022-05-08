@@ -12,7 +12,7 @@ outputFlags decryptText(char *text, char *key, inputFlags flags)
     //CHECK FOR INVALID key
     if (strlen(key) < getKeyLength())
     {
-        fprintf(stderr, "Key must be at least %d characters long!\n", getKeyLength());
+        if (!flags.noOutput) fprintf(stderr, "Key must be at least %d characters long!\n", getKeyLength());
         exit(INVALID_KEY);
     }
 
