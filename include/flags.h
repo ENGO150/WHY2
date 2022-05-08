@@ -13,7 +13,6 @@
 #define VERSIONS_NAME "versions.json" //do I have to explain this?
 
 #define TEST_TEXT "Pepa smrdí." //TEST TEXT FOR ENCRYPTION IN why2-test BINARY
-#define TEST_KEY "lZwOBFvjJEmaYRIaKsALKLkSeJvXhFPbZIRNFbjQRNyiOuLTexhgOpObHzyQgNT" //TEST KEY FOR ENCRYPTION IN why2-test BINARY
 
 #define TEXT_TO_ENCRYPT "Some text yk" //THIS TEXT WILL BE ENCRYPTED IN why2-app BINARY
 
