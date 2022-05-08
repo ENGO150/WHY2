@@ -3,6 +3,7 @@
 
 #include <why2/encrypter.h>
 #include <why2/flags.h>
+#include <why2/misc.h>
 
 int main(void)
 {
@@ -26,6 +27,9 @@ int main(void)
 
         , TEXT_TO_ENCRYPT, encryptedText.outputText
     );
+
+    //DEALLOCATION
+    deallocateOutput(encryptedText);
 
     return 0;
 }

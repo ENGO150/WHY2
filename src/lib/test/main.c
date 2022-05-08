@@ -5,6 +5,7 @@
 #include <why2/encrypter.h>
 #include <why2/decrypter.h>
 #include <why2/flags.h>
+#include <why2/misc.h>
 
 int main(void)
 {
@@ -26,6 +27,9 @@ int main(void)
         fprintf(stderr, "Test failed!\n");
         exit(1);
     }
+
+    //DEALLOCATION
+    deallocateOutput(encrypted);
 
     return 0;
 }
