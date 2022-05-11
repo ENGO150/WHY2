@@ -34,7 +34,6 @@ void checkVersion(inputFlags flags)
 
     //CLEANUP
     curl_easy_cleanup(curl);
-    free(curl);
     fclose(fileBuffer);
 
     while (access(VERSIONS_NAME, R_OK) != 0)
