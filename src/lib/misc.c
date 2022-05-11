@@ -34,6 +34,7 @@ void checkVersion(inputFlags flags)
 
     //CLEANUP
     curl_easy_cleanup(curl);
+    free(curl);
     fclose(fileBuffer);
 
     while (access(VERSIONS_NAME, R_OK) != 0)
@@ -86,6 +87,10 @@ void checkVersion(inputFlags flags)
         //WAIT FOR 5 SECONDS
         sleep(5);
     }
+
+    //DEALLOCATION
+    free(parsedJson);
+    free(active);
 }
 
 void generateTextKeyChain(char key[], int *textKeyChain, int textKeyChainSize)
