@@ -81,11 +81,43 @@ void checkVersion(inputFlags flags)
 
     if (strcmp(VERSION, json_object_get_string(active)) != 0)
     {
-        if (!flags.noOutput) fprintf(stderr, "Your version isn't latest! This release could be unsafe! (%s/%s)\n\n", VERSION, json_object_get_string(active));
+        //COUNT VERSIONS BEHIND
+        int versionsIndex = -1;
+        int versionsBuffer = 0;
+
+	    struct json_object *deprecated;
+	    json_object_object_get_ex(parsedJson, "deprecated", &deprecated);
+        
+        //COUNT versionsIndex
+        for (int i = 0; i < json_object_array_length(deprecated); i++)
+        {
+            //IT'S A MATCH, BABY :D
+		    if (strcmp(json_object_get_string(json_object_array_get_idx(deprecated, i)), VERSION) == 0)
+            {
+                versionsIndex = i;
+
+                break;
+            }
+        }
+
+        //versions.json DOESN'T CONTAIN VERSION (THIS WILL NOT HAPPEN IF YOU WILL NOT EDIT IT)
+        if (versionsIndex == -1)
+        {
+            free(deprecated);
+            goto newerVersion;
+        }
+
+        //COUNT versionsBuffer
+        versionsBuffer = json_object_array_length(deprecated) - versionsIndex;
+
+        if (!flags.noOutput) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, VERSION, json_object_get_string(active));
 
         //WAIT FOR 5 SECONDS
+        free(deprecated);
         sleep(5);
     }
+
+    newerVersion:
 
     //DEALLOCATION
     free(parsedJson);
