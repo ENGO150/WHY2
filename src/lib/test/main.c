@@ -34,6 +34,7 @@ int main(void)
     }
 
     //DEALLOCATION
+    free(buffer);
     deallocateOutput(encrypted);
 
     return 0;
