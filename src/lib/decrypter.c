@@ -89,5 +89,8 @@ outputFlags decryptText(char *text, char *key, inputFlags flags)
         key //USED KEY
     };
 
+    //DEALLOCATION
+    free(textKeyChain);
+
     return output;
 }

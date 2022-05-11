@@ -102,5 +102,8 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
         key //GENERATED/USED KEY
     };
 
+    //DEALLOCATION
+    free(textKeyChain);
+
     return output;
 }
