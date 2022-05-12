@@ -22,14 +22,14 @@ includeDirectory="/usr/include/why2"
 
 flags="-Wall -ljson-c -lcurl"
 
-function runTest()
+runTest()
 {
     ###
     echo "Using '$compiler' as default compiler."
     ###
 
     # Check for debug flag
-    if [[ "$2" == "debug" ]]; then ########## TEST & DEBUG ##########
+    if [[ "$1" == "debug" ]]; then ########## TEST & DEBUG ##########
         flags="$flags -g"
         echo "Using debug flag"
     fi
@@ -54,7 +54,7 @@ function runTest()
     ###
 }
 
-function runInstall()
+runInstall()
 {
     ###
     echo "Installing header files..."
@@ -68,7 +68,7 @@ function runInstall()
     cp $includeFiles $includeDirectory
     ln -sf $includeDirectory/why2.h /usr/include/why2.h
 
-    if [[ "$2" == "include" ]]; then
+    if [[ "$1" == "include" ]]; then
         exit
     fi
 
@@ -123,14 +123,14 @@ function runInstall()
     rm -rf *.o
 }
 
-function runApp()
+runApp()
 {
     ###
     echo "Using '$compiler' as default compiler."
     ###
 
     # Check for debug flag
-    if [[ "$2" == "debug" ]]; then ########## TEST & DEBUG ##########
+    if [[ "$1" == "debug" ]]; then ########## TEST & DEBUG ##########
         flags="$flags -g"
         echo "Using debug flag"
     fi
@@ -156,11 +156,11 @@ function runApp()
 }
 
 if [[ "$1" == "test" ]]; then ########## TEST ##########
-    runTest
+    runTest "$2"
 elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
-    runInstall
+    runInstall "$2"
 elif [[ "$1" == "app" ]]; then ########## BUILD APP ##########
-    runApp
+    runApp "$2"
 else ########## ELSE ##########
     if [[ "$1" == "installTest" ]]; then ########## INSTALL & TEST ##########
         runInstall
