@@ -74,6 +74,12 @@ jobs:
           sudo apt update 
           sudo apt upgrade
 
+      - if: matrix.os == 'ubuntu-latest'
+        name: Setup SWAP
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+
       - name: Permissions
         run: |
           chmod +x ${{ matrix.configure }}
