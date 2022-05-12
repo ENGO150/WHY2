@@ -32,8 +32,11 @@ int main(int argc, char *argv[])
     }
 
     //DEALLOCATION
-    free(buffer);
-    if (!githubActions) deallocateOutput(encrypted);
+    if (!githubActions)
+    {
+        free(buffer);
+        deallocateOutput(encrypted);
+    }
 
     return 0;
 }
