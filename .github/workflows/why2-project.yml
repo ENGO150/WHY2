@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-why2:
+  test-project:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -14,10 +14,9 @@ jobs:
         os:  [ ubuntu-latest ]
         include:
           - os: ubuntu-latest
-            output: out/why2-test
             configure: configure.sh
             build: build.sh
-            app: why2
+            test: test
             
     steps:
       - name: Checkout repository
@@ -31,12 +30,6 @@ jobs:
           sudo apt update 
           sudo apt upgrade
 
-      - if: matrix.os == 'ubuntu-latest'
-        name: Setup SWAP
-        uses: pierotofy/set-swap-space@master
-        with:
-          swap-size-gb: 10
-
       - name: Permissions
         run: |
           chmod +x ${{ matrix.configure }}
@@ -48,10 +41,11 @@ jobs:
       - name: Install WHY2
         run: sudo ./${{ matrix.build }} install
 
-      - name: Build WHY2 (Test)
-        run: ./${{ matrix.build }} test
+      - name: Download WHY2 test project
+        run: wget -O ${{ matrix.test }}.c https://gist.github.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw
 
-      - name: Test
-        run: |
-          ./${{ matrix.output }}
-          ${{ matrix.app }}
+      - name: Build WHY2 project
+        run: cc ${{ matrix.test }}.c -lwhy2 -Wall -ljson-c -lcurl -o ${{ matrix.test }}
+
+      - name: Run test
+        run: ./${{ matrix.test }}
