@@ -52,10 +52,13 @@ void checkVersion(inputFlags flags)
 
     //JSON VARIABLES
     fileBuffer = fopen(VERSIONS_NAME, "r");
-	char buffer[256];
+	char buffer[512];
 	char lineBuffer[64];
 	struct json_object *parsedJson;
 	struct json_object *active;
+
+    //FIX buffer
+    strcpy(buffer, "");
 
     //LOAD jsonFile
 	while (fgets(lineBuffer, sizeof(lineBuffer), fileBuffer) != NULL)
