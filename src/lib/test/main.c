@@ -4,13 +4,14 @@
 
 #include <why2.h>
 
-int main(void)
+int main(int argc, char *argv[])
 {
     char *buffer;
+    int githubActions = argc == 2 && strcmp(argv[1], "--github") == 0; //THIS IS JUST SHIT FOR GITHUB ACTIONS (LOW RAM)
 
     inputFlags flags =
     {
-        1, //SKIP CHECK
+        githubActions, //SKIP CHECK
         0, //NO OUTPUT
     };
 
@@ -32,7 +33,7 @@ int main(void)
 
     //DEALLOCATION
     free(buffer);
-    deallocateOutput(encrypted);
+    if (!githubActions) deallocateOutput(encrypted);
 
     return 0;
 }
