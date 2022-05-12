@@ -62,7 +62,7 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     fi
 
     cp $includeFiles $includeDirectory
-    ln -s $includeDirectory/why2.h /usr/include/why2.h
+    ln -sf $includeDirectory/why2.h /usr/include/why2.h
 
     if [[ "$2" == "include" ]]; then
         exit
