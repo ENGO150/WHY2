@@ -1,4 +1,4 @@
-name: Test WHY2
+name: Test Project
 
 on:
   push:
