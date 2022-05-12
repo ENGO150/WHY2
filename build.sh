@@ -22,7 +22,8 @@ includeDirectory="/usr/include/why2"
 
 flags="-Wall -ljson-c -lcurl"
 
-if [[ "$1" == "test" ]]; then ########## TEST ##########
+function runTest()
+{
     ###
     echo "Using '$compiler' as default compiler."
     ###
@@ -51,7 +52,10 @@ if [[ "$1" == "test" ]]; then ########## TEST ##########
     ###
     echo "Output generated as '$testOutput'"
     ###
-elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
+}
+
+function runInstall()
+{
     ###
     echo "Installing header files..."
     ###
@@ -104,7 +108,7 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     echo "Compiling why2-app..."
     ###
     
-    ./build.sh app
+    runApp
 
     ###
     echo "Installing why2-app..."
@@ -117,7 +121,10 @@ elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
     ###
 
     rm -rf *.o
-elif [[ "$1" == "app" ]]; then ########## BUILD APP ##########
+}
+
+function runApp()
+{
     ###
     echo "Using '$compiler' as default compiler."
     ###
@@ -146,10 +153,18 @@ elif [[ "$1" == "app" ]]; then ########## BUILD APP ##########
     ###
     echo "Output generated as '$appOutput'"
     ###
+}
+
+if [[ "$1" == "test" ]]; then ########## TEST ##########
+    runTest
+elif [[ "$1" == "install" ]]; then ########## INSTALL ##########
+    runInstall
+elif [[ "$1" == "app" ]]; then ########## BUILD APP ##########
+    runApp
 else ########## ELSE ##########
     if [[ "$1" == "installTest" ]]; then ########## INSTALL & TEST ##########
-        ./build.sh install
-        ./build.sh test
+        runInstall
+        runTest
     else ########## ERR ##########
         ###
         echo "You have to enter 'install', 'test' or 'app' as arguments. (Or 'installTest' for install & test)"
