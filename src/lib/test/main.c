@@ -2,10 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <why2/encrypter.h>
-#include <why2/decrypter.h>
-#include <why2/flags.h>
-#include <why2/misc.h>
+#include <why2.h>
 
 int main(void)
 {
