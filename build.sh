@@ -105,18 +105,6 @@ runInstall()
     fi
 
     ###
-    echo "Compiling why2-app..."
-    ###
-    
-    runApp
-
-    ###
-    echo "Installing why2-app..."
-    ###
-
-    mv $appOutput /usr/bin/why2
-
-    ###
     echo "Finished! Cleaning up..."
     ###
 
@@ -125,6 +113,10 @@ runInstall()
 
 runApp()
 {
+    ###
+    echo "Compiling why2-app..."
+    ###
+
     ###
     echo "Using '$compiler' as default compiler."
     ###
@@ -153,6 +145,16 @@ runApp()
     ###
     echo "Output generated as '$appOutput'"
     ###
+
+    ###
+    echo "Installing why2-app..."
+    ###
+
+    mv $appOutput /usr/bin/why2
+
+    ###
+    echo "Finished!"
+    ###
 }
 
 if [[ "$1" == "test" ]]; then ########## TEST ##########
@@ -163,6 +165,7 @@ elif [[ "$1" == "app" ]]; then ########## BUILD APP ##########
     runApp "$2"
 else ########## ELSE ##########
     if [[ "$1" == "installTest" ]]; then ########## INSTALL & TEST ##########
+        exit 69
         runInstall
         runTest
     else ########## ERR ##########
