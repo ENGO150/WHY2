@@ -6,7 +6,7 @@
 
 int main(void)
 {
-    char *buffer;
+    char *buffer = malloc(sizeof(int) * strlen(TEST_TEXT));
 
     inputFlags flags =
     {
@@ -16,7 +16,7 @@ int main(void)
 
     outputFlags encrypted = encryptText(TEST_TEXT, NULL, flags);
 
-    buffer = encrypted.outputText; //GET ENCRYPTED TEXT
+    strcpy(buffer, encrypted.outputText); //GET ENCRYPTED TEXT
 
     encrypted = decryptText(encrypted.outputText, encrypted.usedKey, flags);
 
