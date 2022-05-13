@@ -17,10 +17,10 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     srand(time(0)); //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
 
     //VARIABLES
-    char *key = malloc(getKeyLength());
+    char *key = malloc(sizeof(int) * getKeyLength());
     char *returningText;
     char *textBuffer;
-    int *textKeyChain = malloc(strlen(text) * sizeof(int));
+    int *textKeyChain = malloc(sizeof(int) * strlen(text));
     int numberBuffer = 0;
 
     if (keyNew != NULL)
@@ -75,13 +75,13 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     }
 
     //ALLOCATE returningText (WITH THE SEPARATORS)
-    returningText = malloc(numberBuffer + strlen(text) - 1);
+    returningText = malloc(sizeof(int) * numberBuffer + strlen(text) - 1);
     strcpy(returningText, "");
 
     //LOAD returningText
     for (int i = 0; i < strlen(text); i++)
     {
-        textBuffer = malloc(countIntLength(textKeyChain[i]));
+        textBuffer = malloc(sizeof(int) * countIntLength(textKeyChain[i]));
 
         sprintf(textBuffer, "%d", textKeyChain[i]);
 
