@@ -39,13 +39,17 @@ jobs:
       - name: Praparating
         run: sudo ./${{ matrix.configure }}
 
-      - name: Install WHY2
+      - name: Install WHY2 (Lib)
         run: sudo ./${{ matrix.build }} install
+
+      - name: Install WHY2 (App)
+        run: sudo ./${{ matrix.build }} test
 
       - name: Build WHY2 (Test)
         run: ./${{ matrix.build }} test
 
-      - name: Test
-        run: |
-          ./${{ matrix.output }}
-#          ${{ matrix.app }}
+      - name: Test Lib
+        run: ./${{ matrix.output }}
+
+      - name: Test App
+        run: ${{ matrix.app }}
