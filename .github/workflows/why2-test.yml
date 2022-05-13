@@ -48,4 +48,4 @@ jobs:
       - name: Test
         run: |
           ./${{ matrix.output }}
-          ${{ matrix.app }}
+#          ${{ matrix.app }}
