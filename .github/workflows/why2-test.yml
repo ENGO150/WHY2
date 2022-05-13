@@ -43,7 +43,7 @@ jobs:
         run: sudo ./${{ matrix.build }} install
 
       - name: Install WHY2 (App)
-        run: sudo ./${{ matrix.build }} test
+        run: sudo ./${{ matrix.build }} app
 
       - name: Build WHY2 (Test)
         run: ./${{ matrix.build }} test
