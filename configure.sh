@@ -10,9 +10,9 @@ fi
 
 # Get COMMAND
 if [[ $DISTRO == "Arch" ]]; then
-    COMMAND="pacman -S --needed json-c curl"
+    COMMAND="pacman -S --needed gcc json-c curl"
 elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
-    COMMAND="apt install libjson-c-dev libcurl4-nss-dev"
+    COMMAND="apt install gcc libjson-c-dev libcurl4-nss-dev"
 else
     # 'Unsupported' distro
     echo "It seems you are using unsupported distribution... Don't worry, just install https://github.com/json-c/json-c (+ CURL if you haven't installed it already) and you'll be fine."
