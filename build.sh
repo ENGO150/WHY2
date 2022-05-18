@@ -20,7 +20,8 @@ appOutput="out/why2-app"
 installOutput="libwhy2.so"
 includeDirectory="/usr/include/why2"
 
-flags="-Wall -ljson-c -lcurl"
+defaultFlags="-Wall"
+bufferFlags="$defaultFlags"
 
 runTest()
 {
@@ -30,18 +31,18 @@ runTest()
 
     # Check for debug flag
     if [[ "$1" == "debug" ]]; then ########## TEST & DEBUG ##########
-        flags="$flags -g"
+        bufferFlags="$defaultFlags -g"
         echo "Using debug flag"
     fi
 
-    flags="-lwhy2 -Wall"
+    bufferFlags="-lwhy2 $bufferFlags"
 
     ###
-    echo "Compiling... (Flags: $flags)"
+    echo "Compiling... (flags: $bufferFlags)"
     ###
 
     # Compile
-    $compiler $testFile $flags -o $testOutput
+    $compiler $testFile $bufferFlags -o $testOutput
 
     # Compilation failed
     if [[ $? -ne 0 ]]; then
@@ -76,21 +77,21 @@ runInstall()
     echo "Using '$compiler' as default compiler."
     ###
 
-    flags="-Wall -fPIC -c"
+    bufferFlags="-fPIC -c $defaultFlags"
 
     ###
-    echo "Compiling... (Flags: $flags)"
+    echo "Compiling... (flags: $bufferFlags)"
     ###
 
-    $compiler $flags $sourceFiles
+    $compiler $bufferFlags $sourceFiles
 
-    flags="-Wall -shared -ljson-c -lcurl"
+    bufferFlags="$defaultFlags -shared -ljson-c -lcurl "
 
     ###
-    echo "Compiling library... (Flags: $flags)"
+    echo "Compiling library... (flags: $bufferFlags)"
     ###
 
-    $compiler $flags -o $installOutput *.o
+    $compiler $bufferFlags -o $installOutput *.o
 
     ###
     echo "Installing library..."
@@ -123,18 +124,18 @@ runApp()
 
     # Check for debug flag
     if [[ "$1" == "debug" ]]; then ########## TEST & DEBUG ##########
-        flags="$flags -g"
+        bufferFlags="$defaultFlags -g"
         echo "Using debug flag"
     fi
 
-    flags="-lwhy2 $flags"
+    bufferFlags="-lwhy2 $defaultFlags"
 
     ###
-    echo "Compiling... (Flags: $flags)"
+    echo "Compiling... (flags: $bufferFlags)"
     ###
 
     # Compile
-    $compiler $appFile $flags -o $appOutput
+    $compiler $appFile $bufferFlags -o $appOutput
 
     # Compilation failed
     if [[ $? -ne 0 ]]; then
