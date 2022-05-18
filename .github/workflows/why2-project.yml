@@ -45,7 +45,7 @@ jobs:
         run: wget -O ${{ matrix.test }}.c https://gist.github.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw
 
       - name: Build WHY2 project
-        run: cc ${{ matrix.test }}.c -lwhy2 -Wall -ljson-c -lcurl -o ${{ matrix.test }}
+        run: cc ${{ matrix.test }}.c -lwhy2 -Wall -o ${{ matrix.test }}
 
       - name: Run test
         run: ./${{ matrix.test }}
