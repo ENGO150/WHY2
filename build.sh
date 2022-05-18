@@ -34,7 +34,7 @@ runTest()
         echo "Using debug flag"
     fi
 
-    flags="-lwhy2 $flags"
+    flags="-lwhy2 -Wall"
 
     ###
     echo "Compiling... (Flags: $flags)"
@@ -84,7 +84,7 @@ runInstall()
 
     $compiler $flags $sourceFiles
 
-    flags="-Wall -shared"
+    flags="-Wall -shared -ljson-c -lcurl"
 
     ###
     echo "Compiling library... (Flags: $flags)"
