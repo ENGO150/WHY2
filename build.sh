@@ -128,7 +128,7 @@ runApp()
         echo "Using debug flag"
     fi
 
-    bufferFlags="-lwhy2 $defaultFlags"
+    bufferFlags="-lwhy2 $bufferFlags"
 
     ###
     echo "Compiling... (flags: $bufferFlags)"
