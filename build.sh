@@ -85,13 +85,13 @@ runInstall()
 
     $compiler $bufferFlags $sourceFiles
 
-    bufferFlags="$defaultFlags -shared -ljson-c -lcurl "
+    bufferFlags="$defaultFlags -shared -ljson-c -lcurl"
 
     ###
     echo "Compiling library... (flags: $bufferFlags)"
     ###
 
-    $compiler $bufferFlags -o $installOutput *.o
+    $compiler -o $installOutput *.o $bufferFlags
 
     ###
     echo "Installing library..."
