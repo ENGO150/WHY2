@@ -42,12 +42,8 @@ static int noOutput = 0; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRY
 
 //GETTERS
 int getKeyLength();
-DEPRECATED int getSkipCheck();
-DEPRECATED int getNoOutput();
 
 //SETTERS
 void setKeyLength(int keyLengthNew);
-DEPRECATED void setSkipCheck(int skipCheckNew);
-DEPRECATED void setNoOutput(int noOutputNew);
 
 #endif
