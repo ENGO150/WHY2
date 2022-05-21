@@ -42,7 +42,7 @@ void checkVersion(inputFlags flags)
 
         if (notFoundBuffer == NOT_FOUND_TRIES)
         {
-            if (!flags.noOutput) fprintf(stderr, "%s'%s' not found!\n", CLEAR_SCREEN, VERSIONS_NAME);
+            if (!flags.noOutput) fprintf(stderr, "%s'%s' not found! Exiting...\n", CLEAR_SCREEN, VERSIONS_NAME);
             exit(DOWNLOAD_FAILED);
         }
 
