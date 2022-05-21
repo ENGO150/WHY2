@@ -6,7 +6,7 @@
 #define ENCRYPTION_SEPARATOR_STRING "." //SAME AS ENCRYPTION_SEPARATOR BUT AS STRING
 
 #define INVALID_KEY 1 //EXIT VALUE FOR INVALID KEY
-#define DOWNLOAD_FAILED 1 //EXIT VALUE FOR versions.json DOWNLOAD FAILED
+#define DOWNLOAD_FAILED 2 //EXIT VALUE FOR versions.json DOWNLOAD FAILED
 
 #define VERSION "v3.3.4" //VERSION OF CURRENT BUILD     > DO NOT TOUCH THIS <
 #define VERSIONS_URL "https://raw.githubusercontent.com/ENGO150/WHY2/stable/versions.json" //URL FOR GETTING versions.json
@@ -20,7 +20,7 @@
 
 #define NOT_FOUND_TRIES 10 //NUMBER OF TRIES FOR DOWNLOADING versions.json
 
-#define DEPRECATED __attribute__((deprecated))
+#define DEPRECATED __attribute__((deprecated)) //SAME COMMENT AS VERSIONS_NAME'S
 
 typedef struct input
 {
