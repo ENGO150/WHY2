@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <math.h>
 
 #include <why2/flags.h>
@@ -14,14 +13,18 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     //CHECK FOR ACTIVE VERSION
     if (!flags.skipCheck) checkVersion(flags);
 
-    srand(time(0)); //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
-
     //VARIABLES
     char *key = malloc(sizeof(int) * getKeyLength());
     char *returningText;
     char *textBuffer;
     int *textKeyChain = malloc(sizeof(int) * strlen(text));
-    int numberBuffer = 0;
+    int numberBuffer;
+    FILE *fileBuffer;
+
+    //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
+    fileBuffer = fopen("/dev/urandom", "r");
+    fread(&numberBuffer, 4, 1, fileBuffer);
+    srand(numberBuffer);
 
     if (keyNew != NULL)
     {
@@ -103,6 +106,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     };
 
     //DEALLOCATION
+    fclose(fileBuffer);
     free(textKeyChain);
 
     return output;
