@@ -44,7 +44,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     {
         //SET numberBuffer TO RANDOM NUMBER BETWEEN 0 AND 52
         numberBuffer = (rand() % 52) + 1;
-        
+
         //GET CHAR FROM numberBuffer
         if (numberBuffer > 26)
         {

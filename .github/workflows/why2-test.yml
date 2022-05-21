@@ -18,7 +18,7 @@ jobs:
             configure: configure.sh
             build: build.sh
             app: why2
-            
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -27,7 +27,7 @@ jobs:
 
       - if: matrix.os == 'ubuntu-latest'
         name: Update packages
-        run: | 
+        run: |
           sudo apt update
           sudo apt upgrade
 
@@ -65,7 +65,7 @@ jobs:
             output: out/why2-test
             configure: configure.sh
             app: why2
-            
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -74,7 +74,7 @@ jobs:
 
       - if: matrix.os == 'ubuntu-latest'
         name: Update packages
-        run: | 
+        run: |
           sudo apt update
           sudo apt upgrade
 

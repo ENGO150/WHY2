@@ -90,7 +90,7 @@ void checkVersion(inputFlags flags)
 
 	    struct json_object *deprecated;
 	    json_object_object_get_ex(parsedJson, "deprecated", &deprecated);
-        
+
         //COUNT versionsIndex
         for (int i = 0; i < json_object_array_length(deprecated); i++)
         {
@@ -130,7 +130,7 @@ void checkVersion(inputFlags flags)
 void generateTextKeyChain(char key[], int *textKeyChain, int textKeyChainSize)
 {
     int numberBuffer;
-    
+
     for (int i = 0; i < textKeyChainSize; i++)
     {
         numberBuffer = i;
