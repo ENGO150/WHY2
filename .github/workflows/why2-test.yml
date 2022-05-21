@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-why2:
+  test-why2-script:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -47,6 +47,48 @@ jobs:
 
       - name: Build WHY2 (Test)
         run: ./${{ matrix.build }} test
+
+      - name: Test Lib
+        run: ./${{ matrix.output }}
+
+      - name: Test App
+        run: ${{ matrix.app }}
+
+  test-why2-makefile:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os:  [ ubuntu-latest ]
+        include:
+          - os: ubuntu-latest
+            output: out/why2-test
+            configure: configure.sh
+            app: why2
+            
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: development
+
+      - if: matrix.os == 'ubuntu-latest'
+        name: Update packages
+        run: | 
+          sudo apt update
+          sudo apt upgrade
+
+      - name: Permissions
+        run: chmod +x ${{ matrix.configure }}
+
+      - name: Praparating
+        run: sudo ./${{ matrix.configure }}
+
+      - name: Install WHY2
+        run: sudo make install
+
+      - name: Build WHY2 Test
+        run: make test
 
       - name: Test Lib
         run: ./${{ matrix.output }}
