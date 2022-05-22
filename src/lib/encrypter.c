@@ -84,7 +84,15 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     //LOAD returningText
     for (int i = 0; i < strlen(text); i++)
     {
-        textBuffer = malloc(sizeof(int) * countIntLength(textKeyChain[i]));
+        numberBuffer = sizeof(int) * countIntLength(textKeyChain[i]);
+
+        if (i != 0)
+        {
+            textBuffer = realloc(textBuffer, numberBuffer);
+        } else
+        {
+            textBuffer = malloc(numberBuffer);
+        }
 
         sprintf(textBuffer, "%d", textKeyChain[i]);
 
@@ -94,8 +102,6 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
         {
             strcat(returningText, ENCRYPTION_SEPARATOR_STRING);
         }
-
-        free(textBuffer);
     }
 
     //LOAD output
@@ -108,6 +114,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     //DEALLOCATION
     fclose(fileBuffer);
     free(textKeyChain);
+    free(textBuffer);
 
     return output;
 }
