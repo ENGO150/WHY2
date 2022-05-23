@@ -14,7 +14,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     if (!flags.skipCheck) checkVersion(flags);
 
     //VARIABLES
-    char *key = malloc(sizeof(int) * getKeyLength());
+    char *key = malloc(sizeof(char) * getKeyLength());
     char *returningText;
     char *textBuffer;
     int *textKeyChain = malloc(sizeof(int) * strlen(text));
@@ -78,7 +78,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     }
 
     //ALLOCATE returningText (WITH THE SEPARATORS)
-    returningText = malloc(sizeof(int) * numberBuffer + strlen(text) - 1);
+    returningText = malloc(sizeof(char) * numberBuffer + strlen(text) - 1);
     strcpy(returningText, "");
 
     //LOAD returningText

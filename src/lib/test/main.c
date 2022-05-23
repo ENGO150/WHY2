@@ -10,7 +10,7 @@ int main(void)
 
     inputFlags flags =
     {
-        1, //SKIP CHECK
+        0, //SKIP CHECK
         0, //NO OUTPUT
     };
 
