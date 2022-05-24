@@ -14,10 +14,10 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     if (!flags.skipCheck) checkVersion(flags);
 
     //VARIABLES
-    char *key = malloc(sizeof(char) * getKeyLength());
+    char *key = malloc(getKeyLength());
     char *returningText;
     char *textBuffer;
-    int *textKeyChain = malloc(sizeof(int) * strlen(text));
+    int *textKeyChain = malloc(strlen(text));
     int numberBuffer;
     FILE *fileBuffer;
 
@@ -78,13 +78,13 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     }
 
     //ALLOCATE returningText (WITH THE SEPARATORS)
-    returningText = malloc(sizeof(char) * numberBuffer + strlen(text) - 1);
+    returningText = malloc(numberBuffer + strlen(text) - 1);
     strcpy(returningText, "");
 
     //LOAD returningText
     for (int i = 0; i < strlen(text); i++)
     {
-        numberBuffer = sizeof(int) * countIntLength(textKeyChain[i]);
+        numberBuffer = countIntLength(textKeyChain[i]);
 
         if (i != 0)
         {
