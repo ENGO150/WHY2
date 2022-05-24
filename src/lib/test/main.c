@@ -7,6 +7,7 @@
 int main(void)
 {
     char *buffer = malloc(64);
+    int exitCode = 0;
 
     inputFlags flags =
     {
@@ -27,12 +28,12 @@ int main(void)
     else
     {
         fprintf(stderr, "Test failed!\n");
-        exit(1);
+        exitCode = 1;
     }
 
     //DEALLOCATION
     free(buffer);
     deallocateOutput(encrypted);
 
-    return 0;
+    return exitCode;
 }
