@@ -27,7 +27,7 @@ int main(void)
     }
     else
     {
-        fprintf(stderr, "Test failed!\n");
+        fprintf(stderr, "Test failed!\n\n%s // %s", encrypted.outputText, TEST_TEXT);
         exitCode = 1;
     }
 
