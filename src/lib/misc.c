@@ -52,7 +52,7 @@ void checkVersion(inputFlags flags)
 
     //JSON VARIABLES
 	char *buffer;
-	char lineBuffer[64];
+	char lineBuffer[32];
 	struct json_object *parsedJson;
 	struct json_object *active;
 
