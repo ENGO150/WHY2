@@ -51,11 +51,19 @@ void checkVersion(inputFlags flags)
     }
 
     //JSON VARIABLES
-    fileBuffer = fopen(VERSIONS_NAME, "r");
-	char buffer[512];
+	char *buffer;
 	char lineBuffer[64];
 	struct json_object *parsedJson;
 	struct json_object *active;
+
+    //COUNT LENGTH OF buffer
+    fileBuffer = fopen(VERSIONS_NAME, "r");
+    fseek(fileBuffer, 0, SEEK_END);
+    buffer = malloc(sizeof(char) * ftell(fileBuffer));
+    fclose(fileBuffer);
+
+    //SET fileBuffer
+    fileBuffer = fopen(VERSIONS_NAME, "r"); //TODO: Find some realloc or something, dumbass
 
     //FIX buffer
     strcpy(buffer, "");
@@ -125,6 +133,7 @@ void checkVersion(inputFlags flags)
     //DEALLOCATION
     free(parsedJson);
     free(active);
+    free(buffer);
 }
 
 void generateTextKeyChain(char key[], int *textKeyChain, int textKeyChainSize)
