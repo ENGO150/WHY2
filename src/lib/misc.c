@@ -59,7 +59,7 @@ void checkVersion(inputFlags flags)
     //COUNT LENGTH OF buffer
     fileBuffer = fopen(VERSIONS_NAME, "r");
     fseek(fileBuffer, 0, SEEK_END);
-    buffer = malloc(sizeof(char) * ftell(fileBuffer));
+    buffer = malloc(ftell(fileBuffer));
     fclose(fileBuffer);
 
     //SET fileBuffer
