@@ -54,7 +54,7 @@ outputFlags decryptText(char *text, char *key, inputFlags flags)
             numberBuffer++;
         }
 
-        textBuffer = malloc(sizeof(char) * numberBuffer);
+        textBuffer = malloc(numberBuffer);
 
         //LOAD textBuffer
         for (int j = 0; j < strlen(text); j++)
