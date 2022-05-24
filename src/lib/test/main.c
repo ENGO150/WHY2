@@ -6,7 +6,7 @@
 
 int main(void)
 {
-    char *buffer = malloc(sizeof(int) * strlen(TEST_TEXT));
+    char *buffer = malloc(64);
 
     inputFlags flags =
     {
