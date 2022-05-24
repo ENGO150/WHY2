@@ -25,6 +25,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     fileBuffer = fopen("/dev/urandom", "r");
     fread(&numberBuffer, 4, 1, fileBuffer);
     srand(numberBuffer);
+    fclose(fileBuffer);
 
     if (keyNew != NULL)
     {
@@ -112,7 +113,6 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     };
 
     //DEALLOCATION
-    fclose(fileBuffer);
     free(textKeyChain);
     free(textBuffer);
 
