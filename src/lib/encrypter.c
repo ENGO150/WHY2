@@ -14,7 +14,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     if (!flags.skipCheck) checkVersion(flags);
 
     //VARIABLES
-    char *key = malloc(getKeyLength());
+    char *key = malloc(getKeyLength() + 1);
     char *returningText;
     char *textBuffer;
     int *textKeyChain = malloc(sizeof(int) * strlen(text));
@@ -60,6 +60,8 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
 
         key[i] = (char) numberBuffer;
     }
+
+    key[getKeyLength()] = '\0'; //TODO: CHECK IF THIS CAN'T CAUSE SOME LITTLE TROUBLES (SHOULDN'T)
 
     skipKey:
 
