@@ -60,7 +60,7 @@ void checkVersion(inputFlags flags)
     fileBuffer = fopen(VERSIONS_NAME, "r");
     fseek(fileBuffer, 0, SEEK_END);
     buffer = malloc(ftell(fileBuffer));
-    
+
     rewind(fileBuffer); //REWIND fileBuffer (NO SHIT)
 
     //FIX buffer
