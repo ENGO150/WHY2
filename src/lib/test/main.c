@@ -17,6 +17,9 @@ int main(void)
         0, //NO OUTPUT
     };
 
+    //SET KEY_LENGTH TO 75
+    setKeyLength(75);
+
     //ENCRYPT & DECRYPT
     outputFlags encrypted = encryptText(TEST_TEXT, NULL, flags);
 
