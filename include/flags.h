@@ -37,9 +37,6 @@ typedef struct
 //VARIABLES
 static int keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS <
 
-static int skipCheck = 0; //BOOLEAN FOR SKIPPING VERSION CHECK
-static int noOutput = 0; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
-
 //GETTERS
 int getKeyLength();
 
