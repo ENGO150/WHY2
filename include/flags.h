@@ -22,13 +22,13 @@
 
 #define DEPRECATED __attribute__((deprecated)) //SAME COMMENT AS VERSIONS_NAME'S
 
-typedef struct input
+typedef struct
 {
     int skipCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
     int noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
 } inputFlags;
 
-typedef struct output
+typedef struct
 {
     char *outputText; //VARIABLE FOR ENCRYPTED/DECRYPTED TEXT
     char *usedKey; //VARIABLE FOR USED/GENERATED KEY
