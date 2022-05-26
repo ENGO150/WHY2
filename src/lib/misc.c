@@ -112,6 +112,8 @@ void checkVersion(inputFlags flags)
         //versions.json DOESN'T CONTAIN VERSION (THIS WILL NOT HAPPEN IF YOU WILL NOT EDIT IT)
         if (versionsIndex == -1)
         {
+            if (!flags.noOutput) printf("Version %s not found! Check your flags.\n\n", VERSION);
+
             free(deprecated);
             goto newerVersion;
         }
