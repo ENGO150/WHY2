@@ -8,7 +8,7 @@
 #define INVALID_KEY 1 //EXIT VALUE FOR INVALID KEY
 #define DOWNLOAD_FAILED 2 //EXIT VALUE FOR versions.json DOWNLOAD FAILED
 
-#define VERSION "v4.0" //VERSION OF CURRENT BUILD     > DO NOT TOUCH THIS <
+#define VERSION "v4.0.1" //VERSION OF CURRENT BUILD     > DO NOT TOUCH THIS <
 #define VERSIONS_URL "https://raw.githubusercontent.com/ENGO150/WHY2/stable/versions.json" //URL FOR GETTING versions.json
 #define VERSIONS_NAME "versions.json" //do I have to explain this?
 
