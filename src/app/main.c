@@ -4,14 +4,10 @@
 
 int main(void)
 {
-    inputFlags flags =
-    {
-        1, //SKIP CHECK
-        1 //NO OUTPUT
-    };
+    //RUN ENCRYPTION WITH TEXT_TO_ENRYPT, GENERATE NEW KEY AND DO NOT CHECK FOR ACTIVE VERSION & PREVENT ANY OUTPUT
+    outputFlags encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL, (inputFlags) {1, 1});
 
-    outputFlags encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL, flags);
-
+    //SIMPLE TEXT
     printf
     (
         "Hi.\n"
