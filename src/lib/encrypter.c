@@ -29,7 +29,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
 
     if (keyNew != NULL)
     {
-        checkKey(key, flags); //CHECK FOR INVALID key
+        checkKey(keyNew, flags); //CHECK FOR INVALID key
 
         strcpy(key, keyNew);
 
