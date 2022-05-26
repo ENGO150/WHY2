@@ -15,7 +15,7 @@ elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
     COMMAND="apt install gcc libjson-c-dev libcurl4-nss-dev make"
 else
     # 'Unsupported' distro
-    echo "It seems you are using unsupported distribution... Don't worry, just install https://github.com/json-c/json-c (+ CURL if you haven't installed it already) and you'll be fine."
+    echo "It seems you are using unsupported distribution... Don't worry, just install 'gcc', 'json-c', 'curl' and 'make' and you'll be fine."
     exit
 fi
 
