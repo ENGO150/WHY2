@@ -7,7 +7,7 @@
 int main(void)
 {
     //VARIABLES
-    char *buffer = malloc(64);
+    char *buffer = malloc(128);
     int exitCode = 0;
 
     //FLAGS
