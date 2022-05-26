@@ -14,7 +14,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     if (!flags.skipCheck) checkVersion(flags);
 
     //VARIABLES
-    char *key = malloc(getKeyLength());
+    char *key = malloc(getKeyLength() + 1);
     char *returningText;
     char *textBuffer;
     int *textKeyChain = malloc(sizeof(int) * strlen(text));
@@ -106,8 +106,6 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
             strcat(returningText, ENCRYPTION_SEPARATOR_STRING);
         }
     }
-
-    strcat(returningText, "\0");
 
     //LOAD output
     outputFlags output =

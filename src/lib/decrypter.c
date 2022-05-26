@@ -33,7 +33,7 @@ outputFlags decryptText(char *text, char *key, inputFlags flags)
     }
 
     //SET LENGTH (numberBuffer)
-    returningText = malloc(numberBuffer + 1);
+    returningText = malloc(numberBuffer);
     textKeyChain = malloc(sizeof(int) * numberBuffer);
     int encryptedTextKeyChain[sizeof(int) * numberBuffer];
     textKeyChainLength = numberBuffer;
@@ -81,8 +81,6 @@ outputFlags decryptText(char *text, char *key, inputFlags flags)
     {
         returningText[i] = (char) textKeyChain[i];
     }
-
-    strcat(returningText, "\0");
 
     //LOAD output
     outputFlags output =
