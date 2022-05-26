@@ -14,7 +14,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     if (!flags.skipCheck) checkVersion(flags);
 
     //VARIABLES
-    char *key = malloc(getKeyLength() + 1);
+    char *key = malloc(getKeyLength());
     char *returningText;
     char *textBuffer;
     int *textKeyChain = malloc(sizeof(int) * strlen(text));
