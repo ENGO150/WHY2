@@ -7,13 +7,13 @@
 #include <why2/flags.h>
 #include <why2/misc.h>
 
-outputFlags decryptText(char *text, char *key, inputFlags flags)
+outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
 {
     //CHECK FOR INVALID key
-    checkKey(key, flags);
+    checkKey(keyNew, flags);
 
     //REDEFINE keyLength
-    setKeyLength(strlen(key));
+    setKeyLength(strlen(keyNew));
 
     //VARIABLES
     char *returningText;
@@ -21,6 +21,10 @@ outputFlags decryptText(char *text, char *key, inputFlags flags)
     char *textBuffer;
     int textKeyChainLength;
     int *textKeyChain;
+    char *key = malloc(strlen(keyNew));
+
+    //COPY keyNew TO key
+    strcpy(key, keyNew);
 
     //GET LENGTH OF returningText AND textKeyChain
     for (int i = 0; i < strlen(text); i++)
