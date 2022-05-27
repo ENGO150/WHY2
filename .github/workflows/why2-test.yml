@@ -36,7 +36,7 @@ jobs:
           chmod +x ${{ matrix.configure }}
           chmod +x ${{ matrix.build }}
 
-      - name: Praparating
+      - name: Preparation
         run: sudo ./${{ matrix.configure }}
 
       - name: Install WHY2 (Lib)
@@ -81,7 +81,7 @@ jobs:
       - name: Permissions
         run: chmod +x ${{ matrix.configure }}
 
-      - name: Praparating
+      - name: Preparation
         run: sudo ./${{ matrix.configure }}
 
       - name: Install WHY2
