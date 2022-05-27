@@ -39,6 +39,7 @@ static int keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS <
 
 //GETTERS
 int getKeyLength();
+inputFlags noFlags();
 
 //SETTERS
 void setKeyLength(int keyLengthNew);
