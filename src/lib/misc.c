@@ -139,6 +139,7 @@ void checkVersion(inputFlags flags)
 void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
 {
     int numberBuffer;
+    int numberBuffer2;
 
     for (int i = 0; i < textKeyChainSize; i++)
     {
@@ -150,16 +151,18 @@ void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
             numberBuffer -= getKeyLength();
         }
 
+        numberBuffer2 = numberBuffer + (i < textKeyChainSize);
+
         //FILL textKeyChain
         if ((numberBuffer + 1) % 3 == 0)
         {
-            textKeyChain[i] = key[numberBuffer] * key[numberBuffer + (i < textKeyChainSize)];
+            textKeyChain[i] = key[numberBuffer] * key[numberBuffer2];
         } else if ((numberBuffer + 1) % 2 == 0)
         {
-            textKeyChain[i] = key[numberBuffer] - key[numberBuffer + (i < textKeyChainSize)];
+            textKeyChain[i] = key[numberBuffer] - key[numberBuffer2];
         } else
         {
-            textKeyChain[i] = key[numberBuffer] + key[numberBuffer + (i < textKeyChainSize)];
+            textKeyChain[i] = key[numberBuffer] + key[numberBuffer2];
         }
     }
 }
