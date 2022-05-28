@@ -151,7 +151,7 @@ void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
             numberBuffer -= getKeyLength();
         }
 
-        numberBuffer2 = numberBuffer + (i < textKeyChainSize);
+        numberBuffer2 = getKeyLength() - (numberBuffer + (i < textKeyChainSize));
 
         //FILL textKeyChain
         if ((numberBuffer + 1) % 3 == 0)
