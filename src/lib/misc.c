@@ -136,7 +136,7 @@ void checkVersion(inputFlags flags)
     free(buffer);
 }
 
-void generateTextKeyChain(char key[], int *textKeyChain, int textKeyChainSize)
+void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
 {
     int numberBuffer;
 
