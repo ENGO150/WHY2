@@ -12,7 +12,7 @@
 #define VERSIONS_URL "https://raw.githubusercontent.com/ENGO150/WHY2/stable/versions.json" //URL FOR GETTING versions.json
 #define VERSIONS_NAME "/tmp/versions.json" //do I have to explain this?
 
-#define TEST_TEXT "aAzZ(    )!?#\\/śŠ 420*;" //TEST TEXT FOR ENCRYPTION IN why2-test BINARY
+#define TEST_TEXT "aAzZ(    )!?#\\/śŠ <3|420*;" //TEST TEXT FOR ENCRYPTION IN why2-test BINARY
 
 #define TEXT_TO_ENCRYPT "Some text yk" //THIS TEXT WILL BE ENCRYPTED IN why2-app BINARY
 
