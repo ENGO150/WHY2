@@ -177,7 +177,7 @@ void checkKey(char *key, inputFlags flags)
 {
     if (strlen(key) < getKeyLength())
     {
-        if (!flags.noOutput) fprintf(stderr, "Key must be at least %d characters long!\n", getKeyLength());
+        if (!flags.noOutput) fprintf(stderr, "Key must be at least %lu characters long!\n", getKeyLength());
         exit(INVALID_KEY);
     }
 }

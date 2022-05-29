@@ -1,6 +1,6 @@
 #include <why2/flags.h>
 
-int getKeyLength()
+unsigned long getKeyLength()
 {
     return keyLength;
 }

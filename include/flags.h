@@ -35,10 +35,10 @@ typedef struct
 } outputFlags;
 
 //VARIABLES
-static int keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS <
+static unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS <
 
 //GETTERS
-int getKeyLength();
+unsigned long getKeyLength();
 inputFlags noFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
 
 //SETTERS
