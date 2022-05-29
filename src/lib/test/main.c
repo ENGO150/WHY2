@@ -7,7 +7,8 @@
 int main(void)
 {
     //VARIABLES
-    char *buffer = malloc(128);
+    char *textBuffer = malloc(128);
+    char *keyBuffer;
     int exitCode = 0;
 
     //FLAGS
@@ -19,18 +20,23 @@ int main(void)
 
     //SET KEY_LENGTH TO 100
     setKeyLength(100);
+    keyBuffer = malloc(getKeyLength());
 
     //ENCRYPT & DECRYPT
     outputFlags encrypted = encryptText(TEST_TEXT, NULL, flags);
 
-    strcpy(buffer, encrypted.outputText); //GET ENCRYPTED TEXT
+    strcpy(textBuffer, encrypted.outputText); //GET ENCRYPTED TEXT
+    strcpy(keyBuffer, encrypted.usedKey); //GET KEY
 
-    encrypted = decryptText(encrypted.outputText, encrypted.usedKey, flags);
+    //DEALLOCATE BUFFER
+    deallocateOutput(encrypted);
+
+    encrypted = decryptText(textBuffer, keyBuffer, flags);
 
     //COMPARE DIFFERENCE
     if (strcmp(encrypted.outputText, TEST_TEXT) == 0)
     {
-        printf("Test successful!\n\nTEXT: %s\nOUTPUT: %s\nKEY: %s\n", TEST_TEXT, buffer, encrypted.usedKey);
+        printf("Test successful!\n\nTEXT: %s\nOUTPUT: %s\nKEY: %s\n", TEST_TEXT, textBuffer, encrypted.usedKey);
     }
     else
     {
@@ -39,7 +45,8 @@ int main(void)
     }
 
     //DEALLOCATION
-    free(buffer);
+    free(textBuffer);
+    free(keyBuffer);
     deallocateOutput(encrypted);
 
     return exitCode;
