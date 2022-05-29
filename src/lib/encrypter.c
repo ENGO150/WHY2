@@ -10,8 +10,17 @@
 
 outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
 {
+    //CHECK FOR INVALID text
+    checkText(text, flags);
+
     //CHECK FOR ACTIVE VERSION
     if (!flags.skipCheck) checkVersion(flags);
+
+    if (strcmp(text, "") == 0)
+    {
+        if (!flags.noOutput) fprintf(stderr, "No text to encrypt!\n");
+        exit(1);
+    }
 
     //VARIABLES
     char *key = malloc(getKeyLength());

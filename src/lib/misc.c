@@ -182,6 +182,15 @@ void checkKey(char *key, inputFlags flags)
     }
 }
 
+void checkText(char *text, inputFlags flags)
+{
+    if (strcmp(text, "") == 0)
+    {
+        if (!flags.noOutput) fprintf(stderr, "No text to encrypt!\n");
+        exit(1);
+    }
+}
+
 int countIntLength(int number)
 {
     int returning = 1;

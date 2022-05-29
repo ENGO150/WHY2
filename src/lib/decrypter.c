@@ -9,6 +9,9 @@
 
 outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
 {
+    //CHECK FOR INVALID text
+    checkText(text, flags);
+
     //CHECK FOR INVALID key
     checkKey(keyNew, flags);
 
