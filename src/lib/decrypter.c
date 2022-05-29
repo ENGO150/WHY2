@@ -42,7 +42,7 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
     generateTextKeyChain(key, textKeyChain, numberBuffer);
 
     //LOAD encryptedTextKeyChain
-    for (int i = 0; i < (sizeof(encryptedTextKeyChain) / sizeof(int)); i++)
+    for (int i = 0; i < textKeyChainLength; i++)
     {
         numberBuffer = 0;
 
@@ -76,10 +76,17 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
         textKeyChain[i] -= encryptedTextKeyChain[i];
     }
 
+    //FIX returningText
+    strcpy(returningText, "");
+    for (int i = 0; i < textKeyChainLength; i++)
+    {
+        strcat(returningText, " ");
+    }
+
     //LOAD returningText
     for (int i = 0; i < textKeyChainLength; i++)
     {
-        returningText[i] = (char) textKeyChain[i];
+        returningText[i] = textKeyChain[i];
     }
 
     //LOAD output
