@@ -191,7 +191,7 @@ void checkText(char *text, inputFlags flags)
     }
 }
 
-int countIntLength(int number)
+unsigned long countIntLength(int number)
 {
     int returning = 1;
     int buffer = 10;
