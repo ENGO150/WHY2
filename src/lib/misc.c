@@ -52,25 +52,24 @@ void checkVersion(inputFlags flags)
 
     //JSON VARIABLES
 	char *buffer;
-	char lineBuffer[32];
 	struct json_object *parsedJson;
 	struct json_object *active;
+    int bufferSize;
 
-    //COUNT LENGTH OF buffer
+    //COUNT LENGTH OF buffer AND STORE IT IN bufferSize
     fileBuffer = fopen(VERSIONS_NAME, "r");
     fseek(fileBuffer, 0, SEEK_END);
-    buffer = malloc(ftell(fileBuffer));
-
+    bufferSize = ftell(fileBuffer);
     rewind(fileBuffer); //REWIND fileBuffer (NO SHIT)
+
+    //SET LENGTH OF buffer
+    buffer = malloc(bufferSize);
 
     //FIX buffer
     strcpy(buffer, "");
 
     //LOAD jsonFile
-	while (fgets(lineBuffer, sizeof(lineBuffer), fileBuffer) != NULL)
-    {
-        strcat(buffer, lineBuffer);
-    }
+    fread(buffer, bufferSize, 1, fileBuffer);
 
     //CHECK FOR TEXT IN buffer
     if (strcmp(buffer, "") == 0)
