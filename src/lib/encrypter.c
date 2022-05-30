@@ -4,12 +4,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 #include <why2/flags.h>
 #include <why2/misc.h>
 
 outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
 {
+    //TIME VARIABLES
+    struct timeval startTime;
+    struct timeval finishTime;
+    gettimeofday(&startTime, NULL);
+
     //CHECK FOR INVALID text
     checkText(text, flags);
 
@@ -112,12 +119,16 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
         }
     }
 
+    //GET FINISH TIME
+    gettimeofday(&finishTime, NULL);
+
     //LOAD output
     outputFlags output =
     {
         returningText, //ENCRYPTED TEXT
         key, //GENERATED/USED KEY
-        countUnusedKeySize(text, key) // NUMBER OF UNUSED CHARS IN KEY
+        countUnusedKeySize(text, key), // NUMBER OF UNUSED CHARS IN KEY
+        compareTimeMicro(startTime, finishTime) // ELAPSED TIME
     };
 
     //DEALLOCATION

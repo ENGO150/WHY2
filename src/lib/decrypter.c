@@ -3,12 +3,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include <why2/flags.h>
 #include <why2/misc.h>
 
 outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
 {
+    //TIME VARIABLES
+    struct timeval startTime;
+    struct timeval finishTime;
+    gettimeofday(&startTime, NULL);
+
     //CHECK FOR INVALID text
     checkText(text, flags);
 
@@ -92,12 +98,16 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
         returningText[i] = textKeyChain[i];
     }
 
+    //GET FINISH TIME
+    gettimeofday(&finishTime, NULL);
+
     //LOAD output
     outputFlags output =
     {
         returningText, //DECRYPTED TEXT
         key, //USED KEY
-        countUnusedKeySize(returningText, key)
+        countUnusedKeySize(returningText, key), // NUMBER OF UNUSED CHARS IN KEY
+        compareTimeMicro(startTime, finishTime) // ELAPSED TIME
     };
 
     //DEALLOCATION
