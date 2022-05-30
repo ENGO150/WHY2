@@ -116,7 +116,8 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     outputFlags output =
     {
         returningText, //ENCRYPTED TEXT
-        key //GENERATED/USED KEY
+        key, //GENERATED/USED KEY
+        countUnusedKeySize(text, key) // NUMBER OF UNUSED CHARS IN KEY
     };
 
     //DEALLOCATION

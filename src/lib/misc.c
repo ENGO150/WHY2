@@ -211,3 +211,15 @@ unsigned long countIntLength(int number)
 
     return returning;
 }
+
+unsigned long countUnusedKeySize(char *text, char *key)
+{
+    unsigned long returning = 0;
+
+    if (strlen(key) / 2 > strlen(text))
+    {
+        returning = strlen(key) - 2 * strlen(text);
+    }
+
+    return returning;
+}

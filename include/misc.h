@@ -9,5 +9,6 @@ void deallocateOutput(outputFlags flags); //DEALLOCATES flags
 void checkKey(char *key, inputFlags flags); //CHECKS IF KEY IS VALID
 void checkText(char *text, inputFlags flags); //CHECKS IF TEXT IS VALID
 unsigned long countIntLength(int number); //RETURNS LENGTH OF number
+unsigned long countUnusedKeySize(char *text, char *key); //COUNT unusedKeySize
 
 #endif

@@ -32,6 +32,7 @@ typedef struct
 {
     char *outputText; //VARIABLE FOR ENCRYPTED/DECRYPTED TEXT
     char *usedKey; //VARIABLE FOR USED/GENERATED KEY
+    unsigned long unusedKeySize;
 } outputFlags;
 
 //VARIABLES
