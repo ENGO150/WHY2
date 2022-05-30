@@ -97,7 +97,7 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
     {
         returningText, //DECRYPTED TEXT
         key, //USED KEY
-        countUnusedKeySize(text, key)
+        countUnusedKeySize(returningText, key)
     };
 
     //DEALLOCATION
