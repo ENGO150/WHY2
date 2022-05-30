@@ -36,7 +36,7 @@ int main(void)
     //COMPARE DIFFERENCE
     if (strcmp(encrypted.outputText, TEST_TEXT) == 0)
     {
-        printf("Test successful!\n\nTEXT: %s\nOUTPUT: %s\nKEY: %s\n", TEST_TEXT, textBuffer, encrypted.usedKey);
+        printf("Test successful!\n\nTEXT: %s\nOUTPUT: %s\nKEY: %s\nUNUSED KEY-CHARS: %lu\n", TEST_TEXT, textBuffer, encrypted.usedKey, encrypted.unusedKeySize);
     }
     else
     {
