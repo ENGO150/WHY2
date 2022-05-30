@@ -227,5 +227,5 @@ unsigned long countUnusedKeySize(char *text, char *key)
 
 unsigned long compareTimeMicro(struct timeval startTime, struct timeval finishTime)
 {
-   return (finishTime.tv_sec - startTime.tv_sec) * 1000000 + finishTime.tv_usec - startTime.tv_usec;
+    return (finishTime.tv_sec - startTime.tv_sec) * 1000000 + finishTime.tv_usec - startTime.tv_usec;
 }
