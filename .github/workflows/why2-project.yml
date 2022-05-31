@@ -18,6 +18,11 @@ jobs:
             build: build.sh
             test: test
 
+          - os: macos-latest
+            configure: configure.sh
+            build: build.sh
+            test: test
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2

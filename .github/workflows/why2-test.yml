@@ -19,6 +19,12 @@ jobs:
             build: build.sh
             app: why2
 
+          - os: macos-latest
+            output: out/why2-test
+            configure: configure.sh
+            build: build.sh
+            app: why2
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -62,6 +68,11 @@ jobs:
         os:  [ ubuntu-latest, macos-latest ]
         include:
           - os: ubuntu-latest
+            output: out/why2-test
+            configure: configure.sh
+            app: why2
+
+          - os: macos-latest
             output: out/why2-test
             configure: configure.sh
             app: why2
