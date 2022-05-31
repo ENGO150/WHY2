@@ -13,7 +13,7 @@ jobs:
       matrix:
         os:  [ ubuntu-latest, macos-latest ]
         include:
-          - os: [ ubuntu-latest, macos-latest ]
+          - os: ubuntu-latest
             output: out/why2-test
             configure: configure.sh
             build: build.sh
@@ -61,7 +61,7 @@ jobs:
       matrix:
         os:  [ ubuntu-latest, macos-latest ]
         include:
-          - os: [ ubuntu-latest, macos-latest ]
+          - os: ubuntu-latest
             output: out/why2-test
             configure: configure.sh
             app: why2
