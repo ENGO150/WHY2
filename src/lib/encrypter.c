@@ -17,11 +17,11 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     struct timeval finishTime;
     gettimeofday(&startTime, NULL);
 
-    //CHECK FOR INVALID text
-    checkText(text, flags);
-
     //CHECK FOR ACTIVE VERSION
     if (!flags.skipCheck) checkVersion(flags);
+
+    //CHECK FOR INVALID text
+    checkText(text, flags);
 
     if (strcmp(text, "") == 0)
     {
