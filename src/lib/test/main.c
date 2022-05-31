@@ -45,11 +45,11 @@ int main(void)
         (
             "Test successful!\n\n"
 
-            "TEXT: %s\n"
-            "OUTPUT: %s\n"
-            "KEY: %s\n"
-            "TIME: %lums\n"
-            "UNUSED KEY-CHARS: %lu\n"
+            "TEXT: \t\t%s\n"
+            "OUTPUT: \t%s\n"
+            "KEY: \t\t%s\n"
+            "TIME: \t\t%lums\n"
+            "UNUSED KEY: \t%lu\n"
 
             , TEST_TEXT, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize
         );
