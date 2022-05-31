@@ -15,7 +15,7 @@ int main(void)
 
         "\"%s\" => \"%s\"\n\n"
 
-        "If you'd like to know more about WHY2 Encryption System, please visit: https://github.com/ENGO150/WHY2/wiki \n"
+        "If you'd like to know more about WHY2 Encryption System, please visit: https://github.com/ENGO150/WHY2/wiki \b\n"
         "Thank you so much for supporting this project!\n"
 
         , TEXT_TO_ENCRYPT, encryptedText.outputText
