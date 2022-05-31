@@ -11,14 +11,9 @@ jobs:
 
     strategy:
       matrix:
-        os:  [ ubuntu-latest, macos-latest ]
+        os:  [ ubuntu-latest ]
         include:
           - os: ubuntu-latest
-            configure: configure.sh
-            build: build.sh
-            test: test
-
-          - os: macos-latest
             configure: configure.sh
             build: build.sh
             test: test
