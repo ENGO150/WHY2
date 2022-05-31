@@ -15,6 +15,9 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
     struct timeval finishTime;
     gettimeofday(&startTime, NULL);
 
+    //CHECK FOR ACTIVE VERSION
+    if (!flags.skipCheck) checkVersion(flags);
+
     //CHECK FOR INVALID text
     checkText(text, flags);
 
