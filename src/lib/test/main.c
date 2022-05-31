@@ -41,7 +41,18 @@ int main(void)
     //COMPARE DIFFERENCE
     if (strcmp(encrypted.outputText, TEST_TEXT) == 0)
     {
-        printf("Test successful!\n\nTEXT: %s\nOUTPUT: %s\nKEY: %s\nTIME: %lums\nUNUSED KEY-CHARS: %lu\n", TEST_TEXT, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize);
+        printf
+        (
+            "Test successful!\n\n"
+
+            "TEXT: %s\n"
+            "OUTPUT: %s\n"
+            "KEY: %s\n"
+            "TIME: %lums\n"
+            "UNUSED KEY-CHARS: %lu\n"
+
+            , TEST_TEXT, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize
+        );
     }
     else
     {
