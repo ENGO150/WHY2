@@ -46,9 +46,8 @@ test:
 app:
 	$(CC) $(CFLAGS) $(SRC_APP) -o $(OUTPUT_APP) -l$(PROJECT_NAME)
 
-installTest:
-	make install
-	make test
-
 clean:
 	rm -rf $(OUTPUT)/* *.o *.so
+
+
+installTest: install test
