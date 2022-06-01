@@ -26,19 +26,15 @@ DOLLAR=$
 
 ##########
 
-all: install
-
-install:
-#	Install WHY2-Lib
+installLib:
 	for file in $(INCLUDE); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
 	install -m 755 $(INCLUDE_DIR)/$(PROJECT_NAME).h $(INSTALL_INCLUDE)/$(PROJECT_NAME).h
 	$(CC) $(CFLAGS) -fPIC -c $(SRC)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS)
 	install -m 755 lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
-#	Install WHY2-App
-	make app
+
+installApp: app
 	install -m 755 $(OUTPUT_APP) $(INSTALL_BIN)/$(PROJECT_NAME)
-	make clean
 
 test:
 	$(CC) $(CFLAGS) $(TEST) -o $(OUTPUT_TEST) -l$(PROJECT_NAME)
@@ -49,5 +45,6 @@ app:
 clean:
 	rm -rf $(OUTPUT)/* *.o *.so
 
-
+all: install
 installTest: install test
+install: installLib installApp clean
