@@ -24,7 +24,7 @@
 
 typedef struct
 {
-    unsigned char skipCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
+    unsigned char noCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
     unsigned char noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
 } inputFlags;
 
