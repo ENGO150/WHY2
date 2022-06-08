@@ -16,7 +16,7 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
     gettimeofday(&startTime, NULL);
 
     //CHECK FOR ACTIVE VERSION
-    if (!flags.skipCheck) checkVersion(flags);
+    if (!flags.noCheck) checkVersion(flags);
 
     //CHECK FOR INVALID text
     checkText(text, flags);

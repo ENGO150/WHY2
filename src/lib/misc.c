@@ -11,7 +11,7 @@
 
 void checkVersion(inputFlags flags)
 {
-    if (flags.skipCheck) return;
+    if (flags.noCheck) return;
 
     //FILE-CHECK VARIABLES
     int notFoundBuffer = 0;
