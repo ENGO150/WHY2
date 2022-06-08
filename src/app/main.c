@@ -5,7 +5,7 @@
 int main(void)
 {
     //RUN ENCRYPTION WITH TEXT_TO_ENCRYPT, GENERATE NEW KEY AND DO NOT CHECK FOR ACTIVE VERSION & PREVENT ANY OUTPUT
-    outputFlags encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL, (inputFlags) {1, 1});
+    outputFlags encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL, (inputFlags) {1, 1, 1});
 
     //SIMPLE TEXT
     printf
