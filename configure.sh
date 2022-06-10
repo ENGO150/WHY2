@@ -10,9 +10,9 @@ fi
 
 # Get COMMAND
 if [[ $DISTRO == "Arch" ]]; then
-    COMMAND="pacman -S --needed gcc json-c curl make"
+    COMMAND="pacman -S --needed gcc json-c curl make git"
 elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
-    COMMAND="apt install gcc libjson-c-dev libcurl4-nss-dev make"
+    COMMAND="apt install gcc libjson-c-dev libcurl4-nss-dev make git"
 else
     # 'Unsupported' distro
     echo "It seems you are using unsupported distribution... Don't worry, just install 'gcc', 'json-c', 'curl' and 'make' and you'll be fine."
