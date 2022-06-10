@@ -65,7 +65,8 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
         if (numberBuffer > 26)
         {
             numberBuffer += 70;
-        } else
+        }
+        else
         {
             numberBuffer += 64;
         }
@@ -104,7 +105,8 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
         if (i != 0)
         {
             textBuffer = realloc(textBuffer, numberBuffer);
-        } else
+        }
+        else
         {
             textBuffer = malloc(numberBuffer);
         }

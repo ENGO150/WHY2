@@ -157,10 +157,12 @@ void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
         if ((numberBuffer + 1) % 3 == 0)
         {
             textKeyChain[i] = key[numberBuffer] * key[numberBuffer2];
-        } else if ((numberBuffer + 1) % 2 == 0)
+        }
+        else if ((numberBuffer + 1) % 2 == 0)
         {
             textKeyChain[i] = key[numberBuffer] - key[numberBuffer2];
-        } else
+        }
+        else
         {
             textKeyChain[i] = key[numberBuffer] + key[numberBuffer2];
         }
