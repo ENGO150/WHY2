@@ -7,7 +7,7 @@ unsigned long getKeyLength()
 
 inputFlags noFlags()
 {
-    return (inputFlags) {0, 0, 0};
+    return (inputFlags) {0, 0, 1};
 }
 
 void setKeyLength(int keyLengthNew)
