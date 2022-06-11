@@ -10,12 +10,12 @@ fi
 
 # Get COMMAND
 if [[ $DISTRO == "Arch" ]]; then
-    COMMAND="pacman -S --needed --noconfirm gcc json-c curl make libgit2"
+    COMMAND="pacman -S --needed --noconfirm gcc json-c curl make libgit2 tmux"
 elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
-    COMMAND="apt install -y gcc libjson-c-dev libcurl4-nss-dev make libgit2-dev"
+    COMMAND="apt install -y gcc libjson-c-dev libcurl4-nss-dev make libgit2-dev tmux"
 else
     # 'Unsupported' distro
-    echo "It seems you are using unsupported distribution... Don't worry, just install 'gcc', 'json-c', 'curl' and 'make' and you'll be fine."
+    echo "It seems you are using unsupported distribution... Don't worry, just install 'gcc', 'json-c', 'curl', 'libgit2', 'tmux' and 'make' and you'll be fine."
     exit
 fi
 
