@@ -150,7 +150,7 @@ void checkVersion(inputFlags flags)
             //CHECK FOR ROOT PERMISSIONS
             if (getuid() != 0)
             {
-                if (!flags.noOutput) fprintf(stderr, "You need to be root to update!\n");
+                if (!flags.noOutput) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
                 exit(UPDATE_FAILED);
             }
 
