@@ -8,7 +8,7 @@ SRC_APP=src/app/*.c
 INCLUDE_DIR="include"
 INCLUDE=$(INCLUDE_DIR)/*.h
 TEST=src/lib/test/main.c
-LIBS=-ljson-c -lcurl
+LIBS=-ljson-c -lcurl -lgit2
 
 # Output Files
 PROJECT_NAME=why2
