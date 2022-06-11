@@ -1,13 +1,67 @@
+#define _XOPEN_SOURCE 500
+
 #include <why2/misc.h>
 
 #include <string.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <ftw.h>
 
 #include <curl/curl.h>
 #include <json-c/json.h>
+#include <git2.h>
 
 #include <why2/flags.h>
+
+int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+{
+    int rv = remove(fpath);
+
+    if (rv) perror(fpath);
+
+    return rv;
+}
+
+int removeDirectory(char *path)
+{
+    return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
+}
+
+char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.geeksforgeeks.org/c-program-replace-word-text-another-given-word
+{
+    char *result;
+    int i, cnt = 0;
+    int newLen = strlen(new);
+    int oldLen = strlen(old);
+
+    for (i = 0; string[i] != '\0'; i++)
+    {
+        if (strstr(&string[i], old) == &string[i])
+        {
+            cnt++;
+
+            i += oldLen - 1;
+        }
+    }
+
+    result = (char*) malloc(i + cnt * (newLen - oldLen) + 1);
+
+    i = 0;
+    while (*string)
+    {
+        // compare the substring with the result
+        if (strstr(string, old) == string)
+        {
+            strcpy(&result[i], new);
+            i += newLen;
+            string += oldLen;
+        }
+        else result[i++] = *string++;
+    }
+
+    result[i] = '\0';
+    return result;
+}
 
 void checkVersion(inputFlags flags)
 {
@@ -90,6 +144,62 @@ void checkVersion(inputFlags flags)
 
     if (strcmp(VERSION, json_object_get_string(active)) != 0)
     {
+        //UPDATE
+        if (!flags.noUpdate)
+        {
+            //CHECK FOR ROOT PERMISSIONS
+            if (getuid() != 0)
+            {
+                if (!flags.noOutput) fprintf(stderr, "You need to be root to update!\n");
+                exit(UPDATE_FAILED);
+            }
+
+            //VARIABLES
+            git_repository *repo = NULL;
+            int exitCode;
+            char *installCommand;
+            int installCode;
+
+            //MESSAGE
+            if (!flags.noOutput) printf("Your WHY2 version is outdated!\nUpdating...\t[BETA]\n\n");
+
+            //CHECK IF WHY2 REPO ISN'T ALREADY FOUND IN 'UPDATE_NAME'
+            if (access(UPDATE_NAME, F_OK) == 0)
+            {
+                removeDirectory(UPDATE_NAME);
+            }
+
+            git_libgit2_init(); //START GIT2
+
+            exitCode = git_clone(&repo, UPDATE_URL, UPDATE_NAME, NULL); //CLONE
+
+            git_libgit2_shutdown(); //STOP GIT2
+
+            //CHECK FOR ERRORS
+            if (exitCode != 0)
+            {
+                if (!flags.noOutput) fprintf(stderr, "Updating failed! (cloning)\n");
+                exit(UPDATE_FAILED);
+            }
+
+            //COUNT installCommand LENGTH & ALLOCATE IT
+            installCommand = replaceWord(UPDATE_COMMAND, "{DIR}", UPDATE_NAME);
+
+            installCode = system(installCommand); //INSTALL
+
+            //REMOVE versions.json - OTHERWISE WILL CAUSE SEGFAULT IN NEXT RUN
+            remove(VERSIONS_NAME);
+
+            //CHECK FOR ERRORS
+            if (installCode != 0)
+            {
+                if (!flags.noOutput) fprintf(stderr, "Updating failed! (installing)\n");
+                exit(UPDATE_FAILED);
+            }
+
+            goto deallocation; //GREAT SUCCESS!
+        }
+
         //COUNT VERSIONS BEHIND
         int versionsIndex = -1;
         int versionsBuffer = 0;
@@ -115,7 +225,7 @@ void checkVersion(inputFlags flags)
             if (!flags.noOutput) printf("Version %s not found! Check your flags.\n\n", VERSION);
 
             free(deprecated);
-            goto newerVersion;
+            goto deallocation;
         }
 
         //COUNT versionsBuffer
@@ -128,7 +238,7 @@ void checkVersion(inputFlags flags)
         sleep(5);
     }
 
-    newerVersion:
+    deallocation:
 
     //DEALLOCATION
     free(parsedJson);
