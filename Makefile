@@ -26,9 +26,11 @@ DOLLAR=$
 
 ##########
 
-installLib:
+installHeader:
 	for file in $(INCLUDE); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
 	install -m 755 $(INCLUDE_DIR)/$(PROJECT_NAME).h $(INSTALL_INCLUDE)/$(PROJECT_NAME).h
+
+installLib:
 	$(CC) $(CFLAGS) -fPIC -c $(SRC)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS)
 	install -m 755 lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
@@ -47,4 +49,4 @@ clean:
 
 all: install
 installTest: install test
-install: installLib installApp clean
+install: installHeader installLib installApp clean
