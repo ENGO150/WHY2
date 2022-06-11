@@ -1,6 +1,6 @@
 # Compiler Settings
 CC=cc
-CFLAGS=-Wall
+CFLAGS=-Wall -std=c11
 
 # Source Code
 SRC=src/lib/*.c
