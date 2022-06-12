@@ -98,7 +98,7 @@ void checkVersion(inputFlags flags)
         if (notFoundBuffer == NOT_FOUND_TRIES)
         {
             if (!flags.noOutput) fprintf(stderr, "%s'%s' not found! Exiting...\n", CLEAR_SCREEN, VERSIONS_NAME);
-            exit(DOWNLOAD_FAILED);
+            return noOutput(DOWNLOAD_FAILED);
         }
 
         if (!flags.noOutput) printf("%s'%s' not found (%dx)! Trying again in a second.\n", CLEAR_SCREEN, VERSIONS_NAME, notFoundBuffer);
@@ -151,7 +151,7 @@ void checkVersion(inputFlags flags)
             if (getuid() != 0)
             {
                 if (!flags.noOutput) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
-                exit(UPDATE_FAILED);
+                return noOutput(UPDATE_FAILED);
             }
 
             //VARIABLES
@@ -179,7 +179,7 @@ void checkVersion(inputFlags flags)
             if (exitCode != 0)
             {
                 if (!flags.noOutput) fprintf(stderr, "Updating failed! (cloning)\n");
-                exit(UPDATE_FAILED);
+                return noOutput(UPDATE_FAILED);
             }
 
             //COUNT installCommand LENGTH & ALLOCATE IT
@@ -194,7 +194,7 @@ void checkVersion(inputFlags flags)
             if (installCode != 0)
             {
                 if (!flags.noOutput) fprintf(stderr, "Updating failed! (installing)\n");
-                exit(UPDATE_FAILED);
+                return noOutput(UPDATE_FAILED);
             }
 
             goto deallocation; //GREAT SUCCESS!
@@ -290,7 +290,7 @@ void checkKey(char *key, inputFlags flags)
     if (strlen(key) < getKeyLength())
     {
         if (!flags.noOutput) fprintf(stderr, "Key must be at least %lu characters long!\n", getKeyLength());
-        exit(INVALID_KEY);
+        return noOutput(INVALID_KEY);
     }
 }
 
@@ -299,7 +299,7 @@ void checkText(char *text, inputFlags flags)
     if (strcmp(text, "") == 0)
     {
         if (!flags.noOutput) fprintf(stderr, "No text to encrypt!\n");
-        exit(1);
+        return noOutput(INVALID_TEXT);
     }
 }
 
