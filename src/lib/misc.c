@@ -287,21 +287,21 @@ void deallocateOutput(outputFlags flags)
     free(flags.usedKey);
 }
 
-void checkKey(char *key, inputFlags flags)
+int checkKey(char *key, inputFlags flags)
 {
     if (strlen(key) < getKeyLength())
     {
         if (!flags.noOutput) fprintf(stderr, "Key must be at least %lu characters long!\n", getKeyLength());
-        return noOutput(INVALID_KEY);
+        return INVALID_KEY;
     }
 }
 
-void checkText(char *text, inputFlags flags)
+int checkText(char *text, inputFlags flags)
 {
     if (strcmp(text, "") == 0)
     {
         if (!flags.noOutput) fprintf(stderr, "No text to encrypt!\n");
-        return noOutput(INVALID_TEXT);
+        return INVALID_TEXT;
     }
 }
 
