@@ -12,16 +12,25 @@
 
 outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
 {
+    //CHECK VARIABLE
+    int checkExitCode;
+
     //TIME VARIABLES
     struct timeval startTime;
     struct timeval finishTime;
     gettimeofday(&startTime, NULL);
 
     //CHECK FOR ACTIVE VERSION
-    checkVersion(flags);
+    if ((checkExitCode = checkVersion(flags)) != SUCCESS)
+    {
+        return noOutput(checkExitCode);
+    }
 
     //CHECK FOR INVALID text
-    checkText(text, flags);
+    if ((checkExitCode = checkText(text, flags)) != SUCCESS)
+    {
+        return noOutput(checkExitCode);
+    }
 
     //VARIABLES
     char *key = malloc(getKeyLength());
@@ -39,7 +48,11 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
 
     if (keyNew != NULL)
     {
-        checkKey(keyNew, flags); //CHECK FOR INVALID key
+        //CHECK FOR INVALID key
+        if ((checkExitCode = checkKey(keyNew, flags)) != SUCCESS)
+        {
+            return noOutput(checkExitCode);
+        }
 
         strcpy(key, keyNew);
 
