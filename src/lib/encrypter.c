@@ -130,7 +130,8 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
         returningText, //ENCRYPTED TEXT
         key, //GENERATED/USED KEY
         countUnusedKeySize(text, key), // NUMBER OF UNUSED CHARS IN KEY
-        compareTimeMicro(startTime, finishTime) // ELAPSED TIME
+        compareTimeMicro(startTime, finishTime), // ELAPSED TIME
+        SUCCESS //EXIT CODE
     };
 
     //DEALLOCATION
