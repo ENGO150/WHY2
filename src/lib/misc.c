@@ -63,7 +63,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
     return result;
 }
 
-int checkVersion(inputFlags flags)
+unsigned char checkVersion(inputFlags flags)
 {
     if (flags.noCheck) return SUCCESS;
 
@@ -287,7 +287,7 @@ void deallocateOutput(outputFlags flags)
     free(flags.usedKey);
 }
 
-int checkKey(char *key, inputFlags flags)
+unsigned char checkKey(char *key, inputFlags flags)
 {
     if (strlen(key) < getKeyLength())
     {
@@ -298,7 +298,7 @@ int checkKey(char *key, inputFlags flags)
     return SUCCESS;
 }
 
-int checkText(char *text, inputFlags flags)
+unsigned char checkText(char *text, inputFlags flags)
 {
     if (strcmp(text, "") == 0)
     {
