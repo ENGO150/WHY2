@@ -10,6 +10,11 @@ inputFlags noFlags()
     return (inputFlags) {0, 0, 1};
 }
 
+outputFlags noOutput()
+{
+    return (outputFlags) {"", "", 0, 0};
+}
+
 void setKeyLength(int keyLengthNew)
 {
     keyLength = keyLengthNew;

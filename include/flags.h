@@ -49,6 +49,7 @@ static unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, US
 //GETTERS
 unsigned long getKeyLength();
 inputFlags noFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
+outputFlags noOutput(); //SAME AS noFlags() BUT FOR outputFlags
 
 //SETTERS
 void setKeyLength(int keyLengthNew);
