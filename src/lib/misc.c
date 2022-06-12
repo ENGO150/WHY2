@@ -294,6 +294,8 @@ int checkKey(char *key, inputFlags flags)
         if (!flags.noOutput) fprintf(stderr, "Key must be at least %lu characters long!\n", getKeyLength());
         return INVALID_KEY;
     }
+
+    return SUCCESS;
 }
 
 int checkText(char *text, inputFlags flags)
@@ -303,6 +305,8 @@ int checkText(char *text, inputFlags flags)
         if (!flags.noOutput) fprintf(stderr, "No text to encrypt!\n");
         return INVALID_TEXT;
     }
+
+    return SUCCESS;
 }
 
 unsigned long countIntLength(int number)
