@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo -e "Hey, this will be removed in the future. Use Makefile instead, please.\n"
+
 ####################
 
 # Remove previous output
