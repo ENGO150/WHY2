@@ -26,7 +26,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     if (strcmp(text, "") == 0)
     {
         if (!flags.noOutput) fprintf(stderr, "No text to encrypt!\n");
-        exit(INVALID_TEXT);
+        return noOutput(INVALID_TEXT);
     }
 
     //VARIABLES
