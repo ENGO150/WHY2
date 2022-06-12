@@ -23,12 +23,6 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     //CHECK FOR INVALID text
     checkText(text, flags);
 
-    if (strcmp(text, "") == 0)
-    {
-        if (!flags.noOutput) fprintf(stderr, "No text to encrypt!\n");
-        return noOutput(INVALID_TEXT);
-    }
-
     //VARIABLES
     char *key = malloc(getKeyLength());
     char *returningText;
