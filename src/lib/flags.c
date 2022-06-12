@@ -10,9 +10,9 @@ inputFlags noFlags()
     return (inputFlags) {0, 0, 1};
 }
 
-outputFlags noOutput()
+outputFlags noOutput(unsigned char exitCode)
 {
-    return (outputFlags) {"", "", 0, 0};
+    return (outputFlags) {"", "", 0, 0, exitCode};
 }
 
 void setKeyLength(int keyLengthNew)
