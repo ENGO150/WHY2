@@ -65,7 +65,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
 
 int checkVersion(inputFlags flags)
 {
-    if (flags.noCheck) return;
+    if (flags.noCheck) return SUCCESS;
 
     //FILE-CHECK VARIABLES
     int notFoundBuffer = 0;
