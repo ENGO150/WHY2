@@ -45,6 +45,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     fread(&numberBuffer, 4, 1, fileBuffer);
     srand(numberBuffer);
     fclose(fileBuffer);
+    if (numberBuffer < 0) numberBuffer *= -1; //MAKE numberBuffer POSITIVE
 
     if (keyNew != NULL)
     {
