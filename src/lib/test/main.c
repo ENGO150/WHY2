@@ -51,8 +51,9 @@ int main(void)
             "KEY: \t\t%s\n"
             "TIME: \t\t%lums\n"
             "UNUSED KEY: \t%lu\n"
+            "EXIT CODE: \t%d\n"
 
-            , TEST_TEXT, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize
+            , TEST_TEXT, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize, encrypted.exitCode
         );
     }
     else
