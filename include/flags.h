@@ -41,6 +41,7 @@ typedef struct
     char *usedKey; //VARIABLE FOR USED/GENERATED KEY
     unsigned long unusedKeySize; //VARIABLE FOR COUNT OF UNUSED CHARACTERS IN KEY
     unsigned long elapsedTime; //VARIABLE FOR ELAPSED TIME IN MICROSECONDS => 1s = 1000000µs
+    unsigned char exitCode; //VARIABLE FOR EXIT CODE
 } outputFlags;
 
 //VARIABLES
