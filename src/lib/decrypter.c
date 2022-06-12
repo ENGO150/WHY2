@@ -10,19 +10,31 @@
 
 outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
 {
+    //CHECK VARIABLE
+    int checkExitCode;
+
     //TIME VARIABLES
     struct timeval startTime;
     struct timeval finishTime;
     gettimeofday(&startTime, NULL);
 
     //CHECK FOR ACTIVE VERSION
-    checkVersion(flags);
+    if ((checkExitCode = checkVersion(flags)) != SUCCESS)
+    {
+        return noOutput(checkExitCode);
+    }
 
     //CHECK FOR INVALID text
-    checkText(text, flags);
+    if ((checkExitCode = checkText(text, flags)) != SUCCESS)
+    {
+        return noOutput(checkExitCode);
+    }
 
     //CHECK FOR INVALID key
-    checkKey(keyNew, flags);
+    if ((checkExitCode = checkKey(keyNew, flags)) != SUCCESS)
+    {
+        return noOutput(checkExitCode);
+    }
 
     //REDEFINE keyLength
     setKeyLength(strlen(keyNew));
