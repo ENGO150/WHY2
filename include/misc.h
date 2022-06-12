@@ -5,7 +5,7 @@
 
 #include <why2/flags.h>
 
-void checkVersion(inputFlags flags); //THIS FUNCTION CHECKS IF LATEST VERSION OF WHY2 IS USED
+int checkVersion(inputFlags flags); //THIS FUNCTION CHECKS IF LATEST VERSION OF WHY2 IS USED
 void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize); //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
 void deallocateOutput(outputFlags flags); //DEALLOCATES flags
 void checkKey(char *key, inputFlags flags); //CHECKS IF KEY IS VALID

@@ -63,7 +63,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
     return result;
 }
 
-void checkVersion(inputFlags flags)
+int checkVersion(inputFlags flags)
 {
     if (flags.noCheck) return;
 
@@ -98,7 +98,7 @@ void checkVersion(inputFlags flags)
         if (notFoundBuffer == NOT_FOUND_TRIES)
         {
             if (!flags.noOutput) fprintf(stderr, "%s'%s' not found! Exiting...\n", CLEAR_SCREEN, VERSIONS_NAME);
-            return noOutput(DOWNLOAD_FAILED);
+            return DOWNLOAD_FAILED;
         }
 
         if (!flags.noOutput) printf("%s'%s' not found (%dx)! Trying again in a second.\n", CLEAR_SCREEN, VERSIONS_NAME, notFoundBuffer);
@@ -151,7 +151,7 @@ void checkVersion(inputFlags flags)
             if (getuid() != 0)
             {
                 if (!flags.noOutput) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
-                return noOutput(UPDATE_FAILED);
+                return UPDATE_FAILED;
             }
 
             //VARIABLES
@@ -179,7 +179,7 @@ void checkVersion(inputFlags flags)
             if (exitCode != 0)
             {
                 if (!flags.noOutput) fprintf(stderr, "Updating failed! (cloning)\n");
-                return noOutput(UPDATE_FAILED);
+                return UPDATE_FAILED;
             }
 
             //COUNT installCommand LENGTH & ALLOCATE IT
@@ -194,7 +194,7 @@ void checkVersion(inputFlags flags)
             if (installCode != 0)
             {
                 if (!flags.noOutput) fprintf(stderr, "Updating failed! (installing)\n");
-                return noOutput(UPDATE_FAILED);
+                return UPDATE_FAILED;
             }
 
             goto deallocation; //GREAT SUCCESS!
@@ -244,6 +244,8 @@ void checkVersion(inputFlags flags)
     free(parsedJson);
     free(active);
     free(buffer);
+
+    return SUCCESS;
 }
 
 void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
