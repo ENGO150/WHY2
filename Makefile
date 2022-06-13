@@ -39,7 +39,7 @@ installApp: app
 	install -m 755 $(OUTPUT_APP) $(INSTALL_BIN)/$(PROJECT_NAME)
 
 test:
-	$(CC) $(CFLAGS) $(TEST) -o $(OUTPUT_TEST) -l$(PROJECT_NAME)
+	$(CC) $(CFLAGS) -g $(TEST) -o $(OUTPUT_TEST) -l$(PROJECT_NAME)
 
 app:
 	$(CC) $(CFLAGS) $(SRC_APP) -o $(OUTPUT_APP) -l$(PROJECT_NAME)
