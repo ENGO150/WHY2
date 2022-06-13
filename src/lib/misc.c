@@ -118,7 +118,7 @@ unsigned char checkVersion(inputFlags flags)
     rewind(fileBuffer); //REWIND fileBuffer (NO SHIT)
 
     //SET LENGTH OF buffer
-    buffer = malloc(bufferSize);
+    buffer = malloc(bufferSize + 1);
 
     //FIX buffer
     strcpy(buffer, "");

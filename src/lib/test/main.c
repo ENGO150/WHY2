@@ -22,7 +22,7 @@ int main(void)
 
     //SET KEY_LENGTH TO 100
     setKeyLength(100);
-    keyBuffer = malloc(getKeyLength());
+    keyBuffer = malloc(getKeyLength() + 1);
 
     //ENCRYPT
     outputFlags encrypted = encryptText(TEST_TEXT, NULL, flags);
