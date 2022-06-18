@@ -125,7 +125,10 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
 
         if (i != strlen(text) - 1)
         {
-            strcat(returningText, ENCRYPTION_SEPARATOR_STRING);
+            textBuffer = realloc(textBuffer, 2);
+            sprintf(textBuffer, "%c", ENCRYPTION_SEPARATOR);
+
+            strcat(returningText, textBuffer);
         }
     }
 
