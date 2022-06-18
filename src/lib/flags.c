@@ -29,6 +29,8 @@ outputFlags noOutput(unsigned char exitCode)
 
 void setEncryptionSeparator(char encryptionSeparatorNew)
 {
+    if (encryptionSeparatorNew == '\0') return;
+
     encryptionSeparator = encryptionSeparatorNew;
 }
 
