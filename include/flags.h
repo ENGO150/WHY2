@@ -47,11 +47,13 @@ static char encryptionSeparator = '.'; //     > DO NOT TOUCH THIS, USE setEncryp
 static unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
 
 //GETTERS
+char getEncryptionSeparator();
 unsigned long getKeyLength();
 inputFlags noFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
 outputFlags noOutput(unsigned char exitCode); //SAME AS noFlags() BUT FOR outputFlags
 
 //SETTERS
+void setEncryptionSeparator(char encryptionSeparatorNew);
 void setKeyLength(int keyLengthNew);
 
 #endif

@@ -2,6 +2,11 @@
 
 #include <stdlib.h>
 
+char getEncryptionSeparator()
+{
+    return encryptionSeparator;
+}
+
 unsigned long getKeyLength()
 {
     return keyLength;
@@ -20,6 +25,11 @@ outputFlags noOutput(unsigned char exitCode)
     empty2[0] = '\0';
 
     return (outputFlags) { empty1, empty2, 0, 0, exitCode };
+}
+
+void setEncryptionSeparator(char encryptionSeparatorNew)
+{
+    encryptionSeparator = encryptionSeparatorNew;
 }
 
 void setKeyLength(int keyLengthNew)
