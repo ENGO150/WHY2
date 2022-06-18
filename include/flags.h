@@ -2,8 +2,6 @@
 #define WHY2_FLAGS_H
 
 //CONSTS
-#define ENCRYPTION_SEPARATOR '.' //SEPARATOR BETWEEN KEYS
-
 #define SUCCESS 0 //EXIT CODE FOR SUCCESSFUL RUN
 #define INVALID_KEY 1 //EXIT VALUE FOR INVALID KEY
 #define INVALID_TEXT 4 //EXIT VALUE FOR INVALID TEXT
@@ -45,7 +43,8 @@ typedef struct
 } outputFlags;
 
 //VARIABLES
-static unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength() instead <
+static char encryptionSeparator = '.'; //     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
+static unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
 
 //GETTERS
 unsigned long getKeyLength();
