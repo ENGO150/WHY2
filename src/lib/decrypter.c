@@ -53,7 +53,7 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
     //GET LENGTH OF returningText AND textKeyChain
     for (int i = 0; i < strlen(text); i++)
     {
-        if (text[i] == ENCRYPTION_SEPARATOR) numberBuffer++;
+        if (text[i] == getEncryptionSeparator()) numberBuffer++;
     }
 
     //SET LENGTH (numberBuffer)
@@ -73,7 +73,7 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
         //GET LENGTH OF EACH CHARACTER
         for (int j = 0; j < strlen(text); j++)
         {
-            if (text[j] == ENCRYPTION_SEPARATOR) break;
+            if (text[j] == getEncryptionSeparator()) break;
 
             numberBuffer++;
         }
