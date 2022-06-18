@@ -24,6 +24,9 @@ int main(void)
     setKeyLength(100);
     keyBuffer = malloc(getKeyLength() + 1);
 
+    //SET ENCRYPTION_SEPARATOR TO '|'
+    setEncryptionSeparator('|');
+
     //ENCRYPT
     outputFlags encrypted = encryptText(TEST_TEXT, NULL, flags);
 
