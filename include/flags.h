@@ -43,7 +43,7 @@ typedef struct
 } outputFlags;
 
 //VARIABLES
-static char encryptionSeparator = '.'; //     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
+static char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
 static unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
 
 //GETTERS
