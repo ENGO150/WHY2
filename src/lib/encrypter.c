@@ -82,7 +82,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
         key[i] = (char) numberBuffer;
     }
 
-    key[getKeyLength()] = '\0'; //TODO: CHECK IF THIS CAN'T CAUSE SOME LITTLE TROUBLES (SHOULDN'T)
+    key[getKeyLength()] = '\0';
 
     skipKey:
 
