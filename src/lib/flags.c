@@ -19,10 +19,15 @@ inputFlags noFlags()
 
 outputFlags noOutput(unsigned char exitCode)
 {
-    char *empty1 = malloc(1);
-    char *empty2 = malloc(1);
+    char *empty1 = malloc(1); //TEXT
     empty1[0] = '\0';
-    empty2[0] = '\0';
+
+    char *empty2 = malloc(getKeyLength() + 1); //KEY
+    for (int i = 0; i < getKeyLength(); i++)
+    {
+        empty2[i] = 'x';
+    }
+    empty2[getKeyLength()] = '\0';
 
     return (outputFlags) { empty1, empty2, 0, 0, exitCode };
 }
