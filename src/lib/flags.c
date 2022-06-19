@@ -19,17 +19,17 @@ inputFlags noFlags()
 
 outputFlags noOutput(unsigned char exitCode)
 {
-    char *empty1 = malloc(1); //TEXT
-    empty1[0] = '\0';
+    char *emptyText = malloc(1); //TEXT
+    emptyText[0] = '\0';
 
-    char *empty2 = malloc(getKeyLength() + 1); //KEY
+    char *emptyKey = malloc(getKeyLength() + 1); //KEY
     for (int i = 0; i < getKeyLength(); i++)
     {
-        empty2[i] = 'x';
+        emptyKey[i] = 'x';
     }
-    empty2[getKeyLength()] = '\0';
+    emptyKey[getKeyLength()] = '\0';
 
-    return (outputFlags) { empty1, empty2, 0, 0, exitCode };
+    return (outputFlags) { emptyText, emptyKey, 0, 0, exitCode };
 }
 
 void setEncryptionSeparator(char encryptionSeparatorNew)
