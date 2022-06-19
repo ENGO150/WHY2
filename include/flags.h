@@ -25,6 +25,7 @@
 #define NOT_FOUND_TRIES 10 //NUMBER OF TRIES FOR DOWNLOADING versions.json
 
 #define DEPRECATED __attribute__((deprecated)) //SAME COMMENT AS VERSIONS_NAME'S
+#define UNUSED __attribute__((unused)) //SAME COMMENT AS DEPRECATED'S
 
 typedef struct
 {
