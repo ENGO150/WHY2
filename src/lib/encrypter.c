@@ -63,7 +63,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     }
 
     //LOAD KEY
-    for (int i = 0; i < getKeyLength(); i++)
+    for (int i = 0; i < (int) getKeyLength(); i++)
     {
         //SET numberBuffer TO RANDOM NUMBER BETWEEN 0 AND 52
         numberBuffer = (rand() % 52) + 1;
@@ -89,13 +89,13 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     generateTextKeyChain(key, textKeyChain, strlen(text));
 
     //ACTUALLY ENCRYPT TEXT
-    for (int i = 0; i < strlen(text); i++)
+    for (int i = 0; i < (int) strlen(text); i++)
     {
         textKeyChain[i] -= (int) text[i];
     }
 
     //COUNT REQUIRED SIZE FOR returningText
-    for (int i = 0; i < strlen(text); i++)
+    for (int i = 0; i < (int) strlen(text); i++)
     {
         numberBuffer += countIntLength(textKeyChain[i]);
     }
@@ -105,7 +105,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
     strcpy(returningText, "");
 
     //LOAD returningText
-    for (int i = 0; i < strlen(text); i++)
+    for (int i = 0; i < (int) strlen(text); i++)
     {
         numberBuffer = sizeof(int) * countIntLength(textKeyChain[i]);
 
@@ -122,7 +122,7 @@ outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
 
         strcat(returningText, textBuffer);
 
-        if (i != strlen(text) - 1)
+        if (i != (int) strlen(text) - 1)
         {
             textBuffer = realloc(textBuffer, 2);
             sprintf(textBuffer, "%c", getEncryptionSeparator());

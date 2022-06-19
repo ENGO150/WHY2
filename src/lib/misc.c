@@ -13,7 +13,7 @@
 
 #include <why2/flags.h>
 
-int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+int unlink_cb(const char *fpath, UNUSED const struct stat *sb, UNUSED int typeflag, UNUSED struct FTW *ftwbuf)
 {
     int rv = remove(fpath);
 
@@ -208,7 +208,7 @@ unsigned char checkVersion(inputFlags flags)
 	    json_object_object_get_ex(parsedJson, "deprecated", &deprecated);
 
         //COUNT versionsIndex
-        for (int i = 0; i < json_object_array_length(deprecated); i++)
+        for (int i = 0; i < (int) json_object_array_length(deprecated); i++)
         {
             //IT'S A MATCH, BABY :D
 		    if (strcmp(json_object_get_string(json_object_array_get_idx(deprecated, i)), VERSION) == 0)
@@ -258,7 +258,7 @@ void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
         numberBuffer = i;
 
         //CHECK, IF numberBuffer ISN'T GREATER THAN keyLength AND CUT UNUSED LENGTH
-        while (numberBuffer >= getKeyLength())
+        while (numberBuffer >= (int) getKeyLength())
         {
             numberBuffer -= getKeyLength();
         }

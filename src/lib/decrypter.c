@@ -51,7 +51,7 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
     strcpy(key, keyNew);
 
     //GET LENGTH OF returningText AND textKeyChain
-    for (int i = 0; i < strlen(text); i++)
+    for (int i = 0; i < (int) strlen(text); i++)
     {
         if (text[i] == getEncryptionSeparator()) numberBuffer++;
     }
@@ -71,7 +71,7 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
         numberBuffer = 0;
 
         //GET LENGTH OF EACH CHARACTER
-        for (int j = 0; j < strlen(text); j++)
+        for (int j = 0; j < (int) strlen(text); j++)
         {
             if (text[j] == getEncryptionSeparator()) break;
 
@@ -81,7 +81,7 @@ outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
         textBuffer = malloc(numberBuffer + 1);
 
         //LOAD textBuffer
-        for (int j = 0; j < strlen(text); j++)
+        for (int j = 0; j < (int) strlen(text); j++)
         {
             textBuffer[j] = text[j];
 

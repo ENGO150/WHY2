@@ -23,7 +23,7 @@ outputFlags noOutput(unsigned char exitCode)
     emptyText[0] = '\0';
 
     char *emptyKey = malloc(getKeyLength() + 1); //KEY
-    for (int i = 0; i < getKeyLength(); i++)
+    for (int i = 0; i < (int) getKeyLength(); i++)
     {
         emptyKey[i] = 'x';
     }
