@@ -190,6 +190,8 @@ unsigned char checkVersion(inputFlags flags)
             //REMOVE versions.json - OTHERWISE WILL CAUSE SEGFAULT IN NEXT RUN
             remove(VERSIONS_NAME);
 
+            free(installCommand);
+
             //CHECK FOR ERRORS
             if (installCode != 0)
             {
