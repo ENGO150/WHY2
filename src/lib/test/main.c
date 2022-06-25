@@ -49,12 +49,12 @@ int main(void)
         (
             "Test successful!\n\n"
 
-            "TEXT: \t\t%s\n"
-            "OUTPUT: \t%s\n"
-            "KEY: \t\t%s\n"
-            "TIME: \t\t%lums\n"
-            "UNUSED KEY: \t%lu\n"
-            "EXIT CODE: \t%d\n"
+            "TEXT: \t\t\"%s\"\n"
+            "OUTPUT: \t\"%s\"\n"
+            "KEY: \t\t\"%s\"\n"
+            "TIME: \t\t\"%lums\"\n"
+            "UNUSED KEY: \t\"%lu\"\n"
+            "EXIT CODE: \t\"%d\"\n"
 
             , TEST_TEXT, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize, encrypted.exitCode
         );
