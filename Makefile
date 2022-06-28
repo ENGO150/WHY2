@@ -26,6 +26,9 @@ DOLLAR=$
 
 ##########
 
+noTarget: # Do not use this, please <3
+	@echo Hey you... You have to enter your target, too. Use \'install\' target for installing $(PROJECT_NAME)-core.
+
 installHeader:
 	for file in $(INCLUDE); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
 	install -m 755 $(INCLUDE_DIR)/$(PROJECT_NAME).h $(INSTALL_INCLUDE)/$(PROJECT_NAME).h
