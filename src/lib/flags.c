@@ -2,6 +2,11 @@
 
 #include <stdlib.h>
 
+//VARIABLES
+static char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
+static unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
+
+//GETTERS
 char getEncryptionSeparator()
 {
     return encryptionSeparator;
@@ -32,6 +37,7 @@ outputFlags noOutput(unsigned char exitCode)
     return (outputFlags) { emptyText, emptyKey, 0, 0, exitCode };
 }
 
+//SETTERS
 void setEncryptionSeparator(char encryptionSeparatorNew)
 {
     if (encryptionSeparatorNew == '\0') return;
