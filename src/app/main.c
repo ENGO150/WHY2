@@ -4,8 +4,11 @@
 
 int main(void)
 {
+    //SET FLAGS
+    setFlags((inputFlags) {1, 1, 0});
+
     //RUN ENCRYPTION WITH TEXT_TO_ENCRYPT, GENERATE NEW KEY AND DO NOT CHECK FOR ACTIVE VERSION & PREVENT ANY OUTPUT
-    outputFlags encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL, (inputFlags) {1, 1, 0});
+    outputFlags encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL);
 
     //SIMPLE TEXT
     printf

@@ -20,6 +20,9 @@ int main(void)
         0 //UPDATE
     };
 
+    //SET FLAGS
+    setFlags(flags);
+
     //SET KEY_LENGTH TO 100
     setKeyLength(100);
     keyBuffer = malloc(getKeyLength() + 1);
@@ -28,7 +31,7 @@ int main(void)
     setEncryptionSeparator('|');
 
     //ENCRYPT
-    outputFlags encrypted = encryptText(TEST_TEXT, NULL, flags);
+    outputFlags encrypted = encryptText(TEST_TEXT, NULL);
 
     strcpy(textBuffer, encrypted.outputText); //GET ENCRYPTED TEXT
     strcpy(keyBuffer, encrypted.usedKey); //GET KEY
@@ -38,7 +41,7 @@ int main(void)
     deallocateOutput(encrypted);
 
     //DECRYPT
-    encrypted = decryptText(textBuffer, keyBuffer, flags);
+    encrypted = decryptText(textBuffer, keyBuffer);
 
     timeBuffer += encrypted.elapsedTime; //GET TIME 1
 
