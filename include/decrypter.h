@@ -3,6 +3,6 @@
 
 #include <why2/flags.h>
 
-outputFlags decryptText(char *text, char *keyNew, inputFlags flags); //TEXT from WILL BE DECRYPTED WITH KEY AND RETURNED
+outputFlags decryptText(char *text, char *keyNew); //TEXT from WILL BE DECRYPTED WITH KEY AND RETURNED
 
 #endif

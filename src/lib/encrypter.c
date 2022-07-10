@@ -9,7 +9,7 @@
 #include <why2/flags.h>
 #include <why2/misc.h>
 
-outputFlags encryptText(char *text, char *keyNew, inputFlags flags)
+outputFlags encryptText(char *text, char *keyNew)
 {
     //CHECK VARIABLE
     int checkExitCode;

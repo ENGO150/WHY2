@@ -8,7 +8,7 @@
 #include <why2/flags.h>
 #include <why2/misc.h>
 
-outputFlags decryptText(char *text, char *keyNew, inputFlags flags)
+outputFlags decryptText(char *text, char *keyNew)
 {
     //CHECK VARIABLE
     int checkExitCode;
