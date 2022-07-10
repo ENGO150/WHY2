@@ -145,7 +145,7 @@ unsigned char checkVersion(inputFlags flags)
     if (strcmp(VERSION, json_object_get_string(active)) != 0)
     {
         //UPDATE
-        if (!flags.noUpdate)
+        if (flags.update)
         {
             //CHECK FOR ROOT PERMISSIONS
             if (getuid() != 0)

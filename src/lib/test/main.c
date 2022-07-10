@@ -17,7 +17,7 @@ int main(void)
     {
         0, //SKIP CHECK
         0, //NO OUTPUT
-        1 //NO UPDATE
+        0 //UPDATE
     };
 
     //SET KEY_LENGTH TO 100

@@ -19,7 +19,7 @@ unsigned long getKeyLength()
 
 inputFlags defaultFlags()
 {
-    return (inputFlags) {0, 0, 1};
+    return (inputFlags) { 0, 0, 0 };
 }
 
 outputFlags noOutput(unsigned char exitCode)

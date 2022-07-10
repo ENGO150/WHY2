@@ -31,7 +31,7 @@ typedef struct
 {
     unsigned char noCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
     unsigned char noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
-    unsigned char noUpdate; //BOOLEAN FOR NOT UPDATING YOUR WHY VERSION IF OLD IS USED
+    unsigned char update; //BOOLEAN FOR UPDATING YOUR WHY VERSION IF OLD IS USED
 } inputFlags;
 
 typedef struct
