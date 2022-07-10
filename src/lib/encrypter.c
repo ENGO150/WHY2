@@ -20,13 +20,13 @@ outputFlags encryptText(char *text, char *keyNew)
     gettimeofday(&startTime, NULL);
 
     //CHECK FOR ACTIVE VERSION
-    if ((checkExitCode = checkVersion(flags)) != SUCCESS)
+    if ((checkExitCode = checkVersion(getFlags())) != SUCCESS)
     {
         return noOutput(checkExitCode);
     }
 
     //CHECK FOR INVALID text
-    if ((checkExitCode = checkText(text, flags)) != SUCCESS)
+    if ((checkExitCode = checkText(text, getFlags())) != SUCCESS)
     {
         return noOutput(checkExitCode);
     }
@@ -49,7 +49,7 @@ outputFlags encryptText(char *text, char *keyNew)
     if (keyNew != NULL)
     {
         //CHECK FOR INVALID key
-        if ((checkExitCode = checkKey(keyNew, flags)) != SUCCESS)
+        if ((checkExitCode = checkKey(keyNew, getFlags())) != SUCCESS)
         {
             return noOutput(checkExitCode);
         }
