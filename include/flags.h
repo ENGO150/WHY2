@@ -49,10 +49,12 @@ typedef struct
 char getEncryptionSeparator();
 unsigned long getKeyLength();
 inputFlags defaultFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
+inputFlags getFlags(); //RETURNS USED FLAGS
 outputFlags noOutput(unsigned char exitCode); //SAME AS defaultFlags() BUT FOR outputFlags
 
 //SETTERS
 void setEncryptionSeparator(char encryptionSeparatorNew);
 void setKeyLength(int keyLengthNew);
+void setFlags(inputFlags newFlags); //.... whatcha think?
 
 #endif
