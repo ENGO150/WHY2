@@ -65,7 +65,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
 
 unsigned char checkVersion()
 {
-    if (flags.noCheck) return SUCCESS;
+    if (getFlags().noCheck) return SUCCESS;
 
     //FILE-CHECK VARIABLES
     int notFoundBuffer = 0;
@@ -97,11 +97,11 @@ unsigned char checkVersion()
 
         if (notFoundBuffer == NOT_FOUND_TRIES)
         {
-            if (!flags.noOutput) fprintf(stderr, "%s'%s' not found! Exiting...\n", CLEAR_SCREEN, VERSIONS_NAME);
+            if (!getFlags().noOutput) fprintf(stderr, "%s'%s' not found! Exiting...\n", CLEAR_SCREEN, VERSIONS_NAME);
             return DOWNLOAD_FAILED;
         }
 
-        if (!flags.noOutput) printf("%s'%s' not found (%dx)! Trying again in a second.\n", CLEAR_SCREEN, VERSIONS_NAME, notFoundBuffer);
+        if (!getFlags().noOutput) printf("%s'%s' not found (%dx)! Trying again in a second.\n", CLEAR_SCREEN, VERSIONS_NAME, notFoundBuffer);
         sleep(1);
     }
 
@@ -129,7 +129,7 @@ unsigned char checkVersion()
     //CHECK FOR TEXT IN buffer
     if (strcmp(buffer, "") == 0)
     {
-        if (!flags.noOutput) fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n\n");
+        if (!getFlags().noOutput) fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n\n");
 
         //WAIT FOR 5 SECONDS
         sleep(5);
@@ -145,12 +145,12 @@ unsigned char checkVersion()
     if (strcmp(VERSION, json_object_get_string(active)) != 0)
     {
         //UPDATE
-        if (flags.update)
+        if (getFlags().update)
         {
             //CHECK FOR ROOT PERMISSIONS
             if (getuid() != 0)
             {
-                if (!flags.noOutput) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
+                if (!getFlags().noOutput) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
                 return UPDATE_FAILED;
             }
 
@@ -161,7 +161,7 @@ unsigned char checkVersion()
             int installCode;
 
             //MESSAGE
-            if (!flags.noOutput) printf("Your WHY2 version is outdated!\nUpdating...\t[BETA]\n\n");
+            if (!getFlags().noOutput) printf("Your WHY2 version is outdated!\nUpdating...\t[BETA]\n\n");
 
             //CHECK IF WHY2 REPO ISN'T ALREADY FOUND IN 'UPDATE_NAME'
             if (access(UPDATE_NAME, F_OK) == 0)
@@ -178,7 +178,7 @@ unsigned char checkVersion()
             //CHECK FOR ERRORS
             if (exitCode != 0)
             {
-                if (!flags.noOutput) fprintf(stderr, "Updating failed! (cloning)\n");
+                if (!getFlags().noOutput) fprintf(stderr, "Updating failed! (cloning)\n");
                 return UPDATE_FAILED;
             }
 
@@ -195,7 +195,7 @@ unsigned char checkVersion()
             //CHECK FOR ERRORS
             if (installCode != 0)
             {
-                if (!flags.noOutput) fprintf(stderr, "Updating failed! (installing)\n");
+                if (!getFlags().noOutput) fprintf(stderr, "Updating failed! (installing)\n");
                 return UPDATE_FAILED;
             }
 
@@ -224,7 +224,7 @@ unsigned char checkVersion()
         //versions.json DOESN'T CONTAIN VERSION (THIS WILL NOT HAPPEN IF YOU WILL NOT EDIT IT)
         if (versionsIndex == -1)
         {
-            if (!flags.noOutput) printf("Version %s not found! Check your flags.\n\n", VERSION);
+            if (!getFlags().noOutput) printf("Version %s not found! Check your flags.\n\n", VERSION);
 
             free(deprecated);
             goto deallocation;
@@ -233,7 +233,7 @@ unsigned char checkVersion()
         //COUNT versionsBuffer
         versionsBuffer = json_object_array_length(deprecated) - versionsIndex;
 
-        if (!flags.noOutput) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, VERSION, json_object_get_string(active));
+        if (!getFlags().noOutput) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, VERSION, json_object_get_string(active));
 
         //WAIT FOR 5 SECONDS
         free(deprecated);
@@ -293,7 +293,7 @@ unsigned char checkKey(char *key)
 {
     if (strlen(key) < getKeyLength())
     {
-        if (!flags.noOutput) fprintf(stderr, "Key must be at least %lu characters long!\n", getKeyLength());
+        if (!getFlags().noOutput) fprintf(stderr, "Key must be at least %lu characters long!\n", getKeyLength());
         return INVALID_KEY;
     }
 
@@ -304,7 +304,7 @@ unsigned char checkText(char *text)
 {
     if (strcmp(text, "") == 0)
     {
-        if (!flags.noOutput) fprintf(stderr, "No text to encrypt!\n");
+        if (!getFlags().noOutput) fprintf(stderr, "No text to encrypt!\n");
         return INVALID_TEXT;
     }
 
