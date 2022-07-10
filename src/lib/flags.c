@@ -17,7 +17,7 @@ unsigned long getKeyLength()
     return keyLength;
 }
 
-inputFlags noFlags()
+inputFlags defaultFlags()
 {
     return (inputFlags) {0, 0, 1};
 }

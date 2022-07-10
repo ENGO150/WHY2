@@ -48,8 +48,8 @@ typedef struct
 //GETTERS
 char getEncryptionSeparator();
 unsigned long getKeyLength();
-inputFlags noFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
-outputFlags noOutput(unsigned char exitCode); //SAME AS noFlags() BUT FOR outputFlags
+inputFlags defaultFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
+outputFlags noOutput(unsigned char exitCode); //SAME AS defaultFlags() BUT FOR outputFlags
 
 //SETTERS
 void setEncryptionSeparator(char encryptionSeparatorNew);
