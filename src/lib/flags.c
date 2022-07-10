@@ -26,6 +26,11 @@ inputFlags defaultFlags()
     return DEFAULT_FLAGS;
 }
 
+inputFlags getFlags()
+{
+    return flags;
+}
+
 outputFlags noOutput(unsigned char exitCode)
 {
     char *emptyText = malloc(1); //TEXT
@@ -52,4 +57,9 @@ void setEncryptionSeparator(char encryptionSeparatorNew)
 void setKeyLength(int keyLengthNew)
 {
     keyLength = keyLengthNew;
+}
+
+void setFlags(inputFlags newFlags)
+{
+    flags = newFlags;
 }
