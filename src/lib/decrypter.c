@@ -19,19 +19,19 @@ outputFlags decryptText(char *text, char *keyNew)
     gettimeofday(&startTime, NULL);
 
     //CHECK FOR ACTIVE VERSION
-    if ((checkExitCode = checkVersion(getFlags())) != SUCCESS)
+    if ((checkExitCode = checkVersion()) != SUCCESS)
     {
         return noOutput(checkExitCode);
     }
 
     //CHECK FOR INVALID text
-    if ((checkExitCode = checkText(text, getFlags())) != SUCCESS)
+    if ((checkExitCode = checkText(text)) != SUCCESS)
     {
         return noOutput(checkExitCode);
     }
 
     //CHECK FOR INVALID key
-    if ((checkExitCode = checkKey(keyNew, getFlags())) != SUCCESS)
+    if ((checkExitCode = checkKey(keyNew)) != SUCCESS)
     {
         return noOutput(checkExitCode);
     }
