@@ -5,6 +5,7 @@
 //VARIABLES
 static char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
 static unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
+static inputFlags flags = (inputFlags) { 0, 0, 0 };
 
 //GETTERS
 char getEncryptionSeparator()
