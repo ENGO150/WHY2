@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-why2-makefile:
+  test-why2:
     runs-on: ${{ matrix.os }}
 
     strategy:
