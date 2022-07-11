@@ -46,6 +46,7 @@ outputFlags decryptText(char *text, char *keyNew)
     int textKeyChainLength;
     int *textKeyChain;
     char *key = malloc(strlen(keyNew) + 1);
+    int *encryptedTextKeyChain;
 
     //COPY keyNew TO key
     strcpy(key, keyNew);
@@ -59,7 +60,7 @@ outputFlags decryptText(char *text, char *keyNew)
     //SET LENGTH (numberBuffer)
     returningText = malloc(numberBuffer + 1);
     textKeyChain = malloc(sizeof(int) * numberBuffer);
-    int encryptedTextKeyChain[sizeof(int) * numberBuffer];
+    encryptedTextKeyChain = malloc(sizeof(int) * numberBuffer);
     textKeyChainLength = numberBuffer;
 
     //LOAD textKeyChain
@@ -128,6 +129,7 @@ outputFlags decryptText(char *text, char *keyNew)
 
     //DEALLOCATION
     free(textKeyChain);
+    free(encryptedTextKeyChain);
 
     return output;
 }
