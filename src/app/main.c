@@ -14,7 +14,7 @@ int main(void)
     printf
     (
         "Hi.\n"
-        "This is an simple application written using WHY2 Encryption System.\n\n"
+        "This is a simple application written using WHY2 Encryption System.\n\n"
 
         "\"%s\" => \"%s\"\n\n"
 
