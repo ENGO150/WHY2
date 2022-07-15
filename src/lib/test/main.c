@@ -46,7 +46,7 @@ int main(void)
     timeBuffer += encrypted.elapsedTime; //GET TIME 1
 
     //COMPARE DIFFERENCE
-    if (strcmp(encrypted.outputText, TEST_TEXT) == 0)
+    if (strcmp(encrypted.outputText, TEST_TEXT) == 0 && encrypted.exitCode == 0)
     {
         printf
         (
@@ -64,7 +64,7 @@ int main(void)
     }
     else
     {
-        fprintf(stderr, "Test failed!\n\n%s // %s\n", encrypted.outputText, TEST_TEXT);
+        fprintf(stderr, "Test failed! (%u)\n\n%s // %s\n", encrypted.exitCode, encrypted.outputText, TEST_TEXT);
         exitCode = 1;
     }
 
