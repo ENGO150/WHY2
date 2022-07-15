@@ -79,7 +79,13 @@ outputFlags decryptText(char *text, char *keyNew)
             numberBuffer++;
         }
 
-        textBuffer = malloc(numberBuffer + 1);
+        if (i != 0)
+        {
+            textBuffer = realloc(textBuffer, numberBuffer + 1);
+        } else
+        {
+            textBuffer = malloc(numberBuffer + 1);
+        }
 
         //LOAD textBuffer
         for (int j = 0; j < (int) strlen(text); j++)
@@ -92,7 +98,6 @@ outputFlags decryptText(char *text, char *keyNew)
         encryptedTextKeyChain[i] = atoi(textBuffer);
 
         text += numberBuffer + 1;
-        free(textBuffer);
     }
 
     //DECRYPT TEXT
@@ -130,6 +135,7 @@ outputFlags decryptText(char *text, char *keyNew)
     //DEALLOCATION
     free(textKeyChain);
     free(encryptedTextKeyChain);
+    free(textBuffer);
 
     return output;
 }
