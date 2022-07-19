@@ -112,11 +112,10 @@ outputFlags decryptText(char *text, char *keyNew)
         textKeyChain[i] -= encryptedTextKeyChain[i];
     }
 
-    //FIX returningText
-    strcpy(returningText, "");
-    for (int i = 0; i < textKeyChainLength; i++)
+    //FIX (CLEAN) returningText
+    for (int i = 0; i <= textKeyChainLength; i++)
     {
-        strcat(returningText, " ");
+        returningText[i] = '\0';
     }
 
     //LOAD returningText
