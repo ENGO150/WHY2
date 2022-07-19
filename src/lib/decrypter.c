@@ -87,6 +87,12 @@ outputFlags decryptText(char *text, char *keyNew)
             textBuffer = malloc(numberBuffer + 1);
         }
 
+        //CLEAN (POSSIBLY EXISTING) JUNK in textBuffer
+        for (int i = 0; i <= numberBuffer; i++)
+        {
+            textBuffer[i] = '\0';
+        }
+
         //LOAD textBuffer
         for (int j = 0; j < (int) strlen(text); j++)
         {
