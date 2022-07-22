@@ -13,6 +13,10 @@
 
 #include <why2/flags.h>
 
+double multiply_cb(int a, int b) { return a * b; }
+double subtract_cb(int a, int b) { return a - b; }
+double sum_cb(int a, int b) { return a + b; }
+
 int unlink_cb(const char *fpath, UNUSED const struct stat *sb, UNUSED int typeflag, UNUSED struct FTW *ftwbuf)
 {
     int rv = remove(fpath);
