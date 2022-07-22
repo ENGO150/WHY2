@@ -263,6 +263,7 @@ void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
 {
     int numberBuffer;
     int numberBuffer2;
+    double (*cb)(int, int);
 
     for (int i = 0; i < textKeyChainSize; i++)
     {
@@ -279,16 +280,18 @@ void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
         //FILL textKeyChain
         if ((numberBuffer + 1) % 3 == 0)
         {
-            textKeyChain[textKeyChainSize - (i + 1)] = key[numberBuffer] * key[numberBuffer2];
+            cb = multiply_cb;
         }
         else if ((numberBuffer + 1) % 2 == 0)
         {
-            textKeyChain[textKeyChainSize - (i + 1)] = key[numberBuffer] - key[numberBuffer2];
+            cb = subtract_cb;
         }
         else
         {
-            textKeyChain[textKeyChainSize - (i + 1)] = key[numberBuffer] + key[numberBuffer2];
+            cb = sum_cb;
         }
+
+        textKeyChain[textKeyChainSize - (i + 1)] = doMathematicalOperation(key[numberBuffer], key[numberBuffer2], cb);
     }
 }
 
