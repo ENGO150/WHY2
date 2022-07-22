@@ -31,7 +31,7 @@ inputFlags getFlags()
     return flags;
 }
 
-outputFlags noOutput(unsigned char exitCode)
+outputFlags noOutput(_Bool exitCode)
 {
     char *emptyText = malloc(1); //TEXT
     emptyText[0] = '\0';

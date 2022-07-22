@@ -29,9 +29,9 @@
 
 typedef struct
 {
-    unsigned char noCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
-    unsigned char noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
-    unsigned char update; //BOOLEAN FOR UPDATING YOUR WHY VERSION IF OLD IS USED
+    _Bool noCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
+    _Bool noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
+    _Bool update; //BOOLEAN FOR UPDATING YOUR WHY VERSION IF OLD IS USED
 } inputFlags;
 
 typedef struct
@@ -40,7 +40,7 @@ typedef struct
     char *usedKey; //VARIABLE FOR USED/GENERATED KEY
     unsigned long unusedKeySize; //VARIABLE FOR COUNT OF UNUSED CHARACTERS IN KEY
     unsigned long elapsedTime; //VARIABLE FOR ELAPSED TIME IN MICROSECONDS => 1s = 1000000µs
-    unsigned char exitCode; //VARIABLE FOR EXIT CODE
+    _Bool exitCode; //VARIABLE FOR EXIT CODE
 } outputFlags;
 
 //NOTE: Variables were moved to 'flags.c' to force y'all using getters
@@ -50,7 +50,7 @@ char getEncryptionSeparator();
 unsigned long getKeyLength();
 inputFlags defaultFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
 inputFlags getFlags(); //RETURNS USED FLAGS
-outputFlags noOutput(unsigned char exitCode); //SAME AS defaultFlags() BUT FOR outputFlags
+outputFlags noOutput(_Bool exitCode); //SAME AS defaultFlags() BUT FOR outputFlags
 
 //SETTERS
 void setEncryptionSeparator(char encryptionSeparatorNew);
