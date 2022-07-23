@@ -49,7 +49,7 @@ outputFlags noOutput(_Bool exitCode)
 //SETTERS
 void setEncryptionSeparator(char encryptionSeparatorNew)
 {
-    if (encryptionSeparatorNew == '\0') return;
+    if (encryptionSeparatorNew <= 31) return;
 
     encryptionSeparator = encryptionSeparatorNew;
 }
