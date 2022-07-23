@@ -7,7 +7,7 @@
 int main(void)
 {
     //VARIABLES
-    char *textBuffer = malloc(128);
+    char *textBuffer = malloc(256);
     char *keyBuffer;
     char *statusBuffer;
     char *outputBuffer = malloc(1); //THIS IS TEMP ALLOCATION
