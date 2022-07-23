@@ -16,7 +16,7 @@
 #define UPDATE_NAME "/tmp/why2-update" // fuck you
 #define UPDATE_COMMAND "tmux new-session -d \"cd {DIR} && make install\""
 
-#define TEST_TEXT "aAzZ(    )!?#\\/śŠ <3|420*;" //TEST TEXT FOR ENCRYPTION IN why2-test BINARY
+#define TEST_TEXT "aAzZ(    )!?#\\/śŠ <3|420*;㍿㊓ㅅΔ♛👶🏿" //TEST TEXT FOR ENCRYPTION IN why2-test BINARY
 
 #define TEXT_TO_ENCRYPT "Some text yk" //THIS TEXT WILL BE ENCRYPTED IN why2-app BINARY
 
