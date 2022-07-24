@@ -79,15 +79,9 @@ _Bool checkVersion()
     //FILE-CHECK VARIABLES
     int notFoundBuffer = 0;
 
-    //REMOVE versions.json
-    if (access(VERSIONS_NAME, F_OK) == 0)
-    {
-        remove(VERSIONS_NAME);
-    }
-
     //CURL VARIABLES
     CURL *curl = curl_easy_init();
-    FILE *fileBuffer = fopen(VERSIONS_NAME, "w");
+    FILE *fileBuffer = fopen(VERSIONS_NAME, "w+");
 
     //GET versions.json
     curl_easy_setopt(curl, CURLOPT_URL, VERSIONS_URL);
