@@ -6,9 +6,9 @@
 #define DEFAULT_FLAGS (inputFlags) { 0, 0, 0 }
 
 //VARIABLES
-static char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
-static unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
-static inputFlags flags = DEFAULT_FLAGS;
+char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
+unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
+inputFlags flags = DEFAULT_FLAGS;
 
 //GETTERS
 char getEncryptionSeparator()
