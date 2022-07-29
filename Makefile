@@ -5,7 +5,7 @@ CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnu
 # Source Code
 SRC=src/lib/*.c
 SRC_APP=src/app/*.c
-INCLUDE_DIR="include"
+INCLUDE_DIR=include
 INCLUDE=$(INCLUDE_DIR)/*.h
 TEST=src/lib/test/main.c
 LIBS=-ljson-c -lcurl -lgit2
