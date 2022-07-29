@@ -50,6 +50,6 @@ app:
 clean:
 	rm -rf $(OUTPUT)/* *.o *.so
 
-all: install
-installTest: install test
 install: installHeader installLib installApp clean
+installTest: install test
+all: install
