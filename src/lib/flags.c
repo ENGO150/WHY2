@@ -56,6 +56,8 @@ void setEncryptionSeparator(char encryptionSeparatorNew)
 
 void setKeyLength(int keyLengthNew)
 {
+    if (keyLengthNew < 1) return;
+
     keyLength = keyLengthNew;
 }
 
