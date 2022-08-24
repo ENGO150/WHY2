@@ -351,6 +351,12 @@ unsigned long countUnusedKeySize(char *text, char *key)
     return returning;
 }
 
+unsigned long countRepeatedKeySize(char *text, char *key)
+{
+    //TODO: FIX
+    return 0;
+}
+
 unsigned long compareTimeMicro(struct timeval startTime, struct timeval finishTime)
 {
     return (finishTime.tv_sec - startTime.tv_sec) * 1000000 + finishTime.tv_usec - startTime.tv_usec;
