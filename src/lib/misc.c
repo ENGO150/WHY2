@@ -351,7 +351,7 @@ unsigned long countUnusedKeySize(char *text, char *key)
     return returning;
 }
 
-unsigned long countRepeatedKeySize(char *text, char *key)
+unsigned long countRepeatedKeySize(UNUSED char *text, UNUSED char *key)
 {
     //TODO: FIX
     return 0;
