@@ -133,6 +133,7 @@ outputFlags decryptText(char *text, char *keyNew)
         returningText, //DECRYPTED TEXT
         key, //USED KEY
         countUnusedKeySize(returningText, key), // NUMBER OF UNUSED CHARS IN KEY
+        countRepeatedKeySize(returningText, key), //NUMBER OF REPEATED CHARS IN KEY
         compareTimeMicro(startTime, finishTime), // ELAPSED TIME
         SUCCESS //EXIT CODE
     };
