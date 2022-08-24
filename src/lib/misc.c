@@ -353,8 +353,14 @@ unsigned long countUnusedKeySize(char *text, char *key)
 
 unsigned long countRepeatedKeySize(UNUSED char *text, UNUSED char *key)
 {
-    //TODO: FIX
-    return 0;
+    unsigned long returning = 0;
+
+    if (strlen(key) < strlen(text))
+    {
+        returning = strlen(text) - strlen(key);
+    }
+
+    return returning;
 }
 
 unsigned long compareTimeMicro(struct timeval startTime, struct timeval finishTime)
