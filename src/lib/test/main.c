@@ -81,9 +81,10 @@ int main(void)
         "KEY: \t\t\"%s\"\n"
         "TIME: \t\t\"%lums\"\n"
         "UNUSED KEY: \t\"%lu\"\n"
+        "REPEATED KEY: \t\"%lu\"\n"
         "EXIT CODE: \t\"%d\"\n"
 
-        , statusBuffer, TEST_TEXT, outputBuffer, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize, encrypted.exitCode
+        , statusBuffer, TEST_TEXT, outputBuffer, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize, encrypted.repeatedKeySize, encrypted.exitCode
     );
 
     //DEALLOCATION
