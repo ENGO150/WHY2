@@ -43,7 +43,7 @@ outputFlags noOutput(_Bool exitCode)
     }
     emptyKey[getKeyLength()] = '\0';
 
-    return (outputFlags) { emptyText, emptyKey, 0, 0, exitCode };
+    return (outputFlags) { emptyText, emptyKey, 0, 0, 0, exitCode };
 }
 
 //SETTERS
