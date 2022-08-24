@@ -139,7 +139,7 @@ outputFlags encryptText(char *text, char *keyNew)
         returningText, //ENCRYPTED TEXT
         key, //GENERATED/USED KEY
         countUnusedKeySize(text, key), // NUMBER OF UNUSED CHARS IN KEY
-        countRepeatedKeySize(returningText, key), //NUMBER OF REPEATED CHARS IN KEY
+        countRepeatedKeySize(text, key), //NUMBER OF REPEATED CHARS IN KEY
         compareTimeMicro(startTime, finishTime), // ELAPSED TIME
         SUCCESS //EXIT CODE
     };
