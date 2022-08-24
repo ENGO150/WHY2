@@ -42,6 +42,7 @@ typedef struct
     char *outputText; //VARIABLE FOR ENCRYPTED/DECRYPTED TEXT
     char *usedKey; //VARIABLE FOR USED/GENERATED KEY
     unsigned long unusedKeySize; //VARIABLE FOR COUNT OF UNUSED CHARACTERS IN KEY
+    unsigned long repeatedKeySize; //VARIABLE FOR COUNT OF REPEATED CHARACTERS IN KEY (basically reversed unusedKeySize)
     unsigned long elapsedTime; //VARIABLE FOR ELAPSED TIME IN MICROSECONDS => 1s = 1000000µs
     _Bool exitCode; //VARIABLE FOR EXIT CODE
 } outputFlags;
