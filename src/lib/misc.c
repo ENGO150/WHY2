@@ -355,9 +355,9 @@ unsigned long countRepeatedKeySize(char *text, char *key)
 {
     unsigned long returning = 0;
 
-    if (strlen(key) < strlen(text))
+    if (strlen(key) < 2 * strlen(text))
     {
-        returning = strlen(text) - strlen(key);
+        returning = 2 * strlen(text) - strlen(key);
     }
 
     return returning;
