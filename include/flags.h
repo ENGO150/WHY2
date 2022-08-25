@@ -11,7 +11,7 @@ const enum EXIT_CODES //exit codes you fucking idiot
     UPDATE_FAILED = 3 //EXIT VALUE FOR UPDATE FAILED
 };
 
-#define VERSION "v4.3.1" //VERSION OF CURRENT BUILD     > DO NOT TOUCH THIS <
+#define VERSION "v4.3.2" //VERSION OF CURRENT BUILD     > DO NOT TOUCH THIS <
 #define VERSIONS_URL "https://raw.githubusercontent.com/ENGO150/WHY2/release/versions.json" //URL FOR GETTING versions.json
 #define VERSIONS_NAME "/tmp/why2-versions.json" //do I have to explain this?
 
