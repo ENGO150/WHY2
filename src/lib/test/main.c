@@ -91,6 +91,7 @@ int main(void)
     free(textBuffer);
     free(keyBuffer);
     free(statusBuffer);
+    free(outputBuffer);
     deallocateOutput(encrypted);
 
     return exitCode;
