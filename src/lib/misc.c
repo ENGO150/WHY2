@@ -137,6 +137,10 @@ _Bool checkVersion()
 
         //WAIT FOR 5 SECONDS
         sleep(5);
+
+        free(buffer);
+        fclose(fileBuffer);
+        return SUCCESS;
     }
 
     //CLEANUP
