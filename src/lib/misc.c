@@ -86,6 +86,7 @@ _Bool checkVersion()
     //GET versions.json
     curl_easy_setopt(curl, CURLOPT_URL, VERSIONS_URL);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fileBuffer);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3);
 
     //DOWNLOAD versions.json
     curl_easy_perform(curl);
