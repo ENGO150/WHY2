@@ -25,6 +25,7 @@ const enum EXIT_CODES //exit codes you fucking idiot
 
 #define CLEAR_SCREEN "\e[1;1H\e[2J" //TEXT FOR UNIX CLEAR SCREEN
 
+#define CURL_TIMEOUT 3 //if you need comment explaining, what the fuck is timeout, don't change WHY2's code, alright? thx, love ya
 #define NOT_FOUND_TRIES 10 //NUMBER OF TRIES FOR DOWNLOADING versions.json
 
 #define DEPRECATED __attribute__((deprecated)) //SAME COMMENT AS VERSIONS_NAME'S
