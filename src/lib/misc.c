@@ -343,7 +343,7 @@ unsigned long countUnusedKeySize(char *text, char *key)
 {
     unsigned long returning = 0;
 
-    if (strlen(key) / 2 > strlen(text))
+    if ((long double) (strlen(key)) / 2 > strlen(text))
     {
         returning = strlen(key) - 2 * strlen(text);
     }
