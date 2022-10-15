@@ -72,7 +72,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
     return result;
 }
 
-_Bool checkVersion()
+boolean checkVersion()
 {
     if (getFlags().noCheck) return SUCCESS;
 
@@ -300,7 +300,7 @@ void deallocateOutput(outputFlags flags)
     free(flags.usedKey);
 }
 
-_Bool checkKey(char *key)
+boolean checkKey(char *key)
 {
     if (strlen(key) < getKeyLength())
     {
@@ -311,7 +311,7 @@ _Bool checkKey(char *key)
     return SUCCESS;
 }
 
-_Bool checkText(char *text)
+boolean checkText(char *text)
 {
     if (strcmp(text, "") == 0)
     {

@@ -7,9 +7,9 @@
 
 void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize); //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
 void deallocateOutput(outputFlags flags); //DEALLOCATES flags
-_Bool checkVersion(); //THIS FUNCTION CHECKS IF LATEST VERSION OF WHY2 IS USED
-_Bool checkKey(char *key); //CHECKS IF KEY IS VALID
-_Bool checkText(char *text); //CHECKS IF TEXT IS VALID
+boolean checkVersion(); //THIS FUNCTION CHECKS IF LATEST VERSION OF WHY2 IS USED
+boolean checkKey(char *key); //CHECKS IF KEY IS VALID
+boolean checkText(char *text); //CHECKS IF TEXT IS VALID
 unsigned long countIntLength(int number); //RETURNS LENGTH OF number
 unsigned long countUnusedKeySize(char *text, char *key); //COUNT unusedKeySize
 unsigned long countRepeatedKeySize(char *text, char *key); //COUNT repeatedKeySize

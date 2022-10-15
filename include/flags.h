@@ -31,11 +31,13 @@ const enum EXIT_CODES //exit codes you fucking idiot
 #define DEPRECATED __attribute__((deprecated)) //SAME COMMENT AS VERSIONS_NAME'S
 #define UNUSED __attribute__((unused)) //SAME COMMENT AS DEPRECATED'S
 
+typedef char boolean;
+
 typedef struct
 {
-    _Bool noCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
-    _Bool noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
-    _Bool update; //BOOLEAN FOR UPDATING YOUR WHY VERSION IF OLD IS USED
+    boolean noCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
+    boolean noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
+    boolean update; //BOOLEAN FOR UPDATING YOUR WHY VERSION IF OLD IS USED
 } inputFlags;
 
 typedef struct
@@ -45,7 +47,7 @@ typedef struct
     unsigned long unusedKeySize; //VARIABLE FOR COUNT OF UNUSED CHARACTERS IN KEY
     unsigned long repeatedKeySize; //VARIABLE FOR COUNT OF REPEATED CHARACTERS IN KEY (basically reversed unusedKeySize)
     unsigned long elapsedTime; //VARIABLE FOR ELAPSED TIME IN MICROSECONDS => 1s = 1000000µs
-    _Bool exitCode; //VARIABLE FOR EXIT CODE
+    boolean exitCode; //VARIABLE FOR EXIT CODE
 } outputFlags;
 
 //NOTE: Variables were moved to 'flags.c' to force y'all using getters
@@ -55,7 +57,7 @@ char getEncryptionSeparator();
 unsigned long getKeyLength();
 inputFlags defaultFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
 inputFlags getFlags(); //RETURNS USED FLAGS
-outputFlags noOutput(_Bool exitCode); //SAME AS defaultFlags() BUT FOR outputFlags
+outputFlags noOutput(boolean exitCode); //SAME AS defaultFlags() BUT FOR outputFlags
 
 //SETTERS
 void setEncryptionSeparator(char encryptionSeparatorNew);
