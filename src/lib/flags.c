@@ -5,10 +5,13 @@
 //CONSTS (this is just local)
 #define DEFAULT_FLAGS (inputFlags) { 0, 0, 0 }
 
+int encryptionOperation(int text, int encryptedText);
+
 //VARIABLES
 char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
 unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
 inputFlags flags = DEFAULT_FLAGS;
+int (*encryptionOperation_cb)(int, int) = encryptionOperation;
 
 //GETTERS
 char getEncryptionSeparator()
