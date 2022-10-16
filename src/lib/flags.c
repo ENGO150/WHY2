@@ -65,3 +65,10 @@ void setFlags(inputFlags newFlags)
 {
     flags = newFlags;
 }
+
+//THAT COMMENT AFTER 'SETTERS'
+int encryptionOperation(int text, int encryptedText)
+{
+    //CHANGE THE '-' (MINUS) OPERATOR TO SOMETHING YOU WANT TO USE I GUESS
+    return text - encryptedText;
+}
