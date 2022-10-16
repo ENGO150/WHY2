@@ -90,7 +90,7 @@ outputFlags encryptText(char *text, char *keyNew)
     //ACTUALLY ENCRYPT TEXT
     for (int i = 0; i < (int) strlen(text); i++)
     {
-        textKeyChain[i] -= (int) text[i];
+        textKeyChain[i] = encryptionOperation(textKeyChain[i], (int) text[i]);
     }
 
     //COUNT REQUIRED SIZE FOR returningText

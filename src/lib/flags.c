@@ -71,4 +71,6 @@ int encryptionOperation(int text, int encryptedText)
 {
     //CHANGE THE '-' (MINUS) OPERATOR TO SOMETHING YOU WANT TO USE I GUESS
     return text - encryptedText;
+
+    //I DO NOT RECOMMEND CHANGING THIS, BUT IF YOU WANT TO, XOR IS A GOOD OPERATOR (IDK IF OTHERS WORK lmao)
 }
