@@ -74,6 +74,11 @@ void setFlags(inputFlags newFlags)
     flags = newFlags;
 }
 
+void setEncryptionOperation(encryptionOperation_type_cb newEncryptionOperation)
+{
+    encryptionOperation_cb = newEncryptionOperation;
+}
+
 //SOME OTHER SHIT
 int encryptionOperation(int text, int encryptedText)
 {
