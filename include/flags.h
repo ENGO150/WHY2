@@ -65,5 +65,6 @@ encryptionOperation_type_cb getEncryptionOperation(); //RETURNS FUNCTION WHICH I
 void setEncryptionSeparator(char encryptionSeparatorNew);
 void setKeyLength(int keyLengthNew);
 void setFlags(inputFlags newFlags); //.... whatcha think?
+void setEncryptionOperation(encryptionOperation_type_cb newEncryptionOperation); //are you that dumb?
 
 #endif
