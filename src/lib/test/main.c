@@ -4,6 +4,11 @@
 
 #include <why2.h>
 
+int encryptionOperationTest(int text, int encryptedText)
+{
+    return text ^ encryptedText;
+}
+
 int main(void)
 {
     //VARIABLES
