@@ -11,7 +11,6 @@ int encryptionOperation(int text, int encryptedText);
 char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
 unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
 inputFlags flags = DEFAULT_FLAGS;
-typedef int (*encryptionOperation_type_cb)(int, int);
 encryptionOperation_type_cb encryptionOperation_cb = encryptionOperation;
 
 //GETTERS
