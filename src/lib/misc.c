@@ -17,11 +17,6 @@ double multiply_cb(int a, int b) { return a * b; }
 double subtract_cb(int a, int b) { return a - b; }
 double sum_cb(int a, int b) { return a + b; }
 
-double doMathematicalOperation(int a, int b, double (*op)(int, int))
-{
-    return op(a, b);
-}
-
 int unlink_cb(const char *fpath, UNUSED const struct stat *sb, UNUSED int typeflag, UNUSED struct FTW *ftwbuf)
 {
     int rv = remove(fpath);
@@ -290,7 +285,7 @@ void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
             cb = sum_cb;
         }
 
-        textKeyChain[textKeyChainSize - (i + 1)] = doMathematicalOperation(key[numberBuffer], key[numberBuffer2], cb);
+        textKeyChain[textKeyChainSize - (i + 1)] = cb(key[numberBuffer], key[numberBuffer2]);
     }
 }
 
