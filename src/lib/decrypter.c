@@ -109,7 +109,7 @@ outputFlags decryptText(char *text, char *keyNew)
     //DECRYPT TEXT
     for (int i = 0; i < textKeyChainLength; i++)
     {
-        textKeyChain[i] = encryptionOperation(textKeyChain[i], encryptedTextKeyChain[i]);
+        textKeyChain[i] = getEncryptionOperation()(textKeyChain[i], encryptedTextKeyChain[i]);
     }
 
     //FIX (CLEAN) returningText

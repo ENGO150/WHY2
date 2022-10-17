@@ -66,7 +66,4 @@ void setEncryptionSeparator(char encryptionSeparatorNew);
 void setKeyLength(int keyLengthNew);
 void setFlags(inputFlags newFlags); //.... whatcha think?
 
-//RANDOM SHIT THAT DOESN'T FIT IN MISC, SO I PUT IT IN HERE
-int encryptionOperation(int text, int encryptedText);
-
 #endif
