@@ -41,6 +41,9 @@ int main(void)
     //SET outputBuffer to NULL
     outputBuffer[0] = '\0';
 
+    //SET encryptionOperation to encryptionOperationTest
+    setEncryptionOperation(encryptionOperationTest);
+
     //ENCRYPT
     outputFlags encrypted = encryptText(TEST_TEXT, NULL);
 
