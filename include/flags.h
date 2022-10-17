@@ -32,8 +32,8 @@ const enum EXIT_CODES //exit codes you fucking idiot
 #define UNUSED __attribute__((unused)) //SAME COMMENT AS DEPRECATED'S
 
 //TYPES
-typedef char boolean;
-typedef int (*encryptionOperation_type_cb)(int, int);
+typedef char boolean; //READ THE NAME OR I WILL FIND YOU AND FUCK YOUR MOTHERFUCKING DOG!!!
+typedef int (*encryptionOperation_type_cb)(int, int); //TYPE FOR encryptionOperation CALLBACK
 typedef struct
 {
     boolean noCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
