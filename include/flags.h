@@ -59,6 +59,7 @@ unsigned long getKeyLength();
 inputFlags defaultFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
 inputFlags getFlags(); //RETURNS USED FLAGS
 outputFlags noOutput(boolean exitCode); //SAME AS defaultFlags() BUT FOR outputFlags
+encryptionOperation_type_cb getEncryptionOperation(); //RETURNS FUNCTION WHICH IS USED FOR ENCRYPTION & DECRYPTION
 
 //SETTERS
 void setEncryptionSeparator(char encryptionSeparatorNew);
