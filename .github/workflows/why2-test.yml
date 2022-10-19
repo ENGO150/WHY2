@@ -4,6 +4,8 @@ on:
   push:
     branches: [ development ]
   workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'
 
 jobs:
   test-why2:
