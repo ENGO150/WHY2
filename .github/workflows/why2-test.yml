@@ -5,7 +5,7 @@ on:
     branches: [ development ]
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '40 22 12 4 2'
 
 jobs:
   test-why2:
