@@ -67,7 +67,7 @@ int main(void)
     }
     else //FAILURE
     {
-        statusBuffer = malloc(8);
+        statusBuffer = malloc(7);
         strcpy(statusBuffer, "failed");
 
         outputBuffer = realloc(outputBuffer, strlen(encrypted.outputText) + 6);
