@@ -11,7 +11,7 @@
 outputFlags encryptText(char *text, char *keyNew)
 {
     //CHECK VARIABLE
-    int checkExitCode;
+    unsigned char checkExitCode;
 
     //TIME VARIABLES
     struct timeval startTime;
