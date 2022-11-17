@@ -3,11 +3,11 @@ CC=cc
 CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnull -Wunused -std=c11
 
 # Source Code
-SRC=src/lib/*.c
-SRC_APP=src/app/*.c
-INCLUDE_DIR=include
+SRC=./src/lib/*.c
+SRC_APP=./src/app/*.c
+INCLUDE_DIR=./include
 INCLUDE=$(INCLUDE_DIR)/*.h
-TEST=src/lib/test/main.c
+TEST=./src/lib/test/main.c
 LIBS=-ljson-c -lcurl -lgit2
 
 # Output Files
@@ -36,7 +36,7 @@ installHeader:
 installLib:
 	$(CC) $(CFLAGS) -fPIC -c $(SRC)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS)
-	install -m 755 lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
+	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
 
 installApp: app
 	install -m 755 $(OUTPUT_APP) $(INSTALL_BIN)/$(PROJECT_NAME)
