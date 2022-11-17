@@ -42,7 +42,7 @@ outputFlags encryptText(char *text, char *keyNew)
     fileBuffer = fopen("/dev/urandom", "r");
     fread(&numberBuffer, 4, 1, fileBuffer);
     srand(numberBuffer);
-    if (numberBuffer < 0) numberBuffer *= -1; //MAKE numberBuffer POSITIVE
+    abs(numberBuffer); //MAKE numberBuffer POSITIVE
 
     if (keyNew != NULL)
     {
