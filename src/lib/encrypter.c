@@ -40,7 +40,7 @@ outputFlags encryptText(char *text, char *keyNew)
 
     //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
     fileBuffer = fopen("/dev/urandom", "r");
-    fread(&numberBuffer, 4, 1, fileBuffer);
+    fread(&numberBuffer, sizeof(numberBuffer), 1, fileBuffer);
     srand(numberBuffer);
     numberBuffer = abs(numberBuffer); //MAKE numberBuffer POSITIVE
 
