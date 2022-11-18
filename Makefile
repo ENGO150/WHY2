@@ -5,8 +5,12 @@ CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnu
 # Source Code
 SRC_CORE=./src/core/lib/*.c
 SRC_CORE_APP=./src/core/app/*.c
+SRC_LOGGER=./src/logger/*.c
+
 INCLUDE_DIR=./include
 INCLUDE_CORE=$(INCLUDE_DIR)/*.h
+INCLUDE_LOGGER=$(INCLUDE_DIR)/logger/*.h
+
 TEST=./src/lib/test/main.c
 LIBS=-ljson-c -lcurl -lgit2
 
