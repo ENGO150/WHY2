@@ -44,7 +44,7 @@ buildLibCore:
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_CORE)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS)
 
-installLib: buildLibCore
+installLibCore: buildLibCore
 	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
 
 installApp: app
@@ -60,6 +60,6 @@ clean:
 	rm -rf $(OUTPUT)/* *.o *.so
 
 installHeader: installHeaderCore installHeaderLogger
-install: installHeader installLib installApp clean
+install: installHeader installLibCore installApp clean
 installTest: install test
 all: install
