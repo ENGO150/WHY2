@@ -42,7 +42,7 @@ jobs:
         run: sudo make install
 
       - name: Build WHY2 Test
-        run: make test
+        run: make testCore
 
       - name: Test Lib
         run: ./${{ matrix.output }}
