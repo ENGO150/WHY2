@@ -59,7 +59,7 @@ installAppCore: app
 installLibLogger: buildLibLogger
 	install -m 755 ./lib$(PROJECT_NAME)-logger.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-logger.so
 
-test:
+testCore:
 	$(CC) $(CFLAGS) -g $(TEST_CORE) -o $(OUTPUT_TEST) -l$(PROJECT_NAME)
 
 app:
@@ -70,5 +70,5 @@ clean:
 
 installHeader: installHeaderCore installHeaderLogger
 install: installHeader installLibCore clean installLibLogger installAppCore clean
-installTest: install test
+installTest: install testCore
 all: install
