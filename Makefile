@@ -76,7 +76,7 @@ app:
 	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP) -l$(PROJECT_NAME)
 
 clean:
-	rm -rf $(OUTPUT)/* *.o *.so
+	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so
 
 installHeader: installHeaderCore installHeaderLogger
 install: installHeader installLibCore installLibLogger installAppCore clean
