@@ -56,6 +56,9 @@ installLibCore: buildLibCore
 installAppCore: app
 	install -m 755 $(OUTPUT_APP) $(INSTALL_BIN)/$(PROJECT_NAME)
 
+installLibLogger: buildLibLogger
+	install -m 755 ./lib$(PROJECT_NAME)-logger.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-logger.so
+
 test:
 	$(CC) $(CFLAGS) -g $(TEST_CORE) -o $(OUTPUT_TEST) -l$(PROJECT_NAME)
 
