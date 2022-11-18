@@ -11,7 +11,7 @@ INCLUDE_DIR=./include
 INCLUDE_CORE=$(INCLUDE_DIR)/*.h
 INCLUDE_LOGGER=$(INCLUDE_DIR)/logger/*.h
 
-TEST=./src/lib/test/main.c
+TEST_CORE=./src/lib/test/main.c
 LIBS_CORE=-ljson-c -lcurl -lgit2
 
 # Output Files
@@ -51,7 +51,7 @@ installAppCore: app
 	install -m 755 $(OUTPUT_APP) $(INSTALL_BIN)/$(PROJECT_NAME)
 
 test:
-	$(CC) $(CFLAGS) -g $(TEST) -o $(OUTPUT_TEST) -l$(PROJECT_NAME)
+	$(CC) $(CFLAGS) -g $(TEST_CORE) -o $(OUTPUT_TEST) -l$(PROJECT_NAME)
 
 app:
 	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP) -l$(PROJECT_NAME)
