@@ -47,7 +47,7 @@ buildLibCore:
 installLibCore: buildLibCore
 	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
 
-installApp: app
+installAppCore: app
 	install -m 755 $(OUTPUT_APP) $(INSTALL_BIN)/$(PROJECT_NAME)
 
 test:
@@ -60,6 +60,6 @@ clean:
 	rm -rf $(OUTPUT)/* *.o *.so
 
 installHeader: installHeaderCore installHeaderLogger
-install: installHeader installLibCore installApp clean
+install: installHeader installLibCore installAppCore clean
 installTest: install test
 all: install
