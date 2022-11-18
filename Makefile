@@ -6,7 +6,7 @@ CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnu
 SRC_CORE=./src/core/lib/*.c
 SRC_CORE_APP=./src/core/app/*.c
 INCLUDE_DIR=./include
-INCLUDE=$(INCLUDE_DIR)/*.h
+INCLUDE_CORE=$(INCLUDE_DIR)/*.h
 TEST=./src/lib/test/main.c
 LIBS=-ljson-c -lcurl -lgit2
 
@@ -30,7 +30,7 @@ noTarget: # Do not use this, please <3
 	@echo Hey you... You have to enter your target, too. Use \'install\' target for installing $(PROJECT_NAME)-core.
 
 installHeader:
-	for file in $(INCLUDE); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
+	for file in $(INCLUDE_CORE); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
 	ln -sf $(INSTALL_INCLUDE)/$(PROJECT_NAME)/$(PROJECT_NAME).h $(INSTALL_INCLUDE)/$(PROJECT_NAME).h
 
 buildLib:
