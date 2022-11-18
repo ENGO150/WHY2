@@ -14,6 +14,7 @@
 #include <why2/misc.h>
 
 //LOGGER
+#include <why2/logger/flags.h>
 #include <why2/logger/logger.h>
 
 #endif
