@@ -2,9 +2,9 @@
 
 #include <stdio.h>
 
-int initLogger(char *path)
+int initLogger(char *directoryPath)
 {
-    printf("PATH is: %s\n", path);
+    printf("PATH is: %s\n", directoryPath);
 
     return 0;
 }
