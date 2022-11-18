@@ -43,10 +43,12 @@ installHeaderLogger:
 	for file in $(INCLUDE_LOGGER); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME)/logger; done
 
 buildLibCore:
+	$(MAKE) clean
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_CORE)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS_CORE)
 
 buildLibLogger:
+	$(MAKE) clean
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_LOGGER)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME)-logger.so *.o $(LIBS_LOGGER)
 
@@ -69,6 +71,6 @@ clean:
 	rm -rf $(OUTPUT)/* *.o *.so
 
 installHeader: installHeaderCore installHeaderLogger
-install: installHeader installLibCore clean installLibLogger installAppCore clean
+install: installHeader installLibCore installLibLogger installAppCore clean
 installTest: install testCore
 all: install
