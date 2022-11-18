@@ -69,6 +69,6 @@ clean:
 	rm -rf $(OUTPUT)/* *.o *.so
 
 installHeader: installHeaderCore installHeaderLogger
-install: installHeader installLibCore installAppCore clean
+install: installHeader installLibCore clean installLibLogger installAppCore clean
 installTest: install test
 all: install
