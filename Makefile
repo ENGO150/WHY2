@@ -46,6 +46,10 @@ buildLibCore:
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_CORE)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS_CORE)
 
+buildLibLogger:
+	$(CC) $(CFLAGS) -fPIC -c $(SRC_LOGGER)
+	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME)-logger.so *.o $(LIBS_LOGGER)
+
 installLibCore: buildLibCore
 	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
 
