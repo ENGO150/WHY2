@@ -59,7 +59,7 @@ app:
 clean:
 	rm -rf $(OUTPUT)/* *.o *.so
 
-installHeader: installHeaderCore
+installHeader: installHeaderCore installHeaderLogger
 install: installHeader installLib installApp clean
 installTest: install test
 all: install
