@@ -20,7 +20,8 @@ LIBS_LOGGER=-lwhy2
 # Output Files
 PROJECT_NAME=why2
 OUTPUT=out
-OUTPUT_TEST=$(OUTPUT)/$(PROJECT_NAME)-test
+
+OUTPUT_TEST_CORE=$(OUTPUT)/$(PROJECT_NAME)-test
 OUTPUT_APP=$(OUTPUT)/$(PROJECT_NAME)-app
 
 # Install Files
@@ -63,7 +64,7 @@ installLibLogger: buildLibLogger
 	install -m 755 ./lib$(PROJECT_NAME)-logger.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-logger.so
 
 testCore:
-	$(CC) $(CFLAGS) -g $(TEST_CORE) -o $(OUTPUT_TEST) -l$(PROJECT_NAME)
+	$(CC) $(CFLAGS) -g $(TEST_CORE) -o $(OUTPUT_TEST_CORE) -l$(PROJECT_NAME)
 
 app:
 	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP) -l$(PROJECT_NAME)
