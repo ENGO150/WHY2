@@ -11,7 +11,7 @@ INCLUDE_DIR=./include
 INCLUDE_CORE=$(INCLUDE_DIR)/*.h
 INCLUDE_LOGGER=$(INCLUDE_DIR)/logger/*.h
 
-TEST_CORE=./src/lib/test/main.c
+TEST_CORE=./src/core/lib/test/main.c
 LIBS_CORE=-ljson-c -lcurl -lgit2
 
 # Output Files
