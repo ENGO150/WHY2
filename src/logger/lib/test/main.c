@@ -1,8 +1,12 @@
 #include <why2.h>
 
+#include <stdio.h>
+
 int main(void)
 {
-    initLogger("testing lol");
+    int test = initLogger("./logs");
+
+    printf("%d\n", test);
 
     return 0;
 }
