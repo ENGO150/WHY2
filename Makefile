@@ -69,7 +69,7 @@ testCore:
 	$(CC) $(CFLAGS) -g $(TEST_CORE) -o $(OUTPUT_TEST_CORE) -l$(PROJECT_NAME)
 
 testLogger:
-	$(CC) $(CFLAGS) -g $(TEST_LOGGER) -o $(OUTPUT_TEST_LOGGER) -l$(PROJECT_NAME)
+	$(CC) $(CFLAGS) -g $(TEST_LOGGER) -o $(OUTPUT_TEST_LOGGER) -l$(PROJECT_NAME)-logger
 
 app:
 	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP) -l$(PROJECT_NAME)
