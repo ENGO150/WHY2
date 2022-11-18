@@ -3,8 +3,8 @@ CC=cc
 CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnull -Wunused -std=c11
 
 # Source Code
-SRC=./src/lib/*.c
-SRC_APP=./src/app/*.c
+SRC_CORE=./src/core/lib/*.c
+SRC_CORE_APP=./src/core/app/*.c
 INCLUDE_DIR=./include
 INCLUDE=$(INCLUDE_DIR)/*.h
 TEST=./src/lib/test/main.c
@@ -34,7 +34,7 @@ installHeader:
 	ln -sf $(INSTALL_INCLUDE)/$(PROJECT_NAME)/$(PROJECT_NAME).h $(INSTALL_INCLUDE)/$(PROJECT_NAME).h
 
 buildLib:
-	$(CC) $(CFLAGS) -fPIC -c $(SRC)
+	$(CC) $(CFLAGS) -fPIC -c $(SRC_CORE)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS)
 
 installLib: buildLib
@@ -47,7 +47,7 @@ test:
 	$(CC) $(CFLAGS) -g $(TEST) -o $(OUTPUT_TEST) -l$(PROJECT_NAME)
 
 app:
-	$(CC) $(CFLAGS) $(SRC_APP) -o $(OUTPUT_APP) -l$(PROJECT_NAME)
+	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP) -l$(PROJECT_NAME)
 
 clean:
 	rm -rf $(OUTPUT)/* *.o *.so
