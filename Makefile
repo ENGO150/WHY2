@@ -40,11 +40,11 @@ installHeaderCore:
 installHeaderLogger:
 	for file in $(INCLUDE_LOGGER); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME)/logger; done
 
-buildLib:
+buildLibCore:
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_CORE)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS)
 
-installLib: buildLib
+installLib: buildLibCore
 	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
 
 installApp: app
