@@ -12,7 +12,7 @@ INCLUDE_CORE=$(INCLUDE_DIR)/*.h
 INCLUDE_LOGGER=$(INCLUDE_DIR)/logger/*.h
 
 TEST=./src/lib/test/main.c
-LIBS=-ljson-c -lcurl -lgit2
+LIBS_CORE=-ljson-c -lcurl -lgit2
 
 # Output Files
 PROJECT_NAME=why2
@@ -42,7 +42,7 @@ installHeaderLogger:
 
 buildLibCore:
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_CORE)
-	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS)
+	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS_CORE)
 
 installLibCore: buildLibCore
 	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
