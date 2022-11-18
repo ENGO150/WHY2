@@ -29,7 +29,7 @@ DOLLAR=$
 noTarget: # Do not use this, please <3
 	@echo Hey you... You have to enter your target, too. Use \'install\' target for installing $(PROJECT_NAME)-core.
 
-installHeader:
+installHeaderCore:
 	for file in $(INCLUDE_CORE); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
 	ln -sf $(INSTALL_INCLUDE)/$(PROJECT_NAME)/$(PROJECT_NAME).h $(INSTALL_INCLUDE)/$(PROJECT_NAME).h
 
@@ -52,6 +52,6 @@ app:
 clean:
 	rm -rf $(OUTPUT)/* *.o *.so
 
-install: installHeader installLib installApp clean
+install: installHeaderCore installLib installApp clean
 installTest: install test
 all: install
