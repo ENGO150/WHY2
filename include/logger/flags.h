@@ -1,6 +1,7 @@
 #ifndef WHY2_LOGGER_FLAGS_H
 #define WHY2_LOGGER_FLAGS_H
 
-
+//CONSTS
+#define LOG_FORMAT "xx-xx-xxxx_xxx.log" //THE LAST xxx IS FOR BASE-16 NUMBER OF USAGE THAT DAY (SO MAX IS 4095 [FFF] USAGES PER DAY)
 
 #endif
