@@ -79,5 +79,5 @@ clean:
 
 installHeader: installHeaderCore installHeaderLogger
 install: installHeader installLibCore installLibLogger installAppCore clean
-installTest: install testCore
+installTest: install testCore testLogger
 all: install
