@@ -14,7 +14,7 @@ INCLUDE_LOGGER=$(INCLUDE_DIR)/logger/*.h
 TEST_CORE=./src/core/lib/test/main.c
 LIBS_CORE=-ljson-c -lcurl -lgit2
 
-TEST_LOGGER=./src/core/lib/test/main.c
+TEST_LOGGER=./src/logger/lib/test/main.c
 LIBS_LOGGER=-lwhy2
 
 # Output Files
