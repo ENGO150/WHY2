@@ -39,7 +39,7 @@ int initLogger(char *directoryPath)
         }
     }
 
-    if (buffer > 0xfff) return INVALID_FILE;
+    if (buffer > MAX_USAGE) return INVALID_FILE;
 
     sprintf(filePath, "%s/%04d-%02d-%02d_%03x", directoryPath, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, buffer);
 
