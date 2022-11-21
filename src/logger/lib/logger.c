@@ -18,6 +18,7 @@ int initLogger(char *directoryPath)
     time_t timeL = time(NULL);
     struct tm tm = *localtime(&timeL);
     int buffer = 1;
+    int returning;
     char *filePath = malloc(strlen(directoryPath) + strlen(LOG_FORMAT) + 1);
     DIR *dir;
 
@@ -43,11 +44,11 @@ int initLogger(char *directoryPath)
 
     sprintf(filePath, "%s/%04d-%02d-%02d_%03x", directoryPath, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, buffer);
 
+    returning = open(filePath, O_WRONLY | O_APPEND | O_CREAT, 0644);
+
     //DEALLOCATION
-    //free(filePath);
+    free(filePath);
     closedir(dir);
 
-    return open(filePath, O_WRONLY | O_APPEND | O_CREAT, 0644);
+    return returning;
 }
-
-//TODO: fix filePath deallocation somehow
