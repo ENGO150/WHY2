@@ -8,5 +8,6 @@ const enum RETURN_CODES //exit codes you fucking idiot (2#)
 };
 
 #define LOG_FORMAT "yyyy-mm-dd_xxx.log" //THE LAST xxx IS FOR BASE-16 NUMBER OF USAGE THAT DAY (SO MAX IS 4095 [FFF] USAGES PER DAY)
+#define MAX_USAGE 0xfff
 
 #endif
