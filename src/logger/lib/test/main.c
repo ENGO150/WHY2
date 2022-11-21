@@ -1,6 +1,7 @@
 #include <why2.h>
 
 #include <stdio.h>
+#include <unistd.h>
 
 int main(void)
 {
@@ -8,5 +9,6 @@ int main(void)
 
     printf("%d\n", test);
 
+    close(test);
     return 0;
 }
