@@ -57,7 +57,7 @@ int initLogger(char *directoryPath)
 void writeLog(int loggerFile, char *logMessage)
 {
     //VARIABLES
-    char *buffer = malloc(strlen(WRITE_FORMAT) + strlen(logMessage) + 1);
+    char *buffer = malloc(strlen(WRITE_FORMAT) + strlen(logMessage) + 2);
     time_t timeL = time(NULL);
     struct tm tm = *localtime(&timeL);
 
