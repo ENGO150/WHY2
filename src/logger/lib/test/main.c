@@ -8,7 +8,7 @@ int main(void)
 
     printf("%d\n", test);
 
-    writeLog(test, "Hello from logger-test! 👋");
+    writeLog(test, WRITE_MESSAGE);
 
     deallocateLogger(test);
     return 0;

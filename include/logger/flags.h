@@ -7,6 +7,8 @@ const enum RETURN_CODES //exit codes you fucking idiot (2#)
     INVALID_FILE = -1 //THIS WILL HAPPEN IF YOU USE TOO MUCH LOGS lol
 };
 
+#define WRITE_MESSAGE "Hello from logger-test! 👋"
+
 #define LOG_FORMAT "yyyy-mm-dd_xxx.log" //THE LAST xxx IS FOR BASE-16 NUMBER OF USAGE THAT DAY (SO MAX IS 4095 [FFF] USAGES PER DAY)
 #define LOG_FORMATTING "%s/%04d-%02d-%02d_%03x" //SAME THING AS LOG_FORMAT, BUT USED IN sprintf IN logger.c, NOT AS LENGTH
 
