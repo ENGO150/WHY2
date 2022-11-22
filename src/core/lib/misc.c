@@ -125,6 +125,8 @@ boolean checkVersion()
     //LOAD jsonFile
     fread(buffer, bufferSize, 1, fileBuffer);
 
+    buffer[bufferSize] = '\0';
+
     //CHECK FOR TEXT IN buffer
     if (strcmp(buffer, "") == 0)
     {
