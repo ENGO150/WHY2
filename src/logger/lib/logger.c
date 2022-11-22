@@ -15,7 +15,7 @@ int initLogger(char *directoryPath)
 {
     //VARIABLES
     struct stat st;
-    struct dirent * entry;
+    struct dirent *entry;
     time_t timeL = time(NULL);
     struct tm tm = *localtime(&timeL);
     int buffer = 1;
@@ -56,5 +56,15 @@ int initLogger(char *directoryPath)
 
 void writeLog(int loggerFile, char *logMessage)
 {
-    write(loggerFile, logMessage, strlen(logMessage));
+    //VARIABLES
+    char *buffer = malloc(strlen(WRITE_FORMAT) + strlen(logMessage) + 1);
+    time_t timeL = time(NULL);
+    struct tm tm = *localtime(&timeL);
+
+    sprintf(buffer, WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, logMessage); //LOAD MESSAGE
+
+    write(loggerFile, buffer, strlen(buffer)); //WRITE (YAY)
+
+    //DEALLOCATION
+    free(buffer);
 }
