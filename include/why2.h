@@ -16,5 +16,6 @@
 //LOGGER
 #include <why2/logger/flags.h>
 #include <why2/logger/logger.h>
+#include <why2/logger/utils.h>
 
 #endif
