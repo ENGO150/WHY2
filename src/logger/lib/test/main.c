@@ -4,12 +4,14 @@
 
 int main(void)
 {
-    int test = initLogger(WRITE_DIR);
+    //VARIABLES
+    int test = initLogger(WRITE_DIR); //INITIALIZE LOGGER FILE
 
     printf("%d\n", test);
 
-    writeLog(test, WRITE_MESSAGE);
+    writeLog(test, WRITE_MESSAGE); //WRITE
 
+    //DEALLOCATION
     deallocateLogger(test);
     return 0;
 }
