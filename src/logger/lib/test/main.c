@@ -8,6 +8,8 @@ int main(void)
 
     printf("%d\n", test);
 
+    writeLog(test, "test");
+
     deallocateLogger(test);
     return 0;
 }
