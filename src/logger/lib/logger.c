@@ -40,9 +40,9 @@ int initLogger(char *directoryPath)
         }
     }
 
-    if (buffer > MAX_USAGE) return INVALID_FILE;
+    if (buffer > MAX_USAGE) return INVALID_FILE; //MAX_USAGE WAS REACHED
 
-    sprintf(filePath, LOG_FORMATTING, directoryPath, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, buffer);
+    sprintf(filePath, LOG_FORMATTING, directoryPath, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, buffer); //GENERATE LOG-NAME
 
     returning = open(filePath, O_WRONLY | O_APPEND | O_CREAT, 0644);
 
@@ -51,4 +51,9 @@ int initLogger(char *directoryPath)
     closedir(dir);
 
     return returning;
+}
+
+void writeLog(int loggerFile, char *logMessage)
+{
+    write(loggerFile, logMessage, strlen(logMessage));
 }
