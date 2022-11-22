@@ -4,7 +4,7 @@
 
 int main(void)
 {
-    int test = initLogger("./logs");
+    int test = initLogger(WRITE_DIR);
 
     printf("%d\n", test);
 
