@@ -5,13 +5,13 @@
 int main(void)
 {
     //VARIABLES
-    int test = initLogger(WRITE_DIR); //INITIALIZE LOGGER FILE
+    int logFile = initLogger(WRITE_DIR); //INITIALIZE LOGGER FILE
 
-    printf("%d\n", test);
+    printf("%d\n", logFile);
 
-    writeLog(test, WRITE_MESSAGE); //WRITE
+    writeLog(logFile, WRITE_MESSAGE); //WRITE
 
     //DEALLOCATION
-    deallocateLogger(test);
+    deallocateLogger(logFile);
     return 0;
 }
