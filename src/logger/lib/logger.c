@@ -20,7 +20,7 @@ int initLogger(char *directoryPath)
     struct tm tm = *localtime(&timeL);
     int buffer = 1;
     int returning;
-    char *filePath = malloc(strlen(directoryPath) + strlen(LOG_FORMAT) + 1);
+    char *filePath = malloc(strlen(directoryPath) + strlen(LOG_FORMAT) + 2);
     char *dateBuffer = malloc(strlen("yyyy-mm-dd") + 17); //TODO: MAKE THIS VARIABLE; FIND OUT WHY TF YOU NEED 17 MORE BYTES
     DIR *dir;
 
