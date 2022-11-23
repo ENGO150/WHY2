@@ -20,11 +20,11 @@ int initLogger(char *directoryPath)
     struct tm tm = *localtime(&timeL);
     int buffer = 1;
     int returning;
-    char *filePath = malloc(strlen(directoryPath) + strlen(LOG_FORMAT) + 2);
-    char *dateBuffer = malloc(strlen("yyyy-mm-dd") + 17); //TODO: MAKE THIS VARIABLE; FIND OUT WHY TF YOU NEED 17 MORE BYTES
+    char *filePath = malloc(strlen(directoryPath) + 1 + strlen(LOG_FORMAT) + 1);
+    char *dateBuffer = malloc(strlen(LOG_FORMAT_START) + 1);
     DIR *dir;
 
-    sprintf(dateBuffer, "%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+    sprintf(dateBuffer, LOG_FORMATTING_START, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 
     //CREATE directoryPath DIRECTORY IF IT DOESN'T EXISTS ALREADY
     if (stat(directoryPath, &st) == -1)
