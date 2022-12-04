@@ -141,7 +141,7 @@ boolean checkVersion()
     strcpy(buffer, "");
 
     //LOAD jsonFile
-    fread(buffer, bufferSize, 1, fileBuffer);
+    if (fread(buffer, bufferSize, 1, fileBuffer) == 0) abort(); //TODO: Make it safe
 
     buffer[bufferSize] = '\0';
 
