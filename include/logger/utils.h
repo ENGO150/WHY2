@@ -19,6 +19,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_LOGGER_UTILS_C
 #define WHY2_LOGGER_UTILS_C
 
-void deallocateLogger(int logger); //USE THIS IF YOU WANT TO DEALLOCATE FILE POINTER RETURNED BY logger'S initLogger
+#include <why2/logger/flags.h>
+
+void deallocateLogger(logFile logger); //USE THIS IF YOU WANT TO DEALLOCATE FILE POINTER RETURNED BY logger'S initLogger
 
 #endif
