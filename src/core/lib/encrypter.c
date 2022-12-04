@@ -51,7 +51,7 @@ outputFlags encryptText(char *text, char *keyNew)
     //VARIABLES
     char *key = malloc(getKeyLength() + 1);
     char *returningText;
-    char *textBuffer;
+    char *textBuffer = malloc(1);
     int *textKeyChain = malloc(sizeof(int) * strlen(text));
     int numberBuffer;
     FILE *fileBuffer;
