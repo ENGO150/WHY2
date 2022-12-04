@@ -93,7 +93,7 @@ void writeLog(int loggerFile, char *logMessage)
 
     sprintf(buffer, WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, logMessage); //LOAD MESSAGE
 
-    write(loggerFile, buffer, strlen(buffer)); //WRITE (YAY)
+    if (write(loggerFile, buffer, strlen(buffer)) == 0) abort(); //WRITE (YAY) //TODO: Make it safe
 
     //DEALLOCATION
     free(buffer);
