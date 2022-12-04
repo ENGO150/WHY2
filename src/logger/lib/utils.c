@@ -20,7 +20,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <unistd.h>
 
-void deallocateLogger(int logger)
+#include <why2/logger/flags.h>
+
+void deallocateLogger(logFile logger)
 {
-    close(logger);
+    close(logger.file);
 }
