@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/logger/utils.h>
 
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <why2/logger/flags.h>
@@ -25,4 +26,5 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 void deallocateLogger(logFile logger)
 {
     close(logger.file);
+    free(logger.fileName);
 }
