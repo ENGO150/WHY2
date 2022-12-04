@@ -19,17 +19,34 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(void)
 {
     //VARIABLES
     logFile logger = initLogger(WRITE_DIR); //INITIALIZE LOGGER FILE
-
-    printf("%d\n", logger.file);
+    int bufferSize;
+    char *buffer;
+    FILE *fileBuffer;
 
     writeLog(logger.file, WRITE_MESSAGE); //WRITE
 
+    fileBuffer = fopen(logger.fileName, "r");
+    fseek(fileBuffer, 0, SEEK_END);
+    bufferSize = ftell(fileBuffer);
+    rewind(fileBuffer); //REWIND fileBuffer (NO SHIT)
+
+    //SET LENGTH OF buffer
+    buffer = malloc(bufferSize + 1);
+
+    //LOAD jsonFile
+    fread(buffer, bufferSize, 1, fileBuffer);
+
+    printf("%s\n", buffer);
+
     //DEALLOCATION
+    free(buffer);
+    fclose(fileBuffer);
     deallocateLogger(logger);
     return 0;
 }
