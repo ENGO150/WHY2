@@ -39,4 +39,11 @@ const enum RETURN_CODES //exit codes you fucking idiot (2#)
 
 #define MAX_USAGE 0xfff //LOOK AT LOG_FORMAT
 
+//TYPES
+typedef struct
+{
+    int file;
+    char *fileName;
+} logFile;
+
 #endif
