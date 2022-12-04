@@ -23,13 +23,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 int main(void)
 {
     //VARIABLES
-    int logFile = initLogger(WRITE_DIR); //INITIALIZE LOGGER FILE
+    logFile logger = initLogger(WRITE_DIR); //INITIALIZE LOGGER FILE
 
-    printf("%d\n", logFile);
+    printf("%d\n", logger.file);
 
-    writeLog(logFile, WRITE_MESSAGE); //WRITE
+    writeLog(logger.file, WRITE_MESSAGE); //WRITE
 
     //DEALLOCATION
-    deallocateLogger(logFile);
+    deallocateLogger(logger);
     return 0;
 }
