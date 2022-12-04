@@ -19,7 +19,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_LOGGER_LOGGER_H
 #define WHY2_LOGGER_LOGGER_H
 
-int initLogger(char *directoryPath); //CREATES LOGGING FILE IN directoryPath
+#include <why2/logger/flags.h>
+
+logFile initLogger(char *directoryPath); //CREATES LOGGING FILE IN directoryPath
 void writeLog(int loggerFile, char *logMessage); //WRITES logMessage TO loggerFile
 
 #endif
