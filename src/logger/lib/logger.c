@@ -74,7 +74,6 @@ logFile initLogger(char *directoryPath)
     deallocation:
 
     //DEALLOCATION
-    free(filePath);
     free(dateBuffer);
     closedir(dir);
 
