@@ -86,6 +86,12 @@ logFile initLogger(char *directoryPath)
 
 void writeLog(int loggerFile, char *logMessage)
 {
+    //CHECK IF loggerFile IS CREATED
+    if (loggerFile == INVALID_FILE)
+    {
+        return; //TODO: Add some kind of error message
+    }
+
     //VARIABLES
     char *buffer = malloc(strlen(WRITE_FORMAT) + strlen(logMessage) + 2);
     time_t timeL = time(NULL);
@@ -93,7 +99,7 @@ void writeLog(int loggerFile, char *logMessage)
 
     sprintf(buffer, WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, logMessage); //LOAD MESSAGE
 
-    if (write(loggerFile, buffer, strlen(buffer)) == 0) abort(); //WRITE (YAY) //TODO: Make it safe
+    write(loggerFile, buffer, strlen(buffer)); //WRITE (YAY)
 
     //DEALLOCATION
     free(buffer);
