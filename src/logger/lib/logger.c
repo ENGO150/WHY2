@@ -99,7 +99,7 @@ void writeLog(int loggerFile, char *logMessage)
 
     sprintf(buffer, WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, logMessage); //LOAD MESSAGE
 
-    write(loggerFile, buffer, strlen(buffer)); //WRITE (YAY)
+    (void) write(loggerFile, buffer, strlen(buffer));
 
     //DEALLOCATION
     free(buffer);
