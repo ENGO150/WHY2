@@ -40,7 +40,7 @@ int main(void)
     buffer = malloc(bufferSize + 1);
 
     //LOAD jsonFile
-    if (fread(buffer, bufferSize, 1, fileBuffer) == 0) abort(); //TODO: Make it safe
+    if (fread(buffer, bufferSize, 1, fileBuffer) != 1) abort(); //TODO: Make it safe
 
     printf("%s\n", buffer);
 

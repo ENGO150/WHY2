@@ -99,7 +99,7 @@ void writeLog(int loggerFile, char *logMessage)
 
     sprintf(buffer, WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, logMessage); //LOAD MESSAGE
 
-    if (write(loggerFile, buffer, strlen(buffer)) == 0) abort(); //WRITE (YAY) //TODO: Find why the fuck you can't use version line bellow
+    if (write(loggerFile, buffer, strlen(buffer)) != (ssize_t) strlen(buffer)) abort(); //WRITE (YAY) //TODO: Find why the fuck you can't use version line bellow
     //(void) write(loggerFile, buffer, strlen(buffer));
 
     //DEALLOCATION
