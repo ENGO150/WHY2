@@ -40,6 +40,8 @@ logFile initLogger(char *directoryPath)
     int file;
     char *filePath = malloc(strlen(directoryPath) + 1 + strlen(LOG_FORMAT) + 1);
     char *dateBuffer = malloc(strlen(LOG_FORMAT_START) + 1);
+    char *latestBuffer = malloc(strlen(WRITE_DIR) + strlen(LOG_LATEST) + 2);
+    char *latestFilePath = NULL;
     DIR *dir;
 
     sprintf(dateBuffer, LOG_FORMATTING_START, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
@@ -67,14 +69,25 @@ logFile initLogger(char *directoryPath)
         goto deallocation;
     }
 
-    sprintf(filePath, LOG_FORMATTING, directoryPath, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, buffer); //GENERATE LOG-NAME
+    sprintf(filePath, LOG_FORMATTING, directoryPath, dateBuffer, buffer); //GENERATE LOG-NAME
 
-    file = open(filePath, O_WRONLY | O_APPEND | O_CREAT, 0644);
+    file = open(filePath, O_WRONLY | O_APPEND | O_CREAT, 0644); //CREATE LOG FILE
+
+    //CREATE SYMLINK
+    sprintf(latestBuffer, LOG_LATEST_FORMATTING, WRITE_DIR, LOG_LATEST); //GENERATE LATEST.log PATH
+
+    latestFilePath = malloc(strlen(filePath) + 1);
+    strcpy(latestFilePath, filePath);
+
+    if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); }
+    symlink(latestFilePath + (strlen(WRITE_DIR) + 1), latestBuffer); //CREATE
 
     deallocation:
 
     //DEALLOCATION
     free(dateBuffer);
+    free(latestBuffer);
+    free(latestFilePath);
     closedir(dir);
 
     return (logFile)

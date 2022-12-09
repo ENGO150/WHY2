@@ -27,15 +27,18 @@ const enum RETURN_CODES //exit codes you fucking idiot (2#)
 
 #define WRITE_MESSAGE "Hello from logger-test! 👋"
 #define WRITE_DIR "./logs"
+#define LOG_LATEST "latest.log"
 
 #define LOG_FORMAT "yyyy-mm-dd_xxx.log" //THE LAST xxx IS FOR BASE-16 NUMBER OF USAGE THAT DAY (SO MAX IS 4095 [FFF] USAGES PER DAY)
 #define LOG_FORMAT_START "yyyy-mm-dd" //FIRST PART OF LOG_FORMAT
 
-#define LOG_FORMATTING "%s/%04d-%02d-%02d_%03x.log" //SAME THING AS LOG_FORMAT, BUT USED IN sprintf IN logger.c, NOT AS LENGTH
+#define LOG_FORMATTING "%s/%s_%03x.log" //SAME THING AS LOG_FORMAT, BUT USED IN sprintf IN logger.c, NOT AS LENGTH
 #define LOG_FORMATTING_START "%04d-%02d-%02d" //FIRST PART OF LOG_FORMATTING
 
 #define WRITE_FORMAT "[hh:mm:ss] " //LOG MESSAGE'S PREFIX (THE SPACE AT THE END IS INTENTIONAL)
 #define WRITE_FORMATTING "[%02d:%02d:%02d]: %s" //guess what
+
+#define LOG_LATEST_FORMATTING "%s/%s"
 
 #define MAX_USAGE 0xfff //LOOK AT LOG_FORMAT
 
