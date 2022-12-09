@@ -53,14 +53,7 @@ outputFlags encryptText(char *text, char *keyNew)
     char *returningText;
     char *textBuffer = malloc(1);
     int *textKeyChain = malloc(sizeof(int) * strlen(text));
-    int numberBuffer;
-    FILE *fileBuffer;
-
-    //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
-    fileBuffer = fopen("/dev/urandom", "r");
-    (void) (fread(&numberBuffer, sizeof(numberBuffer), 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
-    numberBuffer = abs(numberBuffer); //MAKE numberBuffer POSITIVE
-    srand(numberBuffer);
+    int numberBuffer = 0;
 
     if (keyNew != NULL)
     {
@@ -135,7 +128,6 @@ outputFlags encryptText(char *text, char *keyNew)
     //DEALLOCATION
     free(textKeyChain);
     free(textBuffer);
-    fclose(fileBuffer);
 
     return output;
 }

@@ -31,6 +31,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/flags.h>
 
+boolean seedSet = 0; //DO NOT FUCKING TOUCH THIS!!!
+
 double multiply_cb(int a, int b) { return a * b; }
 double subtract_cb(int a, int b) { return a - b; }
 double sum_cb(int a, int b) { return a + b; }
@@ -391,6 +393,21 @@ unsigned long compareTimeMicro(struct timeval startTime, struct timeval finishTi
 void generateKey(char *key, int keyLength)
 {
     int numberBuffer;
+
+    if (!seedSet)
+    {
+        //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
+        FILE *fileBuffer;
+
+        fileBuffer = fopen("/dev/urandom", "r");
+        (void) (fread(&numberBuffer, sizeof(numberBuffer), 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
+        numberBuffer = abs(numberBuffer); //MAKE numberBuffer POSITIVE
+        srand(numberBuffer);
+
+        fclose(fileBuffer);
+
+        seedSet = 1;
+    }
 
     for (int i = 0; i < keyLength; i++)
     {
