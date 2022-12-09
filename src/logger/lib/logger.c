@@ -79,7 +79,7 @@ logFile initLogger(char *directoryPath)
     latestFilePath = malloc(strlen(filePath) + 1);
     strcpy(latestFilePath, filePath);
 
-    if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); }
+    if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); } //REMOVE SYMLINK IF IT ALREADY EXISTS
     (void) (symlink(latestFilePath + (strlen(WRITE_DIR) + 1), latestBuffer) + 1); //TODO: Try to create some function for processing exit value //CREATE
 
     deallocation:
