@@ -54,4 +54,10 @@ typedef struct
     char *key;
 } loggerFlags;
 
+//GETTERS
+loggerFlags getLoggerFlags();
+
+//SETTERS
+void setLoggerFlags(loggerFlags loggerFlagsNew);
+
 #endif
