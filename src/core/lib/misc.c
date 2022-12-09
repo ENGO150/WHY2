@@ -427,5 +427,5 @@ void generateKey(char *key, int keyLength)
         key[i] = (char) numberBuffer;
     }
 
-    key[getKeyLength()] = '\0';
+    key[keyLength] = '\0';
 }
