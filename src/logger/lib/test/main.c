@@ -27,7 +27,20 @@ int main(void)
     logFile logger = initLogger(WRITE_DIR); //INITIALIZE LOGGER FILE
     int bufferSize;
     char *buffer;
+    char *usedKey = malloc(getKeyLength() + 1);
     FILE *fileBuffer;
+
+    //GENERATE KEY
+    generateKey(usedKey, getKeyLength());
+
+    //FLAGS
+    logFlags flags =
+    {
+        usedKey
+    };
+
+    //SET FLAGS
+    setLogFlags(flags);
 
     writeLog(logger.file, WRITE_MESSAGE); //WRITE
 
@@ -46,6 +59,7 @@ int main(void)
 
     //DEALLOCATION
     free(buffer);
+    free(usedKey);
     fclose(fileBuffer);
     deallocateLogger(logger);
     return 0;
