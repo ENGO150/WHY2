@@ -387,3 +387,28 @@ unsigned long compareTimeMicro(struct timeval startTime, struct timeval finishTi
 {
     return (finishTime.tv_sec - startTime.tv_sec) * 1000000 + finishTime.tv_usec - startTime.tv_usec;
 }
+
+void generateKey(char *key, int keyLength)
+{
+    int numberBuffer;
+
+    for (int i = 0; i < keyLength; i++)
+    {
+        //SET numberBuffer TO RANDOM NUMBER BETWEEN 0 AND 52
+        numberBuffer = (rand() % 52) + 1;
+
+        //GET CHAR FROM numberBuffer
+        if (numberBuffer > 26)
+        {
+            numberBuffer += 70;
+        }
+        else
+        {
+            numberBuffer += 64;
+        }
+
+        key[i] = (char) numberBuffer;
+    }
+
+    key[getKeyLength()] = '\0';
+}

@@ -24,6 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/flags.h>
 
 void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize); //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
+void generateKey(char *key, int keyLength); //GENERATE ENCRYPTION KEY
 void deallocateOutput(outputFlags flags); //DEALLOCATES flags
 boolean checkVersion(); //THIS FUNCTION CHECKS IF LATEST VERSION OF WHY2 IS USED
 boolean checkKey(char *key); //CHECKS IF KEY IS VALID

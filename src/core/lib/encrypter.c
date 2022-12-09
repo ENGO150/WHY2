@@ -74,32 +74,10 @@ outputFlags encryptText(char *text, char *keyNew)
 
         //REDEFINE keyLength
         setKeyLength(strlen(key));
-
-        goto skipKey;
-    }
-
-    //LOAD KEY
-    for (int i = 0; i < (int) getKeyLength(); i++)
+    } else //LOAD KEY
     {
-        //SET numberBuffer TO RANDOM NUMBER BETWEEN 0 AND 52
-        numberBuffer = (rand() % 52) + 1;
-
-        //GET CHAR FROM numberBuffer
-        if (numberBuffer > 26)
-        {
-            numberBuffer += 70;
-        }
-        else
-        {
-            numberBuffer += 64;
-        }
-
-        key[i] = (char) numberBuffer;
+        generateKey(key, getKeyLength());
     }
-
-    key[getKeyLength()] = '\0';
-
-    skipKey:
 
     //LOAD textKeyChain
     generateTextKeyChain(key, textKeyChain, strlen(text));
