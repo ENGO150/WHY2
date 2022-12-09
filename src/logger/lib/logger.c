@@ -29,6 +29,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/logger/flags.h>
 
+#include <why2/encrypter.h>
+#include <why2/misc.h>
+
 logFile initLogger(char *directoryPath)
 {
     //VARIABLES
@@ -106,14 +109,32 @@ void writeLog(int loggerFile, char *logMessage)
     }
 
     //VARIABLES
-    char *buffer = malloc(strlen(WRITE_FORMAT) + strlen(logMessage) + 2);
+    char *buffer = NULL;
+    char *message = NULL; //COPY OF logMessage
     time_t timeL = time(NULL);
     struct tm tm = *localtime(&timeL);
+    logFlags flags = getLogFlags();
 
-    sprintf(buffer, WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, logMessage); //LOAD MESSAGE
+    if (flags.key != NULL) //ENCRYPT TEXT IF KEY WAS CHANGED
+    {
+        outputFlags encrypted = encryptText(logMessage, flags.key); //ENCRYPT
+
+        message = strdup(encrypted.outputText); //COPY
+
+        //DEALLOCATION
+        free(encrypted.usedKey);
+    } else //FUCK ENCRYPTION, LET'S DO IT; WHY WOULD WE EVEN USE WHY2-CORE? HUH?
+    {
+        message = strdup(logMessage); //COPY
+    }
+
+    buffer = malloc(strlen(WRITE_FORMAT) + strlen(message) + 2); //ALLOCATE
+
+    sprintf(buffer, WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, message); //LOAD MESSAGE
 
     (void) (write(loggerFile, buffer, strlen(buffer)) + 1); //TODO: Try to create some function for processing exit value
 
     //DEALLOCATION
     free(buffer);
+    free(message);
 }
