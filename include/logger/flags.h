@@ -52,12 +52,12 @@ typedef struct
 typedef struct
 {
     char *key;
-} loggerFlags;
+} logFlags;
 
 //GETTERS
-loggerFlags getLoggerFlags();
+logFlags getLogFlags();
 
 //SETTERS
-void setLoggerFlags(loggerFlags loggerFlagsNew);
+void setLogFlags(logFlags logFlagsNew);
 
 #endif
