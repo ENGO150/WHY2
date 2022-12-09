@@ -125,14 +125,7 @@ outputFlags encryptText(char *text, char *keyNew)
     {
         numberBuffer = sizeof(int) * countIntLength(textKeyChain[i]);
 
-        if (i != 0)
-        {
-            textBuffer = realloc(textBuffer, numberBuffer);
-        }
-        else
-        {
-            textBuffer = malloc(numberBuffer);
-        }
+        textBuffer = realloc(textBuffer, numberBuffer);
 
         sprintf(textBuffer, "%d", textKeyChain[i]);
 
