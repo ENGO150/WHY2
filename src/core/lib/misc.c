@@ -141,7 +141,7 @@ boolean checkVersion()
     strcpy(buffer, "");
 
     //LOAD jsonFile
-    if (fread(buffer, bufferSize, 1, fileBuffer) != 1) abort(); //TODO: Make it safe
+    (void) (fread(buffer, bufferSize, 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
 
     buffer[bufferSize] = '\0';
 
