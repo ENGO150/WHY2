@@ -65,14 +65,19 @@ outputFlags decryptText(char *text, char *keyNew)
     int *textKeyChain;
     char *key = malloc(strlen(keyNew) + 1);
     int *encryptedTextKeyChain;
+    char *usedText = malloc(strlen(text) + 1);
+    char *usedTextCopy = usedText;
 
     //COPY keyNew TO key
     strcpy(key, keyNew);
 
+    //COPY text TO usedText
+    strcpy(usedText, text);
+
     //GET LENGTH OF returningText AND textKeyChain
-    for (int i = 0; i < (int) strlen(text); i++)
+    for (int i = 0; i < (int) strlen(usedText); i++)
     {
-        if (text[i] == getEncryptionSeparator()) numberBuffer++;
+        if (usedText[i] == getEncryptionSeparator()) numberBuffer++;
     }
 
     //SET LENGTH (numberBuffer)
@@ -90,9 +95,9 @@ outputFlags decryptText(char *text, char *keyNew)
         numberBuffer = 0;
 
         //GET LENGTH OF EACH CHARACTER
-        for (int j = 0; j < (int) strlen(text); j++)
+        for (int j = 0; j < (int) strlen(usedText); j++)
         {
-            if (text[j] == getEncryptionSeparator()) break;
+            if (usedText[j] == getEncryptionSeparator()) break;
 
             numberBuffer++;
         }
@@ -112,16 +117,16 @@ outputFlags decryptText(char *text, char *keyNew)
         }
 
         //LOAD textBuffer
-        for (int j = 0; j < (int) strlen(text); j++)
+        for (int j = 0; j < (int) strlen(usedText); j++)
         {
-            textBuffer[j] = text[j];
+            textBuffer[j] = usedText[j];
 
             if (numberBuffer == j) break;
         }
 
         encryptedTextKeyChain[i] = atoi(textBuffer);
 
-        text += numberBuffer + 1;
+        usedText += numberBuffer + 1;
     }
 
     //DECRYPT TEXT
@@ -160,6 +165,7 @@ outputFlags decryptText(char *text, char *keyNew)
     free(textKeyChain);
     free(encryptedTextKeyChain);
     free(textBuffer);
+    free(usedTextCopy);
 
     return output;
 }
