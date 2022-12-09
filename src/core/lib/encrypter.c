@@ -49,7 +49,7 @@ outputFlags encryptText(char *text, char *keyNew)
     }
 
     //VARIABLES
-    char *key = malloc(getKeyLength() + 1);
+    char *key = NULL;
     char *returningText;
     char *textBuffer = malloc(1);
     int *textKeyChain = malloc(sizeof(int) * strlen(text));
@@ -63,12 +63,14 @@ outputFlags encryptText(char *text, char *keyNew)
             return noOutput(checkExitCode);
         }
 
-        strcpy(key, keyNew);
+        key = strdup(keyNew);
 
         //REDEFINE keyLength
         setKeyLength(strlen(key));
     } else //LOAD KEY
     {
+        key = malloc(getKeyLength() + 1);
+
         generateKey(key, getKeyLength());
     }
 
