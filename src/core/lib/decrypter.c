@@ -111,9 +111,9 @@ outputFlags decryptText(char *text, char *keyNew)
         }
 
         //CLEAN (POSSIBLY EXISTING) JUNK in textBuffer
-        for (int i = 0; i <= numberBuffer; i++)
+        for (int j = 0; j <= numberBuffer; j++)
         {
-            textBuffer[i] = '\0';
+            textBuffer[j] = '\0';
         }
 
         //LOAD textBuffer
