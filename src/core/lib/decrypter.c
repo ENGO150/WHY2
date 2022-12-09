@@ -60,7 +60,7 @@ outputFlags decryptText(char *text, char *keyNew)
     //VARIABLES
     char *returningText;
     int numberBuffer = 1;
-    char *textBuffer;
+    char *textBuffer = malloc(1);
     int textKeyChainLength;
     int *textKeyChain;
     char *key = malloc(strlen(keyNew) + 1);
@@ -102,13 +102,7 @@ outputFlags decryptText(char *text, char *keyNew)
             numberBuffer++;
         }
 
-        if (i != 0)
-        {
-            textBuffer = realloc(textBuffer, numberBuffer + 1);
-        } else
-        {
-            textBuffer = malloc(numberBuffer + 1);
-        }
+        textBuffer = realloc(textBuffer, numberBuffer + 1);
 
         //CLEAN (POSSIBLY EXISTING) JUNK in textBuffer
         for (int j = 0; j <= numberBuffer; j++)
