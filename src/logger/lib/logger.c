@@ -80,7 +80,7 @@ logFile initLogger(char *directoryPath)
     strcpy(latestFilePath, filePath);
 
     if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); }
-    symlink(latestFilePath + (strlen(WRITE_DIR) + 1), latestBuffer); //CREATE
+    (void) (symlink(latestFilePath + (strlen(WRITE_DIR) + 1), latestBuffer) + 1); //TODO: Try to create some function for processing exit value //CREATE
 
     deallocation:
 
