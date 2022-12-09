@@ -49,4 +49,9 @@ typedef struct
     char *fileName;
 } logFile;
 
+typedef struct
+{
+    char *key;
+} loggerFlags;
+
 #endif
