@@ -59,8 +59,8 @@ outputFlags encryptText(char *text, char *keyNew)
     //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
     fileBuffer = fopen("/dev/urandom", "r");
     (void) (fread(&numberBuffer, sizeof(numberBuffer), 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
-    srand(numberBuffer);
     numberBuffer = abs(numberBuffer); //MAKE numberBuffer POSITIVE
+    srand(numberBuffer);
 
     if (keyNew != NULL)
     {
