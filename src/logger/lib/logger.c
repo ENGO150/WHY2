@@ -115,6 +115,9 @@ void writeLog(int loggerFile, char *logMessage)
     struct tm tm = *localtime(&timeL);
     logFlags flags = getLogFlags();
 
+    //SET ENCRYPTER FLAGS
+    setFlags((inputFlags) { 0, 1, 0 });
+
     if (flags.key != NULL) //ENCRYPT TEXT IF KEY WAS CHANGED
     {
         outputFlags encrypted = encryptText(logMessage, flags.key); //ENCRYPT
