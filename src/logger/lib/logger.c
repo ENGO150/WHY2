@@ -125,7 +125,7 @@ void writeLog(int loggerFile, char *logMessage)
         message = strdup(encrypted.outputText); //COPY
 
         //DEALLOCATION
-        free(encrypted.usedKey);
+        deallocateOutput(encrypted);
     } else //FUCK ENCRYPTION, LET'S DO IT; WHY WOULD WE EVEN USE WHY2-CORE? HUH?
     {
         message = strdup(logMessage); //COPY
