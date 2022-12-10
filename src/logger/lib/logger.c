@@ -116,7 +116,7 @@ void writeLog(int loggerFile, char *logMessage)
     logFlags flags = getLogFlags();
 
     //SET ENCRYPTER FLAGS
-    setFlags((inputFlags) { 0, 1, 0 });
+    if (!getFlagsChanged()) setFlags((inputFlags) { 0, 1, 0 });
 
     if (flags.key != NULL) //ENCRYPT TEXT IF KEY WAS CHANGED
     {
