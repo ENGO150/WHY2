@@ -30,6 +30,7 @@ char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptio
 unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
 inputFlags flags = DEFAULT_FLAGS;
 encryptionOperation_type_cb encryptionOperation_cb = encryptionOperation;
+boolean flagsChanged = 0; //CHANGES TO 1 WHEN U USE setFlags
 
 //GETTERS
 char getEncryptionSeparator()
@@ -90,6 +91,8 @@ void setKeyLength(int keyLengthNew)
 void setFlags(inputFlags newFlags)
 {
     flags = newFlags;
+
+    if (!flagsChanged) flagsChanged = 1;
 }
 
 void setEncryptionOperation(encryptionOperation_type_cb newEncryptionOperation)
