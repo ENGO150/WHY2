@@ -90,8 +90,7 @@ outputFlags encryptText(char *text, char *keyNew)
     }
 
     //ALLOCATE returningText (WITH THE SEPARATORS)
-    returningText = malloc(numberBuffer + strlen(text));
-    strcpy(returningText, "");
+    returningText = calloc(numberBuffer + strlen(text), sizeof(char));
 
     //LOAD returningText
     for (int i = 0; i < (int) strlen(text); i++)
