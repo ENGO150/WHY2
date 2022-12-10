@@ -130,10 +130,7 @@ outputFlags decryptText(char *text, char *keyNew)
     }
 
     //FIX (CLEAN) returningText
-    for (int i = 0; i <= textKeyChainLength; i++)
-    {
-        returningText[i] = '\0';
-    }
+    memset(returningText, '\0', textKeyChainLength + 1);
 
     //LOAD returningText
     for (int i = 0; i < textKeyChainLength; i++)
