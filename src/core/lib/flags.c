@@ -73,6 +73,11 @@ encryptionOperation_type_cb getEncryptionOperation()
     return encryptionOperation_cb;
 }
 
+boolean getFlagsChanged()
+{
+    return flagsChanged;
+}
+
 //SETTERS
 void setEncryptionSeparator(char encryptionSeparatorNew)
 {
