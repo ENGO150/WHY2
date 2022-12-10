@@ -42,7 +42,7 @@ unsigned long getKeyLength()
     return keyLength;
 }
 
-inputFlags defaultFlags()
+inputFlags getDefaultFlags()
 {
     return DEFAULT_FLAGS;
 }

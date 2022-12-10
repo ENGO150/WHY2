@@ -74,9 +74,9 @@ typedef struct
 //GETTERS
 char getEncryptionSeparator();
 unsigned long getKeyLength();
-inputFlags defaultFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
+inputFlags getDefaultFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
 inputFlags getFlags(); //RETURNS USED FLAGS
-outputFlags noOutput(boolean exitCode); //SAME AS defaultFlags() BUT FOR outputFlags
+outputFlags noOutput(boolean exitCode); //SAME AS getDefaultFlags() BUT FOR outputFlags
 encryptionOperation_type_cb getEncryptionOperation(); //RETURNS FUNCTION WHICH IS USED FOR ENCRYPTION & DECRYPTION
 
 //SETTERS
