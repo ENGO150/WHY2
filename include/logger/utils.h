@@ -22,6 +22,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/logger/flags.h>
 
 void deallocateLogger(logFile logger); //USE THIS IF YOU WANT TO DEALLOCATE FILE POINTER RETURNED BY logger'S initLogger
-void decryptLogger(logFile logger, logFlags flags); //PASS logger AND FLAGS, AND PROGRAM WILL DECRYPT YOUR LOG... WHAT DID YOU EXPECT?
+void decryptLogger(logFile logger); //PASS logger AND FLAGS, AND PROGRAM WILL DECRYPT YOUR LOG... WHAT DID YOU EXPECT?
 
 #endif
