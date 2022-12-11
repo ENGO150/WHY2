@@ -55,7 +55,7 @@ typedef struct
 } logFlags;
 
 //GETTERS
-logFlags getLogFlags();
+logFlags getLogFlags(void);
 
 //SETTERS
 void setLogFlags(logFlags logFlagsNew);

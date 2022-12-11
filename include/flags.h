@@ -72,13 +72,13 @@ typedef struct
 //NOTE: Variables were moved to 'flags.c' to force y'all using getters
 
 //GETTERS
-char getEncryptionSeparator();
-unsigned long getKeyLength();
-inputFlags getDefaultFlags(); //THIS GENERATES inputFlags WITH DEFAULT VALUES
-inputFlags getFlags(); //RETURNS USED FLAGS
+char getEncryptionSeparator(void);
+unsigned long getKeyLength(void);
+inputFlags getDefaultFlags(void); //THIS GENERATES inputFlags WITH DEFAULT VALUES
+inputFlags getFlags(void); //RETURNS USED FLAGS
 outputFlags noOutput(boolean exitCode); //SAME AS getDefaultFlags() BUT FOR outputFlags
-encryptionOperation_type_cb getEncryptionOperation(); //RETURNS FUNCTION WHICH IS USED FOR ENCRYPTION & DECRYPTION
-boolean getFlagsChanged();
+encryptionOperation_type_cb getEncryptionOperation(void); //RETURNS FUNCTION WHICH IS USED FOR ENCRYPTION & DECRYPTION
+boolean getFlagsChanged(void);
 
 //SETTERS
 void setEncryptionSeparator(char encryptionSeparatorNew);

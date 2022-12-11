@@ -26,7 +26,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize); //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
 void generateKey(char *key, int keyLength); //GENERATE ENCRYPTION KEY
 void deallocateOutput(outputFlags flags); //DEALLOCATES flags
-boolean checkVersion(); //THIS FUNCTION CHECKS IF LATEST VERSION OF WHY2 IS USED
+boolean checkVersion(void); //THIS FUNCTION CHECKS IF LATEST VERSION OF WHY2 IS USED
 boolean checkKey(char *key); //CHECKS IF KEY IS VALID
 boolean checkText(char *text); //CHECKS IF TEXT IS VALID
 unsigned long countIntLength(int number); //RETURNS LENGTH OF number

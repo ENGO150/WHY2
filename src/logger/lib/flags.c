@@ -24,7 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 logFlags flags = { NULL };
 
 //GETTERS
-logFlags getLogFlags()
+logFlags getLogFlags(void)
 {
     return flags;
 }

@@ -33,22 +33,22 @@ encryptionOperation_type_cb encryptionOperation_cb = encryptionOperation;
 boolean flagsChanged = 0; //CHANGES TO 1 WHEN U USE setFlags
 
 //GETTERS
-char getEncryptionSeparator()
+char getEncryptionSeparator(void)
 {
     return encryptionSeparator;
 }
 
-unsigned long getKeyLength()
+unsigned long getKeyLength(void)
 {
     return keyLength;
 }
 
-inputFlags getDefaultFlags()
+inputFlags getDefaultFlags(void)
 {
     return DEFAULT_FLAGS;
 }
 
-inputFlags getFlags()
+inputFlags getFlags(void)
 {
     return flags;
 }
@@ -68,12 +68,12 @@ outputFlags noOutput(boolean exitCode)
     return (outputFlags) { emptyText, emptyKey, 0, 0, 0, exitCode };
 }
 
-encryptionOperation_type_cb getEncryptionOperation()
+encryptionOperation_type_cb getEncryptionOperation(void)
 {
     return encryptionOperation_cb;
 }
 
-boolean getFlagsChanged()
+boolean getFlagsChanged(void)
 {
     return flagsChanged;
 }

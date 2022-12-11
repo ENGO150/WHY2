@@ -87,7 +87,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
     return result;
 }
 
-boolean checkVersion()
+boolean checkVersion(void)
 {
     if (getFlags().noCheck) return SUCCESS;
 
