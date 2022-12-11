@@ -108,9 +108,16 @@ void writeLog(int loggerFile, char *logMessage)
         return; //TODO: Add some kind of error message
     }
 
+    //COPY logMessage without '\n'
+    char *logMessageUsed = strdup(logMessage);
+    for (int i = 0; i < (int) strlen(logMessageUsed); i++)
+    {
+        if (logMessageUsed[i] == '\n') logMessageUsed[i] = '\0';
+    }
+
     //VARIABLES
     char *buffer = NULL;
-    char *message = NULL; //COPY OF logMessage
+    char *message = NULL; //FINAL MESSAGE
     time_t timeL = time(NULL);
     struct tm tm = *localtime(&timeL);
     logFlags flags = getLogFlags();
@@ -120,15 +127,16 @@ void writeLog(int loggerFile, char *logMessage)
 
     if (flags.key != NULL) //ENCRYPT TEXT IF KEY WAS CHANGED
     {
-        outputFlags encrypted = encryptText(logMessage, flags.key); //ENCRYPT
+        outputFlags encrypted = encryptText(logMessageUsed, flags.key); //ENCRYPT
 
         message = strdup(encrypted.outputText); //COPY
 
         //DEALLOCATION
         deallocateOutput(encrypted);
+        free(logMessageUsed); //I COULD DO THIS SMART SOMEHOW, BUT I AM TOO LAZY FOR THAT SHIT
     } else //FUCK ENCRYPTION, LET'S DO IT; WHY WOULD WE EVEN USE WHY2-CORE? HUH?
     {
-        message = strdup(logMessage); //COPY
+        message = logMessageUsed;
     }
 
     buffer = malloc(strlen(WRITE_FORMAT) + strlen(message) + 3); //ALLOCATE
