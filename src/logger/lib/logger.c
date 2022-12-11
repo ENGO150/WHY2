@@ -131,7 +131,7 @@ void writeLog(int loggerFile, char *logMessage)
         message = strdup(logMessage); //COPY
     }
 
-    buffer = malloc(strlen(WRITE_FORMAT) + strlen(message) + 2); //ALLOCATE
+    buffer = malloc(strlen(WRITE_FORMAT) + strlen(message) + 3); //ALLOCATE
 
     sprintf(buffer, WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, message); //LOAD MESSAGE
 
