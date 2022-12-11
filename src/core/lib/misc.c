@@ -140,7 +140,7 @@ boolean checkVersion(void)
     buffer = malloc(bufferSize + 1);
 
     //FIX buffer
-    strcpy(buffer, "");
+    memset(buffer, '\0', bufferSize);
 
     //LOAD jsonFile
     (void) (fread(buffer, bufferSize, 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
