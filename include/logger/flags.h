@@ -36,7 +36,7 @@ const enum RETURN_CODES //exit codes you fucking idiot (2#)
 #define LOG_FORMATTING_START "%04d-%02d-%02d" //FIRST PART OF LOG_FORMATTING
 
 #define WRITE_FORMAT "[hh:mm:ss] " //LOG MESSAGE'S PREFIX (THE SPACE AT THE END IS INTENTIONAL)
-#define WRITE_FORMATTING "[%02d:%02d:%02d]: %s" //guess what
+#define WRITE_FORMATTING "[%02d:%02d:%02d]: %s\n" //guess what
 
 #define LOG_LATEST_FORMATTING "%s/%s"
 
