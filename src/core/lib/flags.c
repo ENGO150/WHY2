@@ -28,7 +28,7 @@ int encryptionOperation(int text, int encryptedText);
 //VARIABLES
 char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
 unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
-inputFlags flags = DEFAULT_FLAGS;
+inputFlags flagsAllah = DEFAULT_FLAGS; //IT IS CALLED flagsAllah CUZ flags CAUSED SOME FUCKING MEMORY PROBLEMS
 encryptionOperation_type_cb encryptionOperation_cb = encryptionOperation;
 boolean flagsChanged = 0; //CHANGES TO 1 WHEN U USE setFlags
 
@@ -50,7 +50,7 @@ inputFlags getDefaultFlags(void)
 
 inputFlags getFlags(void)
 {
-    return flags;
+    return flagsAllah;
 }
 
 outputFlags noOutput(boolean exitCode)
@@ -95,7 +95,7 @@ void setKeyLength(int keyLengthNew)
 
 void setFlags(inputFlags newFlags)
 {
-    flags = newFlags;
+    flagsAllah = newFlags;
 
     if (!flagsChanged) flagsChanged = 1;
 }
