@@ -94,7 +94,7 @@ app:
 	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP) $(LIB_CORE)
 
 clean:
-	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so
+	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
 
 installHeader: installHeaderCore installHeaderLogger
 install: installHeader installLibCore installLibLogger installAppCore clean
