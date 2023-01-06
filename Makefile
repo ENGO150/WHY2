@@ -18,6 +18,16 @@
 CC=cc
 CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnull -Wunused -std=gnu11 -O2
 
+# Output Files
+PROJECT_NAME=why2
+OUTPUT=out
+LOGS=logs
+
+OUTPUT_TEST_CORE=$(OUTPUT)/$(PROJECT_NAME)-core-test
+OUTPUT_APP=$(OUTPUT)/$(PROJECT_NAME)-app
+
+OUTPUT_TEST_LOGGER=$(OUTPUT)/$(PROJECT_NAME)-logger-test
+
 # Source Code
 SRC_CORE=./src/core/lib/*.c
 SRC_CORE_APP=./src/core/app/*.c
@@ -29,19 +39,11 @@ INCLUDE_LOGGER=$(INCLUDE_DIR)/logger/*.h
 
 TEST_CORE=./src/core/lib/test/main.c
 LIBS_CORE=-ljson-c -lcurl -lgit2
+LIB_CORE=-lwhy2
 
 TEST_LOGGER=./src/logger/lib/test/main.c
 LIBS_LOGGER=-lwhy2
-
-# Output Files
-PROJECT_NAME=why2
-OUTPUT=out
-LOGS=logs
-
-OUTPUT_TEST_CORE=$(OUTPUT)/$(PROJECT_NAME)-core-test
-OUTPUT_APP=$(OUTPUT)/$(PROJECT_NAME)-app
-
-OUTPUT_TEST_LOGGER=$(OUTPUT)/$(PROJECT_NAME)-logger-test
+LIB_LOGGER=-lwhy2-logger
 
 # Install Files
 INSTALL_INCLUDE=/usr/include
@@ -83,13 +85,13 @@ installLibLogger: buildLibLogger
 	install -m 755 ./lib$(PROJECT_NAME)-logger.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-logger.so
 
 testCore:
-	$(CC) $(CFLAGS) -g $(TEST_CORE) -o $(OUTPUT_TEST_CORE) -l$(PROJECT_NAME)
+	$(CC) $(CFLAGS) -g $(TEST_CORE) -o $(OUTPUT_TEST_CORE) $(LIB_CORE)
 
 testLogger:
-	$(CC) $(CFLAGS) -g $(TEST_LOGGER) -o $(OUTPUT_TEST_LOGGER) -l$(PROJECT_NAME) -l$(PROJECT_NAME)-logger
+	$(CC) $(CFLAGS) -g $(TEST_LOGGER) -o $(OUTPUT_TEST_LOGGER) $(LIB_CORE) $(LIB_LOGGER)
 
 app:
-	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP) -l$(PROJECT_NAME)
+	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP) $(LIB_CORE)
 
 clean:
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so
