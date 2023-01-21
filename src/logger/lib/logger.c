@@ -74,7 +74,7 @@ logFile initLogger(char *directoryPath)
 
     sprintf(filePath, LOG_FORMATTING, directoryPath, dateBuffer, buffer); //GENERATE LOG-NAME
 
-    file = open(filePath, O_WRONLY | O_APPEND | O_CREAT, 0644); //CREATE LOG FILE
+    file = open(filePath, O_RDWR | O_APPEND | O_CREAT, 0644); //CREATE LOG FILE
 
     //CREATE SYMLINK
     sprintf(latestBuffer, LOG_LATEST_FORMATTING, WRITE_DIR, LOG_LATEST); //GENERATE LATEST.log PATH
