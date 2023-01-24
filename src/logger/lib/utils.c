@@ -47,7 +47,7 @@ void removeSpaces(char* string)
     } while ((*string++ = *d++));
 }
 
-void decryptLogger(logFile logger) //TODO: Fix valgrind issues
+char **decryptLogger(logFile logger) //TODO: Fix valgrind issues
 {
 
     FILE *file = fdopen(logger.file, "r"); //OPEN logFile AS FILE POINTER
@@ -134,12 +134,11 @@ void decryptLogger(logFile logger) //TODO: Fix valgrind issues
     for (int i = 0; i < buffer3; i++)
     {
         free(linesContent[i]);
-        free(linesContentDecrypted[i]); //TODO: Remove
     }
 
     free(linesContent);
-    free(linesContentDecrypted); //TODO: Remove
 
     free(rawContent);
-    return;
+
+    return linesContentDecrypted;
 }
