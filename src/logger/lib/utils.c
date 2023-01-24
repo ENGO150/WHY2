@@ -23,6 +23,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string.h>
 #include <unistd.h>
 
+#include <why2/decrypter.h>
+#include <why2/flags.h>
+#include <why2/misc.h>
+
 #include <why2/logger/flags.h>
 
 void deallocateLogger(logFile logger)
@@ -47,8 +51,10 @@ void decryptLogger(logFile logger) //TODO: Fix valgrind issues
 {
 
     FILE *file = fdopen(logger.file, "r"); //OPEN logFile AS FILE POINTER
+    outputFlags outputBuffer;
     char *rawContent;
     char **linesContent;
+    char **linesContentDecrypted;
     int rawContentLength;
     int lines = 0;
     int buffer = 0;
@@ -73,7 +79,9 @@ void decryptLogger(logFile logger) //TODO: Fix valgrind issues
         if (rawContent[i] == '\n') lines++;
     }
 
+    //ALLOCATE SPLIT & SPLIT DECRYPTED BUFFERS
     linesContent = malloc(lines + 1);
+    linesContentDecrypted = malloc(lines + 1);
 
     for (int i = 0; i < rawContentLength; i++) //LOAD/SPIT rawContent INTO linesContent
     {
@@ -108,13 +116,29 @@ void decryptLogger(logFile logger) //TODO: Fix valgrind issues
     }
 
     //TODO: Decrypt
+    for (int i = 0; i < buffer3; i++)
+    {
+        outputBuffer = decryptText(linesContent[i], getLogFlags().key);
 
+        linesContentDecrypted[i] = strdup(outputBuffer.outputText);
+
+        deallocateOutput(outputBuffer);
+    }
 
     for (int i = 0; i < buffer3; i++)
     {
-        free(linesContent[i]);
+        printf("%s\n", linesContentDecrypted[i]);
     }
+
+    //DEALLOCATE EACH linesContent & linesContentDecrypted INDEX
+    for (int i = 0; i < buffer3; i++)
+    {
+        free(linesContent[i]);
+        free(linesContentDecrypted[i]); //TODO: Remove
+    }
+
     free(linesContent);
+    free(linesContentDecrypted); //TODO: Remove
 
     free(rawContent);
     return;
