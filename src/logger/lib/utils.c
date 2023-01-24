@@ -125,19 +125,14 @@ char **decryptLogger(logFile logger) //TODO: Fix valgrind issues
         deallocateOutput(outputBuffer);
     }
 
-    for (int i = 0; i < buffer3; i++)
-    {
-        printf("%s\n", linesContentDecrypted[i]);
-    }
-
     //DEALLOCATE EACH linesContent & linesContentDecrypted INDEX
     for (int i = 0; i < buffer3; i++)
     {
         free(linesContent[i]);
     }
 
+    //DEALLOCATION
     free(linesContent);
-
     free(rawContent);
 
     return linesContentDecrypted;
