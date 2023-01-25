@@ -57,6 +57,12 @@ typedef struct
     char *key;
 } logFlags;
 
+typedef struct
+{
+    char **decryptedText;
+    unsigned long length;
+} decryptedOutput;
+
 //GETTERS
 logFlags getLogFlags(void);
 
