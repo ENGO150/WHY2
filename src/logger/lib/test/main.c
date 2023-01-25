@@ -20,15 +20,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int main(void)
 {
     //VARIABLES
     logFile logger = initLogger(WRITE_DIR); //INITIALIZE LOGGER FILE
-    int bufferSize;
-    char *buffer;
     char *usedKey = malloc(getKeyLength() + 1);
-    FILE *fileBuffer;
+    char **decrypted;
+    int exitCode = 0;
 
     //GENERATE KEY
     generateKey(usedKey, getKeyLength());
@@ -44,23 +44,24 @@ int main(void)
 
     writeLog(logger.file, WRITE_MESSAGE); //WRITE
 
-    fileBuffer = fopen(logger.fileName, "r");
-    fseek(fileBuffer, 0, SEEK_END);
-    bufferSize = ftell(fileBuffer);
-    rewind(fileBuffer); //REWIND fileBuffer (NO SHIT)
+    decrypted = decryptLogger(logger); //DECRYPT
 
-    //SET LENGTH OF buffer
-    buffer = calloc(bufferSize + 1, sizeof(buffer)); //CALLOC IS USED BECAUSE OF LE 'Uninitialised value was created by a heap allocation'
+    //COMPARE OUTPUT
+    if (strcmp(decrypted[0], WRITE_MESSAGE) == 0) //SUCCESS
+    {
+        printf("TEST SUCCESSFUL!\n");
+    } else
+    {
+        fprintf(stderr, "TEST FAILED!\n");
+        exitCode = 1;
+    }
 
-    //LOAD jsonFile
-    (void) (fread(buffer, bufferSize, 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
-
-    printf("%s\n", buffer);
+    //TODO: Create some function for deallocating decrypted
+    free(decrypted[0]);
+    free(decrypted);
 
     //DEALLOCATION
-    free(buffer);
     free(usedKey);
-    fclose(fileBuffer);
     deallocateLogger(logger);
-    return 0;
+    return exitCode;
 }
