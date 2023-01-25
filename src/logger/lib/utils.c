@@ -49,91 +49,70 @@ void removeSpaces(char* string)
 
 char **decryptLogger(logFile logger) //TODO: Fix valgrind issues
 {
-
-    FILE *file = fdopen(logger.file, "r"); //OPEN logFile AS FILE POINTER
+    FILE *file = fdopen(logger.file, "r");
     outputFlags outputBuffer;
     char *rawContent;
-    char **linesContent;
-    char **linesContentDecrypted;
-    int rawContentLength;
+    char **content;
+    char **contentDecrypted;
+    int rawContentL;
     int lines = 0;
-    int buffer = 0;
-    int buffer2;
-    int buffer3 = 0;
-    //int buffer4 = 0;
+    int startingAtBuffer = 0;
+    int contentIndexBuffer = 0;
 
+    //COUNT LENGTH OF buffer AND STORE IT IN bufferSize
     fseek(file, 0, SEEK_END);
-    rawContentLength = ftell(file);
-    rewind(file); //REWIND FILE
+    rawContentL = ftell(file);
+    rewind(file); //REWIND file (NO SHIT)
 
     //ALLOCATE rawContent
-    rawContent = malloc(rawContentLength + 1);
+    rawContent = calloc(rawContentL + 1, sizeof(char)); //CALLOC WILL BE USED FOR CLEANING AFTER ALLOCATION
 
-    memset(rawContent, '\0', rawContentLength + 1);
+    //LOAD rawContent
+    (void) (fread(rawContent, rawContentL, 1, file) + 1); //TODO: Try to create some function for processing exit value
 
-    (void) (fread(rawContent, rawContentLength, 1, file) + 1); //TODO: Try to create some function for processing exit value
-
-    //GET lines
-    for (int i = 0; i < rawContentLength; i++)
+    for (int i = 0; i < rawContentL; i++)
     {
         if (rawContent[i] == '\n') lines++;
     }
 
-    //ALLOCATE SPLIT & SPLIT DECRYPTED BUFFERS
-    linesContent = malloc(lines + 1);
-    linesContentDecrypted = malloc(lines + 1);
+    //ALLOCATE content & contentDecrypted
+    content = calloc(lines + 1, sizeof(char));
+    contentDecrypted = calloc(lines + 1, sizeof(char));
 
-    for (int i = 0; i < rawContentLength; i++) //LOAD/SPIT rawContent INTO linesContent
+    for (int i = 0; i < rawContentL; i++) //LOAD rawContent AND SPLIT TO content
     {
-        if (rawContent[i] == '\n')
+        if (rawContent[i] == '\n') //END OF ONE LINE
         {
-            buffer2 = i - buffer;
-            if (buffer != 0) buffer2--;
+            content[contentIndexBuffer] = calloc((i - (startingAtBuffer + strlen(WRITE_FORMAT)) + 1), sizeof(char)); //ALLOCATE ELEMENT
 
-            //printf("%d\t%d\t%d\n", i, buffer, buffer2);
-            //printf("%d\t%d\n", buffer3, buffer2);
-            linesContent[buffer3] = malloc((buffer2 + 1) - strlen(WRITE_FORMAT));
-            //memset(linesContent[buffer3], '\0', buffer2 + 1);
-            // for (int j = 0; j <= buffer2; j++)
-            // {
-            //     linesContent[buffer3][j] = '\0';
-            // }
-
-            for (int j = buffer + strlen(WRITE_FORMAT); j < i; j++)
+            for (int j = startingAtBuffer + strlen(WRITE_FORMAT); j <= i; j++) //LOAD CONTENT OF EACH LINE
             {
-                linesContent[buffer3][j - (buffer + strlen(WRITE_FORMAT))/* - buffer4*/] = rawContent[j];
-                //printf("%d ", j - buffer);
-                //printf("%c", rawContent[j]);
+                content[contentIndexBuffer][j - (startingAtBuffer + strlen(WRITE_FORMAT))] = rawContent[j]; //SET
             }
-            linesContent[buffer3][(buffer2 + 1) - strlen(WRITE_FORMAT)] = '\0';
-            removeSpaces(linesContent[buffer3]);
-            //printf("\n");
 
-            buffer = i;
-            buffer3++;
-            //buffer4 = 1; | e
+            contentIndexBuffer++;
+            startingAtBuffer = i + 1;
         }
     }
 
-    //TODO: Decrypt
-    for (int i = 0; i < buffer3; i++)
+    for (int i = 0; i < lines; i++) //DECRYPT content
     {
-        outputBuffer = decryptText(linesContent[i], getLogFlags().key);
+        outputBuffer = decryptText(content[i], getLogFlags().key); //DECRYPT
 
-        linesContentDecrypted[i] = strdup(outputBuffer.outputText);
+        contentDecrypted[i] = strdup(outputBuffer.outputText); //COPY
 
-        deallocateOutput(outputBuffer);
-    }
-
-    //DEALLOCATE EACH linesContent & linesContentDecrypted INDEX
-    for (int i = 0; i < buffer3; i++)
-    {
-        free(linesContent[i]);
+        deallocateOutput(outputBuffer); //DEALLOCATE outputBuffer
     }
 
     //DEALLOCATION
-    free(linesContent);
-    free(rawContent);
+    for (int i = 0; i < lines; i++) //DEALLOCATE EACH ELEMENT IN content
+    {
+        free(content[i]);
+    }
 
-    return linesContentDecrypted;
+    free(content);
+    free(rawContent);
+    fclose(file);
+
+    return contentDecrypted;
 }
