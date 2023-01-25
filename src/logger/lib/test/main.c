@@ -62,6 +62,6 @@ int main(void)
     //DEALLOCATION
     free(usedKey);
     deallocateLogger(logger);
-    deallocateDoublePointer(decrypted);
+    deallocateDecryptedOutput(decrypted);
     return exitCode;
 }

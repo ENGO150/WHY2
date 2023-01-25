@@ -106,7 +106,7 @@ decryptedOutput decryptLogger(logFile logger) //TODO: Fix valgrind issues
     //DEALLOCATION
     free(rawContent);
     fclose(file);
-    deallocateDoublePointer(content);
+    deallocateDecryptedOutput((decryptedOutput) { content, lines }); //fuck the system lmao
 
     return (decryptedOutput)
     {
