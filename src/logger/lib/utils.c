@@ -110,14 +110,9 @@ char **decryptLogger(logFile logger) //TODO: Fix valgrind issues
     }
 
     //DEALLOCATION
-    for (int i = 0; i < lines; i++) //DEALLOCATE EACH ELEMENT IN content
-    {
-        free(content[i]);
-    }
-
-    free(content);
     free(rawContent);
     fclose(file);
+    deallocateDoublePointer(content);
 
     return contentDecrypted;
 }
