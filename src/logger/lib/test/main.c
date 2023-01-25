@@ -27,7 +27,7 @@ int main(void)
     //VARIABLES
     logFile logger = initLogger(WRITE_DIR); //INITIALIZE LOGGER FILE
     char *usedKey = malloc(getKeyLength() + 1);
-    char **decrypted;
+    decryptedOutput decrypted;
     int exitCode = 0;
 
     //GENERATE KEY
@@ -50,7 +50,7 @@ int main(void)
     decrypted = decryptLogger(logger); //DECRYPT
 
     //COMPARE OUTPUT
-    if (strcmp(decrypted[0], WRITE_MESSAGE_1) == 0) //SUCCESS
+    if (strcmp(decrypted.decryptedText[0], WRITE_MESSAGE_1) == 0) //SUCCESS
     {
         printf("TEST SUCCESSFUL!\n");
     } else
