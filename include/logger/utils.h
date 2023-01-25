@@ -23,6 +23,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 void deallocateLogger(logFile logger); //USE THIS IF YOU WANT TO DEALLOCATE FILE POINTER RETURNED BY logger'S initLogger
 void deallocateDoublePointer(char **string); //DEALLOCATION OF POINTER-TO-POINTER, WHY TF ARE YOU READING THIS
-char **decryptLogger(logFile logger); //PASS logger AND FLAGS, AND PROGRAM WILL DECRYPT YOUR LOG... WHAT DID YOU EXPECT?
+decryptedOutput decryptLogger(logFile logger); //PASS logger AND FLAGS, AND PROGRAM WILL DECRYPT YOUR LOG... WHAT DID YOU EXPECT?
 
 #endif

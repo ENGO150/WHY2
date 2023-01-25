@@ -52,7 +52,7 @@ void deallocateDoublePointer(char **string)
     free(string); //no
 }
 
-char **decryptLogger(logFile logger) //TODO: Fix valgrind issues
+decryptedOutput decryptLogger(logFile logger) //TODO: Fix valgrind issues
 {
     FILE *file = fdopen(logger.file, "r");
     outputFlags outputBuffer;
@@ -114,5 +114,9 @@ char **decryptLogger(logFile logger) //TODO: Fix valgrind issues
     fclose(file);
     deallocateDoublePointer(content);
 
-    return contentDecrypted;
+    return (decryptedOutput)
+    {
+        contentDecrypted,
+        lines
+    };
 }
