@@ -25,7 +25,7 @@ const enum RETURN_CODES //exit codes you fucking idiot (2#)
     INVALID_FILE = -1 //THIS WILL HAPPEN IF YOU USE TOO MUCH LOGS lol
 };
 
-#define WRITE_MESSAGE "Hello from logger-test! 👋"
+#define WRITE_MESSAGE_1 "Hello from logger-test! 👋"
 #define WRITE_DIR "./logs"
 #define LOG_LATEST "latest.log"
 

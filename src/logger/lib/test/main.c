@@ -42,12 +42,12 @@ int main(void)
     //SET FLAGS
     setLogFlags(flags);
 
-    writeLog(logger.file, WRITE_MESSAGE); //WRITE
+    writeLog(logger.file, WRITE_MESSAGE_1); //WRITE
 
     decrypted = decryptLogger(logger); //DECRYPT
 
     //COMPARE OUTPUT
-    if (strcmp(decrypted[0], WRITE_MESSAGE) == 0) //SUCCESS
+    if (strcmp(decrypted[0], WRITE_MESSAGE_1) == 0) //SUCCESS
     {
         printf("TEST SUCCESSFUL!\n");
     } else
