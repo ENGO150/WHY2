@@ -67,7 +67,7 @@ decryptedOutput decryptLogger(logFile logger) //TODO: Fix valgrind issues
     rawContent = calloc(rawContentL + 1, sizeof(char)); //CALLOC WILL BE USED FOR CLEANING AFTER ALLOCATION
 
     //LOAD rawContent
-    (void) (fread(rawContent, rawContentL, 1, file) + 1); //TODO: Try to create some function for processing exit value
+    fread(rawContent, rawContentL, 1, file); //TODO: Try to create some function for processing exit value
 
     for (int i = 0; i < rawContentL; i++)
     {

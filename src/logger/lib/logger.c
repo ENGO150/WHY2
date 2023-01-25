@@ -83,7 +83,7 @@ logFile initLogger(char *directoryPath)
     strcpy(latestFilePath, filePath);
 
     if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); } //REMOVE SYMLINK IF IT ALREADY EXISTS
-    (void) (symlink(latestFilePath + (strlen(WRITE_DIR) + 1), latestBuffer) + 1); //TODO: Try to create some function for processing exit value //CREATE
+    symlink(latestFilePath + (strlen(WRITE_DIR) + 1), latestBuffer);
 
     deallocation:
 
@@ -143,7 +143,7 @@ void writeLog(int loggerFile, char *logMessage)
 
     sprintf(buffer, WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, message); //LOAD MESSAGE
 
-    (void) (write(loggerFile, buffer, strlen(buffer)) + 1); //TODO: Try to create some function for processing exit value
+    write(loggerFile, buffer, strlen(buffer));
 
     //DEALLOCATION
     free(buffer);

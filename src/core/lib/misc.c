@@ -143,7 +143,7 @@ boolean checkVersion(void)
     memset(buffer, '\0', bufferSize);
 
     //LOAD jsonFile
-    (void) (fread(buffer, bufferSize, 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
+    fread(buffer, bufferSize, 1, fileBuffer);
 
     buffer[bufferSize] = '\0';
 
@@ -400,7 +400,7 @@ void generateKey(char *key, int keyLength)
         FILE *fileBuffer;
 
         fileBuffer = fopen("/dev/urandom", "r");
-        (void) (fread(&numberBuffer, sizeof(numberBuffer), 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
+        fread(&numberBuffer, sizeof(numberBuffer), 1, fileBuffer);
         numberBuffer = abs(numberBuffer); //MAKE numberBuffer POSITIVE
         srand(numberBuffer);
 
