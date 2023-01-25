@@ -26,6 +26,9 @@ const enum RETURN_CODES //exit codes you fucking idiot (2#)
 };
 
 #define WRITE_MESSAGE_1 "Hello from logger-test! 👋"
+#define WRITE_MESSAGE_2 "aAzZ(    )!?#\\/śŠ <3|420*;㍿㊓ㅅΔ♛👶🏿"
+#define WRITE_MESSAGE_3 "ˢᵃʸ ʸᵉˢ ᵗᵒ ᵈʳᵘᵍˢ"
+
 #define WRITE_DIR "./logs"
 #define LOG_LATEST "latest.log"
 
