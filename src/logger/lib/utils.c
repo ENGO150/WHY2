@@ -35,6 +35,23 @@ void deallocateLogger(logFile logger)
     free(logger.fileName);
 }
 
+void deallocateDoublePointer(char **string)
+{
+    int buffer = 0;
+
+    for (; 1; buffer++) //GET string SIZE (FIRST DIM)
+    {
+        if (!string[buffer]) break;
+    }
+
+    for (int i = 0; i < buffer; i++) //LOAD ELEMENTS
+    {
+        free(string[i]); //DEALLOCATE ELEMENTS
+    }
+
+    free(string); //no
+}
+
 char **decryptLogger(logFile logger) //TODO: Fix valgrind issues
 {
     FILE *file = fdopen(logger.file, "r");
