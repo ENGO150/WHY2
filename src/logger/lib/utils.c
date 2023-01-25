@@ -35,21 +35,15 @@ void deallocateLogger(logFile logger)
     free(logger.fileName);
 }
 
-void deallocateDoublePointer(char **string)
+void deallocateDecryptedOutput(decryptedOutput output)
 {
-    int buffer = 0;
-
-    for (; 1; buffer++) //GET string SIZE (FIRST DIM)
+    for (int i = 0; i < output.length; i++)
     {
-        if (!string[buffer]) break;
+        free(output.decryptedText[i]);
     }
 
-    for (int i = 0; i < buffer; i++) //LOAD ELEMENTS
-    {
-        free(string[i]); //DEALLOCATE ELEMENTS
-    }
-
-    free(string); //no
+    output.length = 0;
+    free(output.decryptedText);
 }
 
 decryptedOutput decryptLogger(logFile logger) //TODO: Fix valgrind issues
