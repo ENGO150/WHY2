@@ -50,10 +50,24 @@ int main(void)
     decrypted = decryptLogger(logger); //DECRYPT
 
     //COMPARE OUTPUT
-    if (strcmp(decrypted.decryptedText[0], WRITE_MESSAGE_1) == 0) //SUCCESS
+    if //SUCCESS //TODO: Make this smart somehow
+    (
+        strcmp(decrypted.decryptedText[0], WRITE_MESSAGE_1) == 0 &&
+        strcmp(decrypted.decryptedText[1], WRITE_MESSAGE_2) == 0 &&
+        strcmp(decrypted.decryptedText[2], WRITE_MESSAGE_3) == 0
+    )
     {
-        printf("TEST SUCCESSFUL!\n");
-    } else
+        printf
+        (
+            "TEST SUCCESSFUL!\n\n"
+
+            "TEXT:\t\"%s\"\n"
+                 "\t\"%s\"\n"
+                 "\t\"%s\"\n",
+
+            decrypted.decryptedText[0], decrypted.decryptedText[1], decrypted.decryptedText[2]
+        );
+    } else //FAILED
     {
         fprintf(stderr, "TEST FAILED!\n");
         exitCode = 1;
