@@ -37,7 +37,7 @@ void deallocateLogger(logFile logger)
 
 void deallocateDecryptedOutput(decryptedOutput output)
 {
-    for (int i = 0; i < output.length; i++)
+    for (unsigned long i = 0; i < output.length; i++)
     {
         free(output.decryptedText[i]);
     }
