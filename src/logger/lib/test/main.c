@@ -42,7 +42,10 @@ int main(void)
     //SET FLAGS
     setLogFlags(flags);
 
-    writeLog(logger.file, WRITE_MESSAGE_1); //WRITE
+    //WRITE
+    writeLog(logger.file, WRITE_MESSAGE_1);
+    writeLog(logger.file, WRITE_MESSAGE_2);
+    writeLog(logger.file, WRITE_MESSAGE_3);
 
     decrypted = decryptLogger(logger); //DECRYPT
 
