@@ -35,18 +35,6 @@ void deallocateLogger(logFile logger)
     free(logger.fileName);
 }
 
-void removeSpaces(char* string)
-{
-    char* d = string;
-    do
-    {
-        while (*d == ' ')
-        {
-            ++d;
-        }
-    } while ((*string++ = *d++));
-}
-
 char **decryptLogger(logFile logger) //TODO: Fix valgrind issues
 {
     FILE *file = fdopen(logger.file, "r");
