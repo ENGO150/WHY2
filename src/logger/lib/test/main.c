@@ -56,12 +56,9 @@ int main(void)
         exitCode = 1;
     }
 
-    //TODO: Create some function for deallocating decrypted
-    free(decrypted[0]);
-    free(decrypted);
-
     //DEALLOCATION
     free(usedKey);
     deallocateLogger(logger);
+    deallocateDoublePointer(decrypted);
     return exitCode;
 }
