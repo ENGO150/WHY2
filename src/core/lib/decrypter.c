@@ -75,7 +75,7 @@ outputFlags decryptText(char *text, char *keyNew)
     }
 
     //SET LENGTH (numberBuffer)
-    returningText = malloc(numberBuffer + 1);
+    returningText = calloc(numberBuffer + 1, sizeof(char));
     textKeyChain = malloc(sizeof(int) * numberBuffer);
     encryptedTextKeyChain = malloc(sizeof(int) * numberBuffer);
     textKeyChainLength = numberBuffer;
@@ -123,9 +123,6 @@ outputFlags decryptText(char *text, char *keyNew)
     {
         textKeyChain[i] = getEncryptionOperation()(textKeyChain[i], encryptedTextKeyChain[i]);
     }
-
-    //FIX (CLEAN) returningText
-    memset(returningText, '\0', textKeyChainLength + 1);
 
     //LOAD returningText
     for (int i = 0; i < textKeyChainLength; i++)

@@ -137,10 +137,7 @@ boolean checkVersion(void)
     rewind(fileBuffer); //REWIND fileBuffer (NO SHIT)
 
     //SET LENGTH OF buffer
-    buffer = malloc(bufferSize + 1);
-
-    //FIX buffer
-    memset(buffer, '\0', bufferSize);
+    buffer = calloc(bufferSize + 1, sizeof(char));
 
     //LOAD jsonFile
     (void) (fread(buffer, bufferSize, 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
