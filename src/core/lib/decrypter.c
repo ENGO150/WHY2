@@ -60,13 +60,13 @@ outputFlags decryptText(char *text, char *keyNew)
     //VARIABLES
     char *returningText;
     int numberBuffer = 1;
+    int usedTextDeallocationBuffer = 0;
     char *textBuffer = malloc(1);
     int textKeyChainLength;
     int *textKeyChain;
     char *key = strdup(keyNew); //COPY keyNew TO key
     int *encryptedTextKeyChain;
     char *usedText = strdup(text); //COPY text TO usedText
-    char *usedTextCopy = usedText; //TODO: wtf
 
     //GET LENGTH OF returningText AND textKeyChain
     for (int i = 0; i < (int) strlen(usedText); i++)
@@ -115,6 +115,7 @@ outputFlags decryptText(char *text, char *keyNew)
         encryptedTextKeyChain[i] = atoi(textBuffer);
 
         usedText += numberBuffer + 1;
+        usedTextDeallocationBuffer += numberBuffer + 1;
     }
 
     //DECRYPT TEXT
@@ -150,7 +151,7 @@ outputFlags decryptText(char *text, char *keyNew)
     free(textKeyChain);
     free(encryptedTextKeyChain);
     free(textBuffer);
-    free(usedTextCopy);
+    free(usedText - usedTextDeallocationBuffer);
 
     return output;
 }
