@@ -30,7 +30,7 @@ int encryptionOperationTest(int text, int encryptedText)
 int main(void)
 {
     //VARIABLES
-    char *textBuffer = malloc(256);
+    char *textBuffer;
     char *keyBuffer;
     char *statusBuffer;
     char *outputBuffer = malloc(1); //THIS IS TEMP ALLOCATION
@@ -51,7 +51,6 @@ int main(void)
 
     //SET KEY_LENGTH TO 100
     setKeyLength(100);
-    keyBuffer = malloc(getKeyLength() + 1);
 
     //SET ENCRYPTION_SEPARATOR TO '|'
     setEncryptionSeparator('|');
@@ -65,8 +64,8 @@ int main(void)
     //ENCRYPT
     outputFlags encrypted = encryptText(TEST_TEXT, NULL);
 
-    strcpy(textBuffer, encrypted.outputText); //GET ENCRYPTED TEXT
-    strcpy(keyBuffer, encrypted.usedKey); //GET KEY
+    textBuffer = strdup(encrypted.outputText); //GET ENCRYPTED TEXT
+    keyBuffer = strdup(encrypted.usedKey); //GET KEY
     timeBuffer = encrypted.elapsedTime; //GET TIME 1
 
     //DEALLOCATE BUFFER
@@ -80,13 +79,11 @@ int main(void)
     //COMPARE DIFFERENCE
     if (strcmp(encrypted.outputText, TEST_TEXT) == 0 && encrypted.exitCode == 0) //SUCCESS
     {
-        statusBuffer = malloc(11);
-        strcpy(statusBuffer, "successful");
+        statusBuffer = strdup("successful");
     }
     else //FAILURE
     {
-        statusBuffer = malloc(7);
-        strcpy(statusBuffer, "failed");
+        statusBuffer = strdup("failed");
 
         outputBuffer = realloc(outputBuffer, strlen(encrypted.outputText) + 6);
         sprintf(outputBuffer, "\t\t\"%s\"\n", encrypted.outputText);
