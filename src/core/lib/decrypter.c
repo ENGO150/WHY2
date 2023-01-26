@@ -63,16 +63,10 @@ outputFlags decryptText(char *text, char *keyNew)
     char *textBuffer = malloc(1);
     int textKeyChainLength;
     int *textKeyChain;
-    char *key = malloc(strlen(keyNew) + 1);
+    char *key = strdup(keyNew); //COPY keyNew TO key
     int *encryptedTextKeyChain;
-    char *usedText = malloc(strlen(text) + 1);
-    char *usedTextCopy = usedText;
-
-    //COPY keyNew TO key
-    strcpy(key, keyNew);
-
-    //COPY text TO usedText
-    strcpy(usedText, text);
+    char *usedText = strdup(text); //COPY text TO usedText
+    char *usedTextCopy = usedText; //TODO: wtf
 
     //GET LENGTH OF returningText AND textKeyChain
     for (int i = 0; i < (int) strlen(usedText); i++)

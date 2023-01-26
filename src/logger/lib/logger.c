@@ -79,8 +79,7 @@ logFile initLogger(char *directoryPath)
     //CREATE SYMLINK
     sprintf(latestBuffer, LOG_LATEST_FORMATTING, WRITE_DIR, LOG_LATEST); //GENERATE LATEST.log PATH
 
-    latestFilePath = malloc(strlen(filePath) + 1);
-    strcpy(latestFilePath, filePath);
+    latestFilePath = strdup(filePath);
 
     if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); } //REMOVE SYMLINK IF IT ALREADY EXISTS
     (void) (symlink(latestFilePath + (strlen(WRITE_DIR) + 1), latestBuffer) + 1); //TODO: Try to create some function for processing exit value //CREATE
