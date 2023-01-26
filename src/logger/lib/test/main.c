@@ -77,5 +77,6 @@ int main(void)
     free(usedKey);
     deallocateLogger(logger);
     deallocateDecryptedOutput(decrypted);
+
     return exitCode;
 }

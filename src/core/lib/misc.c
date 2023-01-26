@@ -315,6 +315,14 @@ void deallocateOutput(outputFlags flags)
 {
     free(flags.outputText);
     free(flags.usedKey);
+
+    flags.elapsedTime = 0;
+    flags.exitCode = SUCCESS;
+    flags.repeatedKeySize = 0;
+    flags.unusedKeySize = 0;
+
+    flags.outputText = NULL;
+    flags.usedKey = NULL;
 }
 
 boolean checkKey(char *key)

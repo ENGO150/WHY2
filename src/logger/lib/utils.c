@@ -33,6 +33,9 @@ void deallocateLogger(logFile logger)
 {
     close(logger.file);
     free(logger.fileName);
+
+    logger.fileName = NULL;
+    logger.file = INVALID_FILE;
 }
 
 void deallocateDecryptedOutput(decryptedOutput output)
