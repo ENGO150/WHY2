@@ -87,7 +87,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
     return result;
 }
 
-why2_bool checkVersion(void)
+enum EXIT_CODES checkVersion(void)
 {
     if (getFlags().noCheck) return SUCCESS;
 
@@ -319,7 +319,7 @@ void deallocateOutput(outputFlags flags)
     flags.usedKey = NULL;
 }
 
-why2_bool checkKey(char *key)
+enum EXIT_CODES checkKey(char *key)
 {
     if (strlen(key) < getKeyLength())
     {
@@ -330,7 +330,7 @@ why2_bool checkKey(char *key)
     return SUCCESS;
 }
 
-why2_bool checkText(char *text)
+enum EXIT_CODES checkText(char *text)
 {
     if (strcmp(text, "") == 0)
     {

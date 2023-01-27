@@ -53,7 +53,7 @@ inputFlags getFlags(void)
     return flagsAllah;
 }
 
-outputFlags noOutput(why2_bool exitCode)
+outputFlags noOutput(enum EXIT_CODES exitCode)
 {
     char *emptyText = malloc(1); //TEXT
     emptyText[0] = '\0';

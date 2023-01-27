@@ -66,7 +66,7 @@ typedef struct
     unsigned long unusedKeySize; //VARIABLE FOR COUNT OF UNUSED CHARACTERS IN KEY
     unsigned long repeatedKeySize; //VARIABLE FOR COUNT OF REPEATED CHARACTERS IN KEY (basically reversed unusedKeySize)
     unsigned long elapsedTime; //VARIABLE FOR ELAPSED TIME IN MICROSECONDS => 1s = 1000000µs
-    why2_bool exitCode; //VARIABLE FOR EXIT CODE
+    enum EXIT_CODES exitCode; //VARIABLE FOR EXIT CODE
 } outputFlags;
 
 //NOTE: Variables were moved to 'flags.c' to force y'all using getters
@@ -76,7 +76,7 @@ char getEncryptionSeparator(void);
 unsigned long getKeyLength(void);
 inputFlags getDefaultFlags(void); //THIS GENERATES inputFlags WITH DEFAULT VALUES
 inputFlags getFlags(void); //RETURNS USED FLAGS
-outputFlags noOutput(why2_bool exitCode); //SAME AS getDefaultFlags() BUT FOR outputFlags
+outputFlags noOutput(enum EXIT_CODES exitCode); //SAME AS getDefaultFlags() BUT FOR outputFlags
 encryptionOperation_type_cb getEncryptionOperation(void); //RETURNS FUNCTION WHICH IS USED FOR ENCRYPTION & DECRYPTION
 why2_bool getFlagsChanged(void);
 
