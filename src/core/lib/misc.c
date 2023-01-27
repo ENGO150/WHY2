@@ -161,7 +161,7 @@ boolean checkVersion(void)
 	fclose(fileBuffer);
 
     //GET
-	parsedJson = json_tokener_parse(buffer);
+	parsedJson = json_tokener_parse(buffer); //yes, ik, i could use json_object_from_file, but I need to check for internet somehow
 	json_object_object_get_ex(parsedJson, "active", &active);
 
     if (strcmp(VERSION, json_object_get_string(active)) != 0)
@@ -248,7 +248,6 @@ boolean checkVersion(void)
         {
             if (!getFlags().noOutput) printf("Version %s not found! Check your flags.\n\n", VERSION);
 
-            free(deprecated);
             goto deallocation;
         }
 
@@ -258,15 +257,13 @@ boolean checkVersion(void)
         if (!getFlags().noOutput) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, VERSION, json_object_get_string(active));
 
         //WAIT FOR 5 SECONDS
-        free(deprecated);
         sleep(5);
     }
 
     deallocation:
 
     //DEALLOCATION
-    free(parsedJson);
-    free(active);
+    json_object_put(parsedJson); //THIS FREES EVERY json_object - AT LEAST JSON-C'S DOCUMENTATION SAYS THAT
     free(buffer);
 
     return SUCCESS;
