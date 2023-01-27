@@ -49,7 +49,7 @@ void deallocateDecryptedOutput(decryptedOutput output)
     free(output.decryptedText);
 }
 
-decryptedOutput decryptLogger(logFile logger) //TODO: Fix valgrind issues
+decryptedOutput decryptLogger(logFile logger)
 {
     FILE *file = fdopen(logger.file, "r");
     outputFlags outputBuffer;
@@ -78,14 +78,14 @@ decryptedOutput decryptLogger(logFile logger) //TODO: Fix valgrind issues
     }
 
     //ALLOCATE content & contentDecrypted
-    content = calloc(lines + 1, sizeof(char));
-    contentDecrypted = calloc(lines + 1, sizeof(char));
+    content = calloc(lines + 1, sizeof(char*));
+    contentDecrypted = calloc(lines + 1, sizeof(char*));
 
     for (int i = 0; i < rawContentL; i++) //LOAD rawContent AND SPLIT TO content
     {
         if (rawContent[i] == '\n') //END OF ONE LINE
         {
-            content[contentIndexBuffer] = calloc((i - (startingAtBuffer + strlen(WRITE_FORMAT)) + 1), sizeof(char)); //ALLOCATE ELEMENT
+            content[contentIndexBuffer] = calloc((i - (startingAtBuffer + strlen(WRITE_FORMAT)) + 2), sizeof(char)); //ALLOCATE ELEMENT
 
             for (int j = startingAtBuffer + strlen(WRITE_FORMAT); j <= i; j++) //LOAD CONTENT OF EACH LINE
             {
