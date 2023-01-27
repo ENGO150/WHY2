@@ -16,7 +16,7 @@
 
 # Compiler Settings
 CC=cc
-CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnull -Wunused -std=gnu11 -O2
+CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnull -Wunused -std=gnu11 -O2 -g # Remove the '-g' flag if you want the smallest possible lib size
 
 # Output Files
 PROJECT_NAME=why2
@@ -85,10 +85,10 @@ installLibLogger: buildLibLogger
 	install -m 755 ./lib$(PROJECT_NAME)-logger.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-logger.so
 
 testCore:
-	$(CC) $(CFLAGS) -g $(TEST_CORE) -o $(OUTPUT_TEST_CORE) $(LIB_CORE)
+	$(CC) $(CFLAGS) $(TEST_CORE) -o $(OUTPUT_TEST_CORE) $(LIB_CORE)
 
 testLogger:
-	$(CC) $(CFLAGS) -g $(TEST_LOGGER) -o $(OUTPUT_TEST_LOGGER) $(LIB_CORE) $(LIB_LOGGER)
+	$(CC) $(CFLAGS) $(TEST_LOGGER) -o $(OUTPUT_TEST_LOGGER) $(LIB_CORE) $(LIB_LOGGER)
 
 app:
 	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP) $(LIB_CORE)
