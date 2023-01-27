@@ -31,7 +31,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/flags.h>
 
-boolean seedSet = 0; //DO NOT FUCKING TOUCH THIS!!!
+why2_bool seedSet = 0; //DO NOT FUCKING TOUCH THIS!!!
 
 double multiply_cb(int a, int b) { return a * b; }
 double subtract_cb(int a, int b) { return a - b; }
@@ -87,7 +87,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
     return result;
 }
 
-boolean checkVersion(void)
+why2_bool checkVersion(void)
 {
     if (getFlags().noCheck) return SUCCESS;
 
@@ -319,7 +319,7 @@ void deallocateOutput(outputFlags flags)
     flags.usedKey = NULL;
 }
 
-boolean checkKey(char *key)
+why2_bool checkKey(char *key)
 {
     if (strlen(key) < getKeyLength())
     {
@@ -330,7 +330,7 @@ boolean checkKey(char *key)
     return SUCCESS;
 }
 
-boolean checkText(char *text)
+why2_bool checkText(char *text)
 {
     if (strcmp(text, "") == 0)
     {

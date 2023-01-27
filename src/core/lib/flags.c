@@ -30,7 +30,7 @@ char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptio
 unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
 inputFlags flagsAllah = DEFAULT_FLAGS; //IT IS CALLED flagsAllah CUZ flags CAUSED SOME FUCKING MEMORY PROBLEMS
 encryptionOperation_type_cb encryptionOperation_cb = encryptionOperation;
-boolean flagsChanged = 0; //CHANGES TO 1 WHEN U USE setFlags
+why2_bool flagsChanged = 0; //CHANGES TO 1 WHEN U USE setFlags
 
 //GETTERS
 char getEncryptionSeparator(void)
@@ -53,7 +53,7 @@ inputFlags getFlags(void)
     return flagsAllah;
 }
 
-outputFlags noOutput(boolean exitCode)
+outputFlags noOutput(why2_bool exitCode)
 {
     char *emptyText = malloc(1); //TEXT
     emptyText[0] = '\0';
@@ -73,7 +73,7 @@ encryptionOperation_type_cb getEncryptionOperation(void)
     return encryptionOperation_cb;
 }
 
-boolean getFlagsChanged(void)
+why2_bool getFlagsChanged(void)
 {
     return flagsChanged;
 }

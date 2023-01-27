@@ -50,13 +50,13 @@ const enum EXIT_CODES //exit codes you fucking idiot
 #define UNUSED __attribute__((unused)) //SAME COMMENT AS DEPRECATED'S
 
 //TYPES
-typedef char boolean; //READ THE NAME OR I WILL FIND YOU AND FUCK YOUR MOTHERFUCKING DOG!!!
+typedef char why2_bool; //READ THE NAME OR I WILL FIND YOU AND FUCK YOUR MOTHERFUCKING DOG!!!
 typedef int (*encryptionOperation_type_cb)(int, int); //TYPE FOR encryptionOperation CALLBACK
 typedef struct
 {
-    boolean noCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
-    boolean noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
-    boolean update; //BOOLEAN FOR UPDATING YOUR WHY VERSION IF OLD IS USED
+    why2_bool noCheck; //BOOLEAN FOR SKIPPING VERSION CHECK
+    why2_bool noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
+    why2_bool update; //BOOLEAN FOR UPDATING YOUR WHY VERSION IF OLD IS USED
 } inputFlags;
 
 typedef struct
@@ -66,7 +66,7 @@ typedef struct
     unsigned long unusedKeySize; //VARIABLE FOR COUNT OF UNUSED CHARACTERS IN KEY
     unsigned long repeatedKeySize; //VARIABLE FOR COUNT OF REPEATED CHARACTERS IN KEY (basically reversed unusedKeySize)
     unsigned long elapsedTime; //VARIABLE FOR ELAPSED TIME IN MICROSECONDS => 1s = 1000000µs
-    boolean exitCode; //VARIABLE FOR EXIT CODE
+    why2_bool exitCode; //VARIABLE FOR EXIT CODE
 } outputFlags;
 
 //NOTE: Variables were moved to 'flags.c' to force y'all using getters
@@ -76,9 +76,9 @@ char getEncryptionSeparator(void);
 unsigned long getKeyLength(void);
 inputFlags getDefaultFlags(void); //THIS GENERATES inputFlags WITH DEFAULT VALUES
 inputFlags getFlags(void); //RETURNS USED FLAGS
-outputFlags noOutput(boolean exitCode); //SAME AS getDefaultFlags() BUT FOR outputFlags
+outputFlags noOutput(why2_bool exitCode); //SAME AS getDefaultFlags() BUT FOR outputFlags
 encryptionOperation_type_cb getEncryptionOperation(void); //RETURNS FUNCTION WHICH IS USED FOR ENCRYPTION & DECRYPTION
-boolean getFlagsChanged(void);
+why2_bool getFlagsChanged(void);
 
 //SETTERS
 void setEncryptionSeparator(char encryptionSeparatorNew);
