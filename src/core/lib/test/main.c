@@ -39,7 +39,7 @@ int main(void)
     FILE *outputStreamBuffer = stdout;
 
     //FLAGS
-    inputFlags flags =
+    why2_input_flags flags =
     {
         0, //SKIP CHECK
         0, //NO OUTPUT
@@ -47,37 +47,37 @@ int main(void)
     };
 
     //SET FLAGS
-    setFlags(flags);
+    why2_set_flags(flags);
 
     //SET KEY_LENGTH TO 100
-    setKeyLength(100);
+    why2_set_key_length(100);
 
     //SET ENCRYPTION_SEPARATOR TO '|'
-    setEncryptionSeparator('|');
+    why2_set_encryption_separator('|');
 
     //SET outputBuffer to NULL
     outputBuffer[0] = '\0';
 
     //SET encryptionOperation to encryptionOperationTest
-    setEncryptionOperation(encryptionOperationTest);
+    why2_set_encryption_operation(encryptionOperationTest);
 
     //ENCRYPT
-    outputFlags encrypted = encryptText(TEST_TEXT, NULL);
+    why2_output_flags encrypted = why2_encrypt_text(WHY2_TEST_TEXT, NULL);
 
     textBuffer = strdup(encrypted.outputText); //GET ENCRYPTED TEXT
     keyBuffer = strdup(encrypted.usedKey); //GET KEY
     timeBuffer = encrypted.elapsedTime; //GET TIME 1
 
     //DEALLOCATE BUFFER
-    deallocateOutput(encrypted);
+    why2_deallocate_output(encrypted);
 
     //DECRYPT
-    encrypted = decryptText(textBuffer, keyBuffer);
+    encrypted = why2_decrypt_text(textBuffer, keyBuffer);
 
     timeBuffer += encrypted.elapsedTime; //GET TIME 1
 
     //COMPARE DIFFERENCE
-    if (strcmp(encrypted.outputText, TEST_TEXT) == 0 && encrypted.exitCode == 0) //SUCCESS
+    if (strcmp(encrypted.outputText, WHY2_TEST_TEXT) == 0 && encrypted.exitCode == 0) //WHY2_SUCCESS
     {
         statusBuffer = strdup("successful");
     }
@@ -107,7 +107,7 @@ int main(void)
         "REPEATED KEY: \t\"%lu\"\n"
         "EXIT CODE: \t\"%d\"\n"
 
-        , statusBuffer, TEST_TEXT, outputBuffer, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize, encrypted.repeatedKeySize, encrypted.exitCode
+        , statusBuffer, WHY2_TEST_TEXT, outputBuffer, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize, encrypted.repeatedKeySize, encrypted.exitCode
     );
 
     //DEALLOCATION
@@ -115,7 +115,7 @@ int main(void)
     free(keyBuffer);
     free(statusBuffer);
     free(outputBuffer);
-    deallocateOutput(encrypted);
+    why2_deallocate_output(encrypted);
 
     return exitCode;
 }

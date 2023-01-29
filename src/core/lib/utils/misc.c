@@ -37,7 +37,7 @@ double multiply_cb(int a, int b) { return a * b; }
 double subtract_cb(int a, int b) { return a - b; }
 double sum_cb(int a, int b) { return a + b; }
 
-int unlink_cb(const char *fpath, UNUSED const struct stat *sb, UNUSED int typeflag, UNUSED struct FTW *ftwbuf)
+int unlink_cb(const char *fpath, WHY2_UNUSED const struct stat *sb, WHY2_UNUSED int typeflag, WHY2_UNUSED struct FTW *ftwbuf)
 {
     int rv = remove(fpath);
 
@@ -87,21 +87,21 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
     return result;
 }
 
-enum EXIT_CODES checkVersion(void)
+enum WHY2_EXIT_CODES why2_check_version(void)
 {
-    if (getFlags().noCheck) return SUCCESS;
+    if (why2_get_flags().noCheck) return WHY2_SUCCESS;
 
     //FILE-CHECK VARIABLES
     int notFoundBuffer = 0;
 
     //CURL VARIABLES
     CURL *curl = curl_easy_init();
-    FILE *fileBuffer = fopen(VERSIONS_NAME, "w+");
+    FILE *fileBuffer = fopen(WHY2_VERSIONS_NAME, "w+");
 
     //GET versions.json
-    curl_easy_setopt(curl, CURLOPT_URL, VERSIONS_URL);
+    curl_easy_setopt(curl, CURLOPT_URL, WHY2_VERSIONS_URL);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fileBuffer);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, CURL_TIMEOUT);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, WHY2_CURL_TIMEOUT);
 
     //DOWNLOAD versions.json
     curl_easy_perform(curl);
@@ -110,17 +110,17 @@ enum EXIT_CODES checkVersion(void)
     curl_easy_cleanup(curl);
     fclose(fileBuffer);
 
-    while (access(VERSIONS_NAME, R_OK) != 0)
+    while (access(WHY2_VERSIONS_NAME, R_OK) != 0)
     {
         notFoundBuffer++;
 
-        if (notFoundBuffer == NOT_FOUND_TRIES)
+        if (notFoundBuffer == WHY2_NOT_FOUND_TRIES)
         {
-            if (!getFlags().noOutput) fprintf(stderr, "%s'%s' not found! Exiting...\n", CLEAR_SCREEN, VERSIONS_NAME);
-            return DOWNLOAD_FAILED;
+            if (!why2_get_flags().why2_no_output) fprintf(stderr, "%s'%s' not found! Exiting...\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME);
+            return WHY2_DOWNLOAD_FAILED;
         }
 
-        if (!getFlags().noOutput) printf("%s'%s' not found (%dx)! Trying again in a second.\n", CLEAR_SCREEN, VERSIONS_NAME, notFoundBuffer);
+        if (!why2_get_flags().why2_no_output) printf("%s'%s' not found (%dx)! Trying again in a second.\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME, notFoundBuffer);
         sleep(1);
     }
 
@@ -131,7 +131,7 @@ enum EXIT_CODES checkVersion(void)
     int bufferSize;
 
     //COUNT LENGTH OF buffer AND STORE IT IN bufferSize
-    fileBuffer = fopen(VERSIONS_NAME, "r");
+    fileBuffer = fopen(WHY2_VERSIONS_NAME, "r");
     fseek(fileBuffer, 0, SEEK_END);
     bufferSize = ftell(fileBuffer);
     rewind(fileBuffer); //REWIND fileBuffer (NO SHIT)
@@ -147,14 +147,14 @@ enum EXIT_CODES checkVersion(void)
     //CHECK FOR TEXT IN buffer
     if (strcmp(buffer, "") == 0)
     {
-        if (!getFlags().noOutput) fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n\n");
+        if (!why2_get_flags().why2_no_output) fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n\n");
 
         //WAIT FOR 5 SECONDS
         sleep(5);
 
         free(buffer);
         fclose(fileBuffer);
-        return SUCCESS;
+        return WHY2_SUCCESS;
     }
 
     //CLEANUP
@@ -164,16 +164,16 @@ enum EXIT_CODES checkVersion(void)
 	parsedJson = json_tokener_parse(buffer); //yes, ik, i could use json_object_from_file, but I need to check for internet somehow
 	json_object_object_get_ex(parsedJson, "active", &active);
 
-    if (strcmp(VERSION, json_object_get_string(active)) != 0)
+    if (strcmp(WHY2_VERSION, json_object_get_string(active)) != 0)
     {
         //UPDATE
-        if (getFlags().update)
+        if (why2_get_flags().update)
         {
             //CHECK FOR ROOT PERMISSIONS
             if (getuid() != 0)
             {
-                if (!getFlags().noOutput) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
-                return UPDATE_FAILED;
+                if (!why2_get_flags().why2_no_output) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
+                return WHY2_WHY2_UPDATE_FAILED;
             }
 
             //VARIABLES
@@ -183,48 +183,48 @@ enum EXIT_CODES checkVersion(void)
             int installCode;
 
             //MESSAGE
-            if (!getFlags().noOutput) printf("Your WHY2 version is outdated!\nUpdating...\t[BETA]\n\n");
+            if (!why2_get_flags().why2_no_output) printf("Your WHY2 version is outdated!\nUpdating...\t[BETA]\n\n");
 
-            //CHECK IF WHY2 REPO ISN'T ALREADY FOUND IN 'UPDATE_NAME'
-            if (access(UPDATE_NAME, F_OK) == 0)
+            //CHECK IF WHY2 REPO ISN'T ALREADY FOUND IN 'WHY2_UPDATE_NAME'
+            if (access(WHY2_UPDATE_NAME, F_OK) == 0)
             {
-                removeDirectory(UPDATE_NAME);
+                removeDirectory(WHY2_UPDATE_NAME);
             }
 
             git_libgit2_init(); //START GIT2
 
-            exitCode = git_clone(&repo, UPDATE_URL, UPDATE_NAME, NULL); //CLONE
+            exitCode = git_clone(&repo, WHY2_UPDATE_URL, WHY2_UPDATE_NAME, NULL); //CLONE
 
             git_libgit2_shutdown(); //STOP GIT2
 
             //CHECK FOR ERRORS
             if (exitCode != 0)
             {
-                if (!getFlags().noOutput) fprintf(stderr, "Updating failed! (cloning)\n");
-                return UPDATE_FAILED;
+                if (!why2_get_flags().why2_no_output) fprintf(stderr, "Updating failed! (cloning)\n");
+                return WHY2_WHY2_UPDATE_FAILED;
             }
 
             //COUNT installCommand LENGTH & ALLOCATE IT
-            installCommand = replaceWord(UPDATE_COMMAND, "{DIR}", UPDATE_NAME);
+            installCommand = replaceWord(WHY2_UPDATE_COMMAND, "{DIR}", WHY2_UPDATE_NAME);
 
             installCode = system(installCommand); //INSTALL
 
             //REMOVE versions.json - OTHERWISE WILL CAUSE SEGFAULT IN NEXT RUN
-            remove(VERSIONS_NAME);
+            remove(WHY2_VERSIONS_NAME);
 
             free(installCommand);
 
             //CHECK FOR ERRORS
             if (installCode != 0)
             {
-                if (!getFlags().noOutput) fprintf(stderr, "Updating failed! (installing)\n");
-                return UPDATE_FAILED;
+                if (!why2_get_flags().why2_no_output) fprintf(stderr, "Updating failed! (installing)\n");
+                return WHY2_WHY2_UPDATE_FAILED;
             }
 
-            goto deallocation; //GREAT SUCCESS!
+            goto deallocation; //GREAT WHY2_SUCCESS!
         }
 
-        //COUNT VERSIONS BEHIND
+        //COUNT WHY2_VERSIONS BEHIND
         int versionsIndex = -1;
         int versionsBuffer = 0;
 
@@ -235,7 +235,7 @@ enum EXIT_CODES checkVersion(void)
         for (int i = 0; i < (int) json_object_array_length(deprecated); i++)
         {
             //IT'S A MATCH, BABY :D
-		    if (strcmp(json_object_get_string(json_object_array_get_idx(deprecated, i)), VERSION) == 0)
+		    if (strcmp(json_object_get_string(json_object_array_get_idx(deprecated, i)), WHY2_VERSION) == 0)
             {
                 versionsIndex = i;
 
@@ -243,10 +243,10 @@ enum EXIT_CODES checkVersion(void)
             }
         }
 
-        //versions.json DOESN'T CONTAIN VERSION (THIS WILL NOT HAPPEN IF YOU WILL NOT EDIT IT)
+        //versions.json DOESN'T CONTAIN WHY2_VERSION (THIS WILL NOT HAPPEN IF YOU WILL NOT EDIT IT)
         if (versionsIndex == -1)
         {
-            if (!getFlags().noOutput) printf("Version %s not found! Check your flags.\n\n", VERSION);
+            if (!why2_get_flags().why2_no_output) printf("Version %s not found! Check your flags.\n\n", WHY2_VERSION);
 
             goto deallocation;
         }
@@ -254,7 +254,7 @@ enum EXIT_CODES checkVersion(void)
         //COUNT versionsBuffer
         versionsBuffer = json_object_array_length(deprecated) - versionsIndex;
 
-        if (!getFlags().noOutput) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, VERSION, json_object_get_string(active));
+        if (!why2_get_flags().why2_no_output) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, WHY2_VERSION, json_object_get_string(active));
 
         //WAIT FOR 5 SECONDS
         sleep(5);
@@ -266,10 +266,10 @@ enum EXIT_CODES checkVersion(void)
     json_object_put(parsedJson); //THIS FREES EVERY json_object - AT LEAST JSON-C'S DOCUMENTATION SAYS THAT
     free(buffer);
 
-    return SUCCESS;
+    return WHY2_SUCCESS;
 }
 
-void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
+void why2_generate_text_key_chain(char *key, int *textKeyChain, int textKeyChainSize)
 {
     int numberBuffer;
     int numberBuffer2;
@@ -279,13 +279,13 @@ void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
     {
         numberBuffer = i;
 
-        //CHECK, IF numberBuffer ISN'T GREATER THAN keyLength AND CUT UNUSED LENGTH
-        while (numberBuffer >= (int) getKeyLength())
+        //CHECK, IF numberBuffer ISN'T GREATER THAN keyLength AND CUT WHY2_UNUSED LENGTH
+        while (numberBuffer >= (int) why2_get_key_length())
         {
-            numberBuffer -= getKeyLength();
+            numberBuffer -= why2_get_key_length();
         }
 
-        numberBuffer2 = getKeyLength() - (numberBuffer + (i < textKeyChainSize));
+        numberBuffer2 = why2_get_key_length() - (numberBuffer + (i < textKeyChainSize));
 
         //FILL textKeyChain
         if ((numberBuffer + 1) % 3 == 0)
@@ -305,13 +305,13 @@ void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize)
     }
 }
 
-void deallocateOutput(outputFlags flags)
+void why2_deallocate_output(why2_output_flags flags)
 {
     free(flags.outputText);
     free(flags.usedKey);
 
     flags.elapsedTime = 0;
-    flags.exitCode = SUCCESS;
+    flags.exitCode = WHY2_SUCCESS;
     flags.repeatedKeySize = 0;
     flags.unusedKeySize = 0;
 
@@ -319,29 +319,29 @@ void deallocateOutput(outputFlags flags)
     flags.usedKey = NULL;
 }
 
-enum EXIT_CODES checkKey(char *key)
+enum WHY2_EXIT_CODES why2_check_key(char *key)
 {
-    if (strlen(key) < getKeyLength())
+    if (strlen(key) < why2_get_key_length())
     {
-        if (!getFlags().noOutput) fprintf(stderr, "Key must be at least %lu characters long!\n", getKeyLength());
-        return INVALID_KEY;
+        if (!why2_get_flags().why2_no_output) fprintf(stderr, "Key must be at least %lu characters long!\n", why2_get_key_length());
+        return WHY2_INVALID_KEY;
     }
 
-    return SUCCESS;
+    return WHY2_SUCCESS;
 }
 
-enum EXIT_CODES checkText(char *text)
+enum WHY2_EXIT_CODES why2_check_text(char *text)
 {
     if (strcmp(text, "") == 0)
     {
-        if (!getFlags().noOutput) fprintf(stderr, "No text to encrypt!\n");
-        return INVALID_TEXT;
+        if (!why2_get_flags().why2_no_output) fprintf(stderr, "No text to encrypt!\n");
+        return WHY2_INVALID_TEXT;
     }
 
-    return SUCCESS;
+    return WHY2_SUCCESS;
 }
 
-unsigned long countIntLength(int number)
+unsigned long why2_count_int_length(int number)
 {
     int returning = 1;
     int buffer = 10;
@@ -363,7 +363,7 @@ unsigned long countIntLength(int number)
     return returning;
 }
 
-unsigned long countUnusedKeySize(char *text, char *key)
+unsigned long why2_count_unused_key_size(char *text, char *key)
 {
     unsigned long returning = 0;
 
@@ -375,7 +375,7 @@ unsigned long countUnusedKeySize(char *text, char *key)
     return returning;
 }
 
-unsigned long countRepeatedKeySize(char *text, char *key)
+unsigned long why2_count_repeated_key_size(char *text, char *key)
 {
     unsigned long returning = 0;
 
@@ -387,12 +387,12 @@ unsigned long countRepeatedKeySize(char *text, char *key)
     return returning;
 }
 
-unsigned long compareTimeMicro(struct timeval startTime, struct timeval finishTime)
+unsigned long why2_compare_time_micro(struct timeval startTime, struct timeval finishTime)
 {
     return (finishTime.tv_sec - startTime.tv_sec) * 1000000 + finishTime.tv_usec - startTime.tv_usec;
 }
 
-void generateKey(char *key, int keyLength)
+void why2_generate_key(char *key, int keyLength)
 {
     int numberBuffer;
 

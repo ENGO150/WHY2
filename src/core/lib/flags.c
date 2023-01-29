@@ -21,86 +21,86 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 
 //CONSTS (this is just local)
-#define DEFAULT_FLAGS (inputFlags) { 0, 0, 0 }
+#define DEFAULT_FLAGS (why2_input_flags) { 0, 0, 0 }
 
 int encryptionOperation(int text, int encryptedText);
 
 //VARIABLES
-char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE setEncryptionSeparator instead <
-unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE setKeyLength instead <
-inputFlags flagsAllah = DEFAULT_FLAGS; //IT IS CALLED flagsAllah CUZ flags CAUSED SOME FUCKING MEMORY PROBLEMS
-encryptionOperation_type_cb encryptionOperation_cb = encryptionOperation;
-why2_bool flagsChanged = 0; //CHANGES TO 1 WHEN U USE setFlags
+char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE why2_set_encryption_separator instead <
+unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE why2_set_key_length instead <
+why2_input_flags flagsAllah = DEFAULT_FLAGS; //IT IS CALLED flagsAllah CUZ flags CAUSED SOME FUCKING MEMORY PROBLEMS
+why2_encryption_operation_cb encryptionOperation_cb = encryptionOperation;
+why2_bool flagsChanged = 0; //CHANGES TO 1 WHEN U USE why2_set_flags
 
 //GETTERS
-char getEncryptionSeparator(void)
+char why2_get_encryption_separator(void)
 {
     return encryptionSeparator;
 }
 
-unsigned long getKeyLength(void)
+unsigned long why2_get_key_length(void)
 {
     return keyLength;
 }
 
-inputFlags getDefaultFlags(void)
+why2_input_flags why2_get_default_flags(void)
 {
     return DEFAULT_FLAGS;
 }
 
-inputFlags getFlags(void)
+why2_input_flags why2_get_flags(void)
 {
     return flagsAllah;
 }
 
-outputFlags noOutput(enum EXIT_CODES exitCode)
+why2_output_flags why2_no_output(enum WHY2_EXIT_CODES exitCode)
 {
     char *emptyText = malloc(1); //TEXT
     emptyText[0] = '\0';
 
-    char *emptyKey = malloc(getKeyLength() + 1); //KEY
-    for (int i = 0; i < (int) getKeyLength(); i++)
+    char *emptyKey = malloc(why2_get_key_length() + 1); //KEY
+    for (int i = 0; i < (int) why2_get_key_length(); i++)
     {
         emptyKey[i] = 'x';
     }
-    emptyKey[getKeyLength()] = '\0';
+    emptyKey[why2_get_key_length()] = '\0';
 
-    return (outputFlags) { emptyText, emptyKey, 0, 0, 0, exitCode };
+    return (why2_output_flags) { emptyText, emptyKey, 0, 0, 0, exitCode };
 }
 
-encryptionOperation_type_cb getEncryptionOperation(void)
+why2_encryption_operation_cb why2_get_encryption_operation(void)
 {
     return encryptionOperation_cb;
 }
 
-why2_bool getFlagsChanged(void)
+why2_bool why2_get_flags_changed(void)
 {
     return flagsChanged;
 }
 
 //SETTERS
-void setEncryptionSeparator(char encryptionSeparatorNew)
+void why2_set_encryption_separator(char encryptionSeparatorNew)
 {
     if (encryptionSeparatorNew <= 31) return;
 
     encryptionSeparator = encryptionSeparatorNew;
 }
 
-void setKeyLength(int keyLengthNew)
+void why2_set_key_length(int keyLengthNew)
 {
     if (keyLengthNew < 1) return;
 
     keyLength = keyLengthNew;
 }
 
-void setFlags(inputFlags newFlags)
+void why2_set_flags(why2_input_flags newFlags)
 {
     flagsAllah = newFlags;
 
     if (!flagsChanged) flagsChanged = 1;
 }
 
-void setEncryptionOperation(encryptionOperation_type_cb newEncryptionOperation)
+void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOperation)
 {
     encryptionOperation_cb = newEncryptionOperation;
 }

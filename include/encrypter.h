@@ -21,6 +21,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/flags.h>
 
-outputFlags encryptText(char *text, char *keyNew); //TEXT from WILL BE ENCRYPTED WITH KEY AND RETURNED
+why2_output_flags why2_encrypt_text(char *text, char *keyNew); //TEXT from WILL BE ENCRYPTED WITH KEY AND RETURNED
 
 #endif

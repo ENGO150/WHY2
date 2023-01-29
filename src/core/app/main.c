@@ -23,10 +23,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 int main(void)
 {
     //SET FLAGS
-    setFlags((inputFlags) {1, 1, 0});
+    why2_set_flags((why2_input_flags) {1, 1, 0});
 
-    //RUN ENCRYPTION WITH TEXT_TO_ENCRYPT, GENERATE NEW KEY AND DO NOT CHECK FOR ACTIVE VERSION & PREVENT ANY OUTPUT
-    outputFlags encryptedText = encryptText(TEXT_TO_ENCRYPT, NULL);
+    //RUN ENCRYPTION WITH WHY2_TEXT_TO_ENCRYPT, GENERATE NEW KEY AND DO NOT CHECK FOR ACTIVE WHY2_VERSION & PREVENT ANY OUTPUT
+    why2_output_flags encryptedText = why2_encrypt_text(WHY2_TEXT_TO_ENCRYPT, NULL);
 
     //SIMPLE TEXT
     printf
@@ -39,11 +39,11 @@ int main(void)
         "If you'd like to know more about WHY2 Encryption System, please visit: https://github.com/ENGO150/WHY2/wiki \b\n"
         "Thank you so much for supporting this project!\n"
 
-        , TEXT_TO_ENCRYPT, encryptedText.outputText
+        , WHY2_TEXT_TO_ENCRYPT, encryptedText.outputText
     );
 
     //DEALLOCATION
-    deallocateOutput(encryptedText);
+    why2_deallocate_output(encryptedText);
 
     return 0;
 }

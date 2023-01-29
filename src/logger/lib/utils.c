@@ -29,7 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/logger/flags.h>
 
-void deallocateLogger(logFile logger)
+void why2_deallocate_logger(why2_log_file logger)
 {
     close(logger.file);
     free(logger.fileName);
@@ -38,7 +38,7 @@ void deallocateLogger(logFile logger)
     logger.file = INVALID_FILE;
 }
 
-void deallocateDecryptedOutput(decryptedOutput output)
+void why2_deallocate_decrypted_output(why2_decrypted_output output)
 {
     for (unsigned long i = 0; i < output.length; i++)
     {
@@ -49,10 +49,10 @@ void deallocateDecryptedOutput(decryptedOutput output)
     free(output.decryptedText);
 }
 
-decryptedOutput decryptLogger(logFile logger)
+why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
 {
     FILE *file = fdopen(logger.file, "r");
-    outputFlags outputBuffer;
+    why2_output_flags outputBuffer;
     char *rawContent;
     char **content;
     char **contentDecrypted;
@@ -85,11 +85,11 @@ decryptedOutput decryptLogger(logFile logger)
     {
         if (rawContent[i] == '\n') //END OF ONE LINE
         {
-            content[contentIndexBuffer] = calloc((i - (startingAtBuffer + strlen(WRITE_FORMAT)) + 2), sizeof(char)); //ALLOCATE ELEMENT
+            content[contentIndexBuffer] = calloc((i - (startingAtBuffer + strlen(WHY2_WRITE_FORMAT)) + 2), sizeof(char)); //ALLOCATE ELEMENT
 
-            for (int j = startingAtBuffer + strlen(WRITE_FORMAT); j <= i; j++) //LOAD CONTENT OF EACH LINE
+            for (int j = startingAtBuffer + strlen(WHY2_WRITE_FORMAT); j <= i; j++) //LOAD CONTENT OF EACH LINE
             {
-                content[contentIndexBuffer][j - (startingAtBuffer + strlen(WRITE_FORMAT))] = rawContent[j]; //SET
+                content[contentIndexBuffer][j - (startingAtBuffer + strlen(WHY2_WRITE_FORMAT))] = rawContent[j]; //SET
             }
 
             contentIndexBuffer++;
@@ -99,19 +99,19 @@ decryptedOutput decryptLogger(logFile logger)
 
     for (int i = 0; i < lines; i++) //DECRYPT content
     {
-        outputBuffer = decryptText(content[i], getLogFlags().key); //DECRYPT
+        outputBuffer = why2_decrypt_text(content[i], why2_get_log_flags().key); //DECRYPT
 
         contentDecrypted[i] = strdup(outputBuffer.outputText); //COPY
 
-        deallocateOutput(outputBuffer); //DEALLOCATE outputBuffer
+        why2_deallocate_output(outputBuffer); //DEALLOCATE outputBuffer
     }
 
     //DEALLOCATION
     free(rawContent);
     fclose(file);
-    deallocateDecryptedOutput((decryptedOutput) { content, lines }); //fuck the system lmao
+    why2_deallocate_decrypted_output((why2_decrypted_output) { content, lines }); //fuck the system lmao
 
-    return (decryptedOutput)
+    return (why2_decrypted_output)
     {
         contentDecrypted,
         lines

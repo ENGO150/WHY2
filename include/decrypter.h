@@ -21,6 +21,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/flags.h>
 
-outputFlags decryptText(char *text, char *keyNew); //TEXT from WILL BE DECRYPTED WITH KEY AND RETURNED
+why2_output_flags why2_decrypt_text(char *text, char *keyNew); //TEXT from WILL BE DECRYPTED WITH KEY AND RETURNED
 
 #endif

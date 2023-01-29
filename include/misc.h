@@ -23,15 +23,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/flags.h>
 
-void generateTextKeyChain(char *key, int *textKeyChain, int textKeyChainSize); //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
-void generateKey(char *key, int keyLength); //GENERATE ENCRYPTION KEY
-void deallocateOutput(outputFlags flags); //DEALLOCATES flags
-enum EXIT_CODES checkVersion(void); //THIS FUNCTION CHECKS IF LATEST VERSION OF WHY2 IS USED
-enum EXIT_CODES checkKey(char *key); //CHECKS IF KEY IS VALID
-enum EXIT_CODES checkText(char *text); //CHECKS IF TEXT IS VALID
-unsigned long countIntLength(int number); //RETURNS LENGTH OF number
-unsigned long countUnusedKeySize(char *text, char *key); //COUNT unusedKeySize
-unsigned long countRepeatedKeySize(char *text, char *key); //COUNT repeatedKeySize
-unsigned long compareTimeMicro(struct timeval startTime, struct timeval finishTime); //COMPARE TIMES IN MICROSECONDS
+void why2_generate_text_key_chain(char *key, int *textKeyChain, int textKeyChainSize); //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
+void why2_generate_key(char *key, int keyLength); //GENERATE ENCRYPTION KEY
+void why2_deallocate_output(why2_output_flags flags); //DEALLOCATES flags
+enum WHY2_EXIT_CODES why2_check_version(void); //THIS FUNCTION CHECKS IF LATEST WHY2_VERSION OF WHY2 IS USED
+enum WHY2_EXIT_CODES why2_check_key(char *key); //CHECKS IF KEY IS VALID
+enum WHY2_EXIT_CODES why2_check_text(char *text); //CHECKS IF TEXT IS VALID
+unsigned long why2_count_int_length(int number); //RETURNS LENGTH OF number
+unsigned long why2_count_unused_key_size(char *text, char *key); //COUNT unusedKeySize
+unsigned long why2_count_repeated_key_size(char *text, char *key); //COUNT repeatedKeySize
+unsigned long why2_compare_time_micro(struct timeval startTime, struct timeval finishTime); //COMPARE TIMES IN MICROSECONDS
 
 #endif

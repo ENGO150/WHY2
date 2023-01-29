@@ -25,36 +25,36 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 int main(void)
 {
     //VARIABLES
-    logFile logger = initLogger(WRITE_DIR); //INITIALIZE LOGGER FILE
-    char *usedKey = malloc(getKeyLength() + 1);
-    decryptedOutput decrypted;
+    why2_log_file logger = why2_init_logger(WHY2_WRITE_DIR); //INITIALIZE LOGGER FILE
+    char *usedKey = malloc(why2_get_key_length() + 1);
+    why2_decrypted_output decrypted;
     int exitCode = 0;
 
     //GENERATE KEY
-    generateKey(usedKey, getKeyLength());
+    why2_generate_key(usedKey, why2_get_key_length());
 
     //FLAGS
-    logFlags flags =
+    why2_log_flags flags =
     {
         usedKey
     };
 
     //SET FLAGS
-    setLogFlags(flags);
+    why2_set_log_flags(flags);
 
     //WRITE
-    writeLog(logger.file, WRITE_MESSAGE_1);
-    writeLog(logger.file, WRITE_MESSAGE_2);
-    writeLog(logger.file, WRITE_MESSAGE_3);
+    why2_write_log(logger.file, WHY2_WRITE_MESSAGE_1);
+    why2_write_log(logger.file, WHY2_WRITE_MESSAGE_2);
+    why2_write_log(logger.file, WHY2_WRITE_MESSAGE_3);
 
-    decrypted = decryptLogger(logger); //DECRYPT
+    decrypted = why2_decrypt_logger(logger); //DECRYPT
 
     //COMPARE OUTPUT
-    if //SUCCESS //TODO: Make this smart somehow
+    if //WHY2_SUCCESS //TODO: Make this smart somehow
     (
-        strcmp(decrypted.decryptedText[0], WRITE_MESSAGE_1) == 0 &&
-        strcmp(decrypted.decryptedText[1], WRITE_MESSAGE_2) == 0 &&
-        strcmp(decrypted.decryptedText[2], WRITE_MESSAGE_3) == 0
+        strcmp(decrypted.decryptedText[0], WHY2_WRITE_MESSAGE_1) == 0 &&
+        strcmp(decrypted.decryptedText[1], WHY2_WRITE_MESSAGE_2) == 0 &&
+        strcmp(decrypted.decryptedText[2], WHY2_WRITE_MESSAGE_3) == 0
     )
     {
         printf
@@ -75,8 +75,8 @@ int main(void)
 
     //DEALLOCATION
     free(usedKey);
-    deallocateLogger(logger);
-    deallocateDecryptedOutput(decrypted);
+    why2_deallocate_logger(logger);
+    why2_deallocate_decrypted_output(decrypted);
 
     return exitCode;
 }

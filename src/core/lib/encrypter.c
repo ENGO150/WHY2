@@ -26,7 +26,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/flags.h>
 #include <why2/misc.h>
 
-outputFlags encryptText(char *text, char *keyNew)
+why2_output_flags why2_encrypt_text(char *text, char *keyNew)
 {
     //CHECK VARIABLE
     unsigned char checkExitCode;
@@ -36,16 +36,16 @@ outputFlags encryptText(char *text, char *keyNew)
     struct timeval finishTime;
     gettimeofday(&startTime, NULL);
 
-    //CHECK FOR ACTIVE VERSION
-    if ((checkExitCode = checkVersion()) != SUCCESS)
+    //CHECK FOR ACTIVE WHY2_VERSION
+    if ((checkExitCode = why2_check_version()) != WHY2_SUCCESS)
     {
-        return noOutput(checkExitCode);
+        return why2_no_output(checkExitCode);
     }
 
     //CHECK FOR INVALID text
-    if ((checkExitCode = checkText(text)) != SUCCESS)
+    if ((checkExitCode = why2_check_text(text)) != WHY2_SUCCESS)
     {
-        return noOutput(checkExitCode);
+        return why2_no_output(checkExitCode);
     }
 
     //VARIABLES
@@ -58,35 +58,35 @@ outputFlags encryptText(char *text, char *keyNew)
     if (keyNew != NULL)
     {
         //CHECK FOR INVALID key
-        if ((checkExitCode = checkKey(keyNew)) != SUCCESS)
+        if ((checkExitCode = why2_check_key(keyNew)) != WHY2_SUCCESS)
         {
-            return noOutput(checkExitCode);
+            return why2_no_output(checkExitCode);
         }
 
         key = strdup(keyNew);
 
         //REDEFINE keyLength
-        setKeyLength(strlen(key));
+        why2_set_key_length(strlen(key));
     } else //LOAD KEY
     {
-        key = malloc(getKeyLength() + 1);
+        key = malloc(why2_get_key_length() + 1);
 
-        generateKey(key, getKeyLength());
+        why2_generate_key(key, why2_get_key_length());
     }
 
     //LOAD textKeyChain
-    generateTextKeyChain(key, textKeyChain, strlen(text));
+    why2_generate_text_key_chain(key, textKeyChain, strlen(text));
 
     //ACTUALLY ENCRYPT TEXT
     for (int i = 0; i < (int) strlen(text); i++)
     {
-        textKeyChain[i] = getEncryptionOperation()(textKeyChain[i], (int) text[i]);
+        textKeyChain[i] = why2_get_encryption_operation()(textKeyChain[i], (int) text[i]);
     }
 
     //COUNT REQUIRED SIZE FOR returningText
     for (int i = 0; i < (int) strlen(text); i++)
     {
-        numberBuffer += countIntLength(textKeyChain[i]);
+        numberBuffer += why2_count_int_length(textKeyChain[i]);
     }
 
     //ALLOCATE returningText (WITH THE SEPARATORS)
@@ -95,7 +95,7 @@ outputFlags encryptText(char *text, char *keyNew)
     //LOAD returningText
     for (int i = 0; i < (int) strlen(text); i++)
     {
-        numberBuffer = sizeof(int) * countIntLength(textKeyChain[i]);
+        numberBuffer = sizeof(int) * why2_count_int_length(textKeyChain[i]);
 
         textBuffer = realloc(textBuffer, numberBuffer);
 
@@ -106,7 +106,7 @@ outputFlags encryptText(char *text, char *keyNew)
         if (i != (int) strlen(text) - 1)
         {
             textBuffer = realloc(textBuffer, 2);
-            sprintf(textBuffer, "%c", getEncryptionSeparator());
+            sprintf(textBuffer, "%c", why2_get_encryption_separator());
 
             strcat(returningText, textBuffer);
         }
@@ -116,14 +116,14 @@ outputFlags encryptText(char *text, char *keyNew)
     gettimeofday(&finishTime, NULL);
 
     //LOAD output
-    outputFlags output =
+    why2_output_flags output =
     {
         returningText, //ENCRYPTED TEXT
         key, //GENERATED/USED KEY
-        countUnusedKeySize(text, key), // NUMBER OF UNUSED CHARS IN KEY
-        countRepeatedKeySize(text, key), //NUMBER OF REPEATED CHARS IN KEY
-        compareTimeMicro(startTime, finishTime), // ELAPSED TIME
-        SUCCESS //EXIT CODE
+        why2_count_unused_key_size(text, key), // NUMBER OF WHY2_UNUSED CHARS IN KEY
+        why2_count_repeated_key_size(text, key), //NUMBER OF REPEATED CHARS IN KEY
+        why2_compare_time_micro(startTime, finishTime), // ELAPSED TIME
+        WHY2_SUCCESS //EXIT CODE
     };
 
     //DEALLOCATION

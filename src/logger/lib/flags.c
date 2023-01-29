@@ -21,16 +21,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdio.h>
 
 //VARIABLES
-logFlags flags = { NULL };
+why2_log_flags flags = { NULL };
 
 //GETTERS
-logFlags getLogFlags(void)
+why2_log_flags why2_get_log_flags(void)
 {
     return flags;
 }
 
 //SETTERS
-void setLogFlags(logFlags logFlagsNew)
+void why2_set_log_flags(why2_log_flags why2_log_flagsNew)
 {
-    flags = logFlagsNew;
+    flags = why2_log_flagsNew;
 }

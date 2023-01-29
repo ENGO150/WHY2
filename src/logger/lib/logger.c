@@ -32,7 +32,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/encrypter.h>
 #include <why2/misc.h>
 
-logFile initLogger(char *directoryPath)
+why2_log_file why2_init_logger(char *directoryPath)
 {
     //VARIABLES
     struct stat st;
@@ -41,13 +41,13 @@ logFile initLogger(char *directoryPath)
     struct tm tm = *localtime(&timeL);
     int buffer = 1;
     int file;
-    char *filePath = malloc(strlen(directoryPath) + 1 + strlen(LOG_FORMAT) + 1);
-    char *dateBuffer = malloc(strlen(LOG_FORMAT_START) + 1);
-    char *latestBuffer = malloc(strlen(WRITE_DIR) + strlen(LOG_LATEST) + 2);
+    char *filePath = malloc(strlen(directoryPath) + 1 + strlen(WHY2_LOG_FORMAT) + 1);
+    char *dateBuffer = malloc(strlen(WHY2_LOG_FORMAT_START) + 1);
+    char *latestBuffer = malloc(strlen(WHY2_WRITE_DIR) + strlen(WHY2_LOG_LATEST) + 2);
     char *latestFilePath = NULL;
     DIR *dir;
 
-    sprintf(dateBuffer, LOG_FORMATTING_START, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+    sprintf(dateBuffer, WHY2_LOG_FORMATTING_START, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 
     //CREATE directoryPath DIRECTORY IF IT DOESN'T EXISTS ALREADY
     if (stat(directoryPath, &st) == -1)
@@ -65,24 +65,24 @@ logFile initLogger(char *directoryPath)
         }
     }
 
-    if (buffer > MAX_USAGE) //MAX_USAGE WAS REACHED
+    if (buffer > WHY2_MAX_USAGE) //WHY2_MAX_USAGE WAS REACHED
     {
         file = INVALID_FILE;
 
         goto deallocation;
     }
 
-    sprintf(filePath, LOG_FORMATTING, directoryPath, dateBuffer, buffer); //GENERATE LOG-NAME
+    sprintf(filePath, WHY2_LOG_FORMATTING, directoryPath, dateBuffer, buffer); //GENERATE LOG-NAME
 
     file = open(filePath, O_RDWR | O_APPEND | O_CREAT, 0644); //CREATE LOG FILE
 
     //CREATE SYMLINK
-    sprintf(latestBuffer, LOG_LATEST_FORMATTING, WRITE_DIR, LOG_LATEST); //GENERATE LATEST.log PATH
+    sprintf(latestBuffer, WHY2_LOG_LATEST_FORMATTING, WHY2_WRITE_DIR, WHY2_LOG_LATEST); //GENERATE LATEST.log PATH
 
     latestFilePath = strdup(filePath);
 
     if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); } //REMOVE SYMLINK IF IT ALREADY EXISTS
-    (void) (symlink(latestFilePath + (strlen(WRITE_DIR) + 1), latestBuffer) + 1); //TODO: Try to create some function for processing exit value //CREATE
+    (void) (symlink(latestFilePath + (strlen(WHY2_WRITE_DIR) + 1), latestBuffer) + 1); //TODO: Try to create some function for processing exit value //CREATE
 
     deallocation:
 
@@ -92,14 +92,14 @@ logFile initLogger(char *directoryPath)
     free(latestFilePath);
     closedir(dir);
 
-    return (logFile)
+    return (why2_log_file)
     {
         file,
         filePath
     };
 }
 
-void writeLog(int loggerFile, char *logMessage)
+void why2_write_log(int loggerFile, char *logMessage)
 {
     //CHECK IF loggerFile IS CREATED
     if (loggerFile == INVALID_FILE)
@@ -119,28 +119,28 @@ void writeLog(int loggerFile, char *logMessage)
     char *message = NULL; //FINAL MESSAGE
     time_t timeL = time(NULL);
     struct tm tm = *localtime(&timeL);
-    logFlags flags = getLogFlags();
+    why2_log_flags flags = why2_get_log_flags();
 
     //SET ENCRYPTER FLAGS
-    if (!getFlagsChanged()) setFlags((inputFlags) { 0, 1, 0 });
+    if (!why2_get_flags_changed()) why2_set_flags((why2_input_flags) { 0, 1, 0 });
 
     if (flags.key != NULL) //ENCRYPT TEXT IF KEY WAS CHANGED
     {
-        outputFlags encrypted = encryptText(logMessageUsed, flags.key); //ENCRYPT
+        why2_output_flags encrypted = why2_encrypt_text(logMessageUsed, flags.key); //ENCRYPT
 
         message = strdup(encrypted.outputText); //COPY
 
         //DEALLOCATION
-        deallocateOutput(encrypted);
+        why2_deallocate_output(encrypted);
         free(logMessageUsed); //I COULD DO THIS SMART SOMEHOW, BUT I AM TOO LAZY FOR THAT SHIT
     } else //FUCK ENCRYPTION, LET'S DO IT; WHY WOULD WE EVEN USE WHY2-CORE? HUH?
     {
         message = logMessageUsed;
     }
 
-    buffer = malloc(strlen(WRITE_FORMAT) + strlen(message) + 2); //ALLOCATE
+    buffer = malloc(strlen(WHY2_WRITE_FORMAT) + strlen(message) + 2); //ALLOCATE
 
-    sprintf(buffer, WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, message); //LOAD MESSAGE
+    sprintf(buffer, WHY2_WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, message); //LOAD MESSAGE
 
     (void) (write(loggerFile, buffer, strlen(buffer)) + 1); //TODO: Try to create some function for processing exit value
 

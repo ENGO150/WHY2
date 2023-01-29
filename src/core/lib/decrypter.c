@@ -26,7 +26,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/flags.h>
 #include <why2/misc.h>
 
-outputFlags decryptText(char *text, char *keyNew)
+why2_output_flags why2_decrypt_text(char *text, char *keyNew)
 {
     //CHECK VARIABLE
     unsigned char checkExitCode;
@@ -36,26 +36,26 @@ outputFlags decryptText(char *text, char *keyNew)
     struct timeval finishTime;
     gettimeofday(&startTime, NULL);
 
-    //CHECK FOR ACTIVE VERSION
-    if ((checkExitCode = checkVersion()) != SUCCESS)
+    //CHECK FOR ACTIVE WHY2_VERSION
+    if ((checkExitCode = why2_check_version()) != WHY2_SUCCESS)
     {
-        return noOutput(checkExitCode);
+        return why2_no_output(checkExitCode);
     }
 
     //CHECK FOR INVALID text
-    if ((checkExitCode = checkText(text)) != SUCCESS)
+    if ((checkExitCode = why2_check_text(text)) != WHY2_SUCCESS)
     {
-        return noOutput(checkExitCode);
+        return why2_no_output(checkExitCode);
     }
 
     //CHECK FOR INVALID key
-    if ((checkExitCode = checkKey(keyNew)) != SUCCESS)
+    if ((checkExitCode = why2_check_key(keyNew)) != WHY2_SUCCESS)
     {
-        return noOutput(checkExitCode);
+        return why2_no_output(checkExitCode);
     }
 
     //REDEFINE keyLength
-    setKeyLength(strlen(keyNew));
+    why2_set_key_length(strlen(keyNew));
 
     //VARIABLES
     char *returningText;
@@ -71,7 +71,7 @@ outputFlags decryptText(char *text, char *keyNew)
     //GET LENGTH OF returningText AND textKeyChain
     for (int i = 0; i < (int) strlen(usedText); i++)
     {
-        if (usedText[i] == getEncryptionSeparator()) numberBuffer++;
+        if (usedText[i] == why2_get_encryption_separator()) numberBuffer++;
     }
 
     //SET LENGTH (numberBuffer)
@@ -81,7 +81,7 @@ outputFlags decryptText(char *text, char *keyNew)
     textKeyChainLength = numberBuffer;
 
     //LOAD textKeyChain
-    generateTextKeyChain(key, textKeyChain, numberBuffer);
+    why2_generate_text_key_chain(key, textKeyChain, numberBuffer);
 
     //LOAD encryptedTextKeyChain
     for (int i = 0; i < textKeyChainLength; i++)
@@ -91,7 +91,7 @@ outputFlags decryptText(char *text, char *keyNew)
         //GET LENGTH OF EACH CHARACTER
         for (int j = 0; j < (int) strlen(usedText); j++)
         {
-            if (usedText[j] == getEncryptionSeparator()) break;
+            if (usedText[j] == why2_get_encryption_separator()) break;
 
             numberBuffer++;
         }
@@ -121,7 +121,7 @@ outputFlags decryptText(char *text, char *keyNew)
     //DECRYPT TEXT
     for (int i = 0; i < textKeyChainLength; i++)
     {
-        textKeyChain[i] = getEncryptionOperation()(textKeyChain[i], encryptedTextKeyChain[i]);
+        textKeyChain[i] = why2_get_encryption_operation()(textKeyChain[i], encryptedTextKeyChain[i]);
     }
 
     //LOAD returningText
@@ -134,14 +134,14 @@ outputFlags decryptText(char *text, char *keyNew)
     gettimeofday(&finishTime, NULL);
 
     //LOAD output
-    outputFlags output =
+    why2_output_flags output =
     {
         returningText, //DECRYPTED TEXT
         key, //USED KEY
-        countUnusedKeySize(returningText, key), // NUMBER OF UNUSED CHARS IN KEY
-        countRepeatedKeySize(returningText, key), //NUMBER OF REPEATED CHARS IN KEY
-        compareTimeMicro(startTime, finishTime), // ELAPSED TIME
-        SUCCESS //EXIT CODE
+        why2_count_unused_key_size(returningText, key), // NUMBER OF WHY2_UNUSED CHARS IN KEY
+        why2_count_repeated_key_size(returningText, key), //NUMBER OF REPEATED CHARS IN KEY
+        why2_compare_time_micro(startTime, finishTime), // ELAPSED TIME
+        WHY2_SUCCESS //EXIT CODE
     };
 
     //DEALLOCATION
