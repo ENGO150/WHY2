@@ -20,6 +20,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <stdlib.h>
 
+#include <why2/memory.h>
+
 //CONSTS (this is just local)
 #define DEFAULT_FLAGS (why2_input_flags) { 0, 0, 0 }
 
@@ -55,10 +57,10 @@ why2_input_flags why2_get_flags(void)
 
 why2_output_flags why2_no_output(enum WHY2_EXIT_CODES exitCode)
 {
-    char *emptyText = malloc(1); //TEXT
+    char *emptyText = why2_malloc(1); //TEXT
     emptyText[0] = '\0';
 
-    char *emptyKey = malloc(why2_get_key_length() + 1); //KEY
+    char *emptyKey = why2_malloc(why2_get_key_length() + 1); //KEY
     for (int i = 0; i < (int) why2_get_key_length(); i++)
     {
         emptyKey[i] = 'x';

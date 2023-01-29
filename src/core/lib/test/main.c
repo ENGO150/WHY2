@@ -33,7 +33,7 @@ int main(void)
     char *textBuffer;
     char *keyBuffer;
     char *statusBuffer;
-    char *outputBuffer = malloc(1); //THIS IS TEMP ALLOCATION
+    char *outputBuffer = why2_malloc(1); //THIS IS TEMP ALLOCATION
     int exitCode = 0;
     unsigned long timeBuffer;
     FILE *outputStreamBuffer = stdout;
@@ -111,10 +111,10 @@ int main(void)
     );
 
     //DEALLOCATION
-    free(textBuffer);
-    free(keyBuffer);
-    free(statusBuffer);
-    free(outputBuffer);
+    why2_free(textBuffer);
+    why2_free(keyBuffer);
+    why2_free(statusBuffer);
+    why2_free(outputBuffer);
     why2_deallocate_output(encrypted);
 
     return exitCode;

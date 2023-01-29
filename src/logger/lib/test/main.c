@@ -26,7 +26,7 @@ int main(void)
 {
     //VARIABLES
     why2_log_file logger = why2_init_logger(WHY2_WRITE_DIR); //INITIALIZE LOGGER FILE
-    char *usedKey = malloc(why2_get_key_length() + 1);
+    char *usedKey = why2_malloc(why2_get_key_length() + 1);
     why2_decrypted_output decrypted;
     int exitCode = 0;
 
@@ -74,7 +74,7 @@ int main(void)
     }
 
     //DEALLOCATION
-    free(usedKey);
+    why2_free(usedKey);
     why2_deallocate_logger(logger);
     why2_deallocate_decrypted_output(decrypted);
 

@@ -30,6 +30,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/logger/flags.h>
 
 #include <why2/encrypter.h>
+#include <why2/memory.h>
 #include <why2/misc.h>
 
 why2_log_file why2_init_logger(char *directoryPath)
@@ -41,9 +42,9 @@ why2_log_file why2_init_logger(char *directoryPath)
     struct tm tm = *localtime(&timeL);
     int buffer = 1;
     int file;
-    char *filePath = malloc(strlen(directoryPath) + 1 + strlen(WHY2_LOG_FORMAT) + 1);
-    char *dateBuffer = malloc(strlen(WHY2_LOG_FORMAT_START) + 1);
-    char *latestBuffer = malloc(strlen(WHY2_WRITE_DIR) + strlen(WHY2_LOG_LATEST) + 2);
+    char *filePath = why2_malloc(strlen(directoryPath) + 1 + strlen(WHY2_LOG_FORMAT) + 1);
+    char *dateBuffer = why2_malloc(strlen(WHY2_LOG_FORMAT_START) + 1);
+    char *latestBuffer = why2_malloc(strlen(WHY2_WRITE_DIR) + strlen(WHY2_LOG_LATEST) + 2);
     char *latestFilePath = NULL;
     DIR *dir;
 
@@ -87,9 +88,9 @@ why2_log_file why2_init_logger(char *directoryPath)
     deallocation:
 
     //DEALLOCATION
-    free(dateBuffer);
-    free(latestBuffer);
-    free(latestFilePath);
+    why2_free(dateBuffer);
+    why2_free(latestBuffer);
+    why2_free(latestFilePath);
     closedir(dir);
 
     return (why2_log_file)
@@ -132,19 +133,19 @@ void why2_write_log(int loggerFile, char *logMessage)
 
         //DEALLOCATION
         why2_deallocate_output(encrypted);
-        free(logMessageUsed); //I COULD DO THIS SMART SOMEHOW, BUT I AM TOO LAZY FOR THAT SHIT
+        why2_free(logMessageUsed); //I COULD DO THIS SMART SOMEHOW, BUT I AM TOO LAZY FOR THAT SHIT
     } else //FUCK ENCRYPTION, LET'S DO IT; WHY WOULD WE EVEN USE WHY2-CORE? HUH?
     {
         message = logMessageUsed;
     }
 
-    buffer = malloc(strlen(WHY2_WRITE_FORMAT) + strlen(message) + 2); //ALLOCATE
+    buffer = why2_malloc(strlen(WHY2_WRITE_FORMAT) + strlen(message) + 2); //ALLOCATE
 
     sprintf(buffer, WHY2_WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, message); //LOAD MESSAGE
 
     (void) (write(loggerFile, buffer, strlen(buffer)) + 1); //TODO: Try to create some function for processing exit value
 
     //DEALLOCATION
-    free(buffer);
-    free(message);
+    why2_free(buffer);
+    why2_free(message);
 }

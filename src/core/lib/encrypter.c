@@ -24,6 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <sys/time.h>
 
 #include <why2/flags.h>
+#include <why2/memory.h>
 #include <why2/misc.h>
 
 why2_output_flags why2_encrypt_text(char *text, char *keyNew)
@@ -51,8 +52,8 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
     //VARIABLES
     char *key = NULL;
     char *returningText;
-    char *textBuffer = malloc(1);
-    int *textKeyChain = malloc(sizeof(int) * strlen(text));
+    char *textBuffer = why2_malloc(1);
+    int *textKeyChain = why2_malloc(sizeof(int) * strlen(text));
     int numberBuffer = 0;
 
     if (keyNew != NULL)
@@ -69,7 +70,7 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
         why2_set_key_length(strlen(key));
     } else //LOAD KEY
     {
-        key = malloc(why2_get_key_length() + 1);
+        key = why2_malloc(why2_get_key_length() + 1);
 
         why2_generate_key(key, why2_get_key_length());
     }
@@ -90,7 +91,7 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
     }
 
     //ALLOCATE returningText (WITH THE SEPARATORS)
-    returningText = calloc(numberBuffer + strlen(text), sizeof(char));
+    returningText = why2_calloc(numberBuffer + strlen(text), sizeof(char));
 
     //LOAD returningText
     for (int i = 0; i < (int) strlen(text); i++)
@@ -127,8 +128,8 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
     };
 
     //DEALLOCATION
-    free(textKeyChain);
-    free(textBuffer);
+    why2_free(textKeyChain);
+    why2_free(textBuffer);
 
     return output;
 }

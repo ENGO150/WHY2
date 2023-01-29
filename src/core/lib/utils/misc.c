@@ -30,6 +30,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <git2.h>
 
 #include <why2/flags.h>
+#include <why2/memory.h>
 
 why2_bool seedSet = 0; //DO NOT FUCKING TOUCH THIS!!!
 
@@ -68,7 +69,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
         }
     }
 
-    result = (char*) malloc(i + cnt * (newLen - oldLen) + 1);
+    result = (char*) why2_malloc(i + cnt * (newLen - oldLen) + 1);
 
     i = 0;
     while (*string)
@@ -137,7 +138,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     rewind(fileBuffer); //REWIND fileBuffer (NO SHIT)
 
     //SET LENGTH OF buffer
-    buffer = calloc(bufferSize + 1, sizeof(char));
+    buffer = why2_calloc(bufferSize + 1, sizeof(char));
 
     //LOAD jsonFile
     (void) (fread(buffer, bufferSize, 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
@@ -152,7 +153,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
         //WAIT FOR 5 SECONDS
         sleep(5);
 
-        free(buffer);
+        why2_free(buffer);
         fclose(fileBuffer);
         return WHY2_SUCCESS;
     }
@@ -212,7 +213,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             //REMOVE versions.json - OTHERWISE WILL CAUSE SEGFAULT IN NEXT RUN
             remove(WHY2_VERSIONS_NAME);
 
-            free(installCommand);
+            why2_free(installCommand);
 
             //CHECK FOR ERRORS
             if (installCode != 0)
@@ -264,7 +265,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
 
     //DEALLOCATION
     json_object_put(parsedJson); //THIS FREES EVERY json_object - AT LEAST JSON-C'S DOCUMENTATION SAYS THAT
-    free(buffer);
+    why2_free(buffer);
 
     return WHY2_SUCCESS;
 }
@@ -307,8 +308,8 @@ void why2_generate_text_key_chain(char *key, int *textKeyChain, int textKeyChain
 
 void why2_deallocate_output(why2_output_flags flags)
 {
-    free(flags.outputText);
-    free(flags.usedKey);
+    why2_free(flags.outputText);
+    why2_free(flags.usedKey);
 
     flags.elapsedTime = 0;
     flags.exitCode = WHY2_SUCCESS;

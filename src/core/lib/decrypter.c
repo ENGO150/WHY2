@@ -24,6 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <sys/time.h>
 
 #include <why2/flags.h>
+#include <why2/memory.h>
 #include <why2/misc.h>
 
 why2_output_flags why2_decrypt_text(char *text, char *keyNew)
@@ -61,7 +62,7 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
     char *returningText;
     int numberBuffer = 1;
     int usedTextDeallocationBuffer = 0;
-    char *textBuffer = malloc(1);
+    char *textBuffer = why2_malloc(1);
     int textKeyChainLength;
     int *textKeyChain;
     char *key = strdup(keyNew); //COPY keyNew TO key
@@ -75,9 +76,9 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
     }
 
     //SET LENGTH (numberBuffer)
-    returningText = calloc(numberBuffer + 1, sizeof(char));
-    textKeyChain = malloc(sizeof(int) * numberBuffer);
-    encryptedTextKeyChain = malloc(sizeof(int) * numberBuffer);
+    returningText = why2_calloc(numberBuffer + 1, sizeof(char));
+    textKeyChain = why2_malloc(sizeof(int) * numberBuffer);
+    encryptedTextKeyChain = why2_malloc(sizeof(int) * numberBuffer);
     textKeyChainLength = numberBuffer;
 
     //LOAD textKeyChain
@@ -145,10 +146,10 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
     };
 
     //DEALLOCATION
-    free(textKeyChain);
-    free(encryptedTextKeyChain);
-    free(textBuffer);
-    free(usedText - usedTextDeallocationBuffer);
+    why2_free(textKeyChain);
+    why2_free(encryptedTextKeyChain);
+    why2_free(textBuffer);
+    why2_free(usedText - usedTextDeallocationBuffer);
 
     return output;
 }
