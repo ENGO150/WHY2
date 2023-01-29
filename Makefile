@@ -29,7 +29,7 @@ OUTPUT_APP=$(OUTPUT)/$(PROJECT_NAME)-app
 OUTPUT_TEST_LOGGER=$(OUTPUT)/$(PROJECT_NAME)-logger-test
 
 # Source Code
-SRC_CORE=./src/core/lib/*.c
+SRC_CORE=./src/core/lib/*.c ./src/core/lib/utils/*.c
 SRC_CORE_APP=./src/core/app/*.c
 SRC_LOGGER=./src/logger/lib/*.c
 
