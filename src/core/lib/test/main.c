@@ -85,7 +85,7 @@ int main(void)
     {
         statusBuffer = strdup("failed");
 
-        outputBuffer = realloc(outputBuffer, strlen(encrypted.outputText) + 6);
+        outputBuffer = why2_realloc(outputBuffer, strlen(encrypted.outputText) + 6);
         sprintf(outputBuffer, "\t\t\"%s\"\n", encrypted.outputText);
 
         outputStreamBuffer = stderr;

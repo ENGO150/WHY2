@@ -98,7 +98,7 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
     {
         numberBuffer = sizeof(int) * why2_count_int_length(textKeyChain[i]);
 
-        textBuffer = realloc(textBuffer, numberBuffer);
+        textBuffer = why2_realloc(textBuffer, numberBuffer);
 
         sprintf(textBuffer, "%d", textKeyChain[i]);
 
@@ -106,7 +106,7 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
 
         if (i != (int) strlen(text) - 1)
         {
-            textBuffer = realloc(textBuffer, 2);
+            textBuffer = why2_realloc(textBuffer, 2);
             sprintf(textBuffer, "%c", why2_get_encryption_separator());
 
             strcat(returningText, textBuffer);

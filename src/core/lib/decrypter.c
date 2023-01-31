@@ -97,7 +97,7 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
             numberBuffer++;
         }
 
-        textBuffer = realloc(textBuffer, numberBuffer + 1);
+        textBuffer = why2_realloc(textBuffer, numberBuffer + 1);
 
         //CLEAN (POSSIBLY EXISTING) JUNK in textBuffer
         for (int j = 0; j <= numberBuffer; j++)
