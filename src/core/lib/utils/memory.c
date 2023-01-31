@@ -23,7 +23,7 @@ void push_to_list(void *pointer)
 {
     node_t *new_node = malloc(sizeof(node_t)); //CREATE ANOTHER ELEMENT
     node_t *node_buffer_1;
-    node_t *node_buffer_2;
+    //node_t *node_buffer_2;
     //int buffer = 0;
 
     new_node -> pointer = pointer; //ALLOCATED POINTER
@@ -41,7 +41,7 @@ void push_to_list(void *pointer)
     } else
     {
         node_buffer_1 = head;
-        node_buffer_2 = head;
+        //node_buffer_2 = head;
 
         while (node_buffer_1 -> next != NULL) //GET 'LAST' NODE (next POINTER)
         {
