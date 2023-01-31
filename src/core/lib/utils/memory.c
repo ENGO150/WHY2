@@ -19,7 +19,7 @@ typedef struct node
     struct node *last;
 } node_t; //DOUBLY LINKED LIST
 
-node_t *head = NULL; //TODO: Find a way to deallocate this shit at the end
+node_t *head = NULL;
 
 void push_to_list(void *pointer)
 {
@@ -45,10 +45,8 @@ void push_to_list(void *pointer)
     }
 }
 
-void remove_node(node_t *node)
+void remove_node(node_t *node) //valgrind says this causes memory leaks ('still reachable'), but there is no chance like wtf
 {
-    if (head == NULL) return; //LIST IS EMPTY
-
     //REMOVE NODE
     node_t *node_buffer = head;
 
@@ -74,6 +72,8 @@ void remove_node(node_t *node)
     {
         node -> last = NULL;
     }
+
+    if (head == NULL) free(head); //LIST IS EMPTY NOW => DEALLOCATE
 
     //DEALLOCATION
     free(node);
