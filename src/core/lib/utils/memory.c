@@ -80,6 +80,15 @@ void *why2_calloc(unsigned long element, unsigned long size)
     return allocated;
 }
 
+void *why2_realloc(void *pointer, unsigned long size)
+{
+    void *allocated = realloc(pointer, size);
+
+    push_to_list(allocated);
+
+    return allocated;
+}
+
 void why2_free(void *pointer)
 {
     //VARIABLES
