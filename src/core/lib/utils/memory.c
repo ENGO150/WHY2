@@ -6,8 +6,9 @@
 
 #include <why2/memory.h>
 
-#include <stdio.h>
 #include <stdlib.h>
+
+#include <why2/flags.h>
 
 //LOCAL
 typedef struct node
@@ -21,47 +22,54 @@ node_t *head = NULL; //TODO: Find a way to deallocate this shit at the end
 
 void push_to_list(void *pointer)
 {
-    node_t *new_node = malloc(sizeof(node_t)); //CREATE ANOTHER ELEMENT
-    node_t *node_buffer_1;
+    //CREATE NODE
+    node_t *new_node = malloc(sizeof(node_t));
+    node_t *node_buffer = head;
 
-    new_node -> pointer = pointer; //ALLOCATED POINTER
-    new_node -> next = NULL; //NEXT NODE
-    new_node -> last = NULL; //LAST NODE
+    //ADD STUFF TO new_node
+    new_node -> pointer = pointer;
+    new_node -> next = NULL;
+    new_node -> last = NULL;
 
-    if (head == NULL) //ALL MEMORY IS FREED (THERE AREN'T ANY NODES)
+    if (head == NULL) //FIRST NODE
     {
-        head = malloc(sizeof(node_t)); //INIT HEAD
-
-        new_node -> last = head;
-
-        head -> pointer = NULL;
-        head -> next = new_node; //LINK TO new_node
-    } else
+        head = new_node;
+    } else //ADD AT THE END
     {
-        node_buffer_1 = head;
+        while (node_buffer -> next != NULL) node_buffer = node_buffer -> next; //GO TO THE LAST NODE
 
-        while (node_buffer_1 -> next != NULL) //GET 'LAST' NODE (next POINTER)
-        {
-            node_buffer_1 = node_buffer_1 -> next;
-        }
-
-        //LINK
-        node_buffer_1 -> next = new_node;
-        new_node -> last = node_buffer_1;
+        //LINK AT THE END
+        node_buffer -> next = new_node;
+        new_node -> last = node_buffer;
     }
 }
 
 void remove_node(node_t *node)
 {
+    if (head == NULL) return; //LIST IS EMPTY
+
     //REMOVE NODE
-    node -> last -> next = node -> next; //last WILL BE NEVER NULL CUZ CAN ONLY BE ANOTHER NODE OR HEAD
-    if (node -> next != NULL)
+    node_t *node_buffer = head;
+    why2_bool found = 0;
+
+    while (node_buffer -> next != NULL) //GO TROUGH THE LIST
     {
-        node -> next -> last = node -> last;
+        if (node_buffer == node) //FOUND
+        {
+            found = 1;
+            break;
+        } //TODO: Many times it isn't found
+
+        node_buffer = node_buffer -> next;
     }
 
+    if (!found) return; //node WASN'T FOUND IN THE LIST
+
+    if (node_buffer -> last != NULL) node_buffer -> last -> next = node_buffer -> next;
+    if (node_buffer -> next != NULL) node_buffer -> next -> last = node_buffer -> last;
+
     //DEALLOCATION
-    free(node); //TODO: Valgrind says node is still reachable, but it is deallocated here (I think)
+    free(node);
 }
 
 //GLOBAL
