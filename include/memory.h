@@ -9,7 +9,7 @@ void *why2_realloc(void *pointer, unsigned long size);
 
 FILE *why2_fopen(char *file_name, char *modes);
 FILE *why2_fdopen(int file, char *modes);
-int open(char *file, int flags, ...);
+int why2_open(char *file, int flags, ...);
 
 void why2_free(void *pointer);
 
