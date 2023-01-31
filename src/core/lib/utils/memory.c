@@ -7,6 +7,7 @@
 #include <why2/memory.h>
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #include <why2/flags.h>
 
@@ -50,23 +51,29 @@ void remove_node(node_t *node)
 
     //REMOVE NODE
     node_t *node_buffer = head;
-    why2_bool found = 0;
 
     while (node_buffer -> next != NULL) //GO TROUGH THE LIST
     {
-        if (node_buffer == node) //FOUND
-        {
-            found = 1;
-            break;
-        } //TODO: Many times it isn't found
+        if (node_buffer == node) break; //FOUND
 
         node_buffer = node_buffer -> next;
     }
 
-    if (!found) return; //node WASN'T FOUND IN THE LIST
+    if (node -> last != NULL)
+    {
+        node -> last -> next = node -> next;
+    } else
+    {
+        head = node -> next;
+    }
 
-    if (node_buffer -> last != NULL) node_buffer -> last -> next = node_buffer -> next;
-    if (node_buffer -> next != NULL) node_buffer -> next -> last = node_buffer -> last;
+    if (node -> next != NULL)
+    {
+        node -> next -> last = node -> last;
+    } else
+    {
+        node -> last = NULL;
+    }
 
     //DEALLOCATION
     free(node);
