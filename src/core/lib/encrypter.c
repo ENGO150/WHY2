@@ -63,7 +63,7 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
             return why2_no_output(checkExitCode);
         }
 
-        key = strdup(keyNew);
+        key = why2_strdup(keyNew);
 
         //REDEFINE keyLength
         why2_set_key_length(strlen(key));

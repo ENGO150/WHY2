@@ -65,9 +65,9 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
     char *textBuffer = why2_malloc(1);
     int textKeyChainLength;
     int *textKeyChain;
-    char *key = strdup(keyNew); //COPY keyNew TO key
+    char *key = why2_strdup(keyNew); //COPY keyNew TO key
     int *encryptedTextKeyChain;
-    char *usedText = strdup(text); //COPY text TO usedText
+    char *usedText = why2_strdup(text); //COPY text TO usedText
 
     //GET LENGTH OF returningText AND textKeyChain
     for (int i = 0; i < (int) strlen(usedText); i++)

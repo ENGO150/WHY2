@@ -101,7 +101,7 @@ why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
     {
         outputBuffer = why2_decrypt_text(content[i], why2_get_log_flags().key); //DECRYPT
 
-        contentDecrypted[i] = strdup(outputBuffer.outputText); //COPY
+        contentDecrypted[i] = why2_strdup(outputBuffer.outputText); //COPY
 
         why2_deallocate_output(outputBuffer); //DEALLOCATE outputBuffer
     }

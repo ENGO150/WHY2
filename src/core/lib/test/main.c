@@ -64,8 +64,8 @@ int main(void)
     //ENCRYPT
     why2_output_flags encrypted = why2_encrypt_text(WHY2_TEST_TEXT, NULL);
 
-    textBuffer = strdup(encrypted.outputText); //GET ENCRYPTED TEXT
-    keyBuffer = strdup(encrypted.usedKey); //GET KEY
+    textBuffer = why2_strdup(encrypted.outputText); //GET ENCRYPTED TEXT
+    keyBuffer = why2_strdup(encrypted.usedKey); //GET KEY
     timeBuffer = encrypted.elapsedTime; //GET TIME 1
 
     //DEALLOCATE BUFFER
@@ -79,11 +79,11 @@ int main(void)
     //COMPARE DIFFERENCE
     if (strcmp(encrypted.outputText, WHY2_TEST_TEXT) == 0 && encrypted.exitCode == 0) //WHY2_SUCCESS
     {
-        statusBuffer = strdup("successful");
+        statusBuffer = why2_strdup("successful");
     }
     else //FAILURE
     {
-        statusBuffer = strdup("failed");
+        statusBuffer = why2_strdup("failed");
 
         outputBuffer = why2_realloc(outputBuffer, strlen(encrypted.outputText) + 6);
         sprintf(outputBuffer, "\t\t\"%s\"\n", encrypted.outputText);

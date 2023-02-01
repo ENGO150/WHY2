@@ -79,7 +79,7 @@ why2_log_file why2_init_logger(char *directoryPath)
     //CREATE SYMLINK
     sprintf(latestBuffer, WHY2_LOG_LATEST_FORMATTING, WHY2_WRITE_DIR, WHY2_LOG_LATEST); //GENERATE LATEST.log PATH
 
-    latestFilePath = strdup(filePath);
+    latestFilePath = why2_strdup(filePath);
 
     if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); } //REMOVE SYMLINK IF IT ALREADY EXISTS
     (void) (symlink(latestFilePath + (strlen(WHY2_WRITE_DIR) + 1), latestBuffer) + 1); //TODO: Try to create some function for processing exit value //CREATE
@@ -108,7 +108,7 @@ void why2_write_log(int loggerFile, char *logMessage)
     }
 
     //COPY logMessage without '\n'
-    char *logMessageUsed = strdup(logMessage);
+    char *logMessageUsed = why2_strdup(logMessage);
     for (int i = 0; i < (int) strlen(logMessageUsed); i++)
     {
         if (logMessageUsed[i] == '\n') logMessageUsed[i] = '\0';
@@ -128,7 +128,7 @@ void why2_write_log(int loggerFile, char *logMessage)
     {
         why2_output_flags encrypted = why2_encrypt_text(logMessageUsed, flags.key); //ENCRYPT
 
-        message = strdup(encrypted.outputText); //COPY
+        message = why2_strdup(encrypted.outputText); //COPY
 
         //DEALLOCATION
         why2_deallocate_output(encrypted);
