@@ -127,6 +127,6 @@ void why2_free(void *pointer)
         node_buffer = node_buffer -> next;
     }
 
-	remove_node(node_buffer); //REMOVE FROM LIST | IF ISN'T FOUND, PROBABLY WILL CAUSE SEGFAULT (I WON'T MAKE IT SAFE; FUCK YOU - USE why2_free ONLY IF YOU ALLOCATED WITH why2_foo)
+	if (pointer == node_buffer -> pointer) remove_node(node_buffer); //REMOVE FROM LIST IF FOUND
 	free(pointer);
 }
