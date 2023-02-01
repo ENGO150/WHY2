@@ -20,7 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define WHY2_LOGGER_FLAGS_H
 
 //CONSTS
-const enum LOGGER_WHY2_EXIT_CODES //exit codes you fucking idiot (2#)
+const enum WHY2_LOGGER_EXIT_CODES //exit codes you fucking idiot (2#)
 {
     INVALID_FILE = -1 //THIS WILL HAPPEN IF YOU USE TOO MUCH LOGS lol
 };
