@@ -5,6 +5,8 @@ void *why2_malloc(unsigned long size);
 void *why2_calloc(unsigned long element, unsigned long size);
 void *why2_realloc(void *pointer, unsigned long size);
 
+char *why2_strdup(char *string);
+
 void why2_free(void *pointer);
 
 #endif
