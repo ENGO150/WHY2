@@ -68,10 +68,14 @@ void remove_node(node_t *node) //valgrind says this causes memory leaks ('still 
         node -> next -> last = node -> last;
     } else
     {
-        node -> last = NULL;
+        node -> last -> next = NULL; //idk there could be some bugz
     }
 
-    if (head == NULL) free(head); //LIST IS EMPTY NOW => DEALLOCATE
+    if (head -> next == NULL) //LIST IS EMPTY NOW => DEALLOCATE
+    {
+        free(head);
+        head = NULL;
+    }
 
     //DEALLOCATION
     free(node);
