@@ -113,12 +113,13 @@ void why2_free(void *pointer)
     node_t *node_buffer = head;
 
     //FIND pointer IN LINKED LIST
-    while (node_buffer -> next != NULL) //if pointer won't be found, nothing will happen | idk if I wanna fix this or leave it like this
+    while (node_buffer -> next != NULL)
     {
-        node_buffer = node_buffer -> next;
         if (node_buffer -> pointer == pointer) break; //FOUND
+
+        node_buffer = node_buffer -> next;
     }
 
-	remove_node(node_buffer);
+	remove_node(node_buffer); //REMOVE FROM LIST | IF ISN'T FOUND, PROBABLY WILL CAUSE SEGFAULT (I WON'T MAKE IT SAFE; FUCK YOU - USE why2_free ONLY IF YOU ALLOCATED WITH why2_foo)
 	free(pointer);
 }
