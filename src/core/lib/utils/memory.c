@@ -7,9 +7,7 @@
 #include <why2/memory.h>
 
 #include <stdlib.h>
-#include <stdio.h>
-
-#include <why2/flags.h>
+#include <string.h>
 
 //LOCAL
 typedef struct node
@@ -101,6 +99,15 @@ void *why2_calloc(unsigned long element, unsigned long size)
 void *why2_realloc(void *pointer, unsigned long size)
 {
     void *allocated = realloc(pointer, size);
+
+    push_to_list(allocated);
+
+    return allocated;
+}
+
+char *why2_strdup(char *string)
+{
+    char *allocated = strdup(string);
 
     push_to_list(allocated);
 
