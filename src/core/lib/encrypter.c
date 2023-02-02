@@ -51,7 +51,7 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
     //VARIABLES
     char *key = NULL;
     char *returningText;
-    char *textBuffer = why2_malloc(1);
+    char *textBuffer = NULL;
     int *textKeyChain = why2_malloc(sizeof(int) * strlen(text));
     int numberBuffer = 0;
 

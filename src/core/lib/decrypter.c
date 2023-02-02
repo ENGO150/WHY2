@@ -62,7 +62,7 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
     char *returningText;
     int numberBuffer = 1;
     int usedTextDeallocationBuffer = 0;
-    char *textBuffer = why2_malloc(1);
+    char *textBuffer = NULL;
     int textKeyChainLength;
     int *textKeyChain;
     char *key = why2_strdup(keyNew); //COPY keyNew TO key
