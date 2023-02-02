@@ -48,6 +48,8 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
         return why2_no_output(checkExitCode);
     }
 
+    why2_set_memory_identifier("core_decrypt");
+
     //VARIABLES
     char *key = NULL;
     char *returningText;
@@ -60,6 +62,7 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
         //CHECK FOR INVALID key
         if ((checkExitCode = why2_check_key(keyNew)) != WHY2_SUCCESS)
         {
+            why2_clean_memory("core_decrypt");
             return why2_no_output(checkExitCode);
         }
 
@@ -129,6 +132,8 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
     //DEALLOCATION
     why2_free(textKeyChain);
     why2_free(textBuffer);
+
+    why2_reset_memory_identifier();
 
     return output;
 }
