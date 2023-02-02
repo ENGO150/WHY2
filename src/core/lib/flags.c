@@ -81,6 +81,16 @@ void remove_node_from_end()
     free(buffer);
 }
 
+char *get_last_node_identifier(void)
+{
+    if (head == NULL) return DEFAULT_MEMORY_IDENTIFIER;
+
+    node_t *buffer = head;
+    while (buffer -> next != NULL) buffer = buffer -> next;
+
+    return buffer -> identifier;
+}
+
 //GETTERS
 char why2_get_encryption_separator(void)
 {
