@@ -14,8 +14,7 @@ typedef struct node
 {
     void *pointer;
     struct node *next;
-    struct node *last;
-} node_t; //DOUBLY LINKED LIST
+} node_t; //SINGLE LINKED LIST
 
 node_t *head = NULL;
 
@@ -23,63 +22,68 @@ void push_to_list(void *pointer)
 {
     //CREATE NODE
     node_t *new_node = malloc(sizeof(node_t));
-    node_t *node_buffer = head;
+    node_t *buffer = head;
 
-    //ADD STUFF TO new_node
     new_node -> pointer = pointer;
     new_node -> next = NULL;
-    new_node -> last = NULL;
 
-    if (head == NULL) //FIRST NODE
+    if (head == NULL) //INIT LIST
     {
         head = new_node;
-    } else //ADD AT THE END
+    } else
     {
-        while (node_buffer -> next != NULL) node_buffer = node_buffer -> next; //GO TO THE LAST NODE
+        while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
 
-        //LINK AT THE END
-        node_buffer -> next = new_node;
-        new_node -> last = node_buffer;
+        buffer -> next = new_node; //LINK
     }
 }
 
-void remove_node(node_t *node) //valgrind says this causes memory leaks ('still reachable'), but there is no chance like wtf
+void remove_node(node_t *node)
 {
-    //REMOVE NODE
-    node_t *node_buffer = head;
+    /*
+        This whole function assumes the node is in the list, so if you use this without pushing it, bad things will happen :)
+    */
 
-    while (node_buffer -> next != NULL) //GO TROUGH THE LIST
+    node_t *buffer_1 = head;
+    node_t *buffer_2;
+
+    while (buffer_1 -> next != NULL) //GO TROUGH EVERY ELEMENT IN LIST
     {
-        if (node_buffer == node) break; //FOUND
+        if (buffer_1 == node) break; //FOUND (IF THE WHILE GOES TROUGH THE WHOLE LIST WITHOUT THE break, I ASSUME THE LAST NODE IS THE CORRECT ONE)
 
-        node_buffer = node_buffer -> next;
+        buffer_1 = buffer_1 -> next;
     }
 
-    if (node -> last != NULL)
+    if (buffer_1 == head) //node WAS THE FIRST NODE IN THE LIST
     {
-        node -> last -> next = node -> next;
-    } else
+        //UNLINK
+        head = buffer_1 -> next;
+    } else //wdyt
     {
-        head = node -> next;
-    }
+        //GET THE NODE BEFORE node
+        buffer_2 = head;
 
-    if (node -> next != NULL)
-    {
-        node -> next -> last = node -> last;
-    } else
-    {
-         if (node -> last != NULL)
-         {
-            node -> last -> next = NULL;
-         } else //LIST IS EMPTY NOW => DEALLOCATE
-         {
-            free(head);
-            head = NULL;
-         }
+        while (buffer_2 -> next != buffer_1) buffer_2 = buffer_2 -> next;
+
+        //UNLINK
+        buffer_2 -> next = buffer_1 -> next;
     }
 
     //DEALLOCATION
     free(node);
+}
+
+node_t *get_node(void *string)
+{
+    node_t *buffer = head;
+    while (buffer -> next != NULL)
+    {
+        if (buffer -> pointer == string) return buffer;
+
+        buffer = buffer -> next;
+    }
+
+    return buffer;
 }
 
 //GLOBAL
@@ -122,16 +126,12 @@ char *why2_strdup(char *string)
 void why2_free(void *pointer)
 {
     //VARIABLES
-    node_t *node_buffer = head;
+    node_t *node = get_node(pointer);
 
-    //FIND pointer IN LINKED LIST
-    while (node_buffer -> next != NULL)
+	if (pointer == node)
     {
-        if (node_buffer -> pointer == pointer) break; //FOUND
+        remove_node(node); //REMOVE FROM LIST IF FOUND
+    } //TODO: ELSE happens really often
 
-        node_buffer = node_buffer -> next;
-    }
-
-	if (pointer == node_buffer -> pointer) remove_node(node_buffer); //REMOVE FROM LIST IF FOUND
 	free(pointer);
 }
