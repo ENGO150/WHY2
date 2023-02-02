@@ -9,4 +9,6 @@ char *why2_strdup(char *string);
 
 void why2_free(void *pointer);
 
+void why2_clean_memory(char *identifier); //identifier SPECIFIES WHICH NODES TO DEALLOCATE
+
 #endif
