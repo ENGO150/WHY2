@@ -64,7 +64,7 @@ void push_to_list(char *identifier)
     }
 }
 
-void remove_node_from_end()
+void remove_node_from_end(void)
 {
     node_t *buffer = head;
 
