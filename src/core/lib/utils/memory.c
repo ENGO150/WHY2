@@ -83,6 +83,8 @@ node_t *get_node(void *pointer)
         buffer = buffer -> next;
     }
 
+    if (pointer != buffer -> pointer) buffer = NULL; //PREVENT FROM RETURNING INVALID NODE
+
     return buffer;
 }
 
@@ -128,10 +130,10 @@ void why2_free(void *pointer)
     //VARIABLES
     node_t *node = get_node(pointer);
 
-	if (pointer == node)
+	if (pointer != NULL)
     {
         remove_node(node); //REMOVE FROM LIST IF FOUND
-    } //TODO: ELSE happens really often
+    }
 
 	free(pointer);
 }
