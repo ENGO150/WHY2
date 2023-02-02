@@ -82,6 +82,11 @@ why2_bool why2_get_flags_changed(void)
     return flagsChanged;
 }
 
+char *why2_get_memory_identifier(void)
+{
+    return memory_identifier;
+}
+
 //SETTERS
 void why2_set_encryption_separator(char encryptionSeparatorNew)
 {
@@ -107,6 +112,16 @@ void why2_set_flags(why2_input_flags newFlags)
 void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOperation)
 {
     encryptionOperation_cb = newEncryptionOperation;
+}
+
+void why2_set_memory_identifier(char *new_memory_identifier)
+{
+    memory_identifier = new_memory_identifier;
+}
+
+void why2_reset_memory_identifier(void)
+{
+    memory_identifier = DEFAULT_MEMORY_IDENTIFIER;
 }
 
 //SOME OTHER SHIT
