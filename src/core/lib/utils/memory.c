@@ -73,12 +73,12 @@ void remove_node(node_t *node)
     free(node);
 }
 
-node_t *get_node(void *string)
+node_t *get_node(void *pointer)
 {
     node_t *buffer = head;
     while (buffer -> next != NULL)
     {
-        if (buffer -> pointer == string) return buffer;
+        if (buffer -> pointer == pointer) return buffer;
 
         buffer = buffer -> next;
     }
