@@ -24,7 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //CONSTS (this is just local)
 #define DEFAULT_FLAGS (why2_input_flags) { 0, 0, 0 }
-#define DEFAULT_MEMORY_IDENTIFIER NULL
+#define DEFAULT_MEMORY_IDENTIFIER ""
 
 int encryptionOperation(int text, int encryptedText);
 
