@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/flags.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <why2/memory.h>
 
@@ -43,19 +44,19 @@ typedef struct node
     struct node *next;
 } node_t;
 
-node_t *head = NULL;
+node_t *list_head = NULL;
 
-void push_to_list(char *identifier)
+void push_to_list_end(char *identifier)
 {
     node_t *new_node = malloc(sizeof(node_t));
-    node_t *buffer = head;
+    node_t *buffer = list_head;
 
     new_node -> identifier = identifier;
     new_node -> next = NULL;
 
-    if (head == NULL) //LIST IS EMTPY
+    if (list_head == NULL) //LIST IS EMTPY
     {
-        head = new_node;
+        list_head = new_node;
     } else
     {
         while (buffer -> next != NULL) buffer = buffer -> next; //GO TO THE END OF LIST
@@ -66,11 +67,11 @@ void push_to_list(char *identifier)
 
 void remove_node_from_end(void)
 {
-    node_t *buffer = head;
+    node_t *buffer = list_head;
 
     if (buffer -> next == NULL) //ONLY ONE NODE
     {
-        head = NULL;
+        list_head = NULL;
     } else
     {
         while (buffer -> next -> next != NULL) buffer = buffer -> next; //GO TO THE NODE BEFORE END
@@ -83,9 +84,9 @@ void remove_node_from_end(void)
 
 char *get_last_node_identifier(void)
 {
-    if (head == NULL) return DEFAULT_MEMORY_IDENTIFIER;
+    if (list_head == NULL) return DEFAULT_MEMORY_IDENTIFIER;
 
-    node_t *buffer = head;
+    node_t *buffer = list_head;
     while (buffer -> next != NULL) buffer = buffer -> next;
 
     return buffer -> identifier;
@@ -176,12 +177,16 @@ void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOpe
 
 void why2_set_memory_identifier(char *new_memory_identifier)
 {
+    push_to_list_end(new_memory_identifier);
+
     memory_identifier = new_memory_identifier;
 }
 
 void why2_reset_memory_identifier(void)
 {
-    memory_identifier = DEFAULT_MEMORY_IDENTIFIER;
+    remove_node_from_end();
+
+    memory_identifier = get_last_node_identifier();
 }
 
 //SOME OTHER SHIT
