@@ -109,7 +109,9 @@ void *why2_calloc(unsigned long element, unsigned long size)
 
 void *why2_realloc(void *pointer, unsigned long size)
 {
-    void *allocated = realloc(pointer, size);
+    if (pointer != NULL) why2_free(pointer);
+
+    void *allocated = malloc(size);
 
     push_to_list(allocated);
 
