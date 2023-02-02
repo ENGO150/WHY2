@@ -36,6 +36,51 @@ why2_encryption_operation_cb encryptionOperation_cb = encryptionOperation;
 why2_bool flagsChanged = 0; //CHANGES TO 1 WHEN U USE why2_set_flags
 char *memory_identifier = DEFAULT_MEMORY_IDENTIFIER;
 
+//LINKED LIST SHIT
+typedef struct node
+{
+    char *identifier;
+    struct node *next;
+} node_t;
+
+node_t *head = NULL;
+
+void push_to_list(char *identifier)
+{
+    node_t *new_node = malloc(sizeof(node_t));
+    node_t *buffer = head;
+
+    new_node -> identifier = identifier;
+    new_node -> next = NULL;
+
+    if (head == NULL) //LIST IS EMTPY
+    {
+        head = new_node;
+    } else
+    {
+        while (buffer -> next != NULL) buffer = buffer -> next; //GO TO THE END OF LIST
+
+        buffer -> next = new_node; //LINK
+    }
+}
+
+void remove_node_from_end()
+{
+    node_t *buffer = head;
+
+    if (buffer -> next == NULL) //ONLY ONE NODE
+    {
+        head = NULL;
+    } else
+    {
+        while (buffer -> next -> next != NULL) buffer = buffer -> next; //GO TO THE NODE BEFORE END
+
+        buffer -> next = NULL; //UNLINK
+    }
+
+    free(buffer);
+}
+
 //GETTERS
 char why2_get_encryption_separator(void)
 {
