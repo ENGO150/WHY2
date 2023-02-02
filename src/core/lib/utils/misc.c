@@ -92,6 +92,8 @@ enum WHY2_EXIT_CODES why2_check_version(void)
 {
     if (why2_get_flags().noCheck) return WHY2_SUCCESS;
 
+    why2_set_memory_identifier("version_check");
+
     //FILE-CHECK VARIABLES
     int notFoundBuffer = 0;
 
@@ -118,6 +120,8 @@ enum WHY2_EXIT_CODES why2_check_version(void)
         if (notFoundBuffer == WHY2_NOT_FOUND_TRIES)
         {
             if (!why2_get_flags().why2_no_output) fprintf(stderr, "%s'%s' not found! Exiting...\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME);
+
+            why2_clean_memory("version_check");
             return WHY2_DOWNLOAD_FAILED;
         }
 
@@ -153,8 +157,8 @@ enum WHY2_EXIT_CODES why2_check_version(void)
         //WAIT FOR 5 SECONDS
         sleep(5);
 
-        why2_free(buffer);
         fclose(fileBuffer);
+        why2_clean_memory("version_check");
         return WHY2_SUCCESS;
     }
 
@@ -174,6 +178,8 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             if (getuid() != 0)
             {
                 if (!why2_get_flags().why2_no_output) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
+
+                why2_clean_memory("version_check");
                 return WHY2_WHY2_UPDATE_FAILED;
             }
 
@@ -202,6 +208,8 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             if (exitCode != 0)
             {
                 if (!why2_get_flags().why2_no_output) fprintf(stderr, "Updating failed! (cloning)\n");
+
+                why2_clean_memory("version_check");
                 return WHY2_WHY2_UPDATE_FAILED;
             }
 
@@ -219,10 +227,12 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             if (installCode != 0)
             {
                 if (!why2_get_flags().why2_no_output) fprintf(stderr, "Updating failed! (installing)\n");
+
+                why2_clean_memory("version_check");
                 return WHY2_WHY2_UPDATE_FAILED;
             }
 
-            goto deallocation; //GREAT WHY2_SUCCESS!
+            goto deallocation; //GREAT SUCCESS!
         }
 
         //COUNT WHY2_VERSIONS BEHIND
@@ -266,6 +276,8 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     //DEALLOCATION
     json_object_put(parsedJson); //THIS FREES EVERY json_object - AT LEAST JSON-C'S DOCUMENTATION SAYS THAT
     why2_free(buffer);
+
+    why2_reset_memory_identifier();
 
     return WHY2_SUCCESS;
 }
