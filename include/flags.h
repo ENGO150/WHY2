@@ -79,11 +79,15 @@ why2_input_flags why2_get_flags(void); //RETURNS USED FLAGS
 why2_output_flags why2_no_output(enum WHY2_EXIT_CODES exitCode); //SAME AS why2_get_default_flags() BUT FOR why2_output_flags
 why2_encryption_operation_cb why2_get_encryption_operation(void); //RETURNS FUNCTION WHICH IS USED FOR ENCRYPTION & DECRYPTION
 why2_bool why2_get_flags_changed(void);
+char *why2_get_memory_identifier(void); //RETURNS STRING USED IN LINKED LIST (IN memory.c) FOR IDENTIFYING NODES WHEN RUNNING GARBAGE COLLECTOR
 
 //SETTERS
 void why2_set_encryption_separator(char encryptionSeparatorNew);
 void why2_set_key_length(int keyLengthNew);
 void why2_set_flags(why2_input_flags newFlags); //.... whatcha think?
 void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOperation); //are you that dumb?
+void why2_set_memory_identifier(char *new_memory_identifier);
+void why2_reset_memory_identifier(void); //hmmm, what could reset mean.... huh
+
 
 #endif
