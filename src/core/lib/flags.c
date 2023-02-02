@@ -87,6 +87,11 @@ char *why2_get_memory_identifier(void)
     return memory_identifier;
 }
 
+char *why2_get_default_memory_identifier(void)
+{
+    return DEFAULT_MEMORY_IDENTIFIER;
+}
+
 //SETTERS
 void why2_set_encryption_separator(char encryptionSeparatorNew)
 {
