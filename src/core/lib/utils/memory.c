@@ -130,10 +130,7 @@ void why2_free(void *pointer)
     //VARIABLES
     node_t *node = get_node(pointer);
 
-	if (pointer != NULL)
-    {
-        remove_node(node); //REMOVE FROM LIST IF FOUND
-    }
+	if (pointer != NULL) remove_node(node); //REMOVE FROM LIST IF FOUND
 
 	free(pointer);
 }
