@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/flags.h>
 
-#include <stdio.h>
 #include <stdlib.h>
 
 #include <why2/memory.h>
