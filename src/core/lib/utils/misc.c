@@ -92,7 +92,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
 {
     if (why2_get_flags().noCheck) return WHY2_SUCCESS;
 
-    why2_set_memory_identifier("version_check");
+    why2_set_memory_identifier("core_version_check");
 
     //FILE-CHECK VARIABLES
     int notFoundBuffer = 0;
@@ -121,7 +121,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
         {
             if (!why2_get_flags().why2_no_output) fprintf(stderr, "%s'%s' not found! Exiting...\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME);
 
-            why2_clean_memory("version_check");
+            why2_clean_memory("core_version_check");
             return WHY2_DOWNLOAD_FAILED;
         }
 
@@ -158,7 +158,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
         sleep(5);
 
         fclose(fileBuffer);
-        why2_clean_memory("version_check");
+        why2_clean_memory("core_version_check");
         return WHY2_SUCCESS;
     }
 
@@ -179,7 +179,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             {
                 if (!why2_get_flags().why2_no_output) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
 
-                why2_clean_memory("version_check");
+                why2_clean_memory("core_version_check");
                 return WHY2_WHY2_UPDATE_FAILED;
             }
 
@@ -209,7 +209,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             {
                 if (!why2_get_flags().why2_no_output) fprintf(stderr, "Updating failed! (cloning)\n");
 
-                why2_clean_memory("version_check");
+                why2_clean_memory("core_version_check");
                 return WHY2_WHY2_UPDATE_FAILED;
             }
 
@@ -228,7 +228,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             {
                 if (!why2_get_flags().why2_no_output) fprintf(stderr, "Updating failed! (installing)\n");
 
-                why2_clean_memory("version_check");
+                why2_clean_memory("core_version_check");
                 return WHY2_WHY2_UPDATE_FAILED;
             }
 
