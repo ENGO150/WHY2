@@ -138,3 +138,19 @@ void why2_free(void *pointer)
 
 	free(pointer);
 }
+
+void why2_clean_memory(char *identifier)
+{
+    if (head == NULL) return; //LIST IS EMPTY
+
+    node_t *buffer = head;
+
+    while (buffer -> next != NULL) //GO TROUGH LIST
+    {
+        if (buffer -> identifier == identifier) remove_node(buffer);
+
+        buffer = buffer -> next;
+    }
+
+    if (buffer -> identifier == identifier) remove_node(buffer); //LAST NODE
+}
