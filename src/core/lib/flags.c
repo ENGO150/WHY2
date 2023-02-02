@@ -18,10 +18,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/flags.h>
 
+#include <stdio.h>
+
 #include <why2/memory.h>
 
 //CONSTS (this is just local)
 #define DEFAULT_FLAGS (why2_input_flags) { 0, 0, 0 }
+#define DEFAULT_MEMORY_IDENTIFIER NULL
 
 int encryptionOperation(int text, int encryptedText);
 
@@ -31,6 +34,7 @@ unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE why2_
 why2_input_flags flagsAllah = DEFAULT_FLAGS; //IT IS CALLED flagsAllah CUZ flags CAUSED SOME FUCKING MEMORY PROBLEMS
 why2_encryption_operation_cb encryptionOperation_cb = encryptionOperation;
 why2_bool flagsChanged = 0; //CHANGES TO 1 WHEN U USE why2_set_flags
+char *memory_identifier = DEFAULT_MEMORY_IDENTIFIER;
 
 //GETTERS
 char why2_get_encryption_separator(void)
