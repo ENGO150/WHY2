@@ -153,4 +153,6 @@ void why2_clean_memory(char *identifier)
     }
 
     if (buffer -> identifier == identifier) remove_node(buffer); //LAST NODE
+
+    why2_reset_memory_identifier(); //THIS WILL CAUSE SEGFAULT IF YOU DIDN'T USE why2_set_memory_identifier
 }
