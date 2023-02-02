@@ -9,10 +9,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <why2/flags.h>
+
 //LOCAL
 typedef struct node
 {
     void *pointer;
+    char *identifier;
     struct node *next;
 } node_t; //SINGLE LINKED LIST
 
@@ -25,6 +28,7 @@ void push_to_list(void *pointer)
     node_t *buffer = head;
 
     new_node -> pointer = pointer;
+    new_node -> identifier = why2_get_memory_identifier();
     new_node -> next = NULL;
 
     if (head == NULL) //INIT LIST
