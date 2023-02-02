@@ -80,6 +80,7 @@ why2_output_flags why2_no_output(enum WHY2_EXIT_CODES exitCode); //SAME AS why2_
 why2_encryption_operation_cb why2_get_encryption_operation(void); //RETURNS FUNCTION WHICH IS USED FOR ENCRYPTION & DECRYPTION
 why2_bool why2_get_flags_changed(void);
 char *why2_get_memory_identifier(void); //RETURNS STRING USED IN LINKED LIST (IN memory.c) FOR IDENTIFYING NODES WHEN RUNNING GARBAGE COLLECTOR
+char *why2_get_default_memory_identifier(void);
 
 //SETTERS
 void why2_set_encryption_separator(char encryptionSeparatorNew);
