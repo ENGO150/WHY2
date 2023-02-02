@@ -44,10 +44,6 @@ void push_to_list(void *pointer)
 
 void remove_node(node_t *node)
 {
-    /*
-        This whole function assumes the node is in the list, so if you use this without pushing it, bad things will happen :)
-    */
-
     node_t *buffer_1 = head;
     node_t *buffer_2;
 
@@ -57,6 +53,8 @@ void remove_node(node_t *node)
 
         buffer_1 = buffer_1 -> next;
     }
+
+    if (node != buffer_1) return; //node WASN'T FOUND
 
     if (buffer_1 == head) //node WAS THE FIRST NODE IN THE LIST
     {
