@@ -417,17 +417,29 @@ enum WHY2_EXIT_CODES why2_generate_key(char *key, int keyLength)
 
     if (!seedSet)
     {
+        why2_set_memory_identifier("core_key_generation");
+
         //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
         FILE *fileBuffer;
 
         fileBuffer = fopen("/dev/urandom", "r");
-        (void) (fread(&numberBuffer, sizeof(numberBuffer), 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
+
+        if (fread(&numberBuffer, sizeof(numberBuffer), 1, fileBuffer) != 1)
+        {
+            if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
+
+            why2_clean_memory("core_key_generation");
+            return WHY2_INVALID_KEY;
+        }
+
         numberBuffer = abs(numberBuffer); //MAKE numberBuffer POSITIVE
         srand(numberBuffer);
 
         fclose(fileBuffer);
 
         seedSet = 1;
+
+        why2_reset_memory_identifier();
     }
 
     for (int i = 0; i < keyLength; i++)
@@ -449,4 +461,6 @@ enum WHY2_EXIT_CODES why2_generate_key(char *key, int keyLength)
     }
 
     key[keyLength] = '\0';
+
+    return WHY2_SUCCESS;
 }
