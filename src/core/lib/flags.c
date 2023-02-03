@@ -112,7 +112,7 @@ why2_input_flags why2_get_flags(void)
     return flagsAllah;
 }
 
-why2_output_flags why2_no_output(enum WHY2_EXIT_CODES exitCode)
+why2_output_flags why2_no_output(enum WHY2_EXIT_CODES exit_code)
 {
     char *emptyText = why2_malloc(1); //TEXT
     emptyText[0] = '\0';
@@ -124,7 +124,7 @@ why2_output_flags why2_no_output(enum WHY2_EXIT_CODES exitCode)
     }
     emptyKey[why2_get_key_length()] = '\0';
 
-    return (why2_output_flags) { emptyText, emptyKey, 0, 0, 0, exitCode };
+    return (why2_output_flags) { emptyText, emptyKey, 0, 0, 0, exit_code };
 }
 
 why2_encryption_operation_cb why2_get_encryption_operation(void)

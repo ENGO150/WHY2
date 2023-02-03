@@ -30,8 +30,8 @@ enum WHY2_EXIT_CODES why2_check_version(void); //THIS FUNCTION CHECKS IF LATEST 
 enum WHY2_EXIT_CODES why2_check_key(char *key); //CHECKS IF KEY IS VALID
 enum WHY2_EXIT_CODES why2_check_text(char *text); //CHECKS IF TEXT IS VALID
 unsigned long why2_count_int_length(int number); //RETURNS LENGTH OF number
-unsigned long why2_count_unused_key_size(char *text, char *key); //COUNT unusedKeySize
-unsigned long why2_count_repeated_key_size(char *text, char *key); //COUNT repeatedKeySize
+unsigned long why2_count_unused_key_size(char *text, char *key); //COUNT unused_key_size
+unsigned long why2_count_repeated_key_size(char *text, char *key); //COUNT repeated_key_size
 unsigned long why2_compare_time_micro(struct timeval startTime, struct timeval finishTime); //COMPARE TIMES IN MICROSECONDS
 
 #endif

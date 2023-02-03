@@ -34,7 +34,7 @@ int main(void)
     char *keyBuffer;
     char *statusBuffer;
     char *outputBuffer = why2_malloc(1); //THIS IS TEMP ALLOCATION
-    int exitCode = 0;
+    int exit_code = 0;
     unsigned long timeBuffer;
     FILE *outputStreamBuffer = stdout;
 
@@ -64,9 +64,9 @@ int main(void)
     //ENCRYPT
     why2_output_flags encrypted = why2_encrypt_text(WHY2_TEST_TEXT, NULL);
 
-    textBuffer = why2_strdup(encrypted.outputText); //GET ENCRYPTED TEXT
-    keyBuffer = why2_strdup(encrypted.usedKey); //GET KEY
-    timeBuffer = encrypted.elapsedTime; //GET TIME 1
+    textBuffer = why2_strdup(encrypted.output_text); //GET ENCRYPTED TEXT
+    keyBuffer = why2_strdup(encrypted.used_key); //GET KEY
+    timeBuffer = encrypted.elapsed_time; //GET TIME 1
 
     //DEALLOCATE BUFFER
     why2_deallocate_output(encrypted);
@@ -74,10 +74,10 @@ int main(void)
     //DECRYPT
     encrypted = why2_decrypt_text(textBuffer, keyBuffer);
 
-    timeBuffer += encrypted.elapsedTime; //GET TIME 1
+    timeBuffer += encrypted.elapsed_time; //GET TIME 1
 
     //COMPARE DIFFERENCE
-    if (strcmp(encrypted.outputText, WHY2_TEST_TEXT) == 0 && encrypted.exitCode == 0) //WHY2_SUCCESS
+    if (strcmp(encrypted.output_text, WHY2_TEST_TEXT) == 0 && encrypted.exit_code == 0) //WHY2_SUCCESS
     {
         statusBuffer = why2_strdup("successful");
     }
@@ -85,11 +85,11 @@ int main(void)
     {
         statusBuffer = why2_strdup("failed");
 
-        outputBuffer = why2_realloc(outputBuffer, strlen(encrypted.outputText) + 6);
-        sprintf(outputBuffer, "\t\t\"%s\"\n", encrypted.outputText);
+        outputBuffer = why2_realloc(outputBuffer, strlen(encrypted.output_text) + 6);
+        sprintf(outputBuffer, "\t\t\"%s\"\n", encrypted.output_text);
 
         outputStreamBuffer = stderr;
-        exitCode = 1;
+        exit_code = 1;
     }
 
     //PRINT OUTPUT
@@ -107,7 +107,7 @@ int main(void)
         "REPEATED KEY: \t\"%lu\"\n"
         "EXIT CODE: \t\"%d\"\n"
 
-        , statusBuffer, WHY2_TEST_TEXT, outputBuffer, textBuffer, encrypted.usedKey, timeBuffer / 1000, encrypted.unusedKeySize, encrypted.repeatedKeySize, encrypted.exitCode
+        , statusBuffer, WHY2_TEST_TEXT, outputBuffer, textBuffer, encrypted.used_key, timeBuffer / 1000, encrypted.unused_key_size, encrypted.repeated_key_size, encrypted.exit_code
     );
 
     //DEALLOCATION
@@ -117,5 +117,5 @@ int main(void)
     why2_free(outputBuffer);
     why2_deallocate_output(encrypted);
 
-    return exitCode;
+    return exit_code;
 }

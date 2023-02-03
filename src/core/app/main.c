@@ -39,7 +39,7 @@ int main(void)
         "If you'd like to know more about WHY2 Encryption System, please visit: https://github.com/ENGO150/WHY2/wiki \b\n"
         "Thank you so much for supporting this project!\n"
 
-        , WHY2_TEXT_TO_ENCRYPT, encryptedText.outputText
+        , WHY2_TEXT_TO_ENCRYPT, encryptedText.output_text
     );
 
     //DEALLOCATION

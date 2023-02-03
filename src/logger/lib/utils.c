@@ -32,9 +32,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 void why2_deallocate_logger(why2_log_file logger)
 {
     close(logger.file);
-    why2_free(logger.fileName);
+    why2_free(logger.filename);
 
-    logger.fileName = NULL;
+    logger.filename = NULL;
     logger.file = INVALID_FILE;
 }
 
@@ -42,11 +42,11 @@ void why2_deallocate_decrypted_output(why2_decrypted_output output)
 {
     for (unsigned long i = 0; i < output.length; i++)
     {
-        why2_free(output.decryptedText[i]);
+        why2_free(output.decrypted_text[i]);
     }
 
     output.length = 0;
-    why2_free(output.decryptedText);
+    why2_free(output.decrypted_text);
 }
 
 why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
@@ -101,7 +101,7 @@ why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
     {
         outputBuffer = why2_decrypt_text(content[i], why2_get_log_flags().key); //DECRYPT
 
-        contentDecrypted[i] = why2_strdup(outputBuffer.outputText); //COPY
+        contentDecrypted[i] = why2_strdup(outputBuffer.output_text); //COPY
 
         why2_deallocate_output(outputBuffer); //DEALLOCATE outputBuffer
     }

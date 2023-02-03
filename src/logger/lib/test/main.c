@@ -26,17 +26,17 @@ int main(void)
 {
     //VARIABLES
     why2_log_file logger = why2_init_logger(WHY2_WRITE_DIR); //INITIALIZE LOGGER FILE
-    char *usedKey = why2_malloc(why2_get_key_length() + 1);
+    char *used_key = why2_malloc(why2_get_key_length() + 1);
     why2_decrypted_output decrypted;
-    int exitCode = 0;
+    int exit_code = 0;
 
     //GENERATE KEY
-    why2_generate_key(usedKey, why2_get_key_length());
+    why2_generate_key(used_key, why2_get_key_length());
 
     //FLAGS
     why2_log_flags flags =
     {
-        usedKey
+        used_key
     };
 
     //SET FLAGS
@@ -52,9 +52,9 @@ int main(void)
     //COMPARE OUTPUT
     if //WHY2_SUCCESS //TODO: Make this smart somehow
     (
-        strcmp(decrypted.decryptedText[0], WHY2_WRITE_MESSAGE_1) == 0 &&
-        strcmp(decrypted.decryptedText[1], WHY2_WRITE_MESSAGE_2) == 0 &&
-        strcmp(decrypted.decryptedText[2], WHY2_WRITE_MESSAGE_3) == 0
+        strcmp(decrypted.decrypted_text[0], WHY2_WRITE_MESSAGE_1) == 0 &&
+        strcmp(decrypted.decrypted_text[1], WHY2_WRITE_MESSAGE_2) == 0 &&
+        strcmp(decrypted.decrypted_text[2], WHY2_WRITE_MESSAGE_3) == 0
     )
     {
         printf
@@ -65,18 +65,18 @@ int main(void)
                  "\t\"%s\"\n"
                  "\t\"%s\"\n",
 
-            decrypted.decryptedText[0], decrypted.decryptedText[1], decrypted.decryptedText[2]
+            decrypted.decrypted_text[0], decrypted.decrypted_text[1], decrypted.decrypted_text[2]
         );
     } else //FAILED
     {
         fprintf(stderr, "TEST FAILED!\n");
-        exitCode = 1;
+        exit_code = 1;
     }
 
     //DEALLOCATION
-    why2_free(usedKey);
+    why2_free(used_key);
     why2_deallocate_logger(logger);
     why2_deallocate_decrypted_output(decrypted);
 
-    return exitCode;
+    return exit_code;
 }

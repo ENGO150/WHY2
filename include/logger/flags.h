@@ -49,7 +49,7 @@ const enum WHY2_LOGGER_EXIT_CODES //exit codes you fucking idiot (2#)
 typedef struct
 {
     int file;
-    char *fileName;
+    char *filename;
 } why2_log_file;
 
 typedef struct
@@ -59,7 +59,7 @@ typedef struct
 
 typedef struct
 {
-    char **decryptedText;
+    char **decrypted_text;
     unsigned long length;
 } why2_decrypted_output;
 

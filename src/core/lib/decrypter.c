@@ -67,12 +67,12 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
     int *textKeyChain;
     char *key = why2_strdup(keyNew); //COPY keyNew TO key
     int *encryptedTextKeyChain;
-    char *usedText = why2_strdup(text); //COPY text TO usedText
+    char *used_text = why2_strdup(text); //COPY text TO used_text
 
     //GET LENGTH OF returningText AND textKeyChain
-    for (int i = 0; i < (int) strlen(usedText); i++)
+    for (int i = 0; i < (int) strlen(used_text); i++)
     {
-        if (usedText[i] == why2_get_encryption_separator()) numberBuffer++;
+        if (used_text[i] == why2_get_encryption_separator()) numberBuffer++;
     }
 
     //SET LENGTH (numberBuffer)
@@ -90,9 +90,9 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
         numberBuffer = 0;
 
         //GET LENGTH OF EACH CHARACTER
-        for (int j = 0; j < (int) strlen(usedText); j++)
+        for (int j = 0; j < (int) strlen(used_text); j++)
         {
-            if (usedText[j] == why2_get_encryption_separator()) break;
+            if (used_text[j] == why2_get_encryption_separator()) break;
 
             numberBuffer++;
         }
@@ -106,16 +106,16 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
         }
 
         //LOAD textBuffer
-        for (int j = 0; j < (int) strlen(usedText); j++)
+        for (int j = 0; j < (int) strlen(used_text); j++)
         {
-            textBuffer[j] = usedText[j];
+            textBuffer[j] = used_text[j];
 
             if (numberBuffer == j) break;
         }
 
         encryptedTextKeyChain[i] = atoi(textBuffer);
 
-        usedText += numberBuffer + 1;
+        used_text += numberBuffer + 1;
         usedTextDeallocationBuffer += numberBuffer + 1;
     }
 
@@ -149,7 +149,7 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
     why2_free(textKeyChain);
     why2_free(encryptedTextKeyChain);
     why2_free(textBuffer);
-    why2_free(usedText - usedTextDeallocationBuffer);
+    why2_free(used_text - usedTextDeallocationBuffer);
 
     return output;
 }

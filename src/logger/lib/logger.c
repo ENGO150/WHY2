@@ -128,7 +128,7 @@ void why2_write_log(int loggerFile, char *logMessage)
     {
         why2_output_flags encrypted = why2_encrypt_text(logMessageUsed, flags.key); //ENCRYPT
 
-        message = why2_strdup(encrypted.outputText); //COPY
+        message = why2_strdup(encrypted.output_text); //COPY
 
         //DEALLOCATION
         why2_deallocate_output(encrypted);

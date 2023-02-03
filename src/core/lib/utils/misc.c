@@ -90,7 +90,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
 
 enum WHY2_EXIT_CODES why2_check_version(void)
 {
-    if (why2_get_flags().noCheck) return WHY2_SUCCESS;
+    if (why2_get_flags().no_check) return WHY2_SUCCESS;
 
     why2_set_memory_identifier("core_version_check");
 
@@ -119,13 +119,13 @@ enum WHY2_EXIT_CODES why2_check_version(void)
 
         if (notFoundBuffer == WHY2_NOT_FOUND_TRIES)
         {
-            if (!why2_get_flags().noOutput) fprintf(stderr, "%s'%s' not found! Exiting...\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME);
+            if (!why2_get_flags().no_output) fprintf(stderr, "%s'%s' not found! Exiting...\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME);
 
             why2_clean_memory("core_version_check");
             return WHY2_DOWNLOAD_FAILED;
         }
 
-        if (!why2_get_flags().noOutput) printf("%s'%s' not found (%dx)! Trying again in a second.\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME, notFoundBuffer);
+        if (!why2_get_flags().no_output) printf("%s'%s' not found (%dx)! Trying again in a second.\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME, notFoundBuffer);
         sleep(1);
     }
 
@@ -152,7 +152,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     //CHECK FOR TEXT IN buffer
     if (strcmp(buffer, "") == 0)
     {
-        if (!why2_get_flags().noOutput) fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n\n");
+        if (!why2_get_flags().no_output) fprintf(stderr, "You probably aren't connected to internet! This release could be unsafe!\n\n");
 
         //WAIT FOR 5 SECONDS
         sleep(5);
@@ -177,7 +177,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             //CHECK FOR ROOT PERMISSIONS
             if (getuid() != 0)
             {
-                if (!why2_get_flags().noOutput) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
+                if (!why2_get_flags().no_output) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
 
                 why2_clean_memory("core_version_check");
                 return WHY2_WHY2_UPDATE_FAILED;
@@ -185,12 +185,12 @@ enum WHY2_EXIT_CODES why2_check_version(void)
 
             //VARIABLES
             git_repository *repo = NULL;
-            int exitCode;
+            int exit_code;
             char *installCommand;
             int installCode;
 
             //MESSAGE
-            if (!why2_get_flags().noOutput) printf("Your WHY2 version is outdated!\nUpdating...\t[BETA]\n\n");
+            if (!why2_get_flags().no_output) printf("Your WHY2 version is outdated!\nUpdating...\t[BETA]\n\n");
 
             //CHECK IF WHY2 REPO ISN'T ALREADY FOUND IN 'WHY2_UPDATE_NAME'
             if (access(WHY2_UPDATE_NAME, F_OK) == 0)
@@ -200,14 +200,14 @@ enum WHY2_EXIT_CODES why2_check_version(void)
 
             git_libgit2_init(); //START GIT2
 
-            exitCode = git_clone(&repo, WHY2_UPDATE_URL, WHY2_UPDATE_NAME, NULL); //CLONE
+            exit_code = git_clone(&repo, WHY2_UPDATE_URL, WHY2_UPDATE_NAME, NULL); //CLONE
 
             git_libgit2_shutdown(); //STOP GIT2
 
             //CHECK FOR ERRORS
-            if (exitCode != 0)
+            if (exit_code != 0)
             {
-                if (!why2_get_flags().noOutput) fprintf(stderr, "Updating failed! (cloning)\n");
+                if (!why2_get_flags().no_output) fprintf(stderr, "Updating failed! (cloning)\n");
 
                 why2_clean_memory("core_version_check");
                 return WHY2_WHY2_UPDATE_FAILED;
@@ -226,7 +226,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             //CHECK FOR ERRORS
             if (installCode != 0)
             {
-                if (!why2_get_flags().noOutput) fprintf(stderr, "Updating failed! (installing)\n");
+                if (!why2_get_flags().no_output) fprintf(stderr, "Updating failed! (installing)\n");
 
                 why2_clean_memory("core_version_check");
                 return WHY2_WHY2_UPDATE_FAILED;
@@ -257,7 +257,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
         //versions.json DOESN'T CONTAIN WHY2_VERSION (THIS WILL NOT HAPPEN IF YOU WILL NOT EDIT IT)
         if (versionsIndex == -1)
         {
-            if (!why2_get_flags().noOutput) printf("Version %s not found! Check your flags.\n\n", WHY2_VERSION);
+            if (!why2_get_flags().no_output) printf("Version %s not found! Check your flags.\n\n", WHY2_VERSION);
 
             goto deallocation;
         }
@@ -265,7 +265,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
         //COUNT versionsBuffer
         versionsBuffer = json_object_array_length(deprecated) - versionsIndex;
 
-        if (!why2_get_flags().noOutput) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, WHY2_VERSION, json_object_get_string(active));
+        if (!why2_get_flags().no_output) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, WHY2_VERSION, json_object_get_string(active));
 
         //WAIT FOR 5 SECONDS
         sleep(5);
@@ -320,23 +320,23 @@ void why2_generate_text_key_chain(char *key, int *textKeyChain, int textKeyChain
 
 void why2_deallocate_output(why2_output_flags flags)
 {
-    why2_free(flags.outputText);
-    why2_free(flags.usedKey);
+    why2_free(flags.output_text);
+    why2_free(flags.used_key);
 
-    flags.elapsedTime = 0;
-    flags.exitCode = WHY2_SUCCESS;
-    flags.repeatedKeySize = 0;
-    flags.unusedKeySize = 0;
+    flags.elapsed_time = 0;
+    flags.exit_code = WHY2_SUCCESS;
+    flags.repeated_key_size = 0;
+    flags.unused_key_size = 0;
 
-    flags.outputText = NULL;
-    flags.usedKey = NULL;
+    flags.output_text = NULL;
+    flags.used_key = NULL;
 }
 
 enum WHY2_EXIT_CODES why2_check_key(char *key)
 {
     if (strlen(key) < why2_get_key_length())
     {
-        if (!why2_get_flags().noOutput) fprintf(stderr, "Key must be at least %lu characters long!\n", why2_get_key_length());
+        if (!why2_get_flags().no_output) fprintf(stderr, "Key must be at least %lu characters long!\n", why2_get_key_length());
         return WHY2_INVALID_KEY;
     }
 
@@ -347,7 +347,7 @@ enum WHY2_EXIT_CODES why2_check_text(char *text)
 {
     if (strcmp(text, "") == 0)
     {
-        if (!why2_get_flags().noOutput) fprintf(stderr, "No text to encrypt!\n");
+        if (!why2_get_flags().no_output) fprintf(stderr, "No text to encrypt!\n");
         return WHY2_INVALID_TEXT;
     }
 

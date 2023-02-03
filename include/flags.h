@@ -54,19 +54,19 @@ typedef char why2_bool; //READ THE NAME OR I WILL FIND YOU AND FUCK YOUR MOTHERF
 typedef int (*why2_encryption_operation_cb)(int, int); //TYPE FOR encryptionOperation CALLBACK
 typedef struct
 {
-    why2_bool noCheck; //BOOLEAN FOR SKIPPING WHY2_VERSION CHECK
-    why2_bool noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
+    why2_bool no_check; //BOOLEAN FOR SKIPPING WHY2_VERSION CHECK
+    why2_bool no_output; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
     why2_bool update; //BOOLEAN FOR UPDATING YOUR WHY WHY2_VERSION IF OLD IS USED
 } why2_input_flags;
 
 typedef struct
 {
-    char *outputText; //VARIABLE FOR ENCRYPTED/DECRYPTED TEXT
-    char *usedKey; //VARIABLE FOR USED/GENERATED KEY
-    unsigned long unusedKeySize; //VARIABLE FOR COUNT OF WHY2_UNUSED CHARACTERS IN KEY
-    unsigned long repeatedKeySize; //VARIABLE FOR COUNT OF REPEATED CHARACTERS IN KEY (basically reversed unusedKeySize)
-    unsigned long elapsedTime; //VARIABLE FOR ELAPSED TIME IN MICROSECONDS => 1s = 1000000µs
-    enum WHY2_EXIT_CODES exitCode; //VARIABLE FOR EXIT CODE
+    char *output_text; //VARIABLE FOR ENCRYPTED/DECRYPTED TEXT
+    char *used_key; //VARIABLE FOR USED/GENERATED KEY
+    unsigned long unused_key_size; //VARIABLE FOR COUNT OF WHY2_UNUSED CHARACTERS IN KEY
+    unsigned long repeated_key_size; //VARIABLE FOR COUNT OF REPEATED CHARACTERS IN KEY (basically reversed unused_key_size)
+    unsigned long elapsed_time; //VARIABLE FOR ELAPSED TIME IN MICROSECONDS => 1s = 1000000µs
+    enum WHY2_EXIT_CODES exit_code; //VARIABLE FOR EXIT CODE
 } why2_output_flags;
 
 //NOTE: Variables were moved to 'flags.c' to force y'all using getters
@@ -76,7 +76,7 @@ char why2_get_encryption_separator(void);
 unsigned long why2_get_key_length(void);
 why2_input_flags why2_get_default_flags(void); //THIS GENERATES why2_input_flags WITH DEFAULT VALUES
 why2_input_flags why2_get_flags(void); //RETURNS USED FLAGS
-why2_output_flags why2_no_output(enum WHY2_EXIT_CODES exitCode); //SAME AS why2_get_default_flags() BUT FOR why2_output_flags
+why2_output_flags why2_no_output(enum WHY2_EXIT_CODES exit_code); //SAME AS why2_get_default_flags() BUT FOR why2_output_flags
 why2_encryption_operation_cb why2_get_encryption_operation(void); //RETURNS FUNCTION WHICH IS USED FOR ENCRYPTION & DECRYPTION
 why2_bool why2_get_flags_changed(void);
 char *why2_get_memory_identifier(void); //RETURNS STRING USED IN LINKED LIST (IN memory.c) FOR IDENTIFYING NODES WHEN RUNNING GARBAGE COLLECTOR
