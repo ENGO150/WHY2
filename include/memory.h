@@ -9,6 +9,6 @@ char *why2_strdup(char *string);
 
 void why2_free(void *pointer);
 
-void why2_clean_memory(char *identifier); //identifier SPECIFIES WHICH NODES TO DEALLOCATE
+void why2_clean_memory(char *identifier); //identifier SPECIFIES WHICH NODES TO DEALLOCATE | THIS IS BASICALLY GARBAGE COLLECTOR | PASS why2_get_default_memory_identifier() FOR DEALLOCATING EVERYTHING
 
 #endif
