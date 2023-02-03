@@ -144,15 +144,16 @@ void why2_clean_memory(char *identifier)
     if (head == NULL) return; //LIST IS EMPTY
 
     node_t *buffer = head;
+    why2_bool force_deallocating = identifier == why2_get_default_memory_identifier();
 
     while (buffer -> next != NULL) //GO TROUGH LIST
     {
-        if (buffer -> identifier == identifier) why2_free(buffer -> pointer);
+        if (buffer -> identifier == identifier || force_deallocating) why2_free(buffer -> pointer);
 
         buffer = buffer -> next;
     }
 
-    if (buffer -> identifier == identifier) why2_free(buffer -> pointer); //LAST NODE
+    if (buffer -> identifier == identifier || force_deallocating) why2_free(buffer -> pointer); //LAST NODE
 
     why2_reset_memory_identifier(); //THIS WILL CAUSE SEGFAULT IF YOU DIDN'T USE why2_set_memory_identifier
 }
