@@ -55,7 +55,7 @@ typedef int (*why2_encryption_operation_cb)(int, int); //TYPE FOR encryptionOper
 typedef struct
 {
     why2_bool noCheck; //BOOLEAN FOR SKIPPING WHY2_VERSION CHECK
-    why2_bool why2_no_output; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
+    why2_bool noOutput; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
     why2_bool update; //BOOLEAN FOR UPDATING YOUR WHY WHY2_VERSION IF OLD IS USED
 } why2_input_flags;
 
