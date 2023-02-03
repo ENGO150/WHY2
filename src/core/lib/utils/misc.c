@@ -145,7 +145,13 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     buffer = why2_calloc(bufferSize + 1, sizeof(char));
 
     //LOAD jsonFile
-    (void) (fread(buffer, bufferSize, 1, fileBuffer) + 1); //TODO: Try to create some function for processing exit value
+    if (fread(buffer, bufferSize, 1, fileBuffer) != 1)
+    {
+        if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
+
+        why2_clean_memory("core_version_check");
+        return WHY2_DOWNLOAD_FAILED;
+    }
 
     buffer[bufferSize] = '\0';
 
