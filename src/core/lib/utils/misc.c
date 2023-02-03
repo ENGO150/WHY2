@@ -429,7 +429,7 @@ void why2_generate_key(char *key, int keyLength)
             if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
 
             why2_clean_memory("core_key_generation");
-            return WHY2_INVALID_KEY;
+            return;
         }
 
         numberBuffer = abs(numberBuffer); //MAKE numberBuffer POSITIVE
@@ -461,6 +461,4 @@ void why2_generate_key(char *key, int keyLength)
     }
 
     key[keyLength] = '\0';
-
-    return WHY2_SUCCESS;
 }
