@@ -411,7 +411,7 @@ unsigned long why2_compare_time_micro(struct timeval startTime, struct timeval f
     return (finishTime.tv_sec - startTime.tv_sec) * 1000000 + finishTime.tv_usec - startTime.tv_usec;
 }
 
-void why2_generate_key(char *key, int keyLength)
+enum WHY2_EXIT_CODES why2_generate_key(char *key, int keyLength)
 {
     int numberBuffer;
 
