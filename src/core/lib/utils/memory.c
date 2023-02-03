@@ -147,12 +147,12 @@ void why2_clean_memory(char *identifier)
 
     while (buffer -> next != NULL) //GO TROUGH LIST
     {
-        if (buffer -> identifier == identifier) remove_node(buffer);
+        if (buffer -> identifier == identifier) why2_free(buffer -> pointer);
 
         buffer = buffer -> next;
     }
 
-    if (buffer -> identifier == identifier) remove_node(buffer); //LAST NODE
+    if (buffer -> identifier == identifier) why2_free(buffer -> pointer); //LAST NODE
 
     why2_reset_memory_identifier(); //THIS WILL CAUSE SEGFAULT IF YOU DIDN'T USE why2_set_memory_identifier
 }
