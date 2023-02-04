@@ -27,6 +27,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <sys/stat.h>
 
 #include <why2/logger/flags.h>
+#include <why2/logger/utils.h>
 
 #include <why2/encrypter.h>
 #include <why2/memory.h>
@@ -34,6 +35,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 why2_log_file why2_init_logger(char *directoryPath)
 {
+    why2_set_memory_identifier("logger_logfile_init");
+
     //VARIABLES
     struct stat st;
     struct dirent *entry;
@@ -82,7 +85,14 @@ why2_log_file why2_init_logger(char *directoryPath)
     latestFilePath = why2_strdup(filePath);
 
     if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); } //REMOVE SYMLINK IF IT ALREADY EXISTS
-    (void) (symlink(latestFilePath + (strlen(WHY2_WRITE_DIR) + 1), latestBuffer) + 1); //TODO: Try to create some function for processing exit value //CREATE
+
+    if (symlink(latestFilePath + (strlen(WHY2_WRITE_DIR) + 1), latestBuffer) != 0) //CREATE SYMLINK
+    {
+        fprintf(stderr, "Creating symlink failed!\n");
+
+        why2_clean_memory("logger_logfile_init");
+        return why2_empty_log_file();
+    }
 
     deallocation:
 
@@ -91,6 +101,8 @@ why2_log_file why2_init_logger(char *directoryPath)
     why2_free(latestBuffer);
     why2_free(latestFilePath);
     closedir(dir);
+
+    why2_reset_memory_identifier();
 
     return (why2_log_file)
     {
