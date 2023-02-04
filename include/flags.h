@@ -83,7 +83,7 @@ char *why2_get_memory_identifier(void); //RETURNS STRING USED IN LINKED LIST (IN
 char *why2_get_default_memory_identifier(void);
 
 //SETTERS
-void why2_set_encryption_separator(char encryptionSeparatorNew);
+void why2_set_encryption_separator(char encryption_separator_new);
 void why2_set_key_length(int keyLengthNew);
 void why2_set_flags(why2_input_flags newFlags); //.... whatcha think?
 void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOperation); //are you that dumb?

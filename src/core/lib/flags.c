@@ -155,7 +155,7 @@ char *why2_get_default_memory_identifier(void)
 }
 
 //SETTERS
-void why2_set_encryption_separator(char encryptionSeparatorNew)
+void why2_set_encryption_separator(char encryption_separator_new)
 {
     if (encryptionSeparatorNew <= 31) return;
 
