@@ -51,6 +51,8 @@ void why2_deallocate_decrypted_output(why2_decrypted_output output)
 
 why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
 {
+    why2_set_memory_identifier("logger_decryption");
+
     FILE *file = fdopen(logger.file, "r");
     why2_output_flags outputBuffer;
     char *rawContent;
@@ -70,7 +72,13 @@ why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
     rawContent = why2_calloc(rawContentL + 1, sizeof(char)); //CALLOC WILL BE USED FOR CLEANING AFTER ALLOCATION
 
     //LOAD rawContent
-    (void) (fread(rawContent, rawContentL, 1, file) + 1); //TODO: Try to create some function for processing exit value
+    if (fread(rawContent, rawContentL, 1, file) != 1)
+    {
+        if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
+
+        why2_clean_memory("logger_decryption");
+        return why2_empty_decrypted_output();
+    }
 
     for (int i = 0; i < rawContentL; i++)
     {
@@ -110,6 +118,8 @@ why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
     why2_free(rawContent);
     fclose(file);
     why2_deallocate_decrypted_output((why2_decrypted_output) { content, lines }); //fuck the system lmao
+
+    why2_reset_memory_identifier();
 
     return (why2_decrypted_output)
     {
