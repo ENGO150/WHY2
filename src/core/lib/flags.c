@@ -80,7 +80,7 @@ void remove_node_from_end(void)
         buffer -> next = NULL; //UNLINK
     }
 
-    free(buffer);
+    free(buffer -> next);
 }
 
 char *get_last_node_identifier(void)
