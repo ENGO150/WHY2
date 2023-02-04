@@ -69,18 +69,23 @@ void remove_node_from_end(void)
     if (list_head == NULL) return; //EMPTY LIST
 
     node_t *buffer = list_head;
+    node_t *deallocating_node;
 
     if (buffer -> next == NULL) //ONLY ONE NODE
     {
+        deallocating_node = buffer;
+
         list_head = NULL;
     } else
     {
         while (buffer -> next -> next != NULL) buffer = buffer -> next; //GO TO THE NODE BEFORE END
 
+        deallocating_node = buffer -> next;
+
         buffer -> next = NULL; //UNLINK
     }
 
-    free(buffer -> next);
+    free(deallocating_node);
 }
 
 char *get_last_node_identifier(void)
