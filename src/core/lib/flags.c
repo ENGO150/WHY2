@@ -101,7 +101,7 @@ char *get_last_node_identifier(void)
 //GETTERS
 char why2_get_encryption_separator(void)
 {
-    return encryptionSeparator;
+    return encryption_separator;
 }
 
 unsigned long why2_get_key_length(void)
@@ -157,7 +157,12 @@ char *why2_get_default_memory_identifier(void)
 //SETTERS
 void why2_set_encryption_separator(char encryption_separator_new)
 {
-    if (encryptionSeparatorNew <= 31) return;
+    if
+    (
+        encryption_separator_new <= 31 ||
+        (encryption_separator_new >= 48 && encryption_separator_new <= 57) ||
+        encryption_separator_new == 45
+    ) return;
 
     encryption_separator = encryption_separator_new;
 }
