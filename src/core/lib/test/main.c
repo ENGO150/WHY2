@@ -53,7 +53,7 @@ int main(void)
     why2_set_key_length(100);
 
     //SET ENCRYPTION_SEPARATOR TO '|'
-    why2_set_encryption_separator('|');
+    why2_set_encryption_separator('\'');
 
     //SET outputBuffer to NULL
     outputBuffer[0] = '\0';
