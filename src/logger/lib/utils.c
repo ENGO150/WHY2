@@ -117,3 +117,12 @@ why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
         lines
     };
 }
+
+why2_log_file why2_empty_log_file()
+{
+    return (why2_log_file)
+    {
+        INVALID_FILE,
+        NULL
+    };
+}
