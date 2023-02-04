@@ -29,7 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 int encryptionOperation(int text, int encryptedText);
 
 //VARIABLES
-char encryptionSeparator = '.'; //NOPE     > DO NOT TOUCH THIS, USE why2_set_encryption_separator instead <
+char encryption_separator = '.'; //NOPE     > DO NOT TOUCH THIS, USE why2_set_encryption_separator instead <
 unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE why2_set_key_length instead <
 why2_input_flags flagsAllah = DEFAULT_FLAGS; //IT IS CALLED flagsAllah CUZ flags CAUSED SOME FUCKING MEMORY PROBLEMS
 why2_encryption_operation_cb encryptionOperation_cb = encryptionOperation;
@@ -159,7 +159,7 @@ void why2_set_encryption_separator(char encryption_separator_new)
 {
     if (encryptionSeparatorNew <= 31) return;
 
-    encryptionSeparator = encryptionSeparatorNew;
+    encryption_separator = encryption_separator_new;
 }
 
 void why2_set_key_length(int keyLengthNew)
