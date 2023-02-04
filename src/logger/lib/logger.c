@@ -88,7 +88,7 @@ why2_log_file why2_init_logger(char *directoryPath)
 
     if (symlink(latestFilePath + (strlen(WHY2_WRITE_DIR) + 1), latestBuffer) != 0) //CREATE SYMLINK
     {
-        fprintf(stderr, "Creating symlink failed!\n");
+        if (!why2_get_flags().no_output) fprintf(stderr, "Creating symlink failed!\n");
 
         why2_clean_memory("logger_logfile_init");
         return why2_empty_log_file();
