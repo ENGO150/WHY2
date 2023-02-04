@@ -25,5 +25,6 @@ void why2_deallocate_logger(why2_log_file logger); //USE THIS IF YOU WANT TO DEA
 void why2_deallocate_decrypted_output(why2_decrypted_output output); //DEALLOCATION OF POINTER-TO-POINTER, WHY TF ARE YOU READING THIS
 why2_decrypted_output why2_decrypt_logger(why2_log_file logger); //PASS logger AND FLAGS, AND PROGRAM WILL DECRYPT YOUR LOG... WHAT DID YOU EXPECT?
 why2_log_file why2_empty_log_file(); //RETURN EMTPY why2_log_file WHAT THE FUCK DID YOU EXPECT
+why2_decrypted_output why2_empty_decrypted_output(); //NO!
 
 #endif
