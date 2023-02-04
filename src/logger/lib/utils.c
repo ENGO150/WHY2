@@ -126,3 +126,12 @@ why2_log_file why2_empty_log_file()
         NULL
     };
 }
+
+why2_decrypted_output why2_empty_decrypted_output()
+{
+    return (why2_decrypted_output)
+    {
+        NULL,
+        0
+    };
+}
