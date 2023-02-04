@@ -66,6 +66,8 @@ void push_to_list_end(char *identifier)
 
 void remove_node_from_end(void)
 {
+    if (list_head == NULL) return; //EMPTY LIST
+
     node_t *buffer = list_head;
 
     if (buffer -> next == NULL) //ONLY ONE NODE
