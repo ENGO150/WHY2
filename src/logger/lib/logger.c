@@ -154,7 +154,10 @@ void why2_write_log(int loggerFile, char *logMessage)
 
     sprintf(buffer, WHY2_WRITE_FORMATTING, tm.tm_hour, tm.tm_min, tm.tm_sec, message); //LOAD MESSAGE
 
-    (void) (write(loggerFile, buffer, strlen(buffer)) + 1); //TODO: Try to create some function for processing exit value
+    if (write(loggerFile, buffer, strlen(buffer)) != (ssize_t) strlen(buffer))
+    {
+        if (!why2_get_flags().no_output) fprintf(stderr, "Writing failed!");
+    }
 
     //DEALLOCATION
     why2_free(buffer);
