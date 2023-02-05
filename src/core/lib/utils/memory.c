@@ -6,13 +6,15 @@
 
 #include <why2/memory.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <why2/flags.h>
 
 //LOCAL
-const enum POINTER_TYPES
+enum POINTER_TYPES
 {
     ALLOCATION,
     FOPEN,
@@ -145,7 +147,20 @@ void why2_free(void *pointer)
 
 	if (node != NULL) remove_node(node); //REMOVE FROM LIST IF FOUND
 
-	free(pointer);
+	switch (node -> type) //DEALLOCATE BY THE CORRECT WAY
+    {
+        case ALLOCATION: //STANDARD MALLOC, CALLOC OR REALLOC
+            free(pointer);
+            break;
+
+        case FOPEN: //FOPEN OR FDOPEN
+            fclose(pointer);
+            break;
+
+        case OPEN: //OPEN SYSTEM CALL
+            close(*((int*) pointer));
+            break;
+    }
 }
 
 void why2_clean_memory(char *identifier)
