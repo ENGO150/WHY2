@@ -9,7 +9,7 @@ char *why2_strdup(char *string);
 
 void *why2_fopen(char *name, char *modes);
 void *why2_fdopen(int file, char *modes);
-int why2_open(char *name, int flags, ...);
+int why2_open(char *name, int flags, unsigned int mode);
 void *why2_opendir(char *name);
 
 void why2_deallocate(void *pointer);
