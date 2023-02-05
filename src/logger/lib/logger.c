@@ -77,7 +77,7 @@ why2_log_file why2_init_logger(char *directoryPath)
 
     sprintf(filePath, WHY2_LOG_FORMATTING, directoryPath, dateBuffer, buffer); //GENERATE LOG-NAME
 
-    file = open(filePath, O_RDWR | O_APPEND | O_CREAT, 0644); //CREATE LOG FILE
+    file = why2_open(filePath, O_RDWR | O_APPEND | O_CREAT, 0644); //CREATE LOG FILE
 
     //CREATE SYMLINK
     sprintf(latestBuffer, WHY2_LOG_LATEST_FORMATTING, WHY2_WRITE_DIR, WHY2_LOG_LATEST); //GENERATE LATEST.log PATH
