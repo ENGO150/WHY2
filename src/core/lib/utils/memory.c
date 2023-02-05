@@ -12,16 +12,24 @@
 #include <why2/flags.h>
 
 //LOCAL
+const enum POINTER_TYPES
+{
+    ALLOCATION,
+    FOPEN,
+    OPEN
+};
+
 typedef struct node
 {
     void *pointer;
     char *identifier;
+    enum POINTER_TYPES type;
     struct node *next;
 } node_t; //SINGLE LINKED LIST
 
 node_t *head = NULL;
 
-void push_to_list(void *pointer)
+void push_to_list(void *pointer, enum POINTER_TYPES type)
 {
     //CREATE NODE
     node_t *new_node = malloc(sizeof(node_t));
@@ -29,6 +37,7 @@ void push_to_list(void *pointer)
 
     new_node -> pointer = pointer;
     new_node -> identifier = why2_get_memory_identifier();
+    new_node -> type = type;
     new_node -> next = NULL;
 
     if (head == NULL) //INIT LIST
@@ -95,7 +104,7 @@ void *why2_malloc(unsigned long size)
 {
     void *allocated = malloc(size);
 
-    push_to_list(allocated);
+    push_to_list(allocated, ALLOCATION);
 
     return allocated;
 }
@@ -104,7 +113,7 @@ void *why2_calloc(unsigned long element, unsigned long size)
 {
     void *allocated = calloc(element, size);
 
-    push_to_list(allocated);
+    push_to_list(allocated, ALLOCATION);
 
     return allocated;
 }
@@ -115,7 +124,7 @@ void *why2_realloc(void *pointer, unsigned long size)
 
     void *allocated = malloc(size);
 
-    push_to_list(allocated);
+    push_to_list(allocated, ALLOCATION);
 
     return allocated;
 }
@@ -124,7 +133,7 @@ char *why2_strdup(char *string)
 {
     char *allocated = strdup(string);
 
-    push_to_list(allocated);
+    push_to_list(allocated, ALLOCATION);
 
     return allocated;
 }
