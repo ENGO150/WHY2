@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #include <why2/flags.h>
 
@@ -18,7 +19,8 @@ enum POINTER_TYPES
 {
     ALLOCATION,
     FOPEN,
-    OPEN
+    OPEN,
+    OPENDIR
 };
 
 typedef struct node
@@ -159,6 +161,10 @@ void why2_free(void *pointer)
 
         case OPEN: //OPEN SYSTEM CALL
             close(*((int*) pointer));
+            break;
+
+        case OPENDIR: //OPENDIR SYSTEM CALL
+            closedir(pointer);
             break;
     }
 }
