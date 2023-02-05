@@ -50,7 +50,7 @@ const enum WHY2_EXIT_CODES //exit codes you fucking idiot
 #define WHY2_UNUSED __attribute__((unused)) //SAME COMMENT AS WHY2_DEPRECATED'S
 
 //TYPES
-typedef char why2_bool; //READ THE NAME OR I WILL FIND YOU AND FUCK YOUR MOTHERFUCKING DOG!!!
+typedef _Bool why2_bool; //READ THE NAME OR I WILL FIND YOU AND FUCK YOUR MOTHERFUCKING DOG!!!
 typedef int (*why2_encryption_operation_cb)(int, int); //TYPE FOR encryptionOperation CALLBACK
 typedef struct
 {
