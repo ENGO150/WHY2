@@ -155,7 +155,7 @@ void *why2_fdopen(int file, char *modes)
 {
     void *opened = fdopen(file, modes);
 
-    push_to_list(opened, OPEN);
+    push_to_list(opened, FOPEN);
 
     return opened;
 }
