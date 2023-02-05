@@ -156,8 +156,6 @@ void why2_deallocate(void *pointer)
     //VARIABLES
     node_t *node = get_node(pointer);
 
-	if (node != NULL) remove_node(node); //REMOVE FROM LIST IF FOUND
-
 	switch (node -> type) //DEALLOCATE BY THE CORRECT WAY
     {
         case ALLOCATION: //STANDARD MALLOC, CALLOC OR REALLOC
@@ -176,6 +174,8 @@ void why2_deallocate(void *pointer)
             closedir(pointer);
             break;
     }
+
+	if (node != NULL) remove_node(node); //REMOVE FROM LIST IF FOUND
 }
 
 void why2_clean_memory(char *identifier)
