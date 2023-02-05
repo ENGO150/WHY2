@@ -142,6 +142,15 @@ char *why2_strdup(char *string)
     return allocated;
 }
 
+void *why2_fopen(char *name, char *modes)
+{
+    void *opened = fopen(name, modes);
+
+    push_to_list(opened, FOPEN);
+
+    return opened;
+}
+
 void why2_deallocate(void *pointer)
 {
     //VARIABLES
