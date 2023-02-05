@@ -53,7 +53,7 @@ why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
 {
     why2_set_memory_identifier("logger_decryption");
 
-    FILE *file = fdopen(logger.file, "r");
+    FILE *file = why2_fdopen(logger.file, "r");
     why2_output_flags outputBuffer;
     char *rawContent;
     char **content;
@@ -116,7 +116,7 @@ why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
 
     //DEALLOCATION
     why2_deallocate(rawContent);
-    fclose(file);
+    why2_deallocate(file);
     why2_deallocate_decrypted_output((why2_decrypted_output) { content, lines }); //fuck the system lmao
 
     why2_reset_memory_identifier();
