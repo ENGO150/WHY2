@@ -130,8 +130,8 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
     };
 
     //DEALLOCATION
-    why2_free(textKeyChain);
-    why2_free(textBuffer);
+    why2_deallocate(textKeyChain);
+    why2_deallocate(textBuffer);
 
     why2_reset_memory_identifier();
 

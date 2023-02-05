@@ -74,7 +74,7 @@ int main(void)
     }
 
     //DEALLOCATION
-    why2_free(used_key);
+    why2_deallocate(used_key);
     why2_deallocate_logger(logger);
     why2_deallocate_decrypted_output(decrypted);
 

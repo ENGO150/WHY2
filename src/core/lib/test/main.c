@@ -111,10 +111,10 @@ int main(void)
     );
 
     //DEALLOCATION
-    why2_free(textBuffer);
-    why2_free(keyBuffer);
-    why2_free(statusBuffer);
-    why2_free(outputBuffer);
+    why2_deallocate(textBuffer);
+    why2_deallocate(keyBuffer);
+    why2_deallocate(statusBuffer);
+    why2_deallocate(outputBuffer);
     why2_deallocate_output(encrypted);
 
     return exit_code;

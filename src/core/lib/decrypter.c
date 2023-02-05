@@ -146,10 +146,10 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
     };
 
     //DEALLOCATION
-    why2_free(textKeyChain);
-    why2_free(encryptedTextKeyChain);
-    why2_free(textBuffer);
-    why2_free(used_text - usedTextDeallocationBuffer);
+    why2_deallocate(textKeyChain);
+    why2_deallocate(encryptedTextKeyChain);
+    why2_deallocate(textBuffer);
+    why2_deallocate(used_text - usedTextDeallocationBuffer);
 
     return output;
 }

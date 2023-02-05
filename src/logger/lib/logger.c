@@ -97,9 +97,9 @@ why2_log_file why2_init_logger(char *directoryPath)
     deallocation:
 
     //DEALLOCATION
-    why2_free(dateBuffer);
-    why2_free(latestBuffer);
-    why2_free(latestFilePath);
+    why2_deallocate(dateBuffer);
+    why2_deallocate(latestBuffer);
+    why2_deallocate(latestFilePath);
     closedir(dir);
 
     why2_reset_memory_identifier();
@@ -144,7 +144,7 @@ void why2_write_log(int loggerFile, char *logMessage)
 
         //DEALLOCATION
         why2_deallocate_output(encrypted);
-        why2_free(logMessageUsed); //I COULD DO THIS SMART SOMEHOW, BUT I AM TOO LAZY FOR THAT SHIT
+        why2_deallocate(logMessageUsed); //I COULD DO THIS SMART SOMEHOW, BUT I AM TOO LAZY FOR THAT SHIT
     } else //FUCK ENCRYPTION, LET'S DO IT; WHY WOULD WE EVEN USE WHY2-CORE? HUH?
     {
         message = logMessageUsed;
@@ -160,6 +160,6 @@ void why2_write_log(int loggerFile, char *logMessage)
     }
 
     //DEALLOCATION
-    why2_free(buffer);
-    why2_free(message);
+    why2_deallocate(buffer);
+    why2_deallocate(message);
 }

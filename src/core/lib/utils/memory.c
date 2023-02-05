@@ -124,7 +124,7 @@ void *why2_calloc(unsigned long element, unsigned long size)
 
 void *why2_realloc(void *pointer, unsigned long size)
 {
-    if (pointer != NULL) why2_free(pointer);
+    if (pointer != NULL) why2_deallocate(pointer);
 
     void *allocated = malloc(size);
 
@@ -142,7 +142,7 @@ char *why2_strdup(char *string)
     return allocated;
 }
 
-void why2_free(void *pointer)
+void why2_deallocate(void *pointer)
 {
     //VARIABLES
     node_t *node = get_node(pointer);
@@ -178,12 +178,12 @@ void why2_clean_memory(char *identifier)
 
     while (buffer -> next != NULL) //GO TROUGH LIST
     {
-        if (buffer -> identifier == identifier || force_deallocating) why2_free(buffer -> pointer);
+        if (buffer -> identifier == identifier || force_deallocating) why2_deallocate(buffer -> pointer);
 
         buffer = buffer -> next;
     }
 
-    if (buffer -> identifier == identifier || force_deallocating) why2_free(buffer -> pointer); //LAST NODE
+    if (buffer -> identifier == identifier || force_deallocating) why2_deallocate(buffer -> pointer); //LAST NODE
 
     why2_reset_memory_identifier(); //THIS WILL CAUSE SEGFAULT IF YOU DIDN'T USE why2_set_memory_identifier
 }

@@ -227,7 +227,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             //REMOVE versions.json - OTHERWISE WILL CAUSE SEGFAULT IN NEXT RUN
             remove(WHY2_VERSIONS_NAME);
 
-            why2_free(installCommand);
+            why2_deallocate(installCommand);
 
             //CHECK FOR ERRORS
             if (installCode != 0)
@@ -281,7 +281,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
 
     //DEALLOCATION
     json_object_put(parsedJson); //THIS FREES EVERY json_object - AT LEAST JSON-C'S DOCUMENTATION SAYS THAT
-    why2_free(buffer);
+    why2_deallocate(buffer);
 
     why2_reset_memory_identifier();
 
@@ -326,8 +326,8 @@ void why2_generate_text_key_chain(char *key, int *textKeyChain, int textKeyChain
 
 void why2_deallocate_output(why2_output_flags flags)
 {
-    why2_free(flags.output_text);
-    why2_free(flags.used_key);
+    why2_deallocate(flags.output_text);
+    why2_deallocate(flags.used_key);
 
     flags.elapsed_time = 0;
     flags.exit_code = WHY2_SUCCESS;

@@ -32,7 +32,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 void why2_deallocate_logger(why2_log_file logger)
 {
     close(logger.file);
-    why2_free(logger.filename);
+    why2_deallocate(logger.filename);
 
     logger.filename = NULL;
     logger.file = INVALID_FILE;
@@ -42,11 +42,11 @@ void why2_deallocate_decrypted_output(why2_decrypted_output output)
 {
     for (unsigned long i = 0; i < output.length; i++)
     {
-        why2_free(output.decrypted_text[i]);
+        why2_deallocate(output.decrypted_text[i]);
     }
 
     output.length = 0;
-    why2_free(output.decrypted_text);
+    why2_deallocate(output.decrypted_text);
 }
 
 why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
@@ -115,7 +115,7 @@ why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
     }
 
     //DEALLOCATION
-    why2_free(rawContent);
+    why2_deallocate(rawContent);
     fclose(file);
     why2_deallocate_decrypted_output((why2_decrypted_output) { content, lines }); //fuck the system lmao
 
