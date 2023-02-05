@@ -20,7 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define WHY2_FLAGS_H
 
 //CONSTS
-const enum WHY2_EXIT_CODES //exit codes you fucking idiot
+enum WHY2_EXIT_CODES //exit codes you fucking idiot
 {
     WHY2_SUCCESS = 0, //EXIT CODE FOR WHY2_SUCCESSFUL RUN
     WHY2_INVALID_KEY = 1, //EXIT VALUE FOR INVALID KEY
