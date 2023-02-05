@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <dirent.h>
 
 #include <why2/flags.h>
@@ -156,6 +157,15 @@ void *why2_fdopen(int file, char *modes)
     void *opened = fdopen(file, modes);
 
     push_to_list(opened, FOPEN);
+
+    return opened;
+}
+
+int why2_open(char *name, int flags, unsigned int mode)
+{
+    int opened = open(name, flags, mode);
+
+    push_to_list(&opened, OPEN);
 
     return opened;
 }
