@@ -188,7 +188,7 @@ void why2_deallocate(void *pointer)
             break;
 
         case OPEN: //OPEN SYSTEM CALL
-            close(*((int*) pointer));
+            close(*((int*) pointer)); //TODO: Fix global pointer problem
             break;
 
         case OPENDIR: //OPENDIR SYSTEM CALL
