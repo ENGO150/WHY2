@@ -151,6 +151,15 @@ void *why2_fopen(char *name, char *modes)
     return opened;
 }
 
+void *why2_fdopen(int file, char *modes)
+{
+    void *opened = fdopen(file, modes);
+
+    push_to_list(opened, OPEN);
+
+    return opened;
+}
+
 void why2_deallocate(void *pointer)
 {
     //VARIABLES
