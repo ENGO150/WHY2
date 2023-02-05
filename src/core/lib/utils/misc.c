@@ -99,7 +99,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
 
     //CURL VARIABLES
     CURL *curl = curl_easy_init();
-    FILE *fileBuffer = fopen(WHY2_VERSIONS_NAME, "w+");
+    FILE *fileBuffer = why2_fopen(WHY2_VERSIONS_NAME, "w+");
 
     //GET versions.json
     curl_easy_setopt(curl, CURLOPT_URL, WHY2_VERSIONS_URL);
@@ -111,7 +111,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
 
     //CLEANUP
     curl_easy_cleanup(curl);
-    fclose(fileBuffer);
+    why2_deallocate(fileBuffer);
 
     while (access(WHY2_VERSIONS_NAME, R_OK) != 0)
     {
@@ -136,7 +136,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     int bufferSize;
 
     //COUNT LENGTH OF buffer AND STORE IT IN bufferSize
-    fileBuffer = fopen(WHY2_VERSIONS_NAME, "r");
+    fileBuffer = why2_fopen(WHY2_VERSIONS_NAME, "r");
     fseek(fileBuffer, 0, SEEK_END);
     bufferSize = ftell(fileBuffer);
     rewind(fileBuffer); //REWIND fileBuffer (NO SHIT)
@@ -163,13 +163,12 @@ enum WHY2_EXIT_CODES why2_check_version(void)
         //WAIT FOR 5 SECONDS
         sleep(5);
 
-        fclose(fileBuffer);
         why2_clean_memory("core_version_check");
         return WHY2_SUCCESS;
     }
 
     //CLEANUP
-	fclose(fileBuffer);
+	why2_deallocate(fileBuffer);
 
     //GET
 	parsedJson = json_tokener_parse(buffer); //yes, ik, i could use json_object_from_file, but I need to check for internet somehow
@@ -422,7 +421,7 @@ void why2_generate_key(char *key, int keyLength)
         //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
         FILE *fileBuffer;
 
-        fileBuffer = fopen("/dev/urandom", "r");
+        fileBuffer = why2_fopen("/dev/urandom", "r");
 
         if (fread(&numberBuffer, sizeof(numberBuffer), 1, fileBuffer) != 1)
         {
@@ -435,7 +434,7 @@ void why2_generate_key(char *key, int keyLength)
         numberBuffer = abs(numberBuffer); //MAKE numberBuffer POSITIVE
         srand(numberBuffer);
 
-        fclose(fileBuffer);
+        why2_deallocate(fileBuffer);
 
         seedSet = 1;
 
