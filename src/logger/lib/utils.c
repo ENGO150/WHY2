@@ -31,7 +31,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 void why2_deallocate_logger(why2_log_file logger)
 {
-    why2_deallocate(&logger.file);
+    close(logger.file);
     why2_deallocate(logger.filename);
 
     logger.filename = NULL;
