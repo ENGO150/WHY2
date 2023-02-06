@@ -162,6 +162,15 @@ void *why2_fdopen(int file, char *modes)
     return opened;
 }
 
+void *why2_opendir(char *name)
+{
+    void *opened = opendir(name);
+
+    push_to_list(opened, OPENDIR);
+
+    return opened;
+}
+
 void why2_deallocate(void *pointer)
 {
     //VARIABLES
