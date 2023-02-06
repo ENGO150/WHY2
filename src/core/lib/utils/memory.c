@@ -20,7 +20,6 @@ enum POINTER_TYPES
 {
     ALLOCATION,
     FOPEN,
-    OPEN,
     OPENDIR
 };
 
@@ -161,15 +160,6 @@ void *why2_fdopen(int file, char *modes)
     return opened;
 }
 
-int why2_open(char *name, int flags, unsigned int mode)
-{
-    int opened = open(name, flags, mode);
-
-    push_to_list(&opened, OPEN);
-
-    return opened;
-}
-
 void why2_deallocate(void *pointer)
 {
     //VARIABLES
@@ -185,10 +175,6 @@ void why2_deallocate(void *pointer)
 
         case FOPEN: //FOPEN OR FDOPEN
             fclose(pointer);
-            break;
-
-        case OPEN: //OPEN SYSTEM CALL
-            close(*((int*) pointer)); //TODO: Fix global pointer problem
             break;
 
         case OPENDIR: //OPENDIR SYSTEM CALL
