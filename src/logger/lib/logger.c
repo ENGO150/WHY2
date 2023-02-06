@@ -59,7 +59,7 @@ why2_log_file why2_init_logger(char *directoryPath)
     }
 
     //COUNT HOW MANY LOGS WERE GENERATED THIS DAY
-    dir = opendir(directoryPath);
+    dir = why2_opendir(directoryPath);
     while ((entry = readdir(dir)) != NULL)
     {
         if (entry -> d_type == DT_REG)
@@ -101,7 +101,7 @@ why2_log_file why2_init_logger(char *directoryPath)
     why2_deallocate(dateBuffer);
     why2_deallocate(latestBuffer);
     why2_deallocate(latestFilePath);
-    closedir(dir);
+    why2_deallocate(dir);
 
     why2_reset_memory_identifier();
 
