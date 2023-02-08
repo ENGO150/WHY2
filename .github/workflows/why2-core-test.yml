@@ -32,7 +32,7 @@ jobs:
         os:  [ ubuntu-latest ]
         include:
           - os: ubuntu-latest
-            output: out/why2-core-test
+            output: ./out/why2-core-test
             configure: configure.sh
             app: why2
 

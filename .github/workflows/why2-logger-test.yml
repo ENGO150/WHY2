@@ -32,7 +32,7 @@ jobs:
         os:  [ ubuntu-latest ]
         include:
           - os: ubuntu-latest
-            output: out/why2-logger-test
+            output: ./out/why2-logger-test
             configure: configure.sh
             app: why2
 
