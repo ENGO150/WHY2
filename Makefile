@@ -41,11 +41,11 @@ INCLUDE_LOGGER=$(INCLUDE_DIR)/logger/*.h
 
 TEST_CORE=./src/core/lib/test/main.c
 LIBS_CORE=-ljson-c -lcurl -lgit2
-LIB_CORE=-lwhy2
+LIB_CORE=-l$(PROJECT_NAME)
 
 TEST_LOGGER=./src/logger/lib/test/main.c
 LIBS_LOGGER=$(LIB_CORE)
-LIB_LOGGER=-lwhy2-logger
+LIB_LOGGER=-l$(PROJECT_NAME)-logger
 
 # Install Files
 INSTALL_INCLUDE=/usr/include
