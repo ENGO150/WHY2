@@ -24,7 +24,7 @@ OUTPUT=out
 LOGS=logs
 
 OUTPUT_TEST_CORE=$(OUTPUT)/$(PROJECT_NAME)-core-test
-OUTPUT_APP=$(OUTPUT)/$(PROJECT_NAME)-app
+OUTPUT_APP_CORE=$(OUTPUT)/$(PROJECT_NAME)-app
 
 OUTPUT_TEST_LOGGER=$(OUTPUT)/$(PROJECT_NAME)-logger-test
 
@@ -79,7 +79,7 @@ installLibCore: buildLibCore
 	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
 
 installAppCore: appCore
-	install -m 755 $(OUTPUT_APP) $(INSTALL_BIN)/$(PROJECT_NAME)
+	install -m 755 $(OUTPUT_APP_CORE) $(INSTALL_BIN)/$(PROJECT_NAME)
 
 installLibLogger: buildLibLogger
 	install -m 755 ./lib$(PROJECT_NAME)-logger.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-logger.so
@@ -91,7 +91,7 @@ testLogger:
 	$(CC) $(CFLAGS) $(TEST_LOGGER) -o $(OUTPUT_TEST_LOGGER) $(LIB_CORE) $(LIB_LOGGER)
 
 appCore:
-	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP) $(LIB_CORE)
+	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP_CORE) $(LIB_CORE)
 
 clean:
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
