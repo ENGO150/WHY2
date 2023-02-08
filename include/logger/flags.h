@@ -32,7 +32,7 @@ enum WHY2_LOGGER_EXIT_CODES //exit codes you fucking idiot (2#)
 #define WHY2_WRITE_DIR "./logs"
 #define WHY2_LOG_LATEST "latest.log"
 
-#define WHY2_TEST_DIRECTORY "/tmp/"
+#define WHY2_TEST_DIRECTORY "/tmp"
 #define WHY2_LOGGER_TEST_TEXT WHY2_WRITE_MESSAGE_3
 
 #define WHY2_LOG_FORMAT "yyyy-mm-dd_xxx.log" //THE LAST xxx IS FOR BASE-16 NUMBER OF USAGE THAT DAY (SO MAX IS 4095 [FFF] USAGES PER DAY)
