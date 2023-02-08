@@ -93,13 +93,13 @@ testCore:
 	$(CC) $(CFLAGS) $(TEST_CORE) -o $(OUTPUT_TEST_CORE) $(LIB_CORE)
 
 testLogger:
-	$(CC) $(CFLAGS) $(TEST_LOGGER) -o $(OUTPUT_TEST_LOGGER) $(LIB_CORE) $(LIB_LOGGER)
+	$(CC) $(CFLAGS) $(TEST_LOGGER) -o $(OUTPUT_TEST_LOGGER) $(LIBS_LOGGER) $(LIB_LOGGER)
 
 appCore:
 	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP_CORE) $(LIB_CORE)
 
 appLogger:
-	$(CC) $(CFLAGS) $(SRC_LOGGER_APP) -o $(OUTPUT_APP_LOGGER) $(LIB_LOGGER)
+	$(CC) $(CFLAGS) $(SRC_LOGGER_APP) -o $(OUTPUT_APP_LOGGER) $(LIBS_LOGGER) $(LIB_LOGGER)
 
 clean:
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
