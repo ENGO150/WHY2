@@ -102,6 +102,8 @@ clean:
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
 
 installHeader: installHeaderCore installHeaderLogger
-install: installHeader installLibCore installLibLogger installAppCore clean
+installLibs: installLibCore installLibLogger
+installApps: installAppCore
+install: installHeader installLibs installApps clean
 installTest: install testCore testLogger
 all: install
