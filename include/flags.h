@@ -29,7 +29,7 @@ enum WHY2_EXIT_CODES //exit codes you fucking idiot
     WHY2_WHY2_UPDATE_FAILED = 3 //EXIT VALUE FOR UPDATE FAILED
 };
 
-#define WHY2_VERSION "v4.3.2" //WHY2_VERSION OF CURRENT BUILD     > DO NOT TOUCH THIS <
+#define WHY2_VERSION "v5.0" //WHY2_VERSION OF CURRENT BUILD     > DO NOT TOUCH THIS <
 #define WHY2_VERSIONS_URL "https://raw.githubusercontent.com/ENGO150/WHY2/release/versions.json" //URL FOR GETTING versions.json
 #define WHY2_VERSIONS_NAME "/tmp/why2-versions.json" //do I have to explain this?
 
