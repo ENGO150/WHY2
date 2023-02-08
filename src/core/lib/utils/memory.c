@@ -88,6 +88,8 @@ void remove_node(node_t *node)
 
 node_t *get_node(void *pointer)
 {
+    if (head == NULL) return NULL; //EMPTY LIST
+
     node_t *buffer = head;
     while (buffer -> next != NULL)
     {
@@ -154,6 +156,15 @@ void *why2_fdopen(int file, char *modes)
     void *opened = fdopen(file, modes);
 
     push_to_list(opened, FOPEN);
+
+    return opened;
+}
+
+void *why2_opendir(char *name)
+{
+    void *opened = opendir(name);
+
+    push_to_list(opened, OPENDIR);
 
     return opened;
 }
