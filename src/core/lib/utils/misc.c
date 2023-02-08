@@ -416,7 +416,7 @@ void why2_generate_key(char *key, int keyLength)
 
     if (!seedSet)
     {
-        why2_set_memory_identifier("core_key_generation");
+        why2_set_memory_identifier("core_key_generation_random");
 
         //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
         FILE *fileBuffer;
@@ -427,7 +427,7 @@ void why2_generate_key(char *key, int keyLength)
         {
             if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
 
-            why2_clean_memory("core_key_generation");
+            why2_clean_memory("core_key_generation_random");
             return;
         }
 
