@@ -55,6 +55,9 @@ jobs:
       - name: Preparation
         run: sudo ./${{ matrix.configure }}
 
+      - name: Install Valgrind
+        run: sudo apt install valgrind
+
       - name: Install WHY2
         run: sudo make install
 
