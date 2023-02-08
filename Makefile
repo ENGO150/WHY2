@@ -27,11 +27,13 @@ OUTPUT_TEST_CORE=$(OUTPUT)/$(PROJECT_NAME)-core-test
 OUTPUT_APP_CORE=$(OUTPUT)/$(PROJECT_NAME)-core-app
 
 OUTPUT_TEST_LOGGER=$(OUTPUT)/$(PROJECT_NAME)-logger-test
+OUTPUT_APP_LOGGER=$(OUTPUT)/$(PROJECT_NAME)-logger-app
 
 # Source Code
 SRC_CORE=./src/core/lib/*.c ./src/core/lib/utils/*.c
 SRC_CORE_APP=./src/core/app/*.c
 SRC_LOGGER=./src/logger/lib/*.c
+SRC_LOGGER_APP=./src/logger/app/*.c
 
 INCLUDE_DIR=./include
 INCLUDE_CORE=$(INCLUDE_DIR)/*.h
@@ -92,6 +94,9 @@ testLogger:
 
 appCore:
 	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP_CORE) $(LIB_CORE)
+
+appLogger:
+	$(CC) $(CFLAGS) $(SRC_LOGGER_APP) -o $(OUTPUT_APP_LOGGER) $(LIB_LOGGER)
 
 clean:
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
