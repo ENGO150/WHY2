@@ -26,12 +26,9 @@ int main(void)
 {
     //VARIABLES
     why2_log_file logger = why2_init_logger(WHY2_WRITE_DIR); //INITIALIZE LOGGER FILE
-    char *used_key = why2_malloc(why2_get_key_length() + 1);
+    char *used_key = why2_generate_key(why2_get_key_length()); //GENERATE KEY
     why2_decrypted_output decrypted;
     int exit_code = 0;
-
-    //GENERATE KEY
-    why2_generate_key(used_key, why2_get_key_length());
 
     //FLAGS
     why2_log_flags flags =

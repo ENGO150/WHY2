@@ -72,9 +72,7 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
         why2_set_key_length(strlen(key));
     } else //LOAD KEY
     {
-        key = why2_malloc(why2_get_key_length() + 1);
-
-        why2_generate_key(key, why2_get_key_length());
+        key = why2_generate_key(why2_get_key_length());
     }
 
     //LOAD textKeyChain
