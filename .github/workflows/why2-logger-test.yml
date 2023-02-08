@@ -35,6 +35,7 @@ jobs:
             output: ./out/why2-logger-test
             configure: configure.sh
             valgrind: valgrind --leak-check=full --show-leak-kinds=reachable --track-origins=yes -s
+            app: why2-logger
 
     steps:
       - name: Checkout repository
@@ -65,6 +66,9 @@ jobs:
 
       - name: Test Lib
         run: ./${{ matrix.output }}
+
+      - name: Test App
+        run: ${{ matrix.app }}
 
       - name: Test Lib by Valgrind
         run: ${{ matrix.valgrind }} ${{ matrix.output }}
