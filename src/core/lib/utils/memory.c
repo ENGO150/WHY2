@@ -199,13 +199,20 @@ void why2_clean_memory(char *identifier)
     if (head == NULL) return; //LIST IS EMPTY
 
     node_t *buffer = head;
+    void *pointer_buffer = NULL;
     why2_bool force_deallocating = identifier == why2_get_default_memory_identifier();
 
     while (buffer -> next != NULL) //GO TROUGH LIST
     {
-        if (buffer -> identifier == identifier || force_deallocating) why2_deallocate(buffer -> pointer);
+        if (buffer -> identifier == identifier || force_deallocating) pointer_buffer = buffer -> pointer;
 
         buffer = buffer -> next;
+
+        if (pointer_buffer != NULL)
+        {
+            why2_deallocate(pointer_buffer);
+            pointer_buffer = NULL;
+        }
     }
 
     if (buffer -> identifier == identifier || force_deallocating) why2_deallocate(buffer -> pointer); //LAST NODE
