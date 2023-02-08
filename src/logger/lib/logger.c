@@ -46,7 +46,7 @@ why2_log_file why2_init_logger(char *directoryPath)
     int file;
     char *filePath = why2_malloc(strlen(directoryPath) + 1 + strlen(WHY2_LOG_FORMAT) + 1);
     char *dateBuffer = why2_malloc(strlen(WHY2_LOG_FORMAT_START) + 1);
-    char *latestBuffer = why2_malloc(strlen(WHY2_WRITE_DIR) + strlen(WHY2_LOG_LATEST) + 2);
+    char *latestBuffer = why2_malloc(strlen(directoryPath) + strlen(WHY2_LOG_LATEST) + 2);
     char *latestFilePath = NULL;
     DIR *dir;
 
@@ -80,13 +80,13 @@ why2_log_file why2_init_logger(char *directoryPath)
     file = open(filePath, O_RDWR | O_APPEND | O_CREAT, 0644); //CREATE LOG FILE
 
     //CREATE SYMLINK
-    sprintf(latestBuffer, WHY2_LOG_LATEST_FORMATTING, WHY2_WRITE_DIR, WHY2_LOG_LATEST); //GENERATE LATEST.log PATH
+    sprintf(latestBuffer, WHY2_LOG_LATEST_FORMATTING, directoryPath, WHY2_LOG_LATEST); //GENERATE LATEST.log PATH
 
     latestFilePath = why2_strdup(filePath);
 
     if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); } //REMOVE SYMLINK IF IT ALREADY EXISTS
 
-    if (symlink(latestFilePath + (strlen(WHY2_WRITE_DIR) + 1), latestBuffer) != 0) //CREATE SYMLINK
+    if (symlink(latestFilePath + (strlen(directoryPath) + 1), latestBuffer) != 0) //CREATE SYMLINK
     {
         if (!why2_get_flags().no_output) fprintf(stderr, "Creating symlink failed!\n");
 
