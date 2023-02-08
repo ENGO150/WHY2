@@ -24,7 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/flags.h>
 
 void why2_generate_text_key_chain(char *key, int *textKeyChain, int textKeyChainSize); //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
-void why2_generate_key(char *key, int keyLength); //GENERATE ENCRYPTION KEY
+char *why2_generate_key(int key_length); //GENERATE ENCRYPTION KEY
 void why2_deallocate_output(why2_output_flags flags); //DEALLOCATES flags
 enum WHY2_EXIT_CODES why2_check_version(void); //THIS FUNCTION CHECKS IF LATEST WHY2_VERSION OF WHY2 IS USED
 enum WHY2_EXIT_CODES why2_check_key(char *key); //CHECKS IF KEY IS VALID

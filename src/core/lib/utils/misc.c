@@ -410,9 +410,10 @@ unsigned long why2_compare_time_micro(struct timeval startTime, struct timeval f
     return (finishTime.tv_sec - startTime.tv_sec) * 1000000 + finishTime.tv_usec - startTime.tv_usec;
 }
 
-void why2_generate_key(char *key, int keyLength)
+char *why2_generate_key(int key_length)
 {
     int numberBuffer;
+    char *key;
 
     if (!seedSet)
     {
@@ -428,7 +429,7 @@ void why2_generate_key(char *key, int keyLength)
             if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
 
             why2_clean_memory("core_key_generation_random");
-            return;
+            return NULL;
         }
 
         numberBuffer = abs(numberBuffer); //MAKE numberBuffer POSITIVE
@@ -441,7 +442,9 @@ void why2_generate_key(char *key, int keyLength)
         why2_reset_memory_identifier();
     }
 
-    for (int i = 0; i < keyLength; i++)
+    key = why2_malloc(key_length + 1);
+
+    for (int i = 0; i < key_length; i++)
     {
         //SET numberBuffer TO RANDOM NUMBER BETWEEN 0 AND 52
         numberBuffer = (rand() % 52) + 1;
@@ -459,5 +462,7 @@ void why2_generate_key(char *key, int keyLength)
         key[i] = (char) numberBuffer;
     }
 
-    key[keyLength] = '\0';
+    key[key_length] = '\0';
+
+    return key;
 }
