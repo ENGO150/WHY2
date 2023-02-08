@@ -33,6 +33,7 @@ jobs:
         include:
           - os: ubuntu-latest
             output: ./out/why2-core-test
+            valgrind: valgrind --leak-check=full --show-leak-kinds=reachable --track-origins=yes -s
             configure: configure.sh
             app: why2
 
@@ -65,3 +66,6 @@ jobs:
 
       - name: Test App
         run: ${{ matrix.app }}
+
+      - name: Test Lib by Valgrind
+        run: ${{ matrix.valgrind }} ${{ matrix.output }}
