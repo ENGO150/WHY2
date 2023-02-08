@@ -42,7 +42,7 @@ LIBS_CORE=-ljson-c -lcurl -lgit2
 LIB_CORE=-lwhy2
 
 TEST_LOGGER=./src/logger/lib/test/main.c
-LIBS_LOGGER=-lwhy2
+LIBS_LOGGER=$(LIB_CORE)
 LIB_LOGGER=-lwhy2-logger
 
 # Install Files
