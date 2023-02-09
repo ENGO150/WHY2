@@ -59,7 +59,7 @@ void die(char *exit_msg)
 
     why2_clean_memory(why2_get_default_memory_identifier()); //GARBAGE COLLECTOR
 
-    exit(0);
+    exit(1);
 }
 
 char *read_socket(int socket)
