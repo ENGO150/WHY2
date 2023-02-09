@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <why2/memory.h>
 
 //DEFINES
 #define SA struct sockaddr
