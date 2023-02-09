@@ -52,6 +52,8 @@ TEST_LOGGER=./src/logger/lib/test/main.c
 LIBS_LOGGER=$(LIB_CORE)
 LIB_LOGGER=-l$(PROJECT_NAME)-logger
 
+LIBS_CHAT=$(LIB_CORE) -lpthread
+
 # Install Files
 INSTALL_INCLUDE=/usr/include
 INSTALL_LIBRARY=/usr/lib
@@ -83,10 +85,10 @@ buildLibLogger:
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME)-logger.so *.o $(LIBS_LOGGER)
 
 buildChatClient:
-	$(CC) $(CFLAGS) $(SRC_CHAT_CLIENT) -o $(OUTPUT_CHAT_CLIENT) $(LIB_CORE)
+	$(CC) $(CFLAGS) $(SRC_CHAT_CLIENT) -o $(OUTPUT_CHAT_CLIENT) $(LIBS_CHAT)
 
 buildChatServer:
-	$(CC) $(CFLAGS) $(SRC_CHAT_SERVER) -o $(OUTPUT_CHAT_SERVER) $(LIB_CORE)
+	$(CC) $(CFLAGS) $(SRC_CHAT_SERVER) -o $(OUTPUT_CHAT_SERVER) $(LIBS_CHAT)
 
 installLibCore: buildLibCore
 	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
