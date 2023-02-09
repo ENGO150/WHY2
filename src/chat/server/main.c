@@ -44,5 +44,8 @@ int main(void)
 void die(char *exit_msg)
 {
     fprintf(stderr, "%s\n", exit_msg);
+
+    why2_clean_memory(why2_get_default_memory_identifier());
+
     exit(0);
 }
