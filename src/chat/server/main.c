@@ -16,44 +16,27 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <sys/types.h>
+#include <why2/chat/common.h>
 
 void die(char *exit_message);
 
 int main(void)
 {
-    int servSockD = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
+    int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
 
-    //TODO: REMOVE
-    char serMsg[255] = "Message from the server to the "
-                       "client \'Hello Client\' ";
+    if (listen_socket < 0) die("Failed creating socket.");
 
     //DEFINE SERVER ADDRESS
-    struct sockaddr_in servAddr;
-
-    servAddr.sin_family = AF_INET;
-    servAddr.sin_port = htons(9001);
-    servAddr.sin_addr.s_addr = INADDR_ANY;
+    struct sockaddr_in server_addr;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(SERVER_PORT);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
 
     //BIND SOCKET
-    bind(servSockD, (struct sockaddr*) &servAddr, sizeof(servAddr));
+    if (bind(listen_socket, (SA *) &server_addr, sizeof(server_addr)) < 0) die("Failed binding socket.");
 
     //LISTEN
-    listen(servSockD, 1);
-
-    //CLIENT SOCKET
-    int clientSocket = accept(servSockD, NULL, NULL);
-
-    char clientMsg[255];
-
-    //SEND
-    send(clientSocket, serMsg, sizeof(serMsg), 0);
-    recv(clientSocket, clientMsg, sizeof(clientMsg), 0);
-
-    printf("%s\n", clientMsg);
+    if (listen(listen_socket, 1) < 0) die("Binding failed.");
 
     return 0;
 }
