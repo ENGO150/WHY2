@@ -18,6 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/common.h>
 
+#include <sys/ioctl.h>
+#include <unistd.h>
+
 char *read_socket(int socket);
 
 int main(void)
@@ -62,22 +65,17 @@ int main(void)
 
 char *read_socket(int socket)
 {
-    FILE *opened = why2_fdopen(socket, "r"); //OPEN socket
     long content_size;
     char *content;
 
     //COUNT content_size
-    fseek(opened, 0, SEEK_END);
-    content_size = ftell(opened);
-    rewind(opened); //REWIND
+    ioctl(socket, FIONREAD, &content_size);
 
     //ALLOCATE
     content = why2_calloc(content_size, sizeof(char));
 
-    if (fread(content, content_size, 1, opened) != 1) why2_die("Reading socket failed!");
-
-    //DEALLOCATION
-    why2_deallocate(opened);
+    //READ
+    if (read(socket, content, content_size) != content_size) why2_die("Reading socket failed!");
 
     return content;
 }
