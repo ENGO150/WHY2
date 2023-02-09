@@ -11,7 +11,7 @@
 
 //DEFINES
 #define SA struct sockaddr
-#define SERVER_PORT 944
+#define SERVER_PORT 1204
 #define SEND_LENGTH 4096
 
 #endif
