@@ -41,7 +41,7 @@ int main(void)
     if (listen(listen_socket, 1) < 0) why2_die("Binding failed.");
 
     //LOOP ACCEPT
-    while (getchar() != '\n') //END WHEN ENTER IS PRESSED
+    for (;;)
     {
         accepted = accept(listen_socket, (SA *) NULL, NULL); //ACCEPT NEW SOCKET //TODO: CLOSE
 
