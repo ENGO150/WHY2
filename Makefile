@@ -121,6 +121,8 @@ appLogger:
 clean:
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
 
+buildChat: buildChatServer buildChatClient
+
 installHeader: installHeaderCore installHeaderLogger installHeaderChat
 installLibs: installLibCore installLibLogger
 installApps: installAppCore installAppLogger
