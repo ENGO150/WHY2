@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/common.h>
 
-void die(char *exit_message);
 char *read_socket(int socket);
 
 int main(void)
@@ -27,7 +26,7 @@ int main(void)
     int accepted;
     char *received = NULL;
 
-    if (listen_socket < 0) die("Failed creating socket.");
+    if (listen_socket < 0) why2_die("Failed creating socket.");
 
     //DEFINE SERVER ADDRESS
     struct sockaddr_in server_addr;
@@ -36,17 +35,17 @@ int main(void)
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     //BIND SOCKET
-    if (bind(listen_socket, (SA *) &server_addr, sizeof(server_addr)) < 0) die("Failed binding socket.");
+    if (bind(listen_socket, (SA *) &server_addr, sizeof(server_addr)) < 0) why2_die("Failed binding socket.");
 
     //LISTEN
-    if (listen(listen_socket, 1) < 0) die("Binding failed.");
+    if (listen(listen_socket, 1) < 0) why2_die("Binding failed.");
 
     //LOOP ACCEPT
     while (getchar() != '\n') //END WHEN ENTER IS PRESSED
     {
         accepted = accept(listen_socket, (SA *) NULL, NULL); //ACCEPT NEW SOCKET //TODO: CLOSE
 
-        if (accepted == -1) die("Accepting socket failed!");
+        if (accepted == -1) why2_die("Accepting socket failed!");
 
         received = read_socket(accepted);
 
@@ -75,7 +74,7 @@ char *read_socket(int socket)
     //ALLOCATE
     content = why2_calloc(content_size, sizeof(char));
 
-    if (fread(content, content_size, 1, opened) != 1) die("Reading socket failed!");
+    if (fread(content, content_size, 1, opened) != 1) why2_die("Reading socket failed!");
 
     //DEALLOCATION
     why2_deallocate(opened);
