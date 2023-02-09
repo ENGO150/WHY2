@@ -29,11 +29,14 @@ OUTPUT_APP_CORE=$(OUTPUT)/$(PROJECT_NAME)-core-app
 OUTPUT_TEST_LOGGER=$(OUTPUT)/$(PROJECT_NAME)-logger-test
 OUTPUT_APP_LOGGER=$(OUTPUT)/$(PROJECT_NAME)-logger-app
 
+OUTPUT_CHAT_CLIENT=$(OUTPUT)/$(PROJECT_NAME)-chat-client
+
 # Source Code
 SRC_CORE=./src/core/lib/*.c ./src/core/lib/utils/*.c
 SRC_CORE_APP=./src/core/app/*.c
 SRC_LOGGER=./src/logger/lib/*.c
 SRC_LOGGER_APP=./src/logger/app/*.c
+SRC_CHAT_CLIENT=./src/chat/client/*.c
 
 INCLUDE_DIR=./include
 INCLUDE_CORE=$(INCLUDE_DIR)/*.h
@@ -76,6 +79,9 @@ buildLibLogger:
 	$(MAKE) clean
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_LOGGER)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME)-logger.so *.o $(LIBS_LOGGER)
+
+buildChatClient:
+	$(CC) $(CFLAGS) $(SRC_CHAT_CLIENT) -o $(OUTPUT_CHAT_CLIENT) $(LIB_CORE)
 
 installLibCore: buildLibCore
 	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
