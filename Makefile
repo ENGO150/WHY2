@@ -43,6 +43,7 @@ SRC_CHAT_SERVER=./src/chat/server/*.c
 INCLUDE_DIR=./include
 INCLUDE_CORE=$(INCLUDE_DIR)/*.h
 INCLUDE_LOGGER=$(INCLUDE_DIR)/logger/*.h
+INCLUDE_CHAT=$(INCLUDE_DIR)/chat/*.h
 
 TEST_CORE=./src/core/lib/test/main.c
 LIBS_CORE=-ljson-c -lcurl -lgit2
@@ -73,6 +74,9 @@ installHeaderCore:
 
 installHeaderLogger:
 	for file in $(INCLUDE_LOGGER); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME)/logger; done
+
+installHeaderChat:
+	for file in $(INCLUDE_CHAT); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME)/chat; done
 
 buildLibCore:
 	$(MAKE) clean
@@ -117,7 +121,7 @@ appLogger:
 clean:
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
 
-installHeader: installHeaderCore installHeaderLogger
+installHeader: installHeaderCore installHeaderLogger installHeaderChat
 installLibs: installLibCore installLibLogger
 installApps: installAppCore installAppLogger
 install: installHeader installLibs installApps clean
