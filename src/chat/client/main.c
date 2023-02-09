@@ -23,12 +23,12 @@ int main()
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
 
     //DEFINE SERVER ADDRESS
-    struct sockaddr_in servAddr;
-    servAddr.sin_family = AF_INET;
-    servAddr.sin_port = htons(SERVER_PORT);
-    servAddr.sin_addr.s_addr = INADDR_ANY;
+    struct sockaddr_in server_addr;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(SERVER_PORT);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    int connectStatus = connect(listen_socket, (SA *) &servAddr, sizeof(servAddr)); //CONNECT
+    int connectStatus = connect(listen_socket, (SA *) &server_addr, sizeof(server_addr)); //CONNECT
 
     if (connectStatus < 0) why2_die("Connecting failed.");
 
