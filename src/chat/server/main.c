@@ -23,6 +23,8 @@ void die(char *exit_message);
 int main(void)
 {
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
+    int accepted;
+    char *received = why2_malloc(SEND_LENGTH);
 
     if (listen_socket < 0) die("Failed creating socket.");
 
@@ -38,14 +40,23 @@ int main(void)
     //LISTEN
     if (listen(listen_socket, 1) < 0) die("Binding failed.");
 
+    //LOOP ACCEPT
+    while (getchar() != '\n') //END WHEN ENTER IS PRESSED
+    {
+        accepted = accept(listen_socket, (SA *) NULL, NULL);
+    }
+
+    //DEALLOCATION
+    why2_deallocate(received);
+
     return 0;
 }
 
 void die(char *exit_msg)
 {
-    fprintf(stderr, "%s\n", exit_msg);
+    fprintf(stderr, "%s\n", exit_msg); //ERR MSG
 
-    why2_clean_memory(why2_get_default_memory_identifier());
+    why2_clean_memory(why2_get_default_memory_identifier()); //GARBAGE COLLECTOR
 
     exit(0);
 }
