@@ -44,4 +44,5 @@ int main(void)
 void die(char *exit_msg)
 {
     fprintf(stderr, "%s\n", exit_msg);
+    exit(0);
 }
