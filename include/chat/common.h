@@ -14,5 +14,6 @@
 //DEFINES
 #define SA struct sockaddr
 #define SERVER_PORT 1204
+#define MAX_CONNECTIONS 1000
 
 #endif
