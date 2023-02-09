@@ -7,5 +7,6 @@
 
 //DEFINES
 #define SA struct sockaddr
+#define SERVER_PORT 8000
 
 #endif
