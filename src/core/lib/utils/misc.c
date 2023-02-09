@@ -469,7 +469,7 @@ char *why2_generate_key(int key_length)
     return key;
 }
 
-void die(char *exit_msg)
+void why2_die(char *exit_msg)
 {
     fprintf(stderr, "%s\n", exit_msg); //ERR MSG
 
