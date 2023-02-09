@@ -25,7 +25,7 @@ int main(void)
 {
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     int accepted;
-    char *received = why2_malloc(SEND_LENGTH);
+    char *received = NULL;
 
     if (listen_socket < 0) die("Failed creating socket.");
 
@@ -44,7 +44,15 @@ int main(void)
     //LOOP ACCEPT
     while (getchar() != '\n') //END WHEN ENTER IS PRESSED
     {
-        accepted = accept(listen_socket, (SA *) NULL, NULL);
+        accepted = accept(listen_socket, (SA *) NULL, NULL); //ACCEPT NEW SOCKET //TODO: CLOSE
+
+        if (accepted == -1) die("Accepting socket failed!");
+
+        received = read_socket(accepted);
+
+        printf("Received:\n%s\n\n", received);
+
+        why2_deallocate(received);
     }
 
     //DEALLOCATION
