@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include <netinet/in.h>
+void die(char *exit_message);
 
 int main(void)
 {
@@ -56,4 +56,9 @@ int main(void)
     printf("%s\n", clientMsg);
 
     return 0;
+}
+
+void die(char *exit_msg)
+{
+    fprintf(stderr, "%s\n", exit_msg);
 }
