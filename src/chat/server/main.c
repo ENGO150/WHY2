@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/common.h>
 
 void die(char *exit_message);
+char *read_socket(int socket);
 
 int main(void)
 {
@@ -59,4 +60,26 @@ void die(char *exit_msg)
     why2_clean_memory(why2_get_default_memory_identifier()); //GARBAGE COLLECTOR
 
     exit(0);
+}
+
+char *read_socket(int socket)
+{
+    FILE *opened = why2_fdopen(socket, "r"); //OPEN socket
+    long content_size;
+    char *content;
+
+    //COUNT content_size
+    fseek(opened, 0, SEEK_END);
+    content_size = ftell(opened);
+    rewind(opened); //REWIND
+
+    //ALLOCATE
+    content = why2_calloc(content_size, sizeof(char));
+
+    if (fread(content, content_size, 1, opened) != 1) die("Reading socket failed!");
+
+    //DEALLOCATION
+    why2_deallocate(opened);
+
+    return content;
 }
