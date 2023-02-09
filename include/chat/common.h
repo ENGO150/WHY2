@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <why2/flags.h>
 #include <why2/memory.h>
 
 //DEFINES
