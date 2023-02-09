@@ -16,37 +16,23 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-
-#include <netinet/in.h>
+#include <why2/chat/common.h>
 
 int main()
 {
-    int sockD = socket(AF_INET, SOCK_STREAM, 0);
+    int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
 
+    //DEFINE SERVER ADDRESS
     struct sockaddr_in servAddr;
-
     servAddr.sin_family = AF_INET;
-    servAddr.sin_port = htons(9001);
+    servAddr.sin_port = htons(SERVER_PORT);
     servAddr.sin_addr.s_addr = INADDR_ANY;
 
-    int connectStatus = connect(sockD, (struct sockaddr*) &servAddr, sizeof(servAddr));
+    int connectStatus = connect(listen_socket, (SA *) &servAddr, sizeof(servAddr)); //CONNECT
 
-    if (connectStatus == -1)
-    {
-        printf("Error...\n");
-    } else
-    {
-        char strData[255];
+    if (connectStatus < 0) why2_die("Connecting failed.");
 
-        recv(sockD, strData, sizeof(strData), 0);
-        send(sockD, "NE", 3, 0);
-
-        printf("Message: %s\n", strData);
-    }
+    send(listen_socket, "test", 4, 0);
 
     return 0;
 }
