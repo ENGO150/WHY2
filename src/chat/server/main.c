@@ -41,7 +41,7 @@ int main(void)
     if (bind(listen_socket, (SA *) &server_addr, sizeof(server_addr)) < 0) why2_die("Failed binding socket.");
 
     //LISTEN
-    if (listen(listen_socket, 1) < 0) why2_die("Binding failed.");
+    if (listen(listen_socket, MAX_CONNECTIONS) < 0) why2_die("Binding failed.");
 
     //LOOP ACCEPT
     for (;;)
