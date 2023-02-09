@@ -61,15 +61,6 @@ int main(void)
     return 0;
 }
 
-void die(char *exit_msg)
-{
-    fprintf(stderr, "%s\n", exit_msg); //ERR MSG
-
-    why2_clean_memory(why2_get_default_memory_identifier()); //GARBAGE COLLECTOR
-
-    exit(1);
-}
-
 char *read_socket(int socket)
 {
     FILE *opened = why2_fdopen(socket, "r"); //OPEN socket

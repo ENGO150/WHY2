@@ -466,3 +466,12 @@ char *why2_generate_key(int key_length)
 
     return key;
 }
+
+void die(char *exit_msg)
+{
+    fprintf(stderr, "%s\n", exit_msg); //ERR MSG
+
+    why2_clean_memory(why2_get_default_memory_identifier()); //GARBAGE COLLECTOR
+
+    exit(1);
+}
