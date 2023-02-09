@@ -33,5 +33,6 @@ unsigned long why2_count_int_length(int number); //RETURNS LENGTH OF number
 unsigned long why2_count_unused_key_size(char *text, char *key); //COUNT unused_key_size
 unsigned long why2_count_repeated_key_size(char *text, char *key); //COUNT repeated_key_size
 unsigned long why2_compare_time_micro(struct timeval startTime, struct timeval finishTime); //COMPARE TIMES IN MICROSECONDS
+void why2_die(char *exit_message); //PRINTS exit_message ERROR AND EXITS WITH CODE 1
 
 #endif
