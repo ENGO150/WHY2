@@ -75,7 +75,7 @@ char *read_socket(int socket)
     content = why2_calloc(content_size + 1, sizeof(char));
 
     //READ
-    if (read(socket, content, content_size) != content_size) why2_die("Reading socket failed!");
+    if (recv(socket, content, content_size, 0) != content_size) why2_die("Reading socket failed!");
 
     return content;
 }
