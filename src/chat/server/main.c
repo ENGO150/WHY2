@@ -52,6 +52,8 @@ int main(void)
 
         received = read_socket(accepted);
 
+        if (received == NULL) continue; //FAILED
+
         printf("Received:\n%s\n\n", received);
 
         why2_deallocate(received);
@@ -65,6 +67,12 @@ int main(void)
 
 char *read_socket(int socket)
 {
+    if (socket == -1)
+    {
+        fprintf(stderr, "Reading socket failed.");
+        return NULL;
+    }
+
     long content_size = 0;
     char *content = NULL;
 
