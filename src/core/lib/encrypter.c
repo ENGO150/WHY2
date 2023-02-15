@@ -106,10 +106,7 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
 
         if (i != (int) strlen(text) - 1)
         {
-            textBuffer = why2_realloc(textBuffer, 2);
-            sprintf(textBuffer, "%c", why2_get_encryption_separator());
-
-            strcat(returningText, textBuffer);
+            returningText[strlen(returningText)] = why2_get_encryption_separator();
         }
     }
 
