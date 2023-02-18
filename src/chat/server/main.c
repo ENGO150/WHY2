@@ -79,6 +79,12 @@ char *read_socket(int socket)
     //COUNT content_size
     ioctl(socket, FIONREAD, &content_size);
 
+    if (content_size == 0)
+    {
+        fprintf(stderr, "Reading socket failed.");
+        return NULL;
+    }
+
     //ALLOCATE
     content = why2_calloc(content_size + 1, sizeof(char));
 
