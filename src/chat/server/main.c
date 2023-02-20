@@ -60,7 +60,9 @@ int main(void)
 
 void *communicate_thread(void *arg)
 {
-    for (;;)
+    const time_t startTime = time(NULL);
+
+    while (time(NULL) - startTime < 86400) //KEEP COMMUNICATION ALIVE FOR 24 HOURS
     {
         char *received = read_socket(*((int*) arg)); //READ
 
