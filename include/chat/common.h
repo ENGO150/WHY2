@@ -10,6 +10,7 @@
 #include <why2/flags.h>
 #include <why2/misc.h>
 #include <why2/memory.h>
+#include <pthread.h>
 
 //DEFINES
 #define SA struct sockaddr
