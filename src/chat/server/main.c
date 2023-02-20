@@ -27,7 +27,6 @@ int main(void)
 {
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     int accepted;
-    char *received = NULL;
     pthread_t thread;
 
     if (listen_socket < 0) why2_die("Failed creating socket.");
@@ -54,9 +53,6 @@ int main(void)
         pthread_create(&thread, NULL, communicate_thread, &accepted);
     }
 
-    //DEALLOCATION
-    why2_deallocate(received);
-
     return 0;
 }
 
@@ -65,10 +61,11 @@ void *communicate_thread(void *arg)
     printf("User connected.\t%d\n", *((int*) arg));
 
     const time_t startTime = time(NULL);
+    char *received = NULL;
 
     while (time(NULL) - startTime < 86400) //KEEP COMMUNICATION ALIVE FOR 24 HOURS
     {
-        char *received = read_socket(*((int*) arg)); //READ
+        received = read_socket(*((int*) arg)); //READ
 
         if (received == NULL) return NULL; //FAILED; EXIT THREAD
 
@@ -81,7 +78,10 @@ void *communicate_thread(void *arg)
 
     printf("User exited.\t%d\n", *((int*) arg));
 
+    //DEALLOCATION
     close(*((int*) arg));
+    why2_deallocate(received);
+
     return NULL;
 }
 
