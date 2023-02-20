@@ -73,23 +73,21 @@ char *read_socket(int socket)
         return NULL;
     }
 
-    long content_size = 0;
-    char *content = NULL;
+    unsigned short content_size = 0;
+    char *content_buffer = why2_calloc(2, sizeof(char));
 
-    //COUNT content_size
-    ioctl(socket, FIONREAD, &content_size);
+    //GET LENGTH
+    if (recv(socket, content_buffer, 2, 0) != 2) why2_die("Reading socket failed!");
 
-    if (content_size == 0)
-    {
-        fprintf(stderr, "Reading socket failed.");
-        return NULL;
-    }
+    content_size = (unsigned short) (((unsigned) content_buffer[1] << 8) | content_buffer[0]);
+
+    why2_deallocate(content_buffer);
 
     //ALLOCATE
-    content = why2_calloc(content_size + 1, sizeof(char));
+    content_buffer = why2_calloc(content_size + 1, sizeof(char));
 
-    //READ
-    if (recv(socket, content, content_size, 0) != content_size) why2_die("Reading socket failed!");
+    //READ FINAL MESSAGE
+    if (recv(socket, content_buffer, content_size, 0) != content_size) why2_die("Reading socket failed!");
 
-    return content;
+    return content_buffer;
 }
