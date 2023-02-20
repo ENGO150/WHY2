@@ -19,12 +19,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/common.h>
 
 char *read_socket(int socket);
+void *communicate_thread(void *arg);
 
 int main(void)
 {
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     int accepted;
     char *received = NULL;
+    pthread_t thread;
 
     if (listen_socket < 0) why2_die("Failed creating socket.");
 
@@ -45,21 +47,31 @@ int main(void)
     {
         accepted = accept(listen_socket, (SA *) NULL, NULL); //ACCEPT NEW SOCKET //TODO: CLOSE (not only this one)
 
-        if (accepted == -1) why2_die("Accepting socket failed!");
+        if (accepted == -1) continue;
 
-        received = read_socket(accepted); //TODO: Add multithreading
-
-        if (received == NULL) continue; //FAILED
-
-        printf("Received:\n%s\n\n", received);
-
-        why2_deallocate(received);
+        pthread_create(&thread, NULL, communicate_thread, &accepted);
     }
 
     //DEALLOCATION
     why2_deallocate(received);
 
     return 0;
+}
+
+void *communicate_thread(void *arg)
+{
+    for (;;)
+    {
+        char *received = read_socket(*((int*) arg)); //READ
+
+        if (received == NULL) return NULL; //FAILED; EXIT THREAD
+
+        printf("Received:\n%s\n\n", received);
+
+        why2_deallocate(received);
+    }
+
+    return NULL;
 }
 
 char *read_socket(int socket)
@@ -74,7 +86,7 @@ char *read_socket(int socket)
     char *content_buffer = why2_calloc(2, sizeof(char));
 
     //GET LENGTH
-    if (recv(socket, content_buffer, 2, 0) != 2) why2_die("Reading socket failed!");
+    if (recv(socket, content_buffer, 2, 0) != 2) return NULL;
 
     content_size = (unsigned short) (((unsigned) content_buffer[1] << 8) | content_buffer[0]);
 
