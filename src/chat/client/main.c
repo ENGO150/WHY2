@@ -45,7 +45,11 @@ int main(void)
 
         send_socket(line, listen_socket);
 
-        if (strcmp(line, "!exit") == 0) break; //USER REQUESTED PROGRAM EXIT
+        if (strcmp(line, "!exit\n") == 0) //USER REQUESTED PROGRAM EXIT
+        {
+            printf("Exiting...\n");
+            break;
+        }
     }
 
     free(line); //TODO: Unreachable; add exit

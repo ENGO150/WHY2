@@ -62,6 +62,8 @@ int main(void)
 
 void *communicate_thread(void *arg)
 {
+    printf("User connected.\t%d\n", *((int*) arg));
+
     const time_t startTime = time(NULL);
 
     while (time(NULL) - startTime < 86400) //KEEP COMMUNICATION ALIVE FOR 24 HOURS
@@ -70,12 +72,14 @@ void *communicate_thread(void *arg)
 
         if (received == NULL) return NULL; //FAILED; EXIT THREAD
 
-        if (strcmp(received, "!exit") == 0) break; //USER REQUESTED PROGRAM EXIT
+        if (strcmp(received, "!exit\n") == 0) break; //USER REQUESTED PROGRAM EXIT
 
         printf("Received:\n%s\n\n", received);
 
         why2_deallocate(received);
     }
+
+    printf("User exited.\t%d\n", *((int*) arg));
 
     close(*((int*) arg));
     return NULL;
