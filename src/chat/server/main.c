@@ -66,7 +66,7 @@ char *read_socket(int socket)
 {
     if (socket == -1)
     {
-        fprintf(stderr, "Reading socket failed.");
+        fprintf(stderr, "Reading socket failed.\n");
         return NULL;
     }
 
