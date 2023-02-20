@@ -18,9 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/common.h>
 
-#include <sys/ioctl.h>
-#include <unistd.h>
-
 char *read_socket(int socket);
 
 int main(void)
