@@ -18,6 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/common.h>
 
+#include <arpa/inet.h>
+
 void send_socket(char *text, int socket);
 
 int main(void)
@@ -31,6 +33,11 @@ int main(void)
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(SERVER_PORT);
     server_addr.sin_addr.s_addr = INADDR_ANY;
+
+    printf("Welcome.\n\nEnter IP Address:\n>>> ");
+    getline(&line, &line_length, stdin);
+
+    server_addr.sin_addr.s_addr = inet_addr(line);
 
     int connectStatus = connect(listen_socket, (SA *) &server_addr, sizeof(server_addr)); //CONNECT
 
