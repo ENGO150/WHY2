@@ -43,11 +43,11 @@ int main(void)
     //LOOP ACCEPT
     for (;;)
     {
-        accepted = accept(listen_socket, (SA *) NULL, NULL); //ACCEPT NEW SOCKET //TODO: CLOSE
+        accepted = accept(listen_socket, (SA *) NULL, NULL); //ACCEPT NEW SOCKET //TODO: CLOSE (not only this one)
 
         if (accepted == -1) why2_die("Accepting socket failed!");
 
-        received = read_socket(accepted);
+        received = read_socket(accepted); //TODO: Add multithreading
 
         if (received == NULL) continue; //FAILED
 

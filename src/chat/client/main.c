@@ -23,19 +23,29 @@ void send_socket(char *text, int socket);
 int main(void)
 {
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
+    char *line = NULL;
+    size_t line_length = 0;
 
     //DEFINE SERVER ADDRESS
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(SERVER_PORT);
-    server_addr.sin_addr.s_addr = INADDR_ANY;
 
     int connectStatus = connect(listen_socket, (SA *) &server_addr, sizeof(server_addr)); //CONNECT
 
     if (connectStatus < 0) why2_die("Connecting failed.");
 
-    send_socket("123456789123456789", listen_socket);
+    for (;;)
+    {
+        printf(">>> ");
+        getline(&line, &line_length, stdin);
 
+        printf("%s\n", line);
+
+        send_socket(line, listen_socket);
+    }
+
+    free(line); //TODO: Unreachable; add exit
     return 0;
 }
 
