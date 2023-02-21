@@ -111,14 +111,14 @@ node_t *get_node(int connection)
 //GLOBAL
 void why2_send_socket(char *text, int socket)
 {
-    unsigned short text_length = (unsigned short) strlen(text);
-    char *final = why2_calloc(strlen(text) + 2, sizeof(char));
+    unsigned short text_length = (unsigned short) strlen(text) + 2;
+    char *final = why2_calloc(text_length, sizeof(char));
 
     //SPLIT LENGTH INTO TWO CHARS
     final[0] = (unsigned) text_length & 0xff;
     final[1] = (unsigned) text_length >> 8;
 
-    for (int i = 2; i < text_length + 2; i++) //APPEND
+    for (int i = 2; i < text_length; i++) //APPEND
     {
         final[i] = text[i - 2];
     }
@@ -180,7 +180,7 @@ char *why2_read_socket(int socket)
     why2_deallocate(content_buffer);
 
     //ALLOCATE
-    content_buffer = why2_calloc(content_size + 3, sizeof(char));
+    content_buffer = why2_calloc(content_size + 1, sizeof(char));
 
     //READ FINAL MESSAGE
     if (recv(socket, content_buffer, content_size, 0) != content_size) fprintf(stderr, "Socket probably read wrongly!\n");
