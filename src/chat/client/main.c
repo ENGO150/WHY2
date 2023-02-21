@@ -62,7 +62,7 @@ int main(void)
         }
     }
 
-    free(line); //TODO: Unreachable; add exit
+    free(line);
     return 0;
 }
 
