@@ -168,7 +168,7 @@ char *why2_read_socket(int socket)
     }
 
     unsigned short content_size = 0;
-    char *content_buffer = why2_calloc(2, sizeof(char));
+    char *content_buffer = why2_calloc(3, sizeof(char));
 
     //GET LENGTH
     if (recv(socket, content_buffer, 2, 0) != 2) return NULL;
@@ -178,7 +178,7 @@ char *why2_read_socket(int socket)
     why2_deallocate(content_buffer);
 
     //ALLOCATE
-    content_buffer = why2_calloc(content_size + 1, sizeof(char));
+    content_buffer = why2_calloc(content_size + 3, sizeof(char));
 
     //READ FINAL MESSAGE
     if (recv(socket, content_buffer, content_size, 0) != content_size) fprintf(stderr, "Socket probably read wrongly!\n");
