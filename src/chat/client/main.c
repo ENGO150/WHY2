@@ -34,10 +34,13 @@ int main(void)
     server_addr.sin_port = htons(SERVER_PORT);
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
+    //GET IP
     printf("Welcome.\n\nEnter IP Address:\n>>> ");
     getline(&line, &line_length, stdin);
 
     server_addr.sin_addr.s_addr = inet_addr(line);
+
+    printf("###################\n\n");
 
     int connectStatus = connect(listen_socket, (SA *) &server_addr, sizeof(server_addr)); //CONNECT
 
