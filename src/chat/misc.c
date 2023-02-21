@@ -58,6 +58,8 @@ void push_to_list(int connection)
 
 void remove_node(node_t *node)
 {
+    if (node == NULL) return; //NULL NODE
+
     node_t *buffer_1 = head;
     node_t *buffer_2;
 
