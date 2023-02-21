@@ -53,7 +53,7 @@ TEST_LOGGER=./src/logger/lib/test/main.c
 LIBS_LOGGER=$(LIB_CORE)
 LIB_LOGGER=-l$(PROJECT_NAME)-logger
 
-LIBS_CHAT=$(LIB_CORE)
+LIBS_CHAT=$(LIB_CORE) -lpthread
 
 # Install Files
 INSTALL_INCLUDE=/usr/include

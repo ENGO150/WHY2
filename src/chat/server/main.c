@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/common.h>
 
 #include <unistd.h>
+#include <time.h>
 
 char *read_socket(int socket);
 void *communicate_thread(void *arg);
