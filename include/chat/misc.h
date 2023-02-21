@@ -20,5 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define WHY2_CHAT_MISC_H
 
 void send_socket(char *text, int socket); //send socket.... wtf did you expect
+char *read_socket(int socket); //read lol
+void *communicate_thread(void *arg); //COMMUNICATION THREAD
 
 #endif

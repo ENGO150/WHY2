@@ -17,9 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include <why2/chat/common.h>
-#include <why2/chat/misc.h>
-
 #include <arpa/inet.h>
+
+#include <why2/chat/misc.h>
 
 int main(void)
 {

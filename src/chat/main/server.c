@@ -18,11 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/common.h>
 
-#include <unistd.h>
-#include <time.h>
-
-char *read_socket(int socket);
-void *communicate_thread(void *arg);
+#include <why2/chat/misc.h>
 
 int main(void)
 {
@@ -55,60 +51,4 @@ int main(void)
     }
 
     return 0;
-}
-
-void *communicate_thread(void *arg)
-{
-    printf("User connected.\t%d\n", *((int*) arg));
-
-    const time_t startTime = time(NULL);
-    char *received = NULL;
-
-    while (time(NULL) - startTime < 86400) //KEEP COMMUNICATION ALIVE FOR 24 HOURS
-    {
-        received = read_socket(*((int*) arg)); //READ
-
-        if (received == NULL) return NULL; //FAILED; EXIT THREAD
-
-        if (strcmp(received, "!exit\n") == 0) break; //USER REQUESTED PROGRAM EXIT
-
-        printf("Received:\n%s\n\n", received);
-
-        why2_deallocate(received);
-    }
-
-    printf("User exited.\t%d\n", *((int*) arg));
-
-    //DEALLOCATION
-    close(*((int*) arg));
-    why2_deallocate(received);
-
-    return NULL;
-}
-
-char *read_socket(int socket)
-{
-    if (socket == -1)
-    {
-        fprintf(stderr, "Reading socket failed.\n");
-        return NULL;
-    }
-
-    unsigned short content_size = 0;
-    char *content_buffer = why2_calloc(2, sizeof(char));
-
-    //GET LENGTH
-    if (recv(socket, content_buffer, 2, 0) != 2) return NULL;
-
-    content_size = (unsigned short) (((unsigned) content_buffer[1] << 8) | content_buffer[0]);
-
-    why2_deallocate(content_buffer);
-
-    //ALLOCATE
-    content_buffer = why2_calloc(content_size + 1, sizeof(char));
-
-    //READ FINAL MESSAGE
-    if (recv(socket, content_buffer, content_size, 0) != content_size) fprintf(stderr, "Socket probably read wrongly!\n");
-
-    return content_buffer;
 }
