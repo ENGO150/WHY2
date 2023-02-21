@@ -19,9 +19,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_CHAT_MISC_H
 #define WHY2_CHAT_MISC_H
 
-void send_socket(char *text, int socket); //send socket.... wtf did you expect
-char *read_socket(int socket); //read lol
-void *communicate_thread(void *arg); //COMMUNICATION THREAD
-void register_connection(int socket); //ADD SOCKET TO LIST
+void why2_send_socket(char *text, int socket); //send socket.... wtf did you expect
+char *why2_read_socket(int socket); //read lol
+void *why2_communicate_thread(void *arg); //COMMUNICATION THREAD
+void why2_register_connection(int socket); //ADD SOCKET TO LIST
 
 #endif

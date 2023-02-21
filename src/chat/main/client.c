@@ -52,7 +52,7 @@ int main(void)
 
         printf("%s\n", line);
 
-        send_socket(line, listen_socket);
+        why2_send_socket(line, listen_socket);
 
         if (strcmp(line, "!exit\n") == 0) //USER REQUESTED PROGRAM EXIT
         {

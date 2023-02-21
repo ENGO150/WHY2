@@ -47,7 +47,7 @@ int main(void)
 
         if (accepted == -1) continue;
 
-        pthread_create(&thread, NULL, communicate_thread, &accepted);
+        pthread_create(&thread, NULL, why2_communicate_thread, &accepted);
     }
 
     return 0;

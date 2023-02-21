@@ -107,7 +107,7 @@ node_t *get_node(int connection)
 }
 
 //GLOBAL
-void send_socket(char *text, int socket)
+void why2_send_socket(char *text, int socket)
 {
     unsigned short text_length = (unsigned short) strlen(text);
     char *final = why2_calloc(strlen(text) + 2, sizeof(char));
@@ -127,7 +127,7 @@ void send_socket(char *text, int socket)
     why2_deallocate(final);
 }
 
-void *communicate_thread(void *arg)
+void *why2_communicate_thread(void *arg)
 {
     printf("User connected.\t%d\n", *((int*) arg));
 
@@ -136,7 +136,7 @@ void *communicate_thread(void *arg)
 
     while (time(NULL) - startTime < 86400) //KEEP COMMUNICATION ALIVE FOR 24 HOURS
     {
-        received = read_socket(*((int*) arg)); //READ
+        received = why2_read_socket(*((int*) arg)); //READ
 
         if (received == NULL) return NULL; //FAILED; EXIT THREAD
 
@@ -156,7 +156,7 @@ void *communicate_thread(void *arg)
     return NULL;
 }
 
-char *read_socket(int socket)
+char *why2_read_socket(int socket)
 {
     if (socket == -1)
     {
@@ -183,7 +183,7 @@ char *read_socket(int socket)
     return content_buffer;
 }
 
-void register_connection(int socket)
+void why2_register_connection(int socket)
 {
-    push_to_list(socket); //PUSH
+    push_to_list(socket); //SEND
 }
