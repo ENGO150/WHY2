@@ -133,6 +133,8 @@ void *why2_communicate_thread(void *arg)
 {
     printf("User connected.\t%d\n", *((int*) arg));
 
+    why2_register_connection(*((int*) arg)); //TODO: Remove why2_register_connection if unused
+
     const time_t startTime = time(NULL);
     char *received = NULL;
 
