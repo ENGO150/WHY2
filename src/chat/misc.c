@@ -182,3 +182,8 @@ char *read_socket(int socket)
 
     return content_buffer;
 }
+
+void register_connection(int socket)
+{
+    push_to_list(socket); //PUSH
+}
