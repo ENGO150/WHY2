@@ -56,7 +56,7 @@ LIB_LOGGER=-l$(PROJECT_NAME)-logger
 
 LIBS_LIB_CHAT=$(LIB_CORE) -lpthread
 LIB_CHAT=-l$(PROJECT_NAME)-chat
-LIBS_CHAT=$(LIB_CHAT) $(LIB_CORE) #TODO: Possible linking problems
+LIBS_CHAT=$(LIB_CHAT) $(LIBS_LIB_CHAT)
 
 # Install Files
 INSTALL_INCLUDE=/usr/include
