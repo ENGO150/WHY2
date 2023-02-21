@@ -37,8 +37,8 @@ SRC_CORE=./src/core/lib/*.c ./src/core/lib/utils/*.c
 SRC_CORE_APP=./src/core/app/*.c
 SRC_LOGGER=./src/logger/lib/*.c
 SRC_LOGGER_APP=./src/logger/app/*.c
-SRC_CHAT_CLIENT=./src/chat/client/*.c
-SRC_CHAT_SERVER=./src/chat/server/*.c
+SRC_CHAT_CLIENT=./src/chat/main/client.c
+SRC_CHAT_SERVER=./src/chat/main/server.c
 
 INCLUDE_DIR=./include
 INCLUDE_CORE=$(INCLUDE_DIR)/*.h
