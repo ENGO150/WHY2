@@ -121,7 +121,7 @@ void why2_send_socket(char *text, int socket)
     }
 
     //SEND
-    send(socket, final, text_length + 2, 0);
+    send(socket, final, text_length, 0);
 
     why2_deallocate(final);
 }
