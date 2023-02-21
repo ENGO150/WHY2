@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/misc.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <time.h>
@@ -26,6 +27,86 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/memory.h>
 
+//LINKED LIST STUFF (BIT CHANGED memory.c'S VERSION)
+typedef struct node
+{
+    int connection;
+    struct node *next;
+} node_t; //SINGLE LINKED LIST
+
+node_t *head = NULL;
+
+void push_to_list(int connection)
+{
+    //CREATE NODE
+    node_t *new_node = malloc(sizeof(node_t));
+    node_t *buffer = head;
+
+    new_node -> connection = connection;
+    new_node -> next = NULL;
+
+    if (head == NULL) //INIT LIST
+    {
+        head = new_node;
+    } else
+    {
+        while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
+
+        buffer -> next = new_node; //LINK
+    }
+}
+
+void remove_node(node_t *node)
+{
+    node_t *buffer_1 = head;
+    node_t *buffer_2;
+
+    while (buffer_1 -> next != NULL) //GO TROUGH EVERY ELEMENT IN LIST
+    {
+        if (buffer_1 == node) break; //FOUND (IF THE WHILE GOES TROUGH THE WHOLE LIST WITHOUT THE break, I ASSUME THE LAST NODE IS THE CORRECT ONE)
+
+        buffer_1 = buffer_1 -> next;
+    }
+
+    if (node != buffer_1) return; //node WASN'T FOUND
+
+    if (buffer_1 == head) //node WAS THE FIRST NODE IN THE LIST
+    {
+        //UNLINK
+        head = buffer_1 -> next;
+    } else //wdyt
+    {
+        //GET THE NODE BEFORE node
+        buffer_2 = head;
+
+        while (buffer_2 -> next != buffer_1) buffer_2 = buffer_2 -> next;
+
+        //UNLINK
+        buffer_2 -> next = buffer_1 -> next;
+    }
+
+    //DEALLOCATION
+    free(node);
+}
+
+node_t *get_node(int connection)
+{
+    if (head == NULL) return NULL; //EMPTY LIST
+
+    node_t *buffer = head;
+    while (buffer -> next != NULL)
+    {
+        if (buffer -> connection == connection) return buffer;
+
+        buffer = buffer -> next;
+    }
+
+    if (connection != buffer -> connection) buffer = NULL; //PREVENT FROM RETURNING INVALID NODE
+
+    return buffer;
+}
+
+//GLOBAL
 void send_socket(char *text, int socket)
 {
     unsigned short text_length = (unsigned short) strlen(text);
