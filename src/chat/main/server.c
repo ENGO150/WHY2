@@ -48,6 +48,7 @@ int main(void)
         if (accepted == -1) continue;
 
         pthread_create(&thread, NULL, why2_communicate_thread, &accepted);
+        why2_register_connection(accepted); //PUSH TO LIST
     }
 
     return 0;

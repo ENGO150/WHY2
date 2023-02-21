@@ -152,6 +152,7 @@ void *why2_communicate_thread(void *arg)
     printf("User exited.\t%d\n", *((int*) arg));
 
     //DEALLOCATION
+    remove_node(get_node(why2_communicate_thread));
     close(*((int*) arg));
     why2_deallocate(received);
 
