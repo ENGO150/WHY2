@@ -28,7 +28,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
+#include <netinet/in.h> //TODO: Remove not 100% common includes
 #include <why2/misc.h>
 #include <why2/memory.h>
 #include <pthread.h>
