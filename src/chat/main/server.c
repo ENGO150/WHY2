@@ -41,7 +41,7 @@ int main(void)
 
     printf("Server enabled.\n\n");
 
-    pthread_create(&thread, NULL, why2_accept_thread, &listen);
+    pthread_create(&thread, NULL, why2_accept_thread, &listen_socket);
 
     //TODO: Add getline()
 
