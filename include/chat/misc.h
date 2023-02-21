@@ -22,5 +22,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 void send_socket(char *text, int socket); //send socket.... wtf did you expect
 char *read_socket(int socket); //read lol
 void *communicate_thread(void *arg); //COMMUNICATION THREAD
+void register_connection(int socket); //ADD SOCKET TO LIST
 
 #endif
