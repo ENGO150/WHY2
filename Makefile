@@ -39,6 +39,7 @@ SRC_LOGGER=./src/logger/lib/*.c
 SRC_LOGGER_APP=./src/logger/app/*.c
 SRC_CHAT_CLIENT=./src/chat/main/client.c
 SRC_CHAT_SERVER=./src/chat/main/server.c
+SRC_CHAT_MISC=./src/chat/*.c
 
 INCLUDE_DIR=./include
 INCLUDE_CORE=$(INCLUDE_DIR)/*.h
@@ -53,7 +54,9 @@ TEST_LOGGER=./src/logger/lib/test/main.c
 LIBS_LOGGER=$(LIB_CORE)
 LIB_LOGGER=-l$(PROJECT_NAME)-logger
 
-LIBS_CHAT=$(LIB_CORE) -lpthread
+LIBS_LIB_CHAT=$(LIB_CORE) -lpthread
+LIB_CHAT=-l$(PROJECT_NAME)-chat
+LIBS_CHAT=$(LIB_CHAT) $(LIB_CORE) #TODO: Possible linking problems
 
 # Install Files
 INSTALL_INCLUDE=/usr/include
@@ -94,6 +97,11 @@ buildChatClient:
 buildChatServer:
 	$(CC) $(CFLAGS) $(SRC_CHAT_SERVER) -o $(OUTPUT_CHAT_SERVER) $(LIBS_CHAT)
 
+buildLibChat:
+	$(MAKE) clean
+	$(CC) $(CFLAGS) -fPIC -c $(SRC_CHAT_MISC)
+	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME)-chat.so *.o $(LIBS_LIB_CHAT)
+
 installLibCore: buildLibCore
 	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
 
@@ -105,6 +113,9 @@ installLibLogger: buildLibLogger
 
 installAppLogger: appLogger
 	install -m 755 $(OUTPUT_APP_LOGGER) $(INSTALL_BIN)/$(PROJECT_NAME)-logger
+
+installLibChat: buildLibChat
+	install -m 755 ./lib$(PROJECT_NAME)-chat.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-chat.so
 
 testCore:
 	$(CC) $(CFLAGS) $(TEST_CORE) -o $(OUTPUT_TEST_CORE) $(LIB_CORE)
@@ -124,7 +135,7 @@ clean:
 buildChat: buildChatServer buildChatClient
 
 installHeader: installHeaderCore installHeaderLogger installHeaderChat
-installLibs: installLibCore installLibLogger
+installLibs: installLibCore installLibLogger installLibChat
 installApps: installAppCore installAppLogger
 install: installHeader installLibs installApps clean
 installTest: install testCore testLogger
