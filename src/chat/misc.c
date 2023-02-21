@@ -18,12 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/misc.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <time.h>
 #include <unistd.h>
+
+#include <why2/chat/common.h>
 
 #include <why2/memory.h>
 
@@ -191,4 +188,20 @@ char *why2_read_socket(int socket)
 void why2_register_connection(int socket)
 {
     push_to_list(socket); //SEND
+}
+
+void *why2_accept_thread(void *socket)
+{
+    int accepted;
+    pthread_t thread;
+
+    //LOOP ACCEPT
+    for (;;)
+    {
+        accepted = accept(*((int*) socket), (SA *) NULL, NULL); //ACCEPT NEW SOCKET //TODO: CLOSE (not only this one)
+
+        if (accepted == -1) continue;
+
+        pthread_create(&thread, NULL, why2_communicate_thread, &accepted);
+    }
 }

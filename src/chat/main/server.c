@@ -23,7 +23,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 int main(void)
 {
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
-    int accepted;
     pthread_t thread;
 
     if (listen_socket < 0) why2_die("Failed creating socket.");
@@ -42,15 +41,11 @@ int main(void)
 
     printf("Server enabled.\n\n");
 
-    //LOOP ACCEPT
-    for (;;)
-    {
-        accepted = accept(listen_socket, (SA *) NULL, NULL); //ACCEPT NEW SOCKET //TODO: CLOSE (not only this one)
+    pthread_create(&thread, NULL, why2_accept_thread, NULL);
 
-        if (accepted == -1) continue;
+    //TODO: Add getline()
 
-        pthread_create(&thread, NULL, why2_communicate_thread, &accepted);
-    }
+    pthread_join(thread, NULL);
 
     return 0;
 }
