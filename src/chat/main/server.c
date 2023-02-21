@@ -40,6 +40,8 @@ int main(void)
     //LISTEN
     if (listen(listen_socket, MAX_CONNECTIONS) < 0) why2_die("Binding failed.");
 
+    printf("Server enabled.\n\n");
+
     //LOOP ACCEPT
     for (;;)
     {
