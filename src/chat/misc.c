@@ -107,6 +107,22 @@ node_t *get_node(int connection)
     return buffer;
 }
 
+void *send_to_all(void *message)
+{
+    if (head == NULL) return NULL;
+
+    node_t *node_buffer = head;
+
+    do //SEND TO ALL CONNECTIONS
+    {
+        why2_send_socket(*((char**) message), node_buffer -> connection); //SEND TO CLIENT
+
+        node_buffer = node_buffer -> next;
+    } while (node_buffer -> next != NULL);
+
+    return NULL;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, int socket)
 {
@@ -138,6 +154,7 @@ void *why2_communicate_thread(void *arg)
 
     const time_t startTime = time(NULL);
     char *received = NULL;
+    pthread_t thread_buffer;
 
     while (time(NULL) - startTime < 86400) //KEEP COMMUNICATION ALIVE FOR 24 HOURS
     {
@@ -148,6 +165,8 @@ void *why2_communicate_thread(void *arg)
         if (strcmp(received, "!exit\n") == 0) break; //USER REQUESTED PROGRAM EXIT
 
         printf("Received:\n%s\n\n", received);
+
+        pthread_create(&thread_buffer, NULL, send_to_all, &received);
 
         why2_deallocate(received);
     }
