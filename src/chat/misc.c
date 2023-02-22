@@ -180,9 +180,7 @@ char *why2_read_socket(int socket)
     content_buffer = why2_calloc(content_size + 1, sizeof(char));
 
     //READ FINAL MESSAGE
-    if (recv(socket, content_buffer, content_size, 0) != content_size) fprintf(stderr, "Socket probably read wrongly!\n");
-
-    //TODO: Fix size [first two indexes]
+    if (recv(socket, content_buffer, content_size, 0) != content_size - 2) fprintf(stderr, "Socket probably read wrongly!\n");
 
     return content_buffer;
 }
