@@ -24,6 +24,7 @@ char *why2_read_socket(int socket); //read lol
 void *why2_communicate_thread(void *arg); //COMMUNICATION THREAD
 void *why2_accept_thread(void *socket); //LOOP ACCEPTING CONNECTIONS
 void why2_clean_threads(void); //CLOSE EVERY RUNNING THREAD
+void *why2_listen_server(void *socket); //LISTEN FOR OTHER's USERS MESSAGES
 
 typedef struct why2_connection
 {
