@@ -174,7 +174,11 @@ char *why2_read_socket(int socket)
     char *content_buffer = why2_calloc(3, sizeof(char));
 
     //GET LENGTH
-    if (recv(socket, content_buffer, 2, 0) != 2) return NULL;
+    if (recv(socket, content_buffer, 2, 0) != 2)
+    {
+        fprintf(stderr, "Getting message length failed!\n");
+        return NULL;
+    }
 
     content_size = (unsigned short) (((unsigned) content_buffer[1] << 8) | content_buffer[0]);
 
