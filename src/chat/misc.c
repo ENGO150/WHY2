@@ -130,7 +130,7 @@ void *why2_communicate_thread(void *arg)
 {
     printf("User connected.\t%d\n", *((int*) arg));
 
-    why2_register_connection(*((int*) arg)); //TODO: Remove why2_register_connection if unused
+    push_to_list(*((int*) arg));
 
     const time_t startTime = time(NULL);
     char *received = NULL;
@@ -183,11 +183,6 @@ char *why2_read_socket(int socket)
     if (recv(socket, content_buffer, content_size, 0) != content_size - 2) fprintf(stderr, "Socket probably read wrongly!\n");
 
     return content_buffer;
-}
-
-void why2_register_connection(int socket)
-{
-    push_to_list(socket); //SEND
 }
 
 void *why2_accept_thread(void *socket)
