@@ -156,8 +156,8 @@ void *why2_communicate_thread(void *arg)
 
     //DEALLOCATION
     why2_deallocate(received);
-    remove_node(get_node(connection.connection));
     close(connection.connection);
+    remove_node(get_node(connection.connection));
 
     return NULL;
 }
