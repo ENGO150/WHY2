@@ -134,7 +134,7 @@ void *why2_communicate_thread(void *arg)
 
     printf("User connected.\t%d\n", connection.connection);
 
-    push_to_list(connection.connection, connection.thread);
+    push_to_list(connection.connection, pthread_self()); //TODO: Do something with why2_connection_t
 
     const time_t startTime = time(NULL);
     char *received = NULL;
