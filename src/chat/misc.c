@@ -28,18 +28,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 typedef struct node
 {
     int connection;
+    pthread_t thread;
     struct node *next;
 } node_t; //SINGLE LINKED LIST
 
 node_t *head = NULL;
 
-void push_to_list(int connection)
+void push_to_list(int connection, pthread_t thread)
 {
     //CREATE NODE
     node_t *new_node = malloc(sizeof(node_t));
     node_t *buffer = head;
 
     new_node -> connection = connection;
+    new_node -> thread = thread;
     new_node -> next = NULL;
 
     if (head == NULL) //INIT LIST
@@ -128,16 +130,18 @@ void why2_send_socket(char *text, int socket)
 
 void *why2_communicate_thread(void *arg)
 {
-    printf("User connected.\t%d\n", *((int*) arg));
+    why2_connection_t connection = *(why2_connection_t*) arg;
 
-    push_to_list(*((int*) arg));
+    printf("User connected.\t%d\n", connection.connection);
+
+    push_to_list(connection.connection, connection.thread);
 
     const time_t startTime = time(NULL);
     char *received = NULL;
 
     while (time(NULL) - startTime < 86400) //KEEP COMMUNICATION ALIVE FOR 24 HOURS
     {
-        received = why2_read_socket(*((int*) arg)); //READ
+        received = why2_read_socket(connection.connection); //READ
 
         if (received == NULL) return NULL; //FAILED; EXIT THREAD
 
@@ -148,10 +152,10 @@ void *why2_communicate_thread(void *arg)
         why2_deallocate(received);
     }
 
-    printf("User exited.\t%d\n", *((int*) arg));
+    printf("User exited.\t%d\n", connection.connection);
 
     //DEALLOCATION
-    remove_node(get_node(*((int*) arg)));
+    remove_node(get_node(connection.connection));
     close(*((int*) arg));
     why2_deallocate(received);
 
@@ -190,6 +194,8 @@ void *why2_accept_thread(void *socket)
     int accepted;
     pthread_t thread;
 
+    why2_connection_t connection_buffer;
+
     //LOOP ACCEPT
     for (;;)
     {
@@ -197,6 +203,12 @@ void *why2_accept_thread(void *socket)
 
         if (accepted == -1) continue;
 
-        pthread_create(&thread, NULL, why2_communicate_thread, &accepted);
+        connection_buffer = (why2_connection_t)
+        {
+            accepted,
+            thread
+        };
+
+        pthread_create(&thread, NULL, why2_communicate_thread, &connection_buffer);
     }
 }
