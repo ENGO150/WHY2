@@ -24,4 +24,10 @@ char *why2_read_socket(int socket); //read lol
 void *why2_communicate_thread(void *arg); //COMMUNICATION THREAD
 void *why2_accept_thread(void *socket); //LOOP ACCEPTING CONNECTIONS
 
+typedef struct why2_connection
+{
+    int connection;
+    int thread; //pthread_t
+} why2_connection_t;
+
 #endif
