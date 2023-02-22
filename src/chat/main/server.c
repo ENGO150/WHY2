@@ -58,7 +58,7 @@ int main(void)
         }
     }
 
-    //TODO: Exit threads
+    why2_clean_threads();
 
     free(line_buffer);
     close(listen_socket);
