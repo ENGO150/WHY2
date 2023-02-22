@@ -225,6 +225,9 @@ void why2_clean_threads(void)
         node_buffer_2 = node_buffer;
         node_buffer = node_buffer -> next;
 
+        close(node_buffer_2 -> connection);
+        pthread_cancel(node_buffer_2 -> thread);
+
         remove_node(node_buffer_2); //REMOVE
     }
 }
