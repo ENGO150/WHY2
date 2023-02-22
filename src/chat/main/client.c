@@ -50,8 +50,6 @@ int main(void)
         printf(">>> ");
         getline(&line, &line_length, stdin);
 
-        printf("%s\n", line);
-
         why2_send_socket(line, listen_socket);
 
         if (strcmp(line, "!exit\n") == 0) //USER REQUESTED PROGRAM EXIT
