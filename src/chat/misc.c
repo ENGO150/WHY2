@@ -212,3 +212,19 @@ void *why2_accept_thread(void *socket)
         pthread_create(&thread, NULL, why2_communicate_thread, &connection_buffer);
     }
 }
+
+void why2_clean_threads(void)
+{
+    if (head == NULL) return; //EMPTY LIST
+
+    node_t *node_buffer = head;
+    node_t *node_buffer_2;
+
+    while (node_buffer -> next != NULL) //GO TROUGH LIST
+    {
+        node_buffer_2 = node_buffer;
+        node_buffer = node_buffer -> next;
+
+        remove_node(node_buffer_2); //REMOVE
+    }
+}
