@@ -115,7 +115,7 @@ void *send_to_all(void *message)
 
     do //SEND TO ALL CONNECTIONS
     {
-        why2_send_socket(*((char**) message), node_buffer -> connection); //SEND TO CLIENT
+        why2_send_socket((char*) message, node_buffer -> connection); //SEND TO CLIENT
 
         node_buffer = node_buffer -> next;
     } while (node_buffer -> next != NULL);
@@ -166,7 +166,8 @@ void *why2_communicate_thread(void *arg)
 
         printf("Received:\n%s\n\n", received);
 
-        pthread_create(&thread_buffer, NULL, send_to_all, &received);
+        pthread_create(&thread_buffer, NULL, send_to_all, received);
+        pthread_join(thread_buffer, NULL);
 
         why2_deallocate(received);
     }

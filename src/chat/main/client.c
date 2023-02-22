@@ -26,6 +26,7 @@ int main(void)
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     char *line = NULL;
     size_t line_length = 0;
+    pthread_t thread_buffer;
 
     //DEFINE SERVER ADDRESS
     struct sockaddr_in server_addr;
@@ -44,6 +45,8 @@ int main(void)
     int connectStatus = connect(listen_socket, (SA *) &server_addr, sizeof(server_addr)); //CONNECT
 
     if (connectStatus < 0) why2_die("Connecting failed.");
+
+    pthread_create(&thread_buffer, NULL, why2_listen_server, &listen_socket); //LISTEN TO OTHER USERS
 
     for (;;)
     {
