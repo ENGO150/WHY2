@@ -28,7 +28,7 @@ void why2_clean_threads(void); //CLOSE EVERY RUNNING THREAD
 typedef struct why2_connection
 {
     int connection;
-    int thread; //pthread_t
+    unsigned long thread; //pthread_t
 } why2_connection_t;
 
 #endif
