@@ -18,12 +18,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/common.h>
 
+#include <unistd.h>
+
 #include <why2/chat/misc.h>
 
 int main(void)
 {
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     pthread_t thread;
+    size_t line_length_buffer;
+    char *line_buffer;
 
     if (listen_socket < 0) why2_die("Failed creating socket.");
 
@@ -43,9 +47,21 @@ int main(void)
 
     pthread_create(&thread, NULL, why2_accept_thread, &listen_socket);
 
-    //TODO: Add getline()
+    for (;;)
+    {
+        getline(&line_buffer, &line_length_buffer, stdin);
 
-    pthread_join(thread, NULL);
+        if (strcmp(line_buffer, "!exit\n") == 0) //USER REQUESTED PROGRAM EXIT
+        {
+            printf("Exiting...\n");
+            break;
+        }
+    }
+
+    //TODO: Exit threads
+
+    free(line_buffer);
+    close(listen_socket);
 
     return 0;
 }
