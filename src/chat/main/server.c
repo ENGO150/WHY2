@@ -26,8 +26,8 @@ int main(void)
 {
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     pthread_t thread;
-    size_t line_length_buffer;
-    char *line_buffer;
+    size_t line_length_buffer = 0;
+    char *line_buffer = NULL;
 
     if (listen_socket < 0) why2_die("Failed creating socket.");
 
@@ -58,10 +58,11 @@ int main(void)
         }
     }
 
+    //DEALLOCATION
     why2_clean_threads();
-
     free(line_buffer);
     close(listen_socket);
+    pthread_cancel(thread);
 
     return 0;
 }
