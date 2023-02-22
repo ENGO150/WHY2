@@ -254,3 +254,11 @@ void why2_clean_threads(void)
         remove_node(node_buffer_2); //REMOVE
     }
 }
+
+void *why2_listen_server(void *socket)
+{
+    for (;;)
+    {
+        printf("%s\n", why2_read_socket(*((int*) socket)));
+    }
+}
