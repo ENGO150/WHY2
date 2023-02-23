@@ -162,7 +162,12 @@ void *why2_communicate_thread(void *arg)
 
         if (received == NULL) return NULL; //FAILED; EXIT THREAD
 
-        if (strcmp(received, "!exit\n") == 0) break; //USER REQUESTED PROGRAM EXIT
+        if (received[0] == '!') //COMMANDS
+        {
+            if (strcmp(received, "!exit\n") == 0) break; //USER REQUESTED EXIT
+
+            continue; //IGNORE MESSAGES BEGINNING WITH '!'
+        }
 
         printf("Received:\n%s\n\n", received);
 
