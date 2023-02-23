@@ -215,6 +215,8 @@ char *why2_read_socket(int socket)
     //READ FINAL MESSAGE
     if (recv(socket, content_buffer, content_size, 0) != content_size - 2) fprintf(stderr, "Socket probably read wrongly!\n");
 
+    content_buffer[content_size - 2] = '\0'; //TODO: Possible problems
+
     return content_buffer;
 }
 
