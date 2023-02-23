@@ -50,7 +50,7 @@ int main(void)
 
     for (;;)
     {
-        printf(">>> ");
+        printf(">>> "); //TODO: Fix formatting
         getline(&line, &line_length, stdin);
 
         why2_send_socket(line, listen_socket);
