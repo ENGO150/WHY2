@@ -265,8 +265,18 @@ void why2_clean_threads(void)
 
 void *why2_listen_server(void *socket)
 {
+    char *read = NULL;
+
+    printf(">>> "); //TODO: Make this smart
+    fflush(stdout);
+
     for (;;)
     {
-        printf("%s\n", why2_read_socket(*((int*) socket)));
+        read = why2_read_socket(*((int*) socket)); //TODO: Fix other user message formatting
+        printf("\033[A\33[2K\r");
+        printf("%s\n>>> ", read);
+        fflush(stdout);
+
+        why2_deallocate(read);
     }
 }
