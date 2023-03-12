@@ -40,7 +40,12 @@ int main(void)
 
     server_addr.sin_addr.s_addr = inet_addr(line);
 
-    printf("###################\n\n\n");
+    //PRINT UNDERLINE
+    for (unsigned long i = 0; i < strlen(line) + 3; i++)
+    {
+        printf("#");
+    }
+    printf("\n\n\n");
 
     int connectStatus = connect(listen_socket, (SA *) &server_addr, sizeof(server_addr)); //CONNECT
 
