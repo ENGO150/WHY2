@@ -273,7 +273,7 @@ void *why2_listen_server(void *socket)
     for (;;)
     {
         read = why2_read_socket(*((int*) socket)); //TODO: Fix other user message formatting
-        printf("\033[A\33[2K\r");
+        printf("\33[2K\r\033[A");
         printf("%s\n>>> ", read);
         fflush(stdout);
 
