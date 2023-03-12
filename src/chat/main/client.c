@@ -61,6 +61,7 @@ int main(void)
         }
     }
 
+    pthread_cancel(thread_buffer);
     free(line);
     return 0;
 }
