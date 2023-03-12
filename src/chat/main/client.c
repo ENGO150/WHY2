@@ -40,7 +40,7 @@ int main(void)
 
     server_addr.sin_addr.s_addr = inet_addr(line);
 
-    printf("###################\n\n");
+    printf("###################\n\n\n");
 
     int connectStatus = connect(listen_socket, (SA *) &server_addr, sizeof(server_addr)); //CONNECT
 
@@ -51,6 +51,7 @@ int main(void)
     for (;;)
     {
         getline(&line, &line_length, stdin);
+        printf("\33[2K\r\033[A");
 
         why2_send_socket(line, listen_socket);
 
