@@ -16,22 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-/*
-    DO NOT USE THIS FILE IN YOUR PROJECT!
-*/
-
 #ifndef WHY2_CHAT_COMMON_H
 #define WHY2_CHAT_COMMON_H
-
-//INCLUDES
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <netinet/in.h> //TODO: Remove not 100% common includes
-#include <why2/misc.h>
-#include <why2/memory.h>
-#include <pthread.h>
 
 //DEFINES
 #define SA struct sockaddr

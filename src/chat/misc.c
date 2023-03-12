@@ -18,10 +18,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/misc.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
-#include <why2/chat/common.h>
+#include <pthread.h>
 
+#include <why2/chat/common.h>
 #include <why2/memory.h>
 
 //LINKED LIST STUFF (BIT CHANGED memory.c'S VERSION)
