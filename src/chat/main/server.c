@@ -42,14 +42,14 @@ int main(void)
     //DEFINE SERVER ADDRESS
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT);
+    server_addr.sin_port = htons(WHY2_SERVER_PORT);
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     //BIND SOCKET
-    if (bind(listen_socket, (SA *) &server_addr, sizeof(server_addr)) < 0) why2_die("Failed binding socket.");
+    if (bind(listen_socket, (WHY2_SA *) &server_addr, sizeof(server_addr)) < 0) why2_die("Failed binding socket.");
 
     //LISTEN
-    if (listen(listen_socket, MAX_CONNECTIONS) < 0) why2_die("Binding failed.");
+    if (listen(listen_socket, WHY2_MAX_CONNECTIONS) < 0) why2_die("Binding failed.");
 
     printf("Server enabled.\n\n");
 

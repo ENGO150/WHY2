@@ -236,7 +236,7 @@ void *why2_accept_thread(void *socket)
     //LOOP ACCEPT
     for (;;)
     {
-        accepted = accept(*((int*) socket), (SA *) NULL, NULL); //ACCEPT NEW SOCKET //TODO: CLOSE (not only this one)
+        accepted = accept(*((int*) socket), (WHY2_SA *) NULL, NULL); //ACCEPT NEW SOCKET //TODO: CLOSE (not only this one)
 
         if (accepted == -1) continue;
 
@@ -279,7 +279,7 @@ void *why2_listen_server(void *socket)
     for (;;)
     {
         read = why2_read_socket(*((int*) socket)); //TODO: Fix other user message formatting
-        printf(CLEAR_AND_GO_UP);
+        printf(WHY2_CLEAR_AND_GO_UP);
         printf("%s\n>>> ", read);
         fflush(stdout);
 

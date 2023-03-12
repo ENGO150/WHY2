@@ -20,10 +20,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define WHY2_CHAT_COMMON_H
 
 //DEFINES
-#define SA struct sockaddr
-#define SERVER_PORT 1204
-#define MAX_CONNECTIONS 1000
+#define WHY2_SA struct sockaddr
+#define WHY2_SERVER_PORT 1204
+#define WHY2_MAX_CONNECTIONS 1000
 
-#define CLEAR_AND_GO_UP "\33[2K\r\033[A"
+#define WHY2_CLEAR_AND_GO_UP "\33[2K\r\033[A"
 
 #endif

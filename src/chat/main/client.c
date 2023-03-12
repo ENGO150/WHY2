@@ -40,7 +40,7 @@ int main(void)
     //DEFINE SERVER ADDRESS
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT);
+    server_addr.sin_port = htons(WHY2_SERVER_PORT);
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     //GET IP
@@ -56,7 +56,7 @@ int main(void)
     }
     printf("\n\n\n");
 
-    int connectStatus = connect(listen_socket, (SA *) &server_addr, sizeof(server_addr)); //CONNECT
+    int connectStatus = connect(listen_socket, (WHY2_SA *) &server_addr, sizeof(server_addr)); //CONNECT
 
     if (connectStatus < 0) why2_die("Connecting failed.");
 
@@ -65,7 +65,7 @@ int main(void)
     for (;;)
     {
         getline(&line, &line_length, stdin);
-        printf(CLEAR_AND_GO_UP);
+        printf(WHY2_CLEAR_AND_GO_UP);
 
         why2_send_socket(line, listen_socket);
 
