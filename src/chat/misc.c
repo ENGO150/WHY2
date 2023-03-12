@@ -27,7 +27,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <pthread.h>
 
-#include <why2/chat/common.h>
+#include <why2/chat/flags.h>
 #include <why2/memory.h>
 
 //LINKED LIST STUFF (BIT CHANGED memory.c'S VERSION)
