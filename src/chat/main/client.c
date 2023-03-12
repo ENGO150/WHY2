@@ -56,7 +56,7 @@ int main(void)
     for (;;)
     {
         getline(&line, &line_length, stdin);
-        printf("\33[2K\r\033[A");
+        printf(CLEAR_AND_GO_UP);
 
         why2_send_socket(line, listen_socket);
 

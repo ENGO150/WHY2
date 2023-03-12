@@ -38,4 +38,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define SERVER_PORT 1204
 #define MAX_CONNECTIONS 1000
 
+#define CLEAR_AND_GO_UP "\33[2K\r\033[A"
+
 #endif
