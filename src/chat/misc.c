@@ -27,6 +27,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <pthread.h>
 
+#include <json-c/json.h>
+
 #include <why2/chat/flags.h>
 #include <why2/memory.h>
 
@@ -129,10 +131,55 @@ void *send_to_all(void *message)
     return NULL;
 }
 
+void append(char **destination, char *key, char *value)
+{
+    char *output = why2_calloc(strlen(*destination) + strlen(key) + strlen(value) + 7, sizeof(char));
+
+    sprintf(output, "%s%s\"%s\":\"%s\"", *destination, strcmp(*destination, "") == 0 ? "" : ",", key, value);
+
+    why2_deallocate(*destination);
+
+    *destination = output;
+}
+
+void add_brackets(char **json)
+{
+    char *output = why2_calloc(strlen(*json) + 3, sizeof(char));
+
+    sprintf(output, "{%s}", *json);
+
+    why2_deallocate(*json);
+
+    *json = output;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, int socket)
 {
-    unsigned short text_length = (unsigned short) strlen(text) + 2;
+    char *output = why2_strdup("");
+    size_t length_buffer = strlen(text);
+    char *text_copy = why2_calloc(length_buffer, sizeof(char));
+    struct json_object *json = json_tokener_parse("{}");
+
+    //COPY text INTO text_copy WITHOUT LAST CHARACTER
+    strncpy(text_copy, text, length_buffer - 1);
+
+    //ADD OBJECTS
+    json_object_object_add(json, "message", json_object_new_string(text_copy));
+    json_object_object_add(json, "username", json_object_new_string("anon"));
+
+    //GENERATE JSON STRING
+    json_object_object_foreach(json, key, value)
+    {
+        append(&output, key, (char*) json_object_get_string(value));
+    }
+    add_brackets(&output);
+
+    why2_deallocate(text_copy);
+    json_object_put(json);
+
+    //printf("NEGR\n");
+    unsigned short text_length = (unsigned short) strlen(output) + 2;
     char *final = why2_calloc(text_length, sizeof(char));
 
     //SPLIT LENGTH INTO TWO CHARS
@@ -141,13 +188,15 @@ void why2_send_socket(char *text, int socket)
 
     for (int i = 2; i < text_length; i++) //APPEND
     {
-        final[i] = text[i - 2];
+        final[i] = output[i - 2];
     }
 
     //SEND
     send(socket, final, text_length, 0);
 
+    //DEALLOCATION
     why2_deallocate(final);
+    why2_deallocate(output);
 }
 
 void *why2_communicate_thread(void *arg)
