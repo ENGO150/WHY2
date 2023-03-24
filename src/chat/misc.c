@@ -153,6 +153,15 @@ void add_brackets(char **json)
     *json = output;
 }
 
+char *get_string_from_json(struct json_object *json, char *string)
+{
+    struct json_object *object;
+	json_object_object_get_ex(json, string, &object);
+
+    //GET STRINGS
+    return (char*) json_object_get_string(object);
+}
+
 //GLOBAL
 void why2_send_socket(char *text, int socket)
 {
@@ -273,17 +282,12 @@ char *why2_read_socket(int socket)
 
     content_buffer[content_size - 2] = '\0'; //TODO: Possible problems
 
-    //DECODE
+    //PARSE JSON
     struct json_object *json_obj = json_tokener_parse(content_buffer);
-    struct json_object *message_obj;
-    struct json_object *username_obj;
-
-	json_object_object_get_ex(json_obj, "message", &message_obj);
-	json_object_object_get_ex(json_obj, "username", &username_obj);
 
     //GET STRINGS
-    const char *message = json_object_get_string(message_obj);
-    const char *username = json_object_get_string(username_obj);
+    char *message = get_string_from_json(json_obj, "message"); //TODO: Check deallocation problems
+    char *username = get_string_from_json(json_obj, "username");
 
     //ALLOCATE final_message;
     final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char));
