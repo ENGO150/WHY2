@@ -352,9 +352,11 @@ void *why2_listen_server(void *socket)
     {
         read = why2_read_socket(*((int*) socket)); //TODO: Fix other user message formatting
         printf(WHY2_CLEAR_AND_GO_UP);
-        printf("%s\n\n>>> ", read);
+        printf("%s\n\n>>> ", read); //TODO: wtf is the output
         fflush(stdout);
 
         why2_deallocate(read);
     }
 }
+
+//BUG: SERVER SOMETIMES CRASHES - I HAVE NO FUCKING IDEA WHY
