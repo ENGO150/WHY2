@@ -252,6 +252,7 @@ char *why2_read_socket(int socket)
 
     unsigned short content_size = 0;
     char *content_buffer = why2_calloc(3, sizeof(char));
+    char *final_message;
 
     //GET LENGTH
     if (recv(socket, content_buffer, 2, 0) != 2)
@@ -267,12 +268,34 @@ char *why2_read_socket(int socket)
     //ALLOCATE
     content_buffer = why2_calloc(content_size + 1, sizeof(char));
 
-    //READ FINAL MESSAGE
+    //READ JSON MESSAGE
     if (recv(socket, content_buffer, content_size, 0) != content_size - 2) fprintf(stderr, "Socket probably read wrongly!\n");
 
     content_buffer[content_size - 2] = '\0'; //TODO: Possible problems
 
-    return content_buffer;
+    //DECODE
+    struct json_object *json_obj = json_tokener_parse(content_buffer);
+    struct json_object *message_obj;
+    struct json_object *username_obj;
+
+	json_object_object_get_ex(json_obj, "message", &message_obj);
+	json_object_object_get_ex(json_obj, "username", &username_obj);
+
+    //GET STRINGS
+    const char *message = json_object_get_string(message_obj);
+    const char *username = json_object_get_string(username_obj);
+
+    //ALLOCATE final_message;
+    final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char));
+
+    //BUILD final_message
+    sprintf(final_message, "%s: %s", username, message);
+
+    //DEALLOCATION
+    why2_deallocate(content_buffer);
+    json_object_put(json_obj);
+
+    return final_message;
 }
 
 void *why2_accept_thread(void *socket)
