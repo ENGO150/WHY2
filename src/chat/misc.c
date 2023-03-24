@@ -43,7 +43,7 @@ node_t *head = NULL;
 void push_to_list(int connection, pthread_t thread)
 {
     //CREATE NODE
-    node_t *new_node = why2_malloc(sizeof(node_t));
+    node_t *new_node = malloc(sizeof(node_t));
     node_t *buffer = head;
 
     new_node -> connection = connection;
@@ -93,7 +93,7 @@ void remove_node(node_t *node)
     }
 
     //DEALLOCATION
-    why2_deallocate(node);
+    free(node);
 }
 
 node_t *get_node(int connection)
