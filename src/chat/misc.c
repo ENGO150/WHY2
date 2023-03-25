@@ -158,6 +158,17 @@ char *get_string_from_json(struct json_object *json, char *string)
     struct json_object *object;
 	json_object_object_get_ex(json, string, &object);
 
+    return (char*) json_object_get_string(object);
+}
+
+char *get_string_from_json_string(char *json, char *string)
+{
+    struct json_object *json_obj = json_tokener_parse(json);
+    char *returning = get_string_from_json(json_obj, string);
+
+    //DEALLOCATION
+    json_object_put(json_obj);
+
     //GET STRINGS
     return returning;
 }
