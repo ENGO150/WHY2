@@ -344,8 +344,6 @@ char *why2_read_socket(int socket)
     //ALLOCATE final_message
     final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char));
 
-    printf("\n\nGIGANIGGA: %s\n\n", raw_socket);
-
     //BUILD final_message
     sprintf(final_message, "%s: %s", username, message);
 
