@@ -243,7 +243,7 @@ void why2_send_socket(char *text, char *username, int socket)
     struct json_object *json = json_tokener_parse("{}");
 
     //COPY text INTO text_copy (WITHOUT LAST CHARACTER WHEN NEWLINE IS AT THE END)
-    if (text[length_buffer - 1] == '\n') length_buffer--;
+    if (text[length_buffer - 1] == '\n') length_buffer--; //TODO: Remove json syntax
     strncpy(text_copy, text, length_buffer);
 
     //ADD OBJECTS
