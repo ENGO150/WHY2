@@ -317,50 +317,22 @@ void *why2_communicate_thread(void *arg)
 
 char *why2_read_socket(int socket)
 {
-    if (socket == -1)
-    {
-        fprintf(stderr, "Reading socket failed.\n");
-        return NULL;
-    }
-
-    unsigned short content_size = 0;
-    char *content_buffer = why2_calloc(3, sizeof(char));
+    char *raw_socket = read_socket_raw(socket);
     char *final_message;
-
-    //GET LENGTH
-    if (recv(socket, content_buffer, 2, 0) != 2)
-    {
-        fprintf(stderr, "Getting message length failed!\n");
-        return NULL;
-    }
-
-    content_size = (unsigned short) (((unsigned) content_buffer[1] << 8) | content_buffer[0]);
-
-    why2_deallocate(content_buffer);
-
-    //ALLOCATE
-    content_buffer = why2_calloc(content_size + 1, sizeof(char));
-
-    //READ JSON MESSAGE
-    if (recv(socket, content_buffer, content_size, 0) != content_size - 2) fprintf(stderr, "Socket probably read wrongly!\n");
-
-    content_buffer[content_size - 2] = '\0'; //TODO: Possible problems
-
-    //PARSE JSON
-    struct json_object *json_obj = json_tokener_parse(content_buffer);
+    struct json_object *json_obj = json_tokener_parse(raw_socket);
 
     //GET STRINGS
     char *message = get_string_from_json(json_obj, "message"); //TODO: Check deallocation problems
     char *username = get_string_from_json(json_obj, "username");
 
-    //ALLOCATE final_message;
+    //ALLOCATE final_message
     final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char));
 
     //BUILD final_message
     sprintf(final_message, "%s: %s", username, message);
 
     //DEALLOCATION
-    why2_deallocate(content_buffer);
+    why2_deallocate(raw_socket);
     json_object_put(json_obj);
 
     return final_message;
