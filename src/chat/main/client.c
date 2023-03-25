@@ -67,7 +67,7 @@ int main(void)
         getline(&line, &line_length, stdin);
         printf(WHY2_CLEAR_AND_GO_UP);
 
-        why2_send_socket(line, listen_socket);
+        why2_send_socket(line, "anon", listen_socket);
 
         if (strcmp(line, "!exit\n") == 0) //USER REQUESTED PROGRAM EXIT
         {

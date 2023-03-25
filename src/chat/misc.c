@@ -115,18 +115,46 @@ node_t *get_node(int connection)
     return buffer;
 }
 
-void *send_to_all(void *message)
+
+
+char *get_string_from_json(struct json_object *json, char *string)
+{
+    struct json_object *object;
+	json_object_object_get_ex(json, string, &object);
+
+    return (char*) json_object_get_string(object);
+}
+
+char *get_string_from_json_string(char *json, char *string)
+{
+    struct json_object *json_obj = json_tokener_parse(json);
+    char *returning = get_string_from_json(json_obj, string);
+
+    //DEALLOCATION
+    json_object_put(json_obj);
+
+    //GET STRINGS
+    return returning;
+}
+
+void *send_to_all(void *json)
 {
     if (head == NULL) return NULL;
 
     node_t *node_buffer = head;
 
+    //PARSE
+    struct json_object *json_obj = json_tokener_parse((char*) json);
+
     do //SEND TO ALL CONNECTIONS
     {
-        why2_send_socket((char*) message, node_buffer -> connection); //SEND TO CLIENT
+        why2_send_socket(get_string_from_json(json_obj, "message"), get_string_from_json(json_obj, "username"), node_buffer -> connection); //SEND TO CLIENT
 
         node_buffer = node_buffer -> next;
     } while (node_buffer -> next != NULL);
+
+    //DEALLOCATION
+    json_object_put(json_obj);
 
     return NULL;
 }
@@ -151,26 +179,6 @@ void add_brackets(char **json)
     why2_deallocate(*json);
 
     *json = output;
-}
-
-char *get_string_from_json(struct json_object *json, char *string)
-{
-    struct json_object *object;
-	json_object_object_get_ex(json, string, &object);
-
-    return (char*) json_object_get_string(object);
-}
-
-char *get_string_from_json_string(char *json, char *string)
-{
-    struct json_object *json_obj = json_tokener_parse(json);
-    char *returning = get_string_from_json(json_obj, string);
-
-    //DEALLOCATION
-    json_object_put(json_obj);
-
-    //GET STRINGS
-    return returning;
 }
 
 char *read_socket_raw(int socket)
@@ -227,7 +235,7 @@ char *read_socket_from_raw(char *raw)
 }
 
 //GLOBAL
-void why2_send_socket(char *text, int socket)
+void why2_send_socket(char *text, char *username, int socket)
 {
     char *output = why2_strdup("");
     size_t length_buffer = strlen(text);
@@ -239,7 +247,7 @@ void why2_send_socket(char *text, int socket)
 
     //ADD OBJECTS
     json_object_object_add(json, "message", json_object_new_string(text_copy));
-    json_object_object_add(json, "username", json_object_new_string("anon"));
+    json_object_object_add(json, "username", json_object_new_string(username));
 
     //GENERATE JSON STRING
     json_object_object_foreach(json, key, value)
@@ -305,7 +313,7 @@ void *why2_communicate_thread(void *arg)
 
         printf("Received:\n%s\n\n", received);
 
-        pthread_create(&thread_buffer, NULL, send_to_all, received); //TODO: Send only json format, not json format "squared"
+        pthread_create(&thread_buffer, NULL, send_to_all, raw);
         pthread_join(thread_buffer, NULL);
 
         why2_deallocate(received);
@@ -335,6 +343,8 @@ char *why2_read_socket(int socket)
 
     //ALLOCATE final_message
     final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char));
+
+    printf("\n\nGIGANIGGA: %s\n\n", raw_socket);
 
     //BUILD final_message
     sprintf(final_message, "%s: %s", username, message);

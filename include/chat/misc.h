@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_CHAT_MISC_H
 #define WHY2_CHAT_MISC_H
 
-void why2_send_socket(char *text, int socket); //send socket.... wtf did you expect
+void why2_send_socket(char *text, char *username, int socket); //send socket.... wtf did you expect
 char *why2_read_socket(int socket); //read lol
 void *why2_communicate_thread(void *arg); //COMMUNICATION THREAD
 void *why2_accept_thread(void *socket); //LOOP ACCEPTING CONNECTIONS
