@@ -282,17 +282,23 @@ void *why2_communicate_thread(void *arg)
 
     const time_t startTime = time(NULL);
     char *received = NULL;
+    char *raw = NULL;
+    char *decoded_buffer;
     pthread_t thread_buffer;
 
     while (time(NULL) - startTime < 86400) //KEEP COMMUNICATION ALIVE FOR 24 HOURS
     {
-        received = why2_read_socket(connection.connection); //READ
+        //READ
+        raw = read_socket_raw(connection.connection);
+        received = read_socket_from_raw(raw);
 
-        if (received == NULL) return NULL; //FAILED; EXIT THREAD
+        if (received == NULL || raw == NULL) return NULL; //FAILED; EXIT THREAD
 
-        if (received[0] == '!') //COMMANDS
+        decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
+
+        if (decoded_buffer[0] == '!') //COMMANDS
         {
-            if (strcmp(received, "!exit\n") == 0) break; //USER REQUESTED EXIT
+            if (strcmp(decoded_buffer, "!exit") == 0) break; //USER REQUESTED EXIT
 
             continue; //IGNORE MESSAGES BEGINNING WITH '!'
         }
@@ -303,6 +309,8 @@ void *why2_communicate_thread(void *arg)
         pthread_join(thread_buffer, NULL);
 
         why2_deallocate(received);
+        why2_deallocate(raw);
+        why2_deallocate(decoded_buffer);
     }
 
     printf("User exited.\t%d\n", connection.connection);
