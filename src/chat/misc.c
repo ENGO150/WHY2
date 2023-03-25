@@ -305,7 +305,7 @@ void *why2_communicate_thread(void *arg)
 
         printf("Received:\n%s\n\n", received);
 
-        pthread_create(&thread_buffer, NULL, send_to_all, received);
+        pthread_create(&thread_buffer, NULL, send_to_all, received); //TODO: Send only json format, not json format "squared"
         pthread_join(thread_buffer, NULL);
 
         why2_deallocate(received);
