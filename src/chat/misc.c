@@ -220,6 +220,8 @@ char *read_socket_from_raw(char *raw)
     char *final_message;
     struct json_object *json_obj = json_tokener_parse(raw);
 
+    if (json_obj == NULL) return "ERR"; //RETURN IF INVALID SYNTAX WAS SENT BY SOME FUCKING SCRIPT KIDDIE
+
     //GET STRINGS
     char *message = get_string_from_json(json_obj, "message"); //TODO: Check deallocation problems
     char *username = get_string_from_json(json_obj, "username");
