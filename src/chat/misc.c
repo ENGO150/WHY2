@@ -234,6 +234,17 @@ char *read_socket_from_raw(char *raw)
     return final_message;
 }
 
+void remove_json_syntax_characters(char *text)
+{
+    for (size_t i = 0; i < strlen(text); i++) //TODO: DO SOMETHING MORE
+    {
+        if (text[i] == '\"')
+        {
+            text[i] = '\'';
+        }
+    }
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
@@ -243,8 +254,11 @@ void why2_send_socket(char *text, char *username, int socket)
     struct json_object *json = json_tokener_parse("{}");
 
     //COPY text INTO text_copy (WITHOUT LAST CHARACTER WHEN NEWLINE IS AT THE END)
-    if (text[length_buffer - 1] == '\n') length_buffer--; //TODO: Remove json syntax
+    if (text[length_buffer - 1] == '\n') length_buffer--;
     strncpy(text_copy, text, length_buffer);
+
+    //UNFUCK QUOTES FROM text_copy
+    remove_json_syntax_characters(text_copy);
 
     //ADD OBJECTS
     json_object_object_add(json, "message", json_object_new_string(text_copy));
