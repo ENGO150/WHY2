@@ -318,6 +318,8 @@ void *why2_communicate_thread(void *arg)
         //READ
         raw = read_socket_raw(connection.connection);
 
+        if (raw == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
+
         //REMOVE CONTROL CHARACTERS FROM raw
         for (size_t i = 0; i < strlen(raw); i++)
         {
