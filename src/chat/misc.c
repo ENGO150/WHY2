@@ -317,6 +317,13 @@ void *why2_communicate_thread(void *arg)
     {
         //READ
         raw = read_socket_raw(connection.connection);
+
+        //REMOVE CONTROL CHARACTERS FROM raw
+        for (size_t i = 0; i < strlen(raw); i++)
+        {
+            if (raw[i] == '\\') raw[i] = '/';
+        }
+
         received = read_socket_from_raw(raw);
 
         if (received == NULL || raw == NULL) return NULL; //FAILED; EXIT THREAD
