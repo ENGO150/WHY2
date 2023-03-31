@@ -146,6 +146,8 @@ void *send_to_all(void *json)
     //PARSE
     struct json_object *json_obj = json_tokener_parse((char*) json);
 
+    if (json_obj == NULL) return; //EXIT IF INVALID SYNTAX WAS SENT
+
     do //SEND TO ALL CONNECTIONS
     {
         why2_send_socket(get_string_from_json(json_obj, "message"), get_string_from_json(json_obj, "username"), node_buffer -> connection); //SEND TO CLIENT
