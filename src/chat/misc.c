@@ -146,7 +146,7 @@ void *send_to_all(void *json)
     //PARSE
     struct json_object *json_obj = json_tokener_parse((char*) json);
 
-    if (json_obj == NULL) return; //EXIT IF INVALID SYNTAX WAS SENT
+    if (json_obj == NULL) return NULL; //EXIT IF INVALID SYNTAX WAS SENT
 
     do //SEND TO ALL CONNECTIONS
     {
