@@ -315,7 +315,7 @@ void *why2_communicate_thread(void *arg)
     pthread_t thread_buffer;
     why2_bool exiting = 0;
 
-    while ((time(NULL) - start_time) < WHY2_COMMUNICATION_TIME && !exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
+    while ((time(NULL) - start_time) < WHY2_COMMUNICATION_TIME && !exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT] //TODO: Fix stuck
     {
         //READ
         raw = read_socket_raw(connection);
