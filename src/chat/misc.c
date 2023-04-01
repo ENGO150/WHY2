@@ -301,11 +301,11 @@ void why2_send_socket(char *text, char *username, int socket)
 
 void *why2_communicate_thread(void *arg)
 {
-    why2_connection_t connection = *(why2_connection_t*) arg;
+    int connection = *(int*) arg;
 
-    printf("User connected.\t%d\n", connection.connection);
+    printf("User connected.\t%d\n", connection);
 
-    push_to_list(connection.connection, pthread_self()); //TODO: Do something with why2_connection_t
+    push_to_list(connection, pthread_self()); //ADD TO LIST
 
     const time_t startTime = time(NULL);
     char *received = NULL;
@@ -316,7 +316,7 @@ void *why2_communicate_thread(void *arg)
     while (time(NULL) - startTime < 86400) //KEEP COMMUNICATION ALIVE FOR 24 HOURS
     {
         //READ
-        raw = read_socket_raw(connection.connection);
+        raw = read_socket_raw(connection);
 
         if (raw == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
 
@@ -349,12 +349,12 @@ void *why2_communicate_thread(void *arg)
         why2_deallocate(decoded_buffer);
     }
 
-    printf("User exited.\t%d\n", connection.connection);
+    printf("User exited.\t%d\n", connection);
 
     //DEALLOCATION
     why2_deallocate(received);
-    close(connection.connection);
-    remove_node(get_node(connection.connection));
+    close(connection);
+    remove_node(get_node(connection));
 
     return NULL;
 }
@@ -387,8 +387,6 @@ void *why2_accept_thread(void *socket)
     int accepted;
     pthread_t thread;
 
-    why2_connection_t connection_buffer;
-
     //LOOP ACCEPT
     for (;;)
     {
@@ -396,13 +394,7 @@ void *why2_accept_thread(void *socket)
 
         if (accepted == -1) continue;
 
-        connection_buffer = (why2_connection_t)
-        {
-            accepted,
-            thread
-        };
-
-        pthread_create(&thread, NULL, why2_communicate_thread, &connection_buffer);
+        pthread_create(&thread, NULL, why2_communicate_thread, &accepted);
     }
 }
 
