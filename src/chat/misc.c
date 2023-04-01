@@ -31,6 +31,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/flags.h>
 #include <why2/memory.h>
+#include <why2/misc.h>
 
 //LINKED LIST STUFF (BIT CHANGED memory.c'S VERSION)
 typedef struct node
@@ -307,13 +308,14 @@ void *why2_communicate_thread(void *arg)
 
     push_to_list(connection, pthread_self()); //ADD TO LIST
 
-    const time_t startTime = time(NULL);
+    time_t start_time = time(NULL);
     char *received = NULL;
     char *raw = NULL;
     char *decoded_buffer;
     pthread_t thread_buffer;
+    why2_bool exiting = 0;
 
-    while (time(NULL) - startTime < 86400) //KEEP COMMUNICATION ALIVE FOR 24 HOURS
+    while ((time(NULL) - start_time) < WHY2_COMMUNICATION_TIME && !exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
         //READ
         raw = read_socket_raw(connection);
@@ -334,15 +336,20 @@ void *why2_communicate_thread(void *arg)
 
         if (decoded_buffer[0] == '!') //COMMANDS
         {
-            if (strcmp(decoded_buffer, "!exit") == 0) break; //USER REQUESTED EXIT
+            if (strcmp(decoded_buffer, "!exit") == 0) exiting = 1; //USER REQUESTED EXIT
 
-            continue; //IGNORE MESSAGES BEGINNING WITH '!'
+            goto deallocation; //IGNORE MESSAGES BEGINNING WITH '!'
         }
 
         printf("Received:\n%s\n\n", received);
 
         pthread_create(&thread_buffer, NULL, send_to_all, raw);
         pthread_join(thread_buffer, NULL);
+
+        //RESET TIMER
+        start_time = time(NULL);
+
+        deallocation:
 
         why2_deallocate(received);
         why2_deallocate(raw);
