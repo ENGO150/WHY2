@@ -328,7 +328,7 @@ void *why2_communicate_thread(void *arg)
 
         received = read_socket_from_raw(raw);
 
-        if (received == NULL || raw == NULL) return NULL; //FAILED; EXIT THREAD
+        if (received == NULL) break; //FAILED; EXIT THREAD
 
         decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
 
