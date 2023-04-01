@@ -19,11 +19,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_CHAT_COMMON_H
 #define WHY2_CHAT_COMMON_H
 
-//DEFINES
+//MACROS
 #define WHY2_SA struct sockaddr
-#define WHY2_SERVER_PORT 1204
-#define WHY2_MAX_CONNECTIONS 1000
+#define WHY2_SERVER_PORT 1204 //PORT
+#define WHY2_MAX_CONNECTIONS 1000 //MAX USERS CONNECTED AT ONE TIME
+#define WHY2_COMMUNICATION_TIME 300 //SECONDS WAITING BEFORE KICKING USER (TIMEOUT)
 
-#define WHY2_CLEAR_AND_GO_UP "\33[2K\r\033[A"
+#define WHY2_CLEAR_AND_GO_UP "\33[2K\r\033[A" //i mean read the name
 
 #endif
