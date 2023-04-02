@@ -116,8 +116,6 @@ node_t *get_node(int connection)
     return buffer;
 }
 
-
-
 char *get_string_from_json(struct json_object *json, char *string)
 {
     struct json_object *object;
