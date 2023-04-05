@@ -33,10 +33,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-//TIMEOUT STUFF
-pthread_t thread_timeout_buffer;
-
-//LINKED LIST STUFF (BIT CHANGED memory.c'S VERSION)
+//LINKED LIST STUFF (BIT CHANGED memory.c'S VERSION) //TODO: Move llist in some single separate file
 typedef struct node
 {
     int connection;
@@ -285,7 +282,14 @@ void remove_json_syntax_characters(char *text)
 
 void alarm_handler()
 {
-    pthread_cancel(thread_timeout_buffer);
+    //CANCEL OLDEST THREAD
+    pthread_cancel(waiting_head -> thread);
+
+    //REMOVE FIRST NODE
+    waiting_node_t *buffer = waiting_head; //BUFFER
+
+    waiting_head = buffer -> next; //UNLINK
+    free(waiting_head);
 }
 
 //GLOBAL
@@ -356,13 +360,14 @@ void *why2_communicate_thread(void *arg)
     while (!exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
         //READ
-        pthread_create(&thread_timeout_buffer, NULL, read_socket_raw_thread, &connection);
+        pthread_create(&thread_buffer, NULL, read_socket_raw_thread, &connection);
+        waiting_push_to_list(thread_buffer);
 
         //SET TIMEOUT (DEFAULT IS 5 MINUTES)
         signal(SIGALRM, alarm_handler);
         alarm(WHY2_COMMUNICATION_TIME);
 
-        pthread_join(thread_timeout_buffer, &raw_ptr);
+        pthread_join(thread_buffer, &raw_ptr);
 
         if (raw_ptr == WHY2_INVALID_POINTER || raw_ptr == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
 
