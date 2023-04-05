@@ -44,7 +44,14 @@ typedef struct node
     struct node *next;
 } node_t; //SINGLE LINKED LIST
 
+typedef struct waiting_node
+{
+    pthread_t thread;
+    struct waiting_node *next;
+} waiting_node_t; //SINGLE LINKED LIST
+
 node_t *head = NULL;
+waiting_node_t *waiting_head = NULL;
 
 void push_to_list(int connection, pthread_t thread)
 {
@@ -59,6 +66,26 @@ void push_to_list(int connection, pthread_t thread)
     if (head == NULL) //INIT LIST
     {
         head = new_node;
+    } else
+    {
+        while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
+
+        buffer -> next = new_node; //LINK
+    }
+}
+
+void waiting_push_to_list(pthread_t thread)
+{
+    //CREATE NODE
+    waiting_node_t *new_node = malloc(sizeof(waiting_node_t));
+    waiting_node_t *buffer = waiting_head;
+
+    new_node -> thread = thread;
+    new_node -> next = NULL;
+
+    if (waiting_head == NULL) //INIT LIST
+    {
+        waiting_head = new_node;
     } else
     {
         while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
