@@ -383,7 +383,7 @@ void *why2_communicate_thread(void *arg)
     close(connection);
     remove_node(get_node(connection));
 
-    return NULL;
+    return NULL; //TODO: Fix client segfault on timeout
 }
 
 char *why2_read_socket(int socket)
