@@ -461,5 +461,3 @@ void *why2_listen_server(void *socket)
         why2_deallocate(read);
     }
 }
-
-//BUG: SERVER SOMETIMES CRASHES - I HAVE NO FUCKING IDEA WHY
