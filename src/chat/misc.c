@@ -21,9 +21,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <pthread.h>
 
@@ -32,6 +32,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/flags.h>
 #include <why2/memory.h>
 #include <why2/misc.h>
+
+//TIMEOUT STUFF
+pthread_t thread_timeout_buffer;
 
 //LINKED LIST STUFF (BIT CHANGED memory.c'S VERSION)
 typedef struct node
@@ -115,8 +118,6 @@ node_t *get_node(int connection)
 
     return buffer;
 }
-
-
 
 char *get_string_from_json(struct json_object *json, char *string)
 {
@@ -216,6 +217,11 @@ char *read_socket_raw(int socket)
     return content_buffer;
 }
 
+void *read_socket_raw_thread(void *socket)
+{
+    return read_socket_raw(*(int*) socket);
+}
+
 char *read_socket_from_raw(char *raw)
 {
     char *final_message;
@@ -248,6 +254,11 @@ void remove_json_syntax_characters(char *text)
             text[i] = '\'';
         }
     }
+}
+
+void alarm_handler()
+{
+    pthread_cancel(thread_timeout_buffer);
 }
 
 //GLOBAL
@@ -308,19 +319,27 @@ void *why2_communicate_thread(void *arg)
 
     push_to_list(connection, pthread_self()); //ADD TO LIST
 
-    time_t start_time = time(NULL);
     char *received = NULL;
     char *raw = NULL;
+    void *raw_ptr = NULL;
     char *decoded_buffer;
     pthread_t thread_buffer;
     why2_bool exiting = 0;
 
-    while ((time(NULL) - start_time) < WHY2_COMMUNICATION_TIME && !exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT] //TODO: Fix stuck
+    while (!exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT] //TODO: Fix stuck
     {
         //READ
-        raw = read_socket_raw(connection);
+        pthread_create(&thread_timeout_buffer, NULL, read_socket_raw_thread, &connection);
 
-        if (raw == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
+        //SET TIMEOUT (DEFAULT IS 5 MINUTES)
+        signal(SIGALRM, alarm_handler);
+        alarm(WHY2_COMMUNICATION_TIME);
+
+        pthread_join(thread_timeout_buffer, &raw_ptr);
+
+        if (raw_ptr == WHY2_INVALID_POINTER || raw_ptr == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
+
+        raw = (char*) raw_ptr;
 
         //REMOVE CONTROL CHARACTERS FROM raw
         for (size_t i = 0; i < strlen(raw); i++)
@@ -346,14 +365,15 @@ void *why2_communicate_thread(void *arg)
         pthread_create(&thread_buffer, NULL, send_to_all, raw);
         pthread_join(thread_buffer, NULL);
 
-        //RESET TIMER
-        start_time = time(NULL);
-
         deallocation:
 
         why2_deallocate(received);
         why2_deallocate(raw);
+        why2_deallocate(raw_ptr);
         why2_deallocate(decoded_buffer);
+
+        //RESET VARIABLES
+        raw_ptr = NULL;
     }
 
     printf("User exited.\t%d\n", connection);
