@@ -448,14 +448,14 @@ void *why2_listen_server(void *socket)
 {
     char *read = NULL;
 
-    printf(">>> "); //TODO: Make this smart
+    printf(">>> ");
     fflush(stdout);
 
     for (;;)
     {
-        read = why2_read_socket(*((int*) socket)); //TODO: Fix other user message formatting
+        read = why2_read_socket(*((int*) socket));
         printf(WHY2_CLEAR_AND_GO_UP);
-        printf("%s\n\n>>> ", read); //TODO: wtf is the output
+        printf("%s\n\n>>> ", read);
         fflush(stdout);
 
         why2_deallocate(read);
