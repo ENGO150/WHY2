@@ -21,9 +21,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <pthread.h>
 
@@ -33,7 +33,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-//LINKED LIST STUFF (BIT CHANGED memory.c'S VERSION)
+//LINKED LIST STUFF (BIT CHANGED memory.c'S VERSION) //TODO: Move llist in some single separate file
 typedef struct node
 {
     int connection;
@@ -41,7 +41,14 @@ typedef struct node
     struct node *next;
 } node_t; //SINGLE LINKED LIST
 
+typedef struct waiting_node
+{
+    pthread_t thread;
+    struct waiting_node *next;
+} waiting_node_t; //SINGLE LINKED LIST
+
 node_t *head = NULL;
+waiting_node_t *waiting_head = NULL;
 
 void push_to_list(int connection, pthread_t thread)
 {
@@ -56,6 +63,26 @@ void push_to_list(int connection, pthread_t thread)
     if (head == NULL) //INIT LIST
     {
         head = new_node;
+    } else
+    {
+        while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
+
+        buffer -> next = new_node; //LINK
+    }
+}
+
+void waiting_push_to_list(pthread_t thread)
+{
+    //CREATE NODE
+    waiting_node_t *new_node = malloc(sizeof(waiting_node_t));
+    waiting_node_t *buffer = waiting_head;
+
+    new_node -> thread = thread;
+    new_node -> next = NULL;
+
+    if (waiting_head == NULL) //INIT LIST
+    {
+        waiting_head = new_node;
     } else
     {
         while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
@@ -214,6 +241,11 @@ char *read_socket_raw(int socket)
     return content_buffer;
 }
 
+void *read_socket_raw_thread(void *socket)
+{
+    return read_socket_raw(*(int*) socket);
+}
+
 char *read_socket_from_raw(char *raw)
 {
     char *final_message;
@@ -246,6 +278,18 @@ void remove_json_syntax_characters(char *text)
             text[i] = '\'';
         }
     }
+}
+
+void alarm_handler()
+{
+    //CANCEL OLDEST THREAD
+    pthread_cancel(waiting_head -> thread);
+
+    //REMOVE FIRST NODE
+    waiting_node_t *buffer = waiting_head; //BUFFER
+
+    waiting_head = buffer -> next; //UNLINK
+    free(waiting_head);
 }
 
 //GLOBAL
@@ -306,19 +350,28 @@ void *why2_communicate_thread(void *arg)
 
     push_to_list(connection, pthread_self()); //ADD TO LIST
 
-    time_t start_time = time(NULL);
     char *received = NULL;
     char *raw = NULL;
+    void *raw_ptr = NULL;
     char *decoded_buffer;
     pthread_t thread_buffer;
     why2_bool exiting = 0;
 
-    while ((time(NULL) - start_time) < WHY2_COMMUNICATION_TIME && !exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT] //TODO: Fix stuck
+    while (!exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
         //READ
-        raw = read_socket_raw(connection);
+        pthread_create(&thread_buffer, NULL, read_socket_raw_thread, &connection);
+        waiting_push_to_list(thread_buffer);
 
-        if (raw == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
+        //SET TIMEOUT (DEFAULT IS 5 MINUTES)
+        signal(SIGALRM, alarm_handler);
+        alarm(WHY2_COMMUNICATION_TIME);
+
+        pthread_join(thread_buffer, &raw_ptr);
+
+        if (raw_ptr == WHY2_INVALID_POINTER || raw_ptr == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
+
+        raw = (char*) raw_ptr;
 
         //REMOVE CONTROL CHARACTERS FROM raw
         for (size_t i = 0; i < strlen(raw); i++)
@@ -344,14 +397,15 @@ void *why2_communicate_thread(void *arg)
         pthread_create(&thread_buffer, NULL, send_to_all, raw);
         pthread_join(thread_buffer, NULL);
 
-        //RESET TIMER
-        start_time = time(NULL);
-
         deallocation:
 
         why2_deallocate(received);
         why2_deallocate(raw);
+        why2_deallocate(raw_ptr);
         why2_deallocate(decoded_buffer);
+
+        //RESET VARIABLES
+        raw_ptr = NULL;
     }
 
     printf("User exited.\t%d\n", connection);
@@ -361,7 +415,7 @@ void *why2_communicate_thread(void *arg)
     close(connection);
     remove_node(get_node(connection));
 
-    return NULL;
+    return NULL; //TODO: Fix client segfault on timeout
 }
 
 char *why2_read_socket(int socket)
@@ -426,18 +480,16 @@ void *why2_listen_server(void *socket)
 {
     char *read = NULL;
 
-    printf(">>> "); //TODO: Make this smart
+    printf(">>> ");
     fflush(stdout);
 
     for (;;)
     {
-        read = why2_read_socket(*((int*) socket)); //TODO: Fix other user message formatting
+        read = why2_read_socket(*((int*) socket));
         printf(WHY2_CLEAR_AND_GO_UP);
-        printf("%s\n\n>>> ", read); //TODO: wtf is the output
+        printf("%s\n\n>>> ", read);
         fflush(stdout);
 
         why2_deallocate(read);
     }
 }
-
-//BUG: SERVER SOMETIMES CRASHES - I HAVE NO FUCKING IDEA WHY
