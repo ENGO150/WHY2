@@ -23,7 +23,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <signal.h>
 
 #include <pthread.h>
 
@@ -332,16 +331,20 @@ void remove_json_syntax_characters(char *text)
     }
 }
 
-void alarm_handler()
+void *stop_oldest_thread(void *id)
 {
-    //CANCEL OLDEST THREAD
-    pthread_cancel(waiting_head -> thread);
+    sleep(WHY2_COMMUNICATION_TIME); //yk wait
 
-    //REMOVE FIRST NODE
-    waiting_node_t *buffer = waiting_head; //BUFFER
+    pthread_t thread = *(pthread_t*) id;
 
-    waiting_head = buffer -> next; //UNLINK
-    free(waiting_head);
+    if (waiting_head -> thread == thread) //THREAD IS STILL ALIVE, I HOPE
+    {
+        //KILL THE THREAD
+        pthread_cancel(thread);
+        waiting_remove_node(waiting_get_node(thread));
+    }
+
+    return NULL;
 }
 
 //GLOBAL
@@ -407,6 +410,7 @@ void *why2_communicate_thread(void *arg)
     void *raw_ptr = NULL;
     char *decoded_buffer;
     pthread_t thread_buffer;
+    pthread_t thread_deletion_buffer;
     why2_bool exiting = 0;
 
     while (!exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
@@ -415,11 +419,11 @@ void *why2_communicate_thread(void *arg)
         pthread_create(&thread_buffer, NULL, read_socket_raw_thread, &connection);
         waiting_push_to_list(thread_buffer);
 
-        //SET TIMEOUT (DEFAULT IS 5 MINUTES)
-        signal(SIGALRM, alarm_handler);
-        alarm(WHY2_COMMUNICATION_TIME);
+        //RUN DELETION THREAD
+        pthread_create(&thread_deletion_buffer, NULL, stop_oldest_thread, &thread_buffer);
 
         pthread_join(thread_buffer, &raw_ptr);
+        waiting_remove_node(waiting_get_node(thread_buffer));
 
         if (raw_ptr == WHY2_INVALID_POINTER || raw_ptr == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
 
