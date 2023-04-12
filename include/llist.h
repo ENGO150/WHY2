@@ -25,8 +25,8 @@ typedef struct _why2_node
     struct _why2_node *next;
 } why2_node_t; //SINGLE LINKED LIST
 
-void why2_push(void *value); //PUSH ELEMENT TO LIST BACK
-void why2_remove(why2_node_t *node); //REMOVE ELEMENT
-why2_node_t *why2_find(void *value); //FIND ELEMENT IN LIST
+void why2_push(why2_node_t *llist_head, void *value); //PUSH ELEMENT TO LIST BACK
+void why2_remove(why2_node_t *llist_head, why2_node_t *node); //REMOVE ELEMENT
+why2_node_t *why2_find(why2_node_t *llist_head, void *value); //FIND ELEMENT IN LIST
 
 #endif

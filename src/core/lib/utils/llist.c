@@ -22,9 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 
-why2_node_t *llist_head = NULL;
-
-void why2_push(void *value)
+void why2_push(why2_node_t *llist_head, void *value)
 {
     //CREATE NODE
     why2_node_t *new_node = malloc(sizeof(why2_node_t));
@@ -45,7 +43,7 @@ void why2_push(void *value)
     }
 }
 
-void why2_remove(why2_node_t *node)
+void why2_remove(why2_node_t *llist_head, why2_node_t *node)
 {
     if (node == NULL) return; //NULL NODE
 
@@ -80,7 +78,7 @@ void why2_remove(why2_node_t *node)
     free(node);
 }
 
-why2_node_t *why2_find(void *value)
+why2_node_t *why2_find(why2_node_t *llist_head, void *value)
 {
     if (llist_head == NULL) return NULL; //EMPTY LIST
 
