@@ -151,8 +151,9 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     {
         if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
 
-        why2_clean_memory("core_version_check");
-        return WHY2_DOWNLOAD_FAILED;
+        // BELOW CODE IS COMMENTED OUT, BECAUSE IT IS PROBABLY UNNECESSARY
+        // why2_clean_memory("core_version_check");
+        // return WHY2_DOWNLOAD_FAILED;
     }
 
     buffer[bufferSize] = '\0';
