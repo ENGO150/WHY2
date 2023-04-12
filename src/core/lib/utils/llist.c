@@ -78,6 +78,30 @@ void why2_remove(why2_node_t *llist_head, why2_node_t *node)
     free(node);
 }
 
+void why2_remove_back(why2_node_t *llist_head)
+{
+    if (llist_head == NULL) return; //EMPTY LIST
+
+    why2_node_t *buffer = llist_head;
+    why2_node_t *deallocating_node;
+
+    if (buffer -> next == NULL) //ONLY ONE NODE
+    {
+        deallocating_node = buffer;
+
+        llist_head = NULL;
+    } else
+    {
+        while (buffer -> next -> next != NULL) buffer = buffer -> next; //GO TO THE NODE BEFORE END
+
+        deallocating_node = buffer -> next;
+
+        buffer -> next = NULL; //UNLINK
+    }
+
+    free(deallocating_node);
+}
+
 why2_node_t *why2_find(why2_node_t *llist_head, void *value)
 {
     if (llist_head == NULL) return NULL; //EMPTY LIST

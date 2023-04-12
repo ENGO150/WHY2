@@ -27,6 +27,7 @@ typedef struct _why2_node
 
 void why2_push(why2_node_t *llist_head, void *value); //PUSH ELEMENT TO LIST BACK
 void why2_remove(why2_node_t *llist_head, why2_node_t *node); //REMOVE ELEMENT
+void why2_remove_back(why2_node_t *llist_head); //REMOVE LAST ELEMENT
 why2_node_t *why2_find(why2_node_t *llist_head, void *value); //FIND ELEMENT IN LIST
 
 #endif
