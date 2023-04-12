@@ -90,7 +90,7 @@ char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.g
     return result;
 }
 
-enum WHY2_EXIT_CODES why2_check_version(void)
+enum WHY2_EXIT_CODES why2_check_version(void) //! CRASHES WHEN CALLED FROM CHAT STUFF
 {
     if (why2_get_flags().no_check) return WHY2_SUCCESS;
 
