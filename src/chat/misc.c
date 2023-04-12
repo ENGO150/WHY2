@@ -126,6 +126,41 @@ void remove_node(node_t *node)
     free(node);
 }
 
+void waiting_remove_node(waiting_node_t *node)
+{
+    if (node == NULL) return; //NULL NODE
+
+    waiting_node_t *buffer_1 = waiting_head;
+    waiting_node_t *buffer_2;
+
+    while (buffer_1 -> next != NULL) //GO TROUGH EVERY ELEMENT IN LIST
+    {
+        if (buffer_1 == node) break; //FOUND (IF THE WHILE GOES TROUGH THE WHOLE LIST WITHOUT THE break, I ASSUME THE LAST NODE IS THE CORRECT ONE)
+
+        buffer_1 = buffer_1 -> next;
+    }
+
+    if (node != buffer_1) return; //node WASN'T FOUND
+
+    if (buffer_1 == waiting_head) //node WAS THE FIRST NODE IN THE LIST
+    {
+        //UNLINK
+        waiting_head = buffer_1 -> next;
+    } else //wdyt
+    {
+        //GET THE NODE BEFORE node
+        buffer_2 = waiting_head;
+
+        while (buffer_2 -> next != buffer_1) buffer_2 = buffer_2 -> next;
+
+        //UNLINK
+        buffer_2 -> next = buffer_1 -> next;
+    }
+
+    //DEALLOCATION
+    free(node);
+}
+
 node_t *get_node(int connection)
 {
     if (head == NULL) return NULL; //EMPTY LIST
@@ -139,6 +174,23 @@ node_t *get_node(int connection)
     }
 
     if (connection != buffer -> connection) buffer = NULL; //PREVENT FROM RETURNING INVALID NODE
+
+    return buffer;
+}
+
+waiting_node_t *waiting_get_node(pthread_t thread)
+{
+    if (waiting_head == NULL) return NULL; //EMPTY LIST
+
+    waiting_node_t *buffer = waiting_head;
+    while (buffer -> next != NULL)
+    {
+        if (buffer -> thread == thread) return buffer;
+
+        buffer = buffer -> next;
+    }
+
+    if (thread != buffer -> thread) buffer = NULL; //PREVENT FROM RETURNING INVALID NODE
 
     return buffer;
 }
