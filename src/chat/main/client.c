@@ -41,7 +41,6 @@ int main(void)
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(WHY2_SERVER_PORT);
-    server_addr.sin_addr.s_addr = INADDR_ANY;
 
     //GET IP
     printf("Welcome.\n\nEnter IP Address:\n>>> ");
