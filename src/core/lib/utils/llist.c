@@ -22,19 +22,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 
-void why2_list_push(why2_node_t *llist_head, void *value)
+void why2_list_push(why2_list_t *list, void *value)
 {
     //CREATE NODE
+    why2_node_t *head = list -> head;
     why2_node_t *new_node = malloc(sizeof(why2_node_t));
-    why2_node_t *buffer = llist_head;
+    why2_node_t *buffer = head;
 
     //INSERT DATA
     new_node -> value = value;
     new_node -> next = NULL;
 
-    if (llist_head == NULL) //INIT LIST
+    if (head == NULL) //INIT LIST
     {
-        llist_head = new_node;
+        head = new_node;
     } else
     {
         while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
