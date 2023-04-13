@@ -80,18 +80,19 @@ void why2_list_remove(why2_list_t *list, why2_node_t *node)
     free(node);
 }
 
-void why2_list_remove_back(why2_node_t *llist_head)
+void why2_list_remove_back(why2_list_t *list)
 {
-    if (llist_head == NULL) return; //EMPTY LIST
+    why2_node_t *head = list -> head;
+    if (head == NULL) return; //EMPTY LIST
 
-    why2_node_t *buffer = llist_head;
+    why2_node_t *buffer = head;
     why2_node_t *deallocating_node;
 
     if (buffer -> next == NULL) //ONLY ONE NODE
     {
         deallocating_node = buffer;
 
-        llist_head = NULL;
+        head = NULL;
     } else
     {
         while (buffer -> next -> next != NULL) buffer = buffer -> next; //GO TO THE NODE BEFORE END
