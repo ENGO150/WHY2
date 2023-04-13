@@ -29,6 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/decrypter.h>
 #include <why2/encrypter.h>
 #include <why2/flags.h>
+#include <why2/llist.h>
 #include <why2/memory.h>
 #include <why2/misc.h>
 
