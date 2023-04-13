@@ -24,17 +24,17 @@ typedef struct _why2_node
 {
     void *value;
     struct _why2_node *next;
-} why2_node_t; //SINGLE LINKED LIST
+} why2_node_t; //NODES
 
 typedef struct
 {
     why2_node_t *head;
-} why2_list_t;
+} why2_list_t; //SINGLE LINKED LIST MADE OF why2_node_t
 
 //FUNCTIONS
-void why2_list_push(why2_node_t *llist_head, void *value); //PUSH ELEMENT TO LIST BACK
-void why2_list_remove(why2_node_t *llist_head, why2_node_t *node); //REMOVE ELEMENT
-void why2_list_remove_back(why2_node_t *llist_head); //REMOVE LAST ELEMENT
-why2_node_t *why2_list_find(why2_node_t *llist_head, void *value); //FIND ELEMENT IN LIST
+void why2_list_push(why2_list_t *list, void *value); //PUSH ELEMENT TO LIST BACK
+void why2_list_remove(why2_list_t *list, why2_node_t *node); //REMOVE ELEMENT
+void why2_list_remove_back(why2_list_t *list); //REMOVE LAST ELEMENT
+why2_node_t *why2_list_find(why2_list_t *list, void *value); //FIND ELEMENT IN LIST
 
 #endif
