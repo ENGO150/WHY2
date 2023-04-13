@@ -20,7 +20,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <stdlib.h>
 
-#include <why2/llist.h>
 #include <why2/memory.h>
 
 //CONSTS (this is just local)
@@ -38,16 +37,65 @@ why2_bool flagsChanged = 0; //CHANGES TO 1 WHEN U USE why2_set_flags
 char *memory_identifier = DEFAULT_MEMORY_IDENTIFIER;
 
 //LINKED LIST SHIT
-why2_node_t *list_head = NULL;
+typedef struct node
+{
+    char *identifier;
+    struct node *next;
+} node_t;
+
+node_t *list_head = NULL;
+
+void push_to_list_end(char *identifier)
+{
+    node_t *new_node = malloc(sizeof(node_t));
+    node_t *buffer = list_head;
+
+    new_node -> identifier = identifier;
+    new_node -> next = NULL;
+
+    if (list_head == NULL) //LIST IS EMTPY
+    {
+        list_head = new_node;
+    } else
+    {
+        while (buffer -> next != NULL) buffer = buffer -> next; //GO TO THE END OF LIST
+
+        buffer -> next = new_node; //LINK
+    }
+}
+
+void remove_node_from_end(void)
+{
+    if (list_head == NULL) return; //EMPTY LIST
+
+    node_t *buffer = list_head;
+    node_t *deallocating_node;
+
+    if (buffer -> next == NULL) //ONLY ONE NODE
+    {
+        deallocating_node = buffer;
+
+        list_head = NULL;
+    } else
+    {
+        while (buffer -> next -> next != NULL) buffer = buffer -> next; //GO TO THE NODE BEFORE END
+
+        deallocating_node = buffer -> next;
+
+        buffer -> next = NULL; //UNLINK
+    }
+
+    free(deallocating_node);
+}
 
 char *get_last_node_identifier(void)
 {
     if (list_head == NULL) return DEFAULT_MEMORY_IDENTIFIER;
 
-    why2_node_t *buffer = list_head;
+    node_t *buffer = list_head;
     while (buffer -> next != NULL) buffer = buffer -> next;
 
-    return buffer -> value;
+    return buffer -> identifier;
 }
 
 //GETTERS
@@ -140,14 +188,14 @@ void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOpe
 
 void why2_set_memory_identifier(char *new_memory_identifier)
 {
-    why2_push(list_head, new_memory_identifier);
+    push_to_list_end(new_memory_identifier);
 
     memory_identifier = new_memory_identifier;
 }
 
 void why2_reset_memory_identifier(void)
 {
-    why2_remove_back(list_head);
+    remove_node_from_end();
 
     memory_identifier = get_last_node_identifier();
 }
