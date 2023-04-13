@@ -105,11 +105,12 @@ void why2_list_remove_back(why2_list_t *list)
     free(deallocating_node);
 }
 
-why2_node_t *why2_list_find(why2_node_t *llist_head, void *value)
+why2_node_t *why2_list_find(why2_list_t *list, void *value)
 {
-    if (llist_head == NULL) return NULL; //EMPTY LIST
+    why2_node_t *head = list -> head;
+    if (head == NULL) return NULL; //EMPTY LIST
 
-    why2_node_t *buffer = llist_head;
+    why2_node_t *buffer = head;
 
     while (buffer -> next != NULL)
     {
