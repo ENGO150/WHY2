@@ -44,11 +44,12 @@ void why2_list_push(why2_list_t *list, void *value)
     }
 }
 
-void why2_list_remove(why2_node_t *llist_head, why2_node_t *node)
+void why2_list_remove(why2_list_t *list, why2_node_t *node)
 {
     if (node == NULL) return; //NULL NODE
 
-    why2_node_t *buffer_1 = llist_head;
+    why2_node_t *head = list -> head;
+    why2_node_t *buffer_1 = head;
     why2_node_t *buffer_2;
 
     while (buffer_1 -> next != NULL) //GO TROUGH EVERY ELEMENT IN LIST
@@ -60,14 +61,14 @@ void why2_list_remove(why2_node_t *llist_head, why2_node_t *node)
 
     if (node != buffer_1) return; //node WASN'T FOUND
 
-    if (buffer_1 == llist_head) //node WAS THE FIRST NODE IN THE LIST
+    if (buffer_1 == head) //node WAS THE FIRST NODE IN THE LIST
     {
         //UNLINK
-        llist_head = buffer_1 -> next;
+        head = buffer_1 -> next;
     } else //wdyt
     {
         //GET THE NODE BEFORE node
-        buffer_2 = llist_head;
+        buffer_2 = head;
 
         while (buffer_2 -> next != buffer_1) buffer_2 = buffer_2 -> next;
 
