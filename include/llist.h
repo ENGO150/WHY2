@@ -19,14 +19,19 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_LLIST_H
 #define WHY2_LLIST_H
 
+//TYPEDEFS
 typedef struct _why2_node
 {
     void *value;
     struct _why2_node *next;
 } why2_node_t; //SINGLE LINKED LIST
 
-typedef why2_node_t why2_list_t; //just to make the code make sense
+typedef struct
+{
+    why2_node_t *head;
+} why2_list_t;
 
+//FUNCTIONS
 void why2_list_push(why2_node_t *llist_head, void *value); //PUSH ELEMENT TO LIST BACK
 void why2_list_remove(why2_node_t *llist_head, why2_node_t *node); //REMOVE ELEMENT
 void why2_list_remove_back(why2_node_t *llist_head); //REMOVE LAST ELEMENT
