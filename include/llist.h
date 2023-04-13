@@ -19,6 +19,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_LLIST_H
 #define WHY2_LLIST_H
 
+//MACROS
+#define WHY2_LIST_EMPTY { NULL }
+
 //TYPEDEFS
 typedef struct _why2_node
 {
