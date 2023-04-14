@@ -22,26 +22,29 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 
-void why2_list_push(why2_list_t *list, void *value)
+void why2_list_push(why2_list_t *list, void *value, unsigned long size)
 {
     //CREATE NODE
     why2_node_t *head = list -> head;
     why2_node_t *new_node = malloc(sizeof(why2_node_t));
+    new_node -> value = malloc(size); //TODO: Deallocation
     why2_node_t *buffer = head;
 
     //INSERT DATA
-    new_node -> value = value;
+    memcpy(new_node -> value, value, size);
     new_node -> next = NULL;
 
     if (head == NULL) //INIT LIST
     {
-        head = new_node;
+        buffer = new_node;
     } else
     {
         while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
 
         buffer -> next = new_node; //LINK
     }
+
+    list -> head = buffer; //TODO: Unused?
 }
 
 void why2_list_remove(why2_list_t *list, why2_node_t *node)
@@ -77,6 +80,7 @@ void why2_list_remove(why2_list_t *list, why2_node_t *node)
     }
 
     //DEALLOCATION
+    free(node -> value);
     free(node);
 }
 
