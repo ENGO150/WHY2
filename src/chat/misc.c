@@ -29,6 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <json-c/json.h>
 
 #include <why2/chat/flags.h>
+#include <why2/llist.h>
 #include <why2/memory.h>
 #include <why2/misc.h>
 
@@ -47,7 +48,7 @@ typedef struct waiting_node
 } waiting_node_t; //SINGLE LINKED LIST
 
 node_t *head = NULL;
-waiting_node_t *waiting_head = NULL;
+why2_list_t waiting_list = WHY2_LIST_EMPTY;
 
 void push_to_list(int connection, pthread_t thread)
 {
@@ -62,26 +63,6 @@ void push_to_list(int connection, pthread_t thread)
     if (head == NULL) //INIT LIST
     {
         head = new_node;
-    } else
-    {
-        while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
-
-        buffer -> next = new_node; //LINK
-    }
-}
-
-void waiting_push_to_list(pthread_t thread)
-{
-    //CREATE NODE
-    waiting_node_t *new_node = malloc(sizeof(waiting_node_t));
-    waiting_node_t *buffer = waiting_head;
-
-    new_node -> thread = thread;
-    new_node -> next = NULL;
-
-    if (waiting_head == NULL) //INIT LIST
-    {
-        waiting_head = new_node;
     } else
     {
         while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
@@ -125,41 +106,6 @@ void remove_node(node_t *node)
     free(node);
 }
 
-void waiting_remove_node(waiting_node_t *node)
-{
-    if (node == NULL) return; //NULL NODE
-
-    waiting_node_t *buffer_1 = waiting_head;
-    waiting_node_t *buffer_2;
-
-    while (buffer_1 -> next != NULL) //GO TROUGH EVERY ELEMENT IN LIST
-    {
-        if (buffer_1 == node) break; //FOUND (IF THE WHILE GOES TROUGH THE WHOLE LIST WITHOUT THE break, I ASSUME THE LAST NODE IS THE CORRECT ONE)
-
-        buffer_1 = buffer_1 -> next;
-    }
-
-    if (node != buffer_1) return; //node WASN'T FOUND
-
-    if (buffer_1 == waiting_head) //node WAS THE FIRST NODE IN THE LIST
-    {
-        //UNLINK
-        waiting_head = buffer_1 -> next;
-    } else //wdyt
-    {
-        //GET THE NODE BEFORE node
-        buffer_2 = waiting_head;
-
-        while (buffer_2 -> next != buffer_1) buffer_2 = buffer_2 -> next;
-
-        //UNLINK
-        buffer_2 -> next = buffer_1 -> next;
-    }
-
-    //DEALLOCATION
-    free(node);
-}
-
 node_t *get_node(int connection)
 {
     if (head == NULL) return NULL; //EMPTY LIST
@@ -173,23 +119,6 @@ node_t *get_node(int connection)
     }
 
     if (connection != buffer -> connection) buffer = NULL; //PREVENT FROM RETURNING INVALID NODE
-
-    return buffer;
-}
-
-waiting_node_t *waiting_get_node(pthread_t thread)
-{
-    if (waiting_head == NULL) return NULL; //EMPTY LIST
-
-    waiting_node_t *buffer = waiting_head;
-    while (buffer -> next != NULL)
-    {
-        if (buffer -> thread == thread) return buffer;
-
-        buffer = buffer -> next;
-    }
-
-    if (thread != buffer -> thread) buffer = NULL; //PREVENT FROM RETURNING INVALID NODE
 
     return buffer;
 }
@@ -334,14 +263,13 @@ void remove_json_syntax_characters(char *text)
 void *stop_oldest_thread(void *id)
 {
     sleep(WHY2_COMMUNICATION_TIME); //yk wait
+    if (waiting_list.head == NULL) return NULL;
 
-    pthread_t thread = *(pthread_t*) id;
-
-    if (waiting_head -> thread == thread) //THREAD IS STILL ALIVE, I HOPE
+    if (*(pthread_t*) waiting_list.head -> value == *(pthread_t*) id) //THREAD IS STILL ALIVE, I HOPE
     {
         //KILL THE THREAD
-        pthread_cancel(thread);
-        waiting_remove_node(waiting_get_node(thread));
+        pthread_cancel(*(pthread_t*) id);
+        why2_list_remove(&waiting_list, why2_list_find(&waiting_list, id));
     }
 
     return NULL;
