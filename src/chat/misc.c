@@ -424,6 +424,7 @@ void *why2_communicate_thread(void *arg)
 
     push_to_list(connection, pthread_self()); //ADD TO LIST
 
+    void *buffer;
     char *received = NULL;
     char *raw = NULL;
     void *raw_ptr = NULL;
@@ -434,15 +435,17 @@ void *why2_communicate_thread(void *arg)
 
     while (!exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
+        buffer = &thread_buffer;
+
         //READ
         pthread_create(&thread_buffer, NULL, read_socket_raw_thread, &connection);
-        waiting_push_to_list(thread_buffer);
+        why2_list_push(&waiting_list, &buffer, sizeof(thread_buffer));
 
         //RUN DELETION THREAD
         pthread_create(&thread_deletion_buffer, NULL, stop_oldest_thread, &thread_buffer);
 
         pthread_join(thread_buffer, &raw_ptr);
-        waiting_remove_node(waiting_get_node(thread_buffer));
+        why2_list_remove(&waiting_list, find_request(&thread_buffer)); //TODO: SEGFAULT (asi)
 
         if (raw_ptr == WHY2_INVALID_POINTER || raw_ptr == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
 
