@@ -27,7 +27,7 @@ void why2_list_push(why2_list_t *list, void *value, unsigned long size)
     //CREATE NODE
     why2_node_t *head = list -> head;
     why2_node_t *new_node = malloc(sizeof(why2_node_t));
-    new_node -> value = malloc(size); //TODO: Deallocation
+    new_node -> value = malloc(size);
     why2_node_t *buffer = head;
 
     //INSERT DATA
