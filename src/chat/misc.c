@@ -347,6 +347,25 @@ void *stop_oldest_thread(void *id)
     return NULL;
 }
 
+why2_node_t *find_request(void *thread) //COPIED FROM why2_list_find; using double pointers
+{
+    why2_node_t *head = waiting_list.head;
+    if (head == NULL) return NULL; //EMPTY LIST
+
+    why2_node_t *buffer = head;
+
+    while (buffer -> next != NULL)
+    {
+        if (*(void**) buffer -> value == thread) return buffer;
+
+        buffer = buffer -> next;
+    }
+
+    if (thread != *(void**) buffer -> value) buffer = NULL; //PREVENT FROM RETURNING INVALID NODE
+
+    return buffer;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
