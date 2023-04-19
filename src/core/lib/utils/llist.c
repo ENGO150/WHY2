@@ -79,6 +79,8 @@ void why2_list_remove(why2_list_t *list, why2_node_t *node)
         buffer_2 -> next = buffer_1 -> next;
     }
 
+    list -> head = head;
+
     //DEALLOCATION
     free(node -> value);
     free(node);
