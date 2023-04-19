@@ -264,7 +264,6 @@ void *stop_oldest_thread(void *id)
 {
     sleep(WHY2_COMMUNICATION_TIME); //yk wait
     if (waiting_list.head == NULL) return NULL;
-        printf("A\n");
     if (**(pthread_t**) waiting_list.head -> value == *(pthread_t*) id) //THREAD IS STILL ALIVE, I HOPE
     {
         //KILL THE THREAD
@@ -323,7 +322,6 @@ void why2_send_socket(char *text, char *username, int socket)
     why2_deallocate(text_copy);
     json_object_put(json);
 
-    //printf("NEGR\n");
     unsigned short text_length = (unsigned short) strlen(output) + 2;
     char *final = why2_calloc(text_length, sizeof(char));
 
