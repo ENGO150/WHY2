@@ -33,95 +33,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-//LINKED LIST STUFF (BIT CHANGED memory.c'S VERSION) //TODO: Move llist in some single separate file
-typedef struct node
+//LINKED LIST STUFF
+typedef struct _connection_node
 {
     int connection;
     pthread_t thread;
-    struct node *next;
-} node_t; //SINGLE LINKED LIST
+} connection_node_t; //SINGLE LINKED LIST
 
-typedef struct waiting_node
-{
-    pthread_t thread;
-    struct waiting_node *next;
-} waiting_node_t; //SINGLE LINKED LIST
-
-node_t *head = NULL;
+why2_list_t connection_list = WHY2_LIST_EMPTY;
 why2_list_t waiting_list = WHY2_LIST_EMPTY;
-
-void push_to_list(int connection, pthread_t thread)
-{
-    //CREATE NODE
-    node_t *new_node = malloc(sizeof(node_t));
-    node_t *buffer = head;
-
-    new_node -> connection = connection;
-    new_node -> thread = thread;
-    new_node -> next = NULL;
-
-    if (head == NULL) //INIT LIST
-    {
-        head = new_node;
-    } else
-    {
-        while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
-
-        buffer -> next = new_node; //LINK
-    }
-}
-
-void remove_node(node_t *node)
-{
-    if (node == NULL) return; //NULL NODE
-
-    node_t *buffer_1 = head;
-    node_t *buffer_2;
-
-    while (buffer_1 -> next != NULL) //GO TROUGH EVERY ELEMENT IN LIST
-    {
-        if (buffer_1 == node) break; //FOUND (IF THE WHILE GOES TROUGH THE WHOLE LIST WITHOUT THE break, I ASSUME THE LAST NODE IS THE CORRECT ONE)
-
-        buffer_1 = buffer_1 -> next;
-    }
-
-    if (node != buffer_1) return; //node WASN'T FOUND
-
-    if (buffer_1 == head) //node WAS THE FIRST NODE IN THE LIST
-    {
-        //UNLINK
-        head = buffer_1 -> next;
-    } else //wdyt
-    {
-        //GET THE NODE BEFORE node
-        buffer_2 = head;
-
-        while (buffer_2 -> next != buffer_1) buffer_2 = buffer_2 -> next;
-
-        //UNLINK
-        buffer_2 -> next = buffer_1 -> next;
-    }
-
-    //DEALLOCATION
-    free(node);
-}
-
-node_t *get_node(int connection)
-{
-    if (head == NULL) return NULL; //EMPTY LIST
-
-    node_t *buffer = head;
-    while (buffer -> next != NULL)
-    {
-        if (buffer -> connection == connection) return buffer;
-
-        buffer = buffer -> next;
-    }
-
-    if (connection != buffer -> connection) buffer = NULL; //PREVENT FROM RETURNING INVALID NODE
-
-    return buffer;
-}
 
 char *get_string_from_json(struct json_object *json, char *string)
 {
@@ -145,21 +65,25 @@ char *get_string_from_json_string(char *json, char *string)
 
 void *send_to_all(void *json)
 {
+    why2_node_t *head = connection_list.head;
     if (head == NULL) return NULL;
 
-    node_t *node_buffer = head;
+    why2_node_t *node_buffer = head;
+    connection_node_t connection_buffer;
 
     //PARSE
     struct json_object *json_obj = json_tokener_parse((char*) json);
 
     if (json_obj == NULL) return NULL; //EXIT IF INVALID SYNTAX WAS SENT
 
-    do //SEND TO ALL CONNECTIONS
+    while (node_buffer -> next != NULL) //SEND TO ALL CONNECTIONS
     {
-        why2_send_socket(get_string_from_json(json_obj, "message"), get_string_from_json(json_obj, "username"), node_buffer -> connection); //SEND TO CLIENT
+        connection_buffer = *(connection_node_t*) node_buffer -> value;
+
+        why2_send_socket(get_string_from_json(json_obj, "message"), get_string_from_json(json_obj, "username"), connection_buffer.connection); //SEND TO CLIENT
 
         node_buffer = node_buffer -> next;
-    } while (node_buffer -> next != NULL);
+    }
 
     //DEALLOCATION
     json_object_put(json_obj);
@@ -293,6 +217,25 @@ why2_node_t *find_request(void *thread) //COPIED FROM why2_list_find; using doub
     return buffer;
 }
 
+why2_node_t *find_connection(int connection)
+{
+    why2_node_t *head = connection_list.head;
+    if (head == NULL) return NULL; //EMPTY LIST
+
+    why2_node_t *buffer = head;
+
+    while (buffer -> next != NULL)
+    {
+        if ((*(connection_node_t*) buffer -> value).connection == connection) return buffer;
+
+        buffer = buffer -> next;
+    }
+
+    if (connection != (*(connection_node_t*) buffer -> value).connection) buffer = NULL; //PREVENT FROM RETURNING INVALID NODE
+
+    return buffer;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
@@ -348,7 +291,13 @@ void *why2_communicate_thread(void *arg)
 
     printf("User connected.\t%d\n", connection);
 
-    push_to_list(connection, pthread_self()); //ADD TO LIST
+    connection_node_t node = (connection_node_t)
+    {
+        connection,
+        pthread_self()
+    };
+
+    why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
 
     void *buffer;
     char *received = NULL;
@@ -419,7 +368,7 @@ void *why2_communicate_thread(void *arg)
     //DEALLOCATION
     why2_deallocate(received);
     close(connection);
-    remove_node(get_node(connection));
+    why2_list_remove(&connection_list, find_connection(connection));
 
     return NULL; //TODO: Fix client segfault on timeout
 }
@@ -465,20 +414,25 @@ void *why2_accept_thread(void *socket)
 
 void why2_clean_threads(void)
 {
+    why2_node_t *head = waiting_list.head;
     if (head == NULL) return; //EMPTY LIST
 
-    node_t *node_buffer = head;
-    node_t *node_buffer_2;
+    why2_node_t *node_buffer = head;
+    why2_node_t *node_buffer_2;
+
+    connection_node_t connection_buffer;
 
     while (node_buffer -> next != NULL) //GO TROUGH LIST
     {
         node_buffer_2 = node_buffer;
         node_buffer = node_buffer -> next;
 
-        close(node_buffer_2 -> connection);
-        pthread_cancel(node_buffer_2 -> thread);
+        connection_buffer = *(connection_node_t*) node_buffer_2 -> value;
 
-        remove_node(node_buffer_2); //REMOVE
+        close(connection_buffer.connection);
+        pthread_cancel(connection_buffer.thread);
+
+        why2_list_remove(&waiting_list, node_buffer_2); //REMOVE
     }
 }
 
@@ -499,3 +453,5 @@ void *why2_listen_server(void *socket)
         why2_deallocate(read);
     }
 }
+
+//TODO: Client formatting fix
