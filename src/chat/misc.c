@@ -264,8 +264,8 @@ void *stop_oldest_thread(void *id)
 {
     sleep(WHY2_COMMUNICATION_TIME); //yk wait
     if (waiting_list.head == NULL) return NULL;
-
-    if (*(pthread_t*) waiting_list.head -> value == *(pthread_t*) id) //THREAD IS STILL ALIVE, I HOPE
+        printf("A\n");
+    if (**(pthread_t**) waiting_list.head -> value == *(pthread_t*) id) //THREAD IS STILL ALIVE, I HOPE
     {
         //KILL THE THREAD
         pthread_cancel(*(pthread_t*) id);
