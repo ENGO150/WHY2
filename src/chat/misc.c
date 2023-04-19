@@ -367,13 +367,13 @@ void *why2_communicate_thread(void *arg)
 
         //READ
         pthread_create(&thread_buffer, NULL, read_socket_raw_thread, &connection);
-        why2_list_push(&waiting_list, &buffer, sizeof(thread_buffer));
+        why2_list_push(&waiting_list, &buffer, sizeof(thread_buffer)); //TODO: same address is always passed => stop_oldest_thread works every time; fix your shit
 
         //RUN DELETION THREAD
         pthread_create(&thread_deletion_buffer, NULL, stop_oldest_thread, &thread_buffer);
 
         pthread_join(thread_buffer, &raw_ptr);
-        why2_list_remove(&waiting_list, find_request(&thread_buffer)); //TODO: SEGFAULT (asi)
+        why2_list_remove(&waiting_list, find_request(&thread_buffer));
 
         if (raw_ptr == WHY2_INVALID_POINTER || raw_ptr == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
 
