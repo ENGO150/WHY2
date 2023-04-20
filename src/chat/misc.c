@@ -241,7 +241,7 @@ void why2_send_socket(char *text, char *username, int socket)
 {
     char *output = why2_strdup("");
     size_t length_buffer = strlen(text);
-    char *text_copy = why2_calloc(length_buffer, sizeof(char));
+    char *text_copy = why2_calloc(length_buffer + 2, sizeof(char));
     struct json_object *json = json_tokener_parse("{}");
 
     //COPY text INTO text_copy (WITHOUT LAST CHARACTER WHEN NEWLINE IS AT THE END)
