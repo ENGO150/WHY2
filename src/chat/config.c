@@ -15,3 +15,18 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
+#include <why2/chat/config.h>
+
+#include <stdio.h>
+#include <unistd.h>
+
+#include <why2/chat/flags.h>
+
+void why2_chat_init_config(void)
+{
+    if (access(WHY2_CHAT_CONFIG, R_OK) != 0) //CONFIG DOESN'T EXIST
+    {
+        //DO STUFF
+    }
+}
