@@ -29,4 +29,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #define WHY2_INVALID_POINTER (void*) 0xffffffffffffffff
 
+#define WHY2_CONNECT_MESSAGE "{\"username:\"server\", \"message\":\"{X} connected.\"\"}" //guess what
+
 #endif
