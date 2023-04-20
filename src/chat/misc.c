@@ -65,10 +65,8 @@ char *get_string_from_json_string(char *json, char *string)
 
 void *send_to_all(void *json)
 {
-    why2_node_t *head = connection_list.head;
-    if (head == NULL) return NULL;
-
-    why2_node_t *node_buffer = head;
+    why2_node_t _first_node = (why2_node_t) { NULL, connection_list.head };
+    why2_node_t *node_buffer = &_first_node;
     connection_node_t connection_buffer;
 
     //PARSE
@@ -78,11 +76,11 @@ void *send_to_all(void *json)
 
     while (node_buffer -> next != NULL) //SEND TO ALL CONNECTIONS
     {
+        node_buffer = node_buffer -> next;
+
         connection_buffer = *(connection_node_t*) node_buffer -> value;
 
         why2_send_socket(get_string_from_json(json_obj, "message"), get_string_from_json(json_obj, "username"), connection_buffer.connection); //SEND TO CLIENT
-
-        node_buffer = node_buffer -> next;
     }
 
     //DEALLOCATION
@@ -289,8 +287,6 @@ void *why2_communicate_thread(void *arg)
 {
     int connection = *(int*) arg;
 
-    printf("User connected.\t%d\n", connection);
-
     connection_node_t node = (connection_node_t)
     {
         connection,
@@ -301,12 +297,29 @@ void *why2_communicate_thread(void *arg)
 
     void *buffer;
     char *received = NULL;
-    char *raw = NULL;
+    char *raw = why2_strdup("");
     void *raw_ptr = NULL;
     char *decoded_buffer;
     pthread_t thread_buffer;
     pthread_t thread_deletion_buffer;
     why2_bool exiting = 0;
+    struct json_object *json = json_tokener_parse("{}");
+
+    //SEND CONNECTION MESSAGE
+    json_object_object_add(json, "message", json_object_new_string("anon connected"));
+    json_object_object_add(json, "username", json_object_new_string("server")); //TODO: Usernames
+
+    json_object_object_foreach(json, key, value) //GENERATE JSON STRING
+    {
+        append(&raw, key, (char*) json_object_get_string(value));
+    }
+    add_brackets(&raw);
+
+    pthread_create(&thread_buffer, NULL, send_to_all, raw); //SEND
+    pthread_join(thread_buffer, NULL);
+
+    why2_deallocate(raw);
+    raw = NULL;
 
     while (!exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
