@@ -423,6 +423,8 @@ void *why2_accept_thread(void *socket)
 
         pthread_create(&thread, NULL, why2_communicate_thread, &accepted);
     }
+
+    return NULL;
 }
 
 void why2_clean_threads(void)
