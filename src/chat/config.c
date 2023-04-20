@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/config.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <curl/curl.h>
@@ -26,21 +27,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/flags.h>
 #include <why2/flags.h>
 #include <why2/memory.h>
+#include <why2/misc.h>
 
 void why2_chat_init_config(void)
 {
     if (access(WHY2_CHAT_CONFIG, R_OK) != 0) //CONFIG DOESN'T EXIST
     {
+        char *path = why2_replace(WHY2_CHAT_CONFIG, "{USER}", getenv("USER"));
         CURL *curl = curl_easy_init();
-        FILE *fileBuffer = why2_fopen(WHY2_CHAT_CONFIG, "w+");
+        FILE *file_buffer = why2_fopen(path, "w+");
 
         curl_easy_setopt(curl, CURLOPT_URL, WHY2_CHAT_CONFIG_URL);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fileBuffer);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, file_buffer);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, WHY2_CURL_TIMEOUT);
         curl_easy_perform(curl);
 
         //CLEANUP
         curl_easy_cleanup(curl);
-        why2_deallocate(fileBuffer);
+        why2_deallocate(path);
+        why2_deallocate(file_buffer);
     }
 }
