@@ -19,6 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_CHAT_CONFIG_H
 #define WHY2_CHAT_CONFIG_H
 
-//stuff
+void why2_chat_init_config(void); //CHECK IF CONFIG EXISTS, CREATE IT
 
 #endif
