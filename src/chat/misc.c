@@ -71,6 +71,8 @@ void *send_to_all(void *json)
 
     //PARSE
     struct json_object *json_obj = json_tokener_parse((char*) json);
+    char *message = get_string_from_json(json_obj, "message");
+    char *username = get_string_from_json(json_obj, "username");
 
     if (json_obj == NULL) return NULL; //EXIT IF INVALID SYNTAX WAS SENT
 
@@ -80,7 +82,7 @@ void *send_to_all(void *json)
 
         connection_buffer = *(connection_node_t*) node_buffer -> value;
 
-        why2_send_socket(get_string_from_json(json_obj, "message"), get_string_from_json(json_obj, "username"), connection_buffer.connection); //SEND TO CLIENT
+        why2_send_socket(message, username, connection_buffer.connection); //SEND TO CLIENT
     }
 
     //DEALLOCATION
