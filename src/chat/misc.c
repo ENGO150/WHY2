@@ -294,6 +294,7 @@ void *why2_communicate_thread(void *arg)
     };
 
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
+    printf("User connected.\t\t%d\n", connection);
 
     void *buffer;
     char *received = NULL;
@@ -360,8 +361,6 @@ void *why2_communicate_thread(void *arg)
             goto deallocation; //IGNORE MESSAGES BEGINNING WITH '!'
         }
 
-        printf("Received:\n%s\n\n", received);
-
         pthread_create(&thread_buffer, NULL, send_to_all, raw);
         pthread_join(thread_buffer, NULL);
 
@@ -376,7 +375,7 @@ void *why2_communicate_thread(void *arg)
         raw_ptr = NULL;
     }
 
-    printf("User exited.\t%d\n", connection);
+    printf("User disconnected.\t%d\n", connection);
 
     //DEALLOCATION
     why2_deallocate(received);
