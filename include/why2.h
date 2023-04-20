@@ -38,4 +38,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/logger/logger.h>
 #include <why2/logger/utils.h>
 
+//CHAT
+#include <why2/chat/config.h>
+#include <why2/chat/flags.h>
+#include <why2/chat/misc.h>
+
 #endif
