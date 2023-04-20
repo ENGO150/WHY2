@@ -54,42 +54,6 @@ int removeDirectory(char *path)
     return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
 }
 
-char *replaceWord(char *string, char *old, char *new) //CODE FROM: https://www.geeksforgeeks.org/c-program-replace-word-text-another-given-word
-{
-    char *result;
-    int i, cnt = 0;
-    int newLen = strlen(new);
-    int oldLen = strlen(old);
-
-    for (i = 0; string[i] != '\0'; i++)
-    {
-        if (strstr(&string[i], old) == &string[i])
-        {
-            cnt++;
-
-            i += oldLen - 1;
-        }
-    }
-
-    result = (char*) why2_malloc(i + cnt * (newLen - oldLen) + 1);
-
-    i = 0;
-    while (*string)
-    {
-        // compare the substring with the result
-        if (strstr(string, old) == string)
-        {
-            strcpy(&result[i], new);
-            i += newLen;
-            string += oldLen;
-        }
-        else result[i++] = *string++;
-    }
-
-    result[i] = '\0';
-    return result;
-}
-
 enum WHY2_EXIT_CODES why2_check_version(void) //! CRASHES WHEN CALLED FROM CHAT STUFF
 {
     if (why2_get_flags().no_check) return WHY2_SUCCESS;
@@ -222,7 +186,7 @@ enum WHY2_EXIT_CODES why2_check_version(void) //! CRASHES WHEN CALLED FROM CHAT 
             }
 
             //COUNT installCommand LENGTH & ALLOCATE IT
-            installCommand = replaceWord(WHY2_UPDATE_COMMAND, "{DIR}", WHY2_UPDATE_NAME);
+            installCommand = why2_replace(WHY2_UPDATE_COMMAND, "{DIR}", WHY2_UPDATE_NAME);
 
             installCode = system(installCommand); //INSTALL
 
@@ -477,4 +441,40 @@ void why2_die(char *exit_msg)
     why2_clean_memory(why2_get_default_memory_identifier()); //GARBAGE COLLECTOR
 
     exit(1);
+}
+
+char *why2_replace(char *string, char *old, char *new) //CODE FROM: https://www.geeksforgeeks.org/c-program-replace-word-text-another-given-word
+{
+    char *result;
+    int i, cnt = 0;
+    int newLen = strlen(new);
+    int oldLen = strlen(old);
+
+    for (i = 0; string[i] != '\0'; i++)
+    {
+        if (strstr(&string[i], old) == &string[i])
+        {
+            cnt++;
+
+            i += oldLen - 1;
+        }
+    }
+
+    result = (char*) why2_malloc(i + cnt * (newLen - oldLen) + 1);
+
+    i = 0;
+    while (*string)
+    {
+        // compare the substring with the result
+        if (strstr(string, old) == string)
+        {
+            strcpy(&result[i], new);
+            i += newLen;
+            string += oldLen;
+        }
+        else result[i++] = *string++;
+    }
+
+    result[i] = '\0';
+    return result;
 }

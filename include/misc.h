@@ -34,5 +34,6 @@ unsigned long why2_count_unused_key_size(char *text, char *key); //COUNT unused_
 unsigned long why2_count_repeated_key_size(char *text, char *key); //COUNT repeated_key_size
 unsigned long why2_compare_time_micro(struct timeval startTime, struct timeval finishTime); //COMPARE TIMES IN MICROSECONDS
 void why2_die(char *exit_message); //PRINTS exit_message ERROR AND EXITS WITH CODE 1
+char *why2_replace(char *string, char *old, char *new); //REPLACES old IN string WITH new
 
 #endif
