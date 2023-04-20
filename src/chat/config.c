@@ -25,6 +25,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/flags.h>
 #include <why2/flags.h>
+#include <why2/memory.h>
 
 void why2_chat_init_config(void)
 {
