@@ -159,7 +159,7 @@ char *read_socket_from_raw(char *raw)
     if (json_obj == NULL) return "ERR"; //RETURN IF INVALID SYNTAX WAS SENT BY SOME FUCKING SCRIPT KIDDIE
 
     //GET STRINGS
-    char *message = get_string_from_json(json_obj, "message"); //TODO: Check deallocation problems
+    char *message = get_string_from_json(json_obj, "message");
     char *username = get_string_from_json(json_obj, "username");
 
     //ALLOCATE final_message
@@ -398,7 +398,7 @@ char *why2_read_socket(int socket)
     struct json_object *json_obj = json_tokener_parse(raw_socket);
 
     //GET STRINGS
-    char *message = get_string_from_json(json_obj, "message"); //TODO: Check deallocation problems
+    char *message = get_string_from_json(json_obj, "message");
     char *username = get_string_from_json(json_obj, "username");
 
     //ALLOCATE final_message
@@ -485,5 +485,3 @@ void *why2_listen_server(void *socket)
 
     return NULL;
 }
-
-//TODO: Client formatting fix

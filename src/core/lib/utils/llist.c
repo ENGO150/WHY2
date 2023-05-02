@@ -44,7 +44,7 @@ void why2_list_push(why2_list_t *list, void *value, unsigned long size)
         buffer -> next = new_node; //LINK
     }
 
-    list -> head = buffer; //TODO: Unused?
+    list -> head = buffer;
 }
 
 void why2_list_remove(why2_list_t *list, why2_node_t *node)
