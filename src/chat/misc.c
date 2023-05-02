@@ -466,12 +466,24 @@ void *why2_listen_server(void *socket)
     for (;;)
     {
         read = why2_read_socket(*((int*) socket));
-        printf(WHY2_CLEAR_AND_GO_UP);
-        printf("%s\n\n>>> ", read);
-        fflush(stdout);
+
+        if (strncmp(read, "server: code", 12) == 0) //CODE WAS SENT
+        {
+            if (strcmp(read + 8, WHY2_CHAT_CODE_PICK_USERNAME) == 0) //PICK USERNAME
+            {
+                //TODO: Check username
+            }
+        } else
+        {
+            printf(WHY2_CLEAR_AND_GO_UP);
+            printf("%s\n\n>>> ", read);
+            fflush(stdout);
+        }
 
         why2_deallocate(read);
     }
+
+    return NULL;
 }
 
 //TODO: Client formatting fix
