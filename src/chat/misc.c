@@ -28,6 +28,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <json-c/json.h>
 
+#include <why2/chat/config.h>
 #include <why2/chat/flags.h>
 #include <why2/llist.h>
 #include <why2/memory.h>
@@ -297,6 +298,9 @@ void *why2_communicate_thread(void *arg)
 
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
     printf("User connected.\t\t%d\n", connection);
+
+    //GET USERNAME //TODO: Use config
+    why2_send_socket(WHY2_CHAT_CODE_PICK_USERNAME, "server", connection);
 
     void *buffer;
     char *received = NULL;
