@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -30,28 +31,47 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-void why2_chat_init_server_config(void)
+#define SERVER "server.yml"
+
+//LOCAL
+void init_config(char *filename)
 {
-    char *path = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{USER}", getenv("USER"));
+    //GET THE CONFIG TYPE
+    char *buffer = why2_malloc(strlen(WHY2_CHAT_CONFIG_DIR) + strlen(filename) + 2);
+    sprintf(buffer, "%s/%s", WHY2_CHAT_CONFIG_DIR, filename);
+
+    char *path = why2_replace(buffer, "{USER}", getenv("USER"));
 
     if (access(path, R_OK) != 0) //CONFIG DOESN'T EXIST
     {
         char *config_dir = why2_replace(WHY2_CHAT_CONFIG_DIR, "{USER}", getenv("USER"));
 
+        //CREATE CONFIG DIRECTORY
         mkdir(config_dir, 0700);
 
         CURL *curl = curl_easy_init();
         FILE *file_buffer = why2_fopen(path, "w+");
 
-        curl_easy_setopt(curl, CURLOPT_URL, WHY2_CHAT_CONFIG_SERVER_URL);
+        buffer = why2_realloc(buffer, strlen(WHY2_CHAT_CONFIG_URL) + strlen(filename) + 1);
+        sprintf(buffer, "%s%s", WHY2_CHAT_CONFIG_URL, filename);
+
+        //DOWNLOAD CONTENT
+        curl_easy_setopt(curl, CURLOPT_URL, buffer);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, file_buffer);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, WHY2_CURL_TIMEOUT);
         curl_easy_perform(curl);
 
         //CLEANUP
         curl_easy_cleanup(curl);
+        why2_deallocate(buffer);
         why2_deallocate(path);
         why2_deallocate(config_dir);
         why2_deallocate(file_buffer);
     }
+}
+
+//GLOBAL
+void why2_chat_init_server_config(void)
+{
+    init_config(SERVER);
 }
