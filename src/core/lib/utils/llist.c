@@ -98,7 +98,7 @@ void why2_list_remove_back(why2_list_t *list)
     {
         deallocating_node = buffer;
 
-        head = NULL;
+        list -> head = NULL;
     } else
     {
         while (buffer -> next -> next != NULL) buffer = buffer -> next; //GO TO THE NODE BEFORE END
@@ -108,6 +108,7 @@ void why2_list_remove_back(why2_list_t *list)
         buffer -> next = NULL; //UNLINK
     }
 
+    free(deallocating_node -> value);
     free(deallocating_node);
 }
 
