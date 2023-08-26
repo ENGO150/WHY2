@@ -25,6 +25,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <pthread.h>
 
+#include <why2/chat/config.h>
 #include <why2/chat/flags.h>
 #include <why2/chat/misc.h>
 
@@ -32,6 +33,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 int main(void)
 {
+    why2_chat_init_client_config();
+
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     char *line = NULL;
     size_t line_length = 0;
