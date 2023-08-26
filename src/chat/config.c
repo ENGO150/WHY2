@@ -34,6 +34,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //LOCAL
 void init_config(char *filename)
 {
+    struct stat st;
+
+    //CREATE USER CONFIG FOLDER [THIS SHOULDN'T HAPPEN ON CLIENT, BUT IT'S NEEDED ON FRESH SERVERS]
+    if (stat(WHY2_CONFIG_DIR, &st) == -1)
+    {
+        mkdir(WHY2_CONFIG_DIR, 0700);
+    }
+
     //GET THE CONFIG TYPE
     char *buffer = why2_malloc(strlen(WHY2_CHAT_CONFIG_DIR) + strlen(filename) + 2);
     sprintf(buffer, "%s/%s", WHY2_CHAT_CONFIG_DIR, filename);
