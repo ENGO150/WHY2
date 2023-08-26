@@ -32,5 +32,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define WHY2_CHAT_CONFIG_DIR "/home/{USER}/.config/WHY2"
 #define WHY2_CHAT_CONFIG_URL "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/"
 #define WHY2_CHAT_CONFIG_SERVER "server.yml"
+#define WHY2_CHAT_CONFIG_CLIENT "client.yml"
 
 #endif

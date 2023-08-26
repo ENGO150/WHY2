@@ -31,9 +31,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-#define SERVER "server.yml"
-#define CLIENT "client.yml"
-
 //LOCAL
 void init_config(char *filename)
 {
@@ -74,10 +71,10 @@ void init_config(char *filename)
 //GLOBAL
 void why2_chat_init_server_config(void)
 {
-    init_config(SERVER);
+    init_config(WHY2_CHAT_CONFIG_SERVER);
 }
 
 void why2_chat_init_client_config(void)
 {
-    init_config(CLIENT);
+    init_config(WHY2_CHAT_CONFIG_CLIENT);
 }
