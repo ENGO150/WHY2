@@ -22,6 +22,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //MACROS
 #define WHY2_CHAT_CODE_PICK_USERNAME "code_001"
 
-void why2_chat_init_config(void); //CHECK IF CONFIG EXISTS, CREATE IT
+void why2_chat_init_server_config(void); //CHECK IF SERVER CONFIG EXISTS, CREATE IT
 
 #endif

@@ -30,7 +30,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-void why2_chat_init_config(void)
+void why2_chat_init_server_config(void)
 {
     char *path = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{USER}", getenv("USER"));
 
