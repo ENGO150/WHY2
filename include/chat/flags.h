@@ -29,7 +29,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #define WHY2_INVALID_POINTER (void*) 0xffffffffffffffff
 
-#define WHY2_CHAT_CONFIG "/home/{USER}/.why2_chat.yml"
-#define WHY2_CHAT_CONFIG_URL "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/.why2_chat.yml"
+#define WHY2_CHAT_CONFIG_DIR "/home/{USER}/.config/WHY2"
+#define WHY2_CHAT_CONFIG_SERVER "server.yml"
+#define WHY2_CHAT_CONFIG_SERVER_URL "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/server.yml"
 
 #endif
