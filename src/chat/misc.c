@@ -300,7 +300,7 @@ void *why2_communicate_thread(void *arg)
     printf("User connected.\t\t%d\n", connection);
 
     //GET USERNAME //TODO: Use config
-    why2_send_socket(WHY2_CHAT_CODE_PICK_USERNAME, "server", connection);
+    why2_send_socket(WHY2_CHAT_CODE_PICK_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection);
 
     void *buffer;
     char *received = NULL;
@@ -314,7 +314,7 @@ void *why2_communicate_thread(void *arg)
 
     //SEND CONNECTION MESSAGE
     json_object_object_add(json, "message", json_object_new_string("anon connected"));
-    json_object_object_add(json, "username", json_object_new_string("server")); //TODO: Usernames
+    json_object_object_add(json, "username", json_object_new_string(WHY2_CHAT_SERVER_USERNAME)); //TODO: Usernames
 
     json_object_object_foreach(json, key, value) //GENERATE JSON STRING
     {
@@ -467,7 +467,7 @@ void *why2_listen_server(void *socket)
     {
         read = why2_read_socket(*((int*) socket));
 
-        if (strncmp(read, "server: code", 12) == 0) //CODE WAS SENT
+        if (strncmp(read, WHY2_CHAT_SERVER_USERNAME ": code", 12) == 0) //CODE WAS SENT
         {
             if (strcmp(read + 8, WHY2_CHAT_CODE_PICK_USERNAME) == 0) //PICK USERNAME
             {
