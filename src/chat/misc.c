@@ -30,6 +30,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/config.h>
 #include <why2/chat/flags.h>
+#include <why2/chat/parser.h>
+
 #include <why2/llist.h>
 #include <why2/memory.h>
 #include <why2/misc.h>
@@ -299,8 +301,22 @@ void *why2_communicate_thread(void *arg)
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
     printf("User connected.\t\t%d\n", connection);
 
-    //GET USERNAME //TODO: Use config
-    why2_send_socket(WHY2_CHAT_CODE_PICK_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection);
+    //GET USERNAME
+    char *string_buffer = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{USER}", getenv("USER"));
+    char *config_username = why2_yml_read(string_buffer, "user_pick_username");
+
+    if (config_username == NULL || strcmp(config_username, "true") == 0)
+    {
+        if (config_username == NULL) fprintf(stderr, "Your config doesn't contain 'user_pick_username'. Please update your configuration.\n");
+
+        why2_send_socket(WHY2_CHAT_CODE_PICK_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection);
+    } else
+    {
+        //TODO: Implement Database
+    }
+
+    why2_deallocate(string_buffer);
+    why2_deallocate(config_username);
 
     void *buffer;
     char *received = NULL;
