@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define WHY2_CHAT_CONFIG_H
 
 //MACROS
+#define WHY2_CHAT_CODE_ACCEPT_MESSAGES "code_000"
 #define WHY2_CHAT_CODE_PICK_USERNAME "code_001"
 
 #define WHY2_CONFIG_DIR "/home/{USER}/.config"
