@@ -25,6 +25,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define WHY2_MAX_CONNECTIONS 1000 //MAX USERS CONNECTED AT ONE TIME //TODO: Move all to configs
 #define WHY2_COMMUNICATION_TIME 300 //SECONDS WAITING BEFORE KICKING USER (TIMEOUT)
 
+#define WHY2_CHAT_SERVER_USERNAME "server" //THE USERNAME SERVER WILL USE
+
 #define WHY2_CLEAR_AND_GO_UP "\33[2K\r\033[A" //i mean read the name
 
 #define WHY2_INVALID_POINTER (void*) 0xffffffffffffffff
