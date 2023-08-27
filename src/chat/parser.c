@@ -16,13 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <why2/chat/parser.h>
+
 #include <stdio.h>
 #include <string.h>
 
+#include <yaml.h>
+
 #include <why2/memory.h>
 #include <why2/misc.h>
-
-#include <yaml.h>
 
 char *why2_yml_read(char *path, char *key)
 {
