@@ -24,13 +24,13 @@ if [[ $(id -u) != "0" ]] && [[ $1 != "force" ]]; then
     exit 1
 fi
 
-COMMON="gcc make tmux libyaml"
+COMMON="gcc make tmux"
 
 # Get COMMAND
 if [[ $DISTRO == "Arch" ]]; then
-    COMMAND="pacman -S --needed --noconfirm $COMMON json-c curl libgit2"
+    COMMAND="pacman -S --needed --noconfirm $COMMON json-c curl libgit2 libyaml"
 elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
-    COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev"
+    COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev libyaml-dev"
 else
     # 'Unsupported' distro
     echo "It seems you are using unsupported distribution... Don't worry, just install 'gcc', 'json-c', 'curl', 'libgit2', 'tmux', 'libyaml' and 'make' and you'll be fine."
