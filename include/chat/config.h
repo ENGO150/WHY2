@@ -22,7 +22,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //MACROS
 #define WHY2_CHAT_CODE_PICK_USERNAME "code_001"
 
+#define WHY2_CONFIG_DIR "/home/{USER}/.config"
+#define WHY2_CHAT_CONFIG_DIR WHY2_CONFIG_DIR "/WHY2"
+#define WHY2_CHAT_CONFIG_URL "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/"
+#define WHY2_CHAT_CONFIG_SERVER "server.yml"
+#define WHY2_CHAT_CONFIG_CLIENT "client.yml"
+
 void why2_chat_init_server_config(void); //CHECK IF SERVER CONFIG EXISTS, CREATE IT
-void why2_chat_init_client_config(void); //Dementia is a term used to describe a group of symptoms affecting memory, thinking and social abilities. In people who have dementia, the symptoms interfere with their daily lives. Dementia isn't one specific disease. Several diseases can cause dementia.
+void why2_chat_init_client_config(void); //Dementia is a term used to describe a group of symptoms affecting memory, thinking and social abilities. In people who have dementia, the symptoms interfere with their daily lives. Dementia isn't one specific disease. Several diseases can cause dementia. ...
 
 #endif
