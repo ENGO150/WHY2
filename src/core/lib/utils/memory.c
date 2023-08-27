@@ -90,7 +90,7 @@ void remove_node(node_t *node)
 
 node_t *get_node(void *pointer)
 {
-    if (head == NULL) return NULL; //EMPTY LIST
+    if (head == NULL || pointer == NULL) return NULL; //EMPTY LIST
 
     node_t *buffer = head;
     while (buffer -> next != NULL)
