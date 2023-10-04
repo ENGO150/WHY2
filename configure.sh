@@ -31,6 +31,14 @@ if [[ $DISTRO == "Arch" ]]; then
     COMMAND="pacman -S --needed --noconfirm $COMMON json-c curl libgit2 libyaml"
 elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
     COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev libyaml-dev"
+elif [[ $DISTRO == "Gentoo" ]]; then
+    COMMAND="emerge -vn gcc json-c curl make libgit2 tmux"
+
+    # Add
+    echo "LDPATH=/usr/lib/libwhy2.so" > /etc/env.d/99why2-core
+    echo "LDPATH=/usr/lib/libwhy2-logger.so" > /etc/env.d/99why2-logger
+    echo "LDPATH=/usr/lib/libwhy2-chat.so" > /etc/env.d/99why2-chat
+    env-update && source /etc/profile
 else
     # 'Unsupported' distro
     echo "It seems you are using unsupported distribution... Don't worry, just install 'gcc', 'json-c', 'curl', 'libgit2', 'tmux', 'libyaml' and 'make' and you'll be fine."
