@@ -66,7 +66,8 @@ int main(void)
 
     for (;;)
     {
-        getline(&line, &line_length, stdin);
+        if (getline(&line, &line_length, stdin) == -1) why2_die("Reading input failed.");
+
         printf(WHY2_CLEAR_AND_GO_UP);
 
         why2_send_socket(line, "anon", listen_socket);
