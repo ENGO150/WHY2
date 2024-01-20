@@ -352,7 +352,7 @@ void *why2_communicate_thread(void *arg)
 
         //READ
         pthread_create(&thread_buffer, NULL, read_socket_raw_thread, &connection);
-        why2_list_push(&waiting_list, &buffer, sizeof(thread_buffer));
+        why2_list_push(&waiting_list, &buffer, sizeof(buffer));
 
         //RUN DELETION THREAD
         pthread_create(&thread_deletion_buffer, NULL, stop_oldest_thread, &thread_buffer);
@@ -454,26 +454,23 @@ void *why2_accept_thread(void *socket)
 
 void why2_clean_threads(void)
 {
-    why2_node_t *head = waiting_list.head;
-    if (head == NULL) return; //EMPTY LIST
+    if (connection_list.head == NULL) return; //EMPTY LIST
 
-    why2_node_t *node_buffer = head;
-    why2_node_t *node_buffer_2;
-
+    why2_node_t *node_buffer;
     connection_node_t connection_buffer;
 
-    while (node_buffer -> next != NULL) //GO TROUGH LIST
+    do //GO TROUGH LIST
     {
-        node_buffer_2 = node_buffer;
-        node_buffer = node_buffer -> next;
+        node_buffer = connection_list.head;
 
-        connection_buffer = *(connection_node_t*) node_buffer_2 -> value;
+        connection_buffer = *(connection_node_t*) node_buffer -> value;
+
+        why2_send_socket(WHY2_CHAT_CODE_SSQC, WHY2_CHAT_SERVER_USERNAME, connection_buffer.connection);
 
         close(connection_buffer.connection);
-        pthread_cancel(connection_buffer.thread);
 
-        why2_list_remove(&waiting_list, node_buffer_2); //REMOVE
-    }
+        why2_list_remove(&connection_list, node_buffer); //REMOVE
+    } while (connection_list.head != NULL);
 }
 
 void *why2_listen_server(void *socket)
