@@ -37,8 +37,11 @@ int main(void)
 
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     char *line = NULL;
+    void *return_line = NULL;
     size_t line_length = 0;
     pthread_t thread_buffer;
+    pthread_t thread_getline;
+    why2_bool ssqc = 0;
 
     //DEFINE SERVER ADDRESS
     struct sockaddr_in server_addr;
@@ -58,6 +61,8 @@ int main(void)
     }
     printf("\n\n\n");
 
+    free(line); //PREVENT FROM MEMORY LEAK
+
     int connectStatus = connect(listen_socket, (WHY2_SA *) &server_addr, sizeof(server_addr)); //CONNECT
 
     if (connectStatus < 0) why2_die("Connecting failed.");
@@ -66,7 +71,16 @@ int main(void)
 
     for (;;)
     {
-        if (getline(&line, &line_length, stdin) == -1) why2_die("Reading input failed.");
+        pthread_create(&thread_getline, NULL, why2_getline_thread, NULL);
+        pthread_join(thread_getline, &return_line);
+
+        if (return_line == WHY2_INVALID_POINTER) //SERVER QUIT COMMUNICATION
+        {
+            ssqc = 1;
+            break;
+        }
+
+        line = (char*) return_line;
 
         printf(WHY2_CLEAR_AND_GO_UP);
 
@@ -77,9 +91,16 @@ int main(void)
             printf("Exiting...\n");
             break;
         }
+
+        free(return_line);
     }
 
-    pthread_cancel(thread_buffer);
-    free(line);
+    //DEALLOCATION
+    if (!ssqc)
+    {
+        pthread_cancel(thread_buffer);
+        free(return_line);
+    }
+
     return 0;
 }

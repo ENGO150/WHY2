@@ -36,6 +36,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 #include <why2/misc.h>
 
+pthread_t getline_thread;
+
 //LINKED LIST STUFF
 typedef struct _connection_node
 {
@@ -397,6 +399,8 @@ void *why2_communicate_thread(void *arg)
         raw_ptr = NULL;
     }
 
+    why2_send_socket(WHY2_CHAT_CODE_SSQC, WHY2_CHAT_SERVER_USERNAME, connection);
+
     printf("User disconnected.\t%d\n", connection);
 
     //DEALLOCATION
@@ -404,7 +408,7 @@ void *why2_communicate_thread(void *arg)
     close(connection);
     why2_list_remove(&connection_list, find_connection(connection));
 
-    return NULL; //TODO: Fix client segfault on timeout
+    return NULL;
 }
 
 char *why2_read_socket(int socket)
@@ -475,6 +479,7 @@ void why2_clean_threads(void)
 void *why2_listen_server(void *socket)
 {
     char *read = NULL;
+    why2_bool exiting = 0;
 
     printf(">>> ");
     fflush(stdout);
@@ -485,7 +490,14 @@ void *why2_listen_server(void *socket)
 
         if (strncmp(read, WHY2_CHAT_SERVER_USERNAME ": code", 12) == 0) //CODE WAS SENT
         {
-            if (strcmp(read + 8, WHY2_CHAT_CODE_PICK_USERNAME) == 0) //PICK USERNAME
+            if (strcmp(read + 8, WHY2_CHAT_CODE_SSQC) == 0)
+            {
+                printf("%s\nServer closed the connection.\n", WHY2_CLEAR_AND_GO_UP);
+                fflush(stdout);
+
+                pthread_cancel(getline_thread); //CANCEL CLIENT getline
+                exiting = 1; //EXIT THIS THREAD
+            } else if (strcmp(read + 8, WHY2_CHAT_CODE_PICK_USERNAME) == 0) //PICK USERNAME
             {
                 //TODO: Check username
             }
@@ -497,7 +509,19 @@ void *why2_listen_server(void *socket)
         }
 
         why2_deallocate(read);
+        if (exiting) break;
     }
 
     return NULL;
+}
+
+void *why2_getline_thread(WHY2_UNUSED void* arg)
+{
+    getline_thread = pthread_self();
+
+    char *line = NULL;
+    size_t line_length = 0;
+    if (getline(&line, &line_length, stdin) == -1) why2_die("Reading input failed.");
+
+    return line;
 }
