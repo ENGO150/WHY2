@@ -29,6 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/flags.h>
 #include <why2/chat/misc.h>
 
+#include <why2/memory.h>
 #include <why2/misc.h>
 
 int main(void)
@@ -101,6 +102,8 @@ int main(void)
         pthread_cancel(thread_buffer);
         free(return_line);
     }
+
+    why2_clean_memory(""); //RUN GARBAGE COLLECTOR
 
     return 0;
 }
