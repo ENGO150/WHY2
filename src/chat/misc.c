@@ -452,25 +452,45 @@ void *why2_accept_thread(void *socket)
     return NULL;
 }
 
-void why2_clean_threads(void)
+void why2_clean_connections(void)
 {
-    if (connection_list.head == NULL) return; //EMPTY LIST
+    why2_node_t *head = connection_list.head;
+    if (head == NULL) return; //EMPTY LIST
 
-    why2_node_t *node_buffer;
+    why2_node_t *node_buffer = head;
+    why2_node_t *node_buffer_2;
     connection_node_t connection_buffer;
 
     do //GO TROUGH LIST
     {
-        node_buffer = connection_list.head;
+        node_buffer_2 = node_buffer;
+        node_buffer = node_buffer -> next;
 
-        connection_buffer = *(connection_node_t*) node_buffer -> value;
+        connection_buffer = *(connection_node_t*) node_buffer_2 -> value; // TODO: TADY SE TO SERE
 
         why2_send_socket(WHY2_CHAT_CODE_SSQC, WHY2_CHAT_SERVER_USERNAME, connection_buffer.connection);
 
         close(connection_buffer.connection);
+        why2_list_remove(&connection_list, node_buffer_2); //REMOVE
+    } while (node_buffer != NULL);
+}
 
-        why2_list_remove(&connection_list, node_buffer); //REMOVE
-    } while (connection_list.head != NULL);
+void why2_clean_threads(void)
+{
+    why2_node_t *head = waiting_list.head;
+    if (head == NULL) return; //EMPTY LIST
+
+    why2_node_t *node_buffer = head;
+    why2_node_t *node_buffer_2;
+
+    do //GO TROUGH LIST
+    {
+        node_buffer_2 = node_buffer;
+        node_buffer = node_buffer -> next;
+
+        pthread_cancel(**(pthread_t**)(node_buffer_2 -> value));
+        why2_list_remove(&waiting_list, node_buffer_2); //REMOVE
+    } while (node_buffer != NULL);
 }
 
 void *why2_listen_server(void *socket)

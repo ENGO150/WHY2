@@ -70,8 +70,11 @@ int main(void)
         }
     }
 
+    //QUIT COMMUNICATION
+    why2_clean_connections(); //STOP LISTENING; DISCONNECT ALL USERS
+    why2_clean_threads(); //STOP WAITING FOR MESSAGES
+
     //DEALLOCATION
-    why2_clean_threads();
     free(line_buffer);
     close(listen_socket);
     pthread_cancel(thread);

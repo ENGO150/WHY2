@@ -25,7 +25,8 @@ void why2_send_socket(char *text, char *username, int socket); //send socket....
 char *why2_read_socket(int socket); //read lol
 void *why2_communicate_thread(void *arg); //COMMUNICATION THREAD
 void *why2_accept_thread(void *socket); //LOOP ACCEPTING CONNECTIONS
-void why2_clean_threads(void); //CLOSE EVERY RUNNING THREAD
+void why2_clean_connections(void); //CLOSE EVERY CONNECTION
+void why2_clean_threads(void); //CLOSE EVERY RUNNING MESSAGE THREAD
 void *why2_listen_server(void *socket); //LISTEN FOR OTHER's USERS MESSAGES
 void *why2_getline_thread(WHY2_UNUSED void* arg); //START getline IN SEPARATE THREAD
 
