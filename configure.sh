@@ -29,9 +29,13 @@ ARCH_GENTOO_COMMON="$COMMON json-c curl libgit2"
 
 # Get COMMAND
 if [[ $DISTRO == "Arch" ]]; then
-    COMMAND="pacman -S --needed --noconfirm $ARCH_GENTOO_COMMON libyaml cargo"
+    COMMAND="pacman -S --needed --noconfirm $ARCH_GENTOO_COMMON libyaml rustup"
+
+    COMMAND="$COMMAND && pacman -S --needed --noconfirm cargo"
 elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
-    COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev libyaml-dev cargo"
+    COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev libyaml-dev rustup"
+
+    COMMAND="$COMMAND && apt install -y cargo"
 elif [[ $DISTRO == "Gentoo" ]]; then
     COMMAND="emerge -vn $ARCH_GENTOO_COMMON dev-libs/libyaml"
 
