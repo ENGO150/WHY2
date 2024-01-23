@@ -16,6 +16,8 @@
 
 # Compiler Settings
 CC=cc
+RC=cargo
+RFLAGS=--manifest-path src/chat/config/Cargo.toml
 CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnull -Wunused -std=gnu11 -O2 -g # Remove the '-g' flag if you want the smallest possible lib size
 
 # Output Files
@@ -31,6 +33,8 @@ OUTPUT_APP_LOGGER=$(OUTPUT)/$(PROJECT_NAME)-logger-app
 
 OUTPUT_CHAT_CLIENT=$(OUTPUT)/$(PROJECT_NAME)-chat-client
 OUTPUT_CHAT_SERVER=$(OUTPUT)/$(PROJECT_NAME)-chat-server
+
+LIB_CHAT_CONFIG_OUT=./src/chat/config/target/release
 
 # Source Code
 SRC_CORE=./src/core/lib/*.c ./src/core/lib/utils/*.c
@@ -56,7 +60,8 @@ LIB_LOGGER=-l$(PROJECT_NAME)-logger
 
 LIBS_LIB_CHAT=$(LIB_CORE) -lpthread
 LIB_CHAT=-l$(PROJECT_NAME)-chat
-LIBS_CHAT=$(LIB_CHAT) $(LIBS_LIB_CHAT) -lyaml
+LIB_CHAT_CONFIG=$(LIB_CHAT)-config
+LIBS_CHAT=$(LIB_CHAT) $(LIBS_LIB_CHAT) -lyaml $(LIB_CHAT_CONFIG)
 
 # Install Files
 INSTALL_INCLUDE=/usr/include
@@ -100,6 +105,8 @@ buildChatServer:
 buildLibChat:
 	$(MAKE) clean
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_CHAT_MISC)
+	$(RC) build $(RFLAGS) --release
+	install -m 755 $(LIB_CHAT_CONFIG_OUT)/lib$(PROJECT_NAME)_chat_config.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-chat-config.so
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME)-chat.so *.o $(LIBS_LIB_CHAT)
 
 installLibCore: buildLibCore
@@ -130,6 +137,7 @@ appLogger:
 	$(CC) $(CFLAGS) $(SRC_LOGGER_APP) -o $(OUTPUT_APP_LOGGER) $(LIBS_LOGGER) $(LIB_LOGGER)
 
 clean:
+	$(RC) clean $(RFLAGS)
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
 
 buildChat: buildChatServer buildChatClient
