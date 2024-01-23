@@ -19,8 +19,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_DECRYPTER_H
 #define WHY2_DECRYPTER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <why2/flags.h>
 
 why2_output_flags why2_decrypt_text(char *text, char *keyNew); //TEXT from WILL BE DECRYPTED WITH KEY AND RETURNED
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

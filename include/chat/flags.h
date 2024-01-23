@@ -19,6 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_CHAT_COMMON_H
 #define WHY2_CHAT_COMMON_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //MACROS
 #define WHY2_SA struct sockaddr
 #define WHY2_SERVER_PORT 1204 //PORT
@@ -30,5 +34,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define WHY2_CLEAR_AND_GO_UP "\33[2K\r\033[A" //i mean read the name
 
 #define WHY2_INVALID_POINTER (void*) 0xffffffffffffffff
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

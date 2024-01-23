@@ -25,6 +25,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_WHY2_H
 #define WHY2_WHY2_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //CORE
 #include <why2/decrypter.h>
 #include <why2/encrypter.h>
@@ -42,5 +46,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/config.h>
 #include <why2/chat/flags.h>
 #include <why2/chat/misc.h>
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

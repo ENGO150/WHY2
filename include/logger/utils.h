@@ -19,6 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_LOGGER_UTILS_C
 #define WHY2_LOGGER_UTILS_C
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <why2/logger/flags.h>
 
 void why2_deallocate_logger(why2_log_file logger); //USE THIS IF YOU WANT TO DEALLOCATE FILE POINTER RETURNED BY logger'S why2_init_logger
@@ -26,5 +30,9 @@ void why2_deallocate_decrypted_output(why2_decrypted_output output); //DEALLOCAT
 why2_decrypted_output why2_decrypt_logger(why2_log_file logger); //PASS logger AND FLAGS, AND PROGRAM WILL DECRYPT YOUR LOG... WHAT DID YOU EXPECT?
 why2_log_file why2_empty_log_file(); //RETURN EMTPY why2_log_file WHAT THE FUCK DID YOU EXPECT
 why2_decrypted_output why2_empty_decrypted_output(); //NO!
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

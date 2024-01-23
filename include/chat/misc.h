@@ -19,6 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_CHAT_MISC_H
 #define WHY2_CHAT_MISC_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <why2/flags.h> //TODO: fuck this
 
 void why2_send_socket(char *text, char *username, int socket); //send socket.... wtf did you expect
@@ -29,5 +33,9 @@ void why2_clean_connections(void); //CLOSE EVERY CONNECTION
 void why2_clean_threads(void); //CLOSE EVERY RUNNING MESSAGE THREAD
 void *why2_listen_server(void *socket); //LISTEN FOR OTHER's USERS MESSAGES
 void *why2_getline_thread(WHY2_UNUSED void* arg); //START getline IN SEPARATE THREAD
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

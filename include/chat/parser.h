@@ -19,6 +19,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_CHAT_PARSER_H
 #define WHY2_CHAT_PARSER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 char *why2_yml_read(char *path, char *key); //READ key FROM YAML FILE path, RETURNS IT
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

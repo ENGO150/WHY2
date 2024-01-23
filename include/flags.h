@@ -19,6 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_FLAGS_H
 #define WHY2_FLAGS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //CONSTS
 enum WHY2_EXIT_CODES //exit codes you fucking idiot
 {
@@ -89,5 +93,9 @@ void why2_set_flags(why2_input_flags newFlags); //.... whatcha think?
 void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOperation); //are you that dumb?
 void why2_set_memory_identifier(char *new_memory_identifier);
 void why2_reset_memory_identifier(void); //hmmm, what could reset mean.... huh
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

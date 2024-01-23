@@ -19,6 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_LOGGER_FLAGS_H
 #define WHY2_LOGGER_FLAGS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //CONSTS
 enum WHY2_LOGGER_EXIT_CODES //exit codes you fucking idiot (2#)
 {
@@ -71,5 +75,9 @@ why2_log_flags why2_get_log_flags(void);
 
 //SETTERS
 void why2_set_log_flags(why2_log_flags why2_log_flagsNew);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

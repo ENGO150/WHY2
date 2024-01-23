@@ -19,6 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_MISC_H
 #define WHY2_MISC_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <sys/time.h>
 
 #include <why2/flags.h>
@@ -35,5 +39,9 @@ unsigned long why2_count_repeated_key_size(char *text, char *key); //COUNT repea
 unsigned long why2_compare_time_micro(struct timeval startTime, struct timeval finishTime); //COMPARE TIMES IN MICROSECONDS
 void why2_die(char *exit_message); //PRINTS exit_message ERROR AND EXITS WITH CODE 1
 char *why2_replace(char *string, char *old, char *new); //REPLACES old IN string WITH new
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

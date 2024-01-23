@@ -19,6 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_LLIST_H
 #define WHY2_LLIST_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //MACROS
 #define WHY2_LIST_EMPTY { NULL }
 
@@ -39,5 +43,9 @@ void why2_list_push(why2_list_t *list, void *value, unsigned long size); //PUSH 
 void why2_list_remove(why2_list_t *list, why2_node_t *node); //REMOVE ELEMENT
 void why2_list_remove_back(why2_list_t *list); //REMOVE LAST ELEMENT
 why2_node_t *why2_list_find(why2_list_t *list, void *value); //FIND ELEMENT IN LIST
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

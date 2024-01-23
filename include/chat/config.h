@@ -19,6 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_CHAT_CONFIG_H
 #define WHY2_CHAT_CONFIG_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //MACROS
 #define WHY2_CHAT_CODE_ACCEPT_MESSAGES "code_000"
 #define WHY2_CHAT_CODE_PICK_USERNAME "code_001"
@@ -35,5 +39,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 void why2_chat_init_server_config(void); //CHECK IF SERVER CONFIG EXISTS, CREATE IT
 void why2_chat_init_client_config(void); //Dementia is a term used to describe a group of symptoms affecting memory, thinking and social abilities. In people who have dementia, the symptoms interfere with their daily lives. Dementia isn't one specific disease. Several diseases can cause dementia. ...
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

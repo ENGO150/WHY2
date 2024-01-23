@@ -19,9 +19,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef WHY2_LOGGER_LOGGER_H
 #define WHY2_LOGGER_LOGGER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <why2/logger/flags.h>
 
 why2_log_file why2_init_logger(char *directoryPath); //CREATES LOGGING FILE IN directoryPath
 void why2_write_log(int loggerFile, char *logMessage); //WRITES logMessage TO loggerFile
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
