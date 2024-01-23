@@ -48,3 +48,11 @@ fi
 
 # Execute COMMAND
 $COMMAND
+
+# Install Rust
+if ! [ -x "$(command -v cargo)" ]; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+fi
+
+# Config Rust version
+rustup default stable
