@@ -40,7 +40,7 @@ extern "C" {
 void why2_chat_init_server_config(void); //CHECK IF SERVER CONFIG EXISTS, CREATE IT
 void why2_chat_init_client_config(void); //Dementia is a term used to describe a group of symptoms affecting memory, thinking and social abilities. In people who have dementia, the symptoms interfere with their daily lives. Dementia isn't one specific disease. Several diseases can cause dementia. ...
 
-char *why2_config_read(const char* path, const char* table, const char* key);
+char *why2_config_read(const char* path, const char* key);
 void why2_config_read_free(char* s);
 
 #ifdef __cplusplus
