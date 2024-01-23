@@ -51,7 +51,8 @@ $COMMAND
 
 # Install Rust
 if ! [ -x "$(command -v cargo)" ]; then
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y # Install Rust and components
+    source "$HOME/.cargo/env"
 fi
 
 # Config Rust version
