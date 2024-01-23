@@ -14,6 +14,5 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-[connection]
 auto_connect = false # Automatic connection to 'auto_connect_ip'
 auto_connect_ip = "109.123.243.163" # See 'auto_connect'
