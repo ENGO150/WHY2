@@ -4,3 +4,5 @@ out/
 misc/
 logs/
 vgcore.*
+target/
+Cargo.lock
