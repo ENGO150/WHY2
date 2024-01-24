@@ -59,10 +59,10 @@ jobs:
         run: sudo apt install valgrind
 
       - name: Install WHY2
-        run: sudo make install
+        run: make install
 
       - name: Build WHY2 Test
-        run: make testCore
+        run: make test_core
 
       - name: Test Lib
         run: ./${{ matrix.output }}

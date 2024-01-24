@@ -53,7 +53,7 @@ jobs:
         run: sudo ./${{ matrix.configure }}
 
       - name: Install WHY2
-        run: sudo make install
+        run: make install
 
       - name: Download WHY2 test project
         run: curl -Lo ${{ matrix.test }}.c https://gist.github.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw
