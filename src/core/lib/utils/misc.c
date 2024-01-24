@@ -254,7 +254,7 @@ enum WHY2_EXIT_CODES why2_check_version(void) //! CRASHES WHEN CALLED FROM CHAT 
     return WHY2_SUCCESS;
 }
 
-void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_chain_size, enum WHY2_TEXT_KEY_CHAIN_VERSIONS version)
+void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_chain_size)
 {
     int number_buffer;
     int number_buffer_2;
@@ -271,7 +271,7 @@ void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_c
             number_buffer -= why2_get_key_length();
         }
 
-        switch (version)
+        switch (why2_get_flags().version)
         {
             case WHY2_v1:
                 number_buffer_2 = i;
