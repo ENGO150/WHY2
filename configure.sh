@@ -24,18 +24,14 @@ if [[ $(id -u) != "0" ]] && [[ $1 != "force" ]]; then
     exit 1
 fi
 
-COMMON="gcc make tmux"
-ARCH_GENTOO_COMMON="$COMMON json-c curl libgit2"
+COMMON="gcc make tmux curl"
+ARCH_GENTOO_COMMON="$COMMON json-c libgit2"
 
 # Get COMMAND
 if [[ $DISTRO == "Arch" ]]; then
-    COMMAND="pacman -S --needed --noconfirm $ARCH_GENTOO_COMMON libyaml rustup"
-
-    COMMAND="$COMMAND && pacman -S --needed --noconfirm cargo"
+    COMMAND="pacman -S --needed --noconfirm $ARCH_GENTOO_COMMON libyaml"
 elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
-    COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev libyaml-dev rustup"
-
-    COMMAND="$COMMAND && apt install -y cargo"
+    COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev libyaml-dev"
 elif [[ $DISTRO == "Gentoo" ]]; then
     COMMAND="emerge -vn $ARCH_GENTOO_COMMON dev-libs/libyaml"
 
@@ -44,12 +40,6 @@ elif [[ $DISTRO == "Gentoo" ]]; then
     echo "LDPATH=/usr/lib/libwhy2-logger.so" > /etc/env.d/99why2-logger
     echo "LDPATH=/usr/lib/libwhy2-chat.so" > /etc/env.d/99why2-chat
     env-update && source /etc/profile
-
-    # Install Rust
-    if ! [ -x "$(command -v cargo)" ]; then
-        curl https://sh.rustup.rs -sSf | sh # Install Rust and components
-        source "$HOME/.cargo/env"
-    fi
 else
     # 'Unsupported' distro
     echo "It seems you are using unsupported distribution... Don't worry, just install 'gcc', 'json-c', 'curl', 'libgit2', 'tmux', 'libyaml' and 'make' and you'll be fine."
@@ -59,5 +49,8 @@ fi
 # Execute COMMAND
 $COMMAND
 
-# Config Rust version
-rustup default stable
+# Install Rust
+if ! [ -x "$(command -v cargo)" ]; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y # Install Rust and components
+    source "$HOME/.cargo/env"
+fi
