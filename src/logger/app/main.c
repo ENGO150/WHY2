@@ -16,7 +16,7 @@ int main(void)
             1,
             1,
             0,
-            WHY2_v4
+            WHY2_v3
         }
     );
 

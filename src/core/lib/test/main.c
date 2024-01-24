@@ -44,7 +44,7 @@ int main(void)
         0, //SKIP CHECK
         0, //NO OUTPUT
         0, //UPDATE
-        WHY2_v4 //LATEST VERSION
+        WHY2_v3 //LATEST VERSION
     };
 
     //SET FLAGS

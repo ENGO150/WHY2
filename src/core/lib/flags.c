@@ -25,7 +25,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 
 //CONSTS (this is just local)
-#define DEFAULT_FLAGS (why2_input_flags) { 0, 0, 0, WHY2_v4}
+#define DEFAULT_FLAGS (why2_input_flags) { 0, 0, 0, WHY2_v3}
 #define DEFAULT_MEMORY_IDENTIFIER ""
 
 int encryptionOperation(int text, int encryptedText);

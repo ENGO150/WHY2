@@ -271,24 +271,20 @@ void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_c
             number_buffer -= why2_get_key_length();
         }
 
+        //SET tkch VERSION
         switch (why2_get_flags().version)
         {
             case WHY2_v1:
                 number_buffer_2 = i;
-                number_buffer_3 = number_buffer + 1;
+                number_buffer_3 = number_buffer + (i < text_key_chain_size);
                 break;
 
             case WHY2_v2:
                 number_buffer_2 = i;
-                number_buffer_3 = number_buffer + (i < text_key_chain_size);
-                break;
-
-            case WHY2_v3:
-                number_buffer_2 = i;
                 number_buffer_3 = why2_get_key_length() - (number_buffer + (i < text_key_chain_size));
                 break;
 
-            case WHY2_v4:
+            case WHY2_v3:
                 number_buffer_2 = text_key_chain_size - (i + 1);
                 number_buffer_3 = why2_get_key_length() - (number_buffer + (i < text_key_chain_size));
                 break;
