@@ -27,6 +27,15 @@ extern "C" {
 
 #include <why2/flags.h>
 
+//THESE ARE 'HISTORIC' VERSION FOR GENERATING tkch, SO YOU CAN DECRYPT OLD TEXT
+enum WHY2_TEXT_KEY_CHAIN_VERSIONS
+{
+    WHY2_v1, //FIRST VERSION EVER. Replaced on May 25th 15:51:57 2022 UTC in commit 35959a43938edc835c59741aac8127bc132591d0. GOOD OLD TIMES. OR NOT. IT REMINDS ME OF HER. this shit hurts, man
+    WHY2_v2, //SECOND VERSION. Replaced on May 28th 17:45:26 2022 UTC in commit 0d64f4fa7c37f0b57914db902258e279a71c7f9a.
+    WHY2_v3, //THIRD VERSION. Replaced on July 11th 17:12:41 2022 UTC in commit 0f01cde0f1e1a9210f4eef7b949e6d247072d3a6.
+    WHY2_v4 //FOURTH VERSION. THE LATEST ONE
+};
+
 void why2_generate_text_key_chain(char *key, int *textKeyChain, int textKeyChainSize); //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
 char *why2_generate_key(int key_length); //GENERATE ENCRYPTION KEY
 void why2_deallocate_output(why2_output_flags flags); //DEALLOCATES flags
