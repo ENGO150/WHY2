@@ -256,28 +256,50 @@ enum WHY2_EXIT_CODES why2_check_version(void) //! CRASHES WHEN CALLED FROM CHAT 
 
 void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_chain_size, enum WHY2_TEXT_KEY_CHAIN_VERSIONS version)
 {
-    int numberBuffer;
-    int numberBuffer2;
+    int number_buffer;
+    int number_buffer_2;
+    int number_buffer_3;
     int (*cb)(int, int);
 
-    for (int i = 0; i < textKeyChainSize; i++)
+    for (int i = 0; i < text_key_chain_size; i++)
     {
-        numberBuffer = i;
+        number_buffer = i;
 
-        //CHECK, IF numberBuffer ISN'T GREATER THAN keyLength AND CUT WHY2_UNUSED LENGTH
-        while (numberBuffer >= (int) why2_get_key_length())
+        //CHECK, IF number_buffer ISN'T GREATER THAN keyLength AND CUT WHY2_UNUSED LENGTH
+        while (number_buffer >= (int) why2_get_key_length())
         {
-            numberBuffer -= why2_get_key_length();
+            number_buffer -= why2_get_key_length();
         }
 
-        numberBuffer2 = why2_get_key_length() - (numberBuffer + (i < textKeyChainSize));
+        switch (version)
+        {
+            case WHY2_v1:
+                number_buffer_2 = i;
+                number_buffer_3 = number_buffer + 1;
+                break;
+
+            case WHY2_v2:
+                number_buffer_2 = i;
+                number_buffer_3 = number_buffer + (i < text_key_chain_size);
+                break;
+
+            case WHY2_v3:
+                number_buffer_2 = i;
+                number_buffer_3 = why2_get_key_length() - (number_buffer + (i < text_key_chain_size));
+                break;
+
+            case WHY2_v4:
+                number_buffer_2 = text_key_chain_size - (i + 1);
+                number_buffer_3 = why2_get_key_length() - (number_buffer + (i < text_key_chain_size));
+                break;
+        }
 
         //FILL textKeyChain
-        if ((numberBuffer + 1) % 3 == 0)
+        if ((number_buffer + 1) % 3 == 0)
         {
             cb = multiply_cb;
         }
-        else if ((numberBuffer + 1) % 2 == 0)
+        else if ((number_buffer + 1) % 2 == 0)
         {
             cb = subtract_cb;
         }
@@ -286,7 +308,7 @@ void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_c
             cb = sum_cb;
         }
 
-        textKeyChain[textKeyChainSize - (i + 1)] = cb(key[numberBuffer], key[numberBuffer2]);
+        text_key_chain[number_buffer_2] = cb(key[number_buffer], key[number_buffer_3]);
     }
 }
 
