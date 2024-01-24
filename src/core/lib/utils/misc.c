@@ -144,7 +144,41 @@ void old_generate_text_key_chain_third(char *key, int *text_key_chain, int text_
             cb = sum_cb;
         }
 
-        text_key_chain[i] = cb(key[number_buffer], key[getKeyLength() - (number_buffer + (i < text_key_chain_size))]);
+        text_key_chain[i] = cb(key[number_buffer], key[why2_get_key_length() - (number_buffer + (i < text_key_chain_size))]);
+    }
+}
+
+void old_generate_text_key_chain_fourth(char *key, int *text_key_chain, int text_key_chain_size) //FOURTH VERSION. THE LATEST ONE
+{
+    int number_buffer;
+    int number_buffer_2;
+    int (*cb)(int, int);
+
+    for (int i = 0; i < text_key_chain_size; i++)
+    {
+        number_buffer = i;
+
+        //CHECK, IF numberBuffer ISN'T GREATER THAN keyLength AND CUT UNUSED LENGTH
+        while (number_buffer >= (int) why2_get_key_length())
+        {
+            number_buffer -= why2_get_key_length();
+        }
+
+        number_buffer_2 = why2_get_key_length() - (number_buffer + (i < text_key_chain_size));
+
+        //FILL text_key_chain
+        if ((number_buffer + 1) % 3 == 0)
+        {
+            cb = multiply_cb;
+        } else if ((number_buffer + 1) % 2 == 0)
+        {
+            cb = subtract_cb;
+        } else
+        {
+            cb = sum_cb;
+        }
+
+        text_key_chain[text_key_chain_size - (i + 1)] = cb(key[number_buffer], key[number_buffer_2]);
     }
 }
 
