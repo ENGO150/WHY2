@@ -254,7 +254,7 @@ enum WHY2_EXIT_CODES why2_check_version(void) //! CRASHES WHEN CALLED FROM CHAT 
     return WHY2_SUCCESS;
 }
 
-void why2_generate_text_key_chain(char *key, int *textKeyChain, int textKeyChainSize)
+void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_chain_size, enum WHY2_TEXT_KEY_CHAIN_VERSIONS version)
 {
     int numberBuffer;
     int numberBuffer2;

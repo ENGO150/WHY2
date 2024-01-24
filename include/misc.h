@@ -36,7 +36,7 @@ enum WHY2_TEXT_KEY_CHAIN_VERSIONS
     WHY2_v4 //FOURTH VERSION. THE LATEST ONE
 };
 
-void why2_generate_text_key_chain(char *key, int *textKeyChain, int textKeyChainSize); //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
+void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_chain_size, enum WHY2_TEXT_KEY_CHAIN_VERSIONS version) //GENERATES ARRAY FOR ENCRYPTION/DECRYPTION
 char *why2_generate_key(int key_length); //GENERATE ENCRYPTION KEY
 void why2_deallocate_output(why2_output_flags flags); //DEALLOCATES flags
 enum WHY2_EXIT_CODES why2_check_version(void); //THIS FUNCTION CHECKS IF LATEST WHY2_VERSION OF WHY2 IS USED
