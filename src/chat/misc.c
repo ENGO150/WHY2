@@ -398,7 +398,7 @@ void *why2_communicate_thread(void *arg)
         raw_ptr = NULL;
     }
 
-    why2_send_socket(WHY2_CHAT_CODE_SSQC, WHY2_CHAT_SERVER_USERNAME, connection);
+    if (exiting) why2_send_socket(WHY2_CHAT_CODE_SSQC, WHY2_CHAT_SERVER_USERNAME, connection);
 
     printf("User disconnected.\t%d\n", connection);
 
