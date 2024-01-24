@@ -55,7 +55,7 @@ int removeDirectory(char *path)
 }
 
 //THESE old_gen_tkch_number FUNCTIONS ARE 'HISTORIC' FUNCTIONS, SO YOU CAN DECRYPT OLD TEXT
-void old_generate_text_key_chain_first(char *key, int *text_key_chain, int text_key_chain_size) //FIRST VERSION EVER. Replaced on May 25th 15:51:57 2022 UTC in commit 35959a43938edc835c59741aac8127bc132591d0. GOOD OLD TIMES. OR NOT. IT REMINDS ME OF HER. this shit hurts, man
+void generate_text_key_chain_first(char *key, int *text_key_chain, int text_key_chain_size) //FIRST VERSION EVER. Replaced on May 25th 15:51:57 2022 UTC in commit 35959a43938edc835c59741aac8127bc132591d0. GOOD OLD TIMES. OR NOT. IT REMINDS ME OF HER. this shit hurts, man
 {
     int number_buffer;
     int (*cb)(int, int);
@@ -86,7 +86,7 @@ void old_generate_text_key_chain_first(char *key, int *text_key_chain, int text_
     }
 }
 
-void old_generate_text_key_chain_second(char *key, int *text_key_chain, int text_key_chain_size) //SECOND VERSION. Replaced on May 28th 17:45:26 2022 UTC in commit 0d64f4fa7c37f0b57914db902258e279a71c7f9a.
+void generate_text_key_chain_second(char *key, int *text_key_chain, int text_key_chain_size) //SECOND VERSION. Replaced on May 28th 17:45:26 2022 UTC in commit 0d64f4fa7c37f0b57914db902258e279a71c7f9a.
 {
     int number_buffer;
     int (*cb)(int, int);
@@ -117,7 +117,7 @@ void old_generate_text_key_chain_second(char *key, int *text_key_chain, int text
     }
 }
 
-void old_generate_text_key_chain_third(char *key, int *text_key_chain, int text_key_chain_size) //THIRD VERSION. Replaced on July 11th 17:12:41 2022 UTC in commit 0f01cde0f1e1a9210f4eef7b949e6d247072d3a6.
+void generate_text_key_chain_third(char *key, int *text_key_chain, int text_key_chain_size) //THIRD VERSION. Replaced on July 11th 17:12:41 2022 UTC in commit 0f01cde0f1e1a9210f4eef7b949e6d247072d3a6.
 {
     int number_buffer;
     int (*cb)(int, int);
@@ -148,7 +148,7 @@ void old_generate_text_key_chain_third(char *key, int *text_key_chain, int text_
     }
 }
 
-void old_generate_text_key_chain_fourth(char *key, int *text_key_chain, int text_key_chain_size) //FOURTH VERSION. THE LATEST ONE
+void generate_text_key_chain_fourth(char *key, int *text_key_chain, int text_key_chain_size) //FOURTH VERSION. THE LATEST ONE
 {
     int number_buffer;
     int number_buffer_2;
