@@ -304,7 +304,7 @@ void *why2_communicate_thread(void *arg)
 
     //GET USERNAME
     char *string_buffer = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{USER}", getenv("USER"));
-    char *config_username = why2_config_read(string_buffer, "user_pick_username");
+    char *config_username = why2_toml_read(string_buffer, "user_pick_username");
 
     if (config_username == NULL || strcmp(config_username, "true") == 0)
     {
@@ -317,7 +317,7 @@ void *why2_communicate_thread(void *arg)
     }
 
     why2_deallocate(string_buffer);
-    why2_config_read_free(config_username);
+    why2_toml_read_free(config_username);
 
     void *buffer;
     char *received = NULL;

@@ -29,7 +29,7 @@ use std::
 };
 
 #[no_mangle]
-pub extern "C" fn why2_config_read(path: *const c_char, key: *const c_char) -> *mut c_char
+pub extern "C" fn why2_toml_read(path: *const c_char, key: *const c_char) -> *mut c_char
 {
     //CONVERT C STRINGS TO
     let path_r = unsafe { CStr::from_ptr(path).to_string_lossy().into_owned() };
@@ -62,7 +62,7 @@ pub extern "C" fn why2_config_read(path: *const c_char, key: *const c_char) -> *
 }
 
 #[no_mangle]
-pub extern "C" fn why2_config_read_free(s: *mut c_char) //BECAUSE THIS IS RUST MODULE I HAVE TO CREATE A DEALLOCATING FUNCTION
+pub extern "C" fn why2_toml_read_free(s: *mut c_char) //BECAUSE THIS IS RUST MODULE I HAVE TO CREATE A DEALLOCATING FUNCTION
 {
     unsafe //DON'T TRUST THIS, I DEFINITELY KNOW WHAT I'M DOING (idk)
     {
