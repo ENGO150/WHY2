@@ -465,7 +465,7 @@ void why2_clean_connections(void)
         node_buffer_2 = node_buffer;
         node_buffer = node_buffer -> next;
 
-        connection_buffer = *(connection_node_t*) node_buffer_2 -> value; // TODO: TADY SE TO SERE
+        connection_buffer = *(connection_node_t*) node_buffer_2 -> value;
 
         why2_send_socket(WHY2_CHAT_CODE_SSQC, WHY2_CHAT_SERVER_USERNAME, connection_buffer.connection);
 
