@@ -17,6 +17,7 @@
 # Compiler Settings
 CC=cc
 RC=cargo
+CP=sudo install -m 755
 RFLAGS=--manifest-path src/chat/config/Cargo.toml
 CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnull -Wunused -std=gnu11 -O2 -g # Remove the '-g' flag if you want the smallest possible lib size
 
@@ -77,14 +78,14 @@ noTarget: # Do not use this, please <3
 	@echo Hey you... You have to enter your target, too. Use \'install\' target for installing $(PROJECT_NAME)-core.
 
 installHeaderCore:
-	for file in $(INCLUDE_CORE); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
-	ln -sf $(INSTALL_INCLUDE)/$(PROJECT_NAME)/$(PROJECT_NAME).h $(INSTALL_INCLUDE)/$(PROJECT_NAME).h
+	for file in $(INCLUDE_CORE); do $(CP) -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
+	sudo ln -sf $(INSTALL_INCLUDE)/$(PROJECT_NAME)/$(PROJECT_NAME).h $(INSTALL_INCLUDE)/$(PROJECT_NAME).h
 
 installHeaderLogger:
-	for file in $(INCLUDE_LOGGER); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME)/logger; done
+	for file in $(INCLUDE_LOGGER); do $(CP) -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME)/logger; done
 
 installHeaderChat:
-	for file in $(INCLUDE_CHAT); do install -m 755 -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME)/chat; done
+	for file in $(INCLUDE_CHAT); do $(CP) -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME)/chat; done
 
 buildLibCore:
 	$(MAKE) clean
@@ -106,23 +107,23 @@ buildLibChat:
 	$(MAKE) clean
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_CHAT_MISC)
 	$(RC) build $(RFLAGS) --release
-	install -m 755 $(LIB_CHAT_CONFIG_OUT)/lib$(PROJECT_NAME)_chat_config.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-chat-config.so
+	$(CP) $(LIB_CHAT_CONFIG_OUT)/lib$(PROJECT_NAME)_chat_config.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-chat-config.so
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME)-chat.so *.o $(LIBS_LIB_CHAT)
 
 installLibCore: buildLibCore
-	install -m 755 ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
+	$(CP) ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
 
 installAppCore: appCore
-	install -m 755 $(OUTPUT_APP_CORE) $(INSTALL_BIN)/$(PROJECT_NAME)
+	$(CP) $(OUTPUT_APP_CORE) $(INSTALL_BIN)/$(PROJECT_NAME)
 
 installLibLogger: buildLibLogger
-	install -m 755 ./lib$(PROJECT_NAME)-logger.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-logger.so
+	$(CP) ./lib$(PROJECT_NAME)-logger.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-logger.so
 
 installAppLogger: appLogger
-	install -m 755 $(OUTPUT_APP_LOGGER) $(INSTALL_BIN)/$(PROJECT_NAME)-logger
+	$(CP) $(OUTPUT_APP_LOGGER) $(INSTALL_BIN)/$(PROJECT_NAME)-logger
 
 installLibChat: buildLibChat
-	install -m 755 ./lib$(PROJECT_NAME)-chat.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-chat.so
+	$(CP) ./lib$(PROJECT_NAME)-chat.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-chat.so
 
 testCore:
 	$(CC) $(CFLAGS) $(TEST_CORE) -o $(OUTPUT_TEST_CORE) $(LIB_CORE)
