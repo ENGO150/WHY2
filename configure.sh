@@ -29,11 +29,11 @@ ARCH_GENTOO_COMMON="$COMMON json-c libgit2"
 
 # Get COMMAND
 if [[ $DISTRO == "Arch" ]]; then
-    COMMAND="pacman -S --needed --noconfirm $ARCH_GENTOO_COMMON libyaml"
+    COMMAND="pacman -S --needed --noconfirm $ARCH_GENTOO_COMMON"
 elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
-    COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev libyaml-dev"
+    COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev"
 elif [[ $DISTRO == "Gentoo" ]]; then
-    COMMAND="emerge -vn $ARCH_GENTOO_COMMON dev-libs/libyaml"
+    COMMAND="emerge -vn $ARCH_GENTOO_COMMON"
 
     # Add
     echo "LDPATH=/usr/lib/libwhy2.so" > /etc/env.d/99why2-core
