@@ -77,6 +77,12 @@ DOLLAR=$
 no_target: # Do not use this, please <3
 	@echo Hey you... You have to enter your target, too. Use \'install\' target for installing $(PROJECT_NAME)-core.
 
+check_root:
+	@if [ "$(shell id -u)" = 0 ];then\
+		echo "Do not run install rules as root.";\
+		exit 1;\
+	fi
+
 install_header_core:
 	for file in $(INCLUDE_CORE); do $(CP) -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
 	sudo ln -sf $(INSTALL_INCLUDE)/$(PROJECT_NAME)/$(PROJECT_NAME).h $(INSTALL_INCLUDE)/$(PROJECT_NAME).h
@@ -146,6 +152,6 @@ build_chat: build_chat_server build_chat_client
 install_header: install_header_core install_header_logger install_header_chat
 install_libs: install_lib_core install_lib_logger install_lib_chat
 install_apps: install_app_core install_app_logger
-install: install_header install_libs install_apps clean
+install: check_root install_header install_libs install_apps clean
 install_test: install test_core test_logger
 all: install
