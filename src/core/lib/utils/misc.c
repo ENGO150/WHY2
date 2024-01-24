@@ -55,7 +55,7 @@ int removeDirectory(char *path)
 }
 
 //THESE old_gen_tkch_number FUNCTIONS ARE 'HISTORIC' FUNCTIONS, SO YOU CAN DECRYPT OLD TEXT
-void old_generate_text_key_chain_first(char *key, int *text_key_chain, int text_key_chain_size) //FIRST VERSION EVER. GOOD OLD TIMES. OR NOT. IT REMINDS ME OF HER. this shit hurts, man
+void old_generate_text_key_chain_first(char *key, int *text_key_chain, int text_key_chain_size) //FIRST VERSION EVER. Replaced on May 25th 15:51:57 2022 UTC. GOOD OLD TIMES. OR NOT. IT REMINDS ME OF HER. this shit hurts, man
 {
     int number_buffer;
     int (*cb)(int, int);
@@ -86,6 +86,36 @@ void old_generate_text_key_chain_first(char *key, int *text_key_chain, int text_
     }
 }
 
+void old_generate_text_key_chain_second(char *key, int *text_key_chain, int text_key_chain_size) //SECOND VERSION. Replaced on May 28th 17:45:26 2022 UTC.
+{
+    int number_buffer;
+    int (*cb)(int, int);
+
+    for (int i = 0; i < text_key_chain_size; i++)
+    {
+        number_buffer = i;
+
+        //CHECK, IF number_buffer ISN'T GREATER THAN keyLength AND CUT UNUSED LENGTH
+        while (number_buffer >= (int) why2_get_key_length())
+        {
+            number_buffer -= why2_get_key_length();
+        }
+
+        //FILL text_key_chain
+        if ((number_buffer + 1) % 3 == 0)
+        {
+            cb = multiply_cb;
+        } else if ((number_buffer + 1) % 2 == 0)
+        {
+            cb = subtract_cb;
+        } else
+        {
+            cb = sum_cb;
+        }
+
+        text_key_chain[i] = cb(key[number_buffer], key[number_buffer + (i < text_key_chain_size)]);
+    }
+}
 
 enum WHY2_EXIT_CODES why2_check_version(void) //! CRASHES WHEN CALLED FROM CHAT STUFF
 {
