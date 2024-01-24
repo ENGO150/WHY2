@@ -36,9 +36,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 why2_bool seedSet = 0; //DO NOT FUCKING TOUCH THIS!!!
 
-double multiply_cb(int a, int b) { return a * b; }
-double subtract_cb(int a, int b) { return a - b; }
-double sum_cb(int a, int b) { return a + b; }
+int multiply_cb(int a, int b) { return a * b; }
+int subtract_cb(int a, int b) { return a - b; }
+int sum_cb(int a, int b) { return a + b; }
 
 int unlink_cb(const char *fpath, WHY2_UNUSED const struct stat *sb, WHY2_UNUSED int typeflag, WHY2_UNUSED struct FTW *ftwbuf)
 {
@@ -258,7 +258,7 @@ void why2_generate_text_key_chain(char *key, int *textKeyChain, int textKeyChain
 {
     int numberBuffer;
     int numberBuffer2;
-    double (*cb)(int, int);
+    int (*cb)(int, int);
 
     for (int i = 0; i < textKeyChainSize; i++)
     {
