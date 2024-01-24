@@ -17,7 +17,7 @@
 # Compiler Settings
 CC=cc
 RC=cargo
-CP=sudo install -m 755
+CP=sudo install -m 755 # Not so compiler related but idk where to put it
 RFLAGS=--manifest-path src/chat/config/Cargo.toml
 CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnull -Wunused -std=gnu11 -O2 -g # Remove the '-g' flag if you want the smallest possible lib size
 
@@ -74,78 +74,78 @@ DOLLAR=$
 
 ##########
 
-noTarget: # Do not use this, please <3
+no_target: # Do not use this, please <3
 	@echo Hey you... You have to enter your target, too. Use \'install\' target for installing $(PROJECT_NAME)-core.
 
-installHeaderCore:
+install_header_core:
 	for file in $(INCLUDE_CORE); do $(CP) -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
 	sudo ln -sf $(INSTALL_INCLUDE)/$(PROJECT_NAME)/$(PROJECT_NAME).h $(INSTALL_INCLUDE)/$(PROJECT_NAME).h
 
-installHeaderLogger:
+install_header_logger:
 	for file in $(INCLUDE_LOGGER); do $(CP) -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME)/logger; done
 
-installHeaderChat:
+install_header_chat:
 	for file in $(INCLUDE_CHAT); do $(CP) -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME)/chat; done
 
-buildLibCore:
+build_lib_core:
 	$(MAKE) clean
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_CORE)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME).so *.o $(LIBS_CORE)
 
-buildLibLogger:
+build_lib_logger:
 	$(MAKE) clean
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_LOGGER)
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME)-logger.so *.o $(LIBS_LOGGER)
 
-buildChatClient:
+build_chat_client:
 	$(CC) $(CFLAGS) $(SRC_CHAT_CLIENT) -o $(OUTPUT_CHAT_CLIENT) $(LIBS_CHAT)
 
-buildChatServer:
+build_chat_server:
 	$(CC) $(CFLAGS) $(SRC_CHAT_SERVER) -o $(OUTPUT_CHAT_SERVER) $(LIBS_CHAT)
 
-buildLibChat:
+build_lib_chat:
 	$(MAKE) clean
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_CHAT_MISC)
 	$(RC) build $(RFLAGS) --release
 	$(CP) $(LIB_CHAT_CONFIG_OUT)/lib$(PROJECT_NAME)_chat_config.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-chat-config.so
 	$(CC) $(CFLAGS) -shared -o lib$(PROJECT_NAME)-chat.so *.o $(LIBS_LIB_CHAT)
 
-installLibCore: buildLibCore
+install_lib_core: build_lib_core
 	$(CP) ./lib$(PROJECT_NAME).so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME).so
 
-installAppCore: appCore
+install_app_core: app_core
 	$(CP) $(OUTPUT_APP_CORE) $(INSTALL_BIN)/$(PROJECT_NAME)
 
-installLibLogger: buildLibLogger
+install_lib_logger: build_lib_logger
 	$(CP) ./lib$(PROJECT_NAME)-logger.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-logger.so
 
-installAppLogger: appLogger
+install_app_logger: app_logger
 	$(CP) $(OUTPUT_APP_LOGGER) $(INSTALL_BIN)/$(PROJECT_NAME)-logger
 
-installLibChat: buildLibChat
+install_lib_chat: build_lib_chat
 	$(CP) ./lib$(PROJECT_NAME)-chat.so $(INSTALL_LIBRARY)/lib$(PROJECT_NAME)-chat.so
 
-testCore:
+test_core:
 	$(CC) $(CFLAGS) $(TEST_CORE) -o $(OUTPUT_TEST_CORE) $(LIB_CORE)
 
-testLogger:
+test_logger:
 	$(CC) $(CFLAGS) $(TEST_LOGGER) -o $(OUTPUT_TEST_LOGGER) $(LIBS_LOGGER) $(LIB_LOGGER)
 
-appCore:
+app_core:
 	$(CC) $(CFLAGS) $(SRC_CORE_APP) -o $(OUTPUT_APP_CORE) $(LIB_CORE)
 
-appLogger:
+app_logger:
 	$(CC) $(CFLAGS) $(SRC_LOGGER_APP) -o $(OUTPUT_APP_LOGGER) $(LIBS_LOGGER) $(LIB_LOGGER)
 
 clean:
 	$(RC) clean $(RFLAGS)
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
 
-buildChat: buildChatServer buildChatClient
+build_chat: build_chat_server build_chat_client
 
-installHeader: installHeaderCore installHeaderLogger installHeaderChat
-installLibs: installLibCore installLibLogger installLibChat
-installApps: installAppCore installAppLogger
-install: installHeader installLibs installApps clean
-installTest: install testCore testLogger
+install_header: install_header_core install_header_logger install_header_chat
+install_libs: install_lib_core install_lib_logger install_lib_chat
+install_apps: install_app_core install_app_logger
+install: install_header install_libs install_apps clean
+install_test: install test_core test_logger
 all: install
