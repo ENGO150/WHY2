@@ -71,6 +71,7 @@ typedef struct
     why2_bool no_check; //BOOLEAN FOR SKIPPING WHY2_VERSION CHECK
     why2_bool no_output; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
     why2_bool update; //BOOLEAN FOR UPDATING YOUR WHY WHY2_VERSION IF OLD IS USED
+    enum WHY2_TEXT_KEY_CHAIN_VERSIONS version; //VERSION OF tkch
 } why2_input_flags;
 
 typedef struct

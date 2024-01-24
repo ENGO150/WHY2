@@ -135,7 +135,7 @@ void why2_write_log(int loggerFile, char *logMessage)
     why2_log_flags flags = why2_get_log_flags();
 
     //SET ENCRYPTER FLAGS
-    if (!why2_get_flags_changed()) why2_set_flags((why2_input_flags) { 0, 1, 0 });
+    if (!why2_get_flags_changed()) why2_set_flags((why2_input_flags) { 0, 1, 0, WHY2_v4 });
 
     if (flags.key != NULL) //ENCRYPT TEXT IF KEY WAS CHANGED
     {

@@ -43,7 +43,8 @@ int main(void)
     {
         0, //SKIP CHECK
         0, //NO OUTPUT
-        0 //UPDATE
+        0, //UPDATE
+        WHY2_v4 //LATEST VERSION
     };
 
     //SET FLAGS
