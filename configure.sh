@@ -39,6 +39,7 @@ elif [[ $DISTRO == "Gentoo" ]]; then
     echo "LDPATH=/usr/lib/libwhy2.so" > /etc/env.d/99why2-core
     echo "LDPATH=/usr/lib/libwhy2-logger.so" > /etc/env.d/99why2-logger
     echo "LDPATH=/usr/lib/libwhy2-chat.so" > /etc/env.d/99why2-chat
+    echo "LDPATH=/usr/lib/libwhy2-chat-config.so" > /etc/env.d/99why2-chat-config
     env-update && source /etc/profile
 else
     # 'Unsupported' distro
