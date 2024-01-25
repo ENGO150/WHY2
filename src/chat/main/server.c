@@ -61,7 +61,7 @@ int main(void)
 
     for (;;)
     {
-        getline(&line_buffer, &line_length_buffer, stdin);
+    if (getline(&line_buffer, &line_length_buffer, stdin) == -1) why2_die("Reading input failed.");
 
         if (strcmp(line_buffer, "!exit\n") == 0) //USER REQUESTED PROGRAM EXIT
         {

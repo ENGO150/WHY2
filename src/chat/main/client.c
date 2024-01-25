@@ -51,7 +51,7 @@ int main(void)
 
     //GET IP
     printf("Welcome.\n\nEnter IP Address:\n>>> ");
-    getline(&line, &line_length, stdin);
+    if (getline(&line, &line_length, stdin) == -1) why2_die("Reading input failed."); //TODO: Add enums to why2_die()
 
     server_addr.sin_addr.s_addr = inet_addr(line);
 
