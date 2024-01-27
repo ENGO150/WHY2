@@ -21,6 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -189,8 +190,31 @@ void remove_json_syntax_characters(char *text)
     }
 }
 
+void lowercase(char *string)
+{
+    for (unsigned long i = 0; i < strlen(string); i++)
+    {
+        string[i] = tolower(string[i]);
+    }
+}
+
+why2_bool username_equal(char *u1, char *u2)
+{
+    char *one = why2_strdup(u1);
+    char *two = why2_strdup(u2);
+
+    //LOWERCASE
+    lowercase(one);
+    lowercase(two);
+
+    return strcmp(one, two) == 0;
+}
+
 why2_bool check_username(char *username)
 {
+    if (username_equal(username, WHY2_CHAT_SERVER_USERNAME)) return 0; //DISABLE 'server' USERNAME
+    if (username_equal(username, WHY2_DEFAULT_USERNAME)) return 0; //DISABLE 'anon' USERNAME DUE TO ONE USERNAME PER SERVER
+
     for (unsigned long i = 0; i < strlen(username); i++)
     {
         if (!((username[i] >= 48 && username[i] <= 57) ||
