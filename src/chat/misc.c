@@ -42,6 +42,7 @@ typedef struct _connection_node
 {
     int connection;
     pthread_t thread;
+    char *username;
 } connection_node_t; //SINGLE LINKED LIST
 
 why2_list_t connection_list = WHY2_LIST_EMPTY;
@@ -340,7 +341,8 @@ void *why2_communicate_thread(void *arg)
     connection_node_t node = (connection_node_t)
     {
         connection,
-        pthread_self()
+        pthread_self(),
+        why2_strdup(WHY2_DEFAULT_USERNAME)
     };
 
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
@@ -356,7 +358,7 @@ void *why2_communicate_thread(void *arg)
     why2_bool invalid_username;
     why2_bool exiting = 0;
     char *decoded_buffer = NULL;
-    char *username = why2_strdup("anon");
+    char *username = node.username;
 
     why2_deallocate(string_buffer);
 
@@ -379,6 +381,7 @@ void *why2_communicate_thread(void *arg)
 
         invalid_username = (strlen(decoded_buffer) > WHY2_MAX_USERNAME_LENGTH) || !check_username(decoded_buffer); //CHECK FOR USERNAMES LONGER THAN 20 CHARACTERS
 
+        why2_deallocate(username);
         username = decoded_buffer;
 
         //DEALLOCATE STUFF HERE
@@ -416,7 +419,6 @@ void *why2_communicate_thread(void *arg)
     pthread_join(thread_buffer, NULL);
 
     why2_deallocate(raw);
-    why2_deallocate(username);
     why2_deallocate(connection_message);
 
     while (!(exiting || force_exiting)) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
@@ -460,6 +462,8 @@ void *why2_communicate_thread(void *arg)
 
     //DEALLOCATION
     close(connection);
+    why2_deallocate(node.username);
+
     why2_list_remove(&connection_list, find_connection(connection));
 
     return NULL;
