@@ -370,7 +370,6 @@ void *why2_communicate_thread(void *arg)
     pthread_join(thread_buffer, NULL);
 
     why2_deallocate(raw);
-    raw = NULL;
 
     while (!exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
