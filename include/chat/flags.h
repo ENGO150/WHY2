@@ -35,6 +35,8 @@ extern "C" {
 
 #define WHY2_INVALID_POINTER (void*) 0xffffffffffffffff
 
+#define WHY2_MAX_USERNAME_LENGTH 20 //MAXIMAL USERNAME LENGTH
+
 #ifdef __cplusplus
 }
 #endif
