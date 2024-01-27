@@ -350,30 +350,61 @@ void *why2_communicate_thread(void *arg)
     char *string_buffer = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{USER}", getenv("USER"));
     char *config_username = why2_toml_read(string_buffer, "user_pick_username");
 
+    char *raw;
+    void *raw_ptr = NULL;
+    why2_bool force_exiting = 0;
+    why2_bool invalid_username;
+    why2_bool exiting = 0;
+    char *decoded_buffer = NULL;
+    char *username = why2_strdup("anon");
+
+    why2_deallocate(string_buffer);
+
     if (config_username == NULL || strcmp(config_username, "true") == 0)
     {
         if (config_username == NULL) fprintf(stderr, "Your config doesn't contain 'user_pick_username'. Please update your configuration.\n");
 
-        why2_send_socket(WHY2_CHAT_CODE_PICK_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection);
-    } else
-    {
-        //TODO: Implement Database
+        repeat_username_get:
+        invalid_username = 0;
+
+        why2_send_socket(WHY2_CHAT_CODE_PICK_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection); //ASK USER FOR USERNAME
+
+        if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+        {
+            force_exiting = 1; //FAILURE
+            goto deallocation;
+        }
+
+        decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
+
+        invalid_username = (strlen(decoded_buffer) > WHY2_MAX_USERNAME_LENGTH) || !check_username(decoded_buffer); //CHECK FOR USERNAMES LONGER THAN 20 CHARACTERS
+
+        username = decoded_buffer;
+
+        //DEALLOCATE STUFF HERE
+        why2_deallocate(raw);
+        why2_deallocate(raw_ptr);
+
+        if (invalid_username)
+        {
+            why2_send_socket(WHY2_CHAT_CODE_INVALID_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection); //TELL THE USER HE IS DUMB AS FUCK
+            goto repeat_username_get; //REPEAT
+        }
     }
 
-    why2_deallocate(string_buffer);
     why2_toml_read_free(config_username);
 
-    char *received = NULL;
-    char *raw = why2_strdup("");
-    void *raw_ptr = NULL;
-    char *decoded_buffer;
+    raw = why2_strdup("");
     pthread_t thread_buffer;
-    why2_bool exiting = 0;
     struct json_object *json = json_tokener_parse("{}");
+    char *connection_message = why2_malloc(strlen(username) + 11);
+
+    //BUILD connection_message
+    sprintf(connection_message, "%s connected", username);
 
     //SEND CONNECTION MESSAGE
-    json_object_object_add(json, "message", json_object_new_string("anon connected"));
-    json_object_object_add(json, "username", json_object_new_string(WHY2_CHAT_SERVER_USERNAME)); //TODO: Usernames
+    json_object_object_add(json, "message", json_object_new_string(connection_message));
+    json_object_object_add(json, "username", json_object_new_string(WHY2_CHAT_SERVER_USERNAME));
 
     json_object_object_foreach(json, key, value) //GENERATE JSON STRING
     {
@@ -385,8 +416,10 @@ void *why2_communicate_thread(void *arg)
     pthread_join(thread_buffer, NULL);
 
     why2_deallocate(raw);
+    why2_deallocate(username);
+    why2_deallocate(connection_message);
 
-    while (!exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
+    while (!(exiting || force_exiting)) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
         if ((raw = read_user(connection, &raw_ptr)) == NULL) break; //READ
 
