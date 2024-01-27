@@ -106,7 +106,7 @@ int main(void)
 
         printf(WHY2_CLEAR_AND_GO_UP);
 
-        why2_send_socket(line, "anon", listen_socket);
+        why2_send_socket(line, "anon", listen_socket); //TODO: Implement get_username
 
         if (strcmp(line, "!exit\n") == 0) //USER REQUESTED PROGRAM EXIT
         {
