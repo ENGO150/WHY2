@@ -390,7 +390,13 @@ void *why2_communicate_thread(void *arg)
 
         if (decoded_buffer[0] == '!') //COMMANDS
         {
-            if (strcmp(decoded_buffer, "!exit") == 0) exiting = 1; //USER REQUESTED EXIT
+            if (strcmp(decoded_buffer, "!exit") == 0) //USER REQUESTED EXIT
+            {
+                exiting = 1;
+            } else
+            {
+                why2_send_socket(WHY2_CHAT_CODE_INVALID_COMMAND, WHY2_CHAT_SERVER_USERNAME, connection);
+            }
 
             goto deallocation; //IGNORE MESSAGES BEGINNING WITH '!'
         }
@@ -524,11 +530,20 @@ void *why2_listen_server(void *socket)
             } else if (strcmp(read + 8, WHY2_CHAT_CODE_PICK_USERNAME) == 0) //PICK USERNAME
             {
                 //TODO: Check username
+            } else if (strcmp(read + 8, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //PICK USERNAME
+            {
+                printf("\nInvalid command!\n\n");
+                fflush(stdout);
+
+                goto continue_input;
             }
         } else
         {
-            printf(WHY2_CLEAR_AND_GO_UP);
-            printf("%s\n\n>>> ", read);
+            printf("%s%s\n\n", WHY2_CLEAR_AND_GO_UP, read);
+
+            continue_input:
+
+            printf(">>> ");
             fflush(stdout);
         }
 
