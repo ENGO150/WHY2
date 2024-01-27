@@ -389,6 +389,12 @@ void *why2_communicate_thread(void *arg)
 
     if (config_username == NULL || strcmp(config_username, "true") == 0)
     {
+        if (usernames_n++ == WHY2_MAX_USERNAME_TRIES) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
+        {
+            exiting = 1;
+            goto deallocation;
+        }
+
         if (config_username == NULL) fprintf(stderr, "Your config doesn't contain 'user_pick_username'. Please update your configuration.\n");
 
         while (invalid_username)
@@ -415,12 +421,6 @@ void *why2_communicate_thread(void *arg)
             if (invalid_username)
             {
                 why2_send_socket(WHY2_CHAT_CODE_INVALID_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection); //TELL THE USER HE IS DUMB AS FUCK
-            }
-
-            if (++usernames_n == WHY2_MAX_USERNAME_TRIES) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
-            {
-                exiting = 1;
-                goto deallocation;
             }
         }
     }
