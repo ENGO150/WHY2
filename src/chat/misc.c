@@ -188,6 +188,21 @@ void remove_json_syntax_characters(char *text)
     }
 }
 
+why2_bool check_username(char *username)
+{
+    for (unsigned long i = 0; i < strlen(username); i++)
+    {
+        if (!((username[i] >= 48 && username[i] <= 57) ||
+        (username[i] >= 65 && username[i] <= 90) ||     //CHECK ONLY FOR a-Z & 0-9
+        (username[i] >= 97 && username[i] <= 122)))
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 void *stop_oldest_thread(void *id)
 {
     sleep(WHY2_COMMUNICATION_TIME); //yk wait
