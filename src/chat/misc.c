@@ -240,6 +240,35 @@ why2_node_t *find_connection(int connection)
     return buffer;
 }
 
+char *read_user(int connection, void **raw_ptr)
+{
+    //VARIABLES
+    void *buffer;
+    pthread_t thread_buffer;
+    pthread_t thread_deletion_buffer;
+
+    //RESET VARIABLES
+    *raw_ptr = NULL;
+
+    buffer = &thread_buffer;
+
+    //READ
+    pthread_create(&thread_buffer, NULL, read_socket_raw_thread, &connection);
+    why2_list_push(&waiting_list, &buffer, sizeof(buffer));
+
+    //RUN DELETION THREAD
+    pthread_create(&thread_deletion_buffer, NULL, stop_oldest_thread, &thread_buffer);
+
+    //WAIT FOR MESSAGE
+    pthread_join(thread_buffer, raw_ptr);
+    why2_list_remove(&waiting_list, find_request(&thread_buffer));
+    pthread_cancel(thread_deletion_buffer);
+
+    if (*raw_ptr == WHY2_INVALID_POINTER || *raw_ptr == NULL) return NULL; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
+
+    return (char*) *raw_ptr;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
@@ -319,13 +348,11 @@ void *why2_communicate_thread(void *arg)
     why2_deallocate(string_buffer);
     why2_toml_read_free(config_username);
 
-    void *buffer;
     char *received = NULL;
     char *raw = why2_strdup("");
     void *raw_ptr = NULL;
     char *decoded_buffer;
     pthread_t thread_buffer;
-    pthread_t thread_deletion_buffer;
     why2_bool exiting = 0;
     struct json_object *json = json_tokener_parse("{}");
 
@@ -347,23 +374,7 @@ void *why2_communicate_thread(void *arg)
 
     while (!exiting) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
-        buffer = &thread_buffer;
-
-        //READ
-        pthread_create(&thread_buffer, NULL, read_socket_raw_thread, &connection);
-        why2_list_push(&waiting_list, &buffer, sizeof(buffer));
-
-        //RUN DELETION THREAD
-        pthread_create(&thread_deletion_buffer, NULL, stop_oldest_thread, &thread_buffer);
-
-        //WAIT FOR MESSAGE
-        pthread_join(thread_buffer, &raw_ptr);
-        why2_list_remove(&waiting_list, find_request(&thread_buffer));
-        pthread_cancel(thread_deletion_buffer);
-
-        if (raw_ptr == WHY2_INVALID_POINTER || raw_ptr == NULL) break; //QUIT COMMUNICATION IF INVALID PACKET WAS RECEIVED
-
-        raw = (char*) raw_ptr;
+        if ((raw = read_user(connection, &raw_ptr)) == NULL) break; //READ
 
         //REMOVE CONTROL CHARACTERS FROM raw
         for (size_t i = 0; i < strlen(raw); i++)
@@ -393,9 +404,6 @@ void *why2_communicate_thread(void *arg)
         why2_deallocate(raw);
         why2_deallocate(raw_ptr);
         why2_deallocate(decoded_buffer);
-
-        //RESET VARIABLES
-        raw_ptr = NULL;
     }
 
     if (exiting) why2_send_socket(WHY2_CHAT_CODE_SSQC, WHY2_CHAT_SERVER_USERNAME, connection);
