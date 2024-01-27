@@ -43,7 +43,7 @@ elif [[ $DISTRO == "Gentoo" ]]; then
     env-update && source /etc/profile
 else
     # 'Unsupported' distro
-    echo "It seems you are using unsupported distribution... Don't worry, just install 'gcc', 'json-c', 'curl', 'libgit2', 'tmux', 'libyaml' and 'make' and you'll be fine."
+    echo "It seems you are using unsupported distribution... Don't worry, just install 'gcc', 'json-c', 'curl', 'libgit2', 'tmux' and 'make' and you'll be fine."
     exit
 fi
 
