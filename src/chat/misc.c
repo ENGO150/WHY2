@@ -112,7 +112,7 @@ void add_brackets(char **json)
 {
     char *output = why2_calloc(strlen(*json) + 3, sizeof(char));
 
-    sprintf(output, "{%s}", *json);
+    sprintf(output, "{%s}%c", *json, '\0');
 
     why2_deallocate(*json);
 
