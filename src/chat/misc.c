@@ -379,10 +379,11 @@ void *why2_communicate_thread(void *arg)
     char *raw;
     void *raw_ptr = NULL;
     why2_bool force_exiting = 0;
-    why2_bool invalid_username;
+    why2_bool invalid_username = 1;
     why2_bool exiting = 0;
     char *decoded_buffer = NULL;
     char *username = node.username;
+    int usernames_n = 0;
 
     why2_deallocate(string_buffer);
 
@@ -390,32 +391,37 @@ void *why2_communicate_thread(void *arg)
     {
         if (config_username == NULL) fprintf(stderr, "Your config doesn't contain 'user_pick_username'. Please update your configuration.\n");
 
-        repeat_username_get:
-        invalid_username = 0;
-
-        why2_send_socket(WHY2_CHAT_CODE_PICK_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection); //ASK USER FOR USERNAME
-
-        if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+        while (invalid_username)
         {
-            force_exiting = 1; //FAILURE
-            goto deallocation;
-        }
+            why2_send_socket(WHY2_CHAT_CODE_PICK_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection); //ASK USER FOR USERNAME
 
-        decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
+            if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+            {
+                force_exiting = 1; //FAILURE
+                goto deallocation;
+            }
 
-        invalid_username = (strlen(decoded_buffer) > WHY2_MAX_USERNAME_LENGTH) || !check_username(decoded_buffer); //CHECK FOR USERNAMES LONGER THAN 20 CHARACTERS
+            decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
 
-        why2_deallocate(username);
-        username = decoded_buffer;
+            invalid_username = (strlen(decoded_buffer) > WHY2_MAX_USERNAME_LENGTH) || !check_username(decoded_buffer); //CHECK FOR USERNAMES LONGER THAN 20 CHARACTERS
 
-        //DEALLOCATE STUFF HERE
-        why2_deallocate(raw);
-        why2_deallocate(raw_ptr);
+            why2_deallocate(username);
+            username = decoded_buffer;
 
-        if (invalid_username)
-        {
-            why2_send_socket(WHY2_CHAT_CODE_INVALID_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection); //TELL THE USER HE IS DUMB AS FUCK
-            goto repeat_username_get; //REPEAT
+            //DEALLOCATE STUFF HERE
+            why2_deallocate(raw);
+            why2_deallocate(raw_ptr);
+
+            if (invalid_username)
+            {
+                why2_send_socket(WHY2_CHAT_CODE_INVALID_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection); //TELL THE USER HE IS DUMB AS FUCK
+            }
+
+            if (++usernames_n == WHY2_MAX_USERNAME_TRIES) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
+            {
+                exiting = 1;
+                goto deallocation;
+            }
         }
     }
 
