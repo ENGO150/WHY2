@@ -593,7 +593,8 @@ void *why2_listen_server(void *socket)
             }
         } else
         {
-            printf("\n%s%s%s\n\n", WHY2_CLEAR_AND_GO_UP, WHY2_CLEAR_AND_GO_UP, read);
+            printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP); //do not fucking ask me how the fucking formatting fucking works, i dont fucking know
+            printf("\n\n%s%s\n\n", WHY2_CLEAR_AND_GO_UP, read);
 
             continue_input:
 
