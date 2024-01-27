@@ -507,7 +507,7 @@ void *why2_listen_server(void *socket)
     printf(">>> ");
     fflush(stdout);
 
-    for (;;)
+    while (!exiting)
     {
         read = why2_read_socket(*((int*) socket));
 
@@ -541,7 +541,6 @@ void *why2_listen_server(void *socket)
         }
 
         why2_deallocate(read);
-        if (exiting) break;
     }
 
     return NULL;
