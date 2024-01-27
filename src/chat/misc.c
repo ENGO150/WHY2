@@ -589,7 +589,7 @@ void *why2_listen_server(void *socket)
             }
         } else
         {
-            printf("%s%s\n\n", WHY2_CLEAR_AND_GO_UP, read);
+            printf("\n%s%s%s\n\n", WHY2_CLEAR_AND_GO_UP, WHY2_CLEAR_AND_GO_UP, read);
 
             continue_input:
 
