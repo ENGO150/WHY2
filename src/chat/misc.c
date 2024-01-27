@@ -381,10 +381,6 @@ void *why2_communicate_thread(void *arg)
             if (raw[i] == '\\') raw[i] = '/';
         }
 
-        received = read_socket_from_raw(raw);
-
-        if (received == NULL) break; //FAILED; EXIT THREAD
-
         decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
 
         if (decoded_buffer[0] == '!') //COMMANDS
@@ -405,7 +401,6 @@ void *why2_communicate_thread(void *arg)
 
         deallocation:
 
-        why2_deallocate(received);
         why2_deallocate(raw);
         why2_deallocate(raw_ptr);
         why2_deallocate(decoded_buffer);
@@ -416,7 +411,6 @@ void *why2_communicate_thread(void *arg)
     printf("User disconnected.\t%d\n", connection);
 
     //DEALLOCATION
-    why2_deallocate(received);
     close(connection);
     why2_list_remove(&connection_list, find_connection(connection));
 
