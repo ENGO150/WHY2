@@ -309,6 +309,14 @@ char *read_user(int connection, void **raw_ptr)
     return (char*) *raw_ptr;
 }
 
+char *get_username(int connection)
+{
+    why2_node_t *node = find_connection(connection);
+    connection_node_t c_node = *(connection_node_t*) node -> value;
+
+    return c_node.username;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
@@ -326,7 +334,7 @@ void why2_send_socket(char *text, char *username, int socket)
 
     //ADD OBJECTS
     json_object_object_add(json, "message", json_object_new_string(text_copy));
-    json_object_object_add(json, "username", json_object_new_string(username));
+    if (username != NULL) json_object_object_add(json, "username", json_object_new_string(username)); //WAS SENT FROM SERVER
 
     //GENERATE JSON STRING
     json_object_object_foreach(json, key, value)
@@ -362,14 +370,6 @@ void *why2_communicate_thread(void *arg)
 {
     int connection = *(int*) arg;
 
-    connection_node_t node = (connection_node_t)
-    {
-        connection,
-        pthread_self(),
-        why2_strdup(WHY2_DEFAULT_USERNAME)
-    };
-
-    why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
     printf("User connected.\t\t%d\n", connection);
 
     //GET USERNAME
@@ -382,8 +382,9 @@ void *why2_communicate_thread(void *arg)
     why2_bool invalid_username = 1;
     why2_bool exiting = 0;
     char *decoded_buffer = NULL;
-    char *username = node.username;
+    char *username = why2_strdup(WHY2_DEFAULT_USERNAME);
     int usernames_n = 0;
+    struct json_object *json = json_tokener_parse("{}");
 
     why2_deallocate(string_buffer);
 
@@ -427,9 +428,18 @@ void *why2_communicate_thread(void *arg)
 
     why2_toml_read_free(config_username);
 
+    connection_node_t node = (connection_node_t)
+    {
+        connection,
+        pthread_self(),
+        strdup(username)
+    };
+
+    why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
+
     raw = why2_strdup("");
+    char *raw_output;
     pthread_t thread_buffer;
-    struct json_object *json = json_tokener_parse("{}");
     char *connection_message = why2_malloc(strlen(username) + 11);
 
     //BUILD connection_message
@@ -444,16 +454,20 @@ void *why2_communicate_thread(void *arg)
         append(&raw, key, (char*) json_object_get_string(value));
     }
     add_brackets(&raw);
+    json_object_put(json);
 
     pthread_create(&thread_buffer, NULL, send_to_all, raw); //SEND
     pthread_join(thread_buffer, NULL);
 
     why2_deallocate(raw);
     why2_deallocate(connection_message);
+    why2_deallocate(username);
 
     while (!(exiting || force_exiting)) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
         if ((raw = read_user(connection, &raw_ptr)) == NULL) break; //READ
+        json = json_tokener_parse("{}");
+        raw_output = why2_strdup("");
 
         //REMOVE CONTROL CHARACTERS FROM raw
         for (size_t i = 0; i < strlen(raw); i++)
@@ -476,14 +490,26 @@ void *why2_communicate_thread(void *arg)
             goto deallocation; //IGNORE MESSAGES BEGINNING WITH '!'
         }
 
-        pthread_create(&thread_buffer, NULL, send_to_all, raw);
+        //REBUILD MESSAGE WITH USERNAME
+        json_object_object_add(json, "message", json_object_new_string(decoded_buffer));
+        json_object_object_add(json, "username", json_object_new_string(get_username(connection)));
+
+        json_object_object_foreach(json, key, value) //GENERATE JSON STRING
+        {
+            append(&raw_output, key, (char*) json_object_get_string(value));
+        }
+        add_brackets(&raw_output);
+
+        pthread_create(&thread_buffer, NULL, send_to_all, raw_output);
         pthread_join(thread_buffer, NULL);
 
         deallocation:
 
         why2_deallocate(raw);
         why2_deallocate(raw_ptr);
+        why2_deallocate(raw_output);
         why2_deallocate(decoded_buffer);
+        json_object_put(json);
     }
 
     if (exiting) why2_send_socket(WHY2_CHAT_CODE_SSQC, WHY2_CHAT_SERVER_USERNAME, connection);

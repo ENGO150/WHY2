@@ -106,7 +106,7 @@ int main(void)
 
         printf(WHY2_CLEAR_AND_GO_UP);
 
-        why2_send_socket(line, "anon", listen_socket); //TODO: Implement get_username
+        why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
 
         if (strcmp(line, "!exit\n") == 0) //USER REQUESTED PROGRAM EXIT
         {
