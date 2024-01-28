@@ -415,6 +415,26 @@ void *why2_communicate_thread(void *arg)
             why2_deallocate(username);
             username = decoded_buffer;
 
+            if (!invalid_username)
+            {
+                //GO TROUGH LIST AND CHECK FOR DUPLICITY
+                why2_node_t *buffer = connection_list.head;
+
+                while (buffer != NULL)
+                {
+                    //GET USERNAME
+                    connection_node_t *co_node = (connection_node_t*) buffer -> value;
+
+                    if (strcmp(co_node -> username, decoded_buffer) == 0) //COMPARE
+                    {
+                        invalid_username = 1;
+                        break;
+                    }
+
+                    buffer = buffer -> next; //NEXT
+                }
+            }
+
             //DEALLOCATE STUFF HERE
             why2_deallocate(raw);
             why2_deallocate(raw_ptr);
@@ -435,7 +455,7 @@ void *why2_communicate_thread(void *arg)
     {
         connection,
         pthread_self(),
-        strdup(username)
+        why2_strdup(username)
     };
 
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
