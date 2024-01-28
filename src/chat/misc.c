@@ -633,7 +633,7 @@ void *why2_listen_server(void *socket)
                 exiting = 1; //EXIT THIS THREAD
             } else if (strcmp(read + 8, WHY2_CHAT_CODE_PICK_USERNAME) == 0) //PICK USERNAME
             {
-                printf("%sEnter username (a-Z, 0-9; %d-%d characters):\n", WHY2_CLEAR_AND_GO_UP, WHY2_MAX_USERNAME_LENGTH, WHY2_MAX_USERNAME_LENGTH);
+                printf("%sEnter username (a-Z, 0-9; %d-%d characters):\n", WHY2_CLEAR_AND_GO_UP, WHY2_MIN_USERNAME_LENGTH, WHY2_MAX_USERNAME_LENGTH);
                 fflush(stdout);
 
                 goto continue_input;
