@@ -423,6 +423,8 @@ void *why2_communicate_thread(void *arg)
             {
                 why2_send_socket(WHY2_CHAT_CODE_INVALID_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection); //TELL THE USER HE IS DUMB AS FUCK
             }
+
+            printf("User set username.\t%d\t%s\n", connection, decoded_buffer);
         }
     }
 
