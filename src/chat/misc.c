@@ -500,6 +500,12 @@ void *why2_communicate_thread(void *arg)
 
         decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
 
+        if (decoded_buffer == NULL) //idk sometimes this happen, idk why
+        {
+            force_exiting = 1;
+            goto deallocation;
+        }
+
         if (decoded_buffer[0] == '!') //COMMANDS
         {
             if (strcmp(decoded_buffer, "!exit") == 0) //USER REQUESTED EXIT
