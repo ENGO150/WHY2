@@ -69,18 +69,18 @@ char *get_string_from_json_string(char *json, char *string)
     return returning;
 }
 
-void *send_to_all(void *json)
+void send_to_all(char *json)
 {
     why2_node_t _first_node = (why2_node_t) { NULL, connection_list.head };
     why2_node_t *node_buffer = &_first_node;
     connection_node_t connection_buffer;
 
     //PARSE
-    struct json_object *json_obj = json_tokener_parse((char*) json);
+    struct json_object *json_obj = json_tokener_parse(json);
     char *message = get_string_from_json(json_obj, "message");
     char *username = get_string_from_json(json_obj, "username");
 
-    if (json_obj == NULL) return NULL; //EXIT IF INVALID SYNTAX WAS SENT
+    if (json_obj == NULL) return; //EXIT IF INVALID SYNTAX WAS SENT
 
     while (node_buffer -> next != NULL) //SEND TO ALL CONNECTIONS
     {
@@ -93,8 +93,6 @@ void *send_to_all(void *json)
 
     //DEALLOCATION
     json_object_put(json_obj);
-
-    return NULL;
 }
 
 void append(char **destination, char *key, char *value)
@@ -462,7 +460,6 @@ void *why2_communicate_thread(void *arg)
 
     raw = why2_strdup("");
     char *raw_output;
-    pthread_t thread_buffer;
     char *connection_message = why2_malloc(strlen(username) + 11);
 
     //BUILD connection_message
@@ -479,8 +476,7 @@ void *why2_communicate_thread(void *arg)
     add_brackets(&raw);
     json_object_put(json);
 
-    pthread_create(&thread_buffer, NULL, send_to_all, raw); //SEND
-    pthread_join(thread_buffer, NULL);
+    send_to_all(raw); //FUCKING SEND TO ALL YOU TWAT
 
     why2_deallocate(raw);
     why2_deallocate(connection_message);
@@ -529,8 +525,7 @@ void *why2_communicate_thread(void *arg)
         }
         add_brackets(&raw_output);
 
-        pthread_create(&thread_buffer, NULL, send_to_all, raw_output);
-        pthread_join(thread_buffer, NULL);
+        send_to_all(raw_output); //e
 
         deallocation:
 
