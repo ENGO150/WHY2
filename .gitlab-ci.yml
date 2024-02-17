@@ -24,7 +24,7 @@ why2-chat-build:
   script:
     - apt update
     - chmod +x configure.sh
-    - sudo ./configure.sh
+    - ./configure.sh
     - make install
     - make build_chat
   artifacts:
