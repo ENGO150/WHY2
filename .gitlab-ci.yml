@@ -23,8 +23,9 @@ why2-chat-build:
   image: ubuntu:latest
   script:
     - apt update
+    - apt install sudo lsb-release -y
     - chmod +x configure.sh
-    - ./configure.sh
+    - sudo ./configure.sh
     - make install
     - make build_chat
   artifacts:
