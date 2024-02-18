@@ -552,6 +552,9 @@ void *why2_communicate_thread(void *arg)
 char *why2_read_socket(int socket)
 {
     char *raw_socket = read_socket_raw(socket);
+
+    if (raw_socket == NULL) return NULL;
+
     char *final_message;
     struct json_object *json_obj = json_tokener_parse(raw_socket);
 
@@ -642,6 +645,8 @@ void *why2_listen_server(void *socket)
     while (!exiting)
     {
         read = why2_read_socket(*((int*) socket));
+
+        if (read == NULL) continue;
 
         if (strncmp(read, WHY2_CHAT_SERVER_USERNAME ": code", 12) == 0) //CODE WAS SENT
         {
