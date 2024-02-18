@@ -20,7 +20,7 @@ variables:
 
 why2-chat-build:
   stage: build
-  image: ubuntu:latest
+  image: rust:latest
   script:
     - apt update
     - apt install sudo lsb-release -y
