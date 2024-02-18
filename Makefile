@@ -78,10 +78,12 @@ no_target: # Do not use this, please <3
 	@echo Hey you... You have to enter your target, too. Use \'install\' target for installing $(PROJECT_NAME)-core.
 
 check_root:
-	@if [ "$(shell id -u)" = 0 ];then\
+ifneq ($(BYPASS_CHECK),true)
+	@if [ "$(shell id -u)" = 0 ]; then\
 		echo "Do not run install rules as root.";\
 		exit 1;\
 	fi
+endif
 
 install_header_core:
 	for file in $(INCLUDE_CORE); do $(CP) -D $(DOLLAR)file -t $(INSTALL_INCLUDE)/$(PROJECT_NAME); done
