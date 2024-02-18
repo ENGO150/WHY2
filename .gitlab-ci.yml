@@ -65,3 +65,16 @@ why2-logger-test:
     - ./$LOGGER_OUTPUT # Test Lib
     - $LOGGER_APP # Test App
     - $VALGRIND $LOGGER_OUTPUT # Test Lib by Valgrind
+
+why2-project:
+  stage: build
+  image: rust:latest
+  script:
+    - apt update # Update repos
+    - apt install sudo lsb-release -y # Install needed stuff
+    - chmod +x configure.sh # Permissions
+    - sudo ./configure.sh # Preparation
+    - make install BYPASS_CHECK=true # Install WHY2
+    - curl -Lo test.c https://gist.github.com/ENGO150/d8419b6c31ffb68ebb930a5b41af8c73/raw # Download WHY2 test project
+    - cc test.c -lwhy2 -Wall -o test # Build WHY2 project
+    - ./test # Run Test
