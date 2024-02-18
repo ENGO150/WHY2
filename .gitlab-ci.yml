@@ -19,6 +19,8 @@ variables:
   SERVER: "./out/why2-chat-server"
   CORE_OUTPUT: "./out/why2-core-test"
   CORE_APP: "why2"
+  LOGGER_OUTPUT: "./out/why2-logger-test"
+  LOGGER_APP: "why2-logger"
   VALGRIND: "valgrind --leak-check=full --show-leak-kinds=reachable --track-origins=yes -s"
 
 why2-chat-build:
@@ -49,3 +51,17 @@ why2-core-test:
     - ./$CORE_OUTPUT # Test Lib
     - $CORE_APP # Test App
     - $VALGRIND $CORE_OUTPUT # Test Lib by Valgrind
+
+why2-logger-test:
+  stage: build
+  image: rust:latest
+  script:
+    - apt update # Update repos
+    - apt install sudo lsb-release valgrind -y # Install needed stuff
+    - chmod +x configure.sh # Permissions
+    - sudo ./configure.sh # Preparation
+    - make install BYPASS_CHECK=true # Install WHY2
+    - make test_logger # Build WHY2 Test
+    - ./$LOGGER_OUTPUT # Test Lib
+    - $LOGGER_APP # Test App
+    - $VALGRIND $LOGGER_OUTPUT # Test Lib by Valgrind
