@@ -394,12 +394,6 @@ void *why2_communicate_thread(void *arg)
 
         while (invalid_username)
         {
-            if (usernames_n++ == WHY2_MAX_USERNAME_TRIES) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
-            {
-                exiting = 1;
-                goto deallocation;
-            }
-
             if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
             {
                 force_exiting = 1; //FAILURE
@@ -436,6 +430,12 @@ void *why2_communicate_thread(void *arg)
             //DEALLOCATE STUFF HERE
             why2_deallocate(raw);
             why2_deallocate(raw_ptr);
+
+            if (++usernames_n == WHY2_MAX_USERNAME_TRIES) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
+            {
+                exiting = 1;
+                goto deallocation;
+            }
 
             if (invalid_username)
             {
@@ -477,6 +477,8 @@ void *why2_communicate_thread(void *arg)
     json_object_put(json);
 
     send_to_all(raw); //FUCKING SEND TO ALL YOU TWAT
+
+    why2_send_socket(WHY2_CHAT_CODE_ACCEPT_MESSAGES, WHY2_CHAT_SERVER_USERNAME, connection); //TELL USER HE CAN START COMMUNICATING
 
     why2_deallocate(raw);
     why2_deallocate(connection_message);
@@ -638,6 +640,7 @@ void *why2_listen_server(void *socket)
 {
     char *read = NULL;
     why2_bool exiting = 0;
+    why2_bool asking_username = 0;
 
     printf(">>> ");
     fflush(stdout);
@@ -652,15 +655,23 @@ void *why2_listen_server(void *socket)
         {
             if (strcmp(read + 8, WHY2_CHAT_CODE_SSQC) == 0)
             {
-                printf("%s\nServer closed the connection.\n", WHY2_CLEAR_AND_GO_UP);
+                printf("%s%s\nServer closed the connection.\n", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, (!asking_username ? "\n": ""));
                 fflush(stdout);
 
                 pthread_cancel(getline_thread); //CANCEL CLIENT getline
                 exiting = 1; //EXIT THIS THREAD
+            } else if (strcmp(read + 8, WHY2_CHAT_CODE_ACCEPT_MESSAGES) == 0) //PICK USERNAME
+            {
+                asking_username = 0;
+                //goto continue_input;
             } else if (strcmp(read + 8, WHY2_CHAT_CODE_PICK_USERNAME) == 0) //PICK USERNAME
             {
+                username_pick:
+
                 printf("%sEnter username (a-Z, 0-9; %d-%d characters):\n", WHY2_CLEAR_AND_GO_UP, WHY2_MIN_USERNAME_LENGTH, WHY2_MAX_USERNAME_LENGTH);
                 fflush(stdout);
+
+                asking_username = 1;
 
                 goto continue_input;
             } else if (strcmp(read + 8, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //PICK USERNAME
@@ -674,7 +685,7 @@ void *why2_listen_server(void *socket)
                 printf("\nInvalid username!\n\n\n");
                 fflush(stdout);
 
-                goto continue_input;
+                goto username_pick;
             }
         } else
         {
