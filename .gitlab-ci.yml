@@ -23,14 +23,14 @@ variables:
 
 why2-chat-build:
   stage: build
-  image: rust:latest
+  image: rust:latest # Fixes cargo installation problems in ./configure.sh
   script:
-    - apt update
-    - apt install sudo lsb-release -y
-    - chmod +x configure.sh
-    - sudo ./configure.sh
-    - make install BYPASS_CHECK=true
-    - make build_chat
+    - apt update # Update repos
+    - apt install sudo lsb-release -y # Install needed stuff
+    - chmod +x configure.sh # Permissions
+    - sudo ./configure.sh # Preparation
+    - make install BYPASS_CHECK=true # Install WHY2
+    - make build_chat # Build Chat
   artifacts:
     paths:
       - $CLIENT
@@ -40,12 +40,12 @@ why2-core-test:
   stage: build
   image: rust:latest
   script:
-    - apt update
-    - apt install sudo lsb-release -y
-    - chmod +x configure.sh
-    - sudo ./configure.sh
-    - make install BYPASS_CHECK=true
-    - make test_core
-    - ./$CORE_OUTPUT
-    - $APP
-    - $VALGRIND $APP
+    - apt update # Update repos
+    - apt install sudo lsb-release valgrind -y # Install needed stuff
+    - chmod +x configure.sh # Permissions
+    - sudo ./configure.sh # Preparation
+    - make install BYPASS_CHECK=true # Install WHY2
+    - make test_core # Build WHY2 Test
+    - ./$CORE_OUTPUT # Test Lib
+    - $APP # Test App
+    - $VALGRIND $APP # Test Lib by Valgrind
