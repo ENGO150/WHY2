@@ -47,5 +47,5 @@ why2-core-test:
     - make install BYPASS_CHECK=true # Install WHY2
     - make test_core # Build WHY2 Test
     - ./$CORE_OUTPUT # Test Lib
-    - $APP # Test App
-    - $VALGRIND $APP # Test Lib by Valgrind
+    - $CORE_APP # Test App
+    - $VALGRIND $CORE_OUTPUT # Test Lib by Valgrind
