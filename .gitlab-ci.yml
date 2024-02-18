@@ -17,6 +17,9 @@
 variables:
   CLIENT: "./out/why2-chat-client"
   SERVER: "./out/why2-chat-server"
+  CORE_OUTPUT: "./out/why2-core-test"
+  CORE_APP: "why2"
+  VALGRIND: "valgrind --leak-check=full --show-leak-kinds=reachable --track-origins=yes -s"
 
 why2-chat-build:
   stage: build
@@ -32,3 +35,17 @@ why2-chat-build:
     paths:
       - $CLIENT
       - $SERVER
+
+why2-core-test:
+  stage: build
+  image: rust:latest
+  script:
+    - apt update
+    - apt install sudo lsb-release -y
+    - chmod +x configure.sh
+    - sudo ./configure.sh
+    - make install BYPASS_CHECK=true
+    - make test_core
+    - ./$CORE_OUTPUT
+    - $APP
+    - $VALGRIND $APP
