@@ -330,6 +330,15 @@ void why2_send_socket(char *text, char *username, int socket)
     //UNFUCK QUOTES FROM text_copy
     remove_json_syntax_characters(text_copy);
 
+    //REMOVE NON ASCII CHARS
+    int j = 0;
+    for (int i = 0; text_copy[i] != '\0'; i++)
+    {
+        if ((20 <= text_copy[i] && text_copy[i] <= 126)) text_copy[i] = text_copy[j++] = text_copy[i];
+    }
+
+    text_copy[j] = '\0';
+
     //ADD OBJECTS
     json_object_object_add(json, "message", json_object_new_string(text_copy));
     if (username != NULL) json_object_object_add(json, "username", json_object_new_string(username)); //WAS SENT FROM SERVER
