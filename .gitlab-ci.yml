@@ -26,7 +26,7 @@ why2-chat-build:
     - apt install sudo lsb-release -y
     - chmod +x configure.sh
     - sudo ./configure.sh
-    - make install
+    - make install BYPASS_CHECK=true
     - make build_chat
   artifacts:
     paths:
