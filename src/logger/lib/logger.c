@@ -71,31 +71,28 @@ why2_log_file why2_init_logger(char *directoryPath)
     if (buffer > WHY2_MAX_USAGE) //WHY2_MAX_USAGE WAS REACHED
     {
         file = INVALID_FILE;
-
-        goto deallocation;
-    }
-
-    sprintf(filePath, WHY2_LOG_FORMATTING, directoryPath, dateBuffer, buffer); //GENERATE LOG-NAME
-
-    file = open(filePath, O_RDWR | O_APPEND | O_CREAT, 0644); //CREATE LOG FILE
-
-    //CREATE SYMLINK
-    sprintf(latestBuffer, WHY2_LOG_LATEST_FORMATTING, directoryPath, WHY2_LOG_LATEST); //GENERATE LATEST.log PATH
-
-    latestFilePath = why2_strdup(filePath);
-
-    if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); } //REMOVE SYMLINK IF IT ALREADY EXISTS
-
-    if (symlink(latestFilePath + (strlen(directoryPath) + 1), latestBuffer) != 0) //CREATE SYMLINK
+    } else
     {
-        if (!why2_get_flags().no_output) fprintf(stderr, "Creating symlink failed!\n");
+        sprintf(filePath, WHY2_LOG_FORMATTING, directoryPath, dateBuffer, buffer); //GENERATE LOG-NAME
 
-        close(file);
-        why2_clean_memory("logger_logfile_init");
-        return why2_empty_log_file();
+        file = open(filePath, O_RDWR | O_APPEND | O_CREAT, 0644); //CREATE LOG FILE
+
+        //CREATE SYMLINK
+        sprintf(latestBuffer, WHY2_LOG_LATEST_FORMATTING, directoryPath, WHY2_LOG_LATEST); //GENERATE LATEST.log PATH
+
+        latestFilePath = why2_strdup(filePath);
+
+        if (access(latestBuffer, R_OK) == 0) { unlink(latestBuffer); } //REMOVE SYMLINK IF IT ALREADY EXISTS
+
+        if (symlink(latestFilePath + (strlen(directoryPath) + 1), latestBuffer) != 0) //CREATE SYMLINK
+        {
+            if (!why2_get_flags().no_output) fprintf(stderr, "Creating symlink failed!\n");
+
+            close(file);
+            why2_clean_memory("logger_logfile_init");
+            return why2_empty_log_file();
+        }
     }
-
-    deallocation:
 
     //DEALLOCATION
     why2_deallocate(dateBuffer);
