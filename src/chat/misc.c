@@ -210,6 +210,8 @@ why2_bool username_equal(char *u1, char *u2)
 
 why2_bool check_username(char *username)
 {
+    if (username == NULL) return 0;
+
     if (username_equal(username, WHY2_CHAT_SERVER_USERNAME)) return 0; //DISABLE 'server' USERNAME
     if (username_equal(username, WHY2_DEFAULT_USERNAME)) return 0; //DISABLE 'anon' USERNAME DUE TO ONE USERNAME PER SERVER
 
@@ -383,8 +385,9 @@ void *why2_communicate_thread(void *arg)
     char *string_buffer = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{USER}", getenv("USER"));
     char *config_username = why2_toml_read(string_buffer, "user_pick_username");
 
-    char *raw;
+    char *raw = NULL;
     void *raw_ptr = NULL;
+    char *raw_output = NULL;
     why2_bool force_exiting = 0;
     why2_bool invalid_username = 1;
     why2_bool exiting = 0;
@@ -468,7 +471,6 @@ void *why2_communicate_thread(void *arg)
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
 
     raw = why2_strdup("");
-    char *raw_output;
     char *connection_message = why2_malloc(strlen(username) + 11);
 
     //BUILD connection_message
