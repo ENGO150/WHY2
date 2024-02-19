@@ -662,43 +662,30 @@ void *why2_listen_server(void *socket)
 
         if (strncmp(read, WHY2_CHAT_SERVER_USERNAME ": code", 12) == 0) //CODE WAS SENT
         {
-            if (strcmp(read + 8, WHY2_CHAT_CODE_SSQC) == 0)
+            if (strcmp(read + 8, WHY2_CHAT_CODE_SSQC) == 0) //SERVER BROKE UP WITH YOU
             {
                 printf("%s%s%s\nServer closed the connection.\n", asking_username > WHY2_MAX_USERNAME_TRIES ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, (asking_username == 0 ? "\n": ""));
                 fflush(stdout);
 
                 pthread_cancel(getline_thread); //CANCEL CLIENT getline
                 exiting = 1; //EXIT THIS THREAD
-            } else if (strcmp(read + 8, WHY2_CHAT_CODE_ACCEPT_MESSAGES) == 0) //PICK USERNAME
+            } else if (strcmp(read + 8, WHY2_CHAT_CODE_ACCEPT_MESSAGES) == 0)
             {
-                /*if (asking_username != 0)
+                continue;
+            } else if (strcmp(read + 8, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || strcmp(read + 8, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
+            {
+                if (strcmp(read + 8, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //INVALID USERNAME
                 {
-                    asking_username = 0;
-                    printf(WHY2_CLEAR_AND_GO_UP);
+                    printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid username!\n\n\n", asking_username > 1 ? WHY2_CLEAR_AND_GO_UP : "");
                     fflush(stdout);
                 }
 
-                goto continue_input;*/
-            } else if (strcmp(read + 8, WHY2_CHAT_CODE_PICK_USERNAME) == 0) //PICK USERNAME
-            {
-                username_pick:
-
                 printf("%s%sEnter username (a-Z, 0-9; %d-%d characters):\n", asking_username++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP, WHY2_MIN_USERNAME_LENGTH, WHY2_MAX_USERNAME_LENGTH);
                 fflush(stdout);
-
-                goto continue_input;
-            } else if (strcmp(read + 8, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //PICK USERNAME
+            } else if (strcmp(read + 8, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //INVALID CMD
             {
                 printf("\nInvalid command!\n\n");
                 fflush(stdout);
-
-                goto continue_input;
-            } else if (strcmp(read + 8, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME
-            {
-                printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid username!\n\n\n", asking_username > 1 ? WHY2_CLEAR_AND_GO_UP : "");
-                fflush(stdout);
-
-                goto username_pick;
             }
         } else
         {
@@ -711,9 +698,11 @@ void *why2_listen_server(void *socket)
             }
 
             printf("\n\n%s%s\n\n", WHY2_CLEAR_AND_GO_UP, read);
+        }
 
-            continue_input:
 
+        if (!exiting)
+        {
             printf(">>> ");
             fflush(stdout);
         }
