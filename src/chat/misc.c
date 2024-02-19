@@ -509,37 +509,42 @@ void *why2_communicate_thread(void *arg)
 
         if (decoded_buffer == NULL) //idk sometimes this happen, idk why
         {
-            force_exiting = 1;
-            goto deallocation;
-        }
-
-        if (decoded_buffer[0] == '!') //COMMANDS
+            force_exiting = 1; //force exit <3
+        } else
         {
-            if (strcmp(decoded_buffer, "!exit") == 0) //USER REQUESTED EXIT
+            if (strlen(decoded_buffer) != 0)
             {
-                exiting = 1;
-            } else
-            {
-                why2_send_socket(WHY2_CHAT_CODE_INVALID_COMMAND, WHY2_CHAT_SERVER_USERNAME, connection);
+                if (decoded_buffer[0] == '!') //COMMANDS
+                {
+                    if (strcmp(decoded_buffer, "!exit") == 0) //USER REQUESTED EXIT
+                    {
+                        exiting = 1;
+                    } else
+                    {
+                        why2_send_socket(WHY2_CHAT_CODE_INVALID_COMMAND, WHY2_CHAT_SERVER_USERNAME, connection); //INFORM USER THAT HE'S DUMB
+                    }
+
+                    //IGNORE MESSAGES BEGINNING WITH '!'
+                } else
+                {
+                    //REBUILD MESSAGE WITH USERNAME
+                    json_object_object_add(json, "message", json_object_new_string(decoded_buffer));
+                    json_object_object_add(json, "username", json_object_new_string(get_username(connection)));
+
+                    json_object_object_foreach(json, key, value) //GENERATE JSON STRING
+                    {
+                        append(&raw_output, key, (char*) json_object_get_string(value));
+                    }
+                    add_brackets(&raw_output);
+
+                    send_to_all(raw_output); //e
+                }
             }
-
-            goto deallocation; //IGNORE MESSAGES BEGINNING WITH '!'
         }
-
-        //REBUILD MESSAGE WITH USERNAME
-        json_object_object_add(json, "message", json_object_new_string(decoded_buffer));
-        json_object_object_add(json, "username", json_object_new_string(get_username(connection)));
-
-        json_object_object_foreach(json, key, value) //GENERATE JSON STRING
-        {
-            append(&raw_output, key, (char*) json_object_get_string(value));
-        }
-        add_brackets(&raw_output);
-
-        send_to_all(raw_output); //e
 
         deallocation:
 
+        //DEALLOCATION
         why2_deallocate(raw);
         why2_deallocate(raw_ptr);
         why2_deallocate(raw_output);
