@@ -203,47 +203,43 @@ enum WHY2_EXIT_CODES why2_check_version(void) //! CRASHES WHEN CALLED FROM CHAT 
                 why2_clean_memory("core_version_check");
                 return WHY2_WHY2_UPDATE_FAILED;
             }
-
-            goto deallocation; //GREAT SUCCESS!
-        }
-
-        //COUNT WHY2_VERSIONS BEHIND
-        int versionsIndex = -1;
-        int versionsBuffer = 0;
-
-	    struct json_object *deprecated;
-	    json_object_object_get_ex(parsedJson, "deprecated", &deprecated);
-
-        //COUNT versionsIndex
-        for (int i = 0; i < (int) json_object_array_length(deprecated); i++)
+        } else
         {
-            //IT'S A MATCH, BABY :D
-		    if (strcmp(json_object_get_string(json_object_array_get_idx(deprecated, i)), WHY2_VERSION) == 0)
-            {
-                versionsIndex = i;
+            //COUNT WHY2_VERSIONS BEHIND
+            int versionsIndex = -1;
+            int versionsBuffer = 0;
 
-                break;
+            struct json_object *deprecated;
+            json_object_object_get_ex(parsedJson, "deprecated", &deprecated);
+
+            //COUNT versionsIndex
+            for (int i = 0; i < (int) json_object_array_length(deprecated); i++)
+            {
+                //IT'S A MATCH, BABY :D
+                if (strcmp(json_object_get_string(json_object_array_get_idx(deprecated, i)), WHY2_VERSION) == 0)
+                {
+                    versionsIndex = i;
+
+                    break;
+                }
+            }
+
+            //versions.json DOESN'T CONTAIN WHY2_VERSION (THIS WILL NOT HAPPEN IF YOU WILL NOT EDIT IT)
+            if (versionsIndex == -1)
+            {
+                if (!why2_get_flags().no_output) printf("Version %s not found! Check your flags.\n\n", WHY2_VERSION);
+            } else
+            {
+                //COUNT versionsBuffer
+                versionsBuffer = json_object_array_length(deprecated) - versionsIndex;
+
+                if (!why2_get_flags().no_output) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, WHY2_VERSION, json_object_get_string(active));
+
+                //WAIT FOR 5 SECONDS
+                sleep(5);
             }
         }
-
-        //versions.json DOESN'T CONTAIN WHY2_VERSION (THIS WILL NOT HAPPEN IF YOU WILL NOT EDIT IT)
-        if (versionsIndex == -1)
-        {
-            if (!why2_get_flags().no_output) printf("Version %s not found! Check your flags.\n\n", WHY2_VERSION);
-
-            goto deallocation;
-        }
-
-        //COUNT versionsBuffer
-        versionsBuffer = json_object_array_length(deprecated) - versionsIndex;
-
-        if (!why2_get_flags().no_output) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, WHY2_VERSION, json_object_get_string(active));
-
-        //WAIT FOR 5 SECONDS
-        sleep(5);
     }
-
-    deallocation:
 
     //DEALLOCATION
     json_object_put(parsedJson); //THIS FREES EVERY json_object - AT LEAST JSON-C'S DOCUMENTATION SAYS THAT
