@@ -97,7 +97,7 @@ void send_to_all(char *json)
 
 void append(char **destination, char *key, char *value)
 {
-    char *output = why2_calloc(strlen(*destination) + strlen(key) + strlen(value) + 7, sizeof(char*));
+    char *output = why2_calloc(strlen(*destination) + strlen(key) + strlen(value) + 7, sizeof(char));
 
     sprintf(output, "%s%s\"%s\":\"%s\"", *destination, strcmp(*destination, "") == 0 ? "" : ",", key, value);
 
@@ -108,7 +108,7 @@ void append(char **destination, char *key, char *value)
 
 void add_brackets(char **json)
 {
-    char *output = why2_calloc(strlen(*json) + 3, sizeof(char*));
+    char *output = why2_calloc(strlen(*json) + 3, sizeof(char));
 
     sprintf(output, "{%s}%c", *json, '\0');
 
@@ -126,7 +126,7 @@ char *read_socket_raw(int socket)
     }
 
     unsigned short content_size = 0;
-    char *content_buffer = why2_calloc(3, sizeof(char*));
+    char *content_buffer = why2_calloc(3, sizeof(char));
     //GET LENGTH
     if (recv(socket, content_buffer, 2, 0) != 2)
     {
@@ -139,7 +139,7 @@ char *read_socket_raw(int socket)
     why2_deallocate(content_buffer);
 
     //ALLOCATE
-    content_buffer = why2_calloc(content_size + 1, sizeof(char*));
+    content_buffer = why2_calloc(content_size + 1, sizeof(char));
 
     //READ JSON MESSAGE
     if (recv(socket, content_buffer, content_size, 0) != content_size - 2) fprintf(stderr, "Socket probably read wrongly!\n");
@@ -166,7 +166,7 @@ char *read_socket_from_raw(char *raw)
     char *username = get_string_from_json(json_obj, "username");
 
     //ALLOCATE final_message
-    final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char*));
+    final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char));
 
     //BUILD final_message
     sprintf(final_message, "%s: %s", username, message);
@@ -322,7 +322,7 @@ void why2_send_socket(char *text, char *username, int socket)
 {
     char *output = why2_strdup("");
     size_t length_buffer = strlen(text);
-    char *text_copy = why2_calloc(length_buffer + 2, sizeof(char*));
+    char *text_copy = why2_calloc(length_buffer + 2, sizeof(char));
     struct json_object *json = json_tokener_parse("{}");
 
     //COPY text INTO text_copy (WITHOUT LAST CHARACTER WHEN NEWLINE IS AT THE END)
@@ -356,7 +356,7 @@ void why2_send_socket(char *text, char *username, int socket)
     json_object_put(json);
 
     unsigned short text_length = (unsigned short) strlen(output) + 2;
-    char *final = why2_calloc(text_length, sizeof(char*));
+    char *final = why2_calloc(text_length, sizeof(char));
 
     //SPLIT LENGTH INTO TWO CHARS
     final[0] = (unsigned) text_length & 0xff;
@@ -581,7 +581,7 @@ char *why2_read_socket(int socket)
     char *username = get_string_from_json(json_obj, "username");
 
     //ALLOCATE final_message
-    final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char*));
+    final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char));
 
     //BUILD final_message
     sprintf(final_message, "%s: %s", username, message);
