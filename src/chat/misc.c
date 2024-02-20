@@ -145,9 +145,15 @@ char *read_socket_raw(int socket)
     content_buffer = why2_calloc(content_size + 1, sizeof(char));
 
     //READ JSON MESSAGE
-    if (recv(socket, content_buffer, content_size, 0) != content_size - 2) fprintf(stderr, "Socket probably read wrongly!\n");
+    for (int i = 0; strncmp(content_buffer + strlen(content_buffer) - 2, "\"}", 2) != 0; i++)
+    {
+        if (recv(socket, content_buffer + i, 1, 0) != 1) //READ THE MESSAGE BY CHARACTERS
+        {
+            fprintf(stderr, "Socket probably read wrongly!\n");
+        }
+    }
 
-    content_buffer[content_size - 1] = '\0'; //TODO: Possible problems
+    content_buffer[content_size - 1] = '\0';
 
     return content_buffer;
 }
