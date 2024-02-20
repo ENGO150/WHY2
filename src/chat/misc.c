@@ -60,6 +60,9 @@ char *get_string_from_json(struct json_object *json, char *string)
 char *get_string_from_json_string(char *json, char *string)
 {
     struct json_object *json_obj = json_tokener_parse(json);
+
+    if (json_obj == NULL) return NULL; //INVALID SYNTAX WAS SENT BY SOME FUCKING SCRIPT KIDDIE
+
     char *returning = get_string_from_json(json_obj, string);
 
     //DEALLOCATION
@@ -420,7 +423,7 @@ void *why2_communicate_thread(void *arg)
 
             decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
 
-            invalid_username = (strlen(decoded_buffer) > WHY2_MAX_USERNAME_LENGTH) || (strlen(decoded_buffer) < WHY2_MIN_USERNAME_LENGTH) || (!check_username(decoded_buffer)); //CHECK FOR USERNAMES LONGER THAN 20 CHARACTERS
+            invalid_username = decoded_buffer == NULL || (strlen(decoded_buffer) > WHY2_MAX_USERNAME_LENGTH) || (strlen(decoded_buffer) < WHY2_MIN_USERNAME_LENGTH) || (!check_username(decoded_buffer)); //CHECK FOR USERNAMES LONGER THAN 20 CHARACTERS
 
             why2_deallocate(username);
             username = decoded_buffer;
@@ -571,10 +574,10 @@ char *why2_read_socket(int socket)
 {
     char *raw_socket = read_socket_raw(socket);
 
-    if (raw_socket == NULL) return NULL;
-
     char *final_message;
     struct json_object *json_obj = json_tokener_parse(raw_socket);
+
+    if (raw_socket == NULL || json_obj == NULL) return NULL;
 
     //GET STRINGS
     char *message = get_string_from_json(json_obj, "message");
