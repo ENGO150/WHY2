@@ -111,7 +111,7 @@ void append(char **destination, char *key, char *value)
 
 void add_brackets(char **json)
 {
-    char *output = why2_calloc(strlen(*json) + 3, sizeof(char));
+    char *output = why2_calloc(strlen(*json) + 4, sizeof(char));
 
     sprintf(output, "{%s}%c", *json, '\0');
 
