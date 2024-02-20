@@ -163,29 +163,6 @@ void *read_socket_raw_thread(void *socket)
     return read_socket_raw(*(int*) socket);
 }
 
-char *read_socket_from_raw(char *raw)
-{
-    char *final_message;
-    struct json_object *json_obj = json_tokener_parse(raw);
-
-    if (json_obj == NULL) return "ERR"; //RETURN IF INVALID SYNTAX WAS SENT BY SOME FUCKING SCRIPT KIDDIE
-
-    //GET STRINGS
-    char *message = get_string_from_json(json_obj, "message");
-    char *username = get_string_from_json(json_obj, "username");
-
-    //ALLOCATE final_message
-    final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char));
-
-    //BUILD final_message
-    sprintf(final_message, "%s: %s", username, message);
-
-    //DEALLOCATION
-    json_object_put(json_obj);
-
-    return final_message;
-}
-
 void remove_json_syntax_characters(char *text)
 {
     for (size_t i = 0; i < strlen(text); i++) //TODO: DO SOMETHING MORE
