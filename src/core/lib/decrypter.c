@@ -70,7 +70,7 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
     char *used_text = why2_strdup(text); //COPY text TO used_text
 
     //GET LENGTH OF returningText AND textKeyChain
-    for (int i = 0; used_text[i] != '\0'; i++)
+    for (int i = 0; i < (int) strlen(used_text); i++)
     {
         if (used_text[i] == why2_get_encryption_separator()) numberBuffer++;
     }
@@ -90,7 +90,7 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
         numberBuffer = 0;
 
         //GET LENGTH OF EACH CHARACTER
-        for (int j = 0; used_text[i] != '\0'; j++)
+        for (int j = 0; j < (int) strlen(used_text); j++)
         {
             if (used_text[j] == why2_get_encryption_separator()) break;
 
@@ -106,7 +106,7 @@ why2_output_flags why2_decrypt_text(char *text, char *keyNew)
         }
 
         //LOAD textBuffer
-        for (int j = 0; used_text[i] != '\0'; j++)
+        for (int j = 0; j < (int) strlen(used_text); j++)
         {
             textBuffer[j] = used_text[j];
 
