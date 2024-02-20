@@ -165,7 +165,7 @@ void *read_socket_raw_thread(void *socket)
 
 void remove_json_syntax_characters(char *text)
 {
-    for (size_t i = 0; i < strlen(text); i++) //TODO: DO SOMETHING MORE
+    for (int i = 0; text[i] != '\0'; i++) //TODO: DO SOMETHING MORE
     {
         if (text[i] == '\"')
         {
@@ -176,7 +176,7 @@ void remove_json_syntax_characters(char *text)
 
 void lowercase(char *string)
 {
-    for (unsigned long i = 0; i < strlen(string); i++)
+    for (int i = 0; string[i] != '\0'; i++)
     {
         string[i] = tolower(string[i]);
     }
@@ -201,7 +201,7 @@ why2_bool check_username(char *username)
     if (username_equal(username, WHY2_CHAT_SERVER_USERNAME)) return 0; //DISABLE 'server' USERNAME
     if (username_equal(username, WHY2_DEFAULT_USERNAME)) return 0; //DISABLE 'anon' USERNAME DUE TO ONE USERNAME PER SERVER
 
-    for (unsigned long i = 0; i < strlen(username); i++)
+    for (int i = 0; username[i] != '\0'; i++)
     {
         if (!((username[i] >= 48 && username[i] <= 57) ||
         (username[i] >= 65 && username[i] <= 90) ||     //CHECK ONLY FOR a-Z & 0-9
@@ -488,7 +488,7 @@ void *why2_communicate_thread(void *arg)
         raw_output = why2_strdup("");
 
         //REMOVE CONTROL CHARACTERS FROM raw
-        for (size_t i = 0; i < strlen(raw); i++)
+        for (int i = 0; raw[i] != '\0'; i++)
         {
             if (raw[i] == '\\') raw[i] = '/';
         }

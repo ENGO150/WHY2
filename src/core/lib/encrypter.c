@@ -79,13 +79,13 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
     why2_generate_text_key_chain(key, textKeyChain, strlen(text));
 
     //ACTUALLY ENCRYPT TEXT
-    for (int i = 0; i < (int) strlen(text); i++)
+    for (int i = 0; text[i] != '\0'; i++)
     {
         textKeyChain[i] = why2_get_encryption_operation()(textKeyChain[i], (int) text[i]);
     }
 
     //COUNT REQUIRED SIZE FOR returningText
-    for (int i = 0; i < (int) strlen(text); i++)
+    for (int i = 0; text[i] != '\0'; i++)
     {
         numberBuffer += why2_count_int_length(textKeyChain[i]);
     }
@@ -94,7 +94,7 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
     returningText = why2_calloc(numberBuffer + strlen(text), sizeof(char));
 
     //LOAD returningText
-    for (int i = 0; i < (int) strlen(text); i++)
+    for (int i = 0; text[i] != '\0'; i++)
     {
         numberBuffer = sizeof(int) * why2_count_int_length(textKeyChain[i]);
 
