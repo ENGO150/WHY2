@@ -335,8 +335,7 @@ int find_colon(char *text)
     return -1;
 }
 
-//GLOBAL
-void why2_send_socket(char *text, char *username, int socket)
+void send_socket(char *text, char *username, int socket, why2_bool welcome)
 {
     char *output = why2_strdup("");
     size_t length_buffer = strlen(text);
@@ -362,6 +361,24 @@ void why2_send_socket(char *text, char *username, int socket)
     //ADD OBJECTS
     json_object_object_add(json, "message", json_object_new_string(text_copy));
     if (username != NULL) json_object_object_add(json, "username", json_object_new_string(username)); //WAS SENT FROM SERVER
+
+    if (welcome) //SENDING WELCOME MESSAGE TO USER
+    {
+        //GET FROM CONFIG
+        char *max_uname = why2_chat_server_config("max_username_length");
+        char *min_uname = why2_chat_server_config("min_username_length");
+        char *max_tries = why2_chat_server_config("max_username_tries");
+
+        //ADD THE INFO OBJS
+        json_object_object_add(json, "max_uname", json_object_new_string(max_uname));
+        json_object_object_add(json, "min_uname", json_object_new_string(min_uname));
+        json_object_object_add(json, "max_tries", json_object_new_string(max_tries));
+
+        //DEALLOCATION
+        why2_toml_read_free(max_uname);
+        why2_toml_read_free(min_uname);
+        why2_toml_read_free(max_tries);
+    }
 
     //GENERATE JSON STRING
     json_object_object_foreach(json, key, value)
@@ -391,6 +408,12 @@ void why2_send_socket(char *text, char *username, int socket)
     //DEALLOCATION
     why2_deallocate(final);
     why2_deallocate(output);
+}
+
+//GLOBAL
+void why2_send_socket(char *text, char *username, int socket)
+{
+    send_socket(text, username, socket, 0);
 }
 
 void *why2_communicate_thread(void *arg)
