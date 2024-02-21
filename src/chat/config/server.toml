@@ -14,4 +14,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-user_pick_username = true # User will be prompted for his username on connect or will have to set it onetime [NOT IMPLEMENTED]
+user_pick_username = true # User will be prompted for his username on connect or will end up with default_username
+server_username = "server" # Username server will use
+default_username = "anon" # If user_pick_username is set to false, this will be used as client username
+
+communication_time = 300 # Seconds waiting for client message before stopping communication
+
+max_username_length = 20 # Maximal username length
+min_username_length = 4 # Minimal username length
+max_username_tries = 3 # Times asking client for username (if client tries to use invalid username)
