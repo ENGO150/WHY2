@@ -36,6 +36,9 @@ void why2_chat_init_client_config(void); //Dementia is a term used to describe a
 char *why2_toml_read(const char* path, const char* key); //READ key FROM path TOML FILE
 void why2_toml_read_free(char* s); //DEALLOCATE THE READ VALUE
 
+char *why2_chat_server_config(char *key); //why2_toml_read BUT YOU DO NOT HAVE TO INCLUDE path
+char *why2_chat_client_config(char *key); //hihi, *grabs shotgun quietly*
+
 #ifdef __cplusplus
 }
 #endif
