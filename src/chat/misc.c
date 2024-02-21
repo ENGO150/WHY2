@@ -717,42 +717,58 @@ void *why2_listen_server(void *socket)
 {
     char *read = NULL;
     why2_bool exiting = 0;
+    why2_bool continuing;
     unsigned char asking_username = 0;
     char *server_uname = NULL;
+
+    int max_uname = -1;
+    int min_uname = -1;
+    int max_tries = -1;
 
     printf(">>> ");
     fflush(stdout);
 
     while (!exiting)
     {
-        read = why2_read_socket(*((int*) socket));
+        continuing = 0;
 
         if (server_uname == NULL)
         {
-            server_uname = why2_malloc(find_colon(read) + 2);
+            read = read_socket_raw(*((int*) socket));
 
-            for (int i = 0; i < find_colon(read); i++) //COPY USERNAME
-            {
-                server_uname[i] = read[i];
-            }
+            server_uname = get_string_from_json_string(read, "username"); //GET USERNAME
 
-            server_uname[find_colon(read)] = '\0';
+            //GET INFO
+            char *max_uname_str = get_string_from_json_string(read, "max_uname");
+            char *min_uname_str = get_string_from_json_string(read, "min_uname");
+            char *max_tries_str = get_string_from_json_string(read, "max_tries");
+
+            //GET THE INFO AS INTEGERS
+            max_uname = atoi(max_uname_str);
+            min_uname = atoi(min_uname_str);
+            max_tries = atoi(max_tries_str);
+
+            //DEALLOCATE STUFF
+            why2_deallocate(max_uname_str);
+            why2_deallocate(min_uname_str);
+            why2_deallocate(max_tries_str);
+
+            continuing = 1;
+        } else
+        {
+            read = why2_read_socket(*((int*) socket));
+            if (read == NULL) continue;
         }
-
-        if (read == NULL) continue;
 
         if (strncmp(read, server_uname, strlen(server_uname)) == 0 && strncmp(read + strlen(server_uname), ": code", 6) == 0) //CODE WAS SENT
         {
             if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_SSQC) == 0) //SERVER BROKE UP WITH YOU
             {
-                printf("%s%s%s\nServer closed the connection.\n", asking_username != 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, (asking_username == 0 ? "\n": ""));
+                printf("%s%s%s\nServer closed the connection.\n", asking_username > max_tries ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, (asking_username == 0 ? "\n": ""));
                 fflush(stdout);
 
                 pthread_cancel(getline_thread); //CANCEL CLIENT getline
                 exiting = 1; //EXIT THIS THREAD
-            } else if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_ACCEPT_MESSAGES) == 0)
-            {
-                continue;
             } else if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
             {
                 if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //INVALID USERNAME
@@ -761,14 +777,14 @@ void *why2_listen_server(void *socket)
                     fflush(stdout);
                 }
 
-                printf("%s%sEnter username (a-Z, 0-9; %d-%d characters):\n", asking_username++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP, WHY2_MIN_USERNAME_LENGTH, WHY2_MAX_USERNAME_LENGTH);
+                printf("%s%sEnter username (a-Z, 0-9; %d-%d characters):\n", asking_username++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP, min_uname, max_uname);
                 fflush(stdout);
             } else if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //INVALID CMD
             {
                 printf("\nInvalid command!\n\n");
                 fflush(stdout);
             }
-        } else
+        } else if (!continuing)
         {
             printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP); //do not fucking ask me how the fucking formatting fucking works, i dont fucking know
 
@@ -782,7 +798,7 @@ void *why2_listen_server(void *socket)
         }
 
 
-        if (!exiting)
+        if (!exiting && !continuing)
         {
             printf(">>> ");
             fflush(stdout);
