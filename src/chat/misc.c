@@ -63,7 +63,7 @@ char *get_string_from_json_string(char *json, char *string)
 
     if (json_obj == NULL) return NULL; //INVALID SYNTAX WAS SENT BY SOME FUCKING SCRIPT KIDDIE
 
-    char *returning = get_string_from_json(json_obj, string);
+    char *returning = why2_strdup(get_string_from_json(json_obj, string));
 
     //DEALLOCATION
     json_object_put(json_obj);
@@ -194,12 +194,21 @@ why2_bool username_equal(char *u1, char *u2)
     return strcmp(one, two) == 0;
 }
 
+why2_bool username_equal_deallocate(char *u1, char *u2) //SAME THING AS username_equal BUT IT DEALLOCATES u2
+{
+    why2_bool returning = username_equal(u1, u2);
+
+    why2_toml_read_free(u2);
+
+    return returning;
+}
+
 why2_bool check_username(char *username)
 {
     if (username == NULL) return 0;
 
-    if (username_equal(username, WHY2_CHAT_SERVER_USERNAME)) return 0; //DISABLE 'server' USERNAME
-    if (username_equal(username, WHY2_CHAT_DEFAULT_USERNAME)) return 0; //DISABLE 'anon' USERNAME DUE TO ONE USERNAME PER SERVER
+    if (username_equal_deallocate(username, why2_chat_server_config("server_username"))) return 0; //DISABLE 'server' USERNAME
+    if (username_equal_deallocate(username, why2_chat_server_config("default_username"))) return 0; //DISABLE 'anon' USERNAME DUE TO ONE USERNAME PER SERVER
 
     for (unsigned long i = 0; i < strlen(username); i++)
     {
@@ -303,6 +312,23 @@ char *get_username(int connection)
     return c_node.username;
 }
 
+void send_socket_deallocate(char *text, char *username, int socket) //SAME AS why2_send_socket BUT IT DEALLOCATES username
+{
+    why2_send_socket(text, username, socket);
+
+    why2_toml_read_free(username);
+}
+
+int find_colon(char *text)
+{
+    for (int i = 0; i < (int) strlen(text); i++)
+    {
+        if (text[i] == ':') return i;
+    }
+
+    return -1;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
@@ -387,10 +413,11 @@ void *why2_communicate_thread(void *arg)
     {
         if (config_username == NULL) fprintf(stderr, "Your config doesn't contain 'user_pick_username'. Please update your configuration.\n");
 
-        why2_send_socket(WHY2_CHAT_CODE_PICK_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection); //ASK USER FOR USERNAME
+        send_socket_deallocate(WHY2_CHAT_CODE_PICK_USERNAME, why2_chat_server_config("server_username"), connection); //ASK USER FOR USERNAME
 
         while (invalid_username)
         {
+            why2_deallocate(username);
             if (usernames_n++ == WHY2_MAX_USERNAME_TRIES) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
             {
                 exiting = 1;
@@ -407,7 +434,6 @@ void *why2_communicate_thread(void *arg)
 
             invalid_username = decoded_buffer == NULL || (strlen(decoded_buffer) > WHY2_MAX_USERNAME_LENGTH) || (strlen(decoded_buffer) < WHY2_MIN_USERNAME_LENGTH) || (!check_username(decoded_buffer)); //CHECK FOR USERNAMES LONGER THAN 20 CHARACTERS
 
-            why2_deallocate(username);
             username = decoded_buffer;
 
             if (!invalid_username)
@@ -436,7 +462,7 @@ void *why2_communicate_thread(void *arg)
 
             if (invalid_username)
             {
-                why2_send_socket(WHY2_CHAT_CODE_INVALID_USERNAME, WHY2_CHAT_SERVER_USERNAME, connection); //TELL THE USER HE IS DUMB AS FUCK
+                send_socket_deallocate(WHY2_CHAT_CODE_INVALID_USERNAME, why2_chat_server_config("server_username"), connection); //TELL THE USER HE IS DUMB AS FUCK
                 continue;
             }
 
@@ -457,13 +483,14 @@ void *why2_communicate_thread(void *arg)
 
     raw = why2_strdup("");
     char *connection_message = why2_malloc(strlen(username) + 11);
+    char *server_username = why2_chat_server_config("server_username");
 
     //BUILD connection_message
     sprintf(connection_message, "%s connected", username);
 
     //SEND CONNECTION MESSAGE
     json_object_object_add(json, "message", json_object_new_string(connection_message));
-    json_object_object_add(json, "username", json_object_new_string(WHY2_CHAT_SERVER_USERNAME));
+    json_object_object_add(json, "username", json_object_new_string(server_username));
 
     json_object_object_foreach(json, key, value) //GENERATE JSON STRING
     {
@@ -477,6 +504,7 @@ void *why2_communicate_thread(void *arg)
     why2_deallocate(raw);
     why2_deallocate(connection_message);
     why2_deallocate(username);
+    why2_toml_read_free(server_username);
 
     while (!(exiting || force_exiting)) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
@@ -506,7 +534,7 @@ void *why2_communicate_thread(void *arg)
                         exiting = 1;
                     } else
                     {
-                        why2_send_socket(WHY2_CHAT_CODE_INVALID_COMMAND, WHY2_CHAT_SERVER_USERNAME, connection); //INFORM USER THAT HE'S DUMB
+                        send_socket_deallocate(WHY2_CHAT_CODE_INVALID_COMMAND, why2_chat_server_config("server_username"), connection); //INFORM USER THAT HE'S DUMB
                     }
 
                     //IGNORE MESSAGES BEGINNING WITH '!'
@@ -537,7 +565,7 @@ void *why2_communicate_thread(void *arg)
         json_object_put(json);
     }
 
-    if (exiting) why2_send_socket(WHY2_CHAT_CODE_SSQC, WHY2_CHAT_SERVER_USERNAME, connection);
+    if (exiting) send_socket_deallocate(WHY2_CHAT_CODE_SSQC, why2_chat_server_config("server_username"), connection);
 
     printf("User disconnected.\t%d\n", connection);
 
@@ -610,7 +638,7 @@ void why2_clean_connections(void)
 
         connection_buffer = *(connection_node_t*) node_buffer_2 -> value;
 
-        why2_send_socket(WHY2_CHAT_CODE_SSQC, WHY2_CHAT_SERVER_USERNAME, connection_buffer.connection);
+        send_socket_deallocate(WHY2_CHAT_CODE_SSQC, why2_chat_server_config("server_username"), connection_buffer.connection);
 
         close(connection_buffer.connection);
         why2_list_remove(&connection_list, node_buffer_2); //REMOVE
@@ -640,6 +668,7 @@ void *why2_listen_server(void *socket)
     char *read = NULL;
     why2_bool exiting = 0;
     unsigned char asking_username = 0;
+    char *server_uname = NULL;
 
     printf(">>> ");
     fflush(stdout);
@@ -648,23 +677,35 @@ void *why2_listen_server(void *socket)
     {
         read = why2_read_socket(*((int*) socket));
 
+        if (server_uname == NULL)
+        {
+            server_uname = why2_malloc(find_colon(read) + 2);
+
+            for (int i = 0; i < find_colon(read); i++) //COPY USERNAME
+            {
+                server_uname[i] = read[i];
+            }
+
+            server_uname[find_colon(read)] = '\0';
+        }
+
         if (read == NULL) continue;
 
-        if (strncmp(read, WHY2_CHAT_SERVER_USERNAME ": code", 12) == 0) //CODE WAS SENT
+        if (strncmp(read, server_uname, strlen(server_uname)) == 0 && strncmp(read + strlen(server_uname), ": code", 6) == 0) //CODE WAS SENT
         {
-            if (strcmp(read + 8, WHY2_CHAT_CODE_SSQC) == 0) //SERVER BROKE UP WITH YOU
+            if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_SSQC) == 0) //SERVER BROKE UP WITH YOU
             {
                 printf("%s%s%s\nServer closed the connection.\n", asking_username > WHY2_MAX_USERNAME_TRIES ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, (asking_username == 0 ? "\n": ""));
                 fflush(stdout);
 
                 pthread_cancel(getline_thread); //CANCEL CLIENT getline
                 exiting = 1; //EXIT THIS THREAD
-            } else if (strcmp(read + 8, WHY2_CHAT_CODE_ACCEPT_MESSAGES) == 0)
+            } else if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_ACCEPT_MESSAGES) == 0)
             {
                 continue;
-            } else if (strcmp(read + 8, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || strcmp(read + 8, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
+            } else if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
             {
-                if (strcmp(read + 8, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //INVALID USERNAME
+                if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //INVALID USERNAME
                 {
                     printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid username!\n\n\n", asking_username > 1 ? WHY2_CLEAR_AND_GO_UP : "");
                     fflush(stdout);
@@ -672,7 +713,7 @@ void *why2_listen_server(void *socket)
 
                 printf("%s%sEnter username (a-Z, 0-9; %d-%d characters):\n", asking_username++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP, WHY2_MIN_USERNAME_LENGTH, WHY2_MAX_USERNAME_LENGTH);
                 fflush(stdout);
-            } else if (strcmp(read + 8, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //INVALID CMD
+            } else if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //INVALID CMD
             {
                 printf("\nInvalid command!\n\n");
                 fflush(stdout);
@@ -699,6 +740,8 @@ void *why2_listen_server(void *socket)
 
         why2_deallocate(read);
     }
+
+    why2_deallocate(server_uname);
 
     return NULL;
 }
