@@ -485,7 +485,7 @@ void *why2_communicate_thread(void *arg)
 
             decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
 
-            invalid_username = decoded_buffer == NULL || (strlen(decoded_buffer) > WHY2_MAX_USERNAME_LENGTH) || (strlen(decoded_buffer) < WHY2_MIN_USERNAME_LENGTH) || (!check_username(decoded_buffer)); //CHECK FOR USERNAMES LONGER THAN 20 CHARACTERS
+            invalid_username = decoded_buffer == NULL || (strlen(decoded_buffer) > (unsigned long) server_config_int("max_username_length")) || (strlen(decoded_buffer) < (unsigned long) server_config_int("min_username_length")) || (!check_username(decoded_buffer)); //CHECK FOR USERNAMES LONGER THAN 20 CHARACTERS
 
             username = decoded_buffer;
 
