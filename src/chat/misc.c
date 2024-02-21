@@ -367,6 +367,8 @@ void *why2_communicate_thread(void *arg)
 
     printf("User connected.\t\t%d\n", connection);
 
+    send_socket_deallocate(WHY2_CHAT_CODE_ACCEPT_MESSAGES, why2_chat_server_config("server_username"), connection); //TELL USER HE CAN START COMMUNICATING
+
     //GET USERNAME
     char *config_username = why2_chat_server_config("user_pick_username");
 
@@ -471,8 +473,6 @@ void *why2_communicate_thread(void *arg)
     json_object_put(json);
 
     send_to_all(raw); //FUCKING SEND TO ALL YOU TWAT
-
-    why2_send_socket(WHY2_CHAT_CODE_ACCEPT_MESSAGES, WHY2_CHAT_SERVER_USERNAME, connection); //TELL USER HE CAN START COMMUNICATING
 
     why2_deallocate(raw);
     why2_deallocate(connection_message);
