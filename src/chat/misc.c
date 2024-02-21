@@ -225,7 +225,13 @@ why2_bool check_username(char *username)
 
 void *stop_oldest_thread(void *id)
 {
-    sleep(WHY2_COMMUNICATION_TIME); //yk wait
+    //GET THE communication_time INTEGER
+    char *communication_time_str = why2_chat_server_config("communication_time");
+    int communication_time = atoi(communication_time_str);
+    why2_toml_read_free(communication_time_str);
+
+    sleep(communication_time); //yk wait
+
     if (waiting_list.head == NULL) return NULL;
     if (**(pthread_t**) waiting_list.head -> value == *(pthread_t*) id) //THREAD IS STILL ALIVE, I HOPE
     {
