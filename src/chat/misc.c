@@ -407,16 +407,6 @@ void send_welcome_socket_deallocate(char *text, char *username, int socket) //SA
     why2_toml_read_free(username);
 }
 
-int find_colon(char *text)
-{
-    for (int i = 0; i < (int) strlen(text); i++)
-    {
-        if (text[i] == ':') return i;
-    }
-
-    return -1;
-}
-
 void send_welcome_packet(int connection)
 {
     send_welcome_socket_deallocate(WHY2_CHAT_CODE_ACCEPT_MESSAGES, why2_chat_server_config("server_username"), connection);
