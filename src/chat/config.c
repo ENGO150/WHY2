@@ -31,6 +31,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/misc.h>
 
 //LOCAL
+enum CONFIG_TYPES
+{
+    CLIENT,
+    SERVER
+};
+
 void init_config(char *filename)
 {
     struct stat st;
@@ -76,6 +82,34 @@ void init_config(char *filename)
     }
 }
 
+char *config(char *key, enum CONFIG_TYPES type)
+{
+    char *path;
+
+    switch (type) //GET PATH
+    {
+        case CLIENT:
+            path = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_CLIENT, "{USER}", getenv("USER"));
+            break;
+
+        case SERVER:
+            path = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{USER}", getenv("USER"));
+            break;
+
+        default:
+            why2_die("CONFIG_TYPE not implemented!");
+            break;
+    }
+
+    //VALUE
+    char *value = why2_toml_read(path, key);
+
+    //DEALLOCATION
+    why2_deallocate(path);
+
+    return value;
+}
+
 //GLOBAL
 void why2_chat_init_server_config(void)
 {
@@ -85,4 +119,14 @@ void why2_chat_init_server_config(void)
 void why2_chat_init_client_config(void)
 {
     init_config(WHY2_CHAT_CONFIG_CLIENT);
+}
+
+char *why2_chat_server_config(char *key)
+{
+    return config(key, SERVER);
+}
+
+char *why2_chat_client_config(char *key)
+{
+    return config(key, CLIENT);
 }
