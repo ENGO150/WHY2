@@ -23,16 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
-//MACROS
-#define WHY2_CHAT_CODE_ACCEPT_MESSAGES "code_000"
-#define WHY2_CHAT_CODE_PICK_USERNAME "code_001"
-#define WHY2_CHAT_CODE_SERVER_SIDE_QUIT_COMMUNICATION "code_002"
-#define WHY2_CHAT_CODE_INVALID_COMMAND "code_003"
-#define WHY2_CHAT_CODE_INVALID_USERNAME "code_004"
-
-//SHORTCUTS CAUSE I'M LAZY BITCH
-#define WHY2_CHAT_CODE_SSQC WHY2_CHAT_CODE_SERVER_SIDE_QUIT_COMMUNICATION
-
+//CONFIG MACROS
 #define WHY2_CONFIG_DIR "/home/{USER}/.config"
 #define WHY2_CHAT_CONFIG_DIR WHY2_CONFIG_DIR "/WHY2"
 #define WHY2_CHAT_CONFIG_URL "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/config"
@@ -42,8 +33,8 @@ extern "C" {
 void why2_chat_init_server_config(void); //CHECK IF SERVER CONFIG EXISTS, CREATE IT
 void why2_chat_init_client_config(void); //Dementia is a term used to describe a group of symptoms affecting memory, thinking and social abilities. In people who have dementia, the symptoms interfere with their daily lives. Dementia isn't one specific disease. Several diseases can cause dementia. ...
 
-char *why2_toml_read(const char* path, const char* key);
-void why2_toml_read_free(char* s);
+char *why2_toml_read(const char* path, const char* key); //READ key FROM path TOML FILE
+void why2_toml_read_free(char* s); //DEALLOCATE THE READ VALUE
 
 #ifdef __cplusplus
 }
