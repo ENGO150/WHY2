@@ -368,8 +368,7 @@ void *why2_communicate_thread(void *arg)
     printf("User connected.\t\t%d\n", connection);
 
     //GET USERNAME
-    char *string_buffer = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{USER}", getenv("USER"));
-    char *config_username = why2_toml_read(string_buffer, "user_pick_username");
+    char *config_username = why2_chat_server_config("user_pick_username");
 
     char *raw = NULL;
     void *raw_ptr = NULL;
@@ -381,8 +380,6 @@ void *why2_communicate_thread(void *arg)
     char *username = why2_strdup(WHY2_CHAT_DEFAULT_USERNAME);
     int usernames_n = 0;
     struct json_object *json = json_tokener_parse("{}");
-
-    why2_deallocate(string_buffer);
 
     if (config_username == NULL || strcmp(config_username, "true") == 0)
     {

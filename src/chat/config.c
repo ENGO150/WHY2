@@ -84,9 +84,9 @@ void init_config(char *filename)
 
 char *config(char *key, enum CONFIG_TYPES type)
 {
-    char *path;
+    char *path = NULL;
 
-    switch (type) //GET PATH
+    switch (type) //GET path
     {
         case CLIENT:
             path = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_CLIENT, "{USER}", getenv("USER"));

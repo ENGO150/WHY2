@@ -52,12 +52,11 @@ int main(void)
     //GET IP
     printf("Welcome.\n\n");
 
-    char *path = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_CLIENT, "{USER}", getenv("USER"));
-    char *auto_connect = why2_toml_read(path, "auto_connect");
+    char *auto_connect = why2_chat_client_config("auto_connect");
 
     if (strcmp(auto_connect, "true") == 0) //USER ENABLED AUTOMATIC CONNECTION
     {
-        char *auto_connect_ip = why2_toml_read(path, "auto_connect_ip"); //GET IP
+        char *auto_connect_ip = why2_chat_client_config("auto_connect_ip"); //GET IP
 
         line = strdup(auto_connect_ip);
         printf("%s\n", line);
@@ -71,7 +70,6 @@ int main(void)
         line_length = 3; //THIS IS FOR THE UNDERLINE THINGY
     }
 
-    why2_deallocate(path);
     why2_toml_read_free(auto_connect);
 
     server_addr.sin_addr.s_addr = inet_addr(line);
