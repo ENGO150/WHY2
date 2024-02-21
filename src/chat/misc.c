@@ -72,6 +72,28 @@ char *get_string_from_json_string(char *json, char *string)
     return returning;
 }
 
+int get_int_from_json_string(char *json, char *string)
+{
+    char *value = get_string_from_json_string(json, string); //GET VALUE
+
+    int returning = atoi(value); //PARSE
+
+    why2_deallocate(value);
+
+    return returning;
+}
+
+int server_config_int(char *key)
+{
+    char *value_str = why2_chat_server_config(key); //GET STRING
+
+    int returning = atoi(value_str); //PARSE INT
+
+    why2_toml_read_free(value_str);
+
+    return returning;
+}
+
 void send_to_all(char *json)
 {
     why2_node_t _first_node = (why2_node_t) { NULL, connection_list.head };
@@ -225,12 +247,7 @@ why2_bool check_username(char *username)
 
 void *stop_oldest_thread(void *id)
 {
-    //GET THE communication_time INTEGER
-    char *communication_time_str = why2_chat_server_config("communication_time");
-    int communication_time = atoi(communication_time_str);
-    why2_toml_read_free(communication_time_str);
-
-    sleep(communication_time); //yk wait
+    sleep(server_config_int("communication_time")); //yk wait
 
     if (waiting_list.head == NULL) return NULL;
     if (**(pthread_t**) waiting_list.head -> value == *(pthread_t*) id) //THREAD IS STILL ALIVE, I HOPE
@@ -451,14 +468,10 @@ void *why2_communicate_thread(void *arg)
 
         send_socket_deallocate(WHY2_CHAT_CODE_PICK_USERNAME, why2_chat_server_config("server_username"), connection); //ASK USER FOR USERNAME
 
-        char *max_tries_str = why2_chat_server_config("max_username_tries");
-        int max_tries = atoi(max_tries_str);
-        why2_toml_read_free(max_tries_str);
-
         while (invalid_username)
         {
             why2_deallocate(username);
-            if (usernames_n++ == max_tries) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
+            if (usernames_n++ == server_config_int("max_username_tries")) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
             {
                 exiting = 1;
                 goto deallocation;
@@ -729,19 +742,9 @@ void *why2_listen_server(void *socket)
             server_uname = get_string_from_json_string(read, "username"); //GET USERNAME
 
             //GET INFO
-            char *max_uname_str = get_string_from_json_string(read, "max_uname");
-            char *min_uname_str = get_string_from_json_string(read, "min_uname");
-            char *max_tries_str = get_string_from_json_string(read, "max_tries");
-
-            //GET THE INFO AS INTEGERS
-            max_uname = atoi(max_uname_str);
-            min_uname = atoi(min_uname_str);
-            max_tries = atoi(max_tries_str);
-
-            //DEALLOCATE STUFF
-            why2_deallocate(max_uname_str);
-            why2_deallocate(min_uname_str);
-            why2_deallocate(max_tries_str);
+            max_uname = get_int_from_json_string(read, "max_uname");
+            min_uname = get_int_from_json_string(read, "min_uname");
+            max_tries = get_int_from_json_string(read, "max_tries");
 
             continuing = 1;
         } else
