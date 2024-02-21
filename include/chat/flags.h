@@ -32,7 +32,6 @@ extern "C" {
 #define WHY2_CLEAR_AND_GO_UP "\33[2K\r\033[A" //i mean read the name
 
 #define WHY2_INVALID_POINTER (void*) 0xffffffffffffffff
-#define WHY2_CHAT_DEFAULT_USERNAME "anon"
 
 #define WHY2_MAX_USERNAME_LENGTH 20 //MAXIMAL USERNAME LENGTH
 #define WHY2_MIN_USERNAME_LENGTH 4 //MINIMAL USERNAME LENGTH

@@ -405,9 +405,14 @@ void *why2_communicate_thread(void *arg)
     why2_bool invalid_username = 1;
     why2_bool exiting = 0;
     char *decoded_buffer = NULL;
-    char *username = why2_strdup(WHY2_CHAT_DEFAULT_USERNAME);
+    char *username;
     int usernames_n = 0;
     struct json_object *json = json_tokener_parse("{}");
+
+    //GET DEFAULT USERNAME
+    char *default_username = why2_chat_server_config("default_username");
+    username = why2_strdup(default_username);
+    why2_toml_read_free(default_username);
 
     if (config_username == NULL || strcmp(config_username, "true") == 0)
     {
