@@ -753,7 +753,7 @@ void *why2_listen_server(void *socket)
             if (read == NULL) continue;
         }
 
-        if (strncmp(read, server_uname, strlen(server_uname)) == 0 && strncmp(read + strlen(server_uname), ": code", 6) == 0) //CODE WAS SENT
+        if ((strncmp(read, server_uname, strlen(server_uname)) == 0 && strncmp(read + strlen(server_uname), ": code", 6) == 0) && !continuing) //CODE WAS SENT
         {
             if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_SSQC) == 0) //SERVER BROKE UP WITH YOU
             {
