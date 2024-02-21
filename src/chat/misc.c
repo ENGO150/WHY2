@@ -325,16 +325,6 @@ void send_socket_deallocate(char *text, char *username, int socket) //SAME AS wh
     why2_toml_read_free(username);
 }
 
-int find_colon(char *text)
-{
-    for (int i = 0; i < (int) strlen(text); i++)
-    {
-        if (text[i] == ':') return i;
-    }
-
-    return -1;
-}
-
 void send_socket(char *text, char *username, int socket, why2_bool welcome)
 {
     char *output = why2_strdup("");
@@ -410,6 +400,28 @@ void send_socket(char *text, char *username, int socket, why2_bool welcome)
     why2_deallocate(output);
 }
 
+void send_welcome_socket_deallocate(char *text, char *username, int socket) //SAME AS why2_send_socket BUT IT DEALLOCATES username
+{
+    send_socket(text, username, socket, 1);
+
+    why2_toml_read_free(username);
+}
+
+int find_colon(char *text)
+{
+    for (int i = 0; i < (int) strlen(text); i++)
+    {
+        if (text[i] == ':') return i;
+    }
+
+    return -1;
+}
+
+void send_welcome_packet(int connection)
+{
+    send_welcome_socket_deallocate(WHY2_CHAT_CODE_ACCEPT_MESSAGES, why2_chat_server_config("server_username"), connection);
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
@@ -422,7 +434,7 @@ void *why2_communicate_thread(void *arg)
 
     printf("User connected.\t\t%d\n", connection);
 
-    send_socket_deallocate(WHY2_CHAT_CODE_ACCEPT_MESSAGES, why2_chat_server_config("server_username"), connection); //TELL USER HE CAN START COMMUNICATING
+    send_welcome_packet(connection); //TELL USER HE ALL THE INFO HE NEEDS
 
     //GET USERNAME
     char *config_username = why2_chat_server_config("user_pick_username");
