@@ -199,7 +199,7 @@ why2_bool check_username(char *username)
     if (username == NULL) return 0;
 
     if (username_equal(username, WHY2_CHAT_SERVER_USERNAME)) return 0; //DISABLE 'server' USERNAME
-    if (username_equal(username, WHY2_DEFAULT_USERNAME)) return 0; //DISABLE 'anon' USERNAME DUE TO ONE USERNAME PER SERVER
+    if (username_equal(username, WHY2_CHAT_DEFAULT_USERNAME)) return 0; //DISABLE 'anon' USERNAME DUE TO ONE USERNAME PER SERVER
 
     for (unsigned long i = 0; i < strlen(username); i++)
     {
@@ -378,7 +378,7 @@ void *why2_communicate_thread(void *arg)
     why2_bool invalid_username = 1;
     why2_bool exiting = 0;
     char *decoded_buffer = NULL;
-    char *username = why2_strdup(WHY2_DEFAULT_USERNAME);
+    char *username = why2_strdup(WHY2_CHAT_DEFAULT_USERNAME);
     int usernames_n = 0;
     struct json_object *json = json_tokener_parse("{}");
 
