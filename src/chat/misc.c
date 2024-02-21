@@ -426,10 +426,14 @@ void *why2_communicate_thread(void *arg)
 
         send_socket_deallocate(WHY2_CHAT_CODE_PICK_USERNAME, why2_chat_server_config("server_username"), connection); //ASK USER FOR USERNAME
 
+        char *max_tries_str = why2_chat_server_config("max_username_tries");
+        int max_tries = atoi(max_tries_str);
+        why2_toml_read_free(max_tries_str);
+
         while (invalid_username)
         {
             why2_deallocate(username);
-            if (usernames_n++ == WHY2_MAX_USERNAME_TRIES) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
+            if (usernames_n++ == max_tries) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
             {
                 exiting = 1;
                 goto deallocation;
@@ -706,7 +710,7 @@ void *why2_listen_server(void *socket)
         {
             if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_SSQC) == 0) //SERVER BROKE UP WITH YOU
             {
-                printf("%s%s%s\nServer closed the connection.\n", asking_username > WHY2_MAX_USERNAME_TRIES ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, (asking_username == 0 ? "\n": ""));
+                printf("%s%s%s\nServer closed the connection.\n", asking_username != 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, (asking_username == 0 ? "\n": ""));
                 fflush(stdout);
 
                 pthread_cancel(getline_thread); //CANCEL CLIENT getline
