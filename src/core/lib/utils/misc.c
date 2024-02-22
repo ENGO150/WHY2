@@ -24,7 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/time.h>
+#include <sys/random.h>
 #include <ftw.h>
 
 #include <curl/curl.h>
@@ -33,8 +33,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/flags.h>
 #include <why2/memory.h>
-
-why2_bool seedSet = 0; //DO NOT FUCKING TOUCH THIS!!!
 
 int multiply_cb(int a, int b) { return a * b; }
 int subtract_cb(int a, int b) { return a - b; }
@@ -393,54 +391,30 @@ unsigned long why2_compare_time_micro(struct timeval startTime, struct timeval f
 
 char *why2_generate_key(int key_length)
 {
-    int numberBuffer;
+    int number_buffer;
+    unsigned int random_buffer;
     char *key;
-
-    if (!seedSet)
-    {
-        why2_set_memory_identifier("core_key_generation_random");
-
-        //TRY TO MAKE RANDOM GENERATION REALLY "RANDOM"
-        FILE *fileBuffer;
-
-        fileBuffer = why2_fopen("/dev/urandom", "r");
-
-        if (fread(&numberBuffer, sizeof(numberBuffer), 1, fileBuffer) != 1)
-        {
-            if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
-
-            why2_clean_memory("core_key_generation_random");
-            return NULL;
-        }
-
-        numberBuffer = abs(numberBuffer); //MAKE numberBuffer POSITIVE
-        srand(numberBuffer);
-
-        why2_deallocate(fileBuffer);
-
-        seedSet = 1;
-
-        why2_reset_memory_identifier();
-    }
 
     key = why2_malloc(key_length + 1);
 
     for (int i = 0; i < key_length; i++)
     {
+        //GET RANDOM NUMBER
+        if (getrandom(&random_buffer, sizeof(unsigned int), GRND_NONBLOCK) == -1) why2_die("getrandom fn failed!");
+
         //SET numberBuffer TO RANDOM NUMBER BETWEEN 0 AND 52
-        numberBuffer = (rand() % 52) + 1;
+        number_buffer = (random_buffer % 52) + 1;
 
         //GET CHAR FROM numberBuffer
-        if (numberBuffer > 26)
+        if (number_buffer > 26)
         {
-            numberBuffer += 70;
-        }
-        else
+            number_buffer += 70;
+        } else
         {
-            numberBuffer += 64;
+            number_buffer += 64;
         }
 
-        key[i] = (char) numberBuffer;
+        key[i] = (char) number_buffer;
     }
 
     key[key_length] = '\0';
