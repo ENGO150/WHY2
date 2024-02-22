@@ -631,32 +631,6 @@ void *why2_communicate_thread(void *arg)
     return NULL;
 }
 
-char *why2_read_socket(int socket)
-{
-    char *raw_socket = read_socket_raw(socket);
-
-    char *final_message;
-    struct json_object *json_obj = json_tokener_parse(raw_socket);
-
-    if (raw_socket == NULL || json_obj == NULL) return NULL;
-
-    //GET STRINGS
-    char *message = get_string_from_json(json_obj, "message");
-    char *username = get_string_from_json(json_obj, "username");
-
-    //ALLOCATE final_message
-    final_message = why2_calloc(strlen(message) + strlen(username) + 3, sizeof(char));
-
-    //BUILD final_message
-    sprintf(final_message, "%s: %s", username, message);
-
-    //DEALLOCATION
-    why2_deallocate(raw_socket);
-    json_object_put(json_obj);
-
-    return final_message;
-}
-
 void *why2_accept_thread(void *socket)
 {
     int accepted;
@@ -718,12 +692,18 @@ void why2_clean_threads(void)
 
 void *why2_listen_server(void *socket)
 {
+    //STUFF
     char *read = NULL;
     why2_bool exiting = 0;
     why2_bool continuing;
     unsigned char asking_username = 0;
     char *server_uname = NULL;
 
+    //CONTENT
+    char *username = NULL;
+    char *message = NULL;
+
+    //SERVER SETTINGS
     int max_uname = -1;
     int min_uname = -1;
     int max_tries = -1;
@@ -735,11 +715,16 @@ void *why2_listen_server(void *socket)
     {
         continuing = 0;
 
-        if (server_uname == NULL)
-        {
-            read = read_socket_raw(*((int*) socket));
+        read = read_socket_raw(*((int*) socket));
+        if (read == NULL) continue;
 
-            server_uname = get_string_from_json_string(read, "username"); //GET USERNAME
+        //GET CONTENT
+        username = get_string_from_json_string(read, "username");
+        message = get_string_from_json_string(read, "message");
+
+        if (server_uname == NULL) //GET SERVER USERNAME
+        {
+            server_uname = why2_strdup(username); //GET USERNAME
 
             //GET INFO
             max_uname = get_int_from_json_string(read, "max_uname");
@@ -747,24 +732,20 @@ void *why2_listen_server(void *socket)
             max_tries = get_int_from_json_string(read, "max_tries");
 
             continuing = 1;
-        } else
-        {
-            read = why2_read_socket(*((int*) socket));
-            if (read == NULL) continue;
         }
 
-        if ((strncmp(read, server_uname, strlen(server_uname)) == 0 && strncmp(read + strlen(server_uname), ": code", 6) == 0) && !continuing) //CODE WAS SENT
+        if ((strcmp(username, server_uname) == 0 && strncmp(message, "code", 4) == 0) && !continuing) //CODE WAS SENT
         {
-            if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_SSQC) == 0) //SERVER BROKE UP WITH YOU
+            if (strcmp(message, WHY2_CHAT_CODE_SSQC) == 0) //SERVER BROKE UP WITH YOU
             {
                 printf("%s%s%s\nServer closed the connection.\n", asking_username > max_tries ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, (asking_username == 0 ? "\n": ""));
                 fflush(stdout);
 
                 pthread_cancel(getline_thread); //CANCEL CLIENT getline
                 exiting = 1; //EXIT THIS THREAD
-            } else if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
+            } else if (strcmp(message, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || strcmp(message, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
             {
-                if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //INVALID USERNAME
+                if (strcmp(message, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //INVALID USERNAME
                 {
                     printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid username!\n\n\n", asking_username > 1 ? WHY2_CLEAR_AND_GO_UP : "");
                     fflush(stdout);
@@ -772,7 +753,7 @@ void *why2_listen_server(void *socket)
 
                 printf("%s%sEnter username (a-Z, 0-9; %d-%d characters):\n", asking_username++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP, min_uname, max_uname);
                 fflush(stdout);
-            } else if (strcmp(read + strlen(server_uname) + 2, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //INVALID CMD
+            } else if (strcmp(message, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //INVALID CMD
             {
                 printf("\nInvalid command!\n\n");
                 fflush(stdout);
@@ -787,7 +768,7 @@ void *why2_listen_server(void *socket)
                 printf(WHY2_CLEAR_AND_GO_UP);
             }
 
-            printf("\n\n%s%s\n\n", WHY2_CLEAR_AND_GO_UP, read);
+            printf("\n\n%s%s: %s\n\n", WHY2_CLEAR_AND_GO_UP, username, message);
         }
 
 
@@ -797,7 +778,10 @@ void *why2_listen_server(void *socket)
             fflush(stdout);
         }
 
+        //DEALLOCATION
         why2_deallocate(read);
+        why2_deallocate(username);
+        why2_deallocate(message);
     }
 
     why2_deallocate(server_uname);
