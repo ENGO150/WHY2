@@ -23,9 +23,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
+#include <why2/chat/config.h>
+
 //MACROS
 #define WHY2_CHAT_KEY_BITS 4096 //BITS..
 #define WHY2_CHAT_PRIME_ITERS 100 //NUMBER OF ITERATIONS WHEN CHECKING PRIME NUMBER
+
+#define WHY2_CHAT_PUB_KEY_LOCATION WHY2_CHAT_CONFIG_DIR "/keys" //KEYS LOCATION
 
 void why2_chat_generate_keys(void); //GENERATE RSA KEYS
 
