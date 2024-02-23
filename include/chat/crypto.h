@@ -23,7 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
-//STUFF
+void why2_chat_generate_keys(void); //GENERATE RSA KEYS
 
 #ifdef __cplusplus
 }
