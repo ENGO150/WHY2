@@ -23,7 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 int main(void)
 {
     //SET FLAGS
-    why2_set_flags((why2_input_flags) { 1, 1, 0, WHY2_v3 });
+    why2_set_flags((why2_input_flags) { 1, 1, 0, WHY2_v3, WHY2_OUTPUT_TEXT });
 
     //RUN ENCRYPTION WITH WHY2_TEXT_TO_ENCRYPT, GENERATE NEW KEY AND DO NOT CHECK FOR ACTIVE WHY2_VERSION & PREVENT ANY OUTPUT
     why2_output_flags encryptedText = why2_encrypt_text(WHY2_TEXT_TO_ENCRYPT, NULL);

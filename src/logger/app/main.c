@@ -16,7 +16,8 @@ int main(void)
             1,
             1,
             0,
-            WHY2_v3
+            WHY2_v3,
+            WHY2_OUTPUT_TEXT
         }
     );
 
