@@ -88,7 +88,7 @@ void why2_chat_generate_keys(void)
         //COUNT d
         mpz_invert(d, e, phi_n);
 
-        printf("Writing keys...\n");
+        printf("Saving keys...\n");
 
         //ALLOCATE THE KEY PATHS
         char *public_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_PUB_KEY) + 3);
