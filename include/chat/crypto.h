@@ -31,6 +31,8 @@ extern "C" {
 #define WHY2_CHAT_RSA_EXPONENT 65537 //DEFAULT e
 
 #define WHY2_CHAT_KEY_LOCATION WHY2_CHAT_CONFIG_DIR "/keys" //KEYS LOCATION
+#define WHY2_CHAT_PUB_KEY "pub"
+#define WHY2_CHAT_PRI_KEY "pri"
 
 void why2_chat_generate_keys(void); //GENERATE RSA KEYS
 
