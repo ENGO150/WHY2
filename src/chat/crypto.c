@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/random.h>
@@ -87,8 +88,29 @@ void why2_chat_generate_keys(void)
         //COUNT d
         mpz_invert(d, e, phi_n);
 
-        //KEY DEALLOCATION
+        printf("Writing keys...\n");
+
+        //ALLOCATE THE KEY PATHS
+        char *public_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_PUB_KEY) + 3);
+        char *private_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_PRI_KEY) + 3);
+
+        //GET THE ACTUAL KEY PATHS
+        sprintf(public_path, "%s/%s%c", path, WHY2_CHAT_PUB_KEY, '\0');
+        sprintf(private_path, "%s/%s%c", path, WHY2_CHAT_PRI_KEY, '\0');
+
+        //WRITE THE KEYS INTO KEY-FILES
+        FILE *public = fopen(public_path, "w+");
+        FILE *private = fopen(private_path, "w+");
+
+        mpz_out_str(public, 16, n);
+        mpz_out_str(private, 16, d);
+
+        //KEYGEN DEALLOCATION
         mpz_clears(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
+        why2_deallocate(public_path);
+        why2_deallocate(private_path);
+        fclose(public);
+        fclose(private);
     }
 
     //DEALLOCATION
