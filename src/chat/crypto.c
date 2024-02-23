@@ -21,6 +21,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <sys/random.h>
 
+#include <why2/misc.h>
+
 #include <gmp.h>
 
 //LOCAL
@@ -43,4 +45,33 @@ void generate_prime(mpz_t x)
 
     //DEALLOCATION
     gmp_randclear(state);
+}
+
+//GLOBAL
+void why2_chat_generate_keys(void)
+{
+    //VARIABLES
+    mpz_t p, q, e, d, n, phi_n, buffer_1, buffer_2;
+    mpz_inits(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
+
+    //GENERATE PRIMES
+    generate_prime(p);
+    generate_prime(q);
+
+    //SET e
+    mpz_set_ui(e, 65537);
+
+    //GET n
+    mpz_mul(n, p, q);
+
+    //GET phi
+    mpz_sub_ui(buffer_1, p, 1);
+    mpz_sub_ui(buffer_2, q, 1);
+    mpz_mul(phi_n, buffer_1, buffer_2);
+
+    //COUNT d
+    mpz_invert(d, e, phi_n);
+
+    //DEALLOCATION
+    mpz_clears(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
 }
