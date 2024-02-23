@@ -55,7 +55,7 @@ void generate_prime(mpz_t x)
 void why2_chat_generate_keys(void)
 {
     //GET PATH TO KEY DIR
-    char *path = why2_replace(WHY2_CHAT_PUB_KEY_LOCATION, "{USER}", getenv("USER"));
+    char *path = why2_replace(WHY2_CHAT_KEY_LOCATION, "{USER}", getenv("USER"));
 
     //CHECK IF KEYS EXIST
     if (access(path, R_OK) != 0)
