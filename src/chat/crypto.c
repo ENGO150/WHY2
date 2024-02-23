@@ -102,8 +102,8 @@ void why2_chat_generate_keys(void)
         FILE *public = fopen(public_path, "w+");
         FILE *private = fopen(private_path, "w+");
 
-        mpz_out_str(public, 16, n);
-        mpz_out_str(private, 16, d);
+        mpz_out_str(public, WHY2_CHAT_KEY_BASE, n);
+        mpz_out_str(private, WHY2_CHAT_KEY_BASE, d);
 
         //KEYGEN DEALLOCATION
         mpz_clears(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
