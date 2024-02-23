@@ -23,6 +23,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
+//MACROS
+#define WHY2_CHAT_KEY_BITS 4096
+
 void why2_chat_generate_keys(void); //GENERATE RSA KEYS
 
 #ifdef __cplusplus
