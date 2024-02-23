@@ -24,7 +24,8 @@ extern "C" {
 #endif
 
 //MACROS
-#define WHY2_CHAT_KEY_BITS 4096
+#define WHY2_CHAT_KEY_BITS 4096 //BITS..
+#define WHY2_CHAT_PRIME_ITERS 100 //NUMBER OF ITERATIONS WHEN CHECKING PRIME NUMBER
 
 void why2_chat_generate_keys(void); //GENERATE RSA KEYS
 
