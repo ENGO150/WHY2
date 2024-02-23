@@ -41,9 +41,18 @@ elif [[ $DISTRO == "Gentoo" ]]; then
     echo "LDPATH=/usr/lib/libwhy2-chat.so" > /etc/env.d/99why2-chat
     echo "LDPATH=/usr/lib/libwhy2-chat-config.so" > /etc/env.d/99why2-chat-config
     env-update && source /etc/profile
-else
-    # 'Unsupported' distro
-    echo -e "It seems you are using unsupported distribution...\nDon't worry, just install these dependencies:\n\ngcc\njson-c\ncurl\nlibgit2\ntmux\nmake\n\nand you'll be fine."
+else # 'Unsupported' distro
+    IFS=' ' read -r -a dependency_array <<< "$ARCH_GENTOO_COMMON" # Split into dependency_array
+
+    echo -e "It seems you are using unsupported distribution...\nDon't worry, just install these dependencies:\n"
+
+    for dependency in "${dependency_array[@]}" # Iter
+    do
+        echo "$dependency"
+    done
+
+    echo -e "\nand you'll be fine."
+
     exit
 fi
 
