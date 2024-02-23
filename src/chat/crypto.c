@@ -19,8 +19,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/crypto.h>
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include <sys/random.h>
 
+#include <why2/memory.h>
 #include <why2/misc.h>
 
 #include <gmp.h>
@@ -50,28 +54,43 @@ void generate_prime(mpz_t x)
 //GLOBAL
 void why2_chat_generate_keys(void)
 {
-    //VARIABLES
-    mpz_t p, q, e, d, n, phi_n, buffer_1, buffer_2;
-    mpz_inits(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
+    //GET PATH TO KEY DIR
+    char *path = why2_replace(WHY2_CHAT_PUB_KEY_LOCATION, "{USER}", getenv("USER"));
 
-    //GENERATE PRIMES
-    generate_prime(p);
-    generate_prime(q);
+    //CHECK IF KEYS EXIST
+    if (access(path, R_OK) != 0)
+    {
+        mkdir(path, 0700);
 
-    //SET e
-    mpz_set_ui(e, 65537);
+        //SOME USER OUTPUT
+        printf("You are probably running WHY2-Chat for the first time now.\nGenerating RSA keys...\n");
 
-    //GET n
-    mpz_mul(n, p, q);
+        //VARIABLES
+        mpz_t p, q, e, d, n, phi_n, buffer_1, buffer_2;
+        mpz_inits(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
 
-    //GET phi
-    mpz_sub_ui(buffer_1, p, 1);
-    mpz_sub_ui(buffer_2, q, 1);
-    mpz_mul(phi_n, buffer_1, buffer_2);
+        //GENERATE PRIMES
+        generate_prime(p);
+        generate_prime(q);
 
-    //COUNT d
-    mpz_invert(d, e, phi_n);
+        //SET e
+        mpz_set_ui(e, 65537);
+
+        //GET n
+        mpz_mul(n, p, q);
+
+        //GET phi
+        mpz_sub_ui(buffer_1, p, 1);
+        mpz_sub_ui(buffer_2, q, 1);
+        mpz_mul(phi_n, buffer_1, buffer_2);
+
+        //COUNT d
+        mpz_invert(d, e, phi_n);
+
+        //KEY DEALLOCATION
+        mpz_clears(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
+    }
 
     //DEALLOCATION
-    mpz_clears(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
+    why2_deallocate(path);
 }
