@@ -42,6 +42,12 @@ enum WHY2_TEXT_KEY_CHAIN_VERSIONS
     WHY2_v3 //THIRD VERSION. THE LATEST ONE
 };
 
+enum WHY2_OUTPUT_FORMAT
+{
+    WHY2_OUTPUT_TEXT,
+    WHY2_OUTPUT_BYTE
+};
+
 #define WHY2_VERSION "v5.0" //WHY2_VERSION OF CURRENT BUILD     > DO NOT TOUCH THIS <
 #define WHY2_VERSIONS_URL "https://raw.githubusercontent.com/ENGO150/WHY2/release/versions.json" //URL FOR GETTING versions.json
 #define WHY2_VERSIONS_NAME "/tmp/why2-versions.json" //do I have to explain this?
@@ -71,6 +77,7 @@ typedef struct
     why2_bool no_output; //BOOLEAN FOR NOT PRINTING OUTPUT WHEN ENCRYPTING/DECRYPTING
     why2_bool update; //BOOLEAN FOR UPDATING YOUR WHY WHY2_VERSION IF OLD IS USED
     enum WHY2_TEXT_KEY_CHAIN_VERSIONS version; //VERSION OF tkch
+    enum WHY2_OUTPUT_FORMAT format; //VERSION OF tkch
 } why2_input_flags;
 
 typedef struct
