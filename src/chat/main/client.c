@@ -34,7 +34,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 int main(void)
 {
-    why2_chat_init_client_config();
+    why2_chat_init_client_config(); //CREATE client.toml CONFIGURATION
 
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     char *line = NULL;
