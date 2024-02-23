@@ -26,6 +26,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <pthread.h>
 
 #include <why2/chat/config.h>
+#include <why2/chat/crypto.h>
 #include <why2/chat/flags.h>
 #include <why2/chat/misc.h>
 
@@ -35,6 +36,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 int main(void)
 {
     why2_chat_init_client_config(); //CREATE client.toml CONFIGURATION
+    why2_chat_generate_keys(); //CREATE RSA KEYS
 
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     char *line = NULL;
