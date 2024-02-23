@@ -74,7 +74,7 @@ void why2_chat_generate_keys(void)
         generate_prime(q);
 
         //SET e
-        mpz_set_ui(e, 65537);
+        mpz_set_ui(e, WHY2_CHAT_RSA_EXPONENT);
 
         //GET n
         mpz_mul(n, p, q);
