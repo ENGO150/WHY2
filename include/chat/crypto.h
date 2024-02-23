@@ -16,37 +16,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-/*
-    This file basically contains all header files that are needed to use WHY2.
-
-    *You can use them individually ofc*
-*/
-
-#ifndef WHY2_WHY2_H
-#define WHY2_WHY2_H
+#ifndef WHY2_CHAT_CRYPTO_H
+#define WHY2_CHAT_CRYPTO_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-//CORE
-#include <why2/decrypter.h>
-#include <why2/encrypter.h>
-#include <why2/flags.h>
-#include <why2/llist.h>
-#include <why2/memory.h>
-#include <why2/misc.h>
-
-//LOGGER
-#include <why2/logger/flags.h>
-#include <why2/logger/logger.h>
-#include <why2/logger/utils.h>
-
-//CHAT
-#include <why2/chat/config.h>
-#include <why2/chat/crypto.h>
-#include <why2/chat/flags.h>
-#include <why2/chat/misc.h>
+//STUFF
 
 #ifdef __cplusplus
 }
