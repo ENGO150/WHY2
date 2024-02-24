@@ -119,14 +119,27 @@ why2_output_flags why2_encrypt_text(char *text, char *key_new)
         returning_text = why2_calloc(number_buffer + 1, sizeof(char)); //ALLOCATE
 
         //SET LENGTH
-        returning_text[0] = strlen(text) & 0x7f;
-        returning_text[1] = strlen(text) >> 7;
+        returning_text[0] = (strlen(text) & 0x7f) + 1; //+1 BECAUSE WE DON'T WANT \0
+        returning_text[1] = (strlen(text) >> 7) + 1;
 
         //PUT THE text_key_chain INTO returning_text DIRECTLY
         for (unsigned long i = 0; i < strlen(text); i++)
         {
+            //BUILD returning_text
             returning_text[2 + (i * 2)] = text_key_chain[i] & 0x7f;
-            returning_text[3 + (i * 2)] = (text_key_chain[i] >> 7)| ((text_key_chain[i] < 0) ? 0x80 : 0);
+            returning_text[3 + (i * 2)] = (text_key_chain[i] >> 7) | ((text_key_chain[i] < 0) ? 0x80 : 0);
+
+            for (unsigned long j = 2 + (i * 2); j <= 3 + (i * 2); j++)
+            {
+                //ENSURE THERE IS NO \0
+                if (returning_text[j] > 0)
+                {
+                    returning_text[j]++;
+                } else
+                {
+                    returning_text[j]--;
+                }
+            }
         }
     }
 

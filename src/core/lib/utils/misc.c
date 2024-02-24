@@ -469,5 +469,5 @@ char *why2_replace(char *string, char *old, char *new) //CODE FROM: https://www.
 
 unsigned short why2_byte_format_length(char *s)
 {
-    return (s[1] << 7) | s[0]; //ADD THE FIRST TWO INDEXES TOGETHER TO GET LENGTH
+    return ((s[1] - 1) << 7) | (s[0] - 1); //ADD THE FIRST TWO INDEXES TOGETHER TO GET LENGTH
 }
