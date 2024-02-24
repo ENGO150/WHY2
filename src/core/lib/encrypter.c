@@ -26,47 +26,47 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-why2_output_flags why2_encrypt_text(char *text, char *keyNew)
+why2_output_flags why2_encrypt_text(char *text, char *key_new)
 {
     //CHECK VARIABLE
-    unsigned char checkExitCode;
+    unsigned char check_exit_code;
 
     //TIME VARIABLES
-    struct timeval startTime;
-    struct timeval finishTime;
-    gettimeofday(&startTime, NULL);
+    struct timeval start_time;
+    struct timeval finish_time;
+    gettimeofday(&start_time, NULL);
 
     //CHECK FOR ACTIVE WHY2_VERSION
-    if ((checkExitCode = why2_check_version()) != WHY2_SUCCESS)
+    if ((check_exit_code = why2_check_version()) != WHY2_SUCCESS)
     {
-        return why2_no_output(checkExitCode);
+        return why2_no_output(check_exit_code);
     }
 
     //CHECK FOR INVALID text
-    if ((checkExitCode = why2_check_text(text)) != WHY2_SUCCESS)
+    if ((check_exit_code = why2_check_text(text)) != WHY2_SUCCESS)
     {
-        return why2_no_output(checkExitCode);
+        return why2_no_output(check_exit_code);
     }
 
     why2_set_memory_identifier("core_decrypt");
 
     //VARIABLES
     char *key = NULL;
-    char *returningText;
-    char *textBuffer = NULL;
-    int *textKeyChain = why2_malloc(sizeof(int) * strlen(text));
-    int numberBuffer = 0;
+    char *returning_text;
+    char *text_buffer = NULL;
+    int *text_key_chain = why2_malloc(sizeof(int) * strlen(text));
+    int number_buffer = 0;
 
-    if (keyNew != NULL)
+    if (key_new != NULL)
     {
         //CHECK FOR INVALID key
-        if ((checkExitCode = why2_check_key(keyNew)) != WHY2_SUCCESS)
+        if ((check_exit_code = why2_check_key(key_new)) != WHY2_SUCCESS)
         {
             why2_clean_memory("core_decrypt");
-            return why2_no_output(checkExitCode);
+            return why2_no_output(check_exit_code);
         }
 
-        key = why2_strdup(keyNew);
+        key = why2_strdup(key_new);
 
         //REDEFINE keyLength
         why2_set_key_length(strlen(key));
@@ -75,58 +75,58 @@ why2_output_flags why2_encrypt_text(char *text, char *keyNew)
         key = why2_generate_key(why2_get_key_length());
     }
 
-    //LOAD textKeyChain
-    why2_generate_text_key_chain(key, textKeyChain, strlen(text));
+    //LOAD text_key_chain
+    why2_generate_text_key_chain(key, text_key_chain, strlen(text));
 
     //ACTUALLY ENCRYPT TEXT
     for (int i = 0; i < (int) strlen(text); i++)
     {
-        textKeyChain[i] = why2_get_encryption_operation()(textKeyChain[i], (int) text[i]);
+        text_key_chain[i] = why2_get_encryption_operation()(text_key_chain[i], (int) text[i]);
     }
 
-    //COUNT REQUIRED SIZE FOR returningText
+    //COUNT REQUIRED SIZE FOR returning_text
     for (int i = 0; i < (int) strlen(text); i++)
     {
-        numberBuffer += why2_count_int_length(textKeyChain[i]);
+        number_buffer += why2_count_int_length(text_key_chain[i]);
     }
 
-    //ALLOCATE returningText (WITH THE SEPARATORS)
-    returningText = why2_calloc(numberBuffer + strlen(text), sizeof(char));
+    //ALLOCATE returning_text (WITH THE SEPARATORS)
+    returning_text = why2_calloc(number_buffer + strlen(text), sizeof(char));
 
-    //LOAD returningText
+    //LOAD returning_text
     for (int i = 0; i < (int) strlen(text); i++)
     {
-        numberBuffer = sizeof(int) * why2_count_int_length(textKeyChain[i]);
+        number_buffer = sizeof(int) * why2_count_int_length(text_key_chain[i]);
 
-        textBuffer = why2_realloc(textBuffer, numberBuffer);
+        text_buffer = why2_realloc(text_buffer, number_buffer);
 
-        sprintf(textBuffer, "%d", textKeyChain[i]);
+        sprintf(text_buffer, "%d", text_key_chain[i]);
 
-        strcat(returningText, textBuffer);
+        strcat(returning_text, text_buffer);
 
         if (i != (int) strlen(text) - 1)
         {
-            returningText[strlen(returningText)] = why2_get_encryption_separator();
+            returning_text[strlen(returning_text)] = why2_get_encryption_separator();
         }
     }
 
     //GET FINISH TIME
-    gettimeofday(&finishTime, NULL);
+    gettimeofday(&finish_time, NULL);
 
     //LOAD output
     why2_output_flags output =
     {
-        returningText, //ENCRYPTED TEXT
+        returning_text, //ENCRYPTED TEXT
         key, //GENERATED/USED KEY
         why2_count_unused_key_size(text, key), // NUMBER OF WHY2_UNUSED CHARS IN KEY
         why2_count_repeated_key_size(text, key), //NUMBER OF REPEATED CHARS IN KEY
-        why2_compare_time_micro(startTime, finishTime), // ELAPSED TIME
+        why2_compare_time_micro(start_time, finish_time), // ELAPSED TIME
         WHY2_SUCCESS //EXIT CODE
     };
 
     //DEALLOCATION
-    why2_deallocate(textKeyChain);
-    why2_deallocate(textBuffer);
+    why2_deallocate(text_key_chain);
+    why2_deallocate(text_buffer);
 
     why2_reset_memory_identifier();
 
