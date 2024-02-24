@@ -466,3 +466,8 @@ char *why2_replace(char *string, char *old, char *new) //CODE FROM: https://www.
     result[i] = '\0';
     return result;
 }
+
+unsigned short why2_byte_format_length(char *s)
+{
+    return (s[1] << 7) | s[0]; //ADD THE FIRST TWO INDEXES TOGETHER TO GET LENGTH
+}
