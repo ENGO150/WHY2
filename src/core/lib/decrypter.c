@@ -81,13 +81,7 @@ why2_output_flags why2_decrypt_text(char *text, char *key_new)
             for (unsigned short j = 2 + (i * 2); j <= 3 + (i * 2); j++)
             {
                 //ENSURE THERE IS NO \0 (REVERSED)
-                if (text_copy[j] > 0)
-                {
-                    text_copy[j]--;
-                } else
-                {
-                    text_copy[j]++;
-                }
+                if (text_copy[j] == -128) text_copy[j] = 0;
             }
 
             //PUT TOGETHER

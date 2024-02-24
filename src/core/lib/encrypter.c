@@ -132,13 +132,7 @@ why2_output_flags why2_encrypt_text(char *text, char *key_new)
             for (unsigned long j = 2 + (i * 2); j <= 3 + (i * 2); j++)
             {
                 //ENSURE THERE IS NO \0
-                if (returning_text[j] > 0)
-                {
-                    returning_text[j]++;
-                } else
-                {
-                    returning_text[j]--;
-                }
+                if (returning_text[j] == 0) returning_text[j] = -128;
             }
         }
     }
