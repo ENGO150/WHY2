@@ -25,7 +25,7 @@ extern "C" {
 
 #include <why2/flags.h>
 
-why2_output_flags why2_encrypt_text(char *text, char *keyNew); //TEXT from WILL BE ENCRYPTED WITH KEY AND RETURNED
+why2_output_flags why2_encrypt_text(char *text, char *key_new); //TEXT from WILL BE ENCRYPTED WITH KEY AND RETURNED
 
 #ifdef __cplusplus
 }
