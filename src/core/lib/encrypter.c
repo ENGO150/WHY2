@@ -52,7 +52,7 @@ why2_output_flags why2_encrypt_text(char *text, char *key_new)
 
     //VARIABLES
     char *key = NULL;
-    char *returning_text;
+    char *returning_text = NULL;
     char *text_buffer = NULL;
     int *text_key_chain = why2_malloc(sizeof(int) * strlen(text));
     int number_buffer = 0;
@@ -84,29 +84,32 @@ why2_output_flags why2_encrypt_text(char *text, char *key_new)
         text_key_chain[i] = why2_get_encryption_operation()(text_key_chain[i], (int) text[i]);
     }
 
-    //COUNT REQUIRED SIZE FOR returning_text
-    for (int i = 0; i < (int) strlen(text); i++)
+    if (why2_get_flags().format == WHY2_OUTPUT_TEXT) //NORMAL 420.-69 FORMAT
     {
-        number_buffer += why2_count_int_length(text_key_chain[i]);
-    }
-
-    //ALLOCATE returning_text (WITH THE SEPARATORS)
-    returning_text = why2_calloc(number_buffer + strlen(text), sizeof(char));
-
-    //LOAD returning_text
-    for (int i = 0; i < (int) strlen(text); i++)
-    {
-        number_buffer = sizeof(int) * why2_count_int_length(text_key_chain[i]);
-
-        text_buffer = why2_realloc(text_buffer, number_buffer);
-
-        sprintf(text_buffer, "%d", text_key_chain[i]);
-
-        strcat(returning_text, text_buffer);
-
-        if (i != (int) strlen(text) - 1)
+        //COUNT REQUIRED SIZE FOR returning_text
+        for (int i = 0; i < (int) strlen(text); i++)
         {
-            returning_text[strlen(returning_text)] = why2_get_encryption_separator();
+            number_buffer += why2_count_int_length(text_key_chain[i]);
+        }
+
+        //ALLOCATE returning_text (WITH THE SEPARATORS)
+        returning_text = why2_calloc(number_buffer + strlen(text), sizeof(char));
+
+        //LOAD returning_text
+        for (int i = 0; i < (int) strlen(text); i++)
+        {
+            number_buffer = sizeof(int) * why2_count_int_length(text_key_chain[i]);
+
+            text_buffer = why2_realloc(text_buffer, number_buffer);
+
+            sprintf(text_buffer, "%d", text_key_chain[i]);
+
+            strcat(returning_text, text_buffer);
+
+            if (i != (int) strlen(text) - 1)
+            {
+                returning_text[strlen(returning_text)] = why2_get_encryption_separator();
+            }
         }
     }
 
