@@ -84,6 +84,7 @@ why2_output_flags why2_encrypt_text(char *text, char *key_new)
         text_key_chain[i] = why2_get_encryption_operation()(text_key_chain[i], (int) text[i]);
     }
 
+    //OUTPUT FORMATS
     if (why2_get_flags().format == WHY2_OUTPUT_TEXT) //NORMAL 420.-69 FORMAT
     {
         //COUNT REQUIRED SIZE FOR returning_text
@@ -110,6 +111,22 @@ why2_output_flags why2_encrypt_text(char *text, char *key_new)
             {
                 returning_text[strlen(returning_text)] = why2_get_encryption_separator();
             }
+        }
+    } else if (why2_get_flags().format == WHY2_OUTPUT_BYTE) //FUCKED BUT SHORT(ER) OUTPUT
+    {
+        number_buffer = (strlen(text) + 1) * 2; //EACH CHARACTER WILL BE SPLIT INTO TWO CHARS AND FIRST TWO WILL BE LENGTH OF text
+
+        returning_text = why2_calloc(number_buffer + 1, sizeof(char)); //ALLOCATE
+
+        //SET LENGTH
+        returning_text[0] = strlen(text) & 0x7f;
+        returning_text[1] = strlen(text) >> 7;
+
+        //PUT THE text_key_chain INTO returning_text DIRECTLY
+        for (unsigned long i = 0; i < strlen(text); i++)
+        {
+            returning_text[2 + (i * 2)] = text_key_chain[i] & 0x7f;
+            returning_text[3 + (i * 2)] = (text_key_chain[i] >> 7)| ((text_key_chain[i] < 0) ? 0x80 : 0);
         }
     }
 
