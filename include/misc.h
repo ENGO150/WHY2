@@ -39,6 +39,7 @@ unsigned long why2_count_repeated_key_size(char *text, char *key); //COUNT repea
 unsigned long why2_compare_time_micro(struct timeval startTime, struct timeval finishTime); //COMPARE TIMES IN MICROSECONDS
 void why2_die(char *exit_message); //PRINTS exit_message ERROR AND EXITS WITH CODE 1
 char *why2_replace(char *string, char *old, char *new); //REPLACES old IN string WITH new
+unsigned short why2_byte_format_length(char *s); //GET LENGTH OF s OF WHY2_OUTPUT_BYTE FORMAT
 
 #ifdef __cplusplus
 }
