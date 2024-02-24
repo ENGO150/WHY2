@@ -27,129 +27,129 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-why2_output_flags why2_decrypt_text(char *text, char *keyNew)
+why2_output_flags why2_decrypt_text(char *text, char *key_new)
 {
     //CHECK VARIABLE
-    unsigned char checkExitCode;
+    unsigned char check_exit_code;
 
     //TIME VARIABLES
-    struct timeval startTime;
-    struct timeval finishTime;
-    gettimeofday(&startTime, NULL);
+    struct timeval start_time;
+    struct timeval finish_time;
+    gettimeofday(&start_time, NULL);
 
     //CHECK FOR ACTIVE WHY2_VERSION
-    if ((checkExitCode = why2_check_version()) != WHY2_SUCCESS)
+    if ((check_exit_code = why2_check_version()) != WHY2_SUCCESS)
     {
-        return why2_no_output(checkExitCode);
+        return why2_no_output(check_exit_code);
     }
 
     //CHECK FOR INVALID text
-    if ((checkExitCode = why2_check_text(text)) != WHY2_SUCCESS)
+    if ((check_exit_code = why2_check_text(text)) != WHY2_SUCCESS)
     {
-        return why2_no_output(checkExitCode);
+        return why2_no_output(check_exit_code);
     }
 
     //CHECK FOR INVALID key
-    if ((checkExitCode = why2_check_key(keyNew)) != WHY2_SUCCESS)
+    if ((check_exit_code = why2_check_key(key_new)) != WHY2_SUCCESS)
     {
-        return why2_no_output(checkExitCode);
+        return why2_no_output(check_exit_code);
     }
 
     //REDEFINE keyLength
-    why2_set_key_length(strlen(keyNew));
+    why2_set_key_length(strlen(key_new));
 
     //VARIABLES
-    char *returningText;
-    int numberBuffer = 1;
-    int usedTextDeallocationBuffer = 0;
-    char *textBuffer = NULL;
-    int textKeyChainLength;
-    int *textKeyChain;
-    char *key = why2_strdup(keyNew); //COPY keyNew TO key
-    int *encryptedTextKeyChain;
+    char *returning_text;
+    int number_buffer = 1;
+    int used_text_deallocation_buffer = 0;
+    char *text_buffer = NULL;
+    int text_key_chainLength;
+    int *text_key_chain;
+    char *key = why2_strdup(key_new); //COPY key_new TO key
+    int *encrypted_text_key_chain;
     char *used_text = why2_strdup(text); //COPY text TO used_text
 
-    //GET LENGTH OF returningText AND textKeyChain
+    //GET LENGTH OF returning_text AND text_key_chain
     for (int i = 0; i < (int) strlen(used_text); i++)
     {
-        if (used_text[i] == why2_get_encryption_separator()) numberBuffer++;
+        if (used_text[i] == why2_get_encryption_separator()) number_buffer++;
     }
 
-    //SET LENGTH (numberBuffer)
-    returningText = why2_calloc(numberBuffer + 1, sizeof(char));
-    textKeyChain = why2_malloc(sizeof(int) * numberBuffer);
-    encryptedTextKeyChain = why2_malloc(sizeof(int) * numberBuffer);
-    textKeyChainLength = numberBuffer;
+    //SET LENGTH (number_buffer)
+    returning_text = why2_calloc(number_buffer + 1, sizeof(char));
+    text_key_chain = why2_malloc(sizeof(int) * number_buffer);
+    encrypted_text_key_chain = why2_malloc(sizeof(int) * number_buffer);
+    text_key_chainLength = number_buffer;
 
-    //LOAD textKeyChain
-    why2_generate_text_key_chain(key, textKeyChain, numberBuffer);
+    //LOAD text_key_chain
+    why2_generate_text_key_chain(key, text_key_chain, number_buffer);
 
-    //LOAD encryptedTextKeyChain
-    for (int i = 0; i < textKeyChainLength; i++)
+    //LOAD encrypted_text_key_chain
+    for (int i = 0; i < text_key_chainLength; i++)
     {
-        numberBuffer = 0;
+        number_buffer = 0;
 
         //GET LENGTH OF EACH CHARACTER
         for (int j = 0; j < (int) strlen(used_text); j++)
         {
             if (used_text[j] == why2_get_encryption_separator()) break;
 
-            numberBuffer++;
+            number_buffer++;
         }
 
-        textBuffer = why2_realloc(textBuffer, numberBuffer + 1);
+        text_buffer = why2_realloc(text_buffer, number_buffer + 1);
 
-        //CLEAN (POSSIBLY EXISTING) JUNK in textBuffer
-        for (int j = 0; j <= numberBuffer; j++)
+        //CLEAN (POSSIBLY EXISTING) JUNK in text_buffer
+        for (int j = 0; j <= number_buffer; j++)
         {
-            textBuffer[j] = '\0';
+            text_buffer[j] = '\0';
         }
 
-        //LOAD textBuffer
+        //LOAD text_buffer
         for (int j = 0; j < (int) strlen(used_text); j++)
         {
-            textBuffer[j] = used_text[j];
+            text_buffer[j] = used_text[j];
 
-            if (numberBuffer == j) break;
+            if (number_buffer == j) break;
         }
 
-        encryptedTextKeyChain[i] = atoi(textBuffer);
+        encrypted_text_key_chain[i] = atoi(text_buffer);
 
-        used_text += numberBuffer + 1;
-        usedTextDeallocationBuffer += numberBuffer + 1;
+        used_text += number_buffer + 1;
+        used_text_deallocation_buffer += number_buffer + 1;
     }
 
     //DECRYPT TEXT
-    for (int i = 0; i < textKeyChainLength; i++)
+    for (int i = 0; i < text_key_chainLength; i++)
     {
-        textKeyChain[i] = why2_get_encryption_operation()(textKeyChain[i], encryptedTextKeyChain[i]);
+        text_key_chain[i] = why2_get_encryption_operation()(text_key_chain[i], encrypted_text_key_chain[i]);
     }
 
-    //LOAD returningText
-    for (int i = 0; i < textKeyChainLength; i++)
+    //LOAD returning_text
+    for (int i = 0; i < text_key_chainLength; i++)
     {
-        returningText[i] = textKeyChain[i];
+        returning_text[i] = text_key_chain[i];
     }
 
     //GET FINISH TIME
-    gettimeofday(&finishTime, NULL);
+    gettimeofday(&finish_time, NULL);
 
     //LOAD output
     why2_output_flags output =
     {
-        returningText, //DECRYPTED TEXT
+        returning_text, //DECRYPTED TEXT
         key, //USED KEY
-        why2_count_unused_key_size(returningText, key), // NUMBER OF WHY2_UNUSED CHARS IN KEY
-        why2_count_repeated_key_size(returningText, key), //NUMBER OF REPEATED CHARS IN KEY
-        why2_compare_time_micro(startTime, finishTime), // ELAPSED TIME
+        why2_count_unused_key_size(returning_text, key), // NUMBER OF WHY2_UNUSED CHARS IN KEY
+        why2_count_repeated_key_size(returning_text, key), //NUMBER OF REPEATED CHARS IN KEY
+        why2_compare_time_micro(start_time, finish_time), // ELAPSED TIME
         WHY2_SUCCESS //EXIT CODE
     };
 
     //DEALLOCATION
-    why2_deallocate(textKeyChain);
-    why2_deallocate(encryptedTextKeyChain);
-    why2_deallocate(textBuffer);
-    why2_deallocate(used_text - usedTextDeallocationBuffer);
+    why2_deallocate(text_key_chain);
+    why2_deallocate(encrypted_text_key_chain);
+    why2_deallocate(text_buffer);
+    why2_deallocate(used_text - used_text_deallocation_buffer);
 
     return output;
 }
