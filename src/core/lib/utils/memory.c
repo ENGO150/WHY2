@@ -191,6 +191,8 @@ void *why2_opendir(char *name)
 
 void why2_deallocate(void *pointer)
 {
+    if (pointer == NULL) return; //DEALLOCATING NULL
+
     //VARIABLES
     node_t *node = get_node(pointer);
 
