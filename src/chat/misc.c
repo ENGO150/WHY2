@@ -623,38 +623,32 @@ void *why2_communicate_thread(void *arg)
 
         decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
 
-        if (decoded_buffer == NULL) //idk sometimes this happen, idk why
+        if (decoded_buffer != NULL && strlen(decoded_buffer) != 0)
         {
-            force_exiting = 1; //force exit <3
-        } else
-        {
-            if (strlen(decoded_buffer) != 0)
+            if (decoded_buffer[0] == '!') //COMMANDS
             {
-                if (decoded_buffer[0] == '!') //COMMANDS
+                if (strcmp(decoded_buffer, "!exit") == 0) //USER REQUESTED EXIT
                 {
-                    if (strcmp(decoded_buffer, "!exit") == 0) //USER REQUESTED EXIT
-                    {
-                        exiting = 1;
-                    } else
-                    {
-                        send_socket_deallocate(WHY2_CHAT_CODE_INVALID_COMMAND, why2_chat_server_config("server_username"), connection); //INFORM USER THAT HE'S DUMB
-                    }
-
-                    //IGNORE MESSAGES BEGINNING WITH '!'
+                    exiting = 1;
                 } else
                 {
-                    //REBUILD MESSAGE WITH USERNAME
-                    json_object_object_add(json, "message", json_object_new_string(decoded_buffer));
-                    json_object_object_add(json, "username", json_object_new_string(get_username(connection)));
-
-                    json_object_object_foreach(json, key, value) //GENERATE JSON STRING
-                    {
-                        append(&raw_output, key, (char*) json_object_get_string(value));
-                    }
-                    add_brackets(&raw_output);
-
-                    send_to_all(raw_output); //e
+                    send_socket_deallocate(WHY2_CHAT_CODE_INVALID_COMMAND, why2_chat_server_config("server_username"), connection); //INFORM USER THAT HE'S DUMB
                 }
+
+                //IGNORE MESSAGES BEGINNING WITH '!'
+            } else
+            {
+                //REBUILD MESSAGE WITH USERNAME
+                json_object_object_add(json, "message", json_object_new_string(decoded_buffer));
+                json_object_object_add(json, "username", json_object_new_string(get_username(connection)));
+
+                json_object_object_foreach(json, key, value) //GENERATE JSON STRING
+                {
+                    append(&raw_output, key, (char*) json_object_get_string(value));
+                }
+                add_brackets(&raw_output);
+
+                send_to_all(raw_output); //e
             }
         }
 
