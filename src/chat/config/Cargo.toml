@@ -24,4 +24,4 @@ name = "why2_chat_config"
 crate-type = ["cdylib"]
 
 [dependencies]
-toml = "0.8.8"
+toml = "*"
