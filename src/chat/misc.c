@@ -623,6 +623,9 @@ void *why2_communicate_thread(void *arg)
 
         decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
 
+        //TRIM MESSAGE
+        trim_string(&decoded_buffer);
+
         if (decoded_buffer != NULL && strlen(decoded_buffer) != 0)
         {
             if (decoded_buffer[0] == '!') //COMMANDS
