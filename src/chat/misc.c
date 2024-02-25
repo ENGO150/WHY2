@@ -626,7 +626,7 @@ void *why2_communicate_thread(void *arg)
         //TRIM MESSAGE
         trim_string(&decoded_buffer);
 
-        if (decoded_buffer != NULL && strlen(decoded_buffer) != 0)
+        if (decoded_buffer != NULL && strlen(decoded_buffer) != 0 && strlen(decoded_buffer) <= (unsigned long) server_config_int("max_message_length"))
         {
             if (decoded_buffer[0] == '!') //COMMANDS
             {
