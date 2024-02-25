@@ -429,6 +429,56 @@ void send_welcome_packet(int connection)
     send_welcome_socket_deallocate(WHY2_CHAT_CODE_ACCEPT_MESSAGES, why2_chat_server_config("server_username"), connection);
 }
 
+void trim_string(char **s)
+{
+    unsigned long start_spaces = 0;
+    unsigned long end_spaces = 0;
+    unsigned long actual_length;
+
+    //COUNT start_spaces (HOW MANY SPACES ARE IN THE START)
+    for (unsigned long i = 0; i < strlen(*s); i++)
+    {
+        if ((*s)[i] != ' ') break;
+        start_spaces++;
+    }
+
+    //COUNT end_spaces
+    for (long long i = (long long) strlen(*s) - 1; i >= 0; i--)
+    {
+        if ((*s)[i] != ' ') break;
+        end_spaces++;
+    }
+
+    //USER'S HEAD HAS FELL ON THE SPACEBAR
+    if (start_spaces + end_spaces > strlen(*s))
+    {
+        why2_deallocate(*s);
+        *s = NULL;
+
+        return;
+    }
+
+    //COUNT actual_length
+    actual_length = strlen(*s) - (end_spaces + start_spaces);
+
+    if (actual_length == strlen(*s)) return; //NO SPACES TO REMOVE
+
+    char *st = why2_malloc(actual_length + 2); //TRIMMED s
+
+    for (unsigned long i = start_spaces; i < (start_spaces + actual_length); i++)
+    {
+        st[i - start_spaces] = (*s)[i];
+    }
+
+    st[actual_length] = '\0';
+
+    //DEALLOCATE UNTRIMMED s
+    why2_deallocate(*s);
+
+    //SET NEW s
+    *s = st;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
