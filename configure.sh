@@ -18,7 +18,6 @@
 
 # Get linux distro
 DISTRO=$(lsb_release -is)
-USR=$(who am i | awk '{print $1}')
 
 if [[ $(id -u) != "0" ]] && [[ $1 != "force" ]]; then
     echo "You must run this script as root! (To skip this, run with 'force' arg: \"./configure.sh force\")"
@@ -63,5 +62,5 @@ $COMMAND
 # Install Rust
 if ! [ -x "$(command -v cargo)" ]; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y # Install Rust and components
-    su -u $USR source "$HOME/.cargo/env" # TODO: Not working
+    source "$HOME/.cargo/env"
 fi
