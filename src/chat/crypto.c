@@ -86,7 +86,7 @@ char *exp_mod(char *to_exp, char *exponent)
     //GET ALL STUFF
     mpz_init_set_str(m, to_exp, 10);
     mpz_init_set_str(n, why2_get_chat_modulus(), WHY2_CHAT_KEY_BASE);
-    mpz_init_set_str(e, exponent, 10);
+    mpz_init_set_str(e, exponent, WHY2_CHAT_KEY_BASE);
 
     //ENCRYPT MESSAGE
     mpz_powm(c, m, e, n);
