@@ -30,6 +30,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <gmp.h>
 
+//DO NOT TOUCH THESE PLS :3
+char *rsa_modulus = NULL; //THE RSA MODULUS
+char *rsa_d = NULL; //THE RSA d
+
 //LOCAL
 void generate_prime(mpz_t x)
 {
@@ -119,6 +123,6 @@ void why2_chat_init_keys(void)
 
 void why2_chat_deallocate_keys(void)
 {
-    //YOU FUCKING IDIOT DEALLOCATE KEYS
-    //ARE YOU REALLY THAT DUMB?
+    why2_deallocate(rsa_modulus);
+    why2_deallocate(rsa_d);
 }
