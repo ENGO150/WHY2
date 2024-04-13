@@ -36,7 +36,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 int main(void)
 {
     why2_chat_init_client_config(); //CREATE client.toml CONFIGURATION
-    why2_chat_generate_keys(); //CREATE RSA KEYS
+    why2_chat_init_keys(); //CREATE RSA KEYS
 
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     char *line = NULL;
