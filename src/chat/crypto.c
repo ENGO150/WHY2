@@ -76,6 +76,30 @@ void read_file(FILE *file, char **output)
     *output = buffer;
 }
 
+char *exp_mod(long to_encrypt, char *exponent)
+{
+    //VARIABLES
+    char *output;
+    mpz_t m, c, n, e;
+    mpz_init(c);
+
+    //GET ALL STUFF
+    mpz_init_set_si(m, to_encrypt);
+    mpz_init_set_str(n, why2_get_chat_modulus(), WHY2_CHAT_KEY_BASE);
+    mpz_init_set_str(e, exponent, 10);
+
+    //ENCRYPT MESSAGE
+    mpz_powm(c, m, e, n);
+
+    output = why2_malloc(mpz_sizeinbase(c, WHY2_CHAT_KEY_BASE) + 2); //ALLOCATE OUTPUT
+    mpz_get_str(output, WHY2_CHAT_KEY_BASE, c); //GET OUTPUT
+
+    //DEALLOCATION
+    mpz_clears(m, c, n, e, NULL);
+
+    return output;
+}
+
 //GLOBAL
 void why2_chat_init_keys(void)
 {
@@ -172,24 +196,5 @@ char *why2_get_chat_d(void)
 
 char *why2_chat_rsa_pub_encrypt(long to_encrypt)
 {
-    //VARIABLES
-    char *output;
-    mpz_t m, c, n, e;
-    mpz_init(c);
-
-    //GET ALL STUFF
-    mpz_init_set_si(m, to_encrypt);
-    mpz_init_set_str(n, why2_get_chat_modulus(), WHY2_CHAT_KEY_BASE);
-    mpz_init_set_si(e, WHY2_CHAT_RSA_EXPONENT);
-
-    //ENCRYPT MESSAGE
-    mpz_powm(c, m, e, n);
-
-    output = why2_malloc(mpz_sizeinbase(c, WHY2_CHAT_KEY_BASE) + 2); //ALLOCATE OUTPUT
-    mpz_get_str(output, WHY2_CHAT_KEY_BASE, c); //GET OUTPUT
-
-    //DEALLOCATION
-    mpz_clears(m, c, n, e, NULL);
-
-    return output;
+    return exp_mod(to_encrypt, WHY2_CHAT_RSA_EXPONENT);
 }
