@@ -38,6 +38,9 @@ extern "C" {
 void why2_chat_init_keys(void); //INIT (POSSIBLY GENERATE) RSA KEYS
 void why2_chat_deallocate_keys(void); //DEALLOCATE :) (NO SLUR HERE)
 
+char *why2_get_chat_modulus(void); //GET THE RSA MODULUS
+char *why2_get_chat_d(void); //GET THE RSA d
+
 #ifdef __cplusplus
 }
 #endif
