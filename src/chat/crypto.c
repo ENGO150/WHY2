@@ -111,7 +111,7 @@ void why2_chat_init_keys(void)
         generate_prime(q);
 
         //SET e
-        mpz_set_ui(e, WHY2_CHAT_RSA_EXPONENT);
+        mpz_set_str(e, WHY2_CHAT_RSA_EXPONENT, 10);
 
         //GET n
         mpz_mul(n, p, q);
