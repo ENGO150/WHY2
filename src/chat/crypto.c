@@ -56,11 +56,43 @@ void generate_prime(mpz_t x)
     gmp_randclear(state);
 }
 
+void read_file(FILE *file, char **output)
+{
+    //VARIABLES
+    int buffer_size;
+    char *buffer;
+
+    //GET LENGTH
+    fseek(file, 0, SEEK_END);
+    buffer_size = ftell(file);
+    rewind(file);
+
+    //READ
+    buffer = why2_calloc(buffer_size + 1, sizeof(char));
+    if (fread(buffer, buffer_size, 1, file) != 1) why2_die("Reading keyfile failed!");
+    buffer[buffer_size] = '\0';
+
+    //ASSIGN OUTPUT
+    *output = buffer;
+}
+
 //GLOBAL
 void why2_chat_init_keys(void)
 {
+    //KEY FILES
+    FILE *public; //TECHNICALLY, PUBLIC KEY CONTAINS ONLY THE MODULUS AND PRIVATE CONTAINS ONLY THE d
+    FILE *private;
+
     //GET PATH TO KEY DIR
     char *path = why2_replace(WHY2_CHAT_KEY_LOCATION, "{USER}", getenv("USER"));
+
+    //ALLOCATE THE KEY PATHS
+    char *public_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_PUB_KEY) + 3);
+    char *private_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_PRI_KEY) + 3);
+
+    //GET THE ACTUAL KEY PATHS
+    sprintf(public_path, "%s/%s%c", path, WHY2_CHAT_PUB_KEY, '\0');
+    sprintf(private_path, "%s/%s%c", path, WHY2_CHAT_PRI_KEY, '\0');
 
     //CHECK IF KEYS EXIST
     if (access(path, R_OK) != 0)
@@ -94,31 +126,32 @@ void why2_chat_init_keys(void)
 
         printf("Saving keys...\n");
 
-        //ALLOCATE THE KEY PATHS
-        char *public_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_PUB_KEY) + 3);
-        char *private_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_PRI_KEY) + 3);
-
-        //GET THE ACTUAL KEY PATHS
-        sprintf(public_path, "%s/%s%c", path, WHY2_CHAT_PUB_KEY, '\0');
-        sprintf(private_path, "%s/%s%c", path, WHY2_CHAT_PRI_KEY, '\0');
-
         //WRITE THE KEYS INTO KEY-FILES
-        FILE *public = fopen(public_path, "w+");
-        FILE *private = fopen(private_path, "w+");
+        public = fopen(public_path, "w+");
+        private = fopen(private_path, "w+");
 
         mpz_out_str(public, WHY2_CHAT_KEY_BASE, n);
         mpz_out_str(private, WHY2_CHAT_KEY_BASE, d);
 
         //KEYGEN DEALLOCATION
         mpz_clears(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
-        why2_deallocate(public_path);
-        why2_deallocate(private_path);
-        fclose(public);
-        fclose(private);
+    } else
+    {
+        //OPEN FILES
+        public = fopen(public_path, "r");
+        private = fopen(private_path, "r");
+
+        //READ THE KEYS
+        read_file(public, &rsa_modulus);
+        read_file(private, &rsa_d);
     }
 
     //DEALLOCATION
     why2_deallocate(path);
+    why2_deallocate(public_path);
+    why2_deallocate(private_path);
+    fclose(public);
+    fclose(private);
 }
 
 void why2_chat_deallocate_keys(void)
