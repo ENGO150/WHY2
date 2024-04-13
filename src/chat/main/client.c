@@ -126,6 +126,8 @@ int main(void)
         free(return_line);
     }
 
+    why2_chat_deallocate_keys(); //DEALLOCATE GETTERS FOR KEYS
+
     why2_clean_memory(""); //RUN GARBAGE COLLECTOR
 
     return 0;
