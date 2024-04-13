@@ -116,3 +116,9 @@ void why2_chat_init_keys(void)
     //DEALLOCATION
     why2_deallocate(path);
 }
+
+void why2_chat_deallocate_keys(void)
+{
+    //YOU FUCKING IDIOT DEALLOCATE KEYS
+    //ARE YOU REALLY THAT DUMB?
+}

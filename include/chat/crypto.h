@@ -36,6 +36,7 @@ extern "C" {
 #define WHY2_CHAT_KEY_BASE 62 //BASE IN THE GENERATED KEYS ARE STORED IN WHY2_CHAT_KEY_LOCATION
 
 void why2_chat_init_keys(void); //INIT (POSSIBLY GENERATE) RSA KEYS
+void why2_chat_deallocate_keys(void); //DEALLOCATE :) (NO SLUR HERE)
 
 #ifdef __cplusplus
 }
