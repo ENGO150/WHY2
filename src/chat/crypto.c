@@ -127,8 +127,8 @@ void why2_chat_init_keys(void)
         printf("Saving keys...\n");
 
         //WRITE THE KEYS INTO KEY-FILES
-        public = fopen(public_path, "w+");
-        private = fopen(private_path, "w+");
+        public = why2_fopen(public_path, "w+");
+        private = why2_fopen(private_path, "w+");
 
         mpz_out_str(public, WHY2_CHAT_KEY_BASE, n);
         mpz_out_str(private, WHY2_CHAT_KEY_BASE, d);
@@ -138,8 +138,8 @@ void why2_chat_init_keys(void)
     } else
     {
         //OPEN FILES
-        public = fopen(public_path, "r");
-        private = fopen(private_path, "r");
+        public = why2_fopen(public_path, "r");
+        private = why2_fopen(private_path, "r");
 
         //READ THE KEYS
         read_file(public, &rsa_modulus);
@@ -150,8 +150,8 @@ void why2_chat_init_keys(void)
     why2_deallocate(path);
     why2_deallocate(public_path);
     why2_deallocate(private_path);
-    fclose(public);
-    fclose(private);
+    why2_deallocate(public);
+    why2_deallocate(private);
 }
 
 void why2_chat_deallocate_keys(void)
