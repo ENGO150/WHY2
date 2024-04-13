@@ -126,3 +126,13 @@ void why2_chat_deallocate_keys(void)
     why2_deallocate(rsa_modulus);
     why2_deallocate(rsa_d);
 }
+
+char *why2_get_chat_modulus(void)
+{
+    return rsa_modulus;
+}
+
+char *why2_get_chat_d(void)
+{
+    return rsa_d;
+}
