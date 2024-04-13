@@ -198,3 +198,8 @@ char *why2_chat_rsa_pub_encrypt(long to_encrypt)
 {
     return exp_mod(to_encrypt, WHY2_CHAT_RSA_EXPONENT);
 }
+
+char *why2_chat_rsa_pri_decrypt(long to_decrypt)
+{
+    return exp_mod(to_decrypt, why2_get_chat_d());
+}

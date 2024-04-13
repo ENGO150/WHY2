@@ -42,6 +42,7 @@ char *why2_get_chat_modulus(void); //GET THE RSA MODULUS
 char *why2_get_chat_d(void); //GET THE RSA d
 
 char *why2_chat_rsa_pub_encrypt(long to_encrypt); //RSA ENCRYPT USING PUBLIC KEY
+char *why2_chat_rsa_pri_decrypt(long to_decrypt); //RSA DECRYPT USING PRIVATE KEY
 
 #ifdef __cplusplus
 }
