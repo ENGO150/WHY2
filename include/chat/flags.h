@@ -46,6 +46,9 @@ extern "C" {
 //SHORTCUTS CAUSE I'M LAZY BITCH
 #define WHY2_CHAT_CODE_SSQC WHY2_CHAT_CODE_SERVER_SIDE_QUIT_COMMUNICATION
 
+char *why2_chat_client_get_server_exit_cmd(); //GETTER AND SETTER FOR !exit FROM SERVER
+void why2_chat_client_set_server_exit_cmd(char *cmd);
+
 #ifdef __cplusplus
 }
 #endif
