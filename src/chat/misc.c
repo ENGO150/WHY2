@@ -44,6 +44,7 @@ typedef struct _connection_node
     int connection;
     pthread_t thread;
     char *username;
+    unsigned long id;
 } connection_node_t; //SINGLE LINKED LIST
 
 why2_list_t connection_list = WHY2_LIST_EMPTY;
@@ -479,6 +480,29 @@ void trim_string(char **s)
     *s = st;
 }
 
+unsigned long get_latest_id()
+{
+    unsigned long returning = 0;
+    why2_node_t *buffer = connection_list.head;
+    connection_node_t value_buffer;
+
+    while (buffer != NULL)
+    {
+        value_buffer = *(connection_node_t*) buffer -> value;
+
+        if (value_buffer.id == returning)
+        {
+            returning++;
+            buffer = connection_list.head;
+        } else
+        {
+            buffer = buffer -> next;
+        }
+    }
+
+    return returning;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
@@ -579,7 +603,8 @@ void *why2_communicate_thread(void *arg)
     {
         connection,
         pthread_self(),
-        why2_strdup(username)
+        why2_strdup(username),
+        get_latest_id()
     };
 
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
