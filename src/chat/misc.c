@@ -382,6 +382,8 @@ void send_socket(char *text, char *username, int socket, why2_bool welcome)
         json_object_object_add(json, "min_uname", json_object_new_string(min_uname));
         json_object_object_add(json, "max_tries", json_object_new_string(max_tries));
 
+        json_object_object_add(json, "exit_cmd", json_object_new_string(WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT));
+
         //DEALLOCATION
         why2_toml_read_free(max_uname);
         why2_toml_read_free(min_uname);
@@ -802,6 +804,7 @@ void *why2_listen_server(void *socket)
             max_uname = get_int_from_json_string(read, "max_uname");
             min_uname = get_int_from_json_string(read, "min_uname");
             max_tries = get_int_from_json_string(read, "max_tries");
+            why2_chat_client_set_server_exit_cmd(get_string_from_json_string(read, "exit_cmd"));
 
             continuing = 1;
         }

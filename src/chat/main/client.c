@@ -108,15 +108,19 @@ int main(void)
 
         //TODO: Remove accents
 
-        why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
-
         if (strcmp(line, WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\n") == 0) //USER REQUESTED PROGRAM EXIT
         {
             printf("Exiting...\n");
-            break;
-        }
 
-        free(return_line);
+            char *exit_cmd = why2_chat_client_get_server_exit_cmd();
+
+            why2_send_socket(exit_cmd, NULL, listen_socket);
+            why2_deallocate(exit_cmd);
+        } else
+        {
+            why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
+            free(return_line);
+        }
     }
 
     //DEALLOCATION
