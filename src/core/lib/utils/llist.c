@@ -39,11 +39,15 @@ void why2_list_push(why2_list_t *list, void *value, unsigned long size)
         buffer = new_node;
     } else
     {
+        why2_node_t *buffer_2 = buffer;
+
         while (buffer -> next != NULL) buffer = buffer -> next; //GET TO THE END OF LIST
 
         buffer -> next = new_node; //LINK
+        buffer = buffer_2; //GO BACK TO THE START OF THE LLIST
     }
 
+    //APPEND THE new_node TO THE END OF list
     list -> head = buffer;
 }
 
