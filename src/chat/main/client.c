@@ -110,7 +110,7 @@ int main(void)
 
         why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
 
-        if (strcmp(line, "!exit\n") == 0) //USER REQUESTED PROGRAM EXIT
+        if (strcmp(line, WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\n") == 0) //USER REQUESTED PROGRAM EXIT
         {
             printf("Exiting...\n");
             break;

@@ -63,7 +63,7 @@ int main(void)
     {
         if (getline(&line_buffer, &line_length_buffer, stdin) == -1) why2_die("Reading input failed.");
 
-        if (strcmp(line_buffer, "!exit\n") == 0) //USER REQUESTED PROGRAM EXIT
+        if (strcmp(line_buffer, WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\n") == 0) //USER REQUESTED PROGRAM EXIT
         {
             printf("Exiting...\n");
             break;

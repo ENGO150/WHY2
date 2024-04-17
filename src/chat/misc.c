@@ -655,7 +655,7 @@ void *why2_communicate_thread(void *arg)
         {
             if (decoded_buffer[0] == '!') //COMMANDS
             {
-                if (strcmp(decoded_buffer, "!exit") == 0) //USER REQUESTED EXIT
+                if (strcmp(decoded_buffer, WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT) == 0) //USER REQUESTED EXIT
                 {
                     exiting = 1;
                 } else
