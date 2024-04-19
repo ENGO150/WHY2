@@ -43,10 +43,7 @@ void exit_client(WHY2_UNUSED int i) //guess what
     if (exited) return;
     exited = 1;
 
-    char *exit_cmd = why2_chat_client_get_server_exit_cmd();
-
-    why2_send_socket(exit_cmd, NULL, listen_socket);
-    why2_deallocate(exit_cmd);
+    why2_send_socket(WHY2_CHAT_CODE_EXIT, NULL, listen_socket);
 }
 
 int main(void)

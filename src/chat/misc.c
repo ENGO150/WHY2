@@ -382,8 +382,6 @@ void send_socket(char *text, char *username, int socket, why2_bool welcome)
         json_object_object_add(json, "min_uname", json_object_new_string(min_uname));
         json_object_object_add(json, "max_tries", json_object_new_string(max_tries));
 
-        json_object_object_add(json, "exit_cmd", json_object_new_string(WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT));
-
         //DEALLOCATION
         why2_toml_read_free(max_uname);
         why2_toml_read_free(min_uname);
@@ -655,18 +653,15 @@ void *why2_communicate_thread(void *arg)
 
         if (decoded_buffer != NULL && strlen(decoded_buffer) != 0 && strlen(decoded_buffer) <= (unsigned long) server_config_int("max_message_length"))
         {
-            if (decoded_buffer[0] == '!') //COMMANDS
+            if (strncmp(decoded_buffer, "code", 4) == 0) //CODES FROM CLIENT
             {
-                if (strcmp(decoded_buffer, WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT) == 0) //USER REQUESTED EXIT
+                if (strcmp(decoded_buffer, WHY2_CHAT_CODE_EXIT) == 0) //USER REQUESTED EXIT
                 {
                     exiting = 1;
-                } else
-                {
-                    send_socket_deallocate(WHY2_CHAT_CODE_INVALID_COMMAND, why2_chat_server_config("server_username"), connection); //INFORM USER THAT HE'S DUMB
                 }
 
-                //IGNORE MESSAGES BEGINNING WITH '!'
-            } else
+                //IGNORE INVALID CODES, THE USER JUST GOT HIS LOBOTOMY DONE
+            } else if (decoded_buffer[0] != '!') //IGNORE MESSAGES BEGINNING WITH '!'
             {
                 //REBUILD MESSAGE WITH USERNAME
                 json_object_object_add(json, "message", json_object_new_string(decoded_buffer));
@@ -804,7 +799,6 @@ void *why2_listen_server(void *socket)
             max_uname = get_int_from_json_string(read, "max_uname");
             min_uname = get_int_from_json_string(read, "min_uname");
             max_tries = get_int_from_json_string(read, "max_tries");
-            why2_chat_client_set_server_exit_cmd(get_string_from_json_string(read, "exit_cmd"));
 
             continuing = 1;
         }
