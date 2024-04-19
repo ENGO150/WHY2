@@ -116,6 +116,17 @@ int main(void)
 
             why2_send_socket(exit_cmd, NULL, listen_socket);
             why2_deallocate(exit_cmd);
+        } else if (strcmp(line, WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\n") == 0)
+        {
+            printf
+            (
+                "\nCommands:\n---------\n%s\n\n>>> ",
+
+                WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\tExits the program.\n"
+                WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\tPrints out all the commands. :)"
+            );
+
+            fflush(stdout);
         } else
         {
             why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT

@@ -830,7 +830,7 @@ void *why2_listen_server(void *socket)
                 fflush(stdout);
             } else if (strcmp(message, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //INVALID CMD
             {
-                printf("\nInvalid command!\n\n");
+                printf("\nInvalid command! Use \"" WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\" for list of commands.\n\n");
                 fflush(stdout);
             }
         } else if (!continuing)
