@@ -32,17 +32,22 @@ extern "C" {
 
 #define WHY2_INVALID_POINTER (void*) 0xffffffffffffffff
 
-//CODES
+//(SERVER -> CLIENT) CODES
 #define WHY2_CHAT_CODE_ACCEPT_MESSAGES "code_000"
 #define WHY2_CHAT_CODE_PICK_USERNAME "code_001"
 #define WHY2_CHAT_CODE_SERVER_SIDE_QUIT_COMMUNICATION "code_002"
 #define WHY2_CHAT_CODE_INVALID_COMMAND "code_003"
 #define WHY2_CHAT_CODE_INVALID_USERNAME "code_004"
 
+//(SERVER -> CLIENT) CODES
+#define WHY2_CHAT_CODE_EXIT "code_999"
+#define WHY2_CHAT_CODE_PM "code_998"
+
 //COMMANDS
 #define WHY2_CHAT_COMMAND_PREFIX "!" //the little thingy you write before the command names to make the program recognise them boy. You know? Like in minecraft you use /kill... Also, are you dumb?
 #define WHY2_CHAT_COMMAND_EXIT "exit" //QUIT THE PROGRAM CMD
 #define WHY2_CHAT_COMMAND_HELP "help" //PRINT ALL COMMANDS
+#define WHY2_CHAT_COMMAND_PM "pm" //PRIVATE MESSAGES
 
 //SHORTCUTS CAUSE I'M LAZY BITCH
 #define WHY2_CHAT_CODE_SSQC WHY2_CHAT_CODE_SERVER_SIDE_QUIT_COMMUNICATION
