@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -30,15 +31,32 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/flags.h>
 #include <why2/chat/misc.h>
 
+#include <why2/flags.h>
 #include <why2/memory.h>
 #include <why2/misc.h>
 
+why2_bool exited = 0; //USER ALREADY REQUESTED EXIT
+int listen_socket; //THE SERVER SOCKET
+
+void exit_client(WHY2_UNUSED int i) //guess what
+{
+    if (exited) return;
+    exited = 1;
+
+    char *exit_cmd = why2_chat_client_get_server_exit_cmd();
+
+    why2_send_socket(exit_cmd, NULL, listen_socket);
+    why2_deallocate(exit_cmd);
+}
+
 int main(void)
 {
+    signal(SIGINT, exit_client); //HANDLE ^C
+
     why2_chat_init_client_config(); //CREATE client.toml CONFIGURATION
     why2_chat_init_keys(); //CREATE RSA KEYS
 
-    int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
+    listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     char *line = NULL;
     void *return_line = NULL;
     size_t line_length = 0;
@@ -111,11 +129,7 @@ int main(void)
         if (strcmp(line, WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\n") == 0) //USER REQUESTED PROGRAM EXIT
         {
             printf("Exiting...\n");
-
-            char *exit_cmd = why2_chat_client_get_server_exit_cmd();
-
-            why2_send_socket(exit_cmd, NULL, listen_socket);
-            why2_deallocate(exit_cmd);
+            exit_client(0);
         } else if (strcmp(line, WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\n") == 0)
         {
             printf
