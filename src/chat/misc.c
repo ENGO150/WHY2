@@ -432,6 +432,21 @@ void send_welcome_packet(int connection)
 
 void trim_string(char **s)
 {
+    //GET CORRECT ALLOCATION FNS
+    void* (*allocate)(unsigned long);
+    void (*deallocate)(void*);
+
+    if (why2_allocated(s))
+    {
+        allocate = why2_malloc;
+        deallocate = why2_deallocate;
+    } else
+    {
+        allocate = malloc;
+        deallocate = free;
+    }
+
+    //BUFFERS
     unsigned long start_spaces = 0;
     unsigned long end_spaces = 0;
     unsigned long actual_length;
@@ -453,7 +468,7 @@ void trim_string(char **s)
     //USER'S HEAD HAS FELL ON THE SPACEBAR
     if (start_spaces + end_spaces > strlen(*s))
     {
-        why2_deallocate(*s);
+        deallocate(*s);
         *s = NULL;
 
         return;
@@ -464,7 +479,7 @@ void trim_string(char **s)
 
     if (actual_length == strlen(*s)) return; //NO SPACES TO REMOVE
 
-    char *st = why2_malloc(actual_length + 2); //TRIMMED s
+    char *st = allocate(actual_length + 2); //TRIMMED s
 
     for (unsigned long i = start_spaces; i < (start_spaces + actual_length); i++)
     {
@@ -474,7 +489,7 @@ void trim_string(char **s)
     st[actual_length] = '\0';
 
     //DEALLOCATE UNTRIMMED s
-    why2_deallocate(*s);
+    deallocate(*s);
 
     //SET NEW s
     *s = st;
