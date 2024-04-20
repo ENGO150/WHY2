@@ -23,6 +23,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
+#include <why2/flags.h>
+
 void *why2_malloc(unsigned long size);
 void *why2_calloc(unsigned long element, unsigned long size);
 void *why2_realloc(void *pointer, unsigned long size);
@@ -36,6 +38,8 @@ void *why2_opendir(char *name);
 void why2_deallocate(void *pointer);
 
 void why2_clean_memory(char *identifier); //identifier SPECIFIES WHICH NODES TO DEALLOCATE | THIS IS BASICALLY GARBAGE COLLECTOR | PASS why2_get_default_memory_identifier() FOR DEALLOCATING EVERYTHING
+
+why2_bool why2_allocated(void *pointer); //CHECKS IF pointer WAS ALLOCATED USING WHY2-MEM
 
 #ifdef __cplusplus
 }

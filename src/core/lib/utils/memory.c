@@ -241,3 +241,8 @@ void why2_clean_memory(char *identifier)
 
     why2_reset_memory_identifier(); //THIS WILL CAUSE SEGFAULT IF YOU DIDN'T USE why2_set_memory_identifier
 }
+
+why2_bool why2_allocated(void *pointer)
+{
+    return get_node(pointer) != NULL;
+}
