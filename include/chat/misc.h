@@ -32,6 +32,7 @@ void why2_clean_connections(void); //CLOSE EVERY CONNECTION
 void why2_clean_threads(void); //CLOSE EVERY RUNNING MESSAGE THREAD
 void *why2_listen_server(void *socket); //LISTEN FOR OTHER's USERS MESSAGES
 void *why2_getline_thread(WHY2_UNUSED void* arg); //START getline IN SEPARATE THREAD
+void why2_trim_string(char **s); //REMOVES SPACES FROM END AND START OF *s
 
 #ifdef __cplusplus
 }

@@ -430,71 +430,6 @@ void send_welcome_packet(int connection)
     send_welcome_socket_deallocate(WHY2_CHAT_CODE_ACCEPT_MESSAGES, why2_chat_server_config("server_username"), connection);
 }
 
-void trim_string(char **s)
-{
-    //GET CORRECT ALLOCATION FNS
-    void* (*allocate)(unsigned long);
-    void (*deallocate)(void*);
-
-    if (why2_allocated(s))
-    {
-        allocate = why2_malloc;
-        deallocate = why2_deallocate;
-    } else
-    {
-        allocate = malloc;
-        deallocate = free;
-    }
-
-    //BUFFERS
-    unsigned long start_spaces = 0;
-    unsigned long end_spaces = 0;
-    unsigned long actual_length;
-
-    //COUNT start_spaces (HOW MANY SPACES ARE IN THE START)
-    for (unsigned long i = 0; i < strlen(*s); i++)
-    {
-        if ((*s)[i] != ' ') break;
-        start_spaces++;
-    }
-
-    //COUNT end_spaces
-    for (long long i = (long long) strlen(*s) - 1; i >= 0; i--)
-    {
-        if ((*s)[i] != ' ') break;
-        end_spaces++;
-    }
-
-    //USER'S HEAD HAS FELL ON THE SPACEBAR
-    if (start_spaces + end_spaces > strlen(*s))
-    {
-        deallocate(*s);
-        *s = NULL;
-
-        return;
-    }
-
-    //COUNT actual_length
-    actual_length = strlen(*s) - (end_spaces + start_spaces);
-
-    if (actual_length == strlen(*s)) return; //NO SPACES TO REMOVE
-
-    char *st = allocate(actual_length + 2); //TRIMMED s
-
-    for (unsigned long i = start_spaces; i < (start_spaces + actual_length); i++)
-    {
-        st[i - start_spaces] = (*s)[i];
-    }
-
-    st[actual_length] = '\0';
-
-    //DEALLOCATE UNTRIMMED s
-    deallocate(*s);
-
-    //SET NEW s
-    *s = st;
-}
-
 unsigned long get_latest_id()
 {
     unsigned long returning = 0;
@@ -664,7 +599,7 @@ void *why2_communicate_thread(void *arg)
         decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
 
         //TRIM MESSAGE
-        trim_string(&decoded_buffer);
+        why2_trim_string(&decoded_buffer);
 
         if (decoded_buffer != NULL && strlen(decoded_buffer) != 0 && strlen(decoded_buffer) <= (unsigned long) server_config_int("max_message_length"))
         {
@@ -882,4 +817,69 @@ void *why2_getline_thread(WHY2_UNUSED void* arg)
     if (getline(&line, &line_length, stdin) == -1) why2_die("Reading input failed.");
 
     return line;
+}
+
+void why2_trim_string(char **s)
+{
+    //GET CORRECT ALLOCATION FNS
+    void* (*allocate)(unsigned long);
+    void (*deallocate)(void*);
+
+    if (why2_allocated(*s))
+    {
+        allocate = why2_malloc;
+        deallocate = why2_deallocate;
+    } else
+    {
+        allocate = malloc;
+        deallocate = free;
+    }
+
+    //BUFFERS
+    unsigned long start_spaces = 0;
+    unsigned long end_spaces = 0;
+    unsigned long actual_length;
+
+    //COUNT start_spaces (HOW MANY SPACES ARE IN THE START)
+    for (unsigned long i = 0; i < strlen(*s); i++)
+    {
+        if ((*s)[i] != ' ') break;
+        start_spaces++;
+    }
+
+    //COUNT end_spaces
+    for (long long i = (long long) strlen(*s) - 1; i >= 0; i--)
+    {
+        if ((*s)[i] != ' ') break;
+        end_spaces++;
+    }
+
+    //USER'S HEAD HAS FELL ON THE SPACEBAR
+    if (start_spaces + end_spaces > strlen(*s))
+    {
+        deallocate(*s);
+        *s = NULL;
+
+        return;
+    }
+
+    //COUNT actual_length
+    actual_length = strlen(*s) - (end_spaces + start_spaces);
+
+    if (actual_length == strlen(*s)) return; //NO SPACES TO REMOVE
+
+    char *st = allocate(actual_length + 2); //TRIMMED s
+
+    for (unsigned long i = start_spaces; i < (start_spaces + actual_length); i++)
+    {
+        st[i - start_spaces] = (*s)[i];
+    }
+
+    st[actual_length] = '\0';
+
+    //DEALLOCATE UNTRIMMED s
+    deallocate(*s);
+
+    //SET NEW s
+    *s = st;
 }
