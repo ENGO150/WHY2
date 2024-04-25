@@ -118,6 +118,9 @@ int main(void)
         }
 
         line = (char*) return_line;
+        why2_trim_string(&line);
+
+        if (line == NULL) line = strdup("");
 
         printf(WHY2_CLEAR_AND_GO_UP);
 
@@ -141,7 +144,7 @@ int main(void)
         } else
         {
             why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
-            free(return_line);
+            free(line);
         }
     }
 
@@ -149,7 +152,7 @@ int main(void)
     if (!ssqc)
     {
         pthread_cancel(thread_buffer);
-        free(return_line);
+        free(line);
     }
 
     why2_chat_deallocate_keys(); //DEALLOCATE GETTERS FOR KEYS
