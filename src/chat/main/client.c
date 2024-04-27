@@ -95,6 +95,7 @@ int main(void)
     pthread_t thread_buffer;
     pthread_t thread_getline;
     why2_bool ssqc = 0;
+    char *cmd_arg = NULL;
 
     //DEFINE SERVER ADDRESS
     struct sockaddr_in server_addr;
@@ -161,11 +162,11 @@ int main(void)
 
         //TODO: Remove accents
 
-        if (strcmp(line, WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\n") == 0) //USER REQUESTED PROGRAM EXIT
+        if (command(line, WHY2_CHAT_COMMAND_EXIT, &cmd_arg)) //USER REQUESTED PROGRAM EXIT
         {
             printf("Exiting...\n");
             exit_client(0);
-        } else if (strcmp(line, WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\n") == 0)
+        } else if (command(line, WHY2_CHAT_COMMAND_HELP, &cmd_arg))
         {
             printf
             (
@@ -190,6 +191,7 @@ int main(void)
         free(line);
     }
 
+    why2_deallocate(cmd_arg);
     why2_chat_deallocate_keys(); //DEALLOCATE GETTERS FOR KEYS
 
     why2_clean_memory(""); //RUN GARBAGE COLLECTOR
