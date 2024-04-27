@@ -47,6 +47,7 @@ extern "C" {
 #define WHY2_CHAT_COMMAND_PREFIX "!" //the little thingy you write before the command names to make the program recognise them boy. You know? Like in minecraft you use /kill... Also, are you dumb?
 #define WHY2_CHAT_COMMAND_EXIT "exit" //QUIT THE PROGRAM CMD
 #define WHY2_CHAT_COMMAND_HELP "help" //PRINT ALL COMMANDS
+#define WHY2_CHAT_COMMAND_LIST "list" //LIST ALL CONNECTIONS
 #define WHY2_CHAT_COMMAND_PM "pm" //PRIVATE MESSAGES
 
 //SHORTCUTS CAUSE I'M LAZY BITCH
