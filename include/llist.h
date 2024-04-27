@@ -43,6 +43,7 @@ void why2_list_push(why2_list_t *list, void *value, unsigned long size); //PUSH 
 void why2_list_remove(why2_list_t *list, why2_node_t *node); //REMOVE ELEMENT
 void why2_list_remove_back(why2_list_t *list); //REMOVE LAST ELEMENT
 why2_node_t *why2_list_find(why2_list_t *list, void *value); //FIND ELEMENT IN LIST
+unsigned long why2_list_get_size(why2_list_t *list); //GET SIZE
 
 #ifdef __cplusplus
 }
