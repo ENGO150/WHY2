@@ -772,10 +772,6 @@ void *why2_listen_server(void *socket)
 
                 printf("%s%sEnter username (a-Z, 0-9; %d-%d characters):\n", asking_username++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP, min_uname, max_uname);
                 fflush(stdout);
-            } else if (strcmp(message, WHY2_CHAT_CODE_INVALID_COMMAND) == 0) //INVALID CMD
-            {
-                printf("\nInvalid command! Use \"" WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\" for list of commands.\n\n");
-                fflush(stdout);
             }
         } else if (!continuing)
         {
