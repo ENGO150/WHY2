@@ -611,7 +611,7 @@ void *why2_communicate_thread(void *arg)
                 }
 
                 //IGNORE INVALID CODES, THE USER JUST GOT HIS LOBOTOMY DONE
-            } else if (decoded_buffer[0] != '!') //IGNORE MESSAGES BEGINNING WITH '!'
+            } else if (strncmp(decoded_buffer, WHY2_CHAT_COMMAND_PREFIX, strlen(WHY2_CHAT_COMMAND_PREFIX)) != 0) //IGNORE MESSAGES BEGINNING WITH '!'
             {
                 //REBUILD MESSAGE WITH USERNAME
                 json_object_object_add(json, "message", json_object_new_string(decoded_buffer));
