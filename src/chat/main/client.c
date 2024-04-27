@@ -46,6 +46,41 @@ void exit_client(WHY2_UNUSED int i) //guess what
     why2_send_socket(WHY2_CHAT_CODE_EXIT, NULL, listen_socket);
 }
 
+why2_bool command(char *input, char *command, char **arg)
+{
+    why2_bool returning = 0;
+
+    //GET THE COMMANDS
+    char *full_cmd = why2_malloc(strlen(WHY2_CHAT_COMMAND_PREFIX) + strlen(WHY2_CHAT_COMMAND_EXIT) + 2);
+    sprintf(full_cmd, WHY2_CHAT_COMMAND_PREFIX "%s", command);
+
+    if (strncmp(input, full_cmd, strlen(full_cmd)) == 0) //COMMAND WAS EXECUTED
+    {
+        if (strlen(full_cmd) == strlen(input) - 1) //COMMAND DOESN'T HAVE ARGS
+        {
+            returning = 1;
+        } else if (strlen(input) - 2 > strlen(full_cmd) && input[strlen(full_cmd)] == ' ') //COMMAND CONTAINS ARGS
+        {
+            returning = 1;
+            why2_deallocate(*arg); //DEALLOCATION (why2_deallocate fn checks for NULL, don't you worry)
+
+            //GET THE ARGS
+            *arg = why2_malloc(strlen(input) - strlen(full_cmd) - 1); //ALLOCATE
+            for (unsigned long i = strlen(full_cmd) + 1; i < strlen(input) - 1; i++)
+            {
+                (*arg)[i - (strlen(full_cmd) + 1)] = input[i];
+            }
+
+            (*arg)[strlen(input) - strlen(full_cmd) - 2] = '\0'; //NULL TERM
+        }
+    }
+
+    //DEALLOCATE BUFFERS
+    why2_deallocate(full_cmd);
+
+    return returning;
+}
+
 int main(void)
 {
     signal(SIGINT, exit_client); //HANDLE ^C
