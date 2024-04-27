@@ -162,21 +162,25 @@ int main(void)
 
         //TODO: Remove accents
 
-        if (command(line, WHY2_CHAT_COMMAND_EXIT, &cmd_arg)) //USER REQUESTED PROGRAM EXIT
+        if (strncmp(line, WHY2_CHAT_COMMAND_PREFIX, strlen(WHY2_CHAT_COMMAND_PREFIX)) == 0) //OPTIMIZE COMMANDS
         {
-            printf("Exiting...\n");
-            exit_client(0);
-        } else if (command(line, WHY2_CHAT_COMMAND_HELP, &cmd_arg))
-        {
-            printf
-            (
-                "\nCommands:\n---------\n%s\n\n>>> ",
+            //COMMANDS
+            if (command(line, WHY2_CHAT_COMMAND_EXIT, &cmd_arg)) //USER REQUESTED PROGRAM EXIT
+            {
+                printf("Exiting...\n");
+                exit_client(0);
+            } else if (command(line, WHY2_CHAT_COMMAND_HELP, &cmd_arg)) //HELP CMD
+            {
+                printf
+                (
+                    "\nCommands:\n---------\n%s\n\n>>> ",
 
-                WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\tExits the program.\n"
-                WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\tPrints out all the commands. :)"
-            );
+                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\tExits the program.\n"
+                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\tPrints out all the commands. :)"
+                );
 
-            fflush(stdout);
+                fflush(stdout);
+            }
         } else
         {
             why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
