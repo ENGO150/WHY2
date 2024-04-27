@@ -134,3 +134,21 @@ why2_node_t *why2_list_find(why2_list_t *list, void *value)
 
     return buffer;
 }
+
+unsigned long why2_list_get_size(why2_list_t *list)
+{
+    unsigned long n = 0; //RETURNING SIZE
+
+    why2_node_t *head = list -> head;
+    if (head == NULL) return n; //EMPTY LIST
+
+    why2_node_t *buffer = head;
+
+    do
+    {
+        n++;
+        buffer = buffer -> next; //ITER
+    } while (buffer != NULL);
+
+    return n;
+}
