@@ -180,6 +180,9 @@ int main(void)
                 );
 
                 fflush(stdout);
+            } else if (command(line, WHY2_CHAT_COMMAND_LIST, &cmd_arg)) //HELP CMD
+            {
+                why2_send_socket(WHY2_CHAT_CODE_LIST, NULL, listen_socket);
             }
         } else
         {
