@@ -608,6 +608,50 @@ void *why2_communicate_thread(void *arg)
                 if (strcmp(decoded_buffer, WHY2_CHAT_CODE_EXIT) == 0) //USER REQUESTED EXIT
                 {
                     exiting = 1;
+                } else if (strcmp(decoded_buffer, WHY2_CHAT_CODE_LIST) == 0) //USER REQUESTED LIST OF USERS
+                {
+                    why2_node_t *head = connection_list.head;
+                    if (head == NULL) goto deallocation; //TODO: Send no users code
+
+                    //BUFFERS
+                    why2_node_t *buffer = head;
+                    connection_node_t value_buffer;
+                    unsigned long alloc_size = 0;
+                    char *append_buffer;
+
+                    //COUNT REQUIRED MESSAGE ALLOCATION SIZE
+                    do
+                    {
+                        value_buffer = *(connection_node_t*) buffer -> value;
+                        alloc_size += strlen(value_buffer.username) + why2_count_int_length(value_buffer.id) + 2;
+
+                        buffer = buffer -> next; //ITER
+                    } while (buffer != NULL);
+
+                    char *message = why2_calloc(strlen(WHY2_CHAT_CODE_LIST_SERVER) + alloc_size + 1, sizeof(char));
+                    buffer = head; //RESET
+
+                    sprintf(message, WHY2_CHAT_CODE_LIST_SERVER); //SET CODE
+
+                    //FILL THE message
+                    do
+                    {
+                        value_buffer = *(connection_node_t*) buffer -> value;
+
+                        append_buffer = why2_malloc(strlen(value_buffer.username) + why2_count_int_length(value_buffer.id) + 3); //ALLOCATE THE BUFFER
+                        sprintf(append_buffer, ";%s;%ld", value_buffer.username, value_buffer.id); //FILL THE BUFFER
+
+                        strcat(message, append_buffer); //JOIN THE BUFFER TO OUTPUT message
+
+                        why2_deallocate(append_buffer); //DEALLOCATION
+                        buffer = buffer -> next; //ITER
+                    } while (buffer != NULL);
+
+                    //SEND
+                    send_socket_deallocate(message, why2_chat_server_config("server_username"), connection);
+
+                    //DEALLOCATION
+                    why2_deallocate(message);
                 }
 
                 //IGNORE INVALID CODES, THE USER JUST GOT HIS LOBOTOMY DONE
