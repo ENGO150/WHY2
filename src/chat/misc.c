@@ -818,6 +818,26 @@ void *why2_listen_server(void *socket)
 
                 printf("%s%sEnter username (a-Z, 0-9; %d-%d characters):\n", asking_username++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP, min_uname, max_uname);
                 fflush(stdout);
+            } else if (strncmp(message, WHY2_CHAT_CODE_LIST_SERVER, strlen(WHY2_CHAT_CODE_LIST_SERVER)) == 0) //LIST USERS
+            {
+                why2_bool printing_id = 0;
+
+                printf("\nList:\n-----\n");
+
+                //ITER TROUGH LIST OF USERS FROM SERVER
+                for (unsigned long i = strlen(WHY2_CHAT_CODE_LIST_SERVER) + 1; i < strlen(message); i++)
+                {
+                    if (message[i] == ';')
+                    {
+                        printf((printing_id = !printing_id) ? " (" : ")\n");
+                        continue;
+                    }
+
+                    printf("%c", message[i]);
+                }
+
+                printf("\n");
+                fflush(stdout);
             }
         } else if (!continuing)
         {
