@@ -628,7 +628,7 @@ void *why2_communicate_thread(void *arg)
                         buffer = buffer -> next; //ITER
                     } while (buffer != NULL);
 
-                    char *message = why2_calloc(strlen(WHY2_CHAT_CODE_LIST_SERVER) + alloc_size + 1, sizeof(char));
+                    char *message = why2_calloc(strlen(WHY2_CHAT_CODE_LIST_SERVER) + alloc_size + 2, sizeof(char));
                     buffer = head; //RESET
 
                     sprintf(message, WHY2_CHAT_CODE_LIST_SERVER); //SET CODE
@@ -646,6 +646,8 @@ void *why2_communicate_thread(void *arg)
                         why2_deallocate(append_buffer); //DEALLOCATION
                         buffer = buffer -> next; //ITER
                     } while (buffer != NULL);
+
+                    strcat(message, ";");
 
                     //SEND
                     send_socket_deallocate(message, why2_chat_server_config("server_username"), connection);
