@@ -39,9 +39,10 @@ extern "C" {
 #define WHY2_CHAT_CODE_INVALID_USERNAME "code_003"
 #define WHY2_CHAT_CODE_LIST_SERVER "code_004" //SAME AS WHY2_CHAT_CODE_LIST BUT BACK TO THE CLIENT
 
-//(SERVER -> CLIENT) CODES
+//(CLIENT -> SERVER) CODES
 #define WHY2_CHAT_CODE_EXIT "code_999"
 #define WHY2_CHAT_CODE_LIST "code_998"
+#define WHY2_CHAT_CODE_PM "code_997"
 
 //COMMANDS
 #define WHY2_CHAT_COMMAND_PREFIX "!" //the little thingy you write before the command names to make the program recognise them boy. You know? Like in minecraft you use /kill... Also, are you dumb?
