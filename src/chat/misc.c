@@ -23,6 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string.h>
 #include <ctype.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 #include <pthread.h>
@@ -151,32 +152,38 @@ char *read_socket_raw(int socket)
         return NULL;
     }
 
-    unsigned short content_size = 0;
-    char *content_buffer = why2_calloc(3, sizeof(char));
-    //GET LENGTH
-    if (recv(socket, content_buffer, 2, 0) != 2)
+    char *content_buffer = NULL;
+    int content_size;
+
+    why2_bool empty_buffer = 0; //WHETHER MSG_PEEK SHOULD BE USER OR NOT
+
+    do
     {
-        fprintf(stderr, "Getting message length failed!\n");
-        return NULL;
-    }
+        //FIND THE SENT SIZE
+        content_size = 0;
+        if (ioctl(socket, FIONREAD, &content_size) < 0 || content_size <= 0) continue;
 
-    content_size = (unsigned short) (((unsigned) content_buffer[1] << 8) | content_buffer[0]);
+        //ALLOCATE
+        content_buffer = why2_realloc(content_buffer, content_size + 1);
 
-    why2_deallocate(content_buffer);
+        read_section:
 
-    //ALLOCATE
-    content_buffer = why2_calloc(content_size + 1, sizeof(char));
-
-    //READ JSON MESSAGE
-    for (int i = 0; strncmp(content_buffer + strlen(content_buffer) - 2, "\"}", 2) != 0; i++)
-    {
-        if (recv(socket, content_buffer + i, 1, 0) != 1) //READ THE MESSAGE BY CHARACTERS
+        //READ JSON MESSAGE
+        if (recv(socket, content_buffer, content_size, !empty_buffer ? MSG_PEEK : 0) != content_size) //READ THE MESSAGE BY CHARACTERS
         {
             fprintf(stderr, "Socket probably read wrongly!\n");
         }
-    }
 
-    content_buffer[content_size - 1] = '\0';
+        if (empty_buffer) goto return_section; //STOP LOOPING
+    } while (content_buffer == NULL || strncmp(content_buffer + (content_size - 2), "\"}", 2) != 0);
+
+    //REMOVE JUNK FROM BUFFER (CUZ THE MSG_PEEK FLAG)
+    empty_buffer = 1;
+    goto read_section; //TODO: remove the stupid goto
+
+    return_section:
+
+    content_buffer[content_size] = '\0';
 
     return content_buffer;
 }
@@ -398,23 +405,10 @@ void send_socket(char *text, char *username, int socket, why2_bool welcome)
     why2_deallocate(text_copy);
     json_object_put(json);
 
-    unsigned short text_length = (unsigned short) strlen(output) + 2;
-    char *final = why2_calloc(text_length, sizeof(char));
-
-    //SPLIT LENGTH INTO TWO CHARS
-    final[0] = (unsigned) text_length & 0xff;
-    final[1] = (unsigned) text_length >> 8;
-
-    for (int i = 2; i < text_length; i++) //APPEND
-    {
-        final[i] = output[i - 2];
-    }
-
     //SEND
-    send(socket, final, text_length, 0);
+    send(socket, output, strlen(output), 0);
 
     //DEALLOCATION
-    why2_deallocate(final);
     why2_deallocate(output);
 }
 
@@ -601,7 +595,7 @@ void *why2_communicate_thread(void *arg)
         //TRIM MESSAGE
         why2_trim_string(&decoded_buffer);
 
-        if (decoded_buffer != NULL && strlen(decoded_buffer) != 0 && strlen(decoded_buffer) <= (unsigned long) server_config_int("max_message_length"))
+        if (decoded_buffer != NULL && strlen(decoded_buffer) != 0)
         {
             if (strncmp(decoded_buffer, "code", 4) == 0) //CODES FROM CLIENT
             {
