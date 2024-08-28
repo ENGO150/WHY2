@@ -176,9 +176,11 @@ int main(void)
                 (
                     "\nCommands:\n---------\n%s\n\n>>> ",
 
-                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\tPrints out all the commands. :)\n"
-                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_LIST "\tLists all users and their IDs.\n"
-                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\tExits the program."
+                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\t\tPrints out all the commands. :)\n"
+                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_PM " <ID> <MSG>\tSends private message to user.\n"
+                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_LIST "\t\tLists all users and their IDs.\n"
+                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_VERSION "\tCheck server version.\n"
+                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\t\tExits the program."
                 );
 
                 fflush(stdout);
