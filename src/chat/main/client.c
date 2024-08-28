@@ -85,6 +85,7 @@ int main(void)
 {
     signal(SIGINT, exit_client); //HANDLE ^C
 
+    why2_check_version(); //CHECK FOR UPDATES
     why2_chat_init_client_config(); //CREATE client.toml CONFIGURATION
     why2_chat_init_keys(); //CREATE RSA KEYS
 
