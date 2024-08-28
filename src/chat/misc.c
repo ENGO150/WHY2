@@ -930,6 +930,9 @@ void *why2_listen_server(void *socket)
                 {
                     printf("Server is outdated. Some new features may not work correctly.\n\n");
                 }
+            } else if (strncmp(message, WHY2_CHAT_CODE_PM_SERVER, strlen(WHY2_CHAT_CODE_PM_SERVER)) == 0)
+            {
+                printf("\n%s\n\n", message);
             }
         } else if (!continuing)
         {
