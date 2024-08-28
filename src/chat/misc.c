@@ -306,6 +306,25 @@ why2_node_t *find_connection(int connection)
     return buffer;
 }
 
+why2_node_t *find_connection_by_id(unsigned long id)
+{
+    why2_node_t *head = connection_list.head;
+    if (head == NULL) return NULL; //EMPTY LIST
+
+    why2_node_t *buffer = head;
+
+    while (buffer -> next != NULL)
+    {
+        if ((*(connection_node_t*) buffer -> value).id == id) return buffer;
+
+        buffer = buffer -> next;
+    }
+
+    if (id != (*(connection_node_t*) buffer -> value).id) buffer = NULL; //PREVENT FROM RETURNING INVALID NODE
+
+    return buffer;
+}
+
 char *read_user(int connection, void **raw_ptr)
 {
     //VARIABLES
@@ -543,12 +562,14 @@ void *why2_communicate_thread(void *arg)
 
     why2_toml_read_free(config_username);
 
+    unsigned long connection_id = get_latest_id();
+
     connection_node_t node = (connection_node_t)
     {
         connection,
         pthread_self(),
         why2_strdup(username),
-        get_latest_id()
+        connection_id
     };
 
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
@@ -660,6 +681,59 @@ void *why2_communicate_thread(void *arg)
 
                     //DEALLOCATION
                     why2_deallocate(message);
+                } else if (strncmp(decoded_buffer, WHY2_CHAT_CODE_PM, strlen(WHY2_CHAT_CODE_PM)) == 0) //PM
+                {
+                    char *input = decoded_buffer + strlen(WHY2_CHAT_CODE_PM) + 1;
+
+                    char *id = NULL; //RECEIVER
+                    WHY2_UNUSED char *msg;
+
+                    //CHECK ARGS VALIDITY
+                    why2_bool valid_param = strlen(input) >= 3;
+                    if (valid_param)
+                    {
+                        valid_param = 0;
+                        for (unsigned long i = 1; i < strlen(input); i++)
+                        {
+                            if (input[i] == ';')
+                            {
+                                valid_param = 1;
+
+                                //EXTRACT FIRST ARG (ID)
+                                id = why2_malloc(i + 1);
+                                for (unsigned long j = 0; j < i; j++)
+                                {
+                                    id[j] = input[j];
+                                }
+                                id[i] = '\0';
+
+                                //EXTRACT MESSAGE
+                                msg = input + i + 1;
+                                break;
+                            }
+                        }
+                    }
+
+                    //FIND CONNECTION
+                    why2_node_t *pm_connection = id == NULL ? NULL : find_connection_by_id(atoi(id));
+                    if (pm_connection == NULL) valid_param = 0;
+
+                    if (valid_param) //IGNORE INVALID ARGS
+                    {
+                        //ALLOCATE MESSAGE TO SEND TO RECEIVER
+                        char *private_msg = why2_malloc(strlen(WHY2_CHAT_CODE_PM_SERVER) + why2_count_int_length((int) connection_id) + strlen(msg) + 4);
+
+                        //CONSTRUCT DA MESSAGE
+                        sprintf(private_msg, WHY2_CHAT_CODE_PM_SERVER ";%lu;%s;%c", connection_id, msg, '\0');
+
+                        //SEND YOU DUMB FUCK
+                        send_socket_deallocate(private_msg, why2_chat_server_config("server_username"), (*(connection_node_t*) pm_connection -> value).connection);
+
+                        why2_deallocate(private_msg);
+                    }
+
+                    //DEALLOCATION
+                    why2_deallocate(id);
                 }
 
                 //IGNORE INVALID CODES, THE USER JUST GOT THEIR LOBOTOMY DONE
