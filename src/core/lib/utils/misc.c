@@ -52,7 +52,7 @@ int removeDirectory(char *path)
     return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
 }
 
-enum WHY2_EXIT_CODES why2_check_version(void) //! CRASHES WHEN CALLED FROM CHAT STUFF
+enum WHY2_EXIT_CODES why2_check_version(void)
 {
     if (why2_get_flags().no_check) return WHY2_SUCCESS;
 
