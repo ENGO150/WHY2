@@ -52,31 +52,6 @@ int removeDirectory(char *path)
     return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
 }
 
-char *why2_get_version(void)
-{
-    //COUNT LENGTH OF buffer AND STORE IT IN bufferSize
-    FILE *file_buffer = why2_fopen(WHY2_VERSIONS_NAME, "r");
-    fseek(file_buffer, 0, SEEK_END);
-    long buffer_size = ftell(file_buffer);
-    rewind(file_buffer); //REWIND file_buffer (NO SHIT)
-
-    //SET LENGTH OF buffer
-    char *buffer = why2_calloc(buffer_size + 1, sizeof(char));
-
-    //LOAD jsonFile
-    if (fread(buffer, buffer_size, 1, file_buffer) != 1)
-    {
-        if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
-
-        // BELOW CODE IS COMMENTED OUT, BECAUSE IT IS PROBABLY UNNECESSARY
-        // why2_clean_memory("core_version_check");
-        // return WHY2_DOWNLOAD_FAILED;
-    }
-
-    buffer[buffer_size] = '\0';
-    return buffer;
-}
-
 enum WHY2_EXIT_CODES why2_check_version(void)
 {
     if (why2_get_flags().no_check) return WHY2_SUCCESS;
@@ -119,9 +94,31 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     }
 
     //JSON VARIABLES
-	char *buffer = why2_get_version();
+	char *buffer;
+    long buffer_size;
 	struct json_object *parsed_json;
 	struct json_object *active;
+
+    //COUNT LENGTH OF buffer AND STORE IT IN bufferSize
+    file_buffer = why2_fopen(WHY2_VERSIONS_NAME, "r");
+    fseek(file_buffer, 0, SEEK_END);
+    buffer_size = ftell(file_buffer);
+    rewind(file_buffer); //REWIND file_buffer (NO SHIT)
+
+    //SET LENGTH OF buffer
+    buffer = why2_calloc(buffer_size + 1, sizeof(char));
+
+    //LOAD jsonFile
+    if (fread(buffer, buffer_size, 1, file_buffer) != 1)
+    {
+        if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
+
+        // BELOW CODE IS COMMENTED OUT, BECAUSE IT IS PROBABLY UNNECESSARY
+        // why2_clean_memory("core_version_check");
+        // return WHY2_DOWNLOAD_FAILED;
+    }
+
+    buffer[buffer_size] = '\0';
 
     //CHECK FOR TEXT IN buffer
     if (strcmp(buffer, "") == 0)
