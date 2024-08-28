@@ -426,7 +426,7 @@ void send_welcome_packet(int connection)
 
 unsigned long get_latest_id()
 {
-    unsigned long returning = 0;
+    unsigned long returning = 1;
     why2_node_t *buffer = connection_list.head;
     connection_node_t value_buffer;
 
