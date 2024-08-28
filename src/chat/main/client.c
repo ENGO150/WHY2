@@ -185,6 +185,9 @@ int main(void)
             } else if (command(line, WHY2_CHAT_COMMAND_LIST, &cmd_arg)) //LIST CMD
             {
                 why2_send_socket(WHY2_CHAT_CODE_LIST, NULL, listen_socket);
+            } else if (command(line, WHY2_CHAT_COMMAND_VERSION, &cmd_arg)) //VERSION CMD
+            {
+                why2_send_socket(WHY2_CHAT_CODE_VERSION, NULL, listen_socket);
             } else
             {
                 printf("\nInvalid command! Use \"" WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\" for list of commands.\n\n>>> ");
