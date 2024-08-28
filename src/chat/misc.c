@@ -648,6 +648,26 @@ void *why2_communicate_thread(void *arg)
 
                     //DEALLOCATION
                     why2_deallocate(message);
+                } else if (strcmp(decoded_buffer, WHY2_CHAT_CODE_VERSION) == 0)
+                {
+                    //GET VERSION STRING FROM THE VERSIONS JSON
+                    struct json_object *version_object;
+                    char *version_file = why2_get_version();
+                    struct json_object *version_json = json_tokener_parse(version_file);
+                    json_object_object_get_ex(version_json, "active", &version_object);
+
+                    char *version = (char*) json_object_get_string(version_object);
+                    char *message = why2_malloc(strlen(WHY2_CHAT_CODE_VERSION_SERVER) + strlen(version) + 2); //ALLOCATE MESSAGE FOR CLIENT
+
+                    sprintf(message, WHY2_CHAT_CODE_VERSION_SERVER ";%s%c", version, '\0'); //CREATE THE MESSAGE
+
+                    //SEND
+                    send_socket_deallocate(message, why2_chat_server_config("server_username"), connection);
+
+                    //DEALLOCATION
+                    why2_deallocate(message);
+                    json_object_put(version_json);
+                    why2_deallocate(version_file);
                 }
 
                 //IGNORE INVALID CODES, THE USER JUST GOT THEIR LOBOTOMY DONE
