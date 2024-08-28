@@ -195,6 +195,59 @@ int main(void)
                 );
 
                 fflush(stdout);
+            } else if (command(line, WHY2_CHAT_COMMAND_PM, &cmd_arg))
+            {
+                char *id; //PM RECEIVER
+                WHY2_UNUSED char *msg; //something racial
+
+                //CHECK ARGS VALIDITY
+                why2_bool valid_param = cmd_arg != NULL && strlen(cmd_arg) >= 3;
+                if (valid_param)
+                {
+                    valid_param = 0;
+                    for (unsigned long i = 1; i < strlen(cmd_arg); i++)
+                    {
+                        if (cmd_arg[i] == ' ')
+                        {
+                            valid_param = 1;
+
+                            //EXTRACT FIRST ARG (ID)
+                            id = why2_malloc(i + 1);
+                            for (unsigned long j = 0; j < i; j++)
+                            {
+                                id[j] = cmd_arg[j];
+                            }
+                            id[i] = '\0';
+
+                            if (atoi(id) <= 0) //INVALID ID PASSED
+                            {
+                                valid_param = 0;
+                                why2_deallocate(id);
+                                break;
+                            }
+
+                            //EXTRACT MESSAGE
+                            msg = cmd_arg + i + 1;
+                            break;
+                        }
+                    }
+                }
+
+                if (!valid_param) //INVALID ARGS
+                {
+                    invalid("usage");
+                    continue;
+                }
+
+                //BUILD MESSAGE TO SEND TO SERVER
+                char *final_message = why2_malloc(strlen(WHY2_CHAT_CODE_PM) + strlen(id) + strlen(msg) + 3);
+                sprintf(final_message, WHY2_CHAT_CODE_PM ";%s;%s%c", id, msg, '\0');
+
+                why2_send_socket(final_message, NULL, listen_socket); //SEND
+
+                //DEALLOCATION
+                why2_deallocate(id);
+                why2_deallocate(final_message);
             } else if (command(line, WHY2_CHAT_COMMAND_LIST, &cmd_arg)) //LIST CMD
             {
                 why2_send_socket(WHY2_CHAT_CODE_LIST, NULL, listen_socket);
