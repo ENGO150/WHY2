@@ -459,7 +459,7 @@ void *why2_communicate_thread(void *arg)
 
     printf("User connected.\t\t%d\n", connection);
 
-    send_welcome_packet(connection); //TELL USER HE ALL THE INFO HE NEEDS
+    send_welcome_packet(connection); //TELL USER ALL THE INFO THEY NEED
 
     //GET USERNAME
     char *config_username = why2_chat_server_config("user_pick_username");
@@ -489,7 +489,7 @@ void *why2_communicate_thread(void *arg)
         while (invalid_username)
         {
             why2_deallocate(username);
-            if (usernames_n++ == server_config_int("max_username_tries")) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK HIM
+            if (usernames_n++ == server_config_int("max_username_tries")) //ASKED CLIENT WAY TOO FUCKING MANY TIMES FOR USERNAME, KICK THEM
             {
                 exiting = 1;
                 goto deallocation;
@@ -533,7 +533,7 @@ void *why2_communicate_thread(void *arg)
 
             if (invalid_username)
             {
-                send_socket_deallocate(WHY2_CHAT_CODE_INVALID_USERNAME, why2_chat_server_config("server_username"), connection); //TELL THE USER HE IS DUMB AS FUCK
+                send_socket_deallocate(WHY2_CHAT_CODE_INVALID_USERNAME, why2_chat_server_config("server_username"), connection); //TELL THE USER THEY ARE DUMB AS FUCK
                 continue;
             }
 
@@ -650,7 +650,7 @@ void *why2_communicate_thread(void *arg)
                     why2_deallocate(message);
                 }
 
-                //IGNORE INVALID CODES, THE USER JUST GOT HIS LOBOTOMY DONE
+                //IGNORE INVALID CODES, THE USER JUST GOT THEIR LOBOTOMY DONE
             } else if (strncmp(decoded_buffer, WHY2_CHAT_COMMAND_PREFIX, strlen(WHY2_CHAT_COMMAND_PREFIX)) != 0) //IGNORE MESSAGES BEGINNING WITH '!'
             {
                 //REBUILD MESSAGE WITH USERNAME
