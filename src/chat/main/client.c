@@ -54,6 +54,10 @@ why2_bool command(char *input, char *command, char **arg)
     char *full_cmd = why2_malloc(strlen(WHY2_CHAT_COMMAND_PREFIX) + strlen(WHY2_CHAT_COMMAND_EXIT) + 2);
     sprintf(full_cmd, WHY2_CHAT_COMMAND_PREFIX "%s", command);
 
+    //CLEAR arg
+    why2_deallocate(*arg); //DEALLOCATION (why2_deallocate fn checks for NULL, don't you worry)
+    *arg = NULL;
+
     if (strncmp(input, full_cmd, strlen(full_cmd)) == 0) //COMMAND WAS EXECUTED
     {
         if (strlen(full_cmd) == strlen(input) - 1) //COMMAND DOESN'T HAVE ARGS
@@ -62,7 +66,6 @@ why2_bool command(char *input, char *command, char **arg)
         } else if (strlen(input) - 2 > strlen(full_cmd) && input[strlen(full_cmd)] == ' ') //COMMAND CONTAINS ARGS
         {
             returning = 1;
-            why2_deallocate(*arg); //DEALLOCATION (why2_deallocate fn checks for NULL, don't you worry)
 
             //GET THE ARGS
             *arg = why2_malloc(strlen(input) - strlen(full_cmd) - 1); //ALLOCATE
