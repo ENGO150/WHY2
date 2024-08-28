@@ -844,6 +844,18 @@ void *why2_listen_server(void *socket)
 
                 printf("\n");
                 fflush(stdout);
+            } else if (strncmp(message, WHY2_CHAT_CODE_VERSION_SERVER, strlen(WHY2_CHAT_CODE_VERSION_SERVER)) == 0)
+            {
+                char *server_version = message + strlen(WHY2_CHAT_CODE_VERSION_SERVER) + 1;
+
+                //INFO
+                printf("\nServer Version: %s\nClient Version: %s\n\n", server_version, WHY2_VERSION);
+
+                //SERVER IS OUTDATED
+                if (atoi(server_version + 1) < atoi(WHY2_VERSION + 1))
+                {
+                    printf("Server is outdated. Some new features may not work correctly.\n\n");
+                }
             }
         } else if (!continuing)
         {
