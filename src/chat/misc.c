@@ -447,6 +447,24 @@ unsigned long get_latest_id()
     return returning;
 }
 
+char *get_version(void)
+{
+    //GET VERSION STRING FROM THE VERSIONS JSON
+    struct json_object *version_object;
+    char *version_file = why2_get_version();
+    struct json_object *version_json = json_tokener_parse(version_file);
+    json_object_object_get_ex(version_json, "active", &version_object);
+
+    //DUPLICATE version_object STRING (THE ORIGINAL WILL BE REMOVED BY json_object_put)
+    char *version = why2_strdup((char*) json_object_get_string(version_object));
+
+    //DEALLOCATION
+    why2_deallocate(version_file);
+    json_object_put(version_json);
+
+    return version;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
@@ -651,12 +669,7 @@ void *why2_communicate_thread(void *arg)
                 } else if (strcmp(decoded_buffer, WHY2_CHAT_CODE_VERSION) == 0)
                 {
                     //GET VERSION STRING FROM THE VERSIONS JSON
-                    struct json_object *version_object;
-                    char *version_file = why2_get_version();
-                    struct json_object *version_json = json_tokener_parse(version_file);
-                    json_object_object_get_ex(version_json, "active", &version_object);
-
-                    char *version = (char*) json_object_get_string(version_object);
+                    char *version = get_version();
                     char *message = why2_malloc(strlen(WHY2_CHAT_CODE_VERSION_SERVER) + strlen(version) + 2); //ALLOCATE MESSAGE FOR CLIENT
 
                     sprintf(message, WHY2_CHAT_CODE_VERSION_SERVER ";%s%c", version, '\0'); //CREATE THE MESSAGE
@@ -666,8 +679,7 @@ void *why2_communicate_thread(void *arg)
 
                     //DEALLOCATION
                     why2_deallocate(message);
-                    json_object_put(version_json);
-                    why2_deallocate(version_file);
+                    why2_deallocate(version);
                 }
 
                 //IGNORE INVALID CODES, THE USER JUST GOT THEIR LOBOTOMY DONE
