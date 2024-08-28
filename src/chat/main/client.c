@@ -86,6 +86,12 @@ why2_bool command(char *input, char *command, char **arg)
     return returning;
 }
 
+void invalid(char *type)
+{
+    printf("\nInvalid %s! Use \"" WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\" for list of commands.\n\n>>> ", type);
+    fflush(stdout);
+}
+
 int main(void)
 {
     signal(SIGINT, exit_client); //HANDLE ^C
@@ -197,8 +203,7 @@ int main(void)
                 why2_send_socket(WHY2_CHAT_CODE_VERSION, NULL, listen_socket);
             } else
             {
-                printf("\nInvalid command! Use \"" WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\" for list of commands.\n\n>>> ");
-                fflush(stdout);
+                invalid("command");
             }
         } else
         {
