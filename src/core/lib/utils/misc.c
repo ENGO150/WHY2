@@ -52,64 +52,19 @@ int removeDirectory(char *path)
     return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
 }
 
-enum WHY2_EXIT_CODES why2_check_version(void)
+char *why2_get_version(void)
 {
-    if (why2_get_flags().no_check) return WHY2_SUCCESS;
-
-    why2_set_memory_identifier("core_version_check");
-
-    //FILE-CHECK VARIABLES
-    int notFoundBuffer = 0;
-
-    //CURL VARIABLES
-    CURL *curl = curl_easy_init();
-    FILE *fileBuffer = why2_fopen(WHY2_VERSIONS_NAME, "w+");
-
-    //GET versions.json
-    curl_easy_setopt(curl, CURLOPT_URL, WHY2_VERSIONS_URL);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fileBuffer);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, WHY2_CURL_TIMEOUT);
-
-    //DOWNLOAD versions.json
-    curl_easy_perform(curl);
-
-    //CLEANUP
-    curl_easy_cleanup(curl);
-    why2_deallocate(fileBuffer);
-
-    while (access(WHY2_VERSIONS_NAME, R_OK) != 0)
-    {
-        notFoundBuffer++;
-
-        if (notFoundBuffer == WHY2_NOT_FOUND_TRIES)
-        {
-            if (!why2_get_flags().no_output) fprintf(stderr, "%s'%s' not found! Exiting...\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME);
-
-            why2_clean_memory("core_version_check");
-            return WHY2_DOWNLOAD_FAILED;
-        }
-
-        if (!why2_get_flags().no_output) printf("%s'%s' not found (%dx)! Trying again in a second.\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME, notFoundBuffer);
-        sleep(1);
-    }
-
-    //JSON VARIABLES
-	char *buffer;
-	struct json_object *parsedJson;
-	struct json_object *active;
-    int bufferSize;
-
     //COUNT LENGTH OF buffer AND STORE IT IN bufferSize
-    fileBuffer = why2_fopen(WHY2_VERSIONS_NAME, "r");
-    fseek(fileBuffer, 0, SEEK_END);
-    bufferSize = ftell(fileBuffer);
-    rewind(fileBuffer); //REWIND fileBuffer (NO SHIT)
+    FILE *file_buffer = why2_fopen(WHY2_VERSIONS_NAME, "r");
+    fseek(file_buffer, 0, SEEK_END);
+    long buffer_size = ftell(file_buffer);
+    rewind(file_buffer); //REWIND file_buffer (NO SHIT)
 
     //SET LENGTH OF buffer
-    buffer = why2_calloc(bufferSize + 1, sizeof(char));
+    char *buffer = why2_calloc(buffer_size + 1, sizeof(char));
 
     //LOAD jsonFile
-    if (fread(buffer, bufferSize, 1, fileBuffer) != 1)
+    if (fread(buffer, buffer_size, 1, file_buffer) != 1)
     {
         if (!why2_get_flags().no_output) fprintf(stderr, "Reading file failed!\n");
 
@@ -118,7 +73,55 @@ enum WHY2_EXIT_CODES why2_check_version(void)
         // return WHY2_DOWNLOAD_FAILED;
     }
 
-    buffer[bufferSize] = '\0';
+    buffer[buffer_size] = '\0';
+    return buffer;
+}
+
+enum WHY2_EXIT_CODES why2_check_version(void)
+{
+    if (why2_get_flags().no_check) return WHY2_SUCCESS;
+
+    why2_set_memory_identifier("core_version_check");
+
+    //FILE-CHECK VARIABLES
+    int not_found_buffer = 0;
+
+    //CURL VARIABLES
+    CURL *curl = curl_easy_init();
+    FILE *file_buffer = why2_fopen(WHY2_VERSIONS_NAME, "w+");
+
+    //GET versions.json
+    curl_easy_setopt(curl, CURLOPT_URL, WHY2_VERSIONS_URL);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, file_buffer);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, WHY2_CURL_TIMEOUT);
+
+    //DOWNLOAD versions.json
+    curl_easy_perform(curl);
+
+    //CLEANUP
+    curl_easy_cleanup(curl);
+    why2_deallocate(file_buffer);
+
+    while (access(WHY2_VERSIONS_NAME, R_OK) != 0)
+    {
+        not_found_buffer++;
+
+        if (not_found_buffer == WHY2_NOT_FOUND_TRIES)
+        {
+            if (!why2_get_flags().no_output) fprintf(stderr, "%s'%s' not found! Exiting...\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME);
+
+            why2_clean_memory("core_version_check");
+            return WHY2_DOWNLOAD_FAILED;
+        }
+
+        if (!why2_get_flags().no_output) printf("%s'%s' not found (%dx)! Trying again in a second.\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME, not_found_buffer);
+        sleep(1);
+    }
+
+    //JSON VARIABLES
+	char *buffer = why2_get_version();
+	struct json_object *parsed_json;
+	struct json_object *active;
 
     //CHECK FOR TEXT IN buffer
     if (strcmp(buffer, "") == 0)
@@ -133,11 +136,11 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     }
 
     //CLEANUP
-	why2_deallocate(fileBuffer);
+	why2_deallocate(file_buffer);
 
     //GET
-	parsedJson = json_tokener_parse(buffer); //yes, ik, i could use json_object_from_file, but I need to check for internet somehow
-	json_object_object_get_ex(parsedJson, "active", &active);
+	parsed_json = json_tokener_parse(buffer); //yes, ik, i could use json_object_from_file, but I need to check for internet somehow
+	json_object_object_get_ex(parsed_json, "active", &active);
 
     if (strcmp(WHY2_VERSION, json_object_get_string(active)) != 0)
     {
@@ -156,8 +159,8 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             //VARIABLES
             git_repository *repo = NULL;
             int exit_code;
-            char *installCommand;
-            int installCode;
+            char *install_command;
+            int install_code;
 
             //MESSAGE
             if (!why2_get_flags().no_output) printf("Your WHY2 version is outdated!\nUpdating...\t[BETA]\n\n");
@@ -183,18 +186,18 @@ enum WHY2_EXIT_CODES why2_check_version(void)
                 return WHY2_WHY2_UPDATE_FAILED;
             }
 
-            //COUNT installCommand LENGTH & ALLOCATE IT
-            installCommand = why2_replace(WHY2_UPDATE_COMMAND, "{DIR}", WHY2_UPDATE_NAME);
+            //COUNT install_command LENGTH & ALLOCATE IT
+            install_command = why2_replace(WHY2_UPDATE_COMMAND, "{DIR}", WHY2_UPDATE_NAME);
 
-            installCode = system(installCommand); //INSTALL
+            install_code = system(install_command); //INSTALL
 
             //REMOVE versions.json - OTHERWISE WILL CAUSE SEGFAULT IN NEXT RUN
             remove(WHY2_VERSIONS_NAME);
 
-            why2_deallocate(installCommand);
+            why2_deallocate(install_command);
 
             //CHECK FOR ERRORS
-            if (installCode != 0)
+            if (install_code != 0)
             {
                 if (!why2_get_flags().no_output) fprintf(stderr, "Updating failed! (installing)\n");
 
@@ -204,34 +207,34 @@ enum WHY2_EXIT_CODES why2_check_version(void)
         } else
         {
             //COUNT WHY2_VERSIONS BEHIND
-            int versionsIndex = -1;
-            int versionsBuffer = 0;
+            int versions_index = -1;
+            int versions_buffer = 0;
 
             struct json_object *deprecated;
-            json_object_object_get_ex(parsedJson, "deprecated", &deprecated);
+            json_object_object_get_ex(parsed_json, "deprecated", &deprecated);
 
-            //COUNT versionsIndex
+            //COUNT versions_index
             for (int i = 0; i < (int) json_object_array_length(deprecated); i++)
             {
                 //IT'S A MATCH, BABY :D
                 if (strcmp(json_object_get_string(json_object_array_get_idx(deprecated, i)), WHY2_VERSION) == 0)
                 {
-                    versionsIndex = i;
+                    versions_index = i;
 
                     break;
                 }
             }
 
             //versions.json DOESN'T CONTAIN WHY2_VERSION (THIS WILL NOT HAPPEN IF YOU WILL NOT EDIT IT)
-            if (versionsIndex == -1)
+            if (versions_index == -1)
             {
                 if (!why2_get_flags().no_output) printf("Version %s not found! Check your flags.\n\n", WHY2_VERSION);
             } else
             {
-                //COUNT versionsBuffer
-                versionsBuffer = json_object_array_length(deprecated) - versionsIndex;
+                //COUNT versions_buffer
+                versions_buffer = json_object_array_length(deprecated) - versions_index;
 
-                if (!why2_get_flags().no_output) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versionsBuffer, WHY2_VERSION, json_object_get_string(active));
+                if (!why2_get_flags().no_output) fprintf(stderr, "This release could be unsafe! You're %d versions behind! (%s/%s)\n\n", versions_buffer, WHY2_VERSION, json_object_get_string(active));
 
                 //WAIT FOR 5 SECONDS
                 sleep(5);
@@ -240,7 +243,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     }
 
     //DEALLOCATION
-    json_object_put(parsedJson); //THIS FREES EVERY json_object - AT LEAST JSON-C'S DOCUMENTATION SAYS THAT
+    json_object_put(parsed_json); //THIS FREES EVERY json_object - AT LEAST JSON-C'S DOCUMENTATION SAYS THAT
     why2_deallocate(buffer);
 
     why2_reset_memory_identifier();
