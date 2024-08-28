@@ -75,6 +75,8 @@ why2_bool command(char *input, char *command, char **arg)
             }
 
             (*arg)[strlen(input) - strlen(full_cmd) - 2] = '\0'; //NULL TERM
+
+            why2_trim_string(arg);
         }
     }
 
