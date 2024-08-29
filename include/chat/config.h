@@ -23,8 +23,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
+#include <why2/flags.h> //damn i really hate including headers in headers
+
 //CONFIG MACROS
-#define WHY2_CONFIG_DIR "/home/{USER}/.config"
 #define WHY2_CHAT_CONFIG_DIR WHY2_CONFIG_DIR "/WHY2"
 #define WHY2_CHAT_CONFIG_URL "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/config/"
 #define WHY2_CHAT_CONFIG_SERVER "server.toml"
