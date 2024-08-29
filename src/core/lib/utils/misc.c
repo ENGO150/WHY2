@@ -76,9 +76,12 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     //FILE-CHECK VARIABLES
     int not_found_buffer = 0;
 
+    //GET VERSION FILE
+    char *version_file = why2_replace(WHY2_VERSIONS_NAME, "{USER}", getenv("USER"));
+
     //CURL VARIABLES
     CURL *curl = curl_easy_init();
-    FILE *file_buffer = why2_fopen(WHY2_VERSIONS_NAME, "w+");
+    FILE *file_buffer = why2_fopen(version_file, "w+");
 
     //GET versions.json
     curl_easy_setopt(curl, CURLOPT_URL, WHY2_VERSIONS_URL);
@@ -92,19 +95,19 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     curl_easy_cleanup(curl);
     why2_deallocate(file_buffer);
 
-    while (access(WHY2_VERSIONS_NAME, R_OK) != 0)
+    while (access(version_file, R_OK) != 0)
     {
         not_found_buffer++;
 
         if (not_found_buffer == WHY2_NOT_FOUND_TRIES)
         {
-            if (!why2_get_flags().no_output) fprintf(stderr, "%s'%s' not found! Exiting...\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME);
+            if (!why2_get_flags().no_output) fprintf(stderr, "%s'%s' not found! Exiting...\n", WHY2_CLEAR_SCREEN, version_file);
 
             why2_clean_memory("core_version_check");
             return WHY2_DOWNLOAD_FAILED;
         }
 
-        if (!why2_get_flags().no_output) printf("%s'%s' not found (%dx)! Trying again in a second.\n", WHY2_CLEAR_SCREEN, WHY2_VERSIONS_NAME, not_found_buffer);
+        if (!why2_get_flags().no_output) printf("%s'%s' not found (%dx)! Trying again in a second.\n", WHY2_CLEAR_SCREEN, version_file, not_found_buffer);
         sleep(1);
     }
 
@@ -115,7 +118,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
 	struct json_object *active;
 
     //COUNT LENGTH OF buffer AND STORE IT IN bufferSize
-    file_buffer = why2_fopen(WHY2_VERSIONS_NAME, "r");
+    file_buffer = why2_fopen(version_file, "r");
     fseek(file_buffer, 0, SEEK_END);
     buffer_size = ftell(file_buffer);
     rewind(file_buffer); //REWIND file_buffer (NO SHIT)
@@ -204,7 +207,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
             install_code = system(install_command); //INSTALL
 
             //REMOVE versions.json - OTHERWISE WILL CAUSE SEGFAULT IN NEXT RUN
-            remove(WHY2_VERSIONS_NAME);
+            remove(version_file);
 
             why2_deallocate(install_command);
 
@@ -257,6 +260,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     //DEALLOCATION
     json_object_put(parsed_json); //THIS FREES EVERY json_object - AT LEAST JSON-C'S DOCUMENTATION SAYS THAT
     why2_deallocate(buffer);
+    why2_deallocate(version_file);
 
     why2_reset_memory_identifier();
 

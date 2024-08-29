@@ -43,14 +43,14 @@ void init_config(char *filename)
     why2_directory();
 
     //GET THE CONFIG TYPE
-    char *buffer = why2_malloc(strlen(WHY2_CHAT_CONFIG_DIR) + strlen(filename) + 2);
-    sprintf(buffer, "%s/%s", WHY2_CHAT_CONFIG_DIR, filename);
+    char *buffer = why2_malloc(strlen(WHY2_CONFIG_DIR) + strlen(filename) + 2);
+    sprintf(buffer, "%s/%s", WHY2_CONFIG_DIR, filename);
 
     char *path = why2_replace(buffer, "{USER}", getenv("USER"));
 
     if (access(path, R_OK) != 0) //CONFIG DOESN'T EXIST
     {
-        char *config_dir = why2_replace(WHY2_CHAT_CONFIG_DIR, "{USER}", getenv("USER"));
+        char *config_dir = why2_replace(WHY2_CONFIG_DIR, "{USER}", getenv("USER"));
 
         //CREATE CONFIG DIRECTORY
         mkdir(config_dir, 0700);
@@ -83,11 +83,11 @@ char *config(char *key, enum CONFIG_TYPES type)
     switch (type) //GET path
     {
         case CLIENT:
-            path = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_CLIENT, "{USER}", getenv("USER"));
+            path = why2_replace(WHY2_CONFIG_DIR "/" WHY2_CHAT_CONFIG_CLIENT, "{USER}", getenv("USER"));
             break;
 
         case SERVER:
-            path = why2_replace(WHY2_CHAT_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{USER}", getenv("USER"));
+            path = why2_replace(WHY2_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{USER}", getenv("USER"));
             break;
 
         default:
