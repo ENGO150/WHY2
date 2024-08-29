@@ -725,7 +725,8 @@ void *why2_communicate_thread(void *arg)
                         sprintf(private_msg, WHY2_CHAT_CODE_PM_SERVER ";%s;%s;%s;%c", node.username, (*(connection_node_t*) pm_connection -> value).username, msg, '\0');
 
                         //SEND YOU DUMB FUCK
-                        send_socket_deallocate(private_msg, why2_chat_server_config("server_username"), (*(connection_node_t*) pm_connection -> value).connection);
+                        send_socket_deallocate(private_msg, why2_chat_server_config("server_username"), (*(connection_node_t*) pm_connection -> value).connection); //RECIPIENT
+                        send_socket_deallocate(private_msg, why2_chat_server_config("server_username"), connection); //AUTHOR
 
                         why2_deallocate(private_msg);
                     }
