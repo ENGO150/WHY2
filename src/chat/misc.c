@@ -930,7 +930,44 @@ void *why2_listen_server(void *socket)
                 }
             } else if (strncmp(message, WHY2_CHAT_CODE_PM_SERVER, strlen(WHY2_CHAT_CODE_PM_SERVER)) == 0)
             {
-                printf("\n%s\n\n", message);
+                printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP); //do not fucking ask me how the fucking formatting fucking works, i dont fucking know
+
+                char *received_pm = message + strlen(WHY2_CHAT_CODE_PM_SERVER) + 1;
+
+                //DECODED MESSAGE, AUTHOR AND RECIPIENT; 0 = AUTHOR, 1 = RECIPIENT, 2 = MESSAGE
+                char **pm_info = why2_calloc(3, sizeof(char*));
+
+                unsigned long i_buffer = 0;
+                unsigned long n_buffer = 0;
+
+                //DECODE
+                for (unsigned long i = 0; i < strlen(received_pm); i++)
+                {
+                    if (received_pm[i] == ';')
+                    {
+                        //ALLOCATE INFO
+                        pm_info[n_buffer] = why2_malloc((i - i_buffer) + 1);
+
+                        //COPY INFO
+                        for (unsigned long j = i_buffer; j < i; j++)
+                        {
+                            pm_info[n_buffer][j - i_buffer] = received_pm[j];
+                        }
+                        pm_info[n_buffer][i - i_buffer] = '\0';
+
+                        i_buffer = i + 1;
+                        n_buffer++;
+                    }
+                }
+
+                printf("\n\n%s(%s -> %s): %s\n\n", WHY2_CLEAR_AND_GO_UP, pm_info[0], pm_info[1], pm_info[2]);
+
+                //DEALLOCATION
+                for (int i = 0; i < 3; i++)
+                {
+                    why2_deallocate(pm_info[i]);
+                }
+                why2_deallocate(pm_info);
             }
         } else if (!continuing)
         {
