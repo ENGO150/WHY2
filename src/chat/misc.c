@@ -161,7 +161,7 @@ char *read_socket_raw(int socket)
     {
         //FIND THE SENT SIZE
         content_size = 0;
-        if (ioctl(socket, FIONREAD, &content_size) < 0 || content_size <= 0) continue;
+        if (ioctl(socket, FIONREAD, &content_size) < 0 || content_size <= 0) continue; //TODO: Infinite loop
 
         //ALLOCATE
         content_buffer = why2_realloc(content_buffer, content_size + 1);
