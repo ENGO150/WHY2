@@ -52,6 +52,21 @@ int removeDirectory(char *path)
     return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
 }
 
+void why2_directory(void)
+{
+    struct stat st;
+    char *buffer = why2_replace(WHY2_CONFIG_DIR, "{USER}", getenv("USER"));
+
+    //CREATE USER CONFIG FOLDER
+    if (stat(buffer, &st) == -1)
+    {
+        mkdir(buffer, 0700);
+    }
+
+    //DEALLOCATION
+    why2_deallocate(buffer);
+}
+
 enum WHY2_EXIT_CODES why2_check_version(void)
 {
     if (why2_get_flags().no_check) return WHY2_SUCCESS;

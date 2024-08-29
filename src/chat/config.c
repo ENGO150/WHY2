@@ -39,17 +39,11 @@ enum CONFIG_TYPES
 
 void init_config(char *filename)
 {
-    struct stat st;
-    char *buffer = why2_replace(WHY2_CONFIG_DIR, "{USER}", getenv("USER"));
-
     //CREATE USER CONFIG FOLDER [THIS SHOULDN'T HAPPEN ON CLIENT, BUT IT'S NEEDED ON FRESH SERVERS]
-    if (stat(buffer, &st) == -1)
-    {
-        mkdir(buffer, 0700);
-    }
+    why2_directory();
 
     //GET THE CONFIG TYPE
-    buffer = why2_realloc(buffer, strlen(WHY2_CHAT_CONFIG_DIR) + strlen(filename) + 2);
+    char *buffer = why2_malloc(strlen(WHY2_CHAT_CONFIG_DIR) + strlen(filename) + 2);
     sprintf(buffer, "%s/%s", WHY2_CHAT_CONFIG_DIR, filename);
 
     char *path = why2_replace(buffer, "{USER}", getenv("USER"));
