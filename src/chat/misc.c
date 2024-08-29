@@ -562,14 +562,12 @@ void *why2_communicate_thread(void *arg)
 
     why2_toml_read_free(config_username);
 
-    unsigned long connection_id = get_latest_id();
-
     connection_node_t node = (connection_node_t)
     {
         connection,
         pthread_self(),
         why2_strdup(username),
-        connection_id
+        get_latest_id()
     };
 
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
@@ -721,10 +719,10 @@ void *why2_communicate_thread(void *arg)
                     if (valid_param) //IGNORE INVALID ARGS
                     {
                         //ALLOCATE MESSAGE TO SEND TO RECEIVER
-                        char *private_msg = why2_malloc(strlen(WHY2_CHAT_CODE_PM_SERVER) + why2_count_int_length((int) connection_id) + strlen(msg) + 4);
+                        char *private_msg = why2_malloc(strlen(WHY2_CHAT_CODE_PM_SERVER) + strlen(node.username) + strlen((*(connection_node_t*) pm_connection -> value).username) + strlen(msg) + 5);
 
                         //CONSTRUCT DA MESSAGE
-                        sprintf(private_msg, WHY2_CHAT_CODE_PM_SERVER ";%lu;%s;%c", connection_id, msg, '\0');
+                        sprintf(private_msg, WHY2_CHAT_CODE_PM_SERVER ";%s;%s;%s;%c", node.username, (*(connection_node_t*) pm_connection -> value).username, msg, '\0');
 
                         //SEND YOU DUMB FUCK
                         send_socket_deallocate(private_msg, why2_chat_server_config("server_username"), (*(connection_node_t*) pm_connection -> value).connection);
