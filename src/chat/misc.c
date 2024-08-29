@@ -154,6 +154,11 @@ char *read_socket_raw(int socket)
 
     char *content_buffer = NULL;
     int content_size;
+    char *wait_buffer = why2_malloc(2); //TEMP
+
+    //WAIT TILl RECEIVED MSG (ik it sucks but i can't think of better solution; anyways, this is way more convenient than infinite loop that makes my computer go wroom wroom)
+    recv(socket, wait_buffer, 1, MSG_PEEK);
+    why2_deallocate(wait_buffer);
 
     why2_bool empty_buffer = 0; //WHETHER MSG_PEEK SHOULD BE USER OR NOT
 
@@ -161,7 +166,7 @@ char *read_socket_raw(int socket)
     {
         //FIND THE SENT SIZE
         content_size = 0;
-        if (ioctl(socket, FIONREAD, &content_size) < 0 || content_size <= 0) continue; //TODO: Infinite loop
+        if (ioctl(socket, FIONREAD, &content_size) < 0 || content_size <= 0) continue;
 
         //ALLOCATE
         content_buffer = why2_realloc(content_buffer, content_size + 1);
