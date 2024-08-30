@@ -188,7 +188,20 @@ char *read_socket_raw(int socket)
 
     return_section:
 
-    content_buffer[content_size] = '\0';
+    content_buffer[content_size] = '\0'; //NULL TERM
+
+    //VALIDATE JSON FORMAT
+    struct json_object *json = json_tokener_parse(content_buffer);
+    if (json == NULL)
+    {
+        //RESET content_buffer
+        why2_deallocate(content_buffer);
+        content_buffer = NULL;
+    } else
+    {
+        //DEALLOCATION
+        json_object_put(json);
+    }
 
     return content_buffer;
 }
