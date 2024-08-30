@@ -416,16 +416,19 @@ void send_socket(char *text, char *username, int socket, why2_bool welcome)
         char *max_uname = why2_chat_server_config("max_username_length");
         char *min_uname = why2_chat_server_config("min_username_length");
         char *max_tries = why2_chat_server_config("max_username_tries");
+        char *server_name = why2_chat_server_config("server_name");
 
         //ADD THE INFO OBJS
         json_object_object_add(json, "max_uname", json_object_new_string(max_uname));
         json_object_object_add(json, "min_uname", json_object_new_string(min_uname));
         json_object_object_add(json, "max_tries", json_object_new_string(max_tries));
+        json_object_object_add(json, "server_name", json_object_new_string(server_name));
 
         //DEALLOCATION
         why2_toml_read_free(max_uname);
         why2_toml_read_free(min_uname);
         why2_toml_read_free(max_tries);
+        why2_toml_read_free(server_name);
     }
 
     //GENERATE JSON STRING
