@@ -72,6 +72,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     if (why2_get_flags().no_check) return WHY2_SUCCESS;
 
     why2_set_memory_identifier("core_version_check");
+    why2_directory(); //MAKE SURE WHY2 DIR EXISTS
 
     //FILE-CHECK VARIABLES
     int not_found_buffer = 0;
