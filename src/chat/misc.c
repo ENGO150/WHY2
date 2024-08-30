@@ -702,7 +702,7 @@ void *why2_communicate_thread(void *arg)
                     char *input = decoded_buffer + strlen(WHY2_CHAT_CODE_PM) + 1;
 
                     char *id = NULL; //RECEIVER
-                    WHY2_UNUSED char *msg;
+                    char *msg;
 
                     //CHECK ARGS VALIDITY
                     why2_bool valid_param = strlen(input) >= 3;
