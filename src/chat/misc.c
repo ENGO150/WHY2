@@ -873,6 +873,7 @@ void *why2_listen_server(void *socket)
     int max_uname = -1;
     int min_uname = -1;
     int max_tries = -1;
+    char *server_name = NULL;
 
     printf(">>> ");
     fflush(stdout);
@@ -896,7 +897,11 @@ void *why2_listen_server(void *socket)
             max_uname = get_int_from_json_string(read, "max_uname");
             min_uname = get_int_from_json_string(read, "min_uname");
             max_tries = get_int_from_json_string(read, "max_tries");
+            server_name = get_string_from_json_string(read, "server_name");
 
+            printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "Successfully connected to %s.\n\n\n", server_name); //WELCOME
+
+            why2_deallocate(server_name);
             continuing = 1;
         }
 
