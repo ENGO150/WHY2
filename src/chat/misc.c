@@ -967,7 +967,7 @@ void *why2_listen_server(void *socket)
                 //DECODE
                 for (unsigned long i = 0; i < strlen(received_pm); i++)
                 {
-                    if (received_pm[i] == ';')
+                    if (received_pm[i] == ';') //FUTURE ME, THIS IS PRETTY MUCH split FUNCTION IMPLEMENTATION
                     {
                         //ALLOCATE INFO
                         pm_info[n_buffer] = why2_malloc((i - i_buffer) + 1);
@@ -984,7 +984,14 @@ void *why2_listen_server(void *socket)
                     }
                 }
 
-                printf("\n\n%s(%s -> %s): %s\n\n", WHY2_CLEAR_AND_GO_UP, pm_info[0], pm_info[1], pm_info[2]);
+                //OUTPUT
+                if (strcmp(pm_info[0], pm_info[1]) != 0 || strlen(pm_info[0]) != 13)
+                {
+                    printf("\n\n%s(%s -> %s): %s\n\n", WHY2_CLEAR_AND_GO_UP, pm_info[0], pm_info[1], pm_info[2]);
+                } else
+                {
+                    printf("\n\n%s(schizophrenia): %s\n\n", WHY2_CLEAR_AND_GO_UP, pm_info[2]); //:))
+                }
 
                 //DEALLOCATION
                 for (int i = 0; i < 3; i++)
