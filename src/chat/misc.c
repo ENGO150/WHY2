@@ -63,8 +63,6 @@ char *get_string_from_json_string(char *json, char *string)
 {
     struct json_object *json_obj = json_tokener_parse(json);
 
-    if (json_obj == NULL) return NULL; //INVALID SYNTAX WAS SENT BY SOME FUCKING SCRIPT KIDDIE
-
     char *returning = why2_strdup(get_string_from_json(json_obj, string));
 
     //DEALLOCATION
@@ -106,8 +104,6 @@ void send_to_all(char *json)
     struct json_object *json_obj = json_tokener_parse(json);
     char *message = get_string_from_json(json_obj, "message");
     char *username = get_string_from_json(json_obj, "username");
-
-    if (json_obj == NULL) return; //EXIT IF INVALID SYNTAX WAS SENT
 
     while (node_buffer -> next != NULL) //SEND TO ALL CONNECTIONS
     {
