@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 user_pick_username = true # User will be prompted for their username on connect or will end up with default_username
+server_name = "WHY2 Server" # Name of the server
 server_username = "server" # Username server will use
 default_username = "anon" # If user_pick_username is set to false, this will be used as client username
 
