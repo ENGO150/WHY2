@@ -42,6 +42,8 @@ void why2_toml_read_free(char* s); //DEALLOCATE THE READ VALUE
 char *why2_chat_server_config(char *key); //why2_toml_read BUT YOU DO NOT HAVE TO INCLUDE path
 char *why2_chat_client_config(char *key); //hihi, *grabs shotgun quietly*
 
+char *why2_get_server_users_path(void); //RETURNS WHY2_CHAT_CONFIG_SERVER_USERS LOCATION
+
 #ifdef __cplusplus
 }
 #endif
