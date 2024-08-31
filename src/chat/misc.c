@@ -140,6 +140,18 @@ void add_brackets(char **json)
     *json = output;
 }
 
+void remove_non_ascii(char **text)
+{
+    //REMOVE NON ASCII CHARS
+    int j = 0;
+    for (int i = 0; (*text)[i] != '\0'; i++)
+    {
+        if ((20 <= (*text)[i] && (*text)[i] <= 126)) (*text)[i] = (*text)[j++] = (*text)[i];
+    }
+
+    (*text)[j] = '\0';
+}
+
 char *read_socket_raw(int socket)
 {
     if (socket == -1)
@@ -398,13 +410,7 @@ void send_socket(char *text, char *username, int socket, why2_bool welcome)
     remove_json_syntax_characters(text_copy);
 
     //REMOVE NON ASCII CHARS
-    int j = 0;
-    for (int i = 0; text_copy[i] != '\0'; i++)
-    {
-        if ((20 <= text_copy[i] && text_copy[i] <= 126)) text_copy[i] = text_copy[j++] = text_copy[i];
-    }
-
-    text_copy[j] = '\0';
+    remove_non_ascii(&text_copy);
 
     //ADD OBJECTS
     json_object_object_add(json, "message", json_object_new_string(text_copy));
