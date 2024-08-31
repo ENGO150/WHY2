@@ -142,7 +142,7 @@ void add_brackets(char **json)
 
 why2_bool is_ascii(char c)
 {
-    return 20 <= c && c <= 126;
+    return 33 <= c && c <= 126;
 }
 
 void remove_non_ascii(char **text)
