@@ -126,6 +126,38 @@ pub extern "C" fn why2_toml_write(path: *const c_char, key: *const c_char, value
 }
 
 #[no_mangle]
+pub extern "C" fn why2_toml_contains(path: *const c_char, key: *const c_char) -> bool
+{
+    //CONVERT C STRINGS TO RUST STRINGS
+    let path_r = unsafe { CStr::from_ptr(path).to_string_lossy().into_owned() };
+    let key_r = unsafe { CStr::from_ptr(key).to_string_lossy().into_owned() };
+
+    //GET FILE CONTENT
+    let file_raw = match read_to_string(&path_r)
+    {
+        Ok(raw) => raw,
+        Err(e) =>
+        {
+            eprintln!("Could not read TOML config: {}\n{}", path_r, e);
+            return false;
+        },
+    };
+
+    //PARSE FILE
+    let data: Value = match toml::from_str(&file_raw)
+    {
+        Ok(data) => data,
+        Err(e) =>
+        {
+            eprintln!("Could not parse TOML config: {}\n{}", path_r, e);
+            return false;
+        },
+    };
+
+    data.get(&key_r).is_some()
+}
+
+#[no_mangle]
 pub extern "C" fn why2_toml_read_free(s: *mut c_char) //BECAUSE THIS IS RUST MODULE I HAVE TO CREATE A DEALLOCATING FUNCTION
 {
     unsafe //DON'T TRUST THIS, I DEFINITELY KNOW WHAT I'M DOING (idk)
