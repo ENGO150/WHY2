@@ -18,9 +18,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    fs::read_to_string,
     os::raw::c_char,
 
+    fs::
+    {
+        read_to_string,
+        write,
+    },
     ffi::
     {
         CString,
@@ -28,10 +32,12 @@ use std::
     },
 };
 
+use toml::Value;
+
 #[no_mangle]
 pub extern "C" fn why2_toml_read(path: *const c_char, key: *const c_char) -> *mut c_char
 {
-    //CONVERT C STRINGS TO
+    //CONVERT C STRINGS TO RUST STRINGS
     let path_r = unsafe { CStr::from_ptr(path).to_string_lossy().into_owned() };
     let key_r = unsafe { CStr::from_ptr(key).to_string_lossy().into_owned() };
 
@@ -59,6 +65,64 @@ pub extern "C" fn why2_toml_read(path: *const c_char, key: *const c_char) -> *mu
     value = value.replace("\"", "").trim().to_string(); //REMOVE QUOTES
 
     CString::new(value).unwrap().into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn why2_toml_write(path: *const c_char, key: *const c_char, value: *const c_char)
+{
+    //CONVERT C STRINGS TO RUST STRINGS
+    let path_r = unsafe { CStr::from_ptr(path).to_string_lossy().into_owned() };
+    let key_r = unsafe { CStr::from_ptr(key).to_string_lossy().into_owned() };
+    let value_r = unsafe { CStr::from_ptr(value).to_string_lossy().into_owned() };
+
+    //GET FILE CONTENT
+    let file_raw = match read_to_string(&path_r)
+    {
+        Ok(raw) => raw,
+        Err(e) =>
+        {
+            eprintln!("Could not read TOML config: {}\n{}", path_r, e);
+            return;
+        },
+    };
+
+    //PARSE FILE
+    let mut data: Value = match toml::from_str(&file_raw)
+    {
+        Ok(data) => data,
+        Err(e) =>
+        {
+            eprintln!("Could not parse TOML config: {}\n{}", path_r, e);
+            return;
+        },
+    };
+
+    //INSERT VALUE (OR UPDATE)
+    if let Some(table) = data.as_table_mut()
+    {
+        table.insert(key_r, Value::String(value_r));
+    } else
+    {
+        eprintln!("Failed to get TOML table from file: {}", path_r);
+        return;
+    }
+
+    //CONVERT NEW DATA TO STRING
+    let updated_data = match toml::to_string(&data)
+    {
+        Ok(data) => data,
+        Err(e) =>
+        {
+            eprintln!("Failed to convert TOML data to string: {}\n{}", path_r, e);
+            return;
+        },
+    };
+
+    //WRITE NEW DATA
+    if let Err(e) = write(&path_r, updated_data)
+    {
+        eprintln!("Could not write to TOML config: {}\n{}", path_r, e);
+    }
 }
 
 #[no_mangle]
