@@ -34,6 +34,7 @@ void why2_chat_init_server_config(void); //CHECK IF SERVER CONFIG EXISTS, CREATE
 void why2_chat_init_client_config(void); //Dementia is a term used to describe a group of symptoms affecting memory, thinking and social abilities. In people who have dementia, the symptoms interfere with their daily lives. Dementia isn't one specific disease. Several diseases can cause dementia. ...
 
 char *why2_toml_read(const char* path, const char* key); //READ key FROM path TOML FILE
+void why2_toml_write(const char *path, const char *key, const char *value); //WRITE value AS key INTO path TOML FILE
 void why2_toml_read_free(char* s); //DEALLOCATE THE READ VALUE
 
 char *why2_chat_server_config(char *key); //why2_toml_read BUT YOU DO NOT HAVE TO INCLUDE path
