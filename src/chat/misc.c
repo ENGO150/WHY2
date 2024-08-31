@@ -140,13 +140,18 @@ void add_brackets(char **json)
     *json = output;
 }
 
+why2_bool is_ascii(char c)
+{
+    return 20 <= c && c <= 126;
+}
+
 void remove_non_ascii(char **text)
 {
     //REMOVE NON ASCII CHARS
     int j = 0;
     for (int i = 0; (*text)[i] != '\0'; i++)
     {
-        if ((20 <= (*text)[i] && (*text)[i] <= 126)) (*text)[i] = (*text)[j++] = (*text)[i];
+        if (is_ascii((*text)[i])) (*text)[i] = (*text)[j++] = (*text)[i];
     }
 
     (*text)[j] = '\0';
