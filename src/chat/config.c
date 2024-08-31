@@ -110,6 +110,26 @@ char *config(char *key, enum CONFIG_TYPES type)
 void why2_chat_init_server_config(void)
 {
     init_config(WHY2_CHAT_CONFIG_SERVER);
+
+    //CHECK FOR USER CONFIG
+    char *user_pick_username = why2_chat_server_config("user_pick_username");
+    char *config_path = why2_replace(WHY2_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER_USERS, "{USER}", getenv("USER"));
+
+    if (strcmp(user_pick_username, "true") == 0 && access(config_path, R_OK) != 0)
+    {
+        //CREATE THE CONFIG
+        FILE *config_file = why2_fopen(config_path, "w");
+
+        //WRITE SOMETHING POSITIVE TO THE CONFIG :) (i love you, ignore my aggressive ass)
+        fwrite("#haha no users registered, what a loser lol", 1, 43, config_file);
+
+        //CLEANUP
+        why2_deallocate(config_file);
+    }
+
+    //DEALLOCATION
+    why2_toml_read_free(user_pick_username);
+    why2_deallocate(config_path);
 }
 
 void why2_chat_init_client_config(void)
