@@ -29,6 +29,7 @@ extern "C" {
 #define WHY2_CHAT_CONFIG_URL "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/config/"
 #define WHY2_CHAT_CONFIG_SERVER "server.toml"
 #define WHY2_CHAT_CONFIG_CLIENT "client.toml"
+#define WHY2_CHAT_CONFIG_SERVER_USERS "server_users.toml" //LOGIN INFO CONFIG
 
 void why2_chat_init_server_config(void); //CHECK IF SERVER CONFIG EXISTS, CREATE IT
 void why2_chat_init_client_config(void); //Dementia is a term used to describe a group of symptoms affecting memory, thinking and social abilities. In people who have dementia, the symptoms interfere with their daily lives. Dementia isn't one specific disease. Several diseases can cause dementia. ...
