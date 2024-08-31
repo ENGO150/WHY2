@@ -69,11 +69,13 @@ void init_config(char *filename)
 
         //CLEANUP
         curl_easy_cleanup(curl);
-        why2_deallocate(buffer);
-        why2_deallocate(path);
         why2_deallocate(config_dir);
         why2_deallocate(file_buffer);
     }
+
+    //DEALLOCATION
+    why2_deallocate(path);
+    why2_deallocate(buffer);
 }
 
 char *config(char *key, enum CONFIG_TYPES type)
