@@ -113,7 +113,7 @@ void why2_chat_init_server_config(void)
 
     //CHECK FOR USER CONFIG
     char *user_pick_username = why2_chat_server_config("user_pick_username");
-    char *config_path = why2_replace(WHY2_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER_USERS, "{USER}", getenv("USER"));
+    char *config_path = why2_get_server_users_path();
 
     if (strcmp(user_pick_username, "true") == 0 && access(config_path, R_OK) != 0)
     {
@@ -145,4 +145,9 @@ char *why2_chat_server_config(char *key)
 char *why2_chat_client_config(char *key)
 {
     return config(key, CLIENT);
+}
+
+char *why2_get_server_users_path(void)
+{
+    return why2_replace(WHY2_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER_USERS, "{USER}", getenv("USER"));
 }
