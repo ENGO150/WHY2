@@ -30,6 +30,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <gmp.h>
 
+#include <openssl/sha.h>
+
 //DO NOT TOUCH THESE PLS :3
 char *rsa_modulus = NULL; //THE RSA MODULUS
 char *rsa_d = NULL; //THE RSA d
@@ -202,4 +204,24 @@ char *why2_chat_rsa_pub_encrypt(char *to_encrypt)
 char *why2_chat_rsa_pri_decrypt(char *to_decrypt)
 {
     return exp_mod(to_decrypt, why2_get_chat_d());
+}
+
+char *why2_sha256(char *input)
+{
+    unsigned char *output = why2_malloc(SHA256_DIGEST_LENGTH + 1);
+    char *formatted_output = why2_malloc(SHA256_DIGEST_LENGTH * 2 + 2);
+
+    SHA256((unsigned char*) input, strlen(input), output);
+
+    //SAVE AS STRING IN HEX
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+    {
+        sprintf(formatted_output + (i * 2), "%02x", output[i]);
+    }
+    formatted_output[SHA256_DIGEST_LENGTH * 2] = '\0';
+
+    //DEALLOCATION
+    why2_deallocate(output);
+
+    return formatted_output;
 }
