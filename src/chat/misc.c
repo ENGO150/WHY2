@@ -590,6 +590,31 @@ void *why2_communicate_thread(void *arg)
                 continue;
             }
 
+            //USER CONFIG
+            char *password = NULL;
+
+            char *user_config_path = why2_get_server_users_path();
+            if (!why2_toml_contains(user_config_path, decoded_buffer))
+            {
+                send_socket_deallocate(WHY2_CHAT_CODE_ENTER_PASSWORD, why2_chat_server_config("server_username"), connection);
+
+                if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+                {
+                    force_exiting = 1; //FAILURE
+                    goto deallocation;
+                }
+
+                password = get_string_from_json_string(raw, "message"); //DECODE
+
+                why2_toml_write(user_config_path, username, password); //SAVE PASSWORD
+            }
+
+            //CLEANUP
+            why2_deallocate(user_config_path);
+            why2_deallocate(password);
+            why2_deallocate(raw);
+
+            //INFO
             printf("User set username.\t%d\t%s\n", connection, decoded_buffer);
         }
     }
