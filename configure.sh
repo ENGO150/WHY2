@@ -25,13 +25,13 @@ if [[ $(id -u) != "0" ]] && [[ $1 != "force" ]]; then
 fi
 
 COMMON="gcc make tmux curl"
-ARCH_GENTOO_COMMON="$COMMON json-c libgit2 gmp"
+ARCH_GENTOO_COMMON="$COMMON json-c libgit2 gmp openssl"
 
 # Get COMMAND
 if [[ $DISTRO == "Arch" ]]; then
     COMMAND="pacman -S --needed --noconfirm $ARCH_GENTOO_COMMON"
 elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
-    COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev libgmp-dev"
+    COMMAND="apt install -y $COMMON libjson-c-dev libcurl4-nss-dev libgit2-dev libgmp-dev libssl-dev"
 elif [[ $DISTRO == "Gentoo" ]]; then
     COMMAND="emerge -vn $ARCH_GENTOO_COMMON"
 
