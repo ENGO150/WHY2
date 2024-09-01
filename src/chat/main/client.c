@@ -198,7 +198,7 @@ int main(void)
             } else if (command(line, WHY2_CHAT_COMMAND_PM, &cmd_arg))
             {
                 char *id; //PM RECEIVER
-                WHY2_UNUSED char *msg; //something racial
+                char *msg; //something racial
 
                 //CHECK ARGS VALIDITY
                 why2_bool valid_param = cmd_arg != NULL && strlen(cmd_arg) >= 3;
