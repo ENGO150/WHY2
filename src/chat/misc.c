@@ -916,7 +916,7 @@ void *why2_listen_server(void *socket)
             max_tries = get_int_from_json_string(read, "max_tries");
             server_name = get_string_from_json_string(read, "server_name");
 
-            printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "Successfully connected to %s.\n\n\n", server_name); //WELCOME
+            printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "Successfully connected to %s.\nUse !help for commands.\n\n\n", server_name); //WELCOME
 
             why2_deallocate(server_name);
             continuing = 1;
