@@ -44,6 +44,8 @@ char *why2_get_chat_d(void); //GET THE RSA d
 char *why2_chat_rsa_pub_encrypt(char *to_encrypt); //RSA ENCRYPT USING PUBLIC KEY
 char *why2_chat_rsa_pri_decrypt(char *to_decrypt); //RSA DECRYPT USING PRIVATE KEY
 
+char *why2_sha256(char *input); //HASH input USING SHA256 AND RETURN IN STRING
+
 #ifdef __cplusplus
 }
 #endif
