@@ -60,6 +60,10 @@ extern "C" {
 //SHORTCUTS CAUSE I'M LAZY BITCH
 #define WHY2_CHAT_CODE_SSQC WHY2_CHAT_CODE_SERVER_SIDE_QUIT_COMMUNICATION
 
+//FUNCTIONS
+void __why2_set_asking_password(unsigned char asking_password); //IF HASH SHOULD BE SENT INSTEAD OF NORMAL MESSAGE
+void __why2_reset_asking_password();
+
 #ifdef __cplusplus
 }
 #endif
