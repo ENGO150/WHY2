@@ -17,3 +17,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include <why2/chat/flags.h>
+
+unsigned char asking_password_flag = 0;
+
+void __why2_set_asking_password(unsigned char asking_password)
+{
+    asking_password_flag = asking_password;
+}
+
+void __why2_reset_asking_password()
+{
+    asking_password_flag = 0;
+}
