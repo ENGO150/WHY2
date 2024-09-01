@@ -23,6 +23,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
+#include <why2/flags.h>
+
 //MACROS
 #define WHY2_SA struct sockaddr
 #define WHY2_CHAT_SERVER_PORT 1204 //PORT
@@ -61,8 +63,8 @@ extern "C" {
 #define WHY2_CHAT_CODE_SSQC WHY2_CHAT_CODE_SERVER_SIDE_QUIT_COMMUNICATION
 
 //FUNCTIONS
-void __why2_increment_asking_password(unsigned char asking_password); //IF HASH SHOULD BE SENT INSTEAD OF NORMAL MESSAGE
-void __why2_reset_asking_password();
+void __why2_set_asking_password(why2_bool value); //IF HASH SHOULD BE SENT INSTEAD OF NORMAL MESSAGE
+why2_bool __why2_get_asking_password();
 
 #ifdef __cplusplus
 }

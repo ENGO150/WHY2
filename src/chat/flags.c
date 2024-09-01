@@ -18,14 +18,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/flags.h>
 
-unsigned char asking_password = 0;
+why2_bool asking_password = 0;
 
-void __why2_increment_asking_password()
+void __why2_set_asking_password(why2_bool value)
 {
-    asking_password++;
+    asking_password = value;
 }
 
-void __why2_reset_asking_password()
+why2_bool __why2_get_asking_password()
 {
-    asking_password = 0;
+    return asking_password;
 }
