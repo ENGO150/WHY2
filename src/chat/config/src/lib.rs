@@ -34,13 +34,8 @@ use std::
 
 use toml::Value;
 
-#[no_mangle]
-pub extern "C" fn why2_toml_read(path: *const c_char, key: *const c_char) -> *mut c_char
+fn toml_read(path_r: String, key_r: String) -> String
 {
-    //CONVERT C STRINGS TO RUST STRINGS
-    let path_r = unsafe { CStr::from_ptr(path).to_string_lossy().into_owned() };
-    let key_r = unsafe { CStr::from_ptr(key).to_string_lossy().into_owned() };
-
     //GET FILE CONTENT
     let file_raw = match read_to_string(&path_r)
     {
@@ -56,15 +51,21 @@ pub extern "C" fn why2_toml_read(path: *const c_char, key: *const c_char) -> *mu
     };
 
     //GET VALUE BY key_r
-    let mut value = match data.get(&key_r)
+    match data.get(&key_r)
     {
-        Some(value) => value.to_string(),
+        Some(value) => value.to_string().replace("\"", "").trim().to_string(), //TRIM AND SHIT
         None => panic!("Key \"{}\" not found in TOML config: {}", key_r, path_r),
-    };
+    }
+}
 
-    value = value.replace("\"", "").trim().to_string(); //REMOVE QUOTES
+#[no_mangle]
+pub extern "C" fn why2_toml_read(path: *const c_char, key: *const c_char) -> *mut c_char
+{
+    //CONVERT C STRINGS TO RUST STRINGS
+    let path_r = unsafe { CStr::from_ptr(path).to_string_lossy().into_owned() };
+    let key_r = unsafe { CStr::from_ptr(key).to_string_lossy().into_owned() };
 
-    CString::new(value).unwrap().into_raw()
+    CString::new(toml_read(path_r, key_r)).unwrap().into_raw() //GET
 }
 
 #[no_mangle]
@@ -165,29 +166,7 @@ pub extern "C" fn why2_toml_equals(path: *const c_char, key: *const c_char, valu
     let key_r = unsafe { CStr::from_ptr(key).to_string_lossy().into_owned() };
     let value_r = unsafe { CStr::from_ptr(value).to_string_lossy().into_owned() };
 
-    //GET FILE CONTENT
-    let file_raw = match read_to_string(&path_r)
-    {
-        Ok(raw) => raw,
-        Err(e) =>
-        {
-            eprintln!("Could not read TOML config: {}\n{}", path_r, e);
-            return false;
-        },
-    };
-
-    //PARSE FILE
-    let data: Value = match toml::from_str(&file_raw)
-    {
-        Ok(data) => data,
-        Err(e) =>
-        {
-            eprintln!("Could not parse TOML config: {}\n{}", path_r, e);
-            return false;
-        },
-    };
-
-    data.get(&key_r).unwrap().to_string() == value_r
+    toml_read(path_r, key_r) == value_r //RESULT
 }
 
 #[no_mangle]
