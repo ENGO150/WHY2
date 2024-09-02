@@ -260,7 +260,23 @@ int main(void)
             }
         } else
         {
-            why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
+            if (__why2_get_asking_password())
+            {
+                //REMOVE \n AT THE END OF line
+                line[strlen(line) - 1] = '\0';
+
+                char *hash = why2_sha256(line); //HASHISH
+
+                why2_send_socket(hash, NULL, listen_socket); //SEND BUT HASHED
+
+                //DEALLOCATION
+                why2_deallocate(hash);
+                __why2_set_asking_password(0);
+            } else
+            {
+                why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
+            }
+
             free(line);
         }
     }
