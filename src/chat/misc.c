@@ -594,7 +594,7 @@ void *why2_communicate_thread(void *arg)
             char *password = NULL;
 
             char *user_config_path = why2_get_server_users_path();
-            if (!why2_toml_contains(user_config_path, decoded_buffer))
+            if (!why2_toml_contains(user_config_path, decoded_buffer)) //REGISTRATION
             {
                 send_socket_deallocate(WHY2_CHAT_CODE_ENTER_PASSWORD, why2_chat_server_config("server_username"), connection);
 
@@ -607,6 +607,34 @@ void *why2_communicate_thread(void *arg)
                 password = get_string_from_json_string(raw, "message"); //DECODE
 
                 why2_toml_write(user_config_path, username, password); //SAVE PASSWORD
+            } else //LOGIN
+            {
+                send_socket_deallocate(WHY2_CHAT_CODE_ENTER_PASSWORD, why2_chat_server_config("server_username"), connection);
+
+                unsigned char max_tries = (unsigned char) server_config_int("max_password_tries");
+
+                for (unsigned char i = 0; i < max_tries; i++)
+                {
+                    if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+                    {
+                        force_exiting = 1; //FAILURE
+                        goto deallocation;
+                    }
+
+                    password = get_string_from_json_string(raw, "message"); //DECODE
+
+                    if (why2_toml_equals(user_config_path, decoded_buffer, password)) break;
+
+                    if (i == max_tries - 1) //NOP, TOO MANY INVALID PASSWORDS
+                    {
+                        why2_deallocate(password);
+                        exiting = 1;
+
+                        goto deallocation;
+                    }
+
+                    send_socket_deallocate(WHY2_CHAT_CODE_INVALID_PASSWORD, why2_chat_server_config("server_username"), connection);
+                }
             }
 
             //CLEANUP
