@@ -1048,6 +1048,8 @@ void *why2_listen_server(void *socket)
                 why2_deallocate(pm_info);
             } else if (strcmp(message, WHY2_CHAT_CODE_ENTER_PASSWORD) == 0 || strcmp(message, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
             {
+                __why2_set_asking_password(1);
+
                 if (strcmp(message, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0) //INVALID USERNAME
                 {
                     printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid password!\n\n\n", asking_password > 1 ? WHY2_CLEAR_AND_GO_UP : "");
