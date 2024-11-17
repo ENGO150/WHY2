@@ -34,6 +34,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/flags.h>
 #include <why2/memory.h>
 
+int mod_cb(int a, int b) { return a % b; }
 int multiply_cb(int a, int b) { return a * b; }
 int subtract_cb(int a, int b) { return a - b; }
 int sum_cb(int a, int b) { return a + b; }
@@ -302,18 +303,24 @@ void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_c
                 number_buffer_2 = text_key_chain_size - (i + 1);
                 number_buffer_3 = why2_get_key_length() - (number_buffer + (i < text_key_chain_size));
                 break;
+
+            case WHY2_v4:
+                number_buffer_2 = text_key_chain_size - (i + 1);
+                number_buffer_3 = (why2_get_key_length() ^ text_key_chain_size) >> (number_buffer & (i < text_key_chain_size)); //gl fucker
+                break;
         }
 
         //FILL textKeyChain
-        if ((number_buffer + 1) % 3 == 0)
+        if (why2_get_flags().version == WHY2_v4 && (number_buffer + 1) % 4 == 0)
+        {
+            cb = mod_cb;
+        } else if ((number_buffer + 1) % 3 == 0)
         {
             cb = multiply_cb;
-        }
-        else if ((number_buffer + 1) % 2 == 0)
+        } else if ((number_buffer + 1) % 2 == 0)
         {
             cb = subtract_cb;
-        }
-        else
+        } else
         {
             cb = sum_cb;
         }

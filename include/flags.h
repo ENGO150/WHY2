@@ -39,7 +39,8 @@ enum WHY2_TEXT_KEY_CHAIN_VERSIONS
 {
     WHY2_v1, //FIRST VERSION. Replaced on May 28th 17:45:26 2022 UTC in commit 0d64f4fa7c37f0b57914db902258e279a71c7f9a.
     WHY2_v2, //SECOND VERSION. Replaced on July 11th 17:12:41 2022 UTC in commit 0f01cde0f1e1a9210f4eef7b949e6d247072d3a6.
-    WHY2_v3 //THIRD VERSION. THE LATEST ONE
+    WHY2_v3, //THIRD VERSION. <i forgor to add the time>
+    WHY2_v4
 };
 
 enum WHY2_OUTPUT_FORMAT
