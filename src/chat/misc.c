@@ -1086,6 +1086,7 @@ void *why2_listen_server(void *socket)
 
                 printf("%s%s\nEnter password:\n", asking_password++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP);
                 fflush(stdout);
+                //TODO! THIS SOMEHOW BREAKS THE CLIENT INPUT
             }
         } else if (!continuing)
         {
