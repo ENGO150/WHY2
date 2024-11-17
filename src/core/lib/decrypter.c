@@ -78,12 +78,6 @@ why2_output_flags why2_decrypt_text(char *text, char *key_new)
         //GET ENCRYPTED NUMBERS
         for (unsigned short i = 0; i < why2_byte_format_length(text_copy); i++)
         {
-            for (unsigned short j = 2 + (i * 2); j <= 3 + (i * 2); j++)
-            {
-                //ENSURE THERE IS NO \0 (REVERSED)
-                if (text_copy[j] == -128) text_copy[j] = 0;
-            }
-
             //PUT TOGETHER
             encrypted_input[i] = (text_copy[3 + (i * 2)] << 7) | text_copy[2 + (i * 2)];
 
