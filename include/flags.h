@@ -51,7 +51,7 @@ enum WHY2_OUTPUT_FORMAT
 
 #define WHY2_VERSION "v5.0" //WHY2_VERSION OF CURRENT BUILD     > DO NOT TOUCH THIS <
 #define WHY2_VERSIONS_URL "https://raw.githubusercontent.com/ENGO150/WHY2/release/versions.json" //URL FOR GETTING versions.json
-#define WHY2_CONFIG_DIR "/home/{USER}/.config/WHY2"
+#define WHY2_CONFIG_DIR "{HOME}/.config/WHY2"
 #define WHY2_VERSIONS_NAME WHY2_CONFIG_DIR "/.versions.json" //do I have to explain this?
 
 #define WHY2_UPDATE_URL "https://github.com/ENGO150/WHY2.git" // REPOSITORY URL FOR UPDATES (YOU DON'T SAY)

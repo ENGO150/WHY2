@@ -110,7 +110,7 @@ void why2_chat_init_keys(void)
     FILE *private;
 
     //GET PATH TO KEY DIR
-    char *path = why2_replace(WHY2_CHAT_KEY_LOCATION, "{USER}", getenv("USER"));
+    char *path = why2_replace(WHY2_CHAT_KEY_LOCATION, "{HOME}", getenv("HOME"));
 
     //ALLOCATE THE KEY PATHS
     char *public_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_PUB_KEY) + 3);

@@ -56,7 +56,7 @@ int removeDirectory(char *path)
 void why2_directory(void)
 {
     struct stat st;
-    char *buffer = why2_replace(WHY2_CONFIG_DIR, "{USER}", getenv("USER"));
+    char *buffer = why2_replace(WHY2_CONFIG_DIR, "{HOME}", getenv("HOME"));
 
     //CREATE USER CONFIG FOLDER
     if (stat(buffer, &st) == -1)
@@ -79,7 +79,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     int not_found_buffer = 0;
 
     //GET VERSION FILE
-    char *version_file = why2_replace(WHY2_VERSIONS_NAME, "{USER}", getenv("USER"));
+    char *version_file = why2_replace(WHY2_VERSIONS_NAME, "{HOME}", getenv("HOME"));
 
     //CURL VARIABLES
     CURL *curl = curl_easy_init();
