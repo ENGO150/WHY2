@@ -18,11 +18,27 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/chat/flags.h>
 
+#include <unistd.h>
+#include <termios.h>
+
 why2_bool asking_password = 0;
 
 void __why2_set_asking_password(why2_bool value)
 {
     asking_password = value;
+
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty); //GET ATTRS
+
+    if (!value)
+    {
+        tty.c_lflag |= ECHO; //DISABLE
+    } else
+    {
+        tty.c_lflag &= ~ECHO; //ENABLE
+    }
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty); //SET ATTRS
 }
 
 why2_bool __why2_get_asking_password()
