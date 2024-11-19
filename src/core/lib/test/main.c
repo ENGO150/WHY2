@@ -45,7 +45,8 @@ int main(void)
         0, //NO OUTPUT
         0, //UPDATE
         WHY2_v4, //LATEST VERSION
-        WHY2_OUTPUT_TEXT //READABLE TEXT OUTPUT
+        WHY2_OUTPUT_TEXT, //READABLE TEXT OUTPUT
+        255 //PADDING RATE
     };
 
     //SET FLAGS
