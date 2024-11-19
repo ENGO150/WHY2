@@ -80,6 +80,7 @@ typedef struct
     why2_bool update; //BOOLEAN FOR UPDATING YOUR WHY WHY2_VERSION IF OLD IS USED
     enum WHY2_TEXT_KEY_CHAIN_VERSIONS version; //VERSION OF tkch
     enum WHY2_OUTPUT_FORMAT format; //VERSION OF tkch
+    const unsigned char padding; //INSERTED PADDING RATE; 0 = NO PADDING; 255 = SHITLOAD OF PADDING
 } why2_input_flags;
 
 typedef struct
