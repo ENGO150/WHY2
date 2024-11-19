@@ -35,8 +35,6 @@ extern "C" {
 #define WHY2_CHAT_PRI_KEY "pri"
 #define WHY2_CHAT_KEY_BASE 62 //BASE IN THE GENERATED KEYS ARE STORED IN WHY2_CHAT_KEY_LOCATION
 
-#define WHY2_CHECKSUM_SEGMENT_SIZE 4
-
 void why2_chat_init_keys(void); //INIT (POSSIBLY GENERATE) RSA KEYS
 void why2_chat_deallocate_keys(void); //DEALLOCATE :) (NO SLUR HERE)
 
@@ -47,8 +45,6 @@ char *why2_chat_rsa_pub_encrypt(char *to_encrypt); //RSA ENCRYPT USING PUBLIC KE
 char *why2_chat_rsa_pri_decrypt(char *to_decrypt); //RSA DECRYPT USING PRIVATE KEY
 
 char *why2_sha256(char *input); //HASH input USING SHA256 AND RETURN IN STRING
-
-unsigned long why2_checksum_segment(char *input); //TOO LONG TO EXPLAIN, DEAL WITH IT. TREAT IT LIKE A NORMAL CHECKSUM
 
 #ifdef __cplusplus
 }
