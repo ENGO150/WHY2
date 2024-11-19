@@ -278,13 +278,8 @@ void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_c
 
     for (int i = 0; i < text_key_chain_size; i++)
     {
-        number_buffer = i;
-
         //CHECK, IF number_buffer ISN'T GREATER THAN keyLength AND CUT WHY2_UNUSED LENGTH
-        while (number_buffer >= (int) why2_get_key_length())
-        {
-            number_buffer -= why2_get_key_length();
-        }
+        number_buffer = i % why2_get_key_length();
 
         //SET tkch VERSION
         switch (why2_get_flags().version)
