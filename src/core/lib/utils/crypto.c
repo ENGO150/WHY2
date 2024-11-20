@@ -24,18 +24,19 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 unsigned long why2_sum_segment(char *input) //I ABSOLUTELY DO NOT RECOMMEND USING THIS WITH LARGE KEYS!!!
 {
     unsigned long input_size = strlen(input);
-    unsigned long segmented_input_size = ceil(input_size / (double) WHY2_CHECKSUM_SEGMENT_SIZE) * WHY2_CHECKSUM_SEGMENT_SIZE; //CALCULATE CLOSEST 4*n TO input
+    unsigned long segmented_input_size = ceil(input_size / (double) WHY2_SUM_SEGMENT_SIZE) * WHY2_SUM_SEGMENT_SIZE; //CALCULATE CLOSEST 32*n (OR WHY2_SUM_SEGMENT_SIZE*n, IF YOU WILL) TO input
     unsigned long output = 0;
 
-    for (unsigned long i = 0; i < segmented_input_size / WHY2_CHECKSUM_SEGMENT_SIZE; i++) //DIVIDE buffer INTO SEGMENTS, XOR EACH OTHER AND ADD TO output
+    for (unsigned long i = 0; i < segmented_input_size / WHY2_SUM_SEGMENT_SIZE; i++) //DIVIDE buffer INTO SEGMENTS, XOR EACH OTHER AND ADD TO output
     {
         unsigned long output_buffer = 0;
-        for (unsigned long j = 0; j < WHY2_CHECKSUM_SEGMENT_SIZE; j++)
+        for (unsigned long j = 0; j < WHY2_SUM_SEGMENT_SIZE; j++)
         {
-            unsigned long index_buffer = i * WHY2_CHECKSUM_SEGMENT_SIZE + j;
+            unsigned long index_buffer = i * WHY2_SUM_SEGMENT_SIZE + j;
+            char value_buffer = (input_size > index_buffer) ? input[index_buffer] : 0;
 
-            output_buffer ^= (input_size > index_buffer) ? input[index_buffer] : 0; //XORING
-            output_buffer = (output_buffer << WHY2_CHECKSUM_PRIME) | (output_buffer >> (sizeof(unsigned long) * 8 - WHY2_CHECKSUM_PRIME)); //ROTATE
+            output_buffer ^= value_buffer; //XORING
+            output_buffer = (output_buffer * WHY2_SUM_BASE_PRIME + value_buffer) % WHY2_SUM_MOD_PRIME;
         }
 
         output += output_buffer; //ADD
