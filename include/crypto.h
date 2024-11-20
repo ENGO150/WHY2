@@ -28,7 +28,7 @@ extern "C" {
 #define WHY2_CHECKSUM_PRIME 11 //PRIME NUMBER FOR ROTATION
 
 //FUNCTIONS
-unsigned long why2_checksum_segment(char *input); //TOO LONG TO EXPLAIN, DEAL WITH IT. TREAT IT LIKE A NORMAL CHECKSUM
+unsigned long why2_sum_segment(char *input); //TOO LONG TO EXPLAIN, DEAL WITH IT. TREAT IT LIKE A NORMAL CHECKSUM
 
 #ifdef __cplusplus
 }

@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string.h>
 #include <math.h>
 
-unsigned long why2_checksum_segment(char *input) //I ABSOLUTELY DO NOT RECOMMEND USING THIS WITH LARGE KEYS!!!
+unsigned long why2_sum_segment(char *input) //I ABSOLUTELY DO NOT RECOMMEND USING THIS WITH LARGE KEYS!!!
 {
     unsigned long input_size = strlen(input);
     unsigned long segmented_input_size = ceil(input_size / (double) WHY2_CHECKSUM_SEGMENT_SIZE) * WHY2_CHECKSUM_SEGMENT_SIZE; //CALCULATE CLOSEST 4*n TO input
