@@ -55,53 +55,116 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
     why2_set_memory_identifier("core_decrypt");
 
     //VARIABLES
-    char *key = NULL;
+    char *key_new = NULL;
+    char *text_new = NULL;
     char *returning_text = NULL;
     char *text_buffer = NULL;
-    int *text_key_chain = why2_malloc(sizeof(int) * strlen(text));
+    int *text_key_chain;
     int number_buffer = 0;
 
-    if (key_new != NULL)
+    if (key != NULL)
     {
-        //CHECK FOR INVALID key
-        if ((check_exit_code = why2_check_key(key_new)) != WHY2_SUCCESS)
+        //CHECK FOR INVALID key_new
+        if ((check_exit_code = why2_check_key(key)) != WHY2_SUCCESS)
         {
             why2_clean_memory("core_decrypt");
             return why2_no_output(check_exit_code);
         }
 
-        key = why2_strdup(key_new);
+        key_new = why2_strdup(key);
 
         //REDEFINE keyLength
-        why2_set_key_length(strlen(key));
+        why2_set_key_length(strlen(key_new));
     } else //LOAD KEY
     {
-        key = why2_generate_key(why2_get_key_length());
+        key_new = why2_generate_key(why2_get_key_length());
     }
 
+    //PADDING
+    if (why2_get_flags().padding > 0)
+    {
+        why2_list_t split_text = WHY2_LIST_EMPTY; //LIST OF text SPLIT INTO CHARS
+
+        //ADD CHARS
+        for (unsigned long i = 0; i < strlen(text); i++)
+        {
+            why2_list_push(&split_text, &(text[i]), sizeof(text[i])); //ADD
+        }
+
+        //OBTAIN SEED FROM key_new
+        srand(why2_sum_segment(key_new));
+
+        //ADD PADDING TO split_text LIST
+        for (unsigned long i = 0; i < why2_get_flags().padding; i++)
+        {
+            unsigned long random_position = (unsigned long) (rand() % (why2_list_get_size(&split_text))); //GET RANDOM POSITION
+
+            char random_char;
+            why2_random(&random_char, sizeof(random_char)); //GENERATE COMPLETELY RANDOM CHARACTER
+
+            //INSERT RANDOM VALUE
+            why2_node_t *inserted_node = why2_malloc(sizeof(why2_node_t)); //ALLOCATE NODE
+            inserted_node -> value = why2_malloc(sizeof(random_char)); //ALLOCATE VALUE
+            memcpy(inserted_node -> value, &random_char, sizeof(random_char)); //INSERT DATA
+
+            //INSERT INTO LIST
+            if (random_position != 0) //SHOULDN'T BE FIRST
+            {
+                why2_node_t *node_before = split_text.head;
+                for (unsigned long j = 0; j < random_position - 1; j++) node_before = node_before -> next; //SCROLL TO THE POSITION
+
+                inserted_node -> next = node_before -> next; //SEW THE LIST BACK
+                node_before -> next = inserted_node;
+            } else //ADD BEFORE THE WHOLE LIST
+            {
+                inserted_node -> next = split_text.head;
+
+                split_text.head = inserted_node;
+            }
+        }
+
+        //PUT PADDED TEXT INTO text_new
+        text_new = why2_malloc(why2_list_get_size(&split_text) + 1);
+        why2_node_t *buffer = split_text.head;
+        why2_node_t *buffer_2;
+        unsigned long index_buffer = 0;
+
+        do
+        {
+            text_new[index_buffer++] = *(char*) buffer -> value; //COPY VALUE
+
+            buffer_2 = buffer;
+            buffer = buffer -> next; //ITER
+
+            why2_deallocate(buffer_2); //DEALLOCATION
+        } while (buffer != NULL);
+    } else text_new = why2_strdup(text); //USE TEXT WITHOUT PADDING
+
+    text_key_chain = why2_malloc(sizeof(int) * strlen(text_new));
+
     //LOAD text_key_chain
-    why2_generate_text_key_chain(key, text_key_chain, strlen(text));
+    why2_generate_text_key_chain(key_new, text_key_chain, strlen(text_new));
 
     //ACTUALLY ENCRYPT TEXT
-    for (int i = 0; i < (int) strlen(text); i++)
+    for (int i = 0; i < (int) strlen(text_new); i++)
     {
-        text_key_chain[i] = why2_get_encryption_operation()(text_key_chain[i], (int) text[i]);
+        text_key_chain[i] = why2_get_encryption_operation()(text_key_chain[i], (int) text_new[i]);
     }
 
     //OUTPUT FORMATS
     if (why2_get_flags().format == WHY2_OUTPUT_TEXT) //NORMAL 420.-69 FORMAT
     {
         //COUNT REQUIRED SIZE FOR returning_text
-        for (int i = 0; i < (int) strlen(text); i++)
+        for (int i = 0; i < (int) strlen(text_new); i++)
         {
             number_buffer += why2_count_int_length(text_key_chain[i]);
         }
 
         //ALLOCATE returning_text (WITH THE SEPARATORS)
-        returning_text = why2_calloc(number_buffer + strlen(text), sizeof(char));
+        returning_text = why2_calloc(number_buffer + strlen(text_new), sizeof(char));
 
         //LOAD returning_text
-        for (int i = 0; i < (int) strlen(text); i++)
+        for (int i = 0; i < (int) strlen(text_new); i++)
         {
             number_buffer = sizeof(int) * why2_count_int_length(text_key_chain[i]);
 
@@ -111,23 +174,23 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
 
             strcat(returning_text, text_buffer);
 
-            if (i != (int) strlen(text) - 1)
+            if (i != (int) strlen(text_new) - 1)
             {
                 returning_text[strlen(returning_text)] = why2_get_encryption_separator();
             }
         }
     } else if (why2_get_flags().format == WHY2_OUTPUT_BYTE) //FUCKED BUT SHORT(ER) OUTPUT
     {
-        number_buffer = (strlen(text) + 1) * 2; //EACH CHARACTER WILL BE SPLIT INTO TWO CHARS AND FIRST TWO WILL BE LENGTH OF text
+        number_buffer = (strlen(text_new) + 1) * 2; //EACH CHARACTER WILL BE SPLIT INTO TWO CHARS AND FIRST TWO WILL BE LENGTH OF text_new
 
         returning_text = why2_calloc(number_buffer + 1, sizeof(char)); //ALLOCATE
 
         //SET LENGTH
-        returning_text[0] = (strlen(text) & 0x7f) + 1; //+1 BECAUSE WE DON'T WANT \0
-        returning_text[1] = (strlen(text) >> 7) + 1;
+        returning_text[0] = (strlen(text_new) & 0x7f) + 1; //+1 BECAUSE WE DON'T WANT \0
+        returning_text[1] = (strlen(text_new) >> 7) + 1;
 
         //PUT THE text_key_chain INTO returning_text DIRECTLY
-        for (unsigned long i = 0; i < strlen(text); i++)
+        for (unsigned long i = 0; i < strlen(text_new); i++)
         {
             //BUILD returning_text
             returning_text[2 + (i * 2)] = text_key_chain[i] & 0x7f;
@@ -148,9 +211,9 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
     why2_output_flags output =
     {
         returning_text, //ENCRYPTED TEXT
-        key, //GENERATED/USED KEY
-        why2_count_unused_key_size(text, key), // NUMBER OF WHY2_UNUSED CHARS IN KEY
-        why2_count_repeated_key_size(text, key), //NUMBER OF REPEATED CHARS IN KEY
+        key_new, //GENERATED/USED KEY
+        why2_count_unused_key_size(text_new, key_new), // NUMBER OF WHY2_UNUSED CHARS IN KEY
+        why2_count_repeated_key_size(text_new, key_new), //NUMBER OF REPEATED CHARS IN KEY
         why2_compare_time_micro(start_time, finish_time), // ELAPSED TIME
         WHY2_SUCCESS //EXIT CODE
     };
