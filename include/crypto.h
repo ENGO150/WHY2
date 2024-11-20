@@ -29,7 +29,7 @@ extern "C" {
 #define WHY2_SUM_MOD_PRIME 4294967295UL //PRIME FOR SUM MODULUS
 
 //FUNCTIONS
-unsigned long why2_sum_segment(char *input); //CALCULATE SUM++ FOR input; USED FOR PADDING SEED
+unsigned long long why2_sum_segment(char *input); //CALCULATE SUM++ FOR input; USED FOR PADDING SEED
 
 #ifdef __cplusplus
 }

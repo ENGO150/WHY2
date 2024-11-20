@@ -21,11 +21,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string.h>
 #include <math.h>
 
-unsigned long why2_sum_segment(char *input) //I ABSOLUTELY DO NOT RECOMMEND USING THIS WITH LARGE KEYS!!!
+unsigned long long why2_sum_segment(char *input) //I ABSOLUTELY DO NOT RECOMMEND USING THIS WITH LARGE KEYS!!!
 {
     unsigned long input_size = strlen(input);
     unsigned long segmented_input_size = ceil(input_size / (double) WHY2_SUM_SEGMENT_SIZE) * WHY2_SUM_SEGMENT_SIZE; //CALCULATE CLOSEST 32*n (OR WHY2_SUM_SEGMENT_SIZE*n, IF YOU WILL) TO input
-    unsigned long output = 0;
+    unsigned long long output = 0;
 
     for (unsigned long i = 0; i < segmented_input_size / WHY2_SUM_SEGMENT_SIZE; i++) //DIVIDE buffer INTO SEGMENTS, XOR EACH OTHER AND ADD TO output
     {
