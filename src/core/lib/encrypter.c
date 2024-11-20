@@ -19,14 +19,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/encrypter.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <limits.h>
 
+#include <why2/crypto.h>
 #include <why2/flags.h>
+#include <why2/llist.h>
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-why2_output_flags why2_encrypt_text(char *text, char *key_new)
+why2_output_flags why2_encrypt_text(char *text, char *key)
 {
     //CHECK VARIABLE
     unsigned char check_exit_code;
