@@ -27,7 +27,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-why2_output_flags why2_decrypt_text(char *text, char *key_new)
+why2_output_flags why2_decrypt_text(char *text, char *key)
 {
     //CHECK VARIABLE
     unsigned char check_exit_code;
@@ -50,13 +50,13 @@ why2_output_flags why2_decrypt_text(char *text, char *key_new)
     }
 
     //CHECK FOR INVALID key
-    if ((check_exit_code = why2_check_key(key_new)) != WHY2_SUCCESS)
+    if ((check_exit_code = why2_check_key(key)) != WHY2_SUCCESS)
     {
         return why2_no_output(check_exit_code);
     }
 
     //REDEFINE keyLength
-    why2_set_key_length(strlen(key_new));
+    why2_set_key_length(strlen(key));
 
     //VARIABLES
     char *returning_text;
@@ -65,7 +65,7 @@ why2_output_flags why2_decrypt_text(char *text, char *key_new)
     char *text_buffer = NULL;
     int text_key_chainLength;
     int *text_key_chain;
-    char *key = why2_strdup(key_new); //COPY key_new TO key
+    char *key_new = why2_strdup(key); //COPY key TO key_new
     int *encrypted_text_key_chain;
     char *used_text = NULL; //COPY text TO used_text
 
@@ -126,7 +126,7 @@ why2_output_flags why2_decrypt_text(char *text, char *key_new)
     text_key_chainLength = number_buffer;
 
     //LOAD text_key_chain
-    why2_generate_text_key_chain(key, text_key_chain, number_buffer);
+    why2_generate_text_key_chain(key_new, text_key_chain, number_buffer);
 
     //LOAD encrypted_text_key_chain
     for (int i = 0; i < text_key_chainLength; i++)
@@ -182,9 +182,9 @@ why2_output_flags why2_decrypt_text(char *text, char *key_new)
     why2_output_flags output =
     {
         returning_text, //DECRYPTED TEXT
-        key, //USED KEY
-        why2_count_unused_key_size(returning_text, key), // NUMBER OF WHY2_UNUSED CHARS IN KEY
-        why2_count_repeated_key_size(returning_text, key), //NUMBER OF REPEATED CHARS IN KEY
+        key_new, //USED KEY
+        why2_count_unused_key_size(returning_text, key_new), // NUMBER OF WHY2_UNUSED CHARS IN KEY
+        why2_count_repeated_key_size(returning_text, key_new), //NUMBER OF REPEATED CHARS IN KEY
         why2_compare_time_micro(start_time, finish_time), // ELAPSED TIME
         WHY2_SUCCESS //EXIT CODE
     };
