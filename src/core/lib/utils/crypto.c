@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string.h>
 #include <math.h>
 
-unsigned long long why2_sum_segment(char *input) //I ABSOLUTELY DO NOT RECOMMEND USING THIS WITH LARGE KEYS!!!
+unsigned long long why2_sum_segment(char *input) //THE OUTPUT IS GOING TO GROW A LOT WITH LONG input, BUT IT SHOULDN'T BE A BIG PROBLEM. I TESTED FOR OVERFLOWS UP TO 4096-CHAR input AND ONLY GOT TO (14*10^(-7))% OF FULL ULL RANGE LMAO
 {
     unsigned long input_size = strlen(input);
     unsigned long segmented_input_size = ceil(input_size / (double) WHY2_SUM_SEGMENT_SIZE) * WHY2_SUM_SEGMENT_SIZE; //CALCULATE CLOSEST 32*n (OR WHY2_SUM_SEGMENT_SIZE*n, IF YOU WILL) TO input
