@@ -24,13 +24,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/random.h>
 #include <ftw.h>
 
 #include <curl/curl.h>
 #include <json-c/json.h>
 #include <git2.h>
 
+#include <why2/crypto.h>
 #include <why2/flags.h>
 #include <why2/memory.h>
 
@@ -422,7 +422,7 @@ char *why2_generate_key(int key_length)
     for (int i = 0; i < key_length; i++)
     {
         //GET RANDOM NUMBER
-        if (getrandom(&random_buffer, sizeof(unsigned int), GRND_NONBLOCK) == -1) why2_die("getrandom fn failed!");
+        if (why2_random(&random_buffer, sizeof(unsigned int)) == -1) why2_die("getrandom fn failed!");
 
         //SET numberBuffer TO RANDOM NUMBER BETWEEN 0 AND 52
         number_buffer = (random_buffer % 52) + 1;

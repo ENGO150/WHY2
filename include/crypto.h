@@ -23,6 +23,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
+#include <sys/types.h>
+
 //MACROS
 #define WHY2_SUM_SEGMENT_SIZE 32 //SEGMENT SIZE FOR CALCULATING SUM
 #define WHY2_SUM_BASE_PRIME 31 //PRIME FOR SUM BASE
@@ -30,6 +32,7 @@ extern "C" {
 
 //FUNCTIONS
 unsigned long long why2_sum_segment(char *input); //CALCULATE SUM++ FOR input; USED FOR PADDING SEED
+ssize_t why2_random(void *dest, size_t size); //WRITE CRYPTO-SECURE RANDOM NUMBER INTO dest
 
 #ifdef __cplusplus
 }
