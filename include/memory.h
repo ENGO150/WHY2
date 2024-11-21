@@ -27,7 +27,8 @@ extern "C" {
 
 void *why2_malloc(unsigned long size);
 void *why2_calloc(unsigned long element, unsigned long size);
-void *why2_realloc(void *pointer, unsigned long size);
+void *why2_realloc(void *pointer, unsigned long size); //THIS DOESN'T PRESERVE CONTENT OF pointer!
+void *why2_recalloc(void *pointer, unsigned long size, unsigned long block_size); //SAME AS why2_realloc BUT FILLS THE pointer WITH NULL-TERMS
 
 char *why2_strdup(char *string);
 

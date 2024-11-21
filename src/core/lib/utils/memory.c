@@ -153,6 +153,17 @@ void *why2_realloc(void *pointer, unsigned long size)
     return allocated;
 }
 
+void *why2_recalloc(void *pointer, unsigned long size, unsigned long block_size)
+{
+    if (pointer != NULL) why2_deallocate(pointer);
+
+    void *allocated = calloc(size, block_size);
+
+    push_to_list(allocated, ALLOCATION);
+
+    return allocated;
+}
+
 char *why2_strdup(char *string)
 {
     char *allocated = strdup(string);
