@@ -136,6 +136,7 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
             buffer_2 = buffer;
             buffer = buffer -> next; //ITER
 
+            why2_deallocate(buffer_2 -> value); //DEALLOCATION
             why2_deallocate(buffer_2); //DEALLOCATION
         } while (buffer != NULL);
     } else text_new = why2_strdup(text); //USE TEXT WITHOUT PADDING
@@ -221,6 +222,7 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
     //DEALLOCATION
     why2_deallocate(text_key_chain);
     why2_deallocate(text_buffer);
+    why2_deallocate(text_new);
 
     why2_reset_memory_identifier();
 
