@@ -22,12 +22,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 
+#include <why2/memory.h>
+
 void why2_list_push(why2_list_t *list, void *value, unsigned long size)
 {
     //CREATE NODE
     why2_node_t *head = list -> head;
-    why2_node_t *new_node = malloc(sizeof(why2_node_t));
-    new_node -> value = malloc(size);
+    why2_node_t *new_node = why2_malloc(sizeof(why2_node_t));
+    new_node -> value = why2_malloc(size);
     why2_node_t *buffer = head;
 
     //INSERT DATA
@@ -55,8 +57,8 @@ void why2_list_push_at(why2_list_t *list, unsigned long index, void *value, unsi
 {
     //CREATE NODE
     why2_node_t *head = list -> head;
-    why2_node_t *new_node = malloc(sizeof(why2_node_t));
-    new_node -> value = malloc(size);
+    why2_node_t *new_node = why2_malloc(sizeof(why2_node_t));
+    new_node -> value = why2_malloc(size);
 
     //INSERT DATA
     memcpy(new_node -> value, value, size);
@@ -111,8 +113,8 @@ void why2_list_remove(why2_list_t *list, why2_node_t *node)
     list -> head = head;
 
     //DEALLOCATION
-    free(node -> value);
-    free(node);
+    why2_deallocate(node -> value);
+    why2_deallocate(node);
 }
 
 void why2_list_remove_back(why2_list_t *list)
@@ -137,8 +139,8 @@ void why2_list_remove_back(why2_list_t *list)
         buffer -> next = NULL; //UNLINK
     }
 
-    free(deallocating_node -> value);
-    free(deallocating_node);
+    why2_deallocate(deallocating_node -> value);
+    why2_deallocate(deallocating_node);
 }
 
 why2_node_t *why2_list_find(why2_list_t *list, void *value)
