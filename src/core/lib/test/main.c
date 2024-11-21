@@ -46,7 +46,7 @@ int main(void)
         0, //UPDATE
         WHY2_v4, //LATEST VERSION
         WHY2_OUTPUT_TEXT, //READABLE TEXT OUTPUT
-        255 //PADDING RATE
+        WHY2_RECOMMENDED_PADDING_RATE(strlen(WHY2_TEST_TEXT)) //PADDING RATE
     };
 
     //SET FLAGS
