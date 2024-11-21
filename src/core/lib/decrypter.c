@@ -23,7 +23,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <sys/time.h>
 
+#include <why2/crypto.h>
 #include <why2/flags.h>
+#include <why2/llist.h>
 #include <why2/memory.h>
 #include <why2/misc.h>
 
@@ -173,6 +175,59 @@ why2_output_flags why2_decrypt_text(char *text, char *key)
     for (int i = 0; i < text_key_chainLength; i++)
     {
         returning_text[i] = text_key_chain[i];
+    }
+
+    //REMOVE PADDING
+    if (why2_get_flags().padding > 0)
+    {
+        why2_list_t split_text = WHY2_LIST_EMPTY; //LIST OF returning_text SPLIT INTO CHARS
+
+        //ADD CHARS
+        for (unsigned long i = 0; i < strlen(returning_text); i++)
+        {
+            why2_list_push(&split_text, &(returning_text[i]), sizeof(returning_text[i])); //ADD
+        }
+
+        //OBTAIN SEED FROM key_new
+        srand(why2_sum_segment(key_new));
+
+        //GET RANDOM SEQUENCE USED IN ENCRYPTION
+        why2_list_t random_sequence = WHY2_LIST_EMPTY;
+        for (unsigned long i = 0; i < why2_get_flags().padding; i++)
+        {
+            int rand_buffer = rand();
+            why2_list_push(&random_sequence, &rand_buffer, sizeof(int)); //ADD
+        }
+        why2_list_reverse(&random_sequence, sizeof(int)); //REVERSE
+
+        //REMOVE PADDING FROM split_text LIST
+        for (unsigned long i = 0; i < why2_get_flags().padding; i++)
+        {
+            unsigned long random_position = (unsigned long) (*(int*) random_sequence.head -> value % (why2_list_get_size(&split_text) - 1)); //GET RANDOM POSITION
+
+            //REMOVE FROM THE LIST
+            why2_list_remove_at(&split_text, random_position);
+
+            //DEALLOCATION
+            why2_list_remove_at(&random_sequence, 0);
+        }
+
+        //PUT PADDED TEXT INTO text_new
+        returning_text = why2_recalloc(returning_text, why2_list_get_size(&split_text) + 1, sizeof(char));
+        why2_node_t *buffer = split_text.head;
+        why2_node_t *buffer_2;
+        unsigned long index_buffer = 0;
+
+        do
+        {
+            returning_text[index_buffer++] = *(char*) buffer -> value; //COPY VALUE
+
+            buffer_2 = buffer;
+            buffer = buffer -> next; //ITER
+
+            why2_deallocate(buffer_2 -> value); //DEALLOCATION
+            why2_deallocate(buffer_2); //DEALLOCATION
+        } while (buffer != NULL);
     }
 
     //GET FINISH TIME
