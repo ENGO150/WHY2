@@ -30,6 +30,7 @@ extern "C" {
 #endif
 
 //CORE
+#include <why2/crypto.h>
 #include <why2/decrypter.h>
 #include <why2/encrypter.h>
 #include <why2/flags.h>
