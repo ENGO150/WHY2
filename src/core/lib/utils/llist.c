@@ -119,7 +119,7 @@ void why2_list_remove(why2_list_t *list, why2_node_t *node)
 
 void why2_list_remove_at(why2_list_t *list, unsigned long index)
 {
-    if (list == NULL) return; //EMPTY LIST
+    if (list -> head == NULL) return; //EMPTY LIST
 
     why2_node_t *node_to_remove;
 
@@ -201,4 +201,36 @@ unsigned long why2_list_get_size(why2_list_t *list)
     } while (buffer != NULL);
 
     return n;
+}
+
+void why2_list_reverse(why2_list_t *list, unsigned long size)
+{
+    if (list -> head == NULL) return; //LIST IS EMPTY
+
+    why2_list_t reversed_list = WHY2_LIST_EMPTY;
+    why2_node_t *buffer = list -> head;
+    why2_node_t *buffer2;
+
+    //REVERSE INTO reversed_list AND DEALLOCATE list
+    do
+    {
+        //COPY
+        why2_node_t *current_node = why2_malloc(sizeof(why2_node_t));
+        current_node -> value = why2_malloc(size);
+        memcpy(current_node -> value, buffer -> value, size);
+
+        //INSERT INTO reversed_list
+        current_node -> next = reversed_list.head; //CHANGE NEXT POINTER
+        reversed_list.head = current_node; //INSERT
+
+        buffer2 = buffer;
+        buffer = buffer -> next; //ITER
+
+        //DEALLOCATE
+        why2_deallocate(buffer2 -> value);
+        why2_deallocate(buffer2);
+    } while (buffer != NULL);
+
+    //SET list TO reversed_list
+    list -> head = reversed_list.head;
 }
