@@ -51,6 +51,31 @@ void why2_list_push(why2_list_t *list, void *value, unsigned long size)
     list -> head = buffer;
 }
 
+void why2_list_push_at(why2_list_t *list, unsigned long index, void *value, unsigned long size)
+{
+    //CREATE NODE
+    why2_node_t *head = list -> head;
+    why2_node_t *new_node = malloc(sizeof(why2_node_t));
+    new_node -> value = malloc(size);
+
+    //INSERT DATA
+    memcpy(new_node -> value, value, size);
+
+    if (index != 0 && head != NULL) //ISN'T FIRST
+    {
+        why2_node_t *node_before = head;
+        for (unsigned long j = 0; j < index - 1 && j < why2_list_get_size(list); j++) node_before = node_before -> next; //SCROLL TO THE POSITION
+
+        new_node -> next = node_before -> next; //SEW THE LIST BACK
+        node_before -> next = new_node;
+    } else //ADD BEFORE THE WHOLE LIST
+    {
+        new_node -> next = head;
+
+        list -> head = new_node;
+    }
+}
+
 void why2_list_remove(why2_list_t *list, why2_node_t *node)
 {
     if (node == NULL) return; //NULL NODE

@@ -40,6 +40,7 @@ typedef struct
 
 //FUNCTIONS
 void why2_list_push(why2_list_t *list, void *value, unsigned long size); //PUSH ELEMENT TO LIST BACK
+void why2_list_push_at(why2_list_t *list, unsigned long index, void *value, unsigned long size); //PUSH ELEMENT TO INDEX index of LIST
 void why2_list_remove(why2_list_t *list, why2_node_t *node); //REMOVE ELEMENT
 void why2_list_remove_back(why2_list_t *list); //REMOVE LAST ELEMENT
 why2_node_t *why2_list_find(why2_list_t *list, void *value); //FIND ELEMENT IN LIST
