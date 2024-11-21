@@ -6,3 +6,4 @@ logs/
 vgcore.*
 target/
 Cargo.lock
+.gdbinit
