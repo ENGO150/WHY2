@@ -99,8 +99,12 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
         {
             unsigned long random_position = (unsigned long) (rand() % (why2_list_get_size(&split_text))); //GET RANDOM POSITION
 
-            char random_char;
-            why2_random(&random_char, sizeof(random_char)); //GENERATE COMPLETELY RANDOM CHARACTER
+            char random_char = 0;
+            for (int j = 0; j < WHY2_PADDING_NONZERO_TRIES && random_char == 0 ; j++) //GET RANDOM (EXCLUDING 0)
+            {
+                why2_random(&random_char, sizeof(random_char)); //GENERATE COMPLETELY RANDOM CHARACTER
+            }
+            if (random_char == 0) random_char = 1;
 
             //INSERT RANDOM VALUE
             why2_list_push_at(&split_text, random_position, &random_char, sizeof(random_char));
