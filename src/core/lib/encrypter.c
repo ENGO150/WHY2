@@ -103,28 +103,11 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
             why2_random(&random_char, sizeof(random_char)); //GENERATE COMPLETELY RANDOM CHARACTER
 
             //INSERT RANDOM VALUE
-            why2_node_t *inserted_node = why2_malloc(sizeof(why2_node_t)); //ALLOCATE NODE
-            inserted_node -> value = why2_malloc(sizeof(random_char)); //ALLOCATE VALUE
-            memcpy(inserted_node -> value, &random_char, sizeof(random_char)); //INSERT DATA
-
-            //INSERT INTO LIST
-            if (random_position != 0) //SHOULDN'T BE FIRST
-            {
-                why2_node_t *node_before = split_text.head;
-                for (unsigned long j = 0; j < random_position - 1; j++) node_before = node_before -> next; //SCROLL TO THE POSITION
-
-                inserted_node -> next = node_before -> next; //SEW THE LIST BACK
-                node_before -> next = inserted_node;
-            } else //ADD BEFORE THE WHOLE LIST
-            {
-                inserted_node -> next = split_text.head;
-
-                split_text.head = inserted_node;
-            }
+            why2_list_push_at(&split_text, random_position, &random_char, sizeof(random_char));
         }
 
         //PUT PADDED TEXT INTO text_new
-        text_new = why2_malloc(why2_list_get_size(&split_text) + 1);
+        text_new = why2_calloc(why2_list_get_size(&split_text) + 1, sizeof(char));
         why2_node_t *buffer = split_text.head;
         why2_node_t *buffer_2;
         unsigned long index_buffer = 0;
