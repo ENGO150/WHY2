@@ -117,6 +117,29 @@ void why2_list_remove(why2_list_t *list, why2_node_t *node)
     why2_deallocate(node);
 }
 
+void why2_list_remove_at(why2_list_t *list, unsigned long index)
+{
+    if (list == NULL) return; //EMPTY LIST
+
+    why2_node_t *node_to_remove;
+
+    if (index != 0) //SHOULDN'T BE FIRST
+    {
+        why2_node_t *node_before = list -> head;
+        for (unsigned long j = 0; j < index - 1; j++) node_before = node_before -> next; //SCROLL TO THE POSITION
+
+        node_to_remove = node_before -> next;
+        node_before -> next = node_to_remove -> next;
+    } else //ADD BEFORE THE WHOLE LIST
+    {
+        node_to_remove = list -> head;
+        list -> head = node_to_remove -> next;
+    }
+
+    why2_deallocate(node_to_remove -> value);
+    why2_deallocate(node_to_remove);
+}
+
 void why2_list_remove_back(why2_list_t *list)
 {
     why2_node_t *head = list -> head;
