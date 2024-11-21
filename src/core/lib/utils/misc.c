@@ -34,7 +34,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/flags.h>
 #include <why2/memory.h>
 
-int mod_cb(int a, int b) { return a % b; }
+int mod_cb(int a, int b) { return a % (b == 0 ? 1 : b); }
 int multiply_cb(int a, int b) { return a * b; }
 int subtract_cb(int a, int b) { return a - b; }
 int sum_cb(int a, int b) { return a + b; }
