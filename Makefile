@@ -23,8 +23,8 @@ CFLAGS=-Wall -Wextra -Werror -Wcomment -Wformat -Wformat-security -Wmain -Wnonnu
 
 # Output Files
 PROJECT_NAME=why2
-OUTPUT=out
-LOGS=logs
+OUTPUT=./out
+LOGS=./logs
 
 OUTPUT_TEST_CORE=$(OUTPUT)/$(PROJECT_NAME)-core-test
 OUTPUT_APP_CORE=$(OUTPUT)/$(PROJECT_NAME)-core-app
