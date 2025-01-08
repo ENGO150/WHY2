@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-      - uses: actions/checkout@v2
+        uses: actions/checkout@v2
         with:
           ref: development
 
@@ -58,8 +58,10 @@ jobs:
       - name: Install Valgrind
         run: sudo apt install valgrind
 
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install WHY2
-      - uses: dtolnay/rust-toolchain@stable
         run: make install
 
       - name: Build WHY2 Test
