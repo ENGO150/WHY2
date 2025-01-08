@@ -145,6 +145,7 @@ app_logger:
 	$(CC) $(CFLAGS) $(SRC_LOGGER_APP) -o $(OUTPUT_APP_LOGGER) $(LIBS_LOGGER) $(LIB_LOGGER)
 
 clean:
+	. "$(DOLLAR)HOME/.cargo/env"
 	$(RC) clean $(RFLAGS)
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
 
