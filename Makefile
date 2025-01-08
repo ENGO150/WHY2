@@ -81,7 +81,6 @@ check_root:
 ifneq ($(BYPASS_CHECK),true)
 	@if [ "$(shell id -u)" = 0 ]; then\
 		echo "Do not run install rules as root.";\
-		exit 1;\
 	fi
 endif
 
