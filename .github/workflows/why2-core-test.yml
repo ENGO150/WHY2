@@ -56,7 +56,7 @@ jobs:
         run: sudo ./${{ matrix.configure }}
 
       - name: Install Valgrind
-        run: sudo apt install valgrind
+        run: DEBIAN_FRONTEND=noninteractive sudo apt install valgrind
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
