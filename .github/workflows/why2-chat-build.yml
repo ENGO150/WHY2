@@ -39,7 +39,6 @@ jobs:
     steps:
       - name: Checkout repository
       - uses: actions/checkout@v2
-      - uses: dtolnay/rust-toolchain@stable
         with:
           ref: development
 
@@ -56,6 +55,7 @@ jobs:
         run: sudo ./${{ matrix.configure }}
 
       - name: Install WHY2
+      - uses: dtolnay/rust-toolchain@stable
         run: make install
 
       - name: Build Chat
