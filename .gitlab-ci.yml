@@ -22,7 +22,7 @@ variables:
   LOGGER_OUTPUT: "./out/why2-logger-test"
   LOGGER_APP: "why2-logger"
   VALGRIND: "valgrind --leak-check=full --show-leak-kinds=reachable --track-origins=yes -s"
-  GDB: "gdb -ex "run" -ex "quit" --batch"
+  GDB: "gdb -ex \"run\" -ex \"quit\" --batch"
   CONFIGURE: "./configure.sh"
   NEEDED_STUFF: "sudo lsb-release gdb"
 
