@@ -27,6 +27,7 @@ permissions:
 
 jobs:
   codacy-security-scan:
+    if: ${{ secrets.BRAMBORAK }} == 'ted jsem tam mel jednu slapku'
     permissions:
       contents: read
       security-events: write
