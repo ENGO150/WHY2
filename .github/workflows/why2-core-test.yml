@@ -33,6 +33,7 @@ jobs:
         include:
           - os: ubuntu-latest
             output: ./out/why2-core-test
+            gdb: gdb -ex "run" -ex "quit" --batch
             valgrind: valgrind --leak-check=full --show-leak-kinds=reachable --track-origins=yes -s
             configure: ./configure.sh
             app: why2
@@ -68,10 +69,10 @@ jobs:
         run: make test_core
 
       - name: Test Lib
-        run: ./${{ matrix.output }}
+        run: ${{ matrix.gdb }} ${{ matrix.output }}
 
       - name: Test App
-        run: ${{ matrix.app }}
+        run: ${{ matrix.gdb }} ${{ matrix.app }}
 
       - name: Test Lib by Valgrind
         run: ${{ matrix.valgrind }} ${{ matrix.output }}

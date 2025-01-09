@@ -30,6 +30,7 @@ jobs:
         os:  [ ubuntu-latest ]
         include:
           - os: ubuntu-latest
+            gdb: gdb -ex "run" -ex "quit" --batch
             configure: ./configure.sh
             test: ./test
 
@@ -65,4 +66,4 @@ jobs:
         run: cc ${{ matrix.test }}.c -lwhy2 -Wall -o ${{ matrix.test }}
 
       - name: Run test
-        run: ./${{ matrix.test }}
+        run: ${{ matrix.gdb }} ./${{ matrix.test }}
