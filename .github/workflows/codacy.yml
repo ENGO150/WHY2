@@ -27,6 +27,7 @@ permissions:
 
 jobs:
   codacy-security-scan:
+    if: github.repository == "ENGO150/WHY2"
     permissions:
       contents: read
       security-events: write
