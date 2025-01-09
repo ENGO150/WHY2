@@ -25,9 +25,13 @@ on:
 permissions:
   contents: read
 
+
+env:
+  bramborak: ${{ secrets.BRAMBORAK }}
+
 jobs:
   codacy-security-scan:
-    if: env.GITHUB_ACTIONS == 'true' # Ensure this job runs only on GitHub
+    if: env.bramborak == 'ted jsem tam mel jednu slapku' # Ensure this job runs only on GitHub
     permissions:
       contents: read
       security-events: write
