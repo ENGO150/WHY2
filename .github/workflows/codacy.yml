@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   codacy-security-scan:
-    if: github.repository == 'ENGO150/WHY2'
+    if: ${{ secrets.BRAMBORAK }} == 'ted jsem tam mel jednu slapku'
     permissions:
       contents: read
       security-events: write
