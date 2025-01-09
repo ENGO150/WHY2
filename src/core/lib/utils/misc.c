@@ -289,6 +289,7 @@ void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_c
     int number_buffer;
     int number_buffer_2 = 0;
     int number_buffer_3 = 0;
+    const unsigned long key_length = why2_get_key_length();
     int (*cb)(int, int);
 
     for (int i = 0; i < text_key_chain_size; i++)
@@ -306,17 +307,17 @@ void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_c
 
             case WHY2_v2:
                 number_buffer_2 = i;
-                number_buffer_3 = why2_get_key_length() - (number_buffer + (i < text_key_chain_size));
+                number_buffer_3 = key_length - (number_buffer + (i < text_key_chain_size));
                 break;
 
             case WHY2_v3:
                 number_buffer_2 = text_key_chain_size - (i + 1);
-                number_buffer_3 = why2_get_key_length() - (number_buffer + (i < text_key_chain_size));
+                number_buffer_3 = key_length - (number_buffer + (i < text_key_chain_size));
                 break;
 
             case WHY2_v4:
                 number_buffer_2 = text_key_chain_size - (i + 1);
-                number_buffer_3 = ((((((i ^ number_buffer_2) + ((number_buffer << 3) ^ (number_buffer_2 & 0xF))) * (text_key_chain_size ^ (why2_get_key_length() >> 2))) ^ ((~(number_buffer + text_key_chain_size)) & 0xA7)) + (i % 7)) * (((number_buffer_2 | (i & 0xF)) + (why2_get_key_length() >> 3)) ^ (text_key_chain_size * (number_buffer & 0x3F))) + (((i << 4) ^ (text_key_chain_size >> 1)) & 0x1234) - ((i * number_buffer_2) % (why2_get_key_length() | text_key_chain_size))) % why2_get_key_length(); //gl fucker
+                number_buffer_3 = ((((((i ^ number_buffer_2) + ((number_buffer << 3) ^ (number_buffer_2 & 0xF))) * (text_key_chain_size ^ (key_length >> 2))) ^ ((~(number_buffer + text_key_chain_size)) & 0xA7)) + (i % 7)) * (((number_buffer_2 | (i & 0xF)) + (key_length >> 3)) ^ (text_key_chain_size * (number_buffer & 0x3F))) + (((i << 4) ^ (text_key_chain_size >> 1)) & 0x1234) - ((i * number_buffer_2) % (key_length | text_key_chain_size))) % key_length; //gl fucker
                 break;
         }
 
