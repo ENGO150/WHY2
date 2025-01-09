@@ -34,7 +34,7 @@ jobs:
           - os: ubuntu-latest
             client: ./out/why2-chat-client
             server: ./out/why2-chat-server
-            configure: configure.sh
+            configure: ./configure.sh
 
     steps:
       - name: Checkout repository

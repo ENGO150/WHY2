@@ -33,7 +33,7 @@ jobs:
         include:
           - os: ubuntu-latest
             output: ./out/why2-logger-test
-            configure: configure.sh
+            configure: ./configure.sh
             valgrind: valgrind --leak-check=full --show-leak-kinds=reachable --track-origins=yes -s
             app: why2-logger
 

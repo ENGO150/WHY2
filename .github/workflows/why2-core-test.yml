@@ -34,7 +34,7 @@ jobs:
           - os: ubuntu-latest
             output: ./out/why2-core-test
             valgrind: valgrind --leak-check=full --show-leak-kinds=reachable --track-origins=yes -s
-            configure: configure.sh
+            configure: ./configure.sh
             app: why2
 
     steps:

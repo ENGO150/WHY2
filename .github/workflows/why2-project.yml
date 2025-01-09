@@ -30,8 +30,8 @@ jobs:
         os:  [ ubuntu-latest ]
         include:
           - os: ubuntu-latest
-            configure: configure.sh
-            test: test
+            configure: ./configure.sh
+            test: ./test
 
     steps:
       - name: Checkout repository
