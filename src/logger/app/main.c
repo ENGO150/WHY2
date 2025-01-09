@@ -18,7 +18,7 @@ int main(void)
             0,
             WHY2_v4,
             WHY2_OUTPUT_TEXT,
-            0
+            WHY2_RECOMMENDED_PADDING_RATE(strlen(WHY2_LOGGER_TEST_TEXT))
         }
     );
 
