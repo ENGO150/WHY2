@@ -91,7 +91,14 @@ enum WHY2_EXIT_CODES why2_check_version(void)
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, WHY2_CURL_TIMEOUT);
 
     //DOWNLOAD versions.json
-    curl_easy_perform(curl);
+    CURLcode curl_res = curl_easy_perform(curl);
+    if (curl_res != CURLE_OK && !why2_get_flags().no_output) //ERR
+    {
+            fprintf(stderr, "%sDownloading version failed!\n(%s)\n\nExiting...\n", WHY2_CLEAR_SCREEN, curl_easy_strerror(curl_res));
+
+            why2_clean_memory("core_version_check");
+            return WHY2_DOWNLOAD_FAILED;
+    }
 
     //CLEANUP
     curl_easy_cleanup(curl);
