@@ -64,13 +64,13 @@ jobs:
         run: make build_chat
 
       - name: Upload Client
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: WHY2 Chat Client
           path: ${{ matrix.client }}
 
       - name: Upload Server
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: WHY2 Chat Server
           path: ${{ matrix.server }}
