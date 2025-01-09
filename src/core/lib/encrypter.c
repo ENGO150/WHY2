@@ -81,7 +81,7 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
     }
 
     //PADDING
-    if (why2_get_flags().padding > 0) //TODO! this breaks when used with long strings or byte input
+    if (why2_get_flags().padding > 0)
     {
         why2_list_t split_text = WHY2_LIST_EMPTY; //LIST OF text SPLIT INTO CHARS
 
