@@ -50,6 +50,9 @@ jobs:
         run: |
           chmod +x ${{ matrix.configure }}
 
+      - name: Install GDB
+        run: sudo apt-get install gdb -y
+
       - name: Preparation
         run: sudo ./${{ matrix.configure }}
 
