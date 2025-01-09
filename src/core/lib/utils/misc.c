@@ -316,7 +316,7 @@ void why2_generate_text_key_chain(char *key, int *text_key_chain, int text_key_c
 
             case WHY2_v4:
                 number_buffer_2 = text_key_chain_size - (i + 1);
-                number_buffer_3 = (why2_get_key_length() ^ text_key_chain_size) >> (((number_buffer ^ number_buffer_2) % 2) & (i < text_key_chain_size)); //gl fucker
+                number_buffer_3 = ((((((i ^ number_buffer_2) + ((number_buffer << 3) ^ (number_buffer_2 & 0xF))) * (text_key_chain_size ^ (why2_get_key_length() >> 2))) ^ ((~(number_buffer + text_key_chain_size)) & 0xA7)) + (i % 7)) * (((number_buffer_2 | (i & 0xF)) + (why2_get_key_length() >> 3)) ^ (text_key_chain_size * (number_buffer & 0x3F))) + (((i << 4) ^ (text_key_chain_size >> 1)) & 0x1234) - ((i * number_buffer_2) % (why2_get_key_length() | text_key_chain_size))) % why2_get_key_length(); //gl fucker
                 break;
         }
 
