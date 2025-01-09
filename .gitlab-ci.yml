@@ -22,7 +22,6 @@ variables:
   LOGGER_OUTPUT: "./out/why2-logger-test"
   LOGGER_APP: "why2-logger"
   VALGRIND: "valgrind --leak-check=full --show-leak-kinds=reachable --track-origins=yes -s"
-  GDB: "gdb -ex \"run\" -ex \"quit\" --batch"
   CONFIGURE: "./configure.sh"
   NEEDED_STUFF: "sudo lsb-release gdb"
 
@@ -51,8 +50,8 @@ why2-core-test:
     - sudo $CONFIGURE # Preparation
     - make install BYPASS_CHECK=true # Install WHY2
     - make test_core # Build WHY2 Test
-    - ${GDB} $CORE_OUTPUT # Test Lib
-    - ${GDB} $CORE_APP # Test App
+    - gdb -ex "run" -ex "quit" --batch $CORE_OUTPUT # Test Lib
+    - gdb -ex "run" -ex "quit" --batch $CORE_APP # Test App
     - $VALGRIND $CORE_OUTPUT # Test Lib by Valgrind
 
 why2-logger-test:
@@ -65,8 +64,8 @@ why2-logger-test:
     - sudo $CONFIGURE # Preparation
     - make install BYPASS_CHECK=true # Install WHY2
     - make test_logger # Build WHY2 Test
-    - ${GDB} $LOGGER_OUTPUT # Test Lib
-    - ${GDB} $LOGGER_APP # Test App
+    - gdb -ex "run" -ex "quit" --batch $LOGGER_OUTPUT # Test Lib
+    - gdb -ex "run" -ex "quit" --batch $LOGGER_APP # Test App
     - $VALGRIND $LOGGER_OUTPUT # Test Lib by Valgrind
 
 why2-project:
