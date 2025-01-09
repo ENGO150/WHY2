@@ -46,8 +46,8 @@ jobs:
       - if: matrix.os == 'ubuntu-latest'
         name: Update packages
         run: |
-          sudo apt update
-#         sudo apt upgrade
+          sudo apt-get update
+#         sudo apt-get upgrade
 
       - name: Permissions
         run: chmod +x ${{ matrix.configure }}
@@ -56,9 +56,9 @@ jobs:
         run: sudo ./${{ matrix.configure }}
 
       - name: Install Valgrind
-        run: DEBIAN_FRONTEND=noninteractive sudo apt install valgrind
+        run: sudo apt-get install valgrind -y
 
-      - name: Set up Rust
+      - name: Set up Rust # Normally works with configure.sh, but gitea has some beef with cargo idk
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install WHY2
