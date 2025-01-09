@@ -56,15 +56,23 @@ int removeDirectory(char *path)
 void why2_directory(void)
 {
     struct stat st;
+    char *buffer_2 = why2_replace(WHY2_USER_CONFIG_DIR, "{HOME}", getenv("HOME"));
     char *buffer = why2_replace(WHY2_CONFIG_DIR, "{HOME}", getenv("HOME"));
 
     //CREATE USER CONFIG FOLDER
+    if (stat(buffer_2, &st) == -1)
+    {
+        mkdir(buffer_2, 0700);
+    }
+
+    //CREATE WHY2 CONFIG FOLDER
     if (stat(buffer, &st) == -1)
     {
         mkdir(buffer, 0700);
     }
 
     //DEALLOCATION
+    why2_deallocate(buffer_2);
     why2_deallocate(buffer);
 }
 
