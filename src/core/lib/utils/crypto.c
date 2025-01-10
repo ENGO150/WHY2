@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <why2/crypto.h>
 
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <sys/types.h>
@@ -50,4 +51,14 @@ unsigned long long why2_sum_segment(char *input) //THE OUTPUT IS GOING TO GROW A
 ssize_t why2_random(void *dest, size_t size)
 {
     return getrandom(dest, size, GRND_NONBLOCK);
+}
+
+void why2_seed_random(unsigned int seed)
+{
+    srand(seed);
+}
+
+int why2_seeded_random()
+{
+    return rand();
 }
