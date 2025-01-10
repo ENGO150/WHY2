@@ -438,7 +438,7 @@ char *why2_generate_key(int key_length)
     for (int i = 0; i < key_length; i++)
     {
         //GET RANDOM NUMBER
-        if (why2_random(&random_buffer, sizeof(unsigned int)) == -1) why2_die("getrandom fn failed!");
+        if (!why2_random(&random_buffer, sizeof(unsigned int))) why2_die("getrandom fn failed!");
 
         //SET numberBuffer TO RANDOM NUMBER BETWEEN 0 AND 52
         number_buffer = (random_buffer % 52) + 1;

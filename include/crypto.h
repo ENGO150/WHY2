@@ -25,6 +25,8 @@ extern "C" {
 
 #include <sys/types.h>
 
+#include <why2/flags.h>
+
 //MACROS
 #define WHY2_SUM_SEGMENT_SIZE 32 //SEGMENT SIZE FOR CALCULATING SUM
 #define WHY2_SUM_BASE_PRIME 31 //PRIME FOR SUM BASE
@@ -35,7 +37,7 @@ extern "C" {
 
 //FUNCTIONS
 unsigned long long why2_sum_segment(char *input); //CALCULATE SUM++ FOR input; USED FOR PADDING SEED
-ssize_t why2_random(void *dest, size_t size); //WRITE CRYPTO-SECURE RANDOM NUMBER INTO dest
+why2_bool why2_random(void *dest, size_t size); //WRITE CRYPTO-SECURE RANDOM NUMBER INTO dest
 void why2_seed_random(unsigned int seed); //SEED why2_seeded_random OUTPUT
 int why2_seeded_random(); //GENERATE RANDOM NUMBER BASED ON SEED PASSED IN why2_seed_random
 
