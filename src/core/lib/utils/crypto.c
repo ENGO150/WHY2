@@ -24,6 +24,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <sys/types.h>
 #include <sys/random.h>
 
+#include <openssl/rand.h>
+
 unsigned long long why2_sum_segment(char *input) //THE OUTPUT IS GOING TO GROW A LOT WITH LONG input, BUT IT SHOULDN'T BE A BIG PROBLEM. I TESTED FOR OVERFLOWS UP TO 4096-CHAR input AND ONLY GOT TO (14*10^(-7))% OF FULL ULL RANGE LMAO
 {
     unsigned long input_size = strlen(input);
@@ -50,7 +52,7 @@ unsigned long long why2_sum_segment(char *input) //THE OUTPUT IS GOING TO GROW A
 
 ssize_t why2_random(void *dest, size_t size)
 {
-    return getrandom(dest, size, GRND_NONBLOCK);
+    return RAND_bytes((unsigned char*) dest, size) == 1;
 }
 
 void why2_seed_random(unsigned int seed)
