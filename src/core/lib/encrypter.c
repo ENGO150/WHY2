@@ -92,12 +92,12 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
         }
 
         //OBTAIN SEED FROM key_new
-        srand(why2_sum_segment(key_new));
+        why2_seed_random(why2_sum_segment(key_new));
 
         //ADD PADDING TO split_text LIST
         for (unsigned long i = 0; i < why2_get_flags().padding; i++)
         {
-            unsigned long random_position = (unsigned long) (rand() % (why2_list_get_size(&split_text))); //GET RANDOM POSITION
+            unsigned long random_position = (unsigned long) (why2_seeded_random() % (why2_list_get_size(&split_text))); //GET RANDOM POSITION
 
             char random_char = 0;
             for (int j = 0; j < WHY2_PADDING_NONZERO_TRIES && random_char == 0 ; j++) //GET RANDOM (EXCLUDING 0)

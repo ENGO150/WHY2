@@ -189,13 +189,13 @@ why2_output_flags why2_decrypt_text(char *text, char *key)
         }
 
         //OBTAIN SEED FROM key_new
-        srand(why2_sum_segment(key_new));
+        why2_seed_random(why2_sum_segment(key_new));
 
         //GET RANDOM SEQUENCE USED IN ENCRYPTION
         why2_list_t random_sequence = WHY2_LIST_EMPTY;
         for (unsigned long i = 0; i < why2_get_flags().padding; i++)
         {
-            int rand_buffer = rand();
+            int rand_buffer = why2_seeded_random();
             why2_list_push(&random_sequence, &rand_buffer, sizeof(int)); //ADD
         }
         why2_list_reverse(&random_sequence, sizeof(int)); //REVERSE
