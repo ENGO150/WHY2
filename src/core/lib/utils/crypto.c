@@ -25,9 +25,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <sys/random.h>
 
 #include <openssl/rand.h>
+#include <openssl/hmac.h>
 
 #include <why2/flags.h>
 
+typedef struct
+{
+    unsigned long seed; //DA SEED
+    unsigned long counter; //COUNTER FOR DETERMINISTIC OUTPUT
+} PRNG_CTX; //GENERATOR
+
+//LOCAL
+PRNG_CTX generator = { 0, 0 }; //SEEDED RANDOM GENERATOR
+
+//GLOBAL
 unsigned long long why2_sum_segment(char *input) //THE OUTPUT IS GOING TO GROW A LOT WITH LONG input, BUT IT SHOULDN'T BE A BIG PROBLEM. I TESTED FOR OVERFLOWS UP TO 4096-CHAR input AND ONLY GOT TO (14*10^(-7))% OF FULL ULL RANGE LMAO
 {
     unsigned long input_size = strlen(input);
@@ -57,12 +68,34 @@ why2_bool why2_random(void *dest, size_t size)
     return RAND_bytes((unsigned char*) dest, size) == 1;
 }
 
-void why2_seed_random(unsigned int seed)
+void why2_seed_random(unsigned long seed)
 {
-    srand(seed);
+    memset(&generator, 0, sizeof(PRNG_CTX)); //INIT GENERATOR
+    memcpy(&(generator.seed), &seed, sizeof(generator.seed)); //COPY SEED
+    generator.counter = 0; //INIT COUNTER
 }
 
 int why2_seeded_random()
 {
-    return rand();
+    int output;
+    unsigned char counter_bytes[4];
+    unsigned char hmac_output[EVP_MAX_MD_SIZE];
+    unsigned int hmac_len;
+
+    //CONVERT COUNTER TO BYTES
+    counter_bytes[0] = (generator.counter >> 24) & 0xFF;
+    counter_bytes[1] = (generator.counter >> 16) & 0xFF;
+    counter_bytes[2] = (generator.counter >> 8) & 0xFF;
+    counter_bytes[3] = generator.counter & 0xFF;
+
+    //HMAC (seed || counter)
+    HMAC(EVP_sha256(), &(generator.seed), sizeof(generator.seed), counter_bytes, sizeof(counter_bytes), hmac_output, &hmac_len);
+
+    //USE THE FIRST 4 BYTES OF THE HMAC OUTPUT AS DETERMINISTIC RANDOM INTEGER
+    memcpy(&output, hmac_output, sizeof(output));
+
+    //INCREMENT COUNTER
+    generator.counter++;
+
+    return output;
 }
