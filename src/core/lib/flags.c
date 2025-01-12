@@ -145,6 +145,11 @@ void why2_set_memory_identifier(char *new_memory_identifier)
     memory_identifier = new_memory_identifier;
 }
 
+void why2_set_padding(unsigned long padding)
+{
+    flagsAllah.padding = padding;
+}
+
 void why2_reset_memory_identifier(void)
 {
     why2_list_remove_back(&identifier_list);

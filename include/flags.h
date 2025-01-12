@@ -113,6 +113,8 @@ void why2_set_key_length(int keyLengthNew);
 void why2_set_flags(why2_input_flags newFlags); //.... whatcha think?
 void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOperation); //are you that dumb?
 void why2_set_memory_identifier(char *new_memory_identifier);
+void why2_set_padding(unsigned long padding); //SET PADDING RATE WITHOUT REWRITING INPUT FLAGS
+
 void why2_reset_memory_identifier(void); //hmmm, what could reset mean.... huh
 
 #ifdef __cplusplus
