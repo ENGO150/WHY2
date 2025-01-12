@@ -38,7 +38,7 @@ extern "C" {
 //FUNCTIONS
 unsigned long long why2_sum_segment(char *input); //CALCULATE SUM++ FOR input; USED FOR PADDING SEED
 why2_bool why2_random(void *dest, size_t size); //WRITE CRYPTO-SECURE RANDOM NUMBER INTO dest
-void why2_seed_random(unsigned int seed); //SEED why2_seeded_random OUTPUT
+void why2_seed_random(unsigned long seed); //SEED why2_seeded_random OUTPUT
 int why2_seeded_random(); //GENERATE RANDOM NUMBER BASED ON SEED PASSED IN why2_seed_random
 
 #ifdef __cplusplus
