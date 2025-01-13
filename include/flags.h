@@ -111,10 +111,12 @@ char *why2_get_default_memory_identifier(void);
 //SETTERS
 void why2_set_encryption_separator(char encryption_separator_new);
 void why2_set_key_length(int keyLengthNew);
-void why2_set_flags(why2_input_flags newFlags); //.... whatcha think?
+void why2_set_flags(why2_input_flags new_flags); //.... whatcha think?
+void __why2_set_flags_anon(why2_input_flags new_flags); //DO NOT CHANGE flags_changed ON USAGE
 void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOperation); //are you that dumb?
 void why2_set_memory_identifier(char *new_memory_identifier);
 void why2_set_padding(unsigned long padding); //SET PADDING RATE WITHOUT REWRITING INPUT FLAGS
+void __why2_set_padding_anon(unsigned long padding);
 
 void why2_reset_memory_identifier(void); //hmmm, what could reset mean.... huh
 

@@ -132,15 +132,20 @@ void why2_set_key_length(int keyLengthNew)
     keyLength = keyLengthNew;
 }
 
-void why2_set_flags(why2_input_flags newFlags)
+void why2_set_flags(why2_input_flags new_flags)
 {
-    used_flags = newFlags;
+    __why2_set_flags_anon(new_flags);
 
     if (!flags_changed)
     {
         flags_changed = 1;
         padding_changed = 1;
     }
+}
+
+void __why2_set_flags_anon(why2_input_flags new_flags)
+{
+    used_flags = new_flags;
 }
 
 void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOperation)
@@ -157,8 +162,13 @@ void why2_set_memory_identifier(char *new_memory_identifier)
 
 void why2_set_padding(unsigned long padding)
 {
-    used_flags.padding = padding;
+    __why2_set_padding_anon(padding);
     if (!padding_changed) padding_changed = 1;
+}
+
+void __why2_set_padding_anon(unsigned long padding)
+{
+    used_flags.padding = padding;
 }
 
 void why2_reset_memory_identifier(void)
