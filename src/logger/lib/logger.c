@@ -121,7 +121,7 @@ void why2_write_log(int loggerFile, char *logMessage)
     char *logMessageUsed = why2_strdup(logMessage);
     for (int i = 0; i < (int) strlen(logMessageUsed); i++)
     {
-        if (logMessageUsed[i] == '\n') logMessageUsed[i] = '\0';
+        if (logMessageUsed[i] == '\n') logMessageUsed[i] = ' ';
     }
 
     //VARIABLES
