@@ -97,6 +97,11 @@ why2_bool why2_get_flags_changed(void)
     return flags_changed;
 }
 
+why2_bool why2_get_padding_changed(void)
+{
+    return padding_changed;
+}
+
 char *why2_get_memory_identifier(void)
 {
     return memory_identifier;
