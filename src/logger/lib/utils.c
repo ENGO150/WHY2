@@ -107,6 +107,17 @@ why2_decrypted_output why2_decrypt_logger(why2_log_file logger)
 
     for (int i = 0; i < lines; i++) //DECRYPT content
     {
+        if (!why2_get_padding_changed())
+        {
+            printf("A\n");
+            unsigned long length_buffer = 1;
+            for (unsigned long j = 0; j < strlen(content[i]); j++)
+            {
+                if (content[i][j] == why2_get_encryption_separator()) length_buffer++;
+            }
+            __why2_set_padding_anon(length_buffer / 4);
+        }
+
         outputBuffer = why2_decrypt_text(content[i], why2_get_log_flags().key); //DECRYPT
 
         contentDecrypted[i] = why2_strdup(outputBuffer.output_text); //COPY

@@ -29,7 +29,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/logger/flags.h>
 #include <why2/logger/utils.h>
 
+#include <why2/crypto.h>
 #include <why2/encrypter.h>
+#include <why2/flags.h>
 #include <why2/memory.h>
 #include <why2/misc.h>
 
@@ -94,6 +96,9 @@ why2_log_file why2_init_logger(char *directoryPath)
         }
     }
 
+    //SET ENCRYPTER FLAGS
+    if (!why2_get_flags_changed()) __why2_set_flags_anon((why2_input_flags) { 0, 1, 0, WHY2_v4, WHY2_OUTPUT_TEXT, 64 });
+
     //DEALLOCATION
     why2_deallocate(dateBuffer);
     why2_deallocate(latestBuffer);
@@ -131,8 +136,7 @@ void why2_write_log(int loggerFile, char *logMessage)
     struct tm tm = *localtime(&timeL);
     why2_log_flags flags = why2_get_log_flags();
 
-    //SET ENCRYPTER FLAGS
-    if (!why2_get_flags_changed()) why2_set_flags((why2_input_flags) { 0, 1, 0, WHY2_v4, WHY2_OUTPUT_TEXT, 63 });
+    if (!why2_get_padding_changed()) __why2_set_padding_anon(WHY2_RECOMMENDED_PADDING_RATE(strlen(logMessageUsed)));
 
     if (flags.key != NULL) //ENCRYPT TEXT IF KEY WAS CHANGED
     {
