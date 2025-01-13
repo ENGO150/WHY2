@@ -35,7 +35,8 @@ char encryption_separator = '.'; //NOPE     > DO NOT TOUCH THIS, USE why2_set_en
 unsigned long keyLength = 50; //LENGTH OF KEY     > DO NOT TOUCH THIS, USE why2_set_key_length instead <
 why2_input_flags used_flags = DEFAULT_FLAGS; //IT IS CALLED used_flags CUZ flags CAUSED SOME FUCKING MEMORY PROBLEMS
 why2_encryption_operation_cb encryptionOperation_cb = encryptionOperation;
-why2_bool flagsChanged = 0; //CHANGES TO 1 WHEN U USE why2_set_flags
+why2_bool flags_changed = 0; //CHANGES TO 1 WHEN U USE why2_set_flags
+why2_bool padding_changed = 0; //SAME AS flags_changed BUT FOR PADDING
 char *memory_identifier = DEFAULT_MEMORY_IDENTIFIER;
 
 why2_list_t identifier_list = WHY2_LIST_EMPTY;
@@ -93,7 +94,7 @@ why2_encryption_operation_cb why2_get_encryption_operation(void)
 
 why2_bool why2_get_flags_changed(void)
 {
-    return flagsChanged;
+    return flags_changed;
 }
 
 char *why2_get_memory_identifier(void)
@@ -130,7 +131,11 @@ void why2_set_flags(why2_input_flags newFlags)
 {
     used_flags = newFlags;
 
-    if (!flagsChanged) flagsChanged = 1;
+    if (!flags_changed)
+    {
+        flags_changed = 1;
+        padding_changed = 1;
+    }
 }
 
 void why2_set_encryption_operation(why2_encryption_operation_cb newEncryptionOperation)
@@ -148,6 +153,7 @@ void why2_set_memory_identifier(char *new_memory_identifier)
 void why2_set_padding(unsigned long padding)
 {
     used_flags.padding = padding;
+    if (!padding_changed) padding_changed = 1;
 }
 
 void why2_reset_memory_identifier(void)
