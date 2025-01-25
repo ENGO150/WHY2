@@ -173,8 +173,6 @@ char *read_socket_raw(int socket)
     recv(socket, wait_buffer, 1, MSG_PEEK);
     why2_deallocate(wait_buffer);
 
-    why2_bool empty_buffer = 0; //WHETHER MSG_PEEK SHOULD BE USER OR NOT
-
     do
     {
         //FIND THE SENT SIZE
@@ -184,22 +182,12 @@ char *read_socket_raw(int socket)
         //ALLOCATE
         content_buffer = why2_realloc(content_buffer, content_size + 1);
 
-        read_section:
-
         //READ JSON MESSAGE
-        if (recv(socket, content_buffer, content_size, !empty_buffer ? MSG_PEEK : 0) != content_size) //READ THE MESSAGE BY CHARACTERS
+        if (recv(socket, content_buffer, content_size, 0) != content_size) //READ THE MESSAGE BY CHARACTERS
         {
             fprintf(stderr, "Socket probably read wrongly!\n");
         }
-
-        if (empty_buffer) goto return_section; //STOP LOOPING
     } while (content_buffer == NULL || strncmp(content_buffer + (content_size - 2), "\"}", 2) != 0);
-
-    //REMOVE JUNK FROM BUFFER (CUZ THE MSG_PEEK FLAG)
-    empty_buffer = 1;
-    goto read_section; //TODO: remove the stupid goto
-
-    return_section:
 
     content_buffer[content_size] = '\0'; //NULL TERM
 
