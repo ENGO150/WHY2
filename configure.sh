@@ -36,10 +36,10 @@ ARCH_GENTOO_COMMON="$COMMON json-c libgit2 gmp openssl"
 if [[ $DISTRO == "arch" ]]
 then
     COMMAND="pacman -S --needed --noconfirm $ARCH_GENTOO_COMMON"
-elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]
+elif [[ $DISTRO == "debian" ]]
 then
     COMMAND="apt-get install -y $COMMON libjson-c-dev libcurl4-openssl-dev libgit2-dev libgmp-dev libssl-dev"
-elif [[ $DISTRO == "Gentoo" ]]
+elif [[ $DISTRO == "gentoo" ]]
 then
     COMMAND="emerge -vn $ARCH_GENTOO_COMMON"
 
