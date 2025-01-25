@@ -17,9 +17,14 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Get linux distro
-DISTRO=$(lsb_release -is)
+DISTRO=$(grep ^ID_LIKE= /etc/os-release | cut -d= -f2 | tr -d '"')
+if [ -e $DISTRO ]
+then
+    DISTRO=$(grep ^ID= /etc/os-release | cut -d= -f2 | tr -d '"')
+fi
 
-if [[ $(id -u) != "0" ]] && [[ $1 != "force" ]]; then
+if [[ $(id -u) != "0" ]] && [[ $1 != "force" ]]
+then
     echo "You must run this script as root! (To skip this, run with 'force' arg: \"./configure.sh force\")"
     exit 1
 fi
@@ -28,11 +33,14 @@ COMMON="gcc make tmux curl"
 ARCH_GENTOO_COMMON="$COMMON json-c libgit2 gmp openssl"
 
 # Get COMMAND
-if [[ $DISTRO == "Arch" ]]; then
+if [[ $DISTRO == "arch" ]]
+then
     COMMAND="pacman -S --needed --noconfirm $ARCH_GENTOO_COMMON"
-elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]; then
+elif [[ $DISTRO == "Ubuntu" ]] || [[ $DISTRO == "Debian" ]]
+then
     COMMAND="apt-get install -y $COMMON libjson-c-dev libcurl4-openssl-dev libgit2-dev libgmp-dev libssl-dev"
-elif [[ $DISTRO == "Gentoo" ]]; then
+elif [[ $DISTRO == "Gentoo" ]]
+then
     COMMAND="emerge -vn $ARCH_GENTOO_COMMON"
 
     # Add
@@ -60,7 +68,8 @@ fi
 $COMMAND
 
 # Install Rust
-if ! [ -x "$(command -v cargo)" ]; then
+if ! [ -x "$(command -v cargo)" ]
+then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y # Install Rust and components
     source "$HOME/.cargo/env"
 fi
