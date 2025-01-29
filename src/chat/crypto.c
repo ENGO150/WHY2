@@ -32,8 +32,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <openssl/pem.h>
 #include <openssl/ec.h>
 
-char *ecc_pub = NULL;
-char *ecc_pri = NULL;
+EVP_PKEY *keypair = NULL; //KEYPAIR
 
 void read_file(FILE *file, char **output)
 {
@@ -58,74 +57,50 @@ void read_file(FILE *file, char **output)
 //GLOBAL
 void why2_chat_init_keys(void)
 {
-    //KEY FILES
-    FILE *public;
-    FILE *private;
+    FILE *key; //KEY FILE
 
-    //GET PATH TO KEY DIR
-    char *path = why2_replace(WHY2_CHAT_KEY_LOCATION, "{HOME}", getenv("HOME"));
+    char *path = why2_replace(WHY2_CHAT_KEY_LOCATION, "{HOME}", getenv("HOME")); //GET PATH TO KEY DIR
+    char *key_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_KEY) + 3); //ALLOCATE THE KEY PATH
 
-    //ALLOCATE THE KEY PATHS
-    char *public_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_PUB_KEY) + 3);
-    char *private_path = why2_malloc(strlen(path) + strlen(WHY2_CHAT_PRI_KEY) + 3);
+    //GET THE ACTUAL KEY PATH
+    sprintf(key_path, "%s/%s%c", path, WHY2_CHAT_KEY, '\0');
 
-    //GET THE ACTUAL KEY PATHS
-    sprintf(public_path, "%s/%s%c", path, WHY2_CHAT_PUB_KEY, '\0');
-    sprintf(private_path, "%s/%s%c", path, WHY2_CHAT_PRI_KEY, '\0');
-
-    //CHECK IF KEYS EXIST
-    if (access(path, R_OK) != 0)
+    //CHECK IF KEY EXIST
+    if (access(path, R_OK) != 0) //NOT FOUND - CREATE IT
     {
         mkdir(path, 0700);
 
         //SOME USER OUTPUT
-        printf("You are probably running WHY2-Chat for the first time now.\nGenerating ECC keys...\n");
+        printf("No ECC key found.\nGenerating...\n\n");
 
-        //VARIABLES
-        EVP_PKEY *pkey = NULL; //KEYPAIR
         EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL); //CREATE CTX
-
         EVP_PKEY_keygen_init(ctx); //INIT KEYGEN
 
         EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, WHY2_CHAT_ECC); //SETUP ECC
+        EVP_PKEY_keygen(ctx, &keypair); //GENERATE ECC KEYPAIR
 
-        EVP_PKEY_keygen(ctx, &pkey); //GENERATE ECC KEYPAIR
-
-        printf("Saving keys...\n");
-
-        //WRITE THE KEYS INTO KEY-FILES
-        public = why2_fopen(public_path, "w+");
-        private = why2_fopen(private_path, "w+");
-
-        PEM_write_PrivateKey(private, pkey, NULL, NULL, 0, NULL, NULL); //WRITE PRI KEY
-        PEM_write_PUBKEY(public, pkey); //WRITE PUB KEY
+        //WRITE THE KEYS INTO KEY-FILE
+        key = why2_fopen(key_path, "w+");
+        PEM_write_PrivateKey(key, keypair, NULL, NULL, 0, NULL, NULL); //WRITE THE KEY
 
         //DEALLOCATION
         EVP_PKEY_CTX_free(ctx);
-        EVP_PKEY_free(pkey);
     } else
     {
-        //OPEN FILES
-        public = why2_fopen(public_path, "r");
-        private = why2_fopen(private_path, "r");
-
-        //READ THE KEYS
-        read_file(public, &ecc_pub);
-        read_file(private, &ecc_pri);
+        key = why2_fopen(key_path, "r"); //OPEN KEY FILE
+        keypair = PEM_read_PrivateKey(key, NULL, NULL, NULL); //LOAD KEYPAIR
     }
 
     //DEALLOCATION
     why2_deallocate(path);
-    why2_deallocate(public_path);
-    why2_deallocate(private_path);
-    why2_deallocate(public);
-    why2_deallocate(private);
+    why2_deallocate(key_path);
+    why2_deallocate(key);
 }
 
 void why2_chat_deallocate_keys(void)
 {
-    why2_deallocate(ecc_pub);
-    why2_deallocate(ecc_pri);
+    //DEALLOCATE THE pkey
+    EVP_PKEY_free(keypair);
 }
 
 char *why2_sha256(char *input)
