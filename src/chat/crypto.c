@@ -34,24 +34,34 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 EVP_PKEY *keypair = NULL; //KEYPAIR
 
-void read_file(FILE *file, char **output)
+//LOCAL
+char *base64_encode(char *data)
 {
     //VARIABLES
-    int buffer_size;
-    char *buffer;
+    BIO *bio;
+    BIO *b64;
+    BUF_MEM *buffer_ptr;
 
-    //GET LENGTH
-    fseek(file, 0, SEEK_END);
-    buffer_size = ftell(file);
-    rewind(file);
+    //CREATE BIO
+    b64 = BIO_new(BIO_f_base64());
+    bio = BIO_new(BIO_s_mem());
+    bio = BIO_push(b64, bio);
 
-    //READ
-    buffer = why2_calloc(buffer_size + 1, sizeof(char));
-    if (fread(buffer, buffer_size, 1, file) != 1) why2_die("Reading keyfile failed!");
-    buffer[buffer_size] = '\0';
+    BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL); //NO NEWLINES
+    BIO_write(bio, data, strlen(data)); //ENCODE
+    BIO_flush(bio);
 
-    //ASSIGN OUTPUT
-    *output = buffer;
+    BIO_get_mem_ptr(bio, &buffer_ptr); //GET PTR
+    char *b64text = why2_malloc(buffer_ptr -> length + 1); //ALLOCATE
+
+    //COPY
+    memcpy(b64text, buffer_ptr -> data, buffer_ptr -> length);
+    b64text[buffer_ptr -> length] = '\0'; //NULL-TERM
+
+    //DEALLOCATION
+    BIO_free_all(bio);
+
+    return b64text;
 }
 
 //GLOBAL
