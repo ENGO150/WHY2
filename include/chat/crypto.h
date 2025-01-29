@@ -34,6 +34,8 @@ extern "C" {
 void why2_chat_init_keys(void); //INIT (POSSIBLY GENERATE) ECC KEYS
 void why2_chat_deallocate_keys(void); //DEALLOCATE :) (NO SLUR HERE)
 
+char *why2_chat_ecc_sign(char *message); //SIGN message WITH ECC KEY
+
 char *why2_sha256(char *input); //HASH input USING SHA256 AND RETURN IN STRING
 
 #ifdef __cplusplus
