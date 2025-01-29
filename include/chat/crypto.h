@@ -29,8 +29,7 @@ extern "C" {
 #define WHY2_CHAT_ECC NID_secp521r1 //CURVE NAME
 
 #define WHY2_CHAT_KEY_LOCATION WHY2_CONFIG_DIR "/keys" //KEYS LOCATION
-#define WHY2_CHAT_PUB_KEY "pub"
-#define WHY2_CHAT_PRI_KEY "pri"
+#define WHY2_CHAT_KEY "secp521r1.pem"
 
 void why2_chat_init_keys(void); //INIT (POSSIBLY GENERATE) ECC KEYS
 void why2_chat_deallocate_keys(void); //DEALLOCATE :) (NO SLUR HERE)
