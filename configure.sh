@@ -30,7 +30,7 @@ then
 fi
 
 COMMON="gcc make tmux curl"
-ARCH_GENTOO_COMMON="$COMMON json-c libgit2 gmp openssl"
+ARCH_GENTOO_COMMON="$COMMON json-c libgit2 openssl"
 
 # Get COMMAND
 if [[ $DISTRO == "arch" ]]
@@ -38,7 +38,7 @@ then
     COMMAND="pacman -S --needed --noconfirm $ARCH_GENTOO_COMMON"
 elif [[ $DISTRO == "debian" ]]
 then
-    COMMAND="apt-get install -y $COMMON libjson-c-dev libcurl4-openssl-dev libgit2-dev libgmp-dev libssl-dev"
+    COMMAND="apt-get install -y $COMMON libjson-c-dev libcurl4-openssl-dev libgit2-dev libssl-dev"
 elif [[ $DISTRO == "gentoo" ]]
 then
     COMMAND="emerge -vn $ARCH_GENTOO_COMMON"
