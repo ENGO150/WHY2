@@ -35,33 +35,55 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 EVP_PKEY *keypair = NULL; //KEYPAIR
 
 //LOCAL
-char *base64_encode(char *data)
+char* base64_encode(char *message)
 {
     //VARIABLES
     BIO *bio;
     BIO *b64;
     BUF_MEM *buffer_ptr;
+    char* encoded_message;
 
-    //CREATE BIO
+    //INIT BIOs
     b64 = BIO_new(BIO_f_base64());
     bio = BIO_new(BIO_s_mem());
     bio = BIO_push(b64, bio);
 
-    BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL); //NO NEWLINES
-    BIO_write(bio, data, strlen(data)); //ENCODE
+    //ENCODE
+    BIO_write(bio, message, strlen(message));
     BIO_flush(bio);
-
-    BIO_get_mem_ptr(bio, &buffer_ptr); //GET PTR
-    char *b64text = why2_malloc(buffer_ptr -> length + 1); //ALLOCATE
+    BIO_get_mem_ptr(bio, &buffer_ptr);
 
     //COPY
-    memcpy(b64text, buffer_ptr -> data, buffer_ptr -> length);
-    b64text[buffer_ptr -> length] = '\0'; //NULL-TERM
+    encoded_message = why2_malloc(buffer_ptr -> length + 1);
+    memcpy(encoded_message, buffer_ptr -> data, buffer_ptr -> length);
+    encoded_message[buffer_ptr -> length] = '\0';
 
     //DEALLOCATION
     BIO_free_all(bio);
 
-    return b64text;
+    return encoded_message;
+}
+
+char* base64_decode(char *encoded_message)
+{
+    //VARIABLES
+    BIO *bio;
+    BIO *b64;
+    size_t length = strlen(encoded_message);
+    char* decoded_message = why2_malloc(length);
+
+    //INIT BIOs
+    b64 = BIO_new(BIO_f_base64());
+    bio = BIO_new_mem_buf(encoded_message, length);
+    bio = BIO_push(b64, bio);
+
+    //NULL-TERM
+    decoded_message[BIO_read(bio, decoded_message, length)] = '\0';
+
+    //DEALLOCATION
+    BIO_free_all(bio);
+
+    return decoded_message;
 }
 
 //GLOBAL
