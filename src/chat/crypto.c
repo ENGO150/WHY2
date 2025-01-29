@@ -23,40 +23,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/random.h>
 
 #include <why2/memory.h>
 #include <why2/misc.h>
 
-#include <gmp.h>
-
 #include <openssl/sha.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/ec.h>
 
-//DO NOT TOUCH THESE PLS :3
-char *rsa_modulus = NULL; //THE RSA MODULUS
-char *rsa_d = NULL; //THE RSA d
-
-//LOCAL
-void generate_prime(mpz_t x)
-{
-    //RANDOM
-    gmp_randstate_t state;
-    gmp_randinit_default(state);
-    unsigned long random_buffer; //SEED
-
-    do
-    {
-        if (getrandom(&random_buffer, sizeof(unsigned long), GRND_NONBLOCK) == -1) why2_die("getrandom fn failed!");
-
-        //GENERATE RANDOM PRIME USING random_buffer SEED
-        gmp_randseed_ui(state, random_buffer);
-        mpz_urandomb(x, state, WHY2_CHAT_KEY_BITS);
-        mpz_nextprime(x, x);
-    } while (mpz_probab_prime_p(x, WHY2_CHAT_PRIME_ITERS) == 0); //CHECK FOR PRIME PROBABILITY
-
-    //DEALLOCATION
-    gmp_randclear(state);
-}
+char *ecc_pub = NULL;
+char *ecc_pri = NULL;
 
 void read_file(FILE *file, char **output)
 {
@@ -78,35 +55,11 @@ void read_file(FILE *file, char **output)
     *output = buffer;
 }
 
-char *exp_mod(char *to_exp, char *exponent)
-{
-    //VARIABLES
-    char *output;
-    mpz_t m, c, n, e;
-    mpz_init(c);
-
-    //GET ALL STUFF
-    mpz_init_set_str(m, to_exp, 10);
-    mpz_init_set_str(n, why2_get_chat_modulus(), WHY2_CHAT_KEY_BASE);
-    mpz_init_set_str(e, exponent, WHY2_CHAT_KEY_BASE);
-
-    //ENCRYPT MESSAGE
-    mpz_powm(c, m, e, n);
-
-    output = why2_malloc(mpz_sizeinbase(c, 10) + 2); //ALLOCATE OUTPUT
-    mpz_get_str(output, 10, c); //GET OUTPUT
-
-    //DEALLOCATION
-    mpz_clears(m, c, n, e, NULL);
-
-    return output;
-}
-
 //GLOBAL
 void why2_chat_init_keys(void)
 {
     //KEY FILES
-    FILE *public; //TECHNICALLY, PUBLIC KEY CONTAINS ONLY THE MODULUS AND PRIVATE CONTAINS ONLY THE d
+    FILE *public;
     FILE *private;
 
     //GET PATH TO KEY DIR
@@ -126,29 +79,17 @@ void why2_chat_init_keys(void)
         mkdir(path, 0700);
 
         //SOME USER OUTPUT
-        printf("You are probably running WHY2-Chat for the first time now.\nGenerating RSA keys...\n");
+        printf("You are probably running WHY2-Chat for the first time now.\nGenerating ECC keys...\n");
 
         //VARIABLES
-        mpz_t p, q, e, d, n, phi_n, buffer_1, buffer_2;
-        mpz_inits(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
+        EVP_PKEY *pkey = NULL; //KEYPAIR
+        EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL); //CREATE CTX
 
-        //GENERATE PRIMES
-        generate_prime(p);
-        generate_prime(q);
+        EVP_PKEY_keygen_init(ctx); //INIT KEYGEN
 
-        //SET e
-        mpz_set_str(e, WHY2_CHAT_RSA_EXPONENT, 10);
+        EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, WHY2_CHAT_ECC); //SETUP ECC
 
-        //GET n
-        mpz_mul(n, p, q);
-
-        //GET phi
-        mpz_sub_ui(buffer_1, p, 1);
-        mpz_sub_ui(buffer_2, q, 1);
-        mpz_mul(phi_n, buffer_1, buffer_2);
-
-        //COUNT d
-        mpz_invert(d, e, phi_n);
+        EVP_PKEY_keygen(ctx, &pkey); //GENERATE ECC KEYPAIR
 
         printf("Saving keys...\n");
 
@@ -156,11 +97,12 @@ void why2_chat_init_keys(void)
         public = why2_fopen(public_path, "w+");
         private = why2_fopen(private_path, "w+");
 
-        mpz_out_str(public, WHY2_CHAT_KEY_BASE, n);
-        mpz_out_str(private, WHY2_CHAT_KEY_BASE, d);
+        PEM_write_PrivateKey(private, pkey, NULL, NULL, 0, NULL, NULL); //WRITE PRI KEY
+        PEM_write_PUBKEY(public, pkey); //WRITE PUB KEY
 
-        //KEYGEN DEALLOCATION
-        mpz_clears(p, q, e, d, n, phi_n, buffer_1, buffer_2, NULL);
+        //DEALLOCATION
+        EVP_PKEY_CTX_free(ctx);
+        EVP_PKEY_free(pkey);
     } else
     {
         //OPEN FILES
@@ -168,8 +110,8 @@ void why2_chat_init_keys(void)
         private = why2_fopen(private_path, "r");
 
         //READ THE KEYS
-        read_file(public, &rsa_modulus);
-        read_file(private, &rsa_d);
+        read_file(public, &ecc_pub);
+        read_file(private, &ecc_pri);
     }
 
     //DEALLOCATION
@@ -182,28 +124,8 @@ void why2_chat_init_keys(void)
 
 void why2_chat_deallocate_keys(void)
 {
-    why2_deallocate(rsa_modulus);
-    why2_deallocate(rsa_d);
-}
-
-char *why2_get_chat_modulus(void)
-{
-    return rsa_modulus;
-}
-
-char *why2_get_chat_d(void)
-{
-    return rsa_d;
-}
-
-char *why2_chat_rsa_pub_encrypt(char *to_encrypt)
-{
-    return exp_mod(to_encrypt, WHY2_CHAT_RSA_EXPONENT);
-}
-
-char *why2_chat_rsa_pri_decrypt(char *to_decrypt)
-{
-    return exp_mod(to_decrypt, why2_get_chat_d());
+    why2_deallocate(ecc_pub);
+    why2_deallocate(ecc_pri);
 }
 
 char *why2_sha256(char *input)
