@@ -107,6 +107,34 @@ void why2_chat_init_keys(void)
     why2_deallocate(key);
 }
 
+char *why2_chat_ecc_sign(char *message)
+{
+    //VARIABLES
+    EVP_MD_CTX *mdctx = NULL; //SIGNING CONTEXT
+    size_t siglen;
+    char *sig; //SIGNATURE
+    char *encoded_sig; //FINAL (ENCODED) SIGNATURE
+
+    //INIT mdctx
+    mdctx = EVP_MD_CTX_new();
+    EVP_DigestSignInit(mdctx, NULL, EVP_sha256(), NULL, keypair);
+
+    EVP_DigestSignUpdate(mdctx, message, strlen(message)); //UPDATE MESSAGE TO SIGN
+    EVP_DigestSignFinal(mdctx, NULL, &siglen); //COUNT LENGTH
+
+    //GENERATE SIGNATURE
+    sig = why2_malloc(siglen); //ALLOCATE SIGNATURE
+    EVP_DigestSignFinal(mdctx, (unsigned char*) sig, &siglen);
+
+    encoded_sig = base64_encode(sig); //CONVERT sig TO BASE64
+
+    //DEALLOCATION
+    why2_deallocate(sig);
+    EVP_MD_CTX_free(mdctx);
+
+    return encoded_sig;
+}
+
 void why2_chat_deallocate_keys(void)
 {
     //DEALLOCATE THE pkey
