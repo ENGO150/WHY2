@@ -26,23 +26,14 @@ extern "C" {
 #include <why2/chat/config.h>
 
 //MACROS
-#define WHY2_CHAT_KEY_BITS 4096 //BITS..
-#define WHY2_CHAT_PRIME_ITERS 100 //NUMBER OF ITERATIONS WHEN CHECKING PRIME NUMBER
-#define WHY2_CHAT_RSA_EXPONENT "H33" //DEFAULT e IN BASE WHY2_CHAT_KEY_BASE
+#define WHY2_CHAT_ECC NID_secp521r1 //CURVE NAME
 
 #define WHY2_CHAT_KEY_LOCATION WHY2_CONFIG_DIR "/keys" //KEYS LOCATION
 #define WHY2_CHAT_PUB_KEY "pub"
 #define WHY2_CHAT_PRI_KEY "pri"
-#define WHY2_CHAT_KEY_BASE 62 //BASE IN THE GENERATED KEYS ARE STORED IN WHY2_CHAT_KEY_LOCATION
 
-void why2_chat_init_keys(void); //INIT (POSSIBLY GENERATE) RSA KEYS
+void why2_chat_init_keys(void); //INIT (POSSIBLY GENERATE) ECC KEYS
 void why2_chat_deallocate_keys(void); //DEALLOCATE :) (NO SLUR HERE)
-
-char *why2_get_chat_modulus(void); //GET THE RSA MODULUS
-char *why2_get_chat_d(void); //GET THE RSA d
-
-char *why2_chat_rsa_pub_encrypt(char *to_encrypt); //RSA ENCRYPT USING PUBLIC KEY
-char *why2_chat_rsa_pri_decrypt(char *to_decrypt); //RSA DECRYPT USING PRIVATE KEY
 
 char *why2_sha256(char *input); //HASH input USING SHA256 AND RETURN IN STRING
 
