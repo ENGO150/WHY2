@@ -31,6 +31,8 @@ extern "C" {
 #define WHY2_CHAT_KEY_LOCATION WHY2_CONFIG_DIR "/keys" //KEYS LOCATION
 #define WHY2_CHAT_KEY "secp521r1.pem"
 
+#define WHY2_CHAT_BASE64_LENGTH_DELIMITER ':' //SEPARATES BASE64 FROM LENGTH (YnJhbWJvcmFrCg==:9)
+
 void why2_chat_init_keys(void); //INIT (POSSIBLY GENERATE) ECC KEYS
 void why2_chat_deallocate_keys(void); //DEALLOCATE :) (NO SLUR HERE)
 
