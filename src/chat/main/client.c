@@ -189,6 +189,7 @@ int main(void)
 
                     WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_HELP "\t\tPrints out all the commands. :)\n"
                     WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_DM " <ID> <MSG>\tSends direct message to user.\n"
+                    WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_PM " <ID> <MSG>\tSends encrypted message to user.\n" //TODO: Implement
                     WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_LIST "\t\tLists all users and their IDs.\n"
                     WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_VERSION "\tCheck server version.\n"
                     WHY2_CHAT_COMMAND_PREFIX WHY2_CHAT_COMMAND_EXIT "\t\tExits the program."
