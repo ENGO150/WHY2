@@ -98,7 +98,7 @@ int main(void)
 
     why2_check_version(); //CHECK FOR UPDATES
     why2_chat_init_client_config(); //CREATE client.toml CONFIGURATION
-    why2_chat_init_keys(); //CREATE RSA KEYS
+    why2_chat_init_keys(); //CREATE ECC KEY
 
     listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     char *line = NULL;
