@@ -66,14 +66,14 @@ char *base64_encode(char *message, size_t length)
     return encoded_message;
 }
 
-char *base64_decode(char *encoded_message)
+char *base64_decode(char *encoded_message, size_t *length)
 {
     //VARIABLES
     BIO *bio;
     BIO *b64;
     char *separator_ptr = strrchr(encoded_message, WHY2_CHAT_BASE64_LENGTH_DELIMITER); //GET THE DELIMITER POINTER
-    size_t length = strtoull(separator_ptr + 1, NULL, 10);
-    char* decoded_message = why2_malloc(length + 1);
+    *length = strtoull(separator_ptr + 1, NULL, 10);
+    char* decoded_message = why2_malloc(*length + 1);
     int decoded_length;
 
     //INIT BIOs
@@ -83,7 +83,7 @@ char *base64_decode(char *encoded_message)
     bio = BIO_push(b64, bio);
 
     //DECODE
-    decoded_length = BIO_read(bio, decoded_message, length);
+    decoded_length = BIO_read(bio, decoded_message, *length);
 
     //NULL-TERM
     decoded_message[decoded_length] = '\0';
