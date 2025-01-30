@@ -35,7 +35,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 EVP_PKEY *keypair = NULL; //KEYPAIR
 
 //LOCAL
-char* base64_encode(char *message)
+char *base64_encode(char *message, size_t length)
 {
     //VARIABLES
     BIO *bio;
@@ -45,18 +45,20 @@ char* base64_encode(char *message)
 
     //INIT BIOs
     b64 = BIO_new(BIO_f_base64());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL); //DISABLE NEWLINES
     bio = BIO_new(BIO_s_mem());
     bio = BIO_push(b64, bio);
 
     //ENCODE
-    BIO_write(bio, message, strlen(message));
+    BIO_write(bio, message, length);
     BIO_flush(bio);
     BIO_get_mem_ptr(bio, &buffer_ptr);
 
     //COPY
-    encoded_message = why2_malloc(buffer_ptr -> length + 1);
+    encoded_message = why2_malloc(buffer_ptr -> length + why2_count_int_length((int) length) + 2);
     memcpy(encoded_message, buffer_ptr -> data, buffer_ptr -> length);
-    encoded_message[buffer_ptr -> length] = '\0';
+
+    sprintf(encoded_message + buffer_ptr -> length, "%c%zu%c", WHY2_CHAT_BASE64_LENGTH_DELIMITER, length, '\0'); //APPEND LENGTH
 
     //DEALLOCATION
     BIO_free_all(bio);
@@ -64,21 +66,27 @@ char* base64_encode(char *message)
     return encoded_message;
 }
 
-char* base64_decode(char *encoded_message)
+char *base64_decode(char *encoded_message)
 {
     //VARIABLES
     BIO *bio;
     BIO *b64;
-    size_t length = strlen(encoded_message);
-    char* decoded_message = why2_malloc(length);
+    char *separator_ptr = strrchr(encoded_message, WHY2_CHAT_BASE64_LENGTH_DELIMITER); //GET THE DELIMITER POINTER
+    size_t length = strtoull(separator_ptr + 1, NULL, 10);
+    char* decoded_message = why2_malloc(length + 1);
+    int decoded_length;
 
     //INIT BIOs
     b64 = BIO_new(BIO_f_base64());
-    bio = BIO_new_mem_buf(encoded_message, length);
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL); //DISABLE NEWLINES
+    bio = BIO_new_mem_buf(encoded_message, separator_ptr - encoded_message);
     bio = BIO_push(b64, bio);
 
+    //DECODE
+    decoded_length = BIO_read(bio, decoded_message, length);
+
     //NULL-TERM
-    decoded_message[BIO_read(bio, decoded_message, length)] = '\0';
+    decoded_message[decoded_length] = '\0';
 
     //DEALLOCATION
     BIO_free_all(bio);
@@ -148,7 +156,7 @@ char *why2_chat_ecc_sign(char *message)
     sig = why2_malloc(siglen); //ALLOCATE SIGNATURE
     EVP_DigestSignFinal(mdctx, (unsigned char*) sig, &siglen);
 
-    encoded_sig = base64_encode(sig); //CONVERT sig TO BASE64
+    encoded_sig = base64_encode(sig, siglen); //CONVERT sig TO BASE64
 
     //DEALLOCATION
     why2_deallocate(sig);
