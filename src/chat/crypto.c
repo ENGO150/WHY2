@@ -165,6 +165,30 @@ char *why2_chat_ecc_sign(char *message)
     return encoded_sig;
 }
 
+why2_bool why2_chat_ecc_verify_signature(char *message, char *signature, EVP_PKEY *key)
+{
+    //VARIABLES
+    size_t length;
+    char *decoded_signature = base64_decode(signature, &length); //DECODE SIGNATURE
+    why2_bool returning;
+
+    //INIT CONTEXT
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+
+    //INIT VERIFICATION CONTEXT
+    EVP_DigestVerifyInit(ctx, NULL, EVP_sha256(), NULL, key);
+
+    //VERIFY MESSAGE
+    EVP_DigestVerifyUpdate(ctx, message, strlen(message));
+    returning = EVP_DigestVerifyFinal(ctx, (unsigned char*) decoded_signature, length) == 1;
+
+    //DEALLOCATION
+    EVP_MD_CTX_free(ctx);
+    why2_deallocate(decoded_signature);
+
+    return returning;
+}
+
 void why2_chat_deallocate_keys(void)
 {
     //DEALLOCATE THE pkey
