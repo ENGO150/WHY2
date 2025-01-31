@@ -527,6 +527,7 @@ void *why2_communicate_thread(void *arg)
     why2_bool invalid_username = 1;
     why2_bool exiting = 0;
     char *decoded_buffer = NULL;
+    char *decoded_code_buffer = NULL;
     char *username;
     int usernames_n = 0;
     struct json_object *json = json_tokener_parse("{}");
@@ -686,8 +687,6 @@ void *why2_communicate_thread(void *arg)
     why2_deallocate(connection_message);
     why2_deallocate(username);
     why2_toml_read_free(server_username);
-
-    char *decoded_code_buffer = NULL;
 
     while (!(exiting || force_exiting)) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
