@@ -599,7 +599,7 @@ void *why2_communicate_thread(void *arg)
             char *user_config_path = why2_get_server_users_path();
             if (!why2_toml_contains(user_config_path, decoded_buffer)) //REGISTRATION
             {
-                send_socket_deallocate(WHY2_CHAT_CODE_ENTER_PASSWORD, why2_chat_server_config("server_username"), connection);
+                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_ENTER_PASSWORD);
 
                 if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
                 {
@@ -612,7 +612,7 @@ void *why2_communicate_thread(void *arg)
                 why2_toml_write(user_config_path, username, password); //SAVE PASSWORD
             } else //LOGIN
             {
-                send_socket_deallocate(WHY2_CHAT_CODE_ENTER_PASSWORD, why2_chat_server_config("server_username"), connection);
+                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_ENTER_PASSWORD);
 
                 unsigned char max_tries = (unsigned char) server_config_int("max_password_tries");
 
