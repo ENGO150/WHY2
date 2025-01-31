@@ -31,10 +31,12 @@ extern "C" {
 #define WHY2_CHAT_CONFIG_CLIENT "client.toml"
 #define WHY2_CHAT_CONFIG_SERVER_USERS "server_users.toml" //LOGIN INFO CONFIG
 
+#define WHY2_CHAT_AUTHORITY_DIR "certs" //AUTHORITY DIRECTORY
+
 void why2_chat_init_server_config(void); //CHECK IF SERVER CONFIG EXISTS, CREATE IT
 void why2_chat_init_client_config(void); //Dementia is a term used to describe a group of symptoms affecting memory, thinking and social abilities. In people who have dementia, the symptoms interfere with their daily lives. Dementia isn't one specific disease. Several diseases can cause dementia. ...
 
-void why2_chat_init_authority(void); //CREATE AUTHORITY DIRECTORY
+void why2_chat_init_authority(void); //CREATE WHY2_CHAT_AUTHORITY_DIR
 
 char *why2_toml_read(const char* path, const char* key); //READ key FROM path TOML FILE
 void why2_toml_write(const char *path, const char *key, const char *value); //WRITE value AS key INTO path TOML FILE
