@@ -166,6 +166,8 @@ void *why2_recalloc(void *pointer, unsigned long size, unsigned long block_size)
 
 char *why2_strdup(char *string)
 {
+    if (string == NULL) return NULL;
+
     char *allocated = strdup(string);
 
     push_to_list(allocated, ALLOCATION);
