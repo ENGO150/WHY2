@@ -58,7 +58,8 @@ int main(void)
 
     printf("CA server enabled.\n\n");
 
-    pthread_create(&thread, NULL, why2_accept_thread, &listen_socket);
+    _WHY2_ACCEPT_THREAD_PARAMS params = { listen_socket, WHY2_CHAT_AUTHORITY };
+    pthread_create(&thread, NULL, why2_accept_thread, &params);
 
     for (;;)
     {
