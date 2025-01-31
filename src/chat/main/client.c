@@ -43,7 +43,7 @@ void exit_client(WHY2_UNUSED int i) //guess what
     if (exited) return;
     exited = 1;
 
-    why2_send_socket(WHY2_CHAT_CODE_EXIT, NULL, listen_socket);
+    why2_send_socket_code(NULL, NULL, listen_socket, WHY2_CHAT_CODE_EXIT);
 }
 
 why2_bool command(char *input, char *command, char **arg)
