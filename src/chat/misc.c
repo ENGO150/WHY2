@@ -540,7 +540,7 @@ void *why2_communicate_thread(void *arg)
     {
         if (config_username == NULL) fprintf(stderr, "Your config doesn't contain 'user_pick_username'. Please update your configuration.\n");
 
-        send_socket_deallocate(WHY2_CHAT_CODE_PICK_USERNAME, why2_chat_server_config("server_username"), connection); //ASK USER FOR USERNAME
+        send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_PICK_USERNAME); //ASK USER FOR USERNAME
 
         while (invalid_username)
         {
