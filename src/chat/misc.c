@@ -388,25 +388,34 @@ void send_socket_deallocate(char *text, char *username, int socket) //SAME AS wh
     why2_toml_read_free(username);
 }
 
-void send_socket(char *text, char *username, int socket, why2_bool welcome)
+void send_socket(char *text, char *username, int socket, why2_bool welcome, char *code)
 {
+    //VARIABLES
     char *output = why2_strdup("");
-    size_t length_buffer = strlen(text);
-    char *text_copy = why2_calloc(length_buffer + 2, sizeof(char));
     struct json_object *json = json_tokener_parse("{}");
 
-    //COPY text INTO text_copy (WITHOUT LAST CHARACTER WHEN NEWLINE IS AT THE END)
-    if (text[length_buffer - 1] == '\n') length_buffer--;
-    strncpy(text_copy, text, length_buffer);
+    if (text != NULL)
+    {
+        size_t length_buffer = strlen(text);
+        char *text_copy = why2_calloc(length_buffer + 2, sizeof(char));
 
-    //UNFUCK QUOTES FROM text_copy
-    remove_json_syntax_characters(text_copy);
+        //COPY text INTO text_copy (WITHOUT LAST CHARACTER WHEN NEWLINE IS AT THE END)
+        if (text[length_buffer - 1] == '\n') length_buffer--;
+        strncpy(text_copy, text, length_buffer);
 
-    //REMOVE NON ASCII CHARS
-    remove_non_ascii(&text_copy);
+        //UNFUCK QUOTES FROM text_copy
+        remove_json_syntax_characters(text_copy);
 
-    //ADD OBJECTS
-    json_object_object_add(json, "message", json_object_new_string(text_copy));
+        //REMOVE NON ASCII CHARS
+        remove_non_ascii(&text_copy);
+
+        //ADD OBJECTS
+        json_object_object_add(json, "message", json_object_new_string(text_copy));
+
+        //DEALLOCATION
+        why2_deallocate(text_copy);
+    }
+
     if (username != NULL) json_object_object_add(json, "username", json_object_new_string(username)); //WAS SENT FROM SERVER
 
     if (welcome) //SENDING WELCOME MESSAGE TO USER
@@ -430,6 +439,8 @@ void send_socket(char *text, char *username, int socket, why2_bool welcome)
         why2_toml_read_free(server_name);
     }
 
+    if (code != NULL) json_object_object_add(json, "code", json_object_new_string(code));
+
     //GENERATE JSON STRING
     json_object_object_foreach(json, key, value)
     {
@@ -437,19 +448,17 @@ void send_socket(char *text, char *username, int socket, why2_bool welcome)
     }
     add_brackets(&output);
 
-    why2_deallocate(text_copy);
-    json_object_put(json);
-
     //SEND
     send(socket, output, strlen(output), 0);
 
     //DEALLOCATION
+    json_object_put(json);
     why2_deallocate(output);
 }
 
 void send_welcome_socket_deallocate(char *text, char *username, int socket) //SAME AS why2_send_socket BUT IT DEALLOCATES username
 {
-    send_socket(text, username, socket, 1);
+    send_socket(NULL, username, socket, 1, text);
 
     why2_toml_read_free(username);
 }
@@ -485,7 +494,7 @@ unsigned long get_latest_id()
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
-    send_socket(text, username, socket, 0);
+    send_socket(text, username, socket, 0, NULL);
 }
 
 void *why2_communicate_thread(void *arg)
