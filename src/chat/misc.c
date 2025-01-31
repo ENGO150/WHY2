@@ -865,6 +865,13 @@ void *why2_communicate_thread(void *arg)
     return NULL;
 }
 
+void *why2_authority_communicate_thread(void *arg)
+{
+    int connection = *(int*) arg;
+
+    printf("User connected.\t\t%d\n", connection);
+}
+
 void *why2_accept_thread(void *socket)
 {
     int accepted;
