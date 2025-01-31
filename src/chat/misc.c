@@ -870,21 +870,42 @@ void *why2_authority_communicate_thread(void *arg)
     int connection = *(int*) arg;
 
     printf("User connected.\t\t%d\n", connection);
+
+    return NULL;
 }
 
-void *why2_accept_thread(void *socket)
+void *why2_accept_thread(void *params)
 {
+    _WHY2_ACCEPT_THREAD_PARAMS param = *(_WHY2_ACCEPT_THREAD_PARAMS*) params; //GET PARAMETERS
+
+    //VARIABLES
     int accepted;
     pthread_t thread;
 
     //LOOP ACCEPT
     for (;;)
     {
-        accepted = accept(*((int*) socket), (struct sockaddr *) NULL, NULL); //ACCEPT NEW SOCKET
+        accepted = accept(param.socket, (struct sockaddr *) NULL, NULL); //ACCEPT NEW SOCKET
 
         if (accepted == -1) continue;
 
-        pthread_create(&thread, NULL, why2_communicate_thread, &accepted);
+        void *(*communication_thread)(void*) = NULL;
+        switch (param.type) //GET communication_thread
+        {
+            case WHY2_CHAT_SERVER:
+                communication_thread = why2_communicate_thread;
+                break;
+
+            case WHY2_CHAT_AUTHORITY:
+                communication_thread = why2_authority_communicate_thread;
+                break;
+
+            default:
+                why2_die("WHY2_CHAT_SERVER_TYPE not implemented!");
+                break;
+        }
+
+        pthread_create(&thread, NULL, communication_thread, &accepted);
     }
 
     return NULL;
