@@ -388,6 +388,13 @@ void send_socket_deallocate(char *text, char *username, int socket) //SAME AS wh
     why2_toml_read_free(username);
 }
 
+void send_socket_code_deallocate(char *params, char *username, int socket, char *code) //SAME AS send_socket_deallocate BUT WITH CODE FIELD
+{
+    why2_send_socket_code(params, username, socket, code);
+
+    why2_toml_read_free(username);
+}
+
 void send_socket(char *text, char *username, int socket, why2_bool welcome, char *code)
 {
     //VARIABLES
