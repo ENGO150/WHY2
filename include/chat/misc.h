@@ -23,13 +23,23 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
-#include <why2/flags.h> //TODO: fuck this
+#include <why2/flags.h>
 
+#include <why2/chat/flags.h>
+
+//STRUCTS
+typedef struct
+{
+    int socket; //SOCKET POINTER
+    enum WHY2_CHAT_SERVER_TYPE type; //TYPE OF SERVER
+} _WHY2_ACCEPT_THREAD_PARAMS;
+
+//FUNCTIONS
 void why2_send_socket(char *text, char *username, int socket); //send socket.... wtf did you expect
 void why2_send_socket_code(char *params, char *username, int socket, char *code); //SEND SOCKET BUT WITH CODE
 void *why2_communicate_thread(void *arg); //COMMUNICATION THREAD
 void *why2_authority_communicate_thread(void *arg); //CA COMMUNICATION THREAD
-void *why2_accept_thread(void *socket); //LOOP ACCEPTING CONNECTIONS
+void *why2_accept_thread(void *params); //LOOP ACCEPTING CONNECTIONS
 void why2_clean_connections(void); //CLOSE EVERY CONNECTION
 void why2_clean_threads(void); //CLOSE EVERY RUNNING MESSAGE THREAD
 void *why2_listen_server(void *socket); //LISTEN FOR OTHER's USERS MESSAGES
