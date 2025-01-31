@@ -704,141 +704,138 @@ void *why2_communicate_thread(void *arg)
         decoded_code_buffer = get_string_from_json_string(raw, "code"); //DECODE
 
         //TRIM MESSAGE
-        why2_trim_string(&decoded_buffer);
+        if (decoded_buffer != NULL) why2_trim_string(&decoded_buffer);
 
-        if (decoded_buffer != NULL && strlen(decoded_buffer) != 0)
+        if (decoded_code_buffer != NULL) //CODES FROM CLIENT
         {
-            if (decoded_code_buffer != NULL) //CODES FROM CLIENT
+            if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_EXIT) == 0) //USER REQUESTED EXIT
             {
-                if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_EXIT) == 0) //USER REQUESTED EXIT
-                {
-                    exiting = 1;
-                } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_LIST) == 0) //USER REQUESTED LIST OF USERS
-                {
-                    why2_node_t *head = connection_list.head;
-                    if (head == NULL) goto deallocation; //TODO: Send no users code
+                exiting = 1;
+            } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_LIST) == 0) //USER REQUESTED LIST OF USERS
+            {
+                why2_node_t *head = connection_list.head;
+                if (head == NULL) goto deallocation; //TODO: Send no users code
 
-                    //BUFFERS
-                    why2_node_t *buffer = head;
-                    connection_node_t value_buffer;
-                    unsigned long alloc_size = 0;
-                    size_t last_size = 0;
+                //BUFFERS
+                why2_node_t *buffer = head;
+                connection_node_t value_buffer;
+                unsigned long alloc_size = 0;
+                size_t last_size = 0;
 
-                    //COUNT REQUIRED MESSAGE ALLOCATION SIZE
-                    do
+                //COUNT REQUIRED MESSAGE ALLOCATION SIZE
+                do
+                {
+                    value_buffer = *(connection_node_t*) buffer -> value;
+                    alloc_size += strlen(value_buffer.username) + why2_count_int_length(value_buffer.id) + 2;
+
+                    buffer = buffer -> next; //ITER
+                } while (buffer != NULL);
+
+                char *message = why2_calloc(alloc_size + 1, sizeof(char));
+                buffer = head; //RESET
+
+                //FILL THE message
+                do
+                {
+                    value_buffer = *(connection_node_t*) buffer -> value;
+
+                    sprintf(message + last_size, "%s;%ld;", value_buffer.username, value_buffer.id); //APPEND
+
+                    last_size = strlen(message);
+
+                    buffer = buffer -> next; //ITER
+                } while (buffer != NULL);
+
+                //SEND
+                send_socket_code_deallocate(message, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_LIST_SERVER);
+
+                //DEALLOCATION
+                why2_deallocate(message);
+            } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_VERSION) == 0)
+            {
+                //GET VERSION STRING FROM THE VERSIONS JSON
+                char *message = why2_malloc(strlen(WHY2_VERSION) + 1); //ALLOCATE MESSAGE FOR CLIENT
+
+                sprintf(message, "%s%c", WHY2_VERSION, '\0'); //CREATE THE MESSAGE
+
+                //SEND
+                send_socket_code_deallocate(message, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_VERSION_SERVER);
+
+                //DEALLOCATION
+                why2_deallocate(message);
+            } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_PM) == 0 && decoded_buffer != NULL && strlen(decoded_buffer) != 0) //PM
+            {
+                char *id = NULL; //RECEIVER
+                char *msg;
+
+                //CHECK ARGS VALIDITY
+                why2_bool valid_param = strlen(decoded_buffer) >= 3;
+                if (valid_param)
+                {
+                    valid_param = 0;
+                    for (unsigned long i = 1; i < strlen(decoded_buffer); i++)
                     {
-                        value_buffer = *(connection_node_t*) buffer -> value;
-                        alloc_size += strlen(value_buffer.username) + why2_count_int_length(value_buffer.id) + 2;
-
-                        buffer = buffer -> next; //ITER
-                    } while (buffer != NULL);
-
-                    char *message = why2_calloc(alloc_size + 1, sizeof(char));
-                    buffer = head; //RESET
-
-                    //FILL THE message
-                    do
-                    {
-                        value_buffer = *(connection_node_t*) buffer -> value;
-
-                        sprintf(message + last_size, "%s;%ld;", value_buffer.username, value_buffer.id); //APPEND
-
-                        last_size = strlen(message);
-
-                        buffer = buffer -> next; //ITER
-                    } while (buffer != NULL);
-
-                    //SEND
-                    send_socket_code_deallocate(message, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_LIST_SERVER);
-
-                    //DEALLOCATION
-                    why2_deallocate(message);
-                } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_VERSION) == 0)
-                {
-                    //GET VERSION STRING FROM THE VERSIONS JSON
-                    char *message = why2_malloc(strlen(WHY2_VERSION) + 1); //ALLOCATE MESSAGE FOR CLIENT
-
-                    sprintf(message, "%s%c", WHY2_VERSION, '\0'); //CREATE THE MESSAGE
-
-                    //SEND
-                    send_socket_code_deallocate(message, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_VERSION_SERVER);
-
-                    //DEALLOCATION
-                    why2_deallocate(message);
-                } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_PM) == 0) //PM
-                {
-                    char *id = NULL; //RECEIVER
-                    char *msg;
-
-                    //CHECK ARGS VALIDITY
-                    why2_bool valid_param = strlen(decoded_buffer) >= 3;
-                    if (valid_param)
-                    {
-                        valid_param = 0;
-                        for (unsigned long i = 1; i < strlen(decoded_buffer); i++)
+                        if (decoded_buffer[i] == ';')
                         {
-                            if (decoded_buffer[i] == ';')
+                            valid_param = 1;
+
+                            //EXTRACT FIRST ARG (ID)
+                            id = why2_malloc(i + 1);
+                            for (unsigned long j = 0; j < i; j++)
                             {
-                                valid_param = 1;
-
-                                //EXTRACT FIRST ARG (ID)
-                                id = why2_malloc(i + 1);
-                                for (unsigned long j = 0; j < i; j++)
-                                {
-                                    id[j] = decoded_buffer[j];
-                                }
-                                id[i] = '\0';
-
-                                //EXTRACT MESSAGE
-                                msg = decoded_buffer + i + 1;
-                                break;
+                                id[j] = decoded_buffer[j];
                             }
+                            id[i] = '\0';
+
+                            //EXTRACT MESSAGE
+                            msg = decoded_buffer + i + 1;
+                            break;
                         }
                     }
-
-                    //FIND CONNECTION
-                    why2_node_t *pm_connection = id == NULL ? NULL : find_connection_by_id(atoi(id));
-                    if (pm_connection == NULL) valid_param = 0;
-
-                    if (valid_param) //IGNORE INVALID ARGS
-                    {
-                        connection_node_t pm_connection_node = *(connection_node_t*) pm_connection -> value;
-
-                        //ALLOCATE MESSAGE TO SEND TO RECEIVER
-                        char *private_msg = why2_malloc(strlen(node.username) + strlen(pm_connection_node.username) + strlen(msg) + 5);
-
-                        //CONSTRUCT DA MESSAGE
-                        sprintf(private_msg, "%s;%s;%s;%c", node.username, pm_connection_node.username, msg, '\0');
-
-                        //USER IS SENDING THE MESSAGE TO HIMSELF
-                        why2_bool self_pm = pm_connection_node.connection == connection;
-
-                        //SEND YOU DUMB FUCK
-                        send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), pm_connection_node.connection, WHY2_CHAT_CODE_PM_SERVER); //RECIPIENT
-                        if (!self_pm) send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_PM_SERVER); //AUTHOR
-
-                        why2_deallocate(private_msg);
-                    }
-
-                    //DEALLOCATION
-                    why2_deallocate(id);
                 }
 
-                //IGNORE INVALID CODES, THE USER JUST GOT THEIR LOBOTOMY DONE
-            } else if (strncmp(decoded_buffer, WHY2_CHAT_COMMAND_PREFIX, strlen(WHY2_CHAT_COMMAND_PREFIX)) != 0) //IGNORE MESSAGES BEGINNING WITH '!'
-            {
-                //REBUILD MESSAGE WITH USERNAME
-                json_object_object_add(json, "message", json_object_new_string(decoded_buffer));
-                json_object_object_add(json, "username", json_object_new_string(get_username(connection)));
+                //FIND CONNECTION
+                why2_node_t *pm_connection = id == NULL ? NULL : find_connection_by_id(atoi(id));
+                if (pm_connection == NULL) valid_param = 0;
 
-                json_object_object_foreach(json, key, value) //GENERATE JSON STRING
+                if (valid_param) //IGNORE INVALID ARGS
                 {
-                    append(&raw_output, key, (char*) json_object_get_string(value));
-                }
-                add_brackets(&raw_output);
+                    connection_node_t pm_connection_node = *(connection_node_t*) pm_connection -> value;
 
-                send_to_all(raw_output); //e
+                    //ALLOCATE MESSAGE TO SEND TO RECEIVER
+                    char *private_msg = why2_malloc(strlen(node.username) + strlen(pm_connection_node.username) + strlen(msg) + 5);
+
+                    //CONSTRUCT DA MESSAGE
+                    sprintf(private_msg, "%s;%s;%s;%c", node.username, pm_connection_node.username, msg, '\0');
+
+                    //USER IS SENDING THE MESSAGE TO HIMSELF
+                    why2_bool self_pm = pm_connection_node.connection == connection;
+
+                    //SEND YOU DUMB FUCK
+                    send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), pm_connection_node.connection, WHY2_CHAT_CODE_PM_SERVER); //RECIPIENT
+                    if (!self_pm) send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_PM_SERVER); //AUTHOR
+
+                    why2_deallocate(private_msg);
+                }
+
+                //DEALLOCATION
+                why2_deallocate(id);
             }
+
+            //IGNORE INVALID CODES, THE USER JUST GOT THEIR LOBOTOMY DONE
+        } else if (decoded_buffer != NULL && strlen(decoded_buffer) != 0 && strncmp(decoded_buffer, WHY2_CHAT_COMMAND_PREFIX, strlen(WHY2_CHAT_COMMAND_PREFIX)) != 0) //IGNORE MESSAGES BEGINNING WITH '!'
+        {
+            //REBUILD MESSAGE WITH USERNAME
+            json_object_object_add(json, "message", json_object_new_string(decoded_buffer));
+            json_object_object_add(json, "username", json_object_new_string(get_username(connection)));
+
+            json_object_object_foreach(json, key, value) //GENERATE JSON STRING
+            {
+                append(&raw_output, key, (char*) json_object_get_string(value));
+            }
+            add_brackets(&raw_output);
+
+            send_to_all(raw_output); //e
         }
 
         deallocation:
