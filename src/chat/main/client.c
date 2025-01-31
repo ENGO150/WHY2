@@ -241,10 +241,10 @@ int main(void)
                 }
 
                 //BUILD MESSAGE TO SEND TO SERVER
-                char *final_message = why2_malloc(strlen(WHY2_CHAT_CODE_PM) + strlen(id) + strlen(msg) + 3);
-                sprintf(final_message, WHY2_CHAT_CODE_PM ";%s;%s%c", id, msg, '\0');
+                char *final_message = why2_malloc(strlen(id) + strlen(msg) + 2);
+                sprintf(final_message, "%s;%s%c", id, msg, '\0');
 
-                why2_send_socket(final_message, NULL, listen_socket); //SEND
+                why2_send_socket_code(final_message, NULL, listen_socket, WHY2_CHAT_CODE_PM); //SEND
 
                 //DEALLOCATION
                 why2_deallocate(id);
