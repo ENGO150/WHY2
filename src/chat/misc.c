@@ -805,17 +805,17 @@ void *why2_communicate_thread(void *arg)
                         connection_node_t pm_connection_node = *(connection_node_t*) pm_connection -> value;
 
                         //ALLOCATE MESSAGE TO SEND TO RECEIVER
-                        char *private_msg = why2_malloc(strlen(WHY2_CHAT_CODE_PM_SERVER) + strlen(node.username) + strlen(pm_connection_node.username) + strlen(msg) + 6);
+                        char *private_msg = why2_malloc(strlen(node.username) + strlen(pm_connection_node.username) + strlen(msg) + 5);
 
                         //CONSTRUCT DA MESSAGE
-                        sprintf(private_msg, WHY2_CHAT_CODE_PM_SERVER ";%s;%s;%s;%c", node.username, pm_connection_node.username, msg, '\0');
+                        sprintf(private_msg, "%s;%s;%s;%c", node.username, pm_connection_node.username, msg, '\0');
 
                         //USER IS SENDING THE MESSAGE TO HIMSELF
                         why2_bool self_pm = pm_connection_node.connection == connection;
 
                         //SEND YOU DUMB FUCK
-                        send_socket_deallocate(private_msg, why2_chat_server_config("server_username"), pm_connection_node.connection); //RECIPIENT
-                        if (!self_pm) send_socket_deallocate(private_msg, why2_chat_server_config("server_username"), connection); //AUTHOR
+                        send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), pm_connection_node.connection, WHY2_CHAT_CODE_PM_SERVER); //RECIPIENT
+                        if (!self_pm) send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_PM_SERVER); //AUTHOR
 
                         why2_deallocate(private_msg);
                     }
