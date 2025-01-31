@@ -857,7 +857,7 @@ void *why2_communicate_thread(void *arg)
         json_object_put(json);
     }
 
-    if (exiting) send_socket_deallocate(WHY2_CHAT_CODE_SSQC, why2_chat_server_config("server_username"), connection);
+    if (exiting) send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_SSQC);
 
     printf("User disconnected.\t%d\n", connection);
 
@@ -904,7 +904,7 @@ void why2_clean_connections(void)
 
         connection_buffer = *(connection_node_t*) node_buffer_2 -> value;
 
-        send_socket_deallocate(WHY2_CHAT_CODE_SSQC, why2_chat_server_config("server_username"), connection_buffer.connection);
+        send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection_buffer.connection, WHY2_CHAT_CODE_SSQC);
 
         close(connection_buffer.connection);
         why2_list_remove(&connection_list, node_buffer_2); //REMOVE
