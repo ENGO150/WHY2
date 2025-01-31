@@ -636,7 +636,7 @@ void *why2_communicate_thread(void *arg)
                         goto deallocation;
                     }
 
-                    send_socket_deallocate(WHY2_CHAT_CODE_INVALID_PASSWORD, why2_chat_server_config("server_username"), connection);
+                    send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_INVALID_PASSWORD);
                 }
             }
 
