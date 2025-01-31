@@ -754,12 +754,12 @@ void *why2_communicate_thread(void *arg)
                 } else if (strcmp(decoded_buffer, WHY2_CHAT_CODE_VERSION) == 0)
                 {
                     //GET VERSION STRING FROM THE VERSIONS JSON
-                    char *message = why2_malloc(strlen(WHY2_CHAT_CODE_VERSION_SERVER) + strlen(WHY2_VERSION) + 2); //ALLOCATE MESSAGE FOR CLIENT
+                    char *message = why2_malloc(strlen(WHY2_VERSION) + 1); //ALLOCATE MESSAGE FOR CLIENT
 
-                    sprintf(message, WHY2_CHAT_CODE_VERSION_SERVER ";%s%c", WHY2_VERSION, '\0'); //CREATE THE MESSAGE
+                    sprintf(message, "%s%c", WHY2_VERSION, '\0'); //CREATE THE MESSAGE
 
                     //SEND
-                    send_socket_deallocate(message, why2_chat_server_config("server_username"), connection);
+                    send_socket_code_deallocate(message, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_VERSION_SERVER);
 
                     //DEALLOCATION
                     why2_deallocate(message);
