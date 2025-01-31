@@ -36,6 +36,7 @@ int main(void)
 {
     why2_check_version(); //CHECK FOR UPDATES
     why2_chat_init_authority(); //CREATE AUTHORITY DIRECTORY
+    why2_chat_init_keys(); //CREATE ECC KEY
 
     int listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE CA SERVER SOCKET
     pthread_t thread;
