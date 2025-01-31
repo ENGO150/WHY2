@@ -942,6 +942,7 @@ void *why2_listen_server(void *socket)
     //CONTENT
     char *username = NULL;
     char *message = NULL;
+    char *code = NULL;
 
     //SERVER SETTINGS
     int max_uname = -1;
@@ -962,6 +963,7 @@ void *why2_listen_server(void *socket)
         //GET CONTENT
         username = get_string_from_json_string(read, "username");
         message = get_string_from_json_string(read, "message");
+        code = get_string_from_json_string(read, "code");
 
         if (server_uname == NULL) //GET SERVER USERNAME
         {
@@ -979,18 +981,18 @@ void *why2_listen_server(void *socket)
             continuing = 1;
         }
 
-        if ((strcmp(username, server_uname) == 0 && strncmp(message, "code", 4) == 0) && !continuing) //CODE WAS SENT
+        if ((strcmp(username, server_uname) == 0 && code != NULL) && !continuing) //CODE WAS SENT
         {
-            if (strcmp(message, WHY2_CHAT_CODE_SSQC) == 0) //SERVER BROKE UP WITH YOU
+            if (strcmp(code, WHY2_CHAT_CODE_SSQC) == 0) //SERVER BROKE UP WITH YOU
             {
                 printf("%s%s%s\nServer closed the connection.\n", asking_username > max_tries ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, (asking_username == 0 ? "\n": ""));
                 fflush(stdout);
 
                 pthread_cancel(getline_thread); //CANCEL CLIENT getline
                 exiting = 1; //EXIT THIS THREAD
-            } else if (strcmp(message, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || strcmp(message, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
+            } else if (strcmp(code, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || strcmp(code, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
             {
-                if (strcmp(message, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //INVALID USERNAME
+                if (strcmp(code, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //INVALID USERNAME
                 {
                     printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid username!\n\n\n", asking_username > 1 ? WHY2_CLEAR_AND_GO_UP : "");
                     fflush(stdout);
@@ -998,14 +1000,14 @@ void *why2_listen_server(void *socket)
 
                 printf("%s%sEnter username (a-Z, 0-9; %d-%d characters):\n", asking_username++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP, min_uname, max_uname);
                 fflush(stdout);
-            } else if (strncmp(message, WHY2_CHAT_CODE_LIST_SERVER, strlen(WHY2_CHAT_CODE_LIST_SERVER)) == 0) //LIST USERS
+            } else if (strcmp(code, WHY2_CHAT_CODE_LIST_SERVER) == 0) //LIST USERS
             {
                 why2_bool printing_id = 0;
 
                 printf("\nList:\n-----\n");
 
                 //ITER TROUGH LIST OF USERS FROM SERVER
-                for (unsigned long i = strlen(WHY2_CHAT_CODE_LIST_SERVER) + 1; i < strlen(message); i++)
+                for (unsigned long i = 0; i < strlen(message); i++)
                 {
                     if (message[i] == ';')
                     {
@@ -1018,23 +1020,19 @@ void *why2_listen_server(void *socket)
 
                 printf("\n");
                 fflush(stdout);
-            } else if (strncmp(message, WHY2_CHAT_CODE_VERSION_SERVER, strlen(WHY2_CHAT_CODE_VERSION_SERVER)) == 0)
+            } else if (strcmp(code, WHY2_CHAT_CODE_VERSION_SERVER) == 0)
             {
-                char *server_version = message + strlen(WHY2_CHAT_CODE_VERSION_SERVER) + 1;
-
                 //INFO
-                printf("\nServer Version: %s\nClient Version: %s\n\n", server_version, WHY2_VERSION);
+                printf("\nServer Version: %s\nClient Version: %s\n\n", message, WHY2_VERSION);
 
                 //SERVER IS OUTDATED
-                if (atoi(server_version + 1) < atoi(WHY2_VERSION + 1))
+                if (atoi(message + 1) < atoi(WHY2_VERSION + 1))
                 {
                     printf("Server is outdated. Some new features may not work correctly.\n\n");
                 }
-            } else if (strncmp(message, WHY2_CHAT_CODE_PM_SERVER, strlen(WHY2_CHAT_CODE_PM_SERVER)) == 0)
+            } else if (strcmp(code, WHY2_CHAT_CODE_PM_SERVER) == 0)
             {
                 printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP); //do not fucking ask me how the fucking formatting fucking works, i dont fucking know
-
-                char *received_pm = message + strlen(WHY2_CHAT_CODE_PM_SERVER) + 1;
 
                 //DECODED MESSAGE, AUTHOR AND RECIPIENT; 0 = AUTHOR, 1 = RECIPIENT, 2 = MESSAGE
                 char **pm_info = why2_calloc(3, sizeof(char*));
@@ -1043,9 +1041,9 @@ void *why2_listen_server(void *socket)
                 unsigned long n_buffer = 0;
 
                 //DECODE
-                for (unsigned long i = 0; i < strlen(received_pm); i++)
+                for (unsigned long i = 0; i < strlen(message); i++)
                 {
-                    if (received_pm[i] == ';') //FUTURE ME, THIS IS PRETTY MUCH split FUNCTION IMPLEMENTATION
+                    if (message[i] == ';') //FUTURE ME, THIS IS PRETTY MUCH split FUNCTION IMPLEMENTATION
                     {
                         //ALLOCATE INFO
                         pm_info[n_buffer] = why2_malloc((i - i_buffer) + 1);
@@ -1053,7 +1051,7 @@ void *why2_listen_server(void *socket)
                         //COPY INFO
                         for (unsigned long j = i_buffer; j < i; j++)
                         {
-                            pm_info[n_buffer][j - i_buffer] = received_pm[j];
+                            pm_info[n_buffer][j - i_buffer] = message[j];
                         }
                         pm_info[n_buffer][i - i_buffer] = '\0';
 
@@ -1077,11 +1075,11 @@ void *why2_listen_server(void *socket)
                     why2_deallocate(pm_info[i]);
                 }
                 why2_deallocate(pm_info);
-            } else if (strcmp(message, WHY2_CHAT_CODE_ENTER_PASSWORD) == 0 || strcmp(message, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
+            } else if (strcmp(code, WHY2_CHAT_CODE_ENTER_PASSWORD) == 0 || strcmp(code, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
             {
                 __why2_set_asking_password(1);
 
-                if (strcmp(message, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0) //INVALID USERNAME
+                if (strcmp(code, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0) //INVALID USERNAME
                 {
                     printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid password!\n\n\n", asking_password > 1 ? WHY2_CLEAR_AND_GO_UP : "");
                     fflush(stdout);
@@ -1115,6 +1113,7 @@ void *why2_listen_server(void *socket)
         why2_deallocate(read);
         why2_deallocate(username);
         why2_deallocate(message);
+        why2_deallocate(code);
     }
 
     why2_deallocate(server_uname);
