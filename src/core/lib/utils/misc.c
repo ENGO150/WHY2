@@ -185,7 +185,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
                 if (!why2_get_flags().no_output) fprintf(stderr, "You need to be root to update!\t[I DO NOT RECOMMEND USING THIS]\n");
 
                 why2_clean_memory("core_version_check");
-                return WHY2_WHY2_UPDATE_FAILED;
+                return WHY2_UPDATE_FAILED;
             }
 
             //VARIABLES
@@ -215,7 +215,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
                 if (!why2_get_flags().no_output) fprintf(stderr, "Updating failed! (cloning)\n");
 
                 why2_clean_memory("core_version_check");
-                return WHY2_WHY2_UPDATE_FAILED;
+                return WHY2_UPDATE_FAILED;
             }
 
             //COUNT install_command LENGTH & ALLOCATE IT
@@ -234,7 +234,7 @@ enum WHY2_EXIT_CODES why2_check_version(void)
                 if (!why2_get_flags().no_output) fprintf(stderr, "Updating failed! (installing)\n");
 
                 why2_clean_memory("core_version_check");
-                return WHY2_WHY2_UPDATE_FAILED;
+                return WHY2_UPDATE_FAILED;
             }
         } else
         {
