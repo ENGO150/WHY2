@@ -34,6 +34,7 @@ OUTPUT_APP_LOGGER=$(OUTPUT)/$(PROJECT_NAME)-logger-app
 
 OUTPUT_CHAT_CLIENT=$(OUTPUT)/$(PROJECT_NAME)-chat-client
 OUTPUT_CHAT_SERVER=$(OUTPUT)/$(PROJECT_NAME)-chat-server
+OUTPUT_CHAT_AUTHORITY=$(OUTPUT)/$(PROJECT_NAME)-chat-authority
 
 LIB_CHAT_CONFIG_OUT=./src/chat/config/target/release
 
@@ -44,6 +45,7 @@ SRC_LOGGER=./src/logger/lib/*.c
 SRC_LOGGER_APP=./src/logger/app/*.c
 SRC_CHAT_CLIENT=./src/chat/main/client.c
 SRC_CHAT_SERVER=./src/chat/main/server.c
+SRC_CHAT_AUTHORITY=./src/chat/main/authority.c
 SRC_CHAT_MISC=./src/chat/*.c
 
 INCLUDE_DIR=./include
@@ -110,6 +112,9 @@ build_chat_client:
 build_chat_server:
 	$(CC) $(CFLAGS) $(SRC_CHAT_SERVER) -o $(OUTPUT_CHAT_SERVER) $(LIBS_CHAT)
 
+build_chat_authority:
+	$(CC) $(CFLAGS) $(SRC_CHAT_AUTHORITY) -o $(OUTPUT_CHAT_AUTHORITY) $(LIBS_CHAT)
+
 build_lib_chat:
 	$(MAKE) clean
 	$(CC) $(CFLAGS) -fPIC -c $(SRC_CHAT_MISC)
@@ -148,7 +153,7 @@ clean:
 	$(RC) clean $(RFLAGS)
 	rm -rf $(OUTPUT)/* $(LOGS)/* *.o *.so vgcore.*
 
-build_chat: build_chat_server build_chat_client
+build_chat: build_chat_server build_chat_client build_chat_authority
 
 install_header: install_header_core install_header_logger install_header_chat
 install_libs: install_lib_core install_lib_logger install_lib_chat
