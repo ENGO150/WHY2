@@ -873,7 +873,7 @@ void *why2_accept_thread(void *socket)
     //LOOP ACCEPT
     for (;;)
     {
-        accepted = accept(*((int*) socket), (WHY2_SA *) NULL, NULL); //ACCEPT NEW SOCKET
+        accepted = accept(*((int*) socket), (struct sockaddr *) NULL, NULL); //ACCEPT NEW SOCKET
 
         if (accepted == -1) continue;
 

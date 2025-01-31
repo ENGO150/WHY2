@@ -51,7 +51,7 @@ int main(void)
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     //BIND SOCKET
-    if (bind(listen_socket, (WHY2_SA *) &server_addr, sizeof(server_addr)) < 0) why2_die("Failed binding socket.");
+    if (bind(listen_socket, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) why2_die("Failed binding socket.");
 
     //LISTEN
     if (listen(listen_socket, WHY2_MAX_CONNECTIONS) < 0) why2_die("Binding failed.");

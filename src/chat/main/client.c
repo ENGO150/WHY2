@@ -148,7 +148,7 @@ int main(void)
 
     free(line); //PREVENT FROM MEMORY LEAK
 
-    int connectStatus = connect(listen_socket, (WHY2_SA *) &server_addr, sizeof(server_addr)); //CONNECT
+    int connectStatus = connect(listen_socket, (struct sockaddr *) &server_addr, sizeof(server_addr)); //CONNECT
 
     if (connectStatus < 0) why2_die("Connecting failed.");
 

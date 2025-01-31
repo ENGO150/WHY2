@@ -26,7 +26,6 @@ extern "C" {
 #include <why2/flags.h>
 
 //MACROS
-#define WHY2_SA struct sockaddr
 #define WHY2_CHAT_SERVER_PORT 1204 //PORT FOR SERVER
 #define WHY2_CHAT_AUTHORITY_PORT 1203 //PORT FOR CA
 #define WHY2_MAX_CONNECTIONS 1000 //MAX USERS CONNECTED AT ONE TIME
