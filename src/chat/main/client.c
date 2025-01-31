@@ -254,7 +254,7 @@ int main(void)
                 why2_send_socket_code(NULL, NULL, listen_socket, WHY2_CHAT_CODE_LIST);
             } else if (command(line, WHY2_CHAT_COMMAND_VERSION, &cmd_arg)) //VERSION CMD
             {
-                why2_send_socket(WHY2_CHAT_CODE_VERSION, NULL, listen_socket);
+                why2_send_socket_code(NULL, NULL, listen_socket, WHY2_CHAT_CODE_VERSION);
             } else
             {
                 invalid("command");
