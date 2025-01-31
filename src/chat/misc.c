@@ -962,6 +962,8 @@ void *why2_listen_server(void *socket)
 
         if (server_uname == NULL) //GET SERVER USERNAME
         {
+            if (code == NULL || strcmp(code, WHY2_CHAT_CODE_ACCEPT_MESSAGES) != 0) goto deallocation;
+
             server_uname = why2_strdup(username); //GET USERNAME
 
             //GET INFO
@@ -1097,12 +1099,13 @@ void *why2_listen_server(void *socket)
             printf("\n\n%s%s: %s\n\n", WHY2_CLEAR_AND_GO_UP, username, message);
         }
 
-
         if (!exiting && !continuing)
         {
             printf(">>> ");
             fflush(stdout);
         }
+
+        deallocation:
 
         //DEALLOCATION
         why2_deallocate(read);
