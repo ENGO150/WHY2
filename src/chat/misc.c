@@ -497,6 +497,11 @@ void why2_send_socket(char *text, char *username, int socket)
     send_socket(text, username, socket, 0, NULL);
 }
 
+void why2_send_socket_code(char *params, char *username, int socket, char *code)
+{
+    send_socket(params, username, socket, 0, code);
+}
+
 void *why2_communicate_thread(void *arg)
 {
     int connection = *(int*) arg;
