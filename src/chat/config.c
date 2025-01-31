@@ -137,6 +137,24 @@ void why2_chat_init_client_config(void)
     init_config(WHY2_CHAT_CONFIG_CLIENT);
 }
 
+void why2_chat_init_authority(void)
+{
+    //CREATE USER CONFIG FOLDER [THIS SHOULDN'T HAPPEN ON CLIENT, BUT IT'S NEEDED ON FRESH SERVERS]
+    why2_directory();
+
+    //GET THE CONFIG TYPE
+    char *buffer = why2_malloc(strlen(WHY2_CONFIG_DIR) + strlen(WHY2_CHAT_AUTHORITY_DIR) + 2);
+    sprintf(buffer, "%s/%s", WHY2_CONFIG_DIR, WHY2_CHAT_AUTHORITY_DIR);
+
+    char *path = why2_replace(buffer, "{HOME}", getenv("HOME"));
+
+    if (access(path, R_OK) != 0) mkdir(path, 0700); //DIRECTORY DOESN'T EXIST; CREATE IT
+
+    //DEALLOCATION
+    why2_deallocate(path);
+    why2_deallocate(buffer);
+}
+
 char *why2_chat_server_config(char *key)
 {
     return config(key, SERVER);
