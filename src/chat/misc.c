@@ -46,6 +46,7 @@ typedef struct _connection_node
     pthread_t thread;
     char *username;
     unsigned long id;
+    char *key; //EACH USER WILL USE DIFFERENT KEY FOR COMMUNICATION
 } connection_node_t; //SINGLE LINKED LIST
 
 why2_list_t connection_list = WHY2_LIST_EMPTY;
@@ -658,7 +659,8 @@ void *why2_communicate_thread(void *arg)
         connection,
         pthread_self(),
         why2_strdup(username),
-        get_latest_id()
+        get_latest_id(),
+        why2_generate_key(why2_get_key_length())
     };
 
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
@@ -856,6 +858,7 @@ void *why2_communicate_thread(void *arg)
     //DEALLOCATION
     close(connection);
     why2_deallocate(node.username);
+    why2_deallocate(node.key);
 
     why2_list_remove(&connection_list, find_connection(connection));
 
