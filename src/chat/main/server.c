@@ -58,7 +58,7 @@ int main(void)
 
     printf("Server enabled.\n\n");
 
-    _WHY2_ACCEPT_THREAD_PARAMS params = { listen_socket, WHY2_CHAT_SERVER };
+    __why2_accept_thread_params params = { listen_socket, WHY2_CHAT_SERVER };
     pthread_create(&thread, NULL, why2_accept_thread, &params);
 
     for (;;)

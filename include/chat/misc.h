@@ -32,7 +32,7 @@ typedef struct
 {
     int socket; //SOCKET POINTER
     enum WHY2_CHAT_SERVER_TYPE type; //TYPE OF SERVER
-} _WHY2_ACCEPT_THREAD_PARAMS;
+} __why2_accept_thread_params;
 
 //FUNCTIONS
 void why2_send_socket(char *text, char *username, int socket); //send socket.... wtf did you expect

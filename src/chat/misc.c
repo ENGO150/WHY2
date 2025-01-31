@@ -876,7 +876,7 @@ void *why2_authority_communicate_thread(void *arg)
 
 void *why2_accept_thread(void *params)
 {
-    _WHY2_ACCEPT_THREAD_PARAMS param = *(_WHY2_ACCEPT_THREAD_PARAMS*) params; //GET PARAMETERS
+    __why2_accept_thread_params param = *(__why2_accept_thread_params*) params; //GET PARAMETERS
 
     //VARIABLES
     int accepted;
