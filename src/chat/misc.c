@@ -589,7 +589,7 @@ void *why2_communicate_thread(void *arg)
 
             if (invalid_username)
             {
-                send_socket_deallocate(WHY2_CHAT_CODE_INVALID_USERNAME, why2_chat_server_config("server_username"), connection); //TELL THE USER THEY ARE DUMB AS FUCK
+                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_INVALID_USERNAME); //TELL THE USER THEY ARE DUMB AS FUCK
                 continue;
             }
 
