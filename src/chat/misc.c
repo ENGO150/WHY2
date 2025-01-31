@@ -765,7 +765,7 @@ void *why2_communicate_thread(void *arg)
 
                 //DEALLOCATION
                 why2_deallocate(message);
-            } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_PM) == 0 && decoded_buffer != NULL && strlen(decoded_buffer) != 0) //PM
+            } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_DM) == 0 && decoded_buffer != NULL && strlen(decoded_buffer) != 0) //PM
             {
                 char *id = NULL; //RECEIVER
                 char *msg;
@@ -814,8 +814,8 @@ void *why2_communicate_thread(void *arg)
                     why2_bool self_pm = pm_connection_node.connection == connection;
 
                     //SEND YOU DUMB FUCK
-                    send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), pm_connection_node.connection, WHY2_CHAT_CODE_PM_SERVER); //RECIPIENT
-                    if (!self_pm) send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_PM_SERVER); //AUTHOR
+                    send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), pm_connection_node.connection, WHY2_CHAT_CODE_DM_SERVER); //RECIPIENT
+                    if (!self_pm) send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_DM_SERVER); //AUTHOR
 
                     why2_deallocate(private_msg);
                 }
@@ -1055,7 +1055,7 @@ void *why2_listen_server(void *socket)
                 {
                     printf("Server is outdated. Some new features may not work correctly.\n\n");
                 }
-            } else if (strcmp(code, WHY2_CHAT_CODE_PM_SERVER) == 0)
+            } else if (strcmp(code, WHY2_CHAT_CODE_DM_SERVER) == 0)
             {
                 printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP); //do not fucking ask me how the fucking formatting fucking works, i dont fucking know
 

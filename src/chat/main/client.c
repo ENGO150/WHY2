@@ -244,7 +244,7 @@ int main(void)
                 char *final_message = why2_malloc(strlen(id) + strlen(msg) + 2);
                 sprintf(final_message, "%s;%s%c", id, msg, '\0');
 
-                why2_send_socket_code(final_message, NULL, listen_socket, WHY2_CHAT_CODE_PM); //SEND
+                why2_send_socket_code(final_message, NULL, listen_socket, WHY2_CHAT_CODE_DM); //SEND
 
                 //DEALLOCATION
                 why2_deallocate(id);
