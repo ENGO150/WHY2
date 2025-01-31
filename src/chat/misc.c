@@ -687,6 +687,8 @@ void *why2_communicate_thread(void *arg)
     why2_deallocate(username);
     why2_toml_read_free(server_username);
 
+    char *decoded_code_buffer = NULL;
+
     while (!(exiting || force_exiting)) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
         if ((raw = read_user(connection, &raw_ptr)) == NULL) break; //READ
@@ -700,18 +702,19 @@ void *why2_communicate_thread(void *arg)
         }
 
         decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
+        decoded_code_buffer = get_string_from_json_string(raw, "code"); //DECODE
 
         //TRIM MESSAGE
         why2_trim_string(&decoded_buffer);
 
         if (decoded_buffer != NULL && strlen(decoded_buffer) != 0)
         {
-            if (strncmp(decoded_buffer, "code", 4) == 0) //CODES FROM CLIENT
+            if (decoded_code_buffer != NULL) //CODES FROM CLIENT
             {
-                if (strcmp(decoded_buffer, WHY2_CHAT_CODE_EXIT) == 0) //USER REQUESTED EXIT
+                if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_EXIT) == 0) //USER REQUESTED EXIT
                 {
                     exiting = 1;
-                } else if (strcmp(decoded_buffer, WHY2_CHAT_CODE_LIST) == 0) //USER REQUESTED LIST OF USERS
+                } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_LIST) == 0) //USER REQUESTED LIST OF USERS
                 {
                     why2_node_t *head = connection_list.head;
                     if (head == NULL) goto deallocation; //TODO: Send no users code
@@ -751,7 +754,7 @@ void *why2_communicate_thread(void *arg)
 
                     //DEALLOCATION
                     why2_deallocate(message);
-                } else if (strcmp(decoded_buffer, WHY2_CHAT_CODE_VERSION) == 0)
+                } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_VERSION) == 0)
                 {
                     //GET VERSION STRING FROM THE VERSIONS JSON
                     char *message = why2_malloc(strlen(WHY2_VERSION) + 1); //ALLOCATE MESSAGE FOR CLIENT
@@ -763,21 +766,19 @@ void *why2_communicate_thread(void *arg)
 
                     //DEALLOCATION
                     why2_deallocate(message);
-                } else if (strncmp(decoded_buffer, WHY2_CHAT_CODE_PM, strlen(WHY2_CHAT_CODE_PM)) == 0) //PM
+                } else if (strcmp(decoded_code_buffer, WHY2_CHAT_CODE_PM) == 0) //PM
                 {
-                    char *input = decoded_buffer + strlen(WHY2_CHAT_CODE_PM) + 1;
-
                     char *id = NULL; //RECEIVER
                     char *msg;
 
                     //CHECK ARGS VALIDITY
-                    why2_bool valid_param = strlen(input) >= 3;
+                    why2_bool valid_param = strlen(decoded_buffer) >= 3;
                     if (valid_param)
                     {
                         valid_param = 0;
-                        for (unsigned long i = 1; i < strlen(input); i++)
+                        for (unsigned long i = 1; i < strlen(decoded_buffer); i++)
                         {
-                            if (input[i] == ';')
+                            if (decoded_buffer[i] == ';')
                             {
                                 valid_param = 1;
 
@@ -785,12 +786,12 @@ void *why2_communicate_thread(void *arg)
                                 id = why2_malloc(i + 1);
                                 for (unsigned long j = 0; j < i; j++)
                                 {
-                                    id[j] = input[j];
+                                    id[j] = decoded_buffer[j];
                                 }
                                 id[i] = '\0';
 
                                 //EXTRACT MESSAGE
-                                msg = input + i + 1;
+                                msg = decoded_buffer + i + 1;
                                 break;
                             }
                         }
@@ -848,6 +849,7 @@ void *why2_communicate_thread(void *arg)
         why2_deallocate(raw_ptr);
         why2_deallocate(raw_output);
         why2_deallocate(decoded_buffer);
+        why2_deallocate(decoded_code_buffer);
         json_object_put(json);
     }
 
