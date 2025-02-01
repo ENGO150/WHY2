@@ -288,7 +288,7 @@ int main(void)
 
                 char *hash = why2_sha256(line, strlen(line)); //HASHISH
 
-                why2_send_socket(hash, NULL, listen_socket); //SEND BUT HASHED
+                why2_send_socket_code(hash, NULL, listen_socket, WHY2_CHAT_CODE_PASSWORD); //SEND BUT HASHED
 
                 //DEALLOCATION
                 why2_deallocate(hash);

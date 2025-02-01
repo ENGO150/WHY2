@@ -572,6 +572,7 @@ void *why2_communicate_thread(void *arg)
                 code = get_string_from_json_string(raw, "code");
                 exiting_read = code != NULL && strcmp(code, WHY2_CHAT_CODE_USERNAME) == 0;
             } while (!exiting_read);
+            why2_deallocate(code);
 
             decoded_buffer = get_string_from_json_string(raw, "message"); //DECODE
 
@@ -617,11 +618,25 @@ void *why2_communicate_thread(void *arg)
             {
                 send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_ENTER_PASSWORD);
 
-                if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+                //KEEP READING UNTIL CODE ARRIVES
+                char *code = NULL;
+                why2_bool exiting_read = 0;
+                do
                 {
-                    force_exiting = 1; //FAILURE
-                    goto deallocation;
-                }
+                    //DEALLOCATE
+                    why2_deallocate(code);
+
+                    if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+                    {
+                        force_exiting = 1; //FAILURE
+                        goto deallocation;
+                    }
+
+                    //COMPARE CODE
+                    code = get_string_from_json_string(raw, "code");
+                    exiting_read = code != NULL && strcmp(code, WHY2_CHAT_CODE_PASSWORD) == 0;
+                } while (!exiting_read);
+                why2_deallocate(code);
 
                 password = get_string_from_json_string(raw, "message"); //DECODE
 
@@ -634,11 +649,25 @@ void *why2_communicate_thread(void *arg)
 
                 for (unsigned char i = 0; i < max_tries; i++)
                 {
-                    if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+                    //KEEP READING UNTIL CODE ARRIVES
+                    char *code = NULL;
+                    why2_bool exiting_read = 0;
+                    do
                     {
-                        force_exiting = 1; //FAILURE
-                        goto deallocation;
-                    }
+                        //DEALLOCATE
+                        why2_deallocate(code);
+
+                        if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+                        {
+                            force_exiting = 1; //FAILURE
+                            goto deallocation;
+                        }
+
+                        //COMPARE CODE
+                        code = get_string_from_json_string(raw, "code");
+                        exiting_read = code != NULL && strcmp(code, WHY2_CHAT_CODE_PASSWORD) == 0;
+                    } while (!exiting_read);
+                    why2_deallocate(code);
 
                     password = get_string_from_json_string(raw, "message"); //DECODE
 
