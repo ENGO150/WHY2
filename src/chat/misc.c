@@ -1203,15 +1203,50 @@ void *why2_listen_authority(void *socket)
         {
             if (strcmp(code, WHY2_CHAT_CODE_KEY_EXCHANGE) == 0)
             {
+                //VARIABLES
+                char *user_config_path = why2_get_client_config_path();
+                char *username;
+                why2_bool asked_username = 0; //FOR CORRECT DEALLOCATION FN
+
+                if (!why2_toml_contains(user_config_path, "authority_username"))
+                {
+                    //GET USERNAME FOR CA
+                    pthread_t thread_getline;
+
+                    printf("Enter username for CA server.\nIn order to be authenticated, you will need to use this username on server too.\n>>> ");
+
+                    //GET INPUT
+                    pthread_create(&thread_getline, NULL, why2_getline_thread, NULL);
+                    pthread_join(thread_getline, (void**) &username);
+
+                    //REMOVE \n
+                    username[strlen(username) - 1] = '\0';
+
+                    //SAVE
+                    why2_toml_write_preserve(user_config_path, "authority_username", username);
+
+                    asked_username = 1;
+
+                    printf("\n");
+                } else username = why2_chat_client_config("authority_username");
+
                 //SEND CA CLIENT'S ENCRYPTED PUBKEY
                 char *key = why2_chat_ecc_serialize_public_key();
                 char *encrypted_pubkey = why2_chat_ecc_encrypt(key, message); //lol inverted params
 
-                why2_send_socket_code(encrypted_pubkey, NULL, socket_ptr, WHY2_CHAT_CODE_CLIENT_KEY_EXCHANGE); //SEND
+                why2_send_socket_code(encrypted_pubkey, username, socket_ptr, WHY2_CHAT_CODE_CLIENT_KEY_EXCHANGE); //SEND
 
                 //DEALLOCATION
+                why2_deallocate(user_config_path);
                 why2_deallocate(key);
                 why2_deallocate(encrypted_pubkey);
+                if (asked_username)
+                {
+                    free(username);
+                } else
+                {
+                    why2_toml_read_free(username);
+                }
             } else exiting = 1;
         } else exiting = 1;
 
