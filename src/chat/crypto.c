@@ -247,12 +247,12 @@ void why2_chat_deallocate_keys(void)
     EVP_PKEY_free(keypair);
 }
 
-char *why2_sha256(char *input)
+char *why2_sha256(char *input, size_t length)
 {
     unsigned char *output = why2_malloc(SHA256_DIGEST_LENGTH + 1);
     char *formatted_output = why2_malloc(SHA256_DIGEST_LENGTH * 2 + 2);
 
-    SHA256((unsigned char*) input, strlen(input), output);
+    SHA256((unsigned char*) input, length, output);
 
     //SAVE AS STRING IN HEX
     for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
