@@ -61,6 +61,9 @@ enum WHY2_CHAT_SERVER_TYPE //TYPE OF SERVER
 //(AUTHORITY -> CLIENT) CODES
 #define WHY2_CHAT_CODE_KEY_EXCHANGE "AC0" //TELL CLIENT YOU ARE SENDING YOUR PUBLIC KEY
 
+//(CLIENT -> AUTHORITY) CODES
+#define WHY2_CHAT_CODE_CLIENT_KEY_EXCHANGE "CA0" //TELL AUTHORITY YOU ARE SENDING YOUR PUBLIC KEY
+
 //COMMANDS
 #define WHY2_CHAT_COMMAND_PREFIX "!" //the little thingy you write before the command names to make the program recognise them boy. You know? Like in minecraft you use /kill... Also, are you dumb?
 #define WHY2_CHAT_COMMAND_EXIT "exit" //QUIT THE PROGRAM CMD
