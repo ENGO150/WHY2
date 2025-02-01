@@ -50,6 +50,12 @@ typedef struct _connection_node
     char *key; //EACH USER WILL USE DIFFERENT KEY FOR COMMUNICATION
 } connection_node_t; //SINGLE LINKED LIST
 
+typedef struct _read_socket_raw_thread_node
+{
+    int connection;
+    char *key;
+} read_socket_raw_thread_node_t;
+
 why2_list_t connection_list = WHY2_LIST_EMPTY;
 why2_list_t waiting_list = WHY2_LIST_EMPTY;
 
@@ -113,7 +119,7 @@ void send_to_all(char *json)
 
         connection_buffer = *(connection_node_t*) node_buffer -> value;
 
-        why2_send_socket(message, username, connection_buffer.connection); //SEND TO CLIENT
+        why2_send_socket(message, username, connection_buffer.key, connection_buffer.connection); //SEND TO CLIENT
     }
 
     //DEALLOCATION
@@ -159,7 +165,7 @@ void remove_non_ascii(char **text)
     (*text)[j] = '\0';
 }
 
-char *read_socket_raw(int socket)
+char *read_socket_raw(int socket, WHY2_UNUSED char *key)
 {
     if (socket == -1)
     {
@@ -211,7 +217,9 @@ char *read_socket_raw(int socket)
 
 void *read_socket_raw_thread(void *socket)
 {
-    return read_socket_raw(*(int*) socket);
+    read_socket_raw_thread_node_t node = *(read_socket_raw_thread_node_t*) socket;
+
+    return read_socket_raw(node.connection, node.key);
 }
 
 void remove_json_syntax_characters(char *text)
@@ -346,12 +354,15 @@ why2_node_t *find_connection_by_id(unsigned long id)
     return buffer;
 }
 
-char *read_user(int connection, void **raw_ptr)
+char *read_user(int connection, void **raw_ptr, char *key)
 {
     //VARIABLES
     void *buffer;
     pthread_t thread_buffer;
     pthread_t thread_deletion_buffer;
+
+    //PARSE PARAMETERS
+    read_socket_raw_thread_node_t node = { connection, key };
 
     //RESET VARIABLES
     *raw_ptr = NULL;
@@ -359,7 +370,7 @@ char *read_user(int connection, void **raw_ptr)
     buffer = &thread_buffer;
 
     //READ
-    pthread_create(&thread_buffer, NULL, read_socket_raw_thread, &connection);
+    pthread_create(&thread_buffer, NULL, read_socket_raw_thread, &node);
     why2_list_push(&waiting_list, &buffer, sizeof(buffer));
 
     //RUN DELETION THREAD
@@ -383,21 +394,21 @@ char *get_username(int connection)
     return c_node.username;
 }
 
-void send_socket_deallocate(char *text, char *username, int socket) //SAME AS why2_send_socket BUT IT DEALLOCATES username
+void send_socket_deallocate(char *text, char *username, char *key, int socket) //SAME AS why2_send_socket BUT IT DEALLOCATES username
 {
-    why2_send_socket(text, username, socket);
+    why2_send_socket(text, username, key, socket);
 
     why2_toml_read_free(username);
 }
 
-void send_socket_code_deallocate(char *params, char *username, int socket, char *code) //SAME AS send_socket_deallocate BUT WITH CODE FIELD
+void send_socket_code_deallocate(char *params, char *username, char *key, int socket, char *code) //SAME AS send_socket_deallocate BUT WITH CODE FIELD
 {
-    why2_send_socket_code(params, username, socket, code);
+    why2_send_socket_code(params, username, key, socket, code);
 
     why2_toml_read_free(username);
 }
 
-void send_socket(char *text, char *username, int socket, why2_bool welcome, char *code)
+void send_socket(char *text, char *username, WHY2_UNUSED char *why2_key, int socket, why2_bool welcome, char *code)
 {
     //VARIABLES
     char *output = why2_strdup("");
@@ -465,16 +476,16 @@ void send_socket(char *text, char *username, int socket, why2_bool welcome, char
     why2_deallocate(output);
 }
 
-void send_welcome_socket_deallocate(char *text, char *username, int socket) //SAME AS why2_send_socket BUT IT DEALLOCATES username
+void send_welcome_socket_deallocate(char *text, char *username, char *key, int socket) //SAME AS why2_send_socket BUT IT DEALLOCATES username
 {
-    send_socket(NULL, username, socket, 1, text);
+    send_socket(NULL, username, key, socket, 1, text);
 
     why2_toml_read_free(username);
 }
 
-void send_welcome_packet(int connection)
+void send_welcome_packet(int connection, char *key)
 {
-    send_welcome_socket_deallocate(WHY2_CHAT_CODE_ACCEPT_MESSAGES, why2_chat_server_config("server_username"), connection);
+    send_welcome_socket_deallocate(WHY2_CHAT_CODE_ACCEPT_MESSAGES, why2_chat_server_config("server_username"), key, connection);
 }
 
 unsigned long get_latest_id()
@@ -509,7 +520,7 @@ why2_bool perform_key_exchange_client(int connection)
     char *read_code = NULL;
     why2_bool exiting_read = 0;
 
-    why2_send_socket_code(client_pubkey, NULL, connection, WHY2_CHAT_CODE_CLIENT_SERVER_KEY_EXCHANGE); //SEND pubkey TO SERVER
+    why2_send_socket_code(client_pubkey, NULL, NULL, connection, WHY2_CHAT_CODE_CLIENT_SERVER_KEY_EXCHANGE); //SEND pubkey TO SERVER
 
     why2_deallocate(client_pubkey); //DEALLOCATE client_pubkey
 
@@ -519,7 +530,7 @@ why2_bool perform_key_exchange_client(int connection)
         why2_deallocate(read);
         why2_deallocate(read_code);
 
-        read = read_socket_raw(connection);
+        read = read_socket_raw(connection, NULL);
 
         read_code = get_string_from_json_string(read, "code");
         exiting_read = read_code != NULL && strcmp(read_code, WHY2_CHAT_CODE_SERVER_CLIENT_KEY_EXCHANGE) == 0;
@@ -552,7 +563,7 @@ why2_bool perform_key_exchange_server(int connection, char **key)
         why2_deallocate(read);
         why2_deallocate(read_code);
 
-        read = read_socket_raw(connection);
+        read = read_socket_raw(connection, NULL);
 
         read_code = get_string_from_json_string(read, "code");
         exiting_read = read_code != NULL && strcmp(read_code, WHY2_CHAT_CODE_CLIENT_SERVER_KEY_EXCHANGE) == 0;
@@ -564,7 +575,7 @@ why2_bool perform_key_exchange_server(int connection, char **key)
 
     //SEND CLIENT PUBKEY
     server_pubkey = why2_chat_ecc_serialize_public_key();
-    why2_send_socket_code(server_pubkey, NULL, connection, WHY2_CHAT_CODE_SERVER_CLIENT_KEY_EXCHANGE);
+    why2_send_socket_code(server_pubkey, NULL, NULL, connection, WHY2_CHAT_CODE_SERVER_CLIENT_KEY_EXCHANGE);
 
     *key = why2_chat_ecc_shared_key(client_pubkey);
 
@@ -577,14 +588,14 @@ why2_bool perform_key_exchange_server(int connection, char **key)
 }
 
 //GLOBAL
-void why2_send_socket(char *text, char *username, int socket)
+void why2_send_socket(char *text, char *username, char *key, int socket)
 {
-    send_socket(text, username, socket, 0, NULL);
+    send_socket(text, username, key, socket, 0, NULL);
 }
 
-void why2_send_socket_code(char *params, char *username, int socket, char *code)
+void why2_send_socket_code(char *params, char *username, char *key, int socket, char *code)
 {
-    send_socket(params, username, socket, 0, code);
+    send_socket(params, username, key, socket, 0, code);
 }
 
 void *why2_communicate_thread(void *arg)
@@ -601,7 +612,7 @@ void *why2_communicate_thread(void *arg)
 
     printf("User connected.\t\t%d\n", connection);
 
-    send_welcome_packet(connection); //TELL USER ALL THE INFO THEY NEED
+    send_welcome_packet(connection, client_server_key); //TELL USER ALL THE INFO THEY NEED
 
     //GET USERNAME
     char *config_username = why2_chat_server_config("user_pick_username");
@@ -627,7 +638,7 @@ void *why2_communicate_thread(void *arg)
     {
         if (config_username == NULL) fprintf(stderr, "Your config doesn't contain 'user_pick_username'. Please update your configuration.\n");
 
-        send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_PICK_USERNAME); //ASK USER FOR USERNAME
+        send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_PICK_USERNAME); //ASK USER FOR USERNAME
 
         while (invalid_username)
         {
@@ -647,7 +658,7 @@ void *why2_communicate_thread(void *arg)
                 why2_deallocate(code);
                 why2_deallocate(raw);
 
-                if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+                if ((raw = read_user(connection, &raw_ptr, client_server_key)) == NULL) //READ
                 {
                     force_exiting = 1; //FAILURE
                     goto deallocation;
@@ -691,7 +702,7 @@ void *why2_communicate_thread(void *arg)
 
             if (invalid_username)
             {
-                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_INVALID_USERNAME); //TELL THE USER THEY ARE DUMB AS FUCK
+                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_INVALID_USERNAME); //TELL THE USER THEY ARE DUMB AS FUCK
                 continue;
             }
 
@@ -701,7 +712,7 @@ void *why2_communicate_thread(void *arg)
             char *user_config_path = why2_get_server_users_path();
             if (!why2_toml_contains(user_config_path, decoded_buffer)) //REGISTRATION
             {
-                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_ENTER_PASSWORD);
+                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_ENTER_PASSWORD);
 
                 //KEEP READING UNTIL CODE ARRIVES
                 char *code = NULL;
@@ -713,7 +724,7 @@ void *why2_communicate_thread(void *arg)
                     why2_deallocate(code);
                     why2_deallocate(raw);
 
-                    if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+                    if ((raw = read_user(connection, &raw_ptr, client_server_key)) == NULL) //READ
                     {
                         force_exiting = 1; //FAILURE
                         goto deallocation;
@@ -730,7 +741,7 @@ void *why2_communicate_thread(void *arg)
                 why2_toml_write(user_config_path, username, password); //SAVE PASSWORD
             } else //LOGIN
             {
-                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_ENTER_PASSWORD);
+                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_ENTER_PASSWORD);
 
                 unsigned char max_tries = (unsigned char) server_config_int("max_password_tries");
 
@@ -746,7 +757,7 @@ void *why2_communicate_thread(void *arg)
                         why2_deallocate(code);
                         why2_deallocate(raw);
 
-                        if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
+                        if ((raw = read_user(connection, &raw_ptr, client_server_key)) == NULL) //READ
                         {
                             force_exiting = 1; //FAILURE
                             goto deallocation;
@@ -770,7 +781,7 @@ void *why2_communicate_thread(void *arg)
                         goto deallocation;
                     }
 
-                    send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_INVALID_PASSWORD);
+                    send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_INVALID_PASSWORD);
                 }
             }
 
@@ -824,7 +835,7 @@ void *why2_communicate_thread(void *arg)
 
     while (!(exiting || force_exiting)) //KEEP COMMUNICATION ALIVE FOR 5 MINUTES [RESET TIMER AT MESSAGE SENT]
     {
-        if ((raw = read_user(connection, &raw_ptr)) == NULL) break; //READ
+        if ((raw = read_user(connection, &raw_ptr, client_server_key)) == NULL) break; //READ
         json = json_tokener_parse("{}");
         raw_output = why2_strdup("");
 
@@ -881,7 +892,7 @@ void *why2_communicate_thread(void *arg)
                 } while (buffer != NULL);
 
                 //SEND
-                send_socket_code_deallocate(message, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_LIST_SERVER);
+                send_socket_code_deallocate(message, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_LIST_SERVER);
 
                 //DEALLOCATION
                 why2_deallocate(message);
@@ -893,7 +904,7 @@ void *why2_communicate_thread(void *arg)
                 sprintf(message, "%s%c", WHY2_VERSION, '\0'); //CREATE THE MESSAGE
 
                 //SEND
-                send_socket_code_deallocate(message, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_VERSION_SERVER);
+                send_socket_code_deallocate(message, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_VERSION_SERVER);
 
                 //DEALLOCATION
                 why2_deallocate(message);
@@ -946,8 +957,8 @@ void *why2_communicate_thread(void *arg)
                     why2_bool self_pm = pm_connection_node.connection == connection;
 
                     //SEND YOU DUMB FUCK
-                    send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), pm_connection_node.connection, WHY2_CHAT_CODE_DM_SERVER); //RECIPIENT
-                    if (!self_pm) send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_DM_SERVER); //AUTHOR
+                    send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), pm_connection_node.key, pm_connection_node.connection, WHY2_CHAT_CODE_DM_SERVER); //RECIPIENT
+                    if (!self_pm) send_socket_code_deallocate(private_msg, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_DM_SERVER); //AUTHOR
 
                     why2_deallocate(private_msg);
                 }
@@ -983,7 +994,7 @@ void *why2_communicate_thread(void *arg)
         json_object_put(json);
     }
 
-    if (exiting) send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection, WHY2_CHAT_CODE_SSQC);
+    if (exiting) send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_SSQC);
 
     printf("User disconnected.\t%d\n", connection);
 
@@ -1011,12 +1022,12 @@ void *why2_authority_communicate_thread(void *arg)
     printf("User connected.\t\t%d\n", connection);
 
     //SEND USER KEY EXCHANGE CODE
-    why2_send_socket_code(NULL, NULL, connection, WHY2_CHAT_CODE_KEY_EXCHANGE);
+    why2_send_socket_code(NULL, NULL, NULL, connection, WHY2_CHAT_CODE_KEY_EXCHANGE);
 
     do
     {
         //READ PACKET
-        if ((raw = read_user(connection, &raw_ptr)) == NULL) break; //READ
+        if ((raw = read_user(connection, &raw_ptr, NULL)) == NULL) break; //READ
 
         //GET DATA
         message = get_string_from_json_string(raw, "message");
@@ -1050,7 +1061,7 @@ void *why2_authority_communicate_thread(void *arg)
                     fread(buffer, buffer_size, 1, cert); //READ
 
                     //SEND STATUS
-                    why2_send_socket_code(NULL, NULL, connection, strcmp(buffer, message) == 0 ? WHY2_CHAT_CODE_SUCCESS : WHY2_CHAT_CODE_FAILURE);
+                    why2_send_socket_code(NULL, NULL, NULL, connection, strcmp(buffer, message) == 0 ? WHY2_CHAT_CODE_SUCCESS : WHY2_CHAT_CODE_FAILURE);
 
                     //DEALLOCATION
                     why2_deallocate(buffer);
@@ -1061,7 +1072,7 @@ void *why2_authority_communicate_thread(void *arg)
                     fwrite(message, 1, strlen(message), cert); //WRITE PUBKEY
 
                     //CONFIRM SUCCESS
-                    why2_send_socket_code(NULL, NULL, connection, WHY2_CHAT_CODE_SUCCESS);
+                    why2_send_socket_code(NULL, NULL, NULL, connection, WHY2_CHAT_CODE_SUCCESS);
                 }
 
                 //DEALLOCATION
@@ -1137,7 +1148,7 @@ void why2_clean_connections(void)
 
         connection_buffer = *(connection_node_t*) node_buffer_2 -> value;
 
-        send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection_buffer.connection, WHY2_CHAT_CODE_SSQC);
+        send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), connection_buffer.key, connection_buffer.connection, WHY2_CHAT_CODE_SSQC);
 
         close(connection_buffer.connection);
         why2_list_remove(&connection_list, node_buffer_2); //REMOVE
@@ -1195,7 +1206,7 @@ void *why2_listen_server(void *socket)
     {
         continuing = 0;
 
-        read = read_socket_raw(connection);
+        read = read_socket_raw(connection, why2_chat_get_client_server_key());
         if (read == NULL) continue;
 
         //GET CONTENT
@@ -1378,7 +1389,7 @@ void *why2_listen_authority(void *socket)
     do
     {
         //READ PACKET
-        read = read_socket_raw(socket_ptr);
+        read = read_socket_raw(socket_ptr, NULL);
         if (read == NULL) continue; //INVALID PACKET RECEIVED
 
         //GET DATA
@@ -1418,7 +1429,7 @@ void *why2_listen_authority(void *socket)
                 //SEND CA CLIENT'S ENCRYPTED PUBKEY
                 char *key = why2_chat_ecc_serialize_public_key();
 
-                why2_send_socket_code(key, username, socket_ptr, WHY2_CHAT_CODE_CLIENT_KEY_EXCHANGE); //SEND
+                why2_send_socket_code(key, username, NULL, socket_ptr, WHY2_CHAT_CODE_CLIENT_KEY_EXCHANGE); //SEND
 
                 //DEALLOCATION
                 why2_deallocate(user_config_path);

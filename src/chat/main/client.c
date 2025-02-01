@@ -44,7 +44,7 @@ void exit_client(WHY2_UNUSED int i) //guess what
     if (exited) return;
     exited = 1;
 
-    why2_send_socket_code(NULL, NULL, listen_socket, WHY2_CHAT_CODE_EXIT);
+    why2_send_socket_code(NULL, NULL, why2_chat_get_client_server_key(), listen_socket, WHY2_CHAT_CODE_EXIT);
 }
 
 why2_bool command(char *input, char *command, char **arg)
@@ -264,17 +264,17 @@ int main(void)
                 char *final_message = why2_malloc(strlen(id) + strlen(msg) + 2);
                 sprintf(final_message, "%s;%s%c", id, msg, '\0');
 
-                why2_send_socket_code(final_message, NULL, listen_socket, WHY2_CHAT_CODE_DM); //SEND
+                why2_send_socket_code(final_message, NULL, why2_chat_get_client_server_key(), listen_socket, WHY2_CHAT_CODE_DM); //SEND
 
                 //DEALLOCATION
                 why2_deallocate(id);
                 why2_deallocate(final_message);
             } else if (command(line, WHY2_CHAT_COMMAND_LIST, &cmd_arg)) //LIST CMD
             {
-                why2_send_socket_code(NULL, NULL, listen_socket, WHY2_CHAT_CODE_LIST);
+                why2_send_socket_code(NULL, NULL, why2_chat_get_client_server_key(), listen_socket, WHY2_CHAT_CODE_LIST);
             } else if (command(line, WHY2_CHAT_COMMAND_VERSION, &cmd_arg)) //VERSION CMD
             {
-                why2_send_socket_code(NULL, NULL, listen_socket, WHY2_CHAT_CODE_VERSION);
+                why2_send_socket_code(NULL, NULL, why2_chat_get_client_server_key(), listen_socket, WHY2_CHAT_CODE_VERSION);
             } else
             {
                 invalid("command");
@@ -288,7 +288,7 @@ int main(void)
 
                 char *hash = why2_sha256(line, strlen(line)); //HASHISH
 
-                why2_send_socket_code(hash, NULL, listen_socket, WHY2_CHAT_CODE_PASSWORD); //SEND BUT HASHED
+                why2_send_socket_code(hash, NULL, why2_chat_get_client_server_key(), listen_socket, WHY2_CHAT_CODE_PASSWORD); //SEND BUT HASHED
 
                 //DEALLOCATION
                 why2_deallocate(hash);
@@ -299,10 +299,10 @@ int main(void)
                 {
                     __why2_set_asking_username(0);
 
-                    why2_send_socket_code(line, NULL, listen_socket, WHY2_CHAT_CODE_USERNAME);
+                    why2_send_socket_code(line, NULL, why2_chat_get_client_server_key(), listen_socket, WHY2_CHAT_CODE_USERNAME);
                 } else
                 {
-                    why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
+                    why2_send_socket(line, NULL, why2_chat_get_client_server_key(), listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
                 }
             }
 
