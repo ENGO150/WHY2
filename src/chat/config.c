@@ -191,7 +191,7 @@ char *why2_get_client_config_path(void)
 char *why2_get_authority_cert_path(char *username)
 {
     char *buffer = config_path(AUTHORITY);
-    char *path = why2_malloc(strlen(buffer) + strlen(username) + strlen(WHY2_CHAT_AUTHORITY_CERTS_EXTENSION) + 2);
+    char *path = why2_malloc(strlen(buffer) + strlen(username) + strlen(WHY2_CHAT_AUTHORITY_CERTS_EXTENSION) + 3);
 
     //GET THE FILE
     sprintf(path, "%s/%s%s%c", buffer, username, WHY2_CHAT_AUTHORITY_CERTS_EXTENSION, '\0');
