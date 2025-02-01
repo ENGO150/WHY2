@@ -97,6 +97,23 @@ char *base64_decode(char *encoded_message, size_t *length)
     return decoded_message;
 }
 
+void calculate_ecdh_secret(EVP_PKEY *pri, EVP_PKEY *pub, char **secret, size_t *len)
+{
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(pri, NULL);
+    EVP_PKEY_derive_init(ctx); //INIT DERIVE CONTEXT
+
+    EVP_PKEY_derive_set_peer(ctx, pub); //CONFIG
+
+    //ALLOCATE
+    EVP_PKEY_derive(ctx, NULL, len); //CALCULATE LENGTH
+    *secret = why2_malloc(*len);
+
+    EVP_PKEY_derive(ctx, (unsigned char*) *secret, len); //GET SHARED SECRET
+
+    //DEALLOCATION
+    EVP_PKEY_CTX_free(ctx);
+}
+
 //GLOBAL
 void why2_chat_init_keys(void)
 {
