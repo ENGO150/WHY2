@@ -259,7 +259,7 @@ EVP_PKEY* why2_chat_ecc_deserialize_public_key(char *pubkey)
     return key;
 }
 
-char *why2_chat_ecc_shared_key(char *message, char *ecc_key)
+char *why2_chat_ecc_shared_key(char *ecc_key)
 {
     //VARIABLES
     size_t key_length;
