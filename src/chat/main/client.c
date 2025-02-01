@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -108,6 +109,7 @@ int main(void)
     pthread_t thread_getline;
     why2_bool ssqc = 0;
     char *cmd_arg = NULL;
+    why2_bool *ca_success;
 
     //DEFINE CONNECTION PROPERTIES
     struct sockaddr_in server_addr;
@@ -124,7 +126,11 @@ int main(void)
     pthread_create(&thread_buffer, NULL, why2_listen_authority, &listen_socket); //LISTEN TO AUTHORITY (only in why2, fuck authorities irl [hi fbi, this is just a joke haha])
     why2_deallocate(line); //DEALLOCATE ADDRESS
 
-    pthread_join(thread_buffer, NULL); //WAIT UNTIL CA AUTH IS COMPLETED
+    pthread_join(thread_buffer, (void**) &ca_success); //WAIT UNTIL CA AUTH IS COMPLETED
+    close(listen_socket); //CLOSE CONNECTION
+
+    if (!*ca_success) why2_die("CA Authentication failed!");
+    why2_deallocate(ca_success);
 
     //SERVER CONNECT
     server_addr.sin_port = htons(WHY2_CHAT_SERVER_PORT);
