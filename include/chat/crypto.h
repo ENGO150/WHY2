@@ -49,7 +49,7 @@ why2_bool why2_chat_ecc_verify_signature(char *message, char *signature, EVP_PKE
 char *why2_chat_ecc_serialize_public_key(); //GET PUBLIC ECC KEY IN BASE64
 EVP_PKEY* why2_chat_ecc_deserialize_public_key(char *pubkey); //GET EVP_PKEY FROM BASE64 PUBLIC ECC KEY
 
-char *why2_chat_ecc_encrypt(char *message, char *key); //ENCRYPT message WITH ECC key
+char *why2_chat_ecc_shared_key(char *message, char *ecc_key); //ENCRYPT message WITH ECC key
 
 char *why2_sha256(char *input, size_t length); //HASH input USING SHA256 AND RETURN IN STRING
 

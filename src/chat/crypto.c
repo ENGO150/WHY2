@@ -259,13 +259,13 @@ EVP_PKEY* why2_chat_ecc_deserialize_public_key(char *pubkey)
     return key;
 }
 
-char *why2_chat_ecc_encrypt(char *message, char *key)
+char *why2_chat_ecc_shared_key(char *message, char *ecc_key)
 {
     //VARIABLES
     size_t key_length;
     char *secret = NULL;
     size_t secret_len;
-    char *recipient_pubkey_decoded = base64_decode(key, &key_length); //DECODE key
+    char *recipient_pubkey_decoded = base64_decode(ecc_key, &key_length); //DECODE key
     why2_output_flags encrypted;
     char *encrypted_text;
     char *returning;
