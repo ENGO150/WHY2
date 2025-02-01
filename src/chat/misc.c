@@ -31,6 +31,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <json-c/json.h>
 
 #include <why2/chat/config.h>
+#include <why2/chat/crypto.h>
 #include <why2/chat/flags.h>
 
 #include <why2/llist.h>
@@ -867,9 +868,42 @@ void *why2_communicate_thread(void *arg)
 
 void *why2_authority_communicate_thread(void *arg)
 {
+    //VARIABLES
     int connection = *(int*) arg;
+    char *pubkey = why2_chat_ecc_serialize_public_key();
+    why2_bool exiting = 0;
+    char *raw;
+    void *raw_ptr;
+    char *message;
+    char *code;
 
     printf("User connected.\t\t%d\n", connection);
+
+    //SEND USER CA PUBLIC KEY
+    why2_send_socket_code(pubkey, NULL, connection, WHY2_CHAT_CODE_KEY_EXCHANGE);
+    why2_deallocate(pubkey);
+
+    do
+    {
+        //READ PACKET
+        raw = read_user(connection, &raw_ptr);
+        if ((raw = read_user(connection, &raw_ptr)) == NULL) break; //READ
+
+        //GET DATA
+        message = get_string_from_json_string(raw, "message");
+        code = get_string_from_json_string(raw, "code");
+
+        if (code != NULL)
+        {
+            //do stuff
+        } else exiting = 1;
+
+        //DEALLOCATION
+        why2_deallocate(raw);
+        why2_deallocate(raw_ptr);
+        why2_deallocate(message);
+        why2_deallocate(code);
+    } while (!exiting);
 
     return NULL;
 }
