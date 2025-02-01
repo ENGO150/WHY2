@@ -870,18 +870,17 @@ void *why2_authority_communicate_thread(void *arg)
 {
     //VARIABLES
     int connection = *(int*) arg;
-    char *pubkey = why2_chat_ecc_serialize_public_key();
     why2_bool exiting = 0;
     char *raw;
     void *raw_ptr;
     char *message;
+    char *username;
     char *code;
 
     printf("User connected.\t\t%d\n", connection);
 
-    //SEND USER CA PUBLIC KEY
+    //SEND USER KEY EXCHANGE CODE
     why2_send_socket_code(NULL, NULL, connection, WHY2_CHAT_CODE_KEY_EXCHANGE);
-    why2_deallocate(pubkey);
 
     do
     {
@@ -890,17 +889,61 @@ void *why2_authority_communicate_thread(void *arg)
 
         //GET DATA
         message = get_string_from_json_string(raw, "message");
+        username = get_string_from_json_string(raw, "username");
         code = get_string_from_json_string(raw, "code");
 
-        if (code != NULL)
+        if (code != NULL && message != NULL && username != NULL)
         {
-            //do stuff
+            if (strcmp(code, WHY2_CHAT_CODE_CLIENT_KEY_EXCHANGE) == 0)
+            {
+                //GET PATH OF USER CERT
+                char *path = why2_get_authority_cert_path(username);
+                FILE *cert;
+
+                if (access(path, F_OK) == 0) //ALREADY EXISTS
+                {
+                    //VARIABLES
+                    char *buffer;
+                    long buffer_size;
+
+                    cert = why2_fopen(path, "r"); //OPEN FILE
+
+                    //COUNT LENGTH OF buffer AND STORE IT IN buffer_size
+                    fseek(cert, 0, SEEK_END);
+                    buffer_size = ftell(cert);
+                    rewind(cert); //REWIND file_buffer (NO SHIT)
+
+                    //ALLOCATE
+                    buffer = why2_calloc(buffer_size + 1, sizeof(char));
+
+                    fread(buffer, buffer_size, 1, cert); //READ
+
+                    //SEND STATUS
+                    why2_send_socket_code(NULL, NULL, connection, strcmp(buffer, message) == 0 ? WHY2_CHAT_CODE_SUCCESS : WHY2_CHAT_CODE_FAILURE);
+
+                    //DEALLOCATION
+                    why2_deallocate(buffer);
+                } else
+                {
+                    //CREATE CERT
+                    cert = why2_fopen(path, "w+"); //CREATE FILE
+                    fwrite(message, 1, strlen(message), cert); //WRITE PUBKEY
+
+                    //CONFIRM SUCCESS
+                    why2_send_socket_code(NULL, NULL, connection, WHY2_CHAT_CODE_SUCCESS);
+                }
+
+                //DEALLOCATION
+                why2_deallocate(path);
+                why2_deallocate(cert);
+            }
         } else exiting = 1;
 
         //DEALLOCATION
         why2_deallocate(raw);
         why2_deallocate(raw_ptr);
         why2_deallocate(message);
+        why2_deallocate(username);
         why2_deallocate(code);
     } while (!exiting);
 
