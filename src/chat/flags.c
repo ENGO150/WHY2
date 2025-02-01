@@ -22,6 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <termios.h>
 
 why2_bool asking_password = 0;
+why2_bool asking_username = 0;
 
 void __why2_set_asking_password(why2_bool value)
 {
@@ -44,4 +45,14 @@ void __why2_set_asking_password(why2_bool value)
 why2_bool __why2_get_asking_password()
 {
     return asking_password;
+}
+
+void __why2_set_asking_username(why2_bool value)
+{
+    asking_username = value;
+}
+
+why2_bool __why2_get_asking_username()
+{
+    return asking_username;
 }

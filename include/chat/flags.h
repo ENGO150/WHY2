@@ -83,6 +83,9 @@ enum WHY2_CHAT_SERVER_TYPE //TYPE OF SERVER
 void __why2_set_asking_password(why2_bool value); //IF HASH SHOULD BE SENT INSTEAD OF NORMAL MESSAGE
 why2_bool __why2_get_asking_password();
 
+void __why2_set_asking_username(why2_bool value);
+why2_bool __why2_get_asking_username();
+
 #ifdef __cplusplus
 }
 #endif
