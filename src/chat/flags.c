@@ -21,8 +21,27 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include <termios.h>
 
+#include <why2/memory.h>
+
 why2_bool asking_password = 0;
 why2_bool asking_username = 0;
+char *client_server_key = NULL;
+
+void why2_chat_set_client_server_key(char *key)
+{
+    client_server_key = key;
+}
+
+char *why2_chat_get_client_server_key(void)
+{
+    return client_server_key;
+}
+
+void why2_chat_deallocate_client_server_key(void)
+{
+    why2_deallocate(client_server_key);
+    client_server_key = NULL;
+}
 
 void __why2_set_asking_password(why2_bool value)
 {
@@ -42,7 +61,7 @@ void __why2_set_asking_password(why2_bool value)
     tcsetattr(STDIN_FILENO, TCSANOW, &tty); //SET ATTRS
 }
 
-why2_bool __why2_get_asking_password()
+why2_bool __why2_get_asking_password(void)
 {
     return asking_password;
 }
@@ -52,7 +71,7 @@ void __why2_set_asking_username(why2_bool value)
     asking_username = value;
 }
 
-why2_bool __why2_get_asking_username()
+why2_bool __why2_get_asking_username(void)
 {
     return asking_username;
 }

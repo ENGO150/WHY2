@@ -83,11 +83,15 @@ enum WHY2_CHAT_SERVER_TYPE //TYPE OF SERVER
 #define WHY2_CHAT_CODE_SSQC WHY2_CHAT_CODE_SERVER_SIDE_QUIT_COMMUNICATION
 
 //FUNCTIONS
+void why2_chat_set_client_server_key(char *key); //SET KEY USED FOR ENCRYPTION BETWEEN CLIENT AND SERVER
+char *why2_chat_get_client_server_key(void);
+void why2_chat_deallocate_client_server_key(void);
+
 void __why2_set_asking_password(why2_bool value); //IF HASH SHOULD BE SENT INSTEAD OF NORMAL MESSAGE
-why2_bool __why2_get_asking_password();
+why2_bool __why2_get_asking_password(void);
 
 void __why2_set_asking_username(why2_bool value);
-why2_bool __why2_get_asking_username();
+why2_bool __why2_get_asking_username(void);
 
 #ifdef __cplusplus
 }
