@@ -148,9 +148,7 @@ int main(void)
 
     free(line); //PREVENT FROM MEMORY LEAK
 
-    int connectStatus = connect(listen_socket, (struct sockaddr *) &server_addr, sizeof(server_addr)); //CONNECT
-
-    if (connectStatus < 0) why2_die("Connecting failed.");
+    if (connect(listen_socket, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) why2_die("Connecting failed."); //CONNECT
 
     pthread_create(&thread_buffer, NULL, why2_listen_server, &listen_socket); //LISTEN TO OTHER USERS
 
