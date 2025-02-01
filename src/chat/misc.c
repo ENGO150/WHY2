@@ -936,6 +936,7 @@ void *why2_authority_communicate_thread(void *arg)
                 //DEALLOCATION
                 why2_deallocate(path);
                 why2_deallocate(cert);
+                exiting = 1;
             }
         } else exiting = 1;
 
@@ -946,6 +947,8 @@ void *why2_authority_communicate_thread(void *arg)
         why2_deallocate(username);
         why2_deallocate(code);
     } while (!exiting);
+
+    printf("User disconnected.\t%d\n", connection);
 
     return NULL;
 }
