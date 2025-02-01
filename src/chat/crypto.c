@@ -223,6 +223,24 @@ char *why2_chat_ecc_serialize_public_key()
     return base64_encoded;
 }
 
+//TODO: Remove PEM
+EVP_PKEY* why2_chat_ecc_deserialize_public_key(char *pubkey)
+{
+    //VARIABLES
+    BIO *bio;
+    EVP_PKEY *key;
+    char *base64_decoded = base64_decode(pubkey, NULL);
+
+    //EXTRACT KEY
+    bio = BIO_new_mem_buf(base64_decoded, -1);
+    key = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
+
+    //DEALLOCATION
+    BIO_free(bio);
+
+    return key;
+}
+
 void why2_chat_deallocate_keys(void)
 {
     //DEALLOCATE THE pkey
