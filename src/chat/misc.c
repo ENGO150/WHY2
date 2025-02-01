@@ -1182,12 +1182,46 @@ void *why2_listen_server(void *socket)
 
 void *why2_listen_authority(void *socket)
 {
+    //VARIABLES
     int socket_ptr = *(int*) socket;
+    char *read;
+    why2_bool exiting = 0;
+    char *message;
+    char *code;
 
-    for (;;)
+    do
     {
-        read_socket_raw(socket_ptr);
-    }
+        //READ PACKET
+        read = read_socket_raw(socket_ptr);
+        if (read == NULL) continue; //INVALID PACKET RECEIVED
+
+        //GET DATA
+        message = get_string_from_json_string(read, "message");
+        code = get_string_from_json_string(read, "code");
+
+        if (code != NULL)
+        {
+            if (strcmp(code, WHY2_CHAT_CODE_KEY_EXCHANGE) == 0)
+            {
+                //SEND CA CLIENT'S ENCRYPTED PUBKEY
+                char *key = why2_chat_ecc_serialize_public_key();
+                char *encrypted_pubkey = why2_chat_ecc_encrypt(key, message); //lol inverted params
+
+                why2_send_socket_code(encrypted_pubkey, NULL, socket_ptr, WHY2_CHAT_CODE_CLIENT_KEY_EXCHANGE); //SEND
+
+                //DEALLOCATION
+                why2_deallocate(key);
+                why2_deallocate(encrypted_pubkey);
+            } else exiting = 1;
+        } else exiting = 1;
+
+        //DEALLOCATION
+        why2_deallocate(read);
+        why2_deallocate(message);
+        why2_deallocate(code);
+    } while (!exiting);
+
+    return NULL;
 }
 
 void *why2_getline_thread(WHY2_UNUSED void* arg)
