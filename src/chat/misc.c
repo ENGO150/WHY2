@@ -528,13 +528,16 @@ why2_bool perform_key_exchange_client(int connection)
 
     server_pubkey = get_string_from_json_string(read, "message");
 
+    why2_chat_set_client_server_key( why2_chat_ecc_shared_key(server_pubkey)); //CALCULATE SHARED KEY
+
     //DEALLOCATION
     why2_deallocate(read);
+    why2_deallocate(server_pubkey);
 
     return 0;
 }
 
-why2_bool perform_key_exchange_server(int connection)
+why2_bool perform_key_exchange_server(int connection, char **key)
 {
     //VARIABLES
     char *server_pubkey;
@@ -563,8 +566,11 @@ why2_bool perform_key_exchange_server(int connection)
     server_pubkey = why2_chat_ecc_serialize_public_key();
     why2_send_socket_code(server_pubkey, NULL, connection, WHY2_CHAT_CODE_SERVER_CLIENT_KEY_EXCHANGE);
 
+    *key = why2_chat_ecc_shared_key(client_pubkey);
+
     //DEALLOCATION
     why2_deallocate(server_pubkey);
+    why2_deallocate(client_pubkey);
     why2_deallocate(read);
 
     return 0;
@@ -584,9 +590,10 @@ void why2_send_socket_code(char *params, char *username, int socket, char *code)
 void *why2_communicate_thread(void *arg)
 {
     int connection = *(int*) arg;
+    char *client_server_key = NULL;
 
     //PERFORM KEY EXCHANGE
-    if (perform_key_exchange_server(connection))
+    if (perform_key_exchange_server(connection, &client_server_key))
     {
         close(connection);
         return NULL;
@@ -785,7 +792,7 @@ void *why2_communicate_thread(void *arg)
         pthread_self(),
         why2_strdup(username),
         get_latest_id(),
-        why2_generate_key(why2_get_key_length())
+        client_server_key
     };
 
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
