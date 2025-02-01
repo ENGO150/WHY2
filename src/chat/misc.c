@@ -1109,6 +1109,8 @@ void *why2_listen_server(void *socket)
                 exiting = 1; //EXIT THIS THREAD
             } else if (strcmp(code, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || strcmp(code, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
             {
+                __why2_set_asking_username(1);
+
                 if (strcmp(code, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //INVALID USERNAME
                 {
                     printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid username!\n\n\n", asking_username > 1 ? WHY2_CLEAR_AND_GO_UP : "");

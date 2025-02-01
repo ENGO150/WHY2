@@ -294,7 +294,15 @@ int main(void)
                 __why2_set_asking_password(0);
             } else
             {
-                why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
+                if (__why2_get_asking_username())
+                {
+                    __why2_set_asking_username(0);
+
+                    why2_send_socket_code(line, NULL, listen_socket, WHY2_CHAT_CODE_USERNAME);
+                } else
+                {
+                    why2_send_socket(line, NULL, listen_socket); //NULL IS SENT BECAUSE IT IS USELESS TO SEND USER FROM CLIENT - SERVER WON'T USE IT
+                }
             }
 
             free(line);
