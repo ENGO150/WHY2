@@ -26,6 +26,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <pthread.h>
 
 #include <why2/chat/config.h>
+#include <why2/chat/crypto.h>
 #include <why2/chat/flags.h>
 #include <why2/chat/misc.h>
 
