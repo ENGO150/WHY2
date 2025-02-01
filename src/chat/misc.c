@@ -880,7 +880,7 @@ void *why2_authority_communicate_thread(void *arg)
     printf("User connected.\t\t%d\n", connection);
 
     //SEND USER CA PUBLIC KEY
-    why2_send_socket_code(pubkey, NULL, connection, WHY2_CHAT_CODE_KEY_EXCHANGE);
+    why2_send_socket_code(NULL, NULL, connection, WHY2_CHAT_CODE_KEY_EXCHANGE);
     why2_deallocate(pubkey);
 
     do
@@ -1186,7 +1186,6 @@ void *why2_listen_authority(void *socket)
     int socket_ptr = *(int*) socket;
     char *read;
     why2_bool exiting = 0;
-    char *message;
     char *code;
 
     do
@@ -1196,7 +1195,6 @@ void *why2_listen_authority(void *socket)
         if (read == NULL) continue; //INVALID PACKET RECEIVED
 
         //GET DATA
-        message = get_string_from_json_string(read, "message");
         code = get_string_from_json_string(read, "code");
 
         if (code != NULL)
@@ -1232,14 +1230,12 @@ void *why2_listen_authority(void *socket)
 
                 //SEND CA CLIENT'S ENCRYPTED PUBKEY
                 char *key = why2_chat_ecc_serialize_public_key();
-                char *encrypted_pubkey = why2_chat_ecc_encrypt(key, message); //lol inverted params
 
-                why2_send_socket_code(encrypted_pubkey, username, socket_ptr, WHY2_CHAT_CODE_CLIENT_KEY_EXCHANGE); //SEND
+                why2_send_socket_code(key, username, socket_ptr, WHY2_CHAT_CODE_CLIENT_KEY_EXCHANGE); //SEND
 
                 //DEALLOCATION
                 why2_deallocate(user_config_path);
                 why2_deallocate(key);
-                why2_deallocate(encrypted_pubkey);
                 if (asked_username)
                 {
                     free(username);
@@ -1252,7 +1248,6 @@ void *why2_listen_authority(void *socket)
 
         //DEALLOCATION
         why2_deallocate(read);
-        why2_deallocate(message);
         why2_deallocate(code);
     } while (!exiting);
 
