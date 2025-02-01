@@ -101,7 +101,7 @@ int main(void)
     why2_chat_init_client_config(); //CREATE client.toml CONFIGURATION
     why2_chat_init_keys(); //CREATE ECC KEY
 
-    listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
+    listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE AUTHORITY SOCKET
     char *line = NULL;
     void *return_line = NULL;
     size_t line_length = 0;
@@ -133,6 +133,7 @@ int main(void)
     why2_deallocate(ca_success);
 
     //SERVER CONNECT
+    listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
     server_addr.sin_port = htons(WHY2_CHAT_SERVER_PORT);
 
     //GET IP
