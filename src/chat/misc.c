@@ -886,7 +886,6 @@ void *why2_authority_communicate_thread(void *arg)
     do
     {
         //READ PACKET
-        raw = read_user(connection, &raw_ptr);
         if ((raw = read_user(connection, &raw_ptr)) == NULL) break; //READ
 
         //GET DATA
