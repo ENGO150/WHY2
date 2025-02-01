@@ -24,13 +24,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include <sys/stat.h>
 
-#include <why2/memory.h>
-#include <why2/misc.h>
-
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/ec.h>
+
+#include <why2/encrypter.h>
+#include <why2/memory.h>
+#include <why2/misc.h>
 
 EVP_PKEY *keypair = NULL; //KEYPAIR
 
@@ -256,6 +257,49 @@ EVP_PKEY* why2_chat_ecc_deserialize_public_key(char *pubkey)
     BIO_free(bio);
 
     return key;
+}
+
+char *why2_chat_ecc_encrypt(char *message, char *key)
+{
+    //VARIABLES
+    size_t key_length;
+    char *secret = NULL;
+    size_t secret_len;
+    char *recipient_pubkey_decoded = base64_decode(key, &key_length); //DECODE key
+    why2_output_flags encrypted;
+    char *encrypted_text;
+    char *returning;
+    char *sym_key;
+    BIO *bio = BIO_new_mem_buf(recipient_pubkey_decoded, -1);
+    EVP_PKEY *recipient_pubkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
+
+    //CALCULATE SHARED SECRET
+    calculate_ecdh_secret(keypair, recipient_pubkey, &secret, &secret_len);
+
+    //DERIVE WHY2 KEY (SHA256)
+    sym_key = why2_sha256(secret, secret_len);
+
+    //ENCRYPTION SETTINGS
+    if (why2_get_key_length() < strlen(sym_key)) why2_set_key_length(strlen(sym_key)); //ALLOW sym_key'S LENGTH
+    why2_set_flags((why2_input_flags) { 0, 0, 0, WHY2_v4, WHY2_OUTPUT_TEXT, WHY2_CHAT_PADDING(strlen(sym_key)) });
+
+    //ENCRYPT MESSAGE
+    encrypted = why2_encrypt_text(message, sym_key);
+    encrypted_text = why2_strdup(encrypted.output_text);
+
+    //CONVERT TO BASE64
+    returning = base64_encode(encrypted_text, strlen(encrypted_text));
+
+    //DEALLOCATION
+    BIO_free(bio);
+    EVP_PKEY_free(recipient_pubkey);
+    why2_deallocate(secret);
+    why2_deallocate(sym_key);
+    why2_deallocate(recipient_pubkey_decoded);
+    why2_deallocate(encrypted_text);
+    why2_deallocate_output(encrypted);
+
+    return returning;
 }
 
 void why2_chat_deallocate_keys(void)
