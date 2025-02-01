@@ -40,6 +40,7 @@ void why2_chat_init_authority(void); //CREATE WHY2_CHAT_AUTHORITY_DIR
 
 char *why2_toml_read(const char* path, const char* key); //READ key FROM path TOML FILE
 void why2_toml_write(const char *path, const char *key, const char *value); //WRITE value AS key INTO path TOML FILE
+void why2_toml_write_preserve(const char *path, const char *key, const char *value); //WRITE value AS key INTO path TOML FILE WITHOUT REMOVING COMMENTS
 why2_bool why2_toml_contains(const char *path, const char *key); //CHECK IF path CONTAINS key
 why2_bool why2_toml_equals(const char *path, const char *key, const char *value); //CHECK IF key IN path IS EQUAL TO value
 void why2_toml_read_free(char* s); //DEALLOCATE THE READ VALUE

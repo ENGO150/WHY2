@@ -127,6 +127,48 @@ pub extern "C" fn why2_toml_write(path: *const c_char, key: *const c_char, value
 }
 
 #[no_mangle]
+pub extern "C" fn why2_toml_write_preserve(path: *const c_char, key: *const c_char, value: *const c_char)
+{
+    //CONVERT C STRINGS TO RUST STRINGS
+    let path_r = unsafe { CStr::from_ptr(path).to_string_lossy().into_owned() };
+    let key_r = unsafe { CStr::from_ptr(key).to_string_lossy().into_owned() };
+    let value_r = unsafe { CStr::from_ptr(value).to_string_lossy().into_owned() };
+
+    //READ FILE
+    let file_raw = match read_to_string(&path_r)
+    {
+        Ok(raw) => raw,
+        Err(e) =>
+        {
+            eprintln!("Could not read TOML config '{}': {}", path_r, e);
+            return;
+        }
+    };
+
+    //PARSE TO A toml_edit Document
+    let mut doc: toml_edit::Document = match file_raw.parse()
+    {
+        Ok(doc) => doc,
+        Err(e) =>
+        {
+            eprintln!("Could not parse TOML config '{}': {}", path_r, e);
+            return;
+        }
+    };
+
+    doc[&key_r] = toml_edit::value(value_r);
+
+    //CONVERT DOCUMENT TO STRING
+    let updated_data = doc.to_string();
+
+    //WRITE
+    if let Err(e) = write(&path_r, updated_data)
+    {
+        eprintln!("Could not write to TOML config '{}': {}", path_r, e);
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn why2_toml_contains(path: *const c_char, key: *const c_char) -> bool
 {
     //CONVERT C STRINGS TO RUST STRINGS
