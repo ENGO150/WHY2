@@ -37,6 +37,9 @@ extern "C" {
 
 #define WHY2_CHAT_BASE64_LENGTH_DELIMITER ':' //SEPARATES BASE64 FROM LENGTH (YnJhbWJvcmFrCg==:9)
 
+#define WHY2_CHAT_PADDING(input_len) ((unsigned long) input_len / 2)
+
+//FUNCTIONS
 void why2_chat_init_keys(void); //INIT (POSSIBLY GENERATE) ECC KEYS
 void why2_chat_deallocate_keys(void); //DEALLOCATE :) (NO SLUR HERE)
 
