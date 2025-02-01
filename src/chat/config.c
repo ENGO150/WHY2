@@ -34,7 +34,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 enum CONFIG_TYPES
 {
     CLIENT,
-    SERVER
+    SERVER,
+    SERVER_USERS
 };
 
 void init_config(char *filename)
@@ -78,7 +79,7 @@ void init_config(char *filename)
     why2_deallocate(buffer);
 }
 
-char *config(char *key, enum CONFIG_TYPES type)
+char *config_path(enum CONFIG_TYPES type)
 {
     char *path = NULL;
 
@@ -92,10 +93,22 @@ char *config(char *key, enum CONFIG_TYPES type)
             path = why2_replace(WHY2_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER, "{HOME}", getenv("HOME"));
             break;
 
+        case SERVER_USERS:
+            path = why2_replace(WHY2_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER_USERS, "{HOME}", getenv("HOME"));
+            break;
+
         default:
             why2_die("CONFIG_TYPE not implemented!");
             break;
     }
+
+    return path;
+}
+
+char *config(char *key, enum CONFIG_TYPES type)
+{
+    //GET CONFIGURATION PATH
+    char *path = config_path(type);
 
     //VALUE
     char *value = why2_toml_read(path, key);
@@ -167,5 +180,5 @@ char *why2_chat_client_config(char *key)
 
 char *why2_get_server_users_path(void)
 {
-    return why2_replace(WHY2_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER_USERS, "{HOME}", getenv("HOME"));
+    return config_path(SERVER_USERS);
 }
