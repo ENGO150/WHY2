@@ -561,6 +561,7 @@ void *why2_communicate_thread(void *arg)
             {
                 //DEALLOCATE
                 why2_deallocate(code);
+                why2_deallocate(raw);
 
                 if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
                 {
@@ -621,10 +622,12 @@ void *why2_communicate_thread(void *arg)
                 //KEEP READING UNTIL CODE ARRIVES
                 char *code = NULL;
                 why2_bool exiting_read = 0;
+                raw = NULL;
                 do
                 {
                     //DEALLOCATE
                     why2_deallocate(code);
+                    why2_deallocate(raw);
 
                     if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
                     {
@@ -652,10 +655,12 @@ void *why2_communicate_thread(void *arg)
                     //KEEP READING UNTIL CODE ARRIVES
                     char *code = NULL;
                     why2_bool exiting_read = 0;
+                    raw = NULL;
                     do
                     {
                         //DEALLOCATE
                         why2_deallocate(code);
+                        why2_deallocate(raw);
 
                         if ((raw = read_user(connection, &raw_ptr)) == NULL) //READ
                         {
