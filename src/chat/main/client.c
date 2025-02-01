@@ -279,7 +279,7 @@ int main(void)
                 //REMOVE \n AT THE END OF line
                 line[strlen(line) - 1] = '\0';
 
-                char *hash = why2_sha256(line); //HASHISH
+                char *hash = why2_sha256(line, strlen(line)); //HASHISH
 
                 why2_send_socket(hash, NULL, listen_socket); //SEND BUT HASHED
 
