@@ -500,6 +500,76 @@ unsigned long get_latest_id()
     return returning;
 }
 
+why2_bool perform_key_exchange_client(int connection)
+{
+    //VARIABLES
+    char *client_pubkey = why2_chat_ecc_serialize_public_key(); //GET PUBLIC KEY
+    char *server_pubkey;
+    char *read = NULL;
+    char *read_code = NULL;
+    why2_bool exiting_read = 0;
+
+    why2_send_socket_code(client_pubkey, NULL, connection, WHY2_CHAT_CODE_CLIENT_SERVER_KEY_EXCHANGE); //SEND pubkey TO SERVER
+
+    why2_deallocate(client_pubkey); //DEALLOCATE client_pubkey
+
+    //GET SERVER PUBKEY
+    do
+    {
+        why2_deallocate(read);
+        why2_deallocate(read_code);
+
+        read = read_socket_raw(connection);
+
+        read_code = get_string_from_json_string(read, "code");
+        exiting_read = read_code != NULL && strcmp(read_code, WHY2_CHAT_CODE_SERVER_CLIENT_KEY_EXCHANGE) == 0;
+    } while (!exiting_read);
+    why2_deallocate(read_code);
+
+    server_pubkey = get_string_from_json_string(read, "message");
+
+    //DEALLOCATION
+    why2_deallocate(read);
+
+    return 0;
+}
+
+why2_bool perform_key_exchange_server(int connection)
+{
+    //VARIABLES
+    char *server_pubkey;
+    char *client_pubkey;
+    char *read = NULL;
+    char *read_code = NULL;
+    why2_bool exiting_read = 0;
+
+    //GET CLIENT PUBKEY
+    do
+    {
+        why2_deallocate(read);
+        why2_deallocate(read_code);
+
+        read = read_socket_raw(connection);
+
+        read_code = get_string_from_json_string(read, "code");
+        exiting_read = read_code != NULL && strcmp(read_code, WHY2_CHAT_CODE_CLIENT_SERVER_KEY_EXCHANGE) == 0;
+    } while (!exiting_read);
+    why2_deallocate(read_code);
+
+    client_pubkey = get_string_from_json_string(read, "message"); //GET client_pubkey
+    if (client_pubkey == NULL) return 1; //client is funi
+
+    //SEND CLIENT PUBKEY
+    server_pubkey = why2_chat_ecc_serialize_public_key();
+    why2_send_socket_code(server_pubkey, NULL, connection, WHY2_CHAT_CODE_SERVER_CLIENT_KEY_EXCHANGE);
+
+    //DEALLOCATION
+    why2_deallocate(server_pubkey);
+    why2_deallocate(read);
+
+    return 0;
+}
+
 //GLOBAL
 void why2_send_socket(char *text, char *username, int socket)
 {
@@ -514,6 +584,13 @@ void why2_send_socket_code(char *params, char *username, int socket, char *code)
 void *why2_communicate_thread(void *arg)
 {
     int connection = *(int*) arg;
+
+    //PERFORM KEY EXCHANGE
+    if (perform_key_exchange_server(connection))
+    {
+        close(connection);
+        return NULL;
+    }
 
     printf("User connected.\t\t%d\n", connection);
 
@@ -1080,6 +1157,11 @@ void why2_clean_threads(void)
 
 void *why2_listen_server(void *socket)
 {
+    int connection = *(int*) socket;
+
+    //PERFORM KEY EXCHANGE
+    if (perform_key_exchange_client(connection)) return NULL;
+
     //STUFF
     char *read = NULL;
     why2_bool exiting = 0;
@@ -1106,7 +1188,7 @@ void *why2_listen_server(void *socket)
     {
         continuing = 0;
 
-        read = read_socket_raw(*((int*) socket));
+        read = read_socket_raw(connection);
         if (read == NULL) continue;
 
         //GET CONTENT
