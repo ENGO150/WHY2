@@ -182,3 +182,8 @@ char *why2_get_server_users_path(void)
 {
     return config_path(SERVER_USERS);
 }
+
+char *why2_get_client_config_path(void)
+{
+    return config_path(CLIENT);
+}

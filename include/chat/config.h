@@ -48,6 +48,7 @@ char *why2_chat_server_config(char *key); //why2_toml_read BUT YOU DO NOT HAVE T
 char *why2_chat_client_config(char *key); //hihi, *grabs shotgun quietly*
 
 char *why2_get_server_users_path(void); //RETURNS WHY2_CHAT_CONFIG_SERVER_USERS LOCATION
+char *why2_get_client_config_path(void); //RETURNS WHY2_CHAT_CONFIG_CLIENT LOCATION
 
 #ifdef __cplusplus
 }
