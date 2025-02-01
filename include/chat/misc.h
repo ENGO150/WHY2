@@ -43,6 +43,7 @@ void *why2_accept_thread(void *params); //LOOP ACCEPTING CONNECTIONS
 void why2_clean_connections(void); //CLOSE EVERY CONNECTION
 void why2_clean_threads(void); //CLOSE EVERY RUNNING MESSAGE THREAD
 void *why2_listen_server(void *socket); //LISTEN FOR OTHER's USERS MESSAGES
+void *why2_listen_authority(void *socket); //LISTEN TO AUTHORITY
 void *why2_getline_thread(WHY2_UNUSED void* arg); //START getline IN SEPARATE THREAD
 void why2_trim_string(char **s); //REMOVES SPACES FROM END AND START OF *s
 

@@ -1147,6 +1147,16 @@ void *why2_listen_server(void *socket)
     return NULL;
 }
 
+void *why2_listen_authority(void *socket)
+{
+    int socket_ptr = *(int*) socket;
+
+    for (;;)
+    {
+        read_socket_raw(socket_ptr);
+    }
+}
+
 void *why2_getline_thread(WHY2_UNUSED void* arg)
 {
     getline_thread = pthread_self();
