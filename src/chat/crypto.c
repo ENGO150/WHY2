@@ -189,6 +189,37 @@ why2_bool why2_chat_ecc_verify_signature(char *message, char *signature, EVP_PKE
     return returning;
 }
 
+//TODO: Remove PEM
+char *why2_chat_ecc_serialize_public_key()
+{
+    //VARIABLES
+    BIO *bio = BIO_new(BIO_s_mem());
+    char *data;
+    size_t length;
+    char *pubkey;
+    char *base64_encoded;
+
+    //SEPARATE PUBKEY
+    PEM_write_bio_PUBKEY(bio, keypair);
+
+    //ALLOCATE
+    length = BIO_get_mem_data(bio, &data);
+    pubkey = why2_malloc(length + 1);
+
+    //COPY
+    memcpy(pubkey, data, length);
+    pubkey[length] = '\0';
+
+    //ENCODE
+    base64_encoded = base64_encode(pubkey, length);
+
+    //DEALLOCATION
+    BIO_free(bio);
+    why2_deallocate(pubkey);
+
+    return base64_encoded;
+}
+
 void why2_chat_deallocate_keys(void)
 {
     //DEALLOCATE THE pkey

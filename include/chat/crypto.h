@@ -43,6 +43,8 @@ void why2_chat_deallocate_keys(void); //DEALLOCATE :) (NO SLUR HERE)
 char *why2_chat_ecc_sign(char *message); //SIGN message WITH ECC KEY
 why2_bool why2_chat_ecc_verify_signature(char *message, char *signature, EVP_PKEY *key);
 
+char *why2_chat_ecc_serialize_public_key(); //GET PUBLIC ECC KEY IN BASE64
+
 char *why2_sha256(char *input); //HASH input USING SHA256 AND RETURN IN STRING
 
 #ifdef __cplusplus
