@@ -109,9 +109,24 @@ int main(void)
     why2_bool ssqc = 0;
     char *cmd_arg = NULL;
 
-    //DEFINE SERVER ADDRESS
+    //DEFINE CONNECTION PROPERTIES
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
+
+    //CA CONNECT
+    line = why2_chat_client_config("authority_ip"); //GET ADDRESS OF CA
+
+    server_addr.sin_port = htons(WHY2_CHAT_AUTHORITY_PORT); //CA PORT
+    server_addr.sin_addr.s_addr = inet_addr(line); //IP ADDRESS OF CA
+
+    if (connect(listen_socket, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) why2_die("Connecting to CA failed."); //CONNECT TO CA
+
+    pthread_create(&thread_buffer, NULL, why2_listen_authority, &listen_socket); //LISTEN TO AUTHORITY (only in why2, fuck authorities irl [hi fbi, this is just a joke haha])
+    why2_deallocate(line); //DEALLOCATE ADDRESS
+
+    pthread_join(thread_buffer, NULL); //WAIT UNTIL CA AUTH IS COMPLETED
+
+    //SERVER CONNECT
     server_addr.sin_port = htons(WHY2_CHAT_SERVER_PORT);
 
     //GET IP
