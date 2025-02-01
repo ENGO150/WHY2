@@ -266,9 +266,6 @@ char *why2_chat_ecc_shared_key(char *message, char *ecc_key)
     char *secret = NULL;
     size_t secret_len;
     char *recipient_pubkey_decoded = base64_decode(ecc_key, &key_length); //DECODE key
-    why2_output_flags encrypted;
-    char *encrypted_text;
-    char *returning;
     char *sym_key;
     BIO *bio = BIO_new_mem_buf(recipient_pubkey_decoded, -1);
     EVP_PKEY *recipient_pubkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
@@ -279,27 +276,13 @@ char *why2_chat_ecc_shared_key(char *message, char *ecc_key)
     //DERIVE WHY2 KEY (SHA256)
     sym_key = why2_sha256(secret, secret_len);
 
-    //ENCRYPTION SETTINGS
-    if (why2_get_key_length() < strlen(sym_key)) why2_set_key_length(strlen(sym_key)); //ALLOW sym_key'S LENGTH
-    why2_set_flags((why2_input_flags) { 0, 0, 0, WHY2_v4, WHY2_OUTPUT_TEXT, WHY2_CHAT_PADDING(strlen(sym_key)) });
-
-    //ENCRYPT MESSAGE
-    encrypted = why2_encrypt_text(message, sym_key);
-    encrypted_text = why2_strdup(encrypted.output_text);
-
-    //CONVERT TO BASE64
-    returning = base64_encode(encrypted_text, strlen(encrypted_text));
-
     //DEALLOCATION
     BIO_free(bio);
     EVP_PKEY_free(recipient_pubkey);
     why2_deallocate(secret);
-    why2_deallocate(sym_key);
     why2_deallocate(recipient_pubkey_decoded);
-    why2_deallocate(encrypted_text);
-    why2_deallocate_output(encrypted);
 
-    return returning;
+    return sym_key;
 }
 
 void why2_chat_deallocate_keys(void)
