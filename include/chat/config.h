@@ -32,6 +32,7 @@ extern "C" {
 #define WHY2_CHAT_CONFIG_SERVER_USERS "server_users.toml" //LOGIN INFO CONFIG
 
 #define WHY2_CHAT_AUTHORITY_DIR "certs" //AUTHORITY DIRECTORY
+#define WHY2_CHAT_AUTHORITY_CERTS_EXTENSION ".cert"
 
 void why2_chat_init_server_config(void); //CHECK IF SERVER CONFIG EXISTS, CREATE IT
 void why2_chat_init_client_config(void); //Dementia is a term used to describe a group of symptoms affecting memory, thinking and social abilities. In people who have dementia, the symptoms interfere with their daily lives. Dementia isn't one specific disease. Several diseases can cause dementia. ...
