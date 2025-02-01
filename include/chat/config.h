@@ -51,6 +51,7 @@ char *why2_chat_client_config(char *key); //hihi, *grabs shotgun quietly*
 
 char *why2_get_server_users_path(void); //RETURNS WHY2_CHAT_CONFIG_SERVER_USERS LOCATION
 char *why2_get_client_config_path(void); //RETURNS WHY2_CHAT_CONFIG_CLIENT LOCATION
+char *why2_get_authority_cert_path(char *username); //RETURNS PATH TO CA CERTS
 
 #ifdef __cplusplus
 }

@@ -35,7 +35,8 @@ enum CONFIG_TYPES
 {
     CLIENT,
     SERVER,
-    SERVER_USERS
+    SERVER_USERS,
+    AUTHORITY
 };
 
 void init_config(char *filename)
@@ -97,6 +98,10 @@ char *config_path(enum CONFIG_TYPES type)
             path = why2_replace(WHY2_CONFIG_DIR "/" WHY2_CHAT_CONFIG_SERVER_USERS, "{HOME}", getenv("HOME"));
             break;
 
+        case AUTHORITY:
+            path = why2_replace(WHY2_CONFIG_DIR "/" WHY2_CHAT_AUTHORITY_DIR, "{HOME}", getenv("HOME"));
+            break;
+
         default:
             why2_die("CONFIG_TYPE not implemented!");
             break;
@@ -156,16 +161,11 @@ void why2_chat_init_authority(void)
     why2_directory();
 
     //GET THE CONFIG TYPE
-    char *buffer = why2_malloc(strlen(WHY2_CONFIG_DIR) + strlen(WHY2_CHAT_AUTHORITY_DIR) + 2);
-    sprintf(buffer, "%s/%s", WHY2_CONFIG_DIR, WHY2_CHAT_AUTHORITY_DIR);
-
-    char *path = why2_replace(buffer, "{HOME}", getenv("HOME"));
-
+    char *path = config_path(AUTHORITY);
     if (access(path, R_OK) != 0) mkdir(path, 0700); //DIRECTORY DOESN'T EXIST; CREATE IT
 
     //DEALLOCATION
     why2_deallocate(path);
-    why2_deallocate(buffer);
 }
 
 char *why2_chat_server_config(char *key)
@@ -186,4 +186,18 @@ char *why2_get_server_users_path(void)
 char *why2_get_client_config_path(void)
 {
     return config_path(CLIENT);
+}
+
+char *why2_get_authority_cert_path(char *username)
+{
+    char *buffer = config_path(AUTHORITY);
+    char *path = why2_malloc(strlen(buffer) + strlen(username) + strlen(WHY2_CHAT_AUTHORITY_CERTS_EXTENSION) + 2);
+
+    //GET THE FILE
+    sprintf(path, "%s/%s%s%c", buffer, username, WHY2_CHAT_AUTHORITY_CERTS_EXTENSION, '\0');
+
+    //DEALLOCATION
+    why2_deallocate(buffer);
+
+    return path;
 }
