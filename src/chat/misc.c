@@ -1229,7 +1229,10 @@ void *why2_listen_authority(void *socket)
     int socket_ptr = *(int*) socket;
     char *read;
     why2_bool exiting = 0;
+    why2_bool *success = why2_malloc(sizeof(why2_bool));
     char *code;
+
+    *success = 0;
 
     do
     {
@@ -1286,15 +1289,20 @@ void *why2_listen_authority(void *socket)
                 {
                     why2_toml_read_free(username);
                 }
-            } else exiting = 1;
-        } else exiting = 1;
+            } else
+            {
+                //EXIT
+                *success = strcmp(code, WHY2_CHAT_CODE_SUCCESS) == 0;
+                exiting = 1;
+            }
+        }
 
         //DEALLOCATION
         why2_deallocate(read);
         why2_deallocate(code);
     } while (!exiting);
 
-    return NULL;
+    return success;
 }
 
 void *why2_getline_thread(WHY2_UNUSED void* arg)
