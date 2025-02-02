@@ -43,6 +43,9 @@ extern "C" {
 void why2_chat_init_keys(void); //INIT (POSSIBLY GENERATE) ECC KEYS
 void why2_chat_deallocate_keys(void); //DEALLOCATE :) (NO SLUR HERE)
 
+char *why2_chat_base64_encode(char *message, size_t length); //ENCODE message OF length INTO BASE64 WITH LENGTH DELIMITER (WHY2_CHAT_BASE64_LENGTH_DELIMITER)
+char *why2_chat_base64_decode(char *encoded_message, size_t *length); //DECODE encoded_message AND SET length TO OUTPUT LENGTH
+
 char *why2_chat_ecc_sign(char *message); //SIGN message WITH ECC KEY
 why2_bool why2_chat_ecc_verify_signature(char *message, char *signature, EVP_PKEY *key);
 
