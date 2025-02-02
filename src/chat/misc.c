@@ -237,7 +237,9 @@ char *read_socket_raw(int socket, char *key)
     }
 
     char *content_buffer = NULL;
+    char *output;
     size_t content_size = 0;
+    size_t read_size = 0;
     char *wait_buffer = why2_malloc(2); //TEMP
 
     //WAIT TILl RECEIVED MSG (ik it sucks but i can't think of better solution; anyways, this is way more convenient than infinite loop that makes my computer go wroom wroom)
@@ -252,37 +254,44 @@ char *read_socket_raw(int socket, char *key)
     //ALLOCATE
     content_buffer = why2_malloc(content_size + 1);
 
-    for (size_t i = 0; i < content_size; i++)
+    for (; read_size < content_size; read_size++)
     {
         //END OF MESSAGE REACHED (COULD BE CAUSED BY FAST SENT MESSAGES)
-        if (i >= 2 && strncmp(content_buffer + i - 2, "\"}", 2) == 0) break;
+        if (key == NULL && read_size >= 2 && strncmp(content_buffer + read_size - 2, "\"}", 2) == 0) break;
+        if (key != NULL && read_size >= 1 && content_buffer[read_size - 1] == WHY2_CHAT_MESSAGE_DELIMITER) break;
 
         //READ JSON MESSAGE
-        if (recv(socket, content_buffer + i, 1, 0) != 1) //READ THE MESSAGE BY CHARACTERS
+        if (recv(socket, content_buffer + read_size, 1, 0) != 1) //READ THE MESSAGE BY CHARACTERS
         {
             fprintf(stderr, "Socket probably read wrongly!\n");
             break;
         }
     }
 
-    content_buffer[content_size] = '\0'; //NULL TERM
+    //TRUNCATE content_buffer (REMOVE DELIMITER IF ENCRYPTED)
+    output = why2_malloc(read_size + (key != NULL ? 1 : 2));
+    memcpy(output, content_buffer, read_size - (key != NULL ? 1 : 0));
+    output[read_size - (key != NULL ? 1 : 0)] = '\0';
 
-    encrypt_decrypt_message(&content_buffer, key, DECRYPTION); //DECRYPT
+    encrypt_decrypt_message(&output, key, DECRYPTION); //DECRYPT
 
     //VALIDATE JSON FORMAT
-    struct json_object *json = json_tokener_parse(content_buffer);
+    struct json_object *json = json_tokener_parse(output);
     if (json == NULL)
     {
-        //RESET content_buffer
-        why2_deallocate(content_buffer);
-        content_buffer = NULL;
+        //RESET output
+        why2_deallocate(output);
+        output = NULL;
     } else
     {
         //DEALLOCATION
         json_object_put(json);
     }
 
-    return content_buffer;
+    //DEALLOCATION
+    why2_deallocate(content_buffer);
+
+    return output;
 }
 
 void *read_socket_raw_thread(void *socket)
@@ -482,6 +491,7 @@ void send_socket(char *text, char *username, char *why2_key, int socket, why2_bo
 {
     //VARIABLES
     char *output = why2_strdup("");
+    char *buffer;
     struct json_object *json = json_tokener_parse("{}");
 
     if (text != NULL)
@@ -539,6 +549,18 @@ void send_socket(char *text, char *username, char *why2_key, int socket, why2_bo
     add_brackets(&output);
 
     encrypt_decrypt_message(&output, why2_key, ENCRYPTION); //ENCRYPT
+
+    //APPEND DELIMITER IF ENCRYPTED
+    if (why2_key != NULL)
+    {
+        //COPY output TO buffer
+        buffer = why2_malloc(strlen(output) + 2);
+        sprintf(buffer, "%s%c%c", output, WHY2_CHAT_MESSAGE_DELIMITER, '\0');
+
+        //POINT output TO THE NEW buffer
+        why2_deallocate(output);
+        output = buffer;
+    }
 
     //SEND
     send(socket, output, strlen(output), 0);
