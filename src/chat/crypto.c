@@ -190,7 +190,7 @@ why2_bool why2_chat_ecc_verify_signature(char *message, char *signature, EVP_PKE
 {
     //VARIABLES
     size_t length;
-    char *decoded_signature = base64_decode(signature, &length); //DECODE SIGNATURE
+    char *decoded_signature = why2_chat_base64_decode(signature, &length); //DECODE SIGNATURE
     why2_bool returning;
 
     //INIT CONTEXT
@@ -247,7 +247,7 @@ EVP_PKEY* why2_chat_ecc_deserialize_public_key(char *pubkey)
     //VARIABLES
     BIO *bio;
     EVP_PKEY *key;
-    char *base64_decoded = base64_decode(pubkey, NULL);
+    char *base64_decoded = why2_chat_base64_decode(pubkey, NULL);
 
     //EXTRACT KEY
     bio = BIO_new_mem_buf(base64_decoded, -1);
@@ -265,7 +265,7 @@ char *why2_chat_ecc_shared_key(char *ecc_key)
     size_t key_length;
     char *secret = NULL;
     size_t secret_len;
-    char *recipient_pubkey_decoded = base64_decode(ecc_key, &key_length); //DECODE key
+    char *recipient_pubkey_decoded = why2_chat_base64_decode(ecc_key, &key_length); //DECODE key
     char *sym_key;
     BIO *bio = BIO_new_mem_buf(recipient_pubkey_decoded, -1);
     EVP_PKEY *recipient_pubkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
