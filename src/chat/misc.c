@@ -247,6 +247,8 @@ char *read_socket_raw(int socket, char *key)
     //FIND THE RECEIVED SIZE
     ioctl(socket, FIONREAD, &content_size);
 
+    if (content_size == 0) return NULL; //CLIENT PROBABLY QUIT
+
     //ALLOCATE
     content_buffer = why2_malloc(content_size + 1);
 
