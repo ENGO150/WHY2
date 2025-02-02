@@ -319,6 +319,7 @@ int main(void)
 
     why2_deallocate(cmd_arg);
     why2_chat_deallocate_keys(); //DEALLOCATE GETTERS FOR KEYS
+    why2_chat_deallocate_client_server_key();
 
     why2_clean_memory(""); //RUN GARBAGE COLLECTOR
 
