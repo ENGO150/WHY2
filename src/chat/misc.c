@@ -173,6 +173,11 @@ void remove_non_ascii(char **text)
     (*text)[j] = '\0';
 }
 
+char *__fake_base64(char *text, WHY2_UNUSED size_t *length)
+{
+    return why2_strdup(text);
+}
+
 void encrypt_decrypt_message(char **message, char *key, enum ENCRYPTION_DECRYPTION operation)
 {
     //NO ENCRYPTION
@@ -180,19 +185,22 @@ void encrypt_decrypt_message(char **message, char *key, enum ENCRYPTION_DECRYPTI
 
     //CALLBACKS
     why2_output_flags (*operation_cb)(char*, char*) = NULL;
-    char *(*base64_cb)(char*, size_t*) = NULL;
+    char *(*base64_before_cb)(char*, size_t*) = NULL;
+    char *(*base64_after_cb)(char*, size_t*) = NULL;
 
     //SELECT CORRECT CALLBACK
     switch (operation)
     {
         case ENCRYPTION:
             operation_cb = why2_encrypt_text;
-            base64_cb = why2_chat_base64_encode;
+            base64_before_cb = __fake_base64;
+            base64_after_cb = why2_chat_base64_encode;
             break;
 
         case DECRYPTION:
             operation_cb = why2_decrypt_text;
-            base64_cb = why2_chat_base64_decode;
+            base64_before_cb = why2_chat_base64_decode;
+            base64_after_cb = __fake_base64;
             break;
 
         default:
