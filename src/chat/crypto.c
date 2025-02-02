@@ -116,7 +116,7 @@ char *why2_chat_base64_encode(char *message, size_t *length)
     BIO_get_mem_ptr(bio, &buffer_ptr);
 
     //COPY
-    encoded_message = why2_malloc(buffer_ptr -> length + why2_count_int_length((int) *length) + 2);
+    encoded_message = why2_malloc(buffer_ptr -> length + why2_count_int_length((int) *length) + 3);
     memcpy(encoded_message, buffer_ptr -> data, buffer_ptr -> length);
 
     sprintf(encoded_message + buffer_ptr -> length, "%c%zu%c", WHY2_CHAT_BASE64_LENGTH_DELIMITER, *length, '\0'); //APPEND LENGTH
