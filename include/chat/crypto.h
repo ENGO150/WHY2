@@ -23,6 +23,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern "C" {
 #endif
 
+#include <stddef.h>
+
 #include <openssl/types.h>
 
 #include <why2/flags.h>
