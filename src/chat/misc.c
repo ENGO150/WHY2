@@ -1152,10 +1152,12 @@ void *why2_authority_communicate_thread(void *arg)
                     //ALLOCATE
                     buffer = why2_calloc(buffer_size + 1, sizeof(char));
 
-                    fread(buffer, buffer_size, 1, cert); //READ
-
-                    //SEND STATUS
-                    why2_send_socket_code(NULL, NULL, NULL, connection, strcmp(buffer, message) == 0 ? WHY2_CHAT_CODE_SUCCESS : WHY2_CHAT_CODE_FAILURE);
+                    //READ
+                    if (fread(buffer, buffer_size, 1, cert) == 1)
+                    {
+                        //SEND STATUS
+                        why2_send_socket_code(NULL, NULL, NULL, connection, strcmp(buffer, message) == 0 ? WHY2_CHAT_CODE_SUCCESS : WHY2_CHAT_CODE_FAILURE);
+                    }
 
                     //DEALLOCATION
                     why2_deallocate(buffer);
