@@ -174,28 +174,31 @@ char *read_socket_raw(int socket, WHY2_UNUSED char *key)
     }
 
     char *content_buffer = NULL;
-    int content_size;
+    size_t content_size = 0;
     char *wait_buffer = why2_malloc(2); //TEMP
 
     //WAIT TILl RECEIVED MSG (ik it sucks but i can't think of better solution; anyways, this is way more convenient than infinite loop that makes my computer go wroom wroom)
     recv(socket, wait_buffer, 1, MSG_PEEK);
     why2_deallocate(wait_buffer);
 
-    do
-    {
-        //FIND THE SENT SIZE
-        content_size = 0;
-        if (ioctl(socket, FIONREAD, &content_size) < 0 || content_size <= 0) continue;
+    //FIND THE RECEIVED SIZE
+    ioctl(socket, FIONREAD, &content_size);
 
-        //ALLOCATE
-        content_buffer = why2_realloc(content_buffer, content_size + 1);
+    //ALLOCATE
+    content_buffer = why2_malloc(content_size + 1);
+
+    for (size_t i = 0; i < content_size; i++)
+    {
+        //END OF MESSAGE REACHED (COULD BE CAUSED BY FAST SENT MESSAGES)
+        if (i >= 2 && strncmp(content_buffer + i - 2, "\"}", 2) == 0) break;
 
         //READ JSON MESSAGE
-        if (recv(socket, content_buffer, content_size, 0) != content_size) //READ THE MESSAGE BY CHARACTERS
+        if (recv(socket, content_buffer + i, 1, 0) != 1) //READ THE MESSAGE BY CHARACTERS
         {
             fprintf(stderr, "Socket probably read wrongly!\n");
+            break;
         }
-    } while (content_buffer == NULL || strncmp(content_buffer + (content_size - 2), "\"}", 2) != 0);
+    }
 
     content_buffer[content_size] = '\0'; //NULL TERM
 
