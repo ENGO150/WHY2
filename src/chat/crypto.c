@@ -96,7 +96,7 @@ void why2_chat_init_keys(void)
     why2_deallocate(key);
 }
 
-char *why2_chat_base64_encode(char *message, size_t length)
+char *why2_chat_base64_encode(char *message, size_t *length)
 {
     //VARIABLES
     BIO *bio;
@@ -111,15 +111,15 @@ char *why2_chat_base64_encode(char *message, size_t length)
     bio = BIO_push(b64, bio);
 
     //ENCODE
-    BIO_write(bio, message, length);
+    BIO_write(bio, message, *length);
     BIO_flush(bio);
     BIO_get_mem_ptr(bio, &buffer_ptr);
 
     //COPY
-    encoded_message = why2_malloc(buffer_ptr -> length + why2_count_int_length((int) length) + 2);
+    encoded_message = why2_malloc(buffer_ptr -> length + why2_count_int_length((int) *length) + 2);
     memcpy(encoded_message, buffer_ptr -> data, buffer_ptr -> length);
 
-    sprintf(encoded_message + buffer_ptr -> length, "%c%zu%c", WHY2_CHAT_BASE64_LENGTH_DELIMITER, length, '\0'); //APPEND LENGTH
+    sprintf(encoded_message + buffer_ptr -> length, "%c%zu%c", WHY2_CHAT_BASE64_LENGTH_DELIMITER, *length, '\0'); //APPEND LENGTH
 
     //DEALLOCATION
     BIO_free_all(bio);
@@ -177,7 +177,7 @@ char *why2_chat_ecc_sign(char *message)
     sig = why2_malloc(siglen); //ALLOCATE SIGNATURE
     EVP_DigestSignFinal(mdctx, (unsigned char*) sig, &siglen);
 
-    encoded_sig = why2_chat_base64_encode(sig, siglen); //CONVERT sig TO BASE64
+    encoded_sig = why2_chat_base64_encode(sig, &siglen); //CONVERT sig TO BASE64
 
     //DEALLOCATION
     why2_deallocate(sig);
@@ -232,7 +232,7 @@ char *why2_chat_ecc_serialize_public_key()
     pubkey[length] = '\0';
 
     //ENCODE
-    base64_encoded = why2_chat_base64_encode(pubkey, length);
+    base64_encoded = why2_chat_base64_encode(pubkey, &length);
 
     //DEALLOCATION
     BIO_free(bio);
