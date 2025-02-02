@@ -34,6 +34,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <why2/chat/crypto.h>
 #include <why2/chat/flags.h>
 
+#include <why2/encrypter.h>
+#include <why2/decrypter.h>
 #include <why2/llist.h>
 #include <why2/memory.h>
 #include <why2/misc.h>
@@ -55,6 +57,12 @@ typedef struct _read_socket_raw_thread_node
     int connection;
     char *key;
 } read_socket_raw_thread_node_t;
+
+enum ENCRYPTION_DECRYPTION
+{
+    ENCRYPTION,
+    DECRYPTION
+};
 
 why2_list_t connection_list = WHY2_LIST_EMPTY;
 why2_list_t waiting_list = WHY2_LIST_EMPTY;
@@ -163,6 +171,47 @@ void remove_non_ascii(char **text)
     }
 
     (*text)[j] = '\0';
+}
+
+void encrypt_decrypt_message(char **message, char *key, enum ENCRYPTION_DECRYPTION operation)
+{
+    //NO ENCRYPTION
+    if (key == NULL) return;
+
+    //CALLBACKS
+    why2_output_flags (*operation_cb)(char*, char*) = NULL;
+    char *(*base64_cb)(char*, size_t*) = NULL;
+
+    //SELECT CORRECT CALLBACK
+    switch (operation)
+    {
+        case ENCRYPTION:
+            operation_cb = why2_encrypt_text;
+            base64_cb = why2_chat_base64_encode;
+            break;
+
+        case DECRYPTION:
+            operation_cb = why2_decrypt_text;
+            base64_cb = why2_chat_base64_decode;
+            break;
+
+        default:
+            why2_die("ENCRYPTION_DECRYPTION not implemented!");
+            break;
+    }
+
+    //SET FLAGS
+    if (why2_get_key_length() < strlen(key)) why2_set_key_length(strlen(key));
+
+    //ENCRYPT
+    why2_output_flags output = operation_cb(*message, key);
+
+    //COPY OUTPUT IN BASE64
+    why2_deallocate(*message);
+    *message = base64_cb(output.output_text, &output.output_text_length);
+
+    //DEALLOCATION
+    why2_deallocate_output(output);
 }
 
 char *read_socket_raw(int socket, WHY2_UNUSED char *key)
