@@ -61,6 +61,7 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
     char *text_buffer = NULL;
     int *text_key_chain;
     int number_buffer = 0;
+    unsigned long returning_len = 0;
 
     if (key != NULL)
     {
@@ -149,7 +150,8 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
         }
 
         //ALLOCATE returning_text (WITH THE SEPARATORS)
-        returning_text = why2_calloc(number_buffer + strlen(text_new), sizeof(char));
+        returning_len = number_buffer + strlen(text_new);
+        returning_text = why2_calloc(returning_len, sizeof(char));
 
         //LOAD returning_text
         for (int i = 0; i < (int) strlen(text_new); i++)
@@ -171,7 +173,8 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
     {
         number_buffer = (strlen(text_new) + 1) * 2; //EACH CHARACTER WILL BE SPLIT INTO TWO CHARS AND FIRST TWO WILL BE LENGTH OF text_new
 
-        returning_text = why2_calloc(number_buffer + 1, sizeof(char)); //ALLOCATE
+        returning_len = number_buffer + 1;
+        returning_text = why2_calloc(returning_len, sizeof(char)); //ALLOCATE
 
         //SET LENGTH
         returning_text[0] = (strlen(text_new) & 0x7f) + 1; //+1 BECAUSE WE DON'T WANT \0
@@ -199,6 +202,7 @@ why2_output_flags why2_encrypt_text(char *text, char *key)
     why2_output_flags output =
     {
         returning_text, //ENCRYPTED TEXT
+        returning_len, //LENGTH
         key_new, //GENERATED/USED KEY
         why2_count_unused_key_size(text_new, key_new), // NUMBER OF WHY2_UNUSED CHARS IN KEY
         why2_count_repeated_key_size(text_new, key_new), //NUMBER OF REPEATED CHARS IN KEY

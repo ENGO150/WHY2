@@ -74,17 +74,17 @@ why2_input_flags why2_get_flags(void)
 
 why2_output_flags why2_no_output(enum WHY2_EXIT_CODES exit_code)
 {
-    char *emptyText = why2_malloc(1); //TEXT
-    emptyText[0] = '\0';
+    char *empty_text = why2_malloc(1); //TEXT
+    empty_text[0] = '\0';
 
-    char *emptyKey = why2_malloc(why2_get_key_length() + 1); //KEY
-    for (int i = 0; i < (int) why2_get_key_length(); i++)
+    char *empty_key = why2_malloc(why2_get_key_length() + 1); //KEY
+    for (unsigned long i = 0; i < why2_get_key_length(); i++)
     {
-        emptyKey[i] = 'x';
+        empty_key[i] = 'x';
     }
-    emptyKey[why2_get_key_length()] = '\0';
+    empty_key[why2_get_key_length()] = '\0';
 
-    return (why2_output_flags) { emptyText, emptyKey, 0, 0, 0, exit_code };
+    return (why2_output_flags) { empty_text, 0, empty_key, 0, 0, 0, exit_code };
 }
 
 why2_encryption_operation_cb why2_get_encryption_operation(void)

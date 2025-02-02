@@ -70,6 +70,7 @@ why2_output_flags why2_decrypt_text(char *text, char *key)
     char *key_new = why2_strdup(key); //COPY key TO key_new
     int *encrypted_text_key_chain;
     char *used_text = NULL; //COPY text TO used_text
+    unsigned long returning_len = 0;
 
     if (why2_get_flags().format == WHY2_OUTPUT_BYTE)
     {
@@ -122,7 +123,8 @@ why2_output_flags why2_decrypt_text(char *text, char *key)
     }
 
     //SET LENGTH (number_buffer)
-    returning_text = why2_calloc(number_buffer + 1, sizeof(char));
+    returning_len = number_buffer + 1;
+    returning_text = why2_calloc(returning_len, sizeof(char));
     text_key_chain = why2_malloc(sizeof(int) * number_buffer);
     encrypted_text_key_chain = why2_malloc(sizeof(int) * number_buffer);
     text_key_chainLength = number_buffer;
@@ -213,7 +215,8 @@ why2_output_flags why2_decrypt_text(char *text, char *key)
         }
 
         //PUT PADDED TEXT INTO text_new
-        returning_text = why2_recalloc(returning_text, why2_list_get_size(&split_text) + 1, sizeof(char));
+        returning_len = why2_list_get_size(&split_text) + 1;
+        returning_text = why2_recalloc(returning_text, returning_len, sizeof(char));
         why2_node_t *buffer = split_text.head;
         why2_node_t *buffer_2;
         unsigned long index_buffer = 0;
@@ -237,6 +240,7 @@ why2_output_flags why2_decrypt_text(char *text, char *key)
     why2_output_flags output =
     {
         returning_text, //DECRYPTED TEXT
+        returning_len, //LENGTH
         key_new, //USED KEY
         why2_count_unused_key_size(returning_text, key_new), // NUMBER OF WHY2_UNUSED CHARS IN KEY
         why2_count_repeated_key_size(returning_text, key_new), //NUMBER OF REPEATED CHARS IN KEY

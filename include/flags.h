@@ -87,6 +87,7 @@ typedef struct
 typedef struct
 {
     char *output_text; //VARIABLE FOR ENCRYPTED/DECRYPTED TEXT
+    unsigned long output_text_length; //LENGTH OF ENCRYPTED/DECRYPTED TEXT
     char *used_key; //VARIABLE FOR USED/GENERATED KEY
     unsigned long unused_key_size; //VARIABLE FOR COUNT OF WHY2_UNUSED CHARACTERS IN KEY
     unsigned long repeated_key_size; //VARIABLE FOR COUNT OF REPEATED CHARACTERS IN KEY (basically reversed unused_key_size)
