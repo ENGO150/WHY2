@@ -208,21 +208,27 @@ void encrypt_decrypt_message(char **message, char *key, enum ENCRYPTION_DECRYPTI
             break;
     }
 
+    //VARIABLES
+    size_t length = strlen(*message);
+    char *message_decoded = base64_before_cb(*message, &length);
+
     //SET FLAGS
     if (why2_get_key_length() < strlen(key)) why2_set_key_length(strlen(key));
+    why2_set_flags((why2_input_flags) { 1, 1, 0, WHY2_v4, WHY2_OUTPUT_TEXT, 0 }); //TODO: Add padding
 
     //ENCRYPT
-    why2_output_flags output = operation_cb(*message, key);
+    why2_output_flags output = operation_cb(message_decoded, key);
 
     //COPY OUTPUT IN BASE64
     why2_deallocate(*message);
-    *message = base64_cb(output.output_text, &output.output_text_length);
+    *message = base64_after_cb(output.output_text, &output.output_text_length);
 
     //DEALLOCATION
+    why2_deallocate(message_decoded);
     why2_deallocate_output(output);
 }
 
-char *read_socket_raw(int socket, WHY2_UNUSED char *key)
+char *read_socket_raw(int socket, char *key)
 {
     if (socket == -1)
     {
@@ -258,6 +264,8 @@ char *read_socket_raw(int socket, WHY2_UNUSED char *key)
     }
 
     content_buffer[content_size] = '\0'; //NULL TERM
+
+    encrypt_decrypt_message(&content_buffer, key, DECRYPTION); //DECRYPT
 
     //VALIDATE JSON FORMAT
     struct json_object *json = json_tokener_parse(content_buffer);
@@ -468,7 +476,7 @@ void send_socket_code_deallocate(char *params, char *username, char *key, int so
     why2_toml_read_free(username);
 }
 
-void send_socket(char *text, char *username, WHY2_UNUSED char *why2_key, int socket, why2_bool welcome, char *code)
+void send_socket(char *text, char *username, char *why2_key, int socket, why2_bool welcome, char *code)
 {
     //VARIABLES
     char *output = why2_strdup("");
@@ -527,6 +535,8 @@ void send_socket(char *text, char *username, WHY2_UNUSED char *why2_key, int soc
         append(&output, key, (char*) json_object_get_string(value));
     }
     add_brackets(&output);
+
+    encrypt_decrypt_message(&output, why2_key, ENCRYPTION); //ENCRYPT
 
     //SEND
     send(socket, output, strlen(output), 0);
