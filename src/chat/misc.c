@@ -67,6 +67,8 @@ enum ENCRYPTION_DECRYPTION
 why2_list_t connection_list = WHY2_LIST_EMPTY;
 why2_list_t waiting_list = WHY2_LIST_EMPTY;
 
+why2_node_t *find_connection(int connection);
+
 char *get_string_from_json(struct json_object *json, char *string)
 {
     struct json_object *object;
