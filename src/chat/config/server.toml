@@ -27,3 +27,4 @@ max_username_tries = 3 # Times asking client for username (if client tries to us
 max_password_tries = 3 # Same as above but for invalid password
 
 max_message_length = 100 # Maximal message length
+min_message_delay = 250 # Minimal ms delay between user messages (to prevent spamming)
