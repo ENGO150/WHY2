@@ -24,6 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 #include <pthread.h>
 
@@ -93,6 +94,51 @@ void invalid(char *type)
     fflush(stdout);
 }
 
+struct sockaddr_in resolve_domain(char *domain, uint16_t port)
+{
+    //VARIABLES
+    struct sockaddr_in server_addr = { 0 };
+    struct in_addr ipv4_buffer;
+
+    //SET STUFF
+    server_addr.sin_family = AF_INET; //SET FAMILY
+    server_addr.sin_port = htons(port); //SET PORT
+
+    domain[strcspn(domain, "\n")] = '\0'; //REMOVE NEWLINE
+
+    //ALREADY USING IPv4 ADDRESS
+    if (inet_pton(AF_INET, domain, &ipv4_buffer) == 1)
+    {
+        server_addr.sin_addr = ipv4_buffer;
+        return server_addr;
+    }
+
+    //DOMAIN-RESOLVE VARIABLES
+    struct addrinfo hints;
+    struct addrinfo *res = NULL;
+    struct sockaddr_in *ipv4;
+
+    //SET addrinfo STUFF
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    //CERO, NADA
+    if (getaddrinfo(domain, NULL, &hints, &res) != 0)
+    {
+        why2_die("Error resolving domain!");
+    }
+
+    //USE FIRST IPv4 ADDRESS FOUND
+    ipv4 = (struct sockaddr_in *) res -> ai_addr;
+    server_addr.sin_addr = ipv4 -> sin_addr;
+
+    //DEALLOCATION
+    freeaddrinfo(res);
+
+    return server_addr;
+}
+
 int main(void)
 {
     signal(SIGINT, exit_client); //HANDLE ^C
@@ -101,6 +147,7 @@ int main(void)
     why2_chat_init_client_config(); //CREATE client.toml CONFIGURATION
     why2_chat_init_keys(); //CREATE ECC KEY
 
+    //VARIABLES
     listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE AUTHORITY SOCKET
     char *line = NULL;
     void *return_line = NULL;
@@ -110,16 +157,13 @@ int main(void)
     why2_bool ssqc = 0;
     char *cmd_arg = NULL;
     why2_bool *ca_success;
-
-    //DEFINE CONNECTION PROPERTIES
     struct sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;
 
     //CA CONNECT
     line = why2_chat_client_config("authority_ip"); //GET ADDRESS OF CA
 
-    server_addr.sin_port = htons(WHY2_CHAT_AUTHORITY_PORT); //CA PORT
-    server_addr.sin_addr.s_addr = inet_addr(line); //IP ADDRESS OF CA
+    //GET server_addr
+    server_addr = resolve_domain(line, WHY2_CHAT_AUTHORITY_PORT);
 
     if (connect(listen_socket, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) why2_die("Connecting to CA failed."); //CONNECT TO CA
 
@@ -134,7 +178,6 @@ int main(void)
 
     //SERVER CONNECT
     listen_socket = socket(AF_INET, SOCK_STREAM, 0); //CREATE SERVER SOCKET
-    server_addr.sin_port = htons(WHY2_CHAT_SERVER_PORT);
 
     //GET IP
     printf("Welcome.\n\n");
@@ -159,7 +202,8 @@ int main(void)
 
     why2_toml_read_free(auto_connect);
 
-    server_addr.sin_addr.s_addr = inet_addr(line);
+    //GET server_addr
+    server_addr = resolve_domain(line, WHY2_CHAT_SERVER_PORT);
 
     //PRINT UNDERLINE
     for (unsigned long i = 0; i < strlen(line) + line_length; i++)
