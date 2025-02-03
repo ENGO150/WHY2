@@ -35,6 +35,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 int main(void)
 {
+    __why2_chat_set_server(1);
     why2_check_version(); //CHECK FOR UPDATES
     why2_chat_init_authority(); //CREATE AUTHORITY DIRECTORY
     why2_chat_init_keys(); //CREATE ECC KEY
