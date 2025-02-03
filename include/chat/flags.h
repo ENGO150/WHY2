@@ -89,6 +89,9 @@ void why2_chat_set_client_server_key(char *key); //SET KEY USED FOR ENCRYPTION B
 char *why2_chat_get_client_server_key(void);
 void why2_chat_deallocate_client_server_key(void);
 
+void __why2_chat_set_server(why2_bool value); //IF PROGRAM IS SERVER-SIDE
+why2_bool __why2_chat_is_server(void); //IF PROGRAM IS SERVER-SIDE
+
 void __why2_set_asking_password(why2_bool value); //IF HASH SHOULD BE SENT INSTEAD OF NORMAL MESSAGE
 why2_bool __why2_get_asking_password(void);
 

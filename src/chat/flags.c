@@ -25,6 +25,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 why2_bool asking_password = 0;
 why2_bool asking_username = 0;
+why2_bool is_server = 0;
 char *client_server_key = NULL;
 
 void why2_chat_set_client_server_key(char *key)
@@ -41,6 +42,16 @@ void why2_chat_deallocate_client_server_key(void)
 {
     why2_deallocate(client_server_key);
     client_server_key = NULL;
+}
+
+void __why2_chat_set_server(why2_bool value)
+{
+    is_server = value;
+}
+
+why2_bool __why2_chat_is_server(void)
+{
+    return is_server;
 }
 
 void __why2_set_asking_password(why2_bool value)
