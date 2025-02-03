@@ -275,6 +275,9 @@ char *read_socket_raw(int socket, char *key)
 
     encrypt_decrypt_message(&output, key, DECRYPTION); //DECRYPT
 
+    //REMOVE NON-ASCII
+    remove_non_ascii(&output);
+
     //VALIDATE JSON FORMAT
     struct json_object *json = json_tokener_parse(output);
     if (json == NULL)
