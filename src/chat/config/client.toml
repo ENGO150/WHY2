@@ -15,6 +15,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 auto_connect = false # Automatic connection to 'auto_connect_ip'
-auto_connect_ip = "109.123.243.163" # See 'auto_connect'
+auto_connect_ip = "chat.coquette.baby" # See 'auto_connect'
 
-authority_ip = "109.123.243.163" # CA Address; Feel free to change if you don't trust the developer, but be aware that both client and server must use the same CA
+authority_ip = "ca.chat.coquette.baby" # CA Address; Feel free to change if you don't trust the developer, but be aware that both client and server must use the same CA
