@@ -1352,6 +1352,9 @@ void *why2_listen_server(void *socket)
     unsigned char asking_username = 0;
     unsigned char asking_password = 0;
     char *server_uname = NULL;
+    why2_bool bool_buffer_1 = 0;
+    why2_bool bool_buffer_2 = 0;
+    why2_bool bool_buffer_3 = 0;
 
     //CONTENT
     char *username = NULL;
@@ -1406,11 +1409,11 @@ void *why2_listen_server(void *socket)
 
                 pthread_cancel(getline_thread); //CANCEL CLIENT getline
                 exiting = 1; //EXIT THIS THREAD
-            } else if (strcmp(code, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || strcmp(code, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
+            } else if (strcmp(code, WHY2_CHAT_CODE_PICK_USERNAME) == 0 || (bool_buffer_1 = (strcmp(code, WHY2_CHAT_CODE_INVALID_USERNAME) == 0))) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
             {
                 __why2_set_asking_username(1);
 
-                if (strcmp(code, WHY2_CHAT_CODE_INVALID_USERNAME) == 0) //INVALID USERNAME
+                if (bool_buffer_1) //INVALID USERNAME
                 {
                     printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid username!\n\n\n", asking_username > 1 ? WHY2_CLEAR_AND_GO_UP : "");
                     fflush(stdout);
