@@ -63,13 +63,15 @@ jobs:
       - name: Build Chat
         run: make build_chat
 
-      - name: Upload Client
+      - if: env.bramborak == 'ted jsem tam mel jednu slapku' # Ensure this runs only on GitHub
+        name: Upload Client
         uses: actions/upload-artifact@v4
         with:
           name: WHY2 Chat Client
           path: ${{ matrix.client }}
 
-      - name: Upload Server
+      - if: env.bramborak == 'ted jsem tam mel jednu slapku' # Ensure this runs only on GitHub
+        name: Upload Server
         uses: actions/upload-artifact@v4
         with:
           name: WHY2 Chat Server
