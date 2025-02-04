@@ -25,7 +25,6 @@ on:
 permissions:
   contents: read
 
-
 env:
   bramborak: ${{ secrets.BRAMBORAK }}
 
