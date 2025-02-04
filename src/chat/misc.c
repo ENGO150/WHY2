@@ -873,7 +873,7 @@ void *why2_communicate_thread(void *arg)
             char *user_config_path = why2_get_server_users_path();
             if (!why2_toml_contains(user_config_path, decoded_buffer)) //REGISTRATION
             {
-                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_ENTER_PASSWORD);
+                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_REGISTER);
 
                 //KEEP READING UNTIL CODE ARRIVES
                 char *code = NULL;
@@ -902,7 +902,7 @@ void *why2_communicate_thread(void *arg)
                 why2_toml_write(user_config_path, username, password); //SAVE PASSWORD
             } else //LOGIN
             {
-                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_ENTER_PASSWORD);
+                send_socket_code_deallocate(NULL, why2_chat_server_config("server_username"), client_server_key, connection, WHY2_CHAT_CODE_LOGIN);
 
                 unsigned char max_tries = (unsigned char) server_config_int("max_password_tries");
 
@@ -1496,17 +1496,17 @@ void *why2_listen_server(void *socket)
                     why2_deallocate(pm_info[i]);
                 }
                 why2_deallocate(pm_info);
-            } else if (strcmp(code, WHY2_CHAT_CODE_ENTER_PASSWORD) == 0 || strcmp(code, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
+            } else if ((bool_buffer_1 = (strcmp(code, WHY2_CHAT_CODE_REGISTER) == 0)) || (bool_buffer_2 = (strcmp(code, WHY2_CHAT_CODE_LOGIN) == 0)) || (bool_buffer_3 = (strcmp(code, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0))) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
             {
                 __why2_set_asking_password(1);
 
-                if (strcmp(code, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0) //INVALID USERNAME
+                if (bool_buffer_3) //INVALID USERNAME
                 {
                     printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid password!\n\n\n", asking_password > 1 ? WHY2_CLEAR_AND_GO_UP : "");
                     fflush(stdout);
                 }
 
-                printf("%s%s\nEnter password:\n", asking_password++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP);
+                printf("%s%s\nEnter password:%s\n", asking_password++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, bool_buffer_1 ? " (REGISTER)" : (bool_buffer_2 ? " (LOGIN)" : ""));
                 fflush(stdout);
                 //TODO! THIS SOMEHOW BREAKS THE CLIENT INPUT
             }
