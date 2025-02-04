@@ -21,6 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <ctype.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -50,6 +51,8 @@ typedef struct _connection_node
     char *username;
     unsigned long id;
     char *key; //EACH USER WILL USE DIFFERENT KEY FOR COMMUNICATION
+    struct timespec last_message_time; //USED TO PREVENT SPAMMING
+    unsigned char spam_violations; //SPAM MESSAGES IN ROW
 } connection_node_t; //SINGLE LINKED LIST
 
 typedef struct _read_socket_raw_thread_node
@@ -247,6 +250,55 @@ char *read_socket_raw(int socket, char *key)
     //WAIT TILl RECEIVED MSG (ik it sucks but i can't think of better solution; anyways, this is way more convenient than infinite loop that makes my computer go wroom wroom)
     recv(socket, wait_buffer, 1, MSG_PEEK);
     why2_deallocate(wait_buffer);
+
+    //PREVENT FROM SPAMMING
+    if (__why2_chat_is_server())
+    {
+        //VARIABLES
+        int minimal_delay_ns = server_config_int("min_message_delay") * 1000000;
+        struct timespec current_time;
+        why2_node_t *node = find_connection(socket);
+        connection_node_t *client_node;
+
+        if (node != NULL)
+        {
+            client_node = (connection_node_t*) node -> value;
+
+            //GET TIME
+            clock_gettime(CLOCK_MONOTONIC, &current_time);
+
+            //NOT THE FIRST MESSAGE
+            if (client_node -> last_message_time.tv_nsec != -1)
+            {
+                int64_t difference = (current_time.tv_sec - client_node -> last_message_time.tv_sec) * 1000000000LL + (current_time.tv_nsec - client_node -> last_message_time.tv_nsec);
+
+                if (difference < minimal_delay_ns) //USER IS SPAMMING
+                {
+                    //CHECK IF USER REACHED MAXIMUM VIOLATIONS
+                    if (client_node -> spam_violations > server_config_int("max_message_delay_violations")) return NULL;
+
+                    //WAIT UNTIL MINIMAL DELAY IS ACHIEVED
+                    struct timespec sleep_time =
+                    {
+                        .tv_sec = (minimal_delay_ns - difference) / 1000000000,
+                        .tv_nsec = (minimal_delay_ns - difference) % 1000000000
+                    };
+
+                    nanosleep(&sleep_time, NULL); //SLEEP
+
+                    //ADD VIOLATION
+                    client_node -> spam_violations++;
+                } else //USER IS NOT SPAMMING
+                {
+                    //RESET VIOLATIONS
+                    client_node -> spam_violations = 0;
+                }
+            }
+
+            //WRITE NEW TIME
+            clock_gettime(CLOCK_MONOTONIC, &client_node -> last_message_time); //GET TIME
+        }
+    }
 
     //FIND THE RECEIVED SIZE
     ioctl(socket, FIONREAD, &content_size);
@@ -902,7 +954,9 @@ void *why2_communicate_thread(void *arg)
         pthread_self(),
         why2_strdup(username),
         get_latest_id(),
-        client_server_key
+        client_server_key,
+        { -1, -1 },
+        0
     };
 
     why2_list_push(&connection_list, &node, sizeof(node)); //ADD TO LIST
