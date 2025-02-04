@@ -28,3 +28,4 @@ max_password_tries = 3 # Same as above but for invalid password
 
 max_message_length = 100 # Maximal message length
 min_message_delay = 250 # Minimal ms delay between user messages (to prevent spamming)
+max_message_delay_violations = 4 # Maximal 'spam' messages that can be sent in row without getting disconnected
