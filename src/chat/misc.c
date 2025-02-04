@@ -168,6 +168,8 @@ why2_bool is_ascii(char c)
 
 void remove_non_ascii(char **text)
 {
+    if (*text == NULL) return;
+
     //REMOVE NON ASCII CHARS
     int j = 0;
     for (int i = 0; (*text)[i] != '\0'; i++)
@@ -216,6 +218,14 @@ void encrypt_decrypt_message(char **message, char *key, enum ENCRYPTION_DECRYPTI
     //VARIABLES
     size_t length = strlen(*message);
     char *message_decoded = base64_before_cb(*message, &length);
+
+    //INVALID MESSAGE RECEIVED
+    if (message_decoded == NULL)
+    {
+        why2_deallocate(*message);
+        *message = NULL;
+        return;
+    }
 
     //SET FLAGS
     if (why2_get_key_length() < strlen(key)) why2_set_key_length(strlen(key));
@@ -332,8 +342,8 @@ char *read_socket_raw(int socket, char *key)
     //REMOVE NON-ASCII
     remove_non_ascii(&output);
 
-    //VALIDATE JSON FORMAT
-    struct json_object *json = json_tokener_parse(output);
+    //VALIDATE JSON FORMAT (AUTOMATICALLY FAIL IF output IS NULL)
+    struct json_object *json = output == NULL ? NULL : json_tokener_parse(output);
     if (json == NULL)
     {
         //RESET output

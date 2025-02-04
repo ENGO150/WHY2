@@ -133,6 +133,10 @@ char *why2_chat_base64_decode(char *encoded_message, size_t *length)
     BIO *bio;
     BIO *b64;
     char *separator_ptr = strrchr(encoded_message, WHY2_CHAT_BASE64_LENGTH_DELIMITER); //GET THE DELIMITER POINTER
+
+    //INVALID BASE64
+    if (separator_ptr == NULL) return NULL;
+
     size_t length_local = strtoull(separator_ptr + 1, NULL, 10);
     char* decoded_message = why2_malloc(length_local + 1);
     int decoded_length;
