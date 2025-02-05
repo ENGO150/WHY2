@@ -206,7 +206,7 @@ int main(void)
     server_addr = resolve_domain(line, WHY2_CHAT_SERVER_PORT);
 
     //PRINT UNDERLINE
-    for (unsigned long i = 0; i < strlen(line) + line_length; i++)
+    for (unsigned long i = 0; i < strlen(line) + line_length + 1; i++)
     {
         printf("#");
     }
