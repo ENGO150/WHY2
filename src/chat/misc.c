@@ -1493,19 +1493,18 @@ void *why2_listen_server(void *socket)
                     why2_deallocate(pm_info[i]);
                 }
                 why2_deallocate(pm_info);
-            } else if ((bool_buffer_1 = (strcmp(code, WHY2_CHAT_CODE_REGISTER) == 0)) || (bool_buffer_2 = (strcmp(code, WHY2_CHAT_CODE_LOGIN) == 0)) || (bool_buffer_3 = (strcmp(code, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0))) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
+            } else if (strcmp(code, WHY2_CHAT_CODE_REGISTER) == 0 || strcmp(code, WHY2_CHAT_CODE_LOGIN) == 0 || strcmp(code, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0) //PICK USERNAME (COULD BE CAUSE BY INVALID USERNAME)
             {
                 __why2_set_asking_password(1);
 
-                if (bool_buffer_3) //INVALID USERNAME
+                if (strcmp(code, WHY2_CHAT_CODE_INVALID_PASSWORD) == 0) //INVALID USERNAME
                 {
                     printf(WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP "%s\nInvalid password!\n\n\n", asking_password > 1 ? WHY2_CLEAR_AND_GO_UP : "");
                     fflush(stdout);
                 }
 
-                printf("%s%s\nEnter password:%s\n", asking_password++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, bool_buffer_1 ? " (REGISTER)" : (bool_buffer_2 ? " (LOGIN)" : ""));
+                printf("%s%s\nEnter password:%s\n", asking_password++ > 0 ? WHY2_CLEAR_AND_GO_UP : "", WHY2_CLEAR_AND_GO_UP WHY2_CLEAR_AND_GO_UP, (strcmp(code, WHY2_CHAT_CODE_REGISTER) == 0) ? " (REGISTER)" : ((strcmp(code, WHY2_CHAT_CODE_LOGIN) == 0) ? " (LOGIN)" : ""));
                 fflush(stdout);
-                //TODO! THIS SOMEHOW BREAKS THE CLIENT INPUT
             }
         } else if (!continuing)
         {
