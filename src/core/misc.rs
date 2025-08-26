@@ -18,15 +18,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    str,
     env,
     fs,
-
-    io::Write,
     path::Path,
-    fs::File,
 };
 
 use curl::easy::Easy;
+use serde_json::Value;
 
 use crate::core::options;
 use crate::core::options::ExitCode;
@@ -55,14 +54,27 @@ pub fn check_version() -> ExitCode
 
     check_directory(); //MAKE SURE WHY2 DIR EXISTS
 
-    let mut easy = Easy::new();
-    easy.url(options::VERSIONS_URL).expect("Invalid URL");
-    easy.write_function(|data|
+    //DOWNLOAD versions.json
+    let versions_text =
     {
-        File::create(get_why2_dir() + options::VERSIONS_FILE).expect("Failed to create versions.json").write_all(data).expect("Failed to write versions.json");
-        Ok(data.len())
-    }).expect("Saving versions.json failed");
-    easy.perform().expect("Downloading versions.json failed");
+        let mut buffer = String::new();
+        let mut easy = Easy::new();
+        easy.url(options::VERSIONS_URL).expect("Invalid URL");
+
+        {
+            let mut transfer = easy.transfer();
+            transfer.write_function(|data|
+            {
+                buffer.push_str(str::from_utf8(data).expect("Invalid versions.json"));
+                Ok(data.len())
+            }).expect("Reading versions.json failed");
+            transfer.perform().expect("Downloading versions.json failed");
+        }
+
+        buffer
+    };
+
+    let versions_json: Value = serde_json::from_str(&versions_text).expect("Parsing versions.json failed");
 
     ExitCode::Success
 }
