@@ -20,6 +20,10 @@ use std::sync::RwLock;
 
 use lazy_static::lazy_static;
 
+//CONSTS
+pub const USER_CONFIG_DIR: &str = "{HOME}/.config";
+pub const CONFIG_DIR: &str      = "{HOME}/.config/WHY2";
+
 //ENUMS
 //THESE ARE LEGACY VERSIONS FOR GENERATING tkch, SO YOU CAN DECRYPT OLD TEXT
 #[derive(Clone)]
