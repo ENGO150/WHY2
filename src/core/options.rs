@@ -85,14 +85,14 @@ lazy_static!
     static ref CORE_SETTINGS: RwLock<Options> = RwLock::new(Options::default());
 }
 
-pub fn set_core_settings(options: Options)
+pub fn set_core_options(options: Options)
 {
     let mut settings = CORE_SETTINGS.write().unwrap();
     *settings = options;
 }
 
-pub fn get_core_settings() -> Options
+pub fn get_core_options() -> Options
 {
-    let settings = CORE_SETTINGS.read().unwrap();
-    settings.clone()
+    let options = CORE_SETTINGS.read().unwrap();
+    options.clone()
 }
