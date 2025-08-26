@@ -16,6 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod encrypter;
-pub mod misc;
-pub mod options;
+use crate::core::options;
+use crate::core::options::ExitCode;
+
+pub fn check_version() -> ExitCode
+{
+    if options::get_core_options().no_check { return ExitCode::Success; }
+    ExitCode::InvalidKey
+}
