@@ -1,9 +1,0 @@
-.vscode/
-.ccls-cache/
-out/
-misc/
-logs/
-vgcore.*
-target/
-Cargo.lock
-.gdbinit
