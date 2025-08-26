@@ -31,6 +31,6 @@ pub fn check_directory()
 {
     let config = options::USER_CONFIG_DIR.replace("{HOME}", env::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"));
 
-    fs::create_dir(&config).expect("Failed to create config directory"); //CREATE USER CONFIG DIRECTORY
-    fs::create_dir(config + options::CONFIG_DIR).expect("Failed to create WHY2 config directory"); //CREATE WHY2 CONFIG DIRECTORY
+    if !Path::new(&(config.clone() + options::CONFIG_DIR)).is_dir() { fs::create_dir_all(config + options::CONFIG_DIR).expect("Failed to create WHY2 config directory"); } //CREATE WHY2 CONFIG DIRECTORY
+}
 }
