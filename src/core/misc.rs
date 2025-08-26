@@ -31,6 +31,24 @@ use curl::easy::Easy;
 use crate::core::options;
 use crate::core::options::ExitCode;
 
+//PRIVATE
+
+fn __get_dir(dir: &str) -> String
+{
+    dir.replace("{HOME}", env::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"))
+}
+
+fn get_config_dir() -> String
+{
+    __get_dir(options::USER_CONFIG_DIR)
+}
+
+fn get_why2_dir() -> String
+{
+    get_config_dir() + options::CONFIG_DIR
+}
+
+//PUBLIC
 pub fn check_version() -> ExitCode
 {
     if options::get_core_options().no_check { return ExitCode::Success; }
@@ -41,7 +59,7 @@ pub fn check_version() -> ExitCode
     easy.url(options::VERSIONS_URL).expect("Invalid URL");
     easy.write_function(|data|
     {
-        File::create(options::VERSIONS_FILE.replace("{HOME}", env::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"))).expect("Failed to create versions.json").write_all(data).expect("Failed to write versions.json");
+        File::create(get_why2_dir() + options::VERSIONS_FILE).expect("Failed to create versions.json").write_all(data).expect("Failed to write versions.json");
         Ok(data.len())
     }).expect("Saving versions.json failed");
     easy.perform().expect("Downloading versions.json failed");
@@ -51,7 +69,7 @@ pub fn check_version() -> ExitCode
 
 pub fn check_directory()
 {
-    let config = options::USER_CONFIG_DIR.replace("{HOME}", env::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"));
+    let config = get_config_dir();
 
     if !Path::new(&(config.clone() + options::CONFIG_DIR)).is_dir() { fs::create_dir_all(config + options::CONFIG_DIR).expect("Failed to create WHY2 config directory"); } //CREATE WHY2 CONFIG DIRECTORY
 }
