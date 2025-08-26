@@ -50,18 +50,18 @@ pub enum ExitCode //exit codes you fucking idiot
 #[derive(Clone)]
 pub struct Options
 {
-    no_check: bool, //SKIP CHECKING VERSION
-    no_output: bool, //DO NOT PRINT OUTPUT
-    version: Version, //VERSION OF tkch
-    format: OutputFormat, //FORMAT OF output
-    padding: u32, //HOW MANY PADDING CHARS TO ADD
+    pub no_check: bool, //SKIP CHECKING VERSION
+    pub no_output: bool, //DO NOT PRINT OUTPUT
+    pub version: Version, //VERSION OF tkch
+    pub format: OutputFormat, //FORMAT OF output
+    pub padding: u32, //HOW MANY PADDING CHARS TO ADD
 }
 
 pub struct Data
 {
-    output: String, //ENCRYPTED/DECRYPTED TEST
-    key: String, //KEY USED FOR ENCRYPTION
-    exit_code: ExitCode, //EXIT CODE
+    pub output: String, //ENCRYPTED/DECRYPTED TEST
+    pub key: String, //KEY USED FOR ENCRYPTION
+    pub exit_code: ExitCode, //EXIT CODE
 }
 
 //IMPLEMENTATIONS
