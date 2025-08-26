@@ -16,5 +16,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod encrypter;
-pub mod misc;
+//CONSTS
+pub enum ExitCode //exit codes you fucking idiot
+{
+    Success = 0, //EXIT CODE FOR WHY2_SUCCESSFUL RUN
+    InvalidKey = 1, //EXIT CODE FOR INVALID KEY
+    InvalidText = 4, //EXIT CODE FOR INVALID TEXT
+    DownloadFailed = 2, //EXIT CODE FOR versions.json DOWNLOAD FAIL
+}
+
+pub struct WHY2Data
+{
+    output: String, //ENCRYPTED/DECRYPTED TEST
+    key: String, //KEY USED FOR ENCRYPTION
+    exit_code: ExitCode, //EXIT CODE
+}
