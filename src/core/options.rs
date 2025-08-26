@@ -24,6 +24,7 @@ use lazy_static::lazy_static;
 pub const USER_CONFIG_DIR: &str = "{HOME}/.config";
 pub const CONFIG_DIR: &str      = "/WHY2";
 pub const VERSIONS_URL: &str    = "https://raw.githubusercontent.com/ENGO150/WHY2/release/versions.json";
+pub const VERSION: &str         = "v5.0";
 
 //ENUMS
 //THESE ARE LEGACY VERSIONS FOR GENERATING tkch, SO YOU CAN DECRYPT OLD TEXT
