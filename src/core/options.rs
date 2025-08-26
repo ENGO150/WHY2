@@ -23,7 +23,6 @@ use lazy_static::lazy_static;
 //CONSTS
 pub const USER_CONFIG_DIR: &str = "{HOME}/.config";
 pub const CONFIG_DIR: &str      = "/WHY2";
-pub const VERSIONS_FILE: &str   = "/.versions.json";
 pub const VERSIONS_URL: &str    = "https://raw.githubusercontent.com/ENGO150/WHY2/release/versions.json";
 
 //ENUMS
