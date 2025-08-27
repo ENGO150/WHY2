@@ -102,8 +102,10 @@ impl Data
 lazy_static!
 {
     static ref CORE_SETTINGS: RwLock<Options> = RwLock::new(Options::default());
+    static ref KEY_LENGTH: RwLock<usize> = RwLock::new(50);
 }
 
+//CORE SETTINGS
 pub fn set_core_options(options: Options)
 {
     let mut settings = CORE_SETTINGS.write().unwrap();
@@ -114,4 +116,16 @@ pub fn get_core_options() -> Options
 {
     let options = CORE_SETTINGS.read().unwrap();
     options.clone()
+}
+
+//KEY LENGTH
+pub fn set_key_length(length: usize)
+{
+    let mut key_length = KEY_LENGTH.write().unwrap();
+    *key_length = length;
+}
+
+pub fn get_key_length() -> usize
+{
+    *KEY_LENGTH.read().unwrap()
 }
