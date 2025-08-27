@@ -86,6 +86,19 @@ impl Options
     }
 }
 
+impl Data
+{
+    pub fn empty(code: ExitCode) -> Data
+    {
+        Data
+        {
+            output: String::new(),
+            key: String::new(),
+            exit_code: code,
+        }
+    }
+}
+
 lazy_static!
 {
     static ref CORE_SETTINGS: RwLock<Options> = RwLock::new(Options::default());
