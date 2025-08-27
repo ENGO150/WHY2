@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::core::
 {
     misc,
+    options,
     options::{ ExitCode, Data },
 };
 
@@ -28,7 +29,13 @@ pub fn encrypt_text(text: &String, key: &String) -> Data
     misc::check_version();
 
     //CHECK FOR INVALID text
-    if text.is_empty() { return Data::empty(ExitCode::InvalidText) }
+    if text.is_empty() { return Data::empty(ExitCode::InvalidText); }
+
+    if !key.is_empty()
+    {
+        //CHECK FOR INVALID [SHORT] key
+        if options::get_key_length() > key.len() { return Data::empty(ExitCode::InvalidKey); }
+    }
 
     Data::empty(ExitCode::Success)
 }
