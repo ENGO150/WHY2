@@ -46,9 +46,9 @@ pub enum OutputFormat
 
 pub enum ExitCode //exit codes you fucking idiot
 {
-    Success = 0, //EXIT CODE FOR WHY2_SUCCESSFUL RUN
-    InvalidKey = 1, //EXIT CODE FOR INVALID KEY
-    InvalidText = 4, //EXIT CODE FOR INVALID TEXT
+    Success = 0,        //EXIT CODE FOR WHY2_SUCCESSFUL RUN
+    InvalidKey = 1,     //EXIT CODE FOR INVALID KEY
+    InvalidText = 4,    //EXIT CODE FOR INVALID TEXT
     DownloadFailed = 2, //EXIT CODE FOR versions.json DOWNLOAD FAIL
 }
 
@@ -56,17 +56,18 @@ pub enum ExitCode //exit codes you fucking idiot
 #[derive(Clone)]
 pub struct Options
 {
-    pub no_check: bool, //SKIP CHECKING VERSION
-    pub no_output: bool, //DO NOT PRINT OUTPUT
-    pub version: Version, //VERSION OF tkch
+    pub key_length: usize,    //LENGTH OF SYMMETRIC KEY
+    pub no_check: bool,       //SKIP CHECKING VERSION
+    pub no_output: bool,      //DO NOT PRINT OUTPUT
+    pub version: Version,     //VERSION OF tkch
     pub format: OutputFormat, //FORMAT OF output
-    pub padding: u32, //HOW MANY PADDING CHARS TO ADD
+    pub padding: usize,       //HOW MANY PADDING CHARS TO ADD
 }
 
 pub struct Data
 {
-    pub output: String, //ENCRYPTED/DECRYPTED TEST
-    pub key: String, //KEY USED FOR ENCRYPTION
+    pub output: String,      //ENCRYPTED/DECRYPTED TEST
+    pub key: String,         //KEY USED FOR ENCRYPTION
     pub exit_code: ExitCode, //EXIT CODE
 }
 
@@ -77,6 +78,7 @@ impl Options
     {
         Options
         {
+            key_length: 50,
             no_check: false,
             no_output: false,
             version: Version::V4,
@@ -102,7 +104,6 @@ impl Data
 lazy_static!
 {
     static ref CORE_SETTINGS: RwLock<Options> = RwLock::new(Options::default());
-    static ref KEY_LENGTH: RwLock<usize> = RwLock::new(50);
 }
 
 //CORE SETTINGS
@@ -116,16 +117,4 @@ pub fn get_core_options() -> Options
 {
     let options = CORE_SETTINGS.read().unwrap();
     options.clone()
-}
-
-//KEY LENGTH
-pub fn set_key_length(length: usize)
-{
-    let mut key_length = KEY_LENGTH.write().unwrap();
-    *key_length = length;
-}
-
-pub fn get_key_length() -> usize
-{
-    *KEY_LENGTH.read().unwrap()
 }
