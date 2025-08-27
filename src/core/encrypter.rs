@@ -16,7 +16,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub fn encrypt_text(text: &String, key: &String)
+use crate::core::
 {
-    println!("{text}/{key}");
+    misc,
+    options::{ ExitCode, Data },
+};
+
+pub fn encrypt_text(text: &String, key: &String) -> Data
+{
+    //CHECK FOR ACTIVE WHY2 VERSION
+    misc::check_version();
+
+    //CHECK FOR INVALID text
+    if text.is_empty() { return Data::empty(ExitCode::InvalidText) }
+
+    Data::empty(ExitCode::Success)
 }
