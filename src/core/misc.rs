@@ -28,10 +28,8 @@ use curl::easy::Easy;
 use serde_json::Value;
 
 use crate::core::options;
-use crate::core::options::ExitCode;
 
 //PRIVATE
-
 fn __get_dir(dir: &str) -> String
 {
     dir.replace("{HOME}", env::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"))
@@ -48,13 +46,13 @@ fn get_why2_dir() -> String
 }
 
 //PUBLIC
-pub fn check_version() -> ExitCode
+pub fn check_version()
 {
-    if options::get_core_options().no_check { return ExitCode::Success; } //CHECK DISABLED
+    if options::get_core_options().no_check { return; } //CHECK DISABLED
 
     check_directory(); //MAKE SURE WHY2 DIR EXISTS
 
-    if options::get_core_options().no_output { return ExitCode::Success; } //NO OUTPUT WANTED - MEANING THIS WHOLE FUNCTION WOULD BE POINTLESS
+    if options::get_core_options().no_output { return; } //NO OUTPUT WANTED - MEANING THIS WHOLE FUNCTION WOULD BE POINTLESS
 
     //DOWNLOAD versions.json
     let versions_text =
@@ -79,17 +77,12 @@ pub fn check_version() -> ExitCode
     let versions_json: Value = serde_json::from_str(&versions_text).expect("Parsing versions.json failed"); //PARSE versions_text INTO JSON
     let active_version = versions_json["active"].as_str().expect("Invalid versions.json scheme");
 
-    if options::VERSION == active_version
-    {
-        ExitCode::Success
-    } else
+    if options::VERSION != active_version
     {
         let deprecated = versions_json["deprecated"].as_array().expect("Invalid versions.json scheme"); //GET LIST OF ALL PAST VERSIONS
         let pos = deprecated.iter().position(|x| x == options::VERSION).expect("Current version not found"); //COUNT WHERE IN TF HISTORY ARE YOU
 
         eprintln!("This release could be unsafe! You are {} versions behind! ({}/{})", deprecated.iter().skip(pos).count(), options::VERSION, active_version);
-
-        ExitCode::Success
     }
 }
 
