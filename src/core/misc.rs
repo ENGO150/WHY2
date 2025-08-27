@@ -50,22 +50,24 @@ fn get_why2_dir() -> String
 //PUBLIC
 pub fn check_version() -> ExitCode
 {
-    if options::get_core_options().no_check { return ExitCode::Success; }
+    if options::get_core_options().no_check { return ExitCode::Success; } //CHECK DISABLED
 
     check_directory(); //MAKE SURE WHY2 DIR EXISTS
+
+    if options::get_core_options().no_output { return ExitCode::Success; } //NO OUTPUT WANTED - MEANING THIS WHOLE FUNCTION WOULD BE POINTLESS
 
     //DOWNLOAD versions.json
     let versions_text =
     {
         let mut buffer = String::new();
         let mut easy = Easy::new();
-        easy.url(options::VERSIONS_URL).expect("Invalid URL");
+        easy.url(options::VERSIONS_URL).expect("Invalid URL"); //SET URL
 
         {
             let mut transfer = easy.transfer();
             transfer.write_function(|data|
             {
-                buffer.push_str(str::from_utf8(data).expect("Invalid versions.json"));
+                buffer.push_str(str::from_utf8(data).expect("Invalid versions.json")); //LOAD INTO STRING
                 Ok(data.len())
             }).expect("Reading versions.json failed");
             transfer.perform().expect("Downloading versions.json failed");
@@ -74,9 +76,21 @@ pub fn check_version() -> ExitCode
         buffer
     };
 
-    let versions_json: Value = serde_json::from_str(&versions_text).expect("Parsing versions.json failed");
+    let versions_json: Value = serde_json::from_str(&versions_text).expect("Parsing versions.json failed"); //PARSE versions_text INTO JSON
+    let active_version = versions_json["active"].as_str().expect("Invalid versions.json scheme");
 
-    ExitCode::Success
+    if options::VERSION == active_version
+    {
+        ExitCode::Success
+    } else
+    {
+        let deprecated = versions_json["deprecated"].as_array().expect("Invalid versions.json scheme"); //GET LIST OF ALL PAST VERSIONS
+        let pos = deprecated.iter().position(|x| x == options::VERSION).expect("Current version not found"); //COUNT WHERE IN TF HISTORY ARE YOU
+
+        eprintln!("This release could be unsafe! You are {} versions behind! ({}/{})", deprecated.iter().skip(pos).count(), options::VERSION, active_version);
+
+        ExitCode::Success
+    }
 }
 
 pub fn check_directory()
@@ -84,16 +98,4 @@ pub fn check_directory()
     let config = get_config_dir();
 
     if !Path::new(&(config.clone() + options::CONFIG_DIR)).is_dir() { fs::create_dir_all(config + options::CONFIG_DIR).expect("Failed to create WHY2 config directory"); } //CREATE WHY2 CONFIG DIRECTORY
-}
-
-#[cfg(test)]
-mod tests
-{
-    use super::*;
-
-    #[test]
-    fn idk()
-    {
-        check_version();
-    }
 }
