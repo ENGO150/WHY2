@@ -23,7 +23,6 @@ use std::
     path::Path,
 };
 
-use curl::easy::Easy;
 use serde_json::Value;
 use rand::distr::{ Alphanumeric, SampleString };
 
@@ -48,31 +47,18 @@ fn get_why2_dir() -> String
 //PUBLIC
 pub fn check_version()
 {
-    if options::get_core_options().no_check { return; } //CHECK DISABLED
+    let core_options = options::get_core_options();
+    if core_options.no_check { return; } //CHECK DISABLED
 
     check_directory(); //MAKE SURE WHY2 DIR EXISTS
 
-    if options::get_core_options().no_output { return; } //NO OUTPUT WANTED - MEANING THIS WHOLE FUNCTION WOULD BE POINTLESS
+    if core_options.no_output { return; } //NO OUTPUT WANTED - MEANING THIS WHOLE FUNCTION WOULD BE POINTLESS
 
     //DOWNLOAD versions.json
-    let versions_text =
-    {
-        let mut buffer = String::new();
-        let mut easy = Easy::new();
-        easy.url(options::VERSIONS_URL).expect("Invalid URL"); //SET URL
-
-        {
-            let mut transfer = easy.transfer();
-            transfer.write_function(|data|
-            {
-                buffer.push_str(str::from_utf8(data).expect("Invalid versions.json")); //LOAD INTO STRING
-                Ok(data.len())
-            }).expect("Reading versions.json failed");
-            transfer.perform().expect("Downloading versions.json failed");
-        }
-
-        buffer
-    };
+    let versions_text = reqwest::blocking::get(options::VERSIONS_URL)
+        .expect("Failed to fetch versions.json")
+        .text()
+        .expect("Failed to read versions.json");
 
     let versions_json: Value = serde_json::from_str(&versions_text).expect("Parsing versions.json failed"); //PARSE versions_text INTO JSON
     let active_version = versions_json["active"].as_str().expect("Invalid versions.json scheme");
@@ -90,7 +76,11 @@ pub fn check_directory()
 {
     let config = get_config_dir();
 
-    if !Path::new(&(config.clone() + options::CONFIG_DIR)).is_dir() { fs::create_dir_all(config + options::CONFIG_DIR).expect("Failed to create WHY2 config directory"); } //CREATE WHY2 CONFIG DIRECTORY
+    //CREATE WHY2 CONFIG DIRECTORY
+    if !Path::new(&config).join(options::CONFIG_DIR).is_dir()
+    {
+        fs::create_dir_all(config + options::CONFIG_DIR).expect("Failed to create WHY2 config directory");
+    }
 }
 
 pub fn generate_key(length: usize) -> String
