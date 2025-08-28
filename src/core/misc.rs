@@ -26,6 +26,7 @@ use std::
 
 use curl::easy::Easy;
 use serde_json::Value;
+use rand::distr::{ Alphanumeric, SampleString };
 
 use crate::core::options;
 
@@ -91,4 +92,9 @@ pub fn check_directory()
     let config = get_config_dir();
 
     if !Path::new(&(config.clone() + options::CONFIG_DIR)).is_dir() { fs::create_dir_all(config + options::CONFIG_DIR).expect("Failed to create WHY2 config directory"); } //CREATE WHY2 CONFIG DIRECTORY
+}
+
+pub fn generate_key(length: usize) -> String
+{
+    Alphanumeric.sample_string(&mut rand::rng(), length)
 }
