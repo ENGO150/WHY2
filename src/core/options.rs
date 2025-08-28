@@ -72,7 +72,7 @@ pub struct Data
 }
 
 //IMPLEMENTATIONS
-impl Options
+impl Default for Options
 {
     fn default() -> Self
     {
