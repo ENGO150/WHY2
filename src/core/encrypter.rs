@@ -37,7 +37,7 @@ pub fn encrypt_text(text: &str, key: &str) -> Data
     let key_used = if !key.is_empty() //key WAS PASSED TO FUNCTION
     {
         //CHECK FOR INVALID [SHORT] key
-        if key.len() > core_options.key_length { return Data::empty(ExitCode::InvalidKey); }
+        if key.len() < core_options.key_length { return Data::empty(ExitCode::InvalidKey); }
 
         key.to_owned()
     } else //NO key, GENERATE ONE
