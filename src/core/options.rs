@@ -37,13 +37,6 @@ pub enum Version
     V4, //LATEST VERSION, MOST SECURE (how unexpected)
 }
 
-#[derive(Clone)]
-pub enum OutputFormat
-{
-    Text, //HUMAN-READABLE FORMAT
-    Byte, //NON HUMAN-READABLE LIGHTWEIGHT FORMAT
-}
-
 pub enum ExitCode //exit codes you fucking idiot
 {
     Success = 0,        //EXIT CODE FOR WHY2_SUCCESSFUL RUN
@@ -60,7 +53,6 @@ pub struct Options
     pub no_check: bool,                            //SKIP CHECKING VERSION
     pub no_output: bool,                           //DO NOT PRINT OUTPUT
     pub version: Version,                          //VERSION OF tkch
-    pub format: OutputFormat,                      //FORMAT OF output
     pub padding: usize,                            //HOW MANY PADDING CHARS TO ADD
     pub encryption_operation: fn(i32, i32) -> i32, //ENCRYPTION OPERATION CLOSURE
 }
@@ -83,7 +75,6 @@ impl Default for Options
             no_check: false,
             no_output: false,
             version: Version::V4,
-            format: OutputFormat::Text,
             padding: 64,
             encryption_operation: |a, b| a - b,
         }
@@ -96,7 +87,7 @@ impl Data
     {
         Self
         {
-            output: String::new(),
+            output: Vec::new(),
             key: String::new(),
             exit_code: code,
         }
