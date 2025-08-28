@@ -74,9 +74,9 @@ pub struct Data
 //IMPLEMENTATIONS
 impl Options
 {
-    fn default() -> Options
+    fn default() -> Self
     {
-        Options
+        Self
         {
             key_length: 50,
             no_check: false,
@@ -90,9 +90,9 @@ impl Options
 
 impl Data
 {
-    pub fn empty(code: ExitCode) -> Data
+    pub fn empty(code: ExitCode) -> Self
     {
-        Data
+        Self
         {
             output: String::new(),
             key: String::new(),
