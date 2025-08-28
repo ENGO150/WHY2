@@ -62,7 +62,7 @@ pub struct Options
     pub version: Version,                          //VERSION OF tkch
     pub format: OutputFormat,                      //FORMAT OF output
     pub padding: usize,                            //HOW MANY PADDING CHARS TO ADD
-    pub encryption_operation: fn(u32, u32) -> u32, //ENCRYPTION OPERATION CLOSURE
+    pub encryption_operation: fn(i32, i32) -> i32, //ENCRYPTION OPERATION CLOSURE
 }
 
 pub struct Data

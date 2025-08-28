@@ -89,7 +89,7 @@ pub fn generate_key(length: usize) -> String
     Alphanumeric.sample_string(&mut rand::rng(), length)
 }
 
-pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<u32>
+pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<i32>
 {
     //VARIABLES
     let mut number_buffer: usize;
@@ -97,7 +97,7 @@ pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<u32>
     let mut number_buffer_3: usize;
     let core_options = options::get_core_options();
     let key_length = core_options.key_length;
-    let mut text_key_chain: Vec<u32> = vec![0; size];
+    let mut text_key_chain: Vec<i32> = vec![0; size];
     let key_bytes = key.as_bytes();
 
     for i in 0..size
@@ -133,8 +133,8 @@ pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<u32>
         }
 
         //VALUES
-        let a = key_bytes[number_buffer] as u32;
-        let b = key_bytes[number_buffer_3] as u32;
+        let a = key_bytes[number_buffer] as i32;
+        let b = key_bytes[number_buffer_3] as i32;
 
         //GET MATCHING OPERATION BETWEEN VALUES
         let val = if core_options.version == Version::V4 && (number_buffer + 1) % 4 == 0
