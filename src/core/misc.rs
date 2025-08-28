@@ -27,7 +27,7 @@ use serde_json::Value;
 use rand::distr::{ Alphanumeric, SampleString };
 
 use crate::core::options;
-use crate::core::options::Version;
+use crate::core::options::{ Version, Data, ExitCode };
 
 //PRIVATE
 fn __get_dir(dir: &str) -> String
@@ -46,6 +46,21 @@ fn get_why2_dir() -> String
 }
 
 //PUBLIC
+//IMPLEMENTATIONS
+impl Data
+{
+    pub fn empty(code: ExitCode) -> Self
+    {
+        Self
+        {
+            output: Vec::new(),
+            key: String::new(),
+            exit_code: code,
+        }
+    }
+}
+
+//FUNCTIONS
 pub fn check_version()
 {
     let core_options = options::get_core_options();

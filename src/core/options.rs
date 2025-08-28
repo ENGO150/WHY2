@@ -81,24 +81,12 @@ impl Default for Options
     }
 }
 
-impl Data
-{
-    pub fn empty(code: ExitCode) -> Self
-    {
-        Self
-        {
-            output: Vec::new(),
-            key: String::new(),
-            exit_code: code,
-        }
-    }
-}
-
 lazy_static!
 {
     static ref CORE_SETTINGS: RwLock<Options> = RwLock::new(Options::default());
 }
 
+//FUNCTIONS
 //CORE SETTINGS
 pub fn set_core_options(options: Options)
 {
