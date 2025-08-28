@@ -31,10 +31,16 @@ pub fn encrypt_text(text: &String, key: &String) -> Data
     //CHECK FOR INVALID text
     if text.is_empty() { return Data::empty(ExitCode::InvalidText); }
 
+    //GET key_used
+    let key_used: String;
     if !key.is_empty()
     {
         //CHECK FOR INVALID [SHORT] key
-        if options::get_key_length() > key.len() { return Data::empty(ExitCode::InvalidKey); }
+        if options::get_core_options().key_length as usize > key.len() { return Data::empty(ExitCode::InvalidKey); }
+        key_used = key.clone();
+    } else
+    {
+        key_used = misc::generate_key(options::get_core_options().key_length);
     }
 
     Data::empty(ExitCode::Success)
