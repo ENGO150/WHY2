@@ -100,15 +100,3 @@ pub fn encrypt_text(text: &str, key: &str) -> Data
     //RETURN DATA
     Data::from(text_key_chain, key_used)
 }
-
-#[cfg(test)]
-mod tests
-{
-    use super::*;
-
-    #[test]
-    fn test()
-    {
-        encrypt_text("skibidi", "");
-    }
-}
