@@ -18,9 +18,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::core::
 {
+    crypto,
     misc,
     options,
     options::{ ExitCode, Data },
+};
+
+use rand::
+{
+    Rng,
+    SeedableRng,
+    rngs::StdRng,
 };
 
 pub fn encrypt_text(text: &str, key: &str) -> Data
@@ -45,5 +53,52 @@ pub fn encrypt_text(text: &str, key: &str) -> Data
         misc::generate_key(core_options.key_length)
     };
 
+    let mut text_used = text.to_owned();
+
+    //PADDING
+    if core_options.padding > 0
+    {
+        //CONVERT text_used TO VECTOR OR CHARS
+        let mut split_text: Vec<char> = text_used.chars().collect();
+
+        //CREATE DETERMINISTIC RANDOM GENERATOR
+        let mut drng = StdRng::from_seed(crypto::sha256_seed(&key_used));
+        let mut rng = rand::rng(); //this one probably shouldn't be deterministic lmao
+
+        //INSERT PADDING
+        for _ in 0..(core_options.padding)
+        {
+            //GENERATE "RANDOM" POSITION AND RANDOM CHARACTER
+            let random_position = drng.random_range(0..(split_text.len()));
+            let random_char = loop
+            {
+                let c: char = rng.random::<char>(); //GENERATE
+                if c.is_control() { continue; } //DO NOT USE CONTROL CHARS
+                
+                break c;
+            };
+
+            //INSERT TO VECTOR
+            split_text.insert(random_position, random_char);
+        }
+
+        //REBUILD AND OVERWRITE ORIGINAL text_used
+        text_used = split_text.iter().collect();
+    }
+
+    println!("{text_used}");
+
     Data::empty(ExitCode::Success)
+}
+
+#[cfg(test)]
+mod tests
+{
+    use super::*;
+
+    #[test]
+    fn test()
+    {
+        encrypt_text("skibidi", "");
+    }
 }
