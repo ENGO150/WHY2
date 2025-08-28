@@ -56,12 +56,13 @@ pub enum ExitCode //exit codes you fucking idiot
 #[derive(Clone)]
 pub struct Options
 {
-    pub key_length: usize,    //LENGTH OF SYMMETRIC KEY
-    pub no_check: bool,       //SKIP CHECKING VERSION
-    pub no_output: bool,      //DO NOT PRINT OUTPUT
-    pub version: Version,     //VERSION OF tkch
-    pub format: OutputFormat, //FORMAT OF output
-    pub padding: usize,       //HOW MANY PADDING CHARS TO ADD
+    pub key_length: usize,                         //LENGTH OF SYMMETRIC KEY
+    pub no_check: bool,                            //SKIP CHECKING VERSION
+    pub no_output: bool,                           //DO NOT PRINT OUTPUT
+    pub version: Version,                          //VERSION OF tkch
+    pub format: OutputFormat,                      //FORMAT OF output
+    pub padding: usize,                            //HOW MANY PADDING CHARS TO ADD
+    pub encryption_operation: fn(u32, u32) -> u32, //ENCRYPTION OPERATION CLOSURE
 }
 
 pub struct Data
@@ -84,6 +85,7 @@ impl Default for Options
             version: Version::V4,
             format: OutputFormat::Text,
             padding: 64,
+            encryption_operation: |a, b| a - b,
         }
     }
 }
