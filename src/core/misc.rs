@@ -19,7 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     str,
-    env,
     fs,
     path::Path,
 };
@@ -33,7 +32,7 @@ use crate::core::options;
 //PRIVATE
 fn __get_dir(dir: &str) -> String
 {
-    dir.replace("{HOME}", env::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"))
+    dir.replace("{HOME}", dirs::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"))
 }
 
 fn get_config_dir() -> String
