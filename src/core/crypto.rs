@@ -16,18 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 
-pub fn seed(seed_str: &str) -> [u8; 32]
-{
-    //HASH INTO u64
-    let mut hasher = DefaultHasher::new();
-    seed_str.hash(&mut hasher);
-    let hash64 = hasher.finish();
+use sha2::{ Sha256, Digest };
 
-    //FILL 32 BYTE ARRAY
-    let mut seed = [0u8; 32];
-    seed[..8].copy_from_slice(&hash64.to_le_bytes());
-    seed
+pub fn sha256_seed(seed_str: &str) -> [u8; 32]
+{
+    //SHA256
+    let mut hasher = Sha256::new();
+    hasher.update(seed_str.as_bytes());
+
+    hasher.finalize().into()
 }
