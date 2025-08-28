@@ -49,6 +49,7 @@ fn get_why2_dir() -> String
 //IMPLEMENTATIONS
 impl Data
 {
+    //CREATE EMPTY Data, ONLY WITH ExitCode
     pub fn empty(code: ExitCode) -> Self
     {
         Self
@@ -56,6 +57,17 @@ impl Data
             output: Vec::new(),
             key: String::new(),
             exit_code: code,
+        }
+    }
+
+    //CREATE Data WITH Success ExitCode
+    pub fn from(output: Vec<i32>, key: String) -> Self
+    {
+        Self
+        {
+            output: output,
+            key: key,
+            exit_code: ExitCode::Success,
         }
     }
 }
