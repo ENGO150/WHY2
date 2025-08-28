@@ -97,7 +97,8 @@ pub fn encrypt_text(text: &str, key: &str) -> Data
         text_key_chain[i] = (core_options.encryption_operation)(text_key_chain[i], text_used.as_bytes()[i] as i32);
     }
 
-    Data::empty(ExitCode::Success)
+    //RETURN DATA
+    Data::from(text_key_chain, key_used)
 }
 
 #[cfg(test)]
