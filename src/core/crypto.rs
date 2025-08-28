@@ -16,8 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::collections::hash_map::DefaultHasher;
-
 use sha2::{ Sha256, Digest };
 
 pub fn sha256_seed(seed_str: &str) -> [u8; 32]
