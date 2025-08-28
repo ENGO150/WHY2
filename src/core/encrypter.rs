@@ -86,7 +86,16 @@ pub fn encrypt_text(text: &str, key: &str) -> Data
         text_used = split_text.iter().collect();
     }
 
-    println!("{text_used}");
+    let text_used_length = text_used.chars().count(); //LENGTH OF TEXT (+ PADDING)
+
+    //LOAD text_key_chain
+    let mut text_key_chain = misc::generate_text_key_chain(&key_used, text_used_length);
+
+    //ACTUALLY ENCRYPT TEXT
+    for i in 0..text_used_length
+    {
+        text_key_chain[i] = 5;
+    }
 
     Data::empty(ExitCode::Success)
 }
