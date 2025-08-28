@@ -67,7 +67,7 @@ pub struct Options
 
 pub struct Data
 {
-    pub output: String,      //ENCRYPTED/DECRYPTED TEST
+    pub output: Vec<i32>,    //ENCRYPTED/DECRYPTED TEST
     pub key: String,         //KEY USED FOR ENCRYPTION
     pub exit_code: ExitCode, //EXIT CODE
 }
