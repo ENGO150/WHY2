@@ -23,7 +23,7 @@ use crate::core::
     options::{ ExitCode, Data },
 };
 
-pub fn encrypt_text(text: &String, key: &String) -> Data
+pub fn encrypt_text(text: &str, key: &str) -> Data
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
@@ -31,17 +31,19 @@ pub fn encrypt_text(text: &String, key: &String) -> Data
     //CHECK FOR INVALID text
     if text.is_empty() { return Data::empty(ExitCode::InvalidText); }
 
+    let core_options = options::get_core_options(); //CORE OPTIONS
+
     //GET key_used
-    let key_used: String;
-    if !key.is_empty()
+    let key_used = if !key.is_empty() //key WAS PASSED TO FUNCTION
     {
         //CHECK FOR INVALID [SHORT] key
-        if options::get_core_options().key_length as usize > key.len() { return Data::empty(ExitCode::InvalidKey); }
-        key_used = key.clone();
-    } else
+        if key.len() > core_options.key_length { return Data::empty(ExitCode::InvalidKey); }
+
+        key.to_owned()
+    } else //NO key, GENERATE ONE
     {
-        key_used = misc::generate_key(options::get_core_options().key_length);
-    }
+        misc::generate_key(core_options.key_length)
+    };
 
     Data::empty(ExitCode::Success)
 }
