@@ -28,7 +28,7 @@ pub const VERSION: &str         = "v5.0";
 
 //ENUMS
 //THESE ARE LEGACY VERSIONS FOR GENERATING tkch, SO YOU CAN DECRYPT OLD TEXT
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Version
 {
     V1, //FIRST VERSION. Replaced on May 28th 17:45:26 2022 UTC in commit 0d64f4fa7c37f0b57914db902258e279a71c7f9a.
