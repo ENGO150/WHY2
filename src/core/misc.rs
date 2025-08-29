@@ -26,8 +26,18 @@ use std::
 use serde_json::Value;
 use rand::distr::{ Alphanumeric, SampleString };
 
-use crate::core::options;
-use crate::core::options::{ Version, Data, ExitCode };
+use crate::core::
+{
+    options,
+
+    options::
+    {
+        Version,
+        EncryptedData,
+        DecryptedData,
+        ExitCode,
+    },
+};
 
 //PRIVATE
 fn __get_dir(dir: &str) -> String
@@ -47,7 +57,7 @@ fn get_why2_dir() -> String
 
 //PUBLIC
 //IMPLEMENTATIONS
-impl Data
+impl EncryptedData
 {
     //CREATE EMPTY Data, ONLY WITH ExitCode
     pub fn empty(code: ExitCode) -> Self
@@ -62,6 +72,31 @@ impl Data
 
     //CREATE Data WITH Success ExitCode
     pub fn from(output: Vec<i32>, key: String) -> Self
+    {
+        Self
+        {
+            output: output,
+            key: key,
+            exit_code: ExitCode::Success,
+        }
+    }
+}
+
+impl DecryptedData
+{
+    //CREATE EMPTY Data, ONLY WITH ExitCode
+    pub fn empty(code: ExitCode) -> Self
+    {
+        Self
+        {
+            output: String::new(),
+            key: String::new(),
+            exit_code: code,
+        }
+    }
+
+    //CREATE Data WITH Success ExitCode
+    pub fn from(output: String, key: String) -> Self
     {
         Self
         {

@@ -21,7 +21,7 @@ use crate::core::
     crypto,
     misc,
     options,
-    options::{ ExitCode, Data },
+    options::{ ExitCode, EncryptedData },
 };
 
 use rand::
@@ -31,13 +31,13 @@ use rand::
     rngs::StdRng,
 };
 
-pub fn encrypt_text(text: &str, key: &str) -> Data
+pub fn encrypt_text(text: &str, key: &str) -> EncryptedData
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
 
     //CHECK FOR INVALID text
-    if text.is_empty() { return Data::empty(ExitCode::InvalidText); }
+    if text.is_empty() { return EncryptedData::empty(ExitCode::InvalidText); }
 
     let core_options = options::get_core_options(); //CORE OPTIONS
 
@@ -45,7 +45,7 @@ pub fn encrypt_text(text: &str, key: &str) -> Data
     let key_used = if !key.is_empty() //key WAS PASSED TO FUNCTION
     {
         //CHECK FOR INVALID [SHORT] key
-        if key.len() < core_options.key_length { return Data::empty(ExitCode::InvalidKey); }
+        if key.len() < core_options.key_length { return EncryptedData::empty(ExitCode::InvalidKey); }
 
         key.to_owned()
     } else //NO key, GENERATE ONE
@@ -98,5 +98,5 @@ pub fn encrypt_text(text: &str, key: &str) -> Data
     }
 
     //RETURN DATA
-    Data::from(text_key_chain, key_used)
+    EncryptedData::from(text_key_chain, key_used)
 }

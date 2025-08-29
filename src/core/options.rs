@@ -57,9 +57,16 @@ pub struct Options
     pub encryption_operation: fn(i32, i32) -> i32, //ENCRYPTION OPERATION CLOSURE
 }
 
-pub struct Data
+pub struct EncryptedData
 {
-    pub output: Vec<i32>,    //ENCRYPTED/DECRYPTED TEST
+    pub output: Vec<i32>,    //ENCRYPTED TEXT
+    pub key: String,         //KEY USED FOR ENCRYPTION
+    pub exit_code: ExitCode, //EXIT CODE
+}
+
+pub struct DecryptedData
+{
+    pub output: String,      //DECRYPTED DATA
     pub key: String,         //KEY USED FOR ENCRYPTION
     pub exit_code: ExitCode, //EXIT CODE
 }
