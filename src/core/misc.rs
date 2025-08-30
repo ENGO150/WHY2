@@ -43,6 +43,16 @@ fn __get_dir(dir: &str) -> String
     dir.replace("{HOME}", dirs::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"))
 }
 
+fn get_config_dir() -> String
+{
+    __get_dir(options::USER_CONFIG_DIR)
+}
+
+fn get_why2_dir() -> String
+{
+    get_config_dir() + options::CONFIG_DIR
+}
+
 //PUBLIC
 //IMPLEMENTATIONS
 impl EncryptedData
@@ -117,11 +127,6 @@ pub fn check_version()
 
         eprintln!("This release could be unsafe! You are {} versions behind! ({}/{})", deprecated.iter().skip(pos).count(), options::VERSION, active_version);
     }
-}
-
-pub fn get_config_dir() -> String
-{
-    __get_dir(options::USER_CONFIG_DIR)
 }
 
 pub fn check_directory()
