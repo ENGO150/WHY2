@@ -20,10 +20,10 @@ use crate::core::
 {
     crypto,
     misc,
-    options,
 
     options::
     {
+        self,
         EncryptedData,
         DecryptedData,
     },

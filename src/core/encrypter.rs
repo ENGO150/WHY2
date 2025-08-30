@@ -20,8 +20,7 @@ use crate::core::
 {
     crypto,
     misc,
-    options,
-    options::EncryptedData,
+    options::{ self, EncryptedData },
 };
 
 use rand::

@@ -28,10 +28,9 @@ use rand::distr::{ Alphanumeric, SampleString };
 
 use crate::core::
 {
-    options,
-
     options::
     {
+        self,
         Version,
         EncryptedData,
         DecryptedData,
