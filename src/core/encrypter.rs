@@ -74,7 +74,7 @@ pub fn encrypt_text(text: &str, key: &str) -> EncryptedData
             {
                 let c: char = rng.random::<char>(); //GENERATE
                 if c.is_control() { continue; } //DO NOT USE CONTROL CHARS
-                
+
                 break c;
             };
 
