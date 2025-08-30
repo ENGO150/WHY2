@@ -35,7 +35,6 @@ use crate::core::
         Version,
         EncryptedData,
         DecryptedData,
-        ExitCode,
     },
 };
 
@@ -59,50 +58,46 @@ fn get_why2_dir() -> String
 //IMPLEMENTATIONS
 impl EncryptedData
 {
-    //CREATE EMPTY Data, ONLY WITH ExitCode
-    pub fn empty(code: ExitCode) -> Self
+    //CREATE EMPTY Data
+    pub fn empty() -> Self
     {
         Self
         {
             output: None,
             key: None,
-            exit_code: code,
         }
     }
 
-    //CREATE Data WITH Success ExitCode
+    //CREATE Data
     pub fn from(output: Vec<i64>, key: String) -> Self
     {
         Self
         {
             output: Some(output),
             key: Some(key),
-            exit_code: ExitCode::Success,
         }
     }
 }
 
 impl DecryptedData
 {
-    //CREATE EMPTY Data, ONLY WITH ExitCode
-    pub fn empty(code: ExitCode) -> Self
+    //CREATE EMPTY Data
+    pub fn empty() -> Self
     {
         Self
         {
             output: None,
             key: None,
-            exit_code: code,
         }
     }
 
-    //CREATE Data WITH Success ExitCode
+    //CREATE Data
     pub fn from(output: String, key: String) -> Self
     {
         Self
         {
             output: Some(output),
             key: Some(key),
-            exit_code: ExitCode::Success,
         }
     }
 }

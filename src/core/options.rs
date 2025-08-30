@@ -37,14 +37,6 @@ pub enum Version
     V4, //LATEST VERSION, MOST SECURE (how unexpected)
 }
 
-pub enum ExitCode //exit codes you fucking idiot
-{
-    Success = 0,        //EXIT CODE FOR WHY2_SUCCESSFUL RUN
-    InvalidKey = 1,     //EXIT CODE FOR INVALID KEY
-    InvalidText = 4,    //EXIT CODE FOR INVALID TEXT
-    DownloadFailed = 2, //EXIT CODE FOR versions.json DOWNLOAD FAIL
-}
-
 //STRUCTS
 #[derive(Clone)]
 pub struct Options
@@ -61,14 +53,12 @@ pub struct EncryptedData
 {
     pub output: Option<Vec<i64>>, //ENCRYPTED TEXT
     pub key: Option<String>,      //KEY USED FOR ENCRYPTION
-    pub exit_code: ExitCode,      //EXIT CODE
 }
 
 pub struct DecryptedData
 {
     pub output: Option<String>, //DECRYPTED DATA
     pub key: Option<String>,    //KEY USED FOR ENCRYPTION
-    pub exit_code: ExitCode,    //EXIT CODE
 }
 
 //IMPLEMENTATIONS

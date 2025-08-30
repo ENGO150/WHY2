@@ -24,7 +24,6 @@ use crate::core::
 
     options::
     {
-        ExitCode,
         EncryptedData,
         DecryptedData,
     },
@@ -41,9 +40,6 @@ pub fn decrypt_text(encrypted_data: EncryptedData) -> DecryptedData
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
-
-    //CHECK FOR INVALID INPUT
-    if encrypted_data.output.is_empty() { return DecryptedData::empty(ExitCode::InvalidText); }
 
     //VARIABLES
     let core_options = options::get_core_options(); //CORE OPTIONS
