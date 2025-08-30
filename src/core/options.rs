@@ -60,14 +60,14 @@ pub struct Options
 pub struct EncryptedData
 {
     pub output: Vec<i64>,    //ENCRYPTED TEXT
-    pub key: String,         //KEY USED FOR ENCRYPTION
+    pub key: Option<String>, //KEY USED FOR ENCRYPTION
     pub exit_code: ExitCode, //EXIT CODE
 }
 
 pub struct DecryptedData
 {
     pub output: String,      //DECRYPTED DATA
-    pub key: String,         //KEY USED FOR ENCRYPTION
+    pub key: Option<String>,//KEY USED FOR ENCRYPTION
     pub exit_code: ExitCode, //EXIT CODE
 }
 
