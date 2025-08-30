@@ -47,9 +47,9 @@ pub fn decrypt_text(encrypted_data: EncryptedData) -> DecryptedData
 
     //VARIABLES
     let core_options = options::get_core_options(); //CORE OPTIONS
-    let text_encrypted = encrypted_data.output; //ENCRYPTED VECTOR
+    let text_encrypted = encrypted_data.output.expect("No input passed"); //ENCRYPTED VECTOR
     let text_encrypted_length = text_encrypted.len();
-    let key = encrypted_data.key.expect("No key"); //KEY USED FOR ENCRYPTION
+    let key = encrypted_data.key.expect("No key passed"); //KEY USED FOR ENCRYPTION
     let mut text_decrypted: Vec<u32> = vec![0; text_encrypted_length];
 
     //LOAD text_key_chain

@@ -64,7 +64,7 @@ impl EncryptedData
     {
         Self
         {
-            output: Vec::new(),
+            output: None,
             key: None,
             exit_code: code,
         }
@@ -75,7 +75,7 @@ impl EncryptedData
     {
         Self
         {
-            output: output,
+            output: Some(output),
             key: Some(key),
             exit_code: ExitCode::Success,
         }
@@ -89,7 +89,7 @@ impl DecryptedData
     {
         Self
         {
-            output: String::new(),
+            output: None,
             key: None,
             exit_code: code,
         }
@@ -100,7 +100,7 @@ impl DecryptedData
     {
         Self
         {
-            output: output,
+            output: Some(output),
             key: Some(key),
             exit_code: ExitCode::Success,
         }
