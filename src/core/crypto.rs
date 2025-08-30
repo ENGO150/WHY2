@@ -26,3 +26,8 @@ pub fn sha256_seed(seed_str: &str) -> [u8; 32]
 
     hasher.finalize().into()
 }
+
+pub fn recommended_padding_rate(input_length: usize) -> usize
+{
+    input_length / 3
+}
