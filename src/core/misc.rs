@@ -126,12 +126,12 @@ pub fn get_config_dir() -> String
 
 pub fn check_directory()
 {
-    let config = get_config_dir();
+    let config = get_config_dir() + options::CONFIG_DIR;
 
     //CREATE WHY2 CONFIG DIRECTORY
-    if !Path::new(&config).join(options::CONFIG_DIR).is_dir()
+    if !Path::new(&config).is_dir()
     {
-        fs::create_dir_all(config + options::CONFIG_DIR).expect("Failed to create WHY2 config directory");
+        fs::create_dir_all(config).expect("Failed to create WHY2 config directory");
     }
 }
 
