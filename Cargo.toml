@@ -3,6 +3,14 @@ name = "why2"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "chat_client"
+path = "src/chat/bin/client.rs"
+
+[[bin]]
+name = "chat_server"
+path = "src/chat/bin/server.rs"
+
 [dependencies]
 dirs = "6.0.0"
 lazy_static = "1.5.0"
