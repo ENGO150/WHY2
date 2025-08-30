@@ -40,7 +40,7 @@ fn encryption_operation(x: i64, y: i64) -> i64
 }
 
 #[test]
-fn encrypt_decrypt()
+fn encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
 {
     //OPTIONS
     options::set_core_options
@@ -71,15 +71,19 @@ fn encrypt_decrypt()
     //VARIABLES FOR PRINT
     let mut stream: Box<dyn Write>;
     let status: &str;
+    let returning: Result<(), Box<dyn std::error::Error>>;
 
+    //GET VALUES BASED ON RESULT
     if TEST_TEXT == decrypted_text
     {
         stream = Box::new(io::stdout());
         status = "successful";
+        returning = Ok(());
     } else
     {
         stream = Box::new(io::stderr());
         status = "failed";
+        returning = Err("Values do not match".into());
     }
 
     writeln!
@@ -94,4 +98,6 @@ TIME: \t\t{}ms",
 
         measure_stop.as_millis()
     ).unwrap();
+
+    returning
 }
