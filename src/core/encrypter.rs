@@ -31,7 +31,7 @@ use rand::
     rngs::StdRng,
 };
 
-pub fn encrypt_text(text: &str, key: &str) -> EncryptedData
+pub fn encrypt_text(text: &str, key: Option<&str>) -> EncryptedData
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
@@ -39,15 +39,20 @@ pub fn encrypt_text(text: &str, key: &str) -> EncryptedData
     let core_options = options::get_core_options(); //CORE OPTIONS
 
     //GET key_used
-    let key_used = if !key.is_empty() //key WAS PASSED TO FUNCTION
+    let key_used = match key
     {
-        //CHECK FOR INVALID [SHORT] key
-        if key.len() < core_options.key_length { return EncryptedData::empty(); }
+        Some(k) => //key WAS PASSED TO FUNCTION
+        {
+            //CHECK FOR INVALID [SHORT] key
+            if k.len() < core_options.key_length { return EncryptedData::empty(); }
 
-        key.to_owned()
-    } else //NO key, GENERATE ONE
-    {
-        misc::generate_key(core_options.key_length)
+            k.to_owned()
+        },
+
+        None => //NO key, GENERATE ONE
+        {
+            misc::generate_key(core_options.key_length)
+        }
     };
 
     let mut text_used = text.to_owned();
