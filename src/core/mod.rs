@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 pub mod crypto;
+pub mod decrypter;
 pub mod encrypter;
 pub mod misc;
 pub mod options;
