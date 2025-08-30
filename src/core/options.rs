@@ -54,12 +54,12 @@ pub struct Options
     pub no_output: bool,                           //DO NOT PRINT OUTPUT
     pub version: Version,                          //VERSION OF tkch
     pub padding: usize,                            //HOW MANY PADDING CHARS TO ADD
-    pub encryption_operation: fn(i32, i32) -> i32, //ENCRYPTION OPERATION CLOSURE
+    pub encryption_operation: fn(i64, i64) -> i64, //ENCRYPTION OPERATION CLOSURE
 }
 
 pub struct EncryptedData
 {
-    pub output: Vec<i32>,    //ENCRYPTED TEXT
+    pub output: Vec<i64>,    //ENCRYPTED TEXT
     pub key: String,         //KEY USED FOR ENCRYPTION
     pub exit_code: ExitCode, //EXIT CODE
 }
