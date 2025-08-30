@@ -48,11 +48,6 @@ fn get_config_dir() -> String
     __get_dir(options::USER_CONFIG_DIR)
 }
 
-fn get_why2_dir() -> String
-{
-    get_config_dir() + options::CONFIG_DIR
-}
-
 //PUBLIC
 //IMPLEMENTATIONS
 impl EncryptedData
@@ -138,6 +133,11 @@ pub fn check_directory()
     {
         fs::create_dir_all(config).expect("Failed to create WHY2 config directory");
     }
+}
+
+pub fn get_why2_dir() -> String
+{
+    get_config_dir() + options::CONFIG_DIR
 }
 
 pub fn generate_key(length: usize) -> String
