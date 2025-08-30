@@ -17,4 +17,5 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 //CONSTS
-pub const SERVER_CONFIG: &str = "/server.toml"; //SERVER CONFIG FILE
+pub const SERVER_CONFIG: &str = "/server.toml";                                                                //SERVER CONFIG FILE
+pub const CONFIG_URL: &str    = "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/configs"; //CONFIG FILE DOWNLOAD URL
