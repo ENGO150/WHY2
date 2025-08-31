@@ -60,10 +60,10 @@ fn main()
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
 
-        let trimmed = input.trim(); //TRIM
+        input = input.trim().to_owned(); //TRIM
 
         //EXIT
-        if trimmed == "!exit"
+        if input == "!exit"
         {
             println!("Exiting...");
             break;
