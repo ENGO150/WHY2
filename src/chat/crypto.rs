@@ -1,0 +1,56 @@
+/*
+This is part of WHY2
+Copyright (C) 2022-2025 Václav Šmejkal
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+use std::
+{
+    io::Write,
+    path::Path,
+    fs::{ self, File },
+};
+
+use openssl::
+{
+    nid::Nid,
+    ec::{ EcGroup, EcKey },
+};
+
+use crate::
+{
+    core::misc,
+    chat::options,
+};
+
+pub fn init_keys() //CREATE ECC KEYS
+{
+    //CHECK FOR KEYS DIRECTORY
+    let key_dir = misc::get_why2_dir() + options::KEY_LOCATION;
+    if Path::new(&key_dir).is_dir() { return; }
+
+    //CREATE KEYS DIRECTORY
+    fs::create_dir(&key_dir).expect("Failed creating keys directory");
+
+    let group = EcGroup::from_curve_name(Nid::SECP521R1).expect("Invalid curve"); //CREATE secp512r1
+    let ec_key = EcKey::generate(&group).expect("Key generation failed"); //GENERATE KEYPAIR
+
+    //CONVERT PRIVATE KEY TO PEM
+    let pem = ec_key.private_key_to_pem().expect("Getting PEM failed");
+
+    //SAVE TO FILE
+    let mut file = File::create(key_dir + options::KEY_FILENAME).expect("Creating keyfile failed");
+    file.write_all(&pem).expect("Writing to keyfile failed");
+}
