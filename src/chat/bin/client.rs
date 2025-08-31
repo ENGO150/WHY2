@@ -16,7 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use why2::
+{
+    core::misc,
+    chat:: { config, crypto },
+};
+
 fn main()
 {
-    println!("this fucking project ruins my mental sanity");
+    misc::check_version(); //CHECK FOR UPDATES
+    config::init_client_config(); //CREATE client.toml CONFIGURATION
+    crypto::init_keys(); //GENERATE ECC KEYS
 }
