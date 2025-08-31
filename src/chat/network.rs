@@ -16,7 +16,34 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod config;
-pub mod crypto;
-pub mod network;
-pub mod options;
+use std::
+{
+    thread,
+    net::{ TcpListener, TcpStream },
+};
+
+//PRIVATE
+fn listen_client(stream: TcpStream)
+{
+    println!("Skibidi");
+}
+
+//PUBLIC
+pub fn accept_connections(listener: TcpListener) //ACCEPT CONNECTIONS TO SERVER
+{
+    for stream in listener.incoming()
+    {
+        match stream
+        {
+            Ok(stream) =>
+            {
+                println!("New connection: {}", stream.peer_addr().unwrap());
+                thread::spawn(move || listen_client(stream));
+            }
+            Err(e) =>
+            {
+                eprintln!("Connection failed: {}", e);
+            }
+        }
+    }
+}
