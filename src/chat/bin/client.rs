@@ -16,10 +16,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::
+{
+    process,
+    io::{ self, Write },
+    net::TcpStream,
+};
+
 use why2::
 {
     core::misc,
-    chat:: { config, crypto },
+    chat::{ config, crypto },
 };
 
 fn main()
@@ -27,4 +34,44 @@ fn main()
     misc::check_version(); //CHECK FOR UPDATES
     config::init_client_config(); //CREATE client.toml CONFIGURATION
     crypto::init_keys(); //GENERATE ECC KEYS
+
+    println!("Welcome.\n");
+
+    //GET CONNECTING IP
+    let mut connecting_ip = if config::client_config("auto_connect") == "true" //USER ENABLED AUTOMATIC CONNECTION
+    {
+        let ip = config::client_config("auto_connect_ip"); //USE CONFIG IP
+
+        //PRINT OUT IP
+        println!(">>> {ip}");
+        io::stdout().flush().unwrap();
+
+        ip
+    } else //NO AUTO CONNECT
+    {
+        print!("Enter IP Address:\n>>> ");
+        io::stdout().flush().unwrap();
+
+        //GET IP FROM USER INPUT
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+
+        input.trim().to_owned()
+    };
+
+    //ADD PORT TO IP IF MISSING
+    if !connecting_ip.contains(':')
+    {
+        //APPEND DEFAULT PORT TO connecting_ip
+        connecting_ip.push_str(&format!(":{}", config::client_config("default_port")));
+    }
+
+    //PRINT SPACER
+    println!("{}", "=".repeat(connecting_ip.find(":").unwrap() + 4));
+
+    let stream = TcpStream::connect(connecting_ip).unwrap_or_else(|_|
+    {
+        eprintln!("\nConnecting failed.");
+        process::exit(1);
+    });
 }
