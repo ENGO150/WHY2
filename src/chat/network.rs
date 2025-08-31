@@ -25,7 +25,6 @@ use std::
 //PRIVATE
 fn listen_client(stream: TcpStream)
 {
-    println!("Skibidi");
 }
 
 //PUBLIC
@@ -46,4 +45,8 @@ pub fn accept_connections(listener: TcpListener) //ACCEPT CONNECTIONS TO SERVER
             }
         }
     }
+}
+
+pub fn listen_server(stream: TcpStream)
+{
 }
