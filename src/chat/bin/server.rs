@@ -16,10 +16,28 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::
+{
+    thread,
+    net::{ TcpListener, TcpStream },
+    io::
+    {
+        self,
+        Read,
+        Write,
+    },
+};
+
 use why2::
 {
     core::misc,
-    chat:: { config, crypto },
+    chat::
+    {
+        config,
+        crypto,
+        network,
+        options,
+    },
 };
 
 fn main()
@@ -27,4 +45,28 @@ fn main()
     misc::check_version(); //CHECK FOR UPDATES
     config::init_server_config(); //CREATE server.toml CONFIGURATION
     crypto::init_keys(); //GENERATE ECC KEYS
+
+    let address = format!("{}:{}", config::server_config("server_ip"), options::SERVER_PORT); //GET ADDRESS
+    let listener = TcpListener::bind(&address).expect("Binding failed"); //BIND ADDRESS
+    println!("Server enabled.\nListening on {address}\n"); //INFO PRINT
+
+    //CREATE THREAD FOR ACCEPTING CLIENTS
+    thread::spawn(move || network::accept_connections(listener));
+
+    //LOOP FOR SERVER-SIDE USER INPUT
+    loop
+    {
+        //READ INPUT
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+
+        let trimmed = input.trim(); //TRIM
+
+        //EXIT
+        if trimmed == "!exit"
+        {
+            println!("Exiting...");
+            break;
+        }
+    }
 }
