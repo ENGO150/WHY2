@@ -17,12 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 //CONSTS
-pub const SERVER_CONFIG: &str = "/server.toml";                                                                //SERVER CONFIG FILE
-pub const CLIENT_CONFIG: &str = "/client.toml";                                                                //CLIENT CONFIG FILE
-pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                    //SERVER USERS CONFIG FILE
-pub const CONFIG_URL: &str    = "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/configs"; //CONFIG FILE DOWNLOAD URL
+pub const SERVER_PORT: u16          = 1204;                                                                          //PORT FOR SERVER COMMUNICATION
+pub const SERVER_CONFIG: &str       = "/server.toml";                                                                //SERVER CONFIG FILE
+pub const CLIENT_CONFIG: &str       = "/client.toml";                                                                //CLIENT CONFIG FILE
+pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                          //SERVER USERS CONFIG FILE
+pub const CONFIG_URL: &str          = "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/configs"; //CONFIG FILE DOWNLOAD URL
 
-pub const AUTHORITY_DIR: &str = "/certs";                                                                      //AUTHORITY DIRECTORY
+pub const AUTHORITY_DIR: &str       = "/certs";                                                                      //AUTHORITY DIRECTORY
 
-pub const KEY_LOCATION: &str = "/keys";                                                                        //KEY DIRECTORY
-pub const KEY_FILENAME: &str = "/secp521r1.pem";                                                               //NAME OF ECC KEYFILE
+pub const KEY_LOCATION: &str        = "/keys";                                                                       //KEY DIRECTORY
+pub const KEY_FILENAME: &str        = "/secp521r1.pem";                                                              //NAME OF ECC KEYFILE
