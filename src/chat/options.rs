@@ -23,3 +23,6 @@ pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                     
 pub const CONFIG_URL: &str    = "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/configs"; //CONFIG FILE DOWNLOAD URL
 
 pub const AUTHORITY_DIR: &str = "/certs";                                                                      //AUTHORITY DIRECTORY
+
+pub const KEY_LOCATION: &str = "/keys";                                                                        //KEY DIRECTORY
+pub const KEY_FILENAME: &str = "/secp521r1.pem";                                                               //NAME OF ECC KEYFILE
