@@ -59,15 +59,21 @@ fn main()
         input.trim().to_owned()
     };
 
+    //SPACER ("=") TO BE ADDED
+    let mut spacer_add_spaces = 4;
+
     //ADD PORT TO IP IF MISSING
     if !connecting_ip.contains(':')
     {
         //APPEND DEFAULT PORT TO connecting_ip
         connecting_ip.push_str(&format!(":{}", config::client_config("default_port")));
+    } else
+    {
+        spacer_add_spaces += connecting_ip.len() - connecting_ip.find(":").unwrap();
     }
 
     //PRINT SPACER
-    println!("{}", "=".repeat(connecting_ip.find(":").unwrap() + 4));
+    println!("{}", "=".repeat(connecting_ip.find(":").unwrap() + spacer_add_spaces));
 
     let stream = TcpStream::connect(connecting_ip).unwrap_or_else(|_|
     {
