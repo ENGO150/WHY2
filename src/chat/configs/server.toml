@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+server_ip = "0.0.0.0" # Server address
+
 user_pick_username = true # User will be prompted for their username on connect or will end up with default_username
 server_name = "WHY2 Server" # Name of the server
 server_username = "server" # Username server will use
