@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    thread,
     process,
     io::{ self, Write },
     net::TcpStream,
@@ -26,7 +27,12 @@ use std::
 use why2::
 {
     core::misc,
-    chat::{ config, crypto },
+    chat::
+    {
+        config,
+        crypto,
+        network,
+    },
 };
 
 fn main()
@@ -80,4 +86,7 @@ fn main()
         eprintln!("\nConnecting failed.");
         process::exit(1);
     });
+
+    //LISTEN TO SERVER
+    thread::spawn(move || network::listen_server(stream));
 }
