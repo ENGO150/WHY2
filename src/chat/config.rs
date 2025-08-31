@@ -84,6 +84,11 @@ pub fn init_server_config() //INITIALIZE SERVER CONFIG FILES
     }
 }
 
+pub fn init_client_config()
+{
+    init_config(options::CLIENT_CONFIG); //DOWNLOAD client.toml
+}
+
 pub fn server_config(key: &str) -> String //RETURN key FROM server.toml
 {
     config(key, ConfigType::Server)
