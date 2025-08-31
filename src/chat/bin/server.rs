@@ -16,7 +16,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use why2::
+{
+    core::misc,
+    chat::config,
+};
+
 fn main()
 {
-    println!("smrdis pico");
+    misc::check_version(); //CHECK FOR UPDATES
+    config::init_server_config(); //CREATE server.toml CONFIGURATION
 }
