@@ -94,6 +94,11 @@ pub fn server_config(key: &str) -> String //RETURN key FROM server.toml
     config(key, ConfigType::Server)
 }
 
+pub fn client_config(key: &str) -> String //RETURN key FROM client.toml
+{
+    config(key, ConfigType::Client)
+}
+
 pub fn get_server_users_path() -> String //ik, the function names are really weird and may not be helping you, but this returns path to server_users.toml
 {
     config_path(ConfigType::ServerUsers)
