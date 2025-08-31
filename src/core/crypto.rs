@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use sha2::{ Sha256, Digest };
 
-pub fn sha256_seed(seed_str: &str) -> [u8; 32]
+pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 {
     //SHA256
     let mut hasher = Sha256::new();
@@ -27,7 +27,7 @@ pub fn sha256_seed(seed_str: &str) -> [u8; 32]
     hasher.finalize().into()
 }
 
-pub fn recommended_padding_rate(input_length: usize) -> usize
+pub fn recommended_padding_rate(input_length: usize) -> usize //NORMAL PADDING RATE - 1 PADDING TO 3 CHARS
 {
     input_length / 3
 }

@@ -36,7 +36,7 @@ use rand::
     rngs::StdRng,
 };
 
-pub fn decrypt_text(encrypted_data: EncryptedData) -> DecryptedData
+pub fn decrypt_text(encrypted_data: EncryptedData) -> DecryptedData //DECRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();

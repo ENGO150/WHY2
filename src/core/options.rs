@@ -85,13 +85,13 @@ lazy_static!
 
 //FUNCTIONS
 //CORE SETTINGS
-pub fn set_core_options(options: Options)
+pub fn set_core_options(options: Options) //OVERWRITE DEFAULT SETTINGS
 {
     let mut settings = CORE_SETTINGS.write().unwrap();
     *settings = options;
 }
 
-pub fn get_core_options() -> Options
+pub fn get_core_options() -> Options //RETURN SETTINGS
 {
     let options = CORE_SETTINGS.read().unwrap();
     options.clone()

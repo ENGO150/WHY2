@@ -97,7 +97,7 @@ impl DecryptedData
 }
 
 //FUNCTIONS
-pub fn check_version()
+pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
 {
     let core_options = options::get_core_options();
     if core_options.no_check { return; } //CHECK DISABLED
@@ -124,7 +124,7 @@ pub fn check_version()
     }
 }
 
-pub fn check_directory()
+pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
 {
     let config = get_config_dir() + options::CONFIG_DIR;
 
@@ -135,17 +135,17 @@ pub fn check_directory()
     }
 }
 
-pub fn get_why2_dir() -> String
+pub fn get_why2_dir() -> String //RETURN PATH TO WHY2 CONFIG DIRECTORY
 {
     get_config_dir() + options::CONFIG_DIR
 }
 
-pub fn generate_key(length: usize) -> String
+pub fn generate_key(length: usize) -> String //GENERATE WHY2 SYMMETRIC KEY
 {
     Alphanumeric.sample_string(&mut rand::rng(), length)
 }
 
-pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<i64>
+pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<i64> //GENERATE tkch, USED FOR ENCRYPTION/DECRYPTION
 {
     //VARIABLES
     let mut number_buffer: usize;

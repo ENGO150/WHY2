@@ -30,7 +30,7 @@ use rand::
     rngs::StdRng,
 };
 
-pub fn encrypt_text(text: &str, key: Option<&str>) -> EncryptedData
+pub fn encrypt_text(text: &str, key: Option<&str>) -> EncryptedData //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
