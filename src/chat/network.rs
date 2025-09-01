@@ -18,8 +18,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    io::{ Read, Write },
     net::TcpStream,
+    io::
+    {
+        Write,
+        BufReader,
+        BufRead,
+    },
 };
 
 use serde::{ Serialize, Deserialize };
@@ -69,7 +74,7 @@ fn key_exchange_client(stream: &mut TcpStream) -> String
         message = receive(stream, None);
 
         //MATCH, EXIT LOOP
-        if message.code == Some(MessageCode::ClientServerKE) { break; }
+        if message.code == Some(MessageCode::ServerClientKE) { break; }
     }
 
     //CALCULATE SHARED SECRET
@@ -135,15 +140,18 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<String>) 
     }
 
     //SEND
-    stream.write_all(encoded_packet_string.as_bytes()).expect("Sending packet failed");
+    stream.write_all((encoded_packet_string + "\n").as_bytes()).expect("Sending packet failed");
 }
 
 pub fn receive(stream: &mut TcpStream, key: Option<String>) -> MessagePacket
 {
     //READ
-    let mut packet = Vec::new();
-    stream.read_to_end(&mut packet).expect("Reading packet failed");
-    let mut decoded_packet = hex::decode(&packet).expect("Decoding packet failed");
+    let mut reader = BufReader::new(stream);
+    let mut packet = String::new();
+    reader.read_line(&mut packet).expect("Reading packet failed");
+
+    //DECODE PACKET (HEX)
+    let mut decoded_packet = hex::decode(packet.trim()).expect("Decoding packet failed");
 
     //DECRYPT
     if let Some(key) = key
