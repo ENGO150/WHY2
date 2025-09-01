@@ -42,7 +42,7 @@ pub struct MessagePacket
 }
 
 //PRIVATE
-fn key_exchange_client(stream: TcpStream)
+fn key_exchange_client(stream: &mut TcpStream)
 {
     let client_pubkey = crypto::get_public_key();
 
@@ -55,20 +55,20 @@ fn key_exchange_client(stream: TcpStream)
 }
 
 //PUBLIC
-pub fn listen_client(stream: TcpStream) //CLIENT -> SERVER COMMUNICATION
+pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
 }
 
-pub fn listen_server(stream: TcpStream) //SERVER -> CLIENT COMMUNICATION
+pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 {
     key_exchange_client(stream);
 }
 
-pub fn send(stream: TcpStream, packet: MessagePacket, key: Option<String>) //SEND packet TO stream
+pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<String>) //SEND packet TO stream
 {
     //ENCODE THE PACKET STRUCT TO Vec<u8>
     let encoded_packet = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
-    let mut encoded_packet_string = hex::encode(encoded_packet);
+    let mut encoded_packet_string = hex::encode(encoded_packet); //ENCODE TO HEX STRING
 
     //ENCRYPT
     if let Some(key) = key

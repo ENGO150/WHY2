@@ -81,12 +81,12 @@ fn main()
     //PRINT SPACER
     println!("{}", "=".repeat(connecting_ip.find(":").unwrap() + spacer_add_spaces));
 
-    let stream = TcpStream::connect(connecting_ip).unwrap_or_else(|_|
+    let mut stream = TcpStream::connect(connecting_ip).unwrap_or_else(|_|
     {
         eprintln!("\nConnecting failed.");
         process::exit(1);
     });
 
     //LISTEN TO SERVER
-    thread::spawn(move || network::listen_server(stream));
+    thread::spawn(move || network::listen_server(&mut stream));
 }

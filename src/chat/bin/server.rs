@@ -52,10 +52,10 @@ fn main()
         {
             match stream
             {
-                Ok(stream) =>
+                Ok(mut stream) =>
                 {
                     println!("New connection: {}", stream.peer_addr().unwrap());
-                    thread::spawn(move || network::listen_client(stream));
+                    thread::spawn(move || network::listen_client(&mut stream));
                 },
 
                 Err(e) =>
