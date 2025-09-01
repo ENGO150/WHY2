@@ -31,7 +31,11 @@ use serde::{ Serialize, Deserialize };
 
 use crate::
 {
-    chat::crypto,
+    chat::
+    {
+        config,
+        crypto,
+    },
     core::
     {
         encrypter,
@@ -97,7 +101,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> String
     send(stream, MessagePacket
     {
         text: Some(crypto::get_public_key()),
-        username: None,
+        username: Some(config::server_config("server_username")),
         code: Some(MessageCode::ServerClientKE),
     }, None);
 
