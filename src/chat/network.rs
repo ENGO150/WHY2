@@ -20,7 +20,11 @@ use std::net::TcpStream;
 
 use serde::{ Serialize, Deserialize };
 
-use crate::chat::crypto;
+use crate::
+{
+    core::encrypter,
+    chat::crypto,
+};
 
 //STRUCTS
 #[derive(Serialize, Deserialize)]
@@ -64,6 +68,21 @@ pub fn send(stream: TcpStream, packet: MessagePacket, key: Option<String>) //SEN
 {
     //ENCODE THE PACKET STRUCT TO Vec<u8>
     let encoded_packet = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
+    let mut encoded_packet_string = hex::encode(encoded_packet);
 
-    println!("{:?}", encoded_packet);
+    //ENCRYPT
+    if let Some(key) = key
+    {
+        //ENCRYPT
+        let encrypted_packet = encrypter::encrypt_text(&encoded_packet_string, Some(&key)).output.expect("Encrypting packet failed");
+
+        //CONVERT ENCRYPTED PACKET (FROM Vec<i64>) TO Vec<u8>
+        let mut encrypted_packet_flattened = Vec::with_capacity(encrypted_packet.len() * 8);
+        for num in &encrypted_packet
+        {
+            encrypted_packet_flattened.extend_from_slice(&num.to_le_bytes()); //FLATTEN i64s to u8s
+        }
+
+        encoded_packet_string = hex::encode(encrypted_packet_flattened);
+    }
 }
