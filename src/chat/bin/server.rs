@@ -19,13 +19,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     thread,
-    net::{ TcpListener, TcpStream },
-    io::
-    {
-        self,
-        Read,
-        Write,
-    },
+    io,
+    net::TcpListener,
 };
 
 use why2::
@@ -51,7 +46,25 @@ fn main()
     println!("Server enabled.\nListening on {address}\n"); //INFO PRINT
 
     //CREATE THREAD FOR ACCEPTING CLIENTS
-    thread::spawn(move || network::accept_connections(listener));
+    thread::spawn(move ||
+    {
+        for stream in listener.incoming()
+        {
+            match stream
+            {
+                Ok(stream) =>
+                {
+                    println!("New connection: {}", stream.peer_addr().unwrap());
+                    thread::spawn(move || network::listen_client(stream));
+                },
+
+                Err(e) =>
+                {
+                    eprintln!("Connection failed: {}", e);
+                }
+            }
+        }
+    });
 
     //LOOP FOR SERVER-SIDE USER INPUT
     loop

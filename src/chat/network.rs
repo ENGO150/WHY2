@@ -16,37 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::
-{
-    thread,
-    net::{ TcpListener, TcpStream },
-};
+use std::net::TcpStream;
 
 //PRIVATE
-fn listen_client(stream: TcpStream)
+pub fn listen_client(stream: TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
 }
 
-//PUBLIC
-pub fn accept_connections(listener: TcpListener) //ACCEPT CONNECTIONS TO SERVER
-{
-    for stream in listener.incoming()
-    {
-        match stream
-        {
-            Ok(stream) =>
-            {
-                println!("New connection: {}", stream.peer_addr().unwrap());
-                thread::spawn(move || listen_client(stream));
-            }
-            Err(e) =>
-            {
-                eprintln!("Connection failed: {}", e);
-            }
-        }
-    }
-}
-
-pub fn listen_server(stream: TcpStream)
+pub fn listen_server(stream: TcpStream) //SERVER -> CLIENT COMMUNICATION
 {
 }
