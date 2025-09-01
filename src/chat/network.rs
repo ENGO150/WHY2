@@ -18,11 +18,52 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::net::TcpStream;
 
+use serde::{ Serialize, Deserialize };
+
+use crate::chat::crypto;
+
+//STRUCTS
+#[derive(Serialize, Deserialize)]
+pub enum MessageCode //CONTROL CODES
+{
+    CLIENT_SERVER_KE, //CLIENT -> SERVER KEY EXCHANGE
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MessagePacket
+{
+    pub text: Option<String>, //MESSAGE
+    pub username: Option<String>, //USERNAME (SENT ONLY BY SERVER, AS SERVER DOESN'T ACCEPT USERNAMES FROM CLIENT)
+    pub code: Option<MessageCode>, //CONTROL CODE
+}
+
 //PRIVATE
+fn key_exchange_client(stream: TcpStream)
+{
+    let client_pubkey = crypto::get_public_key();
+
+    send(stream, MessagePacket
+    {
+        text: None,
+        username: None,
+        code: Some(MessageCode::CLIENT_SERVER_KE),
+    }, None);
+}
+
+//PUBLIC
 pub fn listen_client(stream: TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
 }
 
 pub fn listen_server(stream: TcpStream) //SERVER -> CLIENT COMMUNICATION
 {
+    key_exchange_client(stream);
+}
+
+pub fn send(stream: TcpStream, packet: MessagePacket, key: Option<String>) //SEND packet TO stream
+{
+    //ENCODE THE PACKET STRUCT TO Vec<u8>
+    let encoded_packet = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
+
+    println!("{:?}", encoded_packet);
 }
