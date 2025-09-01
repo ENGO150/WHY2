@@ -36,10 +36,11 @@ use crate::
 };
 
 //STRUCTS
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq)]
 pub enum MessageCode //CONTROL CODES
 {
     ClientServerKE, //CLIENT -> SERVER KEY EXCHANGE
+    ServerClientKE, //SERVER -> CLIENT KEY EXCHANGE
 }
 
 #[derive(Serialize, Deserialize)]
@@ -51,21 +52,52 @@ pub struct MessagePacket
 }
 
 //PRIVATE
-fn key_exchange_client(stream: &mut TcpStream)
+fn key_exchange_client(stream: &mut TcpStream) -> String
 {
-    let client_pubkey = crypto::get_public_key();
-
+    //SEND ECC PUBKEY TO SERVER
     send(stream, MessagePacket
     {
-        text: None,
+        text: Some(crypto::get_public_key()),
         username: None,
         code: Some(MessageCode::ClientServerKE),
     }, None);
+
+    //WAIT FOR ServerClientKE
+    let mut message;
+    loop
+    {
+        message = receive(stream, None);
+
+        //MATCH, EXIT LOOP
+        if message.code == Some(MessageCode::ClientServerKE) { break; }
+    }
+
+    //CALCULATE SHARED SECRET
+    crypto::get_shared_key(message.text.unwrap())
 }
 
-fn key_exchange_server(stream: &mut TcpStream)
+fn key_exchange_server(stream: &mut TcpStream) -> String
 {
-    receive(stream, None);
+    //WAIT FOR ClientServerKE
+    let mut message;
+    loop
+    {
+        message = receive(stream, None);
+
+        //MATCH, EXIT LOOP
+        if message.code == Some(MessageCode::ClientServerKE) && message.text != None { break; }
+    }
+
+    //SEND ECC PUBKEY TO CLIENT
+    send(stream, MessagePacket
+    {
+        text: Some(crypto::get_public_key()),
+        username: None,
+        code: Some(MessageCode::ServerClientKE),
+    }, None);
+
+    //CALCULATE SHARED SECRET
+    crypto::get_shared_key(message.text.unwrap())
 }
 
 //PUBLIC
