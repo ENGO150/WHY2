@@ -16,7 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::net::TcpStream;
+use std::
+{
+    io::Write,
+    net::TcpStream,
+};
 
 use serde::{ Serialize, Deserialize };
 
@@ -83,6 +87,10 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<String>) 
             encrypted_packet_flattened.extend_from_slice(&num.to_le_bytes()); //FLATTEN i64s to u8s
         }
 
+        //OVERWRITE encoded_packet_string
         encoded_packet_string = hex::encode(encrypted_packet_flattened);
     }
+
+    //SEND
+    stream.write_all(encoded_packet_string.as_bytes()).expect("Sending packet failed");
 }
