@@ -54,3 +54,25 @@ pub fn init_keys() //CREATE ECC KEYS
     let mut file = File::create(key_dir + options::KEY_FILENAME).expect("Creating keyfile failed");
     file.write_all(&pem).expect("Writing to keyfile failed");
 }
+
+pub fn get_public_key() -> String //SERIALIZE PUBKEY
+{
+    //READ KEY
+    let key_pem = fs::read(misc::get_why2_dir() + options::KEY_LOCATION + options::KEY_FILENAME).expect("Reading keyfile failed");
+
+    //PARSE PEM
+    let ec_key = EcKey::private_key_from_pem(&key_pem).expect("Parsing PEM failed");
+
+    //EXTRACT PUBKEY
+    let pubkey = ec_key.public_key();
+
+    //CONVERT TO STRING
+    let pubkey_bytes = pubkey.to_bytes
+    (
+        &ec_key.group(),
+        openssl::ec::PointConversionForm::UNCOMPRESSED,
+        &mut openssl::bn::BigNumContext::new().expect("Failed to init BigNumContext")
+    ).expect("Pubkey conversion failed");
+
+    hex::encode(pubkey_bytes)
+}
