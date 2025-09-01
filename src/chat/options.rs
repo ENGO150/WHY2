@@ -16,6 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::sync::RwLock;
+
+use lazy_static::lazy_static;
+
 //CONSTS
 pub const SERVER_PORT: u16          = 1204;                                                                          //PORT FOR SERVER COMMUNICATION
 pub const SERVER_CONFIG: &str       = "/server.toml";                                                                //SERVER CONFIG FILE
@@ -27,3 +31,22 @@ pub const AUTHORITY_DIR: &str       = "/certs";                                 
 
 pub const KEY_LOCATION: &str        = "/keys";                                                                       //KEY DIRECTORY
 pub const KEY_FILENAME: &str        = "/secp521r1.pem";                                                              //NAME OF ECC KEYFILE
+
+lazy_static!
+{
+    static ref SHARED_KEY: RwLock<String> = RwLock::new(String::new());
+}
+
+//FUNCTIONS
+//CHAT SETTINGS
+pub fn set_shared_key(key: String) //SET KEY
+{
+    let mut shared_key = SHARED_KEY.write().unwrap();
+    *shared_key = key;
+}
+
+pub fn get_shared_key() -> String //RETURN KEY
+{
+    let shared_key = SHARED_KEY.read().unwrap();
+    shared_key.clone()
+}
