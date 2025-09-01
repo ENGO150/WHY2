@@ -26,7 +26,16 @@ use std::
 use openssl::
 {
     nid::Nid,
-    ec::{ EcGroup, EcKey },
+    bn::BigNumContext,
+    derive::Deriver,
+    pkey::PKey,
+    ec::
+    {
+        EcGroup,
+        EcKey,
+        EcPoint,
+        PointConversionForm,
+    },
 };
 
 use crate::
@@ -70,9 +79,43 @@ pub fn get_public_key() -> String //SERIALIZE PUBKEY
     let pubkey_bytes = pubkey.to_bytes
     (
         &ec_key.group(),
-        openssl::ec::PointConversionForm::UNCOMPRESSED,
-        &mut openssl::bn::BigNumContext::new().expect("Failed to init BigNumContext")
+        PointConversionForm::UNCOMPRESSED,
+        &mut BigNumContext::new().expect("Failed to init BigNumContext")
     ).expect("Pubkey conversion failed");
 
+    //ENCODE TO HEX
     hex::encode(pubkey_bytes)
+}
+
+pub fn get_shared_key(key: String) -> String //CALCULATES ECDH
+{
+    //DECODE key (REMOTE PUBLIC KEY)
+    let pub_bytes = hex::decode(key).expect("Decoding pubkey failed");
+
+    //CURVE AND CONTEXT
+    let group = EcGroup::from_curve_name(Nid::SECP521R1).expect("Invalid curve");
+    let mut ctx = BigNumContext::new().expect("Failed to init BigNumContext");
+
+    //CONVERT pub_bytes TO EcPoint
+    let pub_point = EcPoint::from_bytes(&group, &pub_bytes, &mut ctx).expect("Converting pubkey failed");
+
+    //CREATE EcKey FROM pub_point
+    let remote_key = EcKey::from_public_key(&group, &pub_point).expect("Converting pubkey failed");
+
+    //READ KEY
+    let key_pem = fs::read(misc::get_why2_dir() + options::KEY_LOCATION + options::KEY_FILENAME).expect("Reading keyfile failed");
+
+    //PARSE PEM
+    let ec_key = EcKey::private_key_from_pem(&key_pem).expect("Parsing PEM failed");
+
+    //PKeyS
+    let local_pkey = PKey::from_ec_key(ec_key).expect("Invalid local key");
+    let remote_pkey = PKey::from_ec_key(remote_key).expect("Invalid local key");
+
+    //CREATE DERIVER FOR ECDH (USE LOCAL PRIVATE KEY)
+    let mut deriver = Deriver::new(&local_pkey).expect("Invalid local key");
+    deriver.set_peer(&remote_pkey).expect("Invalid remote key");
+
+    //DERIVE SHARED SECRET & ENCODE TO HEX
+    hex::encode(deriver.derive_to_vec().expect("Converting deriver failed"))
 }
