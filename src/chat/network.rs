@@ -74,8 +74,7 @@ fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey,
     }, None);
 
     //WAIT FOR ServerClientKE
-    let mut message;
-    loop
+    let message = loop
     {
         match receive(stream, None)
         {
@@ -84,14 +83,13 @@ fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey,
                 //MATCH, EXIT LOOP
                 if msg.code == Some(MessageCode::ServerClientKE)
                 {
-                    message = msg;
-                    break;
+                    break msg;
                 }
             },
 
             None => continue
         }
-    }
+    };
 
     //CALCULATE SHARED SECRET
     (crypto::get_shared_key(message.text.unwrap()), message.username.unwrap())
@@ -100,8 +98,7 @@ fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey,
 fn key_exchange_server(stream: &mut TcpStream) -> String
 {
     //WAIT FOR ClientServerKE
-    let mut message;
-    loop
+    let message = loop
     {
         match receive(stream, None)
         {
@@ -110,14 +107,13 @@ fn key_exchange_server(stream: &mut TcpStream) -> String
                 //MATCH, EXIT LOOP
                 if msg.code == Some(MessageCode::ClientServerKE) && msg.text != None
                 {
-                    message = msg;
-                    break;
+                    break msg;
                 }
             },
 
             None => continue
         }
-    }
+    };
 
     //SEND ECC PUBKEY TO CLIENT
     send(stream, MessagePacket
@@ -167,12 +163,11 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
     loop
     {
-        let mut read;
-        match receive(stream, Some(chat_options::get_shared_key()))
+        let read = match receive(stream, Some(chat_options::get_shared_key()))
         {
-            Some(msg) => read = msg,
+            Some(msg) => msg,
             None => continue
-        }
+        };
 
         //TODO: Implements codes
     }
