@@ -28,6 +28,7 @@ use std::
 };
 
 use serde::{ Serialize, Deserialize };
+use serde_json::json;
 
 use crate::
 {
@@ -35,6 +36,7 @@ use crate::
     {
         config,
         crypto,
+        options as chat_options,
     },
     core::
     {
@@ -61,7 +63,7 @@ pub struct MessagePacket
 }
 
 //PRIVATE
-fn key_exchange_client(stream: &mut TcpStream) -> String
+fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey, ServerUsername)
 {
     //SEND ECC PUBKEY TO SERVER
     send(stream, MessagePacket
@@ -75,14 +77,24 @@ fn key_exchange_client(stream: &mut TcpStream) -> String
     let mut message;
     loop
     {
-        message = receive(stream, None);
+        match receive(stream, None)
+        {
+            Some(msg) =>
+            {
+                //MATCH, EXIT LOOP
+                if msg.code == Some(MessageCode::ServerClientKE)
+                {
+                    message = msg;
+                    break;
+                }
+            },
 
-        //MATCH, EXIT LOOP
-        if message.code == Some(MessageCode::ServerClientKE) { break; }
+            None => continue
+        }
     }
 
     //CALCULATE SHARED SECRET
-    crypto::get_shared_key(message.text.unwrap())
+    (crypto::get_shared_key(message.text.unwrap()), message.username.unwrap())
 }
 
 fn key_exchange_server(stream: &mut TcpStream) -> String
@@ -91,10 +103,20 @@ fn key_exchange_server(stream: &mut TcpStream) -> String
     let mut message;
     loop
     {
-        message = receive(stream, None);
+        match receive(stream, None)
+        {
+            Some(msg) =>
+            {
+                //MATCH, EXIT LOOP
+                if msg.code == Some(MessageCode::ClientServerKE) && msg.text != None
+                {
+                    message = msg;
+                    break;
+                }
+            },
 
-        //MATCH, EXIT LOOP
-        if message.code == Some(MessageCode::ClientServerKE) && message.text != None { break; }
+            None => continue
+        }
     }
 
     //SEND ECC PUBKEY TO CLIENT
@@ -109,15 +131,51 @@ fn key_exchange_server(stream: &mut TcpStream) -> String
     crypto::get_shared_key(message.text.unwrap())
 }
 
+fn send_welcome_packet(stream: &mut TcpStream, key: String)
+{
+    let welcome_json = json!(
+    {
+        "max_uname": config::server_config("max_username_length"),
+        "min_uname": config::server_config("min_username_length"),
+        "max_tries": config::server_config("max_username_tries"),
+        "server_name": config::server_config("server_name"),
+    }).to_string();
+
+    send(stream, MessagePacket
+    {
+        text: Some(welcome_json),
+        username: Some(config::server_config("server_username")),
+        code: None,
+    }, Some(key));
+}
+
 //PUBLIC
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
-    key_exchange_server(stream);
+    //GET SHARED KEY
+    let shared_key = key_exchange_server(stream);
+    
+    //SEND PACKET WITH REQUIRED SERVER INFO
+    send_welcome_packet(stream, shared_key);
 }
 
 pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 {
-    key_exchange_client(stream);
+    //GET SHARED KEY
+    let (shared_key, server_username) = key_exchange_client(stream);
+    chat_options::set_shared_key(shared_key); //SET GLOBAL CLIENT SHARED KEY
+
+    loop
+    {
+        let mut read;
+        match receive(stream, Some(chat_options::get_shared_key()))
+        {
+            Some(msg) => read = msg,
+            None => continue
+        }
+
+        //TODO: Implements codes
+    }
 }
 
 pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<String>) //SEND packet TO stream
@@ -147,12 +205,14 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<String>) 
     stream.write_all((encoded_packet_string + "\n").as_bytes()).expect("Sending packet failed");
 }
 
-pub fn receive(stream: &mut TcpStream, key: Option<String>) -> MessagePacket
+pub fn receive(stream: &mut TcpStream, key: Option<String>) -> Option<MessagePacket>
 {
     //READ
     let mut reader = BufReader::new(stream);
     let mut packet = String::new();
     reader.read_line(&mut packet).expect("Reading packet failed");
+
+    if packet.is_empty() { return None; } //INVALID READ
 
     //DECODE PACKET (HEX)
     let mut decoded_packet = hex::decode(packet.trim()).expect("Decoding packet failed");
@@ -183,5 +243,5 @@ pub fn receive(stream: &mut TcpStream, key: Option<String>) -> MessagePacket
     }
 
     //DECODE AND RETURN
-    bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard()).expect("Decoding packet failed").0
+    Some(bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard()).expect("Decoding packet failed").0)
 }
