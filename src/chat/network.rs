@@ -203,6 +203,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<String>) 
 
     //SEND
     stream.write_all((encoded_packet_string + "\n").as_bytes()).expect("Sending packet failed");
+    stream.flush().expect("Flushing stream failed");
 }
 
 pub fn receive(stream: &mut TcpStream, key: Option<String>) -> Option<MessagePacket>
