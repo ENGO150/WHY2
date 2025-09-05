@@ -28,7 +28,7 @@ use std::
 };
 
 use serde::{ Serialize, Deserialize };
-use serde_json::json;
+use serde_json::{ json, Value };
 
 use crate::
 {
@@ -162,6 +162,12 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let (shared_key, server_username) = key_exchange_client(stream);
     chat_options::set_shared_key(shared_key); //SET GLOBAL CLIENT SHARED KEY
 
+    //SERVER INFO VARIABLES
+    let mut max_uname: u8;
+    let mut min_uname: u8;
+    let mut server_name: &str;
+    let mut max_tries: u8;
+
     loop
     {
         let read = match receive(stream, Some(chat_options::get_shared_key()))
@@ -170,7 +176,36 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
             None => continue
         };
 
-        //TODO: Implements codes
+        //CODES
+        if let Some(code) = read.code
+        {
+            match code
+            {
+                //WELCOME CODE - SERVER INFORMATIONS
+                MessageCode::Welcome =>
+                {
+                    //TEXT SHOULD CONTAIN JSON DATA
+                    let text = match read.text
+                    {
+                        Some(text) => text,
+                        None => continue //NO JSON DATA, CONTINUE
+                    };
+
+                    //PARSE JSON
+                    let welcome_json: Value = serde_json::from_str(&text).expect("Parsing welcome json failed"); //PARSE WELCOME JSON
+
+                    //GET INFO FROM JSON
+                    max_uname = welcome_json["max_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed");
+                    min_uname = welcome_json["min_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed");
+                    server_name = welcome_json["server_name"].as_str().expect("Invalid welcome json");
+                    max_tries = welcome_json["max_tries"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed");
+
+                    println!("\nSuccessfully connected to {server_name}.\n");
+                },
+
+                _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
+            }
+        }
     }
 }
 
