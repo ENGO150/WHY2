@@ -31,7 +31,8 @@ use why2::
     {
         config,
         crypto,
-        network,
+        options,
+        network::{ self, MessagePacket },
     },
 };
 
@@ -81,12 +82,34 @@ fn main()
     //PRINT SPACER
     println!("{}", "=".repeat(connecting_ip.find(":").unwrap() + spacer_add_spaces));
 
+    //CONNECT TO SERVER
     let mut stream = TcpStream::connect(connecting_ip).unwrap_or_else(|_|
     {
         eprintln!("\nConnecting failed.");
         process::exit(1);
     });
 
+    //CLONE SOCKET FOR CLIENT INPUT
+    let mut client_stream = stream.try_clone().expect("Failed cloning stream");
+
     //LISTEN TO SERVER
     thread::spawn(move || network::listen_server(&mut stream));
+
+    //LOOP FOR CLIENT-SIDE USER INPUT
+    loop
+    {
+        //READ INPUT
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+
+        input = input.trim().to_owned(); //TRIM
+
+        //SEND input TO SERVER
+        network::send(&mut client_stream, MessagePacket
+        {
+            text: Some(input),
+            username: None,
+            code: None,
+        }, Some(&options::get_shared_key().unwrap()));
+    }
 }
