@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::sync::RwLock;
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 //CONSTS
 pub const USER_CONFIG_DIR: &str = "{HOME}/.config";                                                       //USER CONFIG DIRECTORY
@@ -78,10 +78,11 @@ impl Default for Options
     }
 }
 
-lazy_static!
+//SETTINGS
+static CORE_SETTINGS: Lazy<RwLock<Options>> = Lazy::new(||
 {
-    static ref CORE_SETTINGS: RwLock<Options> = RwLock::new(Options::default());
-}
+    RwLock::new(Options::default())
+});
 
 //FUNCTIONS
 //CORE SETTINGS

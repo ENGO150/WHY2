@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::sync::RwLock;
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 //CONSTS
 pub const SERVER_PORT: u16          = 1204;                                                                          //PORT FOR SERVER COMMUNICATION
@@ -32,13 +32,14 @@ pub const AUTHORITY_DIR: &str       = "/certs";                                 
 pub const KEY_LOCATION: &str        = "/keys";                                                                       //KEY DIRECTORY
 pub const KEY_FILENAME: &str        = "/secp521r1.pem";                                                              //NAME OF ECC KEYFILE
 
-lazy_static!
+//SETTINGS
+static SHARED_KEY: Lazy<RwLock<String>> = Lazy::new(|| //SHARED SYMMETRIC KEY (USED ON CLIENT-SIDE)
 {
-    static ref SHARED_KEY: RwLock<String> = RwLock::new(String::new());
-}
+    RwLock::new(String::new())
+});
 
 //FUNCTIONS
-//CHAT SETTINGS
+//SHARED SYM KEY
 pub fn set_shared_key(key: String) //SET KEY
 {
     let mut shared_key = SHARED_KEY.write().unwrap();
