@@ -194,7 +194,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     //LOOP READING
     loop
     {
-        let read = match receive(stream, Some(&chat_options::get_shared_key().unwrap()))
+        let read = match receive(stream, chat_options::get_shared_key().as_deref())
         {
             Some(msg) => msg,
             None => continue
