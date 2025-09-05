@@ -238,8 +238,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     //GET SERVER USERNAME
                     server_uname = read.username;
 
-                    clear_lines(1);
-                    println!("\nSuccessfully connected to {server_name}.\n");
+                    println!("Successfully connected to {server_name}.\n");
                 },
 
                 MessageCode::PickUsername =>
