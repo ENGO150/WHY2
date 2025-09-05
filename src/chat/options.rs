@@ -33,9 +33,9 @@ pub const KEY_LOCATION: &str        = "/keys";                                  
 pub const KEY_FILENAME: &str        = "/secp521r1.pem";                                                              //NAME OF ECC KEYFILE
 
 //SETTINGS
-static SHARED_KEY: Lazy<RwLock<String>> = Lazy::new(|| //SHARED SYMMETRIC KEY (USED ON CLIENT-SIDE)
+static SHARED_KEY: Lazy<RwLock<Option<String>>> = Lazy::new(|| //SHARED SYMMETRIC KEY
 {
-    RwLock::new(String::new())
+    RwLock::new(None)
 });
 
 //FUNCTIONS
@@ -43,10 +43,10 @@ static SHARED_KEY: Lazy<RwLock<String>> = Lazy::new(|| //SHARED SYMMETRIC KEY (U
 pub fn set_shared_key(key: String) //SET KEY
 {
     let mut shared_key = SHARED_KEY.write().unwrap();
-    *shared_key = key;
+    *shared_key = Some(key);
 }
 
-pub fn get_shared_key() -> String //RETURN KEY
+pub fn get_shared_key() -> Option<String> //RETURN KEY
 {
     let shared_key = SHARED_KEY.read().unwrap();
     shared_key.clone()

@@ -50,9 +50,10 @@ use crate::
 #[derive(Serialize, Deserialize, PartialEq)]
 pub enum MessageCode //CONTROL CODES
 {
-    ClientServerKE, //CLIENT -> SERVER KEY EXCHANGE
-    ServerClientKE, //SERVER -> CLIENT KEY EXCHANGE
-    Welcome,        //SERVER -> CLIENT INFORMATIONS
+    ClientServerKE, //CLIENT -> SERVER | KEY EXCHANGE
+    ServerClientKE, //SERVER -> CLIENT | KEY EXCHANGE
+    Welcome,        //SERVER -> CLIENT | INFORMATIONS
+    PickUsername,   //SERVER -> CLIENT | PICK USERNAME
 }
 
 #[derive(Serialize, Deserialize)]
@@ -150,10 +151,20 @@ fn send_welcome_packet(stream: &mut TcpStream, key: &str)
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
     //GET SHARED KEY
-    let shared_key = key_exchange_server(stream);
+    chat_options::set_shared_key(key_exchange_server(stream));
     
     //SEND PACKET WITH REQUIRED SERVER INFO
-    send_welcome_packet(stream, &shared_key);
+    send_welcome_packet(stream, &chat_options::get_shared_key().unwrap());
+
+    //LOOP READING
+    loop
+    {
+        let read = match receive(stream, chat_options::get_shared_key().as_deref())
+        {
+            Some(msg) => msg,
+            None => continue
+        };
+    }
 }
 
 pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
@@ -168,9 +179,10 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut server_name: &str;
     let mut max_tries: u8;
 
+    //LOOP READING
     loop
     {
-        let read = match receive(stream, Some(&chat_options::get_shared_key()))
+        let read = match receive(stream, Some(&chat_options::get_shared_key().unwrap()))
         {
             Some(msg) => msg,
             None => continue
@@ -205,7 +217,6 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
                 MessageCode::PickUsername =>
                 {
-                    println!("A");
                 },
 
                 _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
