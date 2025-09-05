@@ -206,7 +206,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<String>) -> Option<MessagePac
     //READ
     let mut reader = BufReader::new(stream);
     let mut packet = String::new();
-    reader.read_line(&mut packet).expect("Reading packet failed");
+    reader.read_line(&mut packet).expect("Reading packet failed"); //TODO: Make function blocking
 
     if packet.is_empty() { return None; } //INVALID READ
 
