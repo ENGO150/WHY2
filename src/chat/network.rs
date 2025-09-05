@@ -128,7 +128,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> String
     crypto::get_shared_key(message.text.unwrap())
 }
 
-fn send_welcome_packet(stream: &mut TcpStream, key: String)
+fn send_welcome_packet(stream: &mut TcpStream, key: &str)
 {
     let welcome_json = json!(
     {
@@ -153,7 +153,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let shared_key = key_exchange_server(stream);
     
     //SEND PACKET WITH REQUIRED SERVER INFO
-    send_welcome_packet(stream, shared_key);
+    send_welcome_packet(stream, &shared_key);
 }
 
 pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
@@ -170,7 +170,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
     loop
     {
-        let read = match receive(stream, Some(chat_options::get_shared_key()))
+        let read = match receive(stream, Some(&chat_options::get_shared_key()))
         {
             Some(msg) => msg,
             None => continue
@@ -203,13 +203,18 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("\nSuccessfully connected to {server_name}.\n");
                 },
 
+                MessageCode::PickUsername =>
+                {
+                    println!("A");
+                },
+
                 _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
             }
         }
     }
 }
 
-pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<String>) //SEND packet TO stream
+pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&str>) //SEND packet TO stream
 {
     //ENCODE THE PACKET STRUCT TO Vec<u8>
     let encoded_packet = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
@@ -237,7 +242,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<String>) 
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, key: Option<String>) -> Option<MessagePacket>
+pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacket>
 {
     //READ
     let mut reader = BufReader::new(stream);
@@ -267,7 +272,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<String>) -> Option<MessagePac
         let decrypted_packet = decrypter::decrypt_text(options::EncryptedData
         {
             output: Some(recovered_encrypted_packet),
-            key: Some(key),
+            key: Some(key.to_owned()),
         }).output.expect("Decrypting packet failed");
 
         //OVERWRITE decoded_packet
