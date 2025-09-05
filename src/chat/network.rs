@@ -21,6 +21,7 @@ use std::
     net::TcpStream,
     io::
     {
+        self,
         Write,
         BufReader,
         BufRead,
@@ -131,6 +132,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> String
 
 fn send_welcome_packet(stream: &mut TcpStream, key: &str)
 {
+    //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
     {
         "max_uname": config::server_config("max_username_length"),
@@ -139,12 +141,21 @@ fn send_welcome_packet(stream: &mut TcpStream, key: &str)
         "server_name": config::server_config("server_name"),
     }).to_string();
 
+    //SEND
     send(stream, MessagePacket
     {
         text: Some(welcome_json),
         username: Some(config::server_config("server_username")),
         code: Some(MessageCode::Welcome),
     }, Some(key));
+}
+
+fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
+{
+    for _ in 0..n
+    {
+        print!("\x1B[1A\x1B[2K\r");
+    }
 }
 
 //PUBLIC
@@ -178,6 +189,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut min_uname: u8;
     let mut server_name: &str;
     let mut max_tries: u8;
+    let mut server_uname: Option<String> = None;
 
     //LOOP READING
     loop
@@ -189,7 +201,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
         };
 
         //CODES
-        if let Some(code) = read.code
+        if let Some(code) = read.code && (server_uname == None || server_uname == read.username)
         {
             match code
             {
@@ -212,6 +224,10 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     server_name = welcome_json["server_name"].as_str().expect("Invalid welcome json");
                     max_tries = welcome_json["max_tries"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed");
 
+                    //GET SERVER USERNAME
+                    server_uname = read.username;
+
+                    clear_lines(1);
                     println!("\nSuccessfully connected to {server_name}.\n");
                 },
 
@@ -222,6 +238,10 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
             }
         }
+
+        //PRINT INPUT PROMPT
+        print!(">>> ");
+        io::stdout().flush().unwrap();
     }
 }
 
