@@ -52,6 +52,7 @@ pub enum MessageCode //CONTROL CODES
 {
     ClientServerKE, //CLIENT -> SERVER KEY EXCHANGE
     ServerClientKE, //SERVER -> CLIENT KEY EXCHANGE
+    Welcome,        //SERVER -> CLIENT INFORMATIONS
 }
 
 #[derive(Serialize, Deserialize)]
@@ -141,7 +142,7 @@ fn send_welcome_packet(stream: &mut TcpStream, key: String)
     {
         text: Some(welcome_json),
         username: Some(config::server_config("server_username")),
-        code: None,
+        code: Some(MessageCode::Welcome),
     }, Some(key));
 }
 
