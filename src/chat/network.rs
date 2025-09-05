@@ -167,15 +167,26 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //SEND PACKET WITH REQUIRED SERVER INFO
     send_welcome_packet(stream, &chat_options::get_shared_key().unwrap());
 
-    //SEND PICK_USERNAME CODE
+    //GET USERNAME FROM USER
     if config::server_config("user_pick_username") == "true"
     {
+        //SEND PICK_USERNAME CODE
         send(stream, MessagePacket
         {
             text: None,
             username: Some(config::server_config("server_username")),
             code: Some(MessageCode::PickUsername),
         }, chat_options::get_shared_key().as_deref());
+
+        //WAIT FOR ANSWER
+        let response = loop
+        {
+            match receive(stream, chat_options::get_shared_key().as_deref())
+            {
+                Some(msg) => break msg,
+                None => continue
+            }
+        };
     }
 
     //LOOP READING
@@ -196,8 +207,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     chat_options::set_shared_key(shared_key); //SET GLOBAL CLIENT SHARED KEY
 
     //SERVER INFO VARIABLES
-    let mut max_uname: u8;
-    let mut min_uname: u8;
+    let mut max_uname: Option<u8> = None;
+    let mut min_uname: Option<u8> = None;
     let mut server_name: &str;
     let mut max_tries: u8;
     let mut server_uname: Option<String> = None;
@@ -230,8 +241,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     let welcome_json: Value = serde_json::from_str(&text).expect("Parsing welcome json failed"); //PARSE WELCOME JSON
 
                     //GET INFO FROM JSON
-                    max_uname = welcome_json["max_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed");
-                    min_uname = welcome_json["min_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed");
+                    max_uname = Some(welcome_json["max_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed"));
+                    min_uname = Some(welcome_json["min_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed"));
                     server_name = welcome_json["server_name"].as_str().expect("Invalid welcome json");
                     max_tries = welcome_json["max_tries"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed");
 
@@ -241,10 +252,11 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("Successfully connected to {server_name}.\n");
                 },
 
+                //PICK_USERNAME CODE - guess what
                 MessageCode::PickUsername =>
                 {
                     clear_lines(1);
-                    println!("\nEnter username:");
+                    println!("\nEnter username (a-Z, 0-9; {}-{} characters):", min_uname.unwrap(), max_uname.unwrap());
                 },
 
                 _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
