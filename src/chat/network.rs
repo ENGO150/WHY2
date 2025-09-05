@@ -167,6 +167,17 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //SEND PACKET WITH REQUIRED SERVER INFO
     send_welcome_packet(stream, &chat_options::get_shared_key().unwrap());
 
+    //SEND PICK_USERNAME CODE
+    if config::server_config("user_pick_username") == "true"
+    {
+        send(stream, MessagePacket
+        {
+            text: None,
+            username: Some(config::server_config("server_username")),
+            code: Some(MessageCode::PickUsername),
+        }, chat_options::get_shared_key().as_deref());
+    }
+
     //LOOP READING
     loop
     {
@@ -233,6 +244,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
                 MessageCode::PickUsername =>
                 {
+                    clear_lines(1);
+                    println!("\nEnter username:");
                 },
 
                 _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
