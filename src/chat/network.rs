@@ -170,23 +170,51 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //GET USERNAME FROM USER
     if config::server_config("user_pick_username") == "true"
     {
-        //SEND PICK_USERNAME CODE
-        send(stream, MessagePacket
-        {
-            text: None,
-            username: Some(config::server_config("server_username")),
-            code: Some(MessageCode::PickUsername),
-        }, chat_options::get_shared_key().as_deref());
+        //USERNAME CONFIGS
+        let max_tries: usize = config::server_config("max_username_tries").parse().unwrap(); //MAX n
+        let min_len: usize = config::server_config("min_username_length").parse().unwrap();
+        let max_len: usize = config::server_config("max_username_length").parse().unwrap();
 
-        //WAIT FOR ANSWER
-        let response = loop
+        let mut username: Option<String> = None; //USER ENTERED USERNAME
+
+        //ASK n TIMES
+        for _ in 0..max_tries
         {
-            match receive(stream, chat_options::get_shared_key().as_deref())
+            //SEND PICK_USERNAME CODE
+            send(stream, MessagePacket
             {
-                Some(msg) => break msg,
-                None => continue
+                text: None,
+                username: Some(config::server_config("server_username")),
+                code: Some(MessageCode::PickUsername),
+            }, chat_options::get_shared_key().as_deref());
+
+            //WAIT FOR ANSWER
+            let response = loop
+            {
+                match receive(stream, chat_options::get_shared_key().as_deref())
+                {
+                    Some(msg) => break msg,
+                    None => continue
+                }
+            };
+
+            //USERNAME CONDITIONS MET, BREAK LOOP
+            if let Some(uname) = response.text
+            {
+                if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(char::is_alphanumeric)
+                {
+                    username = Some(uname);
+                    break;
+                }
             }
-        };
+        }
+
+        //NO USERNAME RECEIVED
+        if username.is_none()
+        {
+            //TODO: SQC
+            return;
+        }
     }
 
     //LOOP READING
