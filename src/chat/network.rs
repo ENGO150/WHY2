@@ -241,6 +241,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut max_tries: u8;
     let mut server_uname: Option<String> = None;
 
+    let mut invalid_username = false;
+
     //LOOP READING
     loop
     {
@@ -284,6 +286,18 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 MessageCode::PickUsername =>
                 {
                     clear_lines(1);
+
+                    //INVALID UNAME
+                    if invalid_username
+                    {
+                        clear_lines(2);
+                        print!("Username rejected!");
+                    } else //VALID
+                    {
+                        //SET INVALID USERNAME FOR POSSIBLE NEXT CODE
+                        invalid_username = true;
+                    }
+
                     println!("\nEnter username (a-Z, 0-9; {}-{} characters):", min_uname.unwrap(), max_uname.unwrap());
                 },
 
