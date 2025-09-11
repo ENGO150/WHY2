@@ -68,6 +68,16 @@ pub struct MessagePacket
 }
 
 //PRIVATE
+fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode)
+{
+    send(stream, MessagePacket
+    {
+        text: text,
+        username: Some(config::server_config("server_username")),
+        code: Some(code),
+    }, chat_options::get_shared_key().as_deref());
+}
+
 fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey, ServerUsername)
 {
     //SEND ECC PUBKEY TO SERVER
@@ -132,7 +142,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> String
     crypto::get_shared_key(message.text.unwrap())
 }
 
-fn send_welcome_packet(stream: &mut TcpStream, key: &str)
+fn send_welcome_packet(stream: &mut TcpStream)
 {
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
@@ -144,12 +154,7 @@ fn send_welcome_packet(stream: &mut TcpStream, key: &str)
     }).to_string();
 
     //SEND
-    send(stream, MessagePacket
-    {
-        text: Some(welcome_json),
-        username: Some(config::server_config("server_username")),
-        code: Some(MessageCode::Welcome),
-    }, Some(key));
+    send_code(stream, Some(welcome_json), MessageCode::Welcome);
 }
 
 fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
@@ -167,7 +172,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     chat_options::set_shared_key(key_exchange_server(stream));
     
     //SEND PACKET WITH REQUIRED SERVER INFO
-    send_welcome_packet(stream, &chat_options::get_shared_key().unwrap());
+    send_welcome_packet(stream);
 
     //GET USERNAME FROM USER
     if config::server_config("user_pick_username") == "true"
@@ -183,12 +188,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         for _ in 0..max_tries
         {
             //SEND PICK_USERNAME CODE
-            send(stream, MessagePacket
-            {
-                text: None,
-                username: Some(config::server_config("server_username")),
-                code: Some(MessageCode::Username),
-            }, chat_options::get_shared_key().as_deref());
+            send_code(stream, None, MessageCode::Username);
 
             //WAIT FOR ANSWER
             let response = loop
@@ -214,12 +214,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         //NO USERNAME RECEIVED, DISCONNECT CLIENT
         if username.is_none()
         {
-            send(stream, MessagePacket
-            {
-                text: None,
-                username: Some(config::server_config("server_username")),
-                code: Some(MessageCode::Disconnect),
-            }, chat_options::get_shared_key().as_deref());
+            send_code(stream, None, MessageCode::Disconnect);
             return;
         }
     }
