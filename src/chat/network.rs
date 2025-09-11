@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    process,
     net::TcpStream,
     io::
     {
@@ -55,6 +56,7 @@ pub enum MessageCode //CONTROL CODES
     ServerClientKE, //SERVER -> CLIENT | KEY EXCHANGE
     Welcome,        //SERVER -> CLIENT | INFORMATIONS
     PickUsername,   //SERVER -> CLIENT | PICK USERNAME
+    Disconnect,     //SERVER -> CLIENT | QUIT COMMUNICATION
 }
 
 #[derive(Serialize, Deserialize)]
@@ -209,10 +211,15 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             }
         }
 
-        //NO USERNAME RECEIVED
+        //NO USERNAME RECEIVED, DISCONNECT CLIENT
         if username.is_none()
         {
-            //TODO: SQC
+            send(stream, MessagePacket
+            {
+                text: None,
+                username: Some(config::server_config("server_username")),
+                code: Some(MessageCode::Disconnect),
+            }, chat_options::get_shared_key().as_deref());
             return;
         }
     }
@@ -300,6 +307,13 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
                     println!("\nEnter username (a-Z, 0-9; {}-{} characters):", min_uname.unwrap(), max_uname.unwrap());
                 },
+
+                //SERVER DOESN'T LIKE YA ANYMORE - EXIT
+                MessageCode::Disconnect =>
+                {
+                    println!("\nServer quit communication.");
+                    process::exit(0);
+                }
 
                 _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
             }
