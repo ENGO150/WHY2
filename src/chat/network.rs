@@ -55,8 +55,8 @@ pub enum MessageCode //CONTROL CODES
     ClientServerKE, //CLIENT -> SERVER | KEY EXCHANGE
     ServerClientKE, //SERVER -> CLIENT | KEY EXCHANGE
     Welcome,        //SERVER -> CLIENT | INFORMATIONS
-    PickUsername,   //SERVER -> CLIENT | PICK USERNAME
     Disconnect,     //SERVER -> CLIENT | QUIT COMMUNICATION
+    Username,       //SERVER -> CLIENT | PICK USERNAME
 }
 
 #[derive(Serialize, Deserialize)]
@@ -187,7 +187,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             {
                 text: None,
                 username: Some(config::server_config("server_username")),
-                code: Some(MessageCode::PickUsername),
+                code: Some(MessageCode::Username),
             }, chat_options::get_shared_key().as_deref());
 
             //WAIT FOR ANSWER
@@ -290,7 +290,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 },
 
                 //PICK_USERNAME CODE - guess what
-                MessageCode::PickUsername =>
+                MessageCode::Username =>
                 {
                     clear_lines(1);
 
