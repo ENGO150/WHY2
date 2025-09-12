@@ -20,6 +20,8 @@ use std::sync::RwLock;
 
 use once_cell::sync::Lazy;
 
+use termios::Termios;
+
 //CONSTS
 pub const SERVER_PORT: u16          = 1204;                                                                          //PORT FOR SERVER COMMUNICATION
 pub const SERVER_CONFIG: &str       = "/server.toml";                                                                //SERVER CONFIG FILE
@@ -60,6 +62,20 @@ pub fn get_shared_key() -> Option<String> //RETURN KEY
 //ASKING PASSWORD
 pub fn set_asking_password(value: bool) //SET ASKING_PASSWORD
 {
+    //GET STDIN ATTRS
+    let mut termios = Termios::from_fd(0).expect("Failed getting stdin attrs");
+
+    if value //DISABLE ECHO
+    {
+        termios.c_lflag &= !termios::ECHO;
+    } else //ENABLE ECHO
+    {
+        termios.c_lflag |= !termios::ECHO;
+    }
+
+    //SAVE ATTRS
+    termios::tcsetattr(0, termios::TCSANOW, &termios).expect("Failed setting stdin attrs");
+
     let mut asking_password = ASKING_PASSWORD.write().unwrap();
     *asking_password = value;
 }

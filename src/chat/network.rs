@@ -317,6 +317,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 MessageCode::PasswordR => //REGISTER
                 {
                     clear_lines(3);
+                    chat_options::set_asking_password(true);
                     println!("\nEnter password: (REGISTER)");
                 },
 
