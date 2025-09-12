@@ -59,6 +59,7 @@ pub enum MessageCode //CONTROL CODES
     Username,       //SERVER -> CLIENT | PICK USERNAME
     PasswordL,      //SERVER -> CLIENT | LOGIN
     PasswordR,      //SERVER -> CLIENT | REGISTER
+    Accept,         //SERVER -> CLIENT | START CHATTING
 }
 
 #[derive(Serialize, Deserialize)]
@@ -263,6 +264,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         }
     }
 
+    //TELL CLIENT TO START CHATTING
+    send_code(stream, None, MessageCode::Accept);
+
     //LOOP READING
     loop
     {
@@ -359,6 +363,12 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     clear_lines(3);
                     chat_options::set_asking_password(true);
                     println!("\nEnter password: (LOGIN)");
+                },
+
+                MessageCode::Accept => //START CHATTING
+                {
+                    clear_lines(3);
+                    println!("\nLogin successful.\n");
                 },
 
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
