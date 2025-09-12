@@ -362,6 +362,13 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("\nEnter password: (REGISTER)");
                 },
 
+                MessageCode::PasswordL => //LOGIN
+                {
+                    clear_lines(3);
+                    chat_options::set_asking_password(true);
+                    println!("\nEnter password: (LOGIN)");
+                },
+
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
                 MessageCode::Disconnect =>
                 {
