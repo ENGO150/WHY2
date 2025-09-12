@@ -32,7 +32,13 @@ use why2::
         config,
         crypto,
         options,
-        network::{ self, MessagePacket },
+
+        network::
+        {
+            self,
+            MessagePacket,
+            clear_lines,
+        },
     },
 };
 
@@ -107,6 +113,17 @@ fn main()
         //USER ENTERED PASSWORD - HASH
         if options::get_asking_password()
         {
+            //CHECK LENGTH
+            if input.len() <= options::MIN_PASSWORD_LEN
+            {
+                clear_lines(2);
+                print!("\nPassword too short! Enter at least {} characters.\n>>> ", options::MIN_PASSWORD_LEN);
+
+                io::stdout().flush().unwrap();
+                continue;
+            }
+
+            //HASH
             input = crypto::sha256(&input);
             options::set_asking_password(false); //ENABLE ECHO
         }

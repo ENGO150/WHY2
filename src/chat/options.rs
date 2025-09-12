@@ -34,6 +34,8 @@ pub const AUTHORITY_DIR: &str       = "/certs";                                 
 pub const KEY_LOCATION: &str        = "/keys";                                                                       //KEY DIRECTORY
 pub const KEY_FILENAME: &str        = "/secp521r1.pem";                                                              //NAME OF ECC KEYFILE
 
+pub const MIN_PASSWORD_LEN: usize   = 8;                                                                             //MINIMAL PASSWORD LENGTH
+
 //SETTINGS
 static SHARED_KEY: Lazy<RwLock<Option<String>>> = Lazy::new(|| //SHARED SYMMETRIC KEY
 {
