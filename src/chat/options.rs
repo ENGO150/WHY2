@@ -72,7 +72,7 @@ pub fn set_asking_password(value: bool) //SET ASKING_PASSWORD
         termios.c_lflag &= !termios::ECHO;
     } else //ENABLE ECHO
     {
-        termios.c_lflag |= !termios::ECHO;
+        termios.c_lflag |= termios::ECHO;
     }
 
     //SAVE ATTRS
