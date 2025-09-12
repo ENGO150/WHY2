@@ -29,22 +29,17 @@ use crate::
     chat::options,
 };
 
-//ENUMS
-enum ConfigType //TYPE OF CHAT CONFIGS
+//PRIVATE
+fn config_path(filename: &str) -> String //GET CONFIGURATION PATH
 {
-    Client,
-    Server,
-    ServerUsers,
-    Authority,
+    misc::get_why2_dir() + filename
 }
 
-//PRIVATE
-fn init_config(filename: &str)
+fn init_config(filename: &str) //CREATE CONFIG IF MISSING
 {
     misc::check_directory(); //CREATE USER CONFIG DIRECTORY IF MISSING
 
-    let config_path = misc::get_why2_dir() + filename; //GET PATH
-
+    let config_path = config_path(filename);
     if !Path::new(&config_path).is_file()
     {
         let mut config_file = File::create(config_path).expect("Failed to create WHY2 config"); //CREATE CONFIG
@@ -54,27 +49,15 @@ fn init_config(filename: &str)
     }
 }
 
-fn config_path(config_type: ConfigType) -> String
-{
-    //GET CONFIGURATION PATH
-    misc::get_why2_dir() + (match config_type
-    {
-        ConfigType::Client => options::CLIENT_CONFIG,
-        ConfigType::Server => options::SERVER_CONFIG,
-        ConfigType::ServerUsers => options::SERVER_USERS_CONFIG,
-        ConfigType::Authority => options::AUTHORITY_DIR,
-    })
-}
-
-fn get_data(path: String) -> toml::Value //GET Value FROM path
+fn get_data(path: &str) -> toml::Value //GET Value FROM path
 {
     let content = fs::read_to_string(path).expect("Failed to read config"); //READ CONFIG FILE
     toml::from_str(&content).expect("Failed to parse config") //PARSE CONFIG & RETURN
 }
 
-fn config(key: &str, config_type: ConfigType) -> String
+fn config_read(filename: &str, key: &str) -> String //READ CONFIG
 {
-    toml_read(&config_path(config_type), key)
+    get_data(&config_path(filename)).get(key).expect("Key not found").to_string().replace("\"", "").trim().to_string()
 }
 
 //PUBLIC
@@ -82,7 +65,7 @@ pub fn init_server_config() //INITIALIZE SERVER CONFIG FILES
 {
     init_config(options::SERVER_CONFIG); //DOWNLOAD server.toml
 
-    let users_dir_path = get_server_users_path();
+    let users_dir_path = config_path(options::SERVER_USERS_CONFIG);
     if server_config("user_pick_username") == "true" && !Path::new(&users_dir_path).is_dir()
     {
         //WRITE SOMETHING POSITIVE TO THE CONFIG :) (i love you, ignore my aggressive ass)
@@ -97,25 +80,24 @@ pub fn init_client_config()
 
 pub fn server_config(key: &str) -> String //RETURN key FROM server.toml
 {
-    config(key, ConfigType::Server)
+    config_read(options::SERVER_CONFIG, key)
 }
 
 pub fn client_config(key: &str) -> String //RETURN key FROM client.toml
 {
-    config(key, ConfigType::Client)
+    config_read(options::CLIENT_CONFIG, key)
+}
+
+pub fn server_users_config(key: &str) -> String //RETURN key FROM server_users.toml
+{
+    config_read(options::SERVER_USERS_CONFIG, key)
+}
+
+pub fn server_users_write(key: &str, value: &str) //WRITE TO server_users.toml
+{
 }
 
 pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml contains
 {
-    get_data(misc::get_why2_dir() + options::SERVER_USERS_CONFIG).get(key).is_some()
-}
-
-pub fn get_server_users_path() -> String //ik, the function names are really weird and may not be helping you, but this returns path to server_users.toml
-{
-    config_path(ConfigType::ServerUsers)
-}
-
-pub fn toml_read(path: &str, key: &str) -> String //READ TOML FILE
-{
-    get_data(path.to_string()).get(key).expect("Key not found").to_string().replace("\"", "").trim().to_string()
+    get_data(&config_path(options::SERVER_USERS_CONFIG)).get(key).is_some()
 }
