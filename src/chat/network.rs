@@ -314,6 +314,12 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("\nEnter username (a-Z, 0-9; {}-{} characters):", min_uname.unwrap(), max_uname.unwrap());
                 },
 
+                MessageCode::PasswordR => //REGISTER
+                {
+                    clear_lines(3);
+                    println!("\nEnter password: (REGISTER)");
+                },
+
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
                 MessageCode::Disconnect =>
                 {
