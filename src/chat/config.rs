@@ -66,7 +66,7 @@ pub fn init_server_config() //INITIALIZE SERVER CONFIG FILES
     init_config(options::SERVER_CONFIG); //DOWNLOAD server.toml
 
     let users_dir_path = config_path(options::SERVER_USERS_CONFIG);
-    if server_config("user_pick_username") == "true" && !Path::new(&users_dir_path).is_dir()
+    if server_config("user_pick_username") == "true" && !Path::new(&users_dir_path).is_file()
     {
         //WRITE SOMETHING POSITIVE TO THE CONFIG :) (i love you, ignore my aggressive ass)
         fs::write(&users_dir_path, "#haha no users registered, what a loser lol").expect("Writing to config failed");
