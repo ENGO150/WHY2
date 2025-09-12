@@ -108,6 +108,7 @@ fn main()
         if options::get_asking_password()
         {
             input = crypto::sha256(&input);
+            options::set_asking_password(false); //ENABLE ECHO
         }
 
         //SEND input TO SERVER
