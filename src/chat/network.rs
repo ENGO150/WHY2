@@ -57,6 +57,8 @@ pub enum MessageCode //CONTROL CODES
     Welcome,        //SERVER -> CLIENT | INFORMATIONS
     Disconnect,     //SERVER -> CLIENT | QUIT COMMUNICATION
     Username,       //SERVER -> CLIENT | PICK USERNAME
+    PasswordL,      //SERVER -> CLIENT | LOGIN
+    PasswordR,      //SERVER -> CLIENT | REGISTER
 }
 
 #[derive(Serialize, Deserialize)]
@@ -216,6 +218,15 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         {
             send_code(stream, None, MessageCode::Disconnect);
             return;
+        }
+
+        let username = username.unwrap();
+
+        //ASK FOR PASSWORD
+        if !config::server_users_contains(&username)
+        {
+            //SEND REGISTER CODE
+            send_code(stream, None, MessageCode::PasswordR);
         }
     }
 
