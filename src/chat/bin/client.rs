@@ -116,8 +116,9 @@ fn main()
             //CHECK LENGTH
             if input.len() <= options::MIN_PASSWORD_LEN
             {
-                clear_lines(2);
-                print!("\nPassword too short! Enter at least {} characters.\n>>> ", options::MIN_PASSWORD_LEN);
+                print!("\x1B[2FPassword too short! Enter at least {} characters.\x1B[3E", options::MIN_PASSWORD_LEN);
+                clear_lines(1);
+                print!(">>> ");
 
                 io::stdout().flush().unwrap();
                 continue;

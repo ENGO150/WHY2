@@ -367,8 +367,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
                 MessageCode::Accept => //START CHATTING
                 {
-                    clear_lines(3);
-                    println!("\nLogin successful.\n");
+                    clear_lines(2);
+                    println!("Login successful.\n");
                 },
 
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
