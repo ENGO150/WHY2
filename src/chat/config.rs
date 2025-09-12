@@ -95,6 +95,16 @@ pub fn server_users_config(key: &str) -> String //RETURN key FROM server_users.t
 
 pub fn server_users_write(key: &str, value: &str) //WRITE TO server_users.toml
 {
+    let path = config_path(options::SERVER_USERS_CONFIG); //PATH TO server_users.toml
+
+    //GET data
+    let mut data = get_data(&path);
+
+    //WRITE
+    data.as_table_mut().expect("Writing to config failed").insert(key.to_string(), value.into());
+
+    //SAVE
+    fs::write(&path, toml::to_string(&data).expect("Parsing config failed")).expect("Saving config failed");
 }
 
 pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml contains
