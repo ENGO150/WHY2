@@ -227,6 +227,26 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         {
             //SEND REGISTER CODE
             send_code(stream, None, MessageCode::PasswordR);
+
+            //WAIT FOR ANSWER
+            let response = loop
+            {
+                match receive(stream, chat_options::get_shared_key().as_deref())
+                {
+                    Some(msg) => break msg,
+                    None => continue
+                }
+            };
+
+            //INVALID PASSWORD, DISCONNECT CLIENT
+            if response.text.is_none()
+            {
+                send_code(stream, None, MessageCode::Disconnect);
+                return;
+            }
+
+            //SAVE PASSWORD
+            config::server_users_write(&username, &response.text.unwrap());
         }
     }
 
