@@ -38,6 +38,8 @@ use openssl::
     },
 };
 
+use sha2::{ Sha256, Digest };
+
 use crate::
 {
     core::misc,
@@ -118,4 +120,16 @@ pub fn get_shared_key(key: String) -> String //CALCULATES ECDH
 
     //DERIVE SHARED SECRET & ENCODE TO HEX
     hex::encode(deriver.derive_to_vec().expect("Converting deriver failed"))
+}
+
+pub fn sha256(seed_str: &str) -> String //HASH seed_str
+{
+    //SHA256
+    let mut hasher = Sha256::new();
+    hasher.update(seed_str.as_bytes());
+
+    let result = hasher.finalize();
+
+    //FORMAT
+    format!("{:x}", result)
 }

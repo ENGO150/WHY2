@@ -104,6 +104,12 @@ fn main()
 
         input = input.trim().to_owned(); //TRIM
 
+        //USER ENTERED PASSWORD - HASH
+        if options::get_asking_password()
+        {
+            input = crypto::sha256(&input);
+        }
+
         //SEND input TO SERVER
         network::send(&mut client_stream, MessagePacket
         {
