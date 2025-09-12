@@ -66,6 +66,12 @@ fn config_path(config_type: ConfigType) -> String
     })
 }
 
+fn get_data(path: String) -> toml::Value //GET Value FROM path
+{
+    let content = fs::read_to_string(path).expect("Failed to read config"); //READ CONFIG FILE
+    toml::from_str(&content).expect("Failed to parse config") //PARSE CONFIG & RETURN
+}
+
 fn config(key: &str, config_type: ConfigType) -> String
 {
     toml_read(&config_path(config_type), key)
@@ -99,6 +105,11 @@ pub fn client_config(key: &str) -> String //RETURN key FROM client.toml
     config(key, ConfigType::Client)
 }
 
+pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml contains
+{
+    get_data(misc::get_why2_dir() + options::SERVER_USERS_CONFIG).get(key).is_some()
+}
+
 pub fn get_server_users_path() -> String //ik, the function names are really weird and may not be helping you, but this returns path to server_users.toml
 {
     config_path(ConfigType::ServerUsers)
@@ -106,8 +117,5 @@ pub fn get_server_users_path() -> String //ik, the function names are really wei
 
 pub fn toml_read(path: &str, key: &str) -> String //READ TOML FILE
 {
-    let content = fs::read_to_string(path).expect("Failed to read config"); //READ CONFIG FILE
-    let data: toml::Value = toml::from_str(&content).expect("Failed to parse config"); //PARSE CONFIG
-
-    data.get(key).expect("Key not found").to_string().replace("\"", "").trim().to_string()
+    get_data(path.to_string()).get(key).expect("Key not found").to_string().replace("\"", "").trim().to_string()
 }
