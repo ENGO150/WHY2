@@ -159,14 +159,6 @@ fn send_welcome_packet(stream: &mut TcpStream)
     send_code(stream, Some(welcome_json), MessageCode::Welcome);
 }
 
-fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
-{
-    for _ in 0..n
-    {
-        print!("\x1B[1A\x1B[2K\r");
-    }
-}
-
 //PUBLIC
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
@@ -453,4 +445,12 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacke
 
     //DECODE AND RETURN
     Some(bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard()).expect("Decoding packet failed").0)
+}
+
+pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
+{
+    for _ in 0..n
+    {
+        print!("\x1B[1A\x1B[2K\r");
+    }
 }
