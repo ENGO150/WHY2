@@ -164,7 +164,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
     //GET SHARED KEY
     chat_options::set_shared_key(key_exchange_server(stream));
-    
+
     //SEND PACKET WITH REQUIRED SERVER INFO
     send_welcome_packet(stream);
 
