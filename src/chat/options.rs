@@ -38,6 +38,11 @@ static SHARED_KEY: Lazy<RwLock<Option<String>>> = Lazy::new(|| //SHARED SYMMETRI
     RwLock::new(None)
 });
 
+static ASKING_PASSWORD: Lazy<RwLock<bool>> = Lazy::new(|| //SHARED SYMMETRIC KEY
+{
+    RwLock::new(false)
+});
+
 //FUNCTIONS
 //SHARED SYM KEY
 pub fn set_shared_key(key: String) //SET KEY
@@ -50,4 +55,17 @@ pub fn get_shared_key() -> Option<String> //RETURN KEY
 {
     let shared_key = SHARED_KEY.read().unwrap();
     shared_key.clone()
+}
+
+//ASKING PASSWORD
+pub fn set_asking_password(value: bool) //SET ASKING_PASSWORD
+{
+    let mut asking_password = ASKING_PASSWORD.write().unwrap();
+    *asking_password = value;
+}
+
+pub fn get_asking_password() -> bool //GET ASKING_PASSWORD
+{
+    let asking_password = ASKING_PASSWORD.read().unwrap();
+    asking_password.clone()
 }
