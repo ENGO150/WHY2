@@ -223,7 +223,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         let username = username.unwrap();
 
         //ASK FOR PASSWORD
-        if !config::server_users_contains(&username)
+        if !config::server_users_contains(&username) //REGISTRATION
         {
             //SEND REGISTER CODE
             send_code(stream, None, MessageCode::PasswordR);
@@ -238,7 +238,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 }
             };
 
-            //INVALID PASSWORD, DISCONNECT CLIENT
+            //NO PASSWORD, DISCONNECT CLIENT
             if response.text.is_none()
             {
                 send_code(stream, None, MessageCode::Disconnect);
@@ -247,6 +247,27 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
             //SAVE PASSWORD
             config::server_users_write(&username, &response.text.unwrap());
+        } else //LOGIN
+        {
+            //SEND LOGIN CODE
+            send_code(stream, None, MessageCode::PasswordL);
+
+            //WAIT FOR ANSWER
+            let response = loop
+            {
+                match receive(stream, chat_options::get_shared_key().as_deref())
+                {
+                    Some(msg) => break msg,
+                    None => continue
+                }
+            };
+
+            //INVALID PASSWORD, DISCONNECT CLIENT
+            if response.text.is_none() || response.text.unwrap() != config::server_users_config(&username)
+            {
+                send_code(stream, None, MessageCode::Disconnect);
+                return;
+            }
         }
     }
 
