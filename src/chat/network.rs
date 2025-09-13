@@ -199,6 +199,11 @@ fn remove_connection(stream: &mut TcpStream) //REMOVE CONNECTION BY TcpStream
     });
 }
 
+fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
+{
+    CONNECTIONS.read().unwrap().iter().any(|conn| conn.username == username)
+}
+
 //PUBLIC
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
@@ -238,7 +243,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 {
                     if let Some(uname) = r.text
                     {
-                        if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(char::is_alphanumeric)
+                        if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(char::is_alphanumeric) && !user_connected(&uname)
                         {
                             username = Some(uname);
                             break;
