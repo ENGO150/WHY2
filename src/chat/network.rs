@@ -118,7 +118,7 @@ fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey,
     let message = loop
     {
         //READ MESSAGE
-        let received = receive(stream, None);
+        let received = receive(stream, None).unwrap();
 
         if received.code == Some(MessageCode::ServerClientKE) { break received; }
     };
@@ -127,13 +127,17 @@ fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey,
     (crypto::get_shared_key(message.text.unwrap()), message.username.unwrap())
 }
 
-fn key_exchange_server(stream: &mut TcpStream) -> String //KEY EXCHANGE FOR SERVER-SIDE
+fn key_exchange_server(stream: &mut TcpStream) -> Option<String> //KEY EXCHANGE FOR SERVER-SIDE
 {
     //WAIT FOR ClientServerKE
     let message = loop
     {
         //READ MESSAGE
-        let received = receive(stream, None);
+        let received = match receive(stream, None)
+        {
+            Some(r) => r,
+            None => return None,
+        };
 
         if received.code == Some(MessageCode::ClientServerKE) && !received.text.is_none() { break received; }
     };
@@ -147,7 +151,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> String //KEY EXCHANGE FOR SERV
     }, None);
 
     //CALCULATE SHARED SECRET
-    crypto::get_shared_key(message.text.unwrap())
+    Some(crypto::get_shared_key(message.text.unwrap()))
 }
 
 fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>) //send welcome packet you idiot
@@ -181,11 +185,29 @@ fn send_to_all(message: Option<String>, username: &str, code: Option<MessageCode
     }
 }
 
+fn remove_connection(stream: &mut TcpStream) //REMOVE CONNECTION BY TcpStream
+{
+    //GET TARGET PEER ADDRESS
+    let peer_addr = stream.peer_addr().unwrap();
+
+    let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
+
+    //REMOVE MATCHING
+    connections.retain(|conn|
+    {
+        conn.stream.lock().unwrap().peer_addr().unwrap() != peer_addr
+    });
+}
+
 //PUBLIC
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
     //GET SHARED KEY
-    let _shared_key_string = key_exchange_server(stream);
+    let _shared_key_string = match key_exchange_server(stream)
+    {
+        Some(r) => r,
+        None => return
+    };
     let shared_key = Some(_shared_key_string.as_str());
 
     //SEND PACKET WITH REQUIRED SERVER INFO
@@ -209,14 +231,22 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             //SEND PICK_USERNAME CODE
             send_code(stream, None, MessageCode::Username, shared_key);
 
-            //USERNAME CONDITIONS MET, BREAK LOOP
-            if let Some(uname) = receive(stream, shared_key).text
+            match receive(stream, shared_key)
             {
-                if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(char::is_alphanumeric)
+                //USERNAME CONDITIONS MET, BREAK LOOP
+                Some(r) =>
                 {
-                    username = Some(uname);
-                    break;
-                }
+                    if let Some(uname) = r.text
+                    {
+                        if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(char::is_alphanumeric)
+                        {
+                            username = Some(uname);
+                            break;
+                        }
+                    }
+                },
+
+                None => return
             }
         }
 
@@ -236,7 +266,11 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             send_code(stream, None, MessageCode::PasswordR, shared_key);
 
             //WAIT FOR ANSWER
-            let response = receive(stream, shared_key);
+            let response = match receive(stream, shared_key)
+            {
+                Some(r) => r,
+                None => return
+            };
 
             //NO PASSWORD, DISCONNECT CLIENT
             if response.text.is_none()
@@ -253,7 +287,11 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             send_code(stream, None, MessageCode::PasswordL, shared_key);
 
             //WAIT FOR ANSWER
-            let response = receive(stream, shared_key);
+            let response = match receive(stream, shared_key)
+            {
+                Some(r) => r,
+                None => return
+            };
 
             //INVALID PASSWORD, DISCONNECT CLIENT
             if response.text.is_none() || response.text.unwrap() != config::server_users_config(&username)
@@ -289,7 +327,11 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     loop
     {
         //READ
-        let read = receive(stream, shared_key);
+        let read = match receive(stream, shared_key)
+        {
+            Some(r) => r,
+            None => return
+        };
         if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
 
         let message = read.text.unwrap();
@@ -317,7 +359,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     //LOOP READING
     loop
     {
-        let read = receive(stream, chat_options::get_shared_key().as_deref());
+        let read = receive(stream, chat_options::get_shared_key().as_deref()).unwrap();
 
         //CODES
         if let Some(code) = read.code && (server_uname == None || server_uname == read.username)
@@ -440,16 +482,26 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&str>) //
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> MessagePacket
+pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacket>
 {
     //READ
-    let mut reader = BufReader::new(stream);
+    let mut reader = BufReader::new(&mut *stream);
     let mut packet = String::new();
 
     //LOOP UNTIL MESSAGE ARRIVES
     while packet.is_empty()
     {
-        reader.read_line(&mut packet).expect("Reading packet failed"); //TODO: Make function blocking
+        match reader.read_line(&mut packet)
+        {
+            Ok(0) | Err(_) => //CLIENT DISCONNECTED
+            {
+                println!("Closed connection: {}", &stream.peer_addr().unwrap());
+                remove_connection(stream);
+
+                return None;
+            },
+            _ => {}
+        }
     }
 
     //DECODE PACKET (BASE91)
@@ -481,7 +533,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> MessagePacket
     }
 
     //DECODE AND RETURN
-    bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard()).expect("Decoding packet failed").0
+    Some(bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard()).expect("Decoding packet failed").0)
 }
 
 pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
