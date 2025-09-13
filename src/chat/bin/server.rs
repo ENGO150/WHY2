@@ -80,6 +80,8 @@ fn main()
         if input == "!exit"
         {
             println!("Exiting...");
+            network::disconnect_all(); //DISCONNECT ALL USERS
+
             break;
         }
     }

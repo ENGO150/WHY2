@@ -59,7 +59,7 @@ use crate::
 };
 
 //STRUCTS
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum MessageCode //CONTROL CODES
 {
     ClientServerKE, //CLIENT -> SERVER | KEY EXCHANGE
@@ -165,7 +165,7 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>) //send 
     send_code(stream, Some(welcome_json), MessageCode::Welcome, shared_key);
 }
 
-fn send_to_all(message: &str, username: &str) //SEND PACKET TO ALL CLIENTS
+fn send_to_all(message: Option<String>, username: &str, code: Option<MessageCode>) //SEND PACKET TO ALL CLIENTS
 {
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
 
@@ -174,9 +174,9 @@ fn send_to_all(message: &str, username: &str) //SEND PACKET TO ALL CLIENTS
     {
         send(&mut *connection.stream.lock().unwrap(), MessagePacket
         {
-            text: Some(message.to_string()),
+            text: message.clone(),
             username: Some(username.to_string()),
-            code: None,
+            code: code.clone(),
         }, Some(&connection.shared_key));
     }
 }
@@ -294,7 +294,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
         let message = read.text.unwrap();
 
-        send_to_all(&message, &client_username);
+        send_to_all(Some(message), &client_username, None);
     }
 }
 
@@ -490,4 +490,9 @@ pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
     {
         print!("\x1B[1A\x1B[2K\r");
     }
+}
+
+pub fn disconnect_all() //DISCONNECT ALL CLIENTS
+{
+    send_to_all(None, &config::server_config("server_username"), Some(MessageCode::Disconnect));
 }
