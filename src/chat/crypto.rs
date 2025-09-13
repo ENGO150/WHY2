@@ -85,14 +85,14 @@ pub fn get_public_key() -> String //SERIALIZE PUBKEY
         &mut BigNumContext::new().expect("Failed to init BigNumContext")
     ).expect("Pubkey conversion failed");
 
-    //ENCODE TO HEX
-    hex::encode(pubkey_bytes)
+    //ENCODE TO BASE91
+    String::from_utf8(base91::slice_encode(&pubkey_bytes)).expect("Encoding pubkey failed")
 }
 
 pub fn get_shared_key(key: String) -> String //CALCULATES ECDH
 {
     //DECODE key (REMOTE PUBLIC KEY)
-    let pub_bytes = hex::decode(key).expect("Decoding pubkey failed");
+    let pub_bytes = base91::slice_decode(key.as_bytes());
 
     //CURVE AND CONTEXT
     let group = EcGroup::from_curve_name(Nid::SECP521R1).expect("Invalid curve");
@@ -118,8 +118,8 @@ pub fn get_shared_key(key: String) -> String //CALCULATES ECDH
     let mut deriver = Deriver::new(&local_pkey).expect("Invalid local key");
     deriver.set_peer(&remote_pkey).expect("Invalid remote key");
 
-    //DERIVE SHARED SECRET & ENCODE TO HEX
-    hex::encode(deriver.derive_to_vec().expect("Converting deriver failed"))
+    //DERIVE SHARED SECRET & ENCODE TO BASE91
+    String::from_utf8(base91::slice_encode(&deriver.derive_to_vec().expect("Converting deriver failed"))).expect("Encoding shared key failed")
 }
 
 pub fn sha256(seed_str: &str) -> String //HASH seed_str

@@ -416,7 +416,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&str>) //
 {
     //ENCODE THE PACKET STRUCT TO Vec<u8>
     let encoded_packet = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
-    let mut encoded_packet_string = hex::encode(encoded_packet); //ENCODE TO HEX STRING
+    let mut encoded_packet_string = String::from_utf8(base91::slice_encode(&encoded_packet)).expect("Encoding packet failed"); //ENCODE TO BASE91 STRING
 
     //ENCRYPT
     if let Some(key) = key
@@ -432,7 +432,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&str>) //
         }
 
         //OVERWRITE encoded_packet_string
-        encoded_packet_string = hex::encode(encrypted_packet_flattened);
+        encoded_packet_string = String::from_utf8(base91::slice_encode(&encrypted_packet_flattened)).expect("Encoding encrypted packet failed");
     }
 
     //SEND
@@ -452,8 +452,8 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> MessagePacket
         reader.read_line(&mut packet).expect("Reading packet failed"); //TODO: Make function blocking
     }
 
-    //DECODE PACKET (HEX)
-    let mut decoded_packet = hex::decode(packet.trim()).expect("Decoding packet failed");
+    //DECODE PACKET (BASE91)
+    let mut decoded_packet = base91::slice_decode(packet.trim().as_bytes());
 
     //DECRYPT
     if let Some(key) = key
@@ -477,7 +477,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> MessagePacket
         }).output.expect("Decrypting packet failed");
 
         //OVERWRITE decoded_packet
-        decoded_packet = hex::decode(decrypted_packet).expect("Decoding packet failed");
+        decoded_packet = base91::slice_decode(decrypted_packet.as_bytes());
     }
 
     //DECODE AND RETURN
