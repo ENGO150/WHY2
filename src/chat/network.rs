@@ -165,11 +165,20 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>) //send 
     send_code(stream, Some(welcome_json), MessageCode::Welcome, shared_key);
 }
 
-fn send_to_all(message: MessagePacket)
+fn send_to_all(message: MessagePacket, username: &str) //SEND PACKET TO ALL CLIENTS
 {
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
 
-    //for (
+    //SEND TO EACH CLIENT
+    for connection in connections.iter()
+    {
+        send(&mut *connection.stream.lock().unwrap(), MessagePacket
+        {
+            text: message.text.clone(),
+            username: Some(username.to_string()),
+            code: None,
+        }, Some(&connection.shared_key));
+    }
 }
 
 //PUBLIC
@@ -280,6 +289,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     loop
     {
         let read = receive(stream, shared_key);
+        send_to_all(read, &client_username);
     }
 }
 
@@ -296,7 +306,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut max_tries: u8;
     let mut server_uname: Option<String> = None;
 
-    let mut invalid_username = false;
+    let mut invalid_username = false; //PRINT "Invalid Username!"
+    let mut first_message = true; //FORMATTING SHIT
 
     //LOOP READING
     loop
@@ -381,6 +392,13 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
                 _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
             }
+        } else //NO CODE, PRINT MESSAGE
+        {
+            clear_lines(if first_message { 1 } else { 2 });
+            println!("{}: {}\n", read.username.unwrap(), read.text.unwrap());
+
+            //CLEAR TWO LINES FROM NOW ON
+            first_message = false;
         }
 
         //PRINT INPUT PROMPT
