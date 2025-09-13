@@ -40,6 +40,7 @@ fn main()
     misc::check_version(); //CHECK FOR UPDATES
     config::init_server_config(); //CREATE server.toml CONFIGURATION
     crypto::init_keys(); //GENERATE ECC KEYS
+    options::set_core_options(); //SET ENCRYPTION OPTIONS
 
     let address = format!("{}:{}", config::server_config("server_ip"), options::SERVER_PORT); //GET ADDRESS
     let listener = TcpListener::bind(&address).expect("Binding failed"); //BIND ADDRESS

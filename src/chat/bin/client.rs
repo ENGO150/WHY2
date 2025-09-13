@@ -47,6 +47,7 @@ fn main()
     misc::check_version(); //CHECK FOR UPDATES
     config::init_client_config(); //CREATE client.toml CONFIGURATION
     crypto::init_keys(); //GENERATE ECC KEYS
+    options::set_core_options(); //SET ENCRYPTION OPTIONS
 
     println!("Welcome.\n");
 

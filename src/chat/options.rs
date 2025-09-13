@@ -22,6 +22,8 @@ use once_cell::sync::Lazy;
 
 use termios::Termios;
 
+use crate::core::options::{ self, Options };
+
 //CONSTS
 pub const SERVER_PORT: u16          = 1204;                                                                          //PORT FOR SERVER COMMUNICATION
 pub const SERVER_CONFIG: &str       = "/server.toml";                                                                //SERVER CONFIG FILE
@@ -86,4 +88,17 @@ pub fn get_asking_password() -> bool //GET ASKING_PASSWORD
 {
     let asking_password = ASKING_PASSWORD.read().unwrap();
     asking_password.clone()
+}
+
+//CORE ENCRYPTION OPTIONS
+pub fn set_core_options()
+{
+    options::set_core_options
+    (
+        Options
+        {
+            no_check: true,
+            ..Options::default()
+        }
+    );
 }
