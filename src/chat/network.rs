@@ -165,7 +165,7 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>) //send 
     send_code(stream, Some(welcome_json), MessageCode::Welcome, shared_key);
 }
 
-fn send_to_all(message: MessagePacket, username: &str) //SEND PACKET TO ALL CLIENTS
+fn send_to_all(message: &str, username: &str) //SEND PACKET TO ALL CLIENTS
 {
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
 
@@ -174,7 +174,7 @@ fn send_to_all(message: MessagePacket, username: &str) //SEND PACKET TO ALL CLIE
     {
         send(&mut *connection.stream.lock().unwrap(), MessagePacket
         {
-            text: message.text.clone(),
+            text: Some(message.to_string()),
             username: Some(username.to_string()),
             code: None,
         }, Some(&connection.shared_key));
@@ -288,8 +288,13 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //LOOP READING
     loop
     {
+        //READ
         let read = receive(stream, shared_key);
-        send_to_all(read, &client_username);
+        if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
+
+        let message = read.text.unwrap();
+
+        send_to_all(&message, &client_username);
     }
 }
 
