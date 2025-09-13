@@ -63,7 +63,7 @@ pub enum MessageCode //CONTROL CODES
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct MessagePacket
+pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 {
     pub text: Option<String>, //MESSAGE
     pub username: Option<String>, //USERNAME (SENT ONLY BY SERVER, AS SERVER DOESN'T ACCEPT USERNAMES FROM CLIENT)
@@ -71,14 +71,14 @@ pub struct MessagePacket
 }
 
 //PRIVATE
-fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode)
+fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, shared_key: Option<&str>)
 {
     send(stream, MessagePacket
     {
         text: text,
         username: Some(config::server_config("server_username")),
         code: Some(code),
-    }, chat_options::get_shared_key().as_deref());
+    }, shared_key);
 }
 
 fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey, ServerUsername)
@@ -127,7 +127,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> String
     crypto::get_shared_key(message.text.unwrap())
 }
 
-fn send_welcome_packet(stream: &mut TcpStream)
+fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>)
 {
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
@@ -139,17 +139,25 @@ fn send_welcome_packet(stream: &mut TcpStream)
     }).to_string();
 
     //SEND
-    send_code(stream, Some(welcome_json), MessageCode::Welcome);
+    send_code(stream, Some(welcome_json), MessageCode::Welcome, shared_key);
+}
+
+fn send_to_all(message: MessagePacket)
+{
+    let connections = CONNECTIONS.read().unwrap(); //READ LOCK
+
+    //for (
 }
 
 //PUBLIC
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
     //GET SHARED KEY
-    chat_options::set_shared_key(key_exchange_server(stream));
+    let _shared_key_string = key_exchange_server(stream);
+    let shared_key = Some(_shared_key_string.as_str());
 
     //SEND PACKET WITH REQUIRED SERVER INFO
-    send_welcome_packet(stream);
+    send_welcome_packet(stream, shared_key);
 
     //GET USERNAME FROM USER
     if config::server_config("user_pick_username") == "true"
@@ -165,10 +173,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         for _ in 0..max_tries
         {
             //SEND PICK_USERNAME CODE
-            send_code(stream, None, MessageCode::Username);
+            send_code(stream, None, MessageCode::Username, shared_key);
 
             //USERNAME CONDITIONS MET, BREAK LOOP
-            if let Some(uname) = receive(stream, chat_options::get_shared_key().as_deref()).text
+            if let Some(uname) = receive(stream, shared_key).text
             {
                 if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(char::is_alphanumeric)
                 {
@@ -181,7 +189,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         //NO USERNAME RECEIVED, DISCONNECT CLIENT
         if username.is_none()
         {
-            send_code(stream, None, MessageCode::Disconnect);
+            send_code(stream, None, MessageCode::Disconnect, shared_key);
             return;
         }
 
@@ -191,15 +199,15 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         if !config::server_users_contains(&username) //REGISTRATION
         {
             //SEND REGISTER CODE
-            send_code(stream, None, MessageCode::PasswordR);
+            send_code(stream, None, MessageCode::PasswordR, shared_key);
 
             //WAIT FOR ANSWER
-            let response = receive(stream, chat_options::get_shared_key().as_deref());
+            let response = receive(stream, shared_key);
 
             //NO PASSWORD, DISCONNECT CLIENT
             if response.text.is_none()
             {
-                send_code(stream, None, MessageCode::Disconnect);
+                send_code(stream, None, MessageCode::Disconnect, shared_key);
                 return;
             }
 
@@ -208,27 +216,27 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         } else //LOGIN
         {
             //SEND LOGIN CODE
-            send_code(stream, None, MessageCode::PasswordL);
+            send_code(stream, None, MessageCode::PasswordL, shared_key);
 
             //WAIT FOR ANSWER
-            let response = receive(stream, chat_options::get_shared_key().as_deref());
+            let response = receive(stream, shared_key);
 
             //INVALID PASSWORD, DISCONNECT CLIENT
             if response.text.is_none() || response.text.unwrap() != config::server_users_config(&username)
             {
-                send_code(stream, None, MessageCode::Disconnect);
+                send_code(stream, None, MessageCode::Disconnect, shared_key);
                 return;
             }
         }
     }
 
     //TELL CLIENT TO START CHATTING
-    send_code(stream, None, MessageCode::Accept);
+    send_code(stream, None, MessageCode::Accept, shared_key);
 
     //LOOP READING
     loop
     {
-        let read = receive(stream, chat_options::get_shared_key().as_deref());
+        let read = receive(stream, shared_key);
     }
 }
 
