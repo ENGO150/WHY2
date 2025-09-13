@@ -94,19 +94,10 @@ fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey,
     //WAIT FOR ServerClientKE
     let message = loop
     {
-        match receive(stream, None)
-        {
-            Some(msg) =>
-            {
-                //MATCH, EXIT LOOP
-                if msg.code == Some(MessageCode::ServerClientKE)
-                {
-                    break msg;
-                }
-            },
+        //READ MESSAGE
+        let received = receive(stream, None);
 
-            None => continue
-        }
+        if received.code == Some(MessageCode::ServerClientKE) { break received; }
     };
 
     //CALCULATE SHARED SECRET
@@ -118,19 +109,10 @@ fn key_exchange_server(stream: &mut TcpStream) -> String
     //WAIT FOR ClientServerKE
     let message = loop
     {
-        match receive(stream, None)
-        {
-            Some(msg) =>
-            {
-                //MATCH, EXIT LOOP
-                if msg.code == Some(MessageCode::ClientServerKE) && msg.text != None
-                {
-                    break msg;
-                }
-            },
+        //READ MESSAGE
+        let received = receive(stream, None);
 
-            None => continue
-        }
+        if received.code == Some(MessageCode::ClientServerKE) && !received.text.is_none() { break received; }
     };
 
     //SEND ECC PUBKEY TO CLIENT
@@ -185,18 +167,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             //SEND PICK_USERNAME CODE
             send_code(stream, None, MessageCode::Username);
 
-            //WAIT FOR ANSWER
-            let response = loop
-            {
-                match receive(stream, chat_options::get_shared_key().as_deref())
-                {
-                    Some(msg) => break msg,
-                    None => continue
-                }
-            };
-
             //USERNAME CONDITIONS MET, BREAK LOOP
-            if let Some(uname) = response.text
+            if let Some(uname) = receive(stream, chat_options::get_shared_key().as_deref()).text
             {
                 if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(char::is_alphanumeric)
                 {
@@ -222,14 +194,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             send_code(stream, None, MessageCode::PasswordR);
 
             //WAIT FOR ANSWER
-            let response = loop
-            {
-                match receive(stream, chat_options::get_shared_key().as_deref())
-                {
-                    Some(msg) => break msg,
-                    None => continue
-                }
-            };
+            let response = receive(stream, chat_options::get_shared_key().as_deref());
 
             //NO PASSWORD, DISCONNECT CLIENT
             if response.text.is_none()
@@ -246,14 +211,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             send_code(stream, None, MessageCode::PasswordL);
 
             //WAIT FOR ANSWER
-            let response = loop
-            {
-                match receive(stream, chat_options::get_shared_key().as_deref())
-                {
-                    Some(msg) => break msg,
-                    None => continue
-                }
-            };
+            let response = receive(stream, chat_options::get_shared_key().as_deref());
 
             //INVALID PASSWORD, DISCONNECT CLIENT
             if response.text.is_none() || response.text.unwrap() != config::server_users_config(&username)
@@ -270,11 +228,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //LOOP READING
     loop
     {
-        let read = match receive(stream, chat_options::get_shared_key().as_deref())
-        {
-            Some(msg) => msg,
-            None => continue
-        };
+        let read = receive(stream, chat_options::get_shared_key().as_deref());
     }
 }
 
@@ -296,11 +250,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     //LOOP READING
     loop
     {
-        let read = match receive(stream, chat_options::get_shared_key().as_deref())
-        {
-            Some(msg) => msg,
-            None => continue
-        };
+        let read = receive(stream, chat_options::get_shared_key().as_deref());
 
         //CODES
         if let Some(code) = read.code && (server_uname == None || server_uname == read.username)
@@ -416,14 +366,17 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&str>) //
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacket>
+pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> MessagePacket
 {
     //READ
     let mut reader = BufReader::new(stream);
     let mut packet = String::new();
-    reader.read_line(&mut packet).expect("Reading packet failed"); //TODO: Make function blocking
 
-    if packet.is_empty() { return None; } //INVALID READ
+    //LOOP UNTIL MESSAGE ARRIVES
+    while packet.is_empty()
+    {
+        reader.read_line(&mut packet).expect("Reading packet failed"); //TODO: Make function blocking
+    }
 
     //DECODE PACKET (HEX)
     let mut decoded_packet = hex::decode(packet.trim()).expect("Decoding packet failed");
@@ -454,7 +407,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacke
     }
 
     //DECODE AND RETURN
-    Some(bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard()).expect("Decoding packet failed").0)
+    bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard()).expect("Decoding packet failed").0
 }
 
 pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
