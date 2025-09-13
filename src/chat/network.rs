@@ -20,6 +20,14 @@ use std::
 {
     process,
     net::TcpStream,
+
+    sync::
+    {
+        Arc,
+        Mutex,
+        RwLock,
+    },
+
     io::
     {
         self,
@@ -31,6 +39,8 @@ use std::
 
 use serde::{ Serialize, Deserialize };
 use serde_json::{ json, Value };
+
+use once_cell::sync::Lazy;
 
 use crate::
 {
@@ -70,8 +80,21 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub code: Option<MessageCode>, //CONTROL CODE
 }
 
+struct Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
+{
+    stream: Arc<Mutex<TcpStream>>,
+    username: String,
+    shared_key: String,
+}
+
+//LISTS
+static CONNECTIONS: Lazy<Arc<RwLock<Vec<Connection>>>> = Lazy::new(|| //LIST FOR EACH CLIENT CONNECTION
+{
+    Arc::new(RwLock::new(Vec::new()))
+});
+
 //PRIVATE
-fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, shared_key: Option<&str>)
+fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, shared_key: Option<&str>) //SEND CODE TO CLIENT
 {
     send(stream, MessagePacket
     {
@@ -81,7 +104,7 @@ fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, sh
     }, shared_key);
 }
 
-fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey, ServerUsername)
+fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey, ServerUsername) | KEY EXCHANGE FOR CLIENT-SIDE
 {
     //SEND ECC PUBKEY TO SERVER
     send(stream, MessagePacket
@@ -104,7 +127,7 @@ fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey,
     (crypto::get_shared_key(message.text.unwrap()), message.username.unwrap())
 }
 
-fn key_exchange_server(stream: &mut TcpStream) -> String
+fn key_exchange_server(stream: &mut TcpStream) -> String //KEY EXCHANGE FOR SERVER-SIDE
 {
     //WAIT FOR ClientServerKE
     let message = loop
@@ -127,7 +150,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> String
     crypto::get_shared_key(message.text.unwrap())
 }
 
-fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>)
+fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>) //send welcome packet you idiot
 {
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
@@ -158,6 +181,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
     //SEND PACKET WITH REQUIRED SERVER INFO
     send_welcome_packet(stream, shared_key);
+
+    let client_username: String;
 
     //GET USERNAME FROM USER
     if config::server_config("user_pick_username") == "true"
@@ -228,6 +253,24 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 return;
             }
         }
+
+        client_username = username;
+    } else //USE DEFAULT USERNAMES
+    {
+        client_username = config::server_config("default_username");
+    }
+
+    //ADD CLIENT TO CONNECTIONS
+    {
+        let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
+
+        //PUSH
+        connections.push(Connection
+        {
+            stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
+            username: client_username.clone(),
+            shared_key: shared_key.unwrap().to_string(),
+        });
     }
 
     //TELL CLIENT TO START CHATTING
