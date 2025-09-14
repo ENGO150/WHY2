@@ -29,6 +29,7 @@ use why2::
     core::misc,
     chat::
     {
+        command,
         config,
         crypto,
         options,
@@ -110,6 +111,17 @@ fn main()
         io::stdin().read_line(&mut input).unwrap();
 
         input = input.trim().to_owned(); //TRIM
+
+        //USER COMMANDS
+        if let (Some(command), parameters) = command::get_command(&input.to_uppercase())
+        {
+            network::send(&mut client_stream, MessagePacket //SEND COMMAND
+            {
+                text: parameters,
+                username: None,
+                code: Some(command),
+            }, options::get_shared_key().as_deref());
+        }
 
         //USER ENTERED USERNAME - STORE
         if options::get_asking_username()
