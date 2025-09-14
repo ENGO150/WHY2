@@ -16,7 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::sync::RwLock;
+use std::sync::
+{
+    atomic::{ AtomicBool, Ordering },
+    RwLock,
+};
 
 use once_cell::sync::Lazy;
 
@@ -44,15 +48,8 @@ static SHARED_KEY: Lazy<RwLock<Option<String>>> = Lazy::new(|| //SHARED SYMMETRI
     RwLock::new(None)
 });
 
-static ASKING_USERNAME: Lazy<RwLock<bool>> = Lazy::new(|| //CLIENT IS SENDING USENRAME (STORE)
-{
-    RwLock::new(false)
-});
-
-static ASKING_PASSWORD: Lazy<RwLock<bool>> = Lazy::new(|| //CLIENT IS SENDING PASSWORD (DISABLE ECHO)
-{
-    RwLock::new(false)
-});
+static ASKING_USERNAME: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING USENRAME (STORE)
+static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING PASSWORD (DISABLE ECHO)
 
 static USERNAME: Lazy<RwLock<String>> = Lazy::new(|| //CLIENT USERNAME
 {
@@ -76,14 +73,12 @@ pub fn get_shared_key() -> Option<String> //RETURN KEY
 //ASKING USERNAME
 pub fn set_asking_username(value: bool) //GET ASKING_USERNAME
 {
-    let mut asking_username = ASKING_USERNAME.write().unwrap(); //WRITE LOCK
-    *asking_username = value;
+    ASKING_USERNAME.store(value, Ordering::SeqCst);
 }
 
 pub fn get_asking_username() -> bool //SET ASKING_USERNAME
 {
-    let asking_username = ASKING_USERNAME.read().unwrap(); //READ LOCK
-    asking_username.clone()
+    ASKING_USERNAME.load(Ordering::SeqCst)
 }
 
 //ASKING PASSWORD
@@ -103,14 +98,12 @@ pub fn set_asking_password(value: bool) //SET ASKING_PASSWORD
     //SAVE ATTRS
     termios::tcsetattr(0, termios::TCSANOW, &termios).expect("Failed setting stdin attrs");
 
-    let mut asking_password = ASKING_PASSWORD.write().unwrap();
-    *asking_password = value;
+    ASKING_PASSWORD.store(value, Ordering::SeqCst);
 }
 
 pub fn get_asking_password() -> bool //GET ASKING_PASSWORD
 {
-    let asking_password = ASKING_PASSWORD.read().unwrap();
-    asking_password.clone()
+    ASKING_PASSWORD.load(Ordering::SeqCst)
 }
 
 //CORE ENCRYPTION OPTIONS
