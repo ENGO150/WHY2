@@ -21,15 +21,15 @@ use crate::chat::network::MessageCode;
 //CONSTS
 pub const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 
-pub fn get_command(input: &str) -> Option<MessageCode>
+pub fn get_command(input: &str) -> (Option<MessageCode>, Option<String>)
 {
     //input DOESN'T START WITH PREFIX, NO COMMAND
-    if !input.starts_with(COMMAND_PREFIX) { return None; }
+    if !input.starts_with(COMMAND_PREFIX) { return (None, None); }
 
     //COMPARE COMMANDS
     match &input[1..]
     {
-        "EXIT" | "QUIT" | "LEAVE" => Some(MessageCode::Disconnect),
-        _ => None
+        "EXIT" | "QUIT" | "LEAVE" => (Some(MessageCode::Disconnect), None),
+        _ => (None, None)
     }
 }
