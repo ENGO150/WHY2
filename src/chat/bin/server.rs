@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    process,
     thread,
     io,
     net::TcpListener,
@@ -35,6 +36,12 @@ use why2::
         network::{ self, MessageCode },
     },
 };
+
+fn quit() //DISCONNECT ALL USERS
+{
+    println!("Exiting...");
+    network::disconnect_all(); //DISCONNECT ALL USERS
+}
 
 fn main()
 {
@@ -68,6 +75,14 @@ fn main()
         }
     });
 
+    //SET Ctrl+C HANDLER
+    ctrlc::set_handler(move ||
+    {
+        //DISCONNECT ALL USERS AND EXIT
+        quit();
+        process::exit(0);
+    }).expect("Setting Ctrl+C handler failed");
+
     //LOOP FOR SERVER-SIDE USER INPUT
     loop
     {
@@ -84,9 +99,7 @@ fn main()
             {
                 MessageCode::Disconnect =>
                 {
-                    println!("Exiting...");
-                    network::disconnect_all(); //DISCONNECT ALL USERS
-
+                    quit(); //DISCONNECT ALL USERS
                     break;
                 },
 
