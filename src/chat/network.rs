@@ -70,6 +70,7 @@ pub enum MessageCode //CONTROL CODES
     PasswordL,      //SERVER -> CLIENT | LOGIN
     PasswordR,      //SERVER -> CLIENT | REGISTER
     Accept,         //SERVER -> CLIENT | START CHATTING
+    Join,           //SERVER -> CLIENT | CLIENT JOIN MESSAGE
 }
 
 #[derive(Serialize, Deserialize)]
@@ -169,7 +170,7 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>) //send 
     send_code(stream, Some(welcome_json), MessageCode::Welcome, shared_key);
 }
 
-fn send_to_all(message: Option<String>, username: &str, code: Option<MessageCode>) //SEND PACKET TO ALL CLIENTS
+fn send_to_all(message: Option<&str>, username: &str, code: Option<MessageCode>) //SEND PACKET TO ALL CLIENTS
 {
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
 
@@ -178,7 +179,7 @@ fn send_to_all(message: Option<String>, username: &str, code: Option<MessageCode
     {
         send(&mut *connection.stream.lock().unwrap(), MessagePacket
         {
-            text: message.clone(),
+            text: message.map(str::to_string),
             username: Some(username.to_string()),
             code: code.clone(),
         }, Some(&connection.shared_key));
@@ -328,6 +329,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //TELL CLIENT TO START CHATTING
     send_code(stream, None, MessageCode::Accept, shared_key);
 
+    //SEND JOIN MESSAGE
+    send_to_all(Some(&client_username), &config::server_config("server_username"), Some(MessageCode::Join));
+
     //LOOP READING
     loop
     {
@@ -341,7 +345,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
         let message = read.text.unwrap();
 
-        send_to_all(Some(message), &client_username, None);
+        send_to_all(Some(&message), &client_username, None);
     }
 }
 
@@ -374,15 +378,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //WELCOME CODE - SERVER INFORMATIONS
                 MessageCode::Welcome =>
                 {
-                    //TEXT SHOULD CONTAIN JSON DATA
-                    let text = match read.text
-                    {
-                        Some(text) => text,
-                        None => continue //NO JSON DATA, CONTINUE
-                    };
-
                     //PARSE JSON
-                    let welcome_json: Value = serde_json::from_str(&text).expect("Parsing welcome json failed"); //PARSE WELCOME JSON
+                    let welcome_json: Value = serde_json::from_str(&read.text.unwrap()).expect("Parsing welcome json failed"); //PARSE WELCOME JSON
 
                     //GET INFO FROM JSON
                     max_uname = Some(welcome_json["max_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed"));
@@ -434,6 +431,19 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     clear_lines(2);
                     println!("Login successful.\n");
                 },
+
+                MessageCode::Join => //JOIN MESSAGE (CLIENT CONNECTED)
+                {
+                    clear_lines(2);
+
+                    if first_message
+                    {
+                        println!();
+                        first_message = false;
+                    }
+
+                    println!("[{}]: {} connected.\n", server_uname.as_ref().unwrap(), read.text.unwrap());
+                }
 
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
                 MessageCode::Disconnect =>
