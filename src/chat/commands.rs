@@ -15,3 +15,21 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
+use crate::chat::network::MessageCode;
+
+//CONSTS
+pub const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
+
+pub fn get_command(input: &str) -> Option<MessageCode>
+{
+    //input DOESN'T START WITH PREFIX, NO COMMAND
+    if !input.starts_with(COMMAND_PREFIX) { return None; }
+
+    //COMPARE COMMANDS
+    match &input[1..]
+    {
+        "EXIT" | "QUIT" | "LEAVE" => Some(MessageCode::Disconnect),
+        _ => None
+    }
+}
