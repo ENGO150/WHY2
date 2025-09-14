@@ -111,7 +111,7 @@ fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey,
     send(stream, MessagePacket
     {
         text: Some(crypto::get_public_key()),
-        username: Some(config::server_config("server_username")),
+        username: None,
         code: Some(MessageCode::ClientServerKE),
     }, None);
 
