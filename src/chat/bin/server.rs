@@ -28,10 +28,11 @@ use why2::
     core::misc,
     chat::
     {
+        command,
         config,
         crypto,
-        network,
         options,
+        network::{ self, MessageCode },
     },
 };
 
@@ -77,12 +78,20 @@ fn main()
         input = input.trim().to_owned(); //TRIM
 
         //EXIT
-        if input == "!exit"
+        if let (Some(command), _) = command::get_command(&input.to_uppercase())
         {
-            println!("Exiting...");
-            network::disconnect_all(); //DISCONNECT ALL USERS
+            match command
+            {
+                MessageCode::Disconnect =>
+                {
+                    println!("Exiting...");
+                    network::disconnect_all(); //DISCONNECT ALL USERS
 
-            break;
+                    break;
+                },
+
+                _ => {}
+            }
         }
     }
 }
