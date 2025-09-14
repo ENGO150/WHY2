@@ -44,9 +44,19 @@ static SHARED_KEY: Lazy<RwLock<Option<String>>> = Lazy::new(|| //SHARED SYMMETRI
     RwLock::new(None)
 });
 
-static ASKING_PASSWORD: Lazy<RwLock<bool>> = Lazy::new(|| //SHARED SYMMETRIC KEY
+static ASKING_USERNAME: Lazy<RwLock<bool>> = Lazy::new(|| //CLIENT IS SENDING USENRAME (STORE)
 {
     RwLock::new(false)
+});
+
+static ASKING_PASSWORD: Lazy<RwLock<bool>> = Lazy::new(|| //CLIENT IS SENDING PASSWORD (DISABLE ECHO)
+{
+    RwLock::new(false)
+});
+
+static USERNAME: Lazy<RwLock<String>> = Lazy::new(|| //CLIENT USERNAME
+{
+    RwLock::new(String::new())
 });
 
 //FUNCTIONS
@@ -61,6 +71,19 @@ pub fn get_shared_key() -> Option<String> //RETURN KEY
 {
     let shared_key = SHARED_KEY.read().unwrap();
     shared_key.clone()
+}
+
+//ASKING USERNAME
+pub fn set_asking_username(value: bool) //GET ASKING_USERNAME
+{
+    let mut asking_username = ASKING_USERNAME.write().unwrap(); //WRITE LOCK
+    *asking_username = value;
+}
+
+pub fn get_asking_username() -> bool //SET ASKING_USERNAME
+{
+    let asking_username = ASKING_USERNAME.read().unwrap(); //READ LOCK
+    asking_username.clone()
 }
 
 //ASKING PASSWORD
@@ -101,4 +124,17 @@ pub fn set_core_options()
             ..Options::default()
         }
     );
+}
+
+//CLIENT USERNAME
+pub fn set_username(uname: String)
+{
+    let mut username = USERNAME.write().unwrap(); //WRITE LOCK
+    *username = uname;
+}
+
+pub fn get_username() -> String
+{
+    let username = USERNAME.read().unwrap(); //READ LOCK
+    username.clone()
 }

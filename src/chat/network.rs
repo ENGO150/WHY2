@@ -396,12 +396,13 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //PICK_USERNAME CODE - guess what
                 MessageCode::Username =>
                 {
-                    clear_lines(1);
+                    clear_lines(2);
+                    chat_options::set_asking_username(true);
 
                     //INVALID UNAME
                     if invalid_username
                     {
-                        clear_lines(2);
+                        clear_lines(3);
                         print!("Username rejected!");
                     } else //VALID
                     {
@@ -414,21 +415,21 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
                 MessageCode::PasswordR => //REGISTER
                 {
-                    clear_lines(3);
+                    clear_lines(4);
                     chat_options::set_asking_password(true);
                     println!("\nEnter password: (REGISTER)");
                 },
 
                 MessageCode::PasswordL => //LOGIN
                 {
-                    clear_lines(3);
+                    clear_lines(4);
                     chat_options::set_asking_password(true);
                     println!("\nEnter password: (LOGIN)");
                 },
 
                 MessageCode::Accept => //START CHATTING
                 {
-                    clear_lines(2);
+                    clear_lines(3);
                     println!("Login successful.\n");
                 },
 
@@ -456,11 +457,9 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
             }
         } else //NO CODE, PRINT MESSAGE
         {
-            clear_lines(if first_message { 1 } else { 2 });
-            println!("{}: {}\n", read.username.unwrap(), read.text.unwrap());
+            clear_lines(if read.username.as_ref().unwrap() == &chat_options::get_username() { 3 } else { 2 });
 
-            //CLEAR TWO LINES FROM NOW ON
-            first_message = false;
+            println!("{}: {}\n", read.username.unwrap(), read.text.unwrap());
         }
 
         //PRINT INPUT PROMPT
@@ -553,9 +552,16 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacke
 
 pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
 {
-    for _ in 0..n
+    for i in 0..n
     {
-        print!("\x1B[1A\x1B[2K\r");
+        //CLEAR CURRENT LINE
+        print!("\x1B[2K\r");
+
+        //MOVE UP
+        if i < n - 1
+        {
+            print!("\x1B[1A");
+        }
     }
 }
 

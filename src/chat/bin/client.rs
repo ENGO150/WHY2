@@ -111,6 +111,13 @@ fn main()
 
         input = input.trim().to_owned(); //TRIM
 
+        //USER ENTERED USERNAME - STORE
+        if options::get_asking_username()
+        {
+            options::set_username(input.clone()); //STORE USERNAME
+            options::set_asking_username(false); //DISABLE ASKING_USERNAME
+        }
+
         //USER ENTERED PASSWORD - HASH
         if options::get_asking_password()
         {
