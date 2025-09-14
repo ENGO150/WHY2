@@ -143,6 +143,6 @@ fn main()
             text: Some(input),
             username: None,
             code: None,
-        }, Some(&options::get_shared_key().unwrap()));
+        }, options::get_shared_key().as_deref());
     }
 }
