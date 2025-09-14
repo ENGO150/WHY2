@@ -333,9 +333,6 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             Some(r) => r,
             None => return
         };
-        if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
-
-        let message = read.text.unwrap();
 
         //CLIENT CODES
         if read.code.is_some()
@@ -354,6 +351,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 _ => continue
             }
         }
+
+        if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
+        let message = read.text.unwrap();
 
         send_to_all(Some(&message), &username, None);
     }
