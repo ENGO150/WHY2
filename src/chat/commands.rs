@@ -15,9 +15,3 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-
-pub mod commands;
-pub mod config;
-pub mod crypto;
-pub mod network;
-pub mod options;
