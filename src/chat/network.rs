@@ -65,7 +65,7 @@ pub enum MessageCode //CONTROL CODES
     ClientServerKE, //CLIENT -> SERVER | KEY EXCHANGE
     ServerClientKE, //SERVER -> CLIENT | KEY EXCHANGE
     Welcome,        //SERVER -> CLIENT | INFORMATIONS
-    Disconnect,     //SERVER -> CLIENT | QUIT COMMUNICATION
+    Disconnect,     //SERVER <> CLIENT | QUIT COMMUNICATION
     Username,       //SERVER -> CLIENT | PICK USERNAME
     PasswordL,      //SERVER -> CLIENT | LOGIN
     PasswordR,      //SERVER -> CLIENT | REGISTER
@@ -188,6 +188,8 @@ fn send_to_all(message: Option<&str>, username: &str, code: Option<MessageCode>)
 
 fn remove_connection(stream: &mut TcpStream) //REMOVE CONNECTION BY TcpStream
 {
+    println!("Closed connection: {}", &stream.peer_addr().unwrap());
+
     //GET TARGET PEER ADDRESS
     let peer_addr = stream.peer_addr().unwrap();
 
@@ -334,6 +336,24 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
 
         let message = read.text.unwrap();
+
+        //CLIENT CODES
+        if read.code.is_some()
+        {
+            match read.code.unwrap()
+            {
+                MessageCode::Disconnect => //CLIENT QUITS
+                {
+                    //DISCONNECT CLIENT
+                    send_code(stream, None, MessageCode::Disconnect, shared_key);
+                    remove_connection(stream);
+
+                    return;
+                },
+
+                _ => continue
+            }
+        }
 
         send_to_all(Some(&message), &username, None);
     }
@@ -499,9 +519,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacke
         {
             Ok(0) | Err(_) => //CLIENT DISCONNECTED
             {
-                println!("Closed connection: {}", &stream.peer_addr().unwrap());
                 remove_connection(stream);
-
                 return None;
             },
             _ => {}
