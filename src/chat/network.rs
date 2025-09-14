@@ -219,98 +219,88 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //SEND PACKET WITH REQUIRED SERVER INFO
     send_welcome_packet(stream, shared_key);
 
-    let client_username: String;
-
     //GET USERNAME FROM USER
-    if config::server_config("user_pick_username") == "true"
+    let mut username: Option<String> = None; //USER ENTERED USERNAME
+
+    //USERNAME CONFIGS
+    let max_tries: usize = config::server_config("max_username_tries").parse().unwrap(); //MAX n
+    let min_len: usize = config::server_config("min_username_length").parse().unwrap();
+    let max_len: usize = config::server_config("max_username_length").parse().unwrap();
+
+    //ASK n TIMES
+    for _ in 0..max_tries
     {
-        //USERNAME CONFIGS
-        let max_tries: usize = config::server_config("max_username_tries").parse().unwrap(); //MAX n
-        let min_len: usize = config::server_config("min_username_length").parse().unwrap();
-        let max_len: usize = config::server_config("max_username_length").parse().unwrap();
+        //SEND PICK_USERNAME CODE
+        send_code(stream, None, MessageCode::Username, shared_key);
 
-        let mut username: Option<String> = None; //USER ENTERED USERNAME
-
-        //ASK n TIMES
-        for _ in 0..max_tries
+        match receive(stream, shared_key)
         {
-            //SEND PICK_USERNAME CODE
-            send_code(stream, None, MessageCode::Username, shared_key);
-
-            match receive(stream, shared_key)
+            //USERNAME CONDITIONS MET, BREAK LOOP
+            Some(r) =>
             {
-                //USERNAME CONDITIONS MET, BREAK LOOP
-                Some(r) =>
+                if let Some(uname) = r.text
                 {
-                    if let Some(uname) = r.text
+                    if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(char::is_alphanumeric) && !user_connected(&uname)
                     {
-                        if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(char::is_alphanumeric) && !user_connected(&uname)
-                        {
-                            username = Some(uname);
-                            break;
-                        }
+                        username = Some(uname);
+                        break;
                     }
-                },
+                }
+            },
 
-                None => return
-            }
+            None => return
         }
+    }
 
-        //NO USERNAME RECEIVED, DISCONNECT CLIENT
-        if username.is_none()
+    //NO USERNAME RECEIVED, DISCONNECT CLIENT
+    if username.is_none()
+    {
+        send_code(stream, None, MessageCode::Disconnect, shared_key);
+        return;
+    }
+
+    let username = username.unwrap();
+
+    //ASK FOR PASSWORD
+    if !config::server_users_contains(&username) //REGISTRATION
+    {
+        //SEND REGISTER CODE
+        send_code(stream, None, MessageCode::PasswordR, shared_key);
+
+        //WAIT FOR ANSWER
+        let response = match receive(stream, shared_key)
+        {
+            Some(r) => r,
+            None => return
+        };
+
+        //NO PASSWORD, DISCONNECT CLIENT
+        if response.text.is_none()
         {
             send_code(stream, None, MessageCode::Disconnect, shared_key);
             return;
         }
 
-        let username = username.unwrap();
-
-        //ASK FOR PASSWORD
-        if !config::server_users_contains(&username) //REGISTRATION
-        {
-            //SEND REGISTER CODE
-            send_code(stream, None, MessageCode::PasswordR, shared_key);
-
-            //WAIT FOR ANSWER
-            let response = match receive(stream, shared_key)
-            {
-                Some(r) => r,
-                None => return
-            };
-
-            //NO PASSWORD, DISCONNECT CLIENT
-            if response.text.is_none()
-            {
-                send_code(stream, None, MessageCode::Disconnect, shared_key);
-                return;
-            }
-
-            //SAVE PASSWORD
-            config::server_users_write(&username, &response.text.unwrap());
-        } else //LOGIN
-        {
-            //SEND LOGIN CODE
-            send_code(stream, None, MessageCode::PasswordL, shared_key);
-
-            //WAIT FOR ANSWER
-            let response = match receive(stream, shared_key)
-            {
-                Some(r) => r,
-                None => return
-            };
-
-            //INVALID PASSWORD, DISCONNECT CLIENT
-            if response.text.is_none() || response.text.unwrap() != config::server_users_config(&username)
-            {
-                send_code(stream, None, MessageCode::Disconnect, shared_key);
-                return;
-            }
-        }
-
-        client_username = username;
-    } else //USE DEFAULT USERNAMES
+        //SAVE PASSWORD
+        config::server_users_write(&username, &response.text.unwrap());
+    } else //LOGIN
     {
-        client_username = config::server_config("default_username");
+        //SEND LOGIN CODE
+        send_code(stream, None, MessageCode::PasswordL, shared_key);
+
+        //WAIT FOR ANSWER
+        let response = match receive(stream, shared_key)
+        {
+            Some(r) => r,
+            None => return
+        };
+
+        //INVALID PASSWORD, DISCONNECT CLIENT
+        if response.text.is_none() || response.text.unwrap() != config::server_users_config(&username)
+        {
+            send_code(stream, None, MessageCode::Disconnect, shared_key);
+            return;
+        }
     }
 
     //ADD CLIENT TO CONNECTIONS
@@ -321,7 +311,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         connections.push(Connection
         {
             stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
-            username: client_username.clone(),
+            username: username.clone(),
             shared_key: shared_key.unwrap().to_string(),
         });
     }
@@ -330,7 +320,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     send_code(stream, None, MessageCode::Accept, shared_key);
 
     //SEND JOIN MESSAGE
-    send_to_all(Some(&client_username), &config::server_config("server_username"), Some(MessageCode::Join));
+    send_to_all(Some(&username), &config::server_config("server_username"), Some(MessageCode::Join));
 
     //LOOP READING
     loop
@@ -345,7 +335,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
         let message = read.text.unwrap();
 
-        send_to_all(Some(&message), &client_username, None);
+        send_to_all(Some(&message), &username, None);
     }
 }
 

@@ -16,10 +16,8 @@
 
 server_ip = "0.0.0.0" # Server address
 
-user_pick_username = true # User will be prompted for their username on connect or will end up with default_username
 server_name = "WHY2 Server" # Name of the server
 server_username = "server" # Username server will use
-default_username = "anon" # If user_pick_username is set to false, this will be used as client username
 
 communication_time = 300 # Seconds waiting for client message before stopping communication
 
