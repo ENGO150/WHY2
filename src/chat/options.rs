@@ -26,8 +26,6 @@ use std::sync::
 
 use once_cell::sync::Lazy;
 
-use termios::Termios;
-
 use crate::core::options::{ self, Options };
 
 //CONSTS
@@ -91,20 +89,6 @@ pub fn get_asking_username() -> bool //SET ASKING_USERNAME
 //ASKING PASSWORD
 pub fn set_asking_password(value: bool) //SET ASKING_PASSWORD
 {
-    //GET STDIN ATTRS
-    let mut termios = Termios::from_fd(0).expect("Failed getting stdin attrs");
-
-    if value //DISABLE ECHO
-    {
-        termios.c_lflag &= !termios::ECHO;
-    } else //ENABLE ECHO
-    {
-        termios.c_lflag |= termios::ECHO;
-    }
-
-    //SAVE ATTRS
-    termios::tcsetattr(0, termios::TCSANOW, &termios).expect("Failed setting stdin attrs");
-
     ASKING_PASSWORD.store(value, Ordering::SeqCst);
 }
 

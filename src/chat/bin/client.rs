@@ -117,7 +117,6 @@ fn main()
 
     //ENABLE RAW MODE
     terminal::enable_raw_mode().unwrap();
-    options::set_asking_password(false); //asking why this is here? I have no idea... username wont print without this for some reason
 
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
@@ -125,6 +124,7 @@ fn main()
         //CREATE/RESET PARTIAL INPUT VARIABLES
         *options::INPUT_READ.lock().unwrap() = String::new(); //RESET INPUT_READ
         let mut input = String::new();
+        let mut cursor_position = 0;
 
         //READ STDIN
         loop
@@ -136,27 +136,39 @@ fn main()
                     //CHAR INPUT, APPEND
                     KeyCode::Char(c) =>
                     {
-                        input.push(c); //LOCAL VARIABLE
-                        options::INPUT_READ.lock().unwrap().push(c); //GLOBAL VARIABLE
+                        input.insert(cursor_position, c); //LOCAL VARIABLE
+                        options::INPUT_READ.lock().unwrap().insert(cursor_position, c); //GLOBAL VARIABLE
+                        cursor_position += 1; //CURSOR
+
+                        //PRINT ENTERED CHAR
+                        if !options::get_asking_password() //DO NOT PRINT PASSWORD AS TEXT
+                        {
+                            print!("{c}");
+                        } else //PRINT PASSWORD AS ASTERISKS
+                        {
+                            print!("*");
+                        }
                     },
 
                     //CONTROL CHARACTERS
                     KeyCode::Backspace => //BACKSPACE - REMOVE LAST CHAR
                     {
-                        if !input.is_empty()
+                        if cursor_position > 0
                         {
-                            input.pop(); //LOCAL VARIABLE
-                            options::INPUT_READ.lock().unwrap().pop(); //GLOBAL VARIABLE
+                            cursor_position -= 1; //CURSOR
+                            input.remove(cursor_position); //LOCAL VARIABLE
+                            options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
 
                             //CLEAR CHAR FROM STDOUT
-                            print!("\x1B[3D\x1B[0K");
-                            io::stdout().flush().unwrap();
+                            print!("\x1B[1D \x1B[1D");
                         }
                     },
 
                     KeyCode::Enter => break, //ENTER PRESSED, FINALIZE
                     _ => {} //idk
                 }
+
+                io::stdout().flush().unwrap();
             }
         }
 
