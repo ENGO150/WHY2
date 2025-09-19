@@ -31,6 +31,7 @@ use std::
     io::
     {
         self,
+        Read,
         Write,
         BufReader,
         BufRead,
@@ -508,8 +509,18 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&str>) //
 
 pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacket>
 {
+    //MAX PACKET SIZE FOR SERVER
+    let max_packet_size: usize;
+    let is_server = //ONLY APPLY SIZE LIMIT ON SERVER-SIDE
+    {
+        let connections = CONNECTIONS.read().unwrap(); //READ LOCK
+
+        max_packet_size = config::server_config("max_packet_size").parse::<usize>().unwrap(); //GET MAX SIZE
+        !connections.is_empty()
+    };
+
     //READ
-    let mut reader = BufReader::new(&mut *stream);
+    let mut reader = BufReader::new(&mut *stream).take(max_packet_size as u64 + 16);
     let mut packet = String::new();
 
     //LOOP UNTIL MESSAGE ARRIVES
@@ -522,7 +533,16 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacke
                 remove_connection(stream);
                 return None;
             },
-            _ => {}
+
+            Ok(i) => //VALID MESSAGE
+            {
+                if is_server && i >= max_packet_size //INPUT TOO LONG
+                {
+                    send_code(stream, None, MessageCode::Disconnect, key); //DISCONNECT CLIENT
+                    remove_connection(stream);
+                    return None;
+                }
+            }
         }
     }
 
