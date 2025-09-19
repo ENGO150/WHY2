@@ -55,6 +55,25 @@ use why2::
     },
 };
 
+fn redraw_removed(input: &Vec<char>, cursor_position: usize) //REDRAW TEXT AFTER CURSOR
+{
+    //REDRAW INPUT
+    if !options::get_asking_password()
+    {
+        print!("{}", input[cursor_position..].iter().collect::<String>());
+    } else
+    {
+        print!("{}", "*".repeat(input.len() - cursor_position));
+    }
+
+    //MOVE CURSOR BACK WHERE IS SHOULD BE
+    let tail_len = input.len() - cursor_position;
+    if tail_len > 0
+    {
+        print!("\x1B[{}D", tail_len);
+    }
+}
+
 fn main()
 {
     misc::check_version(); //CHECK FOR UPDATES
@@ -172,20 +191,22 @@ fn main()
                             print!("\x1B[1D\x1B[0K");
 
                             //PRINT REMAINING CHARS
-                            if !options::get_asking_password()
-                            {
-                                print!("{}", input[cursor_position..].iter().collect::<String>());
-                            } else
-                            {
-                                print!("{}", "*".repeat(input.len() - cursor_position));
-                            }
+                            redraw_removed(&input, cursor_position);
+                        }
+                    },
 
-                            //MOVE CURSOR BACK WHERE IS SHOULD BE
-                            let tail_len = input.len() - cursor_position;
-                            if tail_len > 0
-                            {
-                                print!("\x1B[{}D", tail_len);
-                            }
+                    KeyCode::Delete => //DELETE - REMOVE NEXT CHAR
+                    {
+                        if cursor_position < input.len()
+                        {
+                            input.remove(cursor_position); //LOCAL VARIABLE
+                            options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
+
+                            //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
+                            print!("\x1B[0K");
+
+                            //PRINT REMAINING CHARS
+                            redraw_removed(&input, cursor_position);
                         }
                     },
 
