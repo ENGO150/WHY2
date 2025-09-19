@@ -253,13 +253,6 @@ fn main()
             }, options::get_shared_key().as_deref());
         }
 
-        //USER ENTERED USERNAME - STORE
-        if options::get_asking_username()
-        {
-            options::set_username(input.clone()); //STORE USERNAME
-            options::set_asking_username(false); //DISABLE ASKING_USERNAME
-        }
-
         //USER ENTERED PASSWORD - HASH
         if options::get_asking_password()
         {

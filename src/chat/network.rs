@@ -407,7 +407,6 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 MessageCode::Username =>
                 {
                     clear_lines(2);
-                    chat_options::set_asking_username(true);
 
                     //INVALID UNAME
                     if invalid_username
@@ -423,27 +422,31 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("\nEnter username (a-Z, 0-9; {}-{} characters):", min_uname.unwrap(), max_uname.unwrap());
                 },
 
-                MessageCode::PasswordR => //REGISTER
+                //REGISTER
+                MessageCode::PasswordR =>
                 {
                     clear_lines(3);
                     chat_options::set_asking_password(true);
                     println!("\nEnter password: (REGISTER)");
                 },
 
-                MessageCode::PasswordL => //LOGIN
+                //LOGIN
+                MessageCode::PasswordL =>
                 {
                     clear_lines(3);
                     chat_options::set_asking_password(true);
                     println!("\nEnter password: (LOGIN)");
                 },
 
-                MessageCode::Accept => //START CHATTING
+                //START CHATTING
+                MessageCode::Accept =>
                 {
                     clear_lines(3);
                     println!("Login successful.\n");
                 },
 
-                MessageCode::Join => //JOIN MESSAGE (CLIENT CONNECTED)
+                //JOIN MESSAGE (CLIENT CONNECTED)
+                MessageCode::Join =>
                 {
                     clear_lines(2);
 

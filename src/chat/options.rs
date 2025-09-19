@@ -48,13 +48,7 @@ static SHARED_KEY: Lazy<RwLock<Option<String>>> = Lazy::new(|| //SHARED SYMMETRI
     RwLock::new(None)
 });
 
-static ASKING_USERNAME: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING USENRAME (STORE)
 static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING PASSWORD (DISABLE ECHO)
-
-static USERNAME: Lazy<RwLock<String>> = Lazy::new(|| //CLIENT USERNAME
-{
-    RwLock::new(String::new())
-});
 
 pub static INPUT_READ: Lazy<Arc<Mutex<Vec<char>>>> = Lazy::new(|| //INPUT READ FROM CLIENT
 {
@@ -73,17 +67,6 @@ pub fn get_shared_key() -> Option<String> //RETURN KEY
 {
     let shared_key = SHARED_KEY.read().unwrap();
     shared_key.clone()
-}
-
-//ASKING USERNAME
-pub fn set_asking_username(value: bool) //GET ASKING_USERNAME
-{
-    ASKING_USERNAME.store(value, Ordering::SeqCst);
-}
-
-pub fn get_asking_username() -> bool //SET ASKING_USERNAME
-{
-    ASKING_USERNAME.load(Ordering::SeqCst)
 }
 
 //ASKING PASSWORD
@@ -108,17 +91,4 @@ pub fn set_core_options()
             ..Options::default()
         }
     );
-}
-
-//CLIENT USERNAME
-pub fn set_username(uname: String)
-{
-    let mut username = USERNAME.write().unwrap(); //WRITE LOCK
-    *username = uname;
-}
-
-pub fn get_username() -> String
-{
-    let username = USERNAME.read().unwrap(); //READ LOCK
-    username.clone()
 }
