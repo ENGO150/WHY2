@@ -20,8 +20,20 @@ use std::
 {
     thread,
     process,
-    io::{ self, Write },
     net::TcpStream,
+    io::{ self, Write },
+};
+
+use crossterm::
+{
+    terminal,
+
+    event::
+    {
+        read,
+        Event,
+        KeyCode
+    },
 };
 
 use why2::
@@ -103,14 +115,50 @@ fn main()
     //LISTEN TO SERVER
     thread::spawn(move || network::listen_server(&mut stream));
 
+    //ENABLE RAW MODE
+    terminal::enable_raw_mode().unwrap();
+    options::set_asking_password(false); //asking why this is here? I have no idea... username wont print without this for some reason
+
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
     {
-        //READ INPUT
+        //CREATE/RESET PARTIAL INPUT VARIABLES
+        *options::INPUT_READ.lock().unwrap() = String::new(); //RESET INPUT_READ
         let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
 
-        input = input.trim().to_owned(); //TRIM
+        //READ STDIN
+        loop
+        {
+            if let Event::Key(key_event) = read().unwrap()
+            {
+                match key_event.code
+                {
+                    //CHAR INPUT, APPEND
+                    KeyCode::Char(c) =>
+                    {
+                        input.push(c); //LOCAL VARIABLE
+                        options::INPUT_READ.lock().unwrap().push(c); //GLOBAL VARIABLE
+                    },
+
+                    //CONTROL CHARACTERS
+                    KeyCode::Backspace => //BACKSPACE - REMOVE LAST CHAR
+                    {
+                        if !input.is_empty()
+                        {
+                            input.pop(); //LOCAL VARIABLE
+                            options::INPUT_READ.lock().unwrap().pop(); //GLOBAL VARIABLE
+
+                            //CLEAR CHAR FROM STDOUT
+                            print!("\x1B[3D\x1B[0K");
+                            io::stdout().flush().unwrap();
+                        }
+                    },
+
+                    KeyCode::Enter => break, //ENTER PRESSED, FINALIZE
+                    _ => {} //idk
+                }
+            }
+        }
 
         //USER COMMANDS
         if let (Some(command), parameters) = command::get_command(&input.to_uppercase())

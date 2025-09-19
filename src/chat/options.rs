@@ -20,6 +20,8 @@ use std::sync::
 {
     atomic::{ AtomicBool, Ordering },
     RwLock,
+    Arc,
+    Mutex,
 };
 
 use once_cell::sync::Lazy;
@@ -54,6 +56,11 @@ static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING
 static USERNAME: Lazy<RwLock<String>> = Lazy::new(|| //CLIENT USERNAME
 {
     RwLock::new(String::new())
+});
+
+pub static INPUT_READ: Lazy<Arc<Mutex<String>>> = Lazy::new(|| //INPUT READ FROM CLIENT
+{
+    Arc::new(Mutex::new(String::new()))
 });
 
 //FUNCTIONS

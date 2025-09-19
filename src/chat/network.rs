@@ -43,6 +43,8 @@ use serde_json::{ json, Value };
 
 use once_cell::sync::Lazy;
 
+use crossterm::terminal;
+
 use crate::
 {
     chat::
@@ -457,6 +459,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
                 MessageCode::Disconnect =>
                 {
+                    terminal::disable_raw_mode().unwrap();
                     println!("\nServer quit communication.");
                     process::exit(0);
                 }
@@ -465,13 +468,13 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
             }
         } else //NO CODE, PRINT MESSAGE
         {
-            clear_lines(if read.username.as_ref().unwrap() == &chat_options::get_username() { 3 } else { 2 });
+            clear_lines(2);
 
             println!("{}: {}\n", read.username.unwrap(), read.text.unwrap());
         }
 
         //PRINT INPUT PROMPT
-        print!(">>> ");
+        print!("\x1B[2K\r>>> {}", chat_options::INPUT_READ.lock().unwrap());
         io::stdout().flush().unwrap();
     }
 }
