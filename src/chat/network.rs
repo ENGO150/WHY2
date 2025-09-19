@@ -163,7 +163,6 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>) //send 
     {
         "max_uname": config::server_config("max_username_length"),
         "min_uname": config::server_config("min_username_length"),
-        "max_tries": config::server_config("max_username_tries"),
         "server_name": config::server_config("server_name"),
     }).to_string();
 
@@ -370,7 +369,6 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut max_uname: Option<u8> = None;
     let mut min_uname: Option<u8> = None;
     let mut server_name: &str;
-    let mut max_tries: u8;
     let mut server_uname: Option<String> = None;
 
     let mut invalid_username = false; //PRINT "Invalid Username!"
@@ -396,7 +394,6 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     max_uname = Some(welcome_json["max_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed"));
                     min_uname = Some(welcome_json["min_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed"));
                     server_name = welcome_json["server_name"].as_str().expect("Invalid welcome json");
-                    max_tries = welcome_json["max_tries"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed");
 
                     //GET SERVER USERNAME
                     server_uname = read.username;
