@@ -73,6 +73,106 @@ fn redraw_removed(input: &Vec<char>, cursor_position: usize) //REDRAW TEXT AFTER
     }
 }
 
+fn read_input() -> String
+{
+    //CREATE/RESET PARTIAL INPUT VARIABLES
+    *options::INPUT_READ.lock().unwrap() = Vec::new(); //RESET INPUT_READ
+    let mut input: Vec<char> = Vec::new();
+    let mut cursor_position = 0;
+
+    loop
+    {
+        if let Event::Key(key_event) = event::read().unwrap()
+        {
+            match key_event.code
+            {
+                //CHAR INPUT, APPEND
+                KeyCode::Char(c) =>
+                {
+                    input.insert(cursor_position, c); //LOCAL VARIABLE
+                    options::INPUT_READ.lock().unwrap().insert(cursor_position, c); //GLOBAL VARIABLE
+                    cursor_position += 1; //CURSOR
+
+                    print!("\x1B[0K");
+
+                    //PRINT ENTERED CHAR
+                    if !options::get_asking_password() //DO NOT PRINT PASSWORD AS TEXT
+                    {
+                        print!("{}", input[(cursor_position - 1)..].iter().collect::<String>());
+                    } else //PRINT PASSWORD AS ASTERISKS
+                    {
+                        print!("{}", "*".repeat((input.len() - cursor_position) + 1));
+                    }
+
+                    //MOVE CURSOR BACK WHERE IS SHOULD BE
+                    let tail_len = input.len() - cursor_position;
+                    if tail_len > 0
+                    {
+                        print!("\x1B[{}D", tail_len);
+                    }
+                },
+
+                //CONTROL CHARACTERS
+                KeyCode::Backspace => //BACKSPACE - REMOVE LAST CHAR
+                {
+                    if cursor_position > 0
+                    {
+                        cursor_position -= 1; //CURSOR
+                        input.remove(cursor_position); //LOCAL VARIABLE
+                        options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
+
+                        //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
+                        print!("\x1B[1D\x1B[0K");
+
+                        //PRINT REMAINING CHARS
+                        redraw_removed(&input, cursor_position);
+                    }
+                },
+
+                KeyCode::Delete => //DELETE - REMOVE NEXT CHAR
+                {
+                    if cursor_position < input.len()
+                    {
+                        input.remove(cursor_position); //LOCAL VARIABLE
+                        options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
+
+                        //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
+                        print!("\x1B[0K");
+
+                        //PRINT REMAINING CHARS
+                        redraw_removed(&input, cursor_position);
+                    }
+                },
+
+                KeyCode::Left => //ARROW LEFT - MOVE CURSOR
+                {
+                    if cursor_position > 0
+                    {
+                        cursor_position -= 1;
+                        print!("\x1B[1D");
+                    }
+                },
+
+                KeyCode::Right => //ARROW RIGHT - MOVE CURSOR
+                {
+                    if cursor_position < input.len()
+                    {
+                        cursor_position += 1;
+                        print!("\x1B[1C");
+                    }
+                },
+
+                KeyCode::Enter => break, //ENTER PRESSED, FINALIZE
+                _ => {} //idk
+            }
+
+            io::stdout().flush().unwrap();
+        }
+    }
+
+    input.iter().collect::<String>()
+}
+
 fn main()
 {
     misc::check_version(); //CHECK FOR UPDATES
@@ -139,104 +239,8 @@ fn main()
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
     {
-        //CREATE/RESET PARTIAL INPUT VARIABLES
-        *options::INPUT_READ.lock().unwrap() = Vec::new(); //RESET INPUT_READ
-        let mut input: Vec<char> = Vec::new();
-        let mut cursor_position = 0;
-
         //READ STDIN
-        loop
-        {
-            if let Event::Key(key_event) = event::read().unwrap()
-            {
-                match key_event.code
-                {
-                    //CHAR INPUT, APPEND
-                    KeyCode::Char(c) =>
-                    {
-                        input.insert(cursor_position, c); //LOCAL VARIABLE
-                        options::INPUT_READ.lock().unwrap().insert(cursor_position, c); //GLOBAL VARIABLE
-                        cursor_position += 1; //CURSOR
-
-                        print!("\x1B[0K");
-
-                        //PRINT ENTERED CHAR
-                        if !options::get_asking_password() //DO NOT PRINT PASSWORD AS TEXT
-                        {
-                            print!("{}", input[(cursor_position - 1)..].iter().collect::<String>());
-                        } else //PRINT PASSWORD AS ASTERISKS
-                        {
-                            print!("{}", "*".repeat((input.len() - cursor_position) + 1));
-                        }
-
-                        //MOVE CURSOR BACK WHERE IS SHOULD BE
-                        let tail_len = input.len() - cursor_position;
-                        if tail_len > 0
-                        {
-                            print!("\x1B[{}D", tail_len);
-                        }
-                    },
-
-                    //CONTROL CHARACTERS
-                    KeyCode::Backspace => //BACKSPACE - REMOVE LAST CHAR
-                    {
-                        if cursor_position > 0
-                        {
-                            cursor_position -= 1; //CURSOR
-                            input.remove(cursor_position); //LOCAL VARIABLE
-                            options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
-
-                            //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
-                            print!("\x1B[1D\x1B[0K");
-
-                            //PRINT REMAINING CHARS
-                            redraw_removed(&input, cursor_position);
-                        }
-                    },
-
-                    KeyCode::Delete => //DELETE - REMOVE NEXT CHAR
-                    {
-                        if cursor_position < input.len()
-                        {
-                            input.remove(cursor_position); //LOCAL VARIABLE
-                            options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
-
-                            //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
-                            print!("\x1B[0K");
-
-                            //PRINT REMAINING CHARS
-                            redraw_removed(&input, cursor_position);
-                        }
-                    },
-
-                    KeyCode::Left => //ARROW LEFT - MOVE CURSOR
-                    {
-                        if cursor_position > 0
-                        {
-                            cursor_position -= 1;
-                            print!("\x1B[1D");
-                        }
-                    },
-
-                    KeyCode::Right => //ARROW RIGHT - MOVE CURSOR
-                    {
-                        if cursor_position < input.len()
-                        {
-                            cursor_position += 1;
-                            print!("\x1B[1C");
-                        }
-                    },
-
-                    KeyCode::Enter => break, //ENTER PRESSED, FINALIZE
-                    _ => {} //idk
-                }
-
-                io::stdout().flush().unwrap();
-            }
-        }
-
-        //CONVERT input FROM Vec<char> TO String
-        let mut input = input.iter().collect::<String>();
+        let mut input = read_input();
 
         //USER COMMANDS
         if let (Some(command), parameters) = command::get_command(&input.to_uppercase())
