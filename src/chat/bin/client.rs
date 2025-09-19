@@ -189,6 +189,15 @@ fn main()
                         }
                     },
 
+                    KeyCode::Left => //ARROW LEFT - MOVE CURSOR
+                    {
+                        if cursor_position > 0
+                        {
+                            cursor_position -= 1;
+                            print!("\x1B[1D");
+                        }
+                    },
+
                     KeyCode::Enter => break, //ENTER PRESSED, FINALIZE
                     _ => {} //idk
                 }
