@@ -140,13 +140,22 @@ fn main()
                         options::INPUT_READ.lock().unwrap().insert(cursor_position, c); //GLOBAL VARIABLE
                         cursor_position += 1; //CURSOR
 
+                        print!("\x1B[0K");
+
                         //PRINT ENTERED CHAR
                         if !options::get_asking_password() //DO NOT PRINT PASSWORD AS TEXT
                         {
-                            print!("{c}");
+                            print!("{}", &input[(cursor_position - 1)..]);
                         } else //PRINT PASSWORD AS ASTERISKS
                         {
-                            print!("*");
+                            print!("{}", "*".repeat((input.len() - cursor_position) + 1));
+                        }
+
+                        //MOVE CURSOR BACK WHERE IS SHOULD BE
+                        let tail_len = input.len() - cursor_position;
+                        if tail_len > 0
+                        {
+                            print!("\x1B[{}D", tail_len);
                         }
                     },
 
@@ -159,8 +168,24 @@ fn main()
                             input.remove(cursor_position); //LOCAL VARIABLE
                             options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
 
-                            //CLEAR CHAR FROM STDOUT
-                            print!("\x1B[1D \x1B[1D");
+                            //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
+                            print!("\x1B[1D\x1B[0K");
+
+                            //PRINT REMAINING CHARS
+                            if !options::get_asking_password()
+                            {
+                                print!("{}", &input[cursor_position..]);
+                            } else
+                            {
+                                print!("{}", "*".repeat(input.len() - cursor_position));
+                            }
+
+                            //MOVE CURSOR BACK WHERE IS SHOULD BE
+                            let tail_len = input.len() - cursor_position;
+                            if tail_len > 0
+                            {
+                                print!("\x1B[{}D", tail_len);
+                            }
                         }
                     },
 
