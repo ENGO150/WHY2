@@ -27,12 +27,11 @@ use std::
 use crossterm::
 {
     terminal,
-
     event::
     {
-        read,
+        self,
+        KeyCode,
         Event,
-        KeyCode
     },
 };
 
@@ -148,7 +147,7 @@ fn main()
         //READ STDIN
         loop
         {
-            if let Event::Key(key_event) = read().unwrap()
+            if let Event::Key(key_event) = event::read().unwrap()
             {
                 match key_event.code
                 {
