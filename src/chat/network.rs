@@ -474,7 +474,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
         }
 
         //PRINT INPUT PROMPT
-        print!("\x1B[2K\r>>> {}", chat_options::INPUT_READ.lock().unwrap());
+        print!("\x1B[2K\r>>> {}", chat_options::INPUT_READ.lock().unwrap().iter().collect::<String>());
         io::stdout().flush().unwrap();
     }
 }

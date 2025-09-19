@@ -122,8 +122,8 @@ fn main()
     loop
     {
         //CREATE/RESET PARTIAL INPUT VARIABLES
-        *options::INPUT_READ.lock().unwrap() = String::new(); //RESET INPUT_READ
-        let mut input = String::new();
+        *options::INPUT_READ.lock().unwrap() = Vec::new(); //RESET INPUT_READ
+        let mut input: Vec<char> = Vec::new();
         let mut cursor_position = 0;
 
         //READ STDIN
@@ -145,7 +145,7 @@ fn main()
                         //PRINT ENTERED CHAR
                         if !options::get_asking_password() //DO NOT PRINT PASSWORD AS TEXT
                         {
-                            print!("{}", &input[(cursor_position - 1)..]);
+                            print!("{}", input[(cursor_position - 1)..].iter().collect::<String>());
                         } else //PRINT PASSWORD AS ASTERISKS
                         {
                             print!("{}", "*".repeat((input.len() - cursor_position) + 1));
@@ -174,7 +174,7 @@ fn main()
                             //PRINT REMAINING CHARS
                             if !options::get_asking_password()
                             {
-                                print!("{}", &input[cursor_position..]);
+                                print!("{}", input[cursor_position..].iter().collect::<String>());
                             } else
                             {
                                 print!("{}", "*".repeat(input.len() - cursor_position));
@@ -205,6 +205,9 @@ fn main()
                 io::stdout().flush().unwrap();
             }
         }
+
+        //CONVERT input FROM Vec<char> TO String
+        let mut input = input.iter().collect::<String>();
 
         //USER COMMANDS
         if let (Some(command), parameters) = command::get_command(&input.to_uppercase())

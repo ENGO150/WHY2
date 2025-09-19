@@ -56,9 +56,9 @@ static USERNAME: Lazy<RwLock<String>> = Lazy::new(|| //CLIENT USERNAME
     RwLock::new(String::new())
 });
 
-pub static INPUT_READ: Lazy<Arc<Mutex<String>>> = Lazy::new(|| //INPUT READ FROM CLIENT
+pub static INPUT_READ: Lazy<Arc<Mutex<Vec<char>>>> = Lazy::new(|| //INPUT READ FROM CLIENT
 {
-    Arc::new(Mutex::new(String::new()))
+    Arc::new(Mutex::new(Vec::new()))
 });
 
 //FUNCTIONS
