@@ -24,31 +24,34 @@ use std::fmt::
 };
 
 //CONSTS
-const COMMAND_PREFIX: &str = "/";  //PREFIX FOR COMMANDS
+const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 
 //ENUMS
 pub enum Command
 {
-    Exit,
-    Help,
+    Exit, //DISCONNECT FROM SERVER
+    Help, //PRINT COMMANDS
+    List, //LIST USERS
 }
 
 //IMPLEMENTATIONS
 impl Display for Command
 {
+    //Command TO STRING
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result
     {
         let name = match self
         {
             Command::Help => "help",
             Command::Exit => "exit",
+            Command::List => "list",
         };
 
         write!(f, "{}{}", COMMAND_PREFIX, name)
     }
 }
 
-pub fn get_command(input: &str) -> (Option<Command>, Option<String>)
+pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMAND + PARAMETERS FROM STRING
 {
     //input DOESN'T START WITH PREFIX, NO COMMAND
     if !input.starts_with(COMMAND_PREFIX) { return (None, None); }
@@ -58,6 +61,7 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>)
     {
         "EXIT" | "QUIT" | "LEAVE"                     => (Some(Command::Exit), None),
         "HELP" | "H" | "COMMANDS" | "USAGE" | "GUIDE" => (Some(Command::Help), None),
+        "LIST" | "USERS" | "CLIENTS" | "SHOW"         => (Some(Command::List), None),
 
         _ => (None, None)
     }

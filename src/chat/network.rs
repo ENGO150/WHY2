@@ -76,6 +76,7 @@ pub enum MessageCode //CONTROL CODES
     Accept,         //SERVER -> CLIENT | START CHATTING
     Join,           //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     Leave,          //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
+    List,           //CLIENT <> SERVER | PRINT CONNECTED USERS
 }
 
 #[derive(Serialize, Deserialize)]

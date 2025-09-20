@@ -368,10 +368,23 @@ fn main()
                         "\nCommands:
                         \r/help - Prints this
                         \r/exit - Disconnects from server
+                        \r/list - Show connected users
                         \n\r>>> ");
-                    continue;
+                },
+
+                Command::List =>
+                {
+                    network::send(&mut client_stream, MessagePacket
+                    {
+                        text: None,
+                        username: None,
+                        id: None,
+                        code: Some(MessageCode::List),
+                    }, options::get_shared_key().as_deref());
                 }
             }
+
+            continue; //DO NOT SEND COMMAND STRING
         }
 
         //APPEND MESSAGE TO HISTORY
