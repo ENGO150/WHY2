@@ -19,7 +19,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::chat::network::MessageCode;
 
 //CONSTS
-pub const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
+pub const COMMAND_PREFIX: &str = "/";  //PREFIX FOR COMMANDS
+
+pub const EXIT_COMMAND: &str = "EXIT"; //EXIT COMMAND
 
 pub fn get_command(input: &str) -> (Option<MessageCode>, Option<String>)
 {
@@ -29,7 +31,7 @@ pub fn get_command(input: &str) -> (Option<MessageCode>, Option<String>)
     //COMPARE COMMANDS
     match &input[1..]
     {
-        "EXIT" | "QUIT" | "LEAVE" => (Some(MessageCode::Disconnect), None),
+        EXIT_COMMAND | "QUIT" | "LEAVE" => (Some(MessageCode::Disconnect), None),
         _ => (None, None)
     }
 }
