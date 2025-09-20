@@ -16,12 +16,34 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::fmt;
+
 use crate::chat::network::MessageCode;
 
 //CONSTS
-pub const COMMAND_PREFIX: &str = "/";  //PREFIX FOR COMMANDS
+const COMMAND_PREFIX: &str = "/";  //PREFIX FOR COMMANDS
 
-pub const EXIT_COMMAND: &str = "EXIT"; //EXIT COMMAND
+//ENUMS
+pub enum Command
+{
+    Exit,
+    Help,
+}
+
+//IMPLEMENTATIONS
+impl fmt::Display for Command
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let name = match self
+        {
+            Command::Help => "help",
+            Command::Exit => "exit",
+        };
+
+        write!(f, "{}{}", COMMAND_PREFIX, name)
+    }
+}
 
 pub fn get_command(input: &str) -> (Option<MessageCode>, Option<String>)
 {
@@ -31,7 +53,7 @@ pub fn get_command(input: &str) -> (Option<MessageCode>, Option<String>)
     //COMPARE COMMANDS
     match &input[1..]
     {
-        EXIT_COMMAND | "QUIT" | "LEAVE" => (Some(MessageCode::Disconnect), None),
+        "EXIT" | "QUIT" | "LEAVE" => (Some(MessageCode::Disconnect), None),
         _ => (None, None)
     }
 }
