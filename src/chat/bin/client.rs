@@ -44,14 +44,15 @@ use why2::
     core::misc,
     chat::
     {
-        command,
         config,
         crypto,
         options,
+        command::{ self, Command },
 
         network::
         {
             self,
+            MessageCode,
             MessagePacket,
             clear_lines,
         },
@@ -100,11 +101,11 @@ fn read_input() -> String
             {
                 match key_event.code
                 {
-                    //EXIT
+                    //CTRL+C (EXIT)
                     KeyCode::Char('c') =>
                     {
                         clear_lines(2);
-                        return format!("{}{}", command::COMMAND_PREFIX, command::EXIT_COMMAND);
+                        return Command::Exit.to_string();
                     },
 
                     _ => {} //some random shortcut
@@ -333,15 +334,26 @@ fn main()
         let mut input = read_input();
 
         //USER COMMANDS
-        if let (Some(command), parameters) = command::get_command(&input.to_uppercase())
+        if let (Some(command), _) = command::get_command(&input.to_uppercase())
         {
-            network::send(&mut client_stream, MessagePacket //SEND COMMAND
+            match command
             {
-                text: parameters,
-                username: None,
-                id: None,
-                code: Some(command),
-            }, options::get_shared_key().as_deref());
+                //EXIT
+                Command::Exit =>
+                {
+                    network::send(&mut client_stream, MessagePacket
+                    {
+                        text: None,
+                        username: None,
+                        id: None,
+                        code: Some(MessageCode::Disconnect),
+                    }, options::get_shared_key().as_deref());
+                },
+
+                Command::Help =>
+                {
+                }
+            }
         }
 
         //APPEND MESSAGE TO HISTORY

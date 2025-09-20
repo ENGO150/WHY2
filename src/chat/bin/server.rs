@@ -29,11 +29,11 @@ use why2::
     core::misc,
     chat::
     {
-        command,
         config,
         crypto,
         options,
-        network::{ self, MessageCode },
+        network,
+        command::{ self, Command },
     },
 };
 
@@ -97,7 +97,7 @@ fn main()
         {
             match command
             {
-                MessageCode::Disconnect =>
+                Command::Exit =>
                 {
                     quit(); //DISCONNECT ALL USERS
                     break;

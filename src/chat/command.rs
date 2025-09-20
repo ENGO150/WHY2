@@ -16,9 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::fmt;
-
-use crate::chat::network::MessageCode;
+use std::fmt::
+{
+    self,
+    Display,
+    Result,
+};
 
 //CONSTS
 const COMMAND_PREFIX: &str = "/";  //PREFIX FOR COMMANDS
@@ -31,9 +34,9 @@ pub enum Command
 }
 
 //IMPLEMENTATIONS
-impl fmt::Display for Command
+impl Display for Command
 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result
     {
         let name = match self
         {
@@ -45,7 +48,7 @@ impl fmt::Display for Command
     }
 }
 
-pub fn get_command(input: &str) -> (Option<MessageCode>, Option<String>)
+pub fn get_command(input: &str) -> (Option<Command>, Option<String>)
 {
     //input DOESN'T START WITH PREFIX, NO COMMAND
     if !input.starts_with(COMMAND_PREFIX) { return (None, None); }
@@ -53,7 +56,9 @@ pub fn get_command(input: &str) -> (Option<MessageCode>, Option<String>)
     //COMPARE COMMANDS
     match &input[1..]
     {
-        "EXIT" | "QUIT" | "LEAVE" => (Some(MessageCode::Disconnect), None),
+        "EXIT" | "QUIT" | "LEAVE" => (Some(Command::Exit), None),
+        //Command::Help | "H" | "COMMANDS" | "USAGE" | "GUIDE" => (None, Some(Command::Help)),
+
         _ => (None, None)
     }
 }
