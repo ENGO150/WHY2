@@ -369,7 +369,8 @@ fn main()
                         \r/help - Prints this
                         \r/exit - Disconnects from server
                         \r/list - Show connected users
-                        \n\r>>> ");
+                        \n\r>>> "
+                    );
                 },
 
                 Command::List =>
