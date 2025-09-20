@@ -460,7 +460,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     //INVALID UNAME
                     if invalid_username
                     {
-                        clear_lines(3);
+                        clear_lines(2);
                         print!("Username rejected!");
                     } else //VALID
                     {
@@ -468,7 +468,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                         invalid_username = true;
                     }
 
-                    println!("\nEnter username (a-Z, 0-9; {}-{} characters):", min_uname.unwrap(), max_uname.unwrap());
+                    println!("\n\x1B[2K\rEnter username (a-Z, 0-9; {}-{} characters):", min_uname.unwrap(), max_uname.unwrap());
                 },
 
                 //REGISTER
