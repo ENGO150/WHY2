@@ -468,7 +468,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                         invalid_username = true;
                     }
 
-                    println!("\n\x1B[2K\rEnter username (a-Z, 0-9; {}-{} characters):", min_uname.unwrap(), max_uname.unwrap());
+                    println!("\n\rEnter username (a-Z, 0-9; {}-{} characters):", min_uname.unwrap(), max_uname.unwrap());
                 },
 
                 //REGISTER
@@ -534,7 +534,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
         }
 
         //PRINT INPUT PROMPT
-        print!("\x1B[2K\r>>> {}", chat_options::INPUT_READ.lock().unwrap().iter().collect::<String>());
+        print!("\r>>> {}", chat_options::INPUT_READ.lock().unwrap().iter().collect::<String>());
         io::stdout().flush().unwrap();
     }
 }
