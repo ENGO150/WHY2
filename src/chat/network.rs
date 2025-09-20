@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     process,
+    collections::HashSet,
     net::TcpStream,
 
     sync::
@@ -88,6 +89,7 @@ struct Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
     stream: Arc<Mutex<TcpStream>>,
     username: String,
+    id: usize,
     shared_key: String,
 }
 
@@ -209,6 +211,23 @@ fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CON
     CONNECTIONS.read().unwrap().iter().any(|conn| conn.username == username)
 }
 
+fn get_latest_id() -> usize
+{
+    //GET HashSet OF IDS
+    let ids: HashSet<usize> = CONNECTIONS.read().unwrap().iter().map(|i| i.id).collect();
+
+    //GET SMALLEST UNUSED ID
+    for i in 0..
+    {
+        if !ids.contains(&i) //ID FOUND, RETURN
+        {
+            return i;
+        }
+    }
+
+    unreachable!("what the fuck");
+}
+
 //PUBLIC
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
@@ -309,15 +328,17 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
     //ADD CLIENT TO CONNECTIONS
     {
-        let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
-
-        //PUSH
-        connections.push(Connection
+        //CREATE CONNECTION
+        let connection = Connection
         {
             stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
             username: username.clone(),
+            id: get_latest_id(),
             shared_key: shared_key.unwrap().to_string(),
-        });
+        };
+
+        //PUSH
+        CONNECTIONS.write().unwrap().push(connection);
     }
 
     //TELL CLIENT TO START CHATTING
