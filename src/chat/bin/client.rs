@@ -20,8 +20,9 @@ use std::
 {
     thread,
     process,
-    net::TcpStream,
     io::{ self, Write },
+    sync::{ Arc, Mutex },
+    net::TcpStream,
 };
 
 use crossterm::
@@ -34,6 +35,8 @@ use crossterm::
         Event,
     },
 };
+
+use once_cell::sync::Lazy;
 
 use why2::
 {
@@ -54,6 +57,13 @@ use why2::
     },
 };
 
+//GLOBAL VARIABLES
+static INPUT_HISTORY: Lazy<Arc<Mutex<(Vec<String>, usize)>>> = Lazy::new(|| //INPUTS READ FROM CLIENT
+{
+    Arc::new(Mutex::new((Vec::new(), 0)))
+});
+
+//HANDLER FNS
 fn redraw_removed(input: &Vec<char>, cursor_position: usize) //REDRAW TEXT AFTER CURSOR
 {
     //REDRAW INPUT
@@ -162,6 +172,32 @@ fn read_input() -> String
                     }
                 },
 
+                KeyCode::Up => //ARROW UP - PAGE HISTORY
+                {
+                    let mut history = INPUT_HISTORY.lock().unwrap();
+
+                    //SKIP IF ON TOP OF HISTORY
+                    if history.0.is_empty() || history.1 == 0 { continue; }
+
+                    //CLEAR CURRENT INPUT
+                    if cursor_position > 0
+                    {
+                        print!("\x1B[{}D\x1B[0K", cursor_position);
+                    }
+
+                    //MOVE IN HISTORY
+                    history.1 -= 1;
+
+                    let new_input = &history.0[history.1]; //SELECTED INPUT IN HISTORY
+
+                    //REPLACE CURRENT INPUT
+                    input = new_input.chars().collect(); //LOCAL VARIABLE
+                    *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
+                    cursor_position = new_input.len(); //CURSOR
+
+                    print!("{}", new_input); //PRINT
+                },
+
                 KeyCode::Enter => break, //ENTER PRESSED, FINALIZE
                 _ => {} //idk
             }
@@ -236,6 +272,9 @@ fn main()
     //ENABLE RAW MODE
     terminal::enable_raw_mode().unwrap();
 
+    //SENDING MESSAGES BOOL (CONDITION FOR ADDING MESSAGES TO HISTORY)
+    let mut sending_messages = false;
+
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
     {
@@ -251,6 +290,21 @@ fn main()
                 username: None,
                 code: Some(command),
             }, options::get_shared_key().as_deref());
+        }
+
+        //APPEND MESSAGE TO HISTORY
+        if sending_messages
+        {
+            let mut history = INPUT_HISTORY.lock().unwrap();
+
+            //ADD INPUT
+            if history.0.last() != Some(&input)
+            {
+                history.0.push(input.clone());
+            }
+
+            //RESET HISTORY POSITION
+            history.1 = history.0.len();
         }
 
         //USER ENTERED PASSWORD - HASH
@@ -269,7 +323,8 @@ fn main()
 
             //HASH
             input = crypto::sha256(&input);
-            options::set_asking_password(false); //ENABLE ECHO
+            options::set_asking_password(false); //DISABLE ASKING_PASSWORD
+            sending_messages = true; //APPEND NEW MESSAGES TO HISTORY
         }
 
         //SEND input TO SERVER
