@@ -75,6 +75,7 @@ pub enum MessageCode //CONTROL CODES
     PasswordR,      //SERVER -> CLIENT | REGISTER
     Accept,         //SERVER -> CLIENT | START CHATTING
     Join,           //SERVER -> CLIENT | CLIENT JOIN MESSAGE
+    Leave,          //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
 }
 
 #[derive(Serialize, Deserialize)]
@@ -195,20 +196,41 @@ fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: O
     }
 }
 
-fn remove_connection(stream: &mut TcpStream) //REMOVE CONNECTION BY TcpStream
+fn remove_connection(stream: &mut TcpStream, disconnect: bool) //REMOVE CONNECTION BY TcpStream
 {
     println!("Closed connection: {}", &stream.peer_addr().unwrap());
 
     //GET TARGET PEER ADDRESS
     let peer_addr = stream.peer_addr().unwrap();
 
-    let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
+    //USERNAME OF TARGET, FOR DISCONNECT MESSAGE
+    let mut username = String::new();
 
     //REMOVE MATCHING
-    connections.retain(|conn|
     {
-        conn.stream.lock().unwrap().peer_addr().unwrap() != peer_addr
-    });
+        let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
+
+        connections.retain(|conn|
+        {
+            let mut removed_stream = conn.stream.lock().unwrap();
+            let should_remove = removed_stream.peer_addr().unwrap() == peer_addr;
+
+            if should_remove
+            {
+                //SEND DISCONNECT CODE TO REMOVED CLIENT
+                if disconnect
+                {
+                    send_code(&mut removed_stream, None, MessageCode::Disconnect, Some(&conn.shared_key));
+                }
+
+                username = conn.username.clone();
+            }
+
+            !should_remove //KEEP NON-MATCHING
+        });
+    }
+
+    send_to_all(Some(&username), &config::server_config("server_username"), None, Some(MessageCode::Leave));
 }
 
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
@@ -373,8 +395,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::Disconnect => //CLIENT QUITS
                 {
                     //DISCONNECT CLIENT
-                    send_code(stream, None, MessageCode::Disconnect, shared_key);
-                    remove_connection(stream);
+                    remove_connection(stream, true);
 
                     return;
                 },
@@ -487,6 +508,14 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("[{}]: {} connected.\n", server_uname.as_ref().unwrap(), read.text.unwrap());
                 }
 
+                //LEAVE MESSAGE (CLIENT DISCONNECTED)
+                MessageCode::Leave =>
+                {
+                    clear_lines(2);
+
+                    println!("[{}]: {} disconnected.\n", server_uname.as_ref().unwrap(), read.text.unwrap());
+                },
+
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
                 MessageCode::Disconnect =>
                 {
@@ -561,7 +590,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacke
         {
             Ok(0) | Err(_) => //CLIENT DISCONNECTED
             {
-                remove_connection(stream);
+                remove_connection(stream, false);
                 return None;
             },
 
@@ -569,8 +598,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacke
             {
                 if is_server && i >= max_packet_size //INPUT TOO LONG
                 {
-                    send_code(stream, None, MessageCode::Disconnect, key); //DISCONNECT CLIENT
-                    remove_connection(stream);
+                    remove_connection(stream, true);
                     return None;
                 }
             }
