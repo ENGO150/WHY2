@@ -491,7 +491,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 MessageCode::Accept =>
                 {
                     clear_lines(3);
-                    println!("Login successful.\n");
+                    println!("Login successful. Press Ctrl+H for help.\n");
                 },
 
                 //JOIN MESSAGE (CLIENT CONNECTED)

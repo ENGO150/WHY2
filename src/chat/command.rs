@@ -56,8 +56,8 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>)
     //COMPARE COMMANDS
     match &input[1..]
     {
-        "EXIT" | "QUIT" | "LEAVE" => (Some(Command::Exit), None),
-        //Command::Help | "H" | "COMMANDS" | "USAGE" | "GUIDE" => (None, Some(Command::Help)),
+        "EXIT" | "QUIT" | "LEAVE"                     => (Some(Command::Exit), None),
+        "HELP" | "H" | "COMMANDS" | "USAGE" | "GUIDE" => (Some(Command::Help), None),
 
         _ => (None, None)
     }

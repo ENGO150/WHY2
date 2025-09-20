@@ -108,6 +108,11 @@ fn read_input() -> String
                         return Command::Exit.to_string();
                     },
 
+                    KeyCode::Char('h') =>
+                    {
+                        return Command::Help.to_string();
+                    }
+
                     _ => {} //some random shortcut
                 };
             } else
@@ -330,6 +335,9 @@ fn main()
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
     {
+        //FLUSH STDOUT
+        io::stdout().flush().unwrap();
+
         //READ STDIN
         let mut input = read_input();
 
@@ -352,6 +360,15 @@ fn main()
 
                 Command::Help =>
                 {
+                    clear_lines(2);
+
+                    print!
+                    (
+                        "\nCommands:
+                        \r/help - Prints this
+                        \r/exit - Disconnects from server
+                        \n\r>>> ");
+                    continue;
                 }
             }
         }
@@ -381,7 +398,6 @@ fn main()
                 clear_lines(1);
                 print!(">>> ");
 
-                io::stdout().flush().unwrap();
                 continue;
             }
 
