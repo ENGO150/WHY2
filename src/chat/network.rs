@@ -401,6 +401,29 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     return;
                 },
 
+                MessageCode::List => //CLIENT REQUESTED LIST OF ONLINE USERS
+                {
+                    let connections = CONNECTIONS.read().unwrap(); //READ LOCK
+                    let mut user_list = Vec::new();
+
+                    //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
+                    for connection in connections.iter()
+                    {
+                        user_list.push(json!({ "username": connection.username, "id": connection.id }));
+                    }
+
+                    //SEND LIST BACK TO CLIENT
+                    send(stream, MessagePacket
+                    {
+                        text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
+                        username: Some(config::server_config("server_username")),
+                        id: None,
+                        code: Some(MessageCode::List),
+                    }, shared_key);
+
+                    continue;
+                }
+
                 _ => continue
             }
         }
@@ -424,19 +447,19 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut server_uname: Option<String> = None;
 
     let mut invalid_username = false; //PRINT "Invalid Username!"
-    let mut first_message = true; //FORMATTING SHIT
+
+    //FORMATTING SHIT
+    let mut first_message = true;
+    let mut extra_space: bool;
 
     //LOOP READING
     loop
     {
         let read = receive(stream, chat_options::get_shared_key().as_deref()).unwrap();
+        extra_space = false; //RESET EXTRA SPACE
 
         //EXTRA SPACE
-        if chat_options::get_extra_space()
-        {
-            chat_options::set_extra_space(false); //DISABLE
-            println!();
-        }
+        if chat_options::get_extra_space() { println!(); }
 
         //CODES
         if let Some(code) = read.code && (server_uname == None || server_uname == read.username)
@@ -524,6 +547,29 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("[{}]: {} disconnected.\n", server_uname.as_ref().unwrap(), read.text.unwrap());
                 },
 
+                //LIST OF ONLINE USERS
+                MessageCode::List =>
+                {
+                    clear_lines(2);
+
+                    if !chat_options::get_extra_space() { println!(); }
+                    println!("Online Users:");
+
+                    //PARSE JSON
+                    let users_json: Value = serde_json::from_str(&read.text.unwrap()).unwrap();
+
+                    //PRINT USERS
+                    for user in users_json.as_array().unwrap()
+                    {
+                        println!("\r{} ({})", user["username"].as_str().unwrap(), user["id"]);
+                    }
+
+                    println!();
+
+                    extra_space = true;
+                    chat_options::set_extra_space(true);
+                }
+
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
                 MessageCode::Disconnect =>
                 {
@@ -544,6 +590,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
         //PRINT INPUT PROMPT
         print!("\r>>> {}", chat_options::INPUT_READ.lock().unwrap().iter().collect::<String>());
         io::stdout().flush().unwrap();
+        if !extra_space { chat_options::set_extra_space(false); } //DISABLE EXTRA SPACE
     }
 }
 
