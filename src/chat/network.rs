@@ -112,7 +112,7 @@ fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, sh
     }, shared_key);
 }
 
-fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey, ServerUsername) | KEY EXCHANGE FOR CLIENT-SIDE
+fn key_exchange_client(stream: &mut TcpStream) -> String //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //SEND ECC PUBKEY TO SERVER
     send(stream, MessagePacket
@@ -133,7 +133,7 @@ fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey,
     };
 
     //CALCULATE SHARED SECRET
-    (crypto::get_shared_key(message.text.unwrap()), message.username.unwrap())
+    crypto::get_shared_key(message.text.unwrap())
 }
 
 fn key_exchange_server(stream: &mut TcpStream) -> Option<String> //KEY EXCHANGE FOR SERVER-SIDE
@@ -392,9 +392,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
 pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 {
-    //GET SHARED KEY
-    let (shared_key, server_username) = key_exchange_client(stream);
-    chat_options::set_shared_key(shared_key); //SET GLOBAL CLIENT SHARED KEY
+    //SET GLOBAL CLIENT SHARED KEY
+    chat_options::set_shared_key(key_exchange_client(stream));
 
     //SERVER INFO VARIABLES
     let mut max_uname: Option<u8> = None;
