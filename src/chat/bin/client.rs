@@ -198,6 +198,39 @@ fn read_input() -> String
                     print!("{}", new_input); //PRINT
                 },
 
+                KeyCode::Down => //ARROW DOWN - PAGE HISTORY
+                { //TODO: Remove duplicity
+                    let mut history = INPUT_HISTORY.lock().unwrap();
+
+                    //SKIP IF ON TOP OF HISTORY
+                    if history.1 == history.0.len() { continue; }
+
+                    //CLEAR CURRENT INPUT
+                    if cursor_position > 0
+                    {
+                        print!("\x1B[{}D\x1B[0K", cursor_position);
+                    }
+
+                    //MOVE IN HISTORY
+                    history.1 += 1;
+
+                    //SELECTED INPUT IN HISTORY
+                    let new_input = if history.1 < history.0.len()
+                    {
+                        &history.0[history.1]
+                    } else
+                    {
+                        ""
+                    };
+
+                    //REPLACE CURRENT INPUT
+                    input = new_input.chars().collect(); //LOCAL VARIABLE
+                    *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
+                    cursor_position = new_input.len(); //CURSOR
+
+                    print!("{}", new_input); //PRINT
+                },
+
                 KeyCode::Enter => break, //ENTER PRESSED, FINALIZE
                 _ => {} //idk
             }
