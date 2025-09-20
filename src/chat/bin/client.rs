@@ -361,6 +361,7 @@ fn main()
                 Command::Help =>
                 {
                     clear_lines(2);
+                    options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
 
                     print!
                     (

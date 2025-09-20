@@ -430,6 +430,13 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     {
         let read = receive(stream, chat_options::get_shared_key().as_deref()).unwrap();
 
+        //EXTRA SPACE
+        if chat_options::get_extra_space()
+        {
+            chat_options::set_extra_space(false); //DISABLE
+            println!();
+        }
+
         //CODES
         if let Some(code) = read.code && (server_uname == None || server_uname == read.username)
         {
