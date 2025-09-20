@@ -32,6 +32,7 @@ use crossterm::
     {
         self,
         KeyCode,
+        KeyModifiers,
         Event,
     },
 };
@@ -94,145 +95,162 @@ fn read_input() -> String
     {
         if let Event::Key(key_event) = event::read().unwrap()
         {
-            match key_event.code
+            //CTRL SHORTCUTS
+            if key_event.modifiers.contains(KeyModifiers::CONTROL)
             {
-                //CHAR INPUT, APPEND
-                KeyCode::Char(c) =>
+                match key_event.code
                 {
-                    input.insert(cursor_position, c); //LOCAL VARIABLE
-                    options::INPUT_READ.lock().unwrap().insert(cursor_position, c); //GLOBAL VARIABLE
-                    cursor_position += 1; //CURSOR
-
-                    print!("\x1B[0K");
-
-                    //PRINT ENTERED CHAR
-                    if !options::get_asking_password() //DO NOT PRINT PASSWORD AS TEXT
+                    //EXIT
+                    KeyCode::Char('c') =>
                     {
-                        print!("{}", input[(cursor_position - 1)..].iter().collect::<String>());
-                    } else //PRINT PASSWORD AS ASTERISKS
-                    {
-                        print!("{}", "*".repeat((input.len() - cursor_position) + 1));
-                    }
+                        clear_lines(2);
+                        return format!("{}{}", command::COMMAND_PREFIX, command::EXIT_COMMAND);
+                    },
 
-                    //MOVE CURSOR BACK WHERE IS SHOULD BE
-                    let tail_len = input.len() - cursor_position;
-                    if tail_len > 0
-                    {
-                        print!("\x1B[{}D", tail_len);
-                    }
-                },
-
-                //CONTROL CHARACTERS
-                KeyCode::Backspace => //BACKSPACE - REMOVE LAST CHAR
+                    _ => {} //some random shortcut
+                };
+            } else
+            {
+                match key_event.code
                 {
-                    if cursor_position > 0
+                    //CHAR INPUT, APPEND
+                    KeyCode::Char(c) =>
                     {
-                        cursor_position -= 1; //CURSOR
-                        input.remove(cursor_position); //LOCAL VARIABLE
-                        options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
+                        input.insert(cursor_position, c); //LOCAL VARIABLE
+                        options::INPUT_READ.lock().unwrap().insert(cursor_position, c); //GLOBAL VARIABLE
+                        cursor_position += 1; //CURSOR
 
-                        //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
-                        print!("\x1B[1D\x1B[0K");
-
-                        //PRINT REMAINING CHARS
-                        redraw_removed(&input, cursor_position);
-                    }
-                },
-
-                KeyCode::Delete => //DELETE - REMOVE NEXT CHAR
-                {
-                    if cursor_position < input.len()
-                    {
-                        input.remove(cursor_position); //LOCAL VARIABLE
-                        options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
-
-                        //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
                         print!("\x1B[0K");
 
-                        //PRINT REMAINING CHARS
-                        redraw_removed(&input, cursor_position);
-                    }
-                },
+                        //PRINT ENTERED CHAR
+                        if !options::get_asking_password() //DO NOT PRINT PASSWORD AS TEXT
+                        {
+                            print!("{}", input[(cursor_position - 1)..].iter().collect::<String>());
+                        } else //PRINT PASSWORD AS ASTERISKS
+                        {
+                            print!("{}", "*".repeat((input.len() - cursor_position) + 1));
+                        }
 
-                KeyCode::Left => //ARROW LEFT - MOVE CURSOR
-                {
-                    if cursor_position > 0
+                        //MOVE CURSOR BACK WHERE IS SHOULD BE
+                        let tail_len = input.len() - cursor_position;
+                        if tail_len > 0
+                        {
+                            print!("\x1B[{}D", tail_len);
+                        }
+                    },
+
+                    //CONTROL CHARACTERS
+                    KeyCode::Backspace => //BACKSPACE - REMOVE LAST CHAR
                     {
-                        cursor_position -= 1;
-                        print!("\x1B[1D");
-                    }
-                },
+                        if cursor_position > 0
+                        {
+                            cursor_position -= 1; //CURSOR
+                            input.remove(cursor_position); //LOCAL VARIABLE
+                            options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
 
-                KeyCode::Right => //ARROW RIGHT - MOVE CURSOR
-                {
-                    if cursor_position < input.len()
+                            //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
+                            print!("\x1B[1D\x1B[0K");
+
+                            //PRINT REMAINING CHARS
+                            redraw_removed(&input, cursor_position);
+                        }
+                    },
+
+                    KeyCode::Delete => //DELETE - REMOVE NEXT CHAR
                     {
-                        cursor_position += 1;
-                        print!("\x1B[1C");
-                    }
-                },
+                        if cursor_position < input.len()
+                        {
+                            input.remove(cursor_position); //LOCAL VARIABLE
+                            options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
 
-                KeyCode::Up => //ARROW UP - PAGE HISTORY
-                {
-                    let mut history = INPUT_HISTORY.lock().unwrap();
+                            //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
+                            print!("\x1B[0K");
 
-                    //SKIP IF ON TOP OF HISTORY
-                    if history.0.is_empty() || history.1 == 0 { continue; }
+                            //PRINT REMAINING CHARS
+                            redraw_removed(&input, cursor_position);
+                        }
+                    },
 
-                    //CLEAR CURRENT INPUT
-                    if cursor_position > 0
+                    KeyCode::Left => //ARROW LEFT - MOVE CURSOR
                     {
-                        print!("\x1B[{}D\x1B[0K", cursor_position);
-                    }
+                        if cursor_position > 0
+                        {
+                            cursor_position -= 1;
+                            print!("\x1B[1D");
+                        }
+                    },
 
-                    //MOVE IN HISTORY
-                    history.1 -= 1;
-
-                    let new_input = &history.0[history.1]; //SELECTED INPUT IN HISTORY
-
-                    //REPLACE CURRENT INPUT
-                    input = new_input.chars().collect(); //LOCAL VARIABLE
-                    *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
-                    cursor_position = new_input.len(); //CURSOR
-
-                    print!("{}", new_input); //PRINT
-                },
-
-                KeyCode::Down => //ARROW DOWN - PAGE HISTORY
-                { //TODO: Remove duplicity
-                    let mut history = INPUT_HISTORY.lock().unwrap();
-
-                    //SKIP IF ON TOP OF HISTORY
-                    if history.1 == history.0.len() { continue; }
-
-                    //CLEAR CURRENT INPUT
-                    if cursor_position > 0
+                    KeyCode::Right => //ARROW RIGHT - MOVE CURSOR
                     {
-                        print!("\x1B[{}D\x1B[0K", cursor_position);
-                    }
+                        if cursor_position < input.len()
+                        {
+                            cursor_position += 1;
+                            print!("\x1B[1C");
+                        }
+                    },
 
-                    //MOVE IN HISTORY
-                    history.1 += 1;
-
-                    //SELECTED INPUT IN HISTORY
-                    let new_input = if history.1 < history.0.len()
+                    KeyCode::Up => //ARROW UP - PAGE HISTORY
                     {
-                        &history.0[history.1]
-                    } else
-                    {
-                        ""
-                    };
+                        let mut history = INPUT_HISTORY.lock().unwrap();
 
-                    //REPLACE CURRENT INPUT
-                    input = new_input.chars().collect(); //LOCAL VARIABLE
-                    *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
-                    cursor_position = new_input.len(); //CURSOR
+                        //SKIP IF ON TOP OF HISTORY
+                        if history.0.is_empty() || history.1 == 0 { continue; }
 
-                    print!("{}", new_input); //PRINT
-                },
+                        //CLEAR CURRENT INPUT
+                        if cursor_position > 0
+                        {
+                            print!("\x1B[{}D\x1B[0K", cursor_position);
+                        }
 
-                KeyCode::Enter => break, //ENTER PRESSED, FINALIZE
-                _ => {} //idk
+                        //MOVE IN HISTORY
+                        history.1 -= 1;
+
+                        let new_input = &history.0[history.1]; //SELECTED INPUT IN HISTORY
+
+                        //REPLACE CURRENT INPUT
+                        input = new_input.chars().collect(); //LOCAL VARIABLE
+                        *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
+                        cursor_position = new_input.len(); //CURSOR
+
+                        print!("{}", new_input); //PRINT
+                    },
+
+                    KeyCode::Down => //ARROW DOWN - PAGE HISTORY
+                    { //TODO: Remove duplicity
+                        let mut history = INPUT_HISTORY.lock().unwrap();
+
+                        //SKIP IF ON TOP OF HISTORY
+                        if history.1 == history.0.len() { continue; }
+
+                        //CLEAR CURRENT INPUT
+                        if cursor_position > 0
+                        {
+                            print!("\x1B[{}D\x1B[0K", cursor_position);
+                        }
+
+                        //MOVE IN HISTORY
+                        history.1 += 1;
+
+                        //SELECTED INPUT IN HISTORY
+                        let new_input = if history.1 < history.0.len()
+                        {
+                            &history.0[history.1]
+                        } else
+                        {
+                            ""
+                        };
+
+                        //REPLACE CURRENT INPUT
+                        input = new_input.chars().collect(); //LOCAL VARIABLE
+                        *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
+                        cursor_position = new_input.len(); //CURSOR
+
+                        print!("{}", new_input); //PRINT
+                    },
+
+                    KeyCode::Enter => break, //ENTER PRESSED, FINALIZE
+                    _ => {} //idk
+                }
             }
 
             io::stdout().flush().unwrap();
