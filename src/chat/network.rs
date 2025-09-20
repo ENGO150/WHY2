@@ -80,17 +80,18 @@ pub enum MessageCode //CONTROL CODES
 #[derive(Serialize, Deserialize)]
 pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 {
-    pub text: Option<String>, //MESSAGE
-    pub username: Option<String>, //USERNAME (SENT ONLY BY SERVER, AS SERVER DOESN'T ACCEPT USERNAMES FROM CLIENT)
+    pub text: Option<String>,      //MESSAGE
+    pub username: Option<String>,  //USERNAME (SENT ONLY BY SERVER, AS SERVER DOESN'T ACCEPT USERNAMES FROM CLIENT)
+    pub id: Option<usize>,         //ID OF USER
     pub code: Option<MessageCode>, //CONTROL CODE
 }
 
 struct Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
-    stream: Arc<Mutex<TcpStream>>,
-    username: String,
-    id: usize,
-    shared_key: String,
+    stream: Arc<Mutex<TcpStream>>, //STREAM
+    username: String,              //USERNAME
+    id: usize,                     //ID OF USER
+    shared_key: String,            //SHARED KEY BETWEEN SERVER AND CLIENT (one to one)
 }
 
 //LISTS
@@ -106,6 +107,7 @@ fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, sh
     {
         text: text,
         username: Some(config::server_config("server_username")),
+        id: None,
         code: Some(code),
     }, shared_key);
 }
@@ -117,6 +119,7 @@ fn key_exchange_client(stream: &mut TcpStream) -> (String, String) //(SharedKey,
     {
         text: Some(crypto::get_public_key()),
         username: None,
+        id: None,
         code: Some(MessageCode::ClientServerKE),
     }, None);
 
@@ -153,6 +156,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> Option<String> //KEY EXCHANGE 
     {
         text: Some(crypto::get_public_key()),
         username: Some(config::server_config("server_username")),
+        id: None,
         code: Some(MessageCode::ServerClientKE),
     }, None);
 
@@ -174,7 +178,7 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>) //send 
     send_code(stream, Some(welcome_json), MessageCode::Welcome, shared_key);
 }
 
-fn send_to_all(message: Option<&str>, username: &str, code: Option<MessageCode>) //SEND PACKET TO ALL CLIENTS
+fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: Option<MessageCode>) //SEND PACKET TO ALL CLIENTS
 {
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
 
@@ -185,6 +189,7 @@ fn send_to_all(message: Option<&str>, username: &str, code: Option<MessageCode>)
         {
             text: message.map(str::to_string),
             username: Some(username.to_string()),
+            id: id,
             code: code.clone(),
         }, Some(&connection.shared_key));
     }
@@ -326,6 +331,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         }
     }
 
+    //GENERATE ID FOR CLIENT
+    let id = get_latest_id();
+
     //ADD CLIENT TO CONNECTIONS
     {
         //CREATE CONNECTION
@@ -333,7 +341,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         {
             stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
             username: username.clone(),
-            id: get_latest_id(),
+            id: id,
             shared_key: shared_key.unwrap().to_string(),
         };
 
@@ -345,7 +353,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     send_code(stream, None, MessageCode::Accept, shared_key);
 
     //SEND JOIN MESSAGE
-    send_to_all(Some(&username), &config::server_config("server_username"), Some(MessageCode::Join));
+    send_to_all(Some(&username), &config::server_config("server_username"), None, Some(MessageCode::Join));
 
     //LOOP READING
     loop
@@ -378,7 +386,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
         let message = read.text.unwrap();
 
-        send_to_all(Some(&message), &username, None);
+        send_to_all(Some(&message), &username, Some(id), None);
     }
 }
 
@@ -494,7 +502,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
         {
             clear_lines(2);
 
-            println!("{}: {}\n", read.username.unwrap(), read.text.unwrap());
+            println!("{} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap());
         }
 
         //PRINT INPUT PROMPT
@@ -619,5 +627,5 @@ pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
 
 pub fn disconnect_all() //DISCONNECT ALL CLIENTS
 {
-    send_to_all(None, &config::server_config("server_username"), Some(MessageCode::Disconnect));
+    send_to_all(None, &config::server_config("server_username"), None, Some(MessageCode::Disconnect));
 }

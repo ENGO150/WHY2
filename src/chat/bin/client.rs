@@ -321,6 +321,7 @@ fn main()
             {
                 text: parameters,
                 username: None,
+                id: None,
                 code: Some(command),
             }, options::get_shared_key().as_deref());
         }
@@ -365,6 +366,7 @@ fn main()
         {
             text: Some(input),
             username: None,
+            id: None,
             code: None,
         }, options::get_shared_key().as_deref());
     }
