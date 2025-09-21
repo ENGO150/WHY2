@@ -342,7 +342,7 @@ fn main()
         let mut input = read_input();
 
         //USER COMMANDS
-        if let (Some(command), _) = command::get_command(&input.to_uppercase())
+        if let (Some(command), _) = command::get_command(&input)
         {
             match command
             {

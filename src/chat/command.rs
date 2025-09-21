@@ -29,9 +29,9 @@ const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 //ENUMS
 pub enum Command
 {
-    Exit, //DISCONNECT FROM SERVER
-    Help, //PRINT COMMANDS
-    List, //LIST USERS
+    Exit,           //DISCONNECT FROM SERVER
+    Help,           //PRINT COMMANDS
+    List,           //LIST USERS
 }
 
 //IMPLEMENTATIONS
@@ -42,9 +42,9 @@ impl Display for Command
     {
         let name = match self
         {
-            Command::Help => "help",
-            Command::Exit => "exit",
-            Command::List => "list",
+            Command::Help           => "help",
+            Command::Exit           => "exit",
+            Command::List           => "list",
         };
 
         write!(f, "{}{}", COMMAND_PREFIX, name)
@@ -56,10 +56,19 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
     //input DOESN'T START WITH PREFIX, NO COMMAND
     if !input.starts_with(COMMAND_PREFIX) { return (None, None); }
 
-    //COMPARE COMMANDS
-    match &input[1..]
+    //SPLIT input TO COMMAND AND PARAMETERS
+    let no_prefix = &input[COMMAND_PREFIX.len()..]; //EXTRACT COMMAND WITHOUT PREFIX (IN UPPERCASE)
+    let (command, parameters) = match no_prefix.split_once(' ') //EXTRACT POSSIBLE PARAMETERS
     {
-        "EXIT" | "QUIT" | "LEAVE"                     => (Some(Command::Exit), None),
+        Some((command, parameters)) => (command.to_ascii_uppercase(), Some(parameters.to_string())),
+        None => (no_prefix.to_ascii_uppercase(), None)
+    };
+
+    //COMPARE COMMANDS
+    match command.as_str()
+    {
+        //NON PARAMETRIC
+        "EXIT" | "QUIT" | "LEAVE" | "DISCONNECT"      => (Some(Command::Exit), None),
         "HELP" | "H" | "COMMANDS" | "USAGE" | "GUIDE" => (Some(Command::Help), None),
         "LIST" | "USERS" | "CLIENTS" | "SHOW"         => (Some(Command::List), None),
 
