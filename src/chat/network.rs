@@ -109,7 +109,7 @@ fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, sh
     send(stream, MessagePacket
     {
         text: text,
-        username: Some(config::server_config("server_username")),
+        username: None,
         id: None,
         code: Some(code),
     }, shared_key);
@@ -158,7 +158,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> Option<String> //KEY EXCHANGE 
     send(stream, MessagePacket
     {
         text: Some(crypto::get_public_key()),
-        username: Some(config::server_config("server_username")),
+        username: None,
         id: None,
         code: Some(MessageCode::ServerClientKE),
     }, None);
@@ -394,7 +394,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         {
             match read.code.unwrap()
             {
-                MessageCode::Disconnect => //CLIENT QUITS
+                //CLIENT QUITS
+                MessageCode::Disconnect =>
                 {
                     //DISCONNECT CLIENT
                     remove_connection(stream, true);
@@ -402,7 +403,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     return;
                 },
 
-                MessageCode::List => //CLIENT REQUESTED LIST OF ONLINE USERS
+                //CLIENT REQUESTED LIST OF ONLINE USERS
+                MessageCode::List =>
                 {
                     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
                     let mut user_list = Vec::new();
@@ -417,7 +419,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     send(stream, MessagePacket
                     {
                         text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
-                        username: Some(config::server_config("server_username")),
+                        username: None,
                         id: None,
                         code: Some(MessageCode::List),
                     }, shared_key);
@@ -445,7 +447,6 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut max_uname: Option<u8> = None;
     let mut min_uname: Option<u8> = None;
     let mut server_name: &str;
-    let mut server_uname: Option<String> = None;
 
     let mut invalid_username = false; //PRINT "Invalid Username!"
 
@@ -463,7 +464,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
         if chat_options::get_extra_space() { println!(); }
 
         //CODES
-        if let Some(code) = read.code && (server_uname == None || server_uname == read.username)
+        if let Some(code) = read.code
         {
             match code
             {
@@ -477,9 +478,6 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     max_uname = Some(welcome_json["max_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed"));
                     min_uname = Some(welcome_json["min_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed"));
                     server_name = welcome_json["server_name"].as_str().expect("Invalid welcome json");
-
-                    //GET SERVER USERNAME
-                    server_uname = read.username;
 
                     println!("Successfully connected to {server_name}.\n");
                 },
@@ -537,7 +535,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                         first_message = false;
                     }
 
-                    println!("[{}]: {} connected.\n", server_uname.as_ref().unwrap(), read.text.unwrap());
+                    println!("[{}]: {} connected.\n", read.username.unwrap(), read.text.unwrap());
                 }
 
                 //LEAVE MESSAGE (CLIENT DISCONNECTED)
@@ -545,7 +543,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 {
                     clear_lines(2);
 
-                    println!("[{}]: {} disconnected.\n", server_uname.as_ref().unwrap(), read.text.unwrap());
+                    println!("[{}]: {} disconnected.\n", read.username.unwrap(), read.text.unwrap());
                 },
 
                 //LIST OF ONLINE USERS
