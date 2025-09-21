@@ -78,6 +78,7 @@ pub enum MessageCode //CONTROL CODES
     Leave,          //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
     List,           //CLIENT <> SERVER | PRINT CONNECTED USERS
     PrivateMessage, //CLIENT <> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
+    InvalidUsage,   //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
 }
 
 #[derive(Serialize, Deserialize)]
@@ -423,12 +424,25 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         id: None,
                         code: Some(MessageCode::List),
                     }, shared_key);
+                },
 
-                    continue;
-                }
+                //PRIVATE MESSAGE
+                MessageCode::PrivateMessage =>
+                {
+                    //CHECK PARAMETER VALIDITY
+                    send(stream, MessagePacket
+                    {
+                        text: None,
+                        username: None,
+                        id: None,
+                        code: Some(MessageCode::InvalidUsage),
+                    }, shared_key);
+                },
 
                 _ => continue
             }
+
+            continue; //DO NOT FORWARD CODES
         }
 
         if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
@@ -552,7 +566,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     clear_lines(2);
 
                     if !chat_options::get_extra_space() { println!(); }
-                    println!("Online Users:");
+                    println!("Online users:");
 
                     //PARSE JSON
                     let users_json: Value = serde_json::from_str(&read.text.unwrap()).unwrap();
@@ -567,7 +581,14 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
                     extra_space = true;
                     chat_options::set_extra_space(true);
-                }
+                },
+
+                //CLIENT MESSED SOME COMMAND UP
+                MessageCode::InvalidUsage =>
+                {
+                    clear_lines(2);
+                    println!("Invalid usage! Press Ctrl+H for help.\n");
+                },
 
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
                 MessageCode::Disconnect =>
