@@ -66,19 +66,20 @@ use crate::
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum MessageCode //CONTROL CODES
 {
-    ClientServerKE, //CLIENT -> SERVER | KEY EXCHANGE
-    ServerClientKE, //SERVER -> CLIENT | KEY EXCHANGE
-    Welcome,        //SERVER -> CLIENT | INFORMATIONS
-    Disconnect,     //SERVER <> CLIENT | QUIT COMMUNICATION
-    Username,       //SERVER -> CLIENT | PICK USERNAME
-    PasswordL,      //SERVER -> CLIENT | LOGIN
-    PasswordR,      //SERVER -> CLIENT | REGISTER
-    Accept,         //SERVER -> CLIENT | START CHATTING
-    Join,           //SERVER -> CLIENT | CLIENT JOIN MESSAGE
-    Leave,          //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
-    List,           //CLIENT <> SERVER | PRINT CONNECTED USERS
-    PrivateMessage, //CLIENT <> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
-    InvalidUsage,   //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
+    ClientServerKE,     //CLIENT -> SERVER | KEY EXCHANGE
+    ServerClientKE,     //SERVER -> CLIENT | KEY EXCHANGE
+    Welcome,            //SERVER -> CLIENT | INFORMATIONS
+    Disconnect,         //SERVER <> CLIENT | QUIT COMMUNICATION
+    Username,           //SERVER -> CLIENT | PICK USERNAME
+    PasswordL,          //SERVER -> CLIENT | LOGIN
+    PasswordR,          //SERVER -> CLIENT | REGISTER
+    Accept,             //SERVER -> CLIENT | START CHATTING
+    Join,               //SERVER -> CLIENT | CLIENT JOIN MESSAGE
+    Leave,              //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
+    List,               //CLIENT <> SERVER | PRINT CONNECTED USERS
+    PrivateMessage,     //CLIENT <> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
+    PrivateMessageBack, //SERVER -> CLIENT | SEND MESSAGE BACK TO SENDER
+    InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
 }
 
 #[derive(Serialize, Deserialize)]
@@ -90,6 +91,7 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub code: Option<MessageCode>, //CONTROL CODE
 }
 
+#[derive(Clone)]
 struct Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
     stream: Arc<Mutex<TcpStream>>, //STREAM
@@ -256,6 +258,11 @@ fn get_latest_id() -> usize
     }
 
     unreachable!("what the fuck");
+}
+
+fn get_connection_by_id(id: usize) -> Option<Connection> //RETURN CONNECTION WITH MATCHING ID
+{
+    CONNECTIONS.read().unwrap().iter().find(|conn| conn.id == id).cloned()
 }
 
 //PUBLIC
@@ -430,6 +437,42 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::PrivateMessage =>
                 {
                     //CHECK PARAMETER VALIDITY
+                    if let Some(message) = read.text //CLIENT ACTUALLY SENT SOMETHING
+                    {
+                        if let Some((sender_id, private_message)) = message.split_once(' ') //CLIENT ACTUALLY PASSED AT LEAST TWO PARAMETERS
+                        {
+                            if let Ok(num) = sender_id.parse::<usize>() //CLIENT ACTUALLY SENT NUMERIC ID
+                            {
+                                if let Some(recipient) = get_connection_by_id(num) //yippee!! client sent valid id
+                                {
+                                    //SEND MESSAGE TO RECEIVER
+                                    if num != id //DO NOT SEND ON SELF MESSAGE
+                                    {
+                                        send(&mut recipient.stream.lock().unwrap(), MessagePacket
+                                        {
+                                            text: Some(private_message.to_string()),
+                                            username: Some(username.clone()),
+                                            id: Some(id),
+                                            code: Some(MessageCode::PrivateMessage),
+                                        }, Some(&recipient.shared_key));
+                                    }
+
+                                    //SEND MESSAGE BACK TO SENDER
+                                    send(stream, MessagePacket
+                                    {
+                                        text: Some(private_message.to_string()),
+                                        username: Some(recipient.username),
+                                        id: Some(num),
+                                        code: Some(MessageCode::PrivateMessageBack),
+                                    }, shared_key);
+
+                                    continue; //VALID, DO NOT SEND InvalidUsage CODE
+                                }
+                            }
+                        }
+                    }
+
+                    //SEND InvalidUsage CODE IF INVALID
                     send(stream, MessagePacket
                     {
                         text: None,
@@ -437,6 +480,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         id: None,
                         code: Some(MessageCode::InvalidUsage),
                     }, shared_key);
+                    continue;
                 },
 
                 _ => continue
@@ -581,6 +625,20 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
                     extra_space = true;
                     chat_options::set_extra_space(true);
+                },
+
+                //PRIVATE MESSAGE INCOMING
+                MessageCode::PrivateMessage =>
+                {
+                    clear_lines(2);
+                    println!("[PM FROM] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap());
+                },
+
+                //PRIVATE MESSAGE INCOMING
+                MessageCode::PrivateMessageBack =>
+                {
+                    clear_lines(2);
+                    println!("[PM TO] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap());
                 },
 
                 //CLIENT MESSED SOME COMMAND UP
