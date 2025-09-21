@@ -697,6 +697,13 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacke
             i64::from_le_bytes(array)
         }).collect();
 
+        //CHECK INVALID DECRYPTED TEXT
+        if recovered_encrypted_packet.len() < options::get_core_options().padding
+        {
+            remove_connection(stream, true);
+            return None;
+        }
+
         //DECRYPT
         let decrypted_packet = decrypter::decrypt_text(options::EncryptedData
         {
