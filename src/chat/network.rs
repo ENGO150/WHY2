@@ -77,6 +77,7 @@ pub enum MessageCode //CONTROL CODES
     Join,           //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     Leave,          //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
     List,           //CLIENT <> SERVER | PRINT CONNECTED USERS
+    PrivateMessage, //CLIENT <> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
 }
 
 #[derive(Serialize, Deserialize)]

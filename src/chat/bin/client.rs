@@ -342,7 +342,7 @@ fn main()
         let mut input = read_input();
 
         //USER COMMANDS
-        if let (Some(command), _) = command::get_command(&input)
+        if let (Some(command), parameters) = command::get_command(&input)
         {
             match command
             {
@@ -358,6 +358,7 @@ fn main()
                     }, options::get_shared_key().as_deref());
                 },
 
+                //HELP
                 Command::Help =>
                 {
                     clear_lines(2);
@@ -367,12 +368,14 @@ fn main()
                     (
                         "\nCommands:
                         \r/help - Prints this
-                        \r/exit - Disconnects from server
                         \r/list - Show connected users
+                        \r/pm (ID) (MESSAGE) - Sends private message
+                        \r/exit - Disconnects from server
                         \n\r>>> "
                     );
                 },
 
+                //LIST USERS
                 Command::List =>
                 {
                     network::send(&mut client_stream, MessagePacket
@@ -382,7 +385,19 @@ fn main()
                         id: None,
                         code: Some(MessageCode::List),
                     }, options::get_shared_key().as_deref());
-                }
+                },
+
+                //PRIVATE MESSAGE
+                Command::PrivateMessage =>
+                {
+                    network::send(&mut client_stream, MessagePacket
+                    {
+                        text: parameters,
+                        username: None,
+                        id: None,
+                        code: Some(MessageCode::PrivateMessage),
+                    }, options::get_shared_key().as_deref());
+                },
             }
 
             continue; //DO NOT SEND COMMAND STRING

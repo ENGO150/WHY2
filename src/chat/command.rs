@@ -32,6 +32,7 @@ pub enum Command
     Exit,           //DISCONNECT FROM SERVER
     Help,           //PRINT COMMANDS
     List,           //LIST USERS
+    PrivateMessage, //ONE TO ONE MESSAGE
 }
 
 //IMPLEMENTATIONS
@@ -45,6 +46,7 @@ impl Display for Command
             Command::Help           => "help",
             Command::Exit           => "exit",
             Command::List           => "list",
+            Command::PrivateMessage => "pm",
         };
 
         write!(f, "{}{}", COMMAND_PREFIX, name)
@@ -71,6 +73,9 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
         "EXIT" | "QUIT" | "LEAVE" | "DISCONNECT"      => (Some(Command::Exit), None),
         "HELP" | "H" | "COMMANDS" | "USAGE" | "GUIDE" => (Some(Command::Help), None),
         "LIST" | "USERS" | "CLIENTS" | "SHOW"         => (Some(Command::List), None),
+
+        //PARAMETRIC
+        "PM" | "DM" | "MSG" | "TELL"                  => (Some(Command::PrivateMessage), parameters),
 
         _ => (None, None)
     }
