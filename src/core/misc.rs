@@ -24,7 +24,12 @@ use std::
 };
 
 use serde_json::Value;
-use rand::distr::{ Alphanumeric, SampleString };
+use rand::
+{
+    TryRngCore,
+    rngs::OsRng,
+    distr::{ Alphanumeric, SampleString },
+};
 
 use crate::core::
 {
@@ -34,6 +39,7 @@ use crate::core::
         Version,
         EncryptedData,
         DecryptedData,
+        RexData,
     },
 };
 
@@ -92,6 +98,19 @@ impl DecryptedData
         {
             output: Some(output),
             key: Some(key),
+        }
+    }
+}
+
+impl RexData
+{
+    //CREATE EMPTY RexData
+    pub fn empty() -> Self
+    {
+        Self
+        {
+            output: None,
+            key: None,
         }
     }
 }
@@ -212,4 +231,18 @@ pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<i64> //GENERATE tk
     }
 
     text_key_chain
+}
+
+pub fn generate_rex_key(length: usize) -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
+{
+    //CREATE MUTABLE INSANCE OF OsRng
+    let mut rng = OsRng;
+
+    //FILL
+    (0..length).map(|_|
+    {
+        let mut bytes = [0u8; 8];
+        rng.try_fill_bytes(&mut bytes).expect("Failed to generate random bytes");
+        i64::from_ne_bytes(bytes)
+    }).collect()
 }

@@ -21,11 +21,7 @@ use std::iter;
 use crate::core::
 {
     misc,
-    rex::
-    {
-        misc as rex_misc,
-        options::RexData,
-    },
+    options::RexData,
 };
 
 pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
@@ -49,7 +45,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         //NO KEY, GENERATE ONE
         None =>
         {
-            rex_misc::generate_key(128)
+            misc::generate_rex_key(128)
         }
     };
 

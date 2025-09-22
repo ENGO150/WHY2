@@ -61,6 +61,12 @@ pub struct DecryptedData
     pub key: Option<String>,    //KEY USED FOR ENCRYPTION
 }
 
+pub struct RexData //DATA FOR REX ENCRYPTER
+{
+    pub output: Option<Vec<i64>>, //OUTPUT VALUE
+    pub key: Option<Vec<i64>>,    //KEY USED FOR ENCRYPTION
+}
+
 //IMPLEMENTATIONS
 impl Default for Options
 {
