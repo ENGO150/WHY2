@@ -16,6 +16,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//pub mod encrypter;
-pub mod misc;
-pub mod options;
+use crate::core::rex::options::RexData;
+
+//IMPLEMENTATIONS
+impl RexData
+{
+    //CREATE EMPTY RexData
+    pub fn empty() -> Self
+    {
+        Self
+        {
+            output: None,
+            key: None,
+        }
+    }
+}
