@@ -79,13 +79,13 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
     let mut chunks: Vec<Grid> = input_used.chunks(64).map(|chunk|
     {
-            let mut grid = empty_grid(); //CREATE GRID
-            for (i, &val) in chunk.iter().enumerate()
-            {
-                grid[i / 8][i % 8] = val;
-            }
+        let mut grid = empty_grid(); //CREATE GRID
+        for (i, &val) in chunk.iter().enumerate()
+        {
+            grid[i / 8][i % 8] = val;
+        }
 
-            grid
+        grid
     }).collect();
 
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
@@ -103,6 +103,13 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         {
             chunk[i / 8][i % 8] = val;
         }
+    }
+
+    //SHAPE KEY TO 8x8 GRID
+    let mut key_grid = empty_grid();
+    for i in 0..64
+    {
+        key_grid[i / 8][i % 8] = key_used[i] ^ key_used[i + 64]; //COMBINE EVERY PART OF KEY
     }
 
     //RETURN EMPTY DATA (ONLY TEST)
