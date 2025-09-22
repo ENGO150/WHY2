@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::iter;
+
 use crate::core::
 {
     misc,
@@ -50,6 +52,26 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
             rex_misc::generate_key(256)
         }
     };
+
+    //GET MUTABLE input
+    let mut input_used = input;
+
+    //PAD input_used TO MULTIPLE OF 64 (ADD EXTRA GRID IF FULL) [PKCS#7]
+    let remainder = input_used.len() % 64; //PADDING CHARS REMAINING TO FULL GRID
+    let padding_len = if remainder == 0 { 64 } else { 64 - remainder }; //HOW MUCH PADDING TO INSERT
+    input_used.extend(iter::repeat(padding_len as i64).take(padding_len));
+
+    //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
+    let mut chunks: Vec<[[i64; 8]; 8]> = input_used.chunks(64).map(|chunk|
+    {
+            let mut grid = [[0i64; 8]; 8]; //CREATE GRID
+            for (i, &val) in chunk.iter().enumerate()
+            {
+                grid[i / 8][i % 8] = val;
+            }
+
+            grid
+    }).collect();
 
     //RETURN EMPTY DATA (ONLY TEST)
     RexData::empty()
