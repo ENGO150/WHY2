@@ -40,7 +40,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         Some(k) =>
         {
             //CHECK FOR INVALID KEY
-            if k.len() != 256 { return RexData::empty(); }
+            if k.len() != 128 { return RexData::empty(); }
 
             //USE KEY IF MATCHING LENGTH
             k
@@ -49,7 +49,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         //NO KEY, GENERATE ONE
         None =>
         {
-            rex_misc::generate_key(256)
+            rex_misc::generate_key(128)
         }
     };
 
