@@ -84,8 +84,15 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         grid
     }).collect();
 
+    //SHAPE KEY TO 8x8 GRID
+    let mut key_grid = empty_grid();
+    for i in 0..64
+    {
+        key_grid[i / 8][i % 8] = key_used[i] ^ key_used[i + 64]; //COMBINE EVERY PART OF KEY
+    }
+
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
-    let mut dprng = StdRng::from_seed(crypto::sha256_seed_rex_key(&key_used));
+    let mut dprng = StdRng::from_seed(crypto::sha256_seed_rex_key(&key_grid));
     for chunk in &mut chunks
     {
         //FLATTEN CHUNK
@@ -101,12 +108,6 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         }
     }
 
-    //SHAPE KEY TO 8x8 GRID
-    let mut key_grid = empty_grid();
-    for i in 0..64
-    {
-        key_grid[i / 8][i % 8] = key_used[i] ^ key_used[i + 64]; //COMBINE EVERY PART OF KEY
-    }
 
     //RETURN EMPTY DATA (ONLY TEST)
     RexData::empty()
