@@ -29,15 +29,11 @@ use crate::core::
 {
     crypto,
     misc,
-    options::RexData,
+    options::{ RexGrid, RexData },
 };
 
-//TYPES
-type Grid = [[i64; 8]; 8];
-
-//FUNCTIONS
 //PRIVATE
-fn empty_grid() -> Grid
+fn empty_grid() -> RexGrid
 {
     [[0i64; 8]; 8]
 }
@@ -77,7 +73,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
     input_used.extend(iter::repeat(padding_len as i64).take(padding_len));
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut chunks: Vec<Grid> = input_used.chunks(64).map(|chunk|
+    let mut chunks: Vec<RexGrid> = input_used.chunks(64).map(|chunk|
     {
         let mut grid = empty_grid(); //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
