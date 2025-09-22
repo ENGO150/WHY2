@@ -24,6 +24,22 @@ pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
     let mut hasher = Sha256::new();
     hasher.update(seed_str.as_bytes());
 
+    //FINALIZE
+    hasher.finalize().into()
+}
+
+pub fn sha256_seed_rex_key(key: &Vec<i64>) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFLING REX GRID
+{
+    //SHA256
+    let mut hasher = Sha256::new();
+
+    //ADD TO HASH
+    for &val in key
+    {
+        hasher.update(&val.to_ne_bytes());
+    }
+
+    //FINALIZE
     hasher.finalize().into()
 }
 
