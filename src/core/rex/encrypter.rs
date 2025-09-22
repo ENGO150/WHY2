@@ -54,3 +54,30 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
     //RETURN EMPTY DATA (ONLY TEST)
     RexData::empty()
 }
+
+pub fn encrypt_string(input: String, key: Option<Vec<i64>>) -> RexData //ENCRYPT STRING USING THE encrypt FN
+{
+    //CONVERT input TO Vec<i64>
+    let mut chars: Vec<char> = input.chars().collect();
+
+    //INSERT PADDING
+    if chars.len() % 2 != 0
+    {
+        chars.push('\0');
+    }
+
+    //CONVERT
+    let vec_input = chars.chunks(2).map(|pair|
+    {
+        //FILL BUFFER
+        let mut buf = [0u8; 8];
+        buf[..4].copy_from_slice(&(pair[0] as u32).to_ne_bytes());
+        buf[4..].copy_from_slice(&(pair[1] as u32).to_ne_bytes());
+
+        //APPEND
+        i64::from_ne_bytes(buf)
+    }).collect();
+
+    //ENCRYPT Vec<i64> AND RETURN
+    encrypt(vec_input, key)
+}
