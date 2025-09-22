@@ -16,12 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//SOURCE FILES
-pub mod crypto;
-pub mod decrypter;
-pub mod encrypter;
-pub mod misc;
-pub mod options;
-
-//MODES
-pub mod rex;
+//STRUCTS
+pub struct RexData
+{
+    pub output: Option<Vec<i64>>, //OUTPUT VALUE
+    pub key: Option<Vec<i64>>,    //KEY USED FOR ENCRYPTION
+}

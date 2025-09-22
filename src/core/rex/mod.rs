@@ -16,12 +16,5 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//SOURCE FILES
-pub mod crypto;
-pub mod decrypter;
-pub mod encrypter;
-pub mod misc;
+//pub mod encrypter;
 pub mod options;
-
-//MODES
-pub mod rex;
