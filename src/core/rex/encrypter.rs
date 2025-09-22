@@ -18,12 +18,31 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::iter;
 
+use rand::
+{
+    SeedableRng,
+    rngs::StdRng,
+    prelude::SliceRandom,
+};
+
 use crate::core::
 {
+    crypto,
     misc,
     options::RexData,
 };
 
+//TYPES
+type Grid = [[i64; 8]; 8];
+
+//FUNCTIONS
+//PRIVATE
+fn empty_grid() -> Grid
+{
+    [[0i64; 8]; 8]
+}
+
+//PUBLIC
 pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
@@ -58,9 +77,9 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
     input_used.extend(iter::repeat(padding_len as i64).take(padding_len));
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut chunks: Vec<[[i64; 8]; 8]> = input_used.chunks(64).map(|chunk|
+    let mut chunks: Vec<Grid> = input_used.chunks(64).map(|chunk|
     {
-            let mut grid = [[0i64; 8]; 8]; //CREATE GRID
+            let mut grid = empty_grid(); //CREATE GRID
             for (i, &val) in chunk.iter().enumerate()
             {
                 grid[i / 8][i % 8] = val;
@@ -68,6 +87,23 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
 
             grid
     }).collect();
+
+    //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
+    let mut dprng = StdRng::from_seed(crypto::sha256_seed_rex_key(&key_used));
+    for chunk in &mut chunks
+    {
+        //FLATTEN CHUNK
+        let mut flattened: Vec<i64> = chunk.iter().flatten().copied().collect();
+
+        //SHUFFLE
+        flattened.shuffle(&mut dprng);
+
+        //REBUILD
+        for (i, val) in flattened.into_iter().enumerate()
+        {
+            chunk[i / 8][i % 8] = val;
+        }
+    }
 
     //RETURN EMPTY DATA (ONLY TEST)
     RexData::empty()
