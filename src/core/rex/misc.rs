@@ -16,6 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use rand::
+{
+    TryRngCore,
+    rngs::OsRng,
+};
+
 use crate::core::rex::options::RexData;
 
 //IMPLEMENTATIONS
@@ -30,4 +36,19 @@ impl RexData
             key: None,
         }
     }
+}
+
+//FUNCTIONS
+pub fn generate_key(length: usize) -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
+{
+    //CREATE MUTABLE INSANCE OF OsRng
+    let mut rng = OsRng;
+
+    //FILL
+    (0..length).map(|_|
+    {
+        let mut bytes = [0u8; 8];
+        rng.try_fill_bytes(&mut bytes).expect("Failed to generate random bytes");
+        i64::from_ne_bytes(bytes)
+    }).collect()
 }
