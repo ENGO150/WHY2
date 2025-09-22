@@ -49,7 +49,7 @@ pub fn decrypt_text(encrypted_data: EncryptedData) -> DecryptedData //DECRYPT
     let mut text_decrypted: Vec<u32> = vec![0; text_encrypted_length];
 
     //LOAD text_key_chain
-    let text_key_chain = misc::generate_text_key_chain(&key, text_encrypted_length);
+    let text_key_chain = crypto::generate_text_key_chain(&key, text_encrypted_length);
 
     //ACTUALLY ENCRYPT TEXT
     for i in 0..text_encrypted_length

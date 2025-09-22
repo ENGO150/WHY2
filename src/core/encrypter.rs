@@ -50,7 +50,7 @@ pub fn encrypt_text(text: &str, key: Option<&str>) -> EncryptedData //ENCRYPT
 
         None => //NO key, GENERATE ONE
         {
-            misc::generate_key(core_options.key_length)
+            crypto::generate_key(core_options.key_length)
         }
     };
 
@@ -91,7 +91,7 @@ pub fn encrypt_text(text: &str, key: Option<&str>) -> EncryptedData //ENCRYPT
     let text_used_length = text_used_chars.len(); //LENGTH OF TEXT (+ PADDING)
 
     //LOAD text_key_chain
-    let mut text_key_chain = misc::generate_text_key_chain(&key_used, text_used_length);
+    let mut text_key_chain = crypto::generate_text_key_chain(&key_used, text_used_length);
 
     //ACTUALLY ENCRYPT TEXT
     for i in 0..text_used_length

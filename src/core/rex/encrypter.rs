@@ -60,7 +60,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         //NO KEY, GENERATE ONE
         None =>
         {
-            misc::generate_rex_key(128)
+            crypto::generate_rex_key(128)
         }
     };
 
