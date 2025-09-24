@@ -71,6 +71,22 @@ pub fn xor_grids(chunk: &mut Grid, key: &Grid) //XOR TWO GRIDS
     }
 }
 
+pub fn subcell(chunk: &mut Grid, round: usize) //APPLIES NONLINEAR MIX
+{
+    //APPLY ON EACH CELL
+    for col in chunk
+    {
+        for cell in col
+        {
+            let mut x = (*cell as u64) ^ (round as u64); //XOR WITH ROUND
+            x ^= (x << 13) & 0xAAAAAAAAAAAAAAAA; //MASK WITH 1010..
+            x ^= (x >> 7) & 0x5555555555555555; //MASK WITH 0101..
+            x ^= x << 17;
+            *cell = x as i64
+        }
+    }
+}
+
 pub fn shift_rows(chunk: &mut Grid, key: &Grid) //SHIFT ROWS IN chunk BASED ON key
 {
     let rows = chunk.len() as i64; //ROWS IN chunk & key

@@ -117,9 +117,10 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Data //ENCRYPT
         rex_misc::xor_grids(chunk, &round_keys[0]);
 
         //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
-        for round_key in &round_keys[1..]
+        for (i, round_key) in round_keys[1..].iter().enumerate()
         {
             rex_misc::xor_grids(chunk, round_key);  //XOR
+            rex_misc::subcell(chunk, i);            //SUBCELL
             rex_misc::shift_rows(chunk, round_key); //SHIFT ROWS
             rex_misc::mix_columns(chunk);           //MIX COLUMNS
         }
