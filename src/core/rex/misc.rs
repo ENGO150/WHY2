@@ -70,3 +70,18 @@ pub fn xor_grids(chunk: &mut Grid, key: &Grid) //XOR TWO GRIDS
         }
     }
 }
+
+pub fn shift_rows(chunk: &mut Grid, key: &Grid) //SHIFT ROWS IN chunk BASED ON key
+{
+    let rows = chunk.len() as i64; //ROWS IN chunk & key
+
+    //SHIFT EACH ROW
+    for (i, row) in chunk.iter_mut().enumerate()
+    {
+        //SPLIT key TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
+        let shift = key[i].iter().fold(0i64, |acc, &x| acc ^ x).rem_euclid(rows) as usize;
+
+        //ROTATE THE ROW
+        row.rotate_left(shift);
+    }
+}
