@@ -18,61 +18,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use sha2::{ Sha256, Digest };
 
-use rand::
-{
-    SeedableRng,
-    TryRngCore,
-    rngs::StdRng,
-    distr::{ Alphanumeric, SampleString },
-};
+use rand::distr::{ Alphanumeric, SampleString };
 
-use crate::core::
-{
-    misc,
-    options::
-    {
-        self,
-        Version,
-        RexGrid
-    },
-};
+use crate::core::options::{ self, Version };
 
-//PRIVATE
-fn generate_rex(rng: &mut StdRng) -> Vec<i64>
-{
-    //FILL
-    (0..(2 * options::REX_GRID_DIMENSIONS.0 * options::REX_GRID_DIMENSIONS.1)).map(|_|
-    {
-        let mut bytes = [0u8; 8];
-        rng.try_fill_bytes(&mut bytes).expect("Failed to generate random bytes");
-        i64::from_ne_bytes(bytes)
-    }).collect()
-}
-
-//PUBLIC
-pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOaR PADDING
+pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 {
     //SHA256
     let mut hasher = Sha256::new();
     hasher.update(seed_str.as_bytes());
-
-    //FINALIZE
-    hasher.finalize().into()
-}
-
-pub fn sha256_seed_rex_key(key: &RexGrid) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFLING REX GRID
-{
-    //SHA256
-    let mut hasher = Sha256::new();
-
-    //ADD TO HASH
-    for row in key
-    {
-        for val in row
-        {
-            hasher.update(&val.to_ne_bytes());
-        }
-    }
 
     //FINALIZE
     hasher.finalize().into()
@@ -155,27 +109,4 @@ pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<i64> //GENERATE tk
     }
 
     text_key_chain
-}
-
-pub fn generate_rex_key() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
-{
-    //CREATE MUTABLE INSANCE OF OsRng
-    generate_rex(&mut StdRng::from_os_rng())
-}
-
-pub fn generate_rex_round_keys(master_key: &RexGrid) -> Vec<RexGrid> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
-{
-    let mut keys: Vec<RexGrid> = Vec::with_capacity(options::REX_ROUND_KEYS);
-
-    //GENERATE KEYS
-    for _ in 0..(options::REX_ROUND_KEYS)
-    {
-        //USE SEED OF LAST KEY TO GENERATE NEW KEY
-        let key = generate_rex(&mut StdRng::from_seed(sha256_seed_rex_key(keys.last().unwrap_or(master_key))));
-
-        //CONVERT KEY TO RexGrid & PUSH TO keys
-        keys.push(misc::shape_rex_key(key));
-    }
-
-    keys
 }

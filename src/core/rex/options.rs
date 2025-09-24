@@ -16,7 +16,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod crypto;
-pub mod encrypter;
-pub mod misc;
-pub mod options;
+//CONSTS (DO NOT CHANGE THOSE UNTIL YOU ARE COMPLETELY SURE WHAT ARE YOU DOING)
+pub const REX_GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                   //DIMENSIONS OF REX GRID
+pub const REX_ROUND_KEYS: usize               = 14;                                                       //NUMBER OF ITERATIONS TO RUN WITH ROUND KEYS
+
+//TYPES
+pub type RexGrid = [[i64; 8]; 8];
+
+//STRUCTS
+pub struct RexData //DATA FOR REX ENCRYPTER
+{
+    pub output: Option<Vec<i64>>, //OUTPUT VALUE
+    pub key: Option<Vec<i64>>,    //KEY USED FOR ENCRYPTION
+}

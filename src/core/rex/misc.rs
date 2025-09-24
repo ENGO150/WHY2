@@ -1,0 +1,60 @@
+/*
+This is part of WHY2
+Copyright (C) 2022-2025 Václav Šmejkal
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+use crate::core::rex::options::
+{
+    self,
+    RexData,
+    RexGrid,
+};
+
+//IMPLEMENTATIONS
+impl RexData
+{
+    //CREATE EMPTY RexData
+    pub fn empty() -> Self
+    {
+        Self
+        {
+            output: None,
+            key: None,
+        }
+    }
+}
+
+//FUNCTIONS
+pub fn empty_grid() -> RexGrid
+{
+    [[0i64; options::REX_GRID_DIMENSIONS.0]; options::REX_GRID_DIMENSIONS.1]
+}
+
+pub fn shape_key(key: Vec<i64>) -> RexGrid
+{
+    //GRID OPTIONS
+    let grid_dims = options::REX_GRID_DIMENSIONS;
+    let grid_area = grid_dims.0 * grid_dims.1;
+
+    //SHAPE
+    let mut key_grid = empty_grid();
+    for i in 0..grid_area
+    {
+        key_grid[i / grid_dims.1][i % grid_dims.0] = key[i] ^ key[i + grid_area]; //COMBINE EVERY PART OF KEY
+    }
+
+    key_grid
+}
