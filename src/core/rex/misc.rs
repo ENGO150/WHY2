@@ -58,3 +58,15 @@ pub fn shape_key(key: Vec<i64>) -> Grid //RESHAPE KEY FROM Vec<i64> TO GRID
 
     key_grid
 }
+
+pub fn xor_grids(chunk: &mut Grid, key: &Grid) //XOR TWO GRIDS
+{
+    for y in 0..chunk.len() //Y DIM
+    {
+        for x in 0..chunk[y].len() //X DIM
+        {
+            //XOR
+            chunk[y][x] ^= key[y][x];
+        }
+    }
+}
