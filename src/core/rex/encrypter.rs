@@ -37,13 +37,6 @@ use crate::core::
     },
 };
 
-//PRIVATE
-fn empty_grid() -> RexGrid
-{
-    [[0i64; options::REX_GRID_DIMENSIONS.0]; options::REX_GRID_DIMENSIONS.1]
-}
-
-//PUBLIC
 pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
@@ -81,7 +74,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
     let mut chunks: Vec<RexGrid> = input_used.chunks(grid_area).map(|chunk|
     {
-        let mut grid = empty_grid(); //CREATE GRID
+        let mut grid = misc::empty_rex_grid(); //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
         {
             grid[i / grid_dims.1][i % grid_dims.0] = val;
@@ -91,11 +84,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
     }).collect();
 
     //SHAPE KEY TO 8x8 GRID
-    let mut key_grid = empty_grid();
-    for i in 0..grid_area
-    {
-        key_grid[i / grid_dims.1][i % grid_dims.0] = key_used[i] ^ key_used[i + grid_area]; //COMBINE EVERY PART OF KEY
-    }
+    let key_grid = misc::shape_rex_key(key_used);
 
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
     let mut dprng = StdRng::from_seed(crypto::sha256_seed_rex_key(&key_grid));

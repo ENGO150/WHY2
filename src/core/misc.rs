@@ -33,6 +33,7 @@ use crate::core::
         EncryptedData,
         DecryptedData,
         RexData,
+        RexGrid,
     },
 };
 
@@ -150,4 +151,25 @@ pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
 pub fn get_why2_dir() -> String //RETURN PATH TO WHY2 CONFIG DIRECTORY
 {
     get_config_dir() + options::CONFIG_DIR
+}
+
+pub fn empty_rex_grid() -> RexGrid
+{
+    [[0i64; options::REX_GRID_DIMENSIONS.0]; options::REX_GRID_DIMENSIONS.1]
+}
+
+pub fn shape_rex_key(key: Vec<i64>) -> RexGrid
+{
+    //GRID OPTIONS
+    let grid_dims = options::REX_GRID_DIMENSIONS;
+    let grid_area = grid_dims.0 * grid_dims.1;
+
+    //SHAPE
+    let mut key_grid = empty_rex_grid();
+    for i in 0..grid_area
+    {
+        key_grid[i / grid_dims.1][i % grid_dims.0] = key[i] ^ key[i + grid_area]; //COMBINE EVERY PART OF KEY
+    }
+
+    key_grid
 }
