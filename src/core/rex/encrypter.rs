@@ -110,6 +110,19 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Data //ENCRYPT
     //GENERATE ROUND KEYS
     let round_keys = crypto::generate_round_keys(&key_grid);
 
+    //APPLY ENCRYPTION TO EACH GRID
+    for chunk in &mut chunks
+    {
+        //INITIAL XOR
+        rex_misc::xor_grids(chunk, &round_keys[0]);
+
+        //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
+        for round_key in &round_keys[1..]
+        {
+            rex_misc::xor_grids(chunk, round_key);  //XOR
+        }
+    }
+
     //RETURN EMPTY DATA (ONLY TEST)
     Data::empty()
 }
