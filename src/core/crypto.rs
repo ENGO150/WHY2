@@ -34,10 +34,10 @@ use crate::core::options::
 };
 
 //PRIVATE
-fn generate_rex(length: usize, rng: &mut StdRng) -> Vec<i64>
+fn generate_rex(rng: &mut StdRng) -> Vec<i64>
 {
     //FILL
-    (0..length).map(|_|
+    (0..(2 * options::REX_GRID_DIMENSIONS.0 * options::REX_GRID_DIMENSIONS.1)).map(|_|
     {
         let mut bytes = [0u8; 8];
         rng.try_fill_bytes(&mut bytes).expect("Failed to generate random bytes");
@@ -153,16 +153,16 @@ pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<i64> //GENERATE tk
     text_key_chain
 }
 
-pub fn generate_rex_key(length: usize) -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
+pub fn generate_rex_key() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
 {
     //CREATE MUTABLE INSANCE OF OsRng
     let mut rng = StdRng::from_os_rng();
-    generate_rex(length, &mut rng)
+    generate_rex(&mut rng)
 }
 
 pub fn generate_rex_round_keys(master_key: &RexGrid) -> Vec<RexGrid>
 {
     let mut dprng = StdRng::from_seed(sha256_seed_rex_key(master_key));
-    generate_rex(128, &mut dprng);
+    generate_rex(&mut dprng);
     Vec::new()
 }

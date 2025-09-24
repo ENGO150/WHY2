@@ -67,10 +67,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         },
 
         //NO KEY, GENERATE ONE
-        None =>
-        {
-            crypto::generate_rex_key(grid_area * 2)
-        }
+        None => crypto::generate_rex_key()
     };
 
     //GET MUTABLE input
