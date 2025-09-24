@@ -125,8 +125,12 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Data //ENCRYPT
         }
     }
 
-    //RETURN EMPTY DATA (ONLY TEST)
-    Data::empty()
+    //RETURN OUTPUT
+    Data
+    {
+        output: Some(chunks),
+        key: Some(key_grid),
+    }
 }
 
 pub fn encrypt_string(input: String, key: Option<Vec<i64>>) -> Data //ENCRYPT STRING USING THE encrypt FN

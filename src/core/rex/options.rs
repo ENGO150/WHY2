@@ -26,6 +26,6 @@ pub type Grid = [[i64; 8]; 8]; //GRID FOR REX DATA
 //STRUCTS
 pub struct Data //DATA FOR REX ENCRYPTER
 {
-    pub output: Option<Vec<i64>>, //OUTPUT VALUE
-    pub key: Option<Vec<i64>>,    //KEY USED FOR ENCRYPTION
+    pub output: Option<Vec<Grid>>, //OUTPUT VALUE
+    pub key: Option<Grid>,         //KEY USED FOR ENCRYPTION
 }
