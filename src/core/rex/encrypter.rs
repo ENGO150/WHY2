@@ -103,6 +103,8 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         }
     }
 
+    //GENERATE ROUND KEYS
+    let round_keys = crypto::generate_rex_round_keys(&key_grid);
 
     //RETURN EMPTY DATA (ONLY TEST)
     RexData::empty()

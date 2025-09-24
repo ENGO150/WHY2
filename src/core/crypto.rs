@@ -26,11 +26,15 @@ use rand::
     distr::{ Alphanumeric, SampleString },
 };
 
-use crate::core::options::
+use crate::core::
 {
-    self,
-    Version,
-    RexGrid
+    misc,
+    options::
+    {
+        self,
+        Version,
+        RexGrid
+    },
 };
 
 //PRIVATE
@@ -156,13 +160,22 @@ pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<i64> //GENERATE tk
 pub fn generate_rex_key() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
 {
     //CREATE MUTABLE INSANCE OF OsRng
-    let mut rng = StdRng::from_os_rng();
-    generate_rex(&mut rng)
+    generate_rex(&mut StdRng::from_os_rng())
 }
 
-pub fn generate_rex_round_keys(master_key: &RexGrid) -> Vec<RexGrid>
+pub fn generate_rex_round_keys(master_key: &RexGrid) -> Vec<RexGrid> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
 {
-    let mut dprng = StdRng::from_seed(sha256_seed_rex_key(master_key));
-    generate_rex(&mut dprng);
-    Vec::new()
+    let mut keys: Vec<RexGrid> = Vec::with_capacity(options::REX_ROUND_KEYS);
+
+    //GENERATE KEYS
+    for _ in 0..(options::REX_ROUND_KEYS)
+    {
+        //USE SEED OF LAST KEY TO GENERATE NEW KEY
+        let key = generate_rex(&mut StdRng::from_seed(sha256_seed_rex_key(keys.last().unwrap_or(master_key))));
+
+        //CONVERT KEY TO RexGrid & PUSH TO keys
+        keys.push(misc::shape_rex_key(key));
+    }
+
+    keys
 }

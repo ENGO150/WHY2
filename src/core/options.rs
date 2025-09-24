@@ -27,7 +27,8 @@ pub const VERSIONS_URL: &str    = "https://raw.githubusercontent.com/ENGO150/WHY
 pub const VERSION: &str         = "v5.0";                                                                 //CURRENT VERSION OF WHY2
 
 //REX CONSTS (DO NOT CHANGE THOSE UNTIL YOU ARE COMPLETELY SURE WHAT ARE YOU DOING)
-pub const REX_GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                       //DIMENSIONS OF REX GRID
+pub const REX_GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                   //DIMENSIONS OF REX GRID
+pub const REX_ROUND_KEYS: usize               = 14;                                                       //NUMBER OF ITERATIONS TO RUN WITH ROUND KEYS
 
 //TYPES
 pub type RexGrid = [[i64; 8]; 8];
