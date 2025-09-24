@@ -35,7 +35,7 @@ use crate::core::rex::
 fn generate_key_handler(rng: &mut StdRng) -> Vec<i64>
 {
     //FILL
-    (0..(2 * options::REX_GRID_DIMENSIONS.0 * options::REX_GRID_DIMENSIONS.1)).map(|_|
+    (0..(2 * options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1)).map(|_|
     {
         let mut bytes = [0u8; 8];
         rng.try_fill_bytes(&mut bytes).expect("Failed to generate random bytes");
@@ -70,10 +70,10 @@ pub fn generate_key() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
 
 pub fn generate_round_keys(master_key: &Grid) -> Vec<Grid> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
 {
-    let mut keys: Vec<Grid> = Vec::with_capacity(options::REX_ROUND_KEYS);
+    let mut keys: Vec<Grid> = Vec::with_capacity(options::ROUND_KEYS);
 
     //GENERATE KEYS
-    for _ in 0..(options::REX_ROUND_KEYS)
+    for _ in 0..(options::ROUND_KEYS)
     {
         //USE SEED OF LAST KEY TO GENERATE NEW KEY
         let key = generate_key_handler(&mut StdRng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));

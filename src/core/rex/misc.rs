@@ -40,13 +40,13 @@ impl Data
 //FUNCTIONS
 pub fn empty_grid() -> Grid
 {
-    [[0i64; options::REX_GRID_DIMENSIONS.0]; options::REX_GRID_DIMENSIONS.1]
+    [[0i64; options::GRID_DIMENSIONS.0]; options::GRID_DIMENSIONS.1]
 }
 
 pub fn shape_key(key: Vec<i64>) -> Grid //RESHAPE KEY FROM Vec<i64> TO GRID
 {
     //GRID OPTIONS
-    let grid_dims = options::REX_GRID_DIMENSIONS;
+    let grid_dims = options::GRID_DIMENSIONS;
     let grid_area = grid_dims.0 * grid_dims.1;
 
     //SHAPE

@@ -47,8 +47,8 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Data //ENCRYPT
     misc::check_version();
 
     //REX OPTIONS
-    let grid_dims = options::REX_GRID_DIMENSIONS; //GRID DIMENSIONS
-    let grid_area = grid_dims.0 * grid_dims.1;    //AREA OF REX GRID
+    let grid_dims = options::GRID_DIMENSIONS;  //GRID DIMENSIONS
+    let grid_area = grid_dims.0 * grid_dims.1; //AREA OF REX GRID
 
     //GET KEY THAT WILL BE USED FOR ENCRYPTION
     let key_used = match key
