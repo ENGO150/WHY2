@@ -26,6 +26,9 @@ pub const CONFIG_DIR: &str      = "/WHY2";                                      
 pub const VERSIONS_URL: &str    = "https://raw.githubusercontent.com/ENGO150/WHY2/release/versions.json"; //versions.json URL
 pub const VERSION: &str         = "v5.0";                                                                 //CURRENT VERSION OF WHY2
 
+//REX CONSTS (DO NOT CHANGE THOSE UNTIL YOU ARE COMPLETELY SURE WHAT ARE YOU DOING)
+pub const REX_GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                       //DIMENSIONS OF REX GRID
+
 //TYPES
 pub type RexGrid = [[i64; 8]; 8];
 

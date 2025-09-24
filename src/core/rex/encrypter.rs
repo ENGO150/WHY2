@@ -29,13 +29,18 @@ use crate::core::
 {
     crypto,
     misc,
-    options::{ RexGrid, RexData },
+    options::
+    {
+        self,
+        RexGrid,
+        RexData,
+    },
 };
 
 //PRIVATE
 fn empty_grid() -> RexGrid
 {
-    [[0i64; 8]; 8]
+    [[0i64; options::REX_GRID_DIMENSIONS.0]; options::REX_GRID_DIMENSIONS.1]
 }
 
 //PUBLIC
@@ -44,6 +49,10 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
 
+    //REX OPTIONS
+    let grid_dims = options::REX_GRID_DIMENSIONS; //GRID DIMENSIONS
+    let grid_area = grid_dims.0 * grid_dims.1;    //AREA OF REX GRID
+
     //GET KEY THAT WILL BE USED FOR ENCRYPTION
     let key_used = match key
     {
@@ -51,7 +60,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         Some(k) =>
         {
             //CHECK FOR INVALID KEY
-            if k.len() != 128 { return RexData::empty(); }
+            if k.len() != grid_area * 2 { return RexData::empty(); }
 
             //USE KEY IF MATCHING LENGTH
             k
@@ -60,7 +69,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         //NO KEY, GENERATE ONE
         None =>
         {
-            crypto::generate_rex_key(128)
+            crypto::generate_rex_key(grid_area * 2)
         }
     };
 
@@ -68,17 +77,17 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
     let mut input_used = input;
 
     //PAD input_used TO MULTIPLE OF 64 (ADD EXTRA GRID IF FULL) [PKCS#7]
-    let remainder = input_used.len() % 64; //PADDING CHARS REMAINING TO FULL GRID
-    let padding_len = if remainder == 0 { 64 } else { 64 - remainder }; //HOW MUCH PADDING TO INSERT
+    let remainder = input_used.len() % grid_area; //PADDING CHARS REMAINING TO FULL GRID
+    let padding_len = if remainder == 0 { grid_area } else { grid_area - remainder }; //HOW MUCH PADDING TO INSERT
     input_used.extend(iter::repeat(padding_len as i64).take(padding_len));
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut chunks: Vec<RexGrid> = input_used.chunks(64).map(|chunk|
+    let mut chunks: Vec<RexGrid> = input_used.chunks(grid_area).map(|chunk|
     {
         let mut grid = empty_grid(); //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
         {
-            grid[i / 8][i % 8] = val;
+            grid[i / grid_dims.1][i % grid_dims.0] = val;
         }
 
         grid
@@ -86,9 +95,9 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
 
     //SHAPE KEY TO 8x8 GRID
     let mut key_grid = empty_grid();
-    for i in 0..64
+    for i in 0..grid_area
     {
-        key_grid[i / 8][i % 8] = key_used[i] ^ key_used[i + 64]; //COMBINE EVERY PART OF KEY
+        key_grid[i / grid_dims.1][i % grid_dims.0] = key_used[i] ^ key_used[i + grid_area]; //COMBINE EVERY PART OF KEY
     }
 
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
@@ -104,7 +113,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         //REBUILD
         for (i, val) in flattened.into_iter().enumerate()
         {
-            chunk[i / 8][i % 8] = val;
+            chunk[i / grid_dims.1][i % grid_dims.0] = val;
         }
     }
 
