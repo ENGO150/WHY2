@@ -35,13 +35,13 @@ use crate::core::
         options::
         {
             self,
-            RexGrid,
-            RexData,
+            Grid,
+            Data,
         },
     },
 };
 
-pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
+pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Data //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
@@ -57,7 +57,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
         Some(k) =>
         {
             //CHECK FOR INVALID KEY
-            if k.len() != grid_area * 2 { return RexData::empty(); }
+            if k.len() != grid_area * 2 { return Data::empty(); }
 
             //USE KEY IF MATCHING LENGTH
             k
@@ -76,7 +76,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
     input_used.extend(iter::repeat(padding_len as i64).take(padding_len));
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut chunks: Vec<RexGrid> = input_used.chunks(grid_area).map(|chunk|
+    let mut chunks: Vec<Grid> = input_used.chunks(grid_area).map(|chunk|
     {
         let mut grid = rex_misc::empty_grid(); //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
@@ -111,10 +111,10 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> RexData //ENCRYPT
     let round_keys = crypto::generate_round_keys(&key_grid);
 
     //RETURN EMPTY DATA (ONLY TEST)
-    RexData::empty()
+    Data::empty()
 }
 
-pub fn encrypt_string(input: String, key: Option<Vec<i64>>) -> RexData //ENCRYPT STRING USING THE encrypt FN
+pub fn encrypt_string(input: String, key: Option<Vec<i64>>) -> Data //ENCRYPT STRING USING THE encrypt FN
 {
     //CONVERT input TO Vec<i64>
     let mut chars: Vec<char> = input.chars().collect();

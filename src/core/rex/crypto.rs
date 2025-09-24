@@ -28,7 +28,7 @@ use rand::
 use crate::core::rex::
 {
     misc,
-    options::{ self, RexGrid },
+    options::{ self, Grid },
 };
 
 //PRIVATE
@@ -44,7 +44,7 @@ fn generate_key_handler(rng: &mut StdRng) -> Vec<i64>
 }
 
 //PUBLIC
-pub fn sha256_seed_grid(key: &RexGrid) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFLING REX GRID
+pub fn sha256_seed_grid(key: &Grid) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFLING REX GRID
 {
     //SHA256
     let mut hasher = Sha256::new();
@@ -68,9 +68,9 @@ pub fn generate_key() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
     generate_key_handler(&mut StdRng::from_os_rng())
 }
 
-pub fn generate_round_keys(master_key: &RexGrid) -> Vec<RexGrid> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
+pub fn generate_round_keys(master_key: &Grid) -> Vec<Grid> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
 {
-    let mut keys: Vec<RexGrid> = Vec::with_capacity(options::REX_ROUND_KEYS);
+    let mut keys: Vec<Grid> = Vec::with_capacity(options::REX_ROUND_KEYS);
 
     //GENERATE KEYS
     for _ in 0..(options::REX_ROUND_KEYS)
@@ -78,7 +78,7 @@ pub fn generate_round_keys(master_key: &RexGrid) -> Vec<RexGrid> //GENERATE 'RAN
         //USE SEED OF LAST KEY TO GENERATE NEW KEY
         let key = generate_key_handler(&mut StdRng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
 
-        //CONVERT KEY TO RexGrid & PUSH TO keys
+        //CONVERT KEY TO Grid & PUSH TO keys
         keys.push(misc::shape_key(key));
     }
 

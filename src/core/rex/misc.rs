@@ -19,14 +19,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::core::rex::options::
 {
     self,
-    RexData,
-    RexGrid,
+    Data,
+    Grid,
 };
 
 //IMPLEMENTATIONS
-impl RexData
+impl Data
 {
-    //CREATE EMPTY RexData
+    //CREATE EMPTY Data
     pub fn empty() -> Self
     {
         Self
@@ -38,12 +38,12 @@ impl RexData
 }
 
 //FUNCTIONS
-pub fn empty_grid() -> RexGrid
+pub fn empty_grid() -> Grid
 {
     [[0i64; options::REX_GRID_DIMENSIONS.0]; options::REX_GRID_DIMENSIONS.1]
 }
 
-pub fn shape_key(key: Vec<i64>) -> RexGrid
+pub fn shape_key(key: Vec<i64>) -> Grid //RESHAPE KEY FROM Vec<i64> TO GRID
 {
     //GRID OPTIONS
     let grid_dims = options::REX_GRID_DIMENSIONS;

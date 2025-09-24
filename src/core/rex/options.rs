@@ -21,10 +21,10 @@ pub const REX_GRID_DIMENSIONS: (usize, usize) = (8, 8);                         
 pub const REX_ROUND_KEYS: usize               = 14;                                                       //NUMBER OF ITERATIONS TO RUN WITH ROUND KEYS
 
 //TYPES
-pub type RexGrid = [[i64; 8]; 8];
+pub type Grid = [[i64; 8]; 8]; //GRID FOR REX DATA
 
 //STRUCTS
-pub struct RexData //DATA FOR REX ENCRYPTER
+pub struct Data //DATA FOR REX ENCRYPTER
 {
     pub output: Option<Vec<i64>>, //OUTPUT VALUE
     pub key: Option<Vec<i64>>,    //KEY USED FOR ENCRYPTION
