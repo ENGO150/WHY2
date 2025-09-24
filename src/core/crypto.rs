@@ -20,14 +20,33 @@ use sha2::{ Sha256, Digest };
 
 use rand::
 {
+    SeedableRng,
     TryRngCore,
-    rngs::OsRng,
+    rngs::StdRng,
     distr::{ Alphanumeric, SampleString },
 };
 
-use crate::core::options::{ self, Version };
+use crate::core::options::
+{
+    self,
+    Version,
+    RexGrid
+};
 
-pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
+//PRIVATE
+fn generate_rex(length: usize, rng: &mut StdRng) -> Vec<i64>
+{
+    //FILL
+    (0..length).map(|_|
+    {
+        let mut bytes = [0u8; 8];
+        rng.try_fill_bytes(&mut bytes).expect("Failed to generate random bytes");
+        i64::from_ne_bytes(bytes)
+    }).collect()
+}
+
+//PUBLIC
+pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOaR PADDING
 {
     //SHA256
     let mut hasher = Sha256::new();
@@ -137,13 +156,13 @@ pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<i64> //GENERATE tk
 pub fn generate_rex_key(length: usize) -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
 {
     //CREATE MUTABLE INSANCE OF OsRng
-    let mut rng = OsRng;
+    let mut rng = StdRng::from_os_rng();
+    generate_rex(length, &mut rng)
+}
 
-    //FILL
-    (0..length).map(|_|
-    {
-        let mut bytes = [0u8; 8];
-        rng.try_fill_bytes(&mut bytes).expect("Failed to generate random bytes");
-        i64::from_ne_bytes(bytes)
-    }).collect()
+pub fn generate_rex_round_keys(master_key: &RexGrid) -> Vec<RexGrid>
+{
+    let mut dprng = StdRng::from_seed(sha256_seed_rex_key(master_key));
+    generate_rex(128, &mut dprng);
+    Vec::new()
 }
