@@ -85,3 +85,16 @@ pub fn shift_rows(chunk: &mut Grid, key: &Grid) //SHIFT ROWS IN chunk BASED ON k
         row.rotate_left(shift);
     }
 }
+
+pub fn mix_columns(chunk: &mut Grid) //MIX COLUMNS IN chunk GRID
+{
+    //XOR COLUMNS IN LINEAR ORDER (0^1 ... 7^8, 8^0)
+    for col in 0..(options::GRID_DIMENSIONS.1)
+    {
+        let next_col = (col + 1) % (options::GRID_DIMENSIONS.1);
+        for row in 0..(options::GRID_DIMENSIONS.0)
+        {
+            chunk[row][col] ^= chunk[row][next_col];
+        }
+    }
+}

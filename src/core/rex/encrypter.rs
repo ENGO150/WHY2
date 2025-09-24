@@ -121,6 +121,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Data //ENCRYPT
         {
             rex_misc::xor_grids(chunk, round_key);  //XOR
             rex_misc::shift_rows(chunk, round_key); //SHIFT ROWS
+            rex_misc::mix_columns(chunk);           //MIX COLUMNS
         }
     }
 
