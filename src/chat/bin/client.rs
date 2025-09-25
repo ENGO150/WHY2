@@ -355,7 +355,7 @@ fn main()
                         username: None,
                         id: None,
                         code: Some(MessageCode::Disconnect),
-                    }, options::get_shared_key().as_deref());
+                    }, options::get_shared_key().as_ref());
                 },
 
                 //HELP
@@ -384,7 +384,7 @@ fn main()
                         username: None,
                         id: None,
                         code: Some(MessageCode::List),
-                    }, options::get_shared_key().as_deref());
+                    }, options::get_shared_key().as_ref());
                 },
 
                 //PRIVATE MESSAGE
@@ -396,7 +396,7 @@ fn main()
                         username: None,
                         id: None,
                         code: Some(MessageCode::PrivateMessage),
-                    }, options::get_shared_key().as_deref());
+                    }, options::get_shared_key().as_ref());
                 },
             }
 
@@ -444,6 +444,6 @@ fn main()
             username: None,
             id: None,
             code: None,
-        }, options::get_shared_key().as_deref());
+        }, options::get_shared_key().as_ref());
     }
 }

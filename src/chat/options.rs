@@ -43,7 +43,7 @@ pub const KEY_FILENAME: &str        = "/secp521r1.pem";                         
 pub const MIN_PASSWORD_LEN: usize   = 8;                                                                             //MINIMAL PASSWORD LENGTH
 
 //SETTINGS
-static SHARED_KEY: Lazy<RwLock<Option<String>>> = Lazy::new(|| //SHARED SYMMETRIC KEY
+static SHARED_KEY: Lazy<RwLock<Option<Vec<i64>>>> = Lazy::new(|| //SHARED SYMMETRIC KEY
 {
     RwLock::new(None)
 });
@@ -59,13 +59,13 @@ pub static INPUT_READ: Lazy<Arc<Mutex<Vec<char>>>> = Lazy::new(|| //INPUT READ F
 
 //FUNCTIONS
 //SHARED SYM KEY
-pub fn set_shared_key(key: String) //SET KEY
+pub fn set_shared_key(key: Vec<i64>) //SET KEY
 {
     let mut shared_key = SHARED_KEY.write().unwrap();
     *shared_key = Some(key);
 }
 
-pub fn get_shared_key() -> Option<String> //RETURN KEY
+pub fn get_shared_key() -> Option<Vec<i64>> //RETURN KEY
 {
     let shared_key = SHARED_KEY.read().unwrap();
     shared_key.clone()

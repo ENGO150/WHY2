@@ -48,17 +48,19 @@ use crossterm::terminal;
 
 use crate::
 {
+    core::rex::
+    {
+        encrypter,
+        decrypter,
+        misc,
+        options::{ self, Grid },
+    },
+
     chat::
     {
         config,
         crypto,
         options as chat_options,
-    },
-    core::
-    {
-        encrypter,
-        decrypter,
-        options,
     },
 };
 
@@ -97,7 +99,7 @@ struct Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
     stream: Arc<Mutex<TcpStream>>, //STREAM
     username: String,              //USERNAME
     id: usize,                     //ID OF USER
-    shared_key: String,            //SHARED KEY BETWEEN SERVER AND CLIENT (one to one)
+    shared_key: Vec<i64>,          //SHARED KEY BETWEEN SERVER AND CLIENT (one to one)
 }
 
 //LISTS
@@ -107,7 +109,7 @@ static CONNECTIONS: Lazy<Arc<RwLock<Vec<Connection>>>> = Lazy::new(|| //LIST FOR
 });
 
 //PRIVATE
-fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, shared_key: Option<&str>) //SEND CODE TO CLIENT
+fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, shared_key: Option<&Vec<i64>>) //SEND CODE TO CLIENT
 {
     send(stream, MessagePacket
     {
@@ -118,7 +120,7 @@ fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, sh
     }, shared_key);
 }
 
-fn key_exchange_client(stream: &mut TcpStream) -> String //KEY EXCHANGE FOR CLIENT-SIDE
+fn key_exchange_client(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //SEND ECC PUBKEY TO SERVER
     send(stream, MessagePacket
@@ -142,7 +144,7 @@ fn key_exchange_client(stream: &mut TcpStream) -> String //KEY EXCHANGE FOR CLIE
     crypto::get_shared_key(message.text.unwrap())
 }
 
-fn key_exchange_server(stream: &mut TcpStream) -> Option<String> //KEY EXCHANGE FOR SERVER-SIDE
+fn key_exchange_server(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR SERVER-SIDE
 {
     //WAIT FOR ClientServerKE
     let message = loop
@@ -170,7 +172,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> Option<String> //KEY EXCHANGE 
     Some(crypto::get_shared_key(message.text.unwrap()))
 }
 
-fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&str>) //send welcome packet you idiot
+fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //send welcome packet you idiot
 {
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
@@ -265,19 +267,42 @@ fn get_connection_by_id(id: usize) -> Option<Connection> //RETURN CONNECTION WIT
     CONNECTIONS.read().unwrap().iter().find(|conn| conn.id == id).cloned()
 }
 
+fn str_to_grids(bytes: Vec<u8>) -> Option<Vec<Grid>> //CONVERT STRING SLICE TO VECTOR OF GRIDS
+{
+    let matrix_size = options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1 * 8; //EACH i64 IS 8 BYTES
+
+    //CHECK FOR VALID GRID
+    if bytes.len() % matrix_size != 0 { return None; }
+
+    Some(bytes.chunks(matrix_size).map(|chunk|
+    {
+        let mut grid = misc::empty_grid();
+        for i in 0..(options::GRID_DIMENSIONS.0)
+        {
+            for j in 0..(options::GRID_DIMENSIONS.1)
+            {
+                let start = (i * options::GRID_DIMENSIONS.1 + j) * 8;
+                let slice = &chunk[start..start + 8];
+                grid[i][j] = i64::from_be_bytes(slice.try_into().unwrap());
+            }
+        }
+
+        grid
+    }).collect())
+}
+
 //PUBLIC
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
     //GET SHARED KEY
-    let _shared_key_string = match key_exchange_server(stream)
+    let shared_key = match key_exchange_server(stream)
     {
-        Some(r) => r,
+        Some(r) => Some(r),
         None => return
     };
-    let shared_key = Some(_shared_key_string.as_str());
 
     //SEND PACKET WITH REQUIRED SERVER INFO
-    send_welcome_packet(stream, shared_key);
+    send_welcome_packet(stream, shared_key.as_ref());
 
     //GET USERNAME FROM USER
     let mut username: Option<String> = None; //USER ENTERED USERNAME
@@ -291,9 +316,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     for _ in 0..max_tries
     {
         //SEND PICK_USERNAME CODE
-        send_code(stream, None, MessageCode::Username, shared_key);
+        send_code(stream, None, MessageCode::Username, shared_key.as_ref());
 
-        match receive(stream, shared_key)
+        match receive(stream, shared_key.as_ref())
         {
             //USERNAME CONDITIONS MET, BREAK LOOP
             Some(r) =>
@@ -315,7 +340,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //NO USERNAME RECEIVED, DISCONNECT CLIENT
     if username.is_none()
     {
-        send_code(stream, None, MessageCode::Disconnect, shared_key);
+        send_code(stream, None, MessageCode::Disconnect, shared_key.as_ref());
         return;
     }
 
@@ -325,10 +350,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     if !config::server_users_contains(&username) //REGISTRATION
     {
         //SEND REGISTER CODE
-        send_code(stream, None, MessageCode::PasswordR, shared_key);
+        send_code(stream, None, MessageCode::PasswordR, shared_key.as_ref());
 
         //WAIT FOR ANSWER
-        let response = match receive(stream, shared_key)
+        let response = match receive(stream, shared_key.as_ref())
         {
             Some(r) => r,
             None => return
@@ -337,7 +362,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         //NO PASSWORD, DISCONNECT CLIENT
         if response.text.is_none()
         {
-            send_code(stream, None, MessageCode::Disconnect, shared_key);
+            send_code(stream, None, MessageCode::Disconnect, shared_key.as_ref());
             return;
         }
 
@@ -346,10 +371,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     } else //LOGIN
     {
         //SEND LOGIN CODE
-        send_code(stream, None, MessageCode::PasswordL, shared_key);
+        send_code(stream, None, MessageCode::PasswordL, shared_key.as_ref());
 
         //WAIT FOR ANSWER
-        let response = match receive(stream, shared_key)
+        let response = match receive(stream, shared_key.as_ref())
         {
             Some(r) => r,
             None => return
@@ -358,7 +383,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         //INVALID PASSWORD, DISCONNECT CLIENT
         if response.text.is_none() || response.text.unwrap() != config::server_users_config(&username)
         {
-            send_code(stream, None, MessageCode::Disconnect, shared_key);
+            send_code(stream, None, MessageCode::Disconnect, shared_key.as_ref());
             return;
         }
     }
@@ -374,7 +399,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
             username: username.clone(),
             id: id,
-            shared_key: shared_key.unwrap().to_string(),
+            shared_key: shared_key.clone().unwrap(),
         };
 
         //PUSH
@@ -382,7 +407,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     }
 
     //TELL CLIENT TO START CHATTING
-    send_code(stream, None, MessageCode::Accept, shared_key);
+    send_code(stream, None, MessageCode::Accept, shared_key.as_ref());
 
     //SEND JOIN MESSAGE
     send_to_all(Some(&username), &config::server_config("server_username"), None, Some(MessageCode::Join));
@@ -391,7 +416,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     loop
     {
         //READ
-        let read = match receive(stream, shared_key)
+        let read = match receive(stream, shared_key.as_ref())
         {
             Some(r) => r,
             None => return
@@ -430,7 +455,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         username: None,
                         id: None,
                         code: Some(MessageCode::List),
-                    }, shared_key);
+                    }, shared_key.as_ref());
                 },
 
                 //PRIVATE MESSAGE
@@ -464,7 +489,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                         username: Some(recipient.username),
                                         id: Some(num),
                                         code: Some(MessageCode::PrivateMessageBack),
-                                    }, shared_key);
+                                    }, shared_key.as_ref());
 
                                     continue; //VALID, DO NOT SEND InvalidUsage CODE
                                 }
@@ -479,7 +504,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         username: None,
                         id: None,
                         code: Some(MessageCode::InvalidUsage),
-                    }, shared_key);
+                    }, shared_key.as_ref());
                     continue;
                 },
 
@@ -515,7 +540,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     //LOOP READING
     loop
     {
-        let read = receive(stream, chat_options::get_shared_key().as_deref()).unwrap();
+        let read = receive(stream, chat_options::get_shared_key().as_ref()).unwrap();
         extra_space = false; //RESET EXTRA SPACE
 
         //EXTRA SPACE
@@ -672,7 +697,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     }
 }
 
-pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&str>) //SEND packet TO stream
+pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>>) //SEND packet TO stream
 {
     //ENCODE THE PACKET STRUCT TO Vec<u8>
     let encoded_packet = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
@@ -682,14 +707,13 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&str>) //
     if let Some(key) = key
     {
         //ENCRYPT
-        let encrypted_packet = encrypter::encrypt_text(&encoded_packet_string, Some(&key)).expect("Encrypting packet failed").output;
+        let encrypted_packet = encrypter::encrypt_string(&encoded_packet_string, Some(key.to_vec())).expect("Encrypting packet failed").output;
 
-        //CONVERT ENCRYPTED PACKET (FROM Vec<i64>) TO Vec<u8>
-        let mut encrypted_packet_flattened = Vec::with_capacity(encrypted_packet.len() * 8);
-        for num in &encrypted_packet
-        {
-            encrypted_packet_flattened.extend_from_slice(&num.to_le_bytes()); //FLATTEN i64s to u8s
-        }
+        //CONVERT ENCRYPTED PACKET (FROM Vec<Grid>) TO Vec<u8>
+        let encrypted_packet_flattened: Vec<u8> = encrypted_packet.iter()
+            .flat_map(|grid| grid.iter()
+                .flat_map(|row| row.iter()
+                    .flat_map(|&val| val.to_be_bytes()))).collect();
 
         //OVERWRITE encoded_packet_string
         encoded_packet_string = String::from_utf8(base91::slice_encode(&encrypted_packet_flattened)).expect("Encoding encrypted packet failed");
@@ -700,7 +724,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&str>) //
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacket>
+pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<MessagePacket>
 {
     //MAX PACKET SIZE FOR SERVER
     let max_packet_size: usize;
@@ -744,30 +768,19 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacke
     //DECRYPT
     if let Some(key) = key
     {
-        //CONVERT decoded_packet FROM Vec<u8> TO Vec<i64>
-        let recovered_encrypted_packet: Vec<i64> = decoded_packet.chunks_exact(8).map(|chunk|
+        //CONVERT decoded_packet FROM Vec<u8> TO Vec<Grid>
+        let recovered_encrypted_packet = match str_to_grids(decoded_packet)
         {
-            //CONVERT chunk TO [u8]
-            let mut array = [0u8; 8];
-            array.copy_from_slice(chunk);
-
-            //RETURN i64
-            i64::from_le_bytes(array)
-        }).collect();
-
-        //CHECK INVALID DECRYPTED TEXT
-        if recovered_encrypted_packet.len() < options::get_core_options().padding
-        {
-            remove_connection(stream, true);
-            return None;
-        }
+            Some(p) => p,
+            None => return None
+        };
 
         //DECRYPT
-        let decrypted_packet = decrypter::decrypt_text(options::EncryptedData
+        let decrypted_packet = decrypter::decrypt_string(options::EncryptedData
         {
             output: recovered_encrypted_packet,
-            key: key.to_owned(),
-        }).output;
+            key: misc::shape_key(key.clone()),
+        });
 
         //OVERWRITE decoded_packet
         decoded_packet = base91::slice_decode(decrypted_packet.as_bytes());
