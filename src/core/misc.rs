@@ -25,15 +25,7 @@ use std::
 
 use serde_json::Value;
 
-use crate::core::
-{
-    options::
-    {
-        self,
-        EncryptedData,
-        DecryptedData,
-    },
-};
+use crate::core::options;
 
 //PRIVATE
 fn __get_dir(dir: &str) -> String

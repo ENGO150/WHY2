@@ -63,11 +63,33 @@ pub fn subcell(chunk: &mut Grid, round: usize) //APPLIES NONLINEAR MIX
     {
         for cell in col
         {
-            let mut x = (*cell as u64) ^ (round as u64); //XOR WITH ROUND
-            x ^= (x << 13) & 0xAAAAAAAAAAAAAAAA; //MASK WITH 1010..
-            x ^= (x >> 7) & 0x5555555555555555; //MASK WITH 0101..
-            x ^= x << 17;
-            *cell = x as i64
+            //SPLIT CELL TO HIGH32 AND LOW32
+            let x = *cell as u64;
+            let mut v0 = (x & 0xFFFF_FFFF) as u32; //LOW
+            let mut v1 = ((x >> 32) & 0xFFFF_FFFF) as u32; //HIGH
+
+            //XOR TWEAK -> MAKE ROUNDS DIFFERENT
+            v0 ^= round as u32;
+
+            //ARX-LIKE ROUNDS (INSPIRED BY XTEA/TEA)
+            let mut sum: u32 = 0;
+            for _ in 0..(options::SUBCELL_ROUNDS)
+            {
+                sum = sum.wrapping_add(options::SUBCELL_DELTA);
+
+                //MIX V1 INTO V0
+                v0 = v0.wrapping_add(((v1 << 4) ^ (v1 >> 5)).wrapping_add(v1) ^ sum);
+
+                //MIX V0 INTO V1
+                v1 = v1.wrapping_add(((v0 << 4) ^ (v0 >> 5)).wrapping_add(v0) ^ sum);
+            }
+
+            //XOR TWEAK
+            v1 ^= round as u32;
+
+            //REBUILD AND APPLY
+            let out = ((v1 as u64) << 32) | (v0 as u64);
+            *cell = out as i64;
         }
     }
 }
