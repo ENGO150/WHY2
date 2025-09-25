@@ -19,15 +19,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::core::rex::options::{ self, Grid };
 
 //PRIVATE
-pub fn shift_rows_handler(chunk: &mut Grid, key: &Grid, invert: bool) //SHIFT ROWS IN chunk BASED ON key
+pub fn shift_rows_handler(grid: &mut Grid, key_grid: &Grid, invert: bool) //SHIFT ROWS IN grid BASED ON key_grid
 {
-    let rows = chunk.len() as i64; //ROWS IN chunk & key
+    let rows = grid.len() as i64; //ROWS IN grid & key_grid
 
     //SHIFT EACH ROW
-    for (i, row) in chunk.iter_mut().enumerate()
+    for (i, row) in grid.iter_mut().enumerate()
     {
-        //SPLIT key TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
-        let shift = key[i].iter().fold(0i64, |acc, &x| acc ^ x).rem_euclid(rows) as usize;
+        //SPLIT key_grid TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
+        let shift = key_grid[i].iter().fold(0i64, |acc, &x| acc ^ x).rem_euclid(rows) as usize;
 
         //ROTATE THE ROW
         if invert
@@ -40,7 +40,7 @@ pub fn shift_rows_handler(chunk: &mut Grid, key: &Grid, invert: bool) //SHIFT RO
     }
 }
 
-pub fn mix_columns_handler(chunk: &mut Grid, invert: bool) //MIX COLUMNS IN chunk GRID
+pub fn mix_columns_handler(grid: &mut Grid, invert: bool) //MIX COLUMNS IN grid GRID
 {
     //GET COLUMNS
     let cols: Box<dyn Iterator<Item = usize>> = if invert
@@ -57,7 +57,7 @@ pub fn mix_columns_handler(chunk: &mut Grid, invert: bool) //MIX COLUMNS IN chun
         let next_col = (col + 1) % (options::GRID_DIMENSIONS.1);
         for row in 0..(options::GRID_DIMENSIONS.0)
         {
-            chunk[row][col] ^= chunk[row][next_col];
+            grid[row][col] ^= grid[row][next_col];
         }
     }
 }
@@ -84,22 +84,22 @@ pub fn shape_key(key: Vec<i64>) -> Grid //RESHAPE KEY FROM Vec<i64> TO GRID
     key_grid
 }
 
-pub fn xor_grids(chunk: &mut Grid, key: &Grid) //XOR TWO GRIDS
+pub fn xor_grids(grid: &mut Grid, key_grid: &Grid) //XOR TWO GRIDS
 {
-    for y in 0..chunk.len() //Y DIM
+    for y in 0..grid.len() //Y DIM
     {
-        for x in 0..chunk[y].len() //X DIM
+        for x in 0..grid[y].len() //X DIM
         {
             //XOR
-            chunk[y][x] ^= key[y][x];
+            grid[y][x] ^= key_grid[y][x];
         }
     }
 }
 
-pub fn subcell(chunk: &mut Grid, round: usize) //APPLIES NONLINEAR MIX
+pub fn subcell(grid: &mut Grid, round: usize) //APPLIES NONLINEAR MIX
 {
     //APPLY ON EACH CELL
-    for col in chunk
+    for col in grid
     {
         for cell in col
         {
@@ -134,10 +134,10 @@ pub fn subcell(chunk: &mut Grid, round: usize) //APPLIES NONLINEAR MIX
     }
 }
 
-pub fn inv_subcell(chunk: &mut Grid, round: usize) //REMOVES NONLINEAR MIX
+pub fn inv_subcell(grid: &mut Grid, round: usize) //REMOVES NONLINEAR MIX
 {
     //APPLY ON EACH CELL
-    for col in chunk
+    for col in grid
     {
         for cell in col
         {
@@ -177,22 +177,22 @@ pub fn inv_subcell(chunk: &mut Grid, round: usize) //REMOVES NONLINEAR MIX
     }
 }
 
-pub fn shift_rows(chunk: &mut Grid, key: &Grid) //SHIFT ROWS IN chunk BASED ON key
+pub fn shift_rows(grid: &mut Grid, key_grid: &Grid) //SHIFT ROWS IN grid BASED ON key_grid
 {
-    shift_rows_handler(chunk, key, false); //USE HANDLER
+    shift_rows_handler(grid, key_grid, false); //USE HANDLER
 }
 
-pub fn inv_shift_rows(chunk: &mut Grid, key: &Grid) //UNSHIFT ROWS IN chunk BASED ON key
+pub fn inv_shift_rows(grid: &mut Grid, key_grid: &Grid) //UNSHIFT ROWS IN grid BASED ON key_grid
 {
-    shift_rows_handler(chunk, key, true); //USE HANDLER
+    shift_rows_handler(grid, key_grid, true); //USE HANDLER
 }
 
-pub fn mix_columns(chunk: &mut Grid) //MIX COLUMNS IN chunk GRID
+pub fn mix_columns(grid: &mut Grid) //MIX COLUMNS IN grid GRID
 {
-    mix_columns_handler(chunk, false); //USE HANDLER
+    mix_columns_handler(grid, false); //USE HANDLER
 }
 
-pub fn inv_mix_columns(chunk: &mut Grid)
+pub fn inv_mix_columns(grid: &mut Grid)
 {
-    mix_columns_handler(chunk, true); //USE HANDLER
+    mix_columns_handler(grid, true); //USE HANDLER
 }

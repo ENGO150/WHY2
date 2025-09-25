@@ -75,7 +75,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
     input_used.extend(iter::repeat(padding_len as i64).take(padding_len));
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut chunks: Vec<Grid> = input_used.chunks(grid_area).map(|chunk|
+    let mut grids: Vec<Grid> = input_used.chunks(grid_area).map(|chunk|
     {
         let mut grid = rex_misc::empty_grid(); //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
@@ -91,10 +91,10 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
 
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
     let mut dprng = StdRng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
-    for chunk in &mut chunks
+    for grid in &mut grids
     {
         //FLATTEN CHUNK
-        let mut flattened: Vec<i64> = chunk.iter().flatten().copied().collect();
+        let mut flattened: Vec<i64> = grid.iter().flatten().copied().collect();
 
         //SHUFFLE
         flattened.shuffle(&mut dprng);
@@ -102,7 +102,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
         //REBUILD
         for (i, val) in flattened.into_iter().enumerate()
         {
-            chunk[i / options::GRID_DIMENSIONS.1][i % options::GRID_DIMENSIONS.0] = val;
+            grid[i / options::GRID_DIMENSIONS.1][i % options::GRID_DIMENSIONS.0] = val;
         }
     }
 
@@ -110,25 +110,25 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
     let round_keys = crypto::generate_round_keys(&key_grid);
 
     //APPLY ENCRYPTION TO EACH GRID
-    for chunk in &mut chunks
+    for grid in &mut grids
     {
         //INITIAL XOR
-        rex_misc::xor_grids(chunk, &round_keys[0]);
+        rex_misc::xor_grids(grid, &round_keys[0]);
 
         //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
         for (i, round_key) in round_keys[1..].iter().enumerate()
         {
-            rex_misc::xor_grids(chunk, round_key);  //XOR
-            rex_misc::subcell(chunk, i);            //SUBCELL
-            rex_misc::shift_rows(chunk, round_key); //SHIFT ROWS
-            rex_misc::mix_columns(chunk);           //MIX COLUMNS
+            rex_misc::xor_grids(grid, round_key);  //XOR
+            rex_misc::subcell(grid, i);            //SUBCELL
+            rex_misc::shift_rows(grid, round_key); //SHIFT ROWS
+            rex_misc::mix_columns(grid);           //MIX COLUMNS
         }
     }
 
     //RETURN OUTPUT
     Some(Data
     {
-        output: chunks,
+        output: grids,
         key: key_grid,
     })
 }
