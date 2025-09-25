@@ -16,8 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::iter;
-
 use rand::
 {
     SeedableRng,
@@ -32,12 +30,7 @@ use crate::core::
     {
         crypto,
         misc as rex_misc,
-        options::
-        {
-            self,
-            Grid,
-            Data,
-        },
+        options::{ self, Data },
     },
 };
 
@@ -47,32 +40,60 @@ pub fn decrypt(input: Data) -> Data //ENCRYPT
     misc::check_version();
 
     //GET MUTABLE input
-    let mut chunks = input.output;
+    let mut grids = input.output;
     let key_grid = input.key;
 
     //GENERATE ROUND KEYS
     let round_keys = crypto::generate_round_keys(&key_grid);
 
     //DECRYPT EACH ENCRYPTED GRID
-    for chunk in &mut chunks
+    for grid in &mut grids
     {
         //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
         for (i, round_key) in round_keys[1..].iter().enumerate().rev()
         {
-            rex_misc::inv_mix_columns(chunk);           //UNMIX COLUMNS
-            rex_misc::inv_shift_rows(chunk, round_key); //UNSHIFT ROWS
-            rex_misc::inv_subcell(chunk, i);            //INVERT SUBCELL
-            rex_misc::xor_grids(chunk, round_key);      //XOR
+            rex_misc::inv_mix_columns(grid);           //UNMIX COLUMNS
+            rex_misc::inv_shift_rows(grid, round_key); //UNSHIFT ROWS
+            rex_misc::inv_subcell(grid, i);            //INVERT SUBCELL
+            rex_misc::xor_grids(grid, round_key);      //XOR
         }
 
         //INITIAL XOR
-        rex_misc::xor_grids(chunk, &round_keys[0]);
+        rex_misc::xor_grids(grid, &round_keys[0]);
+    }
+
+    //DE-SHUFFLING VARIABLES
+    let grid_area = options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1; //AREA OF A GRID
+    let mut dprng = StdRng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
+
+    //DE-SHUFFLE INPUT GRIDS USING DPRNG SEEDED BY KEY HASH
+    for grid in &mut grids
+    {
+        //SHUFFLE-MAP
+        let mut shuffle_map: Vec<usize> = (0..grid_area).collect(); //UNSUFFLED MAP (0, 1, 2 ... 64)
+        shuffle_map.shuffle(&mut dprng); //SHUFFLE GRID WITH DPRNG
+
+        //FLATTEN CHUNK
+        let flattened: Vec<i64> = grid.iter().flatten().copied().collect();
+
+        //APPLY INVERSE PERMUTATION
+        let mut unshuffled = vec![0i64; grid_area];
+        for (i, &shuffled_i) in shuffle_map.iter().enumerate()
+        {
+            unshuffled[shuffled_i] = flattened[i];
+        }
+
+        //REBUILD
+        for (i, val) in unshuffled.into_iter().enumerate()
+        {
+            grid[i / options::GRID_DIMENSIONS.1][i % options::GRID_DIMENSIONS.0] = val;
+        }
     }
 
     //RETURN OUTPUT
     Data
     {
-        output: Vec::new(),
-        key: rex_misc::empty_grid(),
+        output: grids,
+        key: key_grid,
     }
 }
