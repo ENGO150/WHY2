@@ -19,9 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rand::
 {
     SeedableRng,
-    rngs::StdRng,
     prelude::SliceRandom,
 };
+
+use rand_chacha::ChaCha20Rng;
 
 use crate::core::
 {
@@ -64,7 +65,7 @@ pub fn decrypt(input: Data) -> Data //ENCRYPT
 
     //DE-SHUFFLING VARIABLES
     let grid_area = options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1; //AREA OF A GRID
-    let mut dprng = StdRng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
+    let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
 
     //DE-SHUFFLE INPUT GRIDS USING DPRNG SEEDED BY KEY HASH
     for grid in &mut grids

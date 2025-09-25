@@ -21,9 +21,10 @@ use std::iter;
 use rand::
 {
     SeedableRng,
-    rngs::StdRng,
     prelude::SliceRandom,
 };
+
+use rand_chacha::ChaCha20Rng;
 
 use crate::core::
 {
@@ -90,7 +91,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
     let key_grid = rex_misc::shape_key(key_used);
 
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
-    let mut dprng = StdRng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
+    let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
     for grid in &mut grids
     {
         //FLATTEN CHUNK

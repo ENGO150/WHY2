@@ -22,8 +22,10 @@ use rand::
 {
     SeedableRng,
     TryRngCore,
-    rngs::StdRng,
+    rngs::OsRng,
 };
+
+use rand_chacha::ChaCha20Rng;
 
 use crate::core::rex::
 {
@@ -32,7 +34,7 @@ use crate::core::rex::
 };
 
 //PRIVATE
-fn generate_key_handler(rng: &mut StdRng) -> Vec<i64>
+fn generate_key_handler(rng: &mut ChaCha20Rng) -> Vec<i64>
 {
     //FILL
     (0..(2 * options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1)).map(|_|
@@ -64,8 +66,11 @@ pub fn sha256_seed_grid(key: &Grid) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFL
 
 pub fn generate_key() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
 {
-    //CREATE MUTABLE INSANCE OF OsRng
-    generate_key_handler(&mut StdRng::from_os_rng())
+    //CREATE SEED FOR ChaCha20Rng
+    let mut seed = [0u8; 32];
+    OsRng.try_fill_bytes(&mut seed).expect("Creating seed failed"); //FILL
+
+    generate_key_handler(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
 }
 
 pub fn generate_round_keys(master_key: &Grid) -> Vec<Grid> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
@@ -76,7 +81,7 @@ pub fn generate_round_keys(master_key: &Grid) -> Vec<Grid> //GENERATE 'RANDOM' R
     for _ in 0..(options::ROUND_KEYS)
     {
         //USE SEED OF LAST KEY TO GENERATE NEW KEY
-        let key = generate_key_handler(&mut StdRng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
+        let key = generate_key_handler(&mut ChaCha20Rng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
 
         //CONVERT KEY TO Grid & PUSH TO keys
         keys.push(misc::shape_key(key));
