@@ -47,54 +47,6 @@ fn get_config_dir() -> String
 }
 
 //PUBLIC
-//IMPLEMENTATIONS
-impl EncryptedData
-{
-    //CREATE EMPTY Data
-    pub fn empty() -> Self
-    {
-        Self
-        {
-            output: None,
-            key: None,
-        }
-    }
-
-    //CREATE Data
-    pub fn from(output: Vec<i64>, key: String) -> Self
-    {
-        Self
-        {
-            output: Some(output),
-            key: Some(key),
-        }
-    }
-}
-
-impl DecryptedData
-{
-    //CREATE EMPTY Data
-    pub fn empty() -> Self
-    {
-        Self
-        {
-            output: None,
-            key: None,
-        }
-    }
-
-    //CREATE Data
-    pub fn from(output: String, key: String) -> Self
-    {
-        Self
-        {
-            output: Some(output),
-            key: Some(key),
-        }
-    }
-}
-
-//FUNCTIONS
 pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
 {
     let core_options = options::get_core_options();

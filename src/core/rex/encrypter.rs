@@ -41,7 +41,7 @@ use crate::core::
     },
 };
 
-pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Data //ENCRYPT
+pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
@@ -57,7 +57,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Data //ENCRYPT
         Some(k) =>
         {
             //CHECK FOR INVALID KEY
-            if k.len() != grid_area * 2 { return Data::empty(); }
+            if k.len() != grid_area * 2 { return None; }
 
             //USE KEY IF MATCHING LENGTH
             k
@@ -127,14 +127,14 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Data //ENCRYPT
     }
 
     //RETURN OUTPUT
-    Data
+    Some(Data
     {
-        output: Some(chunks),
-        key: Some(key_grid),
-    }
+        output: chunks,
+        key: key_grid,
+    })
 }
 
-pub fn encrypt_string(input: String, key: Option<Vec<i64>>) -> Data //ENCRYPT STRING USING THE encrypt FN
+pub fn encrypt_string(input: String, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT STRING USING THE encrypt FN
 {
     //CONVERT input TO Vec<i64>
     let mut chars: Vec<char> = input.chars().collect();

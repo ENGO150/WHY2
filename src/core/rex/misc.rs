@@ -23,22 +23,7 @@ use crate::core::rex::options::
     Grid,
 };
 
-//IMPLEMENTATIONS
-impl Data
-{
-    //CREATE EMPTY Data
-    pub fn empty() -> Self
-    {
-        Self
-        {
-            output: None,
-            key: None,
-        }
-    }
-}
-
-//FUNCTIONS
-pub fn empty_grid() -> Grid
+pub fn empty_grid() -> Grid //RETURN EMPTY ALLOCATED GRID
 {
     [[0i64; options::GRID_DIMENSIONS.0]; options::GRID_DIMENSIONS.1]
 }

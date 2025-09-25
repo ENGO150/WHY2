@@ -30,7 +30,7 @@ use rand::
     rngs::StdRng,
 };
 
-pub fn encrypt_text(text: &str, key: Option<&str>) -> EncryptedData //ENCRYPT
+pub fn encrypt_text(text: &str, key: Option<&str>) -> Option<EncryptedData> //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
@@ -43,7 +43,7 @@ pub fn encrypt_text(text: &str, key: Option<&str>) -> EncryptedData //ENCRYPT
         Some(k) => //key WAS PASSED TO FUNCTION
         {
             //CHECK FOR INVALID [SHORT] key
-            if k.len() < core_options.key_length { return EncryptedData::empty(); }
+            if k.len() < core_options.key_length { return None; }
 
             k.to_owned()
         },
@@ -100,5 +100,9 @@ pub fn encrypt_text(text: &str, key: Option<&str>) -> EncryptedData //ENCRYPT
     }
 
     //RETURN DATA
-    EncryptedData::from(text_key_chain, key_used)
+    Some(EncryptedData
+    {
+        output: text_key_chain,
+        key: key_used,
+    })
 }

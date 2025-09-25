@@ -682,7 +682,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&str>) //
     if let Some(key) = key
     {
         //ENCRYPT
-        let encrypted_packet = encrypter::encrypt_text(&encoded_packet_string, Some(&key)).output.expect("Encrypting packet failed");
+        let encrypted_packet = encrypter::encrypt_text(&encoded_packet_string, Some(&key)).expect("Encrypting packet failed").output;
 
         //CONVERT ENCRYPTED PACKET (FROM Vec<i64>) TO Vec<u8>
         let mut encrypted_packet_flattened = Vec::with_capacity(encrypted_packet.len() * 8);
@@ -765,9 +765,9 @@ pub fn receive(stream: &mut TcpStream, key: Option<&str>) -> Option<MessagePacke
         //DECRYPT
         let decrypted_packet = decrypter::decrypt_text(options::EncryptedData
         {
-            output: Some(recovered_encrypted_packet),
-            key: Some(key.to_owned()),
-        }).output.expect("Decrypting packet failed");
+            output: recovered_encrypted_packet,
+            key: key.to_owned(),
+        }).output;
 
         //OVERWRITE decoded_packet
         decoded_packet = base91::slice_decode(decrypted_packet.as_bytes());

@@ -58,15 +58,15 @@ fn encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
     let measure_start = Instant::now();
 
     //ENCRYPT & DECRYPT
-    let encrypted = encrypter::encrypt_text(TEST_TEXT, None);
+    let encrypted = encrypter::encrypt_text(TEST_TEXT, None).expect("Encryption failed");
     let decrypted = decrypter::decrypt_text(encrypted);
 
     //STOP MEASURING
     let measure_stop = measure_start.elapsed();
 
     //OUTPUT VARIABLES
-    let decrypted_text = decrypted.output.expect("Decryption failed");
-    let key = decrypted.key.expect("Decryption failed");
+    let decrypted_text = decrypted.output;
+    let key = decrypted.key;
 
     //VARIABLES FOR PRINT
     let mut stream: Box<dyn Write>;
