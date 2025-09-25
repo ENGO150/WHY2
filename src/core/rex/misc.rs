@@ -16,13 +16,53 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::core::rex::options::
-{
-    self,
-    Data,
-    Grid,
-};
+use crate::core::rex::options::{ self, Grid };
 
+//PRIVATE
+pub fn shift_rows_handler(chunk: &mut Grid, key: &Grid, invert: bool) //SHIFT ROWS IN chunk BASED ON key
+{
+    let rows = chunk.len() as i64; //ROWS IN chunk & key
+
+    //SHIFT EACH ROW
+    for (i, row) in chunk.iter_mut().enumerate()
+    {
+        //SPLIT key TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
+        let shift = key[i].iter().fold(0i64, |acc, &x| acc ^ x).rem_euclid(rows) as usize;
+
+        //ROTATE THE ROW
+        if invert
+        {
+            row.rotate_right(shift); //RIGHT ON DECRYPTION
+        } else
+        {
+            row.rotate_left(shift); //LEFT ON ENCRYPTION
+        }
+    }
+}
+
+pub fn mix_columns_handler(chunk: &mut Grid, invert: bool) //MIX COLUMNS IN chunk GRID
+{
+    //GET COLUMNS
+    let cols: Box<dyn Iterator<Item = usize>> = if invert
+    {
+        Box::new((0..options::GRID_DIMENSIONS.1).rev()) //REVERSE ON DECRYPTION
+    } else
+    {
+        Box::new(0..options::GRID_DIMENSIONS.1) //ENCRYPTION
+    };
+
+    //XOR COLUMNS IN LINEAR ORDER (0^1 ... 7^8, 8^0)
+    for col in cols
+    {
+        let next_col = (col + 1) % (options::GRID_DIMENSIONS.1);
+        for row in 0..(options::GRID_DIMENSIONS.0)
+        {
+            chunk[row][col] ^= chunk[row][next_col];
+        }
+    }
+}
+
+//PUBLIC
 pub fn empty_grid() -> Grid //RETURN EMPTY ALLOCATED GRID
 {
     [[0i64; options::GRID_DIMENSIONS.0]; options::GRID_DIMENSIONS.1]
@@ -94,30 +134,65 @@ pub fn subcell(chunk: &mut Grid, round: usize) //APPLIES NONLINEAR MIX
     }
 }
 
+pub fn inv_subcell(chunk: &mut Grid, round: usize) //REMOVES NONLINEAR MIX
+{
+    //APPLY ON EACH CELL
+    for col in chunk
+    {
+        for cell in col
+        {
+            //SPLIT CELL TO HIGH32 AND LOW32
+            let x = *cell as u64;
+            let mut v0 = (x & 0xFFFF_FFFF) as u32; //LOW
+            let mut v1 = ((x >> 32) & 0xFFFF_FFFF) as u32; //HIGH
+
+            //UNDO XOR TWEAK
+            v1 ^= round as u32;
+
+            //PREPARE SUM VALUE TO SUM AFTER ROUND ADDITIONS (DELTA * ROUNDS)
+            let mut sum: u32 = options::SUBCELL_DELTA.wrapping_mul(options::SUBCELL_ROUNDS);
+
+            //RUN ROUNDS IN REVERSE ORDER
+            for _ in 0..(options::SUBCELL_ROUNDS)
+            {
+                /*
+                REVERSE MIXING IN OPPOSITE ORDER
+                v1 = v1 + F(v0) ^ sum
+                v0 = v0 + F(v1') ^ sum
+                */
+
+                v1 = v1.wrapping_sub(((v0 << 4) ^ (v0 >> 5)).wrapping_add(v0) ^ sum);
+                v0 = v0.wrapping_sub(((v1 << 4) ^ (v1 >> 5)).wrapping_add(v1) ^ sum);
+
+                sum = sum.wrapping_sub(options::SUBCELL_DELTA);
+            }
+
+            //UNDO INITIAL XOR TWEAK
+            v0 ^= round as u32;
+
+            //REBUILD AND APPLY
+            let out = ((v1 as u64) << 32) | (v0 as u64);
+            *cell = out as i64;
+        }
+    }
+}
+
 pub fn shift_rows(chunk: &mut Grid, key: &Grid) //SHIFT ROWS IN chunk BASED ON key
 {
-    let rows = chunk.len() as i64; //ROWS IN chunk & key
+    shift_rows_handler(chunk, key, false); //USE HANDLER
+}
 
-    //SHIFT EACH ROW
-    for (i, row) in chunk.iter_mut().enumerate()
-    {
-        //SPLIT key TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
-        let shift = key[i].iter().fold(0i64, |acc, &x| acc ^ x).rem_euclid(rows) as usize;
-
-        //ROTATE THE ROW
-        row.rotate_left(shift);
-    }
+pub fn inv_shift_rows(chunk: &mut Grid, key: &Grid) //UNSHIFT ROWS IN chunk BASED ON key
+{
+    shift_rows_handler(chunk, key, true); //USE HANDLER
 }
 
 pub fn mix_columns(chunk: &mut Grid) //MIX COLUMNS IN chunk GRID
 {
-    //XOR COLUMNS IN LINEAR ORDER (0^1 ... 7^8, 8^0)
-    for col in 0..(options::GRID_DIMENSIONS.1)
-    {
-        let next_col = (col + 1) % (options::GRID_DIMENSIONS.1);
-        for row in 0..(options::GRID_DIMENSIONS.0)
-        {
-            chunk[row][col] ^= chunk[row][next_col];
-        }
-    }
+    mix_columns_handler(chunk, false); //USE HANDLER
+}
+
+pub fn inv_mix_columns(chunk: &mut Grid)
+{
+    mix_columns_handler(chunk, true); //USE HANDLER
 }
