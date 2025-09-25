@@ -26,7 +26,7 @@ min_username_length = 4 # Minimal username length
 max_username_tries = 3 # Times asking client for username (if client tries to use invalid username)
 max_password_tries = 3 # Same as above but for invalid password
 
-max_packet_size = 4096 # Maximal message length
+max_packet_size = 1024 # Maximal message length
 min_message_delay = 250 # Minimal ms delay between user messages (to prevent spamming)
 max_message_delay_violations = 4 # Maximal 'spam' messages that can be sent in row without getting disconnected
 
