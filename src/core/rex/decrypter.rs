@@ -109,3 +109,26 @@ pub fn decrypt(input: EncryptedData) -> DecryptedData //ENCRYPT
         key: key_grid.into_iter().flatten().collect(),
     }
 }
+
+pub fn decrypt_string(input: EncryptedData) -> String //DECRYPT, CONVERT output INTO STRING
+{
+    //DECRYPT
+    let decrypted = decrypt(input).output;
+
+    let mut output = String::with_capacity(decrypted.len() * 2);
+
+    for n in decrypted
+    {
+        let buf = n.to_ne_bytes();
+
+        //FIRST 4 BYTES = HIGH CHAR, FOLLOWING 4 BYTES = LOW CHAR
+        let hi = u32::from_ne_bytes(buf[0..4].try_into().unwrap()); //HIGH
+        let lo = u32::from_ne_bytes(buf[4..8].try_into().unwrap()); //LOW
+
+        //PUSH CHARS TO STRING
+        output.push(char::from_u32(hi).unwrap());
+        if lo != 0 { output.push(char::from_u32(lo).unwrap()); }
+    }
+
+    output
+}
