@@ -26,8 +26,14 @@ pub const SUBCELL_DELTA: u32              = 0x9E3779B9;                         
 pub type Grid = [[i64; 8]; 8]; //GRID FOR REX DATA
 
 //STRUCTS
-pub struct Data //DATA FOR REX ENCRYPTER
+pub struct EncryptedData //DATA FOR REX ENCRYPTER
 {
     pub output: Vec<Grid>, //OUTPUT VALUE
     pub key: Grid,         //KEY USED FOR ENCRYPTION
+}
+
+pub struct DecryptedData //DATA FOR REX DECRYPTER
+{
+    pub output: Vec<i64>, //OUTPUT VALUE
+    pub key: Vec<i64>,    //KEY USED FOR DECRYPTION
 }

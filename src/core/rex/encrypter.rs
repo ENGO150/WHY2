@@ -37,12 +37,12 @@ use crate::core::
         {
             self,
             Grid,
-            Data,
+            EncryptedData,
         },
     },
 };
 
-pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
+pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData> //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
@@ -127,14 +127,14 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
     }
 
     //RETURN OUTPUT
-    Some(Data
+    Some(EncryptedData
     {
         output: grids,
         key: key_grid,
     })
 }
 
-pub fn encrypt_string(input: &String, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT STRING USING THE encrypt FN
+pub fn encrypt_string(input: &String, key: Option<Vec<i64>>) -> Option<EncryptedData> //ENCRYPT STRING USING THE encrypt FN
 {
     //CONVERT input TO Vec<i64>
     let mut chars: Vec<char> = input.chars().collect();

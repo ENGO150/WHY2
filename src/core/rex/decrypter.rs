@@ -31,11 +31,16 @@ use crate::core::
     {
         crypto,
         misc as rex_misc,
-        options::{ self, Data },
+        options::
+        {
+            self,
+            EncryptedData,
+            DecryptedData,
+        },
     },
 };
 
-pub fn decrypt(input: Data) -> Data //ENCRYPT
+pub fn decrypt(input: EncryptedData) -> DecryptedData //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
@@ -91,10 +96,16 @@ pub fn decrypt(input: Data) -> Data //ENCRYPT
         }
     }
 
+    //FLATTEN Vec<Grid> TO Vec<i64>
+    let mut flattened: Vec<i64> = grids.iter().flat_map(|grid| grid.iter().flat_map(|row| row.iter())).copied().collect();
+
+    //REMOVE PADDING
+    flattened.truncate(flattened.len() - (*flattened.last().unwrap() as usize));
+
     //RETURN OUTPUT
-    Data
+    DecryptedData
     {
-        output: grids,
-        key: key_grid,
+        output: flattened,
+        key: key_grid.into_iter().flatten().collect(),
     }
 }
