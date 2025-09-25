@@ -1801,7 +1801,7 @@ dependencies = [
 
 [[package]]
 name = "why2"
-version = "0.2.0"
+version = "0.2.0-rex"
 dependencies = [
  "base91",
  "bincode",
