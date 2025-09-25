@@ -726,14 +726,20 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
 
 pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<MessagePacket>
 {
-    //MAX PACKET SIZE FOR SERVER
-    let max_packet_size: usize;
-    let is_server = //ONLY APPLY SIZE LIMIT ON SERVER-SIDE
+    //GET IS SERVER BOOL
+    let is_server =
     {
         let connections = CONNECTIONS.read().unwrap(); //READ LOCK
-
-        max_packet_size = config::server_config("max_packet_size").parse::<usize>().unwrap(); //GET MAX SIZE
         !connections.is_empty()
+    };
+
+    //GET MAX PACKET SIZE
+    let max_packet_size = if is_server
+    {
+        config::server_config("max_packet_size").parse::<usize>().unwrap() //SERVER
+    } else
+    {
+        config::client_config("max_packet_size").parse::<usize>().unwrap() //CLIENT
     };
 
     //READ
