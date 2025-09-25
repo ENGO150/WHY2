@@ -21,10 +21,10 @@ use std::sync::RwLock;
 use once_cell::sync::Lazy;
 
 //CONSTS
-pub const USER_CONFIG_DIR: &str = "{HOME}/.config";                                                       //USER CONFIG DIRECTORY
-pub const CONFIG_DIR: &str      = "/WHY2";                                                                //DIRECTORY FOR CONFIG FILES
-pub const VERSIONS_URL: &str    = "https://raw.githubusercontent.com/ENGO150/WHY2/release/versions.json"; //versions.json URL
-pub const VERSION: &str         = "v0.2.0-rex";                                                           //CURRENT VERSION OF WHY2
+pub const USER_CONFIG_DIR: &str = "{HOME}/.config";                                                           //USER CONFIG DIRECTORY
+pub const CONFIG_DIR: &str      = "/WHY2";                                                                    //DIRECTORY FOR CONFIG FILES
+pub const VERSIONS_URL: &str    = "https://raw.githubusercontent.com/ENGO150/WHY2/development/versions.json"; //versions.json URL
+pub const VERSION: &str         = "v0.2.0-rex";                                                               //CURRENT VERSION OF WHY2
 
 //ENUMS
 //THESE ARE LEGACY VERSIONS FOR GENERATING tkch, SO YOU CAN DECRYPT OLD TEXT

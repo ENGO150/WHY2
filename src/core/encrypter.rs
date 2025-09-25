@@ -30,6 +30,7 @@ use rand::
     rngs::StdRng,
 };
 
+#[deprecated(since = "0.2.0-rex", note = "Legacy encryption is unsecure. Use REX instead.")]
 pub fn encrypt_text(text: &str, key: Option<&str>) -> Option<EncryptedData> //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
