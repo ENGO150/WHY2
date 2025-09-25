@@ -22,6 +22,7 @@ use rand::
 {
     SeedableRng,
     TryRngCore,
+    RngCore,
     rngs::OsRng,
 };
 
@@ -33,19 +34,6 @@ use crate::core::rex::
     options::{ self, Grid },
 };
 
-//PRIVATE
-fn generate_key_handler(rng: &mut ChaCha20Rng) -> Vec<i64>
-{
-    //FILL
-    (0..(2 * options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1)).map(|_|
-    {
-        let mut bytes = [0u8; 8];
-        rng.try_fill_bytes(&mut bytes).expect("Failed to generate random bytes");
-        i64::from_ne_bytes(bytes)
-    }).collect()
-}
-
-//PUBLIC
 pub fn sha256_seed_grid(key: &Grid) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFLING REX GRID
 {
     //SHA256
@@ -64,13 +52,18 @@ pub fn sha256_seed_grid(key: &Grid) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFL
     hasher.finalize().into()
 }
 
+pub fn generate_key_deterministic(rng: &mut ChaCha20Rng) -> Vec<i64> //GENERATE KEY USING DPRNG
+{
+    (0..(2 * options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1)).map(|_| rng.next_u64() as i64).collect()
+}
+
 pub fn generate_key() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
 {
     //CREATE SEED FOR ChaCha20Rng
     let mut seed = [0u8; 32];
     OsRng.try_fill_bytes(&mut seed).expect("Creating seed failed"); //FILL
 
-    generate_key_handler(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
+    generate_key_deterministic(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
 }
 
 pub fn generate_round_keys(master_key: &Grid) -> Vec<Grid> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
@@ -81,7 +74,7 @@ pub fn generate_round_keys(master_key: &Grid) -> Vec<Grid> //GENERATE 'RANDOM' R
     for _ in 0..(options::ROUND_KEYS)
     {
         //USE SEED OF LAST KEY TO GENERATE NEW KEY
-        let key = generate_key_handler(&mut ChaCha20Rng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
+        let key = generate_key_deterministic(&mut ChaCha20Rng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
 
         //CONVERT KEY TO Grid & PUSH TO keys
         keys.push(misc::shape_key(key));
