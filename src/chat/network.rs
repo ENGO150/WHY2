@@ -726,15 +726,8 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
 
 pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<MessagePacket>
 {
-    //GET IS SERVER BOOL
-    let is_server =
-    {
-        let connections = CONNECTIONS.read().unwrap(); //READ LOCK
-        !connections.is_empty()
-    };
-
     //GET MAX PACKET SIZE
-    let max_packet_size = if is_server
+    let max_packet_size = if chat_options::get_is_server()
     {
         config::server_config("max_packet_size").parse::<usize>().unwrap() //SERVER
     } else
@@ -759,7 +752,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
 
             Ok(i) => //VALID MESSAGE
             {
-                if is_server && i >= max_packet_size //INPUT TOO LONG
+                if chat_options::get_is_server() && i >= max_packet_size //INPUT TOO LONG
                 {
                     remove_connection(stream, true);
                     return None;

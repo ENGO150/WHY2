@@ -52,6 +52,8 @@ static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING
 
 static EXTRA_SPACE: AtomicBool = AtomicBool::new(false); //CLIENT DISPLAYED SOME MENU (/help ETC.), ADD EXTRA SPACE ON NEXT MESSAGE
 
+static IS_SERVER: AtomicBool = AtomicBool::new(false); //PROGRAM IS RUNNING AS A SERVER
+
 pub static INPUT_READ: Lazy<Arc<Mutex<Vec<char>>>> = Lazy::new(|| //INPUT READ FROM CLIENT
 {
     Arc::new(Mutex::new(Vec::new()))
@@ -91,6 +93,17 @@ pub fn set_extra_space(value: bool) //SET EXTRA_SPACE
 pub fn get_extra_space() -> bool //GET EXTRA_SPACE
 {
     EXTRA_SPACE.load(Ordering::SeqCst)
+}
+
+//IS SERVER
+pub fn set_is_server(value: bool) //SET IS_SERVER
+{
+    IS_SERVER.store(value, Ordering::SeqCst);
+}
+
+pub fn get_is_server() -> bool //GET IS_SERVER
+{
+    IS_SERVER.load(Ordering::SeqCst)
 }
 
 //CORE ENCRYPTION OPTIONS
