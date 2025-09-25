@@ -47,8 +47,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
     misc::check_version();
 
     //REX OPTIONS
-    let grid_dims = options::GRID_DIMENSIONS;  //GRID DIMENSIONS
-    let grid_area = grid_dims.0 * grid_dims.1; //AREA OF REX GRID
+    let grid_area = options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1; //AREA OF REX GRID
 
     //GET KEY THAT WILL BE USED FOR ENCRYPTION
     let key_used = match key
@@ -81,7 +80,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
         let mut grid = rex_misc::empty_grid(); //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
         {
-            grid[i / grid_dims.1][i % grid_dims.0] = val;
+            grid[i / options::GRID_DIMENSIONS.1][i % options::GRID_DIMENSIONS.0] = val;
         }
 
         grid
@@ -91,7 +90,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
     let key_grid = rex_misc::shape_key(key_used);
 
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
-    let mut dprng = StdRng::from_seed(crypto::sha256_seed_grid(&key_grid));
+    let mut dprng = StdRng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
     for chunk in &mut chunks
     {
         //FLATTEN CHUNK
@@ -103,7 +102,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<Data> //ENCRYPT
         //REBUILD
         for (i, val) in flattened.into_iter().enumerate()
         {
-            chunk[i / grid_dims.1][i % grid_dims.0] = val;
+            chunk[i / options::GRID_DIMENSIONS.1][i % options::GRID_DIMENSIONS.0] = val;
         }
     }
 
