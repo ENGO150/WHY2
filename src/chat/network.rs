@@ -108,6 +108,7 @@ enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
     NonAuthenticated
     {
         stream: Arc<Mutex<TcpStream>>, //STREAM
+        shared_key: Vec<i64>,          //SHARED KEY
     },
 }
 
@@ -138,7 +139,7 @@ impl Connection
         match self
         {
             Self::Authenticated { shared_key, .. } => Some(shared_key),
-            Self::NonAuthenticated { .. } => None,
+            Self::NonAuthenticated { shared_key, .. } => Some(shared_key),
         }
     }
 }
@@ -373,25 +374,26 @@ fn authenticate_client(connection: Connection) //MOVE CONNECTION FROM NonAuthent
 //PUBLIC
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
-    //ADD CONNECTION TO NonAuthenticated
-    {
-        //CREATE CONNECTION
-        let connection = Connection::NonAuthenticated
-        {
-            stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
-            last_activity: Instant::now(),
-        };
-
-        //PUSH
-        CONNECTIONS.write().unwrap().push(connection);
-    }
-
     //GET SHARED KEY
     let shared_key = match key_exchange_server(stream)
     {
         Some(r) => Some(r),
         None => return
     };
+
+    //ADD CONNECTION TO NonAuthenticated
+    {
+        //CREATE CONNECTION
+        let connection = Connection::NonAuthenticated
+        {
+            stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
+            shared_key: shared_key.clone().unwrap(),
+            last_activity: Instant::now(),
+        };
+
+        //PUSH
+        CONNECTIONS.write().unwrap().push(connection);
+    }
 
     //SEND PACKET WITH REQUIRED SERVER INFO
     send_welcome_packet(stream, shared_key.as_ref());
@@ -909,5 +911,10 @@ pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
 
 pub fn disconnect_all() //DISCONNECT ALL CLIENTS
 {
-    send_to_all(None, &config::server_config("server_username"), None, Some(MessageCode::Disconnect));
+    //ITERATE OVER ALL STREAMS, REMOVE CONNECTIONS
+    let mut streams: Vec<TcpStream> = CONNECTIONS.read().unwrap().iter().map(|conn| conn.stream().lock().unwrap().try_clone().unwrap()).collect();
+    for stream in &mut streams
+    {
+        remove_connection(stream, DisconnectType::Gracefully); //REMOVE GRACEFULLY
+    }
 }
