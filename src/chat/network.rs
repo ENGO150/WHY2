@@ -20,7 +20,7 @@ use std::
 {
     process,
     collections::HashSet,
-    net::{ TcpStream, SocketAddr },
+    net::TcpStream,
     time::{ Instant, Duration },
 
     sync::
@@ -964,46 +964,22 @@ pub fn disconnect_all() //DISCONNECT ALL CLIENTS
 
 pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
 {
-    //TIME VARIABLES
-    let now = Instant::now(); //CURRENT TIME
-    let timeout = Duration::from_secs(config::server_config("communication_time").parse().unwrap()); //TIMEOUT
+    let now = Instant::now();
+    let timeout = Duration::from_secs(config::server_config("communication_time").parse().unwrap());
 
-    //COLLECT PEER ADDRESSES OF INACTIVE CLIENTS
-    let targets: Vec<SocketAddr> =
+    let connections = CONNECTIONS.read().unwrap(); //READ LOCK
+
+    //COLLECT STREAMS OF INACTIVE CONNECTIONS
+    let inactive_streams: Vec<TcpStream> = connections.iter()
+        .filter(|conn| now.duration_since(*conn.last_activity()) > timeout)
+        .filter_map(|conn| conn.stream().lock().ok()?.try_clone().ok())
+        .collect();
+
+    drop(connections); //RELEASE READ LOCK
+
+    //DISCONNECT INACTIVE STREAMS
+    for mut stream in inactive_streams
     {
-        let connections = CONNECTIONS.read().unwrap(); //READ LOCK
-
-        connections.iter().filter_map(|conn|
-        {
-                if now.duration_since(*conn.last_activity()) > timeout //INACTIVE CLIENT FOUND
-                {
-                    conn.stream().lock().ok().and_then(|s| s.peer_addr().ok())
-                } else { None }
-        }).collect()
-    };
-
-    //REMOVE TARGETS
-    for addr in targets
-    {
-        //FIND CONNECTIONS BY THEIR ADDRESSES
-        let stream_opt =
-        {
-            let connections = CONNECTIONS.read().unwrap(); //READ LOCK
-
-            connections.iter().find_map(|conn|
-            {
-                let guard = conn.stream().lock().ok()?; //LOCK STREAM
-                if guard.peer_addr().ok()? == addr //FOUND CONNECTION
-                {
-                    Some(guard.try_clone().unwrap())
-                } else { None }
-            })
-        };
-
-        //REMOVE CONNECTION
-        if let Some(mut stream) = stream_opt
-        {
-            remove_connection(&mut stream, DisconnectType::Gracefully);
-        }
+        remove_connection(&mut stream, DisconnectType::Gracefully);
     }
 }
