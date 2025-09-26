@@ -19,7 +19,7 @@ server_ip = "0.0.0.0" # Server address
 server_name = "WHY2 Server" # Name of the server
 server_username = "server" # Username server will use
 
-communication_time = 300 # Seconds waiting for client message before stopping communication
+communication_time = 300 # Seconds waiting for client message before stopping communication (+- 5 seconds)
 
 max_username_length = 20 # Maximal username length
 min_username_length = 4 # Minimal username length
