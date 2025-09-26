@@ -111,6 +111,14 @@ enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
     },
 }
 
+#[derive(PartialEq)]
+enum DisconnectType //TYPE OF REMOVING CLIENT FROM CONNECTIONS LIST
+{
+    Gracefully,   //SEND Disconnect CODE TO CLIENT
+    Forcefully,   //fuck them, close connection
+    Authenticate, //NOT REMOVING, ONLY TRANSFER TO AUTHENTICATED CLIENTS
+}
+
 //IMPLEMENTATIONS
 impl Connection
 {
@@ -119,8 +127,8 @@ impl Connection
     {
         match self
         {
-            Connection::Authenticated { stream, .. } => stream,
-            Connection::NonAuthenticated { stream, .. } => stream,
+            Self::Authenticated { stream, .. } => stream,
+            Self::NonAuthenticated { stream, .. } => stream,
         }
     }
 
@@ -129,8 +137,8 @@ impl Connection
     {
         match self
         {
-            Connection::Authenticated { shared_key, .. } => Some(shared_key),
-            Connection::NonAuthenticated { .. } => None,
+            Self::Authenticated { shared_key, .. } => Some(shared_key),
+            Self::NonAuthenticated { .. } => None,
         }
     }
 }
@@ -239,9 +247,15 @@ fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: O
     }
 }
 
-fn remove_connection(stream: &mut TcpStream, disconnect: bool) //REMOVE CONNECTION BY TcpStream
+fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType) //REMOVE CONNECTION BY TcpStream
 {
-    println!("Closed connection: {}", &stream.peer_addr().unwrap());
+    println!("{} connection: {}", if disconnect_type == DisconnectType::Authenticate
+    {
+        "Authenticate"
+    } else
+    {
+        "Close"
+    }, &stream.peer_addr().unwrap());
 
     //GET TARGET PEER ADDRESS
     let peer_addr = stream.peer_addr().unwrap();
@@ -261,7 +275,7 @@ fn remove_connection(stream: &mut TcpStream, disconnect: bool) //REMOVE CONNECTI
             if should_remove
             {
                 //SEND DISCONNECT CODE TO REMOVED CLIENT
-                if disconnect
+                if disconnect_type == DisconnectType::Gracefully
                 {
                     send_code(&mut removed_stream, None, MessageCode::Disconnect, conn.shared_key());
                 }
@@ -347,9 +361,31 @@ fn str_to_grids(bytes: Vec<u8>) -> Option<Vec<Grid>> //CONVERT STRING SLICE TO V
     }).collect())
 }
 
+fn authenticate_client(connection: Connection) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
+{
+    if let Connection::Authenticated { ref stream, .. } = connection
+    {
+        remove_connection(&mut stream.lock().unwrap(), DisconnectType::Authenticate); //REMOVE FROM NonAuthenticated
+        CONNECTIONS.write().unwrap().push(connection); //ADD Authenticated
+    }
+}
+
 //PUBLIC
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
+    //ADD CONNECTION TO NonAuthenticated
+    {
+        //CREATE CONNECTION
+        let connection = Connection::NonAuthenticated
+        {
+            stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
+            last_activity: Instant::now(),
+        };
+
+        //PUSH
+        CONNECTIONS.write().unwrap().push(connection);
+    }
+
     //GET SHARED KEY
     let shared_key = match key_exchange_server(stream)
     {
@@ -447,7 +483,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //GENERATE ID FOR CLIENT
     let id = get_latest_id();
 
-    //ADD CLIENT TO CONNECTIONS
+    //AUTHENTICATE CLIENT
     {
         //CREATE CONNECTION
         let connection = Connection::Authenticated
@@ -460,7 +496,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         };
 
         //PUSH
-        CONNECTIONS.write().unwrap().push(connection);
+        authenticate_client(connection);
     }
 
     //TELL CLIENT TO START CHATTING
@@ -488,7 +524,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::Disconnect =>
                 {
                     //DISCONNECT CLIENT
-                    remove_connection(stream, true);
+                    remove_connection(stream, DisconnectType::Gracefully);
 
                     return;
                 },
@@ -809,7 +845,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         {
             Ok(0) | Err(_) => //CLIENT DISCONNECTED
             {
-                remove_connection(stream, false);
+                remove_connection(stream, DisconnectType::Forcefully);
                 return None;
             },
 
@@ -817,7 +853,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
             {
                 if chat_options::get_is_server() && i >= max_packet_size //INPUT TOO LONG
                 {
-                    remove_connection(stream, true);
+                    remove_connection(stream, DisconnectType::Gracefully);
                     return None;
                 }
             }
