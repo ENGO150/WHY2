@@ -20,6 +20,7 @@ use std::
 {
     process,
     thread,
+    time::Duration,
     io,
     net::TcpListener,
 };
@@ -73,6 +74,16 @@ fn main()
                     eprintln!("Connection failed: {}", e);
                 }
             }
+        }
+    });
+
+    //CREATE INACTIVITY WATCHDOG THREAD
+    thread::spawn(move ||
+    {
+        loop
+        {
+            thread::sleep(Duration::from_secs(5));
+            network::disconnect_inactive();
         }
     });
 

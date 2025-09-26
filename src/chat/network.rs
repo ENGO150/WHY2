@@ -18,10 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    time::Instant,
     process,
     collections::HashSet,
-    net::TcpStream,
+    net::{ TcpStream, SocketAddr },
+    time::{ Instant, Duration },
 
     sync::
     {
@@ -263,19 +263,12 @@ fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: O
 
 fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType) //REMOVE CONNECTION BY TcpStream
 {
-    println!("{} connection: {}", if disconnect_type == DisconnectType::Authenticate
-    {
-        "Authenticate"
-    } else
-    {
-        "Close"
-    }, &stream.peer_addr().unwrap());
-
     //GET TARGET PEER ADDRESS
     let peer_addr = stream.peer_addr().unwrap();
 
     //USERNAME OF TARGET, FOR DISCONNECT MESSAGE
     let mut username: Option<String> = None;
+    let mut removed = false;
 
     //REMOVE MATCHING
     {
@@ -298,16 +291,29 @@ fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType) //
                 {
                     username = Some(uname.clone());
                 }
+
+                removed = true;
             }
 
             !should_remove //KEEP NON-MATCHING
         });
     }
 
+    //RETURN IF NO CLIENT WAS REMOVED
+    if !removed { return; }
+
     if username.is_some()
     {
         send_to_all(username.as_ref().map(|s| s.as_str()), &config::server_config("server_username"), None, Some(MessageCode::Leave));
     }
+
+    println!("{} connection: {}", if disconnect_type == DisconnectType::Authenticate
+    {
+        "Authenticate"
+    } else
+    {
+        "Close"
+    }, &stream.peer_addr().unwrap());
 }
 
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
@@ -953,5 +959,51 @@ pub fn disconnect_all() //DISCONNECT ALL CLIENTS
     for stream in &mut streams
     {
         remove_connection(stream, DisconnectType::Gracefully); //REMOVE GRACEFULLY
+    }
+}
+
+pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
+{
+    //TIME VARIABLES
+    let now = Instant::now(); //CURRENT TIME
+    let timeout = Duration::from_secs(config::server_config("communication_time").parse().unwrap()); //TIMEOUT
+
+    //COLLECT PEER ADDRESSES OF INACTIVE CLIENTS
+    let targets: Vec<SocketAddr> =
+    {
+        let connections = CONNECTIONS.read().unwrap(); //READ LOCK
+
+        connections.iter().filter_map(|conn|
+        {
+                if now.duration_since(*conn.last_activity()) > timeout //INACTIVE CLIENT FOUND
+                {
+                    conn.stream().lock().ok().and_then(|s| s.peer_addr().ok())
+                } else { None }
+        }).collect()
+    };
+
+    //REMOVE TARGETS
+    for addr in targets
+    {
+        //FIND CONNECTIONS BY THEIR ADDRESSES
+        let stream_opt =
+        {
+            let connections = CONNECTIONS.read().unwrap(); //READ LOCK
+
+            connections.iter().find_map(|conn|
+            {
+                let guard = conn.stream().lock().ok()?; //LOCK STREAM
+                if guard.peer_addr().ok()? == addr //FOUND CONNECTION
+                {
+                    Some(guard.try_clone().unwrap())
+                } else { None }
+            })
+        };
+
+        //REMOVE CONNECTION
+        if let Some(mut stream) = stream_opt
+        {
+            remove_connection(&mut stream, DisconnectType::Gracefully);
+        }
     }
 }
