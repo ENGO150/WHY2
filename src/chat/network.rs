@@ -845,7 +845,11 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         {
             Ok(0) | Err(_) => //CLIENT DISCONNECTED
             {
-                remove_connection(stream, DisconnectType::Forcefully);
+                if chat_options::get_is_server()
+                {
+                    remove_connection(stream, DisconnectType::Forcefully);
+                }
+
                 return None;
             },
 
