@@ -417,7 +417,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             {
                 if let Some(uname) = r.text
                 {
-                    if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(char::is_alphanumeric) && !user_connected(&uname)
+                    if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') && !user_connected(&uname)
                     {
                         username = Some(uname);
                         break;
