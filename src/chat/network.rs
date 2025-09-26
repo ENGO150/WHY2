@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    time::Instant,
     process,
     collections::HashSet,
     net::TcpStream,
@@ -103,12 +104,14 @@ enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         username: String,              //USERNAME
         id: usize,                     //ID OF USER
         shared_key: Vec<i64>,          //SHARED KEY BETWEEN SERVER AND CLIENT (one to one)
+        last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
     },
 
     NonAuthenticated
     {
         stream: Arc<Mutex<TcpStream>>, //STREAM
         shared_key: Vec<i64>,          //SHARED KEY
+        last_activity: Instant,        //TIME OF LAST MESSAGE
     },
 }
 
@@ -140,6 +143,16 @@ impl Connection
         {
             Self::Authenticated { shared_key, .. } => Some(shared_key),
             Self::NonAuthenticated { shared_key, .. } => Some(shared_key),
+        }
+    }
+
+    //GET LAST ACTIVITY FROM Connection
+    fn last_activity(&self) -> &Instant
+    {
+        match self
+        {
+            Self::Authenticated { last_activity, .. } => last_activity,
+            Self::NonAuthenticated { last_activity, .. } => last_activity,
         }
     }
 }
@@ -888,6 +901,30 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
 
         //OVERWRITE decoded_packet
         decoded_packet = base91::slice_decode(decrypted_packet.as_bytes());
+    }
+
+    //RESET ACTIVITY TIMER ON SERVER
+    if chat_options::get_is_server()
+    {
+        let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
+        let peer_addr = stream.peer_addr().unwrap(); //GET CURRENT PEER ADDRESS
+
+        //FIND CONNECTION AND SET last_activity
+        for conn in connections.iter_mut()
+        {
+            if conn.stream().lock().unwrap().peer_addr().unwrap() == peer_addr //CONNECTION FOUND
+            {
+                match conn
+                {
+                    Connection::Authenticated { last_activity, .. } | Connection::NonAuthenticated { last_activity, .. } =>
+                    {
+                        *last_activity = Instant::now(); //RESET last_activity
+                    },
+                }
+
+                break;
+            }
+        }
     }
 
     //DECODE AND RETURN
