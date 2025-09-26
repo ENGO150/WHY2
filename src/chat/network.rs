@@ -217,11 +217,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANG
     let message = loop
     {
         //READ MESSAGE
-        let received = match receive(stream, None)
-        {
-            Some(r) => r,
-            None => return None,
-        };
+        let received = receive(stream, None)?;
 
         if received.code == Some(MessageCode::ClientServerKE) && !received.text.is_none() { break received; }
     };
@@ -903,17 +899,10 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     //DECRYPT
     if let Some(key) = key
     {
-        //CONVERT decoded_packet FROM Vec<u8> TO Vec<Grid>
-        let recovered_encrypted_packet = match str_to_grids(decoded_packet)
-        {
-            Some(p) => p,
-            None => return None
-        };
-
         //DECRYPT
         let decrypted_packet = decrypter::decrypt_string(options::EncryptedData
         {
-            output: recovered_encrypted_packet,
+            output: str_to_grids(decoded_packet)?, //CONVERT decoded_packet FROM Vec<u8> TO Vec<Grid>
             key: misc::shape_key(key.clone()),
         });
 
