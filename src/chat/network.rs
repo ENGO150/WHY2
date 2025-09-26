@@ -93,13 +93,46 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub code: Option<MessageCode>, //CONTROL CODE
 }
 
+//ENUMS
 #[derive(Clone)]
-struct Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
+enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
-    stream: Arc<Mutex<TcpStream>>, //STREAM
-    username: String,              //USERNAME
-    id: usize,                     //ID OF USER
-    shared_key: Vec<i64>,          //SHARED KEY BETWEEN SERVER AND CLIENT (one to one)
+    Authenticated
+    {
+        stream: Arc<Mutex<TcpStream>>, //STREAM
+        username: String,              //USERNAME
+        id: usize,                     //ID OF USER
+        shared_key: Vec<i64>,          //SHARED KEY BETWEEN SERVER AND CLIENT (one to one)
+    },
+
+    NonAuthenticated
+    {
+        stream: Arc<Mutex<TcpStream>>, //STREAM
+    },
+}
+
+//IMPLEMENTATIONS
+impl Connection
+{
+    //GET STREAM FROM Connection
+    fn stream(&self) -> &Arc<Mutex<TcpStream>>
+    {
+        match self
+        {
+            Connection::Authenticated { stream, .. } => stream,
+            Connection::NonAuthenticated { stream, .. } => stream,
+        }
+    }
+
+    //GET SHARED KEY FROM Connection
+    fn shared_key(&self) -> Option<&Vec<i64>>
+    {
+        match self
+        {
+            Connection::Authenticated { shared_key, .. } => Some(shared_key),
+            Connection::NonAuthenticated { .. } => None,
+        }
+    }
 }
 
 //LISTS
@@ -191,15 +224,18 @@ fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: O
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
 
     //SEND TO EACH CLIENT
-    for connection in connections.iter()
+    for connection_enum in connections.iter()
     {
-        send(&mut *connection.stream.lock().unwrap(), MessagePacket
+        if let Connection::Authenticated { stream, shared_key, .. } = connection_enum
         {
-            text: message.map(str::to_string),
-            username: Some(username.to_string()),
-            id: id,
-            code: code.clone(),
-        }, Some(&connection.shared_key));
+            send(&mut *stream.lock().unwrap(), MessagePacket
+            {
+                text: message.map(str::to_string),
+                username: Some(username.to_string()),
+                id: id,
+                code: code.clone(),
+            }, Some(&shared_key));
+        }
     }
 }
 
@@ -211,7 +247,7 @@ fn remove_connection(stream: &mut TcpStream, disconnect: bool) //REMOVE CONNECTI
     let peer_addr = stream.peer_addr().unwrap();
 
     //USERNAME OF TARGET, FOR DISCONNECT MESSAGE
-    let mut username = String::new();
+    let mut username: Option<String> = None;
 
     //REMOVE MATCHING
     {
@@ -219,7 +255,7 @@ fn remove_connection(stream: &mut TcpStream, disconnect: bool) //REMOVE CONNECTI
 
         connections.retain(|conn|
         {
-            let mut removed_stream = conn.stream.lock().unwrap();
+            let mut removed_stream = conn.stream().lock().unwrap();
             let should_remove = removed_stream.peer_addr().unwrap() == peer_addr;
 
             if should_remove
@@ -227,28 +263,45 @@ fn remove_connection(stream: &mut TcpStream, disconnect: bool) //REMOVE CONNECTI
                 //SEND DISCONNECT CODE TO REMOVED CLIENT
                 if disconnect
                 {
-                    send_code(&mut removed_stream, None, MessageCode::Disconnect, Some(&conn.shared_key));
+                    send_code(&mut removed_stream, None, MessageCode::Disconnect, conn.shared_key());
                 }
 
-                username = conn.username.clone();
+                if let Connection::Authenticated { username: uname, .. } = conn
+                {
+                    username = Some(uname.clone());
+                }
             }
 
             !should_remove //KEEP NON-MATCHING
         });
     }
 
-    send_to_all(Some(&username), &config::server_config("server_username"), None, Some(MessageCode::Leave));
+    if username.is_some()
+    {
+        send_to_all(username.as_ref().map(|s| s.as_str()), &config::server_config("server_username"), None, Some(MessageCode::Leave));
+    }
 }
 
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
 {
-    CONNECTIONS.read().unwrap().iter().any(|conn| conn.username == username)
+    CONNECTIONS.read().unwrap().iter().any(|conn|
+    {
+        matches!(conn, Connection::Authenticated { username: uname, .. } if uname == username)
+    })
 }
 
 fn get_latest_id() -> usize
 {
     //GET HashSet OF IDS
-    let ids: HashSet<usize> = CONNECTIONS.read().unwrap().iter().map(|i| i.id).collect();
+    let ids: HashSet<usize> = CONNECTIONS.read().unwrap().iter().filter_map(|conn|
+    {
+        if let Connection::Authenticated { id, .. } = conn
+        {
+            Some(*id)
+        } else {
+            None
+        }
+    }).collect();
 
     //GET SMALLEST UNUSED ID
     for i in 0..
@@ -264,7 +317,10 @@ fn get_latest_id() -> usize
 
 fn get_connection_by_id(id: usize) -> Option<Connection> //RETURN CONNECTION WITH MATCHING ID
 {
-    CONNECTIONS.read().unwrap().iter().find(|conn| conn.id == id).cloned()
+    CONNECTIONS.read().unwrap().iter().find(|conn|
+    {
+        matches!(conn, Connection::Authenticated { id: user_id, .. } if *user_id == id)
+    }).cloned()
 }
 
 fn str_to_grids(bytes: Vec<u8>) -> Option<Vec<Grid>> //CONVERT STRING SLICE TO VECTOR OF GRIDS
@@ -394,12 +450,13 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //ADD CLIENT TO CONNECTIONS
     {
         //CREATE CONNECTION
-        let connection = Connection
+        let connection = Connection::Authenticated
         {
             stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
             username: username.clone(),
             id: id,
             shared_key: shared_key.clone().unwrap(),
+            last_activity: Instant::now(),
         };
 
         //PUSH
@@ -443,9 +500,12 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     let mut user_list = Vec::new();
 
                     //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
-                    for connection in connections.iter()
+                    for connection_enum in connections.iter()
                     {
-                        user_list.push(json!({ "username": connection.username, "id": connection.id }));
+                        if let Connection::Authenticated { username: uname, id: user_id, .. } = connection_enum
+                        {
+                            user_list.push(json!({ "username": uname, "id": user_id }));
+                        }
                     }
 
                     //SEND LIST BACK TO CLIENT
@@ -468,30 +528,33 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         {
                             if let Ok(num) = sender_id.parse::<usize>() //CLIENT ACTUALLY SENT NUMERIC ID
                             {
-                                if let Some(recipient) = get_connection_by_id(num) //yippee!! client sent valid id
+                                if let Some(recipient_enum) = get_connection_by_id(num) //yippee!! client sent valid id
                                 {
-                                    //SEND MESSAGE TO RECEIVER
-                                    if num != id //DO NOT SEND ON SELF MESSAGE
+                                    if let Connection::Authenticated { stream: recipient_stream, username: recipient_username, shared_key: recipient_key, ..} = recipient_enum
                                     {
-                                        send(&mut recipient.stream.lock().unwrap(), MessagePacket
+                                        //SEND MESSAGE TO RECEIVER
+                                        if num != id //DO NOT SEND ON SELF MESSAGE
+                                        {
+                                            send(&mut recipient_stream.lock().unwrap(), MessagePacket
+                                            {
+                                                text: Some(private_message.to_string()),
+                                                username: Some(username.clone()),
+                                                id: Some(id),
+                                                code: Some(MessageCode::PrivateMessage),
+                                            }, Some(&recipient_key));
+                                        }
+
+                                        //SEND MESSAGE BACK TO SENDER
+                                        send(stream, MessagePacket
                                         {
                                             text: Some(private_message.to_string()),
-                                            username: Some(username.clone()),
-                                            id: Some(id),
-                                            code: Some(MessageCode::PrivateMessage),
-                                        }, Some(&recipient.shared_key));
+                                            username: Some(recipient_username),
+                                            id: Some(num),
+                                            code: Some(MessageCode::PrivateMessageBack),
+                                        }, shared_key.as_ref());
+
+                                        continue; //VALID, DO NOT SEND InvalidUsage CODE
                                     }
-
-                                    //SEND MESSAGE BACK TO SENDER
-                                    send(stream, MessagePacket
-                                    {
-                                        text: Some(private_message.to_string()),
-                                        username: Some(recipient.username),
-                                        id: Some(num),
-                                        code: Some(MessageCode::PrivateMessageBack),
-                                    }, shared_key.as_ref());
-
-                                    continue; //VALID, DO NOT SEND InvalidUsage CODE
                                 }
                             }
                         }
