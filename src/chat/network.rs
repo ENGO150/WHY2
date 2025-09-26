@@ -155,6 +155,18 @@ impl Connection
             Self::NonAuthenticated { last_activity, .. } => last_activity,
         }
     }
+
+    //CHECK IF CONNECTION IS INACTIVE
+    fn is_inactive(&self, now: Option<Instant>) -> bool
+    {
+        now.unwrap_or(Instant::now()).duration_since(*self.last_activity()) > Duration::from_secs(config::server_config("communication_time").parse().unwrap())
+    }
+
+    //CLONE STREAM
+    fn cloned_stream(&self) -> Option<TcpStream>
+    {
+        self.stream().lock().ok()?.try_clone().ok()
+    }
 }
 
 //LISTS
@@ -955,7 +967,7 @@ pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
 pub fn disconnect_all() //DISCONNECT ALL CLIENTS
 {
     //ITERATE OVER ALL STREAMS, REMOVE CONNECTIONS
-    let mut streams: Vec<TcpStream> = CONNECTIONS.read().unwrap().iter().map(|conn| conn.stream().lock().unwrap().try_clone().unwrap()).collect();
+    let mut streams: Vec<TcpStream> = CONNECTIONS.read().unwrap().iter().map(|conn| conn.cloned_stream().unwrap()).collect();
     for stream in &mut streams
     {
         remove_connection(stream, DisconnectType::Gracefully); //REMOVE GRACEFULLY
@@ -965,13 +977,12 @@ pub fn disconnect_all() //DISCONNECT ALL CLIENTS
 pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
 {
     let now = Instant::now();
-    let timeout = Duration::from_secs(config::server_config("communication_time").parse().unwrap());
 
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
 
     //COLLECT STREAMS OF INACTIVE CONNECTIONS
     let inactive_streams: Vec<TcpStream> = connections.iter()
-        .filter(|conn| now.duration_since(*conn.last_activity()) > timeout)
+        .filter(|conn| conn.is_inactive(Some(now)))
         .filter_map(|conn| conn.stream().lock().ok()?.try_clone().ok())
         .collect();
 
