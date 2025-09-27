@@ -39,7 +39,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "chat_client"
 path = "src/chat/bin/client.rs"
-required-feature = ["client"]
+required-features = ["client"]
 
 [[bin]]
 name = "chat_server"
