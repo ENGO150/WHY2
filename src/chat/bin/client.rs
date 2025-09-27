@@ -342,6 +342,7 @@ fn main()
         let mut input = read_input();
 
         //USER COMMANDS
+        let mut command_used = false;
         if let (Some(command), parameters) = command::get_command(&input)
         {
             match command
@@ -407,7 +408,7 @@ fn main()
                 }
             }
 
-            continue; //DO NOT SEND COMMAND STRING
+            command_used = true;
         }
 
         //APPEND MESSAGE TO HISTORY
@@ -424,6 +425,8 @@ fn main()
             //RESET HISTORY POSITION
             history.1 = history.0.len();
         }
+
+        if command_used { continue }; //DO NOT SEND COMMAND STRING
 
         //USER ENTERED PASSWORD - HASH
         if options::get_asking_password()
