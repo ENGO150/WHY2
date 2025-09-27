@@ -91,6 +91,7 @@ pub enum MessageCode //CONTROL CODES
     List,               //CLIENT <> SERVER | PRINT CONNECTED USERS
     PrivateMessage,     //CLIENT <> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
     PrivateMessageBack, //SERVER -> CLIENT | SEND MESSAGE BACK TO SENDER
+    SpamWarning,        //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
 }
 
@@ -115,6 +116,7 @@ enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         id: usize,                     //ID OF USER
         shared_key: Vec<i64>,          //SHARED KEY BETWEEN SERVER AND CLIENT (one to one)
         last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
+        spam_violations: usize,        //SPAM VIOLATIONS (unexpexted, huh?)
     },
 
     NonAuthenticated
@@ -195,6 +197,26 @@ impl Connection
         {
             Self::Authenticated { last_activity, .. } => last_activity,
             Self::NonAuthenticated { last_activity, .. } => last_activity,
+        }
+    }
+
+    //GET SPAM VIOLATIONS FROM Connection
+    fn spam_violations(&self) -> Option<&usize>
+    {
+        match self
+        {
+            Self::Authenticated { spam_violations, .. } => Some(spam_violations),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //GET SPAM VIOLATIONS FROM Connection AS MUTABLE
+    fn spam_violations_mut(&mut self) -> Option<&mut usize>
+    {
+        match self
+        {
+            Self::Authenticated { spam_violations, .. } => Some(spam_violations),
+            Self::NonAuthenticated { .. } => None,
         }
     }
 
@@ -583,6 +605,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             id: id,
             shared_key: shared_key.clone().unwrap(),
             last_activity: Instant::now(),
+            spam_violations: 0,
         };
 
         //PUSH
@@ -855,6 +878,13 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("[PM TO] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap());
                 },
 
+                //SPAM WARNING
+                MessageCode::SpamWarning =>
+                {
+                    clear_lines(2);
+                    println!("Slow down! You're sending messages too quickly.\n");
+                }
+
                 //CLIENT MESSED SOME COMMAND UP
                 MessageCode::InvalidUsage =>
                 {
@@ -983,18 +1013,38 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     {
         let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
         let peer_addr = stream.peer_addr().unwrap(); //GET CURRENT PEER ADDRESS
+        let mut disconnect = false;
 
         //FIND CONNECTION AND SET last_activity
         for conn in connections.iter_mut()
         {
             if conn.stream().lock().unwrap().peer_addr().unwrap() == peer_addr //CONNECTION FOUND
             {
+                //SPAM
+                if conn.is_authenticated() && Instant::now().duration_since(*conn.last_activity()) < Duration::from_millis(config::server_config("min_message_delay").parse().unwrap())
+                {
+                    //INCREMENT SPAM VIOLATIONS
+                    *conn.spam_violations_mut().unwrap() += 1;
 
+                    //SEND WARNING CODE
+                    send_code(stream, None, MessageCode::SpamWarning, conn.shared_key());
+
+                    //CHECK FOR TOO MANY VIOLATIONS
+                    disconnect = *conn.spam_violations().unwrap() > config::server_config("max_message_delay_violations").parse().unwrap();
+                }
 
                 *conn.last_activity_mut() = Instant::now(); //RESET last_activity
 
                 break;
             }
+        }
+
+        //TOO MANY VIOLATIONS, BYE
+        if disconnect
+        {
+            drop(connections); //DROP WRITE LOCK
+            remove_connection(stream, DisconnectType::Gracefully);
+            return None;
         }
     }
 
