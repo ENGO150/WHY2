@@ -148,6 +148,26 @@ impl Connection
         }
     }
 
+    //GET USERNAME FROM Connection
+    fn username(&self) -> Option<&String>
+    {
+        match self
+        {
+            Self::Authenticated { username, .. } => Some(username),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //GET ID FROM Connection
+    fn id(&self) -> Option<&usize>
+    {
+        match self
+        {
+            Self::Authenticated { id, .. } => Some(id),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
     //GET SHARED KEY FROM Connection
     fn shared_key(&self) -> Option<&Vec<i64>>
     {
@@ -178,6 +198,16 @@ impl Connection
     fn cloned_stream(&self) -> Option<TcpStream>
     {
         self.stream().lock().ok()?.try_clone().ok()
+    }
+
+    //IS AUTHENTICATED
+    fn is_authenticated(&self) -> bool
+    {
+        match self
+        {
+            Self::Authenticated { .. } => true,
+            Self::NonAuthenticated { .. } => false,
+        }
     }
 }
 
@@ -271,17 +301,17 @@ fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: O
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
 
     //SEND TO EACH CLIENT
-    for connection_enum in connections.iter()
+    for connection in connections.iter()
     {
-        if let Connection::Authenticated { stream, shared_key, .. } = connection_enum
+        if connection.is_authenticated()
         {
-            send(&mut *stream.lock().unwrap(), MessagePacket
+            send(&mut *connection.stream().lock().unwrap(), MessagePacket
             {
                 text: message.map(str::to_string),
                 username: Some(username.to_string()),
                 id: id,
                 code: code.clone(),
-            }, Some(&shared_key));
+            }, connection.shared_key());
         }
     }
 }
@@ -313,9 +343,9 @@ fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType) //
                     send_code(&mut removed_stream, None, MessageCode::Disconnect, conn.shared_key());
                 }
 
-                if let Connection::Authenticated { username: uname, .. } = conn
+                if conn.is_authenticated()
                 {
-                    username = Some(uname.clone());
+                    username = conn.username().cloned();
                 }
 
                 removed = true;
@@ -347,7 +377,7 @@ fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CON
 {
     CONNECTIONS.read().unwrap().iter().any(|conn|
     {
-        matches!(conn, Connection::Authenticated { username: uname, .. } if uname == username)
+        conn.username() == Some(&username.to_string())
     })
 }
 
@@ -357,10 +387,11 @@ fn get_latest_id() -> usize
     //GET HashSet OF IDS
     let ids: HashSet<usize> = CONNECTIONS.read().unwrap().iter().filter_map(|conn|
     {
-        if let Connection::Authenticated { id, .. } = conn
+        if let Some(id) = conn.id()
         {
             Some(*id)
-        } else {
+        } else
+        {
             None
         }
     }).collect();
@@ -382,7 +413,7 @@ fn get_connection_by_id(id: usize) -> Option<Connection> //RETURN CONNECTION WIT
 {
     CONNECTIONS.read().unwrap().iter().find(|conn|
     {
-        matches!(conn, Connection::Authenticated { id: user_id, .. } if *user_id == id)
+        conn.id() == Some(&id)
     }).cloned()
 }
 
@@ -413,11 +444,8 @@ fn str_to_grids(bytes: Vec<u8>) -> Option<Vec<Grid>> //CONVERT STRING SLICE TO V
 #[cfg(feature = "server")]
 fn authenticate_client(connection: Connection) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
-    if let Connection::Authenticated { ref stream, .. } = connection
-    {
-        remove_connection(&mut stream.lock().unwrap(), DisconnectType::Authenticate); //REMOVE FROM NonAuthenticated
-        CONNECTIONS.write().unwrap().push(connection); //ADD Authenticated
-    }
+    remove_connection(&mut connection.stream().lock().unwrap(), DisconnectType::Authenticate); //REMOVE FROM NonAuthenticated
+    CONNECTIONS.write().unwrap().push(connection); //ADD Authenticated
 }
 
 //PUBLIC
@@ -616,27 +644,27 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         {
                             if let Ok(num) = sender_id.parse::<usize>() //CLIENT ACTUALLY SENT NUMERIC ID
                             {
-                                if let Some(recipient_enum) = get_connection_by_id(num) //yippee!! client sent valid id
+                                if let Some(recipient) = get_connection_by_id(num) //yippee!! client sent valid id
                                 {
-                                    if let Connection::Authenticated { stream: recipient_stream, username: recipient_username, shared_key: recipient_key, ..} = recipient_enum
+                                    if recipient.is_authenticated()
                                     {
                                         //SEND MESSAGE TO RECEIVER
                                         if num != id //DO NOT SEND ON SELF MESSAGE
                                         {
-                                            send(&mut recipient_stream.lock().unwrap(), MessagePacket
+                                            send(&mut recipient.stream().lock().unwrap(), MessagePacket
                                             {
                                                 text: Some(private_message.to_string()),
                                                 username: Some(username.clone()),
                                                 id: Some(id),
                                                 code: Some(MessageCode::PrivateMessage),
-                                            }, Some(&recipient_key));
+                                            }, recipient.shared_key());
                                         }
 
                                         //SEND MESSAGE BACK TO SENDER
                                         send(stream, MessagePacket
                                         {
                                             text: Some(private_message.to_string()),
-                                            username: Some(recipient_username),
+                                            username: recipient.username().cloned(),
                                             id: Some(num),
                                             code: Some(MessageCode::PrivateMessageBack),
                                         }, shared_key.as_ref());
