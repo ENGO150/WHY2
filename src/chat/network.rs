@@ -972,7 +972,7 @@ pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
     //COLLECT STREAMS OF INACTIVE CONNECTIONS
     let inactive_streams: Vec<TcpStream> = connections.iter()
         .filter(|conn| conn.is_inactive(Some(now)))
-        .filter_map(|conn| conn.stream().lock().ok()?.try_clone().ok())
+        .filter_map(|conn| conn.cloned_stream())
         .collect();
 
     drop(connections); //RELEASE READ LOCK
