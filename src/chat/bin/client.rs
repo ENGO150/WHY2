@@ -398,6 +398,13 @@ fn main()
                         code: Some(MessageCode::PrivateMessage),
                     }, options::get_shared_key().as_ref());
                 },
+
+                //INVALID COMMAND
+                Command::Invalid =>
+                {
+                    clear_lines(2);
+                    print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
+                }
             }
 
             continue; //DO NOT SEND COMMAND STRING

@@ -18,8 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::fmt::
 {
-    self,
     Display,
+    Formatter,
     Result,
 };
 
@@ -33,13 +33,14 @@ pub enum Command
     Help,           //PRINT COMMANDS
     List,           //LIST USERS
     PrivateMessage, //ONE TO ONE MESSAGE
+    Invalid,        //INVALID COMMAND
 }
 
 //IMPLEMENTATIONS
 impl Display for Command
 {
     //Command TO STRING
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result
     {
         let name = match self
         {
@@ -47,6 +48,7 @@ impl Display for Command
             Command::Exit           => "exit",
             Command::List           => "list",
             Command::PrivateMessage => "pm",
+            Command::Invalid        => "",
         };
 
         write!(f, "{}{}", COMMAND_PREFIX, name)
@@ -77,6 +79,6 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
         //PARAMETRIC
         "PM" | "DM" | "MSG" | "TELL"                  => (Some(Command::PrivateMessage), parameters),
 
-        _ => (None, None)
+        _ => (Some(Command::Invalid), None)
     }
 }
