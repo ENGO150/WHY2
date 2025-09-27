@@ -192,7 +192,7 @@ pub static CONNECTIONS: Lazy<Arc<RwLock<Vec<Connection>>>> = Lazy::new(|| //LIST
 });
 
 //PRIVATE
-fn key_exchange_server(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR SERVER-SIDE
+fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR SERVER-SIDE
 {
     //WAIT FOR ClientServerKE
     let message = loop
@@ -368,7 +368,7 @@ pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
     //GET SHARED KEY
-    let shared_key = match key_exchange_server(stream)
+    let shared_key = match key_exchange(stream)
     {
         Some(r) => Some(r),
         None => return

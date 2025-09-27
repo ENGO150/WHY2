@@ -39,7 +39,8 @@ use crate::chat::
     },
 };
 
-fn key_exchange_client(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SIDE
+//PRIVATE
+fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //SEND ECC PUBKEY TO SERVER
     network::send(stream, MessagePacket
@@ -63,10 +64,11 @@ fn key_exchange_client(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CL
     crypto::get_shared_key(message.text.unwrap())
 }
 
+//PUBLIC
 pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 {
     //SET GLOBAL CLIENT SHARED KEY
-    options::set_shared_key(key_exchange_client(stream));
+    options::set_shared_key(key_exchange(stream));
 
     //SERVER INFO VARIABLES
     let mut max_uname: Option<u8> = None;
