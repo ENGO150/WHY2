@@ -54,7 +54,7 @@ use why2::
             self,
             MessageCode,
             MessagePacket,
-            clear_lines,
+            client,
         },
     },
 };
@@ -104,7 +104,7 @@ fn read_input() -> String
                     //CTRL+C (EXIT)
                     KeyCode::Char('c') =>
                     {
-                        clear_lines(2);
+                        network::clear_lines(2);
                         return Command::Exit.to_string();
                     },
 
@@ -324,7 +324,7 @@ fn main()
     let mut client_stream = stream.try_clone().expect("Failed cloning stream");
 
     //LISTEN TO SERVER
-    thread::spawn(move || network::listen_server(&mut stream));
+    thread::spawn(move || client::listen_server(&mut stream));
 
     //ENABLE RAW MODE
     terminal::enable_raw_mode().unwrap();
@@ -362,7 +362,7 @@ fn main()
                 //HELP
                 Command::Help =>
                 {
-                    clear_lines(2);
+                    network::clear_lines(2);
                     options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
 
                     print!
@@ -403,7 +403,7 @@ fn main()
                 //INVALID COMMAND
                 Command::Invalid =>
                 {
-                    clear_lines(2);
+                    network::clear_lines(2);
                     print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
                 }
             }
@@ -435,7 +435,7 @@ fn main()
             if input.len() <= options::MIN_PASSWORD_LEN
             {
                 print!("\x1B[2FPassword too short! Enter at least {} characters.\x1B[3E", options::MIN_PASSWORD_LEN);
-                clear_lines(1);
+                network::clear_lines(1);
                 print!(">>> ");
 
                 continue;

@@ -33,7 +33,7 @@ use why2::
         config,
         crypto,
         options,
-        network,
+        network::server,
         command::{ self, Command },
     },
 };
@@ -41,7 +41,7 @@ use why2::
 fn quit() //DISCONNECT ALL USERS
 {
     println!("Exiting...");
-    network::disconnect_all(); //DISCONNECT ALL USERS
+    server::disconnect_all(); //DISCONNECT ALL USERS
 }
 
 fn main()
@@ -65,7 +65,7 @@ fn main()
                 Ok(mut stream) =>
                 {
                     println!("New connection: {}", stream.peer_addr().unwrap());
-                    thread::spawn(move || network::listen_client(&mut stream));
+                    thread::spawn(move || server::listen_client(&mut stream));
                 },
 
                 Err(e) =>
@@ -82,7 +82,7 @@ fn main()
         loop
         {
             thread::sleep(Duration::from_secs(5));
-            network::disconnect_inactive();
+            server::disconnect_inactive();
         }
     });
 
