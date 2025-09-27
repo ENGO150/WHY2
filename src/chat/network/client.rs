@@ -31,6 +31,7 @@ use crate::chat::
 {
     crypto,
     options,
+    misc,
     network::
     {
         self,
@@ -112,12 +113,12 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //PICK_USERNAME CODE - guess what
                 MessageCode::Username =>
                 {
-                    network::clear_lines(2);
+                    misc::clear_lines(2);
 
                     //INVALID UNAME
                     if invalid_username
                     {
-                        network::clear_lines(2);
+                        misc::clear_lines(2);
                         print!("Username rejected!");
                     } else //VALID
                     {
@@ -131,7 +132,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //REGISTER
                 MessageCode::PasswordR =>
                 {
-                    network::clear_lines(3);
+                    misc::clear_lines(3);
                     options::set_asking_password(true);
                     println!("\nEnter password: (REGISTER)");
                 },
@@ -139,7 +140,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //LOGIN
                 MessageCode::PasswordL =>
                 {
-                    network::clear_lines(3);
+                    misc::clear_lines(3);
                     options::set_asking_password(true);
                     println!("\nEnter password: (LOGIN)");
                 },
@@ -147,14 +148,14 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //START CHATTING
                 MessageCode::Accept =>
                 {
-                    network::clear_lines(3);
+                    misc::clear_lines(3);
                     println!("Login successful. Press Ctrl+H for help.\n");
                 },
 
                 //JOIN MESSAGE (CLIENT CONNECTED)
                 MessageCode::Join =>
                 {
-                    network::clear_lines(2);
+                    misc::clear_lines(2);
 
                     if first_message
                     {
@@ -168,7 +169,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //LEAVE MESSAGE (CLIENT DISCONNECTED)
                 MessageCode::Leave =>
                 {
-                    network::clear_lines(2);
+                    misc::clear_lines(2);
 
                     println!("[{}]: {} disconnected.\n", read.username.unwrap(), read.text.unwrap());
                 },
@@ -176,7 +177,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //LIST OF ONLINE USERS
                 MessageCode::List =>
                 {
-                    network::clear_lines(2);
+                    misc::clear_lines(2);
 
                     if !options::get_extra_space() { println!(); }
                     println!("Online users:");
@@ -199,28 +200,28 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //PRIVATE MESSAGE INCOMING
                 MessageCode::PrivateMessage =>
                 {
-                    network::clear_lines(2);
+                    misc::clear_lines(2);
                     println!("[PM FROM] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap());
                 },
 
                 //PRIVATE MESSAGE INCOMING
                 MessageCode::PrivateMessageBack =>
                 {
-                    network::clear_lines(2);
+                    misc::clear_lines(2);
                     println!("[PM TO] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap());
                 },
 
                 //SPAM WARNING
                 MessageCode::SpamWarning =>
                 {
-                    network::clear_lines(2);
+                    misc::clear_lines(2);
                     println!("Slow down! You're sending messages too quickly.\n");
                 }
 
                 //CLIENT MESSED SOME COMMAND UP
                 MessageCode::InvalidUsage =>
                 {
-                    network::clear_lines(2);
+                    misc::clear_lines(2);
                     println!("Invalid usage! Press Ctrl+H for help.\n");
                 },
 
@@ -236,7 +237,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
             }
         } else //NO CODE, PRINT MESSAGE
         {
-            network::clear_lines(2);
+            misc::clear_lines(2);
 
             println!("{} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap());
         }

@@ -47,8 +47,8 @@ use why2::
         config,
         crypto,
         options,
+        misc as chat_misc,
         command::{ self, Command },
-
         network::
         {
             self,
@@ -104,7 +104,7 @@ fn read_input() -> String
                     //CTRL+C (EXIT)
                     KeyCode::Char('c') =>
                     {
-                        network::clear_lines(2);
+                        chat_misc::clear_lines(2);
                         return Command::Exit.to_string();
                     },
 
@@ -362,7 +362,7 @@ fn main()
                 //HELP
                 Command::Help =>
                 {
-                    network::clear_lines(2);
+                    chat_misc::clear_lines(2);
                     options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
 
                     print!
@@ -403,7 +403,7 @@ fn main()
                 //INVALID COMMAND
                 Command::Invalid =>
                 {
-                    network::clear_lines(2);
+                    chat_misc::clear_lines(2);
                     print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
                 }
             }
@@ -435,7 +435,7 @@ fn main()
             if input.len() <= options::MIN_PASSWORD_LEN
             {
                 print!("\x1B[2FPassword too short! Enter at least {} characters.\x1B[3E", options::MIN_PASSWORD_LEN);
-                network::clear_lines(1);
+                chat_misc::clear_lines(1);
                 print!(">>> ");
 
                 continue;

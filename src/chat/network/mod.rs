@@ -246,18 +246,3 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     //DECODE AND RETURN
     Some(bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard()).expect("Decoding packet failed").0)
 }
-
-pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
-{
-    for i in 0..n
-    {
-        //CLEAR CURRENT LINE
-        print!("\x1B[2K\r");
-
-        //MOVE UP
-        if i < n - 1
-        {
-            print!("\x1B[1A");
-        }
-    }
-}

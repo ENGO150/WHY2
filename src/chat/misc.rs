@@ -16,9 +16,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod command;
-pub mod config;
-pub mod crypto;
-pub mod misc;
-pub mod network;
-pub mod options;
+pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
+{
+    for i in 0..n
+    {
+        //CLEAR CURRENT LINE
+        print!("\x1B[2K\r");
+
+        //MOVE UP
+        if i < n - 1
+        {
+            print!("\x1B[1A");
+        }
+    }
+}
