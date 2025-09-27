@@ -347,10 +347,21 @@ fn get_connection_by_id(id: usize) -> Option<Connection> //RETURN CONNECTION WIT
     }).cloned()
 }
 
-fn authenticate_client(connection: Connection) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
+fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize, shared_key: &Vec<i64>) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
-    remove_connection(&mut connection.stream().lock().unwrap(), DisconnectType::Authenticate); //REMOVE FROM NonAuthenticated
-    CONNECTIONS.write().unwrap().push(connection); //ADD Authenticated
+    //REMOVE FROM NonAuthenticated
+    remove_connection(stream, DisconnectType::Authenticate);
+
+    //ADD Authenticated
+    CONNECTIONS.write().unwrap().push(Connection::Authenticated
+    {
+        stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
+        username: username.to_string(),
+        id: id,
+        shared_key: shared_key.clone(),
+        last_activity: Instant::now(),
+        spam_violations: 0,
+    });
 }
 
 //PUBLIC
@@ -479,21 +490,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let id = get_latest_id();
 
     //AUTHENTICATE CLIENT
-    {
-        //CREATE CONNECTION
-        let connection = Connection::Authenticated
-        {
-            stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
-            username: username.clone(),
-            id: id,
-            shared_key: shared_key.clone().unwrap(),
-            last_activity: Instant::now(),
-            spam_violations: 0,
-        };
-
-        //PUSH
-        authenticate_client(connection);
-    }
+    authenticate_client(stream, &username, id, shared_key.as_ref().unwrap());
 
     //TELL CLIENT TO START CHATTING
     send_code(stream, None, MessageCode::Accept, shared_key.as_ref());
