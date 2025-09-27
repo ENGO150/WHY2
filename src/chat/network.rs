@@ -19,16 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     process,
-    collections::HashSet,
     net::TcpStream,
-    time::{ Instant, Duration },
-
-    sync::
-    {
-        Arc,
-        Mutex,
-        RwLock,
-    },
 
     io::
     {
@@ -41,9 +32,7 @@ use std::
 };
 
 use serde::{ Serialize, Deserialize };
-use serde_json::{ json, Value };
-
-use once_cell::sync::Lazy;
+use serde_json::Value;
 
 use crossterm::terminal;
 
@@ -62,6 +51,26 @@ use crate::
         config,
         crypto,
         options as chat_options,
+    },
+};
+
+#[cfg(feature = "server")]
+use serde_json::json;
+
+#[cfg(feature = "server")]
+use once_cell::sync::Lazy;
+
+#[cfg(feature = "server")]
+use std::
+{
+    time::{ Instant, Duration },
+    collections::HashSet,
+
+    sync::
+    {
+        Arc,
+        Mutex,
+        RwLock,
     },
 };
 
@@ -95,6 +104,7 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 }
 
 //ENUMS
+#[cfg(feature = "server")]
 #[derive(Clone)]
 enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
@@ -115,6 +125,7 @@ enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
     },
 }
 
+#[cfg(feature = "server")]
 #[derive(PartialEq)]
 enum DisconnectType //TYPE OF REMOVING CLIENT FROM CONNECTIONS LIST
 {
@@ -124,6 +135,7 @@ enum DisconnectType //TYPE OF REMOVING CLIENT FROM CONNECTIONS LIST
 }
 
 //IMPLEMENTATIONS
+#[cfg(feature = "server")]
 impl Connection
 {
     //GET STREAM FROM Connection
@@ -170,12 +182,14 @@ impl Connection
 }
 
 //LISTS
+#[cfg(feature = "server")]
 static CONNECTIONS: Lazy<Arc<RwLock<Vec<Connection>>>> = Lazy::new(|| //LIST FOR EACH CLIENT CONNECTION
 {
     Arc::new(RwLock::new(Vec::new()))
 });
 
 //PRIVATE
+#[cfg(feature = "server")]
 fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, shared_key: Option<&Vec<i64>>) //SEND CODE TO CLIENT
 {
     send(stream, MessagePacket
@@ -211,6 +225,7 @@ fn key_exchange_client(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CL
     crypto::get_shared_key(message.text.unwrap())
 }
 
+#[cfg(feature = "server")]
 fn key_exchange_server(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR SERVER-SIDE
 {
     //WAIT FOR ClientServerKE
@@ -235,6 +250,7 @@ fn key_exchange_server(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANG
     Some(crypto::get_shared_key(message.text.unwrap()))
 }
 
+#[cfg(feature = "server")]
 fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //send welcome packet you idiot
 {
     //CREATE JSON WITH ALL THE INFO
@@ -249,6 +265,7 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //
     send_code(stream, Some(welcome_json), MessageCode::Welcome, shared_key);
 }
 
+#[cfg(feature = "server")]
 fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: Option<MessageCode>) //SEND PACKET TO ALL CLIENTS
 {
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
@@ -269,6 +286,7 @@ fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: O
     }
 }
 
+#[cfg(feature = "server")]
 fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType) //REMOVE CONNECTION BY TcpStream
 {
     //GET TARGET PEER ADDRESS
@@ -324,6 +342,7 @@ fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType) //
     }, &stream.peer_addr().unwrap());
 }
 
+#[cfg(feature = "server")]
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
 {
     CONNECTIONS.read().unwrap().iter().any(|conn|
@@ -332,6 +351,7 @@ fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CON
     })
 }
 
+#[cfg(feature = "server")]
 fn get_latest_id() -> usize
 {
     //GET HashSet OF IDS
@@ -357,6 +377,7 @@ fn get_latest_id() -> usize
     unreachable!("what the fuck");
 }
 
+#[cfg(feature = "server")]
 fn get_connection_by_id(id: usize) -> Option<Connection> //RETURN CONNECTION WITH MATCHING ID
 {
     CONNECTIONS.read().unwrap().iter().find(|conn|
@@ -389,6 +410,7 @@ fn str_to_grids(bytes: Vec<u8>) -> Option<Vec<Grid>> //CONVERT STRING SLICE TO V
     }).collect())
 }
 
+#[cfg(feature = "server")]
 fn authenticate_client(connection: Connection) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
     if let Connection::Authenticated { ref stream, .. } = connection
@@ -399,6 +421,7 @@ fn authenticate_client(connection: Connection) //MOVE CONNECTION FROM NonAuthent
 }
 
 //PUBLIC
+#[cfg(feature = "server")]
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
     //GET SHARED KEY
@@ -855,13 +878,17 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
 pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<MessagePacket>
 {
     //GET MAX PACKET SIZE
-    let max_packet_size = if chat_options::get_is_server()
+    let max_packet_size: usize;
+
+    #[cfg(feature = "server")]
     {
-        config::server_config("max_packet_size").parse::<usize>().unwrap() //SERVER
-    } else
+        max_packet_size = config::server_config("max_packet_size").parse::<usize>().unwrap();
+    }
+
+    #[cfg(not(feature = "server"))]
     {
-        config::client_config("max_packet_size").parse::<usize>().unwrap() //CLIENT
-    };
+        max_packet_size = config::client_config("max_packet_size").parse::<usize>().unwrap();
+    }
 
     //READ
     let mut reader = BufReader::new(&mut *stream).take(max_packet_size as u64 + 16);
@@ -874,7 +901,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         {
             Ok(0) | Err(_) => //CLIENT DISCONNECTED
             {
-                if chat_options::get_is_server()
+                #[cfg(feature = "server")]
                 {
                     remove_connection(stream, DisconnectType::Forcefully);
                 }
@@ -882,12 +909,15 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
                 return None;
             },
 
-            Ok(i) => //VALID MESSAGE
+            Ok(_i) => //VALID MESSAGE
             {
-                if chat_options::get_is_server() && i >= max_packet_size //INPUT TOO LONG
+                #[cfg(feature = "server")]
                 {
-                    remove_connection(stream, DisconnectType::Gracefully);
-                    return None;
+                    if _i >= max_packet_size //INPUT TOO LONG
+                    {
+                        remove_connection(stream, DisconnectType::Gracefully);
+                        return None;
+                    }
                 }
             }
         }
@@ -910,8 +940,8 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         decoded_packet = base91::slice_decode(decrypted_packet.as_bytes());
     }
 
-    //RESET ACTIVITY TIMER ON SERVER
-    if chat_options::get_is_server()
+    //ACTIVITY TIMER ON SERVER
+    #[cfg(feature = "server")]
     {
         let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
         let peer_addr = stream.peer_addr().unwrap(); //GET CURRENT PEER ADDRESS
@@ -953,6 +983,7 @@ pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
     }
 }
 
+#[cfg(feature = "server")]
 pub fn disconnect_all() //DISCONNECT ALL CLIENTS
 {
     //ITERATE OVER ALL STREAMS, REMOVE CONNECTIONS
@@ -963,6 +994,7 @@ pub fn disconnect_all() //DISCONNECT ALL CLIENTS
     }
 }
 
+#[cfg(feature = "server")]
 pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
 {
     let now = Instant::now();

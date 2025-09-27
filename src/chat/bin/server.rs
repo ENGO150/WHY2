@@ -46,7 +46,6 @@ fn quit() //DISCONNECT ALL USERS
 
 fn main()
 {
-    options::set_is_server(true); //USED FOR TIMEOUTS, MAX PACKET SIZE ETC.
     misc::check_version(); //CHECK FOR UPDATES
     config::init_server_config(); //CREATE server.toml CONFIGURATION
     crypto::init_keys(); //GENERATE ECC KEYS

@@ -29,6 +29,9 @@ authors = ["Václav Šmejkal <engo@satan.red>"]
 
 include = ["src/**", "Cargo.toml", "README", "LICENSE"]
 
+[features]
+server = []
+
 [lib]
 path = "src/lib.rs"
 
@@ -39,6 +42,7 @@ path = "src/chat/bin/client.rs"
 [[bin]]
 name = "chat_server"
 path = "src/chat/bin/server.rs"
+required-features = ["server"]
 
 [dependencies]
 base91 = "0.1.0"
