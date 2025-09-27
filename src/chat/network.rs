@@ -188,6 +188,16 @@ impl Connection
         }
     }
 
+    //GET LAST ACTIVITY FROM Connection AS MUTABLE
+    fn last_activity_mut(&mut self) -> &mut Instant
+    {
+        match self
+        {
+            Self::Authenticated { last_activity, .. } => last_activity,
+            Self::NonAuthenticated { last_activity, .. } => last_activity,
+        }
+    }
+
     //CHECK IF CONNECTION IS INACTIVE
     fn is_inactive(&self, now: Option<Instant>) -> bool
     {
@@ -979,13 +989,9 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         {
             if conn.stream().lock().unwrap().peer_addr().unwrap() == peer_addr //CONNECTION FOUND
             {
-                match conn
-                {
-                    Connection::Authenticated { last_activity, .. } | Connection::NonAuthenticated { last_activity, .. } =>
-                    {
-                        *last_activity = Instant::now(); //RESET last_activity
-                    },
-                }
+
+
+                *conn.last_activity_mut() = Instant::now(); //RESET last_activity
 
                 break;
             }
