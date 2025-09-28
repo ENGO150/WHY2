@@ -30,6 +30,7 @@ use std::
 };
 
 //TYPES
+#[derive(Clone, Debug)]
 pub struct Grid<const W: usize, const H: usize>([[i64; W]; H]); //GRID FOR REX DATA
 
 //IMPLEMENTATIONS
