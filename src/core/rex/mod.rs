@@ -27,6 +27,12 @@ use std::
     vec::IntoIter as IntoVecIter,
     slice::{ Iter, IterMut },
     ops::{ Index, IndexMut },
+    fmt::
+    {
+        Display,
+        Formatter,
+        Result,
+    },
 };
 
 //TYPES
@@ -265,5 +271,62 @@ impl<const W: usize, const H: usize> IndexMut<usize> for Grid<W, H>
 {
     fn index_mut(&mut self, y: usize) -> &mut Self::Output {
         &mut self.0[y]
+    }
+}
+
+//DISPLAY
+impl<const W: usize, const H: usize> Display for Grid<W, H>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result
+    {
+        //CONVERT EACH VALUE TO 4 LINES
+        let cells: Vec<Vec<[String; 4]>> = self.0.iter().map(|row|
+        {
+            row.iter().map(|val|
+            {
+                let s = val.to_string();
+                let chunk_size = (s.len() + 3) / 4;
+                let mut lines = [String::new(), String::new(), String::new(), String::new()];
+
+                for (i, chunk) in s.chars().collect::<Vec<_>>().chunks(chunk_size).enumerate()
+                {
+                    lines[i] = chunk.iter().collect();
+                }
+
+                lines
+            }).collect()
+        }).collect();
+
+        //DETERMINE MAX WIDTH
+        let max_width = cells.iter()
+            .flat_map(|row| row.iter())
+            .flat_map(|lines| lines.iter())
+            .map(|line| line.len())
+            .max()
+            .unwrap_or(1);
+
+        //BUILD HORIZONTAL BORDER
+        let border = format!
+        (
+            "+{}+\n",
+            (0..W).map(|_| "-".repeat(max_width + 2)).collect::<Vec<_>>().join("+")
+        );
+
+        //PRINT
+        for row in &cells
+        {
+            f.write_str(&border)?;
+            for line_idx in 0..4
+            {
+                for cell in row
+                {
+                    write!(f, "| {:>width$} ", cell[line_idx], width = max_width)?;
+                }
+
+                writeln!(f, "|")?;
+            }
+        }
+
+        f.write_str(&border)
     }
 }

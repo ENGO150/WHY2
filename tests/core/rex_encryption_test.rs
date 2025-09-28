@@ -71,7 +71,7 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
         "Test {status}!\n
 TEXT: \t\t\"{TEST_TEXT}\"
 OUTPUT: \t\"{decrypted_string}\"
-KEY: \t\t\"{:?}\"
+KEY: \t\t\n{}
 TIME: \t\t{}ms",
 
         key, measure_stop.as_millis()
