@@ -28,19 +28,19 @@ use rand::
 
 use rand_chacha::ChaCha20Rng;
 
-use crate::core::rex::
-{
-    misc,
-    options::{ self, Grid },
-};
+use crate::core::rex::{ options, Grid };
 
-pub fn sha256_seed_grid(key: &Grid) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFLING REX GRID
+//GRID DIMENSIONS
+const GRID_W: usize = options::GRID_DIMENSIONS.0;
+const GRID_H: usize = options::GRID_DIMENSIONS.1;
+
+pub fn sha256_seed_grid(key: &Grid<GRID_W, GRID_H>) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFLING REX GRID
 {
     //SHA256
     let mut hasher = Sha256::new();
 
     //ADD TO HASH
-    for row in key
+    for row in key.iter()
     {
         for val in row
         {
@@ -54,7 +54,7 @@ pub fn sha256_seed_grid(key: &Grid) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFL
 
 pub fn generate_key_deterministic(rng: &mut ChaCha20Rng) -> Vec<i64> //GENERATE KEY USING DPRNG
 {
-    (0..(2 * options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1)).map(|_| rng.next_u64() as i64).collect()
+    (0..(2 * GRID_W * GRID_H)).map(|_| rng.next_u64() as i64).collect()
 }
 
 pub fn generate_key() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
@@ -66,9 +66,9 @@ pub fn generate_key() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
     generate_key_deterministic(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
 }
 
-pub fn generate_round_keys(master_key: &Grid) -> Vec<Grid> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
+pub fn generate_round_keys(master_key: &Grid<GRID_W, GRID_H>) -> Vec<Grid<GRID_W, GRID_H>> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
 {
-    let mut keys: Vec<Grid> = Vec::with_capacity(options::ROUND_KEYS);
+    let mut keys: Vec<Grid<GRID_W, GRID_H>> = Vec::with_capacity(options::ROUND_KEYS);
 
     //GENERATE KEYS
     for _ in 0..(options::ROUND_KEYS)
@@ -77,7 +77,7 @@ pub fn generate_round_keys(master_key: &Grid) -> Vec<Grid> //GENERATE 'RANDOM' R
         let key = generate_key_deterministic(&mut ChaCha20Rng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
 
         //CONVERT KEY TO Grid & PUSH TO keys
-        keys.push(misc::shape_key(key));
+        keys.push(Grid::from_key(key));
     }
 
     keys

@@ -30,7 +30,6 @@ use crate::core::
     rex::
     {
         crypto,
-        misc as rex_misc,
         options::
         {
             self,
@@ -58,14 +57,14 @@ pub fn decrypt(input: EncryptedData) -> DecryptedData //ENCRYPT
         //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
         for (i, round_key) in round_keys[1..].iter().enumerate().rev()
         {
-            rex_misc::inv_mix_columns(grid);           //UNMIX COLUMNS
-            rex_misc::inv_shift_rows(grid, round_key); //UNSHIFT ROWS
-            rex_misc::inv_subcell(grid, i);            //INVERT SUBCELL
-            rex_misc::xor_grids(grid, round_key);      //XOR
+            grid.inv_mix_columns();         //UNMIX COLUMNS
+            grid.inv_shift_rows(round_key); //UNSHIFT ROWS
+            grid.inv_subcell(i);            //INVERT SUBCELL
+            grid.xor_grids(round_key);      //XOR
         }
 
         //INITIAL XOR
-        rex_misc::xor_grids(grid, &round_keys[0]);
+        grid.xor_grids(&round_keys[0]);
     }
 
     //DE-SHUFFLING VARIABLES
@@ -106,7 +105,7 @@ pub fn decrypt(input: EncryptedData) -> DecryptedData //ENCRYPT
     DecryptedData
     {
         output: flattened,
-        key: key_grid.into_iter().flatten().collect(),
+        key: key_grid.into_iter().collect(),
     }
 }
 

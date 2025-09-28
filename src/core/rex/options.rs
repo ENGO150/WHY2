@@ -16,20 +16,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::core::rex::Grid;
+
 //CONSTS (DO NOT CHANGE THOSE UNTIL YOU ARE COMPLETELY SURE WHAT ARE YOU DOING)
 pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                   //DIMENSIONS OF REX GRID
 pub const ROUND_KEYS: usize               = 14;                                                       //NUMBER OF ITERATIONS TO RUN WITH ROUND KEYS
 pub const SUBCELL_ROUNDS: u32             = 6;                                                        //ITERATIONS FOR MIXING
 pub const SUBCELL_DELTA: u32              = 0x9E3779B9;                                               //USED TO BREAK SYMMETRY ((2 ^ 32) / PHI)
 
-//TYPES
-pub type Grid = [[i64; 8]; 8]; //GRID FOR REX DATA
+const GRID_W: usize = GRID_DIMENSIONS.0;
+const GRID_H: usize = GRID_DIMENSIONS.1;
 
 //STRUCTS
 pub struct EncryptedData //DATA FOR REX ENCRYPTER
 {
-    pub output: Vec<Grid>, //OUTPUT VALUE
-    pub key: Grid,         //KEY USED FOR ENCRYPTION
+    pub output: Vec<Grid<GRID_W, GRID_H>>, //OUTPUT VALUE
+    pub key: Grid<GRID_W, GRID_H>,         //KEY USED FOR ENCRYPTION
 }
 
 pub struct DecryptedData //DATA FOR REX DECRYPTER

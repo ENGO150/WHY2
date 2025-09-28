@@ -44,8 +44,8 @@ use crate::
     {
         encrypter,
         decrypter,
-        misc,
-        options::{ self, Grid },
+        options,
+        Grid,
     },
 };
 
@@ -85,22 +85,26 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub code: Option<MessageCode>, //CONTROL CODE
 }
 
+//CONSTS
+const GRID_W: usize = options::GRID_DIMENSIONS.0;
+const GRID_H: usize = options::GRID_DIMENSIONS.1;
+
 //PRIVATE
-fn str_to_grids(bytes: Vec<u8>) -> Option<Vec<Grid>> //CONVERT STRING SLICE TO VECTOR OF GRIDS
+fn str_to_grids(bytes: Vec<u8>) -> Option<Vec<Grid<GRID_W, GRID_H>>> //CONVERT STRING SLICE TO VECTOR OF GRIDS
 {
-    let matrix_size = options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1 * 8; //EACH i64 IS 8 BYTES
+    let matrix_size = GRID_W * GRID_H * 8; //EACH i64 IS 8 BYTES
 
     //CHECK FOR VALID GRID
     if bytes.len() % matrix_size != 0 { return None; }
 
     Some(bytes.chunks(matrix_size).map(|chunk|
     {
-        let mut grid = misc::empty_grid();
-        for i in 0..(options::GRID_DIMENSIONS.0)
+        let mut grid = Grid::new();
+        for i in 0..(GRID_W)
         {
-            for j in 0..(options::GRID_DIMENSIONS.1)
+            for j in 0..(GRID_H)
             {
-                let start = (i * options::GRID_DIMENSIONS.1 + j) * 8;
+                let start = (i * GRID_H + j) * 8;
                 let slice = &chunk[start..start + 8];
                 grid[i][j] = i64::from_be_bytes(slice.try_into().unwrap());
             }
@@ -196,7 +200,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         let decrypted_packet = decrypter::decrypt_string(options::EncryptedData
         {
             output: str_to_grids(decoded_packet)?, //CONVERT decoded_packet FROM Vec<u8> TO Vec<Grid>
-            key: misc::shape_key(key.clone()),
+            key: Grid::from_key(key.to_vec()),
         });
 
         //OVERWRITE decoded_packet

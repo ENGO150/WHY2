@@ -32,13 +32,8 @@ use crate::core::
     rex::
     {
         crypto,
-        misc as rex_misc,
-        options::
-        {
-            self,
-            Grid,
-            EncryptedData,
-        },
+        options::{ self, EncryptedData },
+        Grid,
     },
 };
 
@@ -48,7 +43,9 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData> 
     misc::check_version();
 
     //REX OPTIONS
-    let grid_area = options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1; //AREA OF REX GRID
+    const GRID_W: usize = options::GRID_DIMENSIONS.0;
+    const GRID_H: usize = options::GRID_DIMENSIONS.1;
+    let grid_area = GRID_W * GRID_H; //AREA OF REX GRID
 
     //GET KEY THAT WILL BE USED FOR ENCRYPTION
     let key_used = match key
@@ -76,19 +73,19 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData> 
     input_used.extend(iter::repeat(padding_len as i64).take(padding_len));
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut grids: Vec<Grid> = input_used.chunks(grid_area).map(|chunk|
+    let mut grids: Vec<Grid<GRID_W, GRID_H>> = input_used.chunks(grid_area).map(|chunk|
     {
-        let mut grid = rex_misc::empty_grid(); //CREATE GRID
+        let mut grid = Grid::new(); //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
         {
-            grid[i / options::GRID_DIMENSIONS.1][i % options::GRID_DIMENSIONS.0] = val;
+            grid[i / GRID_H][i % GRID_W] = val;
         }
 
         grid
     }).collect();
 
     //SHAPE KEY TO 8x8 GRID
-    let key_grid = rex_misc::shape_key(key_used);
+    let key_grid = Grid::<GRID_W, GRID_H>::from_key(key_used);
 
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
     let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
@@ -103,7 +100,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData> 
         //REBUILD
         for (i, val) in flattened.into_iter().enumerate()
         {
-            grid[i / options::GRID_DIMENSIONS.1][i % options::GRID_DIMENSIONS.0] = val;
+            grid[i / GRID_H][i % GRID_W] = val;
         }
     }
 
@@ -114,15 +111,15 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData> 
     for grid in &mut grids
     {
         //INITIAL XOR
-        rex_misc::xor_grids(grid, &round_keys[0]);
+        grid.xor_grids(&round_keys[0]);
 
         //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
         for (i, round_key) in round_keys[1..].iter().enumerate()
         {
-            rex_misc::xor_grids(grid, round_key);  //XOR
-            rex_misc::subcell(grid, i);            //SUBCELL
-            rex_misc::shift_rows(grid, round_key); //SHIFT ROWS
-            rex_misc::mix_columns(grid);           //MIX COLUMNS
+            grid.xor_grids(round_key);  //XOR
+            grid.subcell(i);            //SUBCELL
+            grid.shift_rows(round_key); //SHIFT ROWS
+            grid.mix_columns();         //MIX COLUMNS
         }
     }
 
