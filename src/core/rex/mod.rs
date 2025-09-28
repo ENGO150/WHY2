@@ -48,6 +48,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
         Self([[0i64; W]; H])
     }
 
+    //CREATE KEY GRID
     pub fn from_key(vec: Vec<i64>) -> Self
     {
         //GRID OPTIONS
@@ -61,6 +62,31 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
 
         key_grid
+    }
+
+    //CREATE VECTOR OF GRIDS FROM BYTES
+    pub fn from_bytes(bytes: Vec<u8>) -> Option<Vec<Self>>
+    {
+        let matrix_size = W * H * 8; //EACH i64 IS 8 BYTES
+
+        //CHECK FOR VALID GRID
+        if bytes.len() % matrix_size != 0 { return None; }
+
+        Some(bytes.chunks(matrix_size).map(|chunk|
+        {
+            let mut grid = Grid::new();
+            for i in 0..W
+            {
+                for j in 0..H
+                {
+                    let start = (i * H + j) * 8;
+                    let slice = &chunk[start..start + 8];
+                    grid[i][j] = i64::from_be_bytes(slice.try_into().unwrap());
+                }
+            }
+
+            grid
+        }).collect())
     }
 
     //ITERATOR
