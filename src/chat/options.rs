@@ -16,17 +16,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::sync::
-{
-    atomic::{ AtomicBool, Ordering },
-    RwLock,
-    Arc,
-    Mutex,
-};
+use std::sync::RwLock;
 
 use once_cell::sync::Lazy;
 
 use crate::core::options::{ self, Options };
+
+#[cfg(feature = "client")]
+use std::sync::
+{
+    atomic::{ AtomicBool, Ordering },
+    Arc,
+    Mutex,
+};
 
 //CONSTS
 pub const SERVER_PORT: u16          = 1204;                                                                         //PORT FOR SERVER COMMUNICATION
