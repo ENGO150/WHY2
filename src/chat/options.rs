@@ -48,10 +48,13 @@ static SHARED_KEY: Lazy<RwLock<Option<Vec<i64>>>> = Lazy::new(|| //SHARED SYMMET
     RwLock::new(None)
 });
 
+#[cfg(feature = "client")]
 static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING PASSWORD (DISABLE ECHO)
 
+#[cfg(feature = "client")]
 static EXTRA_SPACE: AtomicBool = AtomicBool::new(false); //CLIENT DISPLAYED SOME MENU (/help ETC.), ADD EXTRA SPACE ON NEXT MESSAGE
 
+#[cfg(feature = "client")]
 pub static INPUT_READ: Lazy<Arc<Mutex<Vec<char>>>> = Lazy::new(|| //INPUT READ FROM CLIENT
 {
     Arc::new(Mutex::new(Vec::new()))
@@ -72,22 +75,26 @@ pub fn get_shared_key() -> Option<Vec<i64>> //RETURN KEY
 }
 
 //ASKING PASSWORD
+#[cfg(feature = "client")]
 pub fn set_asking_password(value: bool) //SET ASKING_PASSWORD
 {
     ASKING_PASSWORD.store(value, Ordering::SeqCst);
 }
 
+#[cfg(feature = "client")]
 pub fn get_asking_password() -> bool //GET ASKING_PASSWORD
 {
     ASKING_PASSWORD.load(Ordering::SeqCst)
 }
 
 //ADD EXTRA SPACE
+#[cfg(feature = "client")]
 pub fn set_extra_space(value: bool) //SET EXTRA_SPACE
 {
     EXTRA_SPACE.store(value, Ordering::SeqCst);
 }
 
+#[cfg(feature = "client")]
 pub fn get_extra_space() -> bool //GET EXTRA_SPACE
 {
     EXTRA_SPACE.load(Ordering::SeqCst)
