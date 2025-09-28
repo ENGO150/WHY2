@@ -29,11 +29,11 @@ use once_cell::sync::Lazy;
 use crate::core::options::{ self, Options };
 
 //CONSTS
-pub const SERVER_PORT: u16          = 1204;                                                                          //PORT FOR SERVER COMMUNICATION
-pub const SERVER_CONFIG: &str       = "/server.toml";                                                                //SERVER CONFIG FILE
-pub const CLIENT_CONFIG: &str       = "/client.toml";                                                                //CLIENT CONFIG FILE
-pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                          //SERVER USERS CONFIG FILE
-pub const CONFIG_URL: &str          = "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/configs"; //CONFIG FILE DOWNLOAD URL
+pub const SERVER_PORT: u16          = 1204;                                                                         //PORT FOR SERVER COMMUNICATION
+pub const SERVER_CONFIG: &str       = "/server.toml";                                                               //SERVER CONFIG FILE
+pub const CLIENT_CONFIG: &str       = "/client.toml";                                                               //CLIENT CONFIG FILE
+pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                         //SERVER USERS CONFIG FILE
+pub const CONFIG_URL: &str          = "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/config"; //CONFIG FILE DOWNLOAD URL
 
 pub const AUTHORITY_DIR: &str       = "/certs";                                                                      //AUTHORITY DIRECTORY
 
