@@ -29,11 +29,14 @@ use std::sync::
 //CONSTS
 pub const METADATA_URL: &str        = "https://crates.io/api/v1/crates/why2";                                       //URL FOR PROJECT METADATA
 
-pub const SERVER_PORT: u16          = 1204;                                                                         //PORT FOR SERVER COMMUNICATION
+pub const USER_CONFIG_DIR: &str     = "{HOME}/.config";                                                             //USER CONFIG DIRECTORY
+pub const CONFIG_DIR: &str          = "/WHY2";                                                                      //DIRECTORY FOR CONFIG FILES
 pub const SERVER_CONFIG: &str       = "/server.toml";                                                               //SERVER CONFIG FILE
 pub const CLIENT_CONFIG: &str       = "/client.toml";                                                               //CLIENT CONFIG FILE
 pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                         //SERVER USERS CONFIG FILE
 pub const CONFIG_URL: &str          = "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/config"; //CONFIG FILE DOWNLOAD URL
+
+pub const SERVER_PORT: u16          = 1204;                                                                         //PORT FOR SERVER COMMUNICATION
 
 pub const AUTHORITY_DIR: &str       = "/certs";                                                                      //AUTHORITY DIRECTORY
 

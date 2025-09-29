@@ -16,6 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::
+{
+    fs,
+    path::Path,
+};
+
 use reqwest::blocking::Client;
 
 use serde_json::Value;
@@ -24,6 +30,18 @@ use semver::Version;
 
 use crate::chat::options;
 
+//PRIVATE
+fn get_dir(dir: &str) -> String
+{
+    dir.replace("{HOME}", dirs::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"))
+}
+
+fn get_config_dir() -> String
+{
+    get_dir(options::USER_CONFIG_DIR)
+}
+
+//PUBLIC
 pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
 {
     //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
@@ -62,6 +80,22 @@ pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
 
         println!("This release could be unsafe! You are {newer_versions} versions behind! ({current_version}/{newest_version})");
     }
+}
+
+pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
+{
+    let config = get_config_dir() + options::CONFIG_DIR;
+
+    //CREATE WHY2 CONFIG DIRECTORY
+    if !Path::new(&config).is_dir()
+    {
+        fs::create_dir_all(config).expect("Failed to create WHY2 config directory");
+    }
+}
+
+pub fn get_why2_dir() -> String //RETURN PATH TO WHY2 CONFIG DIRECTORY
+{
+    get_config_dir() + options::CONFIG_DIR
 }
 
 pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)

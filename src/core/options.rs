@@ -18,10 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::sync::{ LazyLock, RwLock };
 
-//CONSTS
-pub const USER_CONFIG_DIR: &str = "{HOME}/.config";                       //USER CONFIG DIRECTORY
-pub const CONFIG_DIR: &str      = "/WHY2";                                //DIRECTORY FOR CONFIG FILES
-
 //ENUMS
 //THESE ARE LEGACY VERSIONS FOR GENERATING tkch, SO YOU CAN DECRYPT OLD TEXT
 #[derive(Clone, PartialEq)]

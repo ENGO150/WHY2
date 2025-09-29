@@ -27,10 +27,10 @@ use reqwest::blocking::Response;
 
 use toml_edit::{ DocumentMut, Value };
 
-use crate::
+use crate::chat::
 {
-    core::misc,
-    chat::options,
+    options,
+    misc,
 };
 
 //PRIVATE

@@ -50,10 +50,12 @@ use sha2::{ Sha256, Digest };
 
 use crate::
 {
-    core::crypto,
-    core::rex::crypto as rex_crypto,
-    core::misc,
-    chat::options,
+    chat::{ options, misc },
+    core::
+    {
+        crypto,
+        rex::crypto as rex_crypto,
+    },
 };
 
 //PRIVATE
