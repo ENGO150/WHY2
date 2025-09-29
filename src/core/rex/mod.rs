@@ -58,7 +58,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
         let mut key_grid = Self::new();
         for i in 0..grid_area
         {
-            key_grid[i / H][i % W] = vec[i] ^ vec[i + grid_area]; //COMBINE EVERY PART OF KEY
+            key_grid[i / W][i % W] = vec[i] ^ vec[i + grid_area]; //COMBINE EVERY PART OF KEY
         }
 
         key_grid
@@ -75,13 +75,13 @@ impl<const W: usize, const H: usize> Grid<W, H>
         Some(bytes.chunks(matrix_size).map(|chunk|
         {
             let mut grid = Grid::new();
-            for i in 0..W
+            for j in 0..H
             {
-                for j in 0..H
+                for i in 0..W
                 {
-                    let start = (i * H + j) * 8;
+                    let start = (j * W + i) * 8;
                     let slice = &chunk[start..start + 8];
-                    grid[i][j] = i64::from_be_bytes(slice.try_into().unwrap());
+                    grid[j][i] = i64::from_be_bytes(slice.try_into().unwrap());
                 }
             }
 
@@ -101,13 +101,13 @@ impl<const W: usize, const H: usize> Grid<W, H>
         self.0.iter_mut()
     }
 
-    //GET WIDTH (ROWS)
+    //GET WIDTH (COLUMNS)
     pub fn width(&self) -> usize
     {
         W
     }
 
-    //GET HEIGHT (COLUMNS)
+    //GET HEIGHT (HEIGTH)
     pub fn height(&self) -> usize
     {
         H
@@ -141,17 +141,17 @@ impl<const W: usize, const H: usize> Grid<W, H>
         //GET COLUMNS
         let cols: Box<dyn Iterator<Item = usize>> = if invert
         {
-            Box::new((0..H).rev()) //REVERSE ON DECRYPTION
+            Box::new((0..W).rev()) //REVERSE ON DECRYPTION
         } else
         {
-            Box::new(0..H) //ENCRYPTION
+            Box::new(0..W) //ENCRYPTION
         };
 
         //XOR COLUMNS IN LINEAR ORDER (0^1 ... 7^8, 8^0)
         for col in cols
         {
-            let next_col = (col + 1) % H;
-            for row in 0..W
+            let next_col = (col + 1) % W;
+            for row in 0..H
             {
                 self[row][col] ^= self[row][next_col];
             }
@@ -161,9 +161,9 @@ impl<const W: usize, const H: usize> Grid<W, H>
     //PUBLIC
     pub fn xor_grids(&mut self, key_grid: &Grid<W, H>) //XOR TWO GRIDS
     {
-        for y in 0..(self.width()) //Y DIM
+        for y in 0..(self.height()) //Y DIM
         {
-            for x in 0..(self.height()) //X DIM
+            for x in 0..(self.width()) //X DIM
             {
                 //XOR
                 self[y][x] ^= key_grid[y][x];

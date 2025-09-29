@@ -76,7 +76,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
         let mut grid = Grid::new(); //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
         {
-            grid[i / H][i % W] = val;
+            grid[i / W][i % W] = val;
         }
 
         grid
@@ -98,7 +98,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
         //REBUILD
         for (i, val) in flattened.into_iter().enumerate()
         {
-            grid[i / H][i % W] = val;
+            grid[i / W][i % W] = val;
         }
     }
 

@@ -86,7 +86,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> De
         //REBUILD
         for (i, val) in unshuffled.into_iter().enumerate()
         {
-            grid[i / H][i % W] = val;
+            grid[i / W][i % W] = val;
         }
     }
 
