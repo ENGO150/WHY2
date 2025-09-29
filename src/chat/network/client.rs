@@ -220,7 +220,16 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 {
                     misc::clear_lines(2);
                     println!("Slow down! You're sending messages too quickly.\n");
-                }
+                },
+
+                //REGISTRATION DISABLED
+                MessageCode::RegisterDisabled =>
+                {
+                    misc::clear_lines(2);
+                    print!("Server has disabled registration.");
+
+                    continue;
+                },
 
                 //CLIENT MESSED SOME COMMAND UP
                 MessageCode::InvalidUsage =>
