@@ -101,17 +101,23 @@ impl<const W: usize, const H: usize> Grid<W, H>
         self.0.iter_mut()
     }
 
-    //CALCULATE ROWS
-    pub fn rows(&self) -> usize
+    //GET WIDTH (ROWS)
+    pub fn width(&self) -> usize
     {
-        self.0.len()
+        W
+    }
+
+    //GET HEIGHT (COLUMNS)
+    pub fn height(&self) -> usize
+    {
+        H
     }
 
     //ENCRYPTION
     //PRIVATE
     fn shift_rows_handler(&mut self, key_grid: &Grid<W, H>, invert: bool) //SHIFT ROWS IN grid BASED ON key_grid
     {
-        let rows = self.rows() as i64; //ROWS IN grid & key_grid
+        let rows = self.width() as i64; //ROWS IN grid & key_grid
 
         //SHIFT EACH ROW
         for (i, row) in self.iter_mut().enumerate()
@@ -155,9 +161,9 @@ impl<const W: usize, const H: usize> Grid<W, H>
     //PUBLIC
     pub fn xor_grids(&mut self, key_grid: &Grid<W, H>) //XOR TWO GRIDS
     {
-        for y in 0..self.rows() //Y DIM
+        for y in 0..(self.width()) //Y DIM
         {
-            for x in 0..(self[y].len()) //X DIM
+            for x in 0..(self.height()) //X DIM
             {
                 //XOR
                 self[y][x] ^= key_grid[y][x];
@@ -295,7 +301,8 @@ impl<const W: usize, const H: usize> Index<usize> for Grid<W, H>
 //MUTABLE INDEXING
 impl<const W: usize, const H: usize> IndexMut<usize> for Grid<W, H>
 {
-    fn index_mut(&mut self, y: usize) -> &mut Self::Output {
+    fn index_mut(&mut self, y: usize) -> &mut Self::Output
+    {
         &mut self.0[y]
     }
 }
@@ -306,7 +313,7 @@ impl<const W: usize, const H: usize> Display for Grid<W, H>
     fn fmt(&self, f: &mut Formatter<'_>) -> Result
     {
         //CONVERT EACH VALUE TO 4 LINES
-        let cells: Vec<Vec<[String; 4]>> = self.0.iter().map(|row|
+        let cells: Vec<Vec<[String; 4]>> = self.iter().map(|row|
         {
             row.iter().map(|val|
             {
