@@ -429,15 +429,14 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 }
             },
 
-            None => return
+            None => return remove_connection(stream, DisconnectType::Forcefully),
         }
     }
 
     //NO USERNAME RECEIVED, DISCONNECT CLIENT
     if username.is_none()
     {
-        send_code(stream, None, MessageCode::Disconnect, shared_key.as_ref());
-        return;
+        return remove_connection(stream, DisconnectType::Gracefully);
     }
 
     let username = username.unwrap();
@@ -452,14 +451,13 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         let response = match network::receive(stream, shared_key.as_ref())
         {
             Some(r) => r,
-            None => return
+            None => return remove_connection(stream, DisconnectType::Forcefully)
         };
 
         //NO PASSWORD, DISCONNECT CLIENT
         if response.text.is_none()
         {
-            send_code(stream, None, MessageCode::Disconnect, shared_key.as_ref());
-            return;
+            return remove_connection(stream, DisconnectType::Gracefully);
         }
 
         //SAVE PASSWORD
@@ -473,14 +471,13 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         let response = match network::receive(stream, shared_key.as_ref())
         {
             Some(r) => r,
-            None => return
+            None => return remove_connection(stream, DisconnectType::Forcefully),
         };
 
         //INVALID PASSWORD, DISCONNECT CLIENT
         if response.text.is_none() || response.text.unwrap() != config::server_users_config(&username)
         {
-            send_code(stream, None, MessageCode::Disconnect, shared_key.as_ref());
-            return;
+            return remove_connection(stream, DisconnectType::Gracefully);
         }
     }
 
@@ -515,9 +512,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::Disconnect =>
                 {
                     //DISCONNECT CLIENT
-                    remove_connection(stream, DisconnectType::Gracefully);
-
-                    return;
+                    return remove_connection(stream, DisconnectType::Gracefully);
                 },
 
                 //CLIENT REQUESTED LIST OF ONLINE USERS
