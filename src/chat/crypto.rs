@@ -21,25 +21,30 @@ use std::
     io::Write,
     path::Path,
     fs::{ self, File },
+    str,
 };
 
-use openssl::
+use p521::
 {
-    nid::Nid,
-    bn::BigNumContext,
-    derive::Deriver,
-    pkey::PKey,
-    ec::
+    ecdh,
+    PublicKey,
+    SecretKey,
+
+    elliptic_curve::
     {
-        EcGroup,
-        EcKey,
-        EcPoint,
-        PointConversionForm,
+        rand_core::OsRng,
+        sec1::ToEncodedPoint,
+    },
+
+    pkcs8::
+    {
+        DecodePrivateKey,
+        EncodePrivateKey
     },
 };
 
-use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use rand::SeedableRng;
 
 use sha2::{ Sha256, Digest };
 
@@ -51,6 +56,17 @@ use crate::
     chat::options,
 };
 
+//PRIVATE
+fn get_private_key() -> SecretKey //LOAD PRIVATE KEY
+{
+    //READ PEM
+    let private_pem = fs::read_to_string(misc::get_why2_dir() + options::KEY_LOCATION + options::KEY_FILENAME).expect("Reading keyfile failed");
+
+    //PARSE & RETURN
+    SecretKey::from_pkcs8_pem(&private_pem).expect("Parsing PEM failed")
+}
+
+//PUBLIC
 pub fn init_keys() //CREATE ECC KEYS
 {
     //CHECK FOR KEYS DIRECTORY
@@ -60,74 +76,46 @@ pub fn init_keys() //CREATE ECC KEYS
     //CREATE KEYS DIRECTORY
     fs::create_dir(&key_dir).expect("Failed creating keys directory");
 
-    let group = EcGroup::from_curve_name(Nid::SECP521R1).expect("Invalid curve"); //CREATE secp512r1
-    let ec_key = EcKey::generate(&group).expect("Key generation failed"); //GENERATE KEYPAIR
+    //GENERATE PRIVATE KEY
+    let private = SecretKey::random(&mut OsRng);
 
-    //CONVERT PRIVATE KEY TO PEM
-    let pem = ec_key.private_key_to_pem().expect("Getting PEM failed");
+    //ENCODE PRIVATE KEY TO PEM
+    let private_pem = private.to_pkcs8_pem(Default::default()).expect("Encoding to PEM failed");
 
     //SAVE TO FILE
     let mut file = File::create(key_dir + options::KEY_FILENAME).expect("Creating keyfile failed");
-    file.write_all(&pem).expect("Writing to keyfile failed");
+    file.write_all(&private_pem.as_bytes()).expect("Writing to keyfile failed");
 }
 
 pub fn get_public_key() -> String //SERIALIZE PUBKEY
 {
-    //READ KEY
-    let key_pem = fs::read(misc::get_why2_dir() + options::KEY_LOCATION + options::KEY_FILENAME).expect("Reading keyfile failed");
-
-    //PARSE PEM
-    let ec_key = EcKey::private_key_from_pem(&key_pem).expect("Parsing PEM failed");
-
-    //EXTRACT PUBKEY
-    let pubkey = ec_key.public_key();
+    //EXTRACT PUBKEY FROM PRIVATE
+    let public = get_private_key().public_key();
 
     //CONVERT TO STRING
-    let pubkey_bytes = pubkey.to_bytes
-    (
-        &ec_key.group(),
-        PointConversionForm::UNCOMPRESSED,
-        &mut BigNumContext::new().expect("Failed to init BigNumContext")
-    ).expect("Pubkey conversion failed");
+    let public_bytes = public.to_encoded_point(false).as_bytes().to_vec();
 
     //ENCODE TO BASE91
-    String::from_utf8(base91::slice_encode(&pubkey_bytes)).expect("Encoding pubkey failed")
+    String::from_utf8(base91::slice_encode(&public_bytes)).expect("Encoding pubkey failed")
 }
 
-pub fn get_shared_key<const W: usize, const H: usize>(key: String) -> Vec<i64> //CALCULATES ECDH
+pub fn get_shared_key<const W: usize, const H: usize>(key: String) -> Vec<i64> //CALCULATES ELLIPTIC CURVE DIFFIE HELLMAN
 {
     //DECODE key (REMOTE PUBLIC KEY)
-    let pub_bytes = base91::slice_decode(key.as_bytes());
+    let remote_public_bytes = base91::slice_decode(key.as_bytes());
 
-    //CURVE AND CONTEXT
-    let group = EcGroup::from_curve_name(Nid::SECP521R1).expect("Invalid curve");
-    let mut ctx = BigNumContext::new().expect("Failed to init BigNumContext");
+    //PARSE KEY
+    let remote_public = PublicKey::from_sec1_bytes(&remote_public_bytes).expect("Invalid key");
 
-    //CONVERT pub_bytes TO EcPoint
-    let pub_point = EcPoint::from_bytes(&group, &pub_bytes, &mut ctx).expect("Converting pubkey failed");
+    //LOAD LOCAL PRIVATE KEY
+    let local_private = get_private_key();
 
-    //CREATE EcKey FROM pub_point
-    let remote_key = EcKey::from_public_key(&group, &pub_point).expect("Converting pubkey failed");
+    //COMPUTE EDCH
+    let shared = ecdh::diffie_hellman(local_private.to_nonzero_scalar(), remote_public.as_affine());
 
-    //READ KEY
-    let key_pem = fs::read(misc::get_why2_dir() + options::KEY_LOCATION + options::KEY_FILENAME).expect("Reading keyfile failed");
-
-    //PARSE PEM
-    let ec_key = EcKey::private_key_from_pem(&key_pem).expect("Parsing PEM failed");
-
-    //PKeyS
-    let local_pkey = PKey::from_ec_key(ec_key).expect("Invalid local key");
-    let remote_pkey = PKey::from_ec_key(remote_key).expect("Invalid local key");
-
-    //CREATE DERIVER FOR ECDH (USE LOCAL PRIVATE KEY)
-    let mut deriver = Deriver::new(&local_pkey).expect("Invalid local key");
-    deriver.set_peer(&remote_pkey).expect("Invalid remote key");
-
-    //DERIVE SHARED SECRET & ENCODE TO BASE91
-    let derived = String::from_utf8(base91::slice_encode(&deriver.derive_to_vec().expect("Converting deriver failed"))).expect("Encoding shared key failed");
-
-    //SEED ChaCha20Rng USING derived
-    let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed(&derived));
+    //SEED ChaCha20Rng USING SHARED KEY
+    let shared_encoded = base91::slice_encode(shared.raw_secret_bytes());
+    let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed(str::from_utf8(&shared_encoded).expect("Encoding shared key failed")));
 
     //RETURN GENERATED KEY
     rex_crypto::generate_key_deterministic::<W, H>(&mut dprng)
