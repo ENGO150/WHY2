@@ -44,23 +44,19 @@ use crossterm::
     },
 };
 
-use why2::
+use why2::chat::
 {
-    core::misc,
-    chat::
+    config,
+    crypto,
+    options,
+    misc,
+    command::{ self, Command },
+    network::
     {
-        config,
-        crypto,
-        options,
-        misc as chat_misc,
-        command::{ self, Command },
-        network::
-        {
-            self,
-            MessageCode,
-            MessagePacket,
-            client,
-        },
+        self,
+        MessageCode,
+        MessagePacket,
+        client,
     },
 };
 
@@ -109,7 +105,7 @@ fn read_input() -> String
                     //CTRL+C (EXIT)
                     KeyCode::Char('c') =>
                     {
-                        chat_misc::clear_lines(2);
+                        misc::clear_lines(2);
                         return Command::Exit.to_string();
                     },
 
@@ -273,10 +269,9 @@ fn read_input() -> String
 
 fn main()
 {
-    misc::check_version(); //CHECK FOR UPDATES
+    misc::check_version(); //CHECK WHY2 VERSION
     config::init_client_config(); //CREATE client.toml CONFIGURATION
     crypto::init_keys(); //GENERATE ECC KEYS
-    options::set_core_options(); //SET ENCRYPTION OPTIONS
 
     println!("Welcome.\n");
 
@@ -367,7 +362,7 @@ fn main()
                 //HELP
                 Command::Help =>
                 {
-                    chat_misc::clear_lines(2);
+                    misc::clear_lines(2);
                     options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
 
                     print!
@@ -408,7 +403,7 @@ fn main()
                 //INVALID COMMAND
                 Command::Invalid =>
                 {
-                    chat_misc::clear_lines(2);
+                    misc::clear_lines(2);
                     print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
                 }
             }
@@ -440,7 +435,7 @@ fn main()
             if input.len() <= options::MIN_PASSWORD_LEN
             {
                 print!("\x1B[2FPassword too short! Enter at least {} characters.\x1B[3E", options::MIN_PASSWORD_LEN);
-                chat_misc::clear_lines(1);
+                misc::clear_lines(1);
                 print!(">>> ");
 
                 continue;

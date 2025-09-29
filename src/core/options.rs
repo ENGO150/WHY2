@@ -21,7 +21,6 @@ use std::sync::{ LazyLock, RwLock };
 //CONSTS
 pub const USER_CONFIG_DIR: &str = "{HOME}/.config";                       //USER CONFIG DIRECTORY
 pub const CONFIG_DIR: &str      = "/WHY2";                                //DIRECTORY FOR CONFIG FILES
-pub const METADATA_URL: &str    = "https://crates.io/api/v1/crates/why2"; //URL FOR PROJECT METADATA
 
 //ENUMS
 //THESE ARE LEGACY VERSIONS FOR GENERATING tkch, SO YOU CAN DECRYPT OLD TEXT
@@ -39,8 +38,6 @@ pub enum Version
 pub struct Options
 {
     pub key_length: usize,                         //LENGTH OF SYMMETRIC KEY
-    pub no_check: bool,                            //SKIP CHECKING VERSION
-    pub no_output: bool,                           //DO NOT PRINT OUTPUT
     pub version: Version,                          //VERSION OF tkch
     pub padding: usize,                            //HOW MANY PADDING CHARS TO ADD
     pub encryption_operation: fn(i64, i64) -> i64, //ENCRYPTION OPERATION CLOSURE
@@ -66,8 +63,6 @@ impl Default for Options
         Self
         {
             key_length: 50,
-            no_check: false,
-            no_output: false,
             version: Version::V4,
             padding: 64,
             encryption_operation: |a, b| a - b,

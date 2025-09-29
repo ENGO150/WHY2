@@ -18,8 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::sync::{ LazyLock, RwLock };
 
-use crate::core::options::{ self, Options };
-
 #[cfg(feature = "client")]
 use std::sync::
 {
@@ -29,6 +27,8 @@ use std::sync::
 };
 
 //CONSTS
+pub const METADATA_URL: &str        = "https://crates.io/api/v1/crates/why2";                                       //URL FOR PROJECT METADATA
+
 pub const SERVER_PORT: u16          = 1204;                                                                         //PORT FOR SERVER COMMUNICATION
 pub const SERVER_CONFIG: &str       = "/server.toml";                                                               //SERVER CONFIG FILE
 pub const CLIENT_CONFIG: &str       = "/client.toml";                                                               //CLIENT CONFIG FILE
@@ -101,17 +101,4 @@ pub fn set_extra_space(value: bool) //SET EXTRA_SPACE
 pub fn get_extra_space() -> bool //GET EXTRA_SPACE
 {
     EXTRA_SPACE.load(Ordering::SeqCst)
-}
-
-//CORE ENCRYPTION OPTIONS
-pub fn set_core_options()
-{
-    options::set_core_options
-    (
-        Options
-        {
-            no_check: true,
-            ..Options::default()
-        }
-    );
 }

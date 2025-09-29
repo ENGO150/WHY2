@@ -16,6 +16,54 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use reqwest::blocking::Client;
+
+use serde_json::Value;
+
+use semver::Version;
+
+use crate::chat::options;
+
+pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
+{
+    //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
+    let client = Client::new();
+    let metadata_raw = client.get(options::METADATA_URL)
+        .header("User-Agent", "why2-version-check")
+        .send().expect("Sending metadata request failed")
+        .text().expect("Fetching metadata failed");
+
+    //PARSE METADATA TO JSON
+    let metadata: Value = serde_json::from_str(&metadata_raw).expect("Parsing versions.json failed"); //PARSE
+    let newest_version = metadata.get("crate") //GET LATEST VERSION
+        .and_then(|c| c.get("newest_version"))
+        .and_then(|v| v.as_str())
+        .unwrap();
+
+    //OUTDATED VERSION, CALCULATE HOW MANY NEWER VERSIONS EXIST
+    let current_version = env!("CARGO_PKG_VERSION");
+    if current_version != newest_version
+    {
+        //GET ARRAY OF VERSIONS
+        let versions = metadata.get("versions").and_then(|v| v.as_array()).unwrap();
+        let mut newer_versions = 0;
+        let current_version = Version::parse(current_version).expect("Invalid version");
+
+        //CALCULATE
+        for version in versions
+        {
+            //FOUND NEWER VERSION
+            if Version::parse(version.get("num").and_then(|n| n.as_str()).expect("")).expect("") > current_version
+            {
+                //INCREMENT COUNTER
+                newer_versions += 1;
+            }
+        }
+
+        println!("This release could be unsafe! You are {newer_versions} versions behind! ({current_version}/{newest_version})");
+    }
+}
+
 pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
 {
     for i in 0..n

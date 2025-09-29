@@ -19,8 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::core::
 {
     crypto,
-    misc,
-
     options::
     {
         self,
@@ -39,9 +37,6 @@ use rand::
 #[deprecated(since = "0.2.0-rex", note = "Legacy encryption is unsecure. Use REX instead.")]
 pub fn decrypt_text(encrypted_data: EncryptedData) -> DecryptedData //DECRYPT
 {
-    //CHECK FOR ACTIVE WHY2 VERSION
-    misc::check_version();
-
     //VARIABLES
     let core_options = options::get_core_options(); //CORE OPTIONS
     let text_encrypted = encrypted_data.output; //ENCRYPTED VECTOR

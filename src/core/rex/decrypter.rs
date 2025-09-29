@@ -24,21 +24,14 @@ use rand::
 
 use rand_chacha::ChaCha20Rng;
 
-use crate::core::
+use crate::core::rex::
 {
-    misc,
-    rex::
-    {
-        crypto,
-        options::{ EncryptedData, DecryptedData },
-    },
+    crypto,
+    options::{ EncryptedData, DecryptedData },
 };
 
 pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> DecryptedData //ENCRYPT
 {
-    //CHECK FOR ACTIVE WHY2 VERSION
-    misc::check_version();
-
     //GET MUTABLE input
     let mut grids = input.output;
     let key_grid = input.key;

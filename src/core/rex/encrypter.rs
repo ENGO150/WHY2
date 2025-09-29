@@ -26,22 +26,15 @@ use rand::
 
 use rand_chacha::ChaCha20Rng;
 
-use crate::core::
+use crate::core::rex::
 {
-    misc,
-    rex::
-    {
-        crypto,
-        Grid,
-        options::EncryptedData,
-    },
+    crypto,
+    Grid,
+    options::EncryptedData,
 };
 
 pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData<W, H>> //ENCRYPT
 {
-    //CHECK FOR ACTIVE WHY2 VERSION
-    misc::check_version();
-
     //REX OPTIONS
     let grid_area = W * H; //AREA OF REX GRID
 

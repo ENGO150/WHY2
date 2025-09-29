@@ -27,17 +27,14 @@ use std::
     net::TcpListener,
 };
 
-use why2::
+use why2::chat::
 {
-    core::misc,
-    chat::
-    {
-        config,
-        crypto,
-        options,
-        network::server,
-        command::{ self, Command },
-    },
+    config,
+    crypto,
+    options,
+    misc,
+    network::server,
+    command::{ self, Command },
 };
 
 fn quit() //DISCONNECT ALL USERS
@@ -48,10 +45,9 @@ fn quit() //DISCONNECT ALL USERS
 
 fn main()
 {
-    misc::check_version(); //CHECK FOR UPDATES
+    misc::check_version(); //CHECK WHY2 VERSION
     config::init_server_config(); //CREATE server.toml CONFIGURATION
     crypto::init_keys(); //GENERATE ECC KEYS
-    options::set_core_options(); //SET ENCRYPTION OPTIONS
 
     let address = format!("{}:{}", config::server_config("server_ip"), options::SERVER_PORT); //GET ADDRESS
     let listener = TcpListener::bind(&address).expect("Binding failed"); //BIND ADDRESS
