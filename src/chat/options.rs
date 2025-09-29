@@ -16,9 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::sync::RwLock;
-
-use once_cell::sync::Lazy;
+use std::sync::{ LazyLock, RwLock };
 
 use crate::core::options::{ self, Options };
 
@@ -48,7 +46,7 @@ pub const MIN_PASSWORD_LEN: usize   = 8;                                        
 pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                                  //DIMENSIONS OF REX GRID
 
 //SETTINGS
-static SHARED_KEY: Lazy<RwLock<Option<Vec<i64>>>> = Lazy::new(|| //SHARED SYMMETRIC KEY
+static SHARED_KEY: LazyLock<RwLock<Option<Vec<i64>>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
 {
     RwLock::new(None)
 });
@@ -60,7 +58,7 @@ static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING
 static EXTRA_SPACE: AtomicBool = AtomicBool::new(false); //CLIENT DISPLAYED SOME MENU (/help ETC.), ADD EXTRA SPACE ON NEXT MESSAGE
 
 #[cfg(feature = "client")]
-pub static INPUT_READ: Lazy<Arc<Mutex<Vec<char>>>> = Lazy::new(|| //INPUT READ FROM CLIENT
+pub static INPUT_READ: LazyLock<Arc<Mutex<Vec<char>>>> = LazyLock::new(|| //INPUT READ FROM CLIENT
 {
     Arc::new(Mutex::new(Vec::new()))
 });

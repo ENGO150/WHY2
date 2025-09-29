@@ -16,9 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::sync::RwLock;
-
-use once_cell::sync::Lazy;
+use std::sync::{ LazyLock, RwLock };
 
 //CONSTS
 pub const USER_CONFIG_DIR: &str = "{HOME}/.config";                                                           //USER CONFIG DIRECTORY
@@ -79,7 +77,7 @@ impl Default for Options
 }
 
 //SETTINGS
-static CORE_SETTINGS: Lazy<RwLock<Options>> = Lazy::new(||
+static CORE_SETTINGS: LazyLock<RwLock<Options>> = LazyLock::new(||
 {
     RwLock::new(Options::default())
 });

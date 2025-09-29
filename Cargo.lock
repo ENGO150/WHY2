@@ -1797,7 +1797,6 @@ dependencies = [
  "crossterm",
  "ctrlc",
  "dirs",
- "once_cell",
  "openssl",
  "rand",
  "rand_chacha",

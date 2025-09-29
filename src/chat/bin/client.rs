@@ -23,8 +23,13 @@ use std::
     thread,
     process,
     io::{ self, Write },
-    sync::{ Arc, Mutex },
     net::TcpStream,
+    sync::
+    {
+        LazyLock,
+        Arc,
+        Mutex,
+    },
 };
 
 use crossterm::
@@ -38,8 +43,6 @@ use crossterm::
         Event,
     },
 };
-
-use once_cell::sync::Lazy;
 
 use why2::
 {
@@ -62,7 +65,7 @@ use why2::
 };
 
 //GLOBAL VARIABLES
-static INPUT_HISTORY: Lazy<Arc<Mutex<(Vec<String>, usize)>>> = Lazy::new(|| //INPUTS READ FROM CLIENT
+static INPUT_HISTORY: LazyLock<Arc<Mutex<(Vec<String>, usize)>>> = LazyLock::new(|| //INPUTS READ FROM CLIENT
 {
     Arc::new(Mutex::new((Vec::new(), 0)))
 });

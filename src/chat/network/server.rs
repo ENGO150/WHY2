@@ -21,9 +21,9 @@ use std::
     net::TcpStream,
     time::{ Instant, Duration },
     collections::HashSet,
-
     sync::
     {
+        LazyLock,
         Arc,
         Mutex,
         RwLock,
@@ -31,8 +31,6 @@ use std::
 };
 
 use serde_json::json;
-
-use once_cell::sync::Lazy;
 
 use crate::chat::{
         config,
@@ -186,7 +184,7 @@ impl Connection
 }
 
 //LISTS
-pub static CONNECTIONS: Lazy<Arc<RwLock<Vec<Connection>>>> = Lazy::new(|| //LIST FOR EACH CLIENT CONNECTION
+pub static CONNECTIONS: LazyLock<Arc<RwLock<Vec<Connection>>>> = LazyLock::new(|| //LIST FOR EACH CLIENT CONNECTION
 {
     Arc::new(RwLock::new(Vec::new()))
 });
