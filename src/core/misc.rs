@@ -23,7 +23,11 @@ use std::
     path::Path,
 };
 
+use reqwest::blocking::Client;
+
 use serde_json::Value;
+
+use semver::Version;
 
 use crate::core::options;
 
@@ -48,21 +52,41 @@ pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
 
     if core_options.no_output { return; } //NO OUTPUT WANTED - MEANING THIS WHOLE FUNCTION WOULD BE POINTLESS
 
-    //DOWNLOAD versions.json
-    let versions_text = reqwest::blocking::get(options::VERSIONS_URL)
-        .expect("Failed to fetch versions.json")
-        .text()
-        .expect("Failed to read versions.json");
+    //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
+    let client = Client::new();
+    let metadata_raw = client.get(options::METADATA_URL)
+        .header("User-Agent", "why2-version-check")
+        .send().expect("Sending metadata request failed")
+        .text().expect("Fetching metadata failed");
 
-    let versions_json: Value = serde_json::from_str(&versions_text).expect("Parsing versions.json failed"); //PARSE versions_text INTO JSON
-    let active_version = versions_json["active"].as_str().expect("Invalid versions.json scheme");
+    //PARSE METADATA TO JSON
+    let metadata: Value = serde_json::from_str(&metadata_raw).expect("Parsing versions.json failed"); //PARSE
+    let newest_version = metadata.get("crate") //GET LATEST VERSION
+        .and_then(|c| c.get("newest_version"))
+        .and_then(|v| v.as_str())
+        .unwrap();
 
-    if options::VERSION != active_version
+    //OUTDATED VERSION, CALCULATE HOW MANY NEWER VERSIONS EXIST
+    let current_version = env!("CARGO_PKG_VERSION");
+    if current_version != newest_version
     {
-        let deprecated = versions_json["deprecated"].as_array().expect("Invalid versions.json scheme"); //GET LIST OF ALL PAST VERSIONS
-        let pos = deprecated.iter().position(|x| x == options::VERSION).expect("Current version not found"); //COUNT WHERE IN TF HISTORY ARE YOU
+        //GET ARRAY OF VERSIONS
+        let versions = metadata.get("versions").and_then(|v| v.as_array()).unwrap();
+        let mut newer_versions = 0;
+        let current_version = Version::parse(current_version).expect("Invalid version");
 
-        eprintln!("This release could be unsafe! You are {} versions behind! ({}/{})", deprecated.iter().skip(pos).count(), options::VERSION, active_version);
+        //CALCULATE
+        for version in versions
+        {
+            //FOUND NEWER VERSION
+            if Version::parse(version.get("num").and_then(|n| n.as_str()).expect("")).expect("") > current_version
+            {
+                //INCREMENT COUNTER
+                newer_versions += 1;
+            }
+        }
+
+        println!("This release could be unsafe! You are {newer_versions} versions behind! ({current_version}/{newest_version})");
     }
 }
 

@@ -19,10 +19,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::sync::{ LazyLock, RwLock };
 
 //CONSTS
-pub const USER_CONFIG_DIR: &str = "{HOME}/.config";                                                           //USER CONFIG DIRECTORY
-pub const CONFIG_DIR: &str      = "/WHY2";                                                                    //DIRECTORY FOR CONFIG FILES
-pub const VERSIONS_URL: &str    = "https://raw.githubusercontent.com/ENGO150/WHY2/development/versions.json"; //versions.json URL
-pub const VERSION: &str         = "v0.2.1-rex";                                                               //CURRENT VERSION OF WHY2
+pub const USER_CONFIG_DIR: &str = "{HOME}/.config";                       //USER CONFIG DIRECTORY
+pub const CONFIG_DIR: &str      = "/WHY2";                                //DIRECTORY FOR CONFIG FILES
+pub const METADATA_URL: &str    = "https://crates.io/api/v1/crates/why2"; //URL FOR PROJECT METADATA
 
 //ENUMS
 //THESE ARE LEGACY VERSIONS FOR GENERATING tkch, SO YOU CAN DECRYPT OLD TEXT
