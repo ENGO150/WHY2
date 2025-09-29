@@ -30,8 +30,9 @@ authors = ["Václav Šmejkal <engo@satan.red>"]
 include = ["src/**", "Cargo.toml", "README", "LICENSE"]
 
 [features]
-client = ["crossterm", "p521"]
-server = ["p521"]
+chat = ["base91", "bincode", "p521", "serde", "toml_edit"]
+client = ["chat", "crossterm"]
+server = ["chat", "ctrlc"]
 
 [lib]
 path = "src/lib.rs"
@@ -47,16 +48,16 @@ path = "src/chat/bin/server.rs"
 required-features = ["server"]
 
 [dependencies]
-base91 = "0.1.0"
-bincode = { version = "2.0.1", features = ["serde"] }
+base91 = { version = "0.1.0", optional = true }
+bincode = { version = "2.0.1", features = ["serde"], optional = true }
 crossterm = { version = "0.29.0", optional = true }
-ctrlc = "3.5.0"
+ctrlc = { version = "3.5.0", optional = true }
 dirs = "6.0.0"
 p521 = { version = "0.13.3", features = ["ecdh", "pkcs8"], optional = true }
 rand = "0.9.2"
 rand_chacha = "0.9.0"
 reqwest = { version = "0.12.23", features = ["blocking"] }
-serde = "1.0.219"
+serde = { version = "1.0.219", optional = true }
 serde_json = "1.0.143"
 sha2 = "0.10.9"
-toml_edit = "0.23.6"
+toml_edit = { version = "0.23.6", optional = true }
