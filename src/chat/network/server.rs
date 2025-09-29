@@ -64,6 +64,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
     NonAuthenticated
     {
         stream: Arc<Mutex<TcpStream>>, //STREAM
+        username: Option<String>,      //CHOSEN USERNAME
         shared_key: Vec<i64>,          //SHARED KEY
         last_activity: Instant,        //TIME OF LAST MESSAGE
     },
@@ -96,7 +97,17 @@ impl Connection
         match self
         {
             Self::Authenticated { username, .. } => Some(username),
-            Self::NonAuthenticated { .. } => None,
+            Self::NonAuthenticated { username, .. } => username.as_ref(),
+        }
+    }
+
+    //GET USERNAME FROM Connection AS MUTABLE
+    fn username_mut(&mut self) -> &mut Option<String>
+    {
+        match self
+        {
+            Self::Authenticated { .. } => panic!("Do not use username_mut() on Authenticated client"),
+            Self::NonAuthenticated { username, .. } => username,
         }
     }
 
@@ -389,6 +400,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         let connection = Connection::NonAuthenticated
         {
             stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
+            username: None,
             shared_key: shared_key.clone().unwrap(),
             last_activity: Instant::now(),
         };
@@ -440,6 +452,23 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     }
 
     let username = username.unwrap();
+
+    //UPDATE USERNAME IN NonAuthenticated
+    {
+        let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
+        let peer_addr = stream.peer_addr().unwrap(); //GET PEER ADDRESS
+
+        for conn in connections.iter_mut()
+        {
+            if conn.stream().lock().unwrap().peer_addr().unwrap() == peer_addr && !conn.is_authenticated() //CONNECTION FOUND
+            {
+                //UPDATE
+                *conn.username_mut() = Some(username.clone());
+
+                break;
+            }
+        }
+    }
 
     //ASK FOR PASSWORD
     if !config::server_users_contains(&username) //REGISTRATION
