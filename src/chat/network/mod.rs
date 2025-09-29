@@ -78,6 +78,7 @@ pub enum MessageCode //CONTROL CODES
     PrivateMessage,     //CLIENT <> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
     PrivateMessageBack, //SERVER -> CLIENT | SEND MESSAGE BACK TO SENDER
     SpamWarning,        //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN
+    RegisterDisabled,   //SERVER -> CLIENT | REGISTRATION IS DISABLED
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
 }
 

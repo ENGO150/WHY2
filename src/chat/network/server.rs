@@ -19,8 +19,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     net::TcpStream,
-    time::{ Instant, Duration },
     collections::HashSet,
+    time::{ Instant, Duration },
     sync::
     {
         LazyLock,
@@ -32,16 +32,18 @@ use std::
 
 use serde_json::json;
 
-use crate::chat::{
-        config,
-        crypto,
-        network::
-        {
-            self,
-            MessageCode,
-            MessagePacket,
-        }, options,
-    };
+use crate::chat::
+{
+    config,
+    crypto,
+    options,
+    network::
+    {
+        self,
+        MessageCode,
+        MessagePacket,
+    },
+};
 
 //CONSTS
 const GRID_W: usize = options::GRID_DIMENSIONS.0;
@@ -452,6 +454,13 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     }
 
     let username = username.unwrap();
+
+    //BLOCK NEW USERS IF REGISTRATION IS DISABLED
+    if !config::server_config("allow_register").parse::<bool>().unwrap() && !config::server_users_contains(&username)
+    {
+        send_code(stream, None, MessageCode::RegisterDisabled, shared_key.as_ref());
+        return remove_connection(stream, DisconnectType::Gracefully);
+    }
 
     //UPDATE USERNAME IN NonAuthenticated
     {
