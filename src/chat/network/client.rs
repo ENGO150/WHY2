@@ -40,6 +40,10 @@ use crate::chat::
     },
 };
 
+//CONSTS
+const GRID_W: usize = options::GRID_DIMENSIONS.0;
+const GRID_H: usize = options::GRID_DIMENSIONS.1;
+
 //PRIVATE
 fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SIDE
 {
@@ -62,7 +66,7 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
     };
 
     //CALCULATE SHARED SECRET
-    crypto::get_shared_key(message.text.unwrap())
+    crypto::get_shared_key::<GRID_W, GRID_H>(message.text.unwrap())
 }
 
 //PUBLIC

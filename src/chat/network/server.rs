@@ -34,10 +34,7 @@ use serde_json::json;
 
 use once_cell::sync::Lazy;
 
-use crate::
-{
-    chat::
-    {
+use crate::chat::{
         config,
         crypto,
         network::
@@ -45,9 +42,12 @@ use crate::
             self,
             MessageCode,
             MessagePacket,
-        },
-    },
-};
+        }, options,
+    };
+
+//CONSTS
+const GRID_W: usize = options::GRID_DIMENSIONS.0;
+const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //ENUMS
 #[derive(Clone)]
@@ -213,7 +213,7 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
     }, None);
 
     //CALCULATE SHARED SECRET
-    Some(crypto::get_shared_key(message.text.unwrap()))
+    Some(crypto::get_shared_key::<GRID_W, GRID_H>(message.text.unwrap()))
 }
 
 fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //send welcome packet you idiot

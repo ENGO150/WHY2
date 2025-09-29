@@ -30,16 +30,11 @@ use crate::core::
     rex::
     {
         crypto,
-        options::
-        {
-            self,
-            EncryptedData,
-            DecryptedData,
-        },
+        options::{ EncryptedData, DecryptedData },
     },
 };
 
-pub fn decrypt(input: EncryptedData) -> DecryptedData //ENCRYPT
+pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> DecryptedData //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
@@ -68,7 +63,7 @@ pub fn decrypt(input: EncryptedData) -> DecryptedData //ENCRYPT
     }
 
     //DE-SHUFFLING VARIABLES
-    let grid_area = options::GRID_DIMENSIONS.0 * options::GRID_DIMENSIONS.1; //AREA OF A GRID
+    let grid_area = W * H; //AREA OF A GRID
     let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
 
     //DE-SHUFFLE INPUT GRIDS USING DPRNG SEEDED BY KEY HASH
@@ -91,7 +86,7 @@ pub fn decrypt(input: EncryptedData) -> DecryptedData //ENCRYPT
         //REBUILD
         for (i, val) in unshuffled.into_iter().enumerate()
         {
-            grid[i / options::GRID_DIMENSIONS.1][i % options::GRID_DIMENSIONS.0] = val;
+            grid[i / H][i % W] = val;
         }
     }
 
@@ -109,7 +104,7 @@ pub fn decrypt(input: EncryptedData) -> DecryptedData //ENCRYPT
     }
 }
 
-pub fn decrypt_string(input: EncryptedData) -> String //DECRYPT, CONVERT output INTO STRING
+pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> String //DECRYPT, CONVERT output INTO STRING
 {
     //DECRYPT
     let decrypted = decrypt(input).output;

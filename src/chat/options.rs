@@ -44,6 +44,9 @@ pub const KEY_FILENAME: &str        = "/secp521r1.pem";                         
 
 pub const MIN_PASSWORD_LEN: usize   = 8;                                                                             //MINIMAL PASSWORD LENGTH
 
+//DO NOT CHANGE CONST BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
+pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                                  //DIMENSIONS OF REX GRID
+
 //SETTINGS
 static SHARED_KEY: Lazy<RwLock<Option<Vec<i64>>>> = Lazy::new(|| //SHARED SYMMETRIC KEY
 {

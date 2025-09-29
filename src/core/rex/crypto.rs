@@ -30,11 +30,7 @@ use rand_chacha::ChaCha20Rng;
 
 use crate::core::rex::{ options, Grid };
 
-//GRID DIMENSIONS
-const GRID_W: usize = options::GRID_DIMENSIONS.0;
-const GRID_H: usize = options::GRID_DIMENSIONS.1;
-
-pub fn sha256_seed_grid(key: &Grid<GRID_W, GRID_H>) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFLING REX GRID
+pub fn sha256_seed_grid<const W: usize, const H: usize>(key: &Grid<W, H>) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFLING REX GRID
 {
     //SHA256
     let mut hasher = Sha256::new();
@@ -52,29 +48,29 @@ pub fn sha256_seed_grid(key: &Grid<GRID_W, GRID_H>) -> [u8; 32] //GET HASH SEED;
     hasher.finalize().into()
 }
 
-pub fn generate_key_deterministic(rng: &mut ChaCha20Rng) -> Vec<i64> //GENERATE KEY USING DPRNG
+pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaCha20Rng) -> Vec<i64> //GENERATE KEY USING DPRNG
 {
-    (0..(2 * GRID_W * GRID_H)).map(|_| rng.next_u64() as i64).collect()
+    (0..(2 * W * H)).map(|_| rng.next_u64() as i64).collect()
 }
 
-pub fn generate_key() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
+pub fn generate_key<const W: usize, const H: usize>() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
 {
     //CREATE SEED FOR ChaCha20Rng
     let mut seed = [0u8; 32];
     OsRng.try_fill_bytes(&mut seed).expect("Creating seed failed"); //FILL
 
-    generate_key_deterministic(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
+    generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
 }
 
-pub fn generate_round_keys(master_key: &Grid<GRID_W, GRID_H>) -> Vec<Grid<GRID_W, GRID_H>> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
+pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Vec<Grid<W, H>> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
 {
-    let mut keys: Vec<Grid<GRID_W, GRID_H>> = Vec::with_capacity(options::ROUND_KEYS);
+    let mut keys: Vec<Grid<W, H>> = Vec::with_capacity(options::ROUND_KEYS);
 
     //GENERATE KEYS
     for _ in 0..(options::ROUND_KEYS)
     {
         //USE SEED OF LAST KEY TO GENERATE NEW KEY
-        let key = generate_key_deterministic(&mut ChaCha20Rng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
+        let key = generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
 
         //CONVERT KEY TO Grid & PUSH TO keys
         keys.push(Grid::from_key(key));

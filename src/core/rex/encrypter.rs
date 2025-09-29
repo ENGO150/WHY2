@@ -32,20 +32,18 @@ use crate::core::
     rex::
     {
         crypto,
-        options::{ self, EncryptedData },
         Grid,
+        options::EncryptedData,
     },
 };
 
-pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData> //ENCRYPT
+pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData<W, H>> //ENCRYPT
 {
     //CHECK FOR ACTIVE WHY2 VERSION
     misc::check_version();
 
     //REX OPTIONS
-    const GRID_W: usize = options::GRID_DIMENSIONS.0;
-    const GRID_H: usize = options::GRID_DIMENSIONS.1;
-    let grid_area = GRID_W * GRID_H; //AREA OF REX GRID
+    let grid_area = W * H; //AREA OF REX GRID
 
     //GET KEY THAT WILL BE USED FOR ENCRYPTION
     let key_used = match key
@@ -61,7 +59,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData> 
         },
 
         //NO KEY, GENERATE ONE
-        None => crypto::generate_key()
+        None => crypto::generate_key::<W, H>()
     };
 
     //GET MUTABLE input
@@ -73,19 +71,19 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData> 
     input_used.extend(iter::repeat(padding_len as i64).take(padding_len));
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut grids: Vec<Grid<GRID_W, GRID_H>> = input_used.chunks(grid_area).map(|chunk|
+    let mut grids: Vec<Grid<W, H>> = input_used.chunks(grid_area).map(|chunk|
     {
         let mut grid = Grid::new(); //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
         {
-            grid[i / GRID_H][i % GRID_W] = val;
+            grid[i / H][i % W] = val;
         }
 
         grid
     }).collect();
 
     //SHAPE KEY TO 8x8 GRID
-    let key_grid = Grid::<GRID_W, GRID_H>::from_key(key_used);
+    let key_grid = Grid::<W, H>::from_key(key_used);
 
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
     let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
@@ -100,7 +98,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData> 
         //REBUILD
         for (i, val) in flattened.into_iter().enumerate()
         {
-            grid[i / GRID_H][i % GRID_W] = val;
+            grid[i / H][i % W] = val;
         }
     }
 
@@ -131,7 +129,7 @@ pub fn encrypt(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData> 
     })
 }
 
-pub fn encrypt_string(input: &String, key: Option<Vec<i64>>) -> Option<EncryptedData> //ENCRYPT STRING USING THE encrypt FN
+pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Option<Vec<i64>>) -> Option<EncryptedData<W, H>> //ENCRYPT STRING USING THE encrypt FN
 {
     //CONVERT input TO Vec<i64>
     let mut chars: Vec<char> = input.chars().collect();

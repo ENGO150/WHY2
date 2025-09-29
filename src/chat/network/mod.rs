@@ -39,7 +39,12 @@ use serde::{ Serialize, Deserialize };
 
 use crate::
 {
-    chat::config,
+    chat::
+    {
+        config,
+        options as rex_options,
+    },
+
     core::rex::
     {
         encrypter,
@@ -85,6 +90,10 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub code: Option<MessageCode>, //CONTROL CODE
 }
 
+//CONSTS
+const GRID_W: usize = rex_options::GRID_DIMENSIONS.0;
+const GRID_H: usize = rex_options::GRID_DIMENSIONS.1;
+
 //FUNCTIONS
 pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>>) //SEND packet TO stream
 {
@@ -96,7 +105,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
     if let Some(key) = key
     {
         //ENCRYPT
-        let encrypted_packet = encrypter::encrypt_string(&encoded_packet_string, Some(key.to_vec())).expect("Encrypting packet failed").output;
+        let encrypted_packet = encrypter::encrypt_string::<GRID_W, GRID_H>(&encoded_packet_string, Some(key.to_vec())).expect("Encrypting packet failed").output;
 
         //CONVERT ENCRYPTED PACKET (FROM Vec<Grid>) TO Vec<u8>
         let encrypted_packet_flattened: Vec<u8> = encrypted_packet.iter()
@@ -170,7 +179,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         //DECRYPT
         let decrypted_packet = decrypter::decrypt_string(options::EncryptedData
         {
-            output: Grid::from_bytes(decoded_packet)?, //CONVERT decoded_packet FROM Vec<u8> TO Vec<Grid>
+            output: Grid::<GRID_W, GRID_H>::from_bytes(decoded_packet)?, //CONVERT decoded_packet FROM Vec<u8> TO Vec<Grid>
             key: Grid::from_key(key.to_vec()),
         });
 

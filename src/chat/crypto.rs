@@ -94,7 +94,7 @@ pub fn get_public_key() -> String //SERIALIZE PUBKEY
     String::from_utf8(base91::slice_encode(&pubkey_bytes)).expect("Encoding pubkey failed")
 }
 
-pub fn get_shared_key(key: String) -> Vec<i64> //CALCULATES ECDH
+pub fn get_shared_key<const W: usize, const H: usize>(key: String) -> Vec<i64> //CALCULATES ECDH
 {
     //DECODE key (REMOTE PUBLIC KEY)
     let pub_bytes = base91::slice_decode(key.as_bytes());
@@ -130,7 +130,7 @@ pub fn get_shared_key(key: String) -> Vec<i64> //CALCULATES ECDH
     let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed(&derived));
 
     //RETURN GENERATED KEY
-    rex_crypto::generate_key_deterministic(&mut dprng)
+    rex_crypto::generate_key_deterministic::<W, H>(&mut dprng)
 }
 
 pub fn sha256(seed_str: &str) -> String //HASH seed_str
