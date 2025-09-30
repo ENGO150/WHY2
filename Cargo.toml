@@ -38,12 +38,12 @@ server = ["chat", "ctrlc"]
 path = "src/lib.rs"
 
 [[bin]]
-name = "chat_client"
+name = "why2"
 path = "src/chat/bin/client.rs"
 required-features = ["client"]
 
 [[bin]]
-name = "chat_server"
+name = "why2-server"
 path = "src/chat/bin/server.rs"
 required-features = ["server"]
 
