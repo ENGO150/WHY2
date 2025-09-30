@@ -109,10 +109,33 @@ fn read_input() -> String
                         return Command::Exit.to_string();
                     },
 
+                    //CTRL+H (HELP)
                     KeyCode::Char('h') =>
                     {
                         return Command::Help.to_string();
-                    }
+                    },
+
+                    //CTRL+A (MOVE TO LINE START)
+                    KeyCode::Char('a') =>
+                    {
+                        if cursor_position > 0
+                        {
+                            print!("\x1B[{}D", cursor_position);
+                            cursor_position = 0;
+                        }
+                    },
+
+                    //CTRL+E (MOVE TO LINE END)
+                    KeyCode::Char('e') =>
+                    {
+                        let input_len = input.len();
+
+                        if cursor_position < input_len
+                        {
+                            print!("\x1B[{}C", input_len - cursor_position);
+                            cursor_position = input_len;
+                        }
+                    },
 
                     _ => {} //some random shortcut
                 };
