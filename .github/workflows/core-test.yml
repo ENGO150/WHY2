@@ -34,7 +34,7 @@ jobs:
           ref: development
 
       - name: Setup Rust
-        uses: github.com/dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Run tests
         run: cargo test --all --verbose
