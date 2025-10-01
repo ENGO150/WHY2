@@ -79,6 +79,7 @@ pub enum MessageCode //CONTROL CODES
     PrivateMessageBack, //SERVER -> CLIENT | SEND MESSAGE BACK TO SENDER
     SpamWarning,        //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN
     RegisterDisabled,   //SERVER -> CLIENT | REGISTRATION IS DISABLED
+    Version,            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
 }
 

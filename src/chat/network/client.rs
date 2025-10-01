@@ -100,6 +100,31 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
         {
             match code
             {
+                //VERSION CHECK
+                MessageCode::Version =>
+                {
+                    let version = misc::get_version().to_string();
+                    let server_version = read.text.unwrap();
+
+                    //NON MATCHING VERSION (WILL GET DISCONNECTED)
+                    if server_version != version
+                    {
+                        misc::clear_lines(1);
+                        println!("Incompatible version! ({version}/{server_version})");
+                    }
+
+                    //RESPOND
+                    network::send(stream, MessagePacket
+                    {
+                        text: Some(version),
+                        username: None,
+                        id: None,
+                        code: Some(MessageCode::Version),
+                    }, options::get_shared_key().as_ref());
+
+                    continue;
+                }
+
                 //WELCOME CODE - SERVER INFORMATIONS
                 MessageCode::Welcome =>
                 {

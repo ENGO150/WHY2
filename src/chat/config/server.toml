@@ -22,6 +22,7 @@ server_username = "server" # Username server will use
 communication_time = 300 # Seconds waiting for client message before stopping communication (+- 5 seconds)
 
 allow_register = true # Allow new users to register
+check_client_version = true # Allow only clients with same version as server
 
 max_username_length = 20 # Maximal username length
 min_username_length = 4 # Minimal username length

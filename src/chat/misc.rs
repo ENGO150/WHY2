@@ -42,6 +42,11 @@ fn get_config_dir() -> String
 }
 
 //PUBLIC
+pub fn get_version<'a>() -> &'a str //GET COMPILED PACKAGE VERSION
+{
+    env!("CARGO_PKG_VERSION")
+}
+
 pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
 {
     //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
@@ -59,7 +64,7 @@ pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
         .unwrap();
 
     //OUTDATED VERSION, CALCULATE HOW MANY NEWER VERSIONS EXIST
-    let current_version = env!("CARGO_PKG_VERSION");
+    let current_version = get_version();
     if current_version != newest_version
     {
         //GET ARRAY OF VERSIONS

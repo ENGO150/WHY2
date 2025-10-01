@@ -37,6 +37,7 @@ use crate::chat::
     config,
     crypto,
     options,
+    misc,
     network::
     {
         self,
@@ -375,6 +376,23 @@ fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize, shared
     });
 }
 
+fn ask_version(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) -> Option<String> //ASK CLIENT FOR VERSION
+{
+    //ASK FOR VERSION
+    send_code(stream, Some(misc::get_version().to_string()), MessageCode::Version, shared_key);
+
+    //WAIT FOR RESPONSE FROM CLIENT
+    let version = loop
+    {
+        //READ MESSAGE
+        let received = network::receive(stream, shared_key)?;
+
+        if received.code == Some(MessageCode::Version) && !received.text.is_none() { break received; }
+    };
+
+    version.text
+}
+
 //PUBLIC
 pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, shared_key: Option<&Vec<i64>>) //SEND CODE TO CLIENT
 {
@@ -409,6 +427,16 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
         //PUSH
         CONNECTIONS.write().unwrap().push(connection);
+    }
+
+    //ASK CLIENT FOR THEIR PACKAGE VERSION
+    if config::server_config("check_client_version").parse().unwrap()
+    {
+        let version = ask_version(stream, shared_key.as_ref());
+        if version.is_none() || version.unwrap() != misc::get_version()
+        {
+            return remove_connection(stream, DisconnectType::Gracefully);
+        }
     }
 
     //SEND PACKET WITH REQUIRED SERVER INFO
