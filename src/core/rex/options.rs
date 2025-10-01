@@ -16,20 +16,72 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! REX options
+//!
+//! This module defines core parameters and data structures used throughout the WHY2 encryption
+//! and decryption pipeline. It includes round configuration constants, mixing parameters, and
+//! the input/output formats for both encryption and decryption.
+
 use crate::core::rex::Grid;
 
-//CONSTS (DO NOT CHANGE THOSE UNTIL YOU ARE COMPLETELY SURE WHAT ARE YOU DOING)
-pub const ROUND_KEYS: usize               = 14;                                                       //NUMBER OF ITERATIONS TO RUN WITH ROUND KEYS
-pub const SUBCELL_ROUNDS: u32             = 6;                                                        //ITERATIONS FOR MIXING
-pub const SUBCELL_DELTA: u32              = 0x9E3779B9;                                               //USED TO BREAK SYMMETRY ((2 ^ 32) / PHI)
+/// Number of round keys used in the WHY2 cipher.
+///
+/// Each round key introduces nonlinear and linear mixing. This value controls the depth
+/// of encryption and decryption. Increasing it strengthens diffusion but adds computational cost.
+///
+/// Do not modify unless you're fully aware of the cryptographic implications.
+pub const ROUND_KEYS: usize = 14;
+
+/// Number of ARX mixing iterations per cell in the [`subcell`](crate::core::rex::Grid::subcell) transformation.
+///
+/// This controls how many rounds of Add-Rotate-XOR are applied to each cell. More rounds
+/// increase diffusion and resistance to pattern leakage.
+///
+/// Changing this affects the cipher’s nonlinear behavior.
+pub const SUBCELL_ROUNDS: u32 = 6;
+
+
+/// Constant used to break symmetry in ARX mixing.
+///
+/// This is derived from `(2^32) / φ`, where φ is the golden ratio. It ensures that each
+/// round introduces asymmetry and avoids cyclic patterns in the
+/// [`subcell`](crate::core::rex::Grid::subcell) transformation.
+///
+/// This value is cryptographically sensitive and should not be changed casually.
+pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
 
 //STRUCTS
+/// Container for encrypted output.
+///
+/// This struct holds the encrypted Grid chunks and the key Grid used during encryption.
+/// It is returned by [`encrypt`](crate::core::rex::encrypter::encrypt) and consumed by
+/// [`decrypt`](crate::core::rex::decrypter::decrypt) to reverse the transformation.
+///
+/// # Fields
+/// - `output`: A vector of encrypted `Grid<W, H>` chunks.
+/// - `key`: The key Grid used for encryption and required for decryption.
+///
+/// # Notes
+/// - The key is stored in Grid form for direct use in round key generation.
 pub struct EncryptedData<const W: usize, const H: usize> //DATA FOR REX ENCRYPTER
 {
     pub output: Vec<Grid<W, H>>, //OUTPUT VALUE
     pub key: Grid<W, H>,         //KEY USED FOR ENCRYPTION
 }
 
+/// Container for decrypted output.
+///
+/// This struct holds the final data and the original key used during decryption.
+/// It is returned by [`decrypt`](crate::core::rex::decrypter::decrypt) and may be used to reconstruct
+/// the original string or binary payload.
+///
+/// # Fields
+/// - `output`: A flat vector of decrypted `i64` values.
+/// - `key`: The original key used for decryption, stored as a flat vector.
+///
+/// # Notes
+/// - Padding is removed before populating `output`.
+/// - The key is flattened for portability and auditability.
 pub struct DecryptedData //DATA FOR REX DECRYPTER
 {
     pub output: Vec<i64>, //OUTPUT VALUE

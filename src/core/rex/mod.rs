@@ -16,6 +16,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # REX
+//!
+//! This module implements the core encryption logic behind WHY2 algorithm.
+//!
+//! ## Design Overview
+//! - Input and key are formatted into 2D grids of 64-bit cells.
+//! - The key grid is shuffled and seeded to generate round keys.
+//! - Each round applies a nonlinear transformation to the input grids.
+//! - The transofrmation avoid traditional S-boxes, relying instead on symmetric diffusion.
+//! - Round tweaks ensure variability across rounds without requiring per-round constants.
+
 //MODULES
 pub mod crypto;
 pub mod decrypter;
@@ -24,6 +35,7 @@ pub mod options;
 
 use std::
 {
+    result,
     vec::IntoIter as IntoVecIter,
     slice::{ Iter, IterMut },
     ops::{ Index, IndexMut },
@@ -36,19 +48,63 @@ use std::
 };
 
 //TYPES
+/// A 2D matrix of 64-bit signed integers used as the core data structure in WHY2 encryption.
+///
+/// The `Grid` represents either input data or a key, formatted into rows and columns of `i64` cells.
+/// All transformations—round mixing, key scheduling, and nonlinear diffusion—operate directly on this structure.
+///
+/// Grids are flexible and can be transformed in-place.
+/// This abstraction allows WHY2 to generalize encryption over variable-sized blocks.
+///
+/// # Grid Size Consistency
+///
+/// WHY2 requires that the same grid dimensions (rows × columns) be used consistently
+/// throughout encryption and decryption. Mixing grid sizes within a single session or
+/// across rounds is unsupported and may lead to incorrect results or undefined behavior.
+
 #[derive(Clone, Debug)]
 pub struct Grid<const W: usize, const H: usize>([[i64; W]; H]); //GRID FOR REX DATA
 
 //IMPLEMENTATIONS
+/// Implementation of core Grid operations for fixed-size grids.
+///
+/// This block defines methods for `Grid<W, H>`, where `W` and `H` are compile-time constants
+/// representing the grid's width and height. All transformations — such as ARX mixing, key application,
+/// and round-based encryption - operate on grids of this fixed shape.
+///
+/// # Type Parameters
+/// - `W`: Number of columns (width), must be a compile-time constant.
+/// - `H`: Number of rows (height), must be a compile-time constant.
+///
+/// # Notes
+/// - Grid dimensions must remain consistent across encryption and decryption.
 impl<const W: usize, const H: usize> Grid<W, H>
 {
-    //CREATE EMPTY GRID
+    /// Creates a new Grid initialized with zeroes.
+    ///
+    /// This constructor sets up an empty Grid where all cells are set to `0`.
+    ///
+    /// # Returns
+    /// A `Grid` instance with all values set to zero.
+    ///
+    /// # Notes
+    /// - This method does not perform any encryption or transformation.
     pub fn new() -> Self
     {
         Self([[0i64; W]; H])
     }
 
-    //CREATE KEY GRID
+    /// Initializes a key Grid from a vector of signed 64-bit integers.
+    ///
+    /// Each element of the input is transformed by applying an XOR-based tweak, producing the
+    /// internal representation used for encryption. This process ensures that the raw key is
+    /// diffused before being used for round key generation.
+    ///
+    /// # Parameters
+    /// - `raw`: A vector of signed 64-bit integers representing the raw key.
+    ///
+    /// # Returns
+    /// A `Grid` instance containing the transformed key cells.
     pub fn from_key(vec: Vec<i64>) -> Self
     {
         //GRID OPTIONS
@@ -64,7 +120,21 @@ impl<const W: usize, const H: usize> Grid<W, H>
         key_grid
     }
 
-    //CREATE VECTOR OF GRIDS FROM BYTES
+    /// Initializes Grid from vector of unsigned 8-bit integers.
+    ///
+    /// This function constructs Grid by chunking the input vector into `i64` cells. It expects
+    /// exactly `W × H × 8` bytes and returns an error if the input length does not match.
+    ///
+    /// # Parameters
+    /// - `bytes`: A vector of unsigned 8-bit integers
+    ///
+    /// # Returns
+    /// - `Ok(Grid)` if the byte length matches the expected grid size
+    /// - `Err(String)` if the input length is not divisible by matrix size.
+    ///
+    /// # Notes
+    /// - No transformation is applied
+    /// - Use this for raw Grid construction, not for secure key loading
     pub fn from_bytes(bytes: Vec<u8>) -> result::Result<Vec<Self>, String>
     {
         let matrix_size = W * H * 8; //EACH i64 IS 8 BYTES
@@ -96,25 +166,25 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }).collect())
     }
 
-    //ITERATOR
+    /// Returns an iterator over rows in the Grid
     pub fn iter(&self) -> Iter<'_, [i64; W]>
     {
         self.0.iter()
     }
 
-    //MUTABLE ITERATOR
+    /// Returns a mutable iterator over rows in the Grid
     pub fn iter_mut(&mut self) -> IterMut<'_, [i64; W]>
     {
         self.0.iter_mut()
     }
 
-    //GET WIDTH (COLUMNS)
+    /// Returns width (number of columns) in the Grid
     pub fn width(&self) -> usize
     {
         W
     }
 
-    //GET HEIGHT (HEIGTH)
+    /// Returns height (number of rows) in the Grid
     pub fn height(&self) -> usize
     {
         H
@@ -166,7 +236,15 @@ impl<const W: usize, const H: usize> Grid<W, H>
     }
 
     //PUBLIC
-    pub fn xor_grids(&mut self, key_grid: &Grid<W, H>) //XOR TWO GRIDS
+    /// Computes the cell-wise XOR of two Grids.
+    ///
+    /// This function takes two Grids of equal dimensions and modifies the Grid in-place, each cell
+    /// being the bitwise XOR of the corresponding cell from the input Grid. It is used in WHY2
+    /// for mixing round keys, applying masks, or combining intermediate states.
+    ///
+    /// # Parameters
+    /// - `key_grid`: Input Grid for XOR
+    pub fn xor_grids(&mut self, key_grid: &Grid<W, H>)
     {
         for y in 0..(self.height()) //Y DIM
         {
@@ -178,7 +256,27 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    pub fn subcell(&mut self, round: usize) //APPLIES NONLINEAR MIX
+    /// Applies nonlinear ARX-style mixing to each cell in the grid.
+    ///
+    /// This transformation introduces symmetric diffusion by modifying each `i64` cell
+    /// using a combination of addition, rotation, and XOR operations. The process is
+    /// round-dependent and designed to obscure bit patterns across the Grid.
+    ///
+    /// For decryption, use [`inv_subcell`](Grid::inv_subcell).
+    ///
+    /// # Parameters
+    /// - `round`: A round index used to tweak the transformation logic.
+    ///
+    /// # Behavior
+    /// - Each cell is split into two 32-bit halves.
+    /// - The halves are mixed using ARX (Add-Rotate-XOR) operations.
+    /// - The result replaces the original cell value.
+    ///
+    /// # Notes
+    /// - This method mutates the Grid in-place.
+    /// - It is inspired by TEA/XTEA but adapted for WHY2’s Grid architecture.
+    /// - The transformation is deterministic for a given round and Grid state.
+    pub fn subcell(&mut self, round: usize)
     {
         //APPLY ON EACH CELL
         for col in self.iter_mut()
@@ -216,6 +314,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
+    /// Inverts transformation done by [`subcell`](Grid::subcell) method
     pub fn inv_subcell(&mut self, round: usize) //REMOVES NONLINEAR MIX
     {
         //APPLY ON EACH CELL
@@ -259,21 +358,57 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    pub fn shift_rows(&mut self, key_grid: &Grid<W, H>) //SHIFT ROWS IN grid BASED ON key_grid
+    /// Applies row-wise shifting to the Grid based on a key Grid.
+    ///
+    /// This transformation rotates each row of the Grid by a variable amount derived from
+    /// the corresponding row in `key_grid`. The shift amount is computed by XORing all
+    /// values in the key row and reducing modulo the Grid width.
+    ///
+    /// For decryption, use [`inv_shift_rows`](Grid::inv_shift_rows).
+    ///
+    /// # Parameters
+    /// - `key_grid`: A Grid of the same dimensions used to derive row-wise shift values.
+    ///
+    /// # Behavior
+    /// - Each row is rotated left by a computed amount.
+    /// - The shift amount is:
+    ///   `XOR(key_row) % width`
+    ///
+    /// # Notes
+    /// - This method mutates the grid in-place.
+    /// - The key grid must match the grid dimensions exactly.
+    pub fn shift_rows(&mut self, key_grid: &Grid<W, H>)
     {
         self.shift_rows_handler(key_grid, false); //USE HANDLER
     }
 
-    pub fn inv_shift_rows(&mut self, key_grid: &Grid<W, H>) //UNSHIFT ROWS IN grid BASED ON key_grid
+    /// Inverts transformation done by [`shift_rows`](Grid::shift_rows) method
+    pub fn inv_shift_rows(&mut self, key_grid: &Grid<W, H>)
     {
         self.shift_rows_handler(key_grid, true); //USE HANDLER
     }
 
-    pub fn mix_columns(&mut self) //MIX COLUMNS IN grid GRID
+    /// Applies column-wise mixing to the grid using linear XOR diffusion.
+    ///
+    /// This transformation modifies each column by XORing it with its adjacent column,
+    /// introducing horizontal diffusion across the grid. The operation is performed in
+    /// left-to-right order during encryption.
+    ///
+    /// For decryption, use [`inv_mix_columns`](Grid::inv_mix_columns).
+    ///
+    /// # Behavior
+    /// - For each column `c`, compute:
+    ///   `grid[row][c] ^= grid[row][(c + 1) % W]`
+    /// - The last column wraps around to the first.
+    ///
+    /// # Notes
+    /// - This method mutates the grid in-place.
+    pub fn mix_columns(&mut self)
     {
         self.mix_columns_handler(false); //USE HANDLER
     }
 
+    /// Inverts transformation done by [`mix_columns`](Grid::mix_columns) method
     pub fn inv_mix_columns(&mut self)
     {
         self.mix_columns_handler(true); //USE HANDLER

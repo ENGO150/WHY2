@@ -16,6 +16,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! REX Decrypter
+//!
+//! This module defines the core decryption for WHY2, including round-key reversal,
+//! Grid unmixing, deterministic unshuffling, and PKCS-style padding removal. It reconstructs
+//! the original data from encrypted Grid chunks using a symmetric key.
+//!
+//! # Overview
+//! WHY2 encrypts data by transforming it into fixed-size grids ([`Grid`](crate::core::rex::Grid)) and applying
+//! nonlinear and linear mixing across multiple rounds. Decryption reverses these steps:
+//!
+//! 1. **Round Key Generation**: Reconstructs round keys from the master key using chained SHA-256 seeds.
+//! 2. **Grid Unmixing**: Applies inverse subcell, row shift, and column mixing in reverse round order.
+//! 3. **Unshuffling**: Reverses the Grid permutation using a deterministic PRNG seeded from the key hash.
+//! 4. **PKCS Padding Removal**: Truncates the final output using the last cell value as a padding marker.
+
 use rand::
 {
     SeedableRng,
@@ -30,7 +45,27 @@ use crate::core::rex::
     options::{ EncryptedData, DecryptedData },
 };
 
-pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> DecryptedData //ENCRYPT
+/// Decrypts a WHY2-encrypted data into raw `i64` values.
+///
+/// This function reverses the full WHY2 encryption pipeline:
+/// - Applies inverse round transformations (subcell, shift rows, mix columns)
+/// - XORs each grid with round keys in reverse order
+/// - Unshuffles each grid using a deterministic PRNG seeded from the key hash
+/// - Removes PKCS-style padding from the final output
+///
+/// # Parameters
+/// - `input`: An [`EncryptedData`] struct containing the encrypted grids and key grid.
+///
+/// # Returns
+/// A [`DecryptedData`] struct containing:
+/// - `output`: A vector of decrypted `i64` values
+/// - `key`: The original key Grid flattened into a vector
+///
+/// # Notes
+/// - Padding is removed using PKCS-style logic: the last cell value indicates how many trailing values to discard.
+/// - The PRNG used for unshuffling is seeded from the SHA-256 hash of the key grid.
+/// - All transformations are deterministic and reversible.
+pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> DecryptedData
 {
     //GET MUTABLE input
     let mut grids = input.output;
@@ -97,7 +132,24 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> De
     }
 }
 
-pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> String //DECRYPT, CONVERT output INTO STRING
+/// Decrypts a WHY2-encrypted data and reconstructs the original string.
+///
+/// This function performs full decryption using [`decrypt`],
+/// then interprets each `i64` value as two concatenated `u32` characters. The first 4 bytes
+/// represent the high character, and the next 4 bytes represent the low character. If the low
+/// character is zero, it is omitted.
+///
+/// # Parameters
+/// - `input`: An [`EncryptedData`] struct containing encrypted grids and key.
+///
+/// # Returns
+/// A `String` reconstructed from the decrypted values.
+///
+/// # Notes
+/// - Uses native-endian decoding for each `i64` value.
+/// - Each decrypted value contributes up to two Unicode scalar values.
+/// - PKCS-style padding is removed before decoding.
+pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> String
 {
     //DECRYPT
     let decrypted = decrypt(input).output;

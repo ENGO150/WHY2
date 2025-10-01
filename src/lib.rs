@@ -16,7 +16,36 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # WHY2
+//!
+//! WHY2 is a modern, fast, and secure encryption crate designed for privacy-first applications.
+//!
+//! The WHY2 encryption algorithm is loosely inspired by AES, but with a twist. Instead of relying on S-boxes,
+//! WHY2 uses a nonlinear ARX-style transformation (Addition, Rotation, XOR) for diffusion. Input and key data
+//! are formatted into grids with customizable dimensions. The key is shuffled, seeded, and expanded into round keys,
+//! which are then applied to the input grid across multiple rounds.
+//!
+//! WHY2 also powers a minimalist chat application built for maximal privacy. It is designed for self-hosting
+//! by individuals or small groups — not for large public chat rooms.
+//!
+//! ## Features
+//! - Grid-based encryption with customizable layout
+//! - ARX-style nonlinear mixing instead of S-boxes
+//! - Round-key generation from seeded, shuffled keys
+//! - Lightweight encrypted chat backend for private deployments
+//! - Maximal customization
+//!
+//! ## Security Disclaimer
+//!
+//! WHY2 is an experimental encryption algorithm. While it draws inspiration from established designs like AES,
+//! **it has not undergone formal cryptographic review or extensive academic analysis**.
+//!
+//! As such, it should **not be considered suitable for high-assurance or production-grade cryptographic applications** where
+//! proven security guarantees are required. Use at your own discretion, and always evaluate your threat model carefully.
+
+/// Core of WHY2 - encryption functions
 pub mod core;
 
+/// Chat - Minimalist chat app built on core module
 #[cfg(feature = "chat")]
 pub mod chat;

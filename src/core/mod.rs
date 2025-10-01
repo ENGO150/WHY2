@@ -16,10 +16,34 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//SOURCE FILES
+//! # WHY2 Core
+//!
+//! This module implements the core encryption logic behind WHY2 algorithm.
+//!
+//! ## Design Overview
+//! - Input and key are formatted into 2D grids of 64-bit cells.
+//! - The key grid is shuffled and seeded to generate round keys.
+//! - Each round applies a nonlinear transformation to the input grids.
+//! - The transofrmation avoid traditional S-boxes, relying instead on symmetric diffusion.
+//! - Round tweaks ensure variability across rounds without requiring per-round constants.
+//!
+//! ### Deprecation Notice
+//!
+//! Some parts of this module are deprecated and retained only for reference and legacy compatibility.
+//! Those parts are early versions of the WHY2 encryption routines that are considered insecure.
+//!
+//! Due to identified security concerns and lack of cryptographic robustness, this module should **not be used in production**.
+//!
+//! These deprecated components are **not actively documented or maintained**. They remain visible for historical context,
+//! but all future documentation efforts are focused on secure and supported modules.
+//!
+//! For secure applications, use [`core::rex`]—the current and trusted implementation of the WHY2 encryption engine.
+
+/// Modern, AES-inspired, implementation of WHY2
+pub mod rex;
+
+//DEPRECATED
 pub mod crypto;
 pub mod decrypter;
 pub mod encrypter;
 pub mod options;
-
-pub mod rex;

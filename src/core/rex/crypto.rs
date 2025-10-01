@@ -16,6 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # REX Crypto
+//!
+//! This module contains cryptograhic utilities, used by REX module
+
 use sha2::{ Sha256, Digest };
 
 use rand::
@@ -30,7 +34,23 @@ use rand_chacha::ChaCha20Rng;
 
 use crate::core::rex::{ options, Grid };
 
-pub fn sha256_seed_grid<const W: usize, const H: usize>(key: &Grid<W, H>) -> [u8; 32] //GET HASH SEED; USED FOR SHUFFLING REX GRID
+/// Computes a SHA-256 hash of the Grid contents to produce a deterministic seed.
+///
+/// This function serializes the grid into native-endian bytes and feeds them into a SHA-256
+/// hasher. The resulting 32-byte digest can be used as a seed for shuffling, masking, or
+/// round-dependent randomness in the WHY2 cipher.
+///
+/// # Parameters
+/// - `key`: A `Grid` reference whose contents will be hashed.
+///
+/// # Returns
+/// A `[u8; 32]` array containing the SHA-256 digest of the grid.
+///
+/// # Notes
+/// - The hash is computed in row-major order.
+/// - Each `i64` cell is encoded using native-endian byte order.
+/// - This method is deterministic and does not use any external randomness.
+pub fn sha256_seed_grid<const W: usize, const H: usize>(key: &Grid<W, H>) -> [u8; 32]
 {
     //SHA256
     let mut hasher = Sha256::new();
@@ -48,12 +68,40 @@ pub fn sha256_seed_grid<const W: usize, const H: usize>(key: &Grid<W, H>) -> [u8
     hasher.finalize().into()
 }
 
-pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaCha20Rng) -> Vec<i64> //GENERATE KEY USING DPRNG
+/// Generates a deterministic key vector using a ChaCha20-based DRNG.
+///
+/// This function produces a `Vec<i64>` of length `2 × W × H` by sampling from
+/// the provided ChaCha20 random number generator. Each value is derived from a
+/// `u64` output and cast to `i64`, ensuring reproducibility across runs with the same seed.
+///
+/// # Parameters
+/// - `rng`: A mutable reference to a seeded [`ChaCha20Rng`] instance.
+///
+/// # Returns
+/// A vector of signed 64-bit integers representing raw key material.
+///
+/// # Notes
+/// - The output is deterministic for a given RNG seed.
+pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaCha20Rng) -> Vec<i64>
 {
     (0..(2 * W * H)).map(|_| rng.next_u64() as i64).collect()
 }
 
-pub fn generate_key<const W: usize, const H: usize>() -> Vec<i64> //GENERATE WHY2 SYMMETRIC KEY
+/// Generates a symmetric WHY2 key using secure system entropy.
+///
+/// This function creates a 32-byte seed using [`OsRng`], then initializes
+/// a [`ChaCha20Rng`] with that seed to produce a deterministic
+/// stream of pseudorandom values. The output is a flat `Vec<i64>` of length `2 × W × H`,
+/// suitable for use with [`Grid::from_key`](Grid::from_key).
+///
+/// # Returns
+/// A vector of signed 64-bit integers representing raw symmetric key material.
+///
+/// # Notes
+/// - The key is generated using system entropy and is cryptographically secure.
+/// - The output is deterministic for the derived seed, but the seed itself is random.
+/// - This method is suitable for one-time key generation in encryption workflows.
+pub fn generate_key<const W: usize, const H: usize>() -> Vec<i64>
 {
     //CREATE SEED FOR ChaCha20Rng
     let mut seed = [0u8; 32];
@@ -62,7 +110,24 @@ pub fn generate_key<const W: usize, const H: usize>() -> Vec<i64> //GENERATE WHY
     generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
 }
 
-pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Vec<Grid<W, H>> //GENERATE 'RANDOM' ROUND KEYS BASED ON MASTER KEY
+/// Derives a sequence of round keys from a master Grid using deterministic hashing.
+///
+/// This function generates [`options::ROUND_KEYS`] round keys by chaining SHA-256 hashes
+/// of the previous key. Each hash is used as a seed for a [`ChaCha20Rng`],
+/// which produces a vector of `i64` values. These are then converted into `Grid`
+/// instances using [`Grid::from_key`](Grid::from_key).
+///
+/// # Parameters
+/// - `master_key`: The initial Grid used to seed the first round key.
+///
+/// # Returns
+/// A vector of `Grid` round keys, each derived deterministically from the previous one.
+///
+/// # Notes
+/// - The first key is seeded from `master_key`.
+/// - Each subsequent key is seeded from the SHA-256 digest of the previous key.
+/// - This method ensures reproducible round key generation without external randomness.
+pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Vec<Grid<W, H>>
 {
     let mut keys: Vec<Grid<W, H>> = Vec::with_capacity(options::ROUND_KEYS);
 
