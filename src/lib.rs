@@ -35,6 +35,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! - Lightweight encrypted chat backend for private deployments
 //! - Maximal customization
 //!
+//! ## Philosophy
+//! - **Privacy is a right**, not a subscription feature.
+//! - **No government insight**: no telemetry, no backdoors, no metadata leakage.
+//! - **No payment required**: encryption should be free as in freedom.
+//!
 //! ## Security Disclaimer
 //!
 //! WHY2 is an experimental encryption algorithm. While it draws inspiration from established designs like AES,
@@ -42,6 +47,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! As such, it should **not be considered suitable for high-assurance or production-grade cryptographic applications** where
 //! proven security guarantees are required. Use at your own discretion, and always evaluate your threat model carefully.
+//!
+//! ## License
+//! WHY2 is licensed under the GNU GPLv3. You are free to use, modify, and redistribute it
+//! under the terms of the license. See <https://www.gnu.org/licenses/> for details.
 
 /// Core of WHY2 - encryption functions
 pub mod core;
