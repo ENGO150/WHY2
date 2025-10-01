@@ -27,26 +27,26 @@ use std::sync::
 };
 
 //CONSTS
-pub const METADATA_URL: &str        = "https://crates.io/api/v1/crates/why2";                                       //URL FOR PROJECT METADATA
+pub const METADATA_URL: &str        = "https://crates.io/api/v1/crates/why2";                                 //URL FOR PROJECT METADATA
 
-pub const USER_CONFIG_DIR: &str     = "{HOME}/.config";                                                             //USER CONFIG DIRECTORY
-pub const CONFIG_DIR: &str          = "/WHY2";                                                                      //DIRECTORY FOR CONFIG FILES
-pub const SERVER_CONFIG: &str       = "/server.toml";                                                               //SERVER CONFIG FILE
-pub const CLIENT_CONFIG: &str       = "/client.toml";                                                               //CLIENT CONFIG FILE
-pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                         //SERVER USERS CONFIG FILE
-pub const CONFIG_URL: &str          = "https://raw.githubusercontent.com/ENGO150/WHY2/development/src/chat/config"; //CONFIG FILE DOWNLOAD URL
+pub const USER_CONFIG_DIR: &str     = "{HOME}/.config";                                                       //USER CONFIG DIRECTORY
+pub const CONFIG_DIR: &str          = "/WHY2";                                                                //DIRECTORY FOR CONFIG FILES
+pub const SERVER_CONFIG: &str       = "/server.toml";                                                         //SERVER CONFIG FILE
+pub const CLIENT_CONFIG: &str       = "/client.toml";                                                         //CLIENT CONFIG FILE
+pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                   //SERVER USERS CONFIG FILE
+pub const CONFIG_URL: &str          = "https://git.satan.red/ENGO150/WHY2/-/raw/development/src/chat/config"; //CONFIG FILE DOWNLOAD URL
 
-pub const SERVER_PORT: u16          = 1204;                                                                         //PORT FOR SERVER COMMUNICATION
+pub const SERVER_PORT: u16          = 1204;                                                                   //PORT FOR SERVER COMMUNICATION
 
-pub const AUTHORITY_DIR: &str       = "/certs";                                                                      //AUTHORITY DIRECTORY
+pub const AUTHORITY_DIR: &str       = "/certs";                                                               //AUTHORITY DIRECTORY
 
-pub const KEY_LOCATION: &str        = "/keys";                                                                       //KEY DIRECTORY
-pub const KEY_FILENAME: &str        = "/secp521r1.pem";                                                              //NAME OF ECC KEYFILE
+pub const KEY_LOCATION: &str        = "/keys";                                                                //KEY DIRECTORY
+pub const KEY_FILENAME: &str        = "/secp521r1.pem";                                                       //NAME OF ECC KEYFILE
 
-pub const MIN_PASSWORD_LEN: usize   = 8;                                                                             //MINIMAL PASSWORD LENGTH
+pub const MIN_PASSWORD_LEN: usize   = 8;                                                                      //MINIMAL PASSWORD LENGTH
 
 //DO NOT CHANGE CONST BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
-pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                                  //DIMENSIONS OF REX GRID
+pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                           //DIMENSIONS OF REX GRID
 
 //SETTINGS
 static SHARED_KEY: LazyLock<RwLock<Option<Vec<i64>>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
