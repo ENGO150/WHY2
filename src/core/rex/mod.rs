@@ -65,14 +65,21 @@ impl<const W: usize, const H: usize> Grid<W, H>
     }
 
     //CREATE VECTOR OF GRIDS FROM BYTES
-    pub fn from_bytes(bytes: Vec<u8>) -> Option<Vec<Self>>
+    pub fn from_bytes(bytes: Vec<u8>) -> result::Result<Vec<Self>, String>
     {
         let matrix_size = W * H * 8; //EACH i64 IS 8 BYTES
 
         //CHECK FOR VALID GRID
-        if bytes.len() % matrix_size != 0 { return None; }
+        if bytes.len() % matrix_size != 0
+        {
+            return Err(format!
+            (
+                "Invalid byte length: expected multiply of {} bytes for a {}x{} Grid, got {}",
+                matrix_size, W, H, bytes.len()
+            ));
+        }
 
-        Some(bytes.chunks(matrix_size).map(|chunk|
+        Ok(bytes.chunks(matrix_size).map(|chunk|
         {
             let mut grid = Grid::new();
             for j in 0..H
