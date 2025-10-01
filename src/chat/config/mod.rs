@@ -19,6 +19,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     io,
+    str::FromStr,
+    fmt::Debug,
     path::Path,
     fs::{ self, File },
 };
@@ -64,7 +66,9 @@ fn get_data(path: &str) -> DocumentMut //GET DocumentMut FROM path
     content.parse::<DocumentMut>().expect("Failed to parse config") //PARSE CONFIG & RETURN
 }
 
-fn config_read(filename: &str, key: &str) -> String //READ CONFIG
+fn config_read<T: FromStr>(filename: &str, key: &str) -> T //READ CONFIG
+where
+    T::Err: Debug,
 {
     let data = get_data(&config_path(filename));
 
@@ -72,14 +76,16 @@ fn config_read(filename: &str, key: &str) -> String //READ CONFIG
     if let Some(value) = data.get(key) //FOUND IN CONFIG
     {
         //USE APPROPRIATE DATATYPE
-        return match value.as_value().expect("Invalid config")
+        let string_value = match value.as_value().expect("Invalid config")
         {
             Value::String(s) => s.value().to_string(),
             Value::Integer(i) => i.value().to_string(),
             Value::Boolean(b) => b.value().to_string(),
 
             _ => panic!("Unsupported config datatype")
-        }
+        };
+
+        return string_value.parse::<T>().expect("Parsing config value failed");
     }
 
     //key NOT FOUND IN CONFIG, FETCH CONFIG AND INSERT NEW KEY
@@ -121,14 +127,18 @@ pub fn init_client_config()
     init_config(options::CLIENT_CONFIG); //DOWNLOAD client.toml
 }
 
-pub fn server_config(key: &str) -> String //RETURN key FROM server.toml
+pub fn server_config<T: FromStr>(key: &str) -> T //RETURN key FROM server.toml
+where
+    T::Err: Debug,
 {
-    config_read(options::SERVER_CONFIG, key)
+    config_read::<T>(options::SERVER_CONFIG, key)
 }
 
-pub fn client_config(key: &str) -> String //RETURN key FROM client.toml
+pub fn client_config<T: FromStr>(key: &str) -> T //RETURN key FROM client.toml
+where
+    T::Err: Debug,
 {
-    config_read(options::CLIENT_CONFIG, key)
+    config_read::<T>(options::CLIENT_CONFIG, key)
 }
 
 pub fn server_users_config(key: &str) -> String //RETURN key FROM server_users.toml

@@ -177,7 +177,7 @@ impl Connection
     //CHECK IF CONNECTION IS INACTIVE
     fn is_inactive(&self, now: Option<Instant>) -> bool
     {
-        now.unwrap_or(Instant::now()).duration_since(*self.last_activity()) > Duration::from_secs(config::server_config("communication_time").parse().unwrap())
+        now.unwrap_or(Instant::now()).duration_since(*self.last_activity()) > Duration::from_secs(config::server_config::<u64>("communication_time"))
     }
 
     //CLONE STREAM
@@ -233,9 +233,9 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
     {
-        "max_uname": config::server_config("max_username_length"),
-        "min_uname": config::server_config("min_username_length"),
-        "server_name": config::server_config("server_name"),
+        "max_uname": config::server_config::<String>("max_username_length"),
+        "min_uname": config::server_config::<String>("min_username_length"),
+        "server_name": config::server_config::<String>("server_name"),
     }).to_string();
 
     //SEND
@@ -305,7 +305,7 @@ pub fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType
 
     if username.is_some()
     {
-        send_to_all(username.as_ref().map(|s| s.as_str()), &config::server_config("server_username"), None, Some(MessageCode::Leave));
+        send_to_all(username.as_ref().map(|s| s.as_str()), &config::server_config::<String>("server_username"), None, Some(MessageCode::Leave));
     }
 
     println!("{} connection: {}", if disconnect_type == DisconnectType::Authenticate
@@ -430,7 +430,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     }
 
     //ASK CLIENT FOR THEIR PACKAGE VERSION
-    if config::server_config("check_client_version").parse().unwrap()
+    if config::server_config::<bool>("check_client_version")
     {
         let version = ask_version(stream, shared_key.as_ref());
         if version.is_none() || version.unwrap() != misc::get_version()
@@ -446,9 +446,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let mut username: Option<String> = None; //USER ENTERED USERNAME
 
     //USERNAME CONFIGS
-    let max_tries: usize = config::server_config("max_username_tries").parse().unwrap(); //MAX n
-    let min_len: usize = config::server_config("min_username_length").parse().unwrap();
-    let max_len: usize = config::server_config("max_username_length").parse().unwrap();
+    let max_tries = config::server_config::<usize>("max_username_tries"); //MAX n
+    let min_len = config::server_config::<usize>("min_username_length");
+    let max_len = config::server_config::<usize>("max_username_length");
 
     //ASK n TIMES
     for _ in 0..max_tries
@@ -484,7 +484,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let username = username.unwrap();
 
     //BLOCK NEW USERS IF REGISTRATION IS DISABLED
-    if !config::server_config("allow_register").parse::<bool>().unwrap() && !config::server_users_contains(&username)
+    if !config::server_config::<bool>("allow_register") && !config::server_users_contains(&username)
     {
         send_code(stream, None, MessageCode::RegisterDisabled, shared_key.as_ref());
         return remove_connection(stream, DisconnectType::Gracefully);
@@ -557,7 +557,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     send_code(stream, None, MessageCode::Accept, shared_key.as_ref());
 
     //SEND JOIN MESSAGE
-    send_to_all(Some(&username), &config::server_config("server_username"), None, Some(MessageCode::Join));
+    send_to_all(Some(&username), &config::server_config::<String>("server_username"), None, Some(MessageCode::Join));
 
     //LOOP READING
     loop

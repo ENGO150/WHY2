@@ -130,12 +130,12 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
 
     #[cfg(feature = "server")]
     {
-        max_packet_size = config::server_config("max_packet_size").parse::<usize>().unwrap();
+        max_packet_size = config::server_config::<usize>("max_packet_size");
     }
 
     #[cfg(not(feature = "server"))]
     {
-        max_packet_size = config::client_config("max_packet_size").parse::<usize>().unwrap();
+        max_packet_size = config::client_config::<usize>("max_packet_size");
     }
 
     //READ
@@ -201,7 +201,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
             if conn.stream().lock().unwrap().peer_addr().unwrap() == peer_addr //CONNECTION FOUND
             {
                 //SPAM
-                if conn.is_authenticated() && Instant::now().duration_since(*conn.last_activity()) < Duration::from_millis(config::server_config("min_message_delay").parse().unwrap())
+                if conn.is_authenticated() && Instant::now().duration_since(*conn.last_activity()) < Duration::from_millis(config::server_config::<u64>("min_message_delay"))
                 {
                     //INCREMENT SPAM VIOLATIONS
                     *conn.spam_violations_mut().unwrap() += 1;
@@ -210,7 +210,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
                     server::send_code(stream, None, MessageCode::SpamWarning, conn.shared_key());
 
                     //CHECK FOR TOO MANY VIOLATIONS
-                    disconnect = *conn.spam_violations().unwrap() > config::server_config("max_message_delay_violations").parse().unwrap();
+                    disconnect = *conn.spam_violations().unwrap() > config::server_config::<usize>("max_message_delay_violations");
                 }
 
                 *conn.last_activity_mut() = Instant::now(); //RESET last_activity

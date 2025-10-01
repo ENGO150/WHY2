@@ -49,7 +49,7 @@ fn main()
     config::init_server_config(); //CREATE server.toml CONFIGURATION
     crypto::init_keys(); //GENERATE ECC KEYS
 
-    let address = format!("{}:{}", config::server_config("server_ip"), options::SERVER_PORT); //GET ADDRESS
+    let address = format!("{}:{}", config::server_config::<String>("server_ip"), options::SERVER_PORT); //GET ADDRESS
     let listener = TcpListener::bind(&address).expect("Binding failed"); //BIND ADDRESS
     println!("Server enabled.\nListening on {address}\n"); //INFO PRINT
 

@@ -299,7 +299,7 @@ fn main()
     println!("Welcome.\n");
 
     //GET CONNECTING IP
-    let mut connecting_ip = if config::client_config("auto_connect") == "true" //USER ENABLED AUTOMATIC CONNECTION
+    let mut connecting_ip = if config::client_config::<bool>("auto_connect") //USER ENABLED AUTOMATIC CONNECTION
     {
         let ip = config::client_config("auto_connect_ip"); //USE CONFIG IP
 
@@ -327,7 +327,7 @@ fn main()
     if !connecting_ip.contains(':')
     {
         //APPEND DEFAULT PORT TO connecting_ip
-        connecting_ip.push_str(&format!(":{}", config::client_config("default_port")));
+        connecting_ip.push_str(&format!(":{}", config::client_config::<String>("default_port")));
     } else
     {
         spacer_add_spaces += connecting_ip.len() - connecting_ip.find(":").unwrap();
