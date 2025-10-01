@@ -206,13 +206,13 @@ pub static CONNECTIONS: LazyLock<Arc<RwLock<Vec<Connection>>>> = LazyLock::new(|
 //PRIVATE
 fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR SERVER-SIDE
 {
-    //WAIT FOR ClientServerKE
+    //WAIT FOR KeyExchange
     let message = loop
     {
         //READ MESSAGE
         let received = network::receive(stream, None)?;
 
-        if received.code == Some(MessageCode::ClientServerKE) && !received.text.is_none() { break received; }
+        if received.code == Some(MessageCode::KeyExchange) && !received.text.is_none() { break received; }
     };
 
     //SEND ECC PUBKEY TO CLIENT
@@ -221,7 +221,7 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
         text: Some(crypto::get_public_key()),
         username: None,
         id: None,
-        code: Some(MessageCode::ServerClientKE),
+        code: Some(MessageCode::KeyExchange),
     }, None);
 
     //CALCULATE SHARED SECRET

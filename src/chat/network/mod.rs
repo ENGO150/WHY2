@@ -64,8 +64,7 @@ use crate::chat::network::server::DisconnectType;
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum MessageCode //CONTROL CODES
 {
-    ClientServerKE,     //CLIENT -> SERVER | KEY EXCHANGE
-    ServerClientKE,     //SERVER -> CLIENT | KEY EXCHANGE
+    KeyExchange,        //SERVER <> CLIENT | KEY EXCHANGE
     Welcome,            //SERVER -> CLIENT | INFORMATIONS
     Disconnect,         //SERVER <> CLIENT | QUIT COMMUNICATION
     Username,           //SERVER -> CLIENT | PICK USERNAME

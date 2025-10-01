@@ -53,16 +53,16 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
         text: Some(crypto::get_public_key()),
         username: None,
         id: None,
-        code: Some(MessageCode::ClientServerKE),
+        code: Some(MessageCode::KeyExchange),
     }, None);
 
-    //WAIT FOR ServerClientKE
+    //WAIT FOR KeyExchange
     let message = loop
     {
         //READ MESSAGE
         let received = network::receive(stream, None).unwrap();
 
-        if received.code == Some(MessageCode::ServerClientKE) { break received; }
+        if received.code == Some(MessageCode::KeyExchange) { break received; }
     };
 
     //CALCULATE SHARED SECRET
