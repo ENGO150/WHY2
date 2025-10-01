@@ -131,14 +131,14 @@ pub fn server_config<T: FromStr>(key: &str) -> T //RETURN key FROM server.toml
 where
     T::Err: Debug,
 {
-    config_read::<T>(options::SERVER_CONFIG, key)
+    config_read(options::SERVER_CONFIG, key)
 }
 
 pub fn client_config<T: FromStr>(key: &str) -> T //RETURN key FROM client.toml
 where
     T::Err: Debug,
 {
-    config_read::<T>(options::CLIENT_CONFIG, key)
+    config_read(options::CLIENT_CONFIG, key)
 }
 
 pub fn server_users_config(key: &str) -> String //RETURN key FROM server_users.toml
