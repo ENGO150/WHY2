@@ -14,31 +14,32 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-stages:
-  - test
-  - build
+name: Build WHY2 Chat
 
-test-why2-core:
-  stage: test
-  image: rust:latest
-  only:
-    - development
-  script:
-    - echo "Test WHY2 Core"
-    - cargo test --all --verbose
+on:
+  push:
+    branches: [ development ]
 
-build-why2-chat:
-  stage: build
-  image: rust:latest
-  only:
-    - development
-  needs:
-    - job: test-why2-core
-  script:
-    - echo "Build WHY2 Chat"
-    - cargo build --features server,client --release
-  artifacts:
-    name: "why2-chat-artifacts"
-    paths:
-      - ./target/release/why2
-      - ./target/release/why2-server
+jobs:
+  test-why2:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: development
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Chat
+        run: cargo build --features server,client --release
+
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: why2-binaries
+          path: |
+            ./target/release/why2
+            ./target/release/why2-server
