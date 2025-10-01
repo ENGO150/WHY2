@@ -69,7 +69,7 @@ use crate::core::rex::
 /// - Splits the input into grid chunks and shuffles each using a deterministic PRNG seeded from the key hash.
 /// - Applies round-based transformations: initial XOR, subcell mixing, row shifting, and column mixing.
 /// - Returns `None` if the provided key is invalid (wrong length).
-pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<i64>>) -> Option<EncryptedData<W, H>>
+pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, String>
 {
     //REX OPTIONS
     let grid_area = W * H; //AREA OF REX GRID
@@ -81,7 +81,14 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
         Some(k) =>
         {
             //CHECK FOR INVALID KEY
-            if k.len() != grid_area * 2 { return None; }
+            if k.len() != grid_area * 2
+            {
+                return Err(format!
+                (
+                    "Invalid key length: expected length {}, got {}",
+                    grid_area * 2, k.len()
+                ));
+            }
 
             //USE KEY IF MATCHING LENGTH
             k
@@ -151,7 +158,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     }
 
     //RETURN OUTPUT
-    Some(EncryptedData
+    Ok(EncryptedData
     {
         output: grids,
         key: key_grid,
@@ -177,7 +184,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
 /// # Encoding Notes
 /// - Each `i64` packs two `char`s: the first 4 bytes are the high character, the next 4 bytes the low.
 /// - If the string has an odd number of characters, a null character (`'\0'`) is appended for alignment.
-pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Option<Vec<i64>>) -> Option<EncryptedData<W, H>>
+pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, String>
 {
     //CONVERT input TO Vec<i64>
     let mut chars: Vec<char> = input.chars().collect();
