@@ -48,6 +48,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! As such, it should **not be considered suitable for high-assurance or production-grade cryptographic applications** where
 //! proven security guarantees are required. Use at your own discretion, and always evaluate your threat model carefully.
 //!
+//! ## Versioning Note
+//! All versions with the `-rex` suffix use the redesigned encryption system introduced in WHY2 v0.2.0-rex.
+//! These builds are not compatible with pre-`rex` versions and should be treated as a separate lineage.
+//!
 //! ## License
 //! WHY2 is licensed under the GNU GPLv3. You are free to use, modify, and redistribute it
 //! under the terms of the license. See <https://www.gnu.org/licenses/> for details.
