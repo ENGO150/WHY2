@@ -12,6 +12,31 @@
 
 ---
 
+## Code Example
+```rust
+use why2::core::rex::{ encrypter, decrypter };
+
+fn main()
+{
+    let input = String::from("Hello world!");
+
+    // Encrypt input using 8x8 Grid, with random key
+    let encrypted = encrypter::encrypt_string::<8, 8>(&input, None).expect("Encryption failed");
+
+    // Print encrypted Grids
+    for grid in &encrypted.output
+    {
+        println!("{}", grid);
+    }
+
+    // Decrypt
+    let decrypted = decrypter::decrypt_string(encrypted);
+
+    // Compare input & output
+    assert_eq!(input, decrypted);
+}
+```
+
 ##  Links:
 
 - [API documentation](https://docs.rs/why2)
