@@ -364,79 +364,79 @@ fn main()
         //READ STDIN
         let mut input = read_input();
 
-        //USER COMMANDS
-        let mut command_used = false;
-        if let (Some(command), parameters) = command::get_command(&input)
-        {
-            match command
-            {
-                //EXIT
-                Command::Exit =>
-                {
-                    network::send(&mut client_stream, MessagePacket
-                    {
-                        text: None,
-                        username: None,
-                        id: None,
-                        code: Some(MessageCode::Disconnect),
-                    }, options::get_shared_key().as_ref());
-                },
-
-                //HELP
-                Command::Help =>
-                {
-                    misc::clear_lines(2);
-                    options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
-
-                    print!
-                    (
-                        "\nCommands:
-                        \r/help - Prints this
-                        \r/list - Show connected users
-                        \r/pm (ID) (MESSAGE) - Sends private message
-                        \r/exit - Disconnects from server
-                        \n\r>>> "
-                    );
-                },
-
-                //LIST USERS
-                Command::List =>
-                {
-                    network::send(&mut client_stream, MessagePacket
-                    {
-                        text: None,
-                        username: None,
-                        id: None,
-                        code: Some(MessageCode::List),
-                    }, options::get_shared_key().as_ref());
-                },
-
-                //PRIVATE MESSAGE
-                Command::PrivateMessage =>
-                {
-                    network::send(&mut client_stream, MessagePacket
-                    {
-                        text: parameters,
-                        username: None,
-                        id: None,
-                        code: Some(MessageCode::PrivateMessage),
-                    }, options::get_shared_key().as_ref());
-                },
-
-                //INVALID COMMAND
-                Command::Invalid =>
-                {
-                    misc::clear_lines(2);
-                    print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
-                }
-            }
-
-            command_used = true;
-        }
-
         //APPEND MESSAGE TO HISTORY
         if sending_messages
         {
+            //USER COMMANDS
+            let mut command_used = false;
+            if let (Some(command), parameters) = command::get_command(&input)
+            {
+                match command
+                {
+                    //EXIT
+                    Command::Exit =>
+                    {
+                        network::send(&mut client_stream, MessagePacket
+                        {
+                            text: None,
+                            username: None,
+                            id: None,
+                            code: Some(MessageCode::Disconnect),
+                        }, options::get_shared_key().as_ref());
+                    },
+
+                    //HELP
+                    Command::Help =>
+                    {
+                        misc::clear_lines(2);
+                        options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
+
+                        print!
+                        (
+                            "\nCommands:
+                            \r/help - Prints this
+                            \r/list - Show connected users
+                            \r/pm (ID) (MESSAGE) - Sends private message
+                            \r/exit - Disconnects from server
+                            \n\r>>> "
+                        );
+                    },
+
+                    //LIST USERS
+                    Command::List =>
+                    {
+                        network::send(&mut client_stream, MessagePacket
+                        {
+                            text: None,
+                            username: None,
+                            id: None,
+                            code: Some(MessageCode::List),
+                        }, options::get_shared_key().as_ref());
+                    },
+
+                    //PRIVATE MESSAGE
+                    Command::PrivateMessage =>
+                    {
+                        network::send(&mut client_stream, MessagePacket
+                        {
+                            text: parameters,
+                            username: None,
+                            id: None,
+                            code: Some(MessageCode::PrivateMessage),
+                        }, options::get_shared_key().as_ref());
+                    },
+
+                    //INVALID COMMAND
+                    Command::Invalid =>
+                    {
+                        misc::clear_lines(2);
+                        print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
+                    }
+                }
+
+                command_used = true;
+            }
+
             let mut history = INPUT_HISTORY.lock().unwrap();
 
             //ADD INPUT
@@ -447,9 +447,9 @@ fn main()
 
             //RESET HISTORY POSITION
             history.1 = history.0.len();
-        }
 
-        if command_used { continue }; //DO NOT SEND COMMAND STRING
+            if command_used { continue }; //DO NOT SEND COMMAND STRING
+        }
 
         //USER ENTERED PASSWORD - HASH
         if options::get_asking_password()
