@@ -21,5 +21,5 @@ For help, DM me directly on [Discord](https://discord.com/users/6343855039568937
 
 #### License
 <sup>
-WHY2 is licensed under the GNU GPLv3. You are free to use, modify, and redistribute it under the terms of the license. See https://www.gnu.org/licenses/ for details.
+WHY2 is licensed under the GNU GPLv3. You are free to use, modify, and redistribute it under the terms of the license. See <a href="https://www.gnu.org/licenses/" target="_blank">https://www.gnu.org/licenses/</a> for details.
 </sup>
