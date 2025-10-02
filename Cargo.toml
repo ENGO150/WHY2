@@ -21,13 +21,13 @@ edition = "2024"
 
 description = "Lightweight, fast, secure, and easy to use encryption system."
 license = "GPL-3.0-only"
-readme = "README"
+readme = "README.md"
 repository = "https://git.satan.red/ENGO150/WHY2"
 keywords = ["encryption", "chat", "security", "rust"]
 categories = ["command-line-utilities", "network-programming", "cryptography"]
 authors = ["Václav Šmejkal <engo@satan.red>"]
 
-include = ["src/**", "Cargo.toml", "README", "LICENSE"]
+include = ["src/**", "Cargo.toml", "README.md", "LICENSE"]
 
 [package.metadata.docs.rs]
 all-features = true
