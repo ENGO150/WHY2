@@ -430,7 +430,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     }
 
     //ASK CLIENT FOR THEIR PACKAGE VERSION
-    if config::server_config::<bool>("check_client_version")
+    if config::server_config("check_client_version")
     {
         let version = ask_version(stream, shared_key.as_ref());
         if version.is_none() || version.unwrap() != misc::get_version()
