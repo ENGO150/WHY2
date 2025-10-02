@@ -16,7 +16,7 @@
 
 [package]
 name = "why2"
-version = "0.2.5-rex"
+version = "0.2.6-rex"
 edition = "2024"
 
 description = "Lightweight, fast, secure, and easy to use encryption system."
