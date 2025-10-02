@@ -29,8 +29,8 @@ authors = ["Václav Šmejkal <engo@satan.red>"]
 
 include = ["src/**", "Cargo.toml", "README.md", "LICENSE"]
 
-[package.metadata.docs.rs]
-all-features = true
+#[package.metadata.docs.rs]
+#all-features = true
 
 [features]
 chat = ["base91", "bincode", "p521", "serde", "toml_edit"]
