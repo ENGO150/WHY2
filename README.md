@@ -39,7 +39,8 @@ fn main()
 
 ##  Links:
 
-- [API documentation](https://docs.rs/why2)
+- [Prebuilt Binaries](https://github.com/ENGO150/WHY2/actions/workflows/chat-build.yml)
+- [API Documentation](https://docs.rs/why2)
 
 ## Getting Help
 For help, DM me directly on [Discord](https://discord.com/users/634385503956893737) :)
