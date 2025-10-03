@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#![allow(deprecated)]
+
 use sha2::{ Sha256, Digest };
 
 use rand::distr::{ Alphanumeric, SampleString };
