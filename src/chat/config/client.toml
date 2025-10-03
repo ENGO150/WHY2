@@ -19,6 +19,4 @@ default_port = 1204
 auto_connect = false # Automatic connection to 'auto_connect_ip'
 auto_connect_ip = "chat.satan.red" # See 'auto_connect'
 
-max_packet_size = 4096 # Maximal message length
-
 authority_ip = "chat.satan.red" # CA Address; Feel free to change if you don't trust the developer, but be aware that both client and server must use the same CA

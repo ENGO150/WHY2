@@ -28,7 +28,6 @@ use std::
     net::TcpStream,
     io::
     {
-        Read,
         Write,
         BufReader,
         BufRead,
@@ -39,12 +38,7 @@ use serde::{ Serialize, Deserialize };
 
 use crate::
 {
-    chat::
-    {
-        config,
-        options as rex_options,
-    },
-
+    chat::options as rex_options,
     core::rex::
     {
         encrypter,
@@ -55,10 +49,18 @@ use crate::
 };
 
 #[cfg(feature = "server")]
-use std::time::{ Instant, Duration };
+use std::
+{
+    io::Read,
+    time::{ Instant, Duration },
+};
 
 #[cfg(feature = "server")]
-use crate::chat::network::server::DisconnectType;
+use crate::chat::
+{
+    config,
+    network::server::DisconnectType
+};
 
 //STRUCTS
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -125,24 +127,25 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
 
 pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<MessagePacket>
 {
-    //GET MAX PACKET SIZE
-    let max_packet_size: usize;
+    //READ VARIABLES
+    let mut reader: Box<dyn BufRead>;
+    let mut packet = String::new(); //RECEIVED STRING
 
     #[cfg(feature = "server")]
-    {
-        max_packet_size = config::server_config::<usize>("max_packet_size");
-    }
+    let max_packet_size: usize;
 
+    //INIT READER
+    #[cfg(feature = "server")]
+    {
+        max_packet_size = config::server_config("max_packet_size");
+        reader = Box::new(BufReader::new(stream.try_clone().expect("Cloning stream failed")).take(max_packet_size as u64 + 16));
+    }
     #[cfg(not(feature = "server"))]
     {
-        max_packet_size = config::client_config::<usize>("max_packet_size");
+        reader = Box::new(BufReader::new(&mut *stream));
     }
 
-    //READ
-    let mut reader = BufReader::new(&mut *stream).take(max_packet_size as u64 + 16);
-    let mut packet = String::new();
-
-    //LOOP UNTIL MESSAGE ARRIVES
+    //LOOP READING UNTIL MESSAGE ARRIVES
     while packet.is_empty()
     {
         match reader.read_line(&mut packet)
