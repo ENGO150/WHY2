@@ -39,11 +39,28 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! For secure applications, use [`core::rex`]—the current and trusted implementation of the WHY2 encryption engine.
 
+macro_rules! deprecated_mods
+{
+    (
+        version = $version:literal,
+        message = $msg:literal,
+        mods = [$($name:ident),* $(,)?]
+    ) =>
+    {
+        $(
+            #[deprecated(since = $version, note = $msg)]
+            pub mod $name;
+        )*
+    };
+}
+
 /// Modern, AES-inspired, implementation of WHY2
 pub mod rex;
 
 //DEPRECATED
-pub mod crypto;
-pub mod decrypter;
-pub mod encrypter;
-pub mod options;
+deprecated_mods!
+{
+    version = "0.2.0-rex",
+    message = "Legacy encryption is unsecure. Use REX module instead.",
+    mods = [ crypto, decrypter, encrypter, options ]
+}
