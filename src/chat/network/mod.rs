@@ -204,7 +204,9 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
             if conn.stream().lock().unwrap().peer_addr().unwrap() == peer_addr //CONNECTION FOUND
             {
                 //SPAM
-                if conn.is_authenticated() && Instant::now().duration_since(*conn.last_activity()) < Duration::from_millis(config::server_config::<u64>("min_message_delay"))
+                if config::server_config("spam_protection") && conn.is_authenticated() &&
+                    Instant::now().duration_since(*conn.last_activity()) <
+                        Duration::from_millis(config::server_config::<u64>("min_message_delay"))
                 {
                     //INCREMENT SPAM VIOLATIONS
                     *conn.spam_violations_mut().unwrap() += 1;
