@@ -97,6 +97,9 @@ fn read_input() -> String
     {
         if let Event::Key(key_event) = event::read().unwrap()
         {
+            //INGORE KEY RELEASE
+            if key_event.is_release() { continue; }
+
             //CTRL SHORTCUTS
             if key_event.modifiers.contains(KeyModifiers::CONTROL)
             {
