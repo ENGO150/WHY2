@@ -36,7 +36,8 @@ build-why2-chat:
     - job: test-why2-core
   script:
     - echo "Build WHY2 Chat"
-    - cargo build --features server,client --release
+    - cargo build --features client --release
+    - cargo build --features server --release
   artifacts:
     name: "why2-chat-artifacts"
     paths:

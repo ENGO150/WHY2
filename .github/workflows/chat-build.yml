@@ -33,8 +33,11 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build Chat
-        run: cargo build --features server,client --release
+      - name: Build Client
+        run: cargo build --features client --release
+
+      - name: Build Server
+        run: cargo build --features server --release
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
