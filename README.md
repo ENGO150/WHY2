@@ -21,7 +21,8 @@ fn main()
     let input = String::from("Hello world!");
 
     // Encrypt input using 8x8 Grid, with random key
-    let encrypted = encrypter::encrypt_string::<8, 8>(&input, None).expect("Encryption failed");
+    let encrypted = encrypter::encrypt_string::<8, 8>(&input, None)
+                        .expect("Encryption failed");
 
     // Print encrypted Grids
     for grid in &encrypted.output
