@@ -2009,7 +2009,7 @@ dependencies = [
 
 [[package]]
 name = "why2"
-version = "0.2.6-rex"
+version = "0.2.7-rex"
 dependencies = [
  "base91",
  "bincode",
