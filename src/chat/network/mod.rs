@@ -131,14 +131,37 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     let mut reader: Box<dyn BufRead>;
     let mut packet = String::new(); //RECEIVED STRING
 
+    //SERVER SIDE PACKET SIZE LIMIT
     #[cfg(feature = "server")]
     let max_packet_size: usize;
+
+    //SERVER SIDE SPAM PROTECTION
+    #[cfg(feature = "server")]
+    let spam_protection = config::server_config::<bool>("spam_protection");
 
     //INIT READER
     #[cfg(feature = "server")]
     {
-        max_packet_size = config::server_config("max_packet_size");
-        reader = Box::new(BufReader::new(stream.try_clone().expect("Cloning stream failed")).take(max_packet_size as u64 + 16));
+        //CHECK IF CLIENT IS AUTHENTICATED
+        let client_addr = Some(stream.peer_addr().unwrap());
+        let authenticated = server::CONNECTIONS.read().unwrap().iter().any(|conn|
+        {
+            conn.stream().lock().unwrap().peer_addr().ok() == client_addr && conn.is_authenticated()
+        });
+
+        reader = Box::new(BufReader::new(stream.try_clone().expect("Cloning stream failed")));
+
+        //ALLOW BIG MESSAGES WHEN SPAM PROTECTION IS OFF AND CLIENT IS AUTHENTICATED
+        max_packet_size = if !spam_protection && authenticated
+        {
+            usize::MAX
+        } else //SET MAX PACKET SIZE IF SPAM PROTECTION IS ENABLED
+        {
+            let max = config::server_config("max_packet_size");
+            reader = Box::new(reader.take(max as u64 + 16));
+
+            max
+        };
     }
     #[cfg(not(feature = "server"))]
     {
