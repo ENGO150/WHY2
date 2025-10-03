@@ -51,11 +51,7 @@ use sha2::{ Sha256, Digest };
 use crate::
 {
     chat::{ options, misc },
-    core::
-    {
-        crypto,
-        rex::crypto as rex_crypto,
-    },
+    core::rex::crypto,
 };
 
 //PRIVATE
@@ -66,6 +62,16 @@ fn get_private_key() -> SecretKey //LOAD PRIVATE KEY
 
     //PARSE & RETURN
     SecretKey::from_pkcs8_pem(&private_pem).expect("Parsing PEM failed")
+}
+
+fn sha256_handler(str: &str) -> Vec<u8> //HANDLER FOR SHA256
+{
+    //SHA256
+    let mut hasher = Sha256::new();
+    hasher.update(str.as_bytes());
+
+    //FINALIZE
+    hasher.finalize().to_vec()
 }
 
 //PUBLIC
@@ -117,20 +123,20 @@ pub fn get_shared_key<const W: usize, const H: usize>(key: String) -> Vec<i64> /
 
     //SEED ChaCha20Rng USING SHARED KEY
     let shared_encoded = base91::slice_encode(shared.raw_secret_bytes());
-    let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed(str::from_utf8(&shared_encoded).expect("Encoding shared key failed")));
+    let mut dprng = ChaCha20Rng::from_seed(sha256_seed(str::from_utf8(&shared_encoded).expect("Encoding shared key failed")));
 
     //RETURN GENERATED KEY
-    rex_crypto::generate_key_deterministic::<W, H>(&mut dprng)
+    crypto::generate_key_deterministic::<W, H>(&mut dprng)
 }
 
-pub fn sha256(seed_str: &str) -> String //HASH seed_str
+pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 {
     //SHA256
-    let mut hasher = Sha256::new();
-    hasher.update(seed_str.as_bytes());
+    sha256_handler(seed_str).try_into().expect("Seeding string failed")
+}
 
-    let result = hasher.finalize();
-
-    //FORMAT
-    format!("{:x}", result)
+pub fn sha256(str: &str) -> String //HASH seed_str
+{
+    //FORMAT SHA256
+    sha256_handler(str).iter().map(|byte| format!("{:02x}", byte)).collect()
 }
