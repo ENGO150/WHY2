@@ -20,6 +20,10 @@ on:
   push:
     branches: [ development ]
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   build-why2:
     runs-on: ${{ matrix.os }}
