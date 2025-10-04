@@ -18,6 +18,7 @@
 name = "why2"
 version = "0.2.7-rex"
 edition = "2024"
+build = "build.rs"
 
 description = "Lightweight, fast, secure, and easy to use encryption system."
 license = "GPL-3.0-only"
