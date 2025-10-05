@@ -27,6 +27,7 @@ communication_time = 300 # Seconds waiting for client message before stopping co
 # Restrictions
 allow_register = true # Allow new users to register
 check_client_version = true # Allow only clients with same version as server
+max_clients = 20 # Maximal number of clients connected at the same time
 
 # Auth
 max_username_length = 20 # Maximal username length
