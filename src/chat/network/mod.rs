@@ -169,8 +169,22 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     }
 
     //LOOP READING UNTIL MESSAGE ARRIVES
-    while packet.is_empty()
+    loop
     {
+        //CHECK IF CLIENT IS STILL IN ACTIVE CONNETION LIST
+        #[cfg(feature = "server")]
+        {
+            let peer_addr = stream.peer_addr().unwrap();
+            if !server::CONNECTIONS.read().unwrap().iter().any(|conn| conn.stream().lock().unwrap().peer_addr().unwrap() == peer_addr)
+            {
+                return None;
+            }
+        }
+
+        //EXIT LOOP ON MESSAGE
+        if !packet.is_empty() { break; }
+
+        //READ
         match reader.read_line(&mut packet)
         {
             Ok(0) | Err(_) => //CLIENT DISCONNECTED
