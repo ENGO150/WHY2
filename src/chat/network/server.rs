@@ -390,7 +390,7 @@ fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize, shared
         username: username.to_string(),
         id: id,
         shared_key: shared_key.clone(),
-        last_activity: Instant::now(),
+        last_activity: Instant::now() - Duration::from_millis(config::server_config("min_message_delay")),
         spam_violations: 0,
     });
 }
