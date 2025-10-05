@@ -266,7 +266,7 @@ fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: O
 pub fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType) //REMOVE CONNECTION BY TcpStream
 {
     //GET TARGET PEER ADDRESS
-    let peer_addr = stream.peer_addr().unwrap();
+    let peer_addr = stream.peer_addr().ok();
 
     //USERNAME OF TARGET, FOR DISCONNECT MESSAGE
     let mut username: Option<String> = None;
@@ -279,7 +279,7 @@ pub fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType
         connections.retain(|conn|
         {
             let mut removed_stream = conn.stream().lock().unwrap();
-            let should_remove = removed_stream.peer_addr().unwrap() == peer_addr;
+            let should_remove = removed_stream.peer_addr().ok() == peer_addr;
 
             if should_remove
             {
@@ -318,7 +318,7 @@ pub fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType
     } else
     {
         "Close"
-    }, &stream.peer_addr().unwrap());
+    }, peer_addr.unwrap());
 }
 
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
@@ -520,11 +520,11 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //UPDATE USERNAME IN NonAuthenticated
     {
         let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
-        let peer_addr = stream.peer_addr().unwrap(); //GET PEER ADDRESS
+        let peer_addr = stream.peer_addr().ok(); //GET PEER ADDRESS
 
         for conn in connections.iter_mut()
         {
-            if conn.stream().lock().unwrap().peer_addr().unwrap() == peer_addr && !conn.is_authenticated() //CONNECTION FOUND
+            if conn.stream().lock().unwrap().peer_addr().ok() == peer_addr && !conn.is_authenticated() //CONNECTION FOUND
             {
                 //UPDATE
                 *conn.username_mut() = Some(username.clone());

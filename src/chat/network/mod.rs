@@ -143,7 +143,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     #[cfg(feature = "server")]
     {
         //CHECK IF CLIENT IS AUTHENTICATED
-        let client_addr = Some(stream.peer_addr().unwrap());
+        let client_addr = stream.peer_addr().ok();
         let authenticated = server::CONNECTIONS.read().unwrap().iter().any(|conn|
         {
             conn.stream().lock().unwrap().peer_addr().ok() == client_addr && conn.is_authenticated()
@@ -174,8 +174,8 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         //CHECK IF CLIENT IS STILL IN ACTIVE CONNETION LIST
         #[cfg(feature = "server")]
         {
-            let peer_addr = stream.peer_addr().unwrap();
-            if !server::CONNECTIONS.read().unwrap().iter().any(|conn| conn.stream().lock().unwrap().peer_addr().unwrap() == peer_addr)
+            let peer_addr = stream.peer_addr().ok();
+            if !server::CONNECTIONS.read().unwrap().iter().any(|conn| conn.stream().lock().unwrap().peer_addr().ok() == peer_addr)
             {
                 return None;
             }
@@ -232,13 +232,13 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     #[cfg(feature = "server")]
     {
         let mut connections = server::CONNECTIONS.write().unwrap(); //WRITE LOCK
-        let peer_addr = stream.peer_addr().unwrap(); //GET CURRENT PEER ADDRESS
+        let peer_addr = stream.peer_addr().ok(); //GET CURRENT PEER ADDRESS
         let mut disconnect = false;
 
         //FIND CONNECTION AND SET last_activity
         for conn in connections.iter_mut()
         {
-            if conn.stream().lock().unwrap().peer_addr().unwrap() == peer_addr //CONNECTION FOUND
+            if conn.stream().lock().unwrap().peer_addr().ok() == peer_addr //CONNECTION FOUND
             {
                 //SPAM
                 if config::server_config("spam_protection") && conn.is_authenticated() &&
