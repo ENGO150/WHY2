@@ -68,7 +68,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
     {
         stream: Arc<Mutex<TcpStream>>, //STREAM
         username: Option<String>,      //CHOSEN USERNAME
-        shared_key: Vec<i64>,          //SHARED KEY
+        shared_key: Option<Vec<i64>>,  //SHARED KEY
         last_activity: Instant,        //TIME OF LAST MESSAGE
     },
 }
@@ -79,6 +79,7 @@ pub enum DisconnectType //TYPE OF REMOVING CLIENT FROM CONNECTIONS LIST
     Gracefully,   //SEND Disconnect CODE TO CLIENT
     Forcefully,   //fuck them, close connection
     Authenticate, //NOT REMOVING, ONLY TRANSFER TO AUTHENTICATED CLIENTS
+    Update,       //NOT REMOVING, ONLY EDIT CONNECTION VALUE
 }
 
 //IMPLEMENTATIONS
@@ -130,7 +131,7 @@ impl Connection
         match self
         {
             Self::Authenticated { shared_key, .. } => Some(shared_key),
-            Self::NonAuthenticated { shared_key, .. } => Some(shared_key),
+            Self::NonAuthenticated { shared_key, .. } => shared_key.as_ref(),
         }
     }
 
@@ -308,6 +309,9 @@ pub fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType
         send_to_all(username.as_ref().map(|s| s.as_str()), &config::server_config::<String>("server_username"), None, Some(MessageCode::Leave));
     }
 
+    //DO NOT LOG CLIENT UPDATES
+    if disconnect_type == DisconnectType::Update { return; }
+
     println!("{} connection: {}", if disconnect_type == DisconnectType::Authenticate
     {
         "Authenticate"
@@ -359,6 +363,21 @@ fn get_connection_by_id(id: usize) -> Option<Connection> //RETURN CONNECTION WIT
     }).cloned()
 }
 
+fn update_client_shared_key(stream: &mut TcpStream, shared_key: &Vec<i64>) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
+{
+    //REMOVE FROM NonAuthenticated
+    remove_connection(stream, DisconnectType::Update);
+
+    //ADD Authenticated
+    CONNECTIONS.write().unwrap().push(Connection::NonAuthenticated
+    {
+        stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
+        username: None,
+        shared_key: Some(shared_key.clone()),
+        last_activity: Instant::now(),
+    });
+}
+
 fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize, shared_key: &Vec<i64>) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
     //REMOVE FROM NonAuthenticated
@@ -407,13 +426,6 @@ pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode
 
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
-    //GET SHARED KEY
-    let shared_key = match key_exchange(stream)
-    {
-        Some(r) => Some(r),
-        None => return
-    };
-
     //ADD CONNECTION TO NonAuthenticated
     {
         //CREATE CONNECTION
@@ -421,13 +433,23 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         {
             stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
             username: None,
-            shared_key: shared_key.clone().unwrap(),
+            shared_key: None,
             last_activity: Instant::now(),
         };
 
         //PUSH
         CONNECTIONS.write().unwrap().push(connection);
     }
+
+    //GET SHARED KEY
+    let shared_key = match key_exchange(stream)
+    {
+        Some(r) => Some(r),
+        None => return remove_connection(stream, DisconnectType::Forcefully)
+    };
+
+    //UPDATE CONNECTION
+    update_client_shared_key(stream, shared_key.as_ref().unwrap());
 
     //ASK CLIENT FOR THEIR PACKAGE VERSION
     if config::server_config("check_client_version")
