@@ -1,5 +1,5 @@
 # WHY2
-[![Build Status]][pipelines] [![Latest Version]][crates.io] [![Docs Status]][docs]
+[![Build Status]][pipelines] [![Codacy Badge]][gitlab] [![Latest Version]][crates.io] [![Docs Status]][docs]
 
 [Build Status]: https://git.satan.red/ENGO150/WHY2/badges/development/pipeline.svg
 [pipelines]: https://git.satan.red/ENGO150/WHY2/-/pipelines
@@ -7,6 +7,8 @@
 [crates.io]: https://crates.io/crates/why2
 [Docs Status]: https://img.shields.io/docsrs/why2
 [docs]: https://docs.rs/why2
+[Codacy Badge]: https://app.codacy.com/project/badge/Grade/80836146f6fa4567b734e7b5ed452f2d
+[gitlab]: https://git.satan.red/ENGO150/WHY2
 
 **Lightweight, fast, secure, and easy to use encryption system.**
 
