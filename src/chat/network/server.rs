@@ -429,6 +429,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //CHECK FOR MAXIMAL CONNECTIONS
     if CONNECTIONS.read().unwrap().len() == config::server_config::<usize>("max_clients") { return; }
 
+    println!("New connection: {}", stream.peer_addr().unwrap());
+
     //ADD CONNECTION TO NonAuthenticated
     {
         //CREATE CONNECTION

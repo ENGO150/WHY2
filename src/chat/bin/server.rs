@@ -62,7 +62,6 @@ fn main()
             {
                 Ok(mut stream) =>
                 {
-                    println!("New connection: {}", stream.peer_addr().unwrap());
                     thread::spawn(move || server::listen_client(&mut stream));
                 },
 
