@@ -17,10 +17,8 @@
 name: Build WHY2 Chat
 
 on:
-  workflow_run:
-    workflows: ["Test WHY2 Core"]
-    types:
-      - completed
+  push:
+    branches: [ development ]
 
 permissions:
   contents: read
@@ -28,7 +26,6 @@ permissions:
 
 jobs:
   build-why2:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
