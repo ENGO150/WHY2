@@ -75,7 +75,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> De
     let round_keys = crypto::generate_round_keys(&key_grid);
 
     //DECRYPT EACH ENCRYPTED GRID
-    for grid in &mut grids
+    for mut grid in &mut grids
     {
         //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
         for (i, round_key) in round_keys[1..].iter().enumerate().rev()
@@ -83,11 +83,11 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> De
             grid.inv_mix_columns();         //UNMIX COLUMNS
             grid.inv_shift_rows(round_key); //UNSHIFT ROWS
             grid.inv_subcell(i);            //INVERT SUBCELL
-            grid.xor_grids(round_key);      //XOR
+            grid ^= round_key;              //XOR
         }
 
         //INITIAL XOR
-        grid.xor_grids(&round_keys[0]);
+        grid ^= &round_keys[0];
     }
 
     //DE-SHUFFLING VARIABLES

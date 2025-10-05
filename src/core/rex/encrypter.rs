@@ -142,15 +142,15 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     let round_keys = crypto::generate_round_keys(&key_grid);
 
     //APPLY ENCRYPTION TO EACH GRID
-    for grid in &mut grids
+    for mut grid in &mut grids
     {
         //INITIAL XOR
-        grid.xor_grids(&round_keys[0]);
+        grid ^= &round_keys[0];
 
         //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
         for (i, round_key) in round_keys[1..].iter().enumerate()
         {
-            grid.xor_grids(round_key);  //XOR
+            grid ^= round_key;          //XOR
             grid.subcell(i);            //SUBCELL
             grid.shift_rows(round_key); //SHIFT ROWS
             grid.mix_columns();         //MIX COLUMNS

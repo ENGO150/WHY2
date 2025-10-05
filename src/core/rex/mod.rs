@@ -38,7 +38,13 @@ use std::
     result,
     vec::IntoIter as IntoVecIter,
     slice::{ Iter, IterMut },
-    ops::{ Index, IndexMut },
+    ops::
+    {
+        Index,
+        IndexMut,
+        BitXorAssign,
+    },
+
     fmt::
     {
         Display,
@@ -446,6 +452,15 @@ impl<const W: usize, const H: usize> IndexMut<usize> for Grid<W, H>
     fn index_mut(&mut self, y: usize) -> &mut Self::Output
     {
         &mut self.0[y]
+    }
+}
+
+//XOR ASSIGN
+impl<const W: usize, const H: usize> BitXorAssign<&Grid<W, H>> for &mut Grid<W, H>
+{
+    fn bitxor_assign(&mut self, rhs: &Grid<W, H>)
+    {
+        self.xor_grids(&rhs);
     }
 }
 
