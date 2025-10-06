@@ -692,11 +692,13 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
         let message = read.text.unwrap();
 
+        //SEND MESSAGE TO ALL USERS
         send_to_all(MessagePacket
         {
             text: Some(message),
             username: Some(username.clone()),
             id: Some(id),
+            colors: read.colors,
             ..Default::default()
         });
     }
