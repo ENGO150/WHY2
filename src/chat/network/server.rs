@@ -223,6 +223,7 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
         username: None,
         id: None,
         code: Some(MessageCode::KeyExchange),
+        colors: None,
     }, None);
 
     //CALCULATE SHARED SECRET
@@ -243,7 +244,7 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //
     send_code(stream, Some(welcome_json), MessageCode::Welcome, shared_key);
 }
 
-fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: Option<MessageCode>) //SEND PACKET TO ALL CLIENTS
+fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
 {
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
 
@@ -252,13 +253,7 @@ fn send_to_all(message: Option<&str>, username: &str, id: Option<usize>, code: O
     {
         if connection.is_authenticated()
         {
-            network::send(&mut *connection.stream().lock().unwrap(), MessagePacket
-            {
-                text: message.map(str::to_string),
-                username: Some(username.to_string()),
-                id: id,
-                code: code.clone(),
-            }, connection.shared_key());
+            network::send(&mut *connection.stream().lock().unwrap(), packet.clone(), connection.shared_key());
         }
     }
 }
@@ -306,7 +301,14 @@ pub fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType
 
     if username.is_some()
     {
-        send_to_all(username.as_ref().map(|s| s.as_str()), &config::server_config::<String>("server_username"), None, Some(MessageCode::Leave));
+        send_to_all(MessagePacket
+        {
+            text: username.as_ref().map(|s| s.to_string()),
+            username: Some(config::server_config::<String>("server_username")),
+            id: None,
+            code: Some(MessageCode::Leave),
+            colors: None,
+        });
     }
 
     //DO NOT LOG CLIENT UPDATES
@@ -421,6 +423,7 @@ pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode
         username: None,
         id: None,
         code: Some(code),
+        colors: None,
     }, shared_key);
 }
 
@@ -584,7 +587,14 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     send_code(stream, None, MessageCode::Accept, shared_key.as_ref());
 
     //SEND JOIN MESSAGE
-    send_to_all(Some(&username), &config::server_config::<String>("server_username"), None, Some(MessageCode::Join));
+    send_to_all(MessagePacket
+    {
+        text: Some(username.clone()),
+        username: Some(config::server_config::<String>("server_username")),
+        id: None,
+        code: Some(MessageCode::Join),
+        colors: None,
+    });
 
     //LOOP READING
     loop
@@ -630,6 +640,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         username: None,
                         id: None,
                         code: Some(MessageCode::List),
+                        colors: None,
                     }, shared_key.as_ref());
                 },
 
@@ -656,6 +667,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                                 username: Some(username.clone()),
                                                 id: Some(id),
                                                 code: Some(MessageCode::PrivateMessage),
+                                                colors: None,
                                             }, recipient.shared_key());
                                         }
 
@@ -666,6 +678,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                             username: recipient.username().cloned(),
                                             id: Some(num),
                                             code: Some(MessageCode::PrivateMessageBack),
+                                            colors: None,
                                         }, shared_key.as_ref());
 
                                         continue; //VALID, DO NOT SEND InvalidUsage CODE
@@ -682,6 +695,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         username: None,
                         id: None,
                         code: Some(MessageCode::InvalidUsage),
+                        colors: None,
                     }, shared_key.as_ref());
                     continue;
                 },
@@ -695,7 +709,14 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
         let message = read.text.unwrap();
 
-        send_to_all(Some(&message), &username, Some(id), None);
+        send_to_all(MessagePacket
+        {
+            text: Some(message),
+            username: Some(username.clone()),
+            id: Some(id),
+            code: None,
+            colors: None,
+        });
     }
 }
 

@@ -385,6 +385,7 @@ fn main()
                             username: None,
                             id: None,
                             code: Some(MessageCode::Disconnect),
+                            colors: None,
                         }, options::get_shared_key().as_ref());
                     },
 
@@ -414,6 +415,7 @@ fn main()
                             username: None,
                             id: None,
                             code: Some(MessageCode::List),
+                            colors: None,
                         }, options::get_shared_key().as_ref());
                     },
 
@@ -426,6 +428,7 @@ fn main()
                             username: None,
                             id: None,
                             code: Some(MessageCode::PrivateMessage),
+                            colors: None,
                         }, options::get_shared_key().as_ref());
                     },
 
@@ -480,6 +483,7 @@ fn main()
             username: None,
             id: None,
             code: None,
+            colors: None,
         }, options::get_shared_key().as_ref());
     }
 }

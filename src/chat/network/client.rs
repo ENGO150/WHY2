@@ -54,6 +54,7 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
         username: None,
         id: None,
         code: Some(MessageCode::KeyExchange),
+        colors: None,
     }, None);
 
     //WAIT FOR KeyExchange
@@ -120,6 +121,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                         username: None,
                         id: None,
                         code: Some(MessageCode::Version),
+                        colors: None,
                     }, options::get_shared_key().as_ref());
 
                     continue;

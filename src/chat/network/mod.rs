@@ -84,13 +84,21 @@ pub enum MessageCode //CONTROL CODES
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
+pub struct MessageColors //COLORS OF MESSAGE (ALL OF THE STRING VALUES WILL GET COVERTED TO colored::Color)
+{
+    pub username_color: String, //COLOR OF SENDER
+    pub message_color: String,  //COLOR OF MESSAGE
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 {
-    pub text: Option<String>,      //MESSAGE
-    pub username: Option<String>,  //USERNAME (SENT ONLY BY SERVER, AS SERVER DOESN'T ACCEPT USERNAMES FROM CLIENT)
-    pub id: Option<usize>,         //ID OF USER
-    pub code: Option<MessageCode>, //CONTROL CODE
+    pub text: Option<String>,          //MESSAGE
+    pub username: Option<String>,      //USERNAME (SENT ONLY BY SERVER, AS SERVER DOESN'T ACCEPT USERNAMES FROM CLIENT)
+    pub id: Option<usize>,             //ID OF USER
+    pub code: Option<MessageCode>,     //CONTROL CODE
+    pub colors: Option<MessageColors>, //MESSAGE COLORS
 }
 
 //CONSTS
