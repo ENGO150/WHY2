@@ -117,8 +117,7 @@ pub fn init_server_config() //INITIALIZE SERVER CONFIG FILES
     let users_dir_path = config_path(options::SERVER_USERS_CONFIG);
     if !Path::new(&users_dir_path).is_file()
     {
-        //WRITE SOMETHING POSITIVE TO THE CONFIG :) (i love you, ignore my aggressive ass)
-        fs::write(&users_dir_path, "#haha no users registered, what a loser lol").expect("Writing to config failed");
+        fs::write(&users_dir_path, "#*#**#*###**#***###*#").expect("Writing to config failed");
     }
 }
 
