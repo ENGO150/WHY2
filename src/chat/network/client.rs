@@ -27,7 +27,7 @@ use serde_json::Value;
 
 use crossterm::terminal;
 
-use colored::{ Color, Colorize };
+use colored::Colorize;
 
 use crate::chat::
 {
@@ -39,6 +39,7 @@ use crate::chat::
         self,
         MessageCode,
         MessagePacket,
+        SerColor,
     },
 };
 
@@ -68,6 +69,15 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
 
     //CALCULATE SHARED SECRET
     crypto::get_shared_key::<GRID_W, GRID_H>(message.text.unwrap())
+}
+
+fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF PASSED COLOR
+{
+    match color
+    {
+        Some(c) => text.color(c.0).to_string(),
+        None => text
+    }
 }
 
 //PUBLIC
@@ -277,22 +287,12 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
         {
             misc::clear_lines(2);
 
-            //GET COLORS
-            let username_color = if let Some(uname_color) = read.colors.username_color
-            {
-                uname_color.parse().expect("Parsing color failed")
-            } else { Color::White };
-
-            let message_color = if let Some(msg_color) = read.colors.message_color
-            {
-                msg_color.parse().expect("Parsing color failed")
-            } else { Color::White };
-
             println!
             (
                 "{} ({}): {}\n",
 
-                read.username.unwrap().color(username_color), read.id.unwrap(), read.text.unwrap().color(message_color)
+                colorize(read.username.unwrap(), read.colors.username_color), read.id.unwrap(),
+                colorize(read.text.unwrap(), read.colors.message_color)
             );
         }
 

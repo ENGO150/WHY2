@@ -58,6 +58,7 @@ use why2::chat::
         self,
         MessagePacket,
         MessageColors,
+        SerColor,
         client,
     },
 };
@@ -312,9 +313,9 @@ fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: &Opt
     return false;
 }
 
-fn is_color(color: &str) -> bool
+fn to_color(color: &str) -> Result<SerColor, ()>
 {
-    color.parse::<Color>().is_ok()
+    color.parse::<Color>().map(SerColor)
 }
 
 fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CHANGE
@@ -325,7 +326,7 @@ fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CH
     if let Some(parameters) = parameters
     {
         //CHECK FOR COLOR VALIDITY
-        if is_color(&parameters)
+        if to_color(&parameters).is_ok()
         {
             //SAVE COLOR TO CONFIG
             config::client_write(config_key, &parameters.to_lowercase());
@@ -347,13 +348,10 @@ fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CH
 
 fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
 {
-    let username_color = config::client_config::<String>("username_color");
-    let message_color = config::client_config::<String>("message_color");
-
     MessageColors
     {
-        username_color: if is_color(&username_color) { Some(username_color) } else { None },
-        message_color: if is_color(&message_color) { Some(message_color) } else { None },
+        username_color: to_color(&config::client_config::<String>("username_color")).ok(),
+        message_color: to_color(&config::client_config::<String>("message_color")).ok(),
     }
 }
 

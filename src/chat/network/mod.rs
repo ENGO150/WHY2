@@ -25,6 +25,7 @@ pub mod client;
 
 use std::
 {
+    str::FromStr,
     net::TcpStream,
     io::
     {
@@ -34,7 +35,9 @@ use std::
     },
 };
 
-use serde::{ Serialize, Deserialize };
+use serde::{ Deserialize, Deserializer, Serialize, Serializer };
+
+use colored::Color;
 
 use crate::
 {
@@ -84,11 +87,14 @@ pub enum MessageCode //CONTROL CODES
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
 }
 
+#[derive(Clone)]
+pub struct SerColor(pub Color); //SERIALIZABLE Color
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MessageColors //COLORS OF MESSAGE (ALL OF THE STRING VALUES WILL GET COVERTED TO colored::Color)
 {
-    pub username_color: Option<String>, //COLOR OF SENDER
-    pub message_color: Option<String>,  //COLOR OF MESSAGE
+    pub username_color: Option<SerColor>, //COLOR OF SENDER
+    pub message_color: Option<SerColor>,  //COLOR OF MESSAGE
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -122,6 +128,52 @@ impl Default for MessagePacket //DEFAULT
                 message_color: None,
             },
         }
+    }
+}
+
+//SERIALIZE
+impl Serialize for SerColor
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = match self.0
+        {
+            Color::Black => "black",
+            Color::Red => "red",
+            Color::Green => "green",
+            Color::Yellow => "yellow",
+            Color::Blue => "blue",
+            Color::Magenta => "magenta",
+            Color::Cyan => "cyan",
+            Color::BrightBlack => "bright black",
+            Color::BrightRed => "bright red",
+            Color::BrightGreen => "bright green",
+            Color::BrightYellow => "bright yellow",
+            Color::BrightBlue => "bright blue",
+            Color::BrightMagenta => "bright magenta",
+            Color::BrightCyan => "bright cyan",
+            Color::BrightWhite => "bright white",
+
+            _ => "white",
+        };
+
+        serializer.serialize_str(s)
+    }
+}
+
+//DESERIALIZE
+impl<'de> Deserialize<'de> for SerColor
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Color::from_str(&s)
+            .map(SerColor)
+            .map_err(|_| serde::de::Error::custom(format!("Invalid color string: {}", s)))
     }
 }
 
