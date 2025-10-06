@@ -27,6 +27,8 @@ use serde_json::Value;
 
 use crossterm::terminal;
 
+use colored::{ Color, Colorize };
+
 use crate::chat::
 {
     crypto,
@@ -275,7 +277,23 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
         {
             misc::clear_lines(2);
 
-            println!("{} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap());
+            //GET COLORS
+            let username_color = if let Some(uname_color) = read.colors.username_color
+            {
+                uname_color.parse().expect("Parsing color failed")
+            } else { Color::White };
+
+            let message_color = if let Some(msg_color) = read.colors.message_color
+            {
+                msg_color.parse().expect("Parsing color failed")
+            } else { Color::White };
+
+            println!
+            (
+                "{} ({}): {}\n",
+
+                read.username.unwrap().color(username_color), read.id.unwrap(), read.text.unwrap().color(message_color)
+            );
         }
 
         //PRINT INPUT PROMPT
