@@ -57,6 +57,7 @@ use why2::chat::
     {
         self,
         MessagePacket,
+        MessageColors,
         client,
     },
 };
@@ -311,6 +312,51 @@ fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: &Opt
     return false;
 }
 
+fn is_color(color: &str) -> bool
+{
+    color.parse::<Color>().is_ok()
+}
+
+fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CHANGE
+{
+    let message: &str;
+
+    //CHECK FOR PARAMETERS
+    if let Some(parameters) = parameters
+    {
+        //CHECK FOR COLOR VALIDITY
+        if is_color(&parameters)
+        {
+            //SAVE COLOR TO CONFIG
+            config::client_write(config_key, &parameters.to_lowercase());
+
+            message = "Color set successfully.";
+        } else
+        {
+            message = "Invalid color! View colored API for help.";
+        }
+    } else
+    {
+        message = "Invalid usage! Press Ctrl+H for help.";
+    }
+
+    //PRINTOUT RESULT
+    misc::clear_lines(2);
+    print!("{message}\n\n\r>>> ");
+}
+
+fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
+{
+    let username_color = config::client_config::<String>("username_color");
+    let message_color = config::client_config::<String>("message_color");
+
+    MessageColors
+    {
+        username_color: if is_color(&username_color) { Some(username_color) } else { None },
+        message_color: if is_color(&message_color) { Some(message_color) } else { None },
+    }
+}
+
 fn main()
 {
     misc::check_version(); //CHECK WHY2 VERSION
@@ -478,6 +524,7 @@ fn main()
         network::send(&mut client_stream, MessagePacket
         {
             text: Some(input),
+            colors: get_colors(),
             ..Default::default()
         }, options::get_shared_key().as_ref());
     }
