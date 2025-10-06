@@ -381,11 +381,8 @@ fn main()
                     {
                         network::send(&mut client_stream, MessagePacket
                         {
-                            text: None,
-                            username: None,
-                            id: None,
                             code: Some(MessageCode::Disconnect),
-                            colors: None,
+                            ..Default::default()
                         }, options::get_shared_key().as_ref());
                     },
 
@@ -411,11 +408,8 @@ fn main()
                     {
                         network::send(&mut client_stream, MessagePacket
                         {
-                            text: None,
-                            username: None,
-                            id: None,
                             code: Some(MessageCode::List),
-                            colors: None,
+                            ..Default::default()
                         }, options::get_shared_key().as_ref());
                     },
 
@@ -425,10 +419,8 @@ fn main()
                         network::send(&mut client_stream, MessagePacket
                         {
                             text: parameters,
-                            username: None,
-                            id: None,
                             code: Some(MessageCode::PrivateMessage),
-                            colors: None,
+                            ..Default::default()
                         }, options::get_shared_key().as_ref());
                     },
 
@@ -480,10 +472,7 @@ fn main()
         network::send(&mut client_stream, MessagePacket
         {
             text: Some(input),
-            username: None,
-            id: None,
-            code: None,
-            colors: None,
+            ..Default::default()
         }, options::get_shared_key().as_ref());
     }
 }

@@ -105,6 +105,22 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 const GRID_W: usize = rex_options::GRID_DIMENSIONS.0;
 const GRID_H: usize = rex_options::GRID_DIMENSIONS.1;
 
+//IMPLEMENTATIONS
+impl Default for MessagePacket //DEFAULT
+{
+    fn default() -> Self
+    {
+        Self
+        {
+            text: None,
+            username: None,
+            id: None,
+            code: None,
+            colors: None,
+        }
+    }
+}
+
 //FUNCTIONS
 pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>>) //SEND packet TO stream
 {

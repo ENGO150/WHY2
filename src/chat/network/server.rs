@@ -220,10 +220,8 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
     network::send(stream, MessagePacket
     {
         text: Some(crypto::get_public_key()),
-        username: None,
-        id: None,
         code: Some(MessageCode::KeyExchange),
-        colors: None,
+        ..Default::default()
     }, None);
 
     //CALCULATE SHARED SECRET
@@ -305,9 +303,8 @@ pub fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType
         {
             text: username.as_ref().map(|s| s.to_string()),
             username: Some(config::server_config::<String>("server_username")),
-            id: None,
             code: Some(MessageCode::Leave),
-            colors: None,
+            ..Default::default()
         });
     }
 
@@ -420,10 +417,8 @@ pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode
     network::send(stream, MessagePacket
     {
         text: text,
-        username: None,
-        id: None,
         code: Some(code),
-        colors: None,
+        ..Default::default()
     }, shared_key);
 }
 
@@ -591,9 +586,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     {
         text: Some(username.clone()),
         username: Some(config::server_config::<String>("server_username")),
-        id: None,
         code: Some(MessageCode::Join),
-        colors: None,
+        ..Default::default()
     });
 
     //LOOP READING
@@ -637,10 +631,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     network::send(stream, MessagePacket
                     {
                         text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
-                        username: None,
-                        id: None,
                         code: Some(MessageCode::List),
-                        colors: None,
+                        ..Default::default()
                     }, shared_key.as_ref());
                 },
 
@@ -667,7 +659,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                                 username: Some(username.clone()),
                                                 id: Some(id),
                                                 code: Some(MessageCode::PrivateMessage),
-                                                colors: None,
+                                                ..Default::default()
                                             }, recipient.shared_key());
                                         }
 
@@ -678,7 +670,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                             username: recipient.username().cloned(),
                                             id: Some(num),
                                             code: Some(MessageCode::PrivateMessageBack),
-                                            colors: None,
+                                            ..Default::default()
                                         }, shared_key.as_ref());
 
                                         continue; //VALID, DO NOT SEND InvalidUsage CODE
@@ -689,14 +681,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     }
 
                     //SEND InvalidUsage CODE IF INVALID
-                    network::send(stream, MessagePacket
-                    {
-                        text: None,
-                        username: None,
-                        id: None,
-                        code: Some(MessageCode::InvalidUsage),
-                        colors: None,
-                    }, shared_key.as_ref());
+                    send_code(stream, None, MessageCode::InvalidUsage, shared_key.as_ref());
                     continue;
                 },
 
@@ -714,8 +699,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             text: Some(message),
             username: Some(username.clone()),
             id: Some(id),
-            code: None,
-            colors: None,
+            ..Default::default()
         });
     }
 }

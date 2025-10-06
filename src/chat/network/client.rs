@@ -51,10 +51,8 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
     network::send(stream, MessagePacket
     {
         text: Some(crypto::get_public_key()),
-        username: None,
-        id: None,
         code: Some(MessageCode::KeyExchange),
-        colors: None,
+        ..Default::default()
     }, None);
 
     //WAIT FOR KeyExchange
@@ -118,10 +116,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     network::send(stream, MessagePacket
                     {
                         text: Some(version),
-                        username: None,
-                        id: None,
                         code: Some(MessageCode::Version),
-                        colors: None,
+                        ..Default::default()
                     }, options::get_shared_key().as_ref());
 
                     continue;
