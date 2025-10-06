@@ -117,7 +117,14 @@ fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
     let mut data = get_data(&path);
 
     //WRITE
-    data.as_table_mut().insert(key, value.into());
+    let table = data.as_table_mut();
+    if let Some(item) = table.get_mut(key)
+    {
+        *item.as_value_mut().expect("Updating config failed") = value.into();
+    } else
+    {
+        table.insert(key, value.into());
+    }
 
     //SAVE
     fs::write(&path, data.to_string()).expect("Saving config failed");
