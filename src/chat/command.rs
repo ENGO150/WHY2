@@ -23,6 +23,8 @@ use std::fmt::
     Result,
 };
 
+use crate::chat::network::MessageCode;
+
 //CONSTS
 const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 
@@ -39,6 +41,24 @@ pub enum Command
 }
 
 //IMPLEMENTATIONS
+impl Command
+{
+    //GET CODE MATCHING TO COMMAND
+    pub fn to_code(&self) -> Option<MessageCode>
+    {
+        match self
+        {
+            Command::Exit => Some(MessageCode::Disconnect),
+            Command::List => Some(MessageCode::List),
+            Command::PrivateMessage => Some(MessageCode::PrivateMessage),
+            Command::UsernameColor => Some(MessageCode::UsernameColor),
+            Command::MessageColor => Some(MessageCode::MessageColor),
+
+            _ => None,
+        }
+    }
+}
+
 impl Display for Command
 {
     //Command TO STRING

@@ -54,7 +54,6 @@ use why2::chat::
     network::
     {
         self,
-        MessageCode,
         MessagePacket,
         client,
     },
@@ -293,6 +292,23 @@ fn read_input() -> String
     input.iter().collect::<String>()
 }
 
+fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: Option<String>) -> bool //SEND CODE FROM COMMAND IF POSSIBLE
+{
+    //CODE COMMAND
+    if let Some(code) = command.to_code()
+    {
+        network::send(stream, MessagePacket
+        {
+            text: parameters,
+            code: Some(code),
+            ..Default::default()
+        }, options::get_shared_key().as_ref());
+        return true;
+    }
+
+    return false;
+}
+
 fn main()
 {
     misc::check_version(); //CHECK WHY2 VERSION
@@ -374,85 +390,39 @@ fn main()
             let mut command_used = false;
             if let (Some(command), parameters) = command::get_command(&input)
             {
-                match command
+                //SEND CODE ON A SIMPLE COMMAND, CONTINUE OTHERWISE
+                if !send_command_code(&mut client_stream, &command, parameters)
                 {
-                    //EXIT
-                    Command::Exit =>
+                    match command
                     {
-                        network::send(&mut client_stream, MessagePacket
+                        //HELP
+                        Command::Help =>
                         {
-                            code: Some(MessageCode::Disconnect),
-                            ..Default::default()
-                        }, options::get_shared_key().as_ref());
-                    },
+                            misc::clear_lines(2);
+                            options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
 
-                    //HELP
-                    Command::Help =>
-                    {
-                        misc::clear_lines(2);
-                        options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
+                            print!
+                            (
+                                "\nCommands:
+                                \r/help - Prints this
+                                \r/list - Show connected users
+                                \r/pm (ID) (MESSAGE) - Sends private message
+                                \r/ucolor (COLOR) - Sets color of username
+                                \r/color (COLOR) - Sets color of message
+                                \r/exit - Disconnects from server
+                                \n\r>>> "
+                            );
+                        },
 
-                        print!
-                        (
-                            "\nCommands:
-                            \r/help - Prints this
-                            \r/list - Show connected users
-                            \r/pm (ID) (MESSAGE) - Sends private message
-                            \r/ucolor (COLOR) - Sets color of username
-                            \r/color (COLOR) - Sets color of message
-                            \r/exit - Disconnects from server
-                            \n\r>>> "
-                        );
-                    },
-
-                    //LIST USERS
-                    Command::List =>
-                    {
-                        network::send(&mut client_stream, MessagePacket
+                        //INVALID COMMAND
+                        Command::Invalid =>
                         {
-                            code: Some(MessageCode::List),
-                            ..Default::default()
-                        }, options::get_shared_key().as_ref());
-                    },
+                            misc::clear_lines(2);
+                            print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
+                        }
 
-                    //PRIVATE MESSAGE
-                    Command::PrivateMessage =>
-                    {
-                        network::send(&mut client_stream, MessagePacket
-                        {
-                            text: parameters,
-                            code: Some(MessageCode::PrivateMessage),
-                            ..Default::default()
-                        }, options::get_shared_key().as_ref());
-                    },
-
-                    //COLOR OF USERNAME
-                    Command::UsernameColor =>
-                    {
-                        network::send(&mut client_stream, MessagePacket
-                        {
-                            text: parameters,
-                            code: Some(MessageCode::UsernameColor),
-                            ..Default::default()
-                        }, options::get_shared_key().as_ref())
-                    },
-
-                    //COLOR OF MESSAGE
-                    Command::MessageColor =>
-                    {
-                        network::send(&mut client_stream, MessagePacket
-                        {
-                            text: parameters,
-                            code: Some(MessageCode::MessageColor),
-                            ..Default::default()
-                        }, options::get_shared_key().as_ref())
-                    },
-
-                    //INVALID COMMAND
-                    Command::Invalid =>
-                    {
-                        misc::clear_lines(2);
-                        print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
+                        //NON IMPLEMENTED COMMAND
+                        _ => panic!("Invalid command")
                     }
                 }
 
