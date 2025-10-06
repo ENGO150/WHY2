@@ -398,6 +398,8 @@ fn main()
                             \r/help - Prints this
                             \r/list - Show connected users
                             \r/pm (ID) (MESSAGE) - Sends private message
+                            \r/ucolor (COLOR) - Sets color of username
+                            \r/color (COLOR) - Sets color of message
                             \r/exit - Disconnects from server
                             \n\r>>> "
                         );
@@ -422,6 +424,28 @@ fn main()
                             code: Some(MessageCode::PrivateMessage),
                             ..Default::default()
                         }, options::get_shared_key().as_ref());
+                    },
+
+                    //COLOR OF USERNAME
+                    Command::UsernameColor =>
+                    {
+                        network::send(&mut client_stream, MessagePacket
+                        {
+                            text: parameters,
+                            code: Some(MessageCode::UsernameColor),
+                            ..Default::default()
+                        }, options::get_shared_key().as_ref())
+                    },
+
+                    //COLOR OF MESSAGE
+                    Command::MessageColor =>
+                    {
+                        network::send(&mut client_stream, MessagePacket
+                        {
+                            text: parameters,
+                            code: Some(MessageCode::MessageColor),
+                            ..Default::default()
+                        }, options::get_shared_key().as_ref())
                     },
 
                     //INVALID COMMAND

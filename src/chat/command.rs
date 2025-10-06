@@ -33,6 +33,8 @@ pub enum Command
     Help,           //PRINT COMMANDS
     List,           //LIST USERS
     PrivateMessage, //ONE TO ONE MESSAGE
+    UsernameColor,  //SET COLOR OF USERNAME
+    MessageColor,   //SET COLOR OF MESSAGE
     Invalid,        //INVALID COMMAND
 }
 
@@ -48,6 +50,8 @@ impl Display for Command
             Command::Exit           => "exit",
             Command::List           => "list",
             Command::PrivateMessage => "pm",
+            Command::UsernameColor  => "ucolor",
+            Command::MessageColor   => "color",
             Command::Invalid        => "",
         };
 
@@ -78,6 +82,8 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
 
         //PARAMETRIC
         "PM" | "DM" | "MSG" | "TELL"                  => (Some(Command::PrivateMessage), parameters),
+        "UCOLOR" | "USERNAME"                         => (Some(Command::UsernameColor), parameters),
+        "COLOR" | "MESSAGE"                           => (Some(Command::MessageColor), parameters),
 
         _ => (Some(Command::Invalid), None)
     }

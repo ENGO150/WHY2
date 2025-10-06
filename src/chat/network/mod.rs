@@ -81,6 +81,8 @@ pub enum MessageCode //CONTROL CODES
     SpamWarning,        //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN
     RegisterDisabled,   //SERVER -> CLIENT | REGISTRATION IS DISABLED
     Version,            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
+    UsernameColor,      //CLIENT -> SERVER | REQUEST COLOR OF USERNAME
+    MessageColor,       //CLIENT -> SERVER | REQUEST COLOR OF MESSAGE
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
 }
 
