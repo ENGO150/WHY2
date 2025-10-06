@@ -414,12 +414,20 @@ fn main()
                             );
                         },
 
+                        Command::UsernameColor =>
+                        {
+                        },
+
+                        Command::MessageColor =>
+                        {
+                        },
+
                         //INVALID COMMAND
                         Command::Invalid =>
                         {
                             misc::clear_lines(2);
                             print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
-                        }
+                        },
 
                         //NON IMPLEMENTED COMMAND
                         _ => panic!("Invalid command")

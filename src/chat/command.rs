@@ -51,8 +51,6 @@ impl Command
             Command::Exit => Some(MessageCode::Disconnect),
             Command::List => Some(MessageCode::List),
             Command::PrivateMessage => Some(MessageCode::PrivateMessage),
-            Command::UsernameColor => Some(MessageCode::UsernameColor),
-            Command::MessageColor => Some(MessageCode::MessageColor),
 
             _ => None,
         }
