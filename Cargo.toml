@@ -34,7 +34,7 @@ include = ["src/**", "Cargo.toml", "README.md", "LICENSE"]
 #all-features = true
 
 [features]
-chat = ["base91", "bincode", "p521", "serde", "toml_edit", "reqwest"]
+chat = ["base91", "bincode", "p521", "serde", "toml_edit", "reqwest", "colored"]
 client = ["chat", "crossterm"]
 server = ["chat", "ctrlc"]
 
@@ -54,6 +54,7 @@ required-features = ["server"]
 [dependencies]
 base91 = { version = "0.1.0", optional = true }
 bincode = { version = "2.0.1", features = ["serde"], optional = true }
+colored = { version = "3.0.0", optional = true }
 crossterm = { version = "0.29.0", optional = true }
 ctrlc = { version = "3.5.0", optional = true }
 dirs = "6.0.0"
