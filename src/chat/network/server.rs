@@ -458,7 +458,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     if config::server_config("check_client_version")
     {
         let version = ask_version(stream, shared_key.as_ref());
-        if version.is_none() || version.unwrap() != misc::get_version()
+        if version.is_none() || version != Some(misc::get_version().to_string())
         {
             return remove_connection(stream, DisconnectType::Gracefully);
         }
@@ -566,7 +566,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         };
 
         //INVALID PASSWORD, DISCONNECT CLIENT
-        if response.text.is_none() || response.text.unwrap() != config::server_users_config(&username)
+        if response.text.is_none() || response.text != Some(config::server_users_config(&username))
         {
             return remove_connection(stream, DisconnectType::Gracefully);
         }
@@ -601,9 +601,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         };
 
         //CLIENT CODES
-        if read.code.is_some()
+        if let Some(code) = read.code
         {
-            match read.code.unwrap()
+            match code
             {
                 //CLIENT QUITS
                 MessageCode::Disconnect =>
@@ -687,8 +687,6 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
                 _ => continue
             }
-
-            continue; //DO NOT FORWARD CODES
         }
 
         if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
