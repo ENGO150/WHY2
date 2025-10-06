@@ -109,6 +109,20 @@ where
     config_read(filename, key)
 }
 
+fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
+{
+    let path = config_path(filename); //PATH TO CONFIG
+
+    //GET data
+    let mut data = get_data(&path);
+
+    //WRITE
+    data.as_table_mut().insert(key, value.into());
+
+    //SAVE
+    fs::write(&path, data.to_string()).expect("Saving config failed");
+}
+
 //PUBLIC
 pub fn init_server_config() //INITIALIZE SERVER CONFIG FILES
 {
@@ -145,18 +159,14 @@ pub fn server_users_config(key: &str) -> String //RETURN key FROM server_users.t
     config_read(options::SERVER_USERS_CONFIG, key)
 }
 
+pub fn client_write(key: &str, value: &str) //WRITE TO client.toml
+{
+    config_write(options::CLIENT_CONFIG, key, value);
+}
+
 pub fn server_users_write(key: &str, value: &str) //WRITE TO server_users.toml
 {
-    let path = config_path(options::SERVER_USERS_CONFIG); //PATH TO server_users.toml
-
-    //GET data
-    let mut data = get_data(&path);
-
-    //WRITE
-    data.as_table_mut().insert(key, value.into());
-
-    //SAVE
-    fs::write(&path, data.to_string()).expect("Saving config failed");
+    config_write(options::SERVER_USERS_CONFIG, key, value);
 }
 
 pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml contains
