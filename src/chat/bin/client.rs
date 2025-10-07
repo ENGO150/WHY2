@@ -392,7 +392,7 @@ fn main()
     if !connecting_ip.contains(':')
     {
         //APPEND DEFAULT PORT TO connecting_ip
-        connecting_ip.push_str(&format!(":{}", config::client_config::<String>("default_port")));
+        connecting_ip.push_str(&format!(":{}", config::client_config::<u16>("default_port")));
     } else
     {
         spacer_add_spaces += connecting_ip.len() - connecting_ip.find(":").unwrap();
