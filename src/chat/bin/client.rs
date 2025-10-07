@@ -451,7 +451,7 @@ fn main()
                             (
                                 "\nCommands:
                                 \r/help - Prints this
-                                \r/list - Show connected users
+                                \r/list - Show connected users and their IDs
                                 \r/pm (ID) (MESSAGE) - Sends private message
                                 \r/ucolor (COLOR) - Sets color of username
                                 \r/color (COLOR) - Sets color of message
