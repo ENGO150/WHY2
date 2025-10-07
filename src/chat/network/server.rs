@@ -552,7 +552,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         }
 
         //SAVE PASSWORD
-        config::server_users_write(&username, &response.text.unwrap());
+        config::server_users_write(&username, &crypto::hash_password(&response.text.unwrap()));
     } else //LOGIN
     {
         //SEND LOGIN CODE
@@ -566,7 +566,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         };
 
         //INVALID PASSWORD, DISCONNECT CLIENT
-        if response.text.is_none() || response.text != Some(config::server_users_config(&username))
+        if response.text.is_none() || !crypto::compare_password_hash(&config::server_users_config(&username), &response.text.unwrap())
         {
             return remove_connection(stream, DisconnectType::Gracefully);
         }

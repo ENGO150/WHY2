@@ -43,6 +43,15 @@ use p521::
     },
 };
 
+#[cfg(feature = "server")]
+use argon2::
+{
+    Argon2,
+    PasswordHasher,
+    PasswordVerifier,
+    password_hash::{ PasswordHash, SaltString },
+};
+
 use rand_chacha::ChaCha20Rng;
 use rand::SeedableRng;
 
@@ -62,16 +71,6 @@ fn get_private_key() -> SecretKey //LOAD PRIVATE KEY
 
     //PARSE & RETURN
     SecretKey::from_pkcs8_pem(&private_pem).expect("Parsing PEM failed")
-}
-
-fn sha256_handler(str: &str) -> Vec<u8> //HANDLER FOR SHA256
-{
-    //SHA256
-    let mut hasher = Sha256::new();
-    hasher.update(str.as_bytes());
-
-    //FINALIZE
-    hasher.finalize().to_vec()
 }
 
 //PUBLIC
@@ -132,11 +131,29 @@ pub fn get_shared_key<const W: usize, const H: usize>(key: String) -> Vec<i64> /
 pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 {
     //SHA256
-    sha256_handler(seed_str).try_into().expect("Seeding string failed")
+    let mut hasher = Sha256::new();
+    hasher.update(seed_str.as_bytes());
+
+    //FINALIZE
+    hasher.finalize().into()
 }
 
-pub fn sha256(str: &str) -> String //HASH seed_str
+#[cfg(feature = "server")]
+pub fn hash_password(password: &str) -> String //HASH PASSWORD USING ARGON2
 {
-    //FORMAT SHA256
-    sha256_handler(str).iter().map(|byte| format!("{:02x}", byte)).collect()
+    //GENERATE RANDOM SALT
+    let salt = SaltString::generate(&mut OsRng);
+
+    //HASH
+    Argon2::default().hash_password(password.as_bytes(), &salt).unwrap().to_string()
+}
+
+#[cfg(feature = "server")]
+pub fn compare_password_hash(hashed: &str, password: &str) -> bool //COMPARE ARGON2 HASH WITH UNHASHED PASSWORD
+{
+    //PARSE HASH STRING
+    let parsed_hash = PasswordHash::new(hashed).unwrap();
+
+    //COMPARE
+    Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok()
 }

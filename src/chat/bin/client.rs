@@ -427,7 +427,7 @@ fn main()
         io::stdout().flush().unwrap();
 
         //READ STDIN
-        let mut input = read_input();
+        let input = read_input();
 
         //APPEND MESSAGE TO HISTORY
         if sending_messages
@@ -512,8 +512,7 @@ fn main()
                 continue;
             }
 
-            //HASH
-            input = crypto::sha256(&input);
+            //OPTIONS
             options::set_asking_password(false); //DISABLE ASKING_PASSWORD
             sending_messages = true; //APPEND NEW MESSAGES TO HISTORY
         }
