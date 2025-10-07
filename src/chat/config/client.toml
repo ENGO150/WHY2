@@ -25,3 +25,6 @@ auto_connect_ip = "chat.satan.red" # See 'auto_connect'
 disable_colors = false
 username_color = "none"
 message_color = "none"
+
+# Other
+show_id = false

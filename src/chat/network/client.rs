@@ -290,10 +290,11 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
             println!
             (
-                "{} ({}): {}\n",
+                "{}{}: {}\n",
 
-                colorize(read.username.unwrap(), read.colors.username_color), read.id.unwrap(),
-                colorize(read.text.unwrap(), read.colors.message_color)
+                colorize(read.username.unwrap(), read.colors.username_color),                                      //USERNAME
+                if config::client_config("show_id") { format!(" ({})", read.id.unwrap()) } else { String::new() }, //ID
+                colorize(read.text.unwrap(), read.colors.message_color)                                            //MESSAGE
             );
         }
 
