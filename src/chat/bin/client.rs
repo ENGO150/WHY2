@@ -417,9 +417,6 @@ fn main()
     //ENABLE RAW MODE
     terminal::enable_raw_mode().unwrap();
 
-    //SENDING MESSAGES BOOL (CONDITION FOR ADDING MESSAGES TO HISTORY)
-    let mut sending_messages = false;
-
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
     {
@@ -430,7 +427,7 @@ fn main()
         let input = read_input();
 
         //APPEND MESSAGE TO HISTORY
-        if sending_messages
+        if options::get_sending_messages()
         {
             //USER COMMANDS
             let mut command_used = false;
@@ -499,23 +496,8 @@ fn main()
             if command_used { continue }; //DO NOT SEND COMMAND STRING
         }
 
-        //USER ENTERED PASSWORD - HASH
-        if options::get_asking_password()
-        {
-            //CHECK LENGTH
-            if input.len() <= options::MIN_PASSWORD_LEN
-            {
-                print!("\x1B[2FPassword too short! Enter at least {} characters.\x1B[3E", options::MIN_PASSWORD_LEN);
-                misc::clear_lines(1);
-                print!(">>> ");
-
-                continue;
-            }
-
-            //OPTIONS
-            options::set_asking_password(false); //DISABLE ASKING_PASSWORD
-            sending_messages = true; //APPEND NEW MESSAGES TO HISTORY
-        }
+        //DISABLE ASKING_PASSWORD
+        options::set_asking_password(false);
 
         //SEND input TO SERVER
         network::send(&mut client_stream, MessagePacket

@@ -88,11 +88,13 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     options::set_shared_key(key_exchange(stream));
 
     //SERVER INFO VARIABLES
-    let mut max_uname: Option<u8> = None;
-    let mut min_uname: Option<u8> = None;
+    let mut min_pass: Option<u64> = None;
+    let mut max_uname: Option<u64> = None;
+    let mut min_uname: Option<u64> = None;
     let mut server_name: &str;
 
     let mut invalid_username = false; //PRINT "Invalid Username!"
+    let mut invalid_password = false;
 
     //FORMATTING SHIT
     let mut first_message = true;
@@ -143,8 +145,9 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     let welcome_json: Value = serde_json::from_str(&read.text.unwrap()).expect("Parsing welcome json failed"); //PARSE WELCOME JSON
 
                     //GET INFO FROM JSON
-                    max_uname = Some(welcome_json["max_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed"));
-                    min_uname = Some(welcome_json["min_uname"].as_str().expect("Invalid welcome json").parse().expect("Parsing info to int failed"));
+                    min_pass = Some(welcome_json["min_pass"].as_u64().expect("Invalid welcome json"));
+                    max_uname = Some(welcome_json["max_uname"].as_u64().expect("Invalid welcome json"));
+                    min_uname = Some(welcome_json["min_uname"].as_u64().expect("Invalid welcome json"));
                     server_name = welcome_json["server_name"].as_str().expect("Invalid welcome json");
 
                     println!("Successfully connected to {server_name}.\n");
@@ -174,7 +177,17 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 {
                     misc::clear_lines(3);
                     options::set_asking_password(true);
-                    println!("\nEnter password: (REGISTER)");
+
+                    //INVALID PASS
+                    if invalid_password
+                    {
+                        print!("Password rejected! Enter at least {} characters.", min_pass.unwrap());
+                    } else
+                    {
+                        invalid_password = true;
+                    }
+
+                    println!("\n\rEnter password: (REGISTER)");
                 },
 
                 //LOGIN
@@ -190,6 +203,9 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 {
                     misc::clear_lines(3);
                     println!("Login successful. Press Ctrl+H for help.\n");
+
+                    //ALLOW MESSAGE HISTORY & COMMANDS
+                    options::set_sending_messages(true);
                 },
 
                 //JOIN MESSAGE (CLIENT CONNECTED)

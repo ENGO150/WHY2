@@ -15,16 +15,16 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Network
-default_port = 1204
+default_port = 1204 # Server port
 
 # Auto-connect
 auto_connect = false # Automatic connection to 'auto_connect_ip'
 auto_connect_ip = "chat.satan.red" # See 'auto_connect'
 
 # Colors
-disable_colors = false
-username_color = "none"
-message_color = "none"
+disable_colors = false # Disable message colors
+username_color = "none" # Color of username (change via command)
+message_color = "none" # Color of message (change via command)
 
 # Other
-show_id = false
+show_id = false # Show client IDs in chat

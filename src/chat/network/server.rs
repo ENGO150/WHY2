@@ -233,8 +233,9 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
     {
-        "max_uname": config::server_config::<String>("max_username_length"),
-        "min_uname": config::server_config::<String>("min_username_length"),
+        "min_pass": config::server_config::<usize>("min_password_length"),
+        "max_uname": config::server_config::<usize>("max_username_length"),
+        "min_uname": config::server_config::<usize>("min_username_length"),
         "server_name": config::server_config::<String>("server_name"),
     }).to_string();
 
@@ -471,7 +472,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let mut username: Option<String> = None; //USER ENTERED USERNAME
 
     //USERNAME CONFIGS
-    let max_tries = config::server_config::<usize>("max_username_tries"); //MAX n
+    let max_tries = config::server_config::<usize>("max_auth_tries"); //MAX n
     let min_len = config::server_config::<usize>("min_username_length");
     let max_len = config::server_config::<usize>("max_username_length");
 
@@ -535,24 +536,42 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //ASK FOR PASSWORD
     if !config::server_users_contains(&username) //REGISTRATION
     {
-        //SEND REGISTER CODE
-        send_code(stream, None, MessageCode::PasswordR, shared_key.as_ref());
+        let max_tries = config::server_config::<usize>("max_auth_tries"); //MAX n
+        let mut password: Option<String> = None;
 
-        //WAIT FOR ANSWER
-        let response = match network::receive(stream, shared_key.as_ref())
+        //KEEP ASKING FOR PASSWORD n TIMES
+        for _ in 0..max_tries
         {
-            Some(r) => r,
-            None => return remove_connection(stream, DisconnectType::Forcefully)
-        };
+            //SEND REGISTER CODE
+            send_code(stream, None, MessageCode::PasswordR, shared_key.as_ref());
 
-        //NO PASSWORD, DISCONNECT CLIENT
-        if response.text.is_none()
+            //WAIT FOR ANSWER
+            match network::receive(stream, shared_key.as_ref())
+            {
+                Some(r) =>
+                {
+                    if let Some(pass) = r.text
+                    {
+                        //CHECK LENGTH
+                        if pass.len() > config::server_config("min_password_length")
+                        {
+                            password = Some(pass);
+                            break;
+                        }
+                    }
+                },
+
+                None => return remove_connection(stream, DisconnectType::Forcefully)
+            };
+        }
+
+        if password.is_none()
         {
             return remove_connection(stream, DisconnectType::Gracefully);
         }
 
         //SAVE PASSWORD
-        config::server_users_write(&username, &crypto::hash_password(&response.text.unwrap()));
+        config::server_users_write(&username, &crypto::hash_password(&password.unwrap()));
     } else //LOGIN
     {
         //SEND LOGIN CODE

@@ -43,8 +43,6 @@ pub const AUTHORITY_DIR: &str       = "/certs";                                 
 pub const KEY_LOCATION: &str        = "/keys";                                                                //KEY DIRECTORY
 pub const KEY_FILENAME: &str        = "/secp521r1.pem";                                                       //NAME OF ECC KEYFILE
 
-pub const MIN_PASSWORD_LEN: usize   = 8;                                                                      //MINIMAL PASSWORD LENGTH
-
 //DO NOT CHANGE CONST BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                           //DIMENSIONS OF REX GRID
 
@@ -59,6 +57,9 @@ static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING
 
 #[cfg(feature = "client")]
 static EXTRA_SPACE: AtomicBool = AtomicBool::new(false); //CLIENT DISPLAYED SOME MENU (/help ETC.), ADD EXTRA SPACE ON NEXT MESSAGE
+
+#[cfg(feature = "client")]
+static SENDING_MESSAGES: AtomicBool = AtomicBool::new(false); //SENDING MESSAGES BOOL (CONDITION FOR ADDING MESSAGES TO HISTORY)
 
 #[cfg(feature = "client")]
 pub static INPUT_READ: LazyLock<Arc<Mutex<Vec<char>>>> = LazyLock::new(|| //INPUT READ FROM CLIENT
@@ -104,4 +105,17 @@ pub fn set_extra_space(value: bool) //SET EXTRA_SPACE
 pub fn get_extra_space() -> bool //GET EXTRA_SPACE
 {
     EXTRA_SPACE.load(Ordering::SeqCst)
+}
+
+//SENDING MESSAGES
+#[cfg(feature = "client")]
+pub fn get_sending_messages() -> bool //GET SENDING_MESSAGES
+{
+    SENDING_MESSAGES.load(Ordering::SeqCst)
+}
+
+#[cfg(feature = "client")]
+pub fn set_sending_messages(value: bool) //SET SENDING_MESSAGES
+{
+    SENDING_MESSAGES.store(value, Ordering::SeqCst);
 }

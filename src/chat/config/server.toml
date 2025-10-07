@@ -30,10 +30,10 @@ check_client_version = true # Allow only clients with same version as server
 max_clients = 20 # Maximal number of clients connected at the same time
 
 # Auth
+max_auth_tries = 3 # Times asking client for username/password (a valid, long enough password)
+min_password_length = 12 # Minimal password length
 max_username_length = 20 # Maximal username length
 min_username_length = 4 # Minimal username length
-max_username_tries = 3 # Times asking client for username (if client tries to use invalid username)
-max_password_tries = 3 # Same as above but for invalid password
 
 # Spam
 spam_protection = true # Spam protection
