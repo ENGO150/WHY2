@@ -334,7 +334,7 @@ fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CH
             message = "Color set successfully.";
         } else
         {
-            message = "Invalid color! View colored API for help.";
+            message = "Invalid color! See \x1b]8;;https://docs.rs/colored/latest/colored/enum.Color.html\x1b\\colored API\x1b]8;;\x1b\\ for help.";
         }
     } else
     {
