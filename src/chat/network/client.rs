@@ -31,6 +31,7 @@ use colored::Colorize;
 
 use crate::chat::
 {
+    config,
     crypto,
     options,
     misc,
@@ -75,8 +76,8 @@ fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF 
 {
     match color
     {
-        Some(c) => text.color(c.0).to_string(),
-        None => text
+        Some(c) if !config::client_config::<bool>("disable_colors") => text.color(c.0).to_string(),
+        _ => text
     }
 }
 
