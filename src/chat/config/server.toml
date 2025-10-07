@@ -16,6 +16,7 @@
 
 # Network
 server_ip = "0.0.0.0" # Server address
+server_port = 1204 # Server port
 
 # Appearance
 server_name = "WHY2 Server" # Name of the server
