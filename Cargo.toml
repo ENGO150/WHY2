@@ -33,6 +33,10 @@ include = ["src/**", "Cargo.toml", "README.md", "LICENSE"]
 #[package.metadata.docs.rs]
 #all-features = true
 
+[profile.release]
+lto = true
+strip = true
+
 [features]
 chat = ["base91", "bincode", "p521", "serde", "toml_edit", "reqwest", "colored"]
 client = ["chat", "crossterm"]
