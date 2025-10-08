@@ -99,12 +99,18 @@ impl<const W: usize, const H: usize> Grid<W, H>
     pub fn new() -> result::Result<Self, String>
     {
         let area = W * H;
-        if area > 1
+        if area > 1 && W > 1
         {
             Ok(Self([[0i64; W]; H]))
         } else
         {
-            Err(format!("Invalid dimensions: expected area larger than 1, got {W}x{H} ({area})"))
+            Err(if W == 1
+            {
+                format!("Invalid dimensions: expected width larger than 1, got {W}")
+            } else
+            {
+                format!("Invalid dimensions: expected area larger than 1, got {W}x{H} ({area})")
+            })
         }
     }
 
