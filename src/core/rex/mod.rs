@@ -91,13 +91,21 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// This constructor sets up an empty Grid where all cells are set to `0`.
     ///
     /// # Returns
-    /// A `Grid` instance with all values set to zero.
+    /// - Ok(`Grid`) instance with all values set to zero and area is larger than 1.
+    /// - Err(String) if the area is 1
     ///
     /// # Notes
     /// - This method does not perform any encryption or transformation.
-    pub fn new() -> Self
+    pub fn new() -> result::Result<Self, String>
     {
-        Self([[0i64; W]; H])
+        let area = W * H;
+        if area > 1
+        {
+            Ok(Self([[0i64; W]; H]))
+        } else
+        {
+            Err(format!("Invalid dimensions: expected area larger than 1, got {W}x{H} ({area})"))
+        }
     }
 
     /// Initializes a key Grid from a vector of signed 64-bit integers.
@@ -110,20 +118,21 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - `raw`: A vector of signed 64-bit integers representing the raw key.
     ///
     /// # Returns
-    /// A `Grid` instance containing the transformed key cells.
-    pub fn from_key(vec: Vec<i64>) -> Self
+    /// - Ok(`Grid`) instance containing the transformed key cells, if area is largenr than 1.
+    /// - Err(String) if the area is 1
+    pub fn from_key(vec: Vec<i64>) -> result::Result<Self, String>
     {
         //GRID OPTIONS
         let grid_area = W * H;
 
         //SHAPE
-        let mut key_grid = Self::new();
+        let mut key_grid = Self::new()?;
         for i in 0..grid_area
         {
             key_grid[i / W][i % W] = vec[i] ^ vec[i + grid_area]; //COMBINE EVERY PART OF KEY
         }
 
-        key_grid
+        Ok(key_grid)
     }
 
     /// Initializes Grid from vector of unsigned 8-bit integers.
@@ -155,9 +164,9 @@ impl<const W: usize, const H: usize> Grid<W, H>
             ));
         }
 
-        Ok(bytes.chunks(matrix_size).map(|chunk|
+        bytes.chunks(matrix_size).map(|chunk|
         {
-            let mut grid = Grid::new();
+            let mut grid = Grid::new()?;
             for j in 0..H
             {
                 for i in 0..W
@@ -168,8 +177,8 @@ impl<const W: usize, const H: usize> Grid<W, H>
                 }
             }
 
-            grid
-        }).collect())
+            Ok(grid)
+        }).collect()
     }
 
     /// Returns an iterator over rows in the Grid

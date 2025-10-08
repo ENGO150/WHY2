@@ -107,19 +107,19 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     input_used.extend(iter::repeat(padding_len as i64).take(padding_len));
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut grids: Vec<Grid<W, H>> = input_used.chunks(grid_area).map(|chunk|
+    let mut grids: Vec<Grid<W, H>> = input_used.chunks(grid_area).map(|chunk| -> Result<Grid<W, H>, String>
     {
-        let mut grid = Grid::new(); //CREATE GRID
+        let mut grid = Grid::new()?; //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
         {
             grid[i / W][i % W] = val;
         }
 
-        grid
-    }).collect();
+        Ok(grid)
+    }).collect::<Result<Vec<_>, _>>()?;
 
     //SHAPE KEY TO 8x8 GRID
-    let key_grid = Grid::<W, H>::from_key(key_used);
+    let key_grid = Grid::<W, H>::from_key(key_used)?;
 
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
     let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
@@ -139,7 +139,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     }
 
     //GENERATE ROUND KEYS
-    let round_keys = crypto::generate_round_keys(&key_grid);
+    let round_keys = crypto::generate_round_keys(&key_grid)?;
 
     //APPLY ENCRYPTION TO EACH GRID
     for mut grid in &mut grids

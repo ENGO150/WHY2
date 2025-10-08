@@ -57,22 +57,23 @@ use crate::core::rex::
 /// - `input`: An [`EncryptedData`] struct containing the encrypted grids and key grid.
 ///
 /// # Returns
-/// A [`DecryptedData`] struct containing:
-/// - `output`: A vector of decrypted `i64` values
-/// - `key`: The original key Grid flattened into a vector
+/// - Ok([`DecryptedData`]) struct containing:
+///   - `output`: A vector of decrypted `i64` values
+///   - `key`: The original key Grid flattened into a vector
+/// - Err(String) if Grid area is 1
 ///
 /// # Notes
 /// - Padding is removed using PKCS-style logic: the last cell value indicates how many trailing values to discard.
 /// - The PRNG used for unshuffling is seeded from the SHA-256 hash of the key grid.
 /// - All transformations are deterministic and reversible.
-pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> DecryptedData
+pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<DecryptedData, String>
 {
     //GET MUTABLE input
     let mut grids = input.output;
     let key_grid = input.key;
 
     //GENERATE ROUND KEYS
-    let round_keys = crypto::generate_round_keys(&key_grid);
+    let round_keys = crypto::generate_round_keys(&key_grid)?;
 
     //DECRYPT EACH ENCRYPTED GRID
     for mut grid in &mut grids
@@ -125,11 +126,11 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> De
     flattened.truncate(flattened.len() - (*flattened.last().unwrap() as usize));
 
     //RETURN OUTPUT
-    DecryptedData
+    Ok(DecryptedData
     {
         output: flattened,
         key: key_grid.into_iter().collect(),
-    }
+    })
 }
 
 /// Decrypts a WHY2-encrypted data and reconstructs the original string.
@@ -143,16 +144,17 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> De
 /// - `input`: An [`EncryptedData`] struct containing encrypted grids and key.
 ///
 /// # Returns
-/// A `String` reconstructed from the decrypted values.
+/// - Ok(`String`) reconstructed from the decrypted values.
+/// - Err(`String`) if Grid area is 1
 ///
 /// # Notes
 /// - Uses native-endian decoding for each `i64` value.
 /// - Each decrypted value contributes up to two Unicode scalar values.
 /// - PKCS-style padding is removed before decoding.
-pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> String
+pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<String, String>
 {
     //DECRYPT
-    let decrypted = decrypt(input).output;
+    let decrypted = decrypt(input)?.output;
 
     let mut output = String::with_capacity(decrypted.len() * 2);
 
@@ -169,5 +171,5 @@ pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>
         if lo != 0 { output.push(char::from_u32(lo).unwrap()); }
     }
 
-    output
+    Ok(output)
 }

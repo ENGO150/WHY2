@@ -301,8 +301,8 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         let decrypted_packet = decrypter::decrypt_string(options::EncryptedData
         {
             output: Grid::<GRID_W, GRID_H>::from_bytes(decoded_packet).ok()?, //CONVERT decoded_packet FROM Vec<u8> TO Vec<Grid>
-            key: Grid::from_key(key.to_vec()),
-        });
+            key: Grid::from_key(key.to_vec()).unwrap(),
+        }).unwrap();
 
         //OVERWRITE decoded_packet
         decoded_packet = base91::slice_decode(decrypted_packet.as_bytes());

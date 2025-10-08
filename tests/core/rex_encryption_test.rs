@@ -41,7 +41,7 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
     //ENCRYPT & DECRYPT
     let encrypted = encrypter::encrypt_string::<11, 7>(&TEST_TEXT.to_owned(), None).expect("Encryption failed");
     let key = encrypted.key.clone();
-    let decrypted_string = decrypter::decrypt_string(encrypted);
+    let decrypted_string = decrypter::decrypt_string(encrypted).expect("Decryption failed");
 
     //STOP MEASURING
     let measure_stop = measure_start.elapsed();

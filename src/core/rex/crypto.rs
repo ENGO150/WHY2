@@ -127,7 +127,7 @@ pub fn generate_key<const W: usize, const H: usize>() -> Vec<i64>
 /// - The first key is seeded from `master_key`.
 /// - Each subsequent key is seeded from the SHA-256 digest of the previous key.
 /// - This method ensures reproducible round key generation without external randomness.
-pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Vec<Grid<W, H>>
+pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Result<Vec<Grid<W, H>>, String>
 {
     let mut keys: Vec<Grid<W, H>> = Vec::with_capacity(options::ROUND_KEYS);
 
@@ -138,8 +138,8 @@ pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, 
         let key = generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
 
         //CONVERT KEY TO Grid & PUSH TO keys
-        keys.push(Grid::from_key(key));
+        keys.push(Grid::from_key(key)?);
     }
 
-    keys
+    Ok(keys)
 }
