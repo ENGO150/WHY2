@@ -56,6 +56,7 @@ build-why2-chat-windows:
     - job: test-why2-core
   script:
     - echo "Build WHY2 Chat for Windows"
+    - rustup target add x86_64-pc-windows-gnu
     - cargo build --release --target x86_64-pc-windows-gnu
   artifacts:
     name: "why2-chat-windows"
@@ -72,6 +73,7 @@ build-why2-chat-macos:
     - job: test-why2-core
   script:
     - echo "Build WHY2 Chat for macOS"
+    - rustup target add x86_64-apple-darwin
     - cargo build --release --target x86_64-apple-darwin
   artifacts:
     name: "why2-chat-macos"
