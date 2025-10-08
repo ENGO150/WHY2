@@ -30,7 +30,7 @@ test-why2-core:
     - echo "Test WHY2 Core"
     - cargo test --all --verbose
 
-# Build chat for linux (<3)
+# Build chat for linux
 build-why2-chat-linux:
   stage: build
   only:
@@ -46,41 +46,3 @@ build-why2-chat-linux:
     paths:
       - ./target/release/why2
       - ./target/release/why2-server
-
-# Build chat for windows (</3)
-build-why2-chat-windows:
-  stage: build
-  only:
-    - development
-  needs:
-    - job: test-why2-core
-  script:
-    - echo "Build WHY2 Chat for Windows"
-    - apt-get update && apt-get install gcc-mingw-w64-x86-64 -y
-    - rustup target add x86_64-pc-windows-gnu
-    - cargo build --features client --release --target x86_64-pc-windows-gnu
-    - cargo build --features server --release --target x86_64-pc-windows-gnu
-  artifacts:
-    name: "why2-chat-windows"
-    paths:
-      - ./target/x86_64-pc-windows-gnu/release/why2.exe
-      - ./target/x86_64-pc-windows-gnu/release/why2-server.exe
-
-# Build chat for mac
-build-why2-chat-macos:
-  stage: build
-  only:
-    - development
-  needs:
-    - job: test-why2-core
-  script:
-    - echo "Build WHY2 Chat for macOS"
-    - apt-get update && apt-get install clang -y
-    - rustup target add x86_64-apple-darwin
-    - cargo build --features client --release --target x86_64-apple-darwin
-    - cargo build --features server --release --target x86_64-apple-darwin
-  artifacts:
-    name: "why2-chat-macos"
-    paths:
-      - ./target/x86_64-apple-darwin/release/why2
-      - ./target/x86_64-apple-darwin/release/why2-server
