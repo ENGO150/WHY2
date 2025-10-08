@@ -56,6 +56,7 @@ build-why2-chat-windows:
     - job: test-why2-core
   script:
     - echo "Build WHY2 Chat for Windows"
+    - apt-get update && apt-get install mingw-w64 -y
     - rustup target add x86_64-pc-windows-gnu
     - cargo build --release --target x86_64-pc-windows-gnu
   artifacts:
