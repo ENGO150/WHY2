@@ -75,6 +75,7 @@ build-why2-chat-macos:
     - job: test-why2-core
   script:
     - echo "Build WHY2 Chat for macOS"
+    - apt-get update && apt-get install clang -y
     - rustup target add x86_64-apple-darwin
     - cargo build --features client --release --target x86_64-apple-darwin
     - cargo build --features server --release --target x86_64-apple-darwin
