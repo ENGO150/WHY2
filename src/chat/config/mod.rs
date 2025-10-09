@@ -18,14 +18,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    io,
     str::FromStr,
     fmt::Debug,
     path::Path,
+    io::{ self, Cursor },
     fs::{ self, File },
 };
-
-use reqwest::blocking::Response;
 
 use toml_edit::{ DocumentMut, Value };
 
@@ -41,9 +39,9 @@ fn config_path(filename: &str) -> String //GET CONFIGURATION PATH
     misc::get_why2_dir() + filename
 }
 
-fn fetch_config(filename: &str) -> Response //FETCH CONFIG FROM GIT
+fn fetch_config(filename: &str) -> String //FETCH CONFIG FROM GIT
 {
-    reqwest::blocking::get(options::CONFIG_URL.to_owned() + filename).expect("Failed to fetch config file")
+    misc::fetch_data(&(options::CONFIG_URL.to_owned() + filename))
 }
 
 fn init_config(filename: &str) //CREATE CONFIG IF MISSING
@@ -55,7 +53,7 @@ fn init_config(filename: &str) //CREATE CONFIG IF MISSING
     {
         let mut config_file = File::create(config_path).expect("Failed to create WHY2 config"); //CREATE CONFIG
 
-        let mut config = reqwest::blocking::get(options::CONFIG_URL.to_owned() + filename).expect("Failed to fetch config file");
+        let mut config = Cursor::new(misc::fetch_data(&(options::CONFIG_URL.to_owned() + filename)));
         io::copy(&mut config, &mut config_file).expect("Failed writing to config file");
     }
 }
@@ -89,7 +87,7 @@ where
     }
 
     //key NOT FOUND IN CONFIG, FETCH CONFIG AND INSERT NEW KEY
-    let mut new_config: DocumentMut = fetch_config(filename).text().expect("Failed to fetch config file").parse().expect("Failed to parse config");
+    let mut new_config: DocumentMut = fetch_config(filename).parse().expect("Failed to parse config");
 
     //LOAD OLD CONFIG
     for (key, old_value) in data.as_table()

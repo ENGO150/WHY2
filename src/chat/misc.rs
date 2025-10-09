@@ -47,17 +47,21 @@ pub fn get_version<'a>() -> &'a str //GET COMPILED PACKAGE VERSION
     env!("CARGO_PKG_VERSION")
 }
 
+pub fn fetch_data(url: &str) -> String //FETCH DATA USING REQWEST
+{
+    Client::new().get(url)
+        .header("User-Agent", "why2-version-check")
+        .send().expect("Sending request failed")
+        .text().expect("Fetching data failed")
+}
+
 pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
 {
     //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
-    let client = Client::new();
-    let metadata_raw = client.get(options::METADATA_URL)
-        .header("User-Agent", "why2-version-check")
-        .send().expect("Sending metadata request failed")
-        .text().expect("Fetching metadata failed");
+    let metadata_raw = fetch_data(options::METADATA_URL);
 
     //PARSE METADATA TO JSON
-    let metadata: Value = serde_json::from_str(&metadata_raw).expect("Parsing versions.json failed"); //PARSE
+    let metadata: Value = serde_json::from_str(&metadata_raw).expect("Parsing versions failed"); //PARSE
     let newest_version = metadata.get("crate") //GET LATEST VERSION
         .and_then(|c| c.get("newest_version"))
         .and_then(|v| v.as_str())
