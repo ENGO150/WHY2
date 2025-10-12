@@ -56,7 +56,7 @@ upload-to-aur:
       when: always
     - when: never
   script:
-    - apt update && apt install -y git base-devel curl grep sed openssh
+    - apt update && apt install -y git curl grep sed
     - mkdir -p ~/.ssh
     - echo "$AUR_SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
