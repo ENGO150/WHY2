@@ -47,6 +47,7 @@ build-why2-chat-linux:
     paths:
       - ./target/release/why2
       - ./target/release/why2-server
+:q
 
 # Upload to Arch Linux User Repository
 upload-to-aur:
@@ -62,11 +63,10 @@ upload-to-aur:
     - chmod 600 ~/.ssh/id_ed25519
     - echo -e "Host aur.archlinux.org\n\tStrictHostKeyChecking no\n\tUser aur\n\tIdentityFile ~/.ssh/id_ed25519" > ~/.ssh/config
     - VERSION=$(grep '^version =' Cargo.toml | sed -E 's/version = "(.*)-rex"/\1/')
-    - echo "Parsed version: $VERSION"
     - git clone ssh://aur@aur.archlinux.org/why2.git aur-repo
     - cd aur-repo
     - sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
     - makepkg --printsrcinfo > .SRCINFO
     - git add PKGBUILD .SRCINFO
-    - git commit -m "actions: update version to $VERSION"
+    - git commit -m "update version to $VERSION" -m "(automated upload)"
     - git push
