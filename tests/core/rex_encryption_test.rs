@@ -28,8 +28,7 @@ use why2::core::rex::
     decrypter,
 };
 
-//CONSTS
-const TEST_TEXT: &str = "aAzZ(    )!?#\\/śŠ <3|420*;㍿㊓ㅅΔ♛👶🏿";  //TEST TEXT FOR ENCRYPTION
+use crate::core as test_core;
 
 //FUNCTIONS
 #[test]
@@ -39,7 +38,7 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
     let measure_start = Instant::now();
 
     //ENCRYPT & DECRYPT
-    let encrypted = encrypter::encrypt_string::<11, 7>(&TEST_TEXT.to_owned(), None).expect("Encryption failed");
+    let encrypted = encrypter::encrypt_string::<11, 7>(&test_core::TEST_TEXT.to_owned(), None).expect("Encryption failed");
     let key = encrypted.key.clone();
     let decrypted_string = decrypter::decrypt_string(encrypted).expect("Decryption failed");
 
@@ -52,7 +51,7 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
     let returning: Result<(), Box<dyn std::error::Error>>;
 
     //GET VALUES BASED ON RESULT
-    if TEST_TEXT == decrypted_string
+    if test_core::TEST_TEXT == decrypted_string
     {
         stream = Box::new(io::stdout());
         status = "successful";
@@ -69,12 +68,12 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
         stream,
 
         "Test {status}!\n
-TEXT: \t\t\"{TEST_TEXT}\"
+TEXT: \t\t\"{}\"
 OUTPUT: \t\"{decrypted_string}\"
 KEY: \t\t\n{}
 TIME: \t\t{}ms",
 
-        key, measure_stop.as_millis()
+        test_core::TEST_TEXT, key, measure_stop.as_millis()
     ).unwrap();
 
     returning
