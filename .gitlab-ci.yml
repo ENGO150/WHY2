@@ -47,7 +47,6 @@ build-why2-chat-linux:
     paths:
       - ./target/release/why2
       - ./target/release/why2-server
-:q
 
 # Upload to Arch Linux User Repository
 upload-to-aur:
