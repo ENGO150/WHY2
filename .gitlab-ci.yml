@@ -19,6 +19,7 @@ image: rust:latest
 stages:
   - test
   - build
+  - aur
 
 # Test core
 test-why2-core:
@@ -46,3 +47,33 @@ build-why2-chat-linux:
     paths:
       - ./target/release/why2
       - ./target/release/why2-server
+
+# Upload to Arch Linux User Repository
+upload-to-aur:
+  stage: aur
+  only:
+    - development
+  rules:
+    - if: '$CI_SERVER_URL == "https://git.satan.red"'
+      when: always
+    - when: never
+  script:
+    - apt update && apt install -y git base-devel curl grep sed openssh
+
+    - mkdir -p ~/.ssh
+    - echo "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - echo -e "Host aur.archlinux.org\n\tStrictHostKeyChecking no\n\tUser aur\n\tIdentityFile ~/.ssh/id_ed25519" > ~/.ssh/config
+
+    - VERSION=$(grep '^version =' Cargo.toml | sed -E 's/version = "(.*)-rex"/\1/')
+    - echo "Parsed version: $VERSION"
+
+    - git clone ssh://aur@aur.archlinux.org/why2.git aur-repo
+    - cd aur-repo
+
+    - sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
+    - makepkg --printsrcinfo > .SRCINFO
+
+    - git add PKGBUILD .SRCINFO
+    - git commit -m "actions: update version to $VERSION"
+    - git push
