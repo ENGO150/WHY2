@@ -57,7 +57,7 @@ upload-to-aur:
       when: always
     - when: never
   script:
-    - pacman -Syu --no-confirm && pacman -S base-devel git grep sed
+    - pacman -Syu --noconfirm && pacman -S base-devel git grep sed --noconfirm
     - mkdir -p ~/.ssh
     - echo "$AUR_SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
