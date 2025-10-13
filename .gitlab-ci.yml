@@ -52,7 +52,7 @@ build-why2-chat-linux:
 upload-to-aur:
   stage: aur
   rules:
-    - if: '$CI_COMMIT_BRANCH == "development" && $CI_SERVER_URL == "https://git.satan.red"'
+    - if: '$CI_COMMIT_BRANCH == "release" && $CI_SERVER_URL == "https://git.satan.red"'
       when: always
     - when: never
   script:
