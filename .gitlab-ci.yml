@@ -51,7 +51,7 @@ build-why2-chat-linux:
 # Upload to Arch Linux User Repository
 upload-to-aur:
   stage: aur
-  image: archlinux:latest
+  image: agners/archlinuxarm:latest
   rules:
     - if: '$CI_COMMIT_BRANCH == "development" && $CI_SERVER_URL == "https://git.satan.red"'
       when: always
