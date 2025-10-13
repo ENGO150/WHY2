@@ -16,7 +16,7 @@
 
 [package]
 name = "why2"
-version = "0.2.8-rex"
+version = "0.2.9-rex"
 edition = "2024"
 build = "build.rs"
 

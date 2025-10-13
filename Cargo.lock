@@ -2043,7 +2043,7 @@ dependencies = [
 
 [[package]]
 name = "why2"
-version = "0.2.8-rex"
+version = "0.2.9-rex"
 dependencies = [
  "argon2",
  "base91",
