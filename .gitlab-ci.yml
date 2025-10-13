@@ -51,22 +51,21 @@ build-why2-chat-linux:
 # Upload to Arch Linux User Repository
 upload-to-aur:
   stage: aur
-  image: agners/archlinuxarm:latest
   rules:
     - if: '$CI_COMMIT_BRANCH == "development" && $CI_SERVER_URL == "https://git.satan.red"'
       when: always
     - when: never
   script:
-    - pacman -Syu --noconfirm && pacman -S base-devel git grep sed --noconfirm
+    - apt update && apt install -y git grep sed
     - mkdir -p ~/.ssh
     - echo "$AUR_SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
     - echo -e "Host aur.archlinux.org\n\tStrictHostKeyChecking no\n\tUser aur\n\tIdentityFile ~/.ssh/id_ed25519" > ~/.ssh/config
     - VERSION=$(grep '^version =' Cargo.toml | sed -E 's/version = "(.*)-rex"/\1/')
-    - git clone ssh://aur@aur.archlinux.org/why2.git aur-repo
-    - cd aur-repo
+    - git clone ssh://aur@aur.archlinux.org/why2.git
+    - cd why2
     - sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
-    - makepkg --printsrcinfo > .SRCINFO
+    - sed -i 's/^\t*pkgver = .*/\tpkgver = '"$VERSION"'/' .SRCINFO
     - git add PKGBUILD .SRCINFO
     - git commit -m "update version to $VERSION" -m "(automated upload)"
     - git push
