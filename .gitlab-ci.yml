@@ -61,6 +61,8 @@ upload-to-aur:
     - echo "$AUR_SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
     - echo -e "Host aur.archlinux.org\n\tStrictHostKeyChecking no\n\tUser aur\n\tIdentityFile ~/.ssh/id_ed25519" > ~/.ssh/config
+    - git config --global user.name "Expandera"
+    - git config --global user.email "gitlab@satan.red"
     - VERSION=$(grep '^version =' Cargo.toml | sed -E 's/version = "(.*)-rex"/\1/')
     - git clone ssh://aur@aur.archlinux.org/why2.git
     - cd why2
