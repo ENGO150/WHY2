@@ -1,6 +1,73 @@
 Changelog
 =========
 
+v0.2.9-rex:
+- 68f7043: update dependencies
+- 3459a33: upload to aur only on release
+- cb9c24d: add git identity
+- 9e8193e: revert aur to rust image
+- 4763df9: aur noconfirm typo fix
+- be4a907: revert "add private ssh key verification"
+- 650ec74: use archlinuxarm image for aur stage
+- f42159f: use archlinux image for aur stage
+- 67be9b4: revert "add openssh-client install to aur ci"
+- 061f222: add openssh-client install to aur ci
+- b12ef55: add private ssh key verification
+- a321a4a: remove curl install from aur
+- 9468806: remove unused packages from aur ci
+- 0284f1d: test: vim typo fix
+- 94fc833: test: remove colon from gitlab-ci
+- 13fd575: remove ci blank lines
+- 13ba74b: test: fix rules & only ci error
+- cc4ab04: test: add aur publish to gitlab ci
+- d1a9fbe: add aur to readme
+- d4c7ef6: move TEST_TEXT from tests to test::core
+- 8bfeb2f: add changelog to cargo build
+- f7d4107: create handler for reqwest
+- e169bb2: add underscore to changelog & mirrors
+- 1b1d10c: add changelog
+- 63cb425: add scripts to ignored
+- 7cf72b9: revert win & mac builds
+- e874269: add clang installation to mac build
+- 5b4b5cf: add missing binary compilation to mac & win
+- 4ddb71c: optimize build downloads
+- 5215f1c: add mingw-w64 installation to windows build
+- b8f2af4: add rustup targets to gitlab pipeline
+- 72da2bd: add cross-compilation to gitlab-ci
+- f682e7c: add binary optimization for release profile
+- 50aaa1c: prevent from using Grid where W = 1
+- dfcdc48: prevent from using 1x1 grid
+- f9c05ff: move server port from options to config
+- 65d9a21: use u16 for port on client
+- bd810fe: move password strength verification to server
+- 5742217: implement argon2 on server
+- 2a7a798: add argon2 dependency for chat::server
+- 1e705be: update dependencies
+- 13d382d: add option to disable id displaying
+- f15797d: make help command more explanatory
+- adab2ee: add option to disable colors on client
+- 289edcf: add colored API usage link
+- a60e398: fix client config writing
+- 9733320: send colors serialized instead of as a string
+- 56906ef: display colors on client
+- 700ec95: save & send colors from client
+- 98783a9: use option for each color type, not for whole colors
+- 1f27af2: create config::client_write fn
+- f8ca731: forward colors to other users
+- fde94db: remove aggressive comment from server_users
+- 21293d5: use colors on client-side, rather than requesting them from server
+- 80699c3: avoid unwrap in network::server
+- eb8af59: simplify client command codes handling
+- e47c2f8: implement color request commands on client
+- 8c28fa1: implement Default for MessagePacket
+- 9b21791: add colors to MessagePacket
+- 3ed5561: add colored dependency for chat
+- ff9e9f3: update dependencies
+- 2703c21: avoid using unwrap for peer_addr
+- 8e985e5: revert "run chat-build gh workflow only after core-test succeeds"
+- bcc4531: run chat-build gh workflow only after core-test succeeds
+- 02ec3e7: implement BitXorAssign for Grid
+
 v0.2.8-rex:
 - 01cdb12: fix spam warning on auth
 - da56ef8: add code quality badge to readme
