@@ -51,12 +51,13 @@ build-why2-chat-linux:
 # Upload to Arch Linux User Repository
 upload-to-aur:
   stage: aur
+  image: archlinux:latest
   rules:
     - if: '$CI_COMMIT_BRANCH == "development" && $CI_SERVER_URL == "https://git.satan.red"'
       when: always
     - when: never
   script:
-    - apt update && apt install -y git grep sed
+    - pacman -Syu --no-confirm && pacman -S base-devel git grep sed
     - mkdir -p ~/.ssh
     - echo "$AUR_SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
