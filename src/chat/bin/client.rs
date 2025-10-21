@@ -49,7 +49,6 @@ use colored::Color;
 use why2::chat::
 {
     config,
-    crypto,
     options,
     misc,
     command::{ self, Command },
@@ -357,9 +356,9 @@ fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
 
 fn main()
 {
+    //CONFIGURATION
     misc::check_version(); //CHECK WHY2 VERSION
     config::init_client_config(); //CREATE client.toml CONFIGURATION
-    crypto::init_keys(); //GENERATE ECC KEYS
 
     println!("Welcome.\n");
 

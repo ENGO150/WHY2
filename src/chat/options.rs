@@ -36,9 +36,6 @@ pub const CLIENT_CONFIG: &str       = "/client.toml";                           
 pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                   //SERVER USERS CONFIG FILE
 pub const CONFIG_URL: &str          = "https://git.satan.red/ENGO150/WHY2/-/raw/development/src/chat/config"; //CONFIG FILE DOWNLOAD URL
 
-pub const KEY_LOCATION: &str        = "/keys";                                                                //KEY DIRECTORY
-pub const KEY_FILENAME: &str        = "/secp521r1.pem";                                                       //NAME OF ECC KEYFILE
-
 //DO NOT CHANGE CONST BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                           //DIMENSIONS OF REX GRID
 

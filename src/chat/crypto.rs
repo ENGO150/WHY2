@@ -16,30 +16,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::
-{
-    io::Write,
-    path::Path,
-    fs::{ self, File },
-    str,
-};
-
 use p521::
 {
     ecdh,
     PublicKey,
     SecretKey,
-
-    elliptic_curve::
-    {
-        rand_core::OsRng,
-        sec1::ToEncodedPoint,
-    },
-
+    elliptic_curve::rand_core::OsRng,
     pkcs8::
     {
+        EncodePrivateKey,
         DecodePrivateKey,
-        EncodePrivateKey
+        EncodePublicKey,
+        DecodePublicKey,
     },
 };
 
@@ -57,72 +45,33 @@ use rand::SeedableRng;
 
 use sha2::{ Sha256, Digest };
 
-use crate::
+use crate::core::rex::crypto;
+
+pub fn generate_ephemeral_keys() -> (String, String) //CREATE ECC KEYS
 {
-    chat::{ options, misc },
-    core::rex::crypto,
-};
-
-//PRIVATE
-fn get_private_key() -> SecretKey //LOAD PRIVATE KEY
-{
-    //READ PEM
-    let private_pem = fs::read_to_string(misc::get_why2_dir() + options::KEY_LOCATION + options::KEY_FILENAME).expect("Reading keyfile failed");
-
-    //PARSE & RETURN
-    SecretKey::from_pkcs8_pem(&private_pem).expect("Parsing PEM failed")
-}
-
-//PUBLIC
-pub fn init_keys() //CREATE ECC KEYS
-{
-    //CHECK FOR KEYS DIRECTORY
-    let key_dir = misc::get_why2_dir() + options::KEY_LOCATION;
-    if Path::new(&key_dir).is_dir() { return; }
-
-    //CREATE KEYS DIRECTORY
-    fs::create_dir(&key_dir).expect("Failed creating keys directory");
-
     //GENERATE PRIVATE KEY
     let private = SecretKey::random(&mut OsRng);
 
-    //ENCODE PRIVATE KEY TO PEM
-    let private_pem = private.to_pkcs8_pem(Default::default()).expect("Encoding to PEM failed");
+    //ENCODE KEYS TO PEM
+    let private_pem = private.to_pkcs8_pem(Default::default()).expect("Encoding key to PEM failed");
+    let public_pem = private.public_key().to_public_key_pem(Default::default()).expect("Encoding pkey to PEM failed");
 
-    //SAVE TO FILE
-    let mut file = File::create(key_dir + options::KEY_FILENAME).expect("Creating keyfile failed");
-    file.write_all(&private_pem.as_bytes()).expect("Writing to keyfile failed");
+    //RETURN TUPLE OF PRIVATE AND PUBLIC KEYS
+    (private_pem.to_string(), public_pem.to_string())
 }
 
-pub fn get_public_key() -> String //SERIALIZE PUBKEY
+pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Vec<i64> //DERIVE SHARED SYMKEY USING ECDH
 {
-    //EXTRACT PUBKEY FROM PRIVATE
-    let public = get_private_key().public_key();
-
-    //CONVERT TO STRING
-    let public_bytes = public.to_encoded_point(false).as_bytes().to_vec();
-
-    //ENCODE TO BASE91
-    String::from_utf8(base91::slice_encode(&public_bytes)).expect("Encoding pubkey failed")
-}
-
-pub fn get_shared_key<const W: usize, const H: usize>(key: String) -> Vec<i64> //CALCULATES ELLIPTIC CURVE DIFFIE HELLMAN
-{
-    //DECODE key (REMOTE PUBLIC KEY)
-    let remote_public_bytes = base91::slice_decode(key.as_bytes());
-
-    //PARSE KEY
-    let remote_public = PublicKey::from_sec1_bytes(&remote_public_bytes).expect("Invalid key");
-
-    //LOAD LOCAL PRIVATE KEY
-    let local_private = get_private_key();
+    //PARSE KEYS
+    let local_private = SecretKey::from_pkcs8_pem(&local_key).expect("Invalid key");
+    let remote_public = PublicKey::from_public_key_pem(&peer_pkey).expect("Invalid key");
 
     //COMPUTE EDCH
     let shared = ecdh::diffie_hellman(local_private.to_nonzero_scalar(), remote_public.as_affine());
 
     //SEED ChaCha20Rng USING SHARED KEY
     let shared_encoded = base91::slice_encode(shared.raw_secret_bytes());
-    let mut dprng = ChaCha20Rng::from_seed(sha256_seed(str::from_utf8(&shared_encoded).expect("Encoding shared key failed")));
+    let mut dprng = ChaCha20Rng::from_seed(sha256_seed(std::str::from_utf8(&shared_encoded).expect("Encoding shared key failed")));
 
     //RETURN GENERATED KEY
     crypto::generate_key_deterministic::<W, H>(&mut dprng)

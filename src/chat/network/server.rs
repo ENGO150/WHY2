@@ -216,16 +216,19 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
         if received.code == Some(MessageCode::KeyExchange) && !received.text.is_none() { break received; }
     };
 
+    //GENERATE EPHEMERAL KEYS
+    let (sk, pk) = crypto::generate_ephemeral_keys();
+
     //SEND ECC PUBKEY TO CLIENT
     network::send(stream, MessagePacket
     {
-        text: Some(crypto::get_public_key()),
+        text: Some(pk),
         code: Some(MessageCode::KeyExchange),
         ..Default::default()
     }, None);
 
     //CALCULATE SHARED SECRET
-    Some(crypto::get_shared_key::<GRID_W, GRID_H>(message.text.unwrap()))
+    Some(crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap()))
 }
 
 fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //send welcome packet you idiot

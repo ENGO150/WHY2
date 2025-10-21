@@ -51,10 +51,13 @@ const GRID_H: usize = options::GRID_DIMENSIONS.1;
 //PRIVATE
 fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SIDE
 {
+    //GENERATE EPHEMERAL KEYS
+    let (sk, pk) = crypto::generate_ephemeral_keys();
+
     //SEND ECC PUBKEY TO SERVER
     network::send(stream, MessagePacket
     {
-        text: Some(crypto::get_public_key()),
+        text: Some(pk),
         code: Some(MessageCode::KeyExchange),
         ..Default::default()
     }, None);
@@ -69,7 +72,7 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
     };
 
     //CALCULATE SHARED SECRET
-    crypto::get_shared_key::<GRID_W, GRID_H>(message.text.unwrap())
+    crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap())
 }
 
 fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF PASSED COLOR
