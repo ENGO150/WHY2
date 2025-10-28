@@ -99,6 +99,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut invalid_username = false; //PRINT "Invalid Username!"
     let mut invalid_password = false;
 
+    let mut disabled_registration = false; //PRINT "Registration disabled!"
+
     //FORMATTING SHIT
     let mut first_message = true;
     let mut extra_space: bool;
@@ -172,7 +174,18 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                         invalid_username = true;
                     }
 
-                    println!("\n\rEnter username (a-Z, 0-9; {}-{} characters):", min_uname.unwrap(), max_uname.unwrap());
+                    println! //TODO: Fix flushing
+                    (
+                        "\n\rEnter username ({}):",
+
+                        if disabled_registration
+                        {
+                            String::from("Registration disabled!")
+                        } else
+                        {
+                            format!("a-Z, 0-9; {}-{} characters", min_uname.unwrap(), max_uname.unwrap())
+                        }
+                    );
                 },
 
                 //REGISTER
@@ -280,10 +293,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //REGISTRATION DISABLED
                 MessageCode::RegisterDisabled =>
                 {
-                    misc::clear_lines(2);
-                    print!("Server has disabled registration.");
-
-                    continue;
+                    disabled_registration = true;
                 },
 
                 //CLIENT MESSED SOME COMMAND UP

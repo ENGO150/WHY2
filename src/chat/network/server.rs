@@ -479,6 +479,13 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let min_len = config::server_config::<usize>("min_username_length");
     let max_len = config::server_config::<usize>("max_username_length");
 
+    //TELL USER IF REGISTRATIONS ARE DISABLED
+    let disabled_registration = !config::server_config::<bool>("allow_register");
+    if disabled_registration
+    {
+        send_code(stream, None, MessageCode::RegisterDisabled, shared_key.as_ref());
+    }
+
     //ASK n TIMES
     for _ in 0..max_tries
     {
@@ -512,13 +519,6 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
     let username = username.unwrap();
 
-    //BLOCK NEW USERS IF REGISTRATION IS DISABLED
-    if !config::server_config::<bool>("allow_register") && !config::server_users_contains(&username)
-    {
-        send_code(stream, None, MessageCode::RegisterDisabled, shared_key.as_ref());
-        return remove_connection(stream, DisconnectType::Gracefully);
-    }
-
     //UPDATE USERNAME IN NonAuthenticated
     {
         let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
@@ -536,8 +536,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         }
     }
 
+    let user_exists = config::server_users_contains(&username);
+
     //ASK FOR PASSWORD
-    if !config::server_users_contains(&username) //REGISTRATION
+    if !user_exists && !disabled_registration //REGISTRATION (ENTER "FAKE" LOGIN ON DISABLED REGISTER)
     {
         let max_tries = config::server_config::<usize>("max_auth_tries"); //MAX n
         let mut password: Option<String> = None;
@@ -587,8 +589,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             None => return remove_connection(stream, DisconnectType::Forcefully),
         };
 
-        //INVALID PASSWORD, DISCONNECT CLIENT
-        if response.text.is_none() || !crypto::compare_password_hash(&config::server_users_config(&username), &response.text.unwrap())
+        //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
+        if !user_exists || response.text.is_none() || !crypto::compare_password_hash(&config::server_users_config(&username), &response.text.unwrap())
         {
             return remove_connection(stream, DisconnectType::Gracefully);
         }
