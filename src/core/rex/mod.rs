@@ -116,16 +116,16 @@ impl<const W: usize, const H: usize> Grid<W, H>
 
     /// Initializes a key Grid from a vector of signed 64-bit integers.
     ///
-    /// Each element of the input is transformed by applying an XOR-based tweak, producing the
-    /// internal representation used for encryption. This process ensures that the raw key is
-    /// diffused before being used for round key generation.
+    /// Each cell is built from two key parts using nonlinear mixing:
+    /// addition, XOR, and rotation. This improves diffusion and avoids
+    /// simple linear patterns in the key.
     ///
     /// # Parameters
-    /// - `raw`: A vector of signed 64-bit integers representing the raw key.
+    /// - `vec`: A vector of signed 64-bit integers representing the raw key.
     ///
     /// # Returns
-    /// - Ok(`Grid`) instance containing the transformed key cells, if area is largenr than 1.
-    /// - Err(String) if the area is 1
+    /// - Ok(`Grid`) with mixed key values if dimensions are valid.
+    /// - Err(String) if the grid area is too small.
     pub fn from_key(vec: Vec<i64>) -> result::Result<Self, String>
     {
         //GRID OPTIONS
@@ -135,7 +135,17 @@ impl<const W: usize, const H: usize> Grid<W, H>
         let mut key_grid = Self::new()?;
         for i in 0..grid_area
         {
-            key_grid[i / W][i % W] = vec[i] ^ vec[i + grid_area]; //COMBINE EVERY PART OF KEY
+            //APPLY NONLINEAR MIX TO KEY
+            let mut a = vec[i].wrapping_add(vec[i + grid_area]);
+            let mut b = vec[i] ^ vec[i + grid_area];
+            let rot = (i % 64) as u32;
+
+            //ROTATE
+            a = a.rotate_left(rot);
+            b = b.rotate_right(rot);
+
+            //APPLY
+            key_grid[i / W][i % W] = a ^ b ^ (i as i64);
         }
 
         Ok(key_grid)
