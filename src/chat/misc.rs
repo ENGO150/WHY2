@@ -20,12 +20,19 @@ use std::
 {
     fs,
     path::Path,
+    time::Duration,
 };
 
 use reqwest::
 {
     Error,
     blocking::Client,
+    header::
+    {
+        HeaderMap,
+        HeaderValue,
+        USER_AGENT,
+    },
 };
 
 use serde_json::Value;
@@ -53,9 +60,17 @@ pub fn get_version<'a>() -> &'a str //GET COMPILED PACKAGE VERSION
 
 pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
 {
-    Client::new().get(url)
-        .header("User-Agent", "why2-chat-app")
-        .send()?.text()
+    //CUSTOM CLIENT HEADERS
+    let mut headers = HeaderMap::new();
+    headers.insert(USER_AGENT, HeaderValue::from_str(&format!("WHY2/{}", get_version())).expect("Invalid fetch request headers"));
+
+    //BUILD CUSTOM CLIENT
+    let client = Client::builder()
+        .timeout(Duration::from_millis(options::FETCH_TIMEOUT))
+        .default_headers(headers)
+        .build()?;
+
+    client.get(url).send()?.text()
 }
 
 pub fn check_version() //CHECK FOR LATEST WHY2 VERSION

@@ -36,6 +36,8 @@ pub const CLIENT_CONFIG: &str       = "/client.toml";                           
 pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                   //SERVER USERS CONFIG FILE
 pub const CONFIG_URL: &str          = "https://git.satan.red/ENGO150/WHY2/-/raw/development/src/chat/config"; //CONFIG FILE DOWNLOAD URL
 
+pub const FETCH_TIMEOUT: u64        = 5000;                                                                   //TIMOUT FOR FETCHING DATA (MS)
+
 //DO NOT CHANGE CONST BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                           //DIMENSIONS OF REX GRID
 
