@@ -22,7 +22,11 @@ use std::
     path::Path,
 };
 
-use reqwest::blocking::Client;
+use reqwest::
+{
+    Error,
+    blocking::Client,
+};
 
 use serde_json::Value;
 
@@ -47,18 +51,17 @@ pub fn get_version<'a>() -> &'a str //GET COMPILED PACKAGE VERSION
     env!("CARGO_PKG_VERSION")
 }
 
-pub fn fetch_data(url: &str) -> String //FETCH DATA USING REQWEST
+pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
 {
     Client::new().get(url)
-        .header("User-Agent", "why2-version-check")
-        .send().expect("Sending request failed")
-        .text().expect("Fetching data failed")
+        .header("User-Agent", "why2-chat-app")
+        .send()?.text()
 }
 
 pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
 {
     //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
-    let metadata_raw = fetch_data(options::METADATA_URL);
+    let metadata_raw = fetch_data(options::METADATA_URL).expect("Fetching versions failed");
 
     //PARSE METADATA TO JSON
     let metadata: Value = serde_json::from_str(&metadata_raw).expect("Parsing versions failed"); //PARSE

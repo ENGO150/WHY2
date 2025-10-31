@@ -41,7 +41,7 @@ fn config_path(filename: &str) -> String //GET CONFIGURATION PATH
 
 fn fetch_config(filename: &str) -> String //FETCH CONFIG FROM GIT
 {
-    misc::fetch_data(&(options::CONFIG_URL.to_owned() + filename))
+    misc::fetch_data(&(options::CONFIG_URL.to_owned() + filename)).expect("Fetching config failed")
 }
 
 fn init_config(filename: &str) //CREATE CONFIG IF MISSING
@@ -53,7 +53,7 @@ fn init_config(filename: &str) //CREATE CONFIG IF MISSING
     {
         let mut config_file = File::create(config_path).expect("Failed to create WHY2 config"); //CREATE CONFIG
 
-        let mut config = Cursor::new(misc::fetch_data(&(options::CONFIG_URL.to_owned() + filename)));
+        let mut config = Cursor::new(fetch_config(filename));
         io::copy(&mut config, &mut config_file).expect("Failed writing to config file");
     }
 }
