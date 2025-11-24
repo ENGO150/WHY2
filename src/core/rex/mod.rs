@@ -249,17 +249,17 @@ impl<const W: usize, const H: usize> Grid<W, H>
         //GET COLUMNS
         let cols: Box<dyn Iterator<Item = usize>> = if invert
         {
-            Box::new((0..W).rev()) //REVERSE ON DECRYPTION
+            Box::new((0..self.width()).rev()) //REVERSE ON DECRYPTION
         } else
         {
-            Box::new(0..W) //ENCRYPTION
+            Box::new(0..self.width()) //ENCRYPTION
         };
 
         //XOR COLUMNS IN LINEAR ORDER (0^1 ... 7^8, 8^0)
         for col in cols
         {
             let next_col = (col + 1) % W;
-            for row in 0..H
+            for row in 0..self.height()
             {
                 self[row][col] ^= self[row][next_col];
             }
@@ -524,7 +524,7 @@ impl<const W: usize, const H: usize> Display for Grid<W, H>
         let border = format!
         (
             "+{}+\n",
-            (0..W).map(|_| "-".repeat(max_width + 2)).collect::<Vec<_>>().join("+")
+            (0..self.width()).map(|_| "-".repeat(max_width + 2)).collect::<Vec<_>>().join("+")
         );
 
         //PRINT
