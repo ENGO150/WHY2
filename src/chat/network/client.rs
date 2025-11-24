@@ -51,6 +51,15 @@ const GRID_H: usize = options::GRID_DIMENSIONS.1;
 //PRIVATE
 fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SIDE
 {
+    //WAIT FOR KeyExchange
+    let message = loop
+    {
+        //READ MESSAGE
+        let received = network::receive(stream, None).unwrap();
+
+        if received.code == Some(MessageCode::KeyExchange) { break received; }
+    };
+
     //GENERATE EPHEMERAL KEYS
     let (sk, pk) = crypto::generate_ephemeral_keys();
 
@@ -61,15 +70,6 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
         code: Some(MessageCode::KeyExchange),
         ..Default::default()
     }, None);
-
-    //WAIT FOR KeyExchange
-    let message = loop
-    {
-        //READ MESSAGE
-        let received = network::receive(stream, None).unwrap();
-
-        if received.code == Some(MessageCode::KeyExchange) { break received; }
-    };
 
     //CALCULATE SHARED SECRET
     crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap())

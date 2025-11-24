@@ -207,15 +207,6 @@ pub static CONNECTIONS: LazyLock<Arc<RwLock<Vec<Connection>>>> = LazyLock::new(|
 //PRIVATE
 fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR SERVER-SIDE
 {
-    //WAIT FOR KeyExchange
-    let message = loop
-    {
-        //READ MESSAGE
-        let received = network::receive(stream, None)?;
-
-        if received.code == Some(MessageCode::KeyExchange) && !received.text.is_none() { break received; }
-    };
-
     //GENERATE EPHEMERAL KEYS
     let (sk, pk) = crypto::generate_ephemeral_keys();
 
@@ -226,6 +217,15 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
         code: Some(MessageCode::KeyExchange),
         ..Default::default()
     }, None);
+
+    //WAIT FOR KeyExchange
+    let message = loop
+    {
+        //READ MESSAGE
+        let received = network::receive(stream, None)?;
+
+        if received.code == Some(MessageCode::KeyExchange) && !received.text.is_none() { break received; }
+    };
 
     //CALCULATE SHARED SECRET
     Some(crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap()))
