@@ -208,7 +208,7 @@ pub static CONNECTIONS: LazyLock<Arc<RwLock<Vec<Connection>>>> = LazyLock::new(|
 fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR SERVER-SIDE
 {
     //GENERATE EPHEMERAL KEYS
-    let (sk, pk) = crypto::generate_ephemeral_keys();
+    let (sk, pk) = crypto::get_server_keys();
 
     //SEND ECC PUBKEY TO CLIENT
     network::send(stream, MessagePacket

@@ -143,6 +143,13 @@ pub fn init_server_config() //INITIALIZE SERVER CONFIG FILES
 pub fn init_client_config()
 {
     init_config(options::CLIENT_CONFIG); //DOWNLOAD client.toml
+
+    //CRETE CONFIG FOR TOFU
+    let server_keys_path = config_path(options::SERVER_KEYS_CONFIG);
+    if !Path::new(&server_keys_path).is_file()
+    {
+        File::create(server_keys_path).expect("Failed to create server-keys config"); //CREATE CONFIG
+    }
 }
 
 pub fn server_config<T: FromStr>(key: &str) -> T //RETURN key FROM server.toml
@@ -177,4 +184,20 @@ pub fn server_users_write(key: &str, value: &str) //WRITE TO server_users.toml
 pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml contains
 {
     get_data(&config_path(options::SERVER_USERS_CONFIG)).get(key).is_some()
+}
+
+pub fn server_keys_check(host: &str, pubkey: &str) -> bool //CHECK PUBKEY VALIDITY, SAVE IF NOT FOUND (TOFU)
+{
+    let pubkey = String::from_utf8(base91::slice_encode(pubkey.as_bytes())).unwrap();
+
+    //PEER PUBKEY STORED, CHECK VALIDITY
+    if get_data(&config_path(options::SERVER_KEYS_CONFIG)).get(host).is_some()
+    {
+        //COMPARE
+        return config_read::<String>(options::SERVER_KEYS_CONFIG, host) == pubkey;
+    }
+
+    //WRITE NEW KEY
+    config_write(options::SERVER_KEYS_CONFIG, host, &pubkey);
+    true //ořech
 }

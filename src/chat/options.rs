@@ -36,6 +36,11 @@ pub const CLIENT_CONFIG: &str       = "/client.toml";                           
 pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                   //SERVER USERS CONFIG FILE
 pub const CONFIG_URL: &str          = "https://git.satan.red/ENGO150/WHY2/-/raw/development/src/chat/config"; //CONFIG FILE DOWNLOAD URL
 
+pub const SERVER_KEYS_CONFIG: &str  = "/server_keys.toml";                                                    //SERVER PUBKEY CONFIG FILE
+pub const SERVER_KEYS_DIR: &str     = "/server_keys";                                                         //SERVER KEYS DIRECTORY
+pub const SERVER_SKEY: &str         = "/private";                                                             //SERVER PRIVATE KEY FILE
+pub const SERVER_PKEY: &str         = "/public";                                                              //SERVER PUBLIC KEY FILE
+
 pub const FETCH_TIMEOUT: u64        = 5000;                                                                   //TIMOUT FOR FETCHING DATA (MS)
 
 //DO NOT CHANGE CONST BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING

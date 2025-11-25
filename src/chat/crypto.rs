@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::{ fs, path::Path };
+
 use p521::
 {
     ecdh,
@@ -45,7 +47,11 @@ use rand::SeedableRng;
 
 use sha2::{ Sha256, Digest };
 
-use crate::core::rex::crypto;
+use crate::
+{
+    core::rex::crypto,
+    chat::{ misc, options },
+};
 
 pub fn generate_ephemeral_keys() -> (String, String) //CREATE ECC KEYS
 {
@@ -58,6 +64,33 @@ pub fn generate_ephemeral_keys() -> (String, String) //CREATE ECC KEYS
 
     //RETURN TUPLE OF PRIVATE AND PUBLIC KEYS
     (private_pem.to_string(), public_pem.to_string())
+}
+
+pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
+{
+    //CHECK IF KEY DIRECTORY EXISTS
+    let server_keys_dir = misc::get_why2_dir() + options::SERVER_KEYS_DIR;
+    if !Path::new(&server_keys_dir).is_dir()
+    {
+        fs::create_dir_all(&server_keys_dir).expect("Failed to create WHY2 server-keys directory"); //CREATE DIRECTORY
+
+        //GENERATE KEYS
+        let (sk, pk) = generate_ephemeral_keys();
+
+        //SAVE KEYS
+        fs::write(server_keys_dir.clone() + options::SERVER_SKEY, sk).expect("Saving server secret key failed");
+        fs::write(server_keys_dir + options::SERVER_PKEY, pk).expect("Saving server public key failed");
+    }
+}
+
+pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
+{
+    let server_keys_dir = misc::get_why2_dir() + options::SERVER_KEYS_DIR;
+
+    let sk = fs::read_to_string(server_keys_dir.clone() + options::SERVER_SKEY).expect("Reading server secret key failed");
+    let pk = fs::read_to_string(server_keys_dir + options::SERVER_PKEY).expect("Reading server public key failed");
+
+    (sk, pk)
 }
 
 pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Vec<i64> //DERIVE SHARED SYMKEY USING ECDH

@@ -31,6 +31,7 @@ use why2::chat::
 {
     config,
     misc,
+    crypto,
     network::server,
     command::{ self, Command },
 };
@@ -46,6 +47,7 @@ fn main()
     //CONFIGURATION
     misc::check_version(); //CHECK WHY2 VERSION
     config::init_server_config(); //CREATE server.toml CONFIGURATION
+    crypto::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
 
     let address = format!("{}:{}", config::server_config::<String>("server_ip"), config::server_config::<u16>("server_port")); //GET ADDRESS
     let listener = TcpListener::bind(&address).expect("Binding failed"); //BIND ADDRESS

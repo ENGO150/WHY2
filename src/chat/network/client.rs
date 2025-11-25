@@ -60,6 +60,12 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
         if received.code == Some(MessageCode::KeyExchange) { break received; }
     };
 
+    //VERIFY PUBKEY VALIDITY (TOFU)
+    if !config::server_keys_check(&stream.peer_addr().unwrap().ip().to_string(), message.text.as_ref().unwrap())
+    {
+
+    }
+
     //GENERATE EPHEMERAL KEYS
     let (sk, pk) = crypto::generate_ephemeral_keys();
 
