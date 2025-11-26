@@ -244,25 +244,13 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    fn mix_columns_handler(&mut self, invert: bool) //MIX COLUMNS IN grid GRID
+    #[inline(always)]
+    fn mix_columns_handler(&mut self, col: usize) //MIX COLUMNS IN GRID
     {
-        //GET COLUMNS
-        let cols: Box<dyn Iterator<Item = usize>> = if invert
+        let next_col = (col + 1) % W;
+        for row in 0..self.height()
         {
-            Box::new((0..self.width()).rev()) //REVERSE ON DECRYPTION
-        } else
-        {
-            Box::new(0..self.width()) //ENCRYPTION
-        };
-
-        //XOR COLUMNS IN LINEAR ORDER (0^1 ... 7^8, 8^0)
-        for col in cols
-        {
-            let next_col = (col + 1) % W;
-            for row in 0..self.height()
-            {
-                self[row][col] ^= self[row][next_col];
-            }
+            self[row][col] ^= self[row][next_col];
         }
     }
 
@@ -436,13 +424,19 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - This method mutates the grid in-place.
     pub fn mix_columns(&mut self)
     {
-        self.mix_columns_handler(false); //USE HANDLER
+        for col in 0..(self.width())
+        {
+            self.mix_columns_handler(col); //USE HANDLER
+        }
     }
 
     /// Inverts transformation done by [`mix_columns`](Grid::mix_columns) method
     pub fn inv_mix_columns(&mut self)
     {
-        self.mix_columns_handler(true); //USE HANDLER
+        for col in (0..(self.width())).rev()
+        {
+            self.mix_columns_handler(col); //USE HANDLER
+        }
     }
 }
 
