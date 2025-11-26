@@ -142,7 +142,8 @@ fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF 
 pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 {
     //SET GLOBAL CLIENT SHARED KEY
-    options::set_shared_key(key_exchange(stream));
+    let shared_key = key_exchange(stream);
+    options::set_shared_key(shared_key.clone());
 
     //SERVER INFO VARIABLES
     let mut min_pass: Option<u64> = None;
@@ -162,7 +163,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     //LOOP READING
     loop
     {
-        let read = network::receive(stream, options::get_shared_key().as_ref()).unwrap();
+        let read = network::receive(stream, Some(&shared_key)).unwrap();
         extra_space = false; //RESET EXTRA SPACE
 
         //EXTRA SPACE
@@ -192,7 +193,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                         text: Some(version),
                         code: Some(MessageCode::Version),
                         ..Default::default()
-                    }, options::get_shared_key().as_ref());
+                    }, Some(&shared_key));
 
                     continue;
                 }
