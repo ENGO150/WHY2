@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    env,
     thread,
     process,
     io::{ self, Write },
@@ -359,6 +360,21 @@ fn main()
     //CONFIGURATION
     misc::check_version(); //CHECK WHY2 VERSION
     config::init_client_config(); //CREATE client.toml CONFIGURATION
+
+    //CHECK FOR PARAMETERS
+    if let Some(arg) = env::args().nth(1)
+    {
+        if arg == "--verify" && env::args().len() == 4 //SAVE SERVER PUBKEY
+        {
+            config::server_keys_save(&env::args().nth(2).unwrap(), &env::args().nth(3).unwrap());
+            println!("Key saved.");
+        } else //INVALID CMD
+        {
+            println!("Invalid command! Aborting...");
+        }
+
+        return;
+    }
 
     println!("Welcome.\n");
 

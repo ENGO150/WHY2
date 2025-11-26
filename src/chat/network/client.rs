@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    env,
     process,
     net::TcpStream,
     io::{ self, Write },
@@ -31,10 +32,10 @@ use colored::Colorize;
 
 use crate::chat::
 {
-    config,
     crypto,
     options,
     misc,
+    config::{ self, TofuCode },
     network::
     {
         self,
@@ -61,27 +62,56 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
     };
 
     //VERIFY PUBKEY VALIDITY (TOFU)
-    if !config::server_keys_check(&stream.peer_addr().unwrap().ip().to_string(), message.text.as_ref().unwrap())
+    match config::server_keys_check(&stream.peer_addr().unwrap().ip().to_string(), message.text.as_ref().unwrap())
     {
-        //GRACEFULLY DISCONNECT FROM SERVER
-        network::send(stream, MessagePacket
+        TofuCode::Valid => {},
+
+        status @ (TofuCode::Mismatch | TofuCode::Unknown(_)) =>
         {
-            code: Some(MessageCode::Disconnect),
-            ..Default::default()
-        }, None);
+            //GRACEFULLY DISCONNECT FROM SERVER
+            network::send(stream, MessagePacket
+            {
+                code: Some(MessageCode::Disconnect),
+                ..Default::default()
+            }, None);
 
-        println!
-        (
-            "\n\rSECURITY WARNING: SERVER IDENTITY MISMATCH
-            \n\rThe server's identity key is different from the
-            \rkey stored in local configuration. This could
-            \rmean that someone is intercepting your connection
-            \r(Man-in-the-Middle attack) or that the server
-            \rkey has been changed.
-            \n\rConnection aborted to protect your privacy."
-        );
+            //PRINT SECURITY MESSAGE
+            match status
+            {
+                TofuCode::Mismatch => //SOMETHING FUNNY HAPPENING
+                {
+                    println!
+                    (
+                        "\n\rSECURITY WARNING: SERVER IDENTITY MISMATCH
+                        \n\rThe server's identity key is different from the
+                        \rkey stored in local configuration. This could
+                        \rmean that someone is intercepting your connection
+                        \r(Man-in-the-Middle attack) or that the server
+                        \rkey has been changed.
+                        \n\rConnection aborted to protect your privacy."
+                    );
+                },
 
-        process::exit(0);
+                TofuCode::Unknown(hash) => //NEW ONE
+                {
+                    println!
+                    (
+                        "\n\rSECURITY WARNING: UNKNOWN SERVER IDENTITY
+                        \n\rThe server's identity key is not stored in local
+                        \rconfiguration. If you are sure that the key below
+                        \ris valid, enter following command and connect again.
+                        \n\r{} --verify {} {hash}",
+
+                        env::args().nth(0).unwrap(), stream.peer_addr().unwrap().ip()
+                    );
+                },
+
+                _ => panic!("what") //what
+            }
+
+            //EXIT
+            process::exit(0);
+        },
     }
 
     //GENERATE EPHEMERAL KEYS

@@ -19,8 +19,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     str::FromStr,
-    fmt::Debug,
     path::Path,
+    fmt::{ Debug, Write },
     io::{ self, Cursor },
     fs::{ self, File },
 };
@@ -29,9 +29,18 @@ use toml_edit::{ DocumentMut, Value };
 
 use crate::chat::
 {
+    crypto,
     options,
     misc,
 };
+
+//ENUMS
+pub enum TofuCode //POSSIBLE KEY VERIFICATION RESULTS
+{
+    Valid, //KEY MATCHES LOCAL CONFIG
+    Unknown(String), //KEY NOT FOUND IN CONFIG
+    Mismatch, //KEY DIFFERS
+}
 
 //PRIVATE
 fn config_path(filename: &str) -> String //GET CONFIGURATION PATH
@@ -186,18 +195,36 @@ pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml con
     get_data(&config_path(options::SERVER_USERS_CONFIG)).get(key).is_some()
 }
 
-pub fn server_keys_check(host: &str, pubkey: &str) -> bool //CHECK PUBKEY VALIDITY, SAVE IF NOT FOUND (TOFU)
+pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VALIDITY (TOFU)
 {
-    let pubkey = String::from_utf8(base91::slice_encode(pubkey.as_bytes())).unwrap();
+    //HASH PUBKEY
+    let pubkey_hash = crypto::sha256(pubkey);
+    let mut pubkey_string = String::with_capacity(64);
+
+    //SERIALIZE
+    for byte in pubkey_hash
+    {
+        write!(pubkey_string, "{:02x}", byte).unwrap();
+    }
 
     //PEER PUBKEY STORED, CHECK VALIDITY
     if get_data(&config_path(options::SERVER_KEYS_CONFIG)).get(host).is_some()
     {
         //COMPARE
-        return config_read::<String>(options::SERVER_KEYS_CONFIG, host) == pubkey;
+        return if config_read::<String>(options::SERVER_KEYS_CONFIG, host) == pubkey_string
+        {
+            TofuCode::Valid
+        } else
+        {
+            TofuCode::Mismatch
+        }
     }
 
-    //WRITE NEW KEY
-    config_write(options::SERVER_KEYS_CONFIG, host, &pubkey);
-    true //ořech
+    TofuCode::Unknown(pubkey_string)
+}
+
+pub fn server_keys_save(host: &str, pubkey_hash: &str) //SAVE KEY
+{
+    //WRITE
+    config_write(options::SERVER_KEYS_CONFIG, host, pubkey_hash);
 }
