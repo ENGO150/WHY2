@@ -104,13 +104,13 @@ pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, p
 
     //SEED ChaCha20Rng USING SHARED KEY
     let shared_encoded = base91::slice_encode(shared.raw_secret_bytes());
-    let mut dprng = ChaCha20Rng::from_seed(sha256_seed(std::str::from_utf8(&shared_encoded).expect("Encoding shared key failed")));
+    let mut dprng = ChaCha20Rng::from_seed(sha256(std::str::from_utf8(&shared_encoded).expect("Encoding shared key failed")));
 
     //RETURN GENERATED KEY
     crypto::generate_key_deterministic::<W, H>(&mut dprng)
 }
 
-pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
+pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 {
     //SHA256
     let mut hasher = Sha256::new();
