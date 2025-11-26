@@ -63,7 +63,25 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
     //VERIFY PUBKEY VALIDITY (TOFU)
     if !config::server_keys_check(&stream.peer_addr().unwrap().ip().to_string(), message.text.as_ref().unwrap())
     {
+        //GRACEFULLY DISCONNECT FROM SERVER
+        network::send(stream, MessagePacket
+        {
+            code: Some(MessageCode::Disconnect),
+            ..Default::default()
+        }, None);
 
+        println!
+        (
+            "\n\rSECURITY WARNING: SERVER IDENTITY MISMATCH
+            \n\rThe server's identity key is different from the
+            \rkey stored in local configuration. This could
+            \rmean that someone is intercepting your connection
+            \r(Man-in-the-Middle attack) or that the server
+            \rkey has been changed.
+            \n\rConnection aborted to protect your privacy."
+        );
+
+        process::exit(0);
     }
 
     //GENERATE EPHEMERAL KEYS
