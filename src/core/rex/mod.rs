@@ -198,24 +198,28 @@ impl<const W: usize, const H: usize> Grid<W, H>
     }
 
     /// Returns an iterator over rows in the Grid
+    #[inline]
     pub fn iter(&self) -> Iter<'_, [i64; W]>
     {
         self.0.iter()
     }
 
     /// Returns a mutable iterator over rows in the Grid
+    #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, [i64; W]>
     {
         self.0.iter_mut()
     }
 
     /// Returns width (number of columns) in the Grid
+    #[inline]
     pub fn width(&self) -> usize
     {
         W
     }
 
     /// Returns height (number of rows) in the Grid
+    #[inline]
     pub fn height(&self) -> usize
     {
         H
@@ -263,6 +267,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Parameters
     /// - `key_grid`: Input Grid for XOR
+    #[inline]
     pub fn xor_grids(&mut self, key_grid: &Grid<W, H>)
     {
         for y in 0..(self.height()) //Y DIM
