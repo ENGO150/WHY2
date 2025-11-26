@@ -19,22 +19,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     str::FromStr,
+    fmt::Debug,
     path::Path,
-    fmt::{ Debug, Write },
     io::{ self, Cursor },
     fs::{ self, File },
 };
 
 use toml_edit::{ DocumentMut, Value };
 
-use crate::chat::
-{
-    crypto,
-    options,
-    misc,
-};
+use crate::chat::{ options, misc };
+
+#[cfg(feature = "client")]
+use std::fmt::Write;
+
+#[cfg(feature = "client")]
+use crate::chat::crypto;
 
 //ENUMS
+#[cfg(feature = "client")]
 pub enum TofuCode //POSSIBLE KEY VERIFICATION RESULTS
 {
     Valid, //KEY MATCHES LOCAL CONFIG
@@ -138,6 +140,7 @@ fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
 }
 
 //PUBLIC
+#[cfg(feature = "server")]
 pub fn init_server_config() //INITIALIZE SERVER CONFIG FILES
 {
     init_config(options::SERVER_CONFIG); //DOWNLOAD server.toml
@@ -149,6 +152,7 @@ pub fn init_server_config() //INITIALIZE SERVER CONFIG FILES
     }
 }
 
+#[cfg(feature = "client")]
 pub fn init_client_config()
 {
     init_config(options::CLIENT_CONFIG); //DOWNLOAD client.toml
@@ -161,6 +165,7 @@ pub fn init_client_config()
     }
 }
 
+#[cfg(feature = "server")]
 pub fn server_config<T: FromStr>(key: &str) -> T //RETURN key FROM server.toml
 where
     T::Err: Debug,
@@ -168,6 +173,7 @@ where
     config_read(options::SERVER_CONFIG, key)
 }
 
+#[cfg(feature = "client")]
 pub fn client_config<T: FromStr>(key: &str) -> T //RETURN key FROM client.toml
 where
     T::Err: Debug,
@@ -175,26 +181,31 @@ where
     config_read(options::CLIENT_CONFIG, key)
 }
 
+#[cfg(feature = "server")]
 pub fn server_users_config(key: &str) -> String //RETURN key FROM server_users.toml
 {
     config_read(options::SERVER_USERS_CONFIG, key)
 }
 
+#[cfg(feature = "client")]
 pub fn client_write(key: &str, value: &str) //WRITE TO client.toml
 {
     config_write(options::CLIENT_CONFIG, key, value);
 }
 
+#[cfg(feature = "server")]
 pub fn server_users_write(key: &str, value: &str) //WRITE TO server_users.toml
 {
     config_write(options::SERVER_USERS_CONFIG, key, value);
 }
 
+#[cfg(feature = "server")]
 pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml contains
 {
     get_data(&config_path(options::SERVER_USERS_CONFIG)).get(key).is_some()
 }
 
+#[cfg(feature = "client")]
 pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VALIDITY (TOFU)
 {
     //HASH PUBKEY
@@ -223,6 +234,7 @@ pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VA
     TofuCode::Unknown(pubkey_string)
 }
 
+#[cfg(feature = "client")]
 pub fn server_keys_save(host: &str, pubkey_hash: &str) //SAVE KEY
 {
     //WRITE
