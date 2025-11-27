@@ -218,6 +218,9 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
         ..Default::default()
     }, None);
 
+    //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
+    stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
+
     //WAIT FOR KeyExchange
     let message = loop
     {
@@ -226,6 +229,9 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
 
         if received.code == Some(MessageCode::KeyExchange) && !received.text.is_none() { break received; }
     };
+
+    //REMOVE READ TIMEOUT
+    stream.set_read_timeout(None).expect("Failed to unset read timeout");
 
     //CALCULATE SHARED SECRET
     Some(crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap()))
