@@ -93,11 +93,11 @@ pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
     (sk, pk)
 }
 
-pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Vec<i64> //DERIVE SHARED SYMKEY USING ECDH
+pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Option<Vec<i64>> //DERIVE SHARED SYMKEY USING ECDH
 {
     //PARSE KEYS
     let local_private = SecretKey::from_pkcs8_pem(&local_key).expect("Invalid key");
-    let remote_public = PublicKey::from_public_key_pem(&peer_pkey).expect("Invalid key");
+    let remote_public = PublicKey::from_public_key_pem(&peer_pkey).ok()?;
 
     //COMPUTE EDCH
     let shared = ecdh::diffie_hellman(local_private.to_nonzero_scalar(), remote_public.as_affine());
@@ -107,7 +107,7 @@ pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, p
     let mut dprng = ChaCha20Rng::from_seed(sha256(std::str::from_utf8(&shared_encoded).expect("Encoding shared key failed")));
 
     //RETURN GENERATED KEY
-    crypto::generate_key_deterministic::<W, H>(&mut dprng)
+    Some(crypto::generate_key_deterministic::<W, H>(&mut dprng))
 }
 
 pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING

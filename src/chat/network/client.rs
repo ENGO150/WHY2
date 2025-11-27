@@ -126,7 +126,7 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
     }, None);
 
     //CALCULATE SHARED SECRET
-    crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap())
+    crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap()).expect("Shared secret derivation failed")
 }
 
 fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF PASSED COLOR

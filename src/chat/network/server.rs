@@ -234,7 +234,7 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
     stream.set_read_timeout(None).expect("Failed to unset read timeout");
 
     //CALCULATE SHARED SECRET
-    Some(crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap()))
+    crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap())
 }
 
 fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //send welcome packet you idiot
