@@ -221,6 +221,8 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
     //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
     stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
 
+    let mut invalid_packets = 0; //INVALID KEY EXCHANGE PACKETS COUNTER
+
     //WAIT FOR KeyExchange
     let message = loop
     {
@@ -228,6 +230,10 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
         let received = network::receive(stream, None)?;
 
         if received.code == Some(MessageCode::KeyExchange) && !received.text.is_none() { break received; }
+
+        //CHECK INVALID PACKETS COUNTER
+        if invalid_packets == 3 { return None; }
+        invalid_packets += 1; //INCREMENT
     };
 
     //REMOVE READ TIMEOUT
