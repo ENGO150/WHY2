@@ -351,5 +351,16 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     }
 
     //DECODE AND RETURN
-    Some(bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard()).expect("Decoding packet failed").0)
+    match bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard())
+    {
+        Ok((packet, _)) => Some(packet),
+        Err(_) =>
+        {
+            //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
+            #[cfg(feature = "server")]
+            server::remove_connection(stream, DisconnectType::Forcefully);
+
+            None
+        }
+    }
 }
