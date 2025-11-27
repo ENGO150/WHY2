@@ -62,6 +62,18 @@ fn main()
             {
                 Ok(mut stream) =>
                 {
+                    //CHECK FOR MAXIMAL CONNECTIONS
+                    if server::CONNECTIONS.read().unwrap().len() >= config::server_config::<usize>("max_clients")
+                    {
+                        eprintln!
+                        (
+                            "Connection rejected (Server full): {}",
+                            stream.peer_addr().map(|a| a.to_string()).unwrap_or_else(|_| "unknown".to_string())
+                        );
+
+                        continue;
+                    }
+
                     thread::spawn(move || server::listen_client(&mut stream));
                 },
 

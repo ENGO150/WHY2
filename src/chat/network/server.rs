@@ -434,9 +434,6 @@ pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode
 
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
-    //CHECK FOR MAXIMAL CONNECTIONS
-    if CONNECTIONS.read().unwrap().len() == config::server_config::<usize>("max_clients") { return; }
-
     println!("New connection: {}", match stream.peer_addr()
     {
         Ok(addr) => addr,
