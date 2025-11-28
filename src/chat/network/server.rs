@@ -18,8 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    net::TcpStream,
     collections::HashSet,
+    net::{ TcpStream, SocketAddr },
     time::{ Instant, Duration },
     sync::
     {
@@ -84,6 +84,12 @@ impl Connection
             Self::Authenticated { stream, .. } => stream,
             Self::NonAuthenticated { stream, .. } => stream,
         }
+    }
+
+    //GET PEER ADDR FROM Connection#stream
+    pub fn peer_addr(&self) -> Option<SocketAddr>
+    {
+        self.stream().lock().ok()?.peer_addr().ok()
     }
 
     //GET USERNAME FROM Connection
@@ -278,8 +284,8 @@ pub fn remove_connection(stream: &mut TcpStream, grace: bool) //REMOVE CONNECTIO
 
         connections.retain(|conn|
         {
+            let should_remove = conn.peer_addr() == peer_addr;
             let mut removed_stream = conn.stream().lock().unwrap();
-            let should_remove = removed_stream.peer_addr().ok() == peer_addr;
 
             if should_remove
             {
@@ -366,7 +372,7 @@ fn update_client_shared_key(stream: &mut TcpStream, shared_key: &Vec<i64>) //ADD
     let mut connections = CONNECTIONS.write().unwrap();
 
     //FIND CONNECTION
-    if let Some(index) = connections.iter().position(|conn| conn.stream().lock().unwrap().peer_addr().ok() == peer_addr)
+    if let Some(index) = connections.iter().position(|conn| conn.peer_addr() == peer_addr)
     {
         //CLONE STREAM
         let stream = connections[index].stream().clone();
@@ -388,7 +394,7 @@ fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize) //MOVE
     let mut connections = CONNECTIONS.write().unwrap();
 
     //FIND CONNECTION
-    if let Some(index) = connections.iter().position(|conn| conn.stream().lock().unwrap().peer_addr().ok() == peer_addr)
+    if let Some(index) = connections.iter().position(|conn| conn.peer_addr() == peer_addr)
     {
         //CLONE OLD PROPERTIES
         let stream = connections[index].stream().clone();
@@ -538,7 +544,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
         for conn in connections.iter_mut()
         {
-            if conn.stream().lock().unwrap().peer_addr().ok() == peer_addr && !conn.is_authenticated() //CONNECTION FOUND
+            if conn.peer_addr() == peer_addr && !conn.is_authenticated() //CONNECTION FOUND
             {
                 //UPDATE
                 *conn.username_mut() = Some(username.clone());
