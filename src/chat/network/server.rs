@@ -73,15 +73,6 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
     },
 }
 
-#[derive(PartialEq)]
-pub enum DisconnectType //TYPE OF REMOVING CLIENT FROM CONNECTIONS LIST
-{
-    Gracefully,   //SEND Disconnect CODE TO CLIENT
-    Forcefully,   //fuck them, close connection
-    Authenticate, //NOT REMOVING, ONLY TRANSFER TO AUTHENTICATED CLIENTS
-    Update,       //NOT REMOVING, ONLY EDIT CONNECTION VALUE
-}
-
 //IMPLEMENTATIONS
 impl Connection
 {
@@ -272,7 +263,7 @@ fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
     }
 }
 
-pub fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType) //REMOVE CONNECTION BY TcpStream
+pub fn remove_connection(stream: &mut TcpStream, grace: bool) //REMOVE CONNECTION BY TcpStream
 {
     //GET TARGET PEER ADDRESS
     let peer_addr = stream.peer_addr().ok();
@@ -293,7 +284,7 @@ pub fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType
             if should_remove
             {
                 //SEND DISCONNECT CODE TO REMOVED CLIENT
-                if disconnect_type == DisconnectType::Gracefully
+                if grace
                 {
                     send_code(&mut removed_stream, None, MessageCode::Disconnect, conn.shared_key());
                 }
@@ -324,16 +315,7 @@ pub fn remove_connection(stream: &mut TcpStream, disconnect_type: DisconnectType
         });
     }
 
-    //DO NOT LOG CLIENT UPDATES
-    if disconnect_type == DisconnectType::Update { return; }
-
-    println!("{} connection: {}", if disconnect_type == DisconnectType::Authenticate
-    {
-        "Authenticate"
-    } else
-    {
-        "Close"
-    }, peer_addr.unwrap());
+    println!("Close connection: {}", peer_addr.unwrap());
 }
 
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
@@ -380,34 +362,51 @@ fn get_connection_by_id(id: usize) -> Option<Connection> //RETURN CONNECTION WIT
 
 fn update_client_shared_key(stream: &mut TcpStream, shared_key: &Vec<i64>) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
 {
-    //REMOVE FROM NonAuthenticated
-    remove_connection(stream, DisconnectType::Update);
+    let peer_addr = stream.peer_addr().ok();
+    let mut connections = CONNECTIONS.write().unwrap();
 
-    //ADD Authenticated
-    CONNECTIONS.write().unwrap().push(Connection::NonAuthenticated
+    //FIND CONNECTION
+    if let Some(index) = connections.iter().position(|conn| conn.stream().lock().unwrap().peer_addr().ok() == peer_addr)
     {
-        stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
-        username: None,
-        shared_key: Some(shared_key.clone()),
-        last_activity: Instant::now(),
-    });
+        //CLONE STREAM
+        let stream = connections[index].stream().clone();
+
+        //OVERWRITE OLD CONNECTION
+        connections[index] = Connection::NonAuthenticated
+        {
+            stream: stream,
+            username: None,
+            shared_key: Some(shared_key.to_owned()),
+            last_activity: Instant::now(),
+        };
+    }
 }
 
-fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize, shared_key: &Vec<i64>) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
+fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
-    //REMOVE FROM NonAuthenticated
-    remove_connection(stream, DisconnectType::Authenticate);
+    let peer_addr = stream.peer_addr().ok();
+    let mut connections = CONNECTIONS.write().unwrap();
 
-    //ADD Authenticated
-    CONNECTIONS.write().unwrap().push(Connection::Authenticated
+    //FIND CONNECTION
+    if let Some(index) = connections.iter().position(|conn| conn.stream().lock().unwrap().peer_addr().ok() == peer_addr)
     {
-        stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
-        username: username.to_string(),
-        id: id,
-        shared_key: shared_key.clone(),
-        last_activity: Instant::now() - Duration::from_millis(config::server_config("min_message_delay")),
-        spam_violations: 0,
-    });
+        //CLONE OLD PROPERTIES
+        let stream = connections[index].stream().clone();
+        let shared_key = connections[index].shared_key().unwrap().to_owned();
+
+        //OVERWRITE OLD CONNECTION
+        connections[index] = Connection::Authenticated
+        {
+            stream: stream,
+            username: username.to_string(),
+            id: id,
+            shared_key: shared_key,
+            last_activity: Instant::now() - Duration::from_millis(config::server_config("min_message_delay")),
+            spam_violations: 0,
+        };
+
+        println!("Authenticate connection: {}", peer_addr.unwrap());
+    }
 }
 
 fn ask_version(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) -> Option<String> //ASK CLIENT FOR VERSION
@@ -465,7 +464,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let shared_key = match key_exchange(stream)
     {
         Some(r) => Some(r),
-        None => return remove_connection(stream, DisconnectType::Forcefully)
+        None => return remove_connection(stream, false)
     };
 
     //UPDATE CONNECTION
@@ -477,7 +476,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         let version = ask_version(stream, shared_key.as_ref());
         if version.is_none() || version != Some(misc::get_version().to_string())
         {
-            return remove_connection(stream, DisconnectType::Gracefully);
+            return remove_connection(stream, true);
         }
     }
 
@@ -520,14 +519,14 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 }
             },
 
-            None => return remove_connection(stream, DisconnectType::Forcefully),
+            None => return remove_connection(stream, false),
         }
     }
 
     //NO USERNAME RECEIVED, DISCONNECT CLIENT
     if username.is_none()
     {
-        return remove_connection(stream, DisconnectType::Gracefully);
+        return remove_connection(stream, true);
     }
 
     let username = username.unwrap();
@@ -579,13 +578,13 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     }
                 },
 
-                None => return remove_connection(stream, DisconnectType::Forcefully)
+                None => return remove_connection(stream, false)
             };
         }
 
         if password.is_none()
         {
-            return remove_connection(stream, DisconnectType::Gracefully);
+            return remove_connection(stream, true);
         }
 
         //SAVE PASSWORD
@@ -599,13 +598,13 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         let response = match network::receive(stream, shared_key.as_ref())
         {
             Some(r) => r,
-            None => return remove_connection(stream, DisconnectType::Forcefully),
+            None => return remove_connection(stream, false),
         };
 
         //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
         if !user_exists || response.text.is_none() || !crypto::compare_password_hash(&config::server_users_config(&username), &response.text.unwrap())
         {
-            return remove_connection(stream, DisconnectType::Gracefully);
+            return remove_connection(stream, true);
         }
     }
 
@@ -613,7 +612,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let id = get_latest_id();
 
     //AUTHENTICATE CLIENT
-    authenticate_client(stream, &username, id, shared_key.as_ref().unwrap());
+    authenticate_client(stream, &username, id);
 
     //TELL CLIENT TO START CHATTING
     send_code(stream, None, MessageCode::Accept, shared_key.as_ref());
@@ -646,7 +645,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::Disconnect =>
                 {
                     //DISCONNECT CLIENT
-                    return remove_connection(stream, DisconnectType::Gracefully);
+                    return remove_connection(stream, true);
                 },
 
                 //CLIENT REQUESTED LIST OF ONLINE USERS
@@ -747,7 +746,7 @@ pub fn disconnect_all() //DISCONNECT ALL CLIENTS
     let mut streams: Vec<TcpStream> = CONNECTIONS.read().unwrap().iter().map(|conn| conn.cloned_stream().unwrap()).collect();
     for stream in &mut streams
     {
-        remove_connection(stream, DisconnectType::Gracefully); //REMOVE GRACEFULLY
+        remove_connection(stream, true); //REMOVE GRACEFULLY
     }
 }
 
@@ -768,6 +767,6 @@ pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
     //DISCONNECT INACTIVE STREAMS
     for mut stream in inactive_streams
     {
-        remove_connection(&mut stream, DisconnectType::Gracefully);
+        remove_connection(&mut stream, true);
     }
 }

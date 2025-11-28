@@ -59,11 +59,7 @@ use std::
 };
 
 #[cfg(feature = "server")]
-use crate::chat::
-{
-    config,
-    network::server::DisconnectType
-};
+use crate::chat::config;
 
 //STRUCTS
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -272,7 +268,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
             {
                 #[cfg(feature = "server")]
                 {
-                    server::remove_connection(stream, DisconnectType::Forcefully);
+                    server::remove_connection(stream, false);
                 }
 
                 return None;
@@ -284,7 +280,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
                 {
                     if _i >= max_packet_size //INPUT TOO LONG
                     {
-                        server::remove_connection(stream, DisconnectType::Gracefully);
+                        server::remove_connection(stream, true);
                         return None;
                     }
                 }
@@ -346,7 +342,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         if disconnect
         {
             drop(connections); //DROP WRITE LOCK
-            server::remove_connection(stream, DisconnectType::Gracefully);
+            server::remove_connection(stream, true);
             return None;
         }
     }
@@ -359,7 +355,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         {
             //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
             #[cfg(feature = "server")]
-            server::remove_connection(stream, DisconnectType::Forcefully);
+            server::remove_connection(stream, false);
 
             None
         }
