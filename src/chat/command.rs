@@ -32,6 +32,7 @@ const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 pub enum Command
 {
     Exit,           //DISCONNECT FROM SERVER
+    Channel,        //SWITCH CHANNEL
     Help,           //PRINT COMMANDS
     List,           //LIST USERS
     PrivateMessage, //ONE TO ONE MESSAGE
@@ -49,6 +50,7 @@ impl Command
         match self
         {
             Command::Exit => Some(MessageCode::Disconnect),
+            Command::Channel => Some(MessageCode::Channel),
             Command::List => Some(MessageCode::List),
             Command::PrivateMessage => Some(MessageCode::PrivateMessage),
 
@@ -65,6 +67,7 @@ impl Display for Command
         let name = match self
         {
             Command::Help           => "help",
+            Command::Channel        => "channel",
             Command::Exit           => "exit",
             Command::List           => "list",
             Command::PrivateMessage => "pm",
@@ -99,6 +102,7 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
         "LIST" | "USERS" | "CLIENTS" | "SHOW"         => (Some(Command::List), None),
 
         //PARAMETRIC
+        "CHANNEL" | "SWITCH" | "CHECKOUT" | "AREA"    => (Some(Command::Channel), parameters),
         "PM" | "DM" | "MSG" | "TELL"                  => (Some(Command::PrivateMessage), parameters),
         "UCOLOR" | "USERNAME"                         => (Some(Command::UsernameColor), parameters),
         "COLOR" | "MESSAGE"                           => (Some(Command::MessageColor), parameters),

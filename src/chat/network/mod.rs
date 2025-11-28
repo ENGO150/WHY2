@@ -85,6 +85,7 @@ pub enum MessageCode //CONTROL CODES
     RegisterDisabled,   //SERVER -> CLIENT | REGISTRATION IS DISABLED
     Version,            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
+    Channel,            //CLIENT -> SERVER | CLIENTS WANTS TO SWITCH CHANNEL
 }
 
 #[derive(Clone)]
