@@ -75,6 +75,9 @@ fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SI
                 ..Default::default()
             }, None);
 
+            //DISABLE RAW MODE
+            terminal::disable_raw_mode().unwrap();
+
             //PRINT SECURITY MESSAGE
             match status
             {
