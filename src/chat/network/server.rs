@@ -358,12 +358,11 @@ fn get_latest_id() -> usize
     unreachable!("what the fuck");
 }
 
-fn get_connection_by_id(id: usize) -> Option<Connection> //RETURN CONNECTION WITH MATCHING ID
+fn find_connection_index<F>(connections: &Vec<Connection>, condition: F) -> Option<usize> //RETURN INDEX OF CONNECTION WITH MATCHING PREDICATE
+where
+    F: Fn(&Connection) -> bool
 {
-    CONNECTIONS.read().unwrap().iter().find(|conn|
-    {
-        conn.id() == Some(&id)
-    }).cloned()
+    connections.iter().position(condition)
 }
 
 fn update_client_shared_key(stream: &mut TcpStream, shared_key: &Vec<i64>) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
@@ -372,7 +371,7 @@ fn update_client_shared_key(stream: &mut TcpStream, shared_key: &Vec<i64>) //ADD
     let mut connections = CONNECTIONS.write().unwrap();
 
     //FIND CONNECTION
-    if let Some(index) = connections.iter().position(|conn| conn.peer_addr() == peer_addr)
+    if let Some(index) = find_connection_index(&connections, |c| c.peer_addr() == peer_addr)
     {
         //CLONE STREAM
         let stream = connections[index].stream().clone();
@@ -394,7 +393,7 @@ fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize) //MOVE
     let mut connections = CONNECTIONS.write().unwrap();
 
     //FIND CONNECTION
-    if let Some(index) = connections.iter().position(|conn| conn.peer_addr() == peer_addr)
+    if let Some(index) = find_connection_index(&connections, |c| c.peer_addr() == peer_addr)
     {
         //CLONE OLD PROPERTIES
         let stream = connections[index].stream().clone();
@@ -688,28 +687,30 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         {
                             if let Ok(num) = sender_id.parse::<usize>() //CLIENT ACTUALLY SENT NUMERIC ID
                             {
-                                if let Some(recipient) = get_connection_by_id(num) //yippee!! client sent valid id
+                                let connections = CONNECTIONS.read().unwrap();
+                                if let Some(recipient_index) = find_connection_index(&connections,
+                                    |c| c.id() == Some(&num)) //yippee!! client sent valid id
                                 {
-                                    if recipient.is_authenticated()
+                                    if connections[recipient_index].is_authenticated()
                                     {
                                         //SEND MESSAGE TO RECEIVER
                                         if num != id //DO NOT SEND ON SELF MESSAGE
                                         {
-                                            network::send(&mut recipient.stream().lock().unwrap(), MessagePacket
+                                            network::send(&mut connections[recipient_index].stream().lock().unwrap(), MessagePacket
                                             {
                                                 text: Some(private_message.to_string()),
                                                 username: Some(username.clone()),
                                                 id: Some(id),
                                                 code: Some(MessageCode::PrivateMessage),
                                                 ..Default::default()
-                                            }, recipient.shared_key());
+                                            }, connections[recipient_index].shared_key());
                                         }
 
                                         //SEND MESSAGE BACK TO SENDER
                                         network::send(stream, MessagePacket
                                         {
                                             text: Some(private_message.to_string()),
-                                            username: recipient.username().cloned(),
+                                            username: connections[recipient_index].username().cloned(),
                                             id: Some(num),
                                             code: Some(MessageCode::PrivateMessageBack),
                                             ..Default::default()
