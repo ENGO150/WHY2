@@ -680,51 +680,49 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 //PRIVATE MESSAGE
                 MessageCode::PrivateMessage =>
                 {
-                    //CHECK PARAMETER VALIDITY
-                    if let Some(message) = read.text //CLIENT ACTUALLY SENT SOMETHING
+                    //CHECK CLOSURE
+                    let parse_pm_data = |connections: &Vec<Connection>, message: Option<&String>| -> Option<(usize, usize, String)>
                     {
-                        if let Some((sender_id, private_message)) = message.split_once(' ') //CLIENT ACTUALLY PASSED AT LEAST TWO PARAMETERS
+                        let text = message?; //EXISTING PARAMETERS
+                        let (sender_id, private_message) = text.split_once(' ')?; //VALID PARAMETERS
+                        let recipient_id = sender_id.parse::<usize>().ok()?; //VALID ID
+                        let recipient_index = find_connection_index(&connections,
+                        |c| c.id() == Some(&recipient_id))?; //EXISTING ID
+
+                        Some((recipient_index, recipient_id, private_message.to_string()))
+                    };
+
+                    let connections = CONNECTIONS.read().unwrap();
+                    if let Some((recipient_index, recipient_id, private_message)) = parse_pm_data(&connections, read.text.as_ref())
+                    {
+                        //SEND MESSAGE TO RECEIVER
+                        if recipient_id != id //DO NOT SEND ON SELF MESSAGE
                         {
-                            if let Ok(num) = sender_id.parse::<usize>() //CLIENT ACTUALLY SENT NUMERIC ID
+                            network::send(&mut connections[recipient_index].stream().lock().unwrap(), MessagePacket
                             {
-                                let connections = CONNECTIONS.read().unwrap();
-                                if let Some(recipient_index) = find_connection_index(&connections,
-                                    |c| c.id() == Some(&num)) //yippee!! client sent valid id
-                                {
-                                    if connections[recipient_index].is_authenticated()
-                                    {
-                                        //SEND MESSAGE TO RECEIVER
-                                        if num != id //DO NOT SEND ON SELF MESSAGE
-                                        {
-                                            network::send(&mut connections[recipient_index].stream().lock().unwrap(), MessagePacket
-                                            {
-                                                text: Some(private_message.to_string()),
-                                                username: Some(username.clone()),
-                                                id: Some(id),
-                                                code: Some(MessageCode::PrivateMessage),
-                                                ..Default::default()
-                                            }, connections[recipient_index].shared_key());
-                                        }
-
-                                        //SEND MESSAGE BACK TO SENDER
-                                        network::send(stream, MessagePacket
-                                        {
-                                            text: Some(private_message.to_string()),
-                                            username: connections[recipient_index].username().cloned(),
-                                            id: Some(num),
-                                            code: Some(MessageCode::PrivateMessageBack),
-                                            ..Default::default()
-                                        }, shared_key.as_ref());
-
-                                        continue; //VALID, DO NOT SEND InvalidUsage CODE
-                                    }
-                                }
-                            }
+                                text: Some(private_message.to_string()),
+                                username: Some(username.clone()),
+                                id: Some(id),
+                                code: Some(MessageCode::PrivateMessage),
+                                ..Default::default()
+                            }, connections[recipient_index].shared_key());
                         }
+
+                        //SEND MESSAGE BACK TO SENDER
+                        network::send(stream, MessagePacket
+                        {
+                            text: Some(private_message.to_string()),
+                            username: connections[recipient_index].username().cloned(),
+                            id: Some(recipient_id),
+                            code: Some(MessageCode::PrivateMessageBack),
+                            ..Default::default()
+                        }, shared_key.as_ref());
+                    } else
+                    {
+                        //SEND InvalidUsage CODE IF INVALID
+                        send_code(stream, None, MessageCode::InvalidUsage, shared_key.as_ref());
                     }
 
-                    //SEND InvalidUsage CODE IF INVALID
-                    send_code(stream, None, MessageCode::InvalidUsage, shared_key.as_ref());
                     continue;
                 },
 
