@@ -62,6 +62,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         shared_key: Vec<i64>,          //SHARED KEY BETWEEN SERVER AND CLIENT (one to one)
         last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
         spam_violations: usize,        //SPAM VIOLATIONS (unexpexted, huh?)
+        channel: Option<String>,       //CHANNEL
     },
 
     NonAuthenticated
@@ -408,6 +409,7 @@ fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize) //MOVE
             shared_key: shared_key,
             last_activity: Instant::now() - Duration::from_millis(config::server_config("min_message_delay")),
             spam_violations: 0,
+            channel: None,
         };
 
         println!("Authenticate connection: {}", peer_addr.unwrap());
