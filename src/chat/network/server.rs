@@ -61,7 +61,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         id: usize,                     //ID OF USER
         shared_key: Vec<i64>,          //SHARED KEY BETWEEN SERVER AND CLIENT (one to one)
         last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
-        spam_violations: usize,        //SPAM VIOLATIONS (unexpexted, huh?)
+        spam_violations: usize,        //SPAM VIOLATIONS (unexpected, huh?)
         channel: Option<String>,       //CHANNEL
     },
 

@@ -24,7 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! - Input and key are formatted into 2D grids of 64-bit cells.
 //! - The key grid is shuffled and seeded to generate round keys.
 //! - Each round applies a nonlinear transformation to the input grids.
-//! - The transofrmation avoid traditional S-boxes, relying instead on symmetric diffusion.
+//! - The transformation avoid traditional S-boxes, relying instead on symmetric diffusion.
 //! - Round tweaks ensure variability across rounds without requiring per-round constants.
 
 //MODULES
