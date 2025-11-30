@@ -334,7 +334,16 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     //PRINT USERS
                     for user in users_json.as_array().unwrap()
                     {
-                        println!("\r{} ({})", user["username"].as_str().unwrap(), user["id"]);
+                        //GET CHANNEL
+                        let c = if let Some(c) = user["channel"].as_str().map(String::from)
+                        {
+                            format!(" | #{c}")
+                        } else
+                        {
+                            String::new()
+                        };
+
+                        println!("\r{} ({}){}", user["username"].as_str().unwrap(), user["id"], c);
                     }
 
                     println!();

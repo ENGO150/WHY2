@@ -707,9 +707,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
                     for connection_enum in connections.iter()
                     {
-                        if let Connection::Authenticated { username: uname, id: user_id, .. } = connection_enum
+                        if let Connection::Authenticated { username: uname, id: user_id, channel, .. } = connection_enum
                         {
-                            user_list.push(json!({ "username": uname, "id": user_id }));
+                            user_list.push(json!({ "username": uname, "id": user_id, "channel": channel }));
                         }
                     }
 
