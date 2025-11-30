@@ -173,6 +173,16 @@ impl Connection
         }
     }
 
+    //GET CHANNEL
+    fn channel(&self) -> &Option<String>
+    {
+        match self
+        {
+            Self::Authenticated { channel, .. } => channel,
+            Self::NonAuthenticated { .. }  => &None,
+        }
+    }
+
     //CHECK IF CONNECTION IS INACTIVE
     fn is_inactive(&self, now: Option<Instant>) -> bool
     {
@@ -260,11 +270,21 @@ fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
 {
     let connections = CONNECTIONS.read().unwrap(); //READ LOCK
 
+    //GET SENDER'S CHANNEL
+    let channel = if let Some(index) = find_connection_index(&connections, |c| c.username() == packet.username.as_ref())
+    {
+        connections[index].channel()
+    } else
+    {
+        &None
+    };
+
     //SEND TO EACH CLIENT
     for connection in connections.iter()
     {
-        if connection.is_authenticated()
+        if let Connection::Authenticated { channel: c, .. } = connection
         {
+            if c != channel { continue; } //SEND ONLY TO THE SAME CHANNEL
             network::send(&mut *connection.stream().lock().unwrap(), packet.clone(), connection.shared_key());
         }
     }
