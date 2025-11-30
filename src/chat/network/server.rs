@@ -416,6 +416,34 @@ fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize) //MOVE
     }
 }
 
+fn update_client_channel(stream: &mut TcpStream, channel: &Option<String>) //MOVE CLIENT TO CHANNEL
+{
+    let peer_addr = stream.peer_addr().ok();
+    let mut connections = CONNECTIONS.write().unwrap();
+
+    //FIND CONNECTION
+    if let Some(index) = find_connection_index(&connections, |c| c.peer_addr() == peer_addr)
+    {
+        //CLONE OLD PROPERTIES
+        let stream = connections[index].stream().clone();
+        let username = connections[index].username().unwrap().to_string();
+        let id = *connections[index].id().unwrap();
+        let shared_key = connections[index].shared_key().unwrap().to_owned();
+
+        //OVERWRITE OLD CONNECTION
+        connections[index] = Connection::Authenticated
+        {
+            stream: stream,
+            username: username,
+            id: id,
+            shared_key: shared_key,
+            last_activity: Instant::now(),
+            spam_violations: 0,
+            channel: channel.clone(),
+        };
+    }
+}
+
 fn ask_version(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) -> Option<String> //ASK CLIENT FOR VERSION
 {
     //ASK FOR VERSION
@@ -655,6 +683,20 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     return remove_connection(stream, true);
                 },
 
+                //SWITCH CHANNEL
+                MessageCode::Channel =>
+                {
+                    //CHECK PARAMETER VALIDITY
+                    if read.text.iter().all(|s| s.chars().all(|c| c.is_ascii_alphanumeric() || c != ' '))
+                    {
+                        update_client_channel(stream, &read.text);
+                    } else //INVALID CHANNEL
+                    {
+                        //SEND InvalidUsage CODE
+                        send_code(stream, None, MessageCode::InvalidUsage, shared_key.as_ref());
+                    }
+                },
+
                 //CLIENT REQUESTED LIST OF ONLINE USERS
                 MessageCode::List =>
                 {
@@ -724,12 +766,12 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         //SEND InvalidUsage CODE IF INVALID
                         send_code(stream, None, MessageCode::InvalidUsage, shared_key.as_ref());
                     }
-
-                    continue;
                 },
 
-                _ => continue
+                _ => {}
             }
+
+            continue;
         }
 
         if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
