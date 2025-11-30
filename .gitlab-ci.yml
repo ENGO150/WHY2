@@ -60,7 +60,8 @@ upload-to-aur:
     - mkdir -p ~/.ssh
     - echo "$AUR_SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
-    - echo -e "Host aur.archlinux.org\n\tStrictHostKeyChecking no\n\tUser aur\n\tIdentityFile ~/.ssh/id_ed25519" > ~/.ssh/config
+    - echo -e "aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN" >> ~/.ssh/known_hosts
+    - echo -e "Host aur.archlinux.org\n\tUser aur\n\tIdentityFile ~/.ssh/id_ed25519" > ~/.ssh/config
     - git config --global user.name "Expandera"
     - git config --global user.email "gitlab@satan.red"
     - VERSION=$(grep '^version =' Cargo.toml | sed -E 's/version = "(.*)-rex"/\1/')
