@@ -41,3 +41,6 @@ spam_protection = true # Spam protection
 max_packet_size = 1024 # Maximal message length
 min_message_delay = 750 # Minimal ms delay between user messages (to prevent spamming)
 max_message_delay_violations = 3 # Maximal 'spam' messages that can be sent without getting disconnected
+
+# Channel
+max_channel_length = 20 # Maximal length of channel name

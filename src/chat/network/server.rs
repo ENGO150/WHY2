@@ -687,7 +687,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::Channel =>
                 {
                     //CHECK PARAMETER VALIDITY
-                    if read.text.iter().all(|s| s.chars().all(|c| c.is_ascii_alphanumeric() || c != ' '))
+                    if read.text.iter().all(|s| s.len() <= config::server_config("max_channel_length") && s.chars().all(|c| c.is_ascii_alphanumeric() || c != ' '))
                     {
                         update_client_channel(stream, &read.text);
                         send_code(stream, read.text, MessageCode::Channel, shared_key.as_ref());
