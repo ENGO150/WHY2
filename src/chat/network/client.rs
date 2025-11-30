@@ -163,6 +163,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut first_message = true;
     let mut extra_space: bool;
 
+    let mut channel = String::new();
+
     //LOOP READING
     loop
     {
@@ -304,6 +306,20 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("[{}]: {} disconnected.\n", read.username.unwrap(), read.text.unwrap());
                 },
 
+                //CHANNEL CHANGE
+                MessageCode::Channel =>
+                {
+                    channel = if let Some(c) = read.text
+                    {
+                        format!("#{c} | ")
+                    } else
+                    {
+                        String::new()
+                    };
+
+                    misc::clear_lines(1);
+                },
+
                 //LIST OF ONLINE USERS
                 MessageCode::List =>
                 {
@@ -386,7 +402,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
         }
 
         //PRINT INPUT PROMPT
-        print!("\r>>> {}", options::INPUT_READ.lock().unwrap().iter().collect::<String>());
+        print!("\r{}>>> {}", channel, options::INPUT_READ.lock().unwrap().iter().collect::<String>());
         io::stdout().flush().unwrap();
         if !extra_space { options::set_extra_space(false); } //DISABLE EXTRA SPACE
     }

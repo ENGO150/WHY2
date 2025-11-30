@@ -80,8 +80,8 @@ pub enum MessageCode //CONTROL CODES
     SpamWarning,        //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN
     RegisterDisabled,   //SERVER -> CLIENT | REGISTRATION IS DISABLED
     Version,            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
+    Channel,            //SERVER <> CLIENT | CHANNEL CHANGE
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
-    Channel,            //CLIENT -> SERVER | CLIENTS WANTS TO SWITCH CHANNEL
 }
 
 #[derive(Clone)]

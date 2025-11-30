@@ -690,6 +690,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     if read.text.iter().all(|s| s.chars().all(|c| c.is_ascii_alphanumeric() || c != ' '))
                     {
                         update_client_channel(stream, &read.text);
+                        send_code(stream, read.text, MessageCode::Channel, shared_key.as_ref());
                     } else //INVALID CHANNEL
                     {
                         //SEND InvalidUsage CODE
