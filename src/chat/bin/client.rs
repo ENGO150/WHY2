@@ -246,7 +246,7 @@ fn read_input() -> String
                         //REPLACE CURRENT INPUT
                         input = new_input.chars().collect(); //LOCAL VARIABLE
                         *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
-                        cursor_position = new_input.len(); //CURSOR
+                        cursor_position = input.len(); //CURSOR
 
                         print!("{}", new_input); //PRINT
                     },
@@ -279,7 +279,7 @@ fn read_input() -> String
                         //REPLACE CURRENT INPUT
                         input = new_input.chars().collect(); //LOCAL VARIABLE
                         *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
-                        cursor_position = new_input.len(); //CURSOR
+                        cursor_position = input.len(); //CURSOR
 
                         print!("{}", new_input); //PRINT
                     },
