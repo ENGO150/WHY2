@@ -443,6 +443,95 @@ impl<const W: usize, const H: usize> Grid<W, H>
             self.mix_columns_handler(col); //USE HANDLER
         }
     }
+
+    /// Applies a matrix-based linear transformation to mix rows.
+    ///
+    /// This function treats the Grid as a matrix and multiplies it by a key-dependent transformation
+    /// matrix. To ensure the operation is reversible (invertible) in modular arithmetic, the transformation
+    /// is constructed as a product of a Lower triangular matrix (L) and an Upper triangular matrix (U).
+    ///
+    /// This introduces strong vertical diffusion, ensuring that every row influences every other row.
+    ///
+    /// # Parameters
+    /// - `key_grid`: A reference to the key Grid used to derive scalar weights for mixing.
+    ///
+    /// # Behavior
+    /// - **Lower Pass (Downward):** Each row adds a multiple of previous rows (from top to bottom).
+    /// - **Upper Pass (Upward):** Each row adds a multiple of following rows (from bottom to top).
+    ///
+    /// # Notes
+    /// - This method mutates the Grid in-place.
+    /// - All additions and multiplications are wrapping (modulo 2^64).
+    pub fn mix_matrix(&mut self, key_grid: &Grid<W, H>)
+    {
+        //LOWER TRIANGULAR PASS (TOP -> DOWN)
+        for i in 1..self.height()
+        {
+            for j in 0..i
+            {
+                let scalar = key_grid[i][j]; //USE KEY VALUE AS COEFFICIENT
+
+                //Row[i] = Row[i] + (Row[j] * scalar)
+                for col in 0..self.width()
+                {
+                    let val_j = self[j][col];
+                    self[i][col] = self[i][col].wrapping_add(val_j.wrapping_mul(scalar));
+                }
+            }
+        }
+
+        //UPPER TRIANGULAR PASS (BOTTOM -> UP)
+        for i in (0..self.height() - 1).rev()
+        {
+            for j in (i + 1)..self.height()
+            {
+                let scalar = key_grid[i][j];
+
+                //Row[i] = Row[i] + (Row[j] * scalar)
+                for col in 0..self.width()
+                {
+                    let val_j = self[j][col];
+                    self[i][col] = self[i][col].wrapping_add(val_j.wrapping_mul(scalar));
+                }
+            }
+        }
+    }
+
+    /// Inverts transformation done by [`matrix_mix`](Grid::matrix_mix) method
+    pub fn inv_mix_matrix(&mut self, key_grid: &Grid<W, H>)
+    {
+        //REVERSED UPPER TRIANGULAR PASS
+        for i in 0..(self.height() - 1)
+        {
+            for j in (i + 1)..self.height()
+            {
+                let scalar = key_grid[i][j];
+
+                //Row[i] = Row[i] - (Row[j] * scalar)
+                for col in 0..self.width()
+                {
+                    let val_j = self[j][col];
+                    self[i][col] = self[i][col].wrapping_sub(val_j.wrapping_mul(scalar));
+                }
+            }
+        }
+
+        //REVERSED LOWER TRIANGULAR PASS
+        for i in (1..self.height()).rev()
+        {
+            for j in 0..i
+            {
+                let scalar = key_grid[i][j];
+
+                //Row[i] = Row[i] - (Row[j] * scalar)
+                for col in 0..self.width()
+                {
+                    let val_j = self[j][col];
+                    self[i][col] = self[i][col].wrapping_sub(val_j.wrapping_mul(scalar));
+                }
+            }
+        }
+    }
 }
 
 //INTO ITERATOR
