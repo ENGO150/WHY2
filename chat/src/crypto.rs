@@ -47,11 +47,8 @@ use rand::SeedableRng;
 
 use sha2::{ Sha256, Digest };
 
-use crate::
-{
-    core::rex::crypto,
-    chat::{ misc, options },
-};
+use why2_core::rex::crypto;
+use crate::chat::{ misc, options };
 
 pub fn generate_ephemeral_keys() -> (String, String) //CREATE ECC KEYS
 {

@@ -22,7 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! and decryption pipeline. It includes round configuration constants, mixing parameters, and
 //! the input/output formats for both encryption and decryption.
 
-use crate::core::rex::Grid;
+use crate::rex::Grid;
 
 /// Number of round keys used in the WHY2 cipher.
 ///

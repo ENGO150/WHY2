@@ -22,7 +22,7 @@ use sha2::{ Sha256, Digest };
 
 use rand::distr::{ Alphanumeric, SampleString };
 
-use crate::core::options::{ self, Version };
+use crate::options::{ self, Version };
 
 pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 {

@@ -16,58 +16,35 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#![allow(deprecated)]
-
 use std::
 {
     time::Instant,
     io::{ self, Write },
 };
 
-use why2::core::
+use why2_core::rex::
 {
-    crypto,
     encrypter,
     decrypter,
-    options::{ self, Options },
 };
 
 use crate::core as test_core;
 
-//TEST XOR IN ENCRYPTION
-fn encryption_operation(x: i64, y: i64) -> i64
-{
-    x ^ y
-}
-
+//FUNCTIONS
 #[test]
-fn encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
+fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
 {
-    //OPTIONS
-    options::set_core_options
-    (
-        Options
-        {
-            key_length: 100, //USE 2x LARGER KEY
-            padding: crypto::recommended_padding_rate(test_core::TEST_TEXT.len()), //USE RECOMMENDED PADDING
-            encryption_operation: encryption_operation, //USE XOR FOR ENCRYPTING
-            ..Options::default() //DEFAULT OTHER SETTINGS
-        }
-    );
-
     //START MEASURING
     let measure_start = Instant::now();
 
     //ENCRYPT & DECRYPT
-    let encrypted = encrypter::encrypt_text(test_core::TEST_TEXT, None).expect("Encryption failed");
-    let decrypted = decrypter::decrypt_text(encrypted);
+    let encrypted = encrypter::encrypt_string::<11, 7>(&test_core::TEST_TEXT.to_owned(), None).expect("Encryption failed");
+    let key = encrypted.key.clone();
+    let encrypter_measure = measure_start.elapsed();
+    let decrypted_string = decrypter::decrypt_string(encrypted).expect("Decryption failed");
 
     //STOP MEASURING
     let measure_stop = measure_start.elapsed();
-
-    //OUTPUT VARIABLES
-    let decrypted_text = decrypted.output;
-    let key = decrypted.key;
 
     //VARIABLES FOR PRINT
     let mut stream: Box<dyn Write>;
@@ -75,7 +52,7 @@ fn encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
     let returning: Result<(), Box<dyn std::error::Error>>;
 
     //GET VALUES BASED ON RESULT
-    if test_core::TEST_TEXT == decrypted_text
+    if test_core::TEST_TEXT == decrypted_string
     {
         stream = Box::new(io::stdout());
         status = "successful";
@@ -93,11 +70,11 @@ fn encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
 
         "Test {status}!\n
 TEXT: \t\t\"{}\"
-OUTPUT: \t\"{decrypted_text}\"
-KEY: \t\t\"{key}\"
-TIME: \t\t{}ms",
+OUTPUT: \t\"{decrypted_string}\"
+KEY: \t\t\n{}
+TIME: \t\t{}ms ({}ms to encrypt)",
 
-        test_core::TEST_TEXT, measure_stop.as_millis()
+        test_core::TEST_TEXT, key, measure_stop.as_millis(), encrypter_measure.as_millis()
     ).unwrap();
 
     returning

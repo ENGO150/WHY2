@@ -39,17 +39,15 @@ use serde::{ Deserialize, Deserializer, Serialize, Serializer };
 
 use colored::Color;
 
-use crate::
+use why2_core::rex::
 {
-    chat::options as rex_options,
-    core::rex::
-    {
-        encrypter,
-        decrypter,
-        options,
-        Grid,
-    },
+    encrypter,
+    decrypter,
+    options,
+    Grid,
 };
+
+use crate::chat::options as rex_options;
 
 #[cfg(feature = "server")]
 use std::

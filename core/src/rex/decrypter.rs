@@ -39,7 +39,7 @@ use rand::
 
 use rand_chacha::ChaCha20Rng;
 
-use crate::core::rex::
+use crate::rex::
 {
     crypto,
     Grid,

@@ -32,7 +32,7 @@ use rand::
 
 use rand_chacha::ChaCha20Rng;
 
-use crate::core::rex::{ options, Grid };
+use crate::rex::{ options, Grid };
 
 /// Computes a SHA-256 hash of the Grid contents to produce a deterministic seed.
 ///
