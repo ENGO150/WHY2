@@ -34,6 +34,7 @@ fn main()
 
     // Decrypt
     let decrypted = decrypter::decrypt_string(encrypted);
+                        .expect("Decryption failed");
 
     // Compare input & output
     assert_eq!(input, decrypted);
