@@ -108,6 +108,13 @@ fn read_input() -> String
             {
                 match key_event.code
                 {
+                    //CTRL+L (LIST)
+                    KeyCode::Char('l') =>
+                    {
+                        misc::clear_lines(1);
+                        return Command::List.to_string();
+                    },
+
                     //CTRL+C (EXIT)
                     KeyCode::Char('c') =>
                     {
