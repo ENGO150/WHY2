@@ -98,7 +98,7 @@ pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
         for version in versions
         {
             //FOUND NEWER VERSION
-            if Version::parse(version.get("num").and_then(|n| n.as_str()).expect("")).expect("") > current_version
+            if Version::parse(version.get("num").and_then(|n| n.as_str()).unwrap()).unwrap() > current_version
             {
                 //INCREMENT COUNTER
                 newer_versions += 1;
