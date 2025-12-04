@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! # REX Crypto
 //!
-//! This module contains cryptograhic utilities, used by REX module
+//! This module contains cryptographic utilities, used by REX module
 
 use sha2::{ Sha256, Digest };
 
