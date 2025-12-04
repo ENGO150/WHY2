@@ -16,9 +16,5 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//CONSTS
-const TEST_TEXT: &str = "aAzZ(    )!?#\\/śŠ <3|420*;㍿㊓ㅅΔ♛👶🏿"; //TEST TEXT FOR ENCRYPTION
-
 //MODULES
-pub mod rex;
-pub mod encryption_test;
+pub mod rex_encryption_test;
