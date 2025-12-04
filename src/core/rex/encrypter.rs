@@ -141,10 +141,14 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     //GENERATE ROUND KEYS
     let round_keys = crypto::generate_round_keys(&key_grid)?;
 
+    //PREVIOUS GRID STATE (FOR CBC)
+    let mut previous_grid = Grid::<W, H>::new().unwrap();
+
     //APPLY ENCRYPTION TO EACH GRID
     for mut grid in &mut grids
     {
         //INITIAL XOR
+        grid ^= &previous_grid; //CIPHER BLOCK CHAINING (CBC)
         grid ^= &round_keys[0];
 
         //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
@@ -156,6 +160,9 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
             grid.mix_columns();                   //MIX COLUMNS
             grid.mix_matrix(round_key); //MIX MATRIX
         }
+
+        //SAVE CURRENT GRID STATE
+        previous_grid = grid.clone();
     }
 
     //RETURN OUTPUT

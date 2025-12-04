@@ -42,6 +42,7 @@ use rand_chacha::ChaCha20Rng;
 use crate::core::rex::
 {
     crypto,
+    Grid,
     options::{ EncryptedData, DecryptedData },
 };
 
@@ -75,9 +76,15 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     //GENERATE ROUND KEYS
     let round_keys = crypto::generate_round_keys(&key_grid)?;
 
+    //PREVIOUS GRID STATE (FOR CBC)
+    let mut previous_grid = Grid::<W, H>::new().unwrap();
+
     //DECRYPT EACH ENCRYPTED GRID
     for mut grid in &mut grids
     {
+        //SAVE CURRENT GRID STATE
+        let current_grid = grid.clone();
+
         //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
         for (i, round_key) in round_keys[1..].iter().enumerate().rev()
         {
@@ -90,6 +97,10 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 
         //INITIAL XOR
         grid ^= &round_keys[0];
+        grid ^= &previous_grid; //CIPHER BLOCK CHAINING (CBC)
+
+        //SAVE CURRENT (TECHNICALLY PREVIOUS) GRID STATE
+        previous_grid = current_grid;
     }
 
     //DE-SHUFFLING VARIABLES
