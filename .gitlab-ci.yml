@@ -40,8 +40,8 @@ build-why2-chat-linux:
     - job: test-why2-core
   script:
     - echo "Build WHY2 Chat for Linux"
-    - cargo build --features client --release
-    - cargo build --features server --release
+    - cargo build --release
+    - cargo build --bin why2-server --no-default-features --features server --release
   artifacts:
     name: "why2-chat-linux"
     paths:
