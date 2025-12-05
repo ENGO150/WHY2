@@ -21,15 +21,15 @@ stages:
   - build
   - aur
 
-# Test core
-test-why2-core:
+# Test WHY2
+test-why2:
   stage: test
   image: rust:latest
   only:
     - development
   script:
-    - echo "Test WHY2 Core"
-    - cargo test -p why2-tests --all --verbose
+    - echo "Test WHY2"
+    - cargo test --all --verbose
 
 # Build chat for linux
 build-why2-chat-linux:
@@ -37,7 +37,7 @@ build-why2-chat-linux:
   only:
     - development
   needs:
-    - job: test-why2-core
+    - job: test-why2
   script:
     - echo "Build WHY2 Chat for Linux"
     - cargo build --release

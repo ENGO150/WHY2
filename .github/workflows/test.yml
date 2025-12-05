@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-name: Test WHY2 Core
+name: Test WHY2
 
 on:
   push:
@@ -42,4 +42,4 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Run tests
-        run: cargo test -p why2-tests --all --verbose
+        run: cargo test --all --verbose
