@@ -21,9 +21,9 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Core encryption library for WHY2."
+description.workspace = true
 keywords.workspace = true
-categories = ["cryptography"]
+categories.workspace = true
 
 [dependencies]
 rand = { workspace = true }

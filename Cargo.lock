@@ -2011,6 +2011,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "why2-tests"
+version = "0.2.9-rex"
+dependencies = [
+ "rand",
+ "rand_chacha",
+ "sha2",
+ "why2-core",
+]
+
+[[package]]
 name = "winapi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
