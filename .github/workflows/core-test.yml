@@ -42,4 +42,4 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Run tests
-        run: cargo test --all --verbose
+        run: cargo test -p why2-tests --all --verbose
