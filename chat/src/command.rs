@@ -89,7 +89,7 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
     let no_prefix = &input[COMMAND_PREFIX.len()..]; //EXTRACT COMMAND WITHOUT PREFIX (IN UPPERCASE)
     let (command, parameters) = match no_prefix.split_once(' ') //EXTRACT POSSIBLE PARAMETERS
     {
-        Some((command, parameters)) => (command.to_ascii_uppercase(), Some(parameters.to_string())),
+        Some((command, parameters)) => (command.to_ascii_uppercase(), Some(parameters.trim().to_string())),
         None => (no_prefix.to_ascii_uppercase(), None)
     };
 
