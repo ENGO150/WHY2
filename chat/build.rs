@@ -18,6 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 fn main()
 {
+    //DO NOT USE WHY2_DEV_BYPASS IN PRODUCTION!!!
+    if std::env::var("WHY2_DEV_BYPASS").is_ok() { return; }
+
     //ENSURE CORRECT FEATURE USAGE
     let client_feature = std::env::var("CARGO_FEATURE_CLIENT").is_ok();
     let server_feature = std::env::var("CARGO_FEATURE_SERVER").is_ok();
