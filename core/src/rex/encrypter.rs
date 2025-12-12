@@ -31,14 +31,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! 3. **Deterministic Shuffling**: Each Grid is shuffled using a PRNG seeded from the key hash.
 //! 4. **Round-Based Mixing**: Each Grid undergoes XOR, subcell diffusion, row shifting, and column mixing.
 
-use std::iter;
-
 use rand::
 {
     SeedableRng,
     prelude::SliceRandom,
 };
 
+use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 
 use crate::rex::
@@ -101,10 +100,17 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     //GET MUTABLE input
     let mut input_used = input;
 
-    //PAD input_used TO MULTIPLE OF 64 (ADD EXTRA GRID IF FULL) [PKCS#7]
+    //PAD input_used TO MULTIPLE OF 64 (ADD EXTRA GRID IF FULL) [ISO 10126]
     let remainder = input_used.len() % grid_area; //PADDING CHARS REMAINING TO FULL GRID
     let padding_len = if remainder == 0 { grid_area } else { grid_area - remainder }; //HOW MUCH PADDING TO INSERT
-    input_used.extend(iter::repeat(padding_len as i64).take(padding_len));
+
+    //FILL PADDING
+    let mut rng = rand::rng();
+    for _ in 0..(padding_len - 1)
+    {
+        input_used.push(rng.random::<i64>());
+    }
+    input_used.push(padding_len as i64);
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
     let mut grids: Vec<Grid<W, H>> = input_used.chunks(grid_area).map(|chunk| -> Result<Grid<W, H>, String>
