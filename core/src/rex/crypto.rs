@@ -143,3 +143,22 @@ pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, 
 
     Ok(keys)
 }
+
+/// Generates a random initialization vector for CBC mode.
+///
+/// This creates a single Grid filled with cryptographically secure random values
+/// using system entropy. The IV should be unique for each encryption session.
+///
+/// # Returns
+/// A Grid suitable for use as a CBC initialization vector.
+///
+/// # Errors
+/// Returns an error if the Grid dimensions are invalid (should never happen in practice).
+///
+/// # Notes
+/// - The IV does not need to be secret, but must be unpredictable and unique per message.
+/// - The IV will be transmitted alongside the ciphertext.
+pub fn generate_iv<const W: usize, const H: usize>() -> Result<Grid<W, H>, String>
+{
+    Grid::from_key(generate_key::<W, H>())
+}

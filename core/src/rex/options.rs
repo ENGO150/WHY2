@@ -53,20 +53,23 @@ pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
 //STRUCTS
 /// Container for encrypted output.
 ///
-/// This struct holds the encrypted Grid chunks and the key Grid used during encryption.
+/// This struct holds the encrypted Grid chunks, the key Grid and the IV used during encryption.
 /// It is returned by [`encrypt`](crate::core::rex::encrypter::encrypt) and consumed by
 /// [`decrypt`](crate::core::rex::decrypter::decrypt) to reverse the transformation.
 ///
 /// # Fields
 /// - `output`: A vector of encrypted `Grid<W, H>` chunks.
 /// - `key`: The key Grid used for encryption and required for decryption.
+/// - `iv`: The initialization vector used for CBC.
 ///
 /// # Notes
 /// - The key is stored in Grid form for direct use in round key generation.
+/// - The IV does not need to be kept secret but must be unique per encryption.
 pub struct EncryptedData<const W: usize, const H: usize> //DATA FOR REX ENCRYPTER
 {
     pub output: Vec<Grid<W, H>>, //OUTPUT VALUE
     pub key: Grid<W, H>,         //KEY USED FOR ENCRYPTION
+    pub iv: Grid<W, H>,          //INITIALIZATION VECTOR
 }
 
 /// Container for decrypted output.

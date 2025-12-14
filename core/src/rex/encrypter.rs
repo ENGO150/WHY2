@@ -148,7 +148,8 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     let round_keys = crypto::generate_round_keys(&key_grid)?;
 
     //PREVIOUS GRID STATE (FOR CBC)
-    let mut previous_grid = Grid::<W, H>::new().unwrap();
+    let iv = crypto::generate_iv()?; //INITIALIZATION VECTOR
+    let mut previous_grid = iv.clone();
 
     //APPLY ENCRYPTION TO EACH GRID
     for mut grid in &mut grids
@@ -176,6 +177,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     {
         output: grids,
         key: key_grid,
+        iv: iv,
     })
 }
 

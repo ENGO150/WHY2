@@ -183,10 +183,14 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
     if let Some(key) = key
     {
         //ENCRYPT
-        let encrypted_packet = encrypter::encrypt_string::<GRID_W, GRID_H>(&encoded_packet_string, Some(key.to_vec())).expect("Encrypting packet failed").output;
+        let encrypted_data = encrypter::encrypt_string::<GRID_W, GRID_H>(&encoded_packet_string, Some(key.to_vec())).expect("Encrypting packet failed");
+
+        //SERIALIZE ENCRYPTED PACKET
+        let mut grids = encrypted_data.output;
+        grids.insert(0, encrypted_data.iv); //INITIALIZATION VECTOR
 
         //CONVERT ENCRYPTED PACKET (FROM Vec<Grid>) TO Vec<u8>
-        let encrypted_packet_flattened: Vec<u8> = encrypted_packet.iter()
+        let encrypted_packet_flattened: Vec<u8> = grids.iter()
             .flat_map(|grid| grid.iter()
                 .flat_map(|row| row.iter()
                     .flat_map(|&val| val.to_be_bytes()))).collect();
@@ -292,11 +296,18 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     //DECRYPT
     if let Some(key) = key
     {
+        //DESERIALIZE ENCRYPTED PACKET
+        let mut grids = Grid::<GRID_W, GRID_H>::from_bytes(decoded_packet).ok()?;
+
+        //EXTRACT INITIALIZATION VECTOR
+        let iv = grids.remove(0);
+
         //DECRYPT
         let decrypted_packet = decrypter::decrypt_string(options::EncryptedData
         {
-            output: Grid::<GRID_W, GRID_H>::from_bytes(decoded_packet).ok()?, //CONVERT decoded_packet FROM Vec<u8> TO Vec<Grid>
+            output: grids,
             key: Grid::from_key(key.to_vec()).unwrap(),
+            iv: iv,
         }).unwrap();
 
         //OVERWRITE decoded_packet

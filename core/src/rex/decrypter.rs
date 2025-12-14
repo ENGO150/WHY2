@@ -42,7 +42,6 @@ use rand_chacha::ChaCha20Rng;
 use crate::rex::
 {
     crypto,
-    Grid,
     options::{ EncryptedData, DecryptedData },
 };
 
@@ -77,7 +76,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     let round_keys = crypto::generate_round_keys(&key_grid)?;
 
     //PREVIOUS GRID STATE (FOR CBC)
-    let mut previous_grid = Grid::<W, H>::new()?;
+    let mut previous_grid = input.iv;
 
     //DECRYPT EACH ENCRYPTED GRID
     for mut grid in &mut grids
