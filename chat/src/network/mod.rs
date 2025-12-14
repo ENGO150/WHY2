@@ -176,31 +176,43 @@ impl<'de> Deserialize<'de> for SerColor
 pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>>) //SEND packet TO stream
 {
     //ENCODE THE PACKET STRUCT TO Vec<u8>
-    let encoded_packet = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
-    let mut encoded_packet_string = String::from_utf8(base91::slice_encode(&encoded_packet)).expect("Encoding packet failed"); //ENCODE TO BASE91 STRING
+    let packet_bytes = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
+    let final_bytes: Vec<u8>;
 
     //ENCRYPT
     if let Some(key) = key
     {
+        //CONVERT packet_bytes to BINARY
+        let mut input_i64 = Vec::with_capacity((packet_bytes.len() + 7) / 8);
+        for chunk in packet_bytes.chunks(8)
+        {
+            let mut buf = [0u8; 8];
+            buf[..chunk.len()].copy_from_slice(chunk);
+            input_i64.push(i64::from_be_bytes(buf));
+        }
+
         //ENCRYPT
-        let encrypted_data = encrypter::encrypt_string::<GRID_W, GRID_H>(&encoded_packet_string, Some(key.to_vec())).expect("Encrypting packet failed");
+        let encrypted_data = encrypter::encrypt::<GRID_W, GRID_H>(input_i64, Some(key.to_vec())).expect("Encrypting packet failed");
 
         //SERIALIZE ENCRYPTED PACKET
         let mut grids = encrypted_data.output;
         grids.insert(0, encrypted_data.iv); //INITIALIZATION VECTOR
 
         //CONVERT ENCRYPTED PACKET (FROM Vec<Grid>) TO Vec<u8>
-        let encrypted_packet_flattened: Vec<u8> = grids.iter()
+        final_bytes = grids.iter()
             .flat_map(|grid| grid.iter()
                 .flat_map(|row| row.iter()
                     .flat_map(|&val| val.to_be_bytes()))).collect();
-
-        //OVERWRITE encoded_packet_string
-        encoded_packet_string = String::from_utf8(base91::slice_encode(&encrypted_packet_flattened)).expect("Encoding encrypted packet failed");
+    } else
+    {
+        final_bytes = packet_bytes; //NO ENCRYPTION
     }
 
+    //ENCODE ENCRYPTED OUTPUT TO BASE91
+    let encoded_string = String::from_utf8(base91::slice_encode(&final_bytes)).expect("Encoding packet failed");
+
     //SEND
-    stream.write_all((encoded_packet_string + "\n").as_bytes()).expect("Sending packet failed");
+    stream.write_all((encoded_string + "\n").as_bytes()).expect("Sending packet failed");
     stream.flush().expect("Flushing stream failed");
 }
 
@@ -303,7 +315,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         let iv = grids.remove(0);
 
         //DECRYPT
-        let decrypted_packet = decrypter::decrypt_string(options::EncryptedData
+        let decrypted_packet = decrypter::decrypt(options::EncryptedData
         {
             output: grids,
             key: Grid::from_key(key.to_vec()).unwrap(),
@@ -311,7 +323,11 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         }).unwrap();
 
         //OVERWRITE decoded_packet
-        decoded_packet = base91::slice_decode(decrypted_packet.as_bytes());
+        decoded_packet = Vec::with_capacity(decrypted_packet.output.len() * 8);
+        for val in decrypted_packet.output
+        {
+            decoded_packet.extend_from_slice(&val.to_be_bytes());
+        }
     }
 
     //ACTIVITY TIMER ON SERVER
