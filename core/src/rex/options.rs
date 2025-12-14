@@ -38,8 +38,7 @@ pub const ROUND_KEYS: usize = 14;
 /// increase diffusion and resistance to pattern leakage.
 ///
 /// Changing this affects the cipher’s nonlinear behavior.
-pub const SUBCELL_ROUNDS: u32 = 6;
-
+pub const SUBCELL_ROUNDS: u32 = 32;
 
 /// Constant used to break symmetry in ARX mixing.
 ///
