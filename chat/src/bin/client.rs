@@ -63,11 +63,32 @@ use why2::chat::
     },
 };
 
+//STRUCTS
+struct RawModeGuard;
+
 //GLOBAL VARIABLES
 static INPUT_HISTORY: LazyLock<Arc<Mutex<(Vec<String>, usize)>>> = LazyLock::new(|| //INPUTS READ FROM CLIENT
 {
     Arc::new(Mutex::new((Vec::new(), 0)))
 });
+
+//IMPLEMENTATIONS
+impl RawModeGuard
+{
+    fn enable() -> Result<Self, std::io::Error> //ENABLES RAW MODE AND RETURNS A GUARD THAT WILL DISABLE IT ON DROP
+    {
+        terminal::enable_raw_mode()?;
+        Ok(RawModeGuard)
+    }
+}
+
+impl Drop for RawModeGuard
+{
+    fn drop(&mut self)
+    {
+        let _ = terminal::disable_raw_mode(); //IGNORE ERRORS
+    }
+}
 
 //HANDLER FNS
 fn redraw_removed(input: &Vec<char>, cursor_position: usize) //REDRAW TEXT AFTER CURSOR
@@ -437,7 +458,7 @@ fn main()
     thread::spawn(move || client::listen_server(&mut stream));
 
     //ENABLE RAW MODE
-    terminal::enable_raw_mode().unwrap();
+    let _raw_mode_guard = RawModeGuard::enable().unwrap();
 
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
