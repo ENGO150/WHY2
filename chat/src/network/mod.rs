@@ -320,7 +320,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
             output: grids,
             key: Grid::from_key(key.to_vec()).unwrap(),
             iv: iv,
-        }).unwrap();
+        }).ok()?;
 
         //OVERWRITE decoded_packet
         decoded_packet = Vec::with_capacity(decrypted_packet.output.len() * 8);
