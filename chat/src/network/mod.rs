@@ -234,10 +234,13 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     #[cfg(feature = "server")]
     {
         //CHECK IF CLIENT IS AUTHENTICATED
-        let client_addr = stream.peer_addr().ok();
+        let client_addr = stream.peer_addr().ok()?;
         let authenticated = server::CONNECTIONS.iter().any(|conn|
         {
-            conn.stream().lock().unwrap().peer_addr().ok() == client_addr && conn.is_authenticated()
+            conn.stream().lock().ok()
+                .and_then(|s| s.peer_addr().ok())
+                .map(|addr | addr == client_addr && conn.is_authenticated())
+                .unwrap_or(false)
         });
 
         reader = Box::new(BufReader::new(stream.try_clone().expect("Cloning stream failed")));
@@ -254,6 +257,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
             max
         };
     }
+
     #[cfg(not(feature = "server"))]
     {
         reader = Box::new(BufReader::new(&mut *stream));
