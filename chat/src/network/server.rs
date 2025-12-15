@@ -336,7 +336,7 @@ fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CON
 {
     CONNECTIONS.iter().any(|conn|
     {
-        conn.username() == Some(&username.to_string())
+        conn.username().map_or(false, |u| u == &username.to_string())
     })
 }
 
