@@ -88,6 +88,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
         for (i, round_key) in round_keys[1..].iter().enumerate().rev()
         {
             grid.inv_mix_matrix(round_key); //UNMIX MATRIX
+            grid.inv_mix_diagonals();                 //UNMIX DIAGONALS
             grid.inv_mix_columns();                   //UNMIX COLUMNS
             grid.inv_shift_rows(round_key); //UNSHIFT ROWS
             grid.inv_subcell(i);               //INVERT SUBCELL

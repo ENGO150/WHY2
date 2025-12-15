@@ -258,6 +258,53 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
+    fn mix_diagonals_handler(&mut self, row: usize, col: usize) //MIX DIAGONALS IN GRID
+    {
+        //COPY PARAMETERS AS MUTABLE
+        let mut row = row;
+        let mut col = col;
+
+        //WALK ALONG THIS DIAGONAL
+        while row < self.height() - 1 && col < self.width() - 1
+        {
+            let next_row = row + 1;
+            let next_col = col + 1;
+
+            //XOR CURRENT CELL WITH NEXT DIAGONAL CELL
+            self[row][col] ^= self[next_row][next_col];
+
+            row = next_row;
+            col = next_col;
+        }
+    }
+
+    fn inv_mix_diagonals_handler(&mut self, row: usize, col: usize) //UNMIX DIAGONALS IN GRID
+    {
+        //COPY PARAMETERS AS MUTABLE
+        let mut row = row;
+        let mut col = col;
+
+        //FIND THE END OF THIS DIAGONAL
+        let mut diagonal_cells = Vec::new();
+        while row < self.height() - 1 && col < self.width() - 1
+        {
+            diagonal_cells.push((row, col));
+            row += 1;
+            col += 1;
+        }
+
+        //PROCESS IN REVERSE ORDER
+        for i in (0..diagonal_cells.len()).rev()
+        {
+            let (r, c) = diagonal_cells[i];
+            let next_row = r + 1;
+            let next_col = c + 1;
+
+            //APPLY THE SAME XOR TRANSFORMATION
+            self[r][c] ^= self[next_row][next_col];
+        }
+    }
+
     //PUBLIC
     /// Computes the cell-wise XOR of two Grids.
     ///
@@ -530,6 +577,58 @@ impl<const W: usize, const H: usize> Grid<W, H>
                     self[i][col] = self[i][col].wrapping_sub(val_j.wrapping_mul(scalar));
                 }
             }
+        }
+    }
+
+    /// Applies diagonal-wise mixing to the grid using XOR diffusion.
+    ///
+    /// This transformation modifies each diagonal line by XORing each element with
+    /// the next element along that diagonal. A diagonal is defined as a line of cells
+    /// where the difference between row and column indices remains constant.
+    ///
+    /// The mixing proceeds from top-left to bottom-right along each diagonal line,
+    /// ensuring that changes propagate through the entire grid structure.
+    ///
+    /// For decryption, use [`inv_mix_diagonals`](Grid::inv_mix_diagonals).
+    ///
+    /// # Behavior
+    /// - Processes all diagonals parallel to the main diagonal (top-left to bottom-right)
+    /// - For each cell on a diagonal, compute:
+    ///   `grid[row][col] ^= grid[next_row][next_col]`
+    /// - The last cell in each diagonal remains unchanged (no next element to XOR with)
+    ///
+    /// # Notes
+    /// - This method mutates the grid in-place
+    /// - Provides diffusion complementary to row and column mixing
+    /// - The operation is reversible when applied in reverse order
+    pub fn mix_diagonals(&mut self)
+    {
+        //PROCESS DIAGONALS BEGINNING IN THE FIRST COLUMN
+        for start_row in 0..self.height()
+        {
+            self.mix_diagonals_handler(start_row, 0);
+        }
+
+        //PROCESS DIAGONALS STARTING FROM THE FIRST ROW (EXCLUDING [0,0])
+        for start_col in 1..self.width()
+        {
+            self.mix_diagonals_handler(0, start_col);
+        }
+    }
+
+    /// Inverts transformation done by [`mix_diagonals`](Grid::mix_diagonals) method.
+    pub fn inv_mix_diagonals(&mut self)
+    {
+        //PROCESS DIAGONALS STARTING FROM THE FIRST ROW (EXCLUDING [0,0])
+        for start_col in (1..self.width()).rev()
+        {
+            self.inv_mix_diagonals_handler(0, start_col);
+        }
+
+        //PROCESS DIAGONALS BEGINNING IN THE FIRST COLUMN
+        for start_row in (0..self.height()).rev()
+        {
+            self.inv_mix_diagonals_handler(start_row, 0);
         }
     }
 }

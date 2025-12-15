@@ -165,6 +165,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
             grid.subcell(i);               //SUBCELL
             grid.shift_rows(round_key); //SHIFT ROWS
             grid.mix_columns();                   //MIX COLUMNS
+            grid.mix_diagonals();                 //MIX DIAGONALS
             grid.mix_matrix(round_key); //MIX MATRIX
         }
 
