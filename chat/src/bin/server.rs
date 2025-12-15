@@ -63,7 +63,7 @@ fn main()
                 Ok(mut stream) =>
                 {
                     //CHECK FOR MAXIMAL CONNECTIONS
-                    if server::CONNECTIONS.read().unwrap().len() >= config::server_config::<usize>("max_clients")
+                    if server::CONNECTIONS.len() >= config::server_config::<usize>("max_clients")
                     {
                         eprintln!
                         (

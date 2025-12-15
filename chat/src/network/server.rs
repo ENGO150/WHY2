@@ -26,11 +26,12 @@ use std::
         LazyLock,
         Arc,
         Mutex,
-        RwLock,
     },
 };
 
 use serde_json::json;
+
+use dashmap::DashMap;
 
 use crate::chat::
 {
@@ -207,9 +208,9 @@ impl Connection
 }
 
 //LISTS
-pub static CONNECTIONS: LazyLock<Arc<RwLock<Vec<Connection>>>> = LazyLock::new(|| //LIST FOR EACH CLIENT CONNECTION
+pub static CONNECTIONS: LazyLock<Arc<DashMap<SocketAddr, Connection>>> = LazyLock::new(|| //LIST FOR EACH CLIENT CONNECTION
 {
-    Arc::new(RwLock::new(Vec::new()))
+    Arc::new(DashMap::new())
 });
 
 //PRIVATE
@@ -268,24 +269,26 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //
 
 fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
 {
-    let connections = CONNECTIONS.read().unwrap(); //READ LOCK
-
     //GET SENDER'S CHANNEL
-    let channel = if let Some(index) = find_connection_index(&connections, |c| c.username() == packet.username.as_ref())
+    let channel = packet.username.as_ref().and_then(|username|
     {
-        connections[index].channel()
-    } else
-    {
-        &None
-    };
+        CONNECTIONS.iter()
+            .find(|entry| entry.username() == Some(username))
+            .and_then(|entry| entry.channel().clone())
+    });
 
-    //SEND TO EACH CLIENT
-    for connection in connections.iter()
+    //SEND TO EACH CLIENT IN SAME CHANNEL
+    for entry in CONNECTIONS.iter()
     {
-        if let Connection::Authenticated { channel: c, .. } = connection
+        if let Connection::Authenticated { channel: c, .. } = entry.value()
         {
-            if c != channel { continue; } //SEND ONLY TO THE SAME CHANNEL
-            network::send(&mut *connection.stream().lock().unwrap(), packet.clone(), connection.shared_key());
+            if c == &channel
+            {
+                if let Ok(mut stream) = entry.stream().lock()
+                {
+                    network::send(&mut *stream, packet.clone(), entry.shared_key());
+                }
+            }
         }
     }
 }
@@ -293,61 +296,48 @@ fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
 pub fn remove_connection(stream: &mut TcpStream, grace: bool) //REMOVE CONNECTION BY TcpStream
 {
     //GET TARGET PEER ADDRESS
-    let peer_addr = stream.peer_addr().ok();
-
-    //USERNAME OF TARGET, FOR DISCONNECT MESSAGE
-    let mut username: Option<String> = None;
-    let mut removed = false;
-
-    //REMOVE MATCHING
+    let peer_addr = match stream.peer_addr()
     {
-        let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
+        Ok(addr) => addr,
+        Err(_) => return
+    };
 
-        connections.retain(|conn|
+
+    //REMOVE CONNECTION
+    let connection = match CONNECTIONS.remove(&peer_addr)
+    {
+        Some((_, conn)) => conn,
+        None => return
+    };
+
+    //SEND DISCONNECT CODE IF GRACEFUL
+    if grace
+    {
+        if let Ok(mut stream) = connection.stream().lock()
         {
-            let should_remove = conn.peer_addr() == peer_addr;
-            let mut removed_stream = conn.stream().lock().unwrap();
-
-            if should_remove
-            {
-                //SEND DISCONNECT CODE TO REMOVED CLIENT
-                if grace
-                {
-                    send_code(&mut removed_stream, None, MessageCode::Disconnect, conn.shared_key());
-                }
-
-                if conn.is_authenticated()
-                {
-                    username = conn.username().cloned();
-                }
-
-                removed = true;
-            }
-
-            !should_remove //KEEP NON-MATCHING
-        });
+            send_code(&mut *stream, None, MessageCode::Disconnect, connection.shared_key());
+        }
     }
 
-    //RETURN IF NO CLIENT WAS REMOVED
-    if !removed { return; }
-
-    if username.is_some()
+    //SEND LEAVE MESSAGE IF AUTHENTICATED
+    if let Some(username) = connection.username()
     {
         send_to_all(MessagePacket
         {
-            text: username.as_ref().map(|s| s.to_string()),
+            text: Some(username.to_string()),
             username: Some(config::server_config::<String>("server_username")),
             code: Some(MessageCode::Leave),
+
             ..Default::default()
         });
     }
 
-    println!("Close connection: {}", peer_addr.unwrap());
+    println!("Close connection: {}", peer_addr);
 }
 
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
 {
-    CONNECTIONS.read().unwrap().iter().any(|conn|
+    CONNECTIONS.iter().any(|conn|
     {
         conn.username() == Some(&username.to_string())
     })
@@ -356,7 +346,7 @@ fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CON
 fn get_latest_id() -> usize
 {
     //GET HashSet OF IDS
-    let ids: HashSet<usize> = CONNECTIONS.read().unwrap().iter().filter_map(|conn|
+    let ids: HashSet<usize> = CONNECTIONS.iter().filter_map(|conn|
     {
         if let Some(id) = conn.id()
         {
@@ -379,89 +369,75 @@ fn get_latest_id() -> usize
     unreachable!("what the fuck");
 }
 
-fn find_connection_index<F>(connections: &Vec<Connection>, condition: F) -> Option<usize> //RETURN INDEX OF CONNECTION WITH MATCHING PREDICATE
-where
-    F: Fn(&Connection) -> bool
-{
-    connections.iter().position(condition)
-}
-
 fn update_client_shared_key(stream: &mut TcpStream, shared_key: &Vec<i64>) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
 {
-    let peer_addr = stream.peer_addr().ok();
-    let mut connections = CONNECTIONS.write().unwrap();
-
-    //FIND CONNECTION
-    if let Some(index) = find_connection_index(&connections, |c| c.peer_addr() == peer_addr)
+    let peer_addr = match stream.peer_addr()
     {
-        //CLONE STREAM
-        let stream = connections[index].stream().clone();
+        Ok(addr) => addr,
+        Err(_) => return
+    };
 
-        //OVERWRITE OLD CONNECTION
-        connections[index] = Connection::NonAuthenticated
+    //UPDATE CONNECTION
+    CONNECTIONS.alter(&peer_addr, |_, old_connection|
+    {
+        Connection::NonAuthenticated
         {
-            stream: stream,
+            stream: old_connection.stream().clone(),
             username: None,
             shared_key: Some(shared_key.to_owned()),
             last_activity: Instant::now(),
-        };
-    }
+        }
+    });
 }
 
 fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
-    let peer_addr = stream.peer_addr().ok();
-    let mut connections = CONNECTIONS.write().unwrap();
-
-    //FIND CONNECTION
-    if let Some(index) = find_connection_index(&connections, |c| c.peer_addr() == peer_addr)
+    let peer_addr = match stream.peer_addr()
     {
-        //CLONE OLD PROPERTIES
-        let stream = connections[index].stream().clone();
-        let shared_key = connections[index].shared_key().unwrap().to_owned();
+        Ok(addr) => addr,
+        Err(_) => return
+    };
 
-        //OVERWRITE OLD CONNECTION
-        connections[index] = Connection::Authenticated
+    //UPDATE CONNECTION
+    CONNECTIONS.alter(&peer_addr, |_, old_connection|
+    {
+        Connection::Authenticated
         {
-            stream: stream,
+            stream: old_connection.stream().clone(),
             username: username.to_string(),
             id: id,
-            shared_key: shared_key,
+            shared_key: old_connection.shared_key().unwrap().to_owned(),
             last_activity: Instant::now() - Duration::from_millis(config::server_config("min_message_delay")),
             spam_violations: 0,
             channel: None,
-        };
+        }
+    });
 
-        println!("Authenticate connection: {}", peer_addr.unwrap());
-    }
+    println!("Authenticate connection: {}", peer_addr);
 }
 
 fn update_client_channel(stream: &mut TcpStream, channel: &Option<String>) //MOVE CLIENT TO CHANNEL
 {
-    let peer_addr = stream.peer_addr().ok();
-    let mut connections = CONNECTIONS.write().unwrap();
-
-    //FIND CONNECTION
-    if let Some(index) = find_connection_index(&connections, |c| c.peer_addr() == peer_addr)
+    let peer_addr = match stream.peer_addr()
     {
-        //CLONE OLD PROPERTIES
-        let stream = connections[index].stream().clone();
-        let username = connections[index].username().unwrap().to_string();
-        let id = *connections[index].id().unwrap();
-        let shared_key = connections[index].shared_key().unwrap().to_owned();
+        Ok(addr) => addr,
+        Err(_) => return,
+    };
 
-        //OVERWRITE OLD CONNECTION
-        connections[index] = Connection::Authenticated
+    //UPDATE CONNECTION
+    CONNECTIONS.alter(&peer_addr, |_, old_connection|
+    {
+        Connection::Authenticated
         {
-            stream: stream,
-            username: username,
-            id: id,
-            shared_key: shared_key,
+            stream: old_connection.stream().clone(),
+            username: old_connection.username().unwrap().clone(),
+            id: *old_connection.id().unwrap(),
+            shared_key: old_connection.shared_key().unwrap().to_owned(),
             last_activity: Instant::now(),
-            spam_violations: 0,
+            spam_violations: *old_connection.spam_violations().unwrap(),
             channel: channel.clone(),
-        };
-    }
+        }
+    });
 }
 
 fn ask_version(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) -> Option<String> //ASK CLIENT FOR VERSION
@@ -494,26 +470,22 @@ pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode
 
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 {
-    println!("New connection: {}", match stream.peer_addr()
+    let peer_addr = match stream.peer_addr()
     {
         Ok(addr) => addr,
-        Err(_) => return //idk
-    });
+        Err(_) => return,
+    };
 
-    //ADD CONNECTION TO NonAuthenticated
+    println!("New connection: {}", peer_addr);
+
+    //PUSH NEW CONNECTION
+    CONNECTIONS.insert(peer_addr, Connection::NonAuthenticated
     {
-        //CREATE CONNECTION
-        let connection = Connection::NonAuthenticated
-        {
-            stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
-            username: None,
-            shared_key: None,
-            last_activity: Instant::now(),
-        };
-
-        //PUSH
-        CONNECTIONS.write().unwrap().push(connection);
-    }
+        stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
+        username: None,
+        shared_key: None,
+        last_activity: Instant::now(),
+    });
 
     //GET SHARED KEY
     let shared_key = match key_exchange(stream)
@@ -587,19 +559,12 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let username = username.unwrap();
 
     //UPDATE USERNAME IN NonAuthenticated
+    if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
     {
-        let mut connections = CONNECTIONS.write().unwrap(); //WRITE LOCK
-        let peer_addr = stream.peer_addr().ok(); //GET PEER ADDRESS
-
-        for conn in connections.iter_mut()
+        if !conn.is_authenticated()
         {
-            if conn.peer_addr() == peer_addr && !conn.is_authenticated() //CONNECTION FOUND
-            {
-                //UPDATE
-                *conn.username_mut() = Some(username.clone());
-
-                break;
-            }
+            //UPDATE
+            *conn.username_mut() = Some(username.clone());
         }
     }
 
@@ -721,13 +686,12 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 //CLIENT REQUESTED LIST OF ONLINE USERS
                 MessageCode::List =>
                 {
-                    let connections = CONNECTIONS.read().unwrap(); //READ LOCK
                     let mut user_list = Vec::new();
 
                     //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
-                    for connection_enum in connections.iter()
+                    for connection_enum in CONNECTIONS.iter()
                     {
-                        if let Connection::Authenticated { username: uname, id: user_id, channel, .. } = connection_enum
+                        if let Connection::Authenticated { username: uname, id: user_id, channel, .. } = connection_enum.value()
                         {
                             user_list.push(json!({ "username": uname, "id": user_id, "channel": channel }));
                         }
@@ -745,46 +709,53 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 //PRIVATE MESSAGE
                 MessageCode::PrivateMessage =>
                 {
-                    //CHECK CLOSURE
-                    let parse_pm_data = |connections: &Vec<Connection>, message: Option<&String>| -> Option<(usize, usize, String)>
+                    let parse_result = read.text.as_ref().and_then(|text|
                     {
-                        let text = message?; //EXISTING PARAMETERS
-                        let (sender_id, private_message) = text.split_once(' ')?; //VALID PARAMETERS
-                        let recipient_id = sender_id.parse::<usize>().ok()?; //VALID ID
-                        let recipient_index = find_connection_index(&connections,
-                        |c| c.id() == Some(&recipient_id))?; //EXISTING ID
+                        let (id_str, message) = text.split_once(' ')?;
+                        let recipient_id = id_str.parse::<usize>().ok()?;
 
-                        Some((recipient_index, recipient_id, private_message.to_string()))
-                    };
+                        //FIND RECIPIENT BY ID
+                        let recipient_addr = CONNECTIONS.iter()
+                            .find(|entry| entry.value().id() == Some(&recipient_id))
+                            .map(|entry| *entry.key())?;
 
-                    let connections = CONNECTIONS.read().unwrap();
-                    if let Some((recipient_index, recipient_id, private_message)) = parse_pm_data(&connections, read.text.as_ref())
+                        Some((recipient_addr, recipient_id, message.to_string()))
+                    });
+
+                    if let Some((recipient_addr, recipient_id, private_message)) = parse_result
                     {
-                        //SEND MESSAGE TO RECEIVER
-                        if recipient_id != id //DO NOT SEND ON SELF MESSAGE
-                        {
-                            network::send(&mut connections[recipient_index].stream().lock().unwrap(), MessagePacket
+                        //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
+                        if recipient_id != id {
+                            if let Some(recipient) = CONNECTIONS.get(&recipient_addr)
                             {
-                                text: Some(private_message.to_string()),
-                                username: Some(username.clone()),
-                                id: Some(id),
-                                code: Some(MessageCode::PrivateMessage),
-                                ..Default::default()
-                            }, connections[recipient_index].shared_key());
+                                if let Ok(mut recipient_stream) = recipient.stream().lock()
+                                {
+                                    network::send(&mut *recipient_stream, MessagePacket
+                                    {
+                                        text: Some(private_message.clone()),
+                                        username: Some(username.clone()),
+                                        id: Some(id),
+                                        code: Some(MessageCode::PrivateMessage),
+
+                                        ..Default::default()
+                                    }, recipient.shared_key());
+                                }
+                            }
                         }
 
-                        //SEND MESSAGE BACK TO SENDER
+                        //SEND CONFIRMATION BACK TO SENDER
                         network::send(stream, MessagePacket
                         {
-                            text: Some(private_message.to_string()),
-                            username: connections[recipient_index].username().cloned(),
+                            text: Some(private_message),
+                            username: CONNECTIONS.get(&recipient_addr).and_then(|e| e.username().cloned()),
                             id: Some(recipient_id),
                             code: Some(MessageCode::PrivateMessageBack),
+
                             ..Default::default()
                         }, shared_key.as_ref());
                     } else
                     {
-                        //SEND InvalidUsage CODE IF INVALID
+                        //INVALID PM FORMAT
                         send_code(stream, None, MessageCode::InvalidUsage, shared_key.as_ref());
                     }
                 },
@@ -813,7 +784,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 pub fn disconnect_all() //DISCONNECT ALL CLIENTS
 {
     //ITERATE OVER ALL STREAMS, REMOVE CONNECTIONS
-    let mut streams: Vec<TcpStream> = CONNECTIONS.read().unwrap().iter().map(|conn| conn.cloned_stream().unwrap()).collect();
+    let mut streams: Vec<TcpStream> = CONNECTIONS.iter().map(|conn| conn.cloned_stream().unwrap()).collect();
     for stream in &mut streams
     {
         remove_connection(stream, true); //REMOVE GRACEFULLY
@@ -824,15 +795,11 @@ pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
 {
     let now = Instant::now();
 
-    let connections = CONNECTIONS.read().unwrap(); //READ LOCK
-
     //COLLECT STREAMS OF INACTIVE CONNECTIONS
-    let inactive_streams: Vec<TcpStream> = connections.iter()
+    let inactive_streams: Vec<TcpStream> = CONNECTIONS.iter()
         .filter(|conn| conn.is_inactive(Some(now)))
         .filter_map(|conn| conn.cloned_stream())
         .collect();
-
-    drop(connections); //RELEASE READ LOCK
 
     //DISCONNECT INACTIVE STREAMS
     for mut stream in inactive_streams
