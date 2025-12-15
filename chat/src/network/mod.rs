@@ -337,33 +337,28 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     //ACTIVITY TIMER ON SERVER
     #[cfg(feature = "server")]
     {
-        let peer_addr = stream.peer_addr().ok(); //GET CURRENT PEER ADDRESS
+        let peer_addr = stream.peer_addr().ok()?; //GET CURRENT PEER ADDRESS
         let mut disconnect = false;
 
         //FIND CONNECTION AND SET last_activity
-        for mut conn in server::CONNECTIONS.iter_mut()
+        if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
         {
-            if conn.stream().lock().unwrap().peer_addr().ok() == peer_addr //CONNECTION FOUND
+            //SPAM
+            if config::server_config("spam_protection") && conn.is_authenticated() &&
+                Instant::now().duration_since(*conn.last_activity()) <
+                    Duration::from_millis(config::server_config::<u64>("min_message_delay"))
             {
-                //SPAM
-                if config::server_config("spam_protection") && conn.is_authenticated() &&
-                    Instant::now().duration_since(*conn.last_activity()) <
-                        Duration::from_millis(config::server_config::<u64>("min_message_delay"))
-                {
-                    //INCREMENT SPAM VIOLATIONS
-                    *conn.spam_violations_mut().unwrap() += 1;
+                //INCREMENT SPAM VIOLATIONS
+                *conn.spam_violations_mut().unwrap() += 1;
 
-                    //SEND WARNING CODE
-                    server::send_code(stream, None, MessageCode::SpamWarning, conn.shared_key());
+                //SEND WARNING CODE
+                server::send_code(stream, None, MessageCode::SpamWarning, conn.shared_key());
 
-                    //CHECK FOR TOO MANY VIOLATIONS
-                    disconnect = *conn.spam_violations().unwrap() > config::server_config::<usize>("max_message_delay_violations");
-                }
-
-                *conn.last_activity_mut() = Instant::now(); //RESET last_activity
-
-                break;
+                //CHECK FOR TOO MANY VIOLATIONS
+                disconnect = *conn.spam_violations().unwrap() > config::server_config::<usize>("max_message_delay_violations");
             }
+
+            *conn.last_activity_mut() = Instant::now(); //RESET last_activity
         }
 
         //TOO MANY VIOLATIONS, BYE
