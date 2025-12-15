@@ -208,10 +208,7 @@ impl Connection
 }
 
 //LISTS
-pub static CONNECTIONS: LazyLock<Arc<DashMap<SocketAddr, Connection>>> = LazyLock::new(|| //LIST FOR EACH CLIENT CONNECTION
-{
-    Arc::new(DashMap::new())
-});
+pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //PRIVATE
 fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR SERVER-SIDE
