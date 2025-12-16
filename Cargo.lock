@@ -2016,6 +2016,7 @@ dependencies = [
  "ctrlc",
  "dashmap",
  "dirs",
+ "hmac",
  "p521",
  "rand",
  "rand_chacha",
