@@ -21,9 +21,14 @@ use std::sync::{ LazyLock, RwLock };
 #[cfg(feature = "client")]
 use std::sync::
 {
-    atomic::{ AtomicBool, Ordering },
     Arc,
     Mutex,
+    atomic::
+    {
+        AtomicBool,
+        AtomicUsize,
+        Ordering,
+    },
 };
 
 //CONSTS
@@ -66,6 +71,9 @@ pub static INPUT_READ: LazyLock<Arc<Mutex<Vec<char>>>> = LazyLock::new(|| //INPU
 {
     Arc::new(Mutex::new(Vec::new()))
 });
+
+#[cfg(feature = "client")]
+static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER
 
 //FUNCTIONS
 //SHARED SYM KEY
@@ -118,4 +126,16 @@ pub fn get_sending_messages() -> bool //GET SENDING_MESSAGES
 pub fn set_sending_messages(value: bool) //SET SENDING_MESSAGES
 {
     SENDING_MESSAGES.store(value, Ordering::SeqCst);
+}
+
+#[cfg(feature = "client")]
+pub fn get_seq() -> usize //GET SEQUENCE NUMBER
+{
+    SEQ.load(Ordering::Relaxed)
+}
+
+#[cfg(feature = "client")]
+pub fn set_seq(value: usize) //SET SEQUENCE NUMBER
+{
+    SEQ.store(value, Ordering::Relaxed)
 }

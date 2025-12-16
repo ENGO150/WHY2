@@ -107,6 +107,7 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub id: Option<usize>,         //ID OF USER
     pub code: Option<MessageCode>, //CONTROL CODE
     pub colors: MessageColors,     //MESSAGE COLORS
+    pub seq: usize,                //SEQUENCE NUMBER
 }
 
 //CONSTS
@@ -129,6 +130,7 @@ impl Default for MessagePacket //DEFAULT
                 username_color: None,
                 message_color: None,
             },
+            seq: 0,
         }
     }
 }
@@ -182,6 +184,17 @@ impl<'de> Deserialize<'de> for SerColor
 //FUNCTIONS
 pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>>) //SEND packet TO stream
 {
+    //COPY PACKET
+    #[cfg(feature = "client")]
+    let mut packet = packet;
+
+    //ADD SEQUENCE NUMBER TO packet
+    #[cfg(feature = "client")]
+    {
+        packet.seq = rex_options::get_seq() + 1;
+        rex_options::set_seq(packet.seq);
+    }
+
     //ENCODE THE PACKET STRUCT TO Vec<u8>
     let packet_bytes = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
 
@@ -286,11 +299,10 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     //LOOP READING UNTIL MESSAGE ARRIVES
     loop
     {
-        //CHECK IF CLIENT IS STILL IN ACTIVE CONNETION LIST
+        //CHECK IF CLIENT IS STILL IN ACTIVE CONNECTION LIST
         #[cfg(feature = "server")]
         {
-            let peer_addr = stream.peer_addr().ok();
-            if !server::CONNECTIONS.iter().any(|conn| conn.stream().lock().unwrap().peer_addr().ok() == peer_addr)
+            if !server::CONNECTIONS.contains_key(&stream.peer_addr().ok()?)
             {
                 return None;
             }
@@ -435,7 +447,29 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     //DECODE AND RETURN
     match bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard())
     {
-        Ok((packet, _)) => Some(packet),
+        Ok((packet, _)) =>
+        {
+            //VERIFY SEQUENCE NUMBER
+            #[cfg(feature = "server")]
+            {
+                let mut conn = server::CONNECTIONS.get_mut(&stream.peer_addr().ok()?)?;
+
+                if packet.seq == *conn.seq() + 1 //VALID SEQ
+                {
+                    //SET SEQ TO CURRENT
+                    *conn.seq_mut() = packet.seq;
+                } else
+                {
+                    //INVALID SEQ
+                    drop(conn); //PREVENT DEADLOCK
+                    println!("SEQ verification failed: {}", stream.peer_addr().ok()?);
+                    server::remove_connection(stream, false);
+                }
+            }
+
+            Some(packet)
+        },
+
         Err(_) =>
         {
             //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET

@@ -64,6 +64,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
         spam_violations: usize,        //SPAM VIOLATIONS (unexpected, huh?)
         channel: Option<String>,       //CHANNEL
+        seq: usize,                    //SEQUENCE NUMBER
     },
 
     NonAuthenticated
@@ -72,6 +73,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         username: Option<String>,      //CHOSEN USERNAME
         shared_key: Option<Vec<i64>>,  //SHARED KEY
         last_activity: Instant,        //TIME OF LAST MESSAGE
+        seq: usize,                    //SEQUENCE NUMBER
     },
 }
 
@@ -181,6 +183,26 @@ impl Connection
         {
             Self::Authenticated { channel, .. } => channel,
             Self::NonAuthenticated { .. }  => &None,
+        }
+    }
+
+    //GET LAST SEQUENCE NUMBER
+    pub fn seq(&self) -> &usize
+    {
+        match self
+        {
+            Self::Authenticated { seq, .. } => seq,
+            Self::NonAuthenticated { seq, .. } => seq,
+        }
+    }
+
+    //GET LAST SEQUENCE NUMBER AS MUTABLE
+    pub fn seq_mut(&mut self) -> &mut usize
+    {
+        match self
+        {
+            Self::Authenticated { seq, .. } => seq,
+            Self::NonAuthenticated { seq, .. } => seq,
         }
     }
 
@@ -299,7 +321,6 @@ pub fn remove_connection(stream: &mut TcpStream, grace: bool) //REMOVE CONNECTIO
         Err(_) => return
     };
 
-
     //REMOVE CONNECTION
     let connection = match CONNECTIONS.remove(&peer_addr)
     {
@@ -383,6 +404,7 @@ fn update_client_shared_key(stream: &mut TcpStream, shared_key: &Vec<i64>) //ADD
             username: None,
             shared_key: Some(shared_key.to_owned()),
             last_activity: Instant::now(),
+            seq: *old_connection.seq(),
         }
     });
 }
@@ -407,6 +429,7 @@ fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize) //MOVE
             last_activity: Instant::now() - Duration::from_millis(config::server_config("min_message_delay")),
             spam_violations: 0,
             channel: None,
+            seq: *old_connection.seq(),
         }
     });
 
@@ -433,6 +456,7 @@ fn update_client_channel(stream: &mut TcpStream, channel: &Option<String>) //MOV
             last_activity: Instant::now(),
             spam_violations: *old_connection.spam_violations().unwrap(),
             channel: channel.clone(),
+            seq: *old_connection.seq(),
         }
     });
 }
@@ -482,6 +506,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         username: None,
         shared_key: None,
         last_activity: Instant::now(),
+        seq: 0,
     });
 
     //GET SHARED KEY
