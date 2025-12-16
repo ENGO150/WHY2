@@ -39,6 +39,9 @@ use serde::{ Deserialize, Deserializer, Serialize, Serializer };
 
 use colored::Color;
 
+use hmac::{ Hmac, Mac };
+use sha2::Sha256;
+
 use why2_core::rex::
 {
     encrypter,
@@ -47,7 +50,11 @@ use why2_core::rex::
     Grid,
 };
 
-use crate::chat::options as rex_options;
+use crate::chat::
+{
+    crypto,
+    options as rex_options,
+};
 
 #[cfg(feature = "server")]
 use std::
@@ -197,10 +204,25 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
         grids.insert(0, encrypted_data.iv); //INITIALIZATION VECTOR
 
         //CONVERT ENCRYPTED PACKET (FROM Vec<Grid>) TO Vec<u8>
-        grids.iter()
+        let encrypted_bytes: Vec<u8> = grids.iter()
             .flat_map(|grid| grid.iter()
                 .flat_map(|row| row.iter()
-                    .flat_map(|&val| val.to_be_bytes()))).collect()
+                    .flat_map(|&val| val.to_be_bytes()))).collect();
+
+        //DERIVE MAC KEY
+        let mac_key = crypto::derive_mac_key(key);
+
+        //COMPUTE HMAC OVER CIPHERTEXT
+        let mut mac = Hmac::<Sha256>::new_from_slice(&mac_key).expect("HMAC initialization failed");
+        mac.update(&encrypted_bytes);
+
+        let mac_tag = mac.finalize().into_bytes();
+
+        //PREPEND MAC TO CIPHERTEXT ([32-byte HMAC][CIPHERTEXT])
+        let mut transmission_bytes = Vec::with_capacity(32 + encrypted_bytes.len());
+        transmission_bytes.extend_from_slice(&mac_tag);
+        transmission_bytes.extend_from_slice(&encrypted_bytes);
+        transmission_bytes
     } else
     {
         packet_bytes //NO ENCRYPTION

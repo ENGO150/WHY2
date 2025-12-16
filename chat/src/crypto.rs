@@ -136,3 +136,17 @@ pub fn compare_password_hash(hashed: &str, password: &str) -> bool //COMPARE ARG
     //COMPARE
     Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok()
 }
+
+pub fn derive_mac_key(encryption_key: &[i64]) -> Vec<u8> //DERIVE SEPARATE MAC KEY FROM ENCRYPTION KEY
+{
+    let mut hasher = Sha256::new();
+    hasher.update(b"WHY2-HMAC-KEY-V1"); //DOMAIN SEPARATOR
+
+    // Mix in the encryption key
+    for &val in encryption_key
+    {
+        hasher.update(&val.to_ne_bytes());
+    }
+
+    hasher.finalize().to_vec()
+}
