@@ -332,6 +332,49 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     //DECRYPT
     if let Some(key) = key
     {
+        //HMAC VERIFICATION CLOSURE
+        let verify_mac = |packet: Vec<u8>| -> Option<Vec<u8>>
+        {
+            //VERIFY MAC LENGTH
+            if packet.len() < 32
+            {
+                return None;
+            }
+
+            //SEPARATE MAC FROM CIPHERTEXT
+            let received_mac: [u8; 32] = packet[..32].try_into().unwrap();
+            let ciphertext = &packet[32..];
+
+            //DERIVE MAC KEY
+            let mac_key = crypto::derive_mac_key(key);
+
+            //COMPUTE EXPECTED HMAC
+            let mut mac = Hmac::<Sha256>::new_from_slice(&mac_key).expect("HMAC initialization failed");
+            mac.update(ciphertext);
+
+            //VERIFY MAC
+            if mac.verify_slice(&received_mac).is_ok()
+            {
+                Some(ciphertext.to_vec())
+            } else
+            {
+                None
+            }
+        };
+
+        //VERIFY HMAC
+        if let Some(ciphertext) = verify_mac(decoded_packet)
+        {
+            decoded_packet = ciphertext;
+        } else
+        {
+            //LOG IF ON SERVER
+            #[cfg(feature = "server")]
+            println!("HMAC verification failed: {}", stream.peer_addr().unwrap());
+
+            return None;
+        }
+
         //DESERIALIZE ENCRYPTED PACKET
         let mut grids = Grid::<GRID_W, GRID_H>::from_bytes(decoded_packet).ok()?;
 
