@@ -99,7 +99,7 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
         //NON PARAMETRIC
         "EXIT" | "QUIT" | "LEAVE" | "DISCONNECT"      => (Some(Command::Exit), None),
         "HELP" | "H" | "COMMANDS" | "USAGE" | "GUIDE" => (Some(Command::Help), None),
-        "LIST" | "USERS" | "CLIENTS" | "SHOW"         => (Some(Command::List), None),
+        "LIST" | "USERS" | "CLIENTS" | "CHANNELS"     => (Some(Command::List), None),
 
         //PARAMETRIC
         "CHANNEL" | "SWITCH" | "CHECKOUT" | "AREA"    => (Some(Command::Channel), parameters),
