@@ -177,10 +177,8 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
 {
     //ENCODE THE PACKET STRUCT TO Vec<u8>
     let packet_bytes = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
-    let final_bytes: Vec<u8>;
 
-    //ENCRYPT
-    if let Some(key) = key
+    let final_bytes = if let Some(key) = key
     {
         //CONVERT packet_bytes to BINARY
         let mut input_i64 = Vec::with_capacity((packet_bytes.len() + 7) / 8);
@@ -199,14 +197,14 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
         grids.insert(0, encrypted_data.iv); //INITIALIZATION VECTOR
 
         //CONVERT ENCRYPTED PACKET (FROM Vec<Grid>) TO Vec<u8>
-        final_bytes = grids.iter()
+        grids.iter()
             .flat_map(|grid| grid.iter()
                 .flat_map(|row| row.iter()
-                    .flat_map(|&val| val.to_be_bytes()))).collect();
+                    .flat_map(|&val| val.to_be_bytes()))).collect()
     } else
     {
-        final_bytes = packet_bytes; //NO ENCRYPTION
-    }
+        packet_bytes //NO ENCRYPTION
+    };
 
     //ENCODE ENCRYPTED OUTPUT TO BASE91
     let encoded_string = String::from_utf8(base91::slice_encode(&final_bytes)).expect("Encoding packet failed");
