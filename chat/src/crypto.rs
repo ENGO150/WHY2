@@ -145,7 +145,7 @@ pub fn derive_mac_key(encryption_key: &[i64]) -> Vec<u8> //DERIVE SEPARATE MAC K
     // Mix in the encryption key
     for &val in encryption_key
     {
-        hasher.update(&val.to_ne_bytes());
+        hasher.update(&val.to_be_bytes());
     }
 
     hasher.finalize().to_vec()

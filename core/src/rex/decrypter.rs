@@ -172,11 +172,11 @@ pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>
 
     for n in decrypted
     {
-        let buf = n.to_ne_bytes();
+        let buf = n.to_be_bytes();
 
         //FIRST 4 BYTES = HIGH CHAR, FOLLOWING 4 BYTES = LOW CHAR
-        let hi = u32::from_ne_bytes(buf[0..4].try_into().unwrap()); //HIGH
-        let lo = u32::from_ne_bytes(buf[4..8].try_into().unwrap()); //LOW
+        let hi = u32::from_be_bytes(buf[0..4].try_into().unwrap()); //HIGH
+        let lo = u32::from_be_bytes(buf[4..8].try_into().unwrap()); //LOW
 
         //PUSH CHARS TO STRING
         output.push(char::from_u32(hi).unwrap());

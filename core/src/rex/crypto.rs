@@ -60,7 +60,7 @@ pub fn sha256_seed_grid<const W: usize, const H: usize>(key: &Grid<W, H>) -> [u8
     {
         for val in row
         {
-            hasher.update(&val.to_ne_bytes());
+            hasher.update(&val.to_be_bytes());
         }
     }
 

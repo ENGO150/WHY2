@@ -217,11 +217,11 @@ pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Optio
     {
         //FILL BUFFER
         let mut buf = [0u8; 8];
-        buf[..4].copy_from_slice(&(pair[0] as u32).to_ne_bytes());
-        buf[4..].copy_from_slice(&(pair[1] as u32).to_ne_bytes());
+        buf[..4].copy_from_slice(&(pair[0] as u32).to_be_bytes());
+        buf[4..].copy_from_slice(&(pair[1] as u32).to_be_bytes());
 
         //APPEND
-        i64::from_ne_bytes(buf)
+        i64::from_be_bytes(buf)
     }).collect();
 
     //ENCRYPT Vec<i64> AND RETURN
