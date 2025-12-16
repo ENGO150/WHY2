@@ -168,7 +168,12 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     //LOOP READING
     loop
     {
-        let read = network::receive(stream, Some(&shared_key)).unwrap();
+        let read = match network::receive(stream, Some(&shared_key))
+        {
+            Some(packet) => packet,
+            None => continue
+        };
+
         extra_space = false; //RESET EXTRA SPACE
 
         //EXTRA SPACE

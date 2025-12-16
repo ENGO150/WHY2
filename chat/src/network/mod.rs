@@ -185,14 +185,26 @@ impl<'de> Deserialize<'de> for SerColor
 pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>>) //SEND packet TO stream
 {
     //COPY PACKET
-    #[cfg(feature = "client")]
     let mut packet = packet;
 
-    //ADD SEQUENCE NUMBER TO packet
+    //ADD SEQUENCE NUMBER TO packet (FROM CLIENT)
     #[cfg(feature = "client")]
     {
         packet.seq = rex_options::get_seq() + 1;
         rex_options::set_seq(packet.seq);
+    }
+
+    //ADD SEQUENCE NUMBER TO packet (FROM SERVER)
+    #[cfg(feature = "server")]
+    {
+        if let Some(mut conn) = server::CONNECTIONS.get_mut(&stream.peer_addr().unwrap())
+        {
+            if conn.is_authenticated()
+            {
+                packet.seq = conn.server_seq().unwrap() + 1;
+                *conn.server_seq_mut().unwrap() = packet.seq;
+            }
+        }
     }
 
     //ENCODE THE PACKET STRUCT TO Vec<u8>
@@ -267,14 +279,10 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     #[cfg(feature = "server")]
     {
         //CHECK IF CLIENT IS AUTHENTICATED
-        let client_addr = stream.peer_addr().ok()?;
-        let authenticated = server::CONNECTIONS.iter().any(|conn|
-        {
-            conn.stream().lock().ok()
-                .and_then(|s| s.peer_addr().ok())
-                .map(|addr | addr == client_addr && conn.is_authenticated())
-                .unwrap_or(false)
-        });
+        let authenticated = stream.peer_addr().ok()
+            .and_then(|addr| server::CONNECTIONS.get(&addr))
+            .map(|conn| conn.is_authenticated())
+            .unwrap_or(false);
 
         reader = Box::new(BufReader::new(stream.try_clone().expect("Cloning stream failed")));
 
@@ -413,6 +421,8 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     #[cfg(feature = "server")]
     {
         let peer_addr = stream.peer_addr().ok()?; //GET CURRENT PEER ADDRESS
+        let mut spam_warning = false;
+        let mut shared_key = None;
         let mut disconnect = false;
 
         //FIND CONNECTION AND SET last_activity
@@ -426,14 +436,21 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
                 //INCREMENT SPAM VIOLATIONS
                 *conn.spam_violations_mut().unwrap() += 1;
 
-                //SEND WARNING CODE
-                server::send_code(stream, None, MessageCode::SpamWarning, conn.shared_key());
+                //WARN
+                spam_warning = true;
+                shared_key = conn.shared_key().cloned();
 
                 //CHECK FOR TOO MANY VIOLATIONS
                 disconnect = *conn.spam_violations().unwrap() > config::server_config::<usize>("max_message_delay_violations");
             }
 
             *conn.last_activity_mut() = Instant::now(); //RESET last_activity
+        }
+
+        //SEND WARNING CODE
+        if spam_warning
+        {
+            server::send_code(stream, None, MessageCode::SpamWarning, shared_key.as_ref());
         }
 
         //TOO MANY VIOLATIONS, BYE
@@ -450,7 +467,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         Ok((packet, _)) =>
         {
             //VERIFY SEQUENCE NUMBER
-            #[cfg(feature = "server")]
+            #[cfg(feature = "server")] //ON SERVER
             {
                 let mut conn = server::CONNECTIONS.get_mut(&stream.peer_addr().ok()?)?;
 
@@ -464,6 +481,19 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
                     drop(conn); //PREVENT DEADLOCK
                     println!("SEQ verification failed: {}", stream.peer_addr().ok()?);
                     server::remove_connection(stream, false);
+                }
+            }
+
+            //VERIFY SEQUENCE NUMBER
+            #[cfg(feature = "client")] //ON CLIENT
+            {
+                if packet.seq == rex_options::get_server_seq() + 1 || rex_options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
+                {
+                    //SET SEQ
+                    rex_options::set_server_seq(packet.seq);
+                } else //INVALID, DISCONNECT
+                {
+                    return None;
                 }
             }
 

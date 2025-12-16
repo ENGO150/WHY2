@@ -73,7 +73,10 @@ pub static INPUT_READ: LazyLock<Arc<Mutex<Vec<char>>>> = LazyLock::new(|| //INPU
 });
 
 #[cfg(feature = "client")]
-static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER
+static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT -> SERVER)
+
+#[cfg(feature = "client")]
+static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (SERVER -> CLIENT)
 
 //FUNCTIONS
 //SHARED SYM KEY
@@ -138,4 +141,16 @@ pub fn get_seq() -> usize //GET SEQUENCE NUMBER
 pub fn set_seq(value: usize) //SET SEQUENCE NUMBER
 {
     SEQ.store(value, Ordering::Relaxed)
+}
+
+#[cfg(feature = "client")]
+pub fn get_server_seq() -> usize //GET SERVER SEQUENCE NUMBER
+{
+    SERVER_SEQ.load(Ordering::Relaxed)
+}
+
+#[cfg(feature = "client")]
+pub fn set_server_seq(value: usize) //SET SERVER SEQUENCE NUMBER
+{
+    SERVER_SEQ.store(value, Ordering::Relaxed)
 }

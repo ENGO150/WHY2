@@ -64,7 +64,8 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
         spam_violations: usize,        //SPAM VIOLATIONS (unexpected, huh?)
         channel: Option<String>,       //CHANNEL
-        seq: usize,                    //SEQUENCE NUMBER
+        seq: usize,                    //SEQUENCE NUMBER (CLIENT -> SERVER)
+        server_seq: usize,             //SEQUENCE NUMBER (SERVER -> CLIENT)
     },
 
     NonAuthenticated
@@ -206,6 +207,26 @@ impl Connection
         }
     }
 
+    //GET LAST SERVER SEQUENCE NUMBER
+    pub fn server_seq(&self) -> Option<&usize>
+    {
+        match self
+        {
+            Self::Authenticated { server_seq, .. } => Some(server_seq),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //GET LAST SERVER SEQUENCE NUMBER AS MUTABLE
+    pub fn server_seq_mut(&mut self) -> Option<&mut usize>
+    {
+        match self
+        {
+            Self::Authenticated { server_seq, .. } => Some(server_seq),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
     //CHECK IF CONNECTION IS INACTIVE
     fn is_inactive(&self, now: Option<Instant>) -> bool
     {
@@ -296,18 +317,25 @@ fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
             .and_then(|entry| entry.channel().clone())
     });
 
-    //SEND TO EACH CLIENT IN SAME CHANNEL
-    for entry in CONNECTIONS.iter()
+    //COLLECT EACH CLIENT IN SAME CHANNEL
+    let entries: Vec<Connection> = CONNECTIONS.iter().filter_map(|entry|
     {
-        if let Connection::Authenticated { channel: c, .. } = entry.value()
+        match entry.value()
         {
-            if c == &channel
+            Connection::Authenticated { channel: c, .. } if c == &channel =>
             {
-                if let Ok(mut stream) = entry.stream().lock()
-                {
-                    network::send(&mut *stream, packet.clone(), entry.shared_key());
-                }
-            }
+                //FOUND, COLLECT
+                Some(entry.value().clone())
+            },
+            _ => None,
+        }
+    }).collect();
+
+    for ref entry in entries
+    {
+        if let Ok(mut stream) = entry.stream().lock()
+        {
+            network::send(&mut *stream, packet.clone(), entry.shared_key());
         }
     }
 }
@@ -430,6 +458,7 @@ fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize) //MOVE
             spam_violations: 0,
             channel: None,
             seq: *old_connection.seq(),
+            server_seq: 0,
         }
     });
 
@@ -457,6 +486,7 @@ fn update_client_channel(stream: &mut TcpStream, channel: &Option<String>) //MOV
             spam_violations: *old_connection.spam_violations().unwrap(),
             channel: channel.clone(),
             seq: *old_connection.seq(),
+            server_seq: *old_connection.server_seq().unwrap(),
         }
     });
 }
