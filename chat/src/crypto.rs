@@ -124,7 +124,7 @@ pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, p
     let shared = ecdh::diffie_hellman(local_private.to_nonzero_scalar(), remote_public.as_affine());
 
     //USE HKDF TO DERIVE SEPARATE ENCRYPTION AND MAC KEY
-    Some(derive_encryption_keys(shared.raw_secret_bytes(), "WHY2-CHAT"))
+    Some(derive_encryption_keys(shared.raw_secret_bytes(), misc::get_version()))
 }
 
 pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING

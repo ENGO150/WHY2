@@ -58,11 +58,16 @@ pub fn get_version<'a>() -> &'a str //GET COMPILED PACKAGE VERSION
     env!("CARGO_PKG_VERSION")
 }
 
+pub fn get_identifier() -> String //GET IDENTIFIER OF PACKAGE VERSION [WHY2/VERSION]
+{
+    format!("WHY2/{}", get_version())
+}
+
 pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
 {
     //CUSTOM CLIENT HEADERS
     let mut headers = HeaderMap::new();
-    headers.insert(USER_AGENT, HeaderValue::from_str(&format!("WHY2/{}", get_version())).expect("Invalid fetch request headers"));
+    headers.insert(USER_AGENT, HeaderValue::from_str(&get_identifier()).expect("Invalid fetch request headers"));
 
     //BUILD CUSTOM CLIENT
     let client = Client::builder()
