@@ -129,7 +129,10 @@ fn key_exchange(stream: &mut TcpStream) -> (Vec<i64>, Vec<u8>) //KEY EXCHANGE FO
     }, None);
 
     //CALCULATE SHARED SECRET
-    crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap()).expect("Shared secret derivation failed")
+    let keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap()).expect("Shared secret derivation failed");
+
+    options::set_keys(keys.clone()); //SET GLOBAL KEYS VARIABLE
+    keys
 }
 
 fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF PASSED COLOR
@@ -146,7 +149,6 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 {
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let keys = key_exchange(stream);
-    options::set_keys(keys.clone());
 
     //SERVER INFO VARIABLES
     let mut min_pass: Option<u64> = None;

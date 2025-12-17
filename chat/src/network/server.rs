@@ -288,8 +288,9 @@ fn key_exchange(stream: &mut TcpStream) -> Option<(Vec<i64>, Vec<u8>)> //KEY EXC
     //REMOVE READ TIMEOUT
     stream.set_read_timeout(None).expect("Failed to unset read timeout");
 
-    //CALCULATE SHARED SECRET
+    //CALCULATE SHARED SECRET AND UPDATE CONNECTION
     crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap())
+        .inspect(|k| update_client_keys(stream, k))
 }
 
 fn send_welcome_packet(stream: &mut TcpStream, keys: &(Vec<i64>, Vec<u8>)) //send welcome packet you idiot
@@ -545,9 +546,6 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         Some(r) => r,
         None => return remove_connection(stream, false)
     };
-
-    //UPDATE CONNECTION
-    update_client_keys(stream, &keys);
 
     //ASK CLIENT FOR THEIR PACKAGE VERSION
     if config::server_config("check_client_version")
