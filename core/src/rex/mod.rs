@@ -96,6 +96,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Notes
     /// - This method does not perform any encryption or transformation.
+    #[inline]
     pub fn new() -> result::Result<Self, String>
     {
         let area = W * H;
@@ -248,7 +249,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn mix_columns_handler(&mut self, col: usize) //MIX COLUMNS IN GRID
     {
         let next_col = (col + 1) % W;
@@ -448,12 +449,14 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// # Notes
     /// - This method mutates the grid in-place.
     /// - The key grid must match the grid dimensions exactly.
+    #[inline]
     pub fn shift_rows(&mut self, key_grid: &Grid<W, H>)
     {
         self.shift_rows_handler(key_grid, false); //USE HANDLER
     }
 
     /// Inverts transformation done by [`shift_rows`](Grid::shift_rows) method
+    #[inline]
     pub fn inv_shift_rows(&mut self, key_grid: &Grid<W, H>)
     {
         self.shift_rows_handler(key_grid, true); //USE HANDLER
@@ -474,6 +477,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
+    #[inline]
     pub fn mix_columns(&mut self)
     {
         for col in 0..(self.width())
@@ -483,6 +487,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     }
 
     /// Inverts transformation done by [`mix_columns`](Grid::mix_columns) method
+    #[inline]
     pub fn inv_mix_columns(&mut self)
     {
         for col in (0..(self.width())).rev()
@@ -601,6 +606,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - This method mutates the grid in-place
     /// - Provides diffusion complementary to row and column mixing
     /// - The operation is reversible when applied in reverse order
+    #[inline]
     pub fn mix_diagonals(&mut self)
     {
         //PROCESS DIAGONALS BEGINNING IN THE FIRST COLUMN
@@ -617,6 +623,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     }
 
     /// Inverts transformation done by [`mix_diagonals`](Grid::mix_diagonals) method.
+    #[inline]
     pub fn inv_mix_diagonals(&mut self)
     {
         //PROCESS DIAGONALS STARTING FROM THE FIRST ROW (EXCLUDING [0,0])
@@ -641,6 +648,7 @@ impl<const W: usize, const H: usize> IntoIterator for Grid<W, H>
     type IntoIter = IntoVecIter<i64>;
 
     //INTO ITERATOR
+    #[inline]
     fn into_iter(self) -> Self::IntoIter
     {
         self.0.into_iter().flat_map(|row| row.into_iter()).collect::<Vec<i64>>().into_iter()
@@ -652,6 +660,7 @@ impl<const W: usize, const H: usize> Index<usize> for Grid<W, H>
 {
     type Output = [i64; W];
 
+    #[inline]
     fn index(&self, y: usize) -> &Self::Output
     {
         &self.0[y]
@@ -661,6 +670,7 @@ impl<const W: usize, const H: usize> Index<usize> for Grid<W, H>
 //MUTABLE INDEXING
 impl<const W: usize, const H: usize> IndexMut<usize> for Grid<W, H>
 {
+    #[inline]
     fn index_mut(&mut self, y: usize) -> &mut Self::Output
     {
         &mut self.0[y]
@@ -670,6 +680,7 @@ impl<const W: usize, const H: usize> IndexMut<usize> for Grid<W, H>
 //XOR ASSIGN
 impl<const W: usize, const H: usize> BitXorAssign<&Grid<W, H>> for &mut Grid<W, H>
 {
+    #[inline]
     fn bitxor_assign(&mut self, rhs: &Grid<W, H>)
     {
         self.xor_grids(&rhs);
