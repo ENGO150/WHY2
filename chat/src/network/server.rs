@@ -254,7 +254,7 @@ impl Connection
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //PRIVATE
-fn key_exchange(stream: &mut TcpStream) -> Option<(Vec<i64>, Vec<u8>)> //KEY EXCHANGE FOR SERVER-SIDE
+fn key_exchange(stream: &mut TcpStream, keys: &mut (Vec<i64>, Vec<u8>)) //KEY EXCHANGE FOR SERVER-SIDE
 {
     //GENERATE EPHEMERAL KEYS
     let (sk, pk) = crypto::get_server_keys();
@@ -276,12 +276,16 @@ fn key_exchange(stream: &mut TcpStream) -> Option<(Vec<i64>, Vec<u8>)> //KEY EXC
     let message = loop
     {
         //READ MESSAGE
-        let received = network::receive(stream, None)?;
+        let received = match network::receive(stream, None)
+        {
+            Some(r) => r,
+            None => return
+        };
 
         if received.code == Some(MessageCode::KeyExchange) && !received.text.is_none() { break received; }
 
         //CHECK INVALID PACKETS COUNTER
-        if invalid_packets == 3 { return None; }
+        if invalid_packets == 3 { return; }
         invalid_packets += 1; //INCREMENT
     };
 
@@ -289,8 +293,8 @@ fn key_exchange(stream: &mut TcpStream) -> Option<(Vec<i64>, Vec<u8>)> //KEY EXC
     stream.set_read_timeout(None).expect("Failed to unset read timeout");
 
     //CALCULATE SHARED SECRET AND UPDATE CONNECTION
-    crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap())
-        .inspect(|k| update_client_keys(stream, k))
+    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap())
+        .inspect(|k| update_client_keys(stream, k)).unwrap_or((vec![], vec![]));
 }
 
 fn send_welcome_packet(stream: &mut TcpStream, keys: &(Vec<i64>, Vec<u8>)) //send welcome packet you idiot
@@ -541,11 +545,14 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     });
 
     //GET ENCRYPTION & MAC KEYS
-    let keys = match key_exchange(stream)
+    let mut keys = (vec![], vec![]);
+    key_exchange(stream, &mut keys);
+
+    //CHECK FOR VALID KEYS
+    if keys.0.is_empty() || keys.1.is_empty()
     {
-        Some(r) => r,
-        None => return remove_connection(stream, false)
-    };
+        return remove_connection(stream, false)
+    }
 
     //ASK CLIENT FOR THEIR PACKAGE VERSION
     if config::server_config("check_client_version")
