@@ -334,7 +334,7 @@ fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: &Opt
             text: parameters.clone(),
             code: Some(code),
             ..Default::default()
-        }, options::get_shared_key().as_ref());
+        }, options::get_keys().as_ref());
         return true;
     }
 
@@ -549,6 +549,6 @@ fn main()
             text: Some(input),
             colors: get_colors(),
             ..Default::default()
-        }, options::get_shared_key().as_ref());
+        }, options::get_keys().as_ref());
     }
 }

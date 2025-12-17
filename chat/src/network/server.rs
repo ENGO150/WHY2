@@ -60,7 +60,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         stream: Arc<Mutex<TcpStream>>, //STREAM
         username: String,              //USERNAME
         id: usize,                     //ID OF USER
-        shared_key: Vec<i64>,          //SHARED KEY BETWEEN SERVER AND CLIENT (one to one)
+        keys: (Vec<i64>, Vec<u8>),     //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
         last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
         spam_violations: usize,        //SPAM VIOLATIONS (unexpected, huh?)
         channel: Option<String>,       //CHANNEL
@@ -70,11 +70,11 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 
     NonAuthenticated
     {
-        stream: Arc<Mutex<TcpStream>>, //STREAM
-        username: Option<String>,      //CHOSEN USERNAME
-        shared_key: Option<Vec<i64>>,  //SHARED KEY
-        last_activity: Instant,        //TIME OF LAST MESSAGE
-        seq: usize,                    //SEQUENCE NUMBER
+        stream: Arc<Mutex<TcpStream>>,     //STREAM
+        username: Option<String>,          //CHOSEN USERNAME
+        keys: Option<(Vec<i64>, Vec<u8>)>, //SHARED KEYS
+        last_activity: Instant,            //TIME OF LAST MESSAGE
+        seq: usize,                        //SEQUENCE NUMBER
     },
 }
 
@@ -127,13 +127,13 @@ impl Connection
         }
     }
 
-    //GET SHARED KEY FROM Connection
-    pub fn shared_key(&self) -> Option<&Vec<i64>>
+    //GET SHARED KEYS FROM Connection
+    pub fn keys(&self) -> Option<&(Vec<i64>, Vec<u8>)>
     {
         match self
         {
-            Self::Authenticated { shared_key, .. } => Some(shared_key),
-            Self::NonAuthenticated { shared_key, .. } => shared_key.as_ref(),
+            Self::Authenticated { keys, .. } => Some(keys),
+            Self::NonAuthenticated { keys, .. } => keys.as_ref(),
         }
     }
 
@@ -254,7 +254,7 @@ impl Connection
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //PRIVATE
-fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR SERVER-SIDE
+fn key_exchange(stream: &mut TcpStream) -> Option<(Vec<i64>, Vec<u8>)> //KEY EXCHANGE FOR SERVER-SIDE
 {
     //GENERATE EPHEMERAL KEYS
     let (sk, pk) = crypto::get_server_keys();
@@ -292,7 +292,7 @@ fn key_exchange(stream: &mut TcpStream) -> Option<Vec<i64>> //KEY EXCHANGE FOR S
     crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap())
 }
 
-fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //send welcome packet you idiot
+fn send_welcome_packet(stream: &mut TcpStream, keys: &(Vec<i64>, Vec<u8>)) //send welcome packet you idiot
 {
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
@@ -304,7 +304,7 @@ fn send_welcome_packet(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) //
     }).to_string();
 
     //SEND
-    send_code(stream, Some(welcome_json), MessageCode::Welcome, shared_key);
+    send_code(stream, Some(welcome_json), MessageCode::Welcome, Some(keys));
 }
 
 fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
@@ -335,7 +335,7 @@ fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
     {
         if let Ok(mut stream) = entry.stream().lock()
         {
-            network::send(&mut *stream, packet.clone(), entry.shared_key());
+            network::send(&mut *stream, packet.clone(), entry.keys());
         }
     }
 }
@@ -361,7 +361,7 @@ pub fn remove_connection(stream: &mut TcpStream, grace: bool) //REMOVE CONNECTIO
     {
         if let Ok(mut stream) = connection.stream().lock()
         {
-            send_code(&mut *stream, None, MessageCode::Disconnect, connection.shared_key());
+            send_code(&mut *stream, None, MessageCode::Disconnect, connection.keys());
         }
     }
 
@@ -415,7 +415,7 @@ fn get_latest_id() -> usize
     unreachable!("what the fuck");
 }
 
-fn update_client_shared_key(stream: &mut TcpStream, shared_key: &Vec<i64>) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
+fn update_client_keys(stream: &mut TcpStream, keys: &(Vec<i64>, Vec<u8>)) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
 {
     let peer_addr = match stream.peer_addr()
     {
@@ -430,7 +430,7 @@ fn update_client_shared_key(stream: &mut TcpStream, shared_key: &Vec<i64>) //ADD
         {
             stream: old_connection.stream().clone(),
             username: None,
-            shared_key: Some(shared_key.to_owned()),
+            keys: Some(keys.to_owned()),
             last_activity: Instant::now(),
             seq: *old_connection.seq(),
         }
@@ -453,7 +453,7 @@ fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize) //MOVE
             stream: old_connection.stream().clone(),
             username: username.to_string(),
             id: id,
-            shared_key: old_connection.shared_key().unwrap().to_owned(),
+            keys: old_connection.keys().unwrap().to_owned(),
             last_activity: Instant::now() - Duration::from_millis(config::server_config("min_message_delay")),
             spam_violations: 0,
             channel: None,
@@ -481,7 +481,7 @@ fn update_client_channel(stream: &mut TcpStream, channel: &Option<String>) //MOV
             stream: old_connection.stream().clone(),
             username: old_connection.username().unwrap().clone(),
             id: *old_connection.id().unwrap(),
-            shared_key: old_connection.shared_key().unwrap().to_owned(),
+            keys: old_connection.keys().unwrap().to_owned(),
             last_activity: Instant::now(),
             spam_violations: *old_connection.spam_violations().unwrap(),
             channel: channel.clone(),
@@ -491,16 +491,16 @@ fn update_client_channel(stream: &mut TcpStream, channel: &Option<String>) //MOV
     });
 }
 
-fn ask_version(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) -> Option<String> //ASK CLIENT FOR VERSION
+fn ask_version(stream: &mut TcpStream, keys: &(Vec<i64>, Vec<u8>)) -> Option<String> //ASK CLIENT FOR VERSION
 {
     //ASK FOR VERSION
-    send_code(stream, Some(misc::get_version().to_string()), MessageCode::Version, shared_key);
+    send_code(stream, Some(misc::get_version().to_string()), MessageCode::Version, Some(&keys));
 
     //WAIT FOR RESPONSE FROM CLIENT
     let version = loop
     {
         //READ MESSAGE
-        let received = network::receive(stream, shared_key)?;
+        let received = network::receive(stream, Some(keys))?;
 
         if received.code == Some(MessageCode::Version) && !received.text.is_none() { break received; }
     };
@@ -509,14 +509,14 @@ fn ask_version(stream: &mut TcpStream, shared_key: Option<&Vec<i64>>) -> Option<
 }
 
 //PUBLIC
-pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, shared_key: Option<&Vec<i64>>) //SEND CODE TO CLIENT
+pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, keys: Option<&(Vec<i64>, Vec<u8>)>) //SEND CODE TO CLIENT
 {
     network::send(stream, MessagePacket
     {
         text: text,
         code: Some(code),
         ..Default::default()
-    }, shared_key);
+    }, keys);
 }
 
 pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
@@ -534,25 +534,25 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     {
         stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
         username: None,
-        shared_key: None,
+        keys: None,
         last_activity: Instant::now(),
         seq: 0,
     });
 
-    //GET SHARED KEY
-    let shared_key = match key_exchange(stream)
+    //GET ENCRYPTION & MAC KEYS
+    let keys = match key_exchange(stream)
     {
-        Some(r) => Some(r),
+        Some(r) => r,
         None => return remove_connection(stream, false)
     };
 
     //UPDATE CONNECTION
-    update_client_shared_key(stream, shared_key.as_ref().unwrap());
+    update_client_keys(stream, &keys);
 
     //ASK CLIENT FOR THEIR PACKAGE VERSION
     if config::server_config("check_client_version")
     {
-        let version = ask_version(stream, shared_key.as_ref());
+        let version = ask_version(stream, &keys);
         if version.is_none() || version != Some(misc::get_version().to_string())
         {
             return remove_connection(stream, true);
@@ -560,7 +560,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     }
 
     //SEND PACKET WITH REQUIRED SERVER INFO
-    send_welcome_packet(stream, shared_key.as_ref());
+    send_welcome_packet(stream, &keys);
 
     //GET USERNAME FROM USER
     let mut username: Option<String> = None; //USER ENTERED USERNAME
@@ -574,16 +574,16 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let disabled_registration = !config::server_config::<bool>("allow_register");
     if disabled_registration
     {
-        send_code(stream, None, MessageCode::RegisterDisabled, shared_key.as_ref());
+        send_code(stream, None, MessageCode::RegisterDisabled, Some(&keys));
     }
 
     //ASK n TIMES
     for _ in 0..max_tries
     {
         //SEND PICK_USERNAME CODE
-        send_code(stream, None, MessageCode::Username, shared_key.as_ref());
+        send_code(stream, None, MessageCode::Username, Some(&keys));
 
-        match network::receive(stream, shared_key.as_ref())
+        match network::receive(stream, Some(&keys))
         {
             //USERNAME CONDITIONS MET, BREAK LOOP
             Some(r) =>
@@ -632,10 +632,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         for _ in 0..max_tries
         {
             //SEND REGISTER CODE
-            send_code(stream, None, MessageCode::PasswordR, shared_key.as_ref());
+            send_code(stream, None, MessageCode::PasswordR, Some(&keys));
 
             //WAIT FOR ANSWER
-            match network::receive(stream, shared_key.as_ref())
+            match network::receive(stream, Some(&keys))
             {
                 Some(r) =>
                 {
@@ -664,10 +664,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     } else //LOGIN
     {
         //SEND LOGIN CODE
-        send_code(stream, None, MessageCode::PasswordL, shared_key.as_ref());
+        send_code(stream, None, MessageCode::PasswordL, Some(&keys));
 
         //WAIT FOR ANSWER
-        let response = match network::receive(stream, shared_key.as_ref())
+        let response = match network::receive(stream, Some(&keys))
         {
             Some(r) => r,
             None => return remove_connection(stream, false),
@@ -687,7 +687,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     authenticate_client(stream, &username, id);
 
     //TELL CLIENT TO START CHATTING
-    send_code(stream, None, MessageCode::Accept, shared_key.as_ref());
+    send_code(stream, None, MessageCode::Accept, Some(&keys));
 
     //SEND JOIN MESSAGE
     send_to_all(MessagePacket
@@ -702,7 +702,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     loop
     {
         //READ
-        let read = match network::receive(stream, shared_key.as_ref())
+        let read = match network::receive(stream, Some(&keys))
         {
             Some(r) => r,
             None => return
@@ -727,11 +727,11 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     if read.text.iter().all(|s| !s.is_empty() && s.len() <= config::server_config("max_channel_length") && s.chars().all(|c| c.is_ascii_alphanumeric() && c != ' '))
                     {
                         update_client_channel(stream, &read.text);
-                        send_code(stream, read.text, MessageCode::Channel, shared_key.as_ref());
+                        send_code(stream, read.text, MessageCode::Channel, Some(&keys));
                     } else //INVALID CHANNEL
                     {
                         //SEND InvalidUsage CODE
-                        send_code(stream, None, MessageCode::InvalidUsage, shared_key.as_ref());
+                        send_code(stream, None, MessageCode::InvalidUsage, Some(&keys));
                     }
                 },
 
@@ -755,7 +755,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
                         code: Some(MessageCode::List),
                         ..Default::default()
-                    }, shared_key.as_ref());
+                    }, Some(&keys));
                 },
 
                 //PRIVATE MESSAGE
@@ -790,7 +790,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                         code: Some(MessageCode::PrivateMessage),
 
                                         ..Default::default()
-                                    }, recipient.shared_key());
+                                    }, recipient.keys());
                                 }
                             }
                         }
@@ -804,11 +804,11 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                             code: Some(MessageCode::PrivateMessageBack),
 
                             ..Default::default()
-                        }, shared_key.as_ref());
+                        }, Some(&keys));
                     } else
                     {
                         //INVALID PM FORMAT
-                        send_code(stream, None, MessageCode::InvalidUsage, shared_key.as_ref());
+                        send_code(stream, None, MessageCode::InvalidUsage, Some(&keys));
                     }
                 },
 

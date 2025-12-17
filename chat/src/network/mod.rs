@@ -50,11 +50,7 @@ use why2_core::rex::
     Grid,
 };
 
-use crate::chat::
-{
-    crypto,
-    options as rex_options,
-};
+use crate::chat::options as rex_options;
 
 #[cfg(feature = "server")]
 use std::
@@ -182,7 +178,7 @@ impl<'de> Deserialize<'de> for SerColor
 }
 
 //FUNCTIONS
-pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>>) //SEND packet TO stream
+pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&(Vec<i64>, Vec<u8>)>) //SEND packet TO stream
 {
     //COPY PACKET
     let mut packet = packet;
@@ -210,7 +206,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
     //ENCODE THE PACKET STRUCT TO Vec<u8>
     let packet_bytes = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
 
-    let final_bytes = if let Some(key) = key
+    let final_bytes = if let Some(keys) = keys
     {
         //CONVERT packet_bytes to BINARY
         let mut input_i64 = Vec::with_capacity((packet_bytes.len() + 7) / 8);
@@ -222,7 +218,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
         }
 
         //ENCRYPT
-        let encrypted_data = encrypter::encrypt::<GRID_W, GRID_H>(input_i64, Some(key.to_vec())).expect("Encrypting packet failed");
+        let encrypted_data = encrypter::encrypt::<GRID_W, GRID_H>(input_i64, Some(keys.0.clone())).expect("Encrypting packet failed");
 
         //SERIALIZE ENCRYPTED PACKET
         let mut grids = encrypted_data.output;
@@ -234,11 +230,8 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
                 .flat_map(|row| row.iter()
                     .flat_map(|&val| val.to_be_bytes()))).collect();
 
-        //DERIVE MAC KEY
-        let mac_key = crypto::derive_mac_key(key);
-
         //COMPUTE HMAC OVER CIPHERTEXT
-        let mut mac = Hmac::<Sha256>::new_from_slice(&mac_key).expect("HMAC initialization failed");
+        let mut mac = Hmac::<Sha256>::new_from_slice(&keys.1).expect("HMAC initialization failed");
         mac.update(&encrypted_bytes);
 
         let mac_tag = mac.finalize().into_bytes();
@@ -261,7 +254,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, key: Option<&Vec<i64>
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<MessagePacket>
+pub fn receive(stream: &mut TcpStream, keys: Option<&(Vec<i64>, Vec<u8>)>) -> Option<MessagePacket>
 {
     //READ VARIABLES
     let mut reader: Box<dyn BufRead>;
@@ -350,7 +343,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
     let mut decoded_packet = base91::slice_decode(packet.trim().as_bytes());
 
     //DECRYPT
-    if let Some(key) = key
+    if let Some(keys) = keys
     {
         //HMAC VERIFICATION CLOSURE
         let verify_mac = |packet: Vec<u8>| -> Option<Vec<u8>>
@@ -365,11 +358,8 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
             let received_mac: [u8; 32] = packet[..32].try_into().unwrap();
             let ciphertext = &packet[32..];
 
-            //DERIVE MAC KEY
-            let mac_key = crypto::derive_mac_key(key);
-
             //COMPUTE EXPECTED HMAC
-            let mut mac = Hmac::<Sha256>::new_from_slice(&mac_key).expect("HMAC initialization failed");
+            let mut mac = Hmac::<Sha256>::new_from_slice(&keys.1).expect("HMAC initialization failed");
             mac.update(ciphertext);
 
             //VERIFY MAC
@@ -405,7 +395,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
         let decrypted_packet = decrypter::decrypt(options::EncryptedData
         {
             output: grids,
-            key: Grid::from_key(key.to_vec()).unwrap(),
+            key: Grid::from_key(keys.0.clone()).unwrap(),
             iv: iv,
         }).ok()?;
 
@@ -438,7 +428,7 @@ pub fn receive(stream: &mut TcpStream, key: Option<&Vec<i64>>) -> Option<Message
 
                 //WARN
                 spam_warning = true;
-                shared_key = conn.shared_key().cloned();
+                shared_key = conn.keys().cloned();
 
                 //CHECK FOR TOO MANY VIOLATIONS
                 disconnect = *conn.spam_violations().unwrap() > config::server_config::<usize>("max_message_delay_violations");

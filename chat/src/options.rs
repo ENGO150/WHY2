@@ -52,7 +52,7 @@ pub const FETCH_TIMEOUT: u64        = 5000;                                     
 pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                           //DIMENSIONS OF REX GRID
 
 //SETTINGS
-static SHARED_KEY: LazyLock<RwLock<Option<Vec<i64>>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
+static KEYS: LazyLock<RwLock<Option<(Vec<i64>, Vec<u8>)>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
 {
     RwLock::new(None)
 });
@@ -79,16 +79,16 @@ static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT 
 static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (SERVER -> CLIENT)
 
 //FUNCTIONS
-//SHARED SYM KEY
-pub fn set_shared_key(key: Vec<i64>) //SET KEY
+//SHARED KEYS
+pub fn set_keys(keys: (Vec<i64>, Vec<u8>)) //SET KEY
 {
-    let mut shared_key = SHARED_KEY.write().unwrap();
-    *shared_key = Some(key);
+    let mut shared_key = KEYS.write().unwrap();
+    *shared_key = Some(keys);
 }
 
-pub fn get_shared_key() -> Option<Vec<i64>> //RETURN KEY
+pub fn get_keys() -> Option<(Vec<i64>, Vec<u8>)> //RETURN KEY
 {
-    let shared_key = SHARED_KEY.read().unwrap();
+    let shared_key = KEYS.read().unwrap();
     shared_key.clone()
 }
 

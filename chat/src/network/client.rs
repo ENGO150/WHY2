@@ -50,7 +50,7 @@ const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //PRIVATE
-fn key_exchange(stream: &mut TcpStream) -> Vec<i64> //KEY EXCHANGE FOR CLIENT-SIDE
+fn key_exchange(stream: &mut TcpStream) -> (Vec<i64>, Vec<u8>) //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
     let message = loop
@@ -144,9 +144,9 @@ fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF 
 //PUBLIC
 pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 {
-    //SET GLOBAL CLIENT SHARED KEY
-    let shared_key = key_exchange(stream);
-    options::set_shared_key(shared_key.clone());
+    //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
+    let keys = key_exchange(stream);
+    options::set_keys(keys.clone());
 
     //SERVER INFO VARIABLES
     let mut min_pass: Option<u64> = None;
@@ -168,7 +168,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     //LOOP READING
     loop
     {
-        let read = match network::receive(stream, Some(&shared_key))
+        let read = match network::receive(stream, Some(&keys))
         {
             Some(packet) => packet,
             None => continue
@@ -203,7 +203,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                         text: Some(version),
                         code: Some(MessageCode::Version),
                         ..Default::default()
-                    }, Some(&shared_key));
+                    }, Some(&keys));
 
                     continue;
                 }

@@ -33,6 +33,11 @@ use p521::
     },
 };
 
+use sha2::{ Sha256, Digest };
+use hkdf::Hkdf;
+
+use crate::chat::{ misc, options };
+
 #[cfg(feature = "server")]
 use argon2::
 {
@@ -42,14 +47,33 @@ use argon2::
     password_hash::{ PasswordHash, SaltString },
 };
 
-use rand_chacha::ChaCha20Rng;
-use rand::SeedableRng;
+//CONSTS
+const GRID_W: usize = options::GRID_DIMENSIONS.0;
+const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
-use sha2::{ Sha256, Digest };
+//PRIVATE
+fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> (Vec<i64>, Vec<u8>) //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
+{
+    let hkdf = Hkdf::<Sha256>::new(None, shared_secret);
 
-use why2_core::rex::crypto;
-use crate::chat::{ misc, options };
+    //DERIVE KEYS FOR ENCRYPTION & MAC
+    let mut encryption_key = vec![0u8; GRID_W * GRID_H * 16];
+    let mut mac = vec![0u8; 32];
 
+    //EXPAND
+    hkdf.expand(format!("{}-encryption", info).as_bytes(), &mut encryption_key).expect("HKDF expand failed");
+    hkdf.expand(format!("{}-mac", info).as_bytes(), &mut mac).expect("HKDF expand failed");
+
+    //CONVERT ENCRYPTION KEY BYTES TO i64s & RETURN TOGETHER WITH MAC
+    (encryption_key.chunks(8).map(|chunk|
+    {
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(chunk);
+        i64::from_be_bytes(bytes)
+    }).collect(), mac)
+}
+
+//PUBLIC
 pub fn generate_ephemeral_keys() -> (String, String) //CREATE ECC KEYS
 {
     //GENERATE PRIVATE KEY
@@ -90,7 +114,7 @@ pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
     (sk, pk)
 }
 
-pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Option<Vec<i64>> //DERIVE SHARED SYMKEY USING ECDH
+pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Option<(Vec<i64>, Vec<u8>)> //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
 {
     //PARSE KEYS
     let local_private = SecretKey::from_pkcs8_pem(&local_key).expect("Invalid key");
@@ -99,12 +123,8 @@ pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, p
     //COMPUTE EDCH
     let shared = ecdh::diffie_hellman(local_private.to_nonzero_scalar(), remote_public.as_affine());
 
-    //SEED ChaCha20Rng USING SHARED KEY
-    let shared_encoded = base91::slice_encode(shared.raw_secret_bytes());
-    let mut dprng = ChaCha20Rng::from_seed(sha256(std::str::from_utf8(&shared_encoded).expect("Encoding shared key failed")));
-
-    //RETURN GENERATED KEY
-    Some(crypto::generate_key_deterministic::<W, H>(&mut dprng))
+    //USE HKDF TO DERIVE SEPARATE ENCRYPTION AND MAC KEY
+    Some(derive_encryption_keys(shared.raw_secret_bytes(), "WHY2-CHAT"))
 }
 
 pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
@@ -135,18 +155,4 @@ pub fn compare_password_hash(hashed: &str, password: &str) -> bool //COMPARE ARG
 
     //COMPARE
     Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok()
-}
-
-pub fn derive_mac_key(encryption_key: &[i64]) -> Vec<u8> //DERIVE SEPARATE MAC KEY FROM ENCRYPTION KEY
-{
-    let mut hasher = Sha256::new();
-    hasher.update(b"WHY2-HMAC-KEY-V1"); //DOMAIN SEPARATOR
-
-    // Mix in the encryption key
-    for &val in encryption_key
-    {
-        hasher.update(&val.to_be_bytes());
-    }
-
-    hasher.finalize().to_vec()
 }
