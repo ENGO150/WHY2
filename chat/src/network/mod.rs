@@ -27,12 +27,7 @@ use std::
 {
     str::FromStr,
     net::TcpStream,
-    io::
-    {
-        Write,
-        BufReader,
-        BufRead,
-    },
+    io::{ Read, Write },
 };
 
 use serde::{ Deserialize, Deserializer, Serialize, Serializer };
@@ -53,11 +48,7 @@ use why2_core::rex::
 use crate::chat::options as rex_options;
 
 #[cfg(feature = "server")]
-use std::
-{
-    io::Read,
-    time::{ Instant, Duration },
-};
+use std::time::{ Instant, Duration };
 
 #[cfg(feature = "server")]
 use crate::chat::config;
@@ -254,12 +245,8 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&(Vec<i6
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, keys: Option<&(Vec<i64>, Vec<u8>)>) -> Option<MessagePacket>
+pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<i64>, Vec<u8>)>) -> Option<MessagePacket>
 {
-    //READ VARIABLES
-    let mut reader: Box<dyn BufRead>;
-    let mut packet = String::new(); //RECEIVED STRING
-
     //SERVER SIDE PACKET SIZE LIMIT
     #[cfg(feature = "server")]
     let max_packet_size: usize;
@@ -268,7 +255,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&(Vec<i64>, Vec<u8>)>) -> Op
     #[cfg(feature = "server")]
     let spam_protection = config::server_config::<bool>("spam_protection");
 
-    //INIT READER
+    //SETUP LIMITS
     #[cfg(feature = "server")]
     {
         //CHECK IF CLIENT IS AUTHENTICATED
@@ -277,29 +264,191 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&(Vec<i64>, Vec<u8>)>) -> Op
             .map(|conn| conn.is_authenticated())
             .unwrap_or(false);
 
-        reader = Box::new(BufReader::new(stream.try_clone().expect("Cloning stream failed")));
-
         //ALLOW BIG MESSAGES WHEN SPAM PROTECTION IS OFF AND CLIENT IS AUTHENTICATED
         max_packet_size = if !spam_protection && authenticated
         {
             usize::MAX
         } else //SET MAX PACKET SIZE IF SPAM PROTECTION IS ENABLED
         {
-            let max = config::server_config("max_packet_size");
-            reader = Box::new(reader.take(max as u64 + 16));
-
-            max
+            config::server_config("max_packet_size")
         };
-    }
-
-    #[cfg(not(feature = "server"))]
-    {
-        reader = Box::new(BufReader::new(&mut *stream));
     }
 
     //LOOP READING UNTIL MESSAGE ARRIVES
     loop
     {
+        //CHECK IF THERE IS A NEWLINE IN BUFFER
+        if let Some(pos) = buffer.iter().position(|&b| b == b'\n')
+        {
+            //EXTRACT LINE (INCLUDING \n)
+            let mut line: Vec<u8> = buffer.drain(..=pos).collect();
+
+            //REMOVE \n
+            if let Some(&b'\n') = line.last() { line.pop(); }
+
+            //DECODE PACKET (BASE91)
+            let mut decoded_packet = base91::slice_decode(&line);
+
+            //DECRYPT
+            if let Some(keys) = keys
+            {
+                //HMAC VERIFICATION CLOSURE
+                let verify_mac = |packet: Vec<u8>| -> Option<Vec<u8>>
+                {
+                    //VERIFY MAC LENGTH
+                    if packet.len() < 32
+                    {
+                        return None;
+                    }
+
+                    //SEPARATE MAC FROM CIPHERTEXT
+                    let received_mac: [u8; 32] = packet[..32].try_into().unwrap();
+                    let ciphertext = &packet[32..];
+
+                    //COMPUTE EXPECTED HMAC
+                    let mut mac = Hmac::<Sha256>::new_from_slice(&keys.1).expect("HMAC initialization failed");
+                    mac.update(ciphertext);
+
+                    //VERIFY MAC
+                    if mac.verify_slice(&received_mac).is_ok()
+                    {
+                        Some(ciphertext.to_vec())
+                    } else
+                    {
+                        None
+                    }
+                };
+
+                //VERIFY HMAC
+                if let Some(ciphertext) = verify_mac(decoded_packet)
+                {
+                    decoded_packet = ciphertext;
+                } else
+                {
+                    //LOG IF ON SERVER
+                    #[cfg(feature = "server")]
+                    println!("HMAC verification failed: {}", stream.peer_addr().unwrap());
+
+                    return None;
+                }
+
+                //DESERIALIZE ENCRYPTED PACKET
+                let mut grids = Grid::<GRID_W, GRID_H>::from_bytes(decoded_packet).ok()?;
+
+                //EXTRACT INITIALIZATION VECTOR
+                let iv = grids.remove(0);
+
+                //DECRYPT
+                let decrypted_packet = decrypter::decrypt(options::EncryptedData
+                {
+                    output: grids,
+                    key: Grid::from_key(keys.0.clone()).unwrap(),
+                    iv: iv,
+                }).ok()?;
+
+                //OVERWRITE decoded_packet
+                decoded_packet = Vec::with_capacity(decrypted_packet.output.len() * 8);
+                for val in decrypted_packet.output
+                {
+                    decoded_packet.extend_from_slice(&val.to_be_bytes());
+                }
+            }
+
+            //ACTIVITY TIMER ON SERVER
+            #[cfg(feature = "server")]
+            {
+                let peer_addr = stream.peer_addr().ok()?; //GET CURRENT PEER ADDRESS
+                let mut spam_warning = false;
+                let mut shared_key = None;
+                let mut disconnect = false;
+
+                //FIND CONNECTION AND SET last_activity
+                if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
+                {
+                    //SPAM
+                    if config::server_config("spam_protection") && conn.is_authenticated() &&
+                        Instant::now().duration_since(*conn.last_activity()) <
+                            Duration::from_millis(config::server_config::<u64>("min_message_delay"))
+                    {
+                        //INCREMENT SPAM VIOLATIONS
+                        *conn.spam_violations_mut().unwrap() += 1;
+
+                        //WARN
+                        spam_warning = true;
+                        shared_key = conn.keys().cloned();
+
+                        //CHECK FOR TOO MANY VIOLATIONS
+                        disconnect = *conn.spam_violations().unwrap() > config::server_config::<usize>("max_message_delay_violations");
+                    }
+
+                    *conn.last_activity_mut() = Instant::now(); //RESET last_activity
+                }
+
+                //SEND WARNING CODE
+                if spam_warning
+                {
+                    server::send_code(stream, None, MessageCode::SpamWarning, shared_key.as_ref());
+                }
+
+                //TOO MANY VIOLATIONS, BYE
+                if disconnect
+                {
+                    server::remove_connection(stream, true);
+                    return None;
+                }
+            }
+
+            //DECODE AND RETURN
+            match bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard())
+            {
+                Ok((packet, _)) =>
+                {
+                    //VERIFY SEQUENCE NUMBER
+                    #[cfg(feature = "server")] //ON SERVER
+                    {
+                        if let Some(mut conn) = server::CONNECTIONS.get_mut(&stream.peer_addr().ok()?)
+                        {
+                            if packet.seq == *conn.seq() + 1 //VALID SEQ
+                            {
+                                //SET SEQ TO CURRENT
+                                *conn.seq_mut() = packet.seq;
+                            } else
+                            {
+                                //INVALID SEQ
+                                drop(conn); //PREVENT DEADLOCK
+                                println!("SEQ verification failed: {}", stream.peer_addr().ok()?);
+                                server::remove_connection(stream, false);
+                            }
+                        }
+                    }
+
+                    //VERIFY SEQUENCE NUMBER
+                    #[cfg(feature = "client")] //ON CLIENT
+                    {
+                        if packet.seq == rex_options::get_server_seq() + 1 || rex_options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
+                        {
+                            //SET SEQ
+                            rex_options::set_server_seq(packet.seq);
+                        } else //INVALID, DISCONNECT
+                        {
+                            return None;
+                        }
+                    }
+
+                    return Some(packet);
+                },
+
+                Err(_) =>
+                {
+                    //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
+                    #[cfg(feature = "server")]
+                    server::remove_connection(stream, false);
+
+                    return None;
+                }
+            }
+        }
+
         //CHECK IF CLIENT IS STILL IN ACTIVE CONNECTION LIST
         #[cfg(feature = "server")]
         {
@@ -309,13 +458,11 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&(Vec<i64>, Vec<u8>)>) -> Op
             }
         }
 
-        //EXIT LOOP ON MESSAGE
-        if !packet.is_empty() { break; }
-
-        //READ
-        match reader.read_line(&mut packet)
+        //READ FROM STREAM
+        let mut chunk = [0u8; 1024];
+        match stream.read(&mut chunk)
         {
-            Ok(0) | Err(_) => //CLIENT DISCONNECTED
+            Ok(0) => //CLIENT DISCONNECTED
             {
                 #[cfg(feature = "server")]
                 {
@@ -325,178 +472,22 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&(Vec<i64>, Vec<u8>)>) -> Op
                 return None;
             },
 
-            Ok(_i) => //VALID MESSAGE
+            Ok(n) => //VALID READ
             {
                 #[cfg(feature = "server")]
                 {
-                    if _i >= max_packet_size //INPUT TOO LONG
+                    //CHECK MAX PACKET SIZE
+                    if buffer.len() + n > max_packet_size
                     {
-                        server::remove_connection(stream, true);
-                        return None;
+                         server::remove_connection(stream, true);
+                         return None;
                     }
                 }
-            }
-        }
-    }
 
-    //DECODE PACKET (BASE91)
-    let mut decoded_packet = base91::slice_decode(packet.trim().as_bytes());
+                buffer.extend_from_slice(&chunk[..n]);
+            },
 
-    //DECRYPT
-    if let Some(keys) = keys
-    {
-        //HMAC VERIFICATION CLOSURE
-        let verify_mac = |packet: Vec<u8>| -> Option<Vec<u8>>
-        {
-            //VERIFY MAC LENGTH
-            if packet.len() < 32
-            {
-                return None;
-            }
-
-            //SEPARATE MAC FROM CIPHERTEXT
-            let received_mac: [u8; 32] = packet[..32].try_into().unwrap();
-            let ciphertext = &packet[32..];
-
-            //COMPUTE EXPECTED HMAC
-            let mut mac = Hmac::<Sha256>::new_from_slice(&keys.1).expect("HMAC initialization failed");
-            mac.update(ciphertext);
-
-            //VERIFY MAC
-            if mac.verify_slice(&received_mac).is_ok()
-            {
-                Some(ciphertext.to_vec())
-            } else
-            {
-                None
-            }
-        };
-
-        //VERIFY HMAC
-        if let Some(ciphertext) = verify_mac(decoded_packet)
-        {
-            decoded_packet = ciphertext;
-        } else
-        {
-            //LOG IF ON SERVER
-            #[cfg(feature = "server")]
-            println!("HMAC verification failed: {}", stream.peer_addr().unwrap());
-
-            return None;
-        }
-
-        //DESERIALIZE ENCRYPTED PACKET
-        let mut grids = Grid::<GRID_W, GRID_H>::from_bytes(decoded_packet).ok()?;
-
-        //EXTRACT INITIALIZATION VECTOR
-        let iv = grids.remove(0);
-
-        //DECRYPT
-        let decrypted_packet = decrypter::decrypt(options::EncryptedData
-        {
-            output: grids,
-            key: Grid::from_key(keys.0.clone()).unwrap(),
-            iv: iv,
-        }).ok()?;
-
-        //OVERWRITE decoded_packet
-        decoded_packet = Vec::with_capacity(decrypted_packet.output.len() * 8);
-        for val in decrypted_packet.output
-        {
-            decoded_packet.extend_from_slice(&val.to_be_bytes());
-        }
-    }
-
-    //ACTIVITY TIMER ON SERVER
-    #[cfg(feature = "server")]
-    {
-        let peer_addr = stream.peer_addr().ok()?; //GET CURRENT PEER ADDRESS
-        let mut spam_warning = false;
-        let mut shared_key = None;
-        let mut disconnect = false;
-
-        //FIND CONNECTION AND SET last_activity
-        if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
-        {
-            //SPAM
-            if config::server_config("spam_protection") && conn.is_authenticated() &&
-                Instant::now().duration_since(*conn.last_activity()) <
-                    Duration::from_millis(config::server_config::<u64>("min_message_delay"))
-            {
-                //INCREMENT SPAM VIOLATIONS
-                *conn.spam_violations_mut().unwrap() += 1;
-
-                //WARN
-                spam_warning = true;
-                shared_key = conn.keys().cloned();
-
-                //CHECK FOR TOO MANY VIOLATIONS
-                disconnect = *conn.spam_violations().unwrap() > config::server_config::<usize>("max_message_delay_violations");
-            }
-
-            *conn.last_activity_mut() = Instant::now(); //RESET last_activity
-        }
-
-        //SEND WARNING CODE
-        if spam_warning
-        {
-            server::send_code(stream, None, MessageCode::SpamWarning, shared_key.as_ref());
-        }
-
-        //TOO MANY VIOLATIONS, BYE
-        if disconnect
-        {
-            server::remove_connection(stream, true);
-            return None;
-        }
-    }
-
-    //DECODE AND RETURN
-    match bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard())
-    {
-        Ok((packet, _)) =>
-        {
-            //VERIFY SEQUENCE NUMBER
-            #[cfg(feature = "server")] //ON SERVER
-            {
-                let mut conn = server::CONNECTIONS.get_mut(&stream.peer_addr().ok()?)?;
-
-                if packet.seq == *conn.seq() + 1 //VALID SEQ
-                {
-                    //SET SEQ TO CURRENT
-                    *conn.seq_mut() = packet.seq;
-                } else
-                {
-                    //INVALID SEQ
-                    drop(conn); //PREVENT DEADLOCK
-                    println!("SEQ verification failed: {}", stream.peer_addr().ok()?);
-                    server::remove_connection(stream, false);
-                }
-            }
-
-            //VERIFY SEQUENCE NUMBER
-            #[cfg(feature = "client")] //ON CLIENT
-            {
-                if packet.seq == rex_options::get_server_seq() + 1 || rex_options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
-                {
-                    //SET SEQ
-                    rex_options::set_server_seq(packet.seq);
-                } else //INVALID, DISCONNECT
-                {
-                    return None;
-                }
-            }
-
-            Some(packet)
-        },
-
-        Err(_) =>
-        {
-            //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
-            #[cfg(feature = "server")]
-            server::remove_connection(stream, false);
-
-            None
+            Err(_) => return None //ERROR OR TIMEOUT
         }
     }
 }

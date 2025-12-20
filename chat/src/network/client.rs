@@ -50,13 +50,13 @@ const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //PRIVATE
-fn key_exchange(stream: &mut TcpStream, keys: &mut (Vec<i64>, Vec<u8>)) //KEY EXCHANGE FOR CLIENT-SIDE
+fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut (Vec<i64>, Vec<u8>)) //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
     let message = loop
     {
         //READ MESSAGE
-        let received = network::receive(stream, None).unwrap();
+        let received = network::receive(stream, buffer, None).unwrap();
 
         if received.code == Some(MessageCode::KeyExchange) { break received; }
     };
@@ -147,9 +147,12 @@ fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF 
 //PUBLIC
 pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 {
+    //CREATE PERSISTENT BUFFER
+    let mut buffer = Vec::new();
+
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let mut keys = (vec![], vec![]);
-    key_exchange(stream, &mut keys);
+    key_exchange(stream, &mut buffer, &mut keys);
 
     //SERVER INFO VARIABLES
     let mut min_pass: Option<u64> = None;
@@ -171,7 +174,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     //LOOP READING
     loop
     {
-        let read = match network::receive(stream, Some(&keys))
+        let read = match network::receive(stream, &mut buffer, Some(&keys))
         {
             Some(packet) => packet,
             None => continue
