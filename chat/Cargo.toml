@@ -36,7 +36,7 @@ client = ["chat", "dep:crossterm"]
 server = ["chat", "dep:ctrlc", "dep:argon2", "dep:dashmap"]
 
 [dependencies]
-why2-core = { path = "../core", version = "0.2.9-rex" }
+why2-core = { path = "../core", version = "0.3.0-rex" }
 
 argon2 = { version = "0.5.3", optional = true }
 base91 = { version = "0.1.0", optional = true }

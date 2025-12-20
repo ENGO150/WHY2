@@ -2006,7 +2006,7 @@ dependencies = [
 
 [[package]]
 name = "why2"
-version = "0.2.9-rex"
+version = "0.3.0-rex"
 dependencies = [
  "argon2",
  "base91",
@@ -2032,7 +2032,7 @@ dependencies = [
 
 [[package]]
 name = "why2-core"
-version = "0.2.9-rex"
+version = "0.3.0-rex"
 dependencies = [
  "rand",
  "rand_chacha",
@@ -2041,7 +2041,7 @@ dependencies = [
 
 [[package]]
 name = "why2-tests"
-version = "0.2.9-rex"
+version = "0.3.0-rex"
 dependencies = [
  "rand",
  "rand_chacha",

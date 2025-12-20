@@ -1,7 +1,104 @@
 Changelog
 =========
 
+v0.3.0-rex:
+- 2dd1a62: update dependencies
+- ca24431: implement rekeying
+- 7ee70f9: use looser seq verification
+- 07a50ca: decrease max_packet_size to 2048
+- b3c88c4: implement persistent buffer on receive fn
+- 9098c6c: use output parameter for key_exchange fns
+- 4acf5c0: modify keys variable directly from key_exchange fns
+- 053ae48: use inline on cheap rex grid operations
+- 66b347e: use unified identifier across chat
+- 36614d8: replace key derivation seeding with HKDF
+- 8063a3e: implement sequence numbers on server packets
+- eb57e76: add channels alias for list command
+- c88d197: implement sequence numbers on client packets
+- f97480d: use big endian instead of native endian
+- 2b81e59: verify hmac on receive fn
+- b7e7c0a: prepend hmac to ciphertext on send
+- 20fc606: add hmac dependency for chat
+- 7ef594f: simplify send fn
+- 3711acf: implement diagonal mixing to round iterations
+- 537ff3e: optimize user search
+- 18ff11b: fix last_activity iterations
+- b6354d2: prevent stream poisoning on thread crash
+- da7f062: remove unused Arc from CONNECTIONS list
+- 1c9228d: use DashMap instead of RwLock<Vec> on CONNECTIONS list
+- fd96ddd: update dependencies
+- ecd31fb: add raw mode guard for client
+- 3095ec9: increase SUBCELL_ROUNDS TO 32
+- f5a64b9: remove unwrap from receive fn
+- 3467fa8: optimize packet encoding
+- 8857910: implement random initialization vector for cipher block chaining mode
+- f0c4f29: raise max_packet_size to 4096
+- e6639a9: use ISO 10126 padding instead of PKCS#7
+- 5bfa432: fix channel name condition logic
+- 173fc4c: add build.rs bypass env variable
+- 8eb67a7: update dependencies
+- 5f98acc: return trimmed parameters
+- 45ae000: test whole WHY2 instead of core only
+- 1d0ea56: use only why2-tests workspace for core-test
+- 9de1e32: move core/tests to separate workspace
+- c3aaed3: update workflow chat compilations
+- cbd748a: fix url for chat configuration templates
+- d9b0b94: fix type mismatch in readme code example
+- fa379e6: add why2_core alias
+- 90ef62b: typo fix
+- 62bfd67: update dependencies
+- f5faa9c: split on core & chat workspaces
+- 685d8d9: bind C-l to list command
+- eeaba94: replace empty string expect calls with unwrap
+- 8563604: remove unwrap from decrypter cbc
+- 135e559: add diffusion test for rex
+- b366de4: add cipher block chaining to Grids
+- 178cb2e: add matrix mixing operation
+- 2b3b7ef: remove rex prefix from rex-tests
+- 4db3819: create rex test module
+- 05c70df: fix message history crash on special chars
+- ab391f6: enable ssh host key checking for gitlab ci
+- 048061e: fix comment typos
+- 01dc33c: send messages only to matching channel
+- b9737ab: implement max_channel_length config entry
+- b29f4ec: display channel in list command
+- f88405d: display channel in client ui
+- f1984be: update dependencies
+- e25e4aa: process channel change on server
+- 867fc22: add channel property to Authorized Connection
+- 611021a: recreate PM on server-side
+- c46e437: use unified connection finder
+- da5fcff: create peer_addr method for Connection
+- f514eba: optimize connection modifications
+- e23299c: implement channel change request on client
+- 84d9253: disable raw mode on invalid server pkey abort
+- 3007a78: abort server-side key exchange on too many invalid packets
+- 7dbab33: run max_clients check before listen_client
+- 0af5e96: prevent server crash on invalid peer pkey
+- 5d4b299: prevent zombie connections on key exchange
+- 11d7929: prevent RST crash on new server connections
+- b17e368: check for invalid packets on receive fn
+- 0fe2e6a: optimize listen_server fn memory usage
+- a251c1e: add conditional compilation to chat config
+- bd4605a: optimize rex round key fns
+- 74a9f95: optimize rex-mix fn
+- dbecf19: force user to verify new remote pubkeys
+- bbe6e81: rename chat sha256_seed fn to sha256
+- 050cb85: check key validity on client
+- 3da8ebb: use static key on server & store them on client
+- ea3629d: implement height and width fns in Grid
+- 1a850e4: send server pubkey first
+- 649f0f1: update dependencies
+- 6db8ee8: use timeout for fetch_data
+- 6edef51: propagate fetch_data errors
+- f7ef4f0: add encrypt duration measure to rex test
+- ada4ca1: apply non-linear mixing to Grid#from_key
+- 4d0611c: use 'fake' login on disabled registrations
+- 9c03e52: use ephemeral ecc keys
+- 3266c35: update dependencies
+
 v0.2.9-rex:
+- 51ac87b: update changelog
 - 68f7043: update dependencies
 - 3459a33: upload to aur only on release
 - cb9c24d: add git identity
