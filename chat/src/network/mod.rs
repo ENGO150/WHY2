@@ -408,7 +408,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
                     {
                         if let Some(mut conn) = server::CONNECTIONS.get_mut(&stream.peer_addr().ok()?)
                         {
-                            if packet.seq == *conn.seq() + 1 //VALID SEQ
+                            if packet.seq > *conn.seq() //VALID SEQ
                             {
                                 //SET SEQ TO CURRENT
                                 *conn.seq_mut() = packet.seq;
@@ -425,7 +425,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
                     //VERIFY SEQUENCE NUMBER
                     #[cfg(feature = "client")] //ON CLIENT
                     {
-                        if packet.seq == rex_options::get_server_seq() + 1 || rex_options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
+                        if packet.seq > rex_options::get_server_seq() || rex_options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
                         {
                             //SET SEQ
                             rex_options::set_server_seq(packet.seq);
