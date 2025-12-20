@@ -58,6 +58,7 @@ use crate::chat::config;
 pub enum MessageCode //CONTROL CODES
 {
     KeyExchange,        //SERVER <> CLIENT | KEY EXCHANGE
+    Rekey,              //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)
     Welcome,            //SERVER -> CLIENT | INFORMATIONS
     Disconnect,         //SERVER <> CLIENT | QUIT COMMUNICATION
     Username,           //SERVER -> CLIENT | PICK USERNAME

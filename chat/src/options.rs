@@ -48,6 +48,8 @@ pub const SERVER_PKEY: &str         = "/public";                                
 
 pub const FETCH_TIMEOUT: u64        = 5000;                                                                   //TIMOUT FOR FETCHING DATA (MS)
 
+pub const REKEY_INTERVAL: u64       = 600;                                                                    //INTERVAL FOR RE-REKEYING (SECS)
+
 //DO NOT CHANGE CONST BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                           //DIMENSIONS OF REX GRID
 

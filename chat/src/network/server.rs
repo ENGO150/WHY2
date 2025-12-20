@@ -62,6 +62,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         id: usize,                     //ID OF USER
         keys: (Vec<i64>, Vec<u8>),     //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
         last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
+        last_key_exchange: Instant,    //TIME OF LAST REKEY
         spam_violations: usize,        //SPAM VIOLATIONS (unexpected, huh?)
         channel: Option<String>,       //CHANNEL
         seq: usize,                    //SEQUENCE NUMBER (CLIENT -> SERVER)
@@ -154,6 +155,16 @@ impl Connection
         {
             Self::Authenticated { last_activity, .. } => last_activity,
             Self::NonAuthenticated { last_activity, .. } => last_activity,
+        }
+    }
+
+    //GET LAST KEY EXCHANGE FROM Connection
+    pub fn last_key_exchange(&self) -> Option<&Instant>
+    {
+        match self
+        {
+            Self::Authenticated { last_key_exchange, .. } => Some(last_key_exchange),
+            Self::NonAuthenticated { .. } => None,
         }
     }
 
@@ -431,13 +442,36 @@ fn update_client_keys(stream: &mut TcpStream, keys: &(Vec<i64>, Vec<u8>)) //ADD 
     //UPDATE CONNECTION
     CONNECTIONS.alter(&peer_addr, |_, old_connection|
     {
-        Connection::NonAuthenticated
+        match old_connection
         {
-            stream: old_connection.stream().clone(),
-            username: None,
-            keys: Some(keys.to_owned()),
-            last_activity: Instant::now(),
-            seq: *old_connection.seq(),
+            Connection::NonAuthenticated { stream, seq, .. } =>
+            {
+                Connection::NonAuthenticated
+                {
+                    stream: stream,
+                    username: None,
+                    keys: Some(keys.to_owned()),
+                    last_activity: Instant::now(),
+                    seq: seq,
+                }
+            },
+
+            Connection::Authenticated { stream, username, id, last_activity, spam_violations, channel, seq, server_seq, .. } =>
+            {
+                Connection::Authenticated
+                {
+                    stream: stream,
+                    username: username,
+                    id: id,
+                    keys: keys.to_owned(),
+                    last_activity: last_activity,
+                    last_key_exchange: Instant::now(),
+                    spam_violations: spam_violations,
+                    channel: channel,
+                    seq: seq,
+                    server_seq: server_seq,
+                }
+            }
         }
     });
 }
@@ -460,6 +494,7 @@ fn authenticate_client(stream: &mut TcpStream, username: &str, id: usize) //MOVE
             id: id,
             keys: old_connection.keys().unwrap().to_owned(),
             last_activity: Instant::now() - Duration::from_millis(config::server_config("min_message_delay")),
+            last_key_exchange: *old_connection.last_key_exchange().unwrap_or(&Instant::now()),
             spam_violations: 0,
             channel: None,
             seq: *old_connection.seq(),
@@ -488,6 +523,7 @@ fn update_client_channel(stream: &mut TcpStream, channel: &Option<String>) //MOV
             id: *old_connection.id().unwrap(),
             keys: old_connection.keys().unwrap().to_owned(),
             last_activity: Instant::now(),
+            last_key_exchange: *old_connection.last_key_exchange().unwrap(),
             spam_violations: *old_connection.spam_violations().unwrap(),
             channel: channel.clone(),
             seq: *old_connection.seq(),
@@ -715,6 +751,15 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             Some(r) => r,
             None => return
         };
+
+        //REKEY EVERY 10 MINUTES
+        if Instant::now().duration_since(*CONNECTIONS.get(&peer_addr).unwrap().last_key_exchange().unwrap()) >=
+            Duration::from_secs(options::REKEY_INTERVAL)
+        {
+            //INFORM CLIENT ABOUT REKEYING
+            send_code(stream, None, MessageCode::Rekey, Some(&keys));
+            key_exchange(stream, &mut buffer, &mut keys); //INIT REKEY
+        }
 
         //CLIENT CODES
         if let Some(code) = read.code

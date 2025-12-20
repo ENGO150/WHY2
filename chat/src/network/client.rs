@@ -229,6 +229,13 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("Successfully connected to {server_name}.\n");
                 },
 
+                //REKEY - CHANGE KEYS
+                MessageCode::Rekey =>
+                {
+                    //WAIT FOR SERVER TO INIT KEY EXCHANGE
+                    key_exchange(stream, &mut buffer, &mut keys);
+                }
+
                 //PICK_USERNAME CODE - guess what
                 MessageCode::Username =>
                 {
