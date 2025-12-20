@@ -1,6 +1,9 @@
 Changelog
 =========
 
+v0.3.0-rex.1:
+- cd4b916: fix crates.io problems caused by rust workspaces
+
 v0.3.0-rex:
 - 2dd1a62: update dependencies
 - ca24431: implement rekeying
