@@ -2027,26 +2027,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "toml_edit",
- "why2-core",
-]
-
-[[package]]
-name = "why2-core"
-version = "0.3.0-rex"
-dependencies = [
- "rand",
- "rand_chacha",
- "sha2",
-]
-
-[[package]]
-name = "why2-tests"
-version = "0.3.0-rex"
-dependencies = [
- "rand",
- "rand_chacha",
- "sha2",
- "why2-core",
 ]
 
 [[package]]

@@ -57,6 +57,11 @@ macro_rules! deprecated_mods
 /// Modern, AES-inspired, implementation of WHY2
 pub mod rex;
 
+#[cfg(feature = "chat")]
+#[path = "../chat/lib.rs"]
+#[doc(hidden)]
+pub mod chat;
+
 //DEPRECATED
 deprecated_mods!
 {

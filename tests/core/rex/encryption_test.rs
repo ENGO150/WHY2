@@ -22,7 +22,7 @@ use std::
     io::{ self, Write },
 };
 
-use why2_core::rex::
+use why2::rex::
 {
     encrypter,
     decrypter,

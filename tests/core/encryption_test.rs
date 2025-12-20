@@ -24,7 +24,7 @@ use std::
     io::{ self, Write },
 };
 
-use why2_core::
+use why2::
 {
     crypto,
     encrypter,

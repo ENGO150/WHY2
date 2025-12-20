@@ -37,7 +37,7 @@ use colored::Color;
 use hmac::{ Hmac, Mac };
 use sha2::Sha256;
 
-use why2_core::rex::
+use crate::rex::
 {
     encrypter,
     decrypter,
