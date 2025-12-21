@@ -41,10 +41,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build Client
-        run: cargo build --release
+        run: cargo build --features client --release
 
       - name: Build Server
-        run: cargo build --bin why2-server --no-default-features --features server --release
+        run: cargo build --bin why2-server --features server --release
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
