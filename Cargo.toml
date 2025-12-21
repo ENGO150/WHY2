@@ -42,7 +42,7 @@ path = "chat/bin/server.rs"
 required-features = ["server"]
 
 [features]
-default = ["client"]
+default = []
 
 chat = [
     "dep:base91",
