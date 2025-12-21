@@ -16,15 +16,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::env;
+
 fn main()
 {
     //DO NOT USE WHY2_DEV_BYPASS IN PRODUCTION!!!
-    if std::env::var("WHY2_DEV_BYPASS").is_ok() { return; }
+    if env::var("WHY2_DEV_BYPASS").is_ok() { return; }
 
     //ENSURE CORRECT FEATURE USAGE
-    let client_feature = std::env::var("CARGO_FEATURE_CLIENT").is_ok();
-    let server_feature = std::env::var("CARGO_FEATURE_SERVER").is_ok();
-    let chat_feature = std::env::var("CARGO_FEATURE_CHAT").is_ok();
+    let client_feature = env::var("CARGO_FEATURE_CLIENT").is_ok();
+    let server_feature = env::var("CARGO_FEATURE_SERVER").is_ok();
+    let chat_feature = env::var("CARGO_FEATURE_CHAT").is_ok();
 
     //DIRECT CHAT FEATURE USE
     if chat_feature && !(client_feature || server_feature)
