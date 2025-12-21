@@ -19,8 +19,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     collections::HashSet,
-    net::{ TcpStream, SocketAddr },
     time::{ Instant, Duration },
+    net::
+    {
+        TcpStream,
+        SocketAddr,
+        Shutdown,
+    },
     sync::
     {
         LazyLock,
@@ -380,6 +385,9 @@ pub fn remove_connection(stream: &mut TcpStream, grace: bool) //REMOVE CONNECTIO
             send_code(&mut *stream, None, MessageCode::Disconnect, connection.keys());
         }
     }
+
+    //SHUTDOWN STREAM
+    stream.shutdown(Shutdown::Both).ok();
 
     //SEND LEAVE MESSAGE IF AUTHENTICATED
     if let Some(username) = connection.username()
