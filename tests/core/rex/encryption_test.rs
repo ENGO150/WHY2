@@ -64,17 +64,23 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
         returning = Err("Values do not match".into());
     }
 
+    let measure_stop_nanos = measure_stop.as_nanos() as f64;
+    let encrypter_measure_nanos = encrypter_measure.as_nanos() as f64;
+
     writeln!
     (
         stream,
 
-        "Test {status}!\n
-TEXT: \t\t\"{}\"
-OUTPUT: \t\"{decrypted_string}\"
-KEY: \t\t\n{}
-TIME: \t\t{}ms ({}ms to encrypt)",
+        "Test {status}!\n\
+        TEXT: \t\t\"{}\"\
+        OUTPUT: \t\"{decrypted_string}\"\
+        KEY: \t\t\n{}\
+        TIME: \t\t{:.3}ms ({:.3}ms to encrypt [{}%])",
 
-        test_core::TEST_TEXT, key, measure_stop.as_millis(), encrypter_measure.as_millis()
+        test_core::TEST_TEXT, key,
+        measure_stop_nanos / 1_000_000.,
+        encrypter_measure_nanos / 1_000_000.,
+        (encrypter_measure_nanos / measure_stop_nanos * 100.).round()
     ).unwrap();
 
     returning
