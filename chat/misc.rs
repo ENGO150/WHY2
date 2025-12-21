@@ -23,17 +23,7 @@ use std::
     time::Duration,
 };
 
-use reqwest::
-{
-    Error,
-    blocking::Client,
-    header::
-    {
-        HeaderMap,
-        HeaderValue,
-        USER_AGENT,
-    },
-};
+use ureq::{ Error, Agent };
 
 use serde_json::Value;
 
@@ -65,17 +55,18 @@ pub fn get_identifier() -> String //GET IDENTIFIER OF PACKAGE VERSION [WHY2/VERS
 
 pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
 {
-    //CUSTOM CLIENT HEADERS
-    let mut headers = HeaderMap::new();
-    headers.insert(USER_AGENT, HeaderValue::from_str(&get_identifier()).expect("Invalid fetch request headers"));
+    //CREATE CUSTOM CLIENT (WITH TIMEOUT)
+    let agent: Agent = Agent::config_builder()
+        .timeout_global(Some(Duration::from_millis(options::FETCH_TIMEOUT)))
+        .build()
+        .into();
 
-    //BUILD CUSTOM CLIENT
-    let client = Client::builder()
-        .timeout(Duration::from_millis(options::FETCH_TIMEOUT))
-        .default_headers(headers)
-        .build()?;
-
-    client.get(url).send()?.text()
+    //FETCH DATA
+    agent.get(url)
+        .header("User-Agent", &get_identifier())
+        .call()?
+        .body_mut()
+        .read_to_string()
 }
 
 pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
