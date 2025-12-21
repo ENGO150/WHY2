@@ -32,26 +32,26 @@ use std::sync::
 };
 
 //CONSTS
-pub const METADATA_URL: &str        = "https://crates.io/api/v1/crates/why2";                                 //URL FOR PROJECT METADATA
+pub const METADATA_URL: &str        = "https://crates.io/api/v1/crates/why2";                             //URL FOR PROJECT METADATA
 
-pub const USER_CONFIG_DIR: &str     = "{HOME}/.config";                                                       //USER CONFIG DIRECTORY
-pub const CONFIG_DIR: &str          = "/WHY2";                                                                //DIRECTORY FOR CONFIG FILES
-pub const SERVER_CONFIG: &str       = "/server.toml";                                                         //SERVER CONFIG FILE
-pub const CLIENT_CONFIG: &str       = "/client.toml";                                                         //CLIENT CONFIG FILE
-pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                   //SERVER USERS CONFIG FILE
-pub const CONFIG_URL: &str          = "https://git.satan.red/ENGO150/WHY2/-/raw/development/chat/src/config"; //CONFIG FILE DOWNLOAD URL
+pub const USER_CONFIG_DIR: &str     = "{HOME}/.config";                                                   //USER CONFIG DIRECTORY
+pub const CONFIG_DIR: &str          = "/WHY2";                                                            //DIRECTORY FOR CONFIG FILES
+pub const SERVER_CONFIG: &str       = "/server.toml";                                                     //SERVER CONFIG FILE
+pub const CLIENT_CONFIG: &str       = "/client.toml";                                                     //CLIENT CONFIG FILE
+pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                               //SERVER USERS CONFIG FILE
+pub const CONFIG_URL: &str          = "https://git.satan.red/ENGO150/WHY2/-/raw/development/chat/config"; //CONFIG FILE DOWNLOAD URL
 
-pub const SERVER_KEYS_CONFIG: &str  = "/server_keys.toml";                                                    //SERVER PUBKEY CONFIG FILE
-pub const SERVER_KEYS_DIR: &str     = "/server_keys";                                                         //SERVER KEYS DIRECTORY
-pub const SERVER_SKEY: &str         = "/private";                                                             //SERVER PRIVATE KEY FILE
-pub const SERVER_PKEY: &str         = "/public";                                                              //SERVER PUBLIC KEY FILE
+pub const SERVER_KEYS_CONFIG: &str  = "/server_keys.toml";                                                //SERVER PUBKEY CONFIG FILE
+pub const SERVER_KEYS_DIR: &str     = "/server_keys";                                                     //SERVER KEYS DIRECTORY
+pub const SERVER_SKEY: &str         = "/private";                                                         //SERVER PRIVATE KEY FILE
+pub const SERVER_PKEY: &str         = "/public";                                                          //SERVER PUBLIC KEY FILE
 
-pub const FETCH_TIMEOUT: u64        = 5000;                                                                   //TIMOUT FOR FETCHING DATA (MS)
+pub const FETCH_TIMEOUT: u64        = 5000;                                                               //TIMOUT FOR FETCHING DATA (MS)
 
-pub const REKEY_INTERVAL: u64       = 600;                                                                    //INTERVAL FOR RE-REKEYING (SECS)
+pub const REKEY_INTERVAL: u64       = 600;                                                                //INTERVAL FOR RE-REKEYING (SECS)
 
 //DO NOT CHANGE CONST BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
-pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                           //DIMENSIONS OF REX GRID
+pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                       //DIMENSIONS OF REX GRID
 
 //SETTINGS
 static KEYS: LazyLock<RwLock<Option<(Vec<i64>, Vec<u8>)>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
