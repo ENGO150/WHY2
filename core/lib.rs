@@ -16,28 +16,53 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//! # WHY2 Core
+//! # WHY2
 //!
-//! This module implements the core encryption logic behind WHY2 algorithm.
+//! WHY2 is a modern, fast, and secure encryption crate designed for privacy-first applications.
 //!
 //! ## Design Overview
-//! - Input and key are formatted into 2D grids of 64-bit cells.
-//! - The key grid is shuffled and seeded to generate round keys.
-//! - Each round applies a nonlinear transformation to the input grids.
-//! - The transofrmation avoid traditional S-boxes, relying instead on symmetric diffusion.
-//! - Round tweaks ensure variability across rounds without requiring per-round constants.
+//! The WHY2 encryption algorithm is loosely inspired by AES, but with a twist. Instead of relying on S-boxes,
+//! WHY2 uses a nonlinear ARX-style transformation (Addition, Rotation, XOR) for symmetric diffusion.
+//!
+//! Key mechanics include:
+//! - **Grid-based State**: Input and key data are formatted into 2D grids of 64-bit cells.
+//! - **Key Expansion**: The key grid is shuffled and seeded to generate round keys.
+//! - **Nonlinear Mixing**: Each round applies a transformation to the input grids using round tweaks to ensure variability.
+//!
+//! WHY2 also powers a minimalist chat application built for maximal privacy, designed for self-hosting
+//! by individuals or small groups.
+//!
+//! ## Features
+//! - Grid-based encryption with customizable layout
+//! - ARX-style nonlinear mixing instead of S-boxes
+//! - Round-key generation from seeded, shuffled keys
+//! - Lightweight encrypted chat backend for private deployments
+//! - Maximal customization
+//!
+//! ## Philosophy
+//! - **Privacy is a right**, not a subscription feature.
+//! - **No government insight**: no telemetry, no backdoors, no metadata leakage.
+//! - **No payment required**: encryption should be free as in freedom.
+//!
+//! ## Security Disclaimer
+//!
+//! WHY2 is an experimental encryption algorithm. While it draws inspiration from established designs like AES,
+//! **it has not undergone formal cryptographic review or extensive academic analysis**.
+//!
+//! As such, it should **not be considered suitable for high-assurance or production-grade cryptographic applications** where
+//! proven security guarantees are required. Use at your own discretion, and always evaluate your threat model carefully.
+//!
+//! ## License
+//! WHY2 is licensed under the GNU GPLv3. You are free to use, modify, and redistribute it
+//! under the terms of the license. See <https://www.gnu.org/licenses/> for details.
 //!
 //! ### Deprecation Notice
+//! Some parts of this module are deprecated and retained only for refence and legacy compatibility.
+//! These parts represent early versions of the WHY2 encryption routines that are now considered insecure.
 //!
-//! Some parts of this module are deprecated and retained only for reference and legacy compatibility.
-//! Those parts are early versions of the WHY2 encryption routines that are considered insecure.
+//! Due to identified security concerns, these legacy modules should **not be used in production**.
 //!
-//! Due to identified security concerns and lack of cryptographic robustness, this module should **not be used in production**.
-//!
-//! These deprecated components are **not actively documented or maintained**. They remain visible for historical context,
-//! but all future documentation efforts are focused on secure and supported modules.
-//!
-//! For secure applications, use [`core::rex`]—the current and trusted implementation of the WHY2 encryption engine.
+//! For secure applications, always use [`rex`]—the current and trusted implementation of the WHY2 encryption engine.
 
 macro_rules! deprecated_mods
 {
