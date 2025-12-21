@@ -1,6 +1,22 @@
 Changelog
 =========
 
+v1.3.2:
+- 112f190: update dependencies
+- abc980e: use TCP_NODELAY
+- da22dfd: replace reqwest with ureq
+- fa3d2b1: fix invalid CONFIG_URL
+- 4240bbc: optimize release builds
+- 69b651c: print result times to 3 decimal places
+- 5bef446: simplify env checks
+- 9dbcbbf: explicitly use features in pipelines
+- a20f786: remove default client feature
+- fb46bf8: add cargo features to root doc
+- fbbf11d: update root docs
+- f20664e: remove chat module lib
+- 001505a: fix AUR version extraction
+- 5901ed3: fix code example
+
 v1.3.1:
 - 3e8c5fd: fix aur pipeline versioning
 - 191903a: fix PM server deadlock
