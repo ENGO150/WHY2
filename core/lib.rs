@@ -58,7 +58,7 @@ macro_rules! deprecated_mods
 pub mod rex;
 
 #[cfg(feature = "chat")]
-#[path = "../chat/lib.rs"]
+#[path = "../chat/mod.rs"]
 #[doc(hidden)]
 pub mod chat;
 
