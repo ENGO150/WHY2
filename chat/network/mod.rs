@@ -185,7 +185,8 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&(Vec<i6
     //ADD SEQUENCE NUMBER TO packet (FROM SERVER)
     #[cfg(feature = "server")]
     {
-        if let Some(mut conn) = server::CONNECTIONS.get_mut(&stream.peer_addr().unwrap())
+        let peer_addr = stream.peer_addr().ok();
+        if peer_addr.is_some() && let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr.unwrap())
         {
             if conn.is_authenticated()
             {
@@ -256,12 +257,14 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
     #[cfg(feature = "server")]
     let spam_protection = config::server_config::<bool>("spam_protection");
 
+    #[cfg(feature = "server")]
+    let peer_addr = stream.peer_addr().ok()?; //GET CURRENT PEER ADDRESS
+
     //SETUP LIMITS
     #[cfg(feature = "server")]
     {
         //CHECK IF CLIENT IS AUTHENTICATED
-        let authenticated = stream.peer_addr().ok()
-            .and_then(|addr| server::CONNECTIONS.get(&addr))
+        let authenticated = server::CONNECTIONS.get(&peer_addr)
             .map(|conn| conn.is_authenticated())
             .unwrap_or(false);
 
@@ -328,7 +331,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
                 {
                     //LOG IF ON SERVER
                     #[cfg(feature = "server")]
-                    println!("HMAC verification failed: {}", stream.peer_addr().unwrap());
+                    println!("HMAC verification failed: {}", peer_addr);
 
                     return None;
                 }
@@ -358,7 +361,6 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
             //ACTIVITY TIMER ON SERVER
             #[cfg(feature = "server")]
             {
-                let peer_addr = stream.peer_addr().ok()?; //GET CURRENT PEER ADDRESS
                 let mut spam_warning = false;
                 let mut shared_key = None;
                 let mut disconnect = false;
@@ -394,7 +396,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
                 //TOO MANY VIOLATIONS, BYE
                 if disconnect
                 {
-                    server::remove_connection(stream, true);
+                    server::remove_connection(&peer_addr, true);
                     return None;
                 }
             }
@@ -407,7 +409,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
                     //VERIFY SEQUENCE NUMBER
                     #[cfg(feature = "server")] //ON SERVER
                     {
-                        if let Some(mut conn) = server::CONNECTIONS.get_mut(&stream.peer_addr().ok()?)
+                        if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
                         {
                             if packet.seq > *conn.seq() //VALID SEQ
                             {
@@ -417,8 +419,8 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
                             {
                                 //INVALID SEQ
                                 drop(conn); //PREVENT DEADLOCK
-                                println!("SEQ verification failed: {}", stream.peer_addr().ok()?);
-                                server::remove_connection(stream, false);
+                                println!("SEQ verification failed: {}", &peer_addr);
+                                server::remove_connection(&peer_addr, false);
                             }
                         }
                     }
@@ -443,7 +445,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
                 {
                     //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
                     #[cfg(feature = "server")]
-                    server::remove_connection(stream, false);
+                    server::remove_connection(&peer_addr, false);
 
                     return None;
                 }
@@ -453,7 +455,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
         //CHECK IF CLIENT IS STILL IN ACTIVE CONNECTION LIST
         #[cfg(feature = "server")]
         {
-            if !server::CONNECTIONS.contains_key(&stream.peer_addr().ok()?)
+            if !server::CONNECTIONS.contains_key(&peer_addr)
             {
                 return None;
             }
@@ -467,7 +469,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
             {
                 #[cfg(feature = "server")]
                 {
-                    server::remove_connection(stream, false);
+                    server::remove_connection(&peer_addr, false);
                 }
 
                 return None;
@@ -480,7 +482,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
                     //CHECK MAX PACKET SIZE
                     if buffer.len() + n > max_packet_size
                     {
-                         server::remove_connection(stream, true);
+                         server::remove_connection(&peer_addr, true);
                          return None;
                     }
                 }
