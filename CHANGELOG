@@ -1,6 +1,12 @@
 Changelog
 =========
 
+v1.3.1:
+- 3e8c5fd: fix aur pipeline versioning
+- 191903a: fix PM server deadlock
+- 43bbc05: prevent peer_addr unwrapping
+- 556b31e: add stream shutdown to remove_connection fn
+
 v0.3.0-rex.1:
 - cd4b916: fix crates.io problems caused by rust workspaces
 
