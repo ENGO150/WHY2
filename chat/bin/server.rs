@@ -74,6 +74,13 @@ fn main()
                         continue;
                     }
 
+                    //SET TCP_NODELAY
+                    match stream.set_nodelay(true)
+                    {
+                        Ok(_) => {},
+                        Err(_) => continue
+                    }
+
                     thread::spawn(move || server::listen_client(&mut stream));
                 },
 

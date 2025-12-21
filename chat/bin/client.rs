@@ -451,6 +451,9 @@ fn main()
         process::exit(1);
     });
 
+    //SET TCP_NODELAY
+    stream.set_nodelay(true).expect("Failed to set TCP_NODELAY");
+
     //CLONE SOCKET FOR CLIENT INPUT
     let mut client_stream = stream.try_clone().expect("Failed cloning stream");
 
