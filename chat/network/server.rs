@@ -834,21 +834,29 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     if let Some((recipient_addr, recipient_id, private_message)) = parse_result
                     {
                         //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
-                        if recipient_id != id {
-                            if let Some(recipient) = CONNECTIONS.get(&recipient_addr)
+                        if recipient_id != id
+                        {
+                            let recipient_data = if let Some(recipient) =
+                                CONNECTIONS.get(&recipient_addr)
                             {
-                                if let Ok(mut recipient_stream) = recipient.stream().lock()
-                                {
-                                    network::send(&mut *recipient_stream, MessagePacket
-                                    {
-                                        text: Some(private_message.clone()),
-                                        username: Some(username.clone()),
-                                        id: Some(id),
-                                        code: Some(MessageCode::PrivateMessage),
+                                Some((recipient.cloned_stream().unwrap(), recipient.keys().cloned()))
+                            } else
+                            {
+                                None
+                            };
 
-                                        ..Default::default()
-                                    }, recipient.keys());
-                                }
+                            //SEND
+                            if let Some((mut recipient_stream, recipient_keys)) = recipient_data
+                            {
+                                network::send(&mut recipient_stream, MessagePacket
+                                {
+                                    text: Some(private_message.clone()),
+                                    username: Some(username.clone()),
+                                    id: Some(id),
+                                    code: Some(MessageCode::PrivateMessage),
+
+                                    ..Default::default()
+                                }, recipient_keys.as_ref());
                             }
                         }
 
