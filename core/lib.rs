@@ -39,6 +39,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! - Lightweight encrypted chat backend for private deployments
 //! - Maximal customization
 //!
+//! ## Cargo Features
+//!
+//! This crate allows selective enabling of components to keep the build lightweight.
+//!
+//! - **`client`**:
+//!   Enables the terminal-based client application and interactive interface.
+//!
+//! - **`server`**:
+//!   Enables the relay server logic for routing encrypted messages between clients.
+//!   *Use this if you are building a custom node or hosting a relay.*
+//!
 //! ## Philosophy
 //! - **Privacy is a right**, not a subscription feature.
 //! - **No government insight**: no telemetry, no backdoors, no metadata leakage.
