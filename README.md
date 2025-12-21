@@ -16,7 +16,7 @@
 
 ## Code Example
 ```rust
-use why2::core::rex::{ encrypter, decrypter };
+use why2::rex::{ encrypter, decrypter };
 
 fn main()
 {
@@ -33,7 +33,7 @@ fn main()
     }
 
     // Decrypt
-    let decrypted = decrypter::decrypt_string(encrypted);
+    let decrypted = decrypter::decrypt_string(encrypted)
                         .expect("Decryption failed");
 
     // Compare input & output
