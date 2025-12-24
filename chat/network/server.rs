@@ -540,6 +540,11 @@ fn ask_version(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &(Vec<i64>, V
     //ASK FOR VERSION
     send_code(stream, Some(misc::get_version().to_string()), MessageCode::Version, Some(&keys));
 
+    //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
+    stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
+
+    let mut invalid_packets = 0; //INVALID PACKETS COUNTER
+
     //WAIT FOR RESPONSE FROM CLIENT
     let version = loop
     {
@@ -547,7 +552,14 @@ fn ask_version(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &(Vec<i64>, V
         let received = network::receive(stream, buffer, Some(keys))?;
 
         if received.code == Some(MessageCode::Version) && !received.text.is_none() { break received; }
+
+        //CHECK INVALID PACKETS COUNTER
+        if invalid_packets == 3 { return None; }
+        invalid_packets += 1; //INCREMENT
     };
+
+    //REMOVE READ TIMEOUT
+    stream.set_read_timeout(None).expect("Failed to unset read timeout");
 
     version.text
 }
