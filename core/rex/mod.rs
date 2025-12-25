@@ -37,6 +37,7 @@ use std::
 {
     result,
     ops::Range,
+    error::Error,
     slice::{ Iter, IterMut },
     vec::IntoIter as IntoVecIter,
     ops::
@@ -70,10 +71,61 @@ use zeroize::Zeroize;
 /// WHY2 requires that the same grid dimensions (rows × columns) be used consistently
 /// throughout encryption and decryption. Mixing grid sizes within a single session or
 /// across rounds is unsupported and may lead to incorrect results or undefined behavior.
-
 #[derive(Clone, Debug, Zeroize)]
 #[zeroize(drop)]
 pub struct Grid<const W: usize, const H: usize>([[i64; W]; H]); //GRID FOR REX DATA
+
+/// Represents structured errors that can occur during Grid operations.
+///
+/// This enum replaces generic string errors to provide zero-allocation error handling
+/// and programmatic access to failure details. It is primarily used during
+/// Grid initialization and serialization.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GridError
+{
+    /// Indicates that the requested Grid dimensions are invalid for cryptographic operations.
+    ///
+    /// This error occurs when creating a new Grid if the dimensions do not allow
+    /// for sufficient diffusion (e.g., width is 1, or total area is too small).
+    ///
+    /// # Fields
+    /// - `width`: The width (columns) of the attempted Grid.
+    /// - `height`: The height (rows) of the attempted Grid.
+    InvalidDimensions
+    {
+        width: usize,
+        height: usize,
+    },
+
+    /// Indicates that the input byte sequence length does not align with Grid requirements.
+    ///
+    /// This error occurs during deserialization (e.g., `from_bytes`) when the provided
+    /// data length is not a multiple of the Grid's total byte size (`W * H * 8`).
+    ///
+    /// # Fields
+    /// - `expected_mod`: The required modulus (block size in bytes).
+    /// - `actual_len`: The actual length of the provided byte vector.
+    InvalidByteLength
+    {
+        expected_mod: usize,
+        actual_len: usize,
+    },
+
+    /// Indicates that the provided raw key has an incorrect length.
+    ///
+    /// The WHY2 key scheduling algorithm requires the input key vector to be exactly
+    /// twice the size of the Grid area (`2 * W * H`). This allows for the initial
+    /// folding and mixing of key parts (low and high components).
+    ///
+    /// # Fields
+    /// - `expected_len`: The required key length (number of `i64` elements).
+    /// - `actual_len`: The length of the provided key vector.
+    InvalidKeyLength
+    {
+        expected_len: usize,
+        actual_len: usize,
+    },
+}
 
 //IMPLEMENTATIONS
 /// Implementation of core Grid operations for fixed-size grids.
@@ -101,7 +153,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// # Notes
     /// - This method does not perform any encryption or transformation.
     #[inline]
-    pub fn new() -> result::Result<Self, String>
+    pub fn new() -> result::Result<Self, GridError>
     {
         let area = W * H;
         if area > 1 && W > 1
@@ -109,13 +161,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
             Ok(Self([[0i64; W]; H]))
         } else
         {
-            Err(if W == 1
-            {
-                format!("Invalid dimensions: expected width larger than 1, got {W}")
-            } else
-            {
-                format!("Invalid dimensions: expected area larger than 1, got {W}x{H} ({area})")
-            })
+            Err(GridError::InvalidDimensions { width: W, height: H })
         }
     }
 
@@ -131,7 +177,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// # Returns
     /// - Ok(`Grid`) with mixed key values if dimensions are valid.
     /// - Err(String) if the grid area is too small.
-    pub fn from_key(vec: Vec<i64>) -> result::Result<Self, String>
+    pub fn from_key(vec: Vec<i64>) -> result::Result<Self, GridError>
     {
         //GRID OPTIONS
         let grid_area = W * H;
@@ -171,18 +217,14 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// # Notes
     /// - No transformation is applied
     /// - Use this for raw Grid construction, not for secure key loading
-    pub fn from_bytes(bytes: Vec<u8>) -> result::Result<Vec<Self>, String>
+    pub fn from_bytes(bytes: Vec<u8>) -> result::Result<Vec<Self>, GridError>
     {
         let matrix_size = W * H * 8; //EACH i64 IS 8 BYTES
 
         //CHECK FOR VALID GRID
         if bytes.len() % matrix_size != 0
         {
-            return Err(format!
-            (
-                "Invalid byte length: expected multiply of {} bytes for a {}x{} Grid, got {}",
-                matrix_size, W, H, bytes.len()
-            ));
+            return Err(GridError::InvalidByteLength { expected_mod: matrix_size, actual_len: bytes.len() });
         }
 
         bytes.chunks(matrix_size).map(|chunk|
@@ -732,3 +774,36 @@ impl<const W: usize, const H: usize> Display for Grid<W, H>
         f.write_str(&border)
     }
 }
+
+impl Display for GridError
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result
+    {
+        match self
+        {
+            GridError::InvalidDimensions { width, height } =>
+            {
+                if *width <= 1
+                {
+                    write!(f, "Invalid dimensions: expected width larger than 1, got {width}")
+                }
+                else
+                {
+                    write!(f, "Invalid dimensions: expected area larger than 1, got {width}x{height} ({})", width * height)
+                }
+            },
+
+            GridError::InvalidByteLength { expected_mod, actual_len } =>
+            {
+                write!(f, "Invalid byte length: expected multiple of {expected_mod} bytes for this Grid, got {actual_len}")
+            },
+
+            GridError::InvalidKeyLength { expected_len, actual_len } =>
+            {
+                write!(f, "Invalid key length: expected length {expected_len}, got {actual_len}")
+            }
+        }
+    }
+}
+
+impl Error for GridError {}

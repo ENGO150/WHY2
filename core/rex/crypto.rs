@@ -32,7 +32,12 @@ use rand::
 
 use rand_chacha::ChaCha20Rng;
 
-use crate::rex::{ options, Grid };
+use crate::rex::
+{
+    options,
+    Grid,
+    GridError,
+};
 
 /// Computes a SHA-256 hash of the Grid contents to produce a deterministic seed.
 ///
@@ -127,7 +132,7 @@ pub fn generate_key<const W: usize, const H: usize>() -> Vec<i64>
 /// - The first key is seeded from `master_key`.
 /// - Each subsequent key is seeded from the SHA-256 digest of the previous key.
 /// - This method ensures reproducible round key generation without external randomness.
-pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Result<Vec<Grid<W, H>>, String>
+pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Result<Vec<Grid<W, H>>, GridError>
 {
     let mut keys: Vec<Grid<W, H>> = Vec::with_capacity(options::ROUND_KEYS);
 
@@ -158,7 +163,7 @@ pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, 
 /// # Notes
 /// - The IV does not need to be secret, but must be unpredictable and unique per message.
 /// - The IV will be transmitted alongside the ciphertext.
-pub fn generate_iv<const W: usize, const H: usize>() -> Result<Grid<W, H>, String>
+pub fn generate_iv<const W: usize, const H: usize>() -> Result<Grid<W, H>, GridError>
 {
     Grid::from_key(generate_key::<W, H>())
 }

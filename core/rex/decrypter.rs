@@ -42,6 +42,7 @@ use rand_chacha::ChaCha20Rng;
 use crate::rex::
 {
     crypto,
+    GridError,
     options::{ EncryptedData, DecryptedData },
 };
 
@@ -66,7 +67,7 @@ use crate::rex::
 /// - Padding is removed using PKCS-style logic: the last cell value indicates how many trailing values to discard.
 /// - The PRNG used for unshuffling is seeded from the SHA-256 hash of the key grid.
 /// - All transformations are deterministic and reversible.
-pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<DecryptedData, String>
+pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<DecryptedData, GridError>
 {
     //GET MUTABLE input
     let mut grids = input.output;
@@ -163,7 +164,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 /// - Uses native-endian decoding for each `i64` value.
 /// - Each decrypted value contributes up to two Unicode scalar values.
 /// - PKCS-style padding is removed before decoding.
-pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<String, String>
+pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<String, GridError>
 {
     //DECRYPT
     let decrypted = decrypt(input)?.output;

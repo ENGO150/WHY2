@@ -44,6 +44,7 @@ use crate::rex::
 {
     crypto,
     Grid,
+    GridError,
     options::EncryptedData,
 };
 
@@ -68,7 +69,7 @@ use crate::rex::
 /// - Splits the input into grid chunks and shuffles each using a deterministic PRNG seeded from the key hash.
 /// - Applies round-based transformations: initial XOR, subcell mixing, row shifting, and column mixing.
 /// - Returns `None` if the provided key is invalid (wrong length).
-pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, String>
+pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
 {
     //REX OPTIONS
     let grid_area = W * H; //AREA OF REX GRID
@@ -82,11 +83,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
             //CHECK FOR INVALID KEY
             if k.len() != grid_area * 2
             {
-                return Err(format!
-                (
-                    "Invalid key length: expected length {}, got {}",
-                    grid_area * 2, k.len()
-                ));
+                return Err(GridError::InvalidKeyLength { expected_len: grid_area, actual_len: k.len() });
             }
 
             //USE KEY IF MATCHING LENGTH
@@ -113,7 +110,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     input_used.push(padding_len as i64);
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut grids: Vec<Grid<W, H>> = input_used.chunks(grid_area).map(|chunk| -> Result<Grid<W, H>, String>
+    let mut grids: Vec<Grid<W, H>> = input_used.chunks(grid_area).map(|chunk| -> Result<Grid<W, H>, GridError>
     {
         let mut grid = Grid::new()?; //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
@@ -201,7 +198,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
 /// # Encoding Notes
 /// - Each `i64` packs two `char`s: the first 4 bytes are the high character, the next 4 bytes the low.
 /// - If the string has an odd number of characters, a null character (`'\0'`) is appended for alignment.
-pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, String>
+pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
 {
     //CONVERT input TO Vec<i64>
     let mut chars: Vec<char> = input.chars().collect();
