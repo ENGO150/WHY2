@@ -523,11 +523,15 @@ impl<const W: usize, const H: usize> Grid<W, H>
             {
                 let scalar = key_grid[i][j]; //USE KEY VALUE AS COEFFICIENT
 
-                //Row[i] = Row[i] + (Row[j] * scalar)
+                //LWE NOISE
+                let noise = key_grid[j][i].wrapping_add(i as i64);
+
+                //Row[i] = Row[i] + (Row[j] * scalar + noise)
                 for col in 0..self.width()
                 {
                     let val_j = self[j][col];
-                    self[i][col] = self[i][col].wrapping_add(val_j.wrapping_mul(scalar));
+                    let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
+                    self[i][col] = self[i][col].wrapping_add(mixing);
                 }
             }
         }
@@ -539,11 +543,15 @@ impl<const W: usize, const H: usize> Grid<W, H>
             {
                 let scalar = key_grid[i][j];
 
-                //Row[i] = Row[i] + (Row[j] * scalar)
+                //LWE NOISE
+                let noise = key_grid[j][i].wrapping_add(i as i64);
+
+                //Row[i] = Row[i] + (Row[j] * scalar + noise)
                 for col in 0..self.width()
                 {
                     let val_j = self[j][col];
-                    self[i][col] = self[i][col].wrapping_add(val_j.wrapping_mul(scalar));
+                    let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
+                    self[i][col] = self[i][col].wrapping_add(mixing);
                 }
             }
         }
@@ -559,11 +567,15 @@ impl<const W: usize, const H: usize> Grid<W, H>
             {
                 let scalar = key_grid[i][j];
 
-                //Row[i] = Row[i] - (Row[j] * scalar)
+                //LWE NOISE
+                let noise = key_grid[j][i].wrapping_add(i as i64);
+
+                //Row[i] = Row[i] - (Row[j] * scalar + noise)
                 for col in 0..self.width()
                 {
                     let val_j = self[j][col];
-                    self[i][col] = self[i][col].wrapping_sub(val_j.wrapping_mul(scalar));
+                    let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
+                    self[i][col] = self[i][col].wrapping_sub(mixing);
                 }
             }
         }
@@ -575,11 +587,15 @@ impl<const W: usize, const H: usize> Grid<W, H>
             {
                 let scalar = key_grid[i][j];
 
-                //Row[i] = Row[i] - (Row[j] * scalar)
+                //LWE NOISE
+                let noise = key_grid[j][i].wrapping_add(i as i64);
+
+                //Row[i] = Row[i] - (Row[j] * scalar + noise)
                 for col in 0..self.width()
                 {
                     let val_j = self[j][col];
-                    self[i][col] = self[i][col].wrapping_sub(val_j.wrapping_mul(scalar));
+                    let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
+                    self[i][col] = self[i][col].wrapping_sub(mixing);
                 }
             }
         }
