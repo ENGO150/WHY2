@@ -37,7 +37,7 @@ fn main()
                         .expect("Decryption failed");
 
     // Compare input & output
-    assert_eq!(input, decrypted);
+    assert_eq!(input, *decrypted);
 }
 ```
 
