@@ -135,8 +135,15 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     //FLATTEN Vec<Grid> TO Vec<i64>
     let mut flattened: Vec<i64> = grids.iter().flat_map(|grid| grid.iter().flat_map(|row| row.iter())).copied().collect();
 
+    //CHECK PADDING VALIDITY
+    let padding_len = *flattened.last().unwrap_or(&0) as usize;
+    if padding_len == 0 || padding_len > flattened.len() //INVALID (POSSIBLY MALICIOUS) PADDING
+    {
+        return Err(GridError::InvalidPadding);
+    }
+
     //REMOVE PADDING
-    flattened.truncate(flattened.len() - (*flattened.last().unwrap() as usize));
+    flattened.truncate(flattened.len() - padding_len);
 
     //RETURN OUTPUT
     Ok(DecryptedData
