@@ -58,6 +58,9 @@ use std::
 
 use zeroize::Zeroize;
 
+#[cfg(feature = "constant-time")]
+use subtle::{ ConstantTimeEq,  Choice };
+
 //TYPES
 /// A 2D matrix of 64-bit signed integers used as the core data structure in WHY2 encryption.
 ///
@@ -729,6 +732,35 @@ impl<const W: usize, const H: usize> BitXorAssign<&Grid<W, H>> for &mut Grid<W, 
     fn bitxor_assign(&mut self, rhs: &Grid<W, H>)
     {
         self.xor_grids(&rhs);
+    }
+}
+
+//CONSTANT-TIME EQ
+#[cfg(feature = "constant-time")]
+impl<const W: usize, const H: usize> ConstantTimeEq for Grid<W, H>
+{
+    fn ct_eq(&self, other: &Self) -> Choice
+    {
+        let mut result = Choice::from(1);
+
+        for (row_a, row_b) in self.iter().zip(other.iter())
+        {
+            for (cell_a, cell_b) in row_a.iter().zip(row_b.iter())
+            {
+                result &= cell_a.ct_eq(cell_b);
+            }
+        }
+
+        result
+    }
+}
+
+#[cfg(feature = "constant-time")]
+impl<const W: usize, const H: usize> PartialEq for Grid<W, H>
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        self.ct_eq(other).into()
     }
 }
 
