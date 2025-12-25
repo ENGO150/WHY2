@@ -16,13 +16,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::sync::{ LazyLock, RwLock };
 
 #[cfg(feature = "client")]
 use std::sync::
 {
     Arc,
     Mutex,
+    RwLock,
+    LazyLock,
     atomic::
     {
         AtomicBool,
@@ -30,6 +31,9 @@ use std::sync::
         Ordering,
     },
 };
+
+#[cfg(feature = "client")]
+use zeroize::Zeroizing;
 
 //CONSTS
 pub const METADATA_URL: &str        = "https://crates.io/api/v1/crates/why2";                             //URL FOR PROJECT METADATA
@@ -54,7 +58,8 @@ pub const REKEY_INTERVAL: u64       = 600;                                      
 pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                       //DIMENSIONS OF REX GRID
 
 //SETTINGS
-static KEYS: LazyLock<RwLock<Option<(Vec<i64>, Vec<u8>)>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
+#[cfg(feature = "client")]
+static KEYS: LazyLock<RwLock<Option<(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
 {
     RwLock::new(None)
 });
@@ -82,13 +87,15 @@ static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (
 
 //FUNCTIONS
 //SHARED KEYS
-pub fn set_keys(keys: (Vec<i64>, Vec<u8>)) //SET KEY
+#[cfg(feature = "client")]
+pub fn set_keys(keys: (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)) //SET KEY
 {
     let mut shared_key = KEYS.write().unwrap();
     *shared_key = Some(keys);
 }
 
-pub fn get_keys() -> Option<(Vec<i64>, Vec<u8>)> //RETURN KEY
+#[cfg(feature = "client")]
+pub fn get_keys() -> Option<(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)> //RETURN KEY
 {
     let shared_key = KEYS.read().unwrap();
     shared_key.clone()

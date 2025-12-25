@@ -30,6 +30,8 @@ use std::
     io::{ Read, Write },
 };
 
+use zeroize::Zeroizing;
+
 use serde::{ Deserialize, Deserializer, Serialize, Serializer };
 
 use colored::Color;
@@ -170,7 +172,7 @@ impl<'de> Deserialize<'de> for SerColor
 }
 
 //FUNCTIONS
-pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&(Vec<i64>, Vec<u8>)>) //SEND packet TO stream
+pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)>) //SEND packet TO stream
 {
     //COPY PACKET
     let mut packet = packet;
@@ -211,7 +213,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&(Vec<i6
         }
 
         //ENCRYPT
-        let encrypted_data = encrypter::encrypt::<GRID_W, GRID_H>(input_i64, Some(keys.0.clone())).expect("Encrypting packet failed");
+        let encrypted_data = encrypter::encrypt::<GRID_W, GRID_H>(input_i64, Some(keys.0.to_vec())).expect("Encrypting packet failed");
 
         //SERIALIZE ENCRYPTED PACKET
         let mut grids = encrypted_data.output;
@@ -247,7 +249,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&(Vec<i6
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<i64>, Vec<u8>)>) -> Option<MessagePacket>
+pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)>) -> Option<MessagePacket>
 {
     //SERVER SIDE PACKET SIZE LIMIT
     #[cfg(feature = "server")]

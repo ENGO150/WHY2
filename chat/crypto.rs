@@ -36,6 +36,8 @@ use p521::
 use sha2::{ Sha256, Digest };
 use hkdf::Hkdf;
 
+use zeroize::Zeroizing;
+
 use crate::chat::{ misc, options };
 
 #[cfg(feature = "server")]
@@ -52,25 +54,25 @@ const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //PRIVATE
-fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> (Vec<i64>, Vec<u8>) //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
+fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>) //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
 {
     let hkdf = Hkdf::<Sha256>::new(None, shared_secret);
 
     //DERIVE KEYS FOR ENCRYPTION & MAC
-    let mut encryption_key = vec![0u8; GRID_W * GRID_H * 16];
-    let mut mac = vec![0u8; 32];
+    let mut encryption_key = Zeroizing::new(vec![0u8; GRID_W * GRID_H * 16]);
+    let mut mac = Zeroizing::new(vec![0u8; 32]);
 
     //EXPAND
     hkdf.expand(format!("{}-encryption", info).as_bytes(), &mut encryption_key).expect("HKDF expand failed");
     hkdf.expand(format!("{}-mac", info).as_bytes(), &mut mac).expect("HKDF expand failed");
 
     //CONVERT ENCRYPTION KEY BYTES TO i64s & RETURN TOGETHER WITH MAC
-    (encryption_key.chunks(8).map(|chunk|
+    (Zeroizing::new(encryption_key.chunks(8).map(|chunk|
     {
         let mut bytes = [0u8; 8];
         bytes.copy_from_slice(chunk);
         i64::from_be_bytes(bytes)
-    }).collect(), mac)
+    }).collect()), mac)
 }
 
 //PUBLIC
@@ -114,7 +116,7 @@ pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
     (sk, pk)
 }
 
-pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Option<(Vec<i64>, Vec<u8>)> //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
+pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Option<(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)> //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
 {
     //PARSE KEYS
     let local_private = SecretKey::from_pkcs8_pem(&local_key).expect("Invalid key");

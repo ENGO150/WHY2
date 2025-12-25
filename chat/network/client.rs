@@ -24,6 +24,8 @@ use std::
     io::{ self, Write },
 };
 
+use zeroize::Zeroizing;
+
 use serde_json::Value;
 
 use crossterm::terminal;
@@ -50,7 +52,7 @@ const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //PRIVATE
-fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut (Vec<i64>, Vec<u8>)) //KEY EXCHANGE FOR CLIENT-SIDE
+fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)) //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
     let message = loop
@@ -151,7 +153,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut buffer = Vec::new();
 
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
-    let mut keys = (vec![], vec![]);
+    let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
     key_exchange(stream, &mut buffer, &mut keys);
 
     //SERVER INFO VARIABLES

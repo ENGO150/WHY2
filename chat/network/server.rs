@@ -34,6 +34,8 @@ use std::
     },
 };
 
+use zeroize::Zeroizing;
+
 use serde_json::json;
 
 use dashmap::DashMap;
@@ -62,27 +64,27 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
     Authenticated
     {
-        stream: Arc<Mutex<TcpStream>>, //STREAM
-        peer_addr: SocketAddr,         //ADDRESS & PORT
-        username: String,              //USERNAME
-        id: usize,                     //ID OF USER
-        keys: (Vec<i64>, Vec<u8>),     //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
-        last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
-        last_key_exchange: Instant,    //TIME OF LAST REKEY
-        spam_violations: usize,        //SPAM VIOLATIONS (unexpected, huh?)
-        channel: Option<String>,       //CHANNEL
-        seq: usize,                    //SEQUENCE NUMBER (CLIENT -> SERVER)
-        server_seq: usize,             //SEQUENCE NUMBER (SERVER -> CLIENT)
+        stream: Arc<Mutex<TcpStream>>,                   //STREAM
+        peer_addr: SocketAddr,                           //ADDRESS & PORT
+        username: String,                                //USERNAME
+        id: usize,                                       //ID OF USER
+        keys: (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>), //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
+        last_activity: Instant,                          //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
+        last_key_exchange: Instant,                      //TIME OF LAST REKEY
+        spam_violations: usize,                          //SPAM VIOLATIONS (unexpected, huh?)
+        channel: Option<String>,                         //CHANNEL
+        seq: usize,                                      //SEQUENCE NUMBER (CLIENT -> SERVER)
+        server_seq: usize,                               //SEQUENCE NUMBER (SERVER -> CLIENT)
     },
 
     NonAuthenticated
     {
-        stream: Arc<Mutex<TcpStream>>,     //STREAM
-        peer_addr: SocketAddr,             //ADDRESS & PORT
-        username: Option<String>,          //CHOSEN USERNAME
-        keys: Option<(Vec<i64>, Vec<u8>)>, //SHARED KEYS
-        last_activity: Instant,            //TIME OF LAST MESSAGE
-        seq: usize,                        //SEQUENCE NUMBER
+        stream: Arc<Mutex<TcpStream>>,                           //STREAM
+        peer_addr: SocketAddr,                                   //ADDRESS & PORT
+        username: Option<String>,                                //CHOSEN USERNAME
+        keys: Option<(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)>, //SHARED KEYS
+        last_activity: Instant,                                  //TIME OF LAST MESSAGE
+        seq: usize,                                              //SEQUENCE NUMBER
     },
 }
 
@@ -140,7 +142,7 @@ impl Connection
     }
 
     //GET SHARED KEYS FROM Connection
-    pub fn keys(&self) -> Option<&(Vec<i64>, Vec<u8>)>
+    pub fn keys(&self) -> Option<&(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)>
     {
         match self
         {
@@ -276,7 +278,7 @@ impl Connection
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //PRIVATE
-fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut (Vec<i64>, Vec<u8>)) //KEY EXCHANGE FOR SERVER-SIDE
+fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)) //KEY EXCHANGE FOR SERVER-SIDE
 {
     //GET CONNECTION
     let mut stream = match CONNECTIONS.get(peer_addr)
@@ -323,10 +325,11 @@ fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut (Vec<i6
 
     //CALCULATE SHARED SECRET AND UPDATE CONNECTION
     *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap())
-        .inspect(|k| update_client_keys(peer_addr, k)).unwrap_or((vec![], vec![]));
+        .inspect(|k| update_client_keys(peer_addr, k))
+        .unwrap_or((Zeroizing::new(vec![]), Zeroizing::new(vec![])));
 }
 
-fn send_welcome_packet(stream: &mut TcpStream, keys: &(Vec<i64>, Vec<u8>)) //send welcome packet you idiot
+fn send_welcome_packet(stream: &mut TcpStream, keys: &(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)) //send welcome packet you idiot
 {
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
@@ -448,7 +451,7 @@ fn get_latest_id() -> usize
     unreachable!("what the fuck");
 }
 
-fn update_client_keys(peer_addr: &SocketAddr, keys: &(Vec<i64>, Vec<u8>)) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
+fn update_client_keys(peer_addr: &SocketAddr, keys: &(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
 {
     //UPDATE CONNECTION
     CONNECTIONS.alter(peer_addr, |_, old_connection|
@@ -535,10 +538,10 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
     });
 }
 
-fn ask_version(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &(Vec<i64>, Vec<u8>)) -> Option<String> //ASK CLIENT FOR VERSION
+fn ask_version(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)) -> Option<String> //ASK CLIENT FOR VERSION
 {
     //ASK FOR VERSION
-    send_code(stream, Some(misc::get_version().to_string()), MessageCode::Version, Some(&keys));
+    send_code(stream, Some(misc::get_version().to_string()), MessageCode::Version, Some(keys));
 
     //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
     stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
@@ -565,7 +568,7 @@ fn ask_version(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &(Vec<i64>, V
 }
 
 //PUBLIC
-pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, keys: Option<&(Vec<i64>, Vec<u8>)>) //SEND CODE TO CLIENT
+pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, keys: Option<&(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)>) //SEND CODE TO CLIENT
 {
     network::send(stream, MessagePacket
     {
@@ -600,7 +603,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let mut buffer = Vec::new();
 
     //GET ENCRYPTION & MAC KEYS
-    let mut keys = (vec![], vec![]);
+    let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
     key_exchange(&peer_addr, &mut buffer, &mut keys);
 
     //CHECK FOR VALID KEYS
