@@ -54,7 +54,7 @@ const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //PRIVATE
-fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>) //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
+fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> options::SharedKeys //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
 {
     let hkdf = Hkdf::<Sha256>::new(None, shared_secret);
 
@@ -116,7 +116,7 @@ pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
     (sk, pk)
 }
 
-pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Option<(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)> //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
+pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Option<options::SharedKeys> //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
 {
     //PARSE KEYS
     let local_private = SecretKey::from_pkcs8_pem(&local_key).expect("Invalid key");

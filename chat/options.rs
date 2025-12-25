@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use zeroize::Zeroizing;
 
 #[cfg(feature = "client")]
 use std::sync::
@@ -31,9 +32,6 @@ use std::sync::
         Ordering,
     },
 };
-
-#[cfg(feature = "client")]
-use zeroize::Zeroizing;
 
 //CONSTS
 pub const METADATA_URL: &str        = "https://crates.io/api/v1/crates/why2";                             //URL FOR PROJECT METADATA
@@ -57,9 +55,12 @@ pub const REKEY_INTERVAL: u64       = 600;                                      
 //DO NOT CHANGE CONST BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                                                       //DIMENSIONS OF REX GRID
 
+//TYPES
+pub type SharedKeys = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);
+
 //SETTINGS
 #[cfg(feature = "client")]
-static KEYS: LazyLock<RwLock<Option<(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
+static KEYS: LazyLock<RwLock<Option<SharedKeys>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
 {
     RwLock::new(None)
 });
@@ -88,14 +89,14 @@ static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (
 //FUNCTIONS
 //SHARED KEYS
 #[cfg(feature = "client")]
-pub fn set_keys(keys: (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)) //SET KEY
+pub fn set_keys(keys: SharedKeys) //SET KEY
 {
     let mut shared_key = KEYS.write().unwrap();
     *shared_key = Some(keys);
 }
 
 #[cfg(feature = "client")]
-pub fn get_keys() -> Option<(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)> //RETURN KEY
+pub fn get_keys() -> Option<SharedKeys> //RETURN KEY
 {
     let shared_key = KEYS.read().unwrap();
     shared_key.clone()

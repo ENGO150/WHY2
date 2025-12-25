@@ -52,7 +52,7 @@ const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //PRIVATE
-fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)) //KEY EXCHANGE FOR CLIENT-SIDE
+fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options::SharedKeys) //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
     let message = loop

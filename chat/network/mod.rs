@@ -30,8 +30,6 @@ use std::
     io::{ Read, Write },
 };
 
-use zeroize::Zeroizing;
-
 use serde::{ Deserialize, Deserializer, Serialize, Serializer };
 
 use colored::Color;
@@ -47,7 +45,7 @@ use crate::rex::
     Grid,
 };
 
-use crate::chat::options as rex_options;
+use crate::chat::options as chat_options;
 
 #[cfg(feature = "server")]
 use std::time::{ Instant, Duration };
@@ -101,8 +99,8 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 }
 
 //CONSTS
-const GRID_W: usize = rex_options::GRID_DIMENSIONS.0;
-const GRID_H: usize = rex_options::GRID_DIMENSIONS.1;
+const GRID_W: usize = chat_options::GRID_DIMENSIONS.0;
+const GRID_H: usize = chat_options::GRID_DIMENSIONS.1;
 
 //IMPLEMENTATIONS
 impl Default for MessagePacket //DEFAULT
@@ -172,7 +170,7 @@ impl<'de> Deserialize<'de> for SerColor
 }
 
 //FUNCTIONS
-pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)>) //SEND packet TO stream
+pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&chat_options::SharedKeys>) //SEND packet TO stream
 {
     //COPY PACKET
     let mut packet = packet;
@@ -180,8 +178,8 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&(Zeroiz
     //ADD SEQUENCE NUMBER TO packet (FROM CLIENT)
     #[cfg(feature = "client")]
     {
-        packet.seq = rex_options::get_seq() + 1;
-        rex_options::set_seq(packet.seq);
+        packet.seq = chat_options::get_seq() + 1;
+        chat_options::set_seq(packet.seq);
     }
 
     //ADD SEQUENCE NUMBER TO packet (FROM SERVER)
@@ -249,7 +247,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&(Zeroiz
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>)>) -> Option<MessagePacket>
+pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&chat_options::SharedKeys>) -> Option<MessagePacket>
 {
     //SERVER SIDE PACKET SIZE LIMIT
     #[cfg(feature = "server")]
@@ -430,10 +428,10 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Zero
                     //VERIFY SEQUENCE NUMBER
                     #[cfg(feature = "client")] //ON CLIENT
                     {
-                        if packet.seq > rex_options::get_server_seq() || rex_options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
+                        if packet.seq > chat_options::get_server_seq() || chat_options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
                         {
                             //SET SEQ
-                            rex_options::set_server_seq(packet.seq);
+                            chat_options::set_server_seq(packet.seq);
                         } else //INVALID, DISCONNECT
                         {
                             return None;
