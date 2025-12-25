@@ -54,6 +54,8 @@ use std::
     },
 };
 
+use zeroize::Zeroize;
+
 //TYPES
 /// A 2D matrix of 64-bit signed integers used as the core data structure in WHY2 encryption.
 ///
@@ -69,7 +71,8 @@ use std::
 /// throughout encryption and decryption. Mixing grid sizes within a single session or
 /// across rounds is unsupported and may lead to incorrect results or undefined behavior.
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Zeroize)]
+#[zeroize(drop)]
 pub struct Grid<const W: usize, const H: usize>([[i64; W]; H]); //GRID FOR REX DATA
 
 //IMPLEMENTATIONS
