@@ -36,8 +36,9 @@ pub mod options;
 use std::
 {
     result,
-    vec::IntoIter as IntoVecIter,
+    ops::Range,
     slice::{ Iter, IterMut },
+    vec::IntoIter as IntoVecIter,
     ops::
     {
         Index,
@@ -256,6 +257,43 @@ impl<const W: usize, const H: usize> Grid<W, H>
         for row in 0..self.height()
         {
             self[row][col] ^= self[row][next_col];
+        }
+    }
+
+    fn mix_matrix_handler
+    (
+        &mut self,
+        i_range: impl Iterator<Item = usize>,
+        j_range: impl Fn(usize) -> Range<usize>,
+        key_grid: &Grid<W, H>,
+        inv: bool
+    )
+    {
+        for i in i_range
+        {
+            for j in j_range(i)
+            {
+                let scalar = key_grid[i][j]; //USE KEY VALUE AS COEFFICIENT
+
+                //LWE NOISE
+                let noise = key_grid[j][i].wrapping_add(i as i64);
+
+                for col in 0..self.width()
+                {
+                    let val_j = self[j][col];
+                    let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
+
+                    self[i][col] = if !inv //MIX
+                    {
+                        //Row[i] = Row[i] + (Row[j] * scalar + noise)
+                        self[i][col].wrapping_add(mixing)
+                    } else //UNMIX
+                    {
+                        //Row[i] = Row[i] - (Row[j] * scalar + noise)
+                        self[i][col].wrapping_sub(mixing)
+                    }
+                }
+            }
         }
     }
 
@@ -517,88 +555,20 @@ impl<const W: usize, const H: usize> Grid<W, H>
     pub fn mix_matrix(&mut self, key_grid: &Grid<W, H>)
     {
         //LOWER TRIANGULAR PASS (TOP -> DOWN)
-        for i in 1..self.height()
-        {
-            for j in 0..i
-            {
-                let scalar = key_grid[i][j]; //USE KEY VALUE AS COEFFICIENT
-
-                //LWE NOISE
-                let noise = key_grid[j][i].wrapping_add(i as i64);
-
-                //Row[i] = Row[i] + (Row[j] * scalar + noise)
-                for col in 0..self.width()
-                {
-                    let val_j = self[j][col];
-                    let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
-                    self[i][col] = self[i][col].wrapping_add(mixing);
-                }
-            }
-        }
+        self.mix_matrix_handler(1..H, |i| 0..i, key_grid, false);
 
         //UPPER TRIANGULAR PASS (BOTTOM -> UP)
-        for i in (0..self.height() - 1).rev()
-        {
-            for j in (i + 1)..self.height()
-            {
-                let scalar = key_grid[i][j];
-
-                //LWE NOISE
-                let noise = key_grid[j][i].wrapping_add(i as i64);
-
-                //Row[i] = Row[i] + (Row[j] * scalar + noise)
-                for col in 0..self.width()
-                {
-                    let val_j = self[j][col];
-                    let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
-                    self[i][col] = self[i][col].wrapping_add(mixing);
-                }
-            }
-        }
+        self.mix_matrix_handler((0..H - 1).rev(), |i| (i + 1)..H, key_grid, false);
     }
 
     /// Inverts transformation done by [`matrix_mix`](Grid::matrix_mix) method
     pub fn inv_mix_matrix(&mut self, key_grid: &Grid<W, H>)
     {
         //REVERSED UPPER TRIANGULAR PASS
-        for i in 0..(self.height() - 1)
-        {
-            for j in (i + 1)..self.height()
-            {
-                let scalar = key_grid[i][j];
-
-                //LWE NOISE
-                let noise = key_grid[j][i].wrapping_add(i as i64);
-
-                //Row[i] = Row[i] - (Row[j] * scalar + noise)
-                for col in 0..self.width()
-                {
-                    let val_j = self[j][col];
-                    let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
-                    self[i][col] = self[i][col].wrapping_sub(mixing);
-                }
-            }
-        }
+        self.mix_matrix_handler(0..(H - 1), |i| (i + 1)..H, key_grid, true);
 
         //REVERSED LOWER TRIANGULAR PASS
-        for i in (1..self.height()).rev()
-        {
-            for j in 0..i
-            {
-                let scalar = key_grid[i][j];
-
-                //LWE NOISE
-                let noise = key_grid[j][i].wrapping_add(i as i64);
-
-                //Row[i] = Row[i] - (Row[j] * scalar + noise)
-                for col in 0..self.width()
-                {
-                    let val_j = self[j][col];
-                    let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
-                    self[i][col] = self[i][col].wrapping_sub(mixing);
-                }
-            }
-        }
+        self.mix_matrix_handler((1..H).rev(), |i| 0..i, key_grid, true);
     }
 
     /// Applies diagonal-wise mixing to the grid using XOR diffusion.
