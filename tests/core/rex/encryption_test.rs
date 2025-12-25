@@ -40,6 +40,7 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
     //ENCRYPT & DECRYPT
     let encrypted = encrypter::encrypt_string::<11, 7>(&test_core::TEST_TEXT.to_owned(), None).expect("Encryption failed");
     let key = encrypted.key.clone();
+    let encrypted_grid = encrypted.output[0].clone();
     let encrypter_measure = measure_start.elapsed();
     let decrypted_string = decrypter::decrypt_string(encrypted).expect("Decryption failed");
 
@@ -72,12 +73,13 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
         stream,
 
         "Test {status}!\n\
-        TEXT: \t\t\"{}\"\
-        OUTPUT: \t\"{decrypted_string}\"\
-        KEY: \t\t\n{}\
+        TEXT: \t\t\"{}\"\n\
+        OUTPUT: \t\"{decrypted_string}\"\n\
+        KEY:\n{}\n\
+        ENCRYPTED:\n{:x}\n\n\
         TIME: \t\t{:.3}ms ({:.3}ms to encrypt [{}%])",
 
-        test_core::TEST_TEXT, key,
+        test_core::TEST_TEXT, key, encrypted_grid,
         measure_stop_nanos / 1_000_000.,
         encrypter_measure_nanos / 1_000_000.,
         (encrypter_measure_nanos / measure_stop_nanos * 100.).round()
