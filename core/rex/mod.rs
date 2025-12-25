@@ -755,12 +755,19 @@ impl<const W: usize, const H: usize> ConstantTimeEq for Grid<W, H>
     }
 }
 
-#[cfg(feature = "constant-time")]
 impl<const W: usize, const H: usize> PartialEq for Grid<W, H>
 {
     fn eq(&self, other: &Self) -> bool
     {
-        self.ct_eq(other).into()
+        #[cfg(feature = "constant-time")]
+        {
+            self.ct_eq(other).into()
+        }
+
+        #[cfg(not(feature = "constant-time"))]
+        {
+            self.0 == other.0
+        }
     }
 }
 
