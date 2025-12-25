@@ -52,6 +52,7 @@ use std::
         Display,
         Formatter,
         Result,
+        LowerHex,
     },
 };
 
@@ -775,6 +776,22 @@ impl<const W: usize, const H: usize> Display for Grid<W, H>
     }
 }
 
+impl<const W: usize, const H: usize> LowerHex for Grid<W, H>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result
+    {
+        for row in self.iter()
+        {
+            for cell in row
+            {
+                write!(f, "{:016x}", cell)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl Display for GridError
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result
@@ -786,8 +803,7 @@ impl Display for GridError
                 if *width <= 1
                 {
                     write!(f, "Invalid dimensions: expected width larger than 1, got {width}")
-                }
-                else
+                } else
                 {
                     write!(f, "Invalid dimensions: expected area larger than 1, got {width}x{height} ({})", width * height)
                 }
