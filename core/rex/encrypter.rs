@@ -31,14 +31,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! 3. **Deterministic Shuffling**: Each Grid is shuffled using a PRNG seeded from the key hash.
 //! 4. **Round-Based Mixing**: Each Grid undergoes XOR, subcell diffusion, row shifting, and column mixing.
 
+use rand_chacha::ChaCha20Rng;
 use rand::
 {
+    Rng,
     SeedableRng,
     prelude::SliceRandom,
 };
 
-use rand::Rng;
-use rand_chacha::ChaCha20Rng;
+use zeroize::Zeroizing;
 
 use crate::rex::
 {
@@ -87,7 +88,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
             }
 
             //USE KEY IF MATCHING LENGTH
-            k
+            Zeroizing::new(k)
         },
 
         //NO KEY, GENERATE ONE
@@ -95,7 +96,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     };
 
     //GET MUTABLE input
-    let mut input_used = input;
+    let mut input_used = Zeroizing::new(input);
 
     //PAD input_used TO MULTIPLE OF 64 (ADD EXTRA GRID IF FULL) [ISO 10126]
     let remainder = input_used.len() % grid_area; //PADDING CHARS REMAINING TO FULL GRID
@@ -129,15 +130,15 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     for grid in &mut grids
     {
         //FLATTEN CHUNK
-        let mut flattened: Vec<i64> = grid.iter().flatten().copied().collect();
+        let mut flattened = Zeroizing::new(grid.iter().flatten().copied().collect::<Vec<i64>>());
 
         //SHUFFLE
         flattened.shuffle(&mut dprng);
 
         //REBUILD
-        for (i, val) in flattened.into_iter().enumerate()
+        for (i, val) in flattened.iter().enumerate()
         {
-            grid[i / W][i % W] = val;
+            grid[i / W][i % W] = *val;
         }
     }
 
@@ -201,7 +202,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
 pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
 {
     //CONVERT input TO Vec<i64>
-    let mut chars: Vec<char> = input.chars().collect();
+    let mut chars = Zeroizing::new(input.chars().collect::<Vec<char>>());
 
     //INSERT PADDING
     if chars.len() % 2 != 0
@@ -210,7 +211,7 @@ pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Optio
     }
 
     //CONVERT
-    let vec_input = chars.chunks(2).map(|pair|
+    let vec_input = Zeroizing::new(chars.chunks(2).map(|pair|
     {
         //FILL BUFFER
         let mut buf = [0u8; 8];
@@ -219,8 +220,8 @@ pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Optio
 
         //APPEND
         i64::from_be_bytes(buf)
-    }).collect();
+    }).collect::<Vec<i64>>());
 
     //ENCRYPT Vec<i64> AND RETURN
-    encrypt(vec_input, key)
+    encrypt(vec_input.to_vec(), key)
 }

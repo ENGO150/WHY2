@@ -346,13 +346,13 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&(Vec<
                 let decrypted_packet = decrypter::decrypt(options::EncryptedData
                 {
                     output: grids,
-                    key: Grid::from_key(keys.0.clone()).unwrap(),
+                    key: Grid::from_key(keys.0.clone().into()).unwrap(),
                     iv: iv,
                 }).ok()?;
 
                 //OVERWRITE decoded_packet
                 decoded_packet = Vec::with_capacity(decrypted_packet.output.len() * 8);
-                for val in decrypted_packet.output
+                for val in decrypted_packet.output.to_vec()
                 {
                     decoded_packet.extend_from_slice(&val.to_be_bytes());
                 }

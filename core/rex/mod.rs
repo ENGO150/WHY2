@@ -56,7 +56,7 @@ use std::
     },
 };
 
-use zeroize::Zeroize;
+use zeroize::{ Zeroize, Zeroizing };
 
 #[cfg(feature = "constant-time")]
 use subtle::{ ConstantTimeEq,  Choice };
@@ -194,7 +194,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// # Returns
     /// - Ok(`Grid`) with mixed key values if dimensions are valid.
     /// - Err(String) if the grid area is too small.
-    pub fn from_key(vec: Vec<i64>) -> result::Result<Self, GridError>
+    pub fn from_key(vec: Zeroizing<Vec<i64>>) -> result::Result<Self, GridError>
     {
         //GRID OPTIONS
         let grid_area = W * H;

@@ -22,6 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use sha2::{ Sha256, Digest };
 
+use rand_chacha::ChaCha20Rng;
 use rand::
 {
     SeedableRng,
@@ -30,7 +31,7 @@ use rand::
     rngs::OsRng,
 };
 
-use rand_chacha::ChaCha20Rng;
+use zeroize::Zeroizing;
 
 use crate::rex::
 {
@@ -87,9 +88,9 @@ pub fn sha256_seed_grid<const W: usize, const H: usize>(key: &Grid<W, H>) -> [u8
 ///
 /// # Notes
 /// - The output is deterministic for a given RNG seed.
-pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaCha20Rng) -> Vec<i64>
+pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaCha20Rng) -> Zeroizing<Vec<i64>>
 {
-    (0..(2 * W * H)).map(|_| rng.next_u64() as i64).collect()
+    Zeroizing::new((0..(2 * W * H)).map(|_| rng.next_u64() as i64).collect())
 }
 
 /// Generates a symmetric WHY2 key using secure system entropy.
@@ -106,7 +107,7 @@ pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaC
 /// - The key is generated using system entropy and is cryptographically secure.
 /// - The output is deterministic for the derived seed, but the seed itself is random.
 /// - This method is suitable for one-time key generation in encryption workflows.
-pub fn generate_key<const W: usize, const H: usize>() -> Vec<i64>
+pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 {
     //CREATE SEED FOR ChaCha20Rng
     let mut seed = [0u8; 32];

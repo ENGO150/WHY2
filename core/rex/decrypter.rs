@@ -31,13 +31,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! 3. **Unshuffling**: Reverses the Grid permutation using a deterministic PRNG seeded from the key hash.
 //! 4. **PKCS Padding Removal**: Truncates the final output using the last cell value as a padding marker.
 
+use rand_chacha::ChaCha20Rng;
 use rand::
 {
     SeedableRng,
     prelude::SliceRandom,
 };
 
-use rand_chacha::ChaCha20Rng;
+use zeroize::Zeroizing;
 
 use crate::rex::
 {
@@ -112,28 +113,29 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     for grid in &mut grids
     {
         //SHUFFLE-MAP
-        let mut shuffle_map: Vec<usize> = (0..grid_area).collect(); //UNSUFFLED MAP (0, 1, 2 ... 64)
+        let mut shuffle_map = Zeroizing::new((0..grid_area).collect::<Vec<usize>>()); //UNSUFFLED MAP (0, 1, 2 ... 64)
         shuffle_map.shuffle(&mut dprng); //SHUFFLE GRID WITH DPRNG
 
         //FLATTEN CHUNK
-        let flattened: Vec<i64> = grid.iter().flatten().copied().collect();
+        let flattened = Zeroizing::new(grid.iter().flatten().copied().collect::<Vec<i64>>());
 
         //APPLY INVERSE PERMUTATION
-        let mut unshuffled = vec![0i64; grid_area];
+        let mut unshuffled = Zeroizing::new(vec![0i64; grid_area]);
         for (i, &shuffled_i) in shuffle_map.iter().enumerate()
         {
             unshuffled[shuffled_i] = flattened[i];
         }
 
         //REBUILD
-        for (i, val) in unshuffled.into_iter().enumerate()
+        for (i, val) in unshuffled.iter().enumerate()
         {
-            grid[i / W][i % W] = val;
+            grid[i / W][i % W] = *val;
         }
     }
 
     //FLATTEN Vec<Grid> TO Vec<i64>
-    let mut flattened: Vec<i64> = grids.iter().flat_map(|grid| grid.iter().flat_map(|row| row.iter())).copied().collect();
+    let mut flattened = Zeroizing::new(grids.iter()
+        .flat_map(|grid| grid.iter().flat_map(|row| row.iter())).copied().collect::<Vec<i64>>());
 
     //CHECK PADDING VALIDITY
     let padding_len = *flattened.last().unwrap_or(&0) as usize;
@@ -143,12 +145,13 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     }
 
     //REMOVE PADDING
-    flattened.truncate(flattened.len() - padding_len);
+    let new_len = flattened.len() - padding_len;
+    flattened.truncate(new_len);
 
     //RETURN OUTPUT
     Ok(DecryptedData
     {
-        output: flattened,
+        output: flattened.to_vec(),
         key: key_grid.into_iter().collect(),
     })
 }
@@ -171,14 +174,14 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 /// - Uses native-endian decoding for each `i64` value.
 /// - Each decrypted value contributes up to two Unicode scalar values.
 /// - PKCS-style padding is removed before decoding.
-pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<String, GridError>
+pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<Zeroizing<String>, GridError>
 {
     //DECRYPT
-    let decrypted = decrypt(input)?.output;
+    let decrypted = decrypt(input)?;
 
-    let mut output = String::with_capacity(decrypted.len() * 2);
+    let mut output = Zeroizing::new(String::with_capacity(decrypted.output.len() * 2));
 
-    for n in decrypted
+    for n in decrypted.output.iter()
     {
         let buf = n.to_be_bytes();
 

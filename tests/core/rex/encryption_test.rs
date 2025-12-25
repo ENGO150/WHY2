@@ -53,7 +53,7 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
     let returning: Result<(), Box<dyn std::error::Error>>;
 
     //GET VALUES BASED ON RESULT
-    if test_core::TEST_TEXT == decrypted_string
+    if test_core::TEST_TEXT == *decrypted_string
     {
         stream = Box::new(io::stdout());
         status = "successful";
@@ -74,12 +74,12 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
 
         "Test {status}!\n\
         TEXT: \t\t\"{}\"\n\
-        OUTPUT: \t\"{decrypted_string}\"\n\
+        OUTPUT: \t\"{}\"\n\
         KEY:\n{}\n\
         ENCRYPTED:\n{:x}\n\n\
         TIME: \t\t{:.3}ms ({:.3}ms to encrypt [{}%])",
 
-        test_core::TEST_TEXT, key, encrypted_grid,
+        test_core::TEST_TEXT, *decrypted_string, key, encrypted_grid,
         measure_stop_nanos / 1_000_000.,
         encrypter_measure_nanos / 1_000_000.,
         (encrypter_measure_nanos / measure_stop_nanos * 100.).round()
