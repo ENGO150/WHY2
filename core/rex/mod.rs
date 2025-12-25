@@ -596,20 +596,24 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    /// Applies a matrix-based linear transformation to mix rows.
+    /// Applies a matrix-based affine transformation to mix rows.
     ///
     /// This function treats the Grid as a matrix and multiplies it by a key-dependent transformation
-    /// matrix. To ensure the operation is reversible (invertible) in modular arithmetic, the transformation
+    /// matrix, while adding a deterministic noise term to each operation. This converts the
+    /// transformation from purely linear (`Ax`) to affine (`Ax + b`).
+    ///
+    /// To ensure the operation is reversible (invertible) in modular arithmetic, the transformation
     /// is constructed as a product of a Lower triangular matrix (L) and an Upper triangular matrix (U).
     ///
-    /// This introduces strong vertical diffusion, ensuring that every row influences every other row.
+    /// This introduces strong vertical diffusion, ensuring that every row influences every other row,
+    /// while the additive noise prevents simple linear relationship attacks.
     ///
     /// # Parameters
-    /// - `key_grid`: A reference to the key Grid used to derive scalar weights for mixing.
+    /// - `key_grid`: A reference to the key Grid used to derive scalar weights and noise offsets.
     ///
     /// # Behavior
-    /// - **Lower Pass (Downward):** Each row adds a multiple of previous rows (from top to bottom).
-    /// - **Upper Pass (Upward):** Each row adds a multiple of following rows (from bottom to top).
+    /// - **Lower Pass (Downward):** Each row adds a multiple of previous rows plus a noise term.
+    /// - **Upper Pass (Upward):** Each row adds a multiple of following rows plus a noise term.
     ///
     /// # Notes
     /// - This method mutates the Grid in-place.
