@@ -1,6 +1,23 @@
 Changelog
 =========
 
+v1.3.3:
+- ec2aae2: create SharedKeys type
+- 1d42786: implement Zeroize for chat shared keys
+- 1015376: update code example for zeroizing
+- 29a64d0: implement zeroize on whole REX
+- af7e987: implement PartialEq for non constant-time usage
+- c325f7a: add constant-time eq default feature
+- c124c97: check for invalid padding on decryption
+- e3036ee: output hex Grid in REX encryption test
+- a18ba36: implement LowerHex display for Grid
+- ed5b624: replace REX String errors with GridError
+- e863e58: implement Zeroize for Grid
+- 2f89495: add zeroize dependency
+- 3b0ed6d: fix mix_matrix code duplicity
+- 0dee53d: add LWE noise to mix_matrix operation
+- 1dd81b2: use read timeout on ask_version
+
 v1.3.2:
 - 112f190: update dependencies
 - abc980e: use TCP_NODELAY
