@@ -29,7 +29,7 @@ test-why2:
     - development
   script:
     - echo "Test WHY2"
-    - cargo test --all --verbose
+    - cargo test --all --verbose --release
 
 # Build chat for linux
 build-why2-chat-linux:
