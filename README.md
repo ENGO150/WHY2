@@ -16,7 +16,7 @@
 
 ## Code Example
 ```rust
-use why2::rex::{ encrypter, decrypter };
+use why2::{ encrypter, decrypter };
 
 fn main()
 {
