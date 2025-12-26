@@ -47,6 +47,15 @@ use crate::
     options::{ EncryptedData, DecryptedData },
 };
 
+#[cfg(feature = "constant-time")]
+use subtle::
+{
+    ConstantTimeEq,
+    ConstantTimeLess,
+    ConstantTimeGreater,
+    ConditionallySelectable,
+};
+
 /// Decrypts a WHY2-encrypted data into raw `i64` values.
 ///
 /// This function reverses the full WHY2 encryption pipeline:
@@ -125,7 +134,20 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
         let mut unshuffled = Zeroizing::new(vec![0i64; grid_area]);
         for (i, &shuffled_i) in shuffle_map.iter().enumerate()
         {
-            unshuffled[shuffled_i] = flattened[i];
+            #[cfg(feature = "constant-time")]
+            {
+                //O(N) SCAN FOR EACH CELL -> O(N^2)
+                for j in 0..grid_area
+                {
+                    let is_match = j.ct_eq(&shuffled_i);
+                    unshuffled[j].conditional_assign(&flattened[i], is_match);
+                }
+            }
+
+            #[cfg(not(feature = "constant-time"))]
+            {
+                unshuffled[shuffled_i] = flattened[i];
+            }
         }
 
         //REBUILD
@@ -139,8 +161,27 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     let mut flattened = Zeroizing::new(grids.iter()
         .flat_map(|grid| grid.iter().flat_map(|row| row.iter())).copied().collect::<Vec<i64>>());
 
-    //CHECK PADDING VALIDITY
     let padding_len = *flattened.last().unwrap_or(&0) as usize;
+
+    //CHECK PADDING VALIDITY
+    #[cfg(feature = "constant-time")]
+    {
+        let padding_len_u64 = padding_len as u64;
+        let total_len_u64 = flattened.len() as u64;
+
+        //padding_len > 0
+        let padding_gt_zero = padding_len_u64.ct_gt(&0);
+
+        //padding_len <= total_len
+        let len_valid = !total_len_u64.ct_lt(&padding_len_u64);
+
+        if !bool::from(padding_gt_zero & len_valid)
+        {
+             return Err(GridError::InvalidPadding);
+        }
+    }
+
+    #[cfg(not(feature = "constant-time"))]
     if padding_len == 0 || padding_len > flattened.len() //INVALID (POSSIBLY MALICIOUS) PADDING
     {
         return Err(GridError::InvalidPadding);
