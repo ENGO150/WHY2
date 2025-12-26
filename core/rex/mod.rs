@@ -730,12 +730,12 @@ impl<const W: usize, const H: usize> IndexMut<usize> for Grid<W, H>
 }
 
 //XOR ASSIGN
-impl<const W: usize, const H: usize> BitXorAssign<&Grid<W, H>> for &mut Grid<W, H>
+impl<const W: usize, const H: usize> BitXorAssign<&Grid<W, H>> for Grid<W, H>
 {
     #[inline]
     fn bitxor_assign(&mut self, rhs: &Grid<W, H>)
     {
-        self.xor_grids(&rhs);
+        self.xor_grids(rhs);
     }
 }
 
