@@ -43,12 +43,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! This crate allows selective enabling of components to keep the build lightweight.
 //!
+//! - **`constant-time`** (default):
+//!   Enables constant-time comparison for cryptographic operations using the [`subtle`] crate.
+//!   Disabling this may improve performance on non-sensitive data but opens the system to timing attacks.
+//!
 //! - **`client`**:
 //!   Enables the terminal-based client application and interactive interface.
 //!
 //! - **`server`**:
 //!   Enables the relay server logic for routing encrypted messages between clients.
 //!   *Use this if you are building a custom node or hosting a relay.*
+//!
+//! - **`legacy`**:
+//!   Enables the deprecated `legacy` module containing older, insecure versions of the encryption routines.
+//!   This feature should only be used for migration or compatibility testing.
 //!
 //! ## Philosophy
 //! - **Privacy is a right**, not a subscription feature.
