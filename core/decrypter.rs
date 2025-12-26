@@ -50,6 +50,11 @@ use crate::
 /// Decrypts a WHY2-encrypted data into raw `i64` values.
 ///
 /// This function reverses the full WHY2 encryption pipeline:
+///
+/// $$ P_i = C_i \oplus E_K(\text{Nonce} + i) $$
+///
+/// where $E_K$ is the WHY2 block cipher and $i$ is the block counter.
+///
 /// - Applies inverse round transformations (subcell, shift rows, mix columns)
 /// - XORs each grid with round keys in reverse order
 /// - Unshuffles each grid using a deterministic PRNG seeded from the key hash

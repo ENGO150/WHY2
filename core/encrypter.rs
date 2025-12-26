@@ -69,7 +69,10 @@ use crate::
 /// - Splits the input into grid chunks and shuffles each using a deterministic PRNG seeded from the key hash.
 /// - Applies round-based transformations: initial XOR, subcell mixing, row shifting, and column mixing.
 ///
-/// $$ C_i = P_i \oplus Enc_{Key}(Nonce + i) $$
+/// Each plaintext block $P_i$ is encrypted using CTR mode:
+/// $$ C_i = P_i \oplus E_K(\text{Nonce} + i) $$
+///
+/// where $E_K$ denotes the WHY2 block cipher keyed with $K$, and $i$ is the block counter.
 pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
 {
     //REX OPTIONS

@@ -44,8 +44,8 @@ pub const SUBCELL_ROUNDS: u32 = 32;
 
 /// Constant used to break symmetry in ARX mixing.
 ///
-/// This is derived from `(2^32) / φ`, where φ is the golden ratio. It ensures that each
-/// round introduces asymmetry and avoids cyclic patterns in the
+/// This is derived from $\lfloor 2^{32} / \varphi \rfloor$, where $\varphi = \frac{1 + \sqrt{5}}{2}$
+/// is the golden ratio. It ensures that each round introduces asymmetry and avoids cyclic patterns in the
 /// [`subcell`](crate::Grid::subcell) transformation.
 ///
 /// This value is cryptographically sensitive and should not be changed casually.

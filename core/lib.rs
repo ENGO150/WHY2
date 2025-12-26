@@ -250,8 +250,10 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Algorithm
     /// For each cell index $i$, the key parts $A$ and $B$ are derived from the input vector $V$:
-    /// $$ A = (V_i + V_{i + Area}) \lll (i \pmod{64}) $$
-    /// $$ B = (V_i \oplus V_{i + Area}) \ggg (i \pmod{64}) $$
+    /// $$ A = (V_i + V_{i + \text{Area}}) \lll (i \bmod 64) $$
+    /// $$ B = (V_i \oplus V_{i + \text{Area}}) \ggg (i \bmod 64) $$
+    ///
+    /// where $\lll$ and $\ggg$ denote left and right rotation respectively.
     ///
     /// The final grid value is computed as:
     /// $$ Grid_{x,y} = A \oplus B \oplus i $$
@@ -445,7 +447,8 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// $$ v_0 \leftarrow v_0 + (((v_1 \ll 4) \oplus (v_1 \gg 5)) + v_1) \oplus sum $$
     /// $$ v_1 \leftarrow v_1 + (((v_0 \ll 4) \oplus (v_0 \gg 5)) + v_0) \oplus sum $$
     ///
-    /// Where `sum` is incremented by a constant delta $\delta$ in each step.
+    /// where $\text{sum}$ is incremented by a constant $\delta = $ [`SUBCELL_DELTA`](crate::options::SUBCELL_DELTA) in each round:
+    /// $$ \text{sum} \leftarrow \text{sum} + \delta $$
     ///
     /// # Notes
     /// - This method mutates the [`Grid`] in-place.
@@ -494,7 +497,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// This transformation rotates each row of the [`Grid`] by a variable amount derived from
     /// the corresponding row in `key_grid`. The shift amount $S_i$ for row $i$ is computed as:
     ///
-    /// $$ S_i = \left( \bigoplus_{j=0}^{W-1} K_{i,j} \right) \pmod W $$
+    /// $$ S_i = \left( \bigoplus_{j=0}^{W-1} K_{i,j} \right) \bmod W $$
     ///
     /// # Behavior
     /// - Each row is rotated left by $S_i$.
@@ -524,7 +527,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Behavior
     /// For each column $c \in \{0, \dots, W-1\}$, compute:
-    /// $$ Grid_{row, c} \leftarrow Grid_{row, c} \oplus Grid_{row, (c + 1) \pmod W} $$
+    /// $$ G_{r, c} \leftarrow G_{r, c} \oplus G_{r, (c + 1) \bmod W} $$
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
@@ -576,7 +579,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// # Behavior
     /// - Processes all diagonals parallel to the main diagonal.
     /// - For each cell $(r, c)$, compute:
-    ///   $$ Grid_{r,c} \leftarrow Grid_{r,c} \oplus Grid_{r+1, c+1} $$
+    ///   $$ G_{r,c} \leftarrow G_{r,c} \oplus G_{r+1, c+1} $$
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
@@ -603,7 +606,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// It adds 1 to the current cell and propagates the carry bit to the next cell
     /// if a 64-bit overflow occurs:
     ///
-    /// $$ cell \leftarrow (cell + 1) \pmod{2^{64}} $$
+    /// $$ \text{cell} \leftarrow (\text{cell} + 1) \bmod 2^{64} $$
     ///
     /// # Behavior
     /// - Treats the entire grid as a single integer $N$.
