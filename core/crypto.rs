@@ -16,99 +16,160 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#![allow(deprecated)]
+//! # REX Crypto
+//!
+//! This module contains cryptographic utilities, used by REX module
 
 use sha2::{ Sha256, Digest };
 
-use rand::distr::{ Alphanumeric, SampleString };
+use rand_chacha::ChaCha20Rng;
+use rand::
+{
+    SeedableRng,
+    TryRngCore,
+    RngCore,
+    rngs::OsRng,
+};
 
-use crate::options::{ self, Version };
+use zeroize::Zeroizing;
 
-pub fn sha256_seed(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
+use crate::
+{
+    options,
+    Grid,
+    GridError,
+};
+
+/// Computes a SHA-256 hash of the Grid contents to produce a deterministic seed.
+///
+/// This function serializes the grid into native-endian bytes and feeds them into a SHA-256
+/// hasher. The resulting 32-byte digest can be used as a seed for shuffling, masking, or
+/// round-dependent randomness in the WHY2 cipher.
+///
+/// # Parameters
+/// - `key`: A `Grid` reference whose contents will be hashed.
+///
+/// # Returns
+/// A `[u8; 32]` array containing the SHA-256 digest of the grid.
+///
+/// # Notes
+/// - The hash is computed in row-major order.
+/// - Each `i64` cell is encoded using native-endian byte order.
+/// - This method is deterministic and does not use any external randomness.
+pub fn sha256_seed_grid<const W: usize, const H: usize>(key: &Grid<W, H>) -> [u8; 32]
 {
     //SHA256
     let mut hasher = Sha256::new();
-    hasher.update(seed_str.as_bytes());
+
+    //ADD TO HASH
+    for row in key.iter()
+    {
+        for val in row
+        {
+            hasher.update(&val.to_be_bytes());
+        }
+    }
 
     //FINALIZE
     hasher.finalize().into()
 }
 
-pub fn recommended_padding_rate(input_length: usize) -> usize //NORMAL PADDING RATE - 1 PADDING TO 3 CHARS
+/// Generates a deterministic key vector using a ChaCha20-based DRNG.
+///
+/// This function produces a `Vec<i64>` of length $2 \times W \times H$ by sampling from
+/// the provided ChaCha20 random number generator. Each value is derived from a
+/// `u64` output and cast to `i64`.
+///
+/// # Parameters
+/// - `rng`: A mutable reference to a seeded [`ChaCha20Rng`] instance.
+///
+/// # Returns
+/// A vector of signed 64-bit integers representing raw key material.
+///
+/// # Notes
+/// - The output is deterministic for a given RNG seed.
+pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaCha20Rng) -> Zeroizing<Vec<i64>>
 {
-    input_length / 3
+    Zeroizing::new((0..(2 * W * H)).map(|_| rng.next_u64() as i64).collect())
 }
 
-pub fn generate_key(length: usize) -> String //GENERATE WHY2 SYMMETRIC KEY
+/// Generates a symmetric WHY2 key using secure system entropy.
+///
+/// This function creates a 32-byte seed using [`OsRng`], then initializes
+/// a [`ChaCha20Rng`] with that seed to produce a deterministic
+/// stream of pseudorandom values. The output is a flat `Vec<i64>` of length $2 \times W \times H$,
+/// suitable for use with [`Grid::from_key`](crate::rex::Grid::from_key).
+///
+/// # Returns
+/// A vector of signed 64-bit integers representing raw symmetric key material.
+///
+/// # Notes
+/// - The key is generated using system entropy and is cryptographically secure.
+/// - The output is deterministic for the derived seed, but the seed itself is random.
+/// - This method is suitable for one-time key generation in encryption workflows.
+pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 {
-    Alphanumeric.sample_string(&mut rand::rng(), length)
+    //CREATE SEED FOR ChaCha20Rng
+    let mut seed = [0u8; 32];
+    OsRng.try_fill_bytes(&mut seed).expect("Creating seed failed"); //FILL
+
+    generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
 }
 
-pub fn generate_text_key_chain(key: &str, size: usize) -> Vec<i64> //GENERATE tkch, USED FOR ENCRYPTION/DECRYPTION
+/// Derives a sequence of round keys from a master Grid using deterministic hashing.
+///
+/// This function generates [`options::ROUND_KEYS`] round keys by chaining SHA-256 hashes
+/// of the previous key.
+///
+/// $$ K_0 = KDF(Hash(MasterKey)) $$
+/// $$ K_i = KDF(Hash(K_{i-1})) $$
+///
+/// Each hash is used as a seed for a [`ChaCha20Rng`] (the KDF),
+/// which produces a vector of `i64` values. These are then converted into `Grid`
+/// instances using [`Grid::from_key`](crate::rex::Grid::from_key).
+///
+/// # Parameters
+/// - `master_key`: The initial Grid used to seed the first round key.
+///
+/// # Returns
+/// A vector of `Grid` round keys, each derived deterministically from the previous one.
+///
+/// # Notes
+/// - The first key is seeded from `master_key`.
+/// - Each subsequent key is seeded from the SHA-256 digest of the previous key.
+/// - This method ensures reproducible round key generation without external randomness.
+pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Result<Vec<Grid<W, H>>, GridError>
 {
-    //VARIABLES
-    let mut number_buffer: usize;
-    let mut number_buffer_2: usize;
-    let mut number_buffer_3: usize;
-    let core_options = options::get_core_options();
-    let key_length = core_options.key_length;
-    let mut text_key_chain: Vec<i64> = vec![0; size];
-    let key_bytes = key.as_bytes();
+    let mut keys: Vec<Grid<W, H>> = Vec::with_capacity(options::ROUND_KEYS);
 
-    for i in 0..size
+    //GENERATE KEYS
+    for _ in 0..(options::ROUND_KEYS)
     {
-        number_buffer = i % key_length;
+        //USE SEED OF LAST KEY TO GENERATE NEW KEY
+        let key = generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
 
-        //USE CORRECT VERSION
-        match core_options.version
-        {
-            Version::V1 =>
-            {
-                number_buffer_2 = i;
-                number_buffer_3 = number_buffer + (i < size) as usize;
-            },
-
-            Version::V2 =>
-            {
-                number_buffer_2 = i;
-                number_buffer_3 = key_length - (number_buffer + (i < size) as usize);
-            },
-
-            Version::V3 =>
-            {
-                number_buffer_2 = size - (i + 1);
-                number_buffer_3 = key_length - (number_buffer + (i < size) as usize);
-            },
-
-            Version::V4 =>
-            {
-                number_buffer_2 = size - (i + 1);
-                number_buffer_3 = ((((((i ^ number_buffer_2) + ((number_buffer << 3) ^ (number_buffer_2 & 0xF))) * (size ^ (key_length >> 2))) ^ ((!(number_buffer + size)) & 0xA7)) + (i % 7)) * (((number_buffer_2 | (i & 0xF)) + (key_length >> 3)) ^ (size * (number_buffer & 0x3F))) + (((i << 4) ^ (size >> 1)) & 0x1234) - ((i * number_buffer_2) % (key_length | size))) % key_length; //gl fucker
-            },
-        }
-
-        //VALUES
-        let a = key_bytes[number_buffer] as i64;
-        let b = key_bytes[number_buffer_3] as i64;
-
-        //GET MATCHING OPERATION BETWEEN VALUES
-        let val = if core_options.version == Version::V4 && (number_buffer + 1) % 4 == 0
-        {
-            a % b.max(1)
-        } else if (number_buffer + 1) % 3 == 0
-        {
-            a * b
-        } else if (number_buffer + 1) % 2 == 0
-        {
-            a.wrapping_sub(b)
-        } else
-        {
-            a.wrapping_add(b)
-        };
-
-        //SET
-        text_key_chain[number_buffer_2] = val;
+        //CONVERT KEY TO Grid & PUSH TO keys
+        keys.push(Grid::from_key(key)?);
     }
 
-    text_key_chain
+    Ok(keys)
+}
+
+/// Generates a random nonce for CTR mode.
+///
+/// This creates a single Grid filled with cryptographically secure random values
+/// using system entropy. The nonce must be unique for each encryption session.
+///
+/// # Returns
+/// A Grid suitable for use as a CTR nonce.
+///
+/// # Errors
+/// Returns an error if the Grid dimensions are invalid (should never happen in practice).
+///
+/// # Notes
+/// - The nonce does not need to be secret, but must be strictly unique per message.
+/// - The nonce will be transmitted alongside the ciphertext.
+pub fn generate_nonce<const W: usize, const H: usize>() -> Result<Grid<W, H>, GridError>
+{
+    Grid::from_key(generate_key::<W, H>())
 }

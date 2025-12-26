@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // i would prefer to not answer questions about this test. it works. how? no idea
 
-use why2::rex::
+use why2::
 {
     encrypter,
     crypto,

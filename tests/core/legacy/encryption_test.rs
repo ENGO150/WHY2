@@ -16,36 +16,58 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#![allow(deprecated)]
+
 use std::
 {
     time::Instant,
     io::{ self, Write },
 };
 
-use why2::rex::
+use why2::legacy::
 {
+    crypto,
     encrypter,
     decrypter,
+    options::{ self, Options },
 };
 
 use crate::core as test_core;
 
-//FUNCTIONS
-#[test]
-fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
+//TEST XOR IN ENCRYPTION
+fn encryption_operation(x: i64, y: i64) -> i64
 {
+    x ^ y
+}
+
+#[test]
+fn encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
+{
+    //OPTIONS
+    options::set_core_options
+    (
+        Options
+        {
+            key_length: 100, //USE 2x LARGER KEY
+            padding: crypto::recommended_padding_rate(test_core::TEST_TEXT.len()), //USE RECOMMENDED PADDING
+            encryption_operation: encryption_operation, //USE XOR FOR ENCRYPTING
+            ..Options::default() //DEFAULT OTHER SETTINGS
+        }
+    );
+
     //START MEASURING
     let measure_start = Instant::now();
 
     //ENCRYPT & DECRYPT
-    let encrypted = encrypter::encrypt_string::<11, 7>(&test_core::TEST_TEXT.to_owned(), None).expect("Encryption failed");
-    let key = encrypted.key.clone();
-    let encrypted_grid = encrypted.output[0].clone();
-    let encrypter_measure = measure_start.elapsed();
-    let decrypted_string = decrypter::decrypt_string(encrypted).expect("Decryption failed");
+    let encrypted = encrypter::encrypt_text(test_core::TEST_TEXT, None).expect("Encryption failed");
+    let decrypted = decrypter::decrypt_text(encrypted);
 
     //STOP MEASURING
     let measure_stop = measure_start.elapsed();
+
+    //OUTPUT VARIABLES
+    let decrypted_text = decrypted.output;
+    let key = decrypted.key;
 
     //VARIABLES FOR PRINT
     let mut stream: Box<dyn Write>;
@@ -53,7 +75,7 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
     let returning: Result<(), Box<dyn std::error::Error>>;
 
     //GET VALUES BASED ON RESULT
-    if test_core::TEST_TEXT == *decrypted_string
+    if test_core::TEST_TEXT == decrypted_text
     {
         stream = Box::new(io::stdout());
         status = "successful";
@@ -65,24 +87,17 @@ fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
         returning = Err("Values do not match".into());
     }
 
-    let measure_stop_nanos = measure_stop.as_nanos() as f64;
-    let encrypter_measure_nanos = encrypter_measure.as_nanos() as f64;
-
     writeln!
     (
         stream,
 
-        "Test {status}!\n\
-        TEXT: \t\t\"{}\"\n\
-        OUTPUT: \t\"{}\"\n\
-        KEY:\n{}\n\
-        ENCRYPTED:\n{:x}\n\n\
-        TIME: \t\t{:.3}ms ({:.3}ms to encrypt [{}%])",
+        "Test {status}!\n
+TEXT: \t\t\"{}\"
+OUTPUT: \t\"{decrypted_text}\"
+KEY: \t\t\"{key}\"
+TIME: \t\t{}ms",
 
-        test_core::TEST_TEXT, *decrypted_string, key, encrypted_grid,
-        measure_stop_nanos / 1_000_000.,
-        encrypter_measure_nanos / 1_000_000.,
-        (encrypter_measure_nanos / measure_stop_nanos * 100.).round()
+        test_core::TEST_TEXT, measure_stop.as_millis()
     ).unwrap();
 
     returning

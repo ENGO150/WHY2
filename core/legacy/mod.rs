@@ -16,11 +16,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//CONSTS
-const TEST_TEXT: &str = "aAzZ(    )!?#\\/śŠ <3|420*;㍿㊓ㅅΔ♛👶🏿"; //TEST TEXT FOR ENCRYPTION
+//! # WHY2 Legacy
+//!
+//! ## Deprecation Notice
+//! This module is deprecated and retained only for refence and legacy compatibility.
+//! These parts represent early versions of the WHY2 encryption routines that are now considered insecure.
+//!
+//! Due to identified security concerns, these legacy modules should **not be used in production**.
+//!
+//! For secure applications, always use [`rex`](crate)—the current and trusted implementation of the WHY2 encryption engine.
 
-//MODULES
-pub mod encryption_test;
-pub mod diffusion_test;
-
-pub mod legacy;
+pub mod crypto;
+pub mod decrypter;
+pub mod encrypter;
+pub mod options;
