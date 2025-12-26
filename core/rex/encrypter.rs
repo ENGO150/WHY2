@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! REX Encrypter
 //!
 //! This module defines the full encryption pipeline for WHY2, including Grid shaping,
-//! deterministic shuffling, round-based mixing, and PKCS-style padding. It transforms
+//! deterministic shuffling, round-based mixing, and ISO 10126 padding. It transforms
 //! raw data into encrypted Grid chunks using a symmetric key.
 //!
 //! # Overview
@@ -51,7 +51,7 @@ use crate::rex::
 
 /// Encrypts a vector of `i64` values.
 ///
-/// This function transforms the input into fixed-size grids ([`Grid`]), applies PKCS#7-style
+/// This function transforms the input into fixed-size grids ([`Grid`]), applies ISO 10126
 /// padding, and performs round-based encryption using nonlinear and linear mixing.
 ///
 /// # Parameters
@@ -65,11 +65,11 @@ use crate::rex::
 /// - `key`: The key [`Grid`] used for encryption.
 ///
 /// # Behavior
-/// - Pads the input to a multiple of the grid area using PKCS#7-style padding.
+/// - Pads the input to a multiple of the grid area using ISO 10126 padding (random bytes).
 /// - Splits the input into grid chunks and shuffles each using a deterministic PRNG seeded from the key hash.
 /// - Applies round-based transformations: initial XOR, subcell mixing, row shifting, and column mixing.
 ///
-/// $$ C_i = Enc(P_i \oplus K_{round}, Nonce) $$
+/// $$ C_i = P_i \oplus Enc_{Key}(Nonce + i) $$
 pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
 {
     //REX OPTIONS

@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! REX Decrypter
 //!
 //! This module defines the core decryption for WHY2, including round-key reversal,
-//! Grid unmixing, deterministic unshuffling, and PKCS-style padding removal. It reconstructs
+//! Grid unmixing, deterministic unshuffling, and ISO 10126 padding removal. It reconstructs
 //! the original data from encrypted Grid chunks using a symmetric key.
 //!
 //! # Overview
@@ -29,7 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! 1. **Round Key Generation**: Reconstructs round keys from the master key using chained SHA-256 seeds.
 //! 2. **Grid Unmixing**: Applies inverse subcell, row shift, and column mixing in reverse round order.
 //! 3. **Unshuffling**: Reverses the [`Grid`](crate::rex::Grid) permutation using a deterministic PRNG seeded from the key hash.
-//! 4. **PKCS Padding Removal**: Truncates the final output using the last cell value as a padding marker.
+//! 4. **ISO 10126 Padding Removal**: Truncates the final output using the last cell value as a padding marker.
 
 use rand_chacha::ChaCha20Rng;
 use rand::
@@ -53,7 +53,7 @@ use crate::rex::
 /// - Applies inverse round transformations (subcell, shift rows, mix columns)
 /// - XORs each grid with round keys in reverse order
 /// - Unshuffles each grid using a deterministic PRNG seeded from the key hash
-/// - Removes PKCS-style padding from the final output
+/// - Removes ISO 10126 padding from the final output
 ///
 /// # Parameters
 /// - `input`: An [`EncryptedData`] struct containing the encrypted grids and key grid.
@@ -170,7 +170,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 /// # Notes
 /// - Uses native-endian decoding for each `i64` value.
 /// - Each decrypted value contributes up to two Unicode scalar values.
-/// - PKCS-style padding is removed before decoding.
+/// - ISO 10126 padding is removed before decoding.
 pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<Zeroizing<String>, GridError>
 {
     //DECRYPT

@@ -132,10 +132,10 @@ pub enum GridError
 
     /// Indicates that the decrypted data contains invalid padding.
     ///
-    /// WHY2 uses a PKCS#7-style padding scheme where the last byte value indicates
-    /// the number of padding bytes to remove. This error is returned if the padding
-    /// length is zero, exceeds the total data length, or if the padding bytes
-    /// do not match the expected format.
+    /// WHY2 uses an **ISO 10126** padding scheme where the last cell value indicates
+    /// the number of padding cells to remove. The preceding padding cells contain
+    /// random data. This error is returned if the padding length is zero or
+    /// exceeds the total data length.
     ///
     /// # Security Note
     /// In many contexts, a padding error is indistinguishable from a wrong key
