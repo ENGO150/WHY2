@@ -215,7 +215,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&chat_op
 
         //SERIALIZE ENCRYPTED PACKET
         let mut grids = encrypted_data.output;
-        grids.insert(0, encrypted_data.iv); //INITIALIZATION VECTOR
+        grids.insert(0, encrypted_data.nonce); //NONCE
 
         //CONVERT ENCRYPTED PACKET (FROM Vec<Grid>) TO Vec<u8>
         let encrypted_bytes: Vec<u8> = grids.iter()
@@ -339,15 +339,15 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&chat_
                 //DESERIALIZE ENCRYPTED PACKET
                 let mut grids = Grid::<GRID_W, GRID_H>::from_bytes(decoded_packet).ok()?;
 
-                //EXTRACT INITIALIZATION VECTOR
-                let iv = grids.remove(0);
+                //EXTRACT NONCE
+                let nonce = grids.remove(0);
 
                 //DECRYPT
                 let decrypted_packet = decrypter::decrypt(options::EncryptedData
                 {
                     output: grids,
                     key: Grid::from_key(keys.0.clone().into()).unwrap(),
-                    iv: iv,
+                    nonce: nonce,
                 }).ok()?;
 
                 //OVERWRITE decoded_packet
