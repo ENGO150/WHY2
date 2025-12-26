@@ -29,6 +29,12 @@ use std::
     net::TcpStream,
     mem::MaybeUninit,
     io::{ Read, Write },
+    fmt::
+    {
+        self,
+        Display,
+        Formatter,
+    },
 };
 
 use wincode::
@@ -137,11 +143,11 @@ impl Default for MessagePacket //DEFAULT
     }
 }
 
-impl SerColor
+impl Display for SerColor //PARSE SerColor TO STRING
 {
-    fn enc(&self) -> String
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result
     {
-        String::from(match self.0
+        let color_str = match self.0
         {
             Color::Black => "black",
             Color::Red => "red",
@@ -160,18 +166,24 @@ impl SerColor
             Color::BrightWhite => "bright white",
 
             _ => "white",
-        })
-    }
+        };
 
-    fn dec(enc: String) -> Result<Self, ReadError>
-    {
-        Color::from_str(&enc)
+        write!(f, "{color_str}")
+    }
+}
+
+impl FromStr for SerColor //PARSE STRING TO SerColor
+{
+    type Err = ReadError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Color::from_str(s)
             .map(SerColor)
             .map_err(|_| ReadError::Custom("Invalid color string"))
     }
 }
 
-//SERIALIZE
+//SERIALIZE SerColor
 impl SchemaWrite for SerColor
 {
     type Src = Self;
@@ -179,16 +191,16 @@ impl SchemaWrite for SerColor
 
     fn size_of(src: &Self::Src) -> WriteResult<usize>
     {
-        <String as SchemaWrite>::size_of(&src.enc())
+        <String as SchemaWrite>::size_of(&src.to_string())
     }
 
     fn write(writer: &mut impl Writer, src: &Self::Src) -> WriteResult<()>
     {
-        <String as SchemaWrite>::write(writer, &src.enc())
+        <String as SchemaWrite>::write(writer, &src.to_string())
     }
 }
 
-//DESERIALIZE
+//DESERIALIZE SerColor
 impl<'de> SchemaRead<'de> for SerColor
 {
     type Dst = Self;
@@ -196,7 +208,7 @@ impl<'de> SchemaRead<'de> for SerColor
 
     fn read(reader: &mut impl Reader<'de>, dst: &mut MaybeUninit<Self::Dst>) -> ReadResult<()>
     {
-        dst.write(SerColor::dec(<String as SchemaRead>::get(reader)?)?);
+        dst.write(<String as SchemaRead>::get(reader)?.parse::<SerColor>()?);
         Ok(())
     }
 }
