@@ -627,7 +627,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
         self.mix_matrix_handler((0..H - 1).rev(), |i| (i + 1)..H, key_grid, false);
     }
 
-    /// Inverts transformation done by [`matrix_mix`](Grid::matrix_mix) method
+    /// Inverts transformation done by [`mix_matrix`](Grid::mix_matrix) method
     pub fn inv_mix_matrix(&mut self, key_grid: &Grid<W, H>)
     {
         //REVERSED UPPER TRIANGULAR PASS

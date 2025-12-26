@@ -23,7 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! the original data from encrypted Grid chunks using a symmetric key.
 //!
 //! # Overview
-//! WHY2 encrypts data by transforming it into fixed-size grids ([`Grid`](crate::core::rex::Grid)) and applying
+//! WHY2 encrypts data by transforming it into fixed-size grids ([`Grid`](crate::rex::Grid)) and applying
 //! nonlinear and linear mixing across multiple rounds. Decryption reverses these steps:
 //!
 //! 1. **Round Key Generation**: Reconstructs round keys from the master key using chained SHA-256 seeds.
