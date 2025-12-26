@@ -42,7 +42,7 @@ use crate::
 
 /// Computes a SHA-256 hash of the Grid contents to produce a deterministic seed.
 ///
-/// This function serializes the grid into native-endian bytes and feeds them into a SHA-256
+/// This function serializes the grid into big-endian bytes and feeds them into a SHA-256
 /// hasher. The resulting 32-byte digest can be used as a seed for shuffling, masking, or
 /// round-dependent randomness in the WHY2 cipher.
 ///

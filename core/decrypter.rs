@@ -173,7 +173,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 /// - Err(`String`) if Grid area is 1
 ///
 /// # Notes
-/// - Uses native-endian decoding for each `i64` value.
+/// - Uses big-endian decoding for each `i64` value.
 /// - Each decrypted value contributes up to two Unicode scalar values.
 /// - ISO 10126 padding is removed before decoding.
 pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<Zeroizing<String>, GridError>
