@@ -622,15 +622,29 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - If the entire [`Grid`] overflows (wraps around), the counter resets to zero.
     pub fn increment(&mut self)
     {
+        #[cfg(feature = "constant-time")]
+        let mut carry: u64 = 1;
+
+        #[cfg(not(feature = "constant-time"))]
+        let carry: u64 = 1;
+
         for row in self.iter_mut()
         {
             for cell in row.iter_mut()
             {
-                let (result, overflow) = (*cell as u64).overflowing_add(1);
+                let (result, overflow) = (*cell as u64).overflowing_add(carry);
                 *cell = result as i64;
 
                 //NO CARRY (OVERFLOW), DONE
-                if !overflow { return; }
+                #[cfg(not(feature = "constant-time"))]
+                {
+                    if !overflow { return; }
+                }
+
+                #[cfg(feature = "constant-time")]
+                {
+                    carry &= overflow as u64;
+                }
             }
         }
     }
