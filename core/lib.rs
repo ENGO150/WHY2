@@ -515,13 +515,25 @@ impl<const W: usize, const H: usize> Grid<W, H>
     #[inline]
     pub fn shift_rows(&mut self, key_grid: &Grid<W, H>)
     {
-        let rows = self.width() as i64; //ROWS IN grid & key_grid
+        #[cfg(not(feature = "constant-time"))]
+        let rows = self.width() as i64;
 
         //SHIFT EACH ROW
         for (i, row) in self.iter_mut().enumerate()
         {
-            //SPLIT key_grid TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
-            let shift = key_grid[i].iter().fold(0i64, |acc, &x| acc ^ x).rem_euclid(rows) as usize;
+            let hash_chunk = key_grid[i].iter().fold(0i64, |acc, &x| acc ^ x);
+            let shift: usize;
+
+            #[cfg(feature = "constant-time")]
+            {
+                shift = ((hash_chunk as u64 as u128 * W as u128) >> 64) as usize;
+            }
+
+            #[cfg(not(feature = "constant-time"))]
+            {
+                //SPLIT key_grid TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
+                shift = hash_chunk.rem_euclid(rows) as usize;
+            }
 
             //ROTATE THE ROW
             row.rotate_left(shift);
