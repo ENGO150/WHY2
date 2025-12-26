@@ -119,9 +119,14 @@ pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 /// Derives a sequence of round keys from a master Grid using deterministic hashing.
 ///
 /// This function generates [`options::ROUND_KEYS`] round keys by chaining SHA-256 hashes
-/// of the previous key. Each hash is used as a seed for a [`ChaCha20Rng`],
+/// of the previous key.
+///
+/// $$ K_0 = KDF(Hash(MasterKey)) $$
+/// $$ K_i = KDF(Hash(K_{i-1})) $$
+///
+/// Each hash is used as a seed for a [`ChaCha20Rng`] (the KDF),
 /// which produces a vector of `i64` values. These are then converted into `Grid`
-/// instances using [`Grid::from_key`](Grid::from_key).
+/// instances using [`Grid::from_key`](crate::rex::Grid::from_key).
 ///
 /// # Parameters
 /// - `master_key`: The initial Grid used to seed the first round key.

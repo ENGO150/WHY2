@@ -188,6 +188,14 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// addition, XOR, and rotation. This improves diffusion and avoids
     /// simple linear patterns in the key.
     ///
+    /// # Algorithm
+    /// For each cell index $i$, the key parts $A$ and $B$ are derived from the input vector $V$:
+    /// $$ A = (V_i + V_{i + Area}) \lll (i \pmod{64}) $$
+    /// $$ B = (V_i \oplus V_{i + Area}) \ggg (i \pmod{64}) $$
+    ///
+    /// The final grid value is computed as:
+    /// $$ Grid_{x,y} = A \oplus B \oplus i $$
+    ///
     /// # Parameters
     /// - `vec`: A vector of signed 64-bit integers representing the raw key.
     ///
