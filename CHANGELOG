@@ -1,6 +1,35 @@
 Changelog
 =========
 
+v1.3.4:
+- f165f8b: move serde_json dependency to chat only
+- 3dd3985: implement Display & FromStr traits for SerColor
+- a64b501: replace bincode with wincode
+- 03c1b93: update dependencies
+- 422e7be: implement constant-time for Grid::shift_rows
+- ff775ba: implement constant-time in decrypter
+- cb59426: implement constant-time for Grid::increment
+- bb5e236: replace native-endian with BE in docs
+- e2522db: use legacy feature in docs
+- 2ada555: add legacy & constant-time features to doc
+- 5e5021a: make doc LaTeX notations more explicit
+- 883477e: use legacy feature in test pipelines
+- a919e29: disable legacy modules by default
+- b2379f3: update code example for new structure
+- a7ea3d7: use new structure on chat
+- 762a9a3: use new structure in docs
+- e1ee99c: move WHY2 legacy to separate module
+- 3fe9780: add missing LaTeX notations
+- aaedd93: implement CTR on server
+- c182c91: update old pkcs usage in doc
+- ca61359: use LaTeX syntax in rustdoc
+- 9dc397e: clean unused Grid CBC invert operations
+- 72cc4ab: use CTR instead of CBC
+- b61047b: change Grid BitXorAssign implementation to Grid<W, H>
+- a0c2314: fix rustdoc unresolved links
+- 23090a1: include noise in rustdoc for mix_matrix
+- 9f571a4: use release profile for benchmarks
+
 v1.3.3:
 - ec2aae2: create SharedKeys type
 - 1d42786: implement Zeroize for chat shared keys
