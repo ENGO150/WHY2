@@ -290,45 +290,13 @@ impl<const W: usize, const H: usize> Grid<W, H>
     }
 
     //ENCRYPTION
-    //PRIVATE
-    fn shift_rows_handler(&mut self, key_grid: &Grid<W, H>, invert: bool) //SHIFT ROWS IN grid BASED ON key_grid
-    {
-        let rows = self.width() as i64; //ROWS IN grid & key_grid
-
-        //SHIFT EACH ROW
-        for (i, row) in self.iter_mut().enumerate()
-        {
-            //SPLIT key_grid TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
-            let shift = key_grid[i].iter().fold(0i64, |acc, &x| acc ^ x).rem_euclid(rows) as usize;
-
-            //ROTATE THE ROW
-            if invert
-            {
-                row.rotate_right(shift); //RIGHT ON DECRYPTION
-            } else
-            {
-                row.rotate_left(shift); //LEFT ON ENCRYPTION
-            }
-        }
-    }
-
-    #[inline]
-    fn mix_columns_handler(&mut self, col: usize) //MIX COLUMNS IN GRID
-    {
-        let next_col = (col + 1) % W;
-        for row in 0..self.height()
-        {
-            self[row][col] ^= self[row][next_col];
-        }
-    }
-
+    //PRIVATE HANDLERS
     fn mix_matrix_handler
     (
         &mut self,
         i_range: impl Iterator<Item = usize>,
         j_range: impl Fn(usize) -> Range<usize>,
         key_grid: &Grid<W, H>,
-        inv: bool
     )
     {
         for i in i_range
@@ -345,15 +313,8 @@ impl<const W: usize, const H: usize> Grid<W, H>
                     let val_j = self[j][col];
                     let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
 
-                    self[i][col] = if !inv //MIX
-                    {
-                        //Row[i] = Row[i] + (Row[j] * scalar + noise)
-                        self[i][col].wrapping_add(mixing)
-                    } else //UNMIX
-                    {
-                        //Row[i] = Row[i] - (Row[j] * scalar + noise)
-                        self[i][col].wrapping_sub(mixing)
-                    }
+                    //Row[i] = Row[i] + (Row[j] * scalar + noise)
+                    self[i][col] = self[i][col].wrapping_add(mixing); //MIX
                 }
             }
         }
@@ -376,33 +337,6 @@ impl<const W: usize, const H: usize> Grid<W, H>
 
             row = next_row;
             col = next_col;
-        }
-    }
-
-    fn inv_mix_diagonals_handler(&mut self, row: usize, col: usize) //UNMIX DIAGONALS IN GRID
-    {
-        //COPY PARAMETERS AS MUTABLE
-        let mut row = row;
-        let mut col = col;
-
-        //FIND THE END OF THIS DIAGONAL
-        let mut diagonal_cells = Vec::new();
-        while row < self.height() - 1 && col < self.width() - 1
-        {
-            diagonal_cells.push((row, col));
-            row += 1;
-            col += 1;
-        }
-
-        //PROCESS IN REVERSE ORDER
-        for i in (0..diagonal_cells.len()).rev()
-        {
-            let (r, c) = diagonal_cells[i];
-            let next_row = r + 1;
-            let next_col = c + 1;
-
-            //APPLY THE SAME XOR TRANSFORMATION
-            self[r][c] ^= self[next_row][next_col];
         }
     }
 
@@ -433,8 +367,6 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// This transformation introduces symmetric diffusion by modifying each `i64` cell
     /// using a combination of addition, rotation, and XOR operations. The process is
     /// round-dependent and designed to obscure bit patterns across the Grid.
-    ///
-    /// For decryption, use [`inv_subcell`](Grid::inv_subcell).
     ///
     /// # Parameters
     /// - `round`: A round index used to tweak the transformation logic.
@@ -486,57 +418,11 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    /// Inverts transformation done by [`subcell`](Grid::subcell) method
-    pub fn inv_subcell(&mut self, round: usize) //REMOVES NONLINEAR MIX
-    {
-        //APPLY ON EACH CELL
-        for col in self.iter_mut()
-        {
-            for cell in col
-            {
-                //SPLIT CELL TO HIGH32 AND LOW32
-                let x = *cell as u64;
-                let mut v0 = (x & 0xFFFF_FFFF) as u32; //LOW
-                let mut v1 = ((x >> 32) & 0xFFFF_FFFF) as u32; //HIGH
-
-                //UNDO XOR TWEAK
-                v1 ^= round as u32;
-
-                //PREPARE SUM VALUE TO SUM AFTER ROUND ADDITIONS (DELTA * ROUNDS)
-                let mut sum: u32 = options::SUBCELL_DELTA.wrapping_mul(options::SUBCELL_ROUNDS);
-
-                //RUN ROUNDS IN REVERSE ORDER
-                for _ in 0..(options::SUBCELL_ROUNDS)
-                {
-                    /*
-                    REVERSE MIXING IN OPPOSITE ORDER
-                    v1 = v1 + F(v0) ^ sum
-                    v0 = v0 + F(v1') ^ sum
-                    */
-
-                    v1 = v1.wrapping_sub(((v0 << 4) ^ (v0 >> 5)).wrapping_add(v0) ^ sum);
-                    v0 = v0.wrapping_sub(((v1 << 4) ^ (v1 >> 5)).wrapping_add(v1) ^ sum);
-
-                    sum = sum.wrapping_sub(options::SUBCELL_DELTA);
-                }
-
-                //UNDO INITIAL XOR TWEAK
-                v0 ^= round as u32;
-
-                //REBUILD AND APPLY
-                let out = ((v1 as u64) << 32) | (v0 as u64);
-                *cell = out as i64;
-            }
-        }
-    }
-
     /// Applies row-wise shifting to the Grid based on a key Grid.
     ///
     /// This transformation rotates each row of the Grid by a variable amount derived from
     /// the corresponding row in `key_grid`. The shift amount is computed by XORing all
     /// values in the key row and reducing modulo the Grid width.
-    ///
-    /// For decryption, use [`inv_shift_rows`](Grid::inv_shift_rows).
     ///
     /// # Parameters
     /// - `key_grid`: A Grid of the same dimensions used to derive row-wise shift values.
@@ -552,14 +438,17 @@ impl<const W: usize, const H: usize> Grid<W, H>
     #[inline]
     pub fn shift_rows(&mut self, key_grid: &Grid<W, H>)
     {
-        self.shift_rows_handler(key_grid, false); //USE HANDLER
-    }
+        let rows = self.width() as i64; //ROWS IN grid & key_grid
 
-    /// Inverts transformation done by [`shift_rows`](Grid::shift_rows) method
-    #[inline]
-    pub fn inv_shift_rows(&mut self, key_grid: &Grid<W, H>)
-    {
-        self.shift_rows_handler(key_grid, true); //USE HANDLER
+        //SHIFT EACH ROW
+        for (i, row) in self.iter_mut().enumerate()
+        {
+            //SPLIT key_grid TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
+            let shift = key_grid[i].iter().fold(0i64, |acc, &x| acc ^ x).rem_euclid(rows) as usize;
+
+            //ROTATE THE ROW
+            row.rotate_left(shift);
+        }
     }
 
     /// Applies column-wise mixing to the grid using linear XOR diffusion.
@@ -567,8 +456,6 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// This transformation modifies each column by XORing it with its adjacent column,
     /// introducing horizontal diffusion across the grid. The operation is performed in
     /// left-to-right order during encryption.
-    ///
-    /// For decryption, use [`inv_mix_columns`](Grid::inv_mix_columns).
     ///
     /// # Behavior
     /// - For each column `c`, compute:
@@ -582,17 +469,11 @@ impl<const W: usize, const H: usize> Grid<W, H>
     {
         for col in 0..(self.width())
         {
-            self.mix_columns_handler(col); //USE HANDLER
-        }
-    }
-
-    /// Inverts transformation done by [`mix_columns`](Grid::mix_columns) method
-    #[inline]
-    pub fn inv_mix_columns(&mut self)
-    {
-        for col in (0..(self.width())).rev()
-        {
-            self.mix_columns_handler(col); //USE HANDLER
+            let next_col = (col + 1) % W;
+            for row in 0..self.height()
+            {
+                self[row][col] ^= self[row][next_col];
+            }
         }
     }
 
@@ -621,20 +502,10 @@ impl<const W: usize, const H: usize> Grid<W, H>
     pub fn mix_matrix(&mut self, key_grid: &Grid<W, H>)
     {
         //LOWER TRIANGULAR PASS (TOP -> DOWN)
-        self.mix_matrix_handler(1..H, |i| 0..i, key_grid, false);
+        self.mix_matrix_handler(1..H, |i| 0..i, key_grid);
 
         //UPPER TRIANGULAR PASS (BOTTOM -> UP)
-        self.mix_matrix_handler((0..H - 1).rev(), |i| (i + 1)..H, key_grid, false);
-    }
-
-    /// Inverts transformation done by [`mix_matrix`](Grid::mix_matrix) method
-    pub fn inv_mix_matrix(&mut self, key_grid: &Grid<W, H>)
-    {
-        //REVERSED UPPER TRIANGULAR PASS
-        self.mix_matrix_handler(0..(H - 1), |i| (i + 1)..H, key_grid, true);
-
-        //REVERSED LOWER TRIANGULAR PASS
-        self.mix_matrix_handler((1..H).rev(), |i| 0..i, key_grid, true);
+        self.mix_matrix_handler((0..H - 1).rev(), |i| (i + 1)..H, key_grid);
     }
 
     /// Applies diagonal-wise mixing to the grid using XOR diffusion.
@@ -645,8 +516,6 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// The mixing proceeds from top-left to bottom-right along each diagonal line,
     /// ensuring that changes propagate through the entire grid structure.
-    ///
-    /// For decryption, use [`inv_mix_diagonals`](Grid::inv_mix_diagonals).
     ///
     /// # Behavior
     /// - Processes all diagonals parallel to the main diagonal (top-left to bottom-right)
@@ -671,23 +540,6 @@ impl<const W: usize, const H: usize> Grid<W, H>
         for start_col in 1..self.width()
         {
             self.mix_diagonals_handler(0, start_col);
-        }
-    }
-
-    /// Inverts transformation done by [`mix_diagonals`](Grid::mix_diagonals) method.
-    #[inline]
-    pub fn inv_mix_diagonals(&mut self)
-    {
-        //PROCESS DIAGONALS STARTING FROM THE FIRST ROW (EXCLUDING [0,0])
-        for start_col in (1..self.width()).rev()
-        {
-            self.inv_mix_diagonals_handler(0, start_col);
-        }
-
-        //PROCESS DIAGONALS BEGINNING IN THE FIRST COLUMN
-        for start_row in (0..self.height()).rev()
-        {
-            self.inv_mix_diagonals_handler(start_row, 0);
         }
     }
 
