@@ -27,10 +27,24 @@ use std::
 {
     str::FromStr,
     net::TcpStream,
+    mem::MaybeUninit,
     io::{ Read, Write },
 };
 
-use serde::{ Deserialize, Deserializer, Serialize, Serializer };
+use wincode::
+{
+    SchemaWrite,
+    SchemaRead,
+    TypeMeta,
+    WriteResult,
+    ReadResult,
+    error::ReadError,
+    io::
+    {
+        Writer,
+        Reader,
+    },
+};
 
 use colored::Color;
 
@@ -54,7 +68,7 @@ use std::time::{ Instant, Duration };
 use crate::chat::config;
 
 //STRUCTS
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
+#[derive(SchemaWrite, SchemaRead, PartialEq, Clone)]
 pub enum MessageCode //CONTROL CODES
 {
     KeyExchange,        //SERVER <> CLIENT | KEY EXCHANGE
@@ -80,14 +94,14 @@ pub enum MessageCode //CONTROL CODES
 #[derive(Clone)]
 pub struct SerColor(pub Color); //SERIALIZABLE Color
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct MessageColors //COLORS OF MESSAGE (ALL OF THE STRING VALUES WILL GET COVERTED TO colored::Color)
 {
     pub username_color: Option<SerColor>, //COLOR OF SENDER
     pub message_color: Option<SerColor>,  //COLOR OF MESSAGE
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 {
     pub text: Option<String>,      //MESSAGE
@@ -123,14 +137,11 @@ impl Default for MessagePacket //DEFAULT
     }
 }
 
-//SERIALIZE
-impl Serialize for SerColor
+impl SerColor
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+    fn enc(&self) -> String
     {
-        let s = match self.0
+        String::from(match self.0
         {
             Color::Black => "black",
             Color::Red => "red",
@@ -149,23 +160,44 @@ impl Serialize for SerColor
             Color::BrightWhite => "bright white",
 
             _ => "white",
-        };
+        })
+    }
 
-        serializer.serialize_str(s)
+    fn dec(enc: String) -> Result<Self, ReadError>
+    {
+        Color::from_str(&enc)
+            .map(SerColor)
+            .map_err(|_| ReadError::Custom("Invalid color string"))
+    }
+}
+
+//SERIALIZE
+impl SchemaWrite for SerColor
+{
+    type Src = Self;
+    const TYPE_META: TypeMeta = TypeMeta::Dynamic;
+
+    fn size_of(src: &Self::Src) -> WriteResult<usize>
+    {
+        <String as SchemaWrite>::size_of(&src.enc())
+    }
+
+    fn write(writer: &mut impl Writer, src: &Self::Src) -> WriteResult<()>
+    {
+        <String as SchemaWrite>::write(writer, &src.enc())
     }
 }
 
 //DESERIALIZE
-impl<'de> Deserialize<'de> for SerColor
+impl<'de> SchemaRead<'de> for SerColor
 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+    type Dst = Self;
+    const TYPE_META: TypeMeta = TypeMeta::Dynamic;
+
+    fn read(reader: &mut impl Reader<'de>, dst: &mut MaybeUninit<Self::Dst>) -> ReadResult<()>
     {
-        let s = String::deserialize(deserializer)?;
-        Color::from_str(&s)
-            .map(SerColor)
-            .map_err(|_| serde::de::Error::custom(format!("Invalid color string: {}", s)))
+        dst.write(SerColor::dec(<String as SchemaRead>::get(reader)?)?);
+        Ok(())
     }
 }
 
@@ -197,7 +229,7 @@ pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&chat_op
     }
 
     //ENCODE THE PACKET STRUCT TO Vec<u8>
-    let packet_bytes = bincode::serde::encode_to_vec(packet, bincode::config::standard()).expect("Encoding packet failed");
+    let packet_bytes = wincode::serialize(&packet).expect("Encoding packet failed");
 
     let final_bytes = if let Some(keys) = keys
     {
@@ -402,9 +434,9 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&chat_
             }
 
             //DECODE AND RETURN
-            match bincode::serde::decode_from_slice::<MessagePacket, _>(&decoded_packet, bincode::config::standard())
+            match wincode::deserialize::<MessagePacket>(&decoded_packet)
             {
-                Ok((packet, _)) =>
+                Ok(packet) =>
                 {
                     //VERIFY SEQUENCE NUMBER
                     #[cfg(feature = "server")] //ON SERVER
