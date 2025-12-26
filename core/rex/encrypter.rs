@@ -145,30 +145,35 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     //GENERATE ROUND KEYS
     let round_keys = crypto::generate_round_keys(&key_grid)?;
 
-    //PREVIOUS GRID STATE (FOR CBC)
-    let iv = crypto::generate_iv()?; //INITIALIZATION VECTOR
-    let mut previous_grid = iv.clone();
+    //CTR VARIABLES
+    let nonce = crypto::generate_nonce()?; //RANDOM GRID
+    let mut counter_grid = nonce.clone();
 
     //APPLY ENCRYPTION TO EACH GRID
-    for mut grid in &mut grids
+    for grid in &mut grids
     {
-        //INITIAL XOR
-        grid ^= &previous_grid; //CIPHER BLOCK CHAINING (CBC)
-        grid ^= &round_keys[0];
+        //CREATE KEYSTREAM BLOCK
+        let mut keystream_block = counter_grid.clone();
 
-        //XOR WITH EACH ROUND KEY AND SHIFT ROWS & COLUMNS
+        //INITIAL XOR
+        keystream_block ^= &round_keys[0];
+
+        //ROUND OPERATIONS
         for (i, round_key) in round_keys[1..].iter().enumerate()
         {
-            grid ^= round_key;                    //XOR
-            grid.subcell(i);               //SUBCELL
-            grid.shift_rows(round_key); //SHIFT ROWS
-            grid.mix_columns();                   //MIX COLUMNS
-            grid.mix_diagonals();                 //MIX DIAGONALS
-            grid.mix_matrix(round_key); //MIX MATRIX
+            keystream_block ^= round_key;                    //XOR
+            keystream_block.subcell(i);               //SUBCELL
+            keystream_block.shift_rows(round_key); //SHIFT ROWS
+            keystream_block.mix_columns();                   //MIX COLUMNS
+            keystream_block.mix_diagonals();                 //MIX DIAGONALS
+            keystream_block.mix_matrix(round_key); //MIX MATRIX
         }
 
-        //SAVE CURRENT GRID STATE
-        previous_grid = grid.clone();
+        //XOR KEYSTREAM AND DATA
+        *grid ^= &keystream_block;
+
+        //INCREMENT COUNTER FOR NEXT BLOCK
+        counter_grid.increment();
     }
 
     //RETURN OUTPUT
@@ -176,7 +181,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     {
         output: grids,
         key: key_grid,
-        iv: iv,
+        nonce: nonce,
     })
 }
 

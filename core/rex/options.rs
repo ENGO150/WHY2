@@ -70,7 +70,7 @@ pub struct EncryptedData<const W: usize, const H: usize> //DATA FOR REX ENCRYPTE
 {
     pub output: Vec<Grid<W, H>>, //OUTPUT VALUE
     pub key: Grid<W, H>,         //KEY USED FOR ENCRYPTION
-    pub iv: Grid<W, H>,          //INITIALIZATION VECTOR
+    pub nonce: Grid<W, H>,       //NONCE
 }
 
 /// Container for decrypted output.

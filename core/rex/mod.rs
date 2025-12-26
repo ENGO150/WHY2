@@ -690,6 +690,32 @@ impl<const W: usize, const H: usize> Grid<W, H>
             self.inv_mix_diagonals_handler(start_row, 0);
         }
     }
+
+    //UTILS
+    /// Increments the Grid value by 1, treating it as a large Little-Endian integer.
+    ///
+    /// This method iterates through the grid cells starting from the first one.
+    /// It adds 1 to the current cell and propagates the carry bit to the next cell
+    /// if a 64-bit overflow occurs (wrapping from `0xFF...FF` to `0`).
+    ///
+    /// # Behavior
+    /// - Uses `u64` arithmetic to ensure correct carry propagation across the full 64-bit range.
+    /// - Operates in constant time relative to the number of cells (always scans, though logic branches on carry).
+    /// - If the entire Grid overflows (wraps around), the counter simply resets to zero.
+    pub fn increment(&mut self)
+    {
+        for row in self.iter_mut()
+        {
+            for cell in row.iter_mut()
+            {
+                let (result, overflow) = (*cell as u64).overflowing_add(1);
+                *cell = result as i64;
+
+                //NO CARRY (OVERFLOW), DONE
+                if !overflow { return; }
+            }
+        }
+    }
 }
 
 //INTO ITERATOR
