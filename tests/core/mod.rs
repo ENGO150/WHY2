@@ -23,4 +23,5 @@ const TEST_TEXT: &str = "aAzZ(    )!?#\\/śŠ <3|420*;㍿㊓ㅅΔ♛👶🏿"; /
 pub mod encryption_test;
 pub mod diffusion_test;
 
+#[cfg(feature = "legacy")]
 pub mod legacy;

@@ -48,6 +48,7 @@ required-features = ["server"]
 default = ["constant-time"]
 
 constant-time = ["dep:subtle"]
+legacy = []
 
 chat = [
     "dep:base91",
