@@ -26,10 +26,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! WHY2 encrypts data by converting it into fixed-size grids ([`Grid`]) and applying
 //! nonlinear and linear transformations across multiple rounds. The process includes:
 //!
-//! 1. **Grid Shaping**: Input is padded and split into `Grid` chunks.
+//! 1. **Grid Shaping**: Input is padded and split into [`Grid`] chunks.
 //! 2. **Key Handling**: A symmetric key is either provided or securely generated.
-//! 3. **Deterministic Shuffling**: Each Grid is shuffled using a PRNG seeded from the key hash.
-//! 4. **Round-Based Mixing**: Each Grid undergoes XOR, subcell diffusion, row shifting, and column mixing.
+//! 3. **Deterministic Shuffling**: Each [`Grid`] is shuffled using a PRNG seeded from the key hash.
+//! 4. **Round-Based Mixing**: Each [`Grid`] undergoes XOR, subcell diffusion, row shifting, and column mixing.
 
 use rand_chacha::ChaCha20Rng;
 use rand::
@@ -52,24 +52,24 @@ use crate::rex::
 /// Encrypts a vector of `i64` values.
 ///
 /// This function transforms the input into fixed-size grids ([`Grid`]), applies PKCS#7-style
-/// padding, and performs round-based encryption using nonlinear and linear mixing. If no key is
-/// provided, a secure symmetric key is generated internally.
+/// padding, and performs round-based encryption using nonlinear and linear mixing.
 ///
 /// # Parameters
 /// - `input`: A vector of `i64` values representing the data.
 /// - `key`: An optional symmetric key. If `None`, a secure key is generated automatically.
-///          If provided, it must be exactly `2 × W × H` elements long.
+///          If provided, it must be exactly $2 \times W \times H$ elements long.
 ///
 /// # Returns
 /// An [`EncryptedData`] struct containing:
-/// - `output`: A vector of encrypted Grids.
-/// - `key`: The key grid used for encryption.
+/// - `output`: A vector of encrypted [`Grid`]s.
+/// - `key`: The key [`Grid`] used for encryption.
 ///
 /// # Behavior
 /// - Pads the input to a multiple of the grid area using PKCS#7-style padding.
 /// - Splits the input into grid chunks and shuffles each using a deterministic PRNG seeded from the key hash.
 /// - Applies round-based transformations: initial XOR, subcell mixing, row shifting, and column mixing.
-/// - Returns `None` if the provided key is invalid (wrong length).
+///
+/// $$ C_i = Enc(P_i \oplus K_{round}, Nonce) $$
 pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
 {
     //REX OPTIONS
@@ -188,22 +188,12 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
 /// Encrypts a string.
 ///
 /// This function encodes the input string into `i64` values by packing two `char`s
-/// into each 64-bit integer. It then delegates to [`encrypt`], which applies Grid shaping,
-/// deterministic shuffling, round-based mixing, and PKCS#7-style padding.
+/// into each 64-bit integer.
 ///
 /// # Parameters
 /// - `input`: A reference to the string to encrypt.
 /// - `key`: An optional symmetric key. If `None`, a secure key is generated automatically.
-///          If provided, it must be exactly `2 × W × H` elements long.
-///
-/// # Returns
-/// An [`EncryptedData`] struct containing:
-/// - `output`: A vector of encrypted `Grid` chunks.
-/// - `key`: The key grid used for encryption.
-///
-/// # Encoding Notes
-/// - Each `i64` packs two `char`s: the first 4 bytes are the high character, the next 4 bytes the low.
-/// - If the string has an odd number of characters, a null character (`'\0'`) is appended for alignment.
+///          If provided, it must be exactly $2 \times W \times H$ elements long.
 pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
 {
     //CONVERT input TO Vec<i64>

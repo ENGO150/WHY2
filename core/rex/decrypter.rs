@@ -28,7 +28,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! 1. **Round Key Generation**: Reconstructs round keys from the master key using chained SHA-256 seeds.
 //! 2. **Grid Unmixing**: Applies inverse subcell, row shift, and column mixing in reverse round order.
-//! 3. **Unshuffling**: Reverses the Grid permutation using a deterministic PRNG seeded from the key hash.
+//! 3. **Unshuffling**: Reverses the [`Grid`](crate::rex::Grid) permutation using a deterministic PRNG seeded from the key hash.
 //! 4. **PKCS Padding Removal**: Truncates the final output using the last cell value as a padding marker.
 
 use rand_chacha::ChaCha20Rng;
@@ -61,13 +61,8 @@ use crate::rex::
 /// # Returns
 /// - Ok([`DecryptedData`]) struct containing:
 ///   - `output`: A vector of decrypted `i64` values
-///   - `key`: The original key Grid flattened into a vector
-/// - Err(String) if Grid area is 1
-///
-/// # Notes
-/// - Padding is removed using PKCS-style logic: the last cell value indicates how many trailing values to discard.
-/// - The PRNG used for unshuffling is seeded from the SHA-256 hash of the key grid.
-/// - All transformations are deterministic and reversible.
+///   - `key`: The original key [`Grid`](crate::rex::Grid) flattened into a vector
+/// - Err(String) if [`Grid`](crate::rex::Grid) area is 1
 pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<DecryptedData, GridError>
 {
     //GET MUTABLE input

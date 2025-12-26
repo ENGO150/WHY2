@@ -27,6 +27,9 @@ categories = ["cryptography", "network-programming", "command-line-utilities"]
 
 default-run = "why2"
 
+[package.metadata.docs.rs]
+rustdoc-args = [ "--html-in-header", "core/docs-header.html" ]
+
 [lib]
 name = "why2"
 path = "core/lib.rs"

@@ -76,9 +76,9 @@ pub fn sha256_seed_grid<const W: usize, const H: usize>(key: &Grid<W, H>) -> [u8
 
 /// Generates a deterministic key vector using a ChaCha20-based DRNG.
 ///
-/// This function produces a `Vec<i64>` of length `2 × W × H` by sampling from
+/// This function produces a `Vec<i64>` of length $2 \times W \times H$ by sampling from
 /// the provided ChaCha20 random number generator. Each value is derived from a
-/// `u64` output and cast to `i64`, ensuring reproducibility across runs with the same seed.
+/// `u64` output and cast to `i64`.
 ///
 /// # Parameters
 /// - `rng`: A mutable reference to a seeded [`ChaCha20Rng`] instance.
@@ -97,8 +97,8 @@ pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaC
 ///
 /// This function creates a 32-byte seed using [`OsRng`], then initializes
 /// a [`ChaCha20Rng`] with that seed to produce a deterministic
-/// stream of pseudorandom values. The output is a flat `Vec<i64>` of length `2 × W × H`,
-/// suitable for use with [`Grid::from_key`](Grid::from_key).
+/// stream of pseudorandom values. The output is a flat `Vec<i64>` of length $2 \times W \times H$,
+/// suitable for use with [`Grid::from_key`](crate::rex::Grid::from_key).
 ///
 /// # Returns
 /// A vector of signed 64-bit integers representing raw symmetric key material.

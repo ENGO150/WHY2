@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! This module implements the core encryption logic behind WHY2 algorithm.
 //!
 //! ## Design Overview
-//! - Input and key are formatted into 2D grids of 64-bit cells.
+//! - Input and key are formatted into 2D grids of 64-bit cells ($W \times H$).
 //! - The key grid is shuffled and seeded to generate round keys.
 //! - Each round applies a nonlinear transformation to the input grids.
 //! - The transformation avoid traditional S-boxes, relying instead on symmetric diffusion.
@@ -59,20 +59,20 @@ use std::
 use zeroize::{ Zeroize, Zeroizing };
 
 #[cfg(feature = "constant-time")]
-use subtle::{ ConstantTimeEq,  Choice };
+use subtle::{ ConstantTimeEq, Choice };
 
 //TYPES
 /// A 2D matrix of 64-bit signed integers used as the core data structure in WHY2 encryption.
 ///
-/// The `Grid` represents either input data or a key, formatted into rows and columns of `i64` cells.
+/// The [`Grid`] represents either input data or a key, formatted into rows and columns of `i64` cells.
 /// All transformations—round mixing, key scheduling, and nonlinear diffusion—operate directly on this structure.
 ///
 /// Grids are flexible and can be transformed in-place.
-/// This abstraction allows WHY2 to generalize encryption over variable-sized blocks.
+/// This abstraction allows WHY2 to generalize encryption over variable-sized blocks of dimension $W \times H$.
 ///
 /// # Grid Size Consistency
 ///
-/// WHY2 requires that the same grid dimensions (rows × columns) be used consistently
+/// WHY2 requires that the same grid dimensions ($W \times H$) be used consistently
 /// throughout encryption and decryption. Mixing grid sizes within a single session or
 /// across rounds is unsupported and may lead to incorrect results or undefined behavior.
 #[derive(Clone, Debug, Zeroize)]
@@ -101,10 +101,10 @@ pub enum GridError
         height: usize,
     },
 
-    /// Indicates that the input byte sequence length does not align with Grid requirements.
+    /// Indicates that the input byte sequence length does not align with [`Grid`] requirements.
     ///
     /// This error occurs during deserialization (e.g., `from_bytes`) when the provided
-    /// data length is not a multiple of the Grid's total byte size (`W * H * 8`).
+    /// data length is not a multiple of the [`Grid`]'s total byte size ($W \times H \times 8$ bytes).
     ///
     /// # Fields
     /// - `expected_mod`: The required modulus (block size in bytes).
@@ -118,7 +118,7 @@ pub enum GridError
     /// Indicates that the provided raw key has an incorrect length.
     ///
     /// The WHY2 key scheduling algorithm requires the input key vector to be exactly
-    /// twice the size of the Grid area (`2 * W * H`). This allows for the initial
+    /// twice the size of the [`Grid`] area ($2 \times W \times H$). This allows for the initial
     /// folding and mixing of key parts (low and high components).
     ///
     /// # Fields
@@ -219,10 +219,10 @@ impl<const W: usize, const H: usize> Grid<W, H>
         Ok(key_grid)
     }
 
-    /// Initializes Grid from vector of unsigned 8-bit integers.
+    /// Initializes [`Grid`] from vector of unsigned 8-bit integers.
     ///
-    /// This function constructs Grid by chunking the input vector into `i64` cells. It expects
-    /// exactly `W × H × 8` bytes and returns an error if the input length does not match.
+    /// This function constructs [`Grid`] by chunking the input vector into `i64` cells. It expects
+    /// exactly $W \times H \times 8$ bytes and returns an error if the input length does not match.
     ///
     /// # Parameters
     /// - `bytes`: A vector of unsigned 8-bit integers
@@ -343,9 +343,9 @@ impl<const W: usize, const H: usize> Grid<W, H>
     //PUBLIC
     /// Computes the cell-wise XOR of two Grids.
     ///
-    /// This function takes two Grids of equal dimensions and modifies the Grid in-place, each cell
-    /// being the bitwise XOR of the corresponding cell from the input Grid. It is used in WHY2
-    /// for mixing round keys, applying masks, or combining intermediate states.
+    /// This function takes two [`Grid`]s of equal dimensions and modifies the [`Grid`] in-place:
+    /// $$ G_{x,y} = G_{x,y} \oplus K_{x,y} $$
+    /// It is used in WHY2 for mixing round keys, applying masks, or combining intermediate states.
     ///
     /// # Parameters
     /// - `key_grid`: Input Grid for XOR
@@ -366,20 +366,23 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// This transformation introduces symmetric diffusion by modifying each `i64` cell
     /// using a combination of addition, rotation, and XOR operations. The process is
-    /// round-dependent and designed to obscure bit patterns across the Grid.
+    /// round-dependent and designed to obscure bit patterns across the [`Grid`].
     ///
     /// # Parameters
     /// - `round`: A round index used to tweak the transformation logic.
     ///
     /// # Behavior
-    /// - Each cell is split into two 32-bit halves.
-    /// - The halves are mixed using ARX (Add-Rotate-XOR) operations.
-    /// - The result replaces the original cell value.
+    /// Each 64-bit cell is split into two 32-bit halves $v_0, v_1$.
+    /// For `SUBCELL_ROUNDS` iterations, the Feistel-like network applies:
+    /// $$ v_0 \leftarrow v_0 + (((v_1 \ll 4) \oplus (v_1 \gg 5)) + v_1) \oplus sum $$
+    /// $$ v_1 \leftarrow v_1 + (((v_0 \ll 4) \oplus (v_0 \gg 5)) + v_0) \oplus sum $$
+    ///
+    /// Where `sum` is incremented by a constant delta $\delta$ in each step.
     ///
     /// # Notes
-    /// - This method mutates the Grid in-place.
-    /// - It is inspired by TEA/XTEA but adapted for WHY2’s Grid architecture.
-    /// - The transformation is deterministic for a given round and Grid state.
+    /// - This method mutates the [`Grid`] in-place.
+    /// - It is inspired by TEA/XTEA but adapted for WHY2’s [`Grid`] architecture.
+    /// - The transformation is deterministic for a given round and [`Grid`] state.
     pub fn subcell(&mut self, round: usize)
     {
         //APPLY ON EACH CELL
@@ -418,23 +421,18 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    /// Applies row-wise shifting to the Grid based on a key Grid.
+    /// Applies row-wise shifting to the [`Grid`] based on a key [`Grid`].
     ///
-    /// This transformation rotates each row of the Grid by a variable amount derived from
-    /// the corresponding row in `key_grid`. The shift amount is computed by XORing all
-    /// values in the key row and reducing modulo the Grid width.
+    /// This transformation rotates each row of the [`Grid`] by a variable amount derived from
+    /// the corresponding row in `key_grid`. The shift amount $S_i$ for row $i$ is computed as:
     ///
-    /// # Parameters
-    /// - `key_grid`: A Grid of the same dimensions used to derive row-wise shift values.
+    /// $$ S_i = \left( \bigoplus_{j=0}^{W-1} K_{i,j} \right) \pmod W $$
     ///
     /// # Behavior
-    /// - Each row is rotated left by a computed amount.
-    /// - The shift amount is:
-    ///   `XOR(key_row) % width`
+    /// - Each row is rotated left by $S_i$.
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
-    /// - The key grid must match the grid dimensions exactly.
     #[inline]
     pub fn shift_rows(&mut self, key_grid: &Grid<W, H>)
     {
@@ -454,13 +452,11 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// Applies column-wise mixing to the grid using linear XOR diffusion.
     ///
     /// This transformation modifies each column by XORing it with its adjacent column,
-    /// introducing horizontal diffusion across the grid. The operation is performed in
-    /// left-to-right order during encryption.
+    /// introducing horizontal diffusion across the grid.
     ///
     /// # Behavior
-    /// - For each column `c`, compute:
-    ///   `grid[row][c] ^= grid[row][(c + 1) % W]`
-    /// - The last column wraps around to the first.
+    /// For each column $c \in \{0, \dots, W-1\}$, compute:
+    /// $$ Grid_{row, c} \leftarrow Grid_{row, c} \oplus Grid_{row, (c + 1) \pmod W} $$
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
@@ -479,26 +475,22 @@ impl<const W: usize, const H: usize> Grid<W, H>
 
     /// Applies a matrix-based affine transformation to mix rows.
     ///
-    /// This function treats the Grid as a matrix and multiplies it by a key-dependent transformation
-    /// matrix, while adding a deterministic noise term to each operation. This converts the
-    /// transformation from purely linear (`Ax`) to affine (`Ax + b`).
+    /// This function treats the [`Grid`] as a matrix and multiplies it by a key-dependent transformation
+    /// matrix, while adding a deterministic noise term. This converts the transformation from
+    /// purely linear ($Ax$) to affine:
+    ///
+    /// $$ G' = (L \cdot U) \cdot G + \text{noise} $$
     ///
     /// To ensure the operation is reversible (invertible) in modular arithmetic, the transformation
-    /// is constructed as a product of a Lower triangular matrix (L) and an Upper triangular matrix (U).
-    ///
-    /// This introduces strong vertical diffusion, ensuring that every row influences every other row,
-    /// while the additive noise prevents simple linear relationship attacks.
-    ///
-    /// # Parameters
-    /// - `key_grid`: A reference to the key Grid used to derive scalar weights and noise offsets.
+    /// is constructed as a product of a **Lower triangular matrix ($L$)** and an **Upper triangular matrix ($U$)**.
     ///
     /// # Behavior
-    /// - **Lower Pass (Downward):** Each row adds a multiple of previous rows plus a noise term.
-    /// - **Upper Pass (Upward):** Each row adds a multiple of following rows plus a noise term.
+    /// - **Lower Pass ($L$):** Each row adds a multiple of previous rows ($i > j$).
+    /// - **Upper Pass ($U$):** Each row adds a multiple of following rows ($i < j$).
     ///
     /// # Notes
-    /// - This method mutates the Grid in-place.
-    /// - All additions and multiplications are wrapping (modulo 2^64).
+    /// - This method mutates the [`Grid`] in-place.
+    /// - All additions and multiplications are wrapping (modulo $2^{64}$).
     pub fn mix_matrix(&mut self, key_grid: &Grid<W, H>)
     {
         //LOWER TRIANGULAR PASS (TOP -> DOWN)
@@ -511,22 +503,15 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// Applies diagonal-wise mixing to the grid using XOR diffusion.
     ///
     /// This transformation modifies each diagonal line by XORing each element with
-    /// the next element along that diagonal. A diagonal is defined as a line of cells
-    /// where the difference between row and column indices remains constant.
-    ///
-    /// The mixing proceeds from top-left to bottom-right along each diagonal line,
-    /// ensuring that changes propagate through the entire grid structure.
+    /// the next element along that diagonal.
     ///
     /// # Behavior
-    /// - Processes all diagonals parallel to the main diagonal (top-left to bottom-right)
-    /// - For each cell on a diagonal, compute:
-    ///   `grid[row][col] ^= grid[next_row][next_col]`
-    /// - The last cell in each diagonal remains unchanged (no next element to XOR with)
+    /// - Processes all diagonals parallel to the main diagonal.
+    /// - For each cell $(r, c)$, compute:
+    ///   $$ Grid_{r,c} \leftarrow Grid_{r,c} \oplus Grid_{r+1, c+1} $$
     ///
     /// # Notes
-    /// - This method mutates the grid in-place
-    /// - Provides diffusion complementary to row and column mixing
-    /// - The operation is reversible when applied in reverse order
+    /// - This method mutates the grid in-place.
     #[inline]
     pub fn mix_diagonals(&mut self)
     {
@@ -544,16 +529,18 @@ impl<const W: usize, const H: usize> Grid<W, H>
     }
 
     //UTILS
-    /// Increments the Grid value by 1, treating it as a large Little-Endian integer.
+    /// Increments the [`Grid`] value by 1, treating it as a large Little-Endian integer.
     ///
     /// This method iterates through the grid cells starting from the first one.
     /// It adds 1 to the current cell and propagates the carry bit to the next cell
-    /// if a 64-bit overflow occurs (wrapping from `0xFF...FF` to `0`).
+    /// if a 64-bit overflow occurs:
+    ///
+    /// $$ cell \leftarrow (cell + 1) \pmod{2^{64}} $$
     ///
     /// # Behavior
-    /// - Uses `u64` arithmetic to ensure correct carry propagation across the full 64-bit range.
-    /// - Operates in constant time relative to the number of cells (always scans, though logic branches on carry).
-    /// - If the entire Grid overflows (wraps around), the counter simply resets to zero.
+    /// - Treats the entire grid as a single integer $N$.
+    /// - Computes $N \leftarrow N + 1$.
+    /// - If the entire [`Grid`] overflows (wraps around), the counter resets to zero.
     pub fn increment(&mut self)
     {
         for row in self.iter_mut()
