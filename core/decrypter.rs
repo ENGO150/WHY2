@@ -23,12 +23,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! the original data from encrypted Grid chunks using a symmetric key.
 //!
 //! # Overview
-//! WHY2 encrypts data by transforming it into fixed-size grids ([`Grid`](crate::rex::Grid)) and applying
+//! WHY2 encrypts data by transforming it into fixed-size grids ([`Grid`](crate::Grid)) and applying
 //! nonlinear and linear mixing across multiple rounds. Decryption reverses these steps:
 //!
 //! 1. **Round Key Generation**: Reconstructs round keys from the master key using chained SHA-256 seeds.
 //! 2. **Grid Unmixing**: Applies inverse subcell, row shift, and column mixing in reverse round order.
-//! 3. **Unshuffling**: Reverses the [`Grid`](crate::rex::Grid) permutation using a deterministic PRNG seeded from the key hash.
+//! 3. **Unshuffling**: Reverses the [`Grid`](crate::Grid) permutation using a deterministic PRNG seeded from the key hash.
 //! 4. **ISO 10126 Padding Removal**: Truncates the final output using the last cell value as a padding marker.
 
 use rand_chacha::ChaCha20Rng;
@@ -61,8 +61,8 @@ use crate::
 /// # Returns
 /// - Ok([`DecryptedData`]) struct containing:
 ///   - `output`: A vector of decrypted `i64` values
-///   - `key`: The original key [`Grid`](crate::rex::Grid) flattened into a vector
-/// - Err(String) if [`Grid`](crate::rex::Grid) area is 1
+///   - `key`: The original key [`Grid`](crate::Grid) flattened into a vector
+/// - Err(String) if [`Grid`](crate::Grid) area is 1
 pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<DecryptedData, GridError>
 {
     //GET MUTABLE input

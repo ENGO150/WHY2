@@ -55,6 +55,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! - **No government insight**: no telemetry, no backdoors, no metadata leakage.
 //! - **No payment required**: encryption should be free as in freedom.
 //!
+//! ## Terminology
+//!
+//! The codebase is organized to distinguish between the current implementation and deprecated versions:
+//!
+//! * **REX**: Refers to the modern, secure implementation of the WHY2 algorithm.
+//! These are the modules exposed directly at the crate root (e.g., [`encrypter`], [`decrypter`]).
+//! * **Legacy**: Refers to older, deprecated encryption routines found in the [`legacy`] module.
+//! These are retained for compatibility but are considered insecure.
+//!
 //! ## Security Disclaimer
 //!
 //! WHY2 is an experimental encryption algorithm. While it draws inspiration from established designs like AES,

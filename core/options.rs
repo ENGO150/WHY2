@@ -34,7 +34,7 @@ use crate::Grid;
 /// Do not modify unless you're fully aware of the cryptographic implications.
 pub const ROUND_KEYS: usize = 14;
 
-/// Number of ARX mixing iterations per cell in the [`subcell`](crate::rex::Grid::subcell) transformation.
+/// Number of ARX mixing iterations per cell in the [`subcell`](crate::Grid::subcell) transformation.
 ///
 /// This controls how many rounds of Add-Rotate-XOR are applied to each cell. More rounds
 /// increase diffusion and resistance to pattern leakage.
@@ -46,7 +46,7 @@ pub const SUBCELL_ROUNDS: u32 = 32;
 ///
 /// This is derived from `(2^32) / φ`, where φ is the golden ratio. It ensures that each
 /// round introduces asymmetry and avoids cyclic patterns in the
-/// [`subcell`](crate::rex::Grid::subcell) transformation.
+/// [`subcell`](crate::Grid::subcell) transformation.
 ///
 /// This value is cryptographically sensitive and should not be changed casually.
 pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
@@ -55,8 +55,8 @@ pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
 /// Container for encrypted output.
 ///
 /// This struct holds the encrypted Grid chunks, the key Grid and the IV used during encryption.
-/// It is returned by [`encrypt`](crate::rex::encrypter::encrypt) and consumed by
-/// [`decrypt`](crate::rex::decrypter::decrypt) to reverse the transformation.
+/// It is returned by [`encrypt`](crate::encrypter::encrypt) and consumed by
+/// [`decrypt`](crate::decrypter::decrypt) to reverse the transformation.
 ///
 /// # Fields
 /// - `output`: A vector of encrypted `Grid<W, H>` chunks.
@@ -76,7 +76,7 @@ pub struct EncryptedData<const W: usize, const H: usize> //DATA FOR REX ENCRYPTE
 /// Container for decrypted output.
 ///
 /// This struct holds the final data and the original key used during decryption.
-/// It is returned by [`decrypt`](crate::rex::decrypter::decrypt) and may be used to reconstruct
+/// It is returned by [`decrypt`](crate::decrypter::decrypt) and may be used to reconstruct
 /// the original string or binary payload.
 ///
 /// # Fields

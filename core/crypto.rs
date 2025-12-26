@@ -98,7 +98,7 @@ pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaC
 /// This function creates a 32-byte seed using [`OsRng`], then initializes
 /// a [`ChaCha20Rng`] with that seed to produce a deterministic
 /// stream of pseudorandom values. The output is a flat `Vec<i64>` of length $2 \times W \times H$,
-/// suitable for use with [`Grid::from_key`](crate::rex::Grid::from_key).
+/// suitable for use with [`Grid::from_key`](crate::Grid::from_key).
 ///
 /// # Returns
 /// A vector of signed 64-bit integers representing raw symmetric key material.
@@ -126,7 +126,7 @@ pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 ///
 /// Each hash is used as a seed for a [`ChaCha20Rng`] (the KDF),
 /// which produces a vector of `i64` values. These are then converted into `Grid`
-/// instances using [`Grid::from_key`](crate::rex::Grid::from_key).
+/// instances using [`Grid::from_key`](crate::Grid::from_key).
 ///
 /// # Parameters
 /// - `master_key`: The initial Grid used to seed the first round key.
