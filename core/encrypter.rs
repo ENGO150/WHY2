@@ -31,13 +31,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! 3. **Deterministic Shuffling**: Each [`Grid`] is shuffled using a PRNG seeded from the key hash.
 //! 4. **Round-Based Mixing**: Each [`Grid`] undergoes XOR, subcell diffusion, row shifting, and column mixing.
 
+use rand::{ Rng, SeedableRng };
 use rand_chacha::ChaCha20Rng;
-use rand::
-{
-    Rng,
-    SeedableRng,
-    prelude::SliceRandom,
-};
 
 use zeroize::Zeroizing;
 
@@ -48,6 +43,9 @@ use crate::
     GridError,
     options::EncryptedData,
 };
+
+#[cfg(feature = "constant-time")]
+use subtle::{ ConditionallySelectable, ConstantTimeEq };
 
 /// Encrypts a vector of `i64` values.
 ///
@@ -136,7 +134,27 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
         let mut flattened = Zeroizing::new(grid.iter().flatten().copied().collect::<Vec<i64>>());
 
         //SHUFFLE
-        flattened.shuffle(&mut dprng);
+        for i in (1..flattened.len()).rev()
+        {
+            let j = dprng.random_range(0..=i);
+
+            #[cfg(feature = "constant-time")]
+            {
+                for k in 0..=i
+                {
+                    let is_match = k.ct_eq(&j);
+                    let (a, b) = (flattened[i], flattened[k]);
+
+                    flattened[i].conditional_assign(&b, is_match);
+                    flattened[k].conditional_assign(&a, is_match);
+                }
+            }
+
+            #[cfg(not(feature = "constant-time"))]
+            {
+                flattened.swap(i, j);
+            }
+        }
 
         //REBUILD
         for (i, val) in flattened.iter().enumerate()

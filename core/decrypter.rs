@@ -31,12 +31,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! 3. **Unshuffling**: Reverses the [`Grid`](crate::Grid) permutation using a deterministic PRNG seeded from the key hash.
 //! 4. **ISO 10126 Padding Removal**: Truncates the final output using the last cell value as a padding marker.
 
+use rand::{ Rng, SeedableRng };
 use rand_chacha::ChaCha20Rng;
-use rand::
-{
-    SeedableRng,
-    prelude::SliceRandom,
-};
 
 use zeroize::Zeroizing;
 
@@ -125,7 +121,36 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     {
         //SHUFFLE-MAP
         let mut shuffle_map = Zeroizing::new((0..grid_area).collect::<Vec<usize>>()); //UNSUFFLED MAP (0, 1, 2 ... 64)
-        shuffle_map.shuffle(&mut dprng); //SHUFFLE GRID WITH DPRNG
+
+        //SHUFFLE
+        for i in (1..shuffle_map.len()).rev()
+        {
+            let j = dprng.random_range(0..=i);
+
+            #[cfg(feature = "constant-time")]
+            {
+                for k in 0..=i
+                {
+                    let is_match = k.ct_eq(&j);
+
+                    //CAST SHUFFLE MAP TO u64s
+                    let mut val_i = shuffle_map[i] as u64;
+                    let mut val_k = shuffle_map[k] as u64;
+
+                    //SWAP
+                    u64::conditional_swap(&mut val_i, &mut val_k, is_match);
+
+                    //WRITE TO shuffle_map
+                    shuffle_map[i] = val_i as usize;
+                    shuffle_map[k] = val_k as usize;
+                }
+            }
+
+            #[cfg(not(feature = "constant-time"))]
+            {
+                shuffle_map.swap(i, j);
+            }
+        }
 
         //FLATTEN CHUNK
         let flattened = Zeroizing::new(grid.iter().flatten().copied().collect::<Vec<i64>>());
