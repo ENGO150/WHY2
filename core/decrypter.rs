@@ -34,13 +34,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rand::{ Rng, SeedableRng };
 use rand_chacha::ChaCha20Rng;
 
-use rayon::prelude::
-{
-    ParallelIterator,
-    IndexedParallelIterator,
-    IntoParallelRefMutIterator,
-};
-
 use zeroize::Zeroizing;
 
 use crate::
@@ -89,32 +82,8 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     //GENERATE ROUND KEYS
     let round_keys = crypto::generate_round_keys(&key_grid)?;
 
-    //APPLY ENCRYPTION TO EACH GRID (PARALLEL)
-    grids.par_iter_mut().enumerate().for_each(|(i, grid)|
-    {
-        //CREATE KEYSTREAM BLOCK
-        let mut keystream_block = input.nonce.clone();
-
-        //BLOCK INDEX
-        keystream_block.increment(&mut (i as u64));
-
-        //INITIAL XOR
-        keystream_block ^= &round_keys[0];
-
-        //ROUND OPERATIONS
-        for (i, round_key) in round_keys[1..].iter().enumerate()
-        {
-            keystream_block ^= round_key;                    //XOR
-            keystream_block.subcell(i);               //SUBCELL
-            keystream_block.shift_rows(round_key); //SHIFT ROWS
-            keystream_block.mix_columns();                   //MIX COLUMNS
-            keystream_block.mix_diagonals();                 //MIX DIAGONALS
-            keystream_block.mix_matrix(round_key); //MIX MATRIX
-        }
-
-        //XOR KEYSTREAM AND DATA
-        *grid ^= &keystream_block;
-    });
+    //APPLY CTR MODE (PARALLEL)
+    crypto::apply_ctr(&mut grids, &input.nonce, &round_keys);
 
     //DE-SHUFFLING VARIABLES
     let grid_area = W * H; //AREA OF A GRID

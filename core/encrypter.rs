@@ -34,13 +34,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rand::{ Rng, SeedableRng };
 use rand_chacha::ChaCha20Rng;
 
-use rayon::prelude::
-{
-    ParallelIterator,
-    IndexedParallelIterator,
-    IntoParallelRefMutIterator,
-};
-
 use zeroize::Zeroizing;
 
 use crate::
@@ -176,32 +169,8 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     //CTR VARIABLES
     let nonce = crypto::generate_nonce()?; //RANDOM GRID
 
-    //APPLY ENCRYPTION TO EACH GRID (PARALLEL)
-    grids.par_iter_mut().enumerate().for_each(|(i, grid)|
-    {
-        //CREATE KEYSTREAM BLOCK
-        let mut keystream_block = nonce.clone();
-
-        //BLOCK INDEX
-        keystream_block.increment(&mut (i as u64));
-
-        //INITIAL XOR
-        keystream_block ^= &round_keys[0];
-
-        //ROUND OPERATIONS
-        for (i, round_key) in round_keys[1..].iter().enumerate()
-        {
-            keystream_block ^= round_key;                    //XOR
-            keystream_block.subcell(i);               //SUBCELL
-            keystream_block.shift_rows(round_key); //SHIFT ROWS
-            keystream_block.mix_columns();                   //MIX COLUMNS
-            keystream_block.mix_diagonals();                 //MIX DIAGONALS
-            keystream_block.mix_matrix(round_key); //MIX MATRIX
-        }
-
-        //XOR KEYSTREAM AND DATA
-        *grid ^= &keystream_block;
-    });
+    //APPLY CTR MODE (PARALLEL)
+    crypto::apply_ctr(&mut grids, &nonce, &round_keys);
 
     //RETURN OUTPUT
     Ok(EncryptedData

@@ -31,6 +31,13 @@ use rand::
     rngs::OsRng,
 };
 
+use rayon::prelude::
+{
+    ParallelIterator,
+    IndexedParallelIterator,
+    IntoParallelRefMutIterator,
+};
+
 use zeroize::Zeroizing;
 
 use crate::
@@ -172,4 +179,72 @@ pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, 
 pub fn generate_nonce<const W: usize, const H: usize>() -> Result<Grid<W, H>, GridError>
 {
     Grid::from_key(generate_key::<W, H>())
+}
+
+/// Applies CTR (Counter) mode encryption/decryption in parallel.
+///
+/// This function transforms the input `grids` in-place by XORing them with a generated
+/// keystream. Because CTR mode is symmetric, this function is utilized for both encryption
+/// and decryption logic.
+///
+/// # Overview
+/// For each grid block $G_i$ at index $i$, the transformation is defined as:
+///
+/// $$ G_i \leftarrow G_i \oplus E_K(\text{Nonce} + i) $$
+///
+/// Where $E_K$ denotes the WHY2 block cipher keyed with the provided `round_keys`.
+/// The block counter is computed by adding the index $i$ to the base `nonce` using
+/// wrapping arithmetic.
+///
+/// # Parallelism
+/// This function utilizes [`rayon`] to process blocks concurrently. The keystream
+/// for each block is generated independently through the following pipeline:
+///
+/// 1. **Counter Initialization**: $B = \text{Nonce} + i$
+/// 2. **Initial Whitening**: $B \leftarrow B \oplus K_0$
+/// 3. **Round Operations**: For each round $r$ and key $K_r$ (from 1 to $N$):
+///    * **Key Addition**: $B \leftarrow B \oplus K_r$
+///    * **Nonlinear Mixing**: $B \leftarrow \text{Subcell}(B, r)$
+///    * **Row Permutation**: $B \leftarrow \text{ShiftRows}(B, K_r)$
+///    * **Column Diffusion**: $B \leftarrow \text{MixColumns}(B)$
+///    * **Diagonal Diffusion**: $B \leftarrow \text{MixDiagonals}(B)$
+///    * **Matrix Mixing**: $B \leftarrow \text{MixMatrix}(B, K_r)$
+///
+/// # Parameters
+/// - `grids`: A mutable slice of [`Grid`]s representing the plaintext or ciphertext.
+/// - `nonce`: The initial counter [`Grid`] (IV).
+/// - `round_keys`: A sequence of round keys derived from the master key.
+pub fn apply_ctr<const W: usize, const H: usize>
+(
+    grids: &mut [Grid<W, H>],
+    nonce: &Grid<W, H>,
+    round_keys: &[Grid<W, H>],
+)
+{
+    //APPLY ENCRYPTION TO EACH GRID (PARALLEL)
+    grids.par_iter_mut().enumerate().for_each(|(i, grid)|
+    {
+        //CREATE KEYSTREAM BLOCK
+        let mut keystream_block = nonce.clone();
+
+        //BLOCK INDEX
+        keystream_block.increment(&mut (i as u64));
+
+        //INITIAL XOR
+        keystream_block ^= &round_keys[0];
+
+        //ROUND OPERATIONS
+        for (i, round_key) in round_keys[1..].iter().enumerate()
+        {
+            keystream_block ^= round_key;                    //XOR
+            keystream_block.subcell(i);               //SUBCELL
+            keystream_block.shift_rows(round_key); //SHIFT ROWS
+            keystream_block.mix_columns();                   //MIX COLUMNS
+            keystream_block.mix_diagonals();                 //MIX DIAGONALS
+            keystream_block.mix_matrix(round_key); //MIX MATRIX
+        }
+
+        //XOR KEYSTREAM AND DATA
+        *grid ^= &keystream_block;
+    });
 }
