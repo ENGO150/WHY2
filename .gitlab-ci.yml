@@ -63,8 +63,6 @@ build-why2-chat-linux:
   stage: build
   only:
     - development
-  needs:
-    - job: test-why2
   script:
     - cargo build --features client --release
     - cargo build --bin why2-server --features server --release
