@@ -29,7 +29,7 @@ permissions:
   security-events: write
 
 jobs:
-  test-why2:
+  test-why2-encryption:
     runs-on: ubuntu-latest
 
     steps:
@@ -41,5 +41,53 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run tests
-        run: cargo test --all --verbose --features legacy --release
+      - name: Run Test
+        run: cargo test encrypt_decrypt --verbose --release -- --nocapture
+
+  test-why2-grid-overflow:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: development
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Test
+        run: cargo test verify_multi_grid_overflow --verbose --release -- --nocapture
+
+  test-why2-diffusion:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: development
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Input Diffusion Test
+        run: cargo test test_input_diffusion --verbose --release -- --nocapture
+
+      - name: Run Key Diffusion Test
+        run: cargo test test_key_diffusion --verbose --release -- --nocapture
+
+  test-why2-legacy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: development
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Test
+        run: cargo test legacy_encrypt_decrypt --features legacy --verbose --release -- --nocapture
