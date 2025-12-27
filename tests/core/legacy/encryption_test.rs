@@ -32,7 +32,7 @@ use why2::legacy::
     options::{ self, Options },
 };
 
-use crate::core as test_core;
+const TEST_TEXT: &str = "aAzZ(    )!?#\\/śŠ <3|420*;㍿㊓ㅅΔ♛👶🏿"; //TEST TEXT FOR ENCRYPTION
 
 //TEST XOR IN ENCRYPTION
 fn encryption_operation(x: i64, y: i64) -> i64
@@ -41,7 +41,7 @@ fn encryption_operation(x: i64, y: i64) -> i64
 }
 
 #[test]
-fn encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
+fn legacy_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
 {
     //OPTIONS
     options::set_core_options
@@ -49,7 +49,7 @@ fn encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
         Options
         {
             key_length: 100, //USE 2x LARGER KEY
-            padding: crypto::recommended_padding_rate(test_core::TEST_TEXT.len()), //USE RECOMMENDED PADDING
+            padding: crypto::recommended_padding_rate(TEST_TEXT.len()), //USE RECOMMENDED PADDING
             encryption_operation: encryption_operation, //USE XOR FOR ENCRYPTING
             ..Options::default() //DEFAULT OTHER SETTINGS
         }
@@ -59,7 +59,7 @@ fn encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
     let measure_start = Instant::now();
 
     //ENCRYPT & DECRYPT
-    let encrypted = encrypter::encrypt_text(test_core::TEST_TEXT, None).expect("Encryption failed");
+    let encrypted = encrypter::encrypt_text(TEST_TEXT, None).expect("Encryption failed");
     let decrypted = decrypter::decrypt_text(encrypted);
 
     //STOP MEASURING
@@ -75,7 +75,7 @@ fn encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
     let returning: Result<(), Box<dyn std::error::Error>>;
 
     //GET VALUES BASED ON RESULT
-    if test_core::TEST_TEXT == decrypted_text
+    if TEST_TEXT == decrypted_text
     {
         stream = Box::new(io::stdout());
         status = "successful";
@@ -97,7 +97,7 @@ OUTPUT: \t\"{decrypted_text}\"
 KEY: \t\t\"{key}\"
 TIME: \t\t{}ms",
 
-        test_core::TEST_TEXT, measure_stop.as_millis()
+        TEST_TEXT, measure_stop.as_millis()
     ).unwrap();
 
     returning

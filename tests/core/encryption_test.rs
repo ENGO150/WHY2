@@ -18,67 +18,157 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    error::Error,
     time::Instant,
-    io::{ self, Write },
 };
 
 use why2::{ encrypter, decrypter };
-use crate::core::TEST_TEXT;
 
-//FUNCTIONS
+//===============================================
+// TEST DATA - Different sizes for different tests
+//===============================================
+
+//SMALL - 1 GRID
+const TEST_TEXT_SMALL: &str = "aAzZ(    )!?#\\/śŠ <3|420*;㍿㊓ㅅΔ♛👶🏿";
+
+//MEDIUM - ~2-3 GRIDS
+const TEST_TEXT_MEDIUM: &str = "\
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor \
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
+exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute \
+irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla \
+pariatur 🔒🔐🛡️";
+
+//LARGE - 10+ GRIDS FOR PARALLEL ENCRYPTION TEST
+const TEST_TEXT_LARGE: &str = "\
+The WHY2 encryption system represents a modern approach to cryptographic security, \
+combining grid-based transformations with ARX (Add-Rotate-XOR) operations. Unlike \
+traditional block ciphers that rely on S-boxes for nonlinear mixing, WHY2 employs \
+a deterministic pseudo-random number generator seeded from the key hash to achieve \
+diffusion across multiple rounds. Each grid undergoes a series of transformations: \
+subcell mixing introduces nonlinear properties through Feistel-like networks, while \
+shift_rows and mix_columns provide linear diffusion horizontally and vertically. \
+The mix_matrix operation applies an affine transformation by treating the grid as \
+a matrix and multiplying it with a lower-triangular and upper-triangular key-dependent \
+matrix. This ensures that changes in any input bit cascade throughout the entire grid. \
+Mix_diagonals adds another layer of diffusion by XORing cells along diagonal lines, \
+further obscuring patterns. The CTR mode of operation enables parallel encryption of \
+multiple blocks, where each plaintext grid is XORed with a keystream block derived \
+from an incrementing counter. This design allows for efficient parallelization using \
+modern CPU features like SIMD instructions or frameworks like Rayon. Security analysis \
+through diffusion tests confirms that both input and key changes produce approximately \
+50% bit flips in the ciphertext, indicating strong avalanche properties. The constant-time \
+implementation prevents timing attacks by ensuring cryptographic operations take the same \
+amount of time regardless of input values. HMAC authentication protects against tampering, \
+while HKDF derives separate encryption and MAC keys from the shared secret. 🚀🔐✨🌟💎🛡️🔒🎯";
+
+//===============================================
+// MAIN TEST - combines all subtests
+//===============================================
+
 #[test]
-fn rex_encrypt_decrypt() -> Result<(), Box<dyn std::error::Error>>
+fn encrypt_decrypt() -> Result<(), Box<dyn Error>>
 {
-    //START MEASURING
+    //PART 1: ENCRYPTION TESTS
+    println!("\n=== REX Encryption Tests ===\n");
+    println!("┌──────────┬────────────┬──────────┬───────────┬───────────┬───────────┬────────┐");
+    println!("│ Size     │ Input      │ Grids    │ Encrypt   │ Decrypt   │ Total     │ Status │");
+    println!("├──────────┼────────────┼──────────┼───────────┼───────────┼───────────┼────────┤");
+
+    test_encryption(TEST_TEXT_SMALL, "SMALL")?;
+    test_encryption(TEST_TEXT_MEDIUM, "MEDIUM")?;
+    test_encryption(TEST_TEXT_LARGE, "LARGE")?;
+
+    println!("└──────────┴────────────┴──────────┴───────────┴───────────┴───────────┴────────┘\n");
+
+    //PART 2: GRID SIZE COMPARISON
+    let text = TEST_TEXT_LARGE.to_owned();
+    
+    println!("=== Grid Size Comparison ({} chars) ===\n", text.len());
+    println!("┌───────────┬────────┬───────────┐");
+    println!("│ Grid      │ Grids  │ Time      │");
+    println!("├───────────┼────────┼───────────┤");
+
+    //8x8 GRIDS (64 CELLS)
+    let start = Instant::now();
+    let enc_8x8 = encrypter::encrypt_string::<8, 8>(&text, None)?;
+    let time_8x8 = start.elapsed();
+    println!("│ 8x8  (64) │ {:6} │ {:7.2}ms │", enc_8x8.output.len(), time_8x8.as_secs_f64() * 1000.0);
+
+    //11x7 GRIDS (77 CELLS)
+    let start = Instant::now();
+    let enc_11x7 = encrypter::encrypt_string::<11, 7>(&text, None)?;
+    let time_11x7 = start.elapsed();
+    println!("│ 11x7 (77) │ {:6} │ {:7.2}ms │", enc_11x7.output.len(), time_11x7.as_secs_f64() * 1000.0);
+
+    //16x4 GRIDS (64 CELLS)
+    let start = Instant::now();
+    let enc_16x4 = encrypter::encrypt_string::<16, 4>(&text, None)?;
+    let time_16x4 = start.elapsed();
+    println!("│ 16x4 (64) │ {:6} │ {:7.2}ms │", enc_16x4.output.len(), time_16x4.as_secs_f64() * 1000.0);
+
+    println!("└───────────┴────────┴───────────┘\n");
+
+    Ok(())
+}
+
+//===============================================
+// HELPER FUNCTION
+//===============================================
+
+fn test_encryption(text: &str, label: &str) -> Result<(), Box<dyn Error>>
+{
+    //START MEASURE
     let measure_start = Instant::now();
 
     //ENCRYPT & DECRYPT
-    let encrypted = encrypter::encrypt_string::<11, 7>(&TEST_TEXT.to_owned(), None).expect("Encryption failed");
-    let key = encrypted.key.clone();
-    let encrypted_grid = encrypted.output[0].clone();
-    let encrypter_measure = measure_start.elapsed();
-    let decrypted_string = decrypter::decrypt_string(encrypted).expect("Decryption failed");
+    let encrypted = encrypter::encrypt_string::<11, 7>(&text.to_owned(), None)?;
 
-    //STOP MEASURING
+    let num_grids = encrypted.output.len();
+    let encrypter_measure = measure_start.elapsed();
+
+    let decrypted_string = decrypter::decrypt_string(encrypted)?;
+
+    //STOP MEASURE
     let measure_stop = measure_start.elapsed();
 
-    //VARIABLES FOR PRINT
-    let mut stream: Box<dyn Write>;
-    let status: &str;
-    let returning: Result<(), Box<dyn std::error::Error>>;
+    //VERIFY
+    let status = if text == *decrypted_string { "✓" } else { "✗" };
 
-    //GET VALUES BASED ON RESULT
-    if TEST_TEXT == *decrypted_string
+    let total_ms = measure_stop.as_secs_f64() * 1000.0;
+    let encrypt_ms = encrypter_measure.as_secs_f64() * 1000.0;
+    let decrypt_ms = total_ms - encrypt_ms;
+
+    println!
+    (
+        "│ {:8} │ {:4} chars │ {:2} grids │ {:7.2}ms │ {:7.2}ms │ {:7.2}ms │   {}    │",
+        label, text.chars().count(), num_grids,
+        encrypt_ms, decrypt_ms, total_ms, status
+    );
+
+    if text != *decrypted_string
     {
-        stream = Box::new(io::stdout());
-        status = "successful";
-        returning = Ok(());
+        Err("Values do not match".into())
     } else
     {
-        stream = Box::new(io::stderr());
-        status = "failed";
-        returning = Err("Values do not match".into());
+        Ok(())
     }
+}
 
-    let measure_stop_nanos = measure_stop.as_nanos() as f64;
-    let encrypter_measure_nanos = encrypter_measure.as_nanos() as f64;
+//===============================================
+// VERIFICATION TEST
+//===============================================
 
-    writeln!
+#[test]
+fn verify_multi_grid_overflow()
+{
+    let encrypted = encrypter::encrypt_string::<11, 7>(&TEST_TEXT_LARGE.to_owned(), None)
+        .expect("Encryption failed");
+
+    assert!
     (
-        stream,
-
-        "Test {status}!\n\
-        TEXT: \t\t\"{}\"\n\
-        OUTPUT: \t\"{}\"\n\
-        KEY:\n{}\n\
-        ENCRYPTED:\n{:x}\n\n\
-        TIME: \t\t{:.3}ms ({:.3}ms to encrypt [{}%])",
-
-        TEST_TEXT, *decrypted_string, key, encrypted_grid,
-        measure_stop_nanos / 1_000_000.,
-        encrypter_measure_nanos / 1_000_000.,
-        (encrypter_measure_nanos / measure_stop_nanos * 100.).round()
-    ).unwrap();
-
-    returning
+        encrypted.output.len() >= 3,
+        "Large text should overflow into at least 3 grids, got {}",
+        encrypted.output.len()
+    );
 }
