@@ -106,8 +106,9 @@ use std::
     result,
     ops::Range,
     error::Error,
+    iter::Flatten,
+    array::IntoIter,
     slice::{ Iter, IterMut },
-    vec::IntoIter as IntoVecIter,
     ops::
     {
         Index,
@@ -697,13 +698,13 @@ impl<const W: usize, const H: usize> IntoIterator for Grid<W, H>
 {
     //TYPES
     type Item = i64;
-    type IntoIter = IntoVecIter<i64>;
+    type IntoIter = Flatten<IntoIter<[i64; W], H>>;
 
     //INTO ITERATOR
     #[inline]
     fn into_iter(self) -> Self::IntoIter
     {
-        self.0.into_iter().flat_map(|row| row.into_iter()).collect::<Vec<i64>>().into_iter()
+        self.0.into_iter().flatten()
     }
 }
 
