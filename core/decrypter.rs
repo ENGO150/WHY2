@@ -34,6 +34,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rand::{ Rng, SeedableRng };
 use rand_chacha::ChaCha20Rng;
 
+use rayon::prelude::
+{
+    ParallelIterator,
+    IndexedParallelIterator,
+    IntoParallelRefMutIterator,
+};
+
 use zeroize::Zeroizing;
 
 use crate::
@@ -82,14 +89,14 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     //GENERATE ROUND KEYS
     let round_keys = crypto::generate_round_keys(&key_grid)?;
 
-    //CTR COUNTER GRID
-    let mut counter_grid = input.nonce;
-
-    //DECRYPT EACH ENCRYPTED GRID
-    for grid in &mut grids
+    //APPLY ENCRYPTION TO EACH GRID (PARALLEL)
+    grids.par_iter_mut().enumerate().for_each(|(i, grid)|
     {
         //CREATE KEYSTREAM BLOCK
-        let mut keystream_block = counter_grid.clone();
+        let mut keystream_block = input.nonce.clone();
+
+        //BLOCK INDEX
+        keystream_block.increment(&mut (i as u64));
 
         //INITIAL XOR
         keystream_block ^= &round_keys[0];
@@ -107,10 +114,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 
         //XOR KEYSTREAM AND DATA
         *grid ^= &keystream_block;
-
-        //INCREMENT COUNTER FOR NEXT BLOCK
-        counter_grid.increment();
-    }
+    });
 
     //DE-SHUFFLING VARIABLES
     let grid_area = W * H; //AREA OF A GRID

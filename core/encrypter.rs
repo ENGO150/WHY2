@@ -34,6 +34,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rand::{ Rng, SeedableRng };
 use rand_chacha::ChaCha20Rng;
 
+use rayon::prelude::
+{
+    ParallelIterator,
+    IndexedParallelIterator,
+    IntoParallelRefMutIterator,
+};
+
 use zeroize::Zeroizing;
 
 use crate::
@@ -168,13 +175,15 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
 
     //CTR VARIABLES
     let nonce = crypto::generate_nonce()?; //RANDOM GRID
-    let mut counter_grid = nonce.clone();
 
-    //APPLY ENCRYPTION TO EACH GRID
-    for grid in &mut grids
+    //APPLY ENCRYPTION TO EACH GRID (PARALLEL)
+    grids.par_iter_mut().enumerate().for_each(|(i, grid)|
     {
         //CREATE KEYSTREAM BLOCK
-        let mut keystream_block = counter_grid.clone();
+        let mut keystream_block = nonce.clone();
+
+        //BLOCK INDEX
+        keystream_block.increment(&mut (i as u64));
 
         //INITIAL XOR
         keystream_block ^= &round_keys[0];
@@ -192,10 +201,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
 
         //XOR KEYSTREAM AND DATA
         *grid ^= &keystream_block;
-
-        //INCREMENT COUNTER FOR NEXT BLOCK
-        counter_grid.increment();
-    }
+    });
 
     //RETURN OUTPUT
     Ok(EncryptedData

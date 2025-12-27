@@ -645,42 +645,47 @@ impl<const W: usize, const H: usize> Grid<W, H>
     }
 
     //UTILS
-    /// Increments the [`Grid`] value by 1, treating it as a large Little-Endian integer.
+    /// Increments the [`Grid`] value by a specified amount, treating it as a large Little-Endian integer.
     ///
-    /// This method iterates through the grid cells starting from the first one.
-    /// It adds 1 to the current cell and propagates the carry bit to the next cell
-    /// if a 64-bit overflow occurs:
+    /// This method performs modular addition of a 64-bit value to the multi-precision integer
+    /// represented by the grid:
     ///
-    /// $$ \text{cell} \leftarrow (\text{cell} + 1) \bmod 2^{64} $$
+    /// $$ G \leftarrow (G + \text{amount}) \bmod 2^{64 \times W \times H} $$
+    ///
+    /// # Parameters
+    /// - `amount`: The unsigned 64-bit value to add to the grid.
+    ///   - Pass `1` for standard sequential counter increment.
+    ///   - Pass a block index $i$ (offset) when initializing parallel CTR counters.
     ///
     /// # Behavior
-    /// - Treats the entire grid as a single integer $N$.
-    /// - Computes $N \leftarrow N + 1$.
-    /// - If the entire [`Grid`] overflows (wraps around), the counter resets to zero.
-    pub fn increment(&mut self)
+    /// - The [`Grid`] is treated as a single large integer in **Little-Endian** format
+    ///   (the cell at `[0][0]` is the least significant limb).
+    /// - The `amount` is added to the first cell, and any resulting carry is propagated
+    ///   sequentially through the remaining cells.
+    /// - If the entire grid overflows (wraps around), the value resets modulo the grid size.
+    ///
+    /// # Security
+    /// - When the **`constant-time`** feature is enabled, this function always iterates
+    ///   through the entire grid to prevent timing leaks via carry propagation analysis.
+    pub fn increment(&mut self, amount: &mut u64)
     {
-        #[cfg(feature = "constant-time")]
-        let mut carry: u64 = 1;
-
-        #[cfg(not(feature = "constant-time"))]
-        let carry: u64 = 1;
-
         for row in self.iter_mut()
         {
             for cell in row.iter_mut()
             {
-                let (result, overflow) = (*cell as u64).overflowing_add(carry);
+                let (result, overflow) = (*cell as u64).overflowing_add(*amount);
                 *cell = result as i64;
 
                 //NO CARRY (OVERFLOW), DONE
                 #[cfg(not(feature = "constant-time"))]
                 {
                     if !overflow { return; }
+                    *amount = 1;
                 }
 
                 #[cfg(feature = "constant-time")]
                 {
-                    carry &= overflow as u64;
+                    *amount = overflow as u64;
                 }
             }
         }
