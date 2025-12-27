@@ -187,10 +187,10 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
 /// into each 64-bit integer.
 ///
 /// # Parameters
-/// - `input`: A reference to the string to encrypt.
+/// - `input`: A string slice to encrypt.
 /// - `key`: An optional symmetric key. If `None`, a secure key is generated automatically.
 ///          If provided, it must be exactly $2 \times W \times H$ elements long.
-pub fn encrypt_string<const W: usize, const H: usize>(input: &String, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
+pub fn encrypt_string<const W: usize, const H: usize>(input: &str, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
 {
     //CONVERT input TO Vec<i64>
     let mut chars = Zeroizing::new(input.chars().collect::<Vec<char>>());
