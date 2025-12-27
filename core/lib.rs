@@ -238,7 +238,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Returns
     /// - Ok(`Grid`) instance with all values set to zero and area is larger than 1.
-    /// - Err(String) if the area is 1
+    /// - Err(`GridError`) if the area is 1
     ///
     /// # Notes
     /// - This method does not perform any encryption or transformation.
@@ -276,7 +276,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Returns
     /// - Ok(`Grid`) with mixed key values if dimensions are valid.
-    /// - Err(String) if the grid area is too small.
+    /// - Err(`GridError`) if the grid area is too small.
     pub fn from_key(vec: Zeroizing<Vec<i64>>) -> result::Result<Self, GridError>
     {
         //GRID OPTIONS
@@ -308,16 +308,16 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// exactly $W \times H \times 8$ bytes and returns an error if the input length does not match.
     ///
     /// # Parameters
-    /// - `bytes`: A vector of unsigned 8-bit integers
+    /// - `bytes`: A byte slice (`&[8u]`) containing the raw data.
     ///
     /// # Returns
-    /// - `Ok(Grid)` if the byte length matches the expected grid size
-    /// - `Err(String)` if the input length is not divisible by matrix size.
+    /// - Ok(Vec<`Grid`>) if the byte length matches the expected grid size
+    /// - Err(`GridError`) if the input length is not divisible by matrix size.
     ///
     /// # Notes
     /// - No transformation is applied
     /// - Use this for raw Grid construction, not for secure key loading
-    pub fn from_bytes(bytes: Vec<u8>) -> result::Result<Vec<Self>, GridError>
+    pub fn from_bytes(bytes: &[u8]) -> result::Result<Vec<Self>, GridError>
     {
         let matrix_size = W * H * 8; //EACH i64 IS 8 BYTES
 
