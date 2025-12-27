@@ -127,7 +127,12 @@ use std::
 use zeroize::{ Zeroize, Zeroizing };
 
 #[cfg(feature = "constant-time")]
-use subtle::{ ConstantTimeEq, Choice };
+use subtle::
+{
+    Choice,
+    ConstantTimeEq,
+    ConditionallySelectable,
+};
 
 //TYPES
 /// A 2D matrix of 64-bit signed integers used as the core data structure in WHY2 encryption.
@@ -536,7 +541,27 @@ impl<const W: usize, const H: usize> Grid<W, H>
             }
 
             //ROTATE THE ROW
-            row.rotate_left(shift);
+            #[cfg(feature = "constant-time")]
+            {
+                let mut new_row = [0i64; W]; //BUFFER
+
+                for i in 0..W
+                {
+                    let target_src_idx = (i + shift) % W;
+                    for src_idx in 0..W
+                    {
+                        new_row[i].conditional_assign(&row[src_idx], src_idx.ct_eq(&target_src_idx));
+                    }
+                }
+
+                //WRITE RESULT
+                *row = new_row;
+            }
+
+            #[cfg(not(feature = "constant-time"))]
+            {
+                row.rotate_left(shift);
+            }
         }
     }
 
