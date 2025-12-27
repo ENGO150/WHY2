@@ -21,15 +21,42 @@ stages:
   - build
   - aur
 
-# Test WHY2
-test-why2:
+# Test WHY2 Encrypt/Decrypt
+test-why2-encryption:
   stage: test
   image: rust:latest
   only:
     - development
   script:
-    - echo "Test WHY2"
-    - cargo test --all --verbose --features legacy --release
+    - cargo test encrypt_decrypt --verbose --release -- --nocapture
+
+# Test WHY2 Multi Grid Overflow
+test-why2-grid-overflow:
+  stage: test
+  image: rust:latest
+  only:
+    - development
+  script:
+    - cargo test verify_multi_grid_overflow --verbose --release -- --nocapture
+
+# Test WHY2 Diffusion
+test-why2-diffusion:
+  stage: test
+  image: rust:latest
+  only:
+    - development
+  script:
+    - cargo test test_input_diffusion --verbose --release -- --nocapture
+    - cargo test test_key_diffusion --verbose --release -- --nocapture
+
+# Test WHY2 Legacy
+test-why2-legacy:
+  stage: test
+  image: rust:latest
+  only:
+    - development
+  script:
+    - cargo test legacy_encrypt_decrypt --features legacy --verbose --release -- --nocapture
 
 # Build chat for linux
 build-why2-chat-linux:
@@ -39,7 +66,6 @@ build-why2-chat-linux:
   needs:
     - job: test-why2
   script:
-    - echo "Build WHY2 Chat for Linux"
     - cargo build --features client --release
     - cargo build --bin why2-server --features server --release
   artifacts:
