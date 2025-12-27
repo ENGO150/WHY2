@@ -381,7 +381,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&chat_
                 }
 
                 //DESERIALIZE ENCRYPTED PACKET
-                let mut grids = Grid::<GRID_W, GRID_H>::from_bytes(decoded_packet).ok()?;
+                let mut grids = Grid::<GRID_W, GRID_H>::from_bytes(&decoded_packet).ok()?;
 
                 //EXTRACT NONCE
                 let nonce = grids.remove(0);
