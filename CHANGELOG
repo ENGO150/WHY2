@@ -1,6 +1,22 @@
 Changelog
 =========
 
+v1.3.5:
+- 1cef7a8: update documentation for new ctr mode implementation
+- f44732d: implement new Grid::from_bytes on chat
+- 637a536: optimize Grid IntoIterator implementation
+- 080d64b: use string slice as encrypt_string input parameter
+- 4e9db00: use byte slice as Grid::from_bytes parameter
+- 38638b1: move shared CTR application from to crypto::apply_ctr
+- 5266540: implement parallel CTR
+- d23e58f: add rayon dependency
+- c8e735f: remove build-why2-chat job needs
+- ea81f44: split github WHY2 tests
+- 1ddd65f: split gitlab WHY2 tests
+- ecfdf02: make REX encryption test test more inputs
+- b3c701b: implement constant-time array rotation for Grid::shift_rows
+- 7898f14: implement fisher-yates for constant-time shuffle
+
 v1.3.4:
 - f165f8b: move serde_json dependency to chat only
 - 3dd3985: implement Display & FromStr traits for SerColor
