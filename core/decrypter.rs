@@ -23,13 +23,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! the original data from encrypted Grid chunks using a symmetric key.
 //!
 //! # Overview
-//! WHY2 encrypts data by transforming it into fixed-size grids ([`Grid`](crate::Grid)) and applying
-//! nonlinear and linear mixing across multiple rounds. Decryption reverses these steps:
+//! WHY2 encrypts data by transforming it into fixed-size grids ([`Grid`](crate::Grid)) using
+//! CTR mode with a block cipher. Decryption reverses this process:
 //!
 //! 1. **Round Key Generation**: Reconstructs round keys from the master key using chained SHA-256 seeds.
-//! 2. **Grid Unmixing**: Applies inverse subcell, row shift, and column mixing in reverse round order.
-//! 3. **Unshuffling**: Reverses the [`Grid`](crate::Grid) permutation using a deterministic PRNG seeded from the key hash.
-//! 4. **ISO 10126 Padding Removal**: Truncates the final output using the last cell value as a padding marker.
+//! 2. **CTR Mode Decryption**: Each ciphertext [`Grid`](crate::Grid) is XORed with the keystream block (the nonce plus block counter encrypted with WHY2).
+//! 3. **ISO 10126 Padding Removal**: Truncates the final output using the last cell value as a padding marker.
+//!
+//! Since CTR mode is symmetric, the same encryption function is used for both encryption and decryption.
 
 use rand::{ Rng, SeedableRng };
 use rand_chacha::ChaCha20Rng;
@@ -54,22 +55,20 @@ use subtle::
 
 /// Decrypts a WHY2-encrypted data into raw `i64` values.
 ///
-/// This function reverses the full WHY2 encryption pipeline:
+/// This function reverses the full WHY2 encryption pipeline using CTR mode:
 ///
 /// $$ P_i = C_i \oplus E_K(\text{Nonce} + i) $$
 ///
 /// where $E_K$ is the WHY2 block cipher and $i$ is the block counter.
 ///
-/// - Applies inverse round transformations (subcell, shift rows, mix columns)
-/// - XORs each grid with round keys in reverse order
-/// - Unshuffles each grid using a deterministic PRNG seeded from the key hash
+/// - Generates round keys from the master key
+/// - Applies CTR mode decryption (XOR with keystream blocks)
 /// - Removes ISO 10126 padding from the final output
 ///
 /// # Parameters
 /// - `input`: An [`EncryptedData`] struct containing the encrypted grids and key grid.
 ///
-/// # Returns
-/// - Ok([`DecryptedData`]) struct containing:
+/// - Ok([`DecryptedData`](crate::options::DecryptedData)) struct containing:
 ///   - `output`: A vector of decrypted `i64` values
 ///   - `key`: The original key [`Grid`](crate::Grid) flattened into a vector
 /// - Err(String) if [`Grid`](crate::Grid) area is 1
@@ -212,6 +211,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 /// - Err(`String`) if Grid area is 1
 ///
 /// # Notes
+/// - Uses CTR mode for decryption (same as encryption).
 /// - Uses big-endian decoding for each `i64` value.
 /// - Each decrypted value contributes up to two Unicode scalar values.
 /// - ISO 10126 padding is removed before decoding.

@@ -59,13 +59,13 @@ pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
 /// [`decrypt`](crate::decrypter::decrypt) to reverse the transformation.
 ///
 /// # Fields
-/// - `output`: A vector of encrypted `Grid<W, H>` chunks.
-/// - `key`: The key Grid used for encryption and required for decryption.
-/// - `iv`: The initialization vector used for CBC.
+/// - `output`: A vector of encrypted [`Grid`]`<W, H>` chunks.
+/// - `key`: The key [`Grid`] used for encryption and required for decryption.
+/// - `nonce`: The nonce used for CTR mode.
 ///
 /// # Notes
-/// - The key is stored in Grid form for direct use in round key generation.
-/// - The IV does not need to be kept secret but must be unique per encryption.
+/// - The key is stored in [`Grid`] form for direct use in round key generation.
+/// - The nonce does not need to be kept secret but must be unique per encryption.
 pub struct EncryptedData<const W: usize, const H: usize> //DATA FOR REX ENCRYPTER
 {
     pub output: Vec<Grid<W, H>>, //OUTPUT VALUE

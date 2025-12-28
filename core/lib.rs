@@ -258,13 +258,15 @@ impl<const W: usize, const H: usize> Grid<W, H>
 
     /// Initializes a key Grid from a vector of signed 64-bit integers.
     ///
-    /// Each cell is built from two key parts using nonlinear mixing:
+    /// Each cell is built from two key parts using nonlinear mixing.
     /// addition, XOR, and rotation. This improves diffusion and avoids
     /// simple linear patterns in the key.
     ///
     /// # Algorithm
     /// For each cell index $i$, the key parts $A$ and $B$ are derived from the input vector $V$:
+    ///
     /// $$ A = (V_i + V_{i + \text{Area}}) \lll (i \bmod 64) $$
+    ///
     /// $$ B = (V_i \oplus V_{i + \text{Area}}) \ggg (i \bmod 64) $$
     ///
     /// where $\lll$ and $\ggg$ denote left and right rotation respectively.
@@ -457,11 +459,14 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Behavior
     /// Each 64-bit cell is split into two 32-bit halves $v_0, v_1$.
-    /// For `SUBCELL_ROUNDS` iterations, the Feistel-like network applies:
-    /// $$ v_0 \leftarrow v_0 + (((v_1 \ll 4) \oplus (v_1 \gg 5)) + v_1) \oplus sum $$
-    /// $$ v_1 \leftarrow v_1 + (((v_0 \ll 4) \oplus (v_0 \gg 5)) + v_0) \oplus sum $$
+    /// For [`SUBCELL_ROUNDS`](crate::options::SUBCELL_ROUNDS) iterations, the Feistel-like network applies:
+    ///
+    /// $$ v_0 \leftarrow v_0 + (((v_1 \ll 4) \oplus (v_1 \gg 5)) + v_1) \oplus \text{sum} $$
+    ///
+    /// $$ v_1 \leftarrow v_1 + (((v_0 \ll 4) \oplus (v_0 \gg 5)) + v_0) \oplus \text{sum} $$
     ///
     /// where $\text{sum}$ is incremented by a constant $\delta = $ [`SUBCELL_DELTA`](crate::options::SUBCELL_DELTA) in each round:
+    ///
     /// $$ \text{sum} \leftarrow \text{sum} + \delta $$
     ///
     /// # Notes

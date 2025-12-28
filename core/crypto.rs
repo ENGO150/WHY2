@@ -61,7 +61,7 @@ use crate::
 ///
 /// # Notes
 /// - The hash is computed in row-major order.
-/// - Each `i64` cell is encoded using native-endian byte order.
+/// - Each `i64` cell is encoded using big-endian byte order.
 /// - This method is deterministic and does not use any external randomness.
 pub fn sha256_seed_grid<const W: usize, const H: usize>(key: &Grid<W, H>) -> [u8; 32]
 {

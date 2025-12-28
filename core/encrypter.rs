@@ -23,13 +23,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! raw data into encrypted Grid chunks using a symmetric key.
 //!
 //! # Overview
-//! WHY2 encrypts data by converting it into fixed-size grids ([`Grid`]) and applying
-//! nonlinear and linear transformations across multiple rounds. The process includes:
+//! WHY2 encrypts data by converting it into fixed-size grids ([`Grid`](crate::Grid)) and applying
+//! nonlinear and linear transformations across multiple rounds in CTR mode. The process includes:
 //!
-//! 1. **Grid Shaping**: Input is padded and split into [`Grid`] chunks.
+//! 1. **[`Grid`](crate::Grid) Shaping**: Input is padded and split into [`Grid`](crate::Grid) chunks.
 //! 2. **Key Handling**: A symmetric key is either provided or securely generated.
-//! 3. **Deterministic Shuffling**: Each [`Grid`] is shuffled using a PRNG seeded from the key hash.
-//! 4. **Round-Based Mixing**: Each [`Grid`] undergoes XOR, subcell diffusion, row shifting, and column mixing.
+//! 3. **Nonce Generation**: A random nonce is generated for CTR mode.
+//! 4. **CTR Mode Encryption**: Each plaintext [`Grid`](crate::Grid) is XORed with a keystream
+//! block derived from encrypting the nonce plus block counter.
 
 use rand::{ Rng, SeedableRng };
 use rand_chacha::ChaCha20Rng;
@@ -63,9 +64,10 @@ use subtle::{ ConditionallySelectable, ConstantTimeEq };
 /// - `key`: The key [`Grid`] used for encryption.
 ///
 /// # Behavior
-/// - Pads the input to a multiple of the grid area using ISO 10126 padding (random bytes).
-/// - Splits the input into grid chunks and shuffles each using a deterministic PRNG seeded from the key hash.
-/// - Applies round-based transformations: initial XOR, subcell mixing, row shifting, and column mixing.
+/// - Pads the input to a multiple of the [`Grid`](crate::Grid) area using ISO 10126 padding (random bytes + length marker).
+/// - Splits the input into [`Grid`](crate::Grid) chunks.
+/// - Generates a random nonce for CTR mode.
+/// - Applies CTR mode encryption using the WHY2 block cipher.
 ///
 /// Each plaintext block $P_i$ is encrypted using CTR mode:
 /// $$ C_i = P_i \oplus E_K(\text{Nonce} + i) $$
