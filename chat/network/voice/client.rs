@@ -38,6 +38,8 @@ use audiopus::
     coder::Encoder,
 };
 
+use gag::Gag;
+
 use crate::chat::
 {
     options as chat_options,
@@ -67,9 +69,15 @@ pub fn listen_server_voice()
     //INIT AUDIO HOST
     let host = cpal::default_host();
 
+    //SUPPRESS STDERR (AVOID ALSA ERRORS)
+    let stderr_gag = Gag::stderr().unwrap();
+
     //FIND INPUT DEVICE
     let input_device = find_device(host.input_devices().expect("No input device found"))
         .or_else(|| host.default_input_device()).unwrap();
+
+    //DISABLE SUPPRESSION
+    drop(stderr_gag);
 
     //CONFIGURE CPAL INPUT
     let mut input_config: StreamConfig = input_device.default_input_config().unwrap().into();
