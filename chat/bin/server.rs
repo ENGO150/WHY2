@@ -20,21 +20,27 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    process,
-    thread,
-    time::Duration,
     io,
+    thread,
+    process,
+    time::Duration,
     net::TcpListener,
 };
 
 use why2::chat::
 {
-    config,
     misc,
+    config,
     crypto,
     network::server,
     command::{ self, Command },
 };
+
+#[cfg(feature = "voice")]
+use std::net::UdpSocket;
+
+#[cfg(feature = "voice")]
+use why2::chat::network::voice::server as voice_server;
 
 fn quit() //DISCONNECT ALL USERS
 {
@@ -49,9 +55,14 @@ fn main()
     config::init_server_config(); //CREATE server.toml CONFIGURATION
     crypto::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
 
+    //SERIALIZE ADDRESS
     let address = format!("{}:{}", config::server_config::<String>("server_ip"), config::server_config::<u16>("server_port")); //GET ADDRESS
-    let listener = TcpListener::bind(&address).expect("Binding failed"); //BIND ADDRESS
-    println!("Server enabled.\nListening on {address}\n"); //INFO PRINT
+
+    //BIND
+    let listener = TcpListener::bind(&address).expect("Binding failed"); //TCP (TEXT)
+    #[cfg(feature = "voice")] let udp_socket = UdpSocket::bind(&address).expect("Binding UDP failed"); //UDP (VOICE)
+
+    println!("Server enabled.\nListening on {address}\n"); //PRINT INFO
 
     //CREATE THREAD FOR ACCEPTING CLIENTS
     thread::spawn(move ||
@@ -91,6 +102,10 @@ fn main()
             }
         }
     });
+
+    //CREATE THREAD FOR VOICE
+    #[cfg(feature = "voice")]
+    thread::spawn(move || voice_server::listen_client_voice(udp_socket));
 
     //CREATE INACTIVITY WATCHDOG THREAD
     thread::spawn(move ||
