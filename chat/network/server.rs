@@ -795,7 +795,14 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 //VOICE CALL
                 MessageCode::Voice =>
                 {
-                    println!("AAA");
+                    //CHECK DISABLED FEATURE
+                    #[cfg(not(feature = "voice"))]
+                    {
+                        send_code(stream, None, MessageCode::InvalidFeature, Some(&keys));
+                        continue;
+                    }
+
+                    send_code(stream, None, MessageCode::Voice, Some(&keys));
                 },
 
                 //SWITCH CHANNEL

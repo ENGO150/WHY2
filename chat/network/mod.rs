@@ -96,6 +96,7 @@ pub enum MessageCode //CONTROL CODES
     Channel,            //SERVER <> CLIENT | CHANNEL CHANGE
     Voice,              //CLIENT <> SERVER | ESTABLISH VOICE CHAT
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
+    InvalidFeature,     //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE
 }
 
 #[derive(Clone)]

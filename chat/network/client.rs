@@ -340,6 +340,12 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     misc::clear_lines(1);
                 },
 
+                //SERVER ALLOWED VOICE
+                MessageCode::Voice =>
+                {
+                    //TODO: Implement
+                },
+
                 //LIST OF ONLINE USERS
                 MessageCode::List =>
                 {
@@ -406,13 +412,20 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("Invalid usage! Press Ctrl+H for help.\n");
                 },
 
+                //CLIENTED REQUESTED DISABLED FEATURE
+                MessageCode::InvalidFeature =>
+                {
+                    misc::clear_lines(2);
+                    println!("Server has disabled the feature you requested.\n");
+                },
+
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
                 MessageCode::Disconnect =>
                 {
                     terminal::disable_raw_mode().unwrap();
                     println!("\nServer quit communication.");
                     process::exit(0);
-                }
+                },
 
                 _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
             }
