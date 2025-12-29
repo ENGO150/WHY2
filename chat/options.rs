@@ -25,6 +25,7 @@ use std::sync::
     Mutex,
     RwLock,
     LazyLock,
+    OnceLock,
     atomic::
     {
         AtomicBool,
@@ -85,6 +86,9 @@ static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT 
 
 #[cfg(feature = "client")]
 static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (SERVER -> CLIENT)
+
+#[cfg(all(feature = "client", feature = "voice"))]
+static SERVER_ADDRESS: OnceLock<String> = OnceLock::new();
 
 //FUNCTIONS
 //SHARED KEYS
@@ -163,4 +167,17 @@ pub fn get_server_seq() -> usize //GET SERVER SEQUENCE NUMBER
 pub fn set_server_seq(value: usize) //SET SERVER SEQUENCE NUMBER
 {
     SERVER_SEQ.store(value, Ordering::Relaxed)
+}
+
+//SERVER ADDRESS
+#[cfg(all(feature = "client", feature = "voice"))]
+pub fn get_server_address() -> String //GET SERVER ADDRESS
+{
+    SERVER_ADDRESS.get().unwrap().to_owned()
+}
+
+#[cfg(all(feature = "client", feature = "voice"))]
+pub fn set_server_address(address: &str) //SET SERVER ADDRESS
+{
+    SERVER_ADDRESS.set(address.to_owned()).unwrap();
 }

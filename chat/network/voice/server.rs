@@ -18,7 +18,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::net::UdpSocket;
 
+use crate::chat::network::voice;
+
 pub fn listen_client_voice(socket: UdpSocket)
 {
-    println!("{:?}", socket);
+    let received = voice::receive(&socket);
+
+    println!("RECEIVED: {:?}", received);
 }

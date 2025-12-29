@@ -29,7 +29,6 @@ use zeroize::Zeroizing;
 use serde_json::Value;
 
 use crossterm::terminal;
-
 use colored::Colorize;
 
 use crate::chat::
@@ -46,6 +45,12 @@ use crate::chat::
         SerColor,
     },
 };
+
+#[cfg(feature = "voice")]
+use std::thread;
+
+#[cfg(feature = "voice")]
+use crate::chat::network::voice::client as voice_client;
 
 //CONSTS
 const GRID_W: usize = options::GRID_DIMENSIONS.0;
@@ -341,9 +346,10 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 },
 
                 //SERVER ALLOWED VOICE
+                #[cfg(feature = "voice")]
                 MessageCode::Voice =>
                 {
-                    //TODO: Implement
+                    thread::spawn(move || voice_client::listen_server_voice());
                 },
 
                 //LIST OF ONLINE USERS

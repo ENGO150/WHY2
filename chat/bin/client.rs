@@ -444,6 +444,9 @@ fn main()
     //PRINT SPACER
     println!("{}", "=".repeat(connecting_ip.find(":").unwrap() + spacer_add_spaces));
 
+    #[cfg(feature = "voice")]
+    options::set_server_address(&connecting_ip);
+
     //CONNECT TO SERVER
     let mut stream = TcpStream::connect(connecting_ip).unwrap_or_else(|_|
     {
