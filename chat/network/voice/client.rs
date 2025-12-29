@@ -40,8 +40,8 @@ use audiopus::
 
 use crate::chat::
 {
-    network::voice::options,
     options as chat_options,
+    network::voice::{ self, options },
 };
 
 //PRIVATE
@@ -86,8 +86,9 @@ pub fn listen_server_voice()
 
     //INPUT BUFFERS
     let mut input_accum: Vec<f32> = Vec::with_capacity(options::FRAME_SIZE * 2);
-    let mut encoded_buffer = [0u8; 1500];
+    let mut encoded_buffer = [0u8; 1500]; //ALLOCATE BUFFER TO STANDARD MTU
 
+    //CONFIGURE INPUT STREAM
     let input_stream = input_device.build_input_stream(&input_config, move |data: &[f32], _: &_|
     {
         //ACCUMULATE
@@ -103,7 +104,7 @@ pub fn listen_server_voice()
             {
                 Ok(len) =>
                 {
-                    //TODO: Do stuff
+                    voice::send(&socket, &encoded_buffer[..len]).unwrap();
                 },
                 Err(_) => {}, //IGNORE ENCODER ERRORS
             }

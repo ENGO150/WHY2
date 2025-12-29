@@ -22,7 +22,10 @@ use crate::chat::network::voice;
 
 pub fn listen_client_voice(socket: UdpSocket)
 {
-    let received = voice::receive(&socket);
-
-    println!("RECEIVED: {:?} ({})", received, received.len());
+    //LOOP RECEIVING
+    loop
+    {
+        let received = voice::receive(&socket);
+        println!("Received len: {}", received.len()); //DEBUG PRINT
+    }
 }
