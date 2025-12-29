@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//CONSTS
+//CONSTS (I HIGHLY RECOMMEND NOT CHANGING THOSE)
 pub const SAMPLE_RATE: u32  = 48000;                                    //put some text here
 pub const FRAME_MS: u32     = 20;                                       //LENGTH OF ONE FRAME
 pub const FRAME_SIZE: usize = (SAMPLE_RATE * FRAME_MS / 1000) as usize; //960 SAMPLES PER FRAME
