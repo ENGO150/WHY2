@@ -792,6 +792,12 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     return remove_connection(&peer_addr, true);
                 },
 
+                //VOICE CALL
+                MessageCode::Voice =>
+                {
+                    println!("AAA");
+                },
+
                 //SWITCH CHANNEL
                 MessageCode::Channel =>
                 {

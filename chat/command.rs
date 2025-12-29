@@ -29,9 +29,11 @@ use crate::chat::network::MessageCode;
 const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 
 //ENUMS
+#[derive(Debug)]
 pub enum Command
 {
     Exit,           //DISCONNECT FROM SERVER
+    Voice,          //ENABLE VOICE CHAT
     Channel,        //SWITCH CHANNEL
     Help,           //PRINT COMMANDS
     List,           //LIST USERS
@@ -50,6 +52,7 @@ impl Command
         match self
         {
             Command::Exit => Some(MessageCode::Disconnect),
+            Command::Voice => Some(MessageCode::Voice),
             Command::Channel => Some(MessageCode::Channel),
             Command::List => Some(MessageCode::List),
             Command::PrivateMessage => Some(MessageCode::PrivateMessage),
@@ -67,6 +70,7 @@ impl Display for Command
         let name = match self
         {
             Command::Help           => "help",
+            Command::Voice          => "voice",
             Command::Channel        => "channel",
             Command::Exit           => "exit",
             Command::List           => "list",
@@ -98,6 +102,7 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
     {
         //NON PARAMETRIC
         "EXIT" | "QUIT" | "LEAVE" | "DISCONNECT"      => (Some(Command::Exit), None),
+        "VOICE" | "VOIP" | "CALL"                     => (Some(Command::Voice), None),
         "HELP" | "H" | "COMMANDS" | "USAGE" | "GUIDE" => (Some(Command::Help), None),
         "LIST" | "USERS" | "CLIENTS" | "CHANNELS"     => (Some(Command::List), None),
 

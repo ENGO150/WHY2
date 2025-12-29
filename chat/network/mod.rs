@@ -94,6 +94,7 @@ pub enum MessageCode //CONTROL CODES
     RegisterDisabled,   //SERVER -> CLIENT | REGISTRATION IS DISABLED
     Version,            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
     Channel,            //SERVER <> CLIENT | CHANNEL CHANGE
+    Voice,              //CLIENT <> SERVER | ESTABLISH VOICE CHAT
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
 }
 

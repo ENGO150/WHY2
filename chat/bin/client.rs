@@ -479,6 +479,20 @@ fn main()
             let mut command_used = false;
             if let (Some(command), parameters) = command::get_command(&input)
             {
+                //FEATURE COMMANDS
+                if let Some(feature) = match command //COMMAND USED WITHOUT FEATURE
+                {
+                    #[cfg(not(feature = "voice"))]
+                    Command::Voice => Some("voice"),
+
+                    _ => None::<&str>
+                }
+                {
+                    misc::clear_lines(2);
+                    print!("Command '{:?}' requires '{feature}' feature!\n\n\r>>> ", command);
+                    continue;
+                }
+
                 //SEND CODE ON A SIMPLE COMMAND, CONTINUE OTHERWISE
                 if !send_command_code(&mut client_stream, &command, &parameters)
                 {
@@ -494,6 +508,7 @@ fn main()
                             (
                                 "\nCommands:
                                 \r/help - Prints this
+                                \r/voice - Enable voice chat [REQUIRES 'voice' feature]
                                 \r/channel [NAME] - Switches to channel/lobby if NAME is omitted
                                 \r/list - Show connected users and their IDs
                                 \r/pm (ID) (MESSAGE) - Sends private message
