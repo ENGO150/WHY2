@@ -27,6 +27,13 @@ categories = ["cryptography", "network-programming", "command-line-utilities"]
 
 default-run = "why2"
 
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
 [package.metadata.docs.rs]
 features = ["legacy"]
 rustdoc-args = ["--html-in-header", "core/docs-header.html"]
@@ -65,10 +72,17 @@ chat = [
     "dep:hkdf"
 ]
 
+voice = [
+    "dep:cpal",
+    "dep:ringbuf",
+    "dep:audiopus",
+]
+
 client = ["chat", "dep:crossterm"]
 server = ["chat", "dep:ctrlc", "dep:argon2", "dep:dashmap"]
 
 [dependencies]
+# CORE
 rand = "0.9.2"
 rand_chacha = "0.9.0"
 sha2 = "0.10.9"
@@ -76,6 +90,7 @@ rayon = "1.11.0"
 zeroize = { version = "1.8.2", features = ["derive"] }
 subtle = { version = "2.6.1", optional = true }
 
+# CHAT
 argon2 = { version = "0.5.3", optional = true }
 base91 = { version = "0.1.0", optional = true }
 serde_json = { version = "1.0.147", optional = true }
@@ -92,9 +107,7 @@ dashmap = { version = "6.1.0", optional = true }
 hmac = { version = "0.12.1", optional = true }
 hkdf = { version = "0.12.4", optional = true }
 
-[profile.release]
-opt-level = "s"
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
+# VOICE CHAT
+cpal = { version = "0.17.0", optional = true }
+ringbuf = { version = "0.4.8", optional = true }
+audiopus = { version = "0.2.0", optional = true }
