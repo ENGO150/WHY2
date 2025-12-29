@@ -16,37 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//MODULES
-pub mod options;
-
-#[cfg(feature = "client")]
-pub mod client;
-
-#[cfg(feature = "server")]
-pub mod server;
-
-use std::
-{
-    io::Result,
-    net::UdpSocket,
-};
-
-pub fn send(socket: &UdpSocket, data: &[u8]) -> Result<usize> //SEND DATA TO UDP
-{
-    socket.send(data)
-}
-
-pub fn receive(socket: &UdpSocket) -> Vec<u8> //RECEIVE UDP PACKET & DECODE
-{
-    let mut buffer = [0u8; 2048];
-    loop
-    {
-        let len = match socket.recv_from(&mut buffer)
-        {
-            Ok(result) => result.0,
-            Err(_) => continue
-        };
-
-        return buffer[..len].to_vec();
-    }
-}
+//CONSTS
+pub const SAMPLE_RATE: u32  = 48000;                                    //put some text here
+pub const FRAME_MS: u32     = 20;                                       //LENGTH OF ONE FRAME
+pub const FRAME_SIZE: usize = (SAMPLE_RATE * FRAME_MS / 1000) as usize; //960 SAMPLES PER FRAME

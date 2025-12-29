@@ -24,5 +24,5 @@ pub fn listen_client_voice(socket: UdpSocket)
 {
     let received = voice::receive(&socket);
 
-    println!("RECEIVED: {:?}", received);
+    println!("RECEIVED: {:?} ({})", received, received.len());
 }
