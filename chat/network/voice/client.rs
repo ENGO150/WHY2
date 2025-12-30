@@ -145,7 +145,8 @@ pub fn listen_server_voice(id: usize)
                 {
                     voice: encoded_buffer[..len].to_vec(),
                     id: Some(id),
-                    seq: 0,
+
+                    ..Default::default()
                 }).unwrap();
             }
         }

@@ -80,7 +80,8 @@ pub fn listen_client_voice(socket: UdpSocket)
                 {
                     voice: received.voice.clone(),
                     id: None,
-                    seq: 0,
+
+                    ..Default::default()
                 }, &conn_addr.addr).unwrap();
             }
         }

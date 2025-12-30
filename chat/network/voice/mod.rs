@@ -41,6 +41,19 @@ pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
     pub seq: usize,        //SEQUENCE NUMBER
 }
 
+impl Default for VoicePacket
+{
+    fn default() -> Self
+    {
+        VoicePacket
+        {
+            voice: Vec::new(),
+            id: None,
+            seq: 0,
+        }
+    }
+}
+
 pub fn send //SEND DATA TO UDP
 (
     socket: &UdpSocket,
