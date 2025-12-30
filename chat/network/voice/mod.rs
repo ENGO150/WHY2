@@ -39,6 +39,9 @@ use crate::chat::
     options::SharedKeys,
 };
 
+#[cfg(not(feature = "server"))]
+use crate::chat::options as chat_options;
+
 #[derive(SchemaRead, SchemaWrite)]
 pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
 {
@@ -116,11 +119,7 @@ pub fn send //SEND DATA TO UDP
     }
 }
 
-pub fn receive
-(
-    socket: &UdpSocket,
-    #[cfg(feature = "client")] keys: &SharedKeys
-) -> (VoicePacket, SocketAddr) //RECEIVE UDP PACKET & DECODE
+pub fn receive(socket: &UdpSocket) -> (VoicePacket, SocketAddr) //RECEIVE UDP PACKET & DECODE
 {
     let mut buffer = [0u8; 2048];
     loop //BLOCK READING UNTIL PACKET ARRIVES
@@ -159,7 +158,7 @@ pub fn receive
             #[cfg(not(feature = "server"))]
             {
                 buffer_offset = 0;
-                keys.clone()
+                chat_options::get_keys().unwrap()
             }
         };
 

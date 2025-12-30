@@ -182,7 +182,7 @@ pub fn listen_server_voice(id: usize)
     loop
     {
         //READ
-        network_buffer = voice::receive(&socket, &chat_options::get_keys().unwrap()).0;
+        network_buffer = voice::receive(&socket).0;
 
         //VERIFY SERVER SEQ
         if network_buffer.seq <= options::get_server_seq() { continue; } //INGORE INVALID SEQs
