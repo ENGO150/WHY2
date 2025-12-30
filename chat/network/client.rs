@@ -178,6 +178,10 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
     let mut channel = String::new();
 
+    //ID SET BY SERVER
+    #[cfg(feature = "voice")]
+    let mut id = 0usize;
+
     //LOOP READING
     loop
     {
@@ -305,6 +309,12 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     misc::clear_lines(3);
                     println!("Login successful. Press Ctrl+H for help.\n");
 
+                    //SET SERVER-SIDE ID
+                    #[cfg(feature = "voice")]
+                    {
+                        id = read.text.unwrap().parse().unwrap();
+                    }
+
                     //ALLOW MESSAGE HISTORY & COMMANDS
                     options::set_sending_messages(true);
                 },
@@ -349,7 +359,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 #[cfg(feature = "voice")]
                 MessageCode::Voice =>
                 {
-                    thread::spawn(move || voice_client::listen_server_voice());
+                    thread::spawn(move || voice_client::listen_server_voice(id));
                 },
 
                 //LIST OF ONLINE USERS

@@ -54,6 +54,9 @@ use crate::chat::
     },
 };
 
+#[cfg(feature = "voice")]
+use crate::chat::network::voice::server as voice_server;
+
 //CONSTS
 const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
@@ -749,8 +752,21 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //AUTHENTICATE CLIENT
     authenticate_client(&peer_addr, &username, id);
 
+    let accept_text =
+    {
+        #[cfg(feature = "voice")]
+        {
+            Some(id.to_string())
+        }
+
+        #[cfg(not(feature = "voice"))]
+        {
+            None
+        }
+    };
+
     //TELL CLIENT TO START CHATTING
-    send_code(stream, None, MessageCode::Accept, Some(&keys));
+    send_code(stream, accept_text, MessageCode::Accept, Some(&keys));
 
     //SEND JOIN MESSAGE
     send_to_all(MessagePacket
@@ -802,7 +818,11 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         continue;
                     }
 
+                    //ACCEPT VOICE
                     send_code(stream, None, MessageCode::Voice, Some(&keys));
+
+                    //ADD CLIENT ID TO VOICE CONNECTIONS MAP
+                    voice_server::CONNECTIONS.insert(id, None);
                 },
 
                 //SWITCH CHANNEL

@@ -28,7 +28,7 @@ pub mod server;
 use std::
 {
     io::Result,
-    net::UdpSocket,
+    net::{ UdpSocket, SocketAddr },
 };
 
 pub fn send(socket: &UdpSocket, data: &[u8]) -> Result<usize> //SEND DATA TO UDP
@@ -36,17 +36,17 @@ pub fn send(socket: &UdpSocket, data: &[u8]) -> Result<usize> //SEND DATA TO UDP
     socket.send(data)
 }
 
-pub fn receive(socket: &UdpSocket) -> Vec<u8> //RECEIVE UDP PACKET & DECODE
+pub fn receive(socket: &UdpSocket) -> (Vec<u8>, SocketAddr) //RECEIVE UDP PACKET & DECODE
 {
     let mut buffer = [0u8; 2048];
     loop
     {
-        let len = match socket.recv_from(&mut buffer)
+        let (len, addr) = match socket.recv_from(&mut buffer)
         {
-            Ok(result) => result.0,
+            Ok(result) => result,
             Err(_) => continue
         };
 
-        return buffer[..len].to_vec();
+        return (buffer[..len].to_vec(), addr);
     }
 }

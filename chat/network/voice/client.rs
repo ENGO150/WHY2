@@ -75,7 +75,7 @@ fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
 }
 
 //PUBLIC
-pub fn listen_server_voice()
+pub fn listen_server_voice(id: usize)
 {
     //CONNECT
     let socket = Arc::new(UdpSocket::bind("0.0.0.0:0").expect("Binding UDP failed"));
@@ -122,6 +122,7 @@ pub fn listen_server_voice()
     let mut encoded_buffer = [0u8; 1500]; //ALLOCATE BUFFER TO STANDARD MTU
 
     //CONFIGURE INPUT STREAM
+    let id_be = id.to_be_bytes();
     let send_socket = socket.clone();
     let input_stream = input_device.build_input_stream(&stream_config, move |data: &[f32], _: &_|
     {
@@ -133,8 +134,11 @@ pub fn listen_server_voice()
         {
             let frame: Vec<f32> = input_accum.drain(0..options::FRAME_SIZE).collect();
 
+            //PREPEND ID TO PACKET
+            encoded_buffer[..8].copy_from_slice(&id_be);
+
             //ENCODE (IGNORE ERRORS)
-            if let Ok(len) = opus_encoder.encode_float(&frame, &mut encoded_buffer)
+            if let Ok(len) = opus_encoder.encode_float(&frame, &mut encoded_buffer[8..])
             {
                 voice::send(&send_socket, &encoded_buffer[..len]).unwrap();
             }
@@ -169,7 +173,7 @@ pub fn listen_server_voice()
     loop
     {
         //READ
-        network_buffer = voice::receive(&socket);
+        network_buffer = voice::receive(&socket).0;
 
         //DECODE
         if let Ok(decoded_len) = opus_decoder.decode_float(Some(&network_buffer), &mut decoded_buffer[..], false)
