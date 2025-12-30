@@ -35,10 +35,18 @@ use p521::
 
 use sha2::{ Sha256, Digest };
 use hkdf::Hkdf;
+use hmac::{ Hmac, Mac };
 
 use zeroize::Zeroizing;
 
-use crate::chat::{ misc, options };
+use crate::
+{
+    Grid,
+    encrypter,
+    decrypter,
+    options as core_options,
+    chat::{ misc, options },
+};
 
 #[cfg(feature = "server")]
 use argon2::
@@ -73,6 +81,32 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> options::SharedKe
         bytes.copy_from_slice(chunk);
         i64::from_be_bytes(bytes)
     }).collect()), mac)
+}
+
+fn verify_hmac(packet: Vec<u8>, mac: &Vec<u8>) -> Option<Vec<u8>> //VERIFY HMAC
+{
+    //VERIFY MAC LENGTH
+    if packet.len() < 32
+    {
+        return None;
+    }
+
+    //SEPARATE MAC FROM CIPHERTEXT
+    let received_mac: [u8; 32] = packet[..32].try_into().unwrap();
+    let ciphertext = &packet[32..];
+
+    //COMPUTE EXPECTED HMAC
+    let mut mac = Hmac::<Sha256>::new_from_slice(mac).expect("HMAC initialization failed");
+    mac.update(ciphertext);
+
+    //VERIFY MAC
+    if mac.verify_slice(&received_mac).is_ok()
+    {
+        Some(ciphertext.to_vec())
+    } else
+    {
+        None
+    }
 }
 
 //PUBLIC
@@ -157,4 +191,76 @@ pub fn compare_password_hash(hashed: &str, password: &str) -> bool //COMPARE ARG
 
     //COMPARE
     Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok()
+}
+
+pub fn encrypt_packet(packet_bytes: Vec<u8>, keys: &options::SharedKeys) -> Vec<u8>
+{
+    //CONVERT packet_bytes to BINARY
+    let mut input_i64 = Vec::with_capacity((packet_bytes.len() + 7) / 8);
+    for chunk in packet_bytes.chunks(8)
+    {
+        let mut buf = [0u8; 8];
+        buf[..chunk.len()].copy_from_slice(chunk);
+        input_i64.push(i64::from_be_bytes(buf));
+    }
+
+    //ENCRYPT
+    let encrypted_data = encrypter::encrypt::<GRID_W, GRID_H>(input_i64, Some(keys.0.to_vec())).expect("Encrypting packet failed");
+
+    //SERIALIZE ENCRYPTED PACKET
+    let mut grids = encrypted_data.output;
+    grids.insert(0, encrypted_data.nonce); //NONCE
+
+    //CONVERT ENCRYPTED PACKET (FROM Vec<Grid>) TO Vec<u8>
+    let encrypted_bytes: Vec<u8> = grids.iter()
+        .flat_map(|grid| grid.iter()
+            .flat_map(|row| row.iter()
+                .flat_map(|&val| val.to_be_bytes()))).collect();
+
+    //COMPUTE HMAC OVER CIPHERTEXT
+    let mut mac = Hmac::<Sha256>::new_from_slice(&keys.1).expect("HMAC initialization failed");
+    mac.update(&encrypted_bytes);
+
+    let mac_tag = mac.finalize().into_bytes();
+
+    //PREPEND MAC TO CIPHERTEXT ([32-byte HMAC][CIPHERTEXT])
+    let mut transmission_bytes = Vec::with_capacity(32 + encrypted_bytes.len());
+    transmission_bytes.extend_from_slice(&mac_tag);
+    transmission_bytes.extend_from_slice(&encrypted_bytes);
+    transmission_bytes
+}
+
+pub fn decrypt_packet(mut decoded_packet: Vec<u8>, keys: &options::SharedKeys) -> Option<Vec<u8>>
+{
+    //VERIFY HMAC
+    if let Some(ciphertext) = verify_hmac(decoded_packet, &keys.1)
+    {
+        decoded_packet = ciphertext;
+    } else
+    {
+        return None;
+    }
+
+    //DESERIALIZE ENCRYPTED PACKET
+    let mut grids = Grid::<GRID_W, GRID_H>::from_bytes(&decoded_packet).ok()?;
+
+    //EXTRACT NONCE
+    let nonce = grids.remove(0);
+
+    //DECRYPT
+    let decrypted_packet = decrypter::decrypt(core_options::EncryptedData
+    {
+        output: grids,
+        key: Grid::from_key(keys.0.clone().into()).unwrap(),
+        nonce: nonce,
+    }).ok()?;
+
+    //OVERWRITE decoded_packet
+    decoded_packet = Vec::with_capacity(decrypted_packet.output.len() * 8);
+    for val in decrypted_packet.output.to_vec()
+    {
+        decoded_packet.extend_from_slice(&val.to_be_bytes());
+    }
+
+    Some(decoded_packet)
 }
