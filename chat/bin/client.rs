@@ -511,7 +511,7 @@ fn main()
                             (
                                 "\nCommands:
                                 \r/help - Prints this
-                                \r/voice - Enable voice chat [REQUIRES 'voice' feature]
+                                \r/voice - Enable voice chat [REQUIRES 'voice' FEATURE]
                                 \r/channel [NAME] - Switches to channel/lobby if NAME is omitted
                                 \r/list - Show connected users and their IDs
                                 \r/pm (ID) (MESSAGE) - Sends private message
