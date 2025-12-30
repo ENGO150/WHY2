@@ -815,14 +815,16 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     #[cfg(not(feature = "voice"))]
                     {
                         send_code(stream, None, MessageCode::InvalidFeature, Some(&keys));
-                        continue;
                     }
 
-                    //ACCEPT VOICE
-                    send_code(stream, None, MessageCode::Voice, Some(&keys));
+                    #[cfg(feature = "voice")]
+                    {
+                        //ACCEPT VOICE
+                        send_code(stream, None, MessageCode::Voice, Some(&keys));
 
-                    //ADD CLIENT ID TO VOICE CONNECTIONS MAP
-                    voice_server::CONNECTIONS.insert(id, None);
+                        //ADD CLIENT ID TO VOICE CONNECTIONS MAP
+                        voice_server::CONNECTIONS.insert(id, None);
+                    }
                 },
 
                 //SWITCH CHANNEL
