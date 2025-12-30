@@ -155,8 +155,10 @@ pub fn listen_server_voice(id: usize)
         let read_count = consumer.pop_slice(data);
 
         //FILL WITH SILENCE ON UNDERRUN
-        if read_count < data.len() {
-            for i in read_count..data.len() {
+        if read_count < data.len()
+        {
+            for i in read_count..data.len()
+            {
                 data[i] = 0.0;
             }
         }
