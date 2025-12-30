@@ -359,7 +359,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 #[cfg(feature = "voice")]
                 MessageCode::Voice =>
                 {
-                    thread::spawn(move || voice_client::listen_server_voice(id));
+                    let keys = keys.clone();
+                    thread::spawn(move || voice_client::listen_server_voice(id, keys));
                 },
 
                 //LIST OF ONLINE USERS

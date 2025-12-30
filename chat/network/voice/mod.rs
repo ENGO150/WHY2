@@ -33,6 +33,8 @@ use std::
 
 use wincode::{ SchemaRead, SchemaWrite };
 
+use crate::chat::options::SharedKeys;
+
 #[derive(SchemaRead, SchemaWrite)]
 pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
 {
@@ -58,7 +60,8 @@ pub fn send //SEND DATA TO UDP
 (
     socket: &UdpSocket,
     mut packet: VoicePacket,
-    #[cfg(feature = "server")] addr: &SocketAddr
+    #[cfg(feature = "server")] addr: &SocketAddr,
+    keys: &SharedKeys
 ) -> Result<usize, Error>
 {
     //SET SERVER SEQ

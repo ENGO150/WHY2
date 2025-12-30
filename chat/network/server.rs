@@ -135,7 +135,7 @@ impl Connection
     }
 
     //GET ID FROM Connection
-    fn id(&self) -> Option<&usize>
+    pub fn id(&self) -> Option<&usize>
     {
         match self
         {

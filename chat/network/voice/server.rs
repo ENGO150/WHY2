@@ -24,13 +24,22 @@ use std::
 
 use dashmap::DashMap;
 
-use crate::chat::network::voice::{ self, VoicePacket };
+use crate::chat::
+{
+    options::SharedKeys,
+    network::
+    {
+        server,
+        voice::{ self, VoicePacket },
+    },
+};
 
 pub struct Connection
 {
     addr: SocketAddr,  //ADDRESS OF CONNECTION
-    seq: usize,
-    server_seq: usize, //SERVER-SIDE SEQUENCE NUMBER
+    id: usize,         //ID ON TEXT CHAT
+    seq: usize,        //SEQUENCE NUMBER
+    server_seq: usize, //SERVER SEQUENCE NUMBER
 }
 
 //LISTS
@@ -96,6 +105,7 @@ pub fn listen_client_voice(socket: UdpSocket)
                 *conn = Some(Connection
                 {
                     addr: addr,
+                    id: id,
                     seq: 0,
                     server_seq: 0,
                 });
@@ -103,27 +113,33 @@ pub fn listen_client_voice(socket: UdpSocket)
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
         //COLLECT ALL ADDRESSES
-        let addresses = CONNECTIONS.iter().filter_map(|entry|
+        let mut addresses: Vec<(SocketAddr, SharedKeys)> = Vec::new();
+        for connection in CONNECTIONS.iter()
         {
-            entry.value().as_ref().and_then(|conn|
+            if let Some(conn) = connection.value()
             {
-                //return Some(conn.addr);
-                if conn.addr != addr
+                //DO NOT SEND BACK TO SENDER (LOOPBACK)
+                if conn.addr != addr //|| true
                 {
-                    Some(conn.addr)
-                } else { None } //DO NOT SEND BACK TO SENDER (LOOPBACK)
-            })
-        }).collect::<Vec<SocketAddr>>();
+                    //FIND CONNECTION KEYS
+                    if let Some(text_conn) = server::CONNECTIONS.iter()
+                        .find(|entry| entry.value().id() == Some(&conn.id))
+                    {
+                        addresses.push((conn.addr, text_conn.keys().unwrap().clone()));
+                    }
+                }
+            }
+        }
 
         //SEND TO ALL
-        for addr in addresses
+        for addr in addresses.iter()
         {
             voice::send(&socket, VoicePacket
             {
                 voice: received.voice.clone(),
                 id: Some(id),
                 ..Default::default()
-            }, &addr).unwrap();
+            }, &addr.0, &addr.1).unwrap();
         }
     }
 }

@@ -57,7 +57,12 @@ use gag::Gag;
 
 use crate::chat::
 {
-    options as chat_options,
+    options::
+    {
+        SharedKeys,
+        self as chat_options,
+    },
+
     network::voice::
     {
         self,
@@ -80,7 +85,7 @@ fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
 }
 
 //PUBLIC
-pub fn listen_server_voice(id: usize)
+pub fn listen_server_voice(id: usize, keys: SharedKeys)
 {
     //CONNECT
     let socket = Arc::new(UdpSocket::bind("0.0.0.0:0").expect("Binding UDP failed"));
@@ -147,7 +152,7 @@ pub fn listen_server_voice(id: usize)
                     id: Some(id),
 
                     ..Default::default()
-                }).unwrap();
+                }, &keys).unwrap();
             }
         }
     }, |_| {}, None).unwrap();
