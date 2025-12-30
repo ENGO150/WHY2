@@ -146,7 +146,7 @@ pub fn listen_server_voice(id: usize)
     }, |_| {}, None).unwrap();
 
     //JITTER BUFFER
-    let rb = HeapRb::<f32>::new(options::FRAME_SIZE); //~400ms BUFFER
+    let rb = HeapRb::<f32>::new(options::FRAME_SIZE * 20); //~400ms BUFFER
     let (mut producer, mut consumer) = rb.split();
 
     //CONFIGURE OUTPUT STREAM
