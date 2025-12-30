@@ -312,7 +312,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     //SET SERVER-SIDE ID
                     #[cfg(feature = "voice")]
                     {
-                        id = read.text.unwrap().parse().unwrap();
+                        id = read.text.unwrap_or("0".to_string()).parse().unwrap();
                     }
 
                     //ALLOW MESSAGE HISTORY & COMMANDS
