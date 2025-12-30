@@ -26,8 +26,25 @@ pub const FRAME_SIZE: usize = (SAMPLE_RATE * FRAME_MS / 1000) as usize; //960 SA
 
 //GLOBAL VARIABLES
 #[cfg(feature = "client")]
+static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT -> SERVER)
+
+#[cfg(feature = "client")]
 static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (SERVER -> CLIENT)
 
+//SEQ
+#[cfg(feature = "client")]
+pub fn get_seq() -> usize //GET SEQUENCE NUMBER
+{
+    SEQ.load(Ordering::Relaxed)
+}
+
+#[cfg(feature = "client")]
+pub fn set_seq(value: usize) //SET SEQUENCE NUMBER
+{
+    SEQ.store(value, Ordering::Relaxed)
+}
+
+//SERVER SEQ
 #[cfg(feature = "client")]
 pub fn get_server_seq() -> usize //GET SERVER SEQUENCE NUMBER
 {

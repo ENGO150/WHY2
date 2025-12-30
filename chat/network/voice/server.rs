@@ -29,6 +29,7 @@ use crate::chat::network::voice::{ self, VoicePacket };
 pub struct Connection
 {
     addr: SocketAddr,  //ADDRESS OF CONNECTION
+    seq: usize,
     server_seq: usize, //SERVER-SIDE SEQUENCE NUMBER
 }
 
@@ -38,6 +39,18 @@ pub static CONNECTIONS: LazyLock<DashMap<usize, Option<Connection>>> = LazyLock:
 //IMPLEMENTATIONS
 impl Connection
 {
+    //GET SEQ
+    pub fn seq(&self) -> &usize
+    {
+        &self.seq
+    }
+
+    //GET SEQ AS MUTABLE
+    pub fn seq_mut(&mut self) -> &mut usize
+    {
+        &mut self.seq
+    }
+
     //GET SERVER SEQ
     pub fn server_seq(&self) -> &usize
     {
@@ -70,15 +83,20 @@ pub fn listen_client_voice(socket: UdpSocket)
         if let Some(mut conn) = CONNECTIONS.get_mut(&id)
         {
             //FOUND, CHECK ADDRESS
-            if let Some(conn_addr) = conn.value()
+            if let Some(conn) = conn.as_mut()
             {
                 //IGNORE NON-MATCHING ADDRESS
-                if conn_addr.addr != addr { continue; }
+                if conn.addr != addr { continue; }
+
+                //VERIFY SEQ
+                if received.seq <= conn.seq { continue; } //IGNORE INVALID SEQs
+                *conn.seq_mut() = received.seq;
             } else //NOT FOUND, ADD ADDRESS
             {
                 *conn = Some(Connection
                 {
                     addr: addr,
+                    seq: 0,
                     server_seq: 0,
                 });
             }

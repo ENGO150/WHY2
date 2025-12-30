@@ -57,13 +57,10 @@ impl Default for VoicePacket
 pub fn send //SEND DATA TO UDP
 (
     socket: &UdpSocket,
-    packet: VoicePacket,
+    mut packet: VoicePacket,
     #[cfg(feature = "server")] addr: &SocketAddr
 ) -> Result<usize, Error>
 {
-    #[cfg(feature = "server")]
-    let mut packet = packet;
-
     //SET SERVER SEQ
     #[cfg(feature = "server")]
     {
@@ -73,6 +70,13 @@ pub fn send //SEND DATA TO UDP
             packet.seq = conn.server_seq() + 1;
             *conn.server_seq_mut() = packet.seq;
         }
+    }
+
+    //SET SEQ
+    #[cfg(feature = "client")]
+    {
+        packet.seq = options::get_seq() + 1;
+        options::set_seq(packet.seq);
     }
 
     //SERIALIZE PACKET
