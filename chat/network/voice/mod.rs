@@ -61,6 +61,20 @@ pub fn send //SEND DATA TO UDP
     #[cfg(feature = "server")] addr: &SocketAddr
 ) -> Result<usize, Error>
 {
+    #[cfg(feature = "server")]
+    let mut packet = packet;
+
+    //SET SERVER SEQ
+    #[cfg(feature = "server")]
+    {
+        if let Some(mut conn) = server::CONNECTIONS.get_mut(&packet.id.unwrap()) &&
+            let Some(conn) = conn.as_mut()
+        {
+            packet.seq = conn.server_seq() + 1;
+            *conn.server_seq_mut() = packet.seq;
+        }
+    }
+
     //SERIALIZE PACKET
     let packet_bytes = wincode::serialize(&packet).expect("Encoding packet failed");
 

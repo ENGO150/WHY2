@@ -29,13 +29,29 @@ use crate::chat::network::voice::{ self, VoicePacket };
 pub struct Connection
 {
     addr: SocketAddr,  //ADDRESS OF CONNECTION
-    seq: usize,        //SEQUENCE NUMBER
     server_seq: usize, //SERVER-SIDE SEQUENCE NUMBER
 }
 
 //LISTS
 pub static CONNECTIONS: LazyLock<DashMap<usize, Option<Connection>>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
+//IMPLEMENTATIONS
+impl Connection
+{
+    //GET SERVER SEQ
+    pub fn server_seq(&self) -> &usize
+    {
+        &self.server_seq
+    }
+
+    //GET SERVER SEQ AS MUTABLE
+    pub fn server_seq_mut(&mut self) -> &mut usize
+    {
+        &mut self.server_seq
+    }
+}
+
+//FUNCTIONS
 pub fn listen_client_voice(socket: UdpSocket)
 {
     //LOOP RECEIVING
@@ -63,27 +79,33 @@ pub fn listen_client_voice(socket: UdpSocket)
                 *conn = Some(Connection
                 {
                     addr: addr,
-                    seq: 0,
                     server_seq: 0,
                 });
             }
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
-        //SEND TO ALL
-        for connection in CONNECTIONS.iter()
+        //COLLECT ALL ADDRESSES
+        let addresses = CONNECTIONS.iter().filter_map(|entry|
         {
-            if let Some(conn_addr) = connection.value()
+            entry.value().as_ref().and_then(|conn|
             {
-                if conn_addr.addr == addr { continue; } //DO NOT SEND BACK TO SENDER (LOOPBACK)
-
-                voice::send(&socket, VoicePacket
+                //return Some(conn.addr);
+                if conn.addr != addr
                 {
-                    voice: received.voice.clone(),
-                    id: None,
+                    Some(conn.addr)
+                } else { None } //DO NOT SEND BACK TO SENDER (LOOPBACK)
+            })
+        }).collect::<Vec<SocketAddr>>();
 
-                    ..Default::default()
-                }, &conn_addr.addr).unwrap();
-            }
+        //SEND TO ALL
+        for addr in addresses
+        {
+            voice::send(&socket, VoicePacket
+            {
+                voice: received.voice.clone(),
+                id: Some(id),
+                ..Default::default()
+            }, &addr).unwrap();
         }
     }
 }

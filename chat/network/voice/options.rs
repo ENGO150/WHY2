@@ -16,7 +16,26 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#[cfg(feature = "client")]
+use std::sync::atomic::{ AtomicUsize, Ordering };
+
 //CONSTS (I HIGHLY RECOMMEND NOT CHANGING THOSE)
 pub const SAMPLE_RATE: u32  = 48000;                                    //put some text here
 pub const FRAME_MS: u32     = 20;                                       //LENGTH OF ONE FRAME
 pub const FRAME_SIZE: usize = (SAMPLE_RATE * FRAME_MS / 1000) as usize; //960 SAMPLES PER FRAME
+
+//GLOBAL VARIABLES
+#[cfg(feature = "client")]
+static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (SERVER -> CLIENT)
+
+#[cfg(feature = "client")]
+pub fn get_server_seq() -> usize //GET SERVER SEQUENCE NUMBER
+{
+    SERVER_SEQ.load(Ordering::Relaxed)
+}
+
+#[cfg(feature = "client")]
+pub fn set_server_seq(value: usize) //SET SERVER SEQUENCE NUMBER
+{
+    SERVER_SEQ.store(value, Ordering::Relaxed)
+}
