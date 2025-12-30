@@ -42,11 +42,16 @@ pub fn listen_client_voice(socket: UdpSocket)
         //CHECK IF ID IS IN CONNECTIONS
         if let Some(mut conn) = CONNECTIONS.get_mut(&id)
         {
-            if conn.value().is_none()
+            //FOUND, CHECK ADDRESS
+            if let Some(conn_addr) = conn.value()
+            {
+                //IGNORE NON-MATCHING ADDRESS
+                if conn_addr != &addr { continue; }
+            } else //NOT FOUND, ADD ADDRESS
             {
                 *conn = Some(addr);
             }
-        }
+        } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
         //REMOVE ID FROM PACKET
         let received = &received[8..];
@@ -54,9 +59,11 @@ pub fn listen_client_voice(socket: UdpSocket)
         //SEND TO ALL
         for connection in CONNECTIONS.iter()
         {
-            if let Some(addr) = connection.value()
+            if let Some(conn_addr) = connection.value()
             {
-                socket.send_to(received, addr).unwrap();
+                if conn_addr == &addr { continue; } //DO NOT SEND BACK TO SENDER (LOOPBACK)
+
+                socket.send_to(received, conn_addr).unwrap();
             }
         }
     }
