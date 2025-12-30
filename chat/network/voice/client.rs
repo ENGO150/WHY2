@@ -184,6 +184,10 @@ pub fn listen_server_voice(id: usize)
         //READ
         network_buffer = voice::receive(&socket).0;
 
+        //VERIFY SERVER SEQ
+        if network_buffer.seq <= options::get_server_seq() { continue; } //INGORE INVALID SEQs
+        options::set_server_seq(network_buffer.seq); //SET SERVER SEQ
+
         //DECODE
         if let Ok(decoded_len) = opus_decoder.decode_float(Some(&network_buffer.voice), &mut decoded_buffer[..], false)
         {
