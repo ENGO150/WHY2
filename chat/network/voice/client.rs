@@ -140,7 +140,7 @@ pub fn listen_server_voice(id: usize)
             //ENCODE (IGNORE ERRORS)
             if let Ok(len) = opus_encoder.encode_float(&frame, &mut encoded_buffer[8..])
             {
-                voice::send(&send_socket, &encoded_buffer[..len]).unwrap();
+                voice::send(&send_socket, &encoded_buffer[..len + 8]).unwrap();
             }
         }
     }, |_| {}, None).unwrap();
