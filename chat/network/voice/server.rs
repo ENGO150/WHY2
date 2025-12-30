@@ -24,10 +24,17 @@ use std::
 
 use dashmap::DashMap;
 
-use crate::chat::network::voice;
+use crate::chat::network::voice::{ self, VoicePacket };
+
+pub struct Connection
+{
+    addr: SocketAddr,  //ADDRESS OF CONNECTION
+    seq: usize,        //SEQUENCE NUMBER
+    server_seq: usize, //SERVER-SIDE SEQUENCE NUMBER
+}
 
 //LISTS
-pub static CONNECTIONS: LazyLock<DashMap<usize, Option<SocketAddr>>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
+pub static CONNECTIONS: LazyLock<DashMap<usize, Option<Connection>>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 pub fn listen_client_voice(socket: UdpSocket)
 {
@@ -37,7 +44,11 @@ pub fn listen_client_voice(socket: UdpSocket)
         let (received, addr) = voice::receive(&socket);
 
         //GET ID
-        let id = usize::from_be_bytes(received[..8].try_into().unwrap());
+        let id = match received.id
+        {
+            Some(id) => id,
+            None => continue //IGNORE INVALID IDS
+        };
 
         //CHECK IF ID IS IN CONNECTIONS
         if let Some(mut conn) = CONNECTIONS.get_mut(&id)
@@ -46,24 +57,31 @@ pub fn listen_client_voice(socket: UdpSocket)
             if let Some(conn_addr) = conn.value()
             {
                 //IGNORE NON-MATCHING ADDRESS
-                if conn_addr != &addr { continue; }
+                if conn_addr.addr != addr { continue; }
             } else //NOT FOUND, ADD ADDRESS
             {
-                *conn = Some(addr);
+                *conn = Some(Connection
+                {
+                    addr: addr,
+                    seq: 0,
+                    server_seq: 0,
+                });
             }
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
-
-        //REMOVE ID FROM PACKET
-        let received = &received[8..];
 
         //SEND TO ALL
         for connection in CONNECTIONS.iter()
         {
             if let Some(conn_addr) = connection.value()
             {
-                if conn_addr == &addr { continue; } //DO NOT SEND BACK TO SENDER (LOOPBACK)
+                if conn_addr.addr == addr { continue; } //DO NOT SEND BACK TO SENDER (LOOPBACK)
 
-                voice::send(&socket, received, conn_addr).unwrap();
+                voice::send(&socket, VoicePacket
+                {
+                    voice: received.voice.clone(),
+                    id: None,
+                    seq: 0,
+                }, &conn_addr.addr).unwrap();
             }
         }
     }

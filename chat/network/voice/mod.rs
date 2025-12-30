@@ -31,29 +31,41 @@ use std::
     net::{ UdpSocket, SocketAddr },
 };
 
+use wincode::{ SchemaRead, SchemaWrite };
+
+#[derive(SchemaRead, SchemaWrite)]
+pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
+{
+    pub voice: Vec<u8>,    //MESSAGE
+    pub id: Option<usize>, //ID OF USER
+    pub seq: usize,        //SEQUENCE NUMBER
+}
+
 pub fn send //SEND DATA TO UDP
 (
     socket: &UdpSocket,
-    data: &[u8],
+    packet: VoicePacket,
     #[cfg(feature = "server")] addr: &SocketAddr
 ) -> Result<usize, Error>
 {
+    //SERIALIZE PACKET
+    let packet_bytes = wincode::serialize(&packet).expect("Encoding packet failed");
 
     #[cfg(feature = "server")]
     {
-        socket.send_to(data, addr)
+        socket.send_to(&packet_bytes, addr)
     }
 
     #[cfg(not(feature = "server"))]
     {
-        socket.send(data)
+        socket.send(&packet_bytes)
     }
 }
 
-pub fn receive(socket: &UdpSocket) -> (Vec<u8>, SocketAddr) //RECEIVE UDP PACKET & DECODE
+pub fn receive(socket: &UdpSocket) -> (VoicePacket, SocketAddr) //RECEIVE UDP PACKET & DECODE
 {
     let mut buffer = [0u8; 2048];
-    loop
+    loop //BLOCK READING UNTIL PACKET ARRIVES
     {
         let (len, addr) = match socket.recv_from(&mut buffer)
         {
@@ -61,6 +73,11 @@ pub fn receive(socket: &UdpSocket) -> (Vec<u8>, SocketAddr) //RECEIVE UDP PACKET
             Err(_) => continue
         };
 
-        return (buffer[..len].to_vec(), addr);
+        //PACKET ARRIVED, DESERIALIZE
+        match wincode::deserialize::<VoicePacket>(&buffer[..len])
+        {
+            Ok(packet) => return (packet, addr),
+            Err(_) => continue
+        }
     }
 }
