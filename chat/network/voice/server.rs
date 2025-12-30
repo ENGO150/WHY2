@@ -63,7 +63,7 @@ pub fn listen_client_voice(socket: UdpSocket)
             {
                 if conn_addr == &addr { continue; } //DO NOT SEND BACK TO SENDER (LOOPBACK)
 
-                socket.send_to(received, conn_addr).unwrap();
+                voice::send(&socket, received, conn_addr).unwrap();
             }
         }
     }

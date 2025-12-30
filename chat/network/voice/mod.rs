@@ -27,13 +27,27 @@ pub mod server;
 
 use std::
 {
-    io::Result,
+    io::Error,
     net::{ UdpSocket, SocketAddr },
 };
 
-pub fn send(socket: &UdpSocket, data: &[u8]) -> Result<usize> //SEND DATA TO UDP
+pub fn send //SEND DATA TO UDP
+(
+    socket: &UdpSocket,
+    data: &[u8],
+    #[cfg(feature = "server")] addr: &SocketAddr
+) -> Result<usize, Error>
 {
-    socket.send(data)
+
+    #[cfg(feature = "server")]
+    {
+        socket.send_to(data, addr)
+    }
+
+    #[cfg(not(feature = "server"))]
+    {
+        socket.send(data)
+    }
 }
 
 pub fn receive(socket: &UdpSocket) -> (Vec<u8>, SocketAddr) //RECEIVE UDP PACKET & DECODE
