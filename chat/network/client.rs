@@ -20,6 +20,7 @@ use std::
 {
     env,
     process,
+    sync::Arc,
     net::TcpStream,
     io::{ self, Write },
 };
@@ -360,7 +361,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 MessageCode::Voice =>
                 {
                     let keys = keys.clone();
-                    thread::spawn(move || voice_client::listen_server_voice(id, keys));
+                    thread::spawn(move || voice_client::listen_server_voice(id, Arc::new(keys)));
                 },
 
                 //LIST OF ONLINE USERS

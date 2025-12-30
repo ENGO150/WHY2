@@ -74,6 +74,13 @@ impl Connection
 }
 
 //FUNCTIONS
+pub fn find_key(id: &usize) -> Option<SharedKeys>
+{
+    server::CONNECTIONS.iter()
+        .find(|entry| entry.value().id() == Some(id))
+        .map(|c| c.keys().unwrap().clone())
+}
+
 pub fn listen_client_voice(socket: UdpSocket)
 {
     //LOOP RECEIVING
@@ -119,13 +126,12 @@ pub fn listen_client_voice(socket: UdpSocket)
             if let Some(conn) = connection.value()
             {
                 //DO NOT SEND BACK TO SENDER (LOOPBACK)
-                if conn.addr != addr //|| true
+                if conn.addr != addr
                 {
                     //FIND CONNECTION KEYS
-                    if let Some(text_conn) = server::CONNECTIONS.iter()
-                        .find(|entry| entry.value().id() == Some(&conn.id))
+                    if let Some(keys) = find_key(&conn.id)
                     {
-                        addresses.push((conn.addr, text_conn.keys().unwrap().clone()));
+                        addresses.push((conn.addr, keys));
                     }
                 }
             }

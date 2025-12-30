@@ -33,7 +33,11 @@ use std::
 
 use wincode::{ SchemaRead, SchemaWrite };
 
-use crate::chat::options::SharedKeys;
+use crate::chat::
+{
+    crypto,
+    options::SharedKeys,
+};
 
 #[derive(SchemaRead, SchemaWrite)]
 pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
@@ -85,18 +89,38 @@ pub fn send //SEND DATA TO UDP
     //SERIALIZE PACKET
     let packet_bytes = wincode::serialize(&packet).expect("Encoding packet failed");
 
+    //ENCRYPT PACKET
+    #[cfg(feature = "server")]
+    let encrypted_bytes: Vec<u8>;
+
+    #[cfg(not(feature = "server"))]
+    let mut encrypted_bytes: Vec<u8>;
+
+    encrypted_bytes = crypto::encrypt_packet(packet_bytes, keys);
+
+    //PREPEND ID TO PACKET
+    #[cfg(feature = "client")]
+    {
+        let id_be_bytes = packet.id.unwrap().to_be_bytes();
+        encrypted_bytes.splice(0..0, id_be_bytes);
+    }
+
     #[cfg(feature = "server")]
     {
-        socket.send_to(&packet_bytes, addr)
+        socket.send_to(&encrypted_bytes, addr)
     }
 
     #[cfg(not(feature = "server"))]
     {
-        socket.send(&packet_bytes)
+        socket.send(&encrypted_bytes)
     }
 }
 
-pub fn receive(socket: &UdpSocket) -> (VoicePacket, SocketAddr) //RECEIVE UDP PACKET & DECODE
+pub fn receive
+(
+    socket: &UdpSocket,
+    #[cfg(feature = "client")] keys: &SharedKeys
+) -> (VoicePacket, SocketAddr) //RECEIVE UDP PACKET & DECODE
 {
     let mut buffer = [0u8; 2048];
     loop //BLOCK READING UNTIL PACKET ARRIVES
@@ -107,8 +131,43 @@ pub fn receive(socket: &UdpSocket) -> (VoicePacket, SocketAddr) //RECEIVE UDP PA
             Err(_) => continue
         };
 
+        let buffer_offset: usize;
+
+        //GET ID ON SERVER
+        let keys =
+        {
+            #[cfg(feature = "server")]
+            {
+                if len <= 8 { continue; } //INVALID PACKET
+
+                let id = match buffer[..8].try_into()
+                {
+                    Ok(id_be_bytes) => usize::from_be_bytes(id_be_bytes),
+                    Err(_) => continue
+                };
+
+                //REMOVE ID FROM BUFFER
+                buffer_offset = 8;
+
+                match server::find_key(&id)
+                {
+                    Some(k) => k,
+                    None => continue
+                }
+            }
+
+            #[cfg(not(feature = "server"))]
+            {
+                buffer_offset = 0;
+                keys.clone()
+            }
+        };
+
+        //DECRYPT
+        let decrypted_bytes = crypto::decrypt_packet(buffer[buffer_offset..len].to_vec(), &keys).unwrap();
+
         //PACKET ARRIVED, DESERIALIZE
-        match wincode::deserialize::<VoicePacket>(&buffer[..len])
+        match wincode::deserialize::<VoicePacket>(&decrypted_bytes)
         {
             Ok(packet) => return (packet, addr),
             Err(_) => continue

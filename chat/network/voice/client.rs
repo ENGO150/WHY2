@@ -85,7 +85,7 @@ fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
 }
 
 //PUBLIC
-pub fn listen_server_voice(id: usize, keys: SharedKeys)
+pub fn listen_server_voice(id: usize, keys: Arc<SharedKeys>)
 {
     //CONNECT
     let socket = Arc::new(UdpSocket::bind("0.0.0.0:0").expect("Binding UDP failed"));
@@ -133,6 +133,7 @@ pub fn listen_server_voice(id: usize, keys: SharedKeys)
 
     //CONFIGURE INPUT STREAM
     let send_socket = socket.clone();
+    let send_keys = keys.clone();
     let input_stream = input_device.build_input_stream(&stream_config, move |data: &[f32], _: &_|
     {
         //ACCUMULATE
@@ -152,7 +153,7 @@ pub fn listen_server_voice(id: usize, keys: SharedKeys)
                     id: Some(id),
 
                     ..Default::default()
-                }, &keys).unwrap();
+                }, &send_keys).unwrap();
             }
         }
     }, |_| {}, None).unwrap();
@@ -187,7 +188,7 @@ pub fn listen_server_voice(id: usize, keys: SharedKeys)
     loop
     {
         //READ
-        network_buffer = voice::receive(&socket).0;
+        network_buffer = voice::receive(&socket, &keys).0;
 
         //VERIFY SERVER SEQ
         if network_buffer.seq <= options::get_server_seq() { continue; } //INGORE INVALID SEQs
