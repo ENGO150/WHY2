@@ -164,7 +164,11 @@ pub fn receive
         };
 
         //DECRYPT
-        let decrypted_bytes = crypto::decrypt_packet(buffer[buffer_offset..len].to_vec(), &keys).unwrap();
+        let decrypted_bytes = match crypto::decrypt_packet(buffer[buffer_offset..len].to_vec(), &keys)
+        {
+            Some(d) => d,
+            None => continue
+        };
 
         //PACKET ARRIVED, DESERIALIZE
         match wincode::deserialize::<VoicePacket>(&decrypted_bytes)
