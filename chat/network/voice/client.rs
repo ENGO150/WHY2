@@ -82,6 +82,10 @@ fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
 //PUBLIC
 pub fn listen_server_voice(id: usize)
 {
+    //RESET SEQs
+    options::set_seq(0);
+    options::set_server_seq(0);
+
     //CONNECT
     let socket = Arc::new(UdpSocket::bind("0.0.0.0:0").expect("Binding UDP failed"));
     socket.connect(chat_options::get_server_address()).expect("Connecting to server UDP failed");
