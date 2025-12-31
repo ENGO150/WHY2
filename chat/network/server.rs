@@ -404,12 +404,17 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         stream.shutdown(Shutdown::Both).ok();
     }
 
-    //SEND LEAVE MESSAGE IF AUTHENTICATED
-    if let Some(username) = connection.username()
+    //AUTHENTICATED ACTIONS
+    if connection.is_authenticated()
     {
+        //DISCONNECT FROM VOICE CHAT
+        #[cfg(feature = "voice")]
+        voice_server::CONNECTIONS.remove(connection.id().unwrap());
+
+        //SEND LEAVE MESSAGE
         send_to_all(MessagePacket
         {
-            text: Some(username.to_string()),
+            text: Some(connection.username().unwrap().to_string()),
             username: Some(config::server_config::<String>("server_username")),
             code: Some(MessageCode::Leave),
 
@@ -819,11 +824,18 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
                     #[cfg(feature = "voice")]
                     {
-                        //ACCEPT VOICE
+                        //ACKNOWLEDGE
                         send_code(stream, None, MessageCode::Voice, Some(&keys));
 
-                        //ADD CLIENT ID TO VOICE CONNECTIONS MAP
-                        voice_server::CONNECTIONS.insert(id, None);
+                        if !voice_server::CONNECTIONS.contains_key(&id) //IS NOT USING VOICE
+                        {
+                            //ADD CLIENT ID TO VOICE CONNECTIONS MAP
+                            voice_server::CONNECTIONS.insert(id, None);
+                        } else //IS USING VOICE
+                        {
+                            //REMOVE FROM VOICE
+                            voice_server::CONNECTIONS.remove(&id);
+                        }
                     }
                 },
 

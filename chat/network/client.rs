@@ -50,7 +50,11 @@ use crate::chat::
 use std::thread;
 
 #[cfg(feature = "voice")]
-use crate::chat::network::voice::client as voice_client;
+use crate::chat::network::voice::
+{
+    client as voice_client,
+    options as voice_options,
+};
 
 //CONSTS
 const GRID_W: usize = options::GRID_DIMENSIONS.0;
@@ -359,7 +363,19 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 #[cfg(feature = "voice")]
                 MessageCode::Voice =>
                 {
-                    thread::spawn(move || voice_client::listen_server_voice(id));
+                    //TOGGLE VOICE
+                    let status = if voice_options::swap_use_voice()
+                    {
+                        thread::spawn(move || voice_client::listen_server_voice(id));
+                        "en"
+                    } else
+                    {
+                        "dis"
+                    };
+
+                    //PRINT STATUS
+                    misc::clear_lines(2);
+                    println!("Voice {}abled.\n", status);
                 },
 
                 //LIST OF ONLINE USERS

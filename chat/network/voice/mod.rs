@@ -119,11 +119,16 @@ pub fn send //SEND DATA TO UDP
     }
 }
 
-pub fn receive(socket: &UdpSocket) -> (VoicePacket, SocketAddr) //RECEIVE UDP PACKET & DECODE
+
+pub fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //RECEIVE UDP PACKET & DECODE
 {
     let mut buffer = [0u8; 2048];
     loop //BLOCK READING UNTIL PACKET ARRIVES
     {
+        //CHECK FOR VOICE DISABLE
+        #[cfg(feature = "client")]
+        if !options::get_use_voice() { break None; }
+
         let (len, addr) = match socket.recv_from(&mut buffer)
         {
             Ok(result) => result,
@@ -170,9 +175,9 @@ pub fn receive(socket: &UdpSocket) -> (VoicePacket, SocketAddr) //RECEIVE UDP PA
         };
 
         //PACKET ARRIVED, DESERIALIZE
-        match wincode::deserialize::<VoicePacket>(&decrypted_bytes)
+        return match wincode::deserialize::<VoicePacket>(&decrypted_bytes)
         {
-            Ok(packet) => return (packet, addr),
+            Ok(packet) => Some((packet, addr)),
             Err(_) => continue
         }
     }

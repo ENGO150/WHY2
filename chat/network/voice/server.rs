@@ -86,7 +86,7 @@ pub fn listen_client_voice(socket: UdpSocket)
     //LOOP RECEIVING
     loop
     {
-        let (received, addr) = voice::receive(&socket);
+        let (received, addr) = voice::receive(&socket).unwrap();
 
         //GET ID
         let id = match received.id
