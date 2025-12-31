@@ -108,9 +108,13 @@ pub fn listen_server_voice(id: usize)
     drop(stderr_gag);
 
     //CONFIGURE CPAL INPUT
-    let mut stream_config: StreamConfig = input_device.default_input_config().unwrap().into();
-    stream_config.sample_rate = options::SAMPLE_RATE;
-    stream_config.channels = 1;
+    let mut input_config: StreamConfig = input_device.default_input_config().unwrap().into();
+    input_config.sample_rate = options::SAMPLE_RATE;
+    input_config.channels = 1;
+
+    //CONFIGURE CPAL OUTPUT
+    let mut output_config: StreamConfig = output_device.default_output_config().unwrap().into();
+    output_config.sample_rate = options::SAMPLE_RATE;
 
     //PREPARE OPUS ENCODER
     let opus_encoder = Encoder::new
@@ -132,7 +136,7 @@ pub fn listen_server_voice(id: usize)
 
     //CONFIGURE INPUT STREAM
     let send_socket = socket.clone();
-    let input_stream = input_device.build_input_stream(&stream_config, move |data: &[f32], _: &_|
+    let input_stream = input_device.build_input_stream(&input_config, move |data: &[f32], _: &_|
     {
         //ACCUMULATE
         input_accum.extend_from_slice(data);
@@ -145,6 +149,7 @@ pub fn listen_server_voice(id: usize)
             //ENCODE (IGNORE ERRORS)
             if let Ok(len) = opus_encoder.encode_float(&frame, &mut encoded_buffer)
             {
+                //TRANSMIT
                 voice::send(&send_socket, VoicePacket
                 {
                     voice: encoded_buffer[..len].to_vec(),
@@ -161,16 +166,19 @@ pub fn listen_server_voice(id: usize)
     let (mut producer, mut consumer) = rb.split();
 
     //CONFIGURE OUTPUT STREAM
-    let output_stream = output_device.build_output_stream(&stream_config, move |data: &mut [f32], _: &_|
+    let output_channels = output_config.channels as usize;
+    let output_stream = output_device.build_output_stream(&output_config, move |data: &mut [f32], _: &_|
     {
-        let read_count = consumer.pop_slice(data);
+        let frames_to_write = data.len() / output_channels;
 
-        //FILL WITH SILENCE ON UNDERRUN
-        if read_count < data.len()
+        for i in 0..frames_to_write
         {
-            for i in read_count..data.len()
+            let sample = consumer.try_pop().unwrap_or(0.0); //SILENCE ON UNDERRUN
+
+            //WRITE SAMPLE TO ALL CHANNELS
+            for channel in 0..output_channels
             {
-                data[i] = 0.0;
+                data[i * output_channels + channel] = sample;
             }
         }
     }, |_| {}, None).unwrap();
