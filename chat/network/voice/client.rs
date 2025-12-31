@@ -39,6 +39,7 @@ use audiopus::
     Channels,
     SampleRate,
     Application,
+    TryFrom,
     coder::{ Encoder, Decoder },
 };
 
@@ -126,14 +127,14 @@ pub fn listen_server_voice(id: usize)
     //PREPARE OPUS ENCODER
     let opus_encoder = Encoder::new
     (
-        SampleRate::Hz48000,
+        <SampleRate as TryFrom<i32>>::try_from(options::SAMPLE_RATE as i32).unwrap(),
         Channels::Mono,
         Application::Voip
     ).unwrap();
 
     let mut opus_decoder = Decoder::new
     (
-        SampleRate::Hz48000,
+        <SampleRate as TryFrom<i32>>::try_from(options::SAMPLE_RATE as i32).unwrap(),
         Channels::Mono,
     ).unwrap();
 
