@@ -64,8 +64,8 @@ build-why2-chat-linux:
   only:
     - development
   script:
-    - cargo build --features client --release
-    - cargo build --bin why2-server --features server --release
+    - cargo build --features client,voice --release
+    - cargo build --bin why2-server --features server,voice --release
   artifacts:
     name: "why2-chat-linux"
     paths:
