@@ -113,8 +113,12 @@ pub fn listen_server_voice(id: usize)
     input_config.channels = 1;
 
     //CONFIGURE CPAL OUTPUT
-    let mut output_config: StreamConfig = output_device.default_output_config().unwrap().into();
-    output_config.sample_rate = options::SAMPLE_RATE;
+    let output_config: StreamConfig = output_device.supported_output_configs().unwrap()
+        .filter(|c| c.min_sample_rate() <= options::SAMPLE_RATE && c.max_sample_rate() >= options::SAMPLE_RATE)
+        .next()
+        .map(|c| c.with_sample_rate(options::SAMPLE_RATE))
+            .unwrap_or(output_device.default_output_config().unwrap())
+        .into();
 
     //PREPARE OPUS ENCODER
     let opus_encoder = Encoder::new
@@ -165,6 +169,16 @@ pub fn listen_server_voice(id: usize)
     let rb = HeapRb::<f32>::new(options::FRAME_SIZE * 20); //~400ms BUFFER
     let (mut producer, mut consumer) = rb.split();
 
+    //RESAMPLING
+    let source_rate = options::SAMPLE_RATE as f32;
+    let target_rate = output_config.sample_rate as f32;
+    let resample_step = source_rate / target_rate;
+
+    //INTERPOLATION
+    let mut index_frac = 0.0;
+    let mut current_sample = 0.0;
+    let mut next_sample = consumer.try_pop().unwrap_or(0.0);
+
     //CONFIGURE OUTPUT STREAM
     let output_channels = output_config.channels as usize;
     let output_stream = output_device.build_output_stream(&output_config, move |data: &mut [f32], _: &_|
@@ -173,12 +187,21 @@ pub fn listen_server_voice(id: usize)
 
         for i in 0..frames_to_write
         {
-            let sample = consumer.try_pop().unwrap_or(0.0); //SILENCE ON UNDERRUN
+            while index_frac >= 1.0
+            {
+                current_sample = next_sample;
+                next_sample = consumer.try_pop().unwrap_or(0.0); //SILENCE ON UNDERRUN
+                index_frac -= 1.;
+            }
+
+            //LINEAR INTERPOLATION
+            let interpolated_sample = current_sample + (next_sample - current_sample) * index_frac;
+            index_frac += resample_step;
 
             //WRITE SAMPLE TO ALL CHANNELS
             for channel in 0..output_channels
             {
-                data[i * output_channels + channel] = sample;
+                data[i * output_channels + channel] = interpolated_sample;
             }
         }
     }, |_| {}, None).unwrap();
