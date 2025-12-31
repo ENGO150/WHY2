@@ -64,6 +64,7 @@ build-why2-chat-linux:
   only:
     - development
   script:
+    - apt-get update && apt-get install -y pkg-config libasound2-dev libopus-dev
     - cargo build --features client,voice --release
     - cargo build --bin why2-server --features server,voice --release
   artifacts:
