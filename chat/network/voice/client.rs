@@ -241,9 +241,20 @@ pub fn listen_server_voice(id: usize)
             {
                 if chunk.len() == options::SAMPLE_RATE as usize / 100
                 {
+                    //SCALE UP
+                    for sample in chunk.iter_mut()
+                    {
+                        *sample *= 32767.;
+                    }
+
                     //PROCESS NOISE
                     denoiser.process_frame(&mut denoise_buffer, chunk);
-                    chunk.copy_from_slice(&denoise_buffer); //COPY CLEANED SOUND BACK TO CHUNK
+
+                    //SCALE DOWN & COPY
+                    for (i, sample) in denoise_buffer.iter().enumerate()
+                    {
+                        chunk[i] = sample / 32767.;
+                    }
                 }
             }
 
