@@ -19,8 +19,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     net::UdpSocket,
-    collections::HashMap,
     sync::{ Arc, Mutex },
+    collections::{ HashMap, VecDeque },
 };
 
 use cpal::
@@ -110,6 +110,22 @@ fn configure_device(supported_configs: impl Iterator<Item = SupportedStreamConfi
         .into()
 }
 
+fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], id: usize, socket: &UdpSocket)
+{
+    //ENCODE (IGNORE ERRORS)
+    if let Ok(len) = encoder.encode_float(&frame, buffer)
+    {
+        //TRANSMIT
+        voice::send(socket, VoicePacket
+        {
+            voice: buffer[..len].to_vec(),
+            id: Some(id),
+
+            ..Default::default()
+        }, &chat_options::get_keys().unwrap()).unwrap();
+    }
+}
+
 //PUBLIC
 pub fn listen_server_voice(id: usize)
 {
@@ -165,6 +181,11 @@ pub fn listen_server_voice(id: usize)
     let input_resample_step = input_source_rate / input_target_rate;
     let mut input_resample_pos = 0.;
 
+    //VAD
+    let gate_open = Arc::new(Mutex::new(false)); //NOISE GATE
+    let preroll_buffer = Arc::new(Mutex::new(VecDeque::<Vec<f32>>::with_capacity(3))); //PRE-ROLL BUFFER
+    let hold_frames_remaining = Arc::new(Mutex::new(0usize)); //HOLD TIME
+
     //CONFIGURE INPUT STREAM
     let send_socket = socket.clone();
     let input_stream = input_device.build_input_stream(&input_config, move |data: &[f32], _: &_|
@@ -208,17 +229,53 @@ pub fn listen_server_voice(id: usize)
         {
             let frame: Vec<f32> = input_accum.drain(0..options::FRAME_SIZE).collect();
 
-            //ENCODE (IGNORE ERRORS)
-            if let Ok(len) = opus_encoder.encode_float(&frame, &mut encoded_buffer)
-            {
-                //TRANSMIT
-                voice::send(&send_socket, VoicePacket
-                {
-                    voice: encoded_buffer[..len].to_vec(),
-                    id: Some(id),
+            //VAD
+            let rms = (frame.iter().map(|&x| x * x).sum::<f32>() / frame.len() as f32 + 1e-10).sqrt(); //RMS CALCULATION (+ SMALL BIAS)
+            let mut gate = gate_open.lock().unwrap();
+            let mut preroll = preroll_buffer.lock().unwrap();
+            let mut hold_frames = hold_frames_remaining.lock().unwrap();
 
-                    ..Default::default()
-                }, &chat_options::get_keys().unwrap()).unwrap();
+            //HYSTERESIS
+            if !*gate && rms > options::TRESHOLD_OPEN
+            {
+                *gate = true; //SPEAKING
+
+                //SEND STORED FRAMES
+                for old_frame in preroll.iter()
+                {
+                    transmit_audio(&opus_encoder, old_frame, &mut encoded_buffer, id, &send_socket);
+                }
+
+                preroll.clear();
+                *hold_frames = options::HOLD_FRAMES;
+            } else if *gate && rms < options::TRESHOLD_CLOSE
+            {
+                if *hold_frames > 0 //SILENT FRAME, DECREMENT
+                {
+                    *hold_frames -= 1;
+                } else //HOLD TIME EXPIRED, CLOSE GATE
+                {
+                    *gate = false;
+                }
+            } else if *gate && rms >= options::TRESHOLD_CLOSE //SPEAKING CONTINUES, RESET HOLD TIMER
+            {
+                *hold_frames = options::HOLD_FRAMES;
+            }
+
+            //STORE TO PRE-ROLL BUFFER (MAX 3 FRAMES)
+            if !*gate
+            {
+                preroll.push_back(frame.clone());
+                if preroll.len() > 3
+                {
+                    preroll.pop_front();
+                }
+            }
+
+            //TRANSMIT ONLY IF GATE IS OPEN
+            if *gate
+            {
+                transmit_audio(&opus_encoder, &frame, &mut encoded_buffer, id, &send_socket);
             }
         }
     }, |_| {}, None).unwrap();
