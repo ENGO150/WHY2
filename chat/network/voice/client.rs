@@ -59,6 +59,8 @@ use ringbuf::
     },
 };
 
+use nnnoiseless::DenoiseState;
+
 use gag::Gag;
 
 use crate::chat::
@@ -187,6 +189,10 @@ pub fn listen_server_voice(id: usize)
     let preroll_buffer = Arc::new(Mutex::new(VecDeque::<Vec<f32>>::with_capacity(3))); //PRE-ROLL BUFFER
     let hold_frames_remaining = Arc::new(Mutex::new(0usize)); //HOLD TIME
 
+    //NOISE REDUCTION
+    let mut denoiser = DenoiseState::new();
+    let mut denoise_buffer = [0.0f32; 480];
+
     //CONFIGURE INPUT STREAM
     let send_socket = socket.clone();
     let input_stream = input_device.build_input_stream(&input_config, move |data: &[f32], _: &_|
@@ -228,7 +234,18 @@ pub fn listen_server_voice(id: usize)
         //PROCESS
         while input_accum.len() >= options::FRAME_SIZE
         {
-            let frame: Vec<f32> = input_accum.drain(0..options::FRAME_SIZE).collect();
+            let mut frame: Vec<f32> = input_accum.drain(0..options::FRAME_SIZE).collect();
+
+            //NOISE REDUCTION
+            for chunk in frame.chunks_mut(480)
+            {
+                if chunk.len() == 480
+                {
+                    //PROCESS NOISE
+                    denoiser.process_frame(&mut denoise_buffer, chunk);
+                    chunk.copy_from_slice(&denoise_buffer); //COPY CLEANED SOUND BACK TO CHUNK
+                }
+            }
 
             //VAD
             let rms = (frame.iter().map(|&x| x * x).sum::<f32>() / frame.len() as f32 + 1e-10).sqrt(); //RMS CALCULATION (+ SMALL BIAS)
