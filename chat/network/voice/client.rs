@@ -18,8 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    sync::Arc,
     net::UdpSocket,
+    collections::HashMap,
+    sync::{ Arc, Mutex },
 };
 
 use cpal::
@@ -46,6 +47,8 @@ use audiopus::
 use ringbuf::
 {
     HeapRb,
+    HeapCons,
+    HeapProd,
     traits::
     {
         Split,
@@ -66,6 +69,21 @@ use crate::chat::
         VoicePacket,
     },
 };
+
+//STRUCTS
+struct RemoteStream
+{
+    consumer: HeapCons<f32>, //RINGBUFFER READER
+    resample_pos: f32,       //POSITION IN BETWEEN SAMPLES
+    current_sample: f32,     //CURRENT SAMPLE FOR INTERPOLATION
+    next_sample: f32,        //NEXT SAMPLE FOR INTERPOLATION
+}
+
+struct PeerData
+{
+    decoder: Decoder,        //DECODER
+    producer: HeapProd<f32>, //RINGBUFFER WRITER
+}
 
 //PRIVATE
 fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
@@ -130,12 +148,6 @@ pub fn listen_server_voice(id: usize)
         <SampleRate as TryFrom<i32>>::try_from(options::SAMPLE_RATE as i32).unwrap(),
         Channels::Mono,
         Application::Voip
-    ).unwrap();
-
-    let mut opus_decoder = Decoder::new
-    (
-        <SampleRate as TryFrom<i32>>::try_from(options::SAMPLE_RATE as i32).unwrap(),
-        Channels::Mono,
     ).unwrap();
 
     //INPUT BUFFERS
@@ -209,9 +221,10 @@ pub fn listen_server_voice(id: usize)
         }
     }, |_| {}, None).unwrap();
 
-    //JITTER BUFFER
-    let rb = HeapRb::<f32>::new(options::FRAME_SIZE * 20); //~400ms BUFFER
-    let (mut producer, mut consumer) = rb.split();
+    let consumers = Arc::new(Mutex::new(HashMap::<usize, RemoteStream>::new()));
+    let consumers_cloned = consumers.clone();
+
+    let mut peers: HashMap<usize, PeerData> = HashMap::new();
 
     //OUTPUT RESAMPLING
     let output_channels = output_config.channels as usize;
@@ -220,33 +233,45 @@ pub fn listen_server_voice(id: usize)
 
     //OUTPUT INTERPOLATION
     let output_resample_step = output_source_rate / output_target_rate;
-    let mut output_resample_pos = 0.;
-    let mut output_current_sample = 0.;
-    let mut output_next_sample = consumer.try_pop().unwrap_or(0.);
 
     //CONFIGURE OUTPUT STREAM
     let output_stream = output_device.build_output_stream(&output_config, move |data: &mut [f32], _: &_|
     {
+        //CLEAR OUTPUT BUFFER
+        data.fill(0.);
+
         let frames_to_write = data.len() / output_channels;
+        let mut consumers_guard = consumers_cloned.lock().unwrap();
 
         for i in 0..frames_to_write
         {
-            //RESAMPLE LOOP
-            while output_resample_pos >= 1.
+            let mut mixed_sample = 0.;
+
+            for stream in consumers_guard.values_mut()
             {
-                output_current_sample = output_next_sample;
-                output_next_sample = consumer.try_pop().unwrap_or(0.); //SILENCE ON UNDERRUN
-                output_resample_pos -= 1.;
+                //RESAMPLE LOOP
+                while stream.resample_pos >= 1.
+                {
+                    stream.current_sample = stream.next_sample;
+                    stream.next_sample = stream.consumer.try_pop().unwrap_or(0.); //SILENCE ON UNDERRUN
+                    stream.resample_pos -= 1.;
+                }
+
+                //LINEAR INTERPOLATION
+                let interpolated = stream.current_sample + (stream.next_sample - stream.current_sample) * stream.resample_pos;
+                stream.resample_pos += output_resample_step; //MOVE RESAMPLER POSITION FOR THIS CLIENT
+
+                //MIX
+                mixed_sample += interpolated;
             }
 
-            //LINEAR INTERPOLATION
-            let interpolated_sample = output_current_sample + (output_next_sample - output_current_sample) * output_resample_pos;
-            output_resample_pos += output_resample_step;
+            //CLIPPING PROTECTION
+            mixed_sample = mixed_sample.clamp(-1., 1.);
 
             //WRITE SAMPLE TO ALL CHANNELS
             for channel in 0..output_channels
             {
-                data[i * output_channels + channel] = interpolated_sample;
+                data[i * output_channels + channel] = mixed_sample;
             }
         }
     }, |_| {}, None).unwrap();
@@ -256,15 +281,14 @@ pub fn listen_server_voice(id: usize)
     output_stream.play().unwrap(); //OUTPUT
 
     //OUTPUT BUFFERS
-    let mut network_buffer: VoicePacket;
     let mut decoded_buffer = [0.0f32; options::FRAME_SIZE];
 
     loop
     {
         //READ
-        network_buffer = match voice::receive(&socket)
+        let (network_buffer, _) = match voice::receive(&socket)
         {
-            Some(r) => r.0,
+            Some(r) => r,
             None => return
         };
 
@@ -272,11 +296,54 @@ pub fn listen_server_voice(id: usize)
         if network_buffer.seq <= options::get_server_seq() { continue; } //INGORE INVALID SEQs
         options::set_server_seq(network_buffer.seq); //SET SERVER SEQ
 
-        //DECODE
-        if let Ok(decoded_len) = opus_decoder.decode_float(Some(&network_buffer.voice), &mut decoded_buffer[..], false)
+        //GET ID OF SENDER
+        let sender_id = match network_buffer.id
         {
-            //PUSH TO RINGBUFFER
-            producer.push_slice(&decoded_buffer[..decoded_len]);
+            Some(id) => id,
+            None => continue
+        };
+
+        //CREATE NEW CLIENT CONTEXT ON UNKNOWN CLIENT
+        if !peers.contains_key(&sender_id)
+        {
+            //OPUS DECODER
+            let decoder = Decoder::new
+            (
+                <SampleRate as TryFrom<i32>>::try_from(options::SAMPLE_RATE as i32).unwrap(),
+                Channels::Mono,
+            ).unwrap();
+
+            //JITTER BUFFER
+            let rb = HeapRb::<f32>::new(options::FRAME_SIZE * 20);
+            let (producer, mut consumer) = rb.split();
+
+            let first_sample = consumer.try_pop().unwrap_or(0.0);
+
+            //INSERT TO LOCAL MAP
+            peers.insert(sender_id, PeerData
+            {
+                decoder: decoder,
+                producer: producer,
+            });
+
+            //INSERT TO SHARED AUDIO THREAD MAP
+            consumers.lock().unwrap().insert(sender_id, RemoteStream
+            {
+                consumer: consumer,
+                resample_pos: 0.,
+                current_sample: 0.,
+                next_sample: first_sample,
+            });
+        }
+
+        if let Some(peer) = peers.get_mut(&sender_id)
+        {
+            //DECODE
+            if let Ok(decoded_len) = peer.decoder.decode_float(Some(&network_buffer.voice), &mut decoded_buffer[..], false)
+            {
+                //PUSH TO RINGBUFFER
+                peer.producer.push_slice(&decoded_buffer[..decoded_len]);
+            }
         }
     }
 }
