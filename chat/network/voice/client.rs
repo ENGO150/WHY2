@@ -27,6 +27,8 @@ use cpal::
 {
     Device,
     StreamConfig,
+    SupportedStreamConfig,
+    SupportedStreamConfigRange,
     traits::
     {
         DeviceTrait,
@@ -98,6 +100,16 @@ fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
     })
 }
 
+fn configure_device(supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig) -> StreamConfig
+{
+    supported_configs
+        .filter(|c| c.min_sample_rate() <= options::SAMPLE_RATE && c.max_sample_rate() >= options::SAMPLE_RATE)
+        .next()
+        .map(|c| c.with_sample_rate(options::SAMPLE_RATE))
+        .unwrap_or(default_config)
+        .into()
+}
+
 //PUBLIC
 pub fn listen_server_voice(id: usize)
 {
@@ -127,20 +139,10 @@ pub fn listen_server_voice(id: usize)
     drop(stderr_gag);
 
     //CONFIGURE CPAL INPUT
-    let input_config: StreamConfig = input_device.supported_input_configs().unwrap()
-        .filter(|c| c.min_sample_rate() <= options::SAMPLE_RATE && c.max_sample_rate() >= options::SAMPLE_RATE)
-        .next()
-        .map(|c| c.with_sample_rate(options::SAMPLE_RATE))
-            .unwrap_or(input_device.default_input_config().unwrap())
-        .into();
+    let input_config = configure_device(input_device.supported_input_configs().unwrap(), input_device.default_input_config().unwrap());
 
     //CONFIGURE CPAL OUTPUT
-    let output_config: StreamConfig = output_device.supported_output_configs().unwrap()
-        .filter(|c| c.min_sample_rate() <= options::SAMPLE_RATE && c.max_sample_rate() >= options::SAMPLE_RATE)
-        .next()
-        .map(|c| c.with_sample_rate(options::SAMPLE_RATE))
-            .unwrap_or(output_device.default_output_config().unwrap())
-        .into();
+    let output_config = configure_device(output_device.supported_output_configs().unwrap(), output_device.default_output_config().unwrap());
 
     //PREPARE OPUS ENCODER
     let opus_encoder = Encoder::new
