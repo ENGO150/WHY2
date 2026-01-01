@@ -305,6 +305,7 @@ pub fn listen_server_voice(id: usize)
         for i in 0..frames_to_write
         {
             let mut mixed_sample = 0.;
+            let mut active_speakers = 0;
 
             for stream in consumers_guard.values_mut()
             {
@@ -320,12 +321,23 @@ pub fn listen_server_voice(id: usize)
                 let interpolated = stream.current_sample + (stream.next_sample - stream.current_sample) * stream.resample_pos;
                 stream.resample_pos += output_resample_step; //MOVE RESAMPLER POSITION FOR THIS CLIENT
 
-                //MIX
-                mixed_sample += interpolated;
+                //ACTIVE SPEAKER DETECTION
+                if interpolated.abs() > options::MIXING_TRESHOLD
+                {
+                    //MIX
+                    mixed_sample += interpolated;
+                    active_speakers += 1;
+                }
             }
 
-            //CLIPPING PROTECTION
-            mixed_sample = mixed_sample.clamp(-1., 1.);
+            //NORMALIZATION
+            if active_speakers > 1
+            {
+                mixed_sample /= (active_speakers as f32).sqrt();
+            }
+
+            //SOFT CLIPPING (HYPERBOLIC TANGENT)
+            mixed_sample = mixed_sample.tanh();
 
             //WRITE SAMPLE TO ALL CHANNELS
             for channel in 0..output_channels
