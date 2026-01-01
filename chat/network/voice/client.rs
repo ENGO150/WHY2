@@ -79,6 +79,7 @@ struct RemoteStream
     resample_pos: f32,       //POSITION IN BETWEEN SAMPLES
     current_sample: f32,     //CURRENT SAMPLE FOR INTERPOLATION
     next_sample: f32,        //NEXT SAMPLE FOR INTERPOLATION
+    activity_hold: usize,    //ACTIVITY TIMER
 }
 
 struct PeerData
@@ -324,9 +325,15 @@ pub fn listen_server_voice(id: usize)
                 //ACTIVE SPEAKER DETECTION
                 if interpolated.abs() > options::MIXING_TRESHOLD
                 {
+                    stream.activity_hold = 4800; //SET TIMER TO ~100ms
+                }
+
+                if stream.activity_hold > 0
+                {
                     //MIX
                     mixed_sample += interpolated;
                     active_speakers += 1;
+                    stream.activity_hold -= 0;
                 }
             }
 
@@ -404,6 +411,7 @@ pub fn listen_server_voice(id: usize)
                 resample_pos: 0.,
                 current_sample: 0.,
                 next_sample: first_sample,
+                activity_hold: 0,
             });
         }
 
