@@ -144,8 +144,8 @@ pub fn listen_server_voice(id: usize)
 
     //INPUT RESAMPLING
     let input_channels = input_config.channels as usize;
-    let input_source_rate = options::SAMPLE_RATE as f32;
-    let input_target_rate = input_config.sample_rate as f32;
+    let input_source_rate = input_config.sample_rate as f32;
+    let input_target_rate = options::SAMPLE_RATE as f32;
 
     //INPUT INTERPOLATION
     let input_resample_step = input_source_rate / input_target_rate;
