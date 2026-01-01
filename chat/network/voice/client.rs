@@ -350,7 +350,7 @@ pub fn listen_server_voice(id: usize)
                     //MIX
                     mixed_sample += interpolated;
                     active_speakers += 1;
-                    stream.activity_hold -= 0;
+                    stream.activity_hold -= 1;
                 }
             }
 
