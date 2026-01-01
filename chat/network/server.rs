@@ -834,7 +834,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         } else //IS USING VOICE
                         {
                             //REMOVE FROM VOICE
-                            voice_server::CONNECTIONS.remove(&id);
+                            if let Some(conn) = voice_server::CONNECTIONS.remove(&id).unwrap().1
+                            {
+                                println!("Close voice connection: {}", conn.peer_addr());
+                            }
                         }
                     }
                 },

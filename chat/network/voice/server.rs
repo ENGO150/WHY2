@@ -48,6 +48,12 @@ pub static CONNECTIONS: LazyLock<DashMap<usize, Option<Connection>>> = LazyLock:
 //IMPLEMENTATIONS
 impl Connection
 {
+    //GET PEER ADDRESS
+    pub fn peer_addr(&self) -> &SocketAddr
+    {
+        &self.addr
+    }
+
     //GET SEQ
     pub fn seq(&self) -> &usize
     {
@@ -116,6 +122,8 @@ pub fn listen_client_voice(socket: UdpSocket)
                     seq: 0,
                     server_seq: 0,
                 });
+
+                println!("New voice connection: {}", addr);
             }
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
