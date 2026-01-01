@@ -1,6 +1,6 @@
 /*
 This is part of WHY2
-Copyright (C) 2022-2025 Václav Šmejkal
+Copyright (C) 2022-2026 Václav Šmejkal
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
