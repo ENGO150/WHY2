@@ -120,7 +120,7 @@ pub fn listen_client_voice(socket: UdpSocket)
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
         //COLLECT ALL ADDRESSES
-        let mut addresses: Vec<(SocketAddr, SharedKeys)> = Vec::new();
+        let mut addresses: Vec<(SocketAddr, SharedKeys, usize)> = Vec::new();
         for connection in CONNECTIONS.iter()
         {
             if let Some(conn) = connection.value()
@@ -131,21 +131,21 @@ pub fn listen_client_voice(socket: UdpSocket)
                     //FIND CONNECTION KEYS
                     if let Some(keys) = find_key(&conn.id)
                     {
-                        addresses.push((conn.addr, keys));
+                        addresses.push((conn.addr, keys, conn.id));
                     }
                 }
             }
         }
 
         //SEND TO ALL
-        for addr in addresses.iter()
+        for (addr, keys, recipient_id) in addresses.iter()
         {
             voice::send(&socket, VoicePacket
             {
                 voice: received.voice.clone(),
                 id: Some(id),
                 ..Default::default()
-            }, &addr.0, &addr.1).unwrap();
+            }, addr, recipient_id, keys).unwrap();
         }
     }
 }

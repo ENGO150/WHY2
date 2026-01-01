@@ -68,13 +68,14 @@ pub fn send //SEND DATA TO UDP
     socket: &UdpSocket,
     mut packet: VoicePacket,
     #[cfg(feature = "server")] addr: &SocketAddr,
+    #[cfg(feature = "server")] recipient_id: &usize,
     keys: &SharedKeys
 ) -> Result<usize, Error>
 {
     //SET SERVER SEQ
     #[cfg(feature = "server")]
     {
-        if let Some(mut conn) = server::CONNECTIONS.get_mut(&packet.id.unwrap()) &&
+        if let Some(mut conn) = server::CONNECTIONS.get_mut(recipient_id) &&
             let Some(conn) = conn.as_mut()
         {
             packet.seq = conn.server_seq() + 1;
