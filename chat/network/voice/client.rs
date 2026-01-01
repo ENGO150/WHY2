@@ -191,7 +191,7 @@ pub fn listen_server_voice(id: usize)
 
     //NOISE REDUCTION
     let mut denoiser = DenoiseState::new();
-    let mut denoise_buffer = [0.0f32; 480];
+    let mut denoise_buffer = [0.0f32; options::SAMPLE_RATE as usize / 100];
 
     //CONFIGURE INPUT STREAM
     let send_socket = socket.clone();
@@ -237,9 +237,9 @@ pub fn listen_server_voice(id: usize)
             let mut frame: Vec<f32> = input_accum.drain(0..options::FRAME_SIZE).collect();
 
             //NOISE REDUCTION
-            for chunk in frame.chunks_mut(480)
+            for chunk in frame.chunks_mut(options::SAMPLE_RATE as usize / 100)
             {
-                if chunk.len() == 480
+                if chunk.len() == options::SAMPLE_RATE as usize / 100
                 {
                     //PROCESS NOISE
                     denoiser.process_frame(&mut denoise_buffer, chunk);
@@ -342,7 +342,7 @@ pub fn listen_server_voice(id: usize)
                 //ACTIVE SPEAKER DETECTION
                 if interpolated.abs() > options::MIXING_TRESHOLD
                 {
-                    stream.activity_hold = 4800; //SET TIMER TO ~100ms
+                    stream.activity_hold = options::SAMPLE_RATE as usize / 10; //SET TIMER TO ~100ms
                 }
 
                 if stream.activity_hold > 0
