@@ -130,7 +130,7 @@ pub fn listen_client_voice(socket: UdpSocket)
                     server_seq: 0,
                 });
 
-                println!("New voice connection: {}", addr);
+                log::info!("New voice connection: {}", addr);
             }
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 

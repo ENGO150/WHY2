@@ -309,7 +309,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&chat_
                     {
                         //LOG IF ON SERVER
                         #[cfg(feature = "server")]
-                        println!("HMAC verification failed: {}", peer_addr);
+                        log::warn!("HMAC verification failed: {}", peer_addr);
 
                         return None;
                     }
@@ -377,7 +377,7 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&chat_
                             {
                                 //INVALID SEQ
                                 drop(conn); //PREVENT DEADLOCK
-                                println!("SEQ verification failed: {}", &peer_addr);
+                                log::warn!("SEQ verification failed: {}", &peer_addr);
                                 server::remove_connection(&peer_addr, false);
                             }
                         }

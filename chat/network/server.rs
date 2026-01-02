@@ -422,7 +422,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         });
     }
 
-    println!("Close connection: {}", peer_addr);
+    log::info!("Close connection: {}", peer_addr);
 }
 
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
@@ -521,7 +521,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
         }
     });
 
-    println!("Authenticate connection: {}", peer_addr);
+    log::info!("Authenticate connection: {}", peer_addr);
 }
 
 fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOVE CLIENT TO CHANNEL
@@ -594,7 +594,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         Err(_) => return,
     };
 
-    println!("New connection: {}", peer_addr);
+    log::info!("New connection: {}", peer_addr);
 
     //PUSH NEW CONNECTION
     CONNECTIONS.insert(peer_addr, Connection::NonAuthenticated
@@ -836,7 +836,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                             //REMOVE FROM VOICE
                             if let Some(conn) = voice_server::CONNECTIONS.remove(&id).unwrap().1
                             {
-                                println!("Close voice connection: {}", conn.peer_addr());
+                                log::info!("Close voice connection: {}", conn.peer_addr());
                             }
                         }
                     }

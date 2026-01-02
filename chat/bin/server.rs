@@ -27,6 +27,8 @@ use std::
     net::TcpListener,
 };
 
+use simple_logger::SimpleLogger;
+
 use why2::chat::
 {
     misc,
@@ -44,12 +46,15 @@ use why2::chat::network::voice::server as voice_server;
 
 fn quit() //DISCONNECT ALL USERS
 {
-    println!("Exiting...");
+    log::info!("Exiting...");
     server::disconnect_all(); //DISCONNECT ALL USERS
 }
 
 fn main()
 {
+    //INIT LOGGER
+    SimpleLogger::new().init().unwrap();
+
     //CONFIGURATION
     misc::check_version(); //CHECK WHY2 VERSION
     config::init_server_config(); //CREATE server.toml CONFIGURATION
@@ -62,7 +67,7 @@ fn main()
     let listener = TcpListener::bind(&address).expect("Binding failed"); //TCP (TEXT)
     #[cfg(feature = "voice")] let udp_socket = UdpSocket::bind(&address).expect("Binding UDP failed"); //UDP (VOICE)
 
-    println!("Server enabled.\nListening on {address}\n"); //PRINT INFO
+    log::info!("Server enabled.\nListening on {address}\n"); //PRINT INFO
 
     //CREATE THREAD FOR ACCEPTING CLIENTS
     thread::spawn(move ||
@@ -76,7 +81,7 @@ fn main()
                     //CHECK FOR MAXIMAL CONNECTIONS
                     if server::CONNECTIONS.len() >= config::server_config::<usize>("max_clients")
                     {
-                        eprintln!
+                        log::error!
                         (
                             "Connection rejected (Server full): {}",
                             stream.peer_addr().map(|a| a.to_string()).unwrap_or_else(|_| "unknown".to_string())
@@ -97,7 +102,7 @@ fn main()
 
                 Err(e) =>
                 {
-                    eprintln!("Connection failed: {}", e);
+                    log::error!("Connection failed: {}", e);
                 }
             }
         }
