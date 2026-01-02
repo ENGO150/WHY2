@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    time::Instant,
     sync::LazyLock,
     net::{ UdpSocket, SocketAddr },
 };
@@ -30,16 +31,22 @@ use crate::chat::
     network::
     {
         server,
-        voice::{ self, VoicePacket },
+        voice::
+        {
+            self,
+            options,
+            VoicePacket,
+        },
     },
 };
 
 pub struct Connection
 {
-    addr: SocketAddr,  //ADDRESS OF CONNECTION
-    id: usize,         //ID ON TEXT CHAT
-    seq: usize,        //SEQUENCE NUMBER
-    server_seq: usize, //SERVER SEQUENCE NUMBER
+    addr: SocketAddr,          //ADDRESS OF CONNECTION
+    id: usize,                 //ID ON TEXT CHAT
+    seq: usize,                //SEQUENCE NUMBER
+    server_seq: usize,         //SERVER SEQUENCE NUMBER
+    packet_accumulator: usize, //PACKET ACCUMULATOR
 }
 
 //LISTS
@@ -60,12 +67,6 @@ impl Connection
         &self.seq
     }
 
-    //GET SEQ AS MUTABLE
-    pub fn seq_mut(&mut self) -> &mut usize
-    {
-        &mut self.seq
-    }
-
     //GET SERVER SEQ
     pub fn server_seq(&self) -> &usize
     {
@@ -79,7 +80,7 @@ impl Connection
     }
 }
 
-//FUNCTIONS
+//HELPER FUNCTIONS
 pub fn find_key(id: &usize) -> Option<SharedKeys>
 {
     server::CONNECTIONS.iter()
@@ -103,6 +104,16 @@ pub fn remove_connection(id: &usize) //REMOVE CONNECTION
     }
 }
 
+pub fn reset_last_activity(id: &usize)
+{
+    if let Some(mut conn) = server::CONNECTIONS.iter_mut()
+        .find(|entry| entry.value().id() == Some(id))
+    {
+        *conn.last_activity_mut() = Instant::now();
+    }
+}
+
+//MAIN FUNCTION
 pub fn listen_client_voice(socket: UdpSocket)
 {
     //LOOP RECEIVING
@@ -128,7 +139,15 @@ pub fn listen_client_voice(socket: UdpSocket)
 
                 //VERIFY SEQ
                 if received.seq <= conn.seq { continue; } //IGNORE INVALID SEQs
-                *conn.seq_mut() = received.seq;
+                conn.seq = received.seq;
+
+                //ACTIVITY TIMER
+                conn.packet_accumulator += 1;
+                if conn.packet_accumulator >= options::ACTIVITY_TRESHOLD
+                {
+                    conn.packet_accumulator = 0; //RESET ACCUM
+                    reset_last_activity(&id); //RESET ACTIVITY TIMER
+                }
             } else //NOT FOUND, ADD ADDRESS
             {
                 *conn = Some(Connection
@@ -137,6 +156,7 @@ pub fn listen_client_voice(socket: UdpSocket)
                     id: id,
                     seq: 0,
                     server_seq: 0,
+                    packet_accumulator: 0,
                 });
 
                 log::info!("New voice connection: {}", addr);
