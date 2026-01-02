@@ -94,6 +94,15 @@ pub fn find_channel(id: &usize) -> Option<Option<String>>
         .map(|c| c.channel().clone())
 }
 
+pub fn remove_connection(id: &usize) //REMOVE CONNECTION
+{
+    if let Some((_, conn)) = CONNECTIONS.remove(id) &&
+        let Some(conn) = conn
+    {
+        log::info!("Close voice connection: {}", conn.peer_addr());
+    }
+}
+
 pub fn listen_client_voice(socket: UdpSocket)
 {
     //LOOP RECEIVING

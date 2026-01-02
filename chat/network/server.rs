@@ -409,7 +409,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
     {
         //DISCONNECT FROM VOICE CHAT
         #[cfg(feature = "voice")]
-        voice_server::CONNECTIONS.remove(connection.id().unwrap());
+        voice_server::remove_connection(connection.id().unwrap());
 
         //SEND LEAVE MESSAGE
         send_to_all(MessagePacket
@@ -834,10 +834,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         } else //IS USING VOICE
                         {
                             //REMOVE FROM VOICE
-                            if let Some(conn) = voice_server::CONNECTIONS.remove(&id).unwrap().1
-                            {
-                                log::info!("Close voice connection: {}", conn.peer_addr());
-                            }
+                            voice_server::remove_connection(&id);
                         }
                     }
                 },
