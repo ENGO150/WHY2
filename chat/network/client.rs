@@ -334,6 +334,9 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 {
                     misc::clear_lines(2);
 
+                    //REMOVE FROM CONSUMERS MAP
+                    voice_client::CONSUMERS.lock().unwrap().remove(&read.id.unwrap());
+
                     println!("[{}]: {} disconnected.\n", read.username.unwrap(), read.text.unwrap());
                 },
 

@@ -416,6 +416,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         {
             text: Some(connection.username().unwrap().to_string()),
             username: Some(config::server_config::<String>("server_username")),
+            id: connection.id().copied(),
             code: Some(MessageCode::Leave),
 
             ..Default::default()
