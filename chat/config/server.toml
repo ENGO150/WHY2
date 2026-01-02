@@ -18,6 +18,9 @@
 server_ip = "0.0.0.0" # Server address
 server_port = 1204 # Server port
 
+# Voice Chat
+enable_voice_chat = true # Enable (changing requires restart)
+
 # Appearance
 server_name = "WHY2 Server" # Name of the server
 server_username = "server" # Username server will use
