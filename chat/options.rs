@@ -95,13 +95,13 @@ static SERVER_ADDRESS: OnceLock<String> = OnceLock::new();
 #[cfg(feature = "server")]
 pub fn enable_voice_chat() //SET VOICE CHAT TO TRUE
 {
-    VOICE_CHAT.store(true, Ordering::SeqCst);
+    VOICE_CHAT.store(true, Ordering::Relaxed);
 }
 
 #[cfg(feature = "server")]
 pub fn voice_chat_enabled() -> bool //GET VOICE CHAT
 {
-    VOICE_CHAT.load(Ordering::SeqCst)
+    VOICE_CHAT.load(Ordering::Relaxed)
 }
 
 //SHARED KEYS
@@ -123,39 +123,39 @@ pub fn get_keys() -> Option<SharedKeys> //RETURN KEY
 #[cfg(feature = "client")]
 pub fn set_asking_password(value: bool) //SET ASKING_PASSWORD
 {
-    ASKING_PASSWORD.store(value, Ordering::SeqCst);
+    ASKING_PASSWORD.store(value, Ordering::Relaxed);
 }
 
 #[cfg(feature = "client")]
 pub fn get_asking_password() -> bool //GET ASKING_PASSWORD
 {
-    ASKING_PASSWORD.load(Ordering::SeqCst)
+    ASKING_PASSWORD.load(Ordering::Relaxed)
 }
 
 //ADD EXTRA SPACE
 #[cfg(feature = "client")]
 pub fn set_extra_space(value: bool) //SET EXTRA_SPACE
 {
-    EXTRA_SPACE.store(value, Ordering::SeqCst);
+    EXTRA_SPACE.store(value, Ordering::Relaxed);
 }
 
 #[cfg(feature = "client")]
 pub fn get_extra_space() -> bool //GET EXTRA_SPACE
 {
-    EXTRA_SPACE.load(Ordering::SeqCst)
+    EXTRA_SPACE.load(Ordering::Relaxed)
 }
 
 //SENDING MESSAGES
 #[cfg(feature = "client")]
 pub fn get_sending_messages() -> bool //GET SENDING_MESSAGES
 {
-    SENDING_MESSAGES.load(Ordering::SeqCst)
+    SENDING_MESSAGES.load(Ordering::Relaxed)
 }
 
 #[cfg(feature = "client")]
 pub fn set_sending_messages(value: bool) //SET SENDING_MESSAGES
 {
-    SENDING_MESSAGES.store(value, Ordering::SeqCst);
+    SENDING_MESSAGES.store(value, Ordering::Relaxed);
 }
 
 #[cfg(feature = "client")]
