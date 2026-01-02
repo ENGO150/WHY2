@@ -73,7 +73,7 @@ fn main()
     let listener = TcpListener::bind(&address).expect("Binding failed"); //TCP (TEXT)
     #[cfg(feature = "voice")] let udp_socket = UdpSocket::bind(&address).expect("Binding UDP failed"); //UDP (VOICE)
 
-    log::info!("Server enabled.\nListening on {address}\n"); //PRINT INFO
+    log::info!("Listening on {address}"); //PRINT INFO
 
     //CREATE THREAD FOR ACCEPTING CLIENTS
     thread::spawn(move ||
