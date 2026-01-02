@@ -18,7 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    thread,
+    time::Duration,
     net::UdpSocket,
+    io::{ self, Write },
     collections::{ HashMap, VecDeque },
     sync::
     {
@@ -67,15 +70,31 @@ use ringbuf::
 use nnnoiseless::DenoiseState;
 
 use gag::Gag;
+use crossterm::
+{
+    terminal,
+    style::Print,
+    QueueableCommand,
+    cursor::
+    {
+        MoveTo,
+        SavePosition,
+        RestorePosition,
+    },
+};
 
 use crate::chat::
 {
     options as chat_options,
-    network::voice::
+    network::
     {
-        self,
-        options,
-        VoicePacket,
+        client,
+        voice::
+        {
+            self,
+            options,
+            VoicePacket,
+        },
     },
 };
 
@@ -391,6 +410,16 @@ pub fn listen_server_voice(id: usize)
     input_stream.play().unwrap();  //INPUT
     output_stream.play().unwrap(); //OUTPUT
 
+    //START VOICE ACTIVITY DISPLAY THREAD
+    thread::spawn(move ||
+    {
+        loop
+        {
+            display_vad();
+            thread::sleep(Duration::from_millis(60));
+        }
+    });
+
     //OUTPUT BUFFERS
     let mut decoded_buffer = [0.0f32; options::FRAME_SIZE];
 
@@ -463,4 +492,80 @@ pub fn listen_server_voice(id: usize)
 pub fn remove_consumer(id: &usize)
 {
     CONSUMERS.lock().unwrap().remove(id);
+}
+
+fn display_vad()
+{
+    //GET ACTIVE SPEAKER USERNAMES
+    let mut active_speakers = Vec::new();
+    if let Ok(consumers) = CONSUMERS.try_lock()
+    {
+        for (id, stream) in consumers.iter()
+        {
+            if stream.activity_hold > 0
+            {
+                if let Some(username) = client::CLIENTS.lock().unwrap().get(id)
+                {
+                    active_speakers.push(username.clone());
+                }
+            }
+        }
+    }
+
+    //PREPARE TERMINAL
+    let mut stdout = io::stdout();
+    let (cols, rows) = terminal::size().unwrap_or((80, 24));
+
+    //SAVE CURSOR POSITION
+    stdout.queue(SavePosition).unwrap();
+
+    let overlay_width = 25; //WINDOW WIDTH
+    let bottom_row = rows.saturating_sub(2); //BEGIN WINDOW 2 LINES FROM BOTTOM
+    let available_height = rows.saturating_sub(4) as usize;
+
+    //MAX USERS TO DISPLAY
+    let limit = available_height.min(15);
+
+    //CLEAR WINDOW
+    for i in 0..=limit
+    {
+        let y = bottom_row.saturating_sub(i as u16);
+        let x = cols.saturating_sub(overlay_width as u16);
+
+        stdout.queue(MoveTo(x, y)).unwrap();
+        stdout.queue(Print(" ".repeat(overlay_width as usize))).unwrap(); //FILL WITH BLANK SPACES
+    }
+
+    //STORE ACTIVE SPEAKER COUNT
+    let count = active_speakers.len().min(limit);
+
+    //DRAW NEW STATE
+    for (i, username) in active_speakers.iter().take(limit).enumerate()
+    {
+        let y = bottom_row.saturating_sub(i as u16);
+
+        //TEXT FORMAT
+        let text = format!("- {} ", username);
+
+        let x = cols.saturating_sub(text.chars().count() as u16).saturating_sub(1);
+
+        stdout.queue(MoveTo(x, y)).unwrap();
+        stdout.queue(Print(text)).unwrap();
+    }
+
+    //PRINT "SPEAKING"
+    if count > 0
+    {
+        let y = bottom_row.saturating_sub(count as u16);
+        let text = "SPEAKING:";
+
+        let x = cols.saturating_sub(text.chars().count() as u16).saturating_sub(1);
+
+        stdout.queue(MoveTo(x, y)).unwrap();
+        stdout.queue(Print(text)).unwrap();
+    }
+
+    //RESTORE CURSOR POSITION
+    stdout.queue(RestorePosition).unwrap();
+    stdout.flush().unwrap(); //FLUSH STDOUT
 }
