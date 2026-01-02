@@ -1,6 +1,76 @@
 Changelog
 =========
 
+v1.4.0:
+- 8e95779: mention voice chat in rustdoc
+- 98aa334: remove voice feature from pipelines
+- 4e7c740: use Relaxed Ordering instead of SeqCst
+- 47eb0cf: use server config to enable chat
+- b5e97bc: add enable_voice_chat server config entry
+- 173ad3d: make voice chat default on client
+- c0012c4: add helper function for removing voice connection
+- 2e4b73a: simplify server enabled info log
+- 6c6d48f: ignore ureq & rustls info logs
+- edcf54d: implement logger on chat servers
+- fd9e130: add logging dependencies
+- 6f02fb4: specify registration on max_auth_tries config entry
+- 9d10140: implement channels to voice chat
+- ecadba6: lower gate tresholds
+- a901fc4: fix noise reduction
+- 7185e1a: fix active speaker bug
+- 326baaa: use global sample rate for voice processing
+- 2c852bc: implement noise reduction
+- 38536da: add nnnoiseless dependency
+- 480a644: update dependencies
+- a5a5446: fix fluctuating normalization
+- 3249c7f: implement audio normalization & soft clipping
+- 7b94b9d: implement voice activity detection
+- a7259c6: remove cpal config duplicity
+- 6313d03: implement client output audio mixing
+- ad2539e: print server voice log
+- a69e26d: use proper recipient_id for server-seq in send fn
+- 614fa43: fix client input resampling
+- c4f781a: update license year
+- b7d802f: use voice SAMPLE_RATE const for constructing SampleRate
+- 8d24fa1: resample input stream
+- 2beb10e: resample output stream
+- fadf5de: allow multi-channel output device
+- 40019d8: install audio dependencies in chat pipelines
+- 6e7fcbe: use voice feature for build pipelines
+- 952865a: fix client voice reconnection seq problems
+- c152f18: implement voice disconnection
+- ab794c9: fix client rekey hmac failure
+- ff63ca0: verify hmac on voice receive
+- 2ed2ced: use updated client keys on voice
+- 9e3fb18: implement voice packet encryption
+- a2dab2f: collect keys for voice encryption
+- 95aa8bf: move chat packet encryption to chat::crypto
+- e091eb3: implement seq
+- f6e47f1: verify server seq on client
+- 3bc0a42: implement server_seq
+- d15a7ce: implement Default trait for VoicePacket
+- c2c0d1d: implement VoicePacket & Connection structs on voice chat
+- 5c5e56f: use voice::send on server & client
+- 8bbf91f: fix client underrun code formatting
+- ec27ac4: correct client help output formatting
+- 5460a33: verify voice packet id on server properly
+- 2b2e012: increase jitter buffer to ~400ms
+- 5c577f5: include id len in client voice packets
+- 5d5441c: fix voice client crash on non-voice server auth
+- a4bc15d: fix non-voice server build error
+- 906b90c: prepend id to voice packet
+- 312e18a: implement receive section on client
+- f68976e: use gag for supressing alsa errors
+- a934048: add voice options warning
+- 0e4741f: send client voice to server
+- 5916bbf: segment client voice input & encode to opus
+- 50ada25: send test UDP message from client to server
+- f076ae3: create simple udp server handler
+- e88732f: allow voice on server
+- e93ba7b: add voice command
+- 24d4be8: disallow voice feature on its own
+- 1a93bc0: add voice chat dependencies
+
 v1.3.5:
 - 1cef7a8: update documentation for new ctr mode implementation
 - f44732d: implement new Grid::from_bytes on chat
