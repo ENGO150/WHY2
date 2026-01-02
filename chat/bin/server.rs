@@ -27,6 +27,7 @@ use std::
     net::TcpListener,
 };
 
+use log::LevelFilter;
 use simple_logger::SimpleLogger;
 
 use why2::chat::
@@ -53,7 +54,12 @@ fn quit() //DISCONNECT ALL USERS
 fn main()
 {
     //INIT LOGGER
-    SimpleLogger::new().init().unwrap();
+    SimpleLogger::new()
+        .with_level(LevelFilter::Info)
+        .with_module_level("ureq", LevelFilter::Warn) //DISABLE UREQ INFO LOGS
+        .with_module_level("rustls", LevelFilter::Warn) //DISABLE RUSTLS INFO LOGS
+        .init()
+        .unwrap();
 
     //CONFIGURATION
     misc::check_version(); //CHECK WHY2 VERSION
