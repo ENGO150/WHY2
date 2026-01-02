@@ -22,7 +22,9 @@ use std::
     thread,
     process,
     net::TcpStream,
+    collections::HashMap,
     io::{ self, Write },
+    sync::{ LazyLock, Mutex },
 };
 
 use zeroize::Zeroizing;
@@ -55,6 +57,9 @@ use crate::chat::
 //CONSTS
 const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
+
+//GLOBAL VARIABLES
+pub static CLIENTS: LazyLock<Mutex<HashMap<usize, String>>> = LazyLock::new(|| Mutex::new(HashMap::new())); //OTHER CLIENTS
 
 //PRIVATE
 fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options::SharedKeys) //KEY EXCHANGE FOR CLIENT-SIDE
@@ -326,7 +331,14 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                         first_message = false;
                     }
 
-                    println!("[{}]: {} connected.\n", read.username.unwrap(), read.text.unwrap());
+                    //LOAD VARIABLES
+                    let username = read.text.unwrap();
+                    let id = read.id.unwrap();
+
+                    //STORE IN CLIENTS MAP
+                    CLIENTS.lock().unwrap().insert(id, username.clone());
+
+                    println!("[{}]: {} connected.\n", read.username.unwrap(), username);
                 }
 
                 //LEAVE MESSAGE (CLIENT DISCONNECTED)
@@ -334,8 +346,12 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 {
                     misc::clear_lines(2);
 
-                    //REMOVE FROM CONSUMERS MAP
-                    voice_client::remove_consumer(&read.id.unwrap());
+                    //LOAD ID
+                    let id = read.id.unwrap();
+
+                    //REMOVE FROM MAPS
+                    voice_client::remove_consumer(&id); //REMOVE FROM CONSUMER MAP
+                    CLIENTS.lock().unwrap().remove(&id); //REMOVE FROM CLIENT MAP
 
                     println!("[{}]: {} disconnected.\n", read.username.unwrap(), read.text.unwrap());
                 },

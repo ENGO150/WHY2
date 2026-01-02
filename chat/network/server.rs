@@ -758,22 +758,15 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //AUTHENTICATE CLIENT
     authenticate_client(&peer_addr, &username, id);
 
-    let accept_text = if options::voice_chat_enabled()
-    {
-        Some(id.to_string())
-    } else
-    {
-        None
-    };
-
     //TELL CLIENT TO START CHATTING
-    send_code(stream, accept_text, MessageCode::Accept, Some(&keys));
+    send_code(stream, Some(id.to_string()), MessageCode::Accept, Some(&keys));
 
     //SEND JOIN MESSAGE
     send_to_all(MessagePacket
     {
         text: Some(username.clone()),
         username: Some(config::server_config::<String>("server_username")),
+        id: Some(id),
         code: Some(MessageCode::Join),
         ..Default::default()
     });
