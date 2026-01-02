@@ -29,14 +29,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! - **Key Expansion**: The key grid is shuffled and seeded to generate round keys.
 //! - **Nonlinear Mixing**: Each round applies a transformation to the input grids using round tweaks to ensure variability.
 //!
-//! WHY2 also powers a minimalist chat application built for maximal privacy, designed for self-hosting
+//! WHY2 also powers a minimalist text and voice chat application built for maximal privacy, designed for self-hosting
 //! by individuals or small groups.
 //!
 //! ## Features
 //! - Grid-based encryption with customizable layout
 //! - ARX-style nonlinear mixing instead of S-boxes
 //! - Round-key generation from seeded, shuffled keys
-//! - Lightweight encrypted chat backend for private deployments
+//! - Lightweight encrypted text and voice chat backend for private deployments
 //! - Maximal customization
 //!
 //! ## Cargo Features
@@ -48,7 +48,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!   Disabling this may improve performance on non-sensitive data but opens the system to timing attacks.
 //!
 //! - **`client`**:
-//!   Enables the terminal-based client application and interactive interface.
+//!   Enables the terminal-based client application with interactive interface and real-time voice chat support.
 //!
 //! - **`server`**:
 //!   Enables the relay server logic for routing encrypted messages between clients.
