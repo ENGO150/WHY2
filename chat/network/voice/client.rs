@@ -526,18 +526,38 @@ fn display_vad()
     //MAX USERS TO DISPLAY
     let limit = available_height.min(15);
 
+    //CALCULATE MAX WIDTH FOR ALIGNMENT
+    let header_text = "SPEAKING:";
+    let mut max_content_width = header_text.len();
+
+    //FIND LONGEST LINE
+    for username in active_speakers.iter().take(limit)
+    {
+        let width = username.chars().count() + 3; // "- " + username + " "
+        if width > max_content_width
+        {
+            max_content_width = width;
+        }
+    }
+
+    //DETERMINE CLEAR WIDTH
+    let clear_width = overlay_width.max(max_content_width);
+
     //CLEAR WINDOW
     for i in 0..=limit
     {
         let y = bottom_row.saturating_sub(i as u16);
-        let x = cols.saturating_sub(overlay_width as u16);
+        let x = cols.saturating_sub(clear_width as u16);
 
         stdout.queue(MoveTo(x, y)).unwrap();
-        stdout.queue(Print(" ".repeat(overlay_width as usize))).unwrap(); //FILL WITH BLANK SPACES
+        stdout.queue(Print(" ".repeat(clear_width as usize))).unwrap(); //FILL WITH BLANK SPACES
     }
 
     //STORE ACTIVE SPEAKER COUNT
     let count = active_speakers.len().min(limit);
+
+    //CALCULATE ALIGNMENT X
+    let align_x = cols.saturating_sub(max_content_width as u16).saturating_sub(1);
 
     //DRAW NEW STATE
     for (i, username) in active_speakers.iter().take(limit).enumerate()
@@ -547,9 +567,7 @@ fn display_vad()
         //TEXT FORMAT
         let text = format!("- {} ", username);
 
-        let x = cols.saturating_sub(text.chars().count() as u16).saturating_sub(1);
-
-        stdout.queue(MoveTo(x, y)).unwrap();
+        stdout.queue(MoveTo(align_x, y)).unwrap();
         stdout.queue(Print(text)).unwrap();
     }
 
@@ -557,12 +575,9 @@ fn display_vad()
     if count > 0
     {
         let y = bottom_row.saturating_sub(count as u16);
-        let text = "SPEAKING:";
 
-        let x = cols.saturating_sub(text.chars().count() as u16).saturating_sub(1);
-
-        stdout.queue(MoveTo(x, y)).unwrap();
-        stdout.queue(Print(text)).unwrap();
+        stdout.queue(MoveTo(align_x, y)).unwrap();
+        stdout.queue(Print(header_text)).unwrap();
     }
 
     //RESTORE CURSOR POSITION
