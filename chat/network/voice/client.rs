@@ -415,7 +415,9 @@ pub fn listen_server_voice(id: usize)
     {
         loop
         {
-            display_vad();
+            if !options::get_use_voice() { return; } //QUIT ON /leave
+
+            display_active_speakers(); //SHOW VOICE ACTIVITY
             thread::sleep(Duration::from_millis(60));
         }
     });
@@ -494,7 +496,7 @@ pub fn remove_consumer(id: &usize)
     CONSUMERS.lock().unwrap().remove(id);
 }
 
-fn display_vad()
+fn display_active_speakers()
 {
     //GET ACTIVE SPEAKER USERNAMES
     let mut active_speakers = Vec::new();
