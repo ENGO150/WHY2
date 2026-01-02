@@ -51,11 +51,9 @@ use crate::chat::
         self,
         MessageCode,
         MessagePacket,
+        voice::server as voice_server,
     },
 };
-
-#[cfg(feature = "voice")]
-use crate::chat::network::voice::server as voice_server;
 
 //CONSTS
 const GRID_W: usize = options::GRID_DIMENSIONS.0;
@@ -408,8 +406,10 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
     if connection.is_authenticated()
     {
         //DISCONNECT FROM VOICE CHAT
-        #[cfg(feature = "voice")]
-        voice_server::remove_connection(connection.id().unwrap());
+        if options::voice_chat_enabled()
+        {
+            voice_server::remove_connection(connection.id().unwrap());
+        }
 
         //SEND LEAVE MESSAGE
         send_to_all(MessagePacket
@@ -757,17 +757,12 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //AUTHENTICATE CLIENT
     authenticate_client(&peer_addr, &username, id);
 
-    let accept_text =
+    let accept_text = if options::voice_chat_enabled()
     {
-        #[cfg(feature = "voice")]
-        {
-            Some(id.to_string())
-        }
-
-        #[cfg(not(feature = "voice"))]
-        {
-            None
-        }
+        Some(id.to_string())
+    } else
+    {
+        None
     };
 
     //TELL CLIENT TO START CHATTING
@@ -817,12 +812,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::Voice =>
                 {
                     //CHECK DISABLED FEATURE
-                    #[cfg(not(feature = "voice"))]
+                    if !options::voice_chat_enabled()
                     {
                         send_code(stream, None, MessageCode::InvalidFeature, Some(&keys));
-                    }
-
-                    #[cfg(feature = "voice")]
+                    } else
                     {
                         //ACKNOWLEDGE
                         send_code(stream, None, MessageCode::Voice, Some(&keys));

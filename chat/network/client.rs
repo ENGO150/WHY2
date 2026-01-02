@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     env,
+    thread,
     process,
     net::TcpStream,
     io::{ self, Write },
@@ -43,17 +44,12 @@ use crate::chat::
         MessageCode,
         MessagePacket,
         SerColor,
+        voice::
+        {
+            client as voice_client,
+            options as voice_options,
+        }
     },
-};
-
-#[cfg(feature = "voice")]
-use std::thread;
-
-#[cfg(feature = "voice")]
-use crate::chat::network::voice::
-{
-    client as voice_client,
-    options as voice_options,
 };
 
 //CONSTS
@@ -183,7 +179,6 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
     let mut channel = String::new();
 
     //ID SET BY SERVER
-    #[cfg(feature = "voice")]
     let mut id = 0usize;
 
     //LOOP READING
@@ -314,10 +309,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("Login successful. Press Ctrl+H for help.\n");
 
                     //SET SERVER-SIDE ID
-                    #[cfg(feature = "voice")]
-                    {
-                        id = read.text.unwrap_or("0".to_string()).parse().unwrap();
-                    }
+                    id = read.text.unwrap_or("0".to_string()).parse().unwrap();
 
                     //ALLOW MESSAGE HISTORY & COMMANDS
                     options::set_sending_messages(true);
@@ -360,7 +352,6 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 },
 
                 //SERVER ALLOWED VOICE
-                #[cfg(feature = "voice")]
                 MessageCode::Voice =>
                 {
                     //TOGGLE VOICE

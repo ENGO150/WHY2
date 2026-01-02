@@ -24,7 +24,7 @@ use std::
     thread,
     process,
     time::Duration,
-    net::TcpListener,
+    net::{ TcpListener, UdpSocket },
 };
 
 use log::LevelFilter;
@@ -35,15 +35,14 @@ use why2::chat::
     misc,
     config,
     crypto,
-    network::server,
+    options,
     command::{ self, Command },
+    network::
+    {
+        server,
+        voice::server as voice_server,
+    },
 };
-
-#[cfg(feature = "voice")]
-use std::net::UdpSocket;
-
-#[cfg(feature = "voice")]
-use why2::chat::network::voice::server as voice_server;
 
 fn quit() //DISCONNECT ALL USERS
 {
@@ -66,12 +65,24 @@ fn main()
     config::init_server_config(); //CREATE server.toml CONFIGURATION
     crypto::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
 
+    //CHECK IF VOICE IS ENABLED
+    if config::server_config("enable_voice_chat")
+    {
+        options::enable_voice_chat();
+    }
+
     //SERIALIZE ADDRESS
     let address = format!("{}:{}", config::server_config::<String>("server_ip"), config::server_config::<u16>("server_port")); //GET ADDRESS
 
     //BIND
     let listener = TcpListener::bind(&address).expect("Binding failed"); //TCP (TEXT)
-    #[cfg(feature = "voice")] let udp_socket = UdpSocket::bind(&address).expect("Binding UDP failed"); //UDP (VOICE)
+    let mut udp_socket: Option<UdpSocket> = None; //UDP (VOICE)
+
+    //ENABLE VOICE
+    if options::voice_chat_enabled()
+    {
+        udp_socket = Some(UdpSocket::bind(&address).expect("Binding UDP failed"));
+    }
 
     log::info!("Listening on {address}"); //PRINT INFO
 
@@ -115,8 +126,10 @@ fn main()
     });
 
     //CREATE THREAD FOR VOICE
-    #[cfg(feature = "voice")]
-    thread::spawn(move || voice_server::listen_client_voice(udp_socket));
+    if options::voice_chat_enabled()
+    {
+        thread::spawn(move || voice_server::listen_client_voice(udp_socket.unwrap()));
+    }
 
     //CREATE INACTIVITY WATCHDOG THREAD
     thread::spawn(move ||

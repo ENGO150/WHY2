@@ -18,6 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use zeroize::Zeroizing;
 
+use std::sync::atomic::{ AtomicBool, Ordering };
+
 #[cfg(feature = "client")]
 use std::sync::
 {
@@ -26,12 +28,7 @@ use std::sync::
     RwLock,
     LazyLock,
     OnceLock,
-    atomic::
-    {
-        AtomicBool,
-        AtomicUsize,
-        Ordering,
-    },
+    atomic::AtomicUsize,
 };
 
 //CONSTS
@@ -60,6 +57,9 @@ pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                             
 pub type SharedKeys = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);
 
 //SETTINGS
+#[cfg(feature = "server")]
+static VOICE_CHAT: AtomicBool = AtomicBool::new(false);
+
 #[cfg(feature = "client")]
 static KEYS: LazyLock<RwLock<Option<SharedKeys>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
 {
@@ -87,10 +87,23 @@ static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT 
 #[cfg(feature = "client")]
 static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (SERVER -> CLIENT)
 
-#[cfg(all(feature = "client", feature = "voice"))]
+#[cfg(feature = "client")]
 static SERVER_ADDRESS: OnceLock<String> = OnceLock::new();
 
 //FUNCTIONS
+//VOICE CHAT
+#[cfg(feature = "server")]
+pub fn enable_voice_chat() //SET VOICE CHAT TO TRUE
+{
+    VOICE_CHAT.store(true, Ordering::SeqCst);
+}
+
+#[cfg(feature = "server")]
+pub fn voice_chat_enabled() -> bool //GET VOICE CHAT
+{
+    VOICE_CHAT.load(Ordering::SeqCst)
+}
+
 //SHARED KEYS
 #[cfg(feature = "client")]
 pub fn set_keys(keys: SharedKeys) //SET KEY
@@ -170,13 +183,13 @@ pub fn set_server_seq(value: usize) //SET SERVER SEQUENCE NUMBER
 }
 
 //SERVER ADDRESS
-#[cfg(all(feature = "client", feature = "voice"))]
+#[cfg(feature = "client")]
 pub fn get_server_address() -> String //GET SERVER ADDRESS
 {
     SERVER_ADDRESS.get().unwrap().to_owned()
 }
 
-#[cfg(all(feature = "client", feature = "voice"))]
+#[cfg(feature = "client")]
 pub fn set_server_address(address: &str) //SET SERVER ADDRESS
 {
     SERVER_ADDRESS.set(address.to_owned()).unwrap();
