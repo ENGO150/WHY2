@@ -19,8 +19,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     net::UdpSocket,
-    sync::{ Arc, Mutex },
     collections::{ HashMap, VecDeque },
+    sync::
+    {
+        Arc,
+        Mutex,
+        LazyLock,
+    },
 };
 
 use cpal::
@@ -75,7 +80,7 @@ use crate::chat::
 };
 
 //STRUCTS
-struct RemoteStream
+pub struct RemoteStream
 {
     consumer: HeapCons<f32>, //RINGBUFFER READER
     resample_pos: f32,       //POSITION IN BETWEEN SAMPLES
@@ -89,6 +94,9 @@ struct PeerData
     decoder: Decoder,        //DECODER
     producer: HeapProd<f32>, //RINGBUFFER WRITER
 }
+
+//GLOBAL VARIABLES
+pub static CONSUMERS: LazyLock<Mutex<HashMap<usize, RemoteStream>>> = LazyLock::new(|| Mutex::new(HashMap::new())); //OTHER CLIENTS
 
 //PRIVATE
 fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
@@ -309,9 +317,6 @@ pub fn listen_server_voice(id: usize)
         }
     }, |_| {}, None).unwrap();
 
-    let consumers = Arc::new(Mutex::new(HashMap::<usize, RemoteStream>::new()));
-    let consumers_cloned = consumers.clone();
-
     let mut peers: HashMap<usize, PeerData> = HashMap::new();
 
     //OUTPUT RESAMPLING
@@ -329,7 +334,7 @@ pub fn listen_server_voice(id: usize)
         data.fill(0.);
 
         let frames_to_write = data.len() / output_channels;
-        let mut consumers_guard = consumers_cloned.lock().unwrap();
+        let mut consumers_guard = CONSUMERS.lock().unwrap();
 
         for i in 0..frames_to_write
         {
@@ -433,7 +438,7 @@ pub fn listen_server_voice(id: usize)
             });
 
             //INSERT TO SHARED AUDIO THREAD MAP
-            consumers.lock().unwrap().insert(sender_id, RemoteStream
+            CONSUMERS.lock().unwrap().insert(sender_id, RemoteStream
             {
                 consumer: consumer,
                 resample_pos: 0.,
