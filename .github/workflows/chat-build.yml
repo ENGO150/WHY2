@@ -49,10 +49,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build Client
-        run: cargo build --features client,voice --release
+        run: cargo build --features client --release
 
       - name: Build Server
-        run: cargo build --bin why2-server --features server,voice --release
+        run: cargo build --bin why2-server --features server --release
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
