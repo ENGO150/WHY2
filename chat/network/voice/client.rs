@@ -80,7 +80,7 @@ use crate::chat::
 };
 
 //STRUCTS
-pub struct RemoteStream
+struct RemoteStream
 {
     consumer: HeapCons<f32>, //RINGBUFFER READER
     resample_pos: f32,       //POSITION IN BETWEEN SAMPLES
@@ -96,7 +96,7 @@ struct PeerData
 }
 
 //GLOBAL VARIABLES
-pub static CONSUMERS: LazyLock<Mutex<HashMap<usize, RemoteStream>>> = LazyLock::new(|| Mutex::new(HashMap::new())); //OTHER CLIENTS
+static CONSUMERS: LazyLock<Mutex<HashMap<usize, RemoteStream>>> = LazyLock::new(|| Mutex::new(HashMap::new())); //OTHER CLIENTS
 
 //PRIVATE
 fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
@@ -458,4 +458,9 @@ pub fn listen_server_voice(id: usize)
             }
         }
     }
+}
+
+pub fn remove_consumer(id: &usize)
+{
+    CONSUMERS.lock().unwrap().remove(id);
 }
