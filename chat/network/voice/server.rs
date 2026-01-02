@@ -87,6 +87,13 @@ pub fn find_key(id: &usize) -> Option<SharedKeys>
         .map(|c| c.keys().unwrap().clone())
 }
 
+pub fn find_channel(id: &usize) -> Option<Option<String>>
+{
+    server::CONNECTIONS.iter()
+        .find(|entry| entry.value().id() == Some(id))
+        .map(|c| c.channel().clone())
+}
+
 pub fn listen_client_voice(socket: UdpSocket)
 {
     //LOOP RECEIVING
@@ -127,6 +134,9 @@ pub fn listen_client_voice(socket: UdpSocket)
             }
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
+        //FIND SENDER'S CHANNEL
+        let sender_channel = find_channel(&id);
+
         //COLLECT ALL ADDRESSES
         let mut addresses: Vec<(SocketAddr, SharedKeys, usize)> = Vec::new();
         for connection in CONNECTIONS.iter()
@@ -136,6 +146,9 @@ pub fn listen_client_voice(socket: UdpSocket)
                 //DO NOT SEND BACK TO SENDER (LOOPBACK)
                 if conn.addr != addr
                 {
+                    //SEND ONLY TO SAME CHANNEL
+                    if sender_channel != find_channel(&conn.id) { continue; }
+
                     //FIND CONNECTION KEYS
                     if let Some(keys) = find_key(&conn.id)
                     {

@@ -205,7 +205,7 @@ impl Connection
     }
 
     //GET CHANNEL
-    fn channel(&self) -> &Option<String>
+    pub fn channel(&self) -> &Option<String>
     {
         match self
         {
