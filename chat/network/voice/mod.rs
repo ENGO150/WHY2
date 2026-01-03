@@ -45,9 +45,10 @@ use crate::chat::options as chat_options;
 #[derive(SchemaRead, SchemaWrite)]
 pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
 {
-    pub voice: Vec<u8>,    //MESSAGE
-    pub id: Option<usize>, //ID OF USER
-    pub seq: usize,        //SEQUENCE NUMBER
+    pub voice: Vec<u8>,           //MESSAGE
+    pub username: Option<String>, //USERNAME
+    pub id: Option<usize>,        //ID OF USER
+    pub seq: usize,               //SEQUENCE NUMBER
 }
 
 impl Default for VoicePacket
@@ -58,6 +59,7 @@ impl Default for VoicePacket
         {
             voice: Vec::new(),
             id: None,
+            username: None,
             seq: 0,
         }
     }
@@ -76,7 +78,7 @@ pub fn send //SEND DATA TO UDP
     #[cfg(feature = "server")]
     {
         if let Some(mut conn) = server::CONNECTIONS.get_mut(recipient_id) &&
-            let Some(conn) = conn.as_mut()
+            let Some(conn) = conn.0.as_mut()
         {
             packet.seq = conn.server_seq() + 1;
             *conn.server_seq_mut() = packet.seq;

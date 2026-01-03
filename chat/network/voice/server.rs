@@ -50,7 +50,7 @@ pub struct Connection
 }
 
 //LISTS
-pub static CONNECTIONS: LazyLock<DashMap<usize, Option<Connection>>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
+pub static CONNECTIONS: LazyLock<DashMap<usize, (Option<Connection>, String)>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //IMPLEMENTATIONS
 impl Connection
@@ -97,7 +97,7 @@ pub fn find_channel(id: &usize) -> Option<Option<String>>
 
 pub fn remove_connection(id: &usize) //REMOVE CONNECTION
 {
-    if let Some((_, conn)) = CONNECTIONS.remove(id) &&
+    if let Some((_, (conn, _))) = CONNECTIONS.remove(id) &&
         let Some(conn) = conn
     {
         log::info!("Close voice connection: {}", conn.peer_addr());
@@ -128,11 +128,14 @@ pub fn listen_client_voice(socket: UdpSocket)
             None => continue //IGNORE INVALID IDS
         };
 
+        //CLIENT USERNAME
+        let username: String;
+
         //CHECK IF ID IS IN CONNECTIONS
         if let Some(mut conn) = CONNECTIONS.get_mut(&id)
         {
             //FOUND, CHECK ADDRESS
-            if let Some(conn) = conn.as_mut()
+            if let Some(conn) = conn.0.as_mut()
             {
                 //IGNORE NON-MATCHING ADDRESS
                 if conn.addr != addr { continue; }
@@ -150,7 +153,7 @@ pub fn listen_client_voice(socket: UdpSocket)
                 }
             } else //NOT FOUND, ADD ADDRESS
             {
-                *conn = Some(Connection
+                conn.0 = Some(Connection
                 {
                     addr: addr,
                     id: id,
@@ -161,6 +164,9 @@ pub fn listen_client_voice(socket: UdpSocket)
 
                 log::info!("New voice connection: {}", addr);
             }
+
+            //SET USERNAME
+            username = conn.1.clone();
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
         //FIND SENDER'S CHANNEL
@@ -170,7 +176,7 @@ pub fn listen_client_voice(socket: UdpSocket)
         let mut addresses: Vec<(SocketAddr, SharedKeys, usize)> = Vec::new();
         for connection in CONNECTIONS.iter()
         {
-            if let Some(conn) = connection.value()
+            if let (Some(conn), _) = connection.value()
             {
                 //DO NOT SEND BACK TO SENDER (LOOPBACK)
                 if conn.addr != addr
@@ -193,6 +199,7 @@ pub fn listen_client_voice(socket: UdpSocket)
             voice::send(&socket, VoicePacket
             {
                 voice: received.voice.clone(),
+                username: Some(username.to_string()),
                 id: Some(id),
                 ..Default::default()
             }, addr, recipient_id, keys).unwrap();

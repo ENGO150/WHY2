@@ -86,15 +86,11 @@ use crossterm::
 use crate::chat::
 {
     options as chat_options,
-    network::
+    network::voice::
     {
-        client,
-        voice::
-        {
-            self,
-            options,
-            VoicePacket,
-        },
+        self,
+        options,
+        VoicePacket,
     },
 };
 
@@ -106,6 +102,7 @@ struct RemoteStream
     current_sample: f32,     //CURRENT SAMPLE FOR INTERPOLATION
     next_sample: f32,        //NEXT SAMPLE FOR INTERPOLATION
     activity_hold: usize,    //ACTIVITY TIMER
+    username: String,        //USERNAME
 }
 
 struct PeerData
@@ -476,6 +473,7 @@ pub fn listen_server_voice(id: usize)
                 current_sample: 0.,
                 next_sample: first_sample,
                 activity_hold: 0,
+                username: network_buffer.username.unwrap(),
             });
         }
 
@@ -502,14 +500,11 @@ fn display_active_speakers()
     let mut active_speakers = Vec::new();
     if let Ok(consumers) = CONSUMERS.try_lock()
     {
-        for (id, stream) in consumers.iter()
+        for (_, stream) in consumers.iter()
         {
             if stream.activity_hold > 0
             {
-                if let Some(username) = client::CLIENTS.lock().unwrap().get(id)
-                {
-                    active_speakers.push(username.clone());
-                }
+                active_speakers.push(stream.username.clone());
             }
         }
     }

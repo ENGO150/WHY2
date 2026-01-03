@@ -766,7 +766,6 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     {
         text: Some(username.clone()),
         username: Some(config::server_config::<String>("server_username")),
-        id: Some(id),
         code: Some(MessageCode::Join),
         ..Default::default()
     });
@@ -817,7 +816,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         if !voice_server::CONNECTIONS.contains_key(&id) //IS NOT USING VOICE
                         {
                             //ADD CLIENT ID TO VOICE CONNECTIONS MAP
-                            voice_server::CONNECTIONS.insert(id, None);
+                            voice_server::CONNECTIONS.insert(id, (None, username.clone()));
                         } else //IS USING VOICE
                         {
                             //REMOVE FROM VOICE
