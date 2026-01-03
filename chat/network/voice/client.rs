@@ -554,16 +554,10 @@ fn display_active_speakers(local_username: &str)
     }
 
     //SORT
-    users_to_display.sort_by(|a, b|
+    if users_to_display.len() > 1
     {
-        if a.is_speaking == b.is_speaking
-        {
-            a.username.cmp(&b.username)
-        } else
-        {
-            b.is_speaking.cmp(&a.is_speaking)
-        }
-    });
+        users_to_display[1..].sort_by(|a, b| a.username.cmp(&b.username));
+    }
 
     //PREPARE TERMINAL
     let mut stdout = io::stdout();
