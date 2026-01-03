@@ -28,6 +28,7 @@ use std::
         Arc,
         Mutex,
         LazyLock,
+        atomic::{ AtomicUsize, Ordering },
     },
 };
 
@@ -113,6 +114,7 @@ struct PeerData
 }
 
 //GLOBAL VARIABLES
+static LOCAL_DISPLAY_HOLD: AtomicUsize = AtomicUsize::new(0);
 static CONSUMERS: LazyLock<Mutex<HashMap<usize, RemoteStream>>> = LazyLock::new(|| Mutex::new(HashMap::new())); //OTHER CLIENTS
 
 //PRIVATE
@@ -155,7 +157,7 @@ fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], id: usize
 }
 
 //PUBLIC
-pub fn listen_server_voice(id: usize)
+pub fn listen_server_voice(id: usize, username: String)
 {
     //RESET SEQs
     options::set_seq(0);
@@ -223,6 +225,12 @@ pub fn listen_server_voice(id: usize)
     let input_stream = input_device.build_input_stream(&input_config, move |data: &[f32], _: &_|
     {
         let frames_in_buffer = data.len() / input_channels;
+
+        let current_hold = LOCAL_DISPLAY_HOLD.load(Ordering::Relaxed);
+        if current_hold > 0
+        {
+             LOCAL_DISPLAY_HOLD.store(current_hold.saturating_sub(frames_in_buffer), Ordering::Relaxed);
+        }
 
         //MONO DOWNMIX CLOSURE
         let get_mono_sample = |index: usize| -> f32
@@ -329,6 +337,7 @@ pub fn listen_server_voice(id: usize)
             //TRANSMIT ONLY IF GATE IS OPEN
             if *gate
             {
+                LOCAL_DISPLAY_HOLD.store(options::SAMPLE_RATE as usize, Ordering::Relaxed);
                 transmit_audio(&opus_encoder, &frame, &mut encoded_buffer, id, &send_socket);
             }
         }
@@ -422,7 +431,7 @@ pub fn listen_server_voice(id: usize)
         {
             if !options::get_use_voice() { return; } //QUIT ON /leave
 
-            display_active_speakers(); //SHOW VOICE ACTIVITY
+            display_active_speakers(&username); //SHOW VOICE ACTIVITY
             thread::sleep(Duration::from_millis(60));
         }
     });
@@ -503,10 +512,18 @@ pub fn remove_consumer(id: &usize)
     CONSUMERS.lock().unwrap().remove(id);
 }
 
-fn display_active_speakers()
+fn display_active_speakers(local_username: &str)
 {
-    //GET ACTIVE SPEAKER USERNAMES
+    //ACTIVE SPEAKER USERNAMES
     let mut active_speakers = Vec::new();
+
+    //GET LOCAL CLIENT
+    if LOCAL_DISPLAY_HOLD.load(Ordering::Relaxed) > 0
+    {
+        active_speakers.push(local_username.to_string());
+    }
+
+    //GET REMOTE CLIENTS
     if let Ok(consumers) = CONSUMERS.try_lock()
     {
         for (_, stream) in consumers.iter()
@@ -517,6 +534,9 @@ fn display_active_speakers()
             }
         }
     }
+
+    //REVERSE ACTIVE SPEAKERS
+    active_speakers.reverse();
 
     //PREPARE TERMINAL
     let mut stdout = io::stdout();

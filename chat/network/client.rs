@@ -178,8 +178,9 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
 
     let mut channel = String::new();
 
-    //ID SET BY SERVER
-    let mut id = 0usize;
+    //CONNECTION PROPERTIES
+    let mut id = 0usize; //ID SET BY SERVER
+    let mut username: Option<String> = None;
 
     //LOOP READING
     loop
@@ -320,13 +321,16 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 {
                     misc::clear_lines(2);
 
+                    let user = read.text.unwrap();
+
                     if first_message
                     {
                         println!();
+                        username = Some(user.clone());
                         first_message = false;
                     }
 
-                    println!("[{}]: {} connected.\n", read.username.unwrap(), read.text.unwrap());
+                    println!("[{}]: {} connected.\n", read.username.unwrap(), user);
                 }
 
                 //LEAVE MESSAGE (CLIENT DISCONNECTED)
@@ -356,7 +360,8 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     //TOGGLE VOICE
                     let status = if voice_options::swap_use_voice()
                     {
-                        thread::spawn(move || voice_client::listen_server_voice(id));
+                        let username = username.clone();
+                        thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap()));
                         "en"
                     } else
                     {
