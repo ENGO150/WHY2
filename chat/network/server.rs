@@ -819,6 +819,14 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                             voice_server::CONNECTIONS.insert(id, (None, username.clone()));
                         } else //IS USING VOICE
                         {
+                            //SEND CODE TO LAST CHANNEL
+                            send_to_all(MessagePacket
+                            {
+                                code: Some(MessageCode::ChannelLeave),
+                                id: Some(id),
+                                ..Default::default()
+                            });
+
                             //REMOVE FROM VOICE
                             voice_server::remove_connection(&id);
                         }
@@ -845,17 +853,6 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         //UPDATE CHANNEL
                         update_client_channel(&peer_addr, &read.text);
                         send_code(stream, read.text, MessageCode::Channel, Some(&keys));
-
-                        //SEND ChannelJoin CODE TO NEW CHANNEL
-                        if options::voice_chat_enabled()
-                        {
-                            send_to_all(MessagePacket
-                            {
-                                code: Some(MessageCode::ChannelJoin),
-                                id: Some(id),
-                                ..Default::default()
-                            });
-                        }
                     } else //INVALID CHANNEL
                     {
                         //SEND InvalidUsage CODE
