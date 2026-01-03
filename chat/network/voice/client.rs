@@ -74,8 +74,16 @@ use gag::Gag;
 use crossterm::
 {
     terminal,
-    style::Print,
     QueueableCommand,
+    style::
+    {
+        Print,
+        SetForegroundColor,
+        Color,
+        ResetColor,
+        SetAttribute,
+        Attribute
+    },
     cursor::
     {
         MoveTo,
@@ -514,99 +522,122 @@ pub fn remove_consumer(id: &usize)
 
 fn display_active_speakers(local_username: &str)
 {
-    //ACTIVE SPEAKER USERNAMES
-    let mut active_speakers = Vec::new();
-
-    //GET LOCAL CLIENT
-    if LOCAL_DISPLAY_HOLD.load(Ordering::Relaxed) > 0
+    //HELPER STRUCT
+    struct DisplayUser
     {
-        active_speakers.push(local_username.to_string());
+        username: String,
+        is_speaking: bool,
     }
 
-    //GET REMOTE CLIENTS
+    //ALL USERS
+    let mut users_to_display = Vec::new();
+
+    //ADD LOCAL CLIENT
+    let local_speaking = LOCAL_DISPLAY_HOLD.load(Ordering::Relaxed) > 0;
+    users_to_display.push(DisplayUser
+    {
+        username: local_username.to_string(),
+        is_speaking: local_speaking,
+    });
+
+    //COLLECT OTHER USERS
     if let Ok(consumers) = CONSUMERS.try_lock()
     {
         for (_, stream) in consumers.iter()
         {
-            if stream.display_hold > 0
+            users_to_display.push(DisplayUser
             {
-                active_speakers.push(stream.username.clone());
-            }
+                username: stream.username.clone(),
+                is_speaking: stream.display_hold > 0, //SPEAKING
+            });
         }
     }
 
-    //REVERSE ACTIVE SPEAKERS
-    active_speakers.reverse();
+    //SORT
+    users_to_display.sort_by(|a, b|
+    {
+        if a.is_speaking == b.is_speaking
+        {
+            a.username.cmp(&b.username)
+        } else
+        {
+            b.is_speaking.cmp(&a.is_speaking)
+        }
+    });
 
     //PREPARE TERMINAL
     let mut stdout = io::stdout();
     let (cols, rows) = terminal::size().unwrap_or((80, 24));
 
-    //SAVE CURSOR POSITION
     stdout.queue(SavePosition).unwrap();
 
-    let overlay_width = 25; //WINDOW WIDTH
-    let bottom_row = rows.saturating_sub(2); //BEGIN WINDOW 2 LINES FROM BOTTOM
+    let overlay_width = 25;
+    let bottom_row = rows.saturating_sub(2);
     let available_height = rows.saturating_sub(4) as usize;
-
-    //MAX USERS TO DISPLAY
     let limit = available_height.min(15);
 
-    //CALCULATE MAX WIDTH FOR ALIGNMENT
-    let header_text = "SPEAKING:";
+    let header_text = "VOICE CHANNEL:"; //HEADER
     let mut max_content_width = header_text.len();
 
-    //FIND LONGEST LINE
-    for username in active_speakers.iter().take(limit)
+    //FIND WIDEST LINE
+    for user in users_to_display.iter().take(limit)
     {
-        let width = username.chars().count() + 3; // "- " + username + " "
+        let width = user.username.chars().count() + 3;
         if width > max_content_width
         {
             max_content_width = width;
         }
     }
 
-    //DETERMINE CLEAR WIDTH
     let clear_width = overlay_width.max(max_content_width);
+    let align_x = cols.saturating_sub(max_content_width as u16).saturating_sub(1);
 
     //CLEAR WINDOW
     for i in 0..=limit
     {
         let y = bottom_row.saturating_sub(i as u16);
         let x = cols.saturating_sub(clear_width as u16);
-
         stdout.queue(MoveTo(x, y)).unwrap();
-        stdout.queue(Print(" ".repeat(clear_width as usize))).unwrap(); //FILL WITH BLANK SPACES
+        stdout.queue(Print(" ".repeat(clear_width as usize))).unwrap();
     }
 
-    //STORE ACTIVE SPEAKER COUNT
-    let count = active_speakers.len().min(limit);
-
-    //CALCULATE ALIGNMENT X
-    let align_x = cols.saturating_sub(max_content_width as u16).saturating_sub(1);
-
-    //DRAW NEW STATE
-    for (i, username) in active_speakers.iter().take(limit).enumerate()
+    //PRINT
+    for (i, user) in users_to_display.iter().take(limit).enumerate()
     {
         let y = bottom_row.saturating_sub(i as u16);
-
-        //TEXT FORMAT
-        let text = format!("- {} ", username);
+        let text = format!("- {} ", user.username);
 
         stdout.queue(MoveTo(align_x, y)).unwrap();
-        stdout.queue(Print(text)).unwrap();
+
+        if user.is_speaking
+        {
+            //ACTIVE
+            stdout.queue(SetForegroundColor(Color::Green)).unwrap();
+            stdout.queue(SetAttribute(Attribute::Bold)).unwrap();
+            stdout.queue(Print(text)).unwrap();
+            stdout.queue(SetAttribute(Attribute::Reset)).unwrap();
+            stdout.queue(ResetColor).unwrap();
+        } else
+        {
+            //INACTIVE
+            stdout.queue(SetForegroundColor(Color::DarkGrey)).unwrap();
+            stdout.queue(Print(text)).unwrap();
+            stdout.queue(ResetColor).unwrap();
+        }
     }
 
-    //PRINT "SPEAKING"
-    if count > 0
+    //HEADER PRINT
+    if !users_to_display.is_empty()
     {
+        let count = users_to_display.len().min(limit);
         let y = bottom_row.saturating_sub(count as u16);
 
         stdout.queue(MoveTo(align_x, y)).unwrap();
+        stdout.queue(SetAttribute(Attribute::Underlined)).unwrap();
         stdout.queue(Print(header_text)).unwrap();
+        stdout.queue(SetAttribute(Attribute::Reset)).unwrap();
     }
 
-    //RESTORE CURSOR POSITION
     stdout.queue(RestorePosition).unwrap();
-    stdout.flush().unwrap(); //FLUSH STDOUT
+    stdout.flush().unwrap();
 }
