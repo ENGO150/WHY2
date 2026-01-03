@@ -831,8 +831,31 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     //CHECK PARAMETER VALIDITY
                     if read.text.iter().all(|s| !s.is_empty() && s.len() <= config::server_config("max_channel_length") && s.chars().all(|c| c.is_ascii_alphanumeric() && c != ' '))
                     {
+                        //SEND ChannelLeave CODE TO OLD CHANNEL
+                        if options::voice_chat_enabled()
+                        {
+                            send_to_all(MessagePacket
+                            {
+                                code: Some(MessageCode::ChannelLeave),
+                                id: Some(id),
+                                ..Default::default()
+                            });
+                        }
+
+                        //UPDATE CHANNEL
                         update_client_channel(&peer_addr, &read.text);
                         send_code(stream, read.text, MessageCode::Channel, Some(&keys));
+
+                        //SEND ChannelJoin CODE TO NEW CHANNEL
+                        if options::voice_chat_enabled()
+                        {
+                            send_to_all(MessagePacket
+                            {
+                                code: Some(MessageCode::ChannelJoin),
+                                id: Some(id),
+                                ..Default::default()
+                            });
+                        }
                     } else //INVALID CHANNEL
                     {
                         //SEND InvalidUsage CODE

@@ -373,6 +373,12 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("Voice {}abled.\n", status);
                 },
 
+                //CLIENT LEFT VOICE CHANNEL
+                MessageCode::ChannelLeave =>
+                {
+                    voice_client::remove_consumer(&read.id.unwrap());
+                },
+
                 //LIST OF ONLINE USERS
                 MessageCode::List =>
                 {

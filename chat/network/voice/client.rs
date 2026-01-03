@@ -460,7 +460,7 @@ pub fn listen_server_voice(id: usize, username: String)
         };
 
         //CREATE NEW CLIENT CONTEXT ON UNKNOWN CLIENT
-        if !peers.contains_key(&sender_id)
+        if !peers.contains_key(&sender_id) || !CONSUMERS.lock().unwrap().contains_key(&sender_id)
         {
             //OPUS DECODER
             let decoder = Decoder::new
