@@ -102,6 +102,7 @@ struct RemoteStream
     current_sample: f32,     //CURRENT SAMPLE FOR INTERPOLATION
     next_sample: f32,        //NEXT SAMPLE FOR INTERPOLATION
     activity_hold: usize,    //ACTIVITY TIMER
+    display_hold: usize,     //ACTIVITY WINDOW TIMER
     username: String,        //USERNAME
 }
 
@@ -375,6 +376,7 @@ pub fn listen_server_voice(id: usize)
                 if interpolated.abs() > options::MIXING_TRESHOLD
                 {
                     stream.activity_hold = options::SAMPLE_RATE as usize / 10; //SET TIMER TO ~100ms
+                    stream.display_hold = options::SAMPLE_RATE as usize; //SET DISPLAY FOR ~1000ms
                 }
 
                 if stream.activity_hold > 0
@@ -383,6 +385,12 @@ pub fn listen_server_voice(id: usize)
                     mixed_sample += interpolated;
                     active_speakers += 1;
                     stream.activity_hold -= 1;
+                }
+
+                //DECREMENT DISPLAY TIMER
+                if stream.display_hold > 0
+                {
+                    stream.display_hold -= 1;
                 }
             }
 
@@ -473,6 +481,7 @@ pub fn listen_server_voice(id: usize)
                 current_sample: 0.,
                 next_sample: first_sample,
                 activity_hold: 0,
+                display_hold: 0,
                 username: network_buffer.username.unwrap(),
             });
         }
@@ -502,7 +511,7 @@ fn display_active_speakers()
     {
         for (_, stream) in consumers.iter()
         {
-            if stream.activity_hold > 0
+            if stream.display_hold > 0
             {
                 active_speakers.push(stream.username.clone());
             }
