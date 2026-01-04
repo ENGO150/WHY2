@@ -886,6 +886,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 send_to_all(MessagePacket
                                 {
                                     code: Some(MessageCode::ChannelLeave),
+                                    username: Some(username.clone()),
                                     id: Some(id),
                                     ..Default::default()
                                 });
@@ -909,6 +910,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                             send_to_all(MessagePacket
                             {
                                 code: Some(MessageCode::ChannelLeave),
+                                username: Some(username.clone()),
                                 id: Some(id),
                                 ..Default::default()
                             });
