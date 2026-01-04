@@ -1,6 +1,40 @@
 Changelog
 =========
 
+v1.4.1:
+- b417037: sort clients in vad window by id
+- 31930c0: change DISPLAY_HOLD to 200ms
+- 5302ff0: move voice::client constants to voice::options
+- 35ddc5a: prioritize release profile speed over binary size
+- 1256e01: simplify encrypter key parameter pattern matching
+- 3fdb593: remove network::send redundant mutability
+- 77cdd54: fix ChannelLeave sending bug
+- 94d00bd: merge CONSUMERS and peers
+- 5fc62dd: add clients automatically on voice join
+- a8234a5: fix ChannelJoin ghost client bug
+- 369267f: implement opus packet verification on server
+- 7014fe9: implement ChannelJoin code
+- 6a09914: send hello packet on voice connect
+- 6a93983: remove voice feature from build script
+- 6f60f58: fix active speakers sorting
+- 5fe7f1c: display all users in active users window
+- 04fb995: implement ChannelLeave on Voice and Leave code
+- d9f3fe6: revert sound effects
+- 3a4aff6: add voice channel sound effects
+- 293810c: move voice_client to separate module
+- 65195ef: call voice_client::remove_consumer on ChannelLeave code
+- e1f62fe: display local client in active speakers window
+- c3c01d7: implement display_hold for vad window
+- 1190d04: use usernames for active speakers window
+- 0276fc9: kill active speakers thread on voice disconnect
+- 46f03de: display active speakers with left text align
+- 2518d02: display active speakers on client
+- cfe4678: map client ids with usernames on client
+- 2a4ddfc: make consumers private
+- 2fc5894: remove consumer from map on Leave code
+- 5d24119: move consumers HashMap to global context
+- 1cf6b0d: reset server activity timer on voice
+
 v1.4.0:
 - 8e95779: mention voice chat in rustdoc
 - 98aa334: remove voice feature from pipelines
