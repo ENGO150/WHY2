@@ -377,6 +377,19 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     println!("Voice {}abled.\n", status);
                 },
 
+                //VOICE CLIENTS
+                MessageCode::VoiceClients =>
+                {
+                    //PARSE JSON
+                    let clients: Vec<(usize, String)> = serde_json::from_str(&read.text.unwrap()).expect("Parsing welcome json failed");
+
+                    //ADD CLIENTS
+                    for (id, username) in clients
+                    {
+                        voice_client::add_consumer(id, username, None);
+                    }
+                }
+
                 //CLIENT JOINED VOICE CHANNEL
                 MessageCode::ChannelJoin =>
                 {

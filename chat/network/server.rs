@@ -576,6 +576,52 @@ fn ask_version(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &options::Sha
     version.text
 }
 
+fn send_voice_clients(stream: &mut TcpStream, keys: &options::SharedKeys, id: usize)
+{
+    //FIND CHANNEL
+    let sender_channel = match CONNECTIONS.iter().find(|e| e.value().id() == Some(&id))
+    {
+        Some(entry) => entry.value().channel().clone(),
+        None => return,
+    };
+
+    let mut clients: Vec<(usize, String)> = Vec::new();
+
+    //COLLECT VOICE CLIENTS
+    for entry in CONNECTIONS.iter()
+    {
+        let conn = entry.value();
+
+        let uid = match conn.id()
+        {
+            Some(i) => *i,
+            None => continue
+        };
+
+        //FILTERS
+        if uid == id { continue; } // IGNORE SELF
+        if conn.channel() != &sender_channel { continue; } //IGNORE ANOTHER CHANNELS
+
+        //CHECK IF IS IN VOICE
+        if voice_server::CONNECTIONS.contains_key(&uid)
+        {
+            //ADD USERNAMES
+            if let Some(username) = conn.username()
+            {
+                 clients.push((uid, username.clone()));
+            }
+        }
+    }
+
+    //SEND
+    network::send(stream, MessagePacket
+    {
+        text: Some(json!(clients).to_string()),
+        code: Some(MessageCode::VoiceClients),
+        ..Default::default()
+    }, Some(keys));
+}
+
 //PUBLIC
 pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, keys: Option<&options::SharedKeys>) //SEND CODE TO CLIENT
 {
@@ -829,6 +875,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     ..Default::default()
                                 });
                             }
+
+                            //SEND CONNECTED CLIENTS
+                            send_voice_clients(stream, &keys, id);
                         } else //IS USING VOICE
                         {
                             //SEND CODE TO LAST CHANNEL
@@ -880,6 +929,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 ..Default::default()
                             });
                         }
+
+                        //SEND CONNECTED CLIENTS
+                        send_voice_clients(stream, &keys, id);
                     } else //INVALID CHANNEL
                     {
                         //SEND InvalidUsage CODE
