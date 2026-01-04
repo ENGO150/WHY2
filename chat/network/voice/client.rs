@@ -539,6 +539,7 @@ fn display_active_speakers(local_username: &str)
     //HELPER STRUCT
     struct DisplayUser
     {
+        id: usize,
         username: String,
         is_speaking: bool,
     }
@@ -550,6 +551,7 @@ fn display_active_speakers(local_username: &str)
     let local_speaking = LOCAL_DISPLAY_HOLD.load(Ordering::Relaxed) > 0;
     users_to_display.push(DisplayUser
     {
+        id: 0,
         username: local_username.to_string(),
         is_speaking: local_speaking,
     });
@@ -557,10 +559,11 @@ fn display_active_speakers(local_username: &str)
     //COLLECT OTHER USERS
     if let Ok(consumers) = CONSUMERS.try_lock()
     {
-        for (_, (stream, _)) in consumers.iter()
+        for (id, (stream, _)) in consumers.iter()
         {
             users_to_display.push(DisplayUser
             {
+                id: *id,
                 username: stream.username.clone(),
                 is_speaking: stream.display_hold > 0, //SPEAKING
             });
@@ -570,7 +573,7 @@ fn display_active_speakers(local_username: &str)
     //SORT
     if users_to_display.len() > 1
     {
-        users_to_display[1..].sort_by(|a, b| a.username.cmp(&b.username));
+        users_to_display[1..].sort_by_key(|u| u.id);
     }
 
     //PREPARE TERMINAL
@@ -610,7 +613,7 @@ fn display_active_speakers(local_username: &str)
     }
 
     //PRINT
-    for (i, user) in users_to_display.iter().take(limit).enumerate()
+    for (i, user) in users_to_display.iter().take(limit).rev().enumerate()
     {
         let y = bottom_row.saturating_sub(i as u16);
         let text = format!("- {} ", user.username);
