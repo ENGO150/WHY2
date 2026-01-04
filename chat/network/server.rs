@@ -870,7 +870,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         send_code(stream, read.text, MessageCode::Channel, Some(&keys));
 
                         //SEND CODE TO CHANNEL
-                        if options::voice_chat_enabled()
+                        if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
                         {
                             send_to_all(MessagePacket
                             {

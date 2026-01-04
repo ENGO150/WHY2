@@ -381,7 +381,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 MessageCode::ChannelJoin =>
                 {
                     let joined_id = read.id.unwrap();
-                    if id != joined_id
+                    if voice_options::get_use_voice() && id != joined_id
                     {
                         voice_client::add_consumer(read.id.unwrap(), read.username.unwrap(), None);
                     }
