@@ -36,7 +36,7 @@ pub const MIXING_TRESHOLD: f32      = 0.001;                                    
 pub const ACTIVITY_TRESHOLD: usize  = 100;                                      //SERVER ACTIVITY TIMER RESET TRESHOLD (~2000ms)
 
 pub const ACTIVITY_HOLD: usize      = (SAMPLE_RATE / 10) as usize;              //HOW LONG AFTER SPEAKING CLIENT BECOMES INACTIVE (~100ms)
-pub const DISPLAY_HOLD: usize       = 1000;                                     //ACTIVITY_HOLD BUT MS FOR DISPLAY WINDOW
+pub const DISPLAY_HOLD: usize       = 200;                                      //ACTIVITY_HOLD BUT MS FOR DISPLAY WINDOW
 
 pub const JITTER_BUFFER_SIZE: usize = 20;                                       //FRAME SIZE OF JITTER BUFFER
 
