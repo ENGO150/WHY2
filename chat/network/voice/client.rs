@@ -192,6 +192,15 @@ pub fn listen_server_voice(id: usize, username: String)
     //DISABLE SUPPRESSION
     drop(stderr_gag);
 
+    //SEND HELLO PACKET
+    voice::send(&socket, VoicePacket
+    {
+        voice: Vec::new(),
+        id: Some(id),
+
+        ..Default::default()
+    }, &chat_options::get_keys().unwrap()).unwrap();
+
     //CONFIGURE CPAL INPUT
     let input_config = configure_device(input_device.supported_input_configs().unwrap(), input_device.default_input_config().unwrap());
 
