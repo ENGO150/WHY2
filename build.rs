@@ -27,7 +27,6 @@ fn main()
     let client_feature = env::var("CARGO_FEATURE_CLIENT").is_ok();
     let server_feature = env::var("CARGO_FEATURE_SERVER").is_ok();
     let chat_feature = env::var("CARGO_FEATURE_CHAT").is_ok();
-    let voice_feature = env::var("CARGO_FEATURE_VOICE").is_ok();
 
     //DIRECT CHAT FEATURE USE
     if chat_feature && !(client_feature || server_feature)
@@ -39,11 +38,5 @@ fn main()
     if client_feature && server_feature
     {
         panic!("Features `client` and `server` cannot be enabled at the same time.");
-    }
-
-    //USE OF VOICE FEATURE WITHOUT CHAT
-    if voice_feature && !(client_feature || server_feature)
-    {
-        panic!("Feature `voice` must be enabled along with `client` or `server`.");
     }
 }
