@@ -210,11 +210,8 @@ impl<'de> SchemaRead<'de> for SerColor
 }
 
 //FUNCTIONS
-pub fn send(stream: &mut TcpStream, packet: MessagePacket, keys: Option<&chat_options::SharedKeys>) //SEND packet TO stream
+pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&chat_options::SharedKeys>) //SEND packet TO stream
 {
-    //COPY PACKET
-    let mut packet = packet;
-
     //ADD SEQUENCE NUMBER TO packet (FROM CLIENT)
     #[cfg(feature = "client")]
     {
