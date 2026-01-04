@@ -90,6 +90,7 @@ pub enum MessageCode //CONTROL CODES
     Version,            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
     Channel,            //SERVER <> CLIENT | CHANNEL CHANGE
     Voice,              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
+    ChannelJoin,        //SERVER -> CLIENT | CLIENT JOINED VOICE CHANNEL
     ChannelLeave,       //SERVER -> CLIENT | CLIENT LEFT VOICE CHANNEL
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
     InvalidFeature,     //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE

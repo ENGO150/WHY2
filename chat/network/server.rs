@@ -817,15 +817,30 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         {
                             //ADD CLIENT ID TO VOICE CONNECTIONS MAP
                             voice_server::CONNECTIONS.insert(id, (None, username.clone()));
+
+                            //SEND CODE TO CHANNEL
+                            if options::voice_chat_enabled()
+                            {
+                                send_to_all(MessagePacket
+                                {
+                                    code: Some(MessageCode::ChannelJoin),
+                                    username: Some(username.clone()),
+                                    id: Some(id),
+                                    ..Default::default()
+                                });
+                            }
                         } else //IS USING VOICE
                         {
                             //SEND CODE TO LAST CHANNEL
-                            send_to_all(MessagePacket
+                            if options::voice_chat_enabled()
                             {
-                                code: Some(MessageCode::ChannelLeave),
-                                id: Some(id),
-                                ..Default::default()
-                            });
+                                send_to_all(MessagePacket
+                                {
+                                    code: Some(MessageCode::ChannelLeave),
+                                    id: Some(id),
+                                    ..Default::default()
+                                });
+                            }
 
                             //REMOVE FROM VOICE
                             voice_server::remove_connection(&id);
@@ -853,6 +868,18 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         //UPDATE CHANNEL
                         update_client_channel(&peer_addr, &read.text);
                         send_code(stream, read.text, MessageCode::Channel, Some(&keys));
+
+                        //SEND CODE TO CHANNEL
+                        if options::voice_chat_enabled()
+                        {
+                            send_to_all(MessagePacket
+                            {
+                                code: Some(MessageCode::ChannelJoin),
+                                username: Some(username.clone()),
+                                id: Some(id),
+                                ..Default::default()
+                            });
+                        }
                     } else //INVALID CHANNEL
                     {
                         //SEND InvalidUsage CODE

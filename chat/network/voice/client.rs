@@ -115,7 +115,7 @@ struct RemoteStream
     username: String,        //USERNAME
 }
 
-struct PeerData
+pub struct PeerData
 {
     decoder: Decoder,        //DECODER
     producer: HeapProd<f32>, //RINGBUFFER WRITER
@@ -479,37 +479,7 @@ pub fn listen_server_voice(id: usize, username: String)
         //CREATE NEW CLIENT CONTEXT ON UNKNOWN CLIENT
         if !peers.contains_key(&sender_id) || !CONSUMERS.lock().unwrap().contains_key(&sender_id)
         {
-            //OPUS DECODER
-            let decoder = Decoder::new
-            (
-                <SampleRate as TryFrom<i32>>::try_from(options::SAMPLE_RATE as i32).unwrap(),
-                Channels::Mono,
-            ).unwrap();
-
-            //JITTER BUFFER
-            let rb = HeapRb::<f32>::new(options::FRAME_SIZE * 20);
-            let (producer, mut consumer) = rb.split();
-
-            let first_sample = consumer.try_pop().unwrap_or(0.0);
-
-            //INSERT TO LOCAL MAP
-            peers.insert(sender_id, PeerData
-            {
-                decoder: decoder,
-                producer: producer,
-            });
-
-            //INSERT TO SHARED AUDIO THREAD MAP
-            CONSUMERS.lock().unwrap().insert(sender_id, RemoteStream
-            {
-                consumer: consumer,
-                resample_pos: 0.,
-                current_sample: 0.,
-                next_sample: first_sample,
-                activity_hold: 0,
-                display_hold: 0,
-                username: network_buffer.username.unwrap(),
-            });
+            add_consumer(sender_id, network_buffer.username.unwrap(), Some(&mut peers));
         }
 
         if let Some(peer) = peers.get_mut(&sender_id)
@@ -527,6 +497,49 @@ pub fn listen_server_voice(id: usize, username: String)
 pub fn remove_consumer(id: &usize)
 {
     CONSUMERS.lock().unwrap().remove(id);
+}
+
+pub fn remove_all_consumers()
+{
+    CONSUMERS.lock().unwrap().clear();
+}
+
+pub fn add_consumer(id: usize, username: String, peers: Option<&mut HashMap<usize, PeerData>>)
+{
+    //OPUS DECODER
+    let decoder = Decoder::new
+    (
+        <SampleRate as TryFrom<i32>>::try_from(options::SAMPLE_RATE as i32).unwrap(),
+        Channels::Mono,
+    ).unwrap();
+
+    //JITTER BUFFER
+    let rb = HeapRb::<f32>::new(options::FRAME_SIZE * 20);
+    let (producer, mut consumer) = rb.split();
+
+    let first_sample = consumer.try_pop().unwrap_or(0.0);
+
+    //INSERT TO LOCAL MAP
+    if let Some(peers) = peers
+    {
+        peers.insert(id, PeerData
+        {
+            decoder: decoder,
+            producer: producer,
+        });
+    }
+
+    //INSERT TO SHARED AUDIO THREAD MAP
+    CONSUMERS.lock().unwrap().insert(id, RemoteStream
+    {
+        consumer: consumer,
+        resample_pos: 0.,
+        current_sample: 0.,
+        next_sample: first_sample,
+        activity_hold: 0,
+        display_hold: 0,
+        username: username,
+    });
 }
 
 fn display_active_speakers(local_username: &str)

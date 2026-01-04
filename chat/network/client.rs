@@ -344,6 +344,9 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //CHANNEL CHANGE
                 MessageCode::Channel =>
                 {
+                    //REMOVE ALL STORED VOICE CLIENTS
+                    voice_client::remove_all_consumers();
+
                     channel = if let Some(c) = read.text
                     {
                         format!("#{c} | ")
@@ -372,6 +375,16 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     //PRINT STATUS
                     misc::clear_lines(2);
                     println!("Voice {}abled.\n", status);
+                },
+
+                //CLIENT JOINED VOICE CHANNEL
+                MessageCode::ChannelJoin =>
+                {
+                    let joined_id = read.id.unwrap();
+                    if id != joined_id
+                    {
+                        voice_client::add_consumer(read.id.unwrap(), read.username.unwrap(), None);
+                    }
                 },
 
                 //CLIENT LEFT VOICE CHANNEL
