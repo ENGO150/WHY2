@@ -354,7 +354,7 @@ pub fn listen_server_voice(id: usize, username: String)
             //TRANSMIT ONLY IF GATE IS OPEN
             if *gate
             {
-                LOCAL_DISPLAY_HOLD.store(options::SAMPLE_RATE as usize, Ordering::Relaxed);
+                LOCAL_DISPLAY_HOLD.store((options::SAMPLE_RATE * options::DISPLAY_HOLD as u32 / 1000) as usize, Ordering::Relaxed);
                 transmit_audio(&opus_encoder, &frame, &mut encoded_buffer, id, &send_socket);
             }
         }
@@ -399,8 +399,8 @@ pub fn listen_server_voice(id: usize, username: String)
                 //ACTIVE SPEAKER DETECTION
                 if interpolated.abs() > options::MIXING_TRESHOLD
                 {
-                    stream.activity_hold = options::SAMPLE_RATE as usize / 10; //SET TIMER TO ~100ms
-                    stream.display_hold = options::SAMPLE_RATE as usize; //SET DISPLAY FOR ~1000ms
+                    stream.activity_hold = options::ACTIVITY_HOLD; //SET TIMER TO ~100ms
+                    stream.display_hold = (options::SAMPLE_RATE * options::DISPLAY_HOLD as u32 / 1000) as usize; //SET DISPLAY FOR ~1000ms
                 }
 
                 if stream.activity_hold > 0
@@ -512,7 +512,7 @@ pub fn add_consumer(id: usize, username: String)
     ).unwrap();
 
     //JITTER BUFFER
-    let rb = HeapRb::<f32>::new(options::FRAME_SIZE * 20);
+    let rb = HeapRb::<f32>::new(options::FRAME_SIZE * options::JITTER_BUFFER_SIZE);
     let (producer, mut consumer) = rb.split();
 
     let first_sample = consumer.try_pop().unwrap_or(0.0);
