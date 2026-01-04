@@ -81,6 +81,52 @@ impl Connection
 }
 
 //HELPER FUNCTIONS
+//PRIVATE
+fn parse_opus_len(bytes: &[u8]) -> (usize, usize)
+{
+    if bytes.is_empty() { return (0, 0); }
+    let b0 = bytes[0] as usize;
+    if b0 < 252
+    {
+        (b0, 1)
+    } else if bytes.len() >= 2
+    {
+        let b1 = bytes[1] as usize;
+        (b1 * 4 + b0, 2)
+    } else
+    {
+        (0, 0)
+    }
+}
+
+fn validate_opus_packet(packet: &[u8]) -> bool
+{
+    if packet.is_empty() { return false; }
+
+    let toc = packet[0];
+    let framing = toc & 0x03;
+
+    match framing
+    {
+        0 => true,
+        1 => (packet.len() - 1) % 2 == 0,
+        2 =>
+        {
+            if packet.len() < 2 { return false; }
+            let (len, count) = parse_opus_len(&packet[1..]);
+            if count == 0 { return false; }
+            packet.len() >= 1 + count + len
+        },
+        3 => {
+            if packet.len() < 2 { return false; }
+            let frame_count = packet[1] & 0x3F;
+            frame_count > 0
+        },
+        _ => false
+    }
+}
+
+//PUBLIC
 pub fn find_key(id: &usize) -> Option<SharedKeys>
 {
     server::CONNECTIONS.iter()
@@ -168,6 +214,9 @@ pub fn listen_client_voice(socket: UdpSocket)
             //SET USERNAME
             username = conn.1.clone();
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
+
+        //VALIDATE PACKET
+        if !validate_opus_packet(&received.voice) { continue; } //IGNORE INVALID
 
         //FIND SENDER'S CHANNEL
         let sender_channel = find_channel(&id);
