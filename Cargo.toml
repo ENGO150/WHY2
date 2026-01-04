@@ -28,7 +28,7 @@ categories = ["cryptography", "network-programming", "command-line-utilities"]
 default-run = "why2"
 
 [profile.release]
-opt-level = "s"
+opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
