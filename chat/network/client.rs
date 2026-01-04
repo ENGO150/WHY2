@@ -386,7 +386,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     //ADD CLIENTS
                     for (id, username) in clients
                     {
-                        voice_client::add_consumer(id, username, None);
+                        voice_client::add_consumer(id, username);
                     }
                 }
 
@@ -396,7 +396,7 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                     let joined_id = read.id.unwrap();
                     if voice_options::get_use_voice() && id != joined_id
                     {
-                        voice_client::add_consumer(read.id.unwrap(), read.username.unwrap(), None);
+                        voice_client::add_consumer(read.id.unwrap(), read.username.unwrap());
                     }
                 },
 

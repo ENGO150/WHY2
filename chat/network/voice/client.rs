@@ -123,7 +123,7 @@ pub struct PeerData
 
 //GLOBAL VARIABLES
 static LOCAL_DISPLAY_HOLD: AtomicUsize = AtomicUsize::new(0);
-static CONSUMERS: LazyLock<Mutex<HashMap<usize, RemoteStream>>> = LazyLock::new(|| Mutex::new(HashMap::new())); //OTHER CLIENTS
+static CONSUMERS: LazyLock<Mutex<HashMap<usize, (RemoteStream, PeerData)>>> = LazyLock::new(|| Mutex::new(HashMap::new())); //OTHER CLIENTS
 
 //PRIVATE
 fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
@@ -360,8 +360,6 @@ pub fn listen_server_voice(id: usize, username: String)
         }
     }, |_| {}, None).unwrap();
 
-    let mut peers: HashMap<usize, PeerData> = HashMap::new();
-
     //OUTPUT RESAMPLING
     let output_channels = output_config.channels as usize;
     let output_source_rate = options::SAMPLE_RATE as f32;
@@ -384,7 +382,7 @@ pub fn listen_server_voice(id: usize, username: String)
             let mut mixed_sample = 0.;
             let mut active_speakers = 0;
 
-            for stream in consumers_guard.values_mut()
+            for (stream, _) in consumers_guard.values_mut()
             {
                 //RESAMPLE LOOP
                 while stream.resample_pos >= 1.
@@ -477,12 +475,12 @@ pub fn listen_server_voice(id: usize, username: String)
         };
 
         //CREATE NEW CLIENT CONTEXT ON UNKNOWN CLIENT
-        if !peers.contains_key(&sender_id) || !CONSUMERS.lock().unwrap().contains_key(&sender_id)
+        if !CONSUMERS.lock().unwrap().contains_key(&sender_id)
         {
-            add_consumer(sender_id, network_buffer.username.unwrap(), Some(&mut peers));
+            add_consumer(sender_id, network_buffer.username.unwrap());
         }
 
-        if let Some(peer) = peers.get_mut(&sender_id)
+        if let Some((_, peer)) = CONSUMERS.lock().unwrap().get_mut(&sender_id)
         {
             //DECODE
             if let Ok(decoded_len) = peer.decoder.decode_float(Some(&network_buffer.voice), &mut decoded_buffer[..], false)
@@ -504,7 +502,7 @@ pub fn remove_all_consumers()
     CONSUMERS.lock().unwrap().clear();
 }
 
-pub fn add_consumer(id: usize, username: String, peers: Option<&mut HashMap<usize, PeerData>>)
+pub fn add_consumer(id: usize, username: String)
 {
     //OPUS DECODER
     let decoder = Decoder::new
@@ -519,18 +517,8 @@ pub fn add_consumer(id: usize, username: String, peers: Option<&mut HashMap<usiz
 
     let first_sample = consumer.try_pop().unwrap_or(0.0);
 
-    //INSERT TO LOCAL MAP
-    if let Some(peers) = peers
-    {
-        peers.insert(id, PeerData
-        {
-            decoder: decoder,
-            producer: producer,
-        });
-    }
-
     //INSERT TO SHARED AUDIO THREAD MAP
-    CONSUMERS.lock().unwrap().insert(id, RemoteStream
+    CONSUMERS.lock().unwrap().insert(id, (RemoteStream
     {
         consumer: consumer,
         resample_pos: 0.,
@@ -539,7 +527,11 @@ pub fn add_consumer(id: usize, username: String, peers: Option<&mut HashMap<usiz
         activity_hold: 0,
         display_hold: 0,
         username: username,
-    });
+    }, PeerData
+    {
+        decoder: decoder,
+        producer: producer,
+    }));
 }
 
 fn display_active_speakers(local_username: &str)
@@ -565,7 +557,7 @@ fn display_active_speakers(local_username: &str)
     //COLLECT OTHER USERS
     if let Ok(consumers) = CONSUMERS.try_lock()
     {
-        for (_, stream) in consumers.iter()
+        for (_, (stream, _)) in consumers.iter()
         {
             users_to_display.push(DisplayUser
             {
