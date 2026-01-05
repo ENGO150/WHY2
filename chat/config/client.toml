@@ -16,6 +16,8 @@
 
 # Network
 default_port = 1204 # Server port
+socks5_enabled = false # Use SOCKS5 proxying
+socks5_addr = "127.0.0.1:9050" # Local proxy address
 
 # Auto-connect
 auto_connect = false # Automatic connection to 'auto_connect_ip'
