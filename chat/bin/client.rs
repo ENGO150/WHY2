@@ -33,6 +33,8 @@ use std::
     },
 };
 
+use socks::Socks5Stream;
+
 use crossterm::
 {
     terminal,
@@ -447,12 +449,29 @@ fn main()
     //SET GLOBAL SERVER ADDR
     options::set_server_address(&connecting_addr);
 
-    //CONNECT TO SERVER
-    let mut stream = TcpStream::connect(connecting_addr).unwrap_or_else(|_|
+    //CHECK IF SOCKS5 IS ENABLED
+    if config::client_config("socks5_enabled")
     {
-        eprintln!("\nConnecting failed.");
-        process::exit(1);
-    });
+        options::enable_socks5();
+    }
+
+    //CONNECT TO SERVER
+    let mut stream = match if !options::socks5_enabled() //NO SOCKS5
+    {
+        TcpStream::connect(connecting_addr)
+    } else //USE PROXY
+    {
+        Socks5Stream::connect(config::client_config::<String>("socks5_addr"), connecting_addr.as_str())
+            .map(|s| s.into_inner())
+    }
+    {
+        Ok(s) => s,
+        Err(e) =>
+        {
+            eprintln!("\nConnecting failed: {e}");
+            process::exit(1);
+        }
+    };
 
     //SET TCP_NODELAY
     stream.set_nodelay(true).expect("Failed to set TCP_NODELAY");

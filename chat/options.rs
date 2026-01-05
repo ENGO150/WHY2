@@ -90,6 +90,9 @@ static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (
 #[cfg(feature = "client")]
 static SERVER_ADDRESS: OnceLock<String> = OnceLock::new();
 
+#[cfg(feature = "client")]
+static SOCKS5: AtomicBool = AtomicBool::new(false); //USE SOCKS5 (TOR)
+
 //FUNCTIONS
 //VOICE CHAT
 #[cfg(feature = "server")]
@@ -193,4 +196,17 @@ pub fn get_server_address() -> String //GET SERVER ADDRESS
 pub fn set_server_address(address: &str) //SET SERVER ADDRESS
 {
     SERVER_ADDRESS.set(address.to_owned()).unwrap();
+}
+
+//SOCKS5
+#[cfg(feature = "client")]
+pub fn enable_socks5() //SET SOCKS5 TO TRUE
+{
+    SOCKS5.store(true, Ordering::Relaxed);
+}
+
+#[cfg(feature = "client")]
+pub fn socks5_enabled() -> bool //GET SOCKS5
+{
+    SOCKS5.load(Ordering::Relaxed)
 }

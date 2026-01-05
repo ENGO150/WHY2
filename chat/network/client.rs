@@ -361,6 +361,13 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
                 //SERVER ALLOWED VOICE
                 MessageCode::Voice =>
                 {
+                    if options::socks5_enabled()
+                    {
+                        misc::clear_lines(2);
+                        println!("Voice chat cannot be enabled while using SOCKS5.\n");
+                        continue;
+                    }
+
                     //TOGGLE VOICE
                     let status = if voice_options::swap_use_voice()
                     {
