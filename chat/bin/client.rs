@@ -406,16 +406,16 @@ fn main()
 
     println!("Welcome.\n");
 
-    //GET CONNECTING IP
-    let mut connecting_ip = if config::client_config::<bool>("auto_connect") //USER ENABLED AUTOMATIC CONNECTION
+    //GET CONNECTING ADDRESS
+    let mut connecting_addr = if config::client_config::<bool>("auto_connect") //USER ENABLED AUTOMATIC CONNECTION
     {
-        let ip = config::client_config("auto_connect_ip"); //USE CONFIG IP
+        let addr = config::client_config("auto_connect_addr"); //USE CONFIG ADDR
 
         //PRINT OUT IP
-        println!(">>> {ip}");
+        println!(">>> {addr}");
         io::stdout().flush().unwrap();
 
-        ip
+        addr
     } else //NO AUTO CONNECT
     {
         print!("Enter IP Address:\n>>> ");
@@ -432,23 +432,23 @@ fn main()
     let mut spacer_add_spaces = 4;
 
     //ADD PORT TO IP IF MISSING
-    if !connecting_ip.contains(':')
+    if !connecting_addr.contains(':')
     {
         //APPEND DEFAULT PORT TO connecting_ip
-        connecting_ip.push_str(&format!(":{}", config::client_config::<u16>("default_port")));
+        connecting_addr.push_str(&format!(":{}", config::client_config::<u16>("default_port")));
     } else
     {
-        spacer_add_spaces += connecting_ip.len() - connecting_ip.find(":").unwrap();
+        spacer_add_spaces += connecting_addr.len() - connecting_addr.find(":").unwrap();
     }
 
     //PRINT SPACER
-    println!("{}", "=".repeat(connecting_ip.find(":").unwrap() + spacer_add_spaces));
+    println!("{}", "=".repeat(connecting_addr.find(":").unwrap() + spacer_add_spaces));
 
     //SET GLOBAL SERVER ADDR
-    options::set_server_address(&connecting_ip);
+    options::set_server_address(&connecting_addr);
 
     //CONNECT TO SERVER
-    let mut stream = TcpStream::connect(connecting_ip).unwrap_or_else(|_|
+    let mut stream = TcpStream::connect(connecting_addr).unwrap_or_else(|_|
     {
         eprintln!("\nConnecting failed.");
         process::exit(1);

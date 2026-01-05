@@ -20,8 +20,8 @@ socks5_enabled = false # Use SOCKS5 proxying
 socks5_addr = "127.0.0.1:9050" # Local proxy address
 
 # Auto-connect
-auto_connect = false # Automatic connection to 'auto_connect_ip'
-auto_connect_ip = "chat.satan.red" # See 'auto_connect'
+auto_connect = false # Automatic connection to 'auto_connect_addr'
+auto_connect_addr = "0.0.0.0" # See 'auto_connect'
 
 # Colors
 disable_colors = false # Disable message colors
