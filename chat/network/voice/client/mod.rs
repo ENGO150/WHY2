@@ -16,6 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//MODULES
+pub mod sfx;
+
 use std::
 {
     thread,
@@ -100,6 +103,7 @@ use crate::chat::
         self,
         options,
         VoicePacket,
+        client::sfx::SoundEffect,
     },
 };
 
@@ -424,6 +428,9 @@ pub fn listen_server_voice(id: usize, username: String)
                 mixed_sample /= (active_speakers as f32).sqrt();
             }
 
+            //MIX EFFECTS
+            sfx::play_effects(&mut mixed_sample);
+
             //SOFT CLIPPING (HYPERBOLIC TANGENT)
             mixed_sample = mixed_sample.tanh();
 
@@ -438,6 +445,10 @@ pub fn listen_server_voice(id: usize, username: String)
     //RUN STREAMS
     input_stream.play().unwrap();  //INPUT
     output_stream.play().unwrap(); //OUTPUT
+
+    //PLAY JOIN SOUND
+    sfx::clear_effects();
+    sfx::queue_effect(SoundEffect::Join);
 
     //START VOICE ACTIVITY DISPLAY THREAD
     thread::spawn(move ||
@@ -495,6 +506,9 @@ pub fn listen_server_voice(id: usize, username: String)
 pub fn remove_consumer(id: &usize)
 {
     CONSUMERS.lock().unwrap().remove(id);
+
+    //PLAY LEAVE SOUND EFFECT
+    sfx::queue_effect(SoundEffect::Leave);
 }
 
 pub fn remove_all_consumers()
@@ -532,6 +546,9 @@ pub fn add_consumer(id: usize, username: String)
         decoder: decoder,
         producer: producer,
     }));
+
+    //PLAY JOIN SOUND EFFECT
+    sfx::queue_effect(SoundEffect::Join);
 }
 
 fn display_active_speakers(local_username: &str)
