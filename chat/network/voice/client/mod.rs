@@ -38,6 +38,7 @@ use std::
 use cpal::
 {
     Device,
+    Stream,
     StreamConfig,
     SupportedStreamConfig,
     SupportedStreamConfigRange,
@@ -108,6 +109,17 @@ use crate::chat::
 };
 
 //STRUCTS
+struct LocalStream
+{
+    _input: Stream,
+    _output: Stream,
+}
+
+struct StreamGuard
+{
+    generation: usize,
+}
+
 struct RemoteStream
 {
     consumer: HeapCons<f32>, //RINGBUFFER READER
@@ -126,8 +138,27 @@ pub struct PeerData
 }
 
 //GLOBAL VARIABLES
-static LOCAL_DISPLAY_HOLD: AtomicUsize = AtomicUsize::new(0);
+static LOCAL_STREAMS: LazyLock<Mutex<Option<LocalStream>>> = LazyLock::new(|| Mutex::new(None));
 static CONSUMERS: LazyLock<Mutex<HashMap<usize, (RemoteStream, PeerData)>>> = LazyLock::new(|| Mutex::new(HashMap::new())); //OTHER CLIENTS
+
+static LOCAL_DISPLAY_HOLD: AtomicUsize = AtomicUsize::new(0);
+static AUDIO_GENERATION: AtomicUsize = AtomicUsize::new(0);
+
+//IMPLEMENTATIONS
+impl Drop for StreamGuard
+{
+    //CLEAR STREAMS
+    fn drop(&mut self)
+    {
+        if AUDIO_GENERATION.load(Ordering::Relaxed) == self.generation
+        {
+            if let Ok(mut streams) = LOCAL_STREAMS.lock()
+            {
+                *streams = None;
+            }
+        }
+    }
+}
 
 //PRIVATE
 fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
@@ -175,9 +206,16 @@ pub fn listen_server_voice(id: usize, username: String)
     options::set_seq(0);
     options::set_server_seq(0);
 
+    //DUPLICATE STREAM GUARDS
+    let current_generation = AUDIO_GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
+    let _guard = StreamGuard { generation: current_generation };
+
     //CONNECT
     let socket = Arc::new(UdpSocket::bind("0.0.0.0:0").expect("Binding UDP failed"));
     socket.connect(chat_options::get_server_address()).expect("Connecting to server UDP failed");
+
+    //SET SOCKET TIMEOUT
+    socket.set_read_timeout(Some(Duration::from_millis(1000))).expect("Setting socket timeout failed");
 
     //INIT AUDIO HOST
     let host = cpal::default_host();
@@ -245,6 +283,9 @@ pub fn listen_server_voice(id: usize, username: String)
     let send_socket = socket.clone();
     let input_stream = input_device.build_input_stream(&input_config, move |data: &[f32], _: &_|
     {
+        //CHECK GENERATION
+        if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
+
         let frames_in_buffer = data.len() / input_channels;
 
         let current_hold = LOCAL_DISPLAY_HOLD.load(Ordering::Relaxed);
@@ -375,6 +416,9 @@ pub fn listen_server_voice(id: usize, username: String)
     //CONFIGURE OUTPUT STREAM
     let output_stream = output_device.build_output_stream(&output_config, move |data: &mut [f32], _: &_|
     {
+        //CHECK GENERATION
+        if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
+
         //CLEAR OUTPUT BUFFER
         data.fill(0.);
 
@@ -445,6 +489,13 @@ pub fn listen_server_voice(id: usize, username: String)
     //RUN STREAMS
     input_stream.play().unwrap();  //INPUT
     output_stream.play().unwrap(); //OUTPUT
+
+    //MOVE STREAMS TO GLOBAL STORAGE
+    *LOCAL_STREAMS.lock().unwrap() = Some(LocalStream
+    {
+        _input: input_stream,
+        _output: output_stream,
+    });
 
     //PLAY JOIN SOUND
     sfx::clear_effects();
