@@ -659,6 +659,7 @@ fn display_active_speakers(local_username: &str)
         id: usize,
         username: String,
         is_speaking: bool,
+        latency: u128,
     }
 
     //ALL USERS
@@ -671,6 +672,7 @@ fn display_active_speakers(local_username: &str)
         id: 0,
         username: local_username.to_string(),
         is_speaking: local_speaking,
+        latency: 0,
     });
 
     //COLLECT OTHER USERS
@@ -683,6 +685,7 @@ fn display_active_speakers(local_username: &str)
                 id: *id,
                 username: stream.username.clone(),
                 is_speaking: stream.display_hold > 0, //SPEAKING
+                latency: stream.avg_latency,
             });
         }
     }
@@ -733,7 +736,13 @@ fn display_active_speakers(local_username: &str)
     for (i, user) in users_to_display.iter().take(limit).rev().enumerate()
     {
         let y = bottom_row.saturating_sub(i as u16);
-        let text = format!("- {} ", user.username);
+        let text = if user.username == local_username
+        {
+            format!("- {} ", user.username)
+        } else
+        {
+            format!("- {} [{}ms]", user.username, user.latency)
+        };
 
         stdout.queue(MoveTo(align_x, y)).unwrap();
 
