@@ -524,11 +524,17 @@ pub fn listen_server_voice(id: usize, username: String)
             Some(r) => r,
             None => //READING FAILED, TIMEOUT OR CRASH PROBABLY
             {
+                //CHECK GENERATION
+                if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
+
+                //PLAY LEAVE SOUND EFFECT
+                sfx::queue_effect(SoundEffect::Leave);
+
                 //FINISH SOUND EFFECTS
                 while sfx::is_playing()
                 {
-                    //CHECK GENERATION
-                    if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { break; }
+                    //CHECK GENERATION AGAIN AHAHAHHAHAAH
+                    if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
 
                     thread::sleep(Duration::from_millis(50));
                 }
@@ -568,10 +574,11 @@ pub fn listen_server_voice(id: usize, username: String)
 
 pub fn remove_consumer(id: &usize)
 {
-    CONSUMERS.lock().unwrap().remove(id);
-
-    //PLAY LEAVE SOUND EFFECT
-    sfx::queue_effect(SoundEffect::Leave);
+    if CONSUMERS.lock().unwrap().remove(id).is_some()
+    {
+        //PLAY LEAVE SOUND EFFECT
+        sfx::queue_effect(SoundEffect::Leave);
+    }
 }
 
 pub fn remove_all_consumers()
