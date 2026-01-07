@@ -28,6 +28,7 @@ pub mod server;
 use std::
 {
     io::Error,
+    time::{ SystemTime, UNIX_EPOCH },
     net::{ UdpSocket, SocketAddr },
 };
 
@@ -49,6 +50,7 @@ pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
     pub username: Option<String>, //USERNAME
     pub id: Option<usize>,        //ID OF USER
     pub seq: usize,               //SEQUENCE NUMBER
+    pub timestamp: u128,          //TIME OF SENDING
 }
 
 impl Default for VoicePacket
@@ -61,6 +63,7 @@ impl Default for VoicePacket
             id: None,
             username: None,
             seq: 0,
+            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
         }
     }
 }

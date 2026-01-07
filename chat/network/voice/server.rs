@@ -250,6 +250,7 @@ pub fn listen_client_voice(socket: UdpSocket)
                 voice: received.voice.clone(),
                 username: Some(username.to_string()),
                 id: Some(id),
+                timestamp: received.timestamp,
                 ..Default::default()
             }, addr, recipient_id, keys).unwrap();
         }
