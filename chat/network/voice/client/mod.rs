@@ -584,6 +584,9 @@ pub fn remove_consumer(id: &usize)
 pub fn remove_all_consumers()
 {
     CONSUMERS.lock().unwrap().clear();
+
+    //PLAY JOIN SOUND EFFECT (THIS IS CALLED ON CHANNEL CHANGE)
+    sfx::queue_effect(SoundEffect::Join);
 }
 
 pub fn add_consumer(id: usize, username: String)
