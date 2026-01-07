@@ -22,10 +22,15 @@ pub mod sfx;
 use std::
 {
     thread,
-    time::Duration,
     net::UdpSocket,
     io::{ self, Write },
     collections::{ HashMap, VecDeque },
+    time::
+    {
+        SystemTime,
+        Duration,
+        UNIX_EPOCH,
+    },
     sync::
     {
         Arc,
@@ -122,13 +127,15 @@ struct StreamGuard
 
 struct RemoteStream
 {
-    consumer: HeapCons<f32>, //RINGBUFFER READER
-    resample_pos: f32,       //POSITION IN BETWEEN SAMPLES
-    current_sample: f32,     //CURRENT SAMPLE FOR INTERPOLATION
-    next_sample: f32,        //NEXT SAMPLE FOR INTERPOLATION
-    activity_hold: usize,    //ACTIVITY TIMER
-    display_hold: usize,     //ACTIVITY WINDOW TIMER
-    username: String,        //USERNAME
+    consumer: HeapCons<f32>,   //RINGBUFFER READER
+    resample_pos: f32,         //POSITION IN BETWEEN SAMPLES
+    current_sample: f32,       //CURRENT SAMPLE FOR INTERPOLATION
+    next_sample: f32,          //NEXT SAMPLE FOR INTERPOLATION
+    activity_hold: usize,      //ACTIVITY TIMER
+    display_hold: usize,       //ACTIVITY WINDOW TIMER
+    username: String,          //USERNAME
+    latencies: VecDeque<u128>, //HISTORY OF LATENCIES
+    avg_latency: u128,         //AVERAGE LATENCY TO DISPLAY
 }
 
 pub struct PeerData
@@ -560,8 +567,26 @@ pub fn listen_server_voice(id: usize, username: String)
             add_consumer(sender_id, network_buffer.username.unwrap());
         }
 
-        if let Some((_, peer)) = CONSUMERS.lock().unwrap().get_mut(&sender_id)
+        if let Some((stream, peer)) = CONSUMERS.lock().unwrap().get_mut(&sender_id)
         {
+            //CALCULATE LATENCY
+            let latency = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().saturating_sub(network_buffer.timestamp);
+
+            //STORE LATENCY TO BUFFER
+            stream.latencies.push_back(latency);
+            if stream.latencies.len() > 20 //STORE ONLY LATEST 20 LATENCIES
+            {
+                stream.latencies.pop_front();
+            }
+
+            //CALCULATE AVERAGE LATENCY
+            let sum: u128 = stream.latencies.iter().sum();
+            if !stream.latencies.is_empty()
+            {
+                //STORE IN AVG_LATENCY
+                stream.avg_latency = sum / stream.latencies.len() as u128;
+            }
+
             //DECODE
             if let Ok(decoded_len) = peer.decoder.decode_float(Some(&network_buffer.voice), &mut decoded_buffer[..], false)
             {
@@ -614,6 +639,8 @@ pub fn add_consumer(id: usize, username: String)
         activity_hold: 0,
         display_hold: 0,
         username: username,
+        latencies: VecDeque::with_capacity(20),
+        avg_latency: 0,
     }, PeerData
     {
         decoder: decoder,
