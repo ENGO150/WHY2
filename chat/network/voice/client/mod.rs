@@ -215,7 +215,7 @@ pub fn listen_server_voice(id: usize, username: String)
     socket.connect(chat_options::get_server_address()).expect("Connecting to server UDP failed");
 
     //SET SOCKET TIMEOUT
-    socket.set_read_timeout(Some(Duration::from_millis(1000))).expect("Setting socket timeout failed");
+    socket.set_read_timeout(Some(Duration::from_millis(200))).expect("Setting socket timeout failed");
 
     //INIT AUDIO HOST
     let host = cpal::default_host();
@@ -522,7 +522,19 @@ pub fn listen_server_voice(id: usize, username: String)
         let (network_buffer, _) = match voice::receive(&socket)
         {
             Some(r) => r,
-            None => return
+            None => //READING FAILED, TIMEOUT OR CRASH PROBABLY
+            {
+                //FINISH SOUND EFFECTS
+                while sfx::is_playing()
+                {
+                    //CHECK GENERATION
+                    if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { break; }
+
+                    thread::sleep(Duration::from_millis(50));
+                }
+
+                return;
+            }
         };
 
         //VERIFY SERVER SEQ

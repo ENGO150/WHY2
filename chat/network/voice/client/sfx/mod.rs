@@ -132,3 +132,8 @@ pub fn play_effects(mixed_sample: &mut f32) //PLAY ALL SOUND IN ACTIVE_EFFECTS
         });
     }
 }
+
+pub fn is_playing() -> bool //CHECK IF ANY SOUND EFFECT IS QUEUED
+{
+    ACTIVE_EFFECTS.lock().map(|e| !e.is_empty()).unwrap_or(false)
+}
