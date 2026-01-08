@@ -713,7 +713,14 @@ fn display_active_speakers(local_username: &str)
     //FIND WIDEST LINE
     for user in users_to_display.iter().take(limit)
     {
-        let width = user.username.chars().count() + 3;
+        let mut width = user.username.chars().count() + 3;
+
+        //ALSO ADD LATENCY TO WIDTH (IF LATENCY SHOWN)
+        if user.username != local_username
+        {
+            width += user.latency.to_string().len() + 4;
+        }
+
         if width > max_content_width
         {
             max_content_width = width;
