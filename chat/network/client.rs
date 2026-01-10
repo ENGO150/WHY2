@@ -19,7 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     thread,
-    process,
     net::TcpStream,
     sync::mpsc::Sender,
 };
@@ -62,6 +61,7 @@ pub enum ClientEvent
     TofuError(TofuCode),       //TOFU VERIFICATION FAILED
     Clear(usize),              //CLEAR n LINES
     ExtraSpace,                //JUST RANDOM NEWLINE
+    Quit,                      //SERVER QUIT COMMUNICATION
 }
 
 //FUNCTIONS
@@ -447,9 +447,8 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
                 MessageCode::Disconnect =>
                 {
-                    terminal::disable_raw_mode().unwrap();
-                    println!("\nServer quit communication.");
-                    process::exit(0);
+                    tx.send(ClientEvent::Quit).unwrap();
+                    return;
                 },
 
                 _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE

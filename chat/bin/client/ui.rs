@@ -23,6 +23,7 @@ use std::
     io::{ self, Write },
 };
 
+use crossterm::terminal;
 use colored::Colorize;
 
 use why2::chat::
@@ -133,5 +134,11 @@ pub fn draw_event(event: ClientEvent)
 
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),
+        ClientEvent::Quit =>
+        {
+            terminal::disable_raw_mode().unwrap();
+            println!("\nServer quit communication.");
+            process::exit(0);
+        },
     }
 }
