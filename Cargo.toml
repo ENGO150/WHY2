@@ -44,7 +44,7 @@ path = "core/lib.rs"
 
 [[bin]]
 name = "why2"
-path = "chat/bin/client.rs"
+path = "chat/bin/client/mod.rs"
 required-features = ["client"]
 
 [[bin]]
