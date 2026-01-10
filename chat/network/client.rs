@@ -59,6 +59,7 @@ pub enum ClientEvent
     Message(MessagePacket), //RECEIVED MESSAGE
     Prompt(String, String), //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
     TofuError(TofuCode),    //TOFU VERIFICATION FAILED
+    ExtraSpace,             //JUST RANDOM NEWLINE
 }
 
 //FUNCTIONS
@@ -162,7 +163,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
         extra_space = false; //RESET EXTRA SPACE
 
         //EXTRA SPACE
-        if options::get_extra_space() { println!(); }
+        if options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
 
         //CODES
         if let Some(code) = read.code
@@ -386,7 +387,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 {
                     misc::clear_lines(2);
 
-                    if !options::get_extra_space() { println!(); }
+                    if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
                     println!("Online users:");
 
                     //PARSE JSON

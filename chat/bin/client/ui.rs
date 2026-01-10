@@ -121,6 +121,8 @@ pub fn draw_event(event: ClientEvent)
             }
 
             process::exit(1);
-        }
+        },
+
+        ClientEvent::ExtraSpace => println!(),
     }
 }
