@@ -22,7 +22,7 @@ use std::
     thread,
     process,
     net::TcpStream,
-    io::{ self, Write },
+    sync::mpsc::Sender,
 };
 
 use zeroize::Zeroizing;
@@ -30,7 +30,6 @@ use zeroize::Zeroizing;
 use serde_json::Value;
 
 use crossterm::terminal;
-use colored::Colorize;
 
 use crate::chat::
 {
@@ -43,7 +42,6 @@ use crate::chat::
         self,
         MessageCode,
         MessagePacket,
-        SerColor,
         voice::
         {
             client as voice_client,
@@ -56,6 +54,14 @@ use crate::chat::
 const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
+//ENUMS
+pub enum ClientEvent
+{
+    Message(MessagePacket), //RECEIVED MESSAGE
+    Prompt(String, String), //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
+}
+
+//FUNCTIONS
 //PRIVATE
 fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options::SharedKeys) //KEY EXCHANGE FOR CLIENT-SIDE
 {
@@ -142,17 +148,8 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
     options::set_keys(keys.clone());
 }
 
-fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF PASSED COLOR
-{
-    match color
-    {
-        Some(c) if !config::client_config::<bool>("disable_colors") => text.color(c.0).to_string(),
-        _ => text
-    }
-}
-
 //PUBLIC
-pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
+pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
     //CREATE PERSISTENT BUFFER
     let mut buffer = Vec::new();
@@ -498,21 +495,11 @@ pub fn listen_server(stream: &mut TcpStream) //SERVER -> CLIENT COMMUNICATION
             }
         } else //NO CODE, PRINT MESSAGE
         {
-            misc::clear_lines(2);
-
-            println!
-            (
-                "{}{}: {}\n",
-
-                colorize(read.username.unwrap(), read.colors.username_color),                                      //USERNAME
-                if config::client_config("show_id") { format!(" ({})", read.id.unwrap()) } else { String::new() }, //ID
-                colorize(read.text.unwrap(), read.colors.message_color)                                            //MESSAGE
-            );
+            tx.send(ClientEvent::Message(read)).unwrap();
         }
 
         //PRINT INPUT PROMPT
-        print!("\r{}>>> {}", channel, options::INPUT_READ.lock().unwrap().iter().collect::<String>());
-        io::stdout().flush().unwrap();
+        tx.send(ClientEvent::Prompt(channel.clone(), options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
         if !extra_space { options::set_extra_space(false); } //DISABLE EXTRA SPACE
     }
 }

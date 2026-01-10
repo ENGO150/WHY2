@@ -18,6 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #![cfg(feature = "client")]
 
+//MODULES
+pub mod ui;
+
 use std::
 {
     env,
@@ -27,6 +30,7 @@ use std::
     net::TcpStream,
     sync::
     {
+        mpsc,
         LazyLock,
         Arc,
         Mutex,
@@ -61,7 +65,7 @@ use why2::chat::
         MessagePacket,
         MessageColors,
         SerColor,
-        client,
+        client::{ self, ClientEvent },
     },
 };
 
@@ -476,14 +480,26 @@ fn main()
     //SET TCP_NODELAY
     stream.set_nodelay(true).expect("Failed to set TCP_NODELAY");
 
+    //CREATE CHANNEL
+    let (tx, rx) = mpsc::channel::<ClientEvent>();
+
     //CLONE SOCKET FOR CLIENT INPUT
     let mut client_stream = stream.try_clone().expect("Failed cloning stream");
 
     //LISTEN TO SERVER
-    thread::spawn(move || client::listen_server(&mut stream));
+    thread::spawn(move || client::listen_server(&mut stream, tx));
 
     //ENABLE RAW MODE
     let _raw_mode_guard = RawModeGuard::enable().unwrap();
+
+    //SPAWN PRINTER THREAD
+    thread::spawn(move ||
+    {
+        while let Ok(event) = rx.recv()
+        {
+            ui::draw_event(event);
+        }
+    });
 
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
