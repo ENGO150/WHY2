@@ -79,6 +79,14 @@ pub fn draw_event(event: ClientEvent)
             );
         },
 
+        ClientEvent::Info(message, newline, lines) =>
+        {
+            clear_lines(lines);
+            print!("{message}");
+
+            if newline { println!() }
+        },
+
         ClientEvent::Prompt(channel, message) => //SHOW PROMPT BAR
         {
             print!("\r{}>>> {}", channel, message);
@@ -123,6 +131,7 @@ pub fn draw_event(event: ClientEvent)
             process::exit(1);
         },
 
+        ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),
     }
 }

@@ -56,10 +56,12 @@ const GRID_H: usize = options::GRID_DIMENSIONS.1;
 //ENUMS
 pub enum ClientEvent
 {
-    Message(MessagePacket), //RECEIVED MESSAGE
-    Prompt(String, String), //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
-    TofuError(TofuCode),    //TOFU VERIFICATION FAILED
-    ExtraSpace,             //JUST RANDOM NEWLINE
+    Message(MessagePacket),    //RECEIVED MESSAGE
+    Info(String, bool, usize), //INFO/STATUS LOG, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
+    Prompt(String, String),    //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
+    TofuError(TofuCode),       //TOFU VERIFICATION FAILED
+    Clear(usize),              //CLEAR n LINES
+    ExtraSpace,                //JUST RANDOM NEWLINE
 }
 
 //FUNCTIONS
@@ -179,8 +181,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     //NON MATCHING VERSION (WILL GET DISCONNECTED)
                     if server_version != version
                     {
-                        misc::clear_lines(1);
-                        println!("Incompatible version! ({version}/{server_version})");
+                        tx.send(ClientEvent::Info(String::from("Incompatible version! ({version}/{server_version})"), true, 1)).unwrap();
                     }
 
                     //RESPOND
@@ -206,7 +207,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     min_uname = Some(welcome_json["min_uname"].as_u64().expect("Invalid welcome json"));
                     server_name = welcome_json["server_name"].as_str().expect("Invalid welcome json");
 
-                    println!("Successfully connected to {server_name}.\n");
+                    tx.send(ClientEvent::Info(format!("Successfully connected to {server_name}.\n"), true, 0)).unwrap();
                 },
 
                 //REKEY - CHANGE KEYS
@@ -219,20 +220,20 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 //PICK_USERNAME CODE - guess what
                 MessageCode::Username =>
                 {
-                    misc::clear_lines(2);
+                    tx.send(ClientEvent::Clear(2)).unwrap();
 
                     //INVALID UNAME
                     if invalid_username
                     {
-                        misc::clear_lines(2);
-                        print!("Username rejected!");
+                        tx.send(ClientEvent::Clear(2)).unwrap();
+                        tx.send(ClientEvent::Info(String::from("Username rejected!"), false, 0)).unwrap();
                     } else //VALID
                     {
                         //SET INVALID USERNAME FOR POSSIBLE NEXT CODE
                         invalid_username = true;
                     }
 
-                    println! //TODO: Fix flushing
+                    tx.send(ClientEvent::Info(format!
                     (
                         "\n\rEnter username ({}):",
 
@@ -243,40 +244,38 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                         {
                             format!("a-Z, 0-9; {}-{} characters", min_uname.unwrap(), max_uname.unwrap())
                         }
-                    );
+                    ), true, 0)).unwrap();
                 },
 
                 //REGISTER
                 MessageCode::PasswordR =>
                 {
-                    misc::clear_lines(3);
+                    tx.send(ClientEvent::Clear(3)).unwrap();
                     options::set_asking_password(true);
 
                     //INVALID PASS
                     if invalid_password
                     {
-                        print!("Password rejected! Enter at least {} characters.", min_pass.unwrap());
+                        tx.send(ClientEvent::Info(format!("Password rejected! Enter at least {} characters.", min_pass.unwrap()), false, 3)).unwrap();
                     } else
                     {
                         invalid_password = true;
                     }
 
-                    println!("\n\rEnter password: (REGISTER)");
+                    tx.send(ClientEvent::Info(String::from("\n\rEnter password: (REGISTER)"), true, 0)).unwrap();
                 },
 
                 //LOGIN
                 MessageCode::PasswordL =>
                 {
-                    misc::clear_lines(3);
                     options::set_asking_password(true);
-                    println!("\nEnter password: (LOGIN)");
+                    tx.send(ClientEvent::Info(String::from("\nEnter password: (LOGIN)"), true, 3)).unwrap();
                 },
 
                 //START CHATTING
                 MessageCode::Accept =>
                 {
-                    misc::clear_lines(3);
-                    println!("Login successful. Press Ctrl+H for help.\n");
+                    tx.send(ClientEvent::Info(String::from("Login successful. Press Ctrl+H for help.\n"), true, 3)).unwrap();
 
                     //SET SERVER-SIDE ID
                     id = read.text.unwrap_or("0".to_string()).parse().unwrap();
@@ -288,25 +287,24 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 //JOIN MESSAGE (CLIENT CONNECTED)
                 MessageCode::Join =>
                 {
-                    misc::clear_lines(2);
+                    tx.send(ClientEvent::Clear(2)).unwrap();
 
                     let user = read.text.unwrap();
 
                     if first_message
                     {
-                        println!();
+                        tx.send(ClientEvent::ExtraSpace).unwrap();
                         username = Some(user.clone());
                         first_message = false;
                     }
 
-                    println!("[{}]: {} connected.\n", read.username.unwrap(), user);
+                    tx.send(ClientEvent::Info(format!("[{}]: {} connected.\n", read.username.unwrap(), user), true, 0)).unwrap();
                 }
 
                 //LEAVE MESSAGE (CLIENT DISCONNECTED)
                 MessageCode::Leave =>
                 {
-                    misc::clear_lines(2);
-                    println!("[{}]: {} disconnected.\n", read.username.unwrap(), read.text.unwrap());
+                    tx.send(ClientEvent::Info(format!("[{}]: {} disconnected.\n", read.username.unwrap(), read.text.unwrap()), true, 2)).unwrap();
                     voice_client::remove_consumer(&read.id.unwrap());
                 },
 
@@ -324,7 +322,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                         String::new()
                     };
 
-                    misc::clear_lines(1);
+                    tx.send(ClientEvent::Clear(1)).unwrap();
                 },
 
                 //SERVER ALLOWED VOICE
@@ -332,8 +330,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 {
                     if options::socks5_enabled()
                     {
-                        misc::clear_lines(2);
-                        println!("Voice chat cannot be enabled while using SOCKS5.\n");
+                        tx.send(ClientEvent::Info(String::from("Voice chat cannot be enabled while using SOCKS5.\n"), true, 2)).unwrap();
                         continue;
                     }
 
@@ -349,8 +346,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     };
 
                     //PRINT STATUS
-                    misc::clear_lines(2);
-                    println!("Voice {}abled.\n", status);
+                    tx.send(ClientEvent::Info(format!("Voice {}abled.\n", status), true, 2)).unwrap();
                 },
 
                 //VOICE CLIENTS
@@ -385,10 +381,8 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 //LIST OF ONLINE USERS
                 MessageCode::List =>
                 {
-                    misc::clear_lines(2);
-
                     if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
-                    println!("Online users:");
+                    tx.send(ClientEvent::Info(String::from("Online clients:"), true, 2)).unwrap();
 
                     //PARSE JSON
                     let users_json: Value = serde_json::from_str(&read.text.unwrap()).unwrap();
@@ -405,10 +399,10 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                             String::new()
                         };
 
-                        println!("\r{} ({}){}", user["username"].as_str().unwrap(), user["id"], c);
+                        tx.send(ClientEvent::Info(format!("\r{} ({}){}", user["username"].as_str().unwrap(), user["id"], c), true, 0)).unwrap();
                     }
 
-                    println!();
+                    tx.send(ClientEvent::ExtraSpace).unwrap();
 
                     extra_space = true;
                     options::set_extra_space(true);
@@ -417,22 +411,19 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 //PRIVATE MESSAGE INCOMING
                 MessageCode::PrivateMessage =>
                 {
-                    misc::clear_lines(2);
-                    println!("[PM FROM] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap());
+                    tx.send(ClientEvent::Info(format!("[PM FROM] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap()), true, 2)).unwrap();
                 },
 
                 //PRIVATE MESSAGE INCOMING
                 MessageCode::PrivateMessageBack =>
                 {
-                    misc::clear_lines(2);
-                    println!("[PM TO] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap());
+                    tx.send(ClientEvent::Info(format!("[PM TO] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap()), true, 2)).unwrap();
                 },
 
                 //SPAM WARNING
                 MessageCode::SpamWarning =>
                 {
-                    misc::clear_lines(2);
-                    println!("Slow down! You're sending messages too quickly.\n");
+                    tx.send(ClientEvent::Info(String::from("Slow down! You're sending messages too quickly.\n"), true, 2)).unwrap();
                 },
 
                 //REGISTRATION DISABLED
@@ -444,15 +435,13 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 //CLIENT MESSED SOME COMMAND UP
                 MessageCode::InvalidUsage =>
                 {
-                    misc::clear_lines(2);
-                    println!("Invalid usage! Press Ctrl+H for help.\n");
+                    tx.send(ClientEvent::Info(String::from("Invalid usage! Press Ctrl+H for help.\n"), true, 2)).unwrap();
                 },
 
                 //CLIENTED REQUESTED DISABLED FEATURE
                 MessageCode::InvalidFeature =>
                 {
-                    misc::clear_lines(2);
-                    println!("Server has disabled the feature you requested.\n");
+                    tx.send(ClientEvent::Info(String::from("Server has disabled the feature you requested.\n"), true, 2)).unwrap();
                 },
 
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
