@@ -116,7 +116,7 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
 
         #[cfg(not(feature = "client"))]
         {
-            println!(print_text);
+            println!("{print_text}");
         }
     }
 }
