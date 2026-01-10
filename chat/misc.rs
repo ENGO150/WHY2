@@ -136,18 +136,3 @@ pub fn get_why2_dir() -> String //RETURN PATH TO WHY2 CONFIG DIRECTORY
 {
     get_config_dir() + options::CONFIG_DIR
 }
-
-pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
-{
-    for i in 0..n
-    {
-        //CLEAR CURRENT LINE
-        print!("\x1B[2K\r");
-
-        //MOVE UP
-        if i < n - 1
-        {
-            print!("\x1B[1A");
-        }
-    }
-}

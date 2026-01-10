@@ -138,14 +138,14 @@ fn read_input() -> String
                     //CTRL+L (LIST)
                     KeyCode::Char('l') =>
                     {
-                        misc::clear_lines(1);
+                        ui::clear_lines(1);
                         return Command::List.to_string();
                     },
 
                     //CTRL+C (EXIT)
                     KeyCode::Char('c') =>
                     {
-                        misc::clear_lines(2);
+                        ui::clear_lines(2);
                         return Command::Exit.to_string();
                     },
 
@@ -376,7 +376,7 @@ fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CH
     }
 
     //PRINTOUT RESULT
-    misc::clear_lines(2);
+    ui::clear_lines(2);
     print!("{message}\n\n\r>>> ");
 }
 
@@ -525,7 +525,7 @@ fn main()
                         //HELP
                         Command::Help =>
                         {
-                            misc::clear_lines(2);
+                            ui::clear_lines(2);
                             options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
 
                             print!
@@ -556,7 +556,7 @@ fn main()
                         //INVALID COMMAND
                         Command::Invalid =>
                         {
-                            misc::clear_lines(2);
+                            ui::clear_lines(2);
                             print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
                         },
 

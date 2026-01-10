@@ -56,21 +56,6 @@ use why2::chat::
 };
 
 //PRIVATE
-fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
-{
-    for i in 0..n
-    {
-        //CLEAR CURRENT LINE
-        print!("\x1B[2K\r");
-
-        //MOVE UP
-        if i < n - 1
-        {
-            print!("\x1B[1A");
-        }
-    }
-}
-
 fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF PASSED COLOR
 {
     match color
@@ -251,5 +236,20 @@ pub fn draw_event(event: ClientEvent)
             println!("\nServer quit communication.");
             process::exit(0);
         },
+    }
+}
+
+pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
+{
+    for i in 0..n
+    {
+        //CLEAR CURRENT LINE
+        print!("\x1B[2K\r");
+
+        //MOVE UP
+        if i < n - 1
+        {
+            print!("\x1B[1A");
+        }
     }
 }
