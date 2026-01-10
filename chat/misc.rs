@@ -31,6 +31,12 @@ use semver::Version;
 
 use crate::chat::options;
 
+#[cfg(feature = "client")]
+use std::sync::mpsc::Sender;
+
+#[cfg(feature = "client")]
+use crate::chat::network::client::ClientEvent;
+
 //PRIVATE
 fn get_dir(dir: &str) -> String
 {
@@ -69,7 +75,7 @@ pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
         .read_to_string()
 }
 
-pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
+pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHECK FOR LATEST WHY2 VERSION
 {
     //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
     let metadata_raw = fetch_data(options::METADATA_URL).expect("Fetching versions failed");
@@ -101,7 +107,17 @@ pub fn check_version() //CHECK FOR LATEST WHY2 VERSION
             }
         }
 
-        println!("This release could be unsafe! You are {newer_versions} versions behind! ({current_version}/{newest_version})");
+        let print_text = format!("This release could be unsafe! You are {newer_versions} versions behind! ({current_version}/{newest_version})");
+
+        #[cfg(feature = "client")]
+        {
+            tx.send(ClientEvent::Info(print_text, true, 0)).unwrap()
+        }
+
+        #[cfg(not(feature = "client"))]
+        {
+            println!(print_text);
+        }
     }
 }
 

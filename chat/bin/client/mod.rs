@@ -391,8 +391,11 @@ fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
 
 fn main()
 {
+    //CREATE CHANNEL
+    let (tx, rx) = mpsc::channel::<ClientEvent>();
+
     //CONFIGURATION
-    misc::check_version(); //CHECK WHY2 VERSION
+    misc::check_version(&tx); //CHECK WHY2 VERSION
     config::init_client_config(); //CREATE client.toml CONFIGURATION
 
     //CHECK FOR PARAMETERS
@@ -479,9 +482,6 @@ fn main()
 
     //SET TCP_NODELAY
     stream.set_nodelay(true).expect("Failed to set TCP_NODELAY");
-
-    //CREATE CHANNEL
-    let (tx, rx) = mpsc::channel::<ClientEvent>();
 
     //CLONE SOCKET FOR CLIENT INPUT
     let mut client_stream = stream.try_clone().expect("Failed cloning stream");
