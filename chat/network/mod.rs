@@ -248,7 +248,7 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
     let encoded_string = String::from_utf8(base91::slice_encode(&final_bytes)).expect("Encoding packet failed");
 
     //SEND
-    stream.write_all((encoded_string + "\n").as_bytes()).expect("Sending packet failed");
+    let _ = stream.write_all((encoded_string + "\n").as_bytes());
     stream.flush().expect("Flushing stream failed");
 }
 
