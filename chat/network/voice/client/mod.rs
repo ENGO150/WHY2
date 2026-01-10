@@ -23,7 +23,6 @@ use std::
 {
     thread,
     net::UdpSocket,
-    io::{ self, Write },
     collections::{ HashMap, VecDeque },
     time::
     {
@@ -36,6 +35,7 @@ use std::
         Arc,
         Mutex,
         LazyLock,
+        mpsc::Sender,
         atomic::{ AtomicUsize, Ordering },
     },
 };
@@ -80,36 +80,20 @@ use ringbuf::
 use nnnoiseless::DenoiseState;
 
 use gag::Gag;
-use crossterm::
-{
-    terminal,
-    QueueableCommand,
-    style::
-    {
-        Print,
-        SetForegroundColor,
-        Color,
-        ResetColor,
-        SetAttribute,
-        Attribute
-    },
-    cursor::
-    {
-        MoveTo,
-        SavePosition,
-        RestorePosition,
-    },
-};
 
 use crate::chat::
 {
     options as chat_options,
-    network::voice::
+    network::
     {
-        self,
-        options,
-        VoicePacket,
-        client::sfx::SoundEffect,
+        client::{ ClientEvent, VoiceUser },
+        voice::
+        {
+            self,
+            options,
+            VoicePacket,
+            client::sfx::SoundEffect,
+        },
     },
 };
 
@@ -207,7 +191,7 @@ fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], id: usize
 }
 
 //PUBLIC
-pub fn listen_server_voice(id: usize, username: String)
+pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
 {
     //RESET SEQs
     options::set_seq(0);
@@ -515,7 +499,7 @@ pub fn listen_server_voice(id: usize, username: String)
         {
             if !options::get_use_voice() { return; } //QUIT ON /leave
 
-            display_active_speakers(&username); //SHOW VOICE ACTIVITY
+            display_active_speakers(&username, &tx); //SHOW VOICE ACTIVITY
             thread::sleep(Duration::from_millis(60));
         }
     });
@@ -651,28 +635,20 @@ pub fn add_consumer(id: usize, username: String)
     sfx::queue_effect(SoundEffect::Join);
 }
 
-fn display_active_speakers(local_username: &str)
+fn display_active_speakers(local_username: &str, tx: &Sender<ClientEvent>)
 {
-    //HELPER STRUCT
-    struct DisplayUser
-    {
-        id: usize,
-        username: String,
-        is_speaking: bool,
-        latency: u128,
-    }
-
     //ALL USERS
     let mut users_to_display = Vec::new();
 
     //ADD LOCAL CLIENT
     let local_speaking = LOCAL_DISPLAY_HOLD.load(Ordering::Relaxed) > 0;
-    users_to_display.push(DisplayUser
+    users_to_display.push(VoiceUser
     {
         id: 0,
         username: local_username.to_string(),
         is_speaking: local_speaking,
         latency: 0,
+        is_local: true,
     });
 
     //COLLECT OTHER USERS
@@ -680,12 +656,13 @@ fn display_active_speakers(local_username: &str)
     {
         for (id, (stream, _)) in consumers.iter()
         {
-            users_to_display.push(DisplayUser
+            users_to_display.push(VoiceUser
             {
                 id: *id,
                 username: stream.username.clone(),
                 is_speaking: stream.display_hold > 0, //SPEAKING
                 latency: stream.avg_latency,
+                is_local: true,
             });
         }
     }
@@ -696,92 +673,6 @@ fn display_active_speakers(local_username: &str)
         users_to_display[1..].sort_by_key(|u| u.id);
     }
 
-    //PREPARE TERMINAL
-    let mut stdout = io::stdout();
-    let (cols, rows) = terminal::size().unwrap_or((80, 24));
-
-    stdout.queue(SavePosition).unwrap();
-
-    let overlay_width = 25;
-    let bottom_row = rows.saturating_sub(2);
-    let available_height = rows.saturating_sub(4) as usize;
-    let limit = available_height.min(15);
-
-    let header_text = "VOICE CHANNEL:"; //HEADER
-    let mut max_content_width = header_text.len();
-
-    //FIND WIDEST LINE
-    for user in users_to_display.iter().take(limit)
-    {
-        let mut width = user.username.chars().count() + 3;
-
-        //ALSO ADD LATENCY TO WIDTH (IF LATENCY SHOWN)
-        if user.username != local_username
-        {
-            width += user.latency.to_string().len() + 4;
-        }
-
-        if width > max_content_width
-        {
-            max_content_width = width;
-        }
-    }
-
-    let clear_width = overlay_width.max(max_content_width);
-    let align_x = cols.saturating_sub(max_content_width as u16).saturating_sub(1);
-
-    //CLEAR WINDOW
-    for i in 0..=limit
-    {
-        let y = bottom_row.saturating_sub(i as u16);
-        let x = cols.saturating_sub(clear_width as u16);
-        stdout.queue(MoveTo(x, y)).unwrap();
-        stdout.queue(Print(" ".repeat(clear_width as usize))).unwrap();
-    }
-
-    //PRINT
-    for (i, user) in users_to_display.iter().take(limit).rev().enumerate()
-    {
-        let y = bottom_row.saturating_sub(i as u16);
-        let text = if user.username == local_username
-        {
-            format!("- {} ", user.username)
-        } else
-        {
-            format!("- {} [{}ms]", user.username, user.latency)
-        };
-
-        stdout.queue(MoveTo(align_x, y)).unwrap();
-
-        if user.is_speaking
-        {
-            //ACTIVE
-            stdout.queue(SetForegroundColor(Color::Green)).unwrap();
-            stdout.queue(SetAttribute(Attribute::Bold)).unwrap();
-            stdout.queue(Print(text)).unwrap();
-            stdout.queue(SetAttribute(Attribute::Reset)).unwrap();
-            stdout.queue(ResetColor).unwrap();
-        } else
-        {
-            //INACTIVE
-            stdout.queue(SetForegroundColor(Color::DarkGrey)).unwrap();
-            stdout.queue(Print(text)).unwrap();
-            stdout.queue(ResetColor).unwrap();
-        }
-    }
-
-    //HEADER PRINT
-    if !users_to_display.is_empty()
-    {
-        let count = users_to_display.len().min(limit);
-        let y = bottom_row.saturating_sub(count as u16);
-
-        stdout.queue(MoveTo(align_x, y)).unwrap();
-        stdout.queue(SetAttribute(Attribute::Underlined)).unwrap();
-        stdout.queue(Print(header_text)).unwrap();
-        stdout.queue(SetAttribute(Attribute::Reset)).unwrap();
-    }
-
-    stdout.queue(RestorePosition).unwrap();
-    stdout.flush().unwrap();
+    //DISPLAY
+    tx.send(ClientEvent::VoiceActivity(users_to_display)).unwrap();
 }

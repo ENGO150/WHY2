@@ -52,16 +52,27 @@ use crate::chat::
 const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
+//STRUCTS
+pub struct VoiceUser
+{
+    pub id: usize,          //ID OF USER
+    pub username: String,   //USERNAME TO DISPLAY
+    pub is_speaking: bool,  //TAKE A WILD GUESS
+    pub latency: u128,      //USER'S PING
+    pub is_local: bool,     //AM I THE USER?
+}
+
 //ENUMS
 pub enum ClientEvent
 {
-    Message(MessagePacket),    //RECEIVED MESSAGE
-    Info(String, bool, usize), //INFO/STATUS LOG, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
-    Prompt(String, String),    //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
-    TofuError(TofuCode),       //TOFU VERIFICATION FAILED
-    Clear(usize),              //CLEAR n LINES
-    ExtraSpace,                //JUST RANDOM NEWLINE
-    Quit,                      //SERVER QUIT COMMUNICATION
+    Message(MessagePacket),        //RECEIVED MESSAGE
+    Info(String, bool, usize),     //INFO/STATUS LOG, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
+    Prompt(String, String),        //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
+    TofuError(TofuCode),           //TOFU VERIFICATION FAILED
+    VoiceActivity(Vec<VoiceUser>), //VOICE OVERLAY
+    Clear(usize),                  //CLEAR n LINES
+    ExtraSpace,                    //JUST RANDOM NEWLINE
+    Quit,                          //SERVER QUIT COMMUNICATION
 }
 
 //FUNCTIONS
@@ -338,7 +349,8 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     let status = if voice_options::swap_use_voice()
                     {
                         let username = username.clone();
-                        thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap()));
+                        let voice_tx = tx.clone();
+                        thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap(), voice_tx));
                         "en"
                     } else
                     {
