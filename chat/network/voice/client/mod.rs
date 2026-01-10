@@ -497,7 +497,12 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
     {
         loop
         {
-            if !options::get_use_voice() { return; } //QUIT ON /leave
+            //QUIT ON /leave
+            if !options::get_use_voice()
+            {
+                tx.send(ClientEvent::VoiceActivity(Vec::new())).unwrap(); //CLEAR WINDOW
+                return;
+            }
 
             display_active_speakers(&username, &tx); //SHOW VOICE ACTIVITY
             thread::sleep(Duration::from_millis(60));
