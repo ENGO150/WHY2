@@ -662,7 +662,7 @@ fn display_active_speakers(local_username: &str, tx: &Sender<ClientEvent>)
                 username: stream.username.clone(),
                 is_speaking: stream.display_hold > 0, //SPEAKING
                 latency: stream.avg_latency,
-                is_local: true,
+                is_local: false,
             });
         }
     }
