@@ -504,9 +504,6 @@ fn main()
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
     {
-        //FLUSH STDOUT
-        io::stdout().flush().unwrap();
-
         //READ STDIN
         let input = read_input();
 

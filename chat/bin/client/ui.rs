@@ -95,7 +95,6 @@ pub fn draw_event(event: ClientEvent)
         ClientEvent::Prompt(channel, message) => //SHOW PROMPT BAR
         {
             print!("\r{}>>> {}", channel, message);
-            io::stdout().flush().unwrap();
         },
 
         ClientEvent::TofuError(status) =>
@@ -225,7 +224,6 @@ pub fn draw_event(event: ClientEvent)
             }
 
             stdout.queue(RestorePosition).unwrap();
-            stdout.flush().unwrap();
         }
 
         ClientEvent::Clear(n) => clear_lines(n),
@@ -237,6 +235,9 @@ pub fn draw_event(event: ClientEvent)
             process::exit(0);
         },
     }
+
+    //FLUSH STDOUT
+    io::stdout().flush().unwrap();
 }
 
 pub fn clear_lines(n: usize) //CLEARS n LINES (ALSO MOVES THE CURSOR n LINES UP)
