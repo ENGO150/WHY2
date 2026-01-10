@@ -16,13 +16,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::io::{ self, Write };
+use std::
+{
+    env,
+    process,
+    io::{ self, Write },
+};
 
 use colored::Colorize;
 
 use why2::chat::
 {
-    config,
+    config::{ self, TofuCode },
     network::
     {
         SerColor,
@@ -79,5 +84,43 @@ pub fn draw_event(event: ClientEvent)
             print!("\r{}>>> {}", channel, message);
             io::stdout().flush().unwrap();
         },
+
+        ClientEvent::TofuError(status) =>
+        {
+            match status
+            {
+                TofuCode::Mismatch => //SOMETHING FUNNY HAPPENING
+                {
+                    println!
+                    (
+                        "\n\rSECURITY WARNING: SERVER IDENTITY MISMATCH
+                        \n\rThe server's identity key is different from the
+                        \rkey stored in local configuration. This could
+                        \rmean that someone is intercepting your connection
+                        \r(Man-in-the-Middle attack) or that the server
+                        \rkey has been changed.
+                        \n\rConnection aborted to protect your privacy."
+                    );
+                },
+
+                TofuCode::Unknown(hash, ip) => //NEW ONE
+                {
+                    println!
+                    (
+                        "\n\rSECURITY WARNING: UNKNOWN SERVER IDENTITY
+                        \n\rThe server's identity key is not stored in local
+                        \rconfiguration. If you are sure that the key below
+                        \ris valid, enter following command and connect again.
+                        \n\r{} --verify {ip} {hash}",
+
+                        env::args().nth(0).unwrap()
+                    );
+                },
+
+                _ => panic!("what") //what
+            }
+
+            process::exit(1);
+        }
     }
 }

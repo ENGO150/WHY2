@@ -40,7 +40,7 @@ use crate::chat::crypto;
 pub enum TofuCode //POSSIBLE KEY VERIFICATION RESULTS
 {
     Valid, //KEY MATCHES LOCAL CONFIG
-    Unknown(String), //KEY NOT FOUND IN CONFIG
+    Unknown(String, String), //KEY NOT FOUND IN CONFIG
     Mismatch, //KEY DIFFERS
 }
 
@@ -231,7 +231,7 @@ pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VA
         }
     }
 
-    TofuCode::Unknown(pubkey_string)
+    TofuCode::Unknown(pubkey_string, host.to_string())
 }
 
 #[cfg(feature = "client")]

@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    env,
     thread,
     process,
     net::TcpStream,
@@ -59,11 +58,12 @@ pub enum ClientEvent
 {
     Message(MessagePacket), //RECEIVED MESSAGE
     Prompt(String, String), //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
+    TofuError(TofuCode),    //TOFU VERIFICATION FAILED
 }
 
 //FUNCTIONS
 //PRIVATE
-fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options::SharedKeys) //KEY EXCHANGE FOR CLIENT-SIDE
+fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options::SharedKeys, tx: &Sender<ClientEvent>) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
     let message = loop
@@ -79,7 +79,7 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
     {
         TofuCode::Valid => {},
 
-        status @ (TofuCode::Mismatch | TofuCode::Unknown(_)) =>
+        status @ (TofuCode::Mismatch | TofuCode::Unknown(_, _)) =>
         {
             //GRACEFULLY DISCONNECT FROM SERVER
             network::send(stream, MessagePacket
@@ -92,41 +92,10 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
             terminal::disable_raw_mode().unwrap();
 
             //PRINT SECURITY MESSAGE
-            match status
-            {
-                TofuCode::Mismatch => //SOMETHING FUNNY HAPPENING
-                {
-                    println!
-                    (
-                        "\n\rSECURITY WARNING: SERVER IDENTITY MISMATCH
-                        \n\rThe server's identity key is different from the
-                        \rkey stored in local configuration. This could
-                        \rmean that someone is intercepting your connection
-                        \r(Man-in-the-Middle attack) or that the server
-                        \rkey has been changed.
-                        \n\rConnection aborted to protect your privacy."
-                    );
-                },
-
-                TofuCode::Unknown(hash) => //NEW ONE
-                {
-                    println!
-                    (
-                        "\n\rSECURITY WARNING: UNKNOWN SERVER IDENTITY
-                        \n\rThe server's identity key is not stored in local
-                        \rconfiguration. If you are sure that the key below
-                        \ris valid, enter following command and connect again.
-                        \n\r{} --verify {} {hash}",
-
-                        env::args().nth(0).unwrap(), stream.peer_addr().unwrap().ip()
-                    );
-                },
-
-                _ => panic!("what") //what
-            }
+            tx.send(ClientEvent::TofuError(status)).unwrap();
 
             //EXIT
-            process::exit(0);
+            return false;
         },
     }
 
@@ -146,6 +115,8 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
 
     //SET GLOBAL KEYS VARIABLE
     options::set_keys(keys.clone());
+
+    true
 }
 
 //PUBLIC
@@ -156,7 +127,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
 
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    key_exchange(stream, &mut buffer, &mut keys);
+    if !key_exchange(stream, &mut buffer, &mut keys, &tx) { return; }
 
     //SERVER INFO VARIABLES
     let mut min_pass: Option<u64> = None;
@@ -241,7 +212,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 MessageCode::Rekey =>
                 {
                     //WAIT FOR SERVER TO INIT KEY EXCHANGE
-                    key_exchange(stream, &mut buffer, &mut keys);
+                    key_exchange(stream, &mut buffer, &mut keys, &tx);
                 }
 
                 //PICK_USERNAME CODE - guess what
