@@ -70,6 +70,11 @@ pub fn draw_event(event: ClientEvent)
 {
     match event
     {
+        ClientEvent::Connected(server_name) =>
+        {
+            println!("Successfully connected to {server_name}.\n");
+        }
+
         ClientEvent::Message(message) => //MESSAGE RECEIVED
         {
             clear_lines(2);

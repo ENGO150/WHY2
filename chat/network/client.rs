@@ -63,6 +63,7 @@ pub struct VoiceUser
 //ENUMS
 pub enum ClientEvent
 {
+    Connected(String),             //SUCCESSFUL CONNECTION MESSAGE
     Message(MessagePacket),        //RECEIVED MESSAGE
     Info(String, bool, usize),     //INFO/STATUS LOG, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
     Prompt(String, String),        //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
@@ -213,7 +214,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     min_uname = Some(welcome_json["min_uname"].as_u64().expect("Invalid welcome json"));
                     server_name = welcome_json["server_name"].as_str().expect("Invalid welcome json");
 
-                    tx.send(ClientEvent::Info(format!("Successfully connected to {server_name}.\n"), true, 0)).unwrap();
+                    tx.send(ClientEvent::Connected(server_name.to_string())).unwrap();
                 },
 
                 //REKEY - CHANGE KEYS
