@@ -99,6 +99,9 @@ pub fn draw_event(event: ClientEvent)
 
         ClientEvent::TofuError(status) =>
         {
+            //DISABLE RAW MODE
+            terminal::disable_raw_mode().unwrap();
+
             match status
             {
                 TofuCode::Mismatch => //SOMETHING FUNNY HAPPENING

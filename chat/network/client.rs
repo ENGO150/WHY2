@@ -27,8 +27,6 @@ use zeroize::Zeroizing;
 
 use serde_json::Value;
 
-use crossterm::terminal;
-
 use crate::chat::
 {
     crypto,
@@ -101,9 +99,6 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
                 code: Some(MessageCode::Disconnect),
                 ..Default::default()
             }, None);
-
-            //DISABLE RAW MODE
-            terminal::disable_raw_mode().unwrap();
 
             //PRINT SECURITY MESSAGE
             tx.send(ClientEvent::TofuError(status)).unwrap();
