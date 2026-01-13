@@ -127,7 +127,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
 ];
 
 //CONSTS
-const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
+pub const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 
 //IMPLEMENTATIONS
 impl Command

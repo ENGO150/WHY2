@@ -58,7 +58,11 @@ use why2::chat::
     config,
     options,
     misc,
-    command::{ self, Command },
+    command::
+    {
+        self,
+        Command,
+    },
     network::
     {
         self,
@@ -525,19 +529,38 @@ fn main()
                             ui::clear_lines(2);
                             options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
 
-                            print!
-                            (
-                                "\nCommands:
-                                \r/help - Prints this
-                                \r/voice - Enable voice chat
-                                \r/channel [NAME] - Switches to channel/lobby if NAME is omitted
-                                \r/list - Show connected users and their IDs
-                                \r/pm (ID) (MESSAGE) - Sends private message
-                                \r/ucolor (COLOR) - Sets color of username
-                                \r/color (COLOR) - Sets color of message
-                                \r/exit - Disconnects from server
-                                \n\r>>> "
-                            );
+                            //PRINT COMMAND LIST
+                            println!("\nCommands:");
+
+                            for info in command::COMMAND_LIST //ITERATE OVER ALL COMMANDS
+                            {
+                                //[OPTIONAL], (REQUIRED)
+                                let args = info.args.iter().map(|arg|
+                                {
+                                    if arg.required
+                                    {
+                                        format!("({})", arg.name)
+                                    } else
+                                    {
+                                        format!("[{}]", arg.name)
+                                    }
+                                }).collect::<Vec<String>>().join(" ");
+
+                                let separator = if info.args.is_empty() { "" } else { " " };
+
+                                //PRINT COMMAND
+                                println!
+                                (
+                                    "\r{prefix}{name}{separator}{args} - {description}",
+                                    prefix = command::COMMAND_PREFIX,
+                                    name = info.triggers[0].to_lowercase(),
+                                    description = info.description,
+                                );
+                            }
+
+                            //PRINT PROMPT BAR
+                            print!("\n\r>>> ");
+                            io::stdout().flush().unwrap();
                         },
 
                         Command::UsernameColor =>
