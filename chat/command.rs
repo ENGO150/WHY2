@@ -25,11 +25,8 @@ use std::fmt::
 
 use crate::chat::network::MessageCode;
 
-//CONSTS
-const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
-
 //ENUMS
-#[derive(Debug)]
+#[derive(Clone, PartialEq)]
 pub enum Command
 {
     Exit,           //DISCONNECT FROM SERVER
@@ -42,6 +39,95 @@ pub enum Command
     MessageColor,   //SET COLOR OF MESSAGE
     Invalid,        //INVALID COMMAND
 }
+
+//STRUCTS
+pub struct CommandArg //COMMAND PARAMETER
+{
+    pub name: &'static str,
+    pub required: bool,
+}
+
+pub struct CommandInfo //COMMAND INFO
+{
+    pub command: Command,
+    pub triggers: &'static [&'static str],
+    pub args: &'static [CommandArg],
+    pub description: &'static str,
+}
+
+pub const COMMAND_LIST: &[CommandInfo] =
+&[
+    CommandInfo
+    {
+        command: Command::Help,
+        triggers: &[ "HELP", "H", "COMMANDS", "USAGE", "GUIDE" ],
+        args: &[],
+        description: "Prints all available commands",
+    },
+
+    CommandInfo
+    {
+        command: Command::Voice,
+        triggers: &[ "VOICE", "VOIP", "CALL" ],
+        args: &[],
+        description: "Toggles voice chat",
+    },
+
+    CommandInfo
+    {
+        command: Command::Channel,
+        triggers: &[ "CHANNEL", "SWITCH", "CHECKOUT", "AREA" ],
+        args: &[CommandArg { name: "NAME", required: false }],
+        description: "Switches to channel/lobby if NAME is omitted",
+    },
+
+    CommandInfo
+    {
+        command: Command::List,
+        triggers: &[ "LIST", "USERS", "CLIENTS", "CHANNELS", "IDS", "ID" ],
+        args: &[],
+        description: "Shows connected users and their IDs",
+    },
+
+    CommandInfo
+    {
+        command: Command::PrivateMessage,
+        triggers: &[ "PM", "DM", "MSG", "TELL" ],
+        args:
+        &[
+            CommandArg { name: "ID", required: true },
+            CommandArg { name: "MESSAGE", required: true },
+        ],
+        description: "Sends private message",
+    },
+
+    CommandInfo
+    {
+        command: Command::UsernameColor,
+        triggers: &[ "UCOLOR", "USERNAME" ],
+        args: &[CommandArg { name: "COLOR", required: true }],
+        description: "Sets color of username",
+    },
+
+    CommandInfo
+    {
+        command: Command::MessageColor,
+        triggers: &[ "COLOR", "MESSAGE" ],
+        args: &[CommandArg { name: "COLOR", required: true }],
+        description: "Sets color of message",
+    },
+
+    CommandInfo
+    {
+        command: Command::Exit,
+        triggers: &[ "EXIT", "LEAVE", "QUIT", "DISCONNECT" ],
+        args: &[],
+        description: "Disconnects from the server",
+    },
+];
+
+//CONSTS
+const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 
 //IMPLEMENTATIONS
 impl Command
@@ -67,18 +153,10 @@ impl Display for Command
     //Command TO STRING
     fn fmt(&self, f: &mut Formatter<'_>) -> Result
     {
-        let name = match self
-        {
-            Command::Help           => "help",
-            Command::Voice          => "voice",
-            Command::Channel        => "channel",
-            Command::Exit           => "exit",
-            Command::List           => "list",
-            Command::PrivateMessage => "pm",
-            Command::UsernameColor  => "ucolor",
-            Command::MessageColor   => "color",
-            Command::Invalid        => "",
-        };
+        let name = COMMAND_LIST.iter()
+            .find(|info| info.command == *self)
+            .map(|info| info.triggers[0].to_lowercase())
+            .unwrap_or(String::new()); //HANDLE INVALID
 
         write!(f, "{}{}", COMMAND_PREFIX, name)
     }
@@ -97,21 +175,14 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
         None => (no_prefix.to_ascii_uppercase(), None)
     };
 
-    //COMPARE COMMANDS
-    match command.as_str()
+    //SEARCH FOR COMMAND
+    for info in COMMAND_LIST
     {
-        //NON PARAMETRIC
-        "EXIT" | "QUIT" | "LEAVE" | "DISCONNECT"      => (Some(Command::Exit), None),
-        "VOICE" | "VOIP" | "CALL"                     => (Some(Command::Voice), None),
-        "HELP" | "H" | "COMMANDS" | "USAGE" | "GUIDE" => (Some(Command::Help), None),
-        "LIST" | "USERS" | "CLIENTS" | "CHANNELS"     => (Some(Command::List), None),
-
-        //PARAMETRIC
-        "CHANNEL" | "SWITCH" | "CHECKOUT" | "AREA"    => (Some(Command::Channel), parameters),
-        "PM" | "DM" | "MSG" | "TELL"                  => (Some(Command::PrivateMessage), parameters),
-        "UCOLOR" | "USERNAME"                         => (Some(Command::UsernameColor), parameters),
-        "COLOR" | "MESSAGE"                           => (Some(Command::MessageColor), parameters),
-
-        _ => (Some(Command::Invalid), None)
+        if info.triggers.contains(&command.as_str())
+        {
+            return (Some(info.command.clone()), parameters);
+        }
     }
+
+    (Some(Command::Invalid), None)
 }
