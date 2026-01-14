@@ -334,23 +334,6 @@ fn read_input() -> String
     input.iter().collect::<String>()
 }
 
-fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: &Option<String>) -> bool //SEND CODE FROM COMMAND IF POSSIBLE
-{
-    //CODE COMMAND
-    if let Some(code) = command.to_code()
-    {
-        network::send(stream, MessagePacket
-        {
-            text: parameters.clone(),
-            code: Some(code),
-            ..Default::default()
-        }, options::get_keys().as_ref());
-        return true;
-    }
-
-    return false;
-}
-
 fn to_color(color: &str) -> Result<SerColor, ()>
 {
     color.parse::<Color>().map(SerColor)
@@ -519,7 +502,7 @@ fn main()
             if let (Some(command), parameters) = command::get_command(&input)
             {
                 //SEND CODE ON A SIMPLE COMMAND, CONTINUE OTHERWISE
-                if !send_command_code(&mut client_stream, &command, &parameters)
+                if !command::send_command_code(&mut client_stream, &command, &parameters)
                 {
                     match command
                     {

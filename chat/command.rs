@@ -25,6 +25,16 @@ use std::fmt::
 
 use crate::chat::network::MessageCode;
 
+#[cfg(feature = "client")]
+use std::net::TcpStream;
+
+#[cfg(feature = "client")]
+use crate::chat::
+{
+    options,
+    network::{ self, MessagePacket },
+};
+
 //ENUMS
 #[derive(Clone, PartialEq)]
 pub enum Command
@@ -185,4 +195,20 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
     }
 
     (Some(Command::Invalid), None)
+}
+
+#[cfg(feature = "client")]
+pub fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: &Option<String>) -> bool //SEND CODE FROM COMMAND IF POSSIBLE
+{
+    //CODE COMMAND
+    if let Some(code) = command.to_code()
+    {
+        network::send(stream, MessagePacket
+        {
+            text: parameters.clone(),
+            code: Some(code),
+            ..Default::default()
+        }, options::get_keys().as_ref());
+        true
+    } else { false }
 }
