@@ -123,37 +123,40 @@ pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
     generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
 }
 
-/// Derives a sequence of round keys from a master Grid using deterministic hashing.
+/// Derives a sequence of round keys from a master Grid using a deterministic CSPRNG stream.
 ///
-/// This function generates [`options::ROUND_KEYS`] round keys by chaining SHA-256 hashes
-/// of the previous key.
+/// This function generates [`options::ROUND_KEYS`] round keys by expanding the master key
+/// using a CSPRNG stream.
 ///
-/// $$ K_0 = KDF(Hash(MasterKey)) $$
-/// $$ K_i = KDF(Hash(K_{i-1})) $$
+/// $$ S = \text{Hash}(\text{MasterKey}) $$
+/// $$ K_0, \dots, K_N \leftarrow \text{CSPRNG}(S) $$
 ///
-/// Each hash is used as a seed for a [`ChaCha20Rng`] (the KDF),
-/// which produces a vector of `i64` values. These are then converted into `Grid`
-/// instances using [`Grid::from_key`](crate::Grid::from_key).
+/// The master key hash is used as a seed for a [`ChaCha20Rng`], which produces a continuous
+/// stream of `i64` values. These are then converted into `Grid` instances using
+/// [`Grid::from_key`](crate::Grid::from_key).
 ///
 /// # Parameters
-/// - `master_key`: The initial Grid used to seed the first round key.
+/// - `master_key`: The initial Grid used to seed the key generation.
 ///
 /// # Returns
-/// A vector of `Grid` round keys, each derived deterministically from the previous one.
+/// A vector of `Grid` round keys, derived deterministically from the master key.
 ///
 /// # Notes
-/// - The first key is seeded from `master_key`.
-/// - Each subsequent key is seeded from the SHA-256 digest of the previous key.
+/// - The CSPRNG is initialized once using the `master_key` hash.
+/// - All keys are generated from a single stream, acting as a KDF-Expand phase.
 /// - This method ensures reproducible round key generation without external randomness.
 pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Result<Vec<Grid<W, H>>, GridError>
 {
     let mut keys: Vec<Grid<W, H>> = Vec::with_capacity(options::ROUND_KEYS);
 
+    //CREATE CSPRNG FROM THE MASTER KEY
+    let mut rng = ChaCha20Rng::from_seed(sha256_seed_grid(master_key)); //DERIVE SEED FROM MASTER KEY HASH
+
     //GENERATE KEYS
     for _ in 0..(options::ROUND_KEYS)
     {
         //USE SEED OF LAST KEY TO GENERATE NEW KEY
-        let key = generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(sha256_seed_grid(keys.last().unwrap_or(master_key))));
+        let key = generate_key_deterministic::<W, H>(&mut rng);
 
         //CONVERT KEY TO Grid & PUSH TO keys
         keys.push(Grid::from_key(key)?);
