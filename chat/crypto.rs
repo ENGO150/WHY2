@@ -30,7 +30,19 @@ use p521::
         DecodePrivateKey,
         EncodePublicKey,
         DecodePublicKey,
+        der::pem::
+        {
+            self,
+            LineEnding,
+        },
     },
+};
+
+use ml_kem::
+{
+    MlKem768,
+    KemCore,
+    EncodedSizeUser,
 };
 
 use sha2::{ Sha256, Digest };
@@ -123,6 +135,19 @@ pub fn generate_ephemeral_keys() -> (String, String) //CREATE ECC KEYS
     (private_pem.to_string(), public_pem.to_string())
 }
 
+#[cfg(feature = "server")]
+pub fn generate_server_pq_keys() -> (String, String) //GENERATE POST-QUANTUM KEYS
+{
+    //GENERATE KEYS
+    let (dk, ek) = MlKem768::generate(&mut OsRng);
+
+    let dk_pem = pem::encode_string("PQ PRIVATE KEY", LineEnding::LF, &dk.as_bytes()).expect("Encoding EQ key to PEM failed");
+    let ek_pem = pem::encode_string("PQ PUBLIC KEY", LineEnding::LF, &ek.as_bytes()).expect("Encoding EQ pkey to PEM failed");
+
+    (dk_pem, ek_pem)
+}
+
+#[cfg(feature = "server")]
 pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
 {
     //CHECK IF KEY DIRECTORY EXISTS
@@ -132,14 +157,20 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
         fs::create_dir_all(&server_keys_dir).expect("Failed to create WHY2 server-keys directory"); //CREATE DIRECTORY
 
         //GENERATE KEYS
-        let (sk, pk) = generate_ephemeral_keys();
+        let (sk, pk) = generate_ephemeral_keys();   //ECC
+        let (dk, ek) = generate_server_pq_keys(); //ML-KEM
 
-        //SAVE KEYS
+        //SAVE ECC KEYS
         fs::write(server_keys_dir.clone() + options::SERVER_SKEY, sk).expect("Saving server secret key failed");
-        fs::write(server_keys_dir + options::SERVER_PKEY, pk).expect("Saving server public key failed");
+        fs::write(server_keys_dir.clone() + options::SERVER_PKEY, pk).expect("Saving server public key failed");
+
+        //SAVE PQ KEYS
+        fs::write(server_keys_dir.clone() + options::SERVER_PQ_SKEY, dk).expect("Saving server PQ secret key failed");
+        fs::write(server_keys_dir + options::SERVER_PQ_PKEY, ek).expect("Saving server PQ public key failed");
     }
 }
 
+#[cfg(feature = "server")]
 pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
 {
     let server_keys_dir = misc::get_why2_dir() + options::SERVER_KEYS_DIR;

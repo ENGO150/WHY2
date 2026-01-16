@@ -45,6 +45,8 @@ pub const SERVER_KEYS_CONFIG: &str  = "/server_keys.toml";                      
 pub const SERVER_KEYS_DIR: &str     = "/server_keys";                                                     //SERVER KEYS DIRECTORY
 pub const SERVER_SKEY: &str         = "/private";                                                         //SERVER PRIVATE KEY FILE
 pub const SERVER_PKEY: &str         = "/public";                                                          //SERVER PUBLIC KEY FILE
+pub const SERVER_PQ_SKEY: &str      = "/private_pq";                                                      //SERVER POST-QUANTUM PRIVATE KEY FILE
+pub const SERVER_PQ_PKEY: &str      = "/public_pq";                                                       //SERVER POST-QUANTUM PUBLIC KEY FILE
 
 pub const FETCH_TIMEOUT: u64        = 5000;                                                               //TIMOUT FOR FETCHING DATA (MS)
 
