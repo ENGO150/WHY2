@@ -325,7 +325,7 @@ fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut options
     stream.set_read_timeout(None).expect("Failed to unset read timeout");
 
     //CALCULATE SHARED SECRET AND UPDATE CONNECTION
-    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap())
+    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap(), None)
         .inspect(|k| update_client_keys(peer_addr, k))
         .unwrap_or((Zeroizing::new(vec![]), Zeroizing::new(vec![])));
 }

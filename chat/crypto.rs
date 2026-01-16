@@ -16,8 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{ fs, path::Path };
-
 use p521::
 {
     ecdh,
@@ -43,6 +41,8 @@ use ml_kem::
     MlKem768,
     KemCore,
     EncodedSizeUser,
+    Ciphertext,
+    kem::{ Encapsulate, Decapsulate },
 };
 
 use sha2::{ Sha256, Digest };
@@ -61,6 +61,9 @@ use crate::
 };
 
 #[cfg(feature = "server")]
+use std::{ fs, path::Path };
+
+#[cfg(feature = "server")]
 use argon2::
 {
     Argon2,
@@ -74,6 +77,11 @@ const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //PRIVATE
+fn decode_raw_pem(pem: &str) -> Vec<u8>
+{
+    pem::decode_vec(pem.as_bytes()).expect("Decoding PEM failed").1.to_vec()
+}
+
 fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> options::SharedKeys //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
 {
     let hkdf = Hkdf::<Sha256>::new(None, shared_secret);
@@ -181,7 +189,23 @@ pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
     (sk, pk)
 }
 
-pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, peer_pkey: String) -> Option<options::SharedKeys> //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
+#[cfg(feature = "server")]
+pub fn get_server_pq_keys() -> (String, String) //GET SERVER ML-KEM KEYS
+{
+    let server_keys_dir = misc::get_why2_dir() + options::SERVER_KEYS_DIR;
+
+    let dk = fs::read_to_string(server_keys_dir.clone() + options::SERVER_PQ_SKEY).expect("Reading server PQ secret key failed");
+    let ek = fs::read_to_string(server_keys_dir + options::SERVER_PQ_PKEY).expect("Reading server PQ public key failed");
+
+    (dk, ek)
+}
+
+pub fn derive_shared_secret<const W: usize, const H: usize> //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
+(
+    local_key: String,
+    peer_pkey: String,
+    pq_secret: Option<Vec<u8>>
+) -> Option<options::SharedKeys>
 {
     //PARSE KEYS
     let local_private = SecretKey::from_pkcs8_pem(&local_key).expect("Invalid key");
@@ -190,8 +214,49 @@ pub fn derive_shared_secret<const W: usize, const H: usize>(local_key: String, p
     //COMPUTE EDCH
     let shared = ecdh::diffie_hellman(local_private.to_nonzero_scalar(), remote_public.as_affine());
 
+    //COMBINE SECRETS
+    let mut final_secret = shared.raw_secret_bytes().to_vec();
+
+    //APPEND PQ
+    if let Some(pq) = pq_secret
+    {
+        final_secret.extend_from_slice(&pq);
+    }
+
     //USE HKDF TO DERIVE SEPARATE ENCRYPTION AND MAC KEY
-    Some(derive_encryption_keys(shared.raw_secret_bytes(), misc::get_version()))
+    Some(derive_encryption_keys(&final_secret, misc::get_version()))
+}
+
+pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Vec<u8>)
+{
+    //DECODE PEM
+    let pk_bytes = decode_raw_pem(peer_pk_bytes);
+
+    //DESERIALIZE KEY
+    let ek = <MlKem768 as KemCore>::EncapsulationKey::from_bytes((&pk_bytes[..]).try_into().unwrap());
+
+    //ENCAPSULATE
+    let (ct, ss) = ek.encapsulate(&mut OsRng).expect("Encapsulation failed");
+
+    //ENCODE CIPHERTEXT TO PEM
+    let ct_pem = pem::encode_string("PQ CIPHERTEXT", LineEnding::LF, &ct).unwrap();
+
+    (ct_pem, ss.to_vec())
+}
+
+pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Vec<u8>
+{
+    //DECODE PEM
+    let sk_bytes = decode_raw_pem(local_sk_pem);
+    let ct_bytes = decode_raw_pem(ciphertext_pem);
+
+    //DESERIALIZE
+    let dk = <MlKem768 as KemCore>::DecapsulationKey::from_bytes((&sk_bytes[..]).try_into().unwrap());
+    let ct = Ciphertext::<MlKem768>::try_from(ct_bytes.as_slice()).unwrap();
+
+    let ss = dk.decapsulate(&ct).expect("Decapsulation failed");
+
+    ss.to_vec()
 }
 
 pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING

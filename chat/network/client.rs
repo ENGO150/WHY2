@@ -121,7 +121,7 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
     }, None);
 
     //CALCULATE SHARED SECRET
-    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap()).expect("Shared secret derivation failed");
+    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap(), None).expect("Shared secret derivation failed");
 
     //SET GLOBAL KEYS VARIABLE
     options::set_keys(keys.clone());
