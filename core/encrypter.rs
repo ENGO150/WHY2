@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! REX Encrypter
 //!
 //! This module defines the full encryption pipeline for WHY2, including Grid shaping,
-//! deterministic shuffling, round-based mixing, and ISO 10126 padding. It transforms
+//! deterministic shuffling and round-based mixing. It transforms
 //! raw data into encrypted Grid chunks using a symmetric key.
 //!
 //! # Overview
@@ -50,8 +50,8 @@ use subtle::{ ConditionallySelectable, ConstantTimeEq };
 
 /// Encrypts a vector of `i64` values.
 ///
-/// This function transforms the input into fixed-size grids ([`Grid`]), applies ISO 10126
-/// padding, and performs round-based encryption using nonlinear and linear mixing.
+/// This function transforms the input into fixed-size grids ([`Grid`]) and performs
+/// round-based encryption using nonlinear and linear mixing.
 ///
 /// # Parameters
 /// - `input`: A vector of `i64` values representing the data.
@@ -64,7 +64,6 @@ use subtle::{ ConditionallySelectable, ConstantTimeEq };
 /// - `key`: The key [`Grid`] used for encryption.
 ///
 /// # Behavior
-/// - Pads the input to a multiple of the [`Grid`](crate::Grid) area using ISO 10126 padding (random bytes + length marker).
 /// - Splits the input into [`Grid`](crate::Grid) chunks.
 /// - Generates a random nonce for CTR mode.
 /// - Applies CTR mode encryption using the WHY2 block cipher.
@@ -94,19 +93,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     };
 
     //GET MUTABLE input
-    let mut input_used = Zeroizing::new(input);
-
-    //PAD input_used TO MULTIPLE OF 64 (ADD EXTRA GRID IF FULL) [ISO 10126]
-    let remainder = input_used.len() % grid_area; //PADDING CHARS REMAINING TO FULL GRID
-    let padding_len = if remainder == 0 { grid_area } else { grid_area - remainder }; //HOW MUCH PADDING TO INSERT
-
-    //FILL PADDING
-    let mut rng = rand::rng();
-    for _ in 0..(padding_len - 1)
-    {
-        input_used.push(rng.random::<i64>());
-    }
-    input_used.push(padding_len as i64);
+    let input_used = Zeroizing::new(input);
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
     let mut grids: Vec<Grid<W, H>> = input_used.chunks(grid_area).map(|chunk| -> Result<Grid<W, H>, GridError>

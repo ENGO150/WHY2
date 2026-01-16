@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! REX Decrypter
 //!
 //! This module defines the core decryption for WHY2, including round-key reversal,
-//! Grid unmixing, deterministic unshuffling, and ISO 10126 padding removal. It reconstructs
+//! Grid unmixing and deterministic unshuffling. It reconstructs
 //! the original data from encrypted Grid chunks using a symmetric key.
 //!
 //! # Overview
@@ -28,7 +28,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! 1. **Round Key Generation**: Reconstructs round keys from the master key using chained SHA-256 seeds.
 //! 2. **CTR Mode Decryption**: Each ciphertext [`Grid`](crate::Grid) is XORed with the keystream block (the nonce plus block counter encrypted with WHY2).
-//! 3. **ISO 10126 Padding Removal**: Truncates the final output using the last cell value as a padding marker.
 //!
 //! Since CTR mode is symmetric, the same encryption function is used for both encryption and decryption.
 
@@ -45,13 +44,7 @@ use crate::
 };
 
 #[cfg(feature = "constant-time")]
-use subtle::
-{
-    ConstantTimeEq,
-    ConstantTimeLess,
-    ConstantTimeGreater,
-    ConditionallySelectable,
-};
+use subtle::{ ConstantTimeEq, ConditionallySelectable };
 
 /// Decrypts a WHY2-encrypted data into raw `i64` values.
 ///
@@ -63,7 +56,6 @@ use subtle::
 ///
 /// - Generates round keys from the master key
 /// - Applies CTR mode decryption (XOR with keystream blocks)
-/// - Removes ISO 10126 padding from the final output
 ///
 /// # Parameters
 /// - `input`: An [`EncryptedData`] struct containing the encrypted grids and key grid.
@@ -155,38 +147,8 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     }
 
     //FLATTEN Vec<Grid> TO Vec<i64>
-    let mut flattened = Zeroizing::new(grids.iter()
+    let flattened = Zeroizing::new(grids.iter()
         .flat_map(|grid| grid.iter().flat_map(|row| row.iter())).copied().collect::<Vec<i64>>());
-
-    let padding_len = *flattened.last().unwrap_or(&0) as usize;
-
-    //CHECK PADDING VALIDITY
-    #[cfg(feature = "constant-time")]
-    {
-        let padding_len_u64 = padding_len as u64;
-        let total_len_u64 = flattened.len() as u64;
-
-        //padding_len > 0
-        let padding_gt_zero = padding_len_u64.ct_gt(&0);
-
-        //padding_len <= total_len
-        let len_valid = !total_len_u64.ct_lt(&padding_len_u64);
-
-        if !bool::from(padding_gt_zero & len_valid)
-        {
-             return Err(GridError::InvalidPadding);
-        }
-    }
-
-    #[cfg(not(feature = "constant-time"))]
-    if padding_len == 0 || padding_len > flattened.len() //INVALID (POSSIBLY MALICIOUS) PADDING
-    {
-        return Err(GridError::InvalidPadding);
-    }
-
-    //REMOVE PADDING
-    let new_len = flattened.len() - padding_len;
-    flattened.truncate(new_len);
 
     //RETURN OUTPUT
     Ok(DecryptedData
@@ -214,7 +176,6 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 /// - Uses CTR mode for decryption (same as encryption).
 /// - Uses big-endian decoding for each `i64` value.
 /// - Each decrypted value contributes up to two Unicode scalar values.
-/// - ISO 10126 padding is removed before decoding.
 pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<Zeroizing<String>, GridError>
 {
     //DECRYPT
@@ -231,7 +192,7 @@ pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>
         let lo = u32::from_be_bytes(buf[4..8].try_into().unwrap()); //LOW
 
         //PUSH CHARS TO STRING
-        output.push(char::from_u32(hi).unwrap());
+        if hi != 0 { output.push(char::from_u32(hi).unwrap()); }
         if lo != 0 { output.push(char::from_u32(lo).unwrap()); }
     }
 

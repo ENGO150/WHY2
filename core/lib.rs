@@ -203,19 +203,6 @@ pub enum GridError
         expected_len: usize,
         actual_len: usize,
     },
-
-    /// Indicates that the decrypted data contains invalid padding.
-    ///
-    /// WHY2 uses an **ISO 10126** padding scheme where the last cell value indicates
-    /// the number of padding cells to remove. The preceding padding cells contain
-    /// random data. This error is returned if the padding length is zero or
-    /// exceeds the total data length.
-    ///
-    /// # Security Note
-    /// In many contexts, a padding error is indistinguishable from a wrong key
-    /// or corrupted ciphertext. To prevent Padding Oracle attacks, applications
-    /// should handle this error carefully and ideally rely on a preceding MAC check.
-    InvalidPadding,
 }
 
 //IMPLEMENTATIONS
@@ -880,11 +867,6 @@ impl Display for GridError
             {
                 write!(f, "Invalid key length: expected length {expected_len}, got {actual_len}")
             },
-
-            GridError::InvalidPadding =>
-            {
-                write!(f, "Invalid padding: data structure does not match padding scheme requirements")
-            }
         }
     }
 }
