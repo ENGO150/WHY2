@@ -36,7 +36,7 @@ use std::
 
 use zeroize::Zeroizing;
 
-use serde_json::json;
+use serde_json::{ json, Value };
 
 use dashmap::DashMap;
 
@@ -288,13 +288,21 @@ fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut options
         None => return
     };
 
-    //GENERATE EPHEMERAL KEYS
-    let (sk, pk) = crypto::get_server_keys();
+    //LOAD KEYS
+    let (sk, pk) = crypto::get_server_keys();          //ECC
+    let (pq_sk, pq_pk) = crypto::get_server_pq_keys(); //PQ (ML-KEM)
+
+    //PREPARE PAYLOAD
+    let payload = serde_json::json!
+    ({
+        "ecc": pk,
+        "pq": pq_pk,
+    }).to_string();
 
     //SEND ECC PUBKEY TO CLIENT
     network::send(&mut stream, MessagePacket
     {
-        text: Some(pk),
+        text: Some(payload),
         code: Some(MessageCode::KeyExchange),
         ..Default::default()
     }, None);
@@ -324,8 +332,16 @@ fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut options
     //REMOVE READ TIMEOUT
     stream.set_read_timeout(None).expect("Failed to unset read timeout");
 
+    //PARSE CLIENT RESPONSE (JSON)
+    let client_response: Value = serde_json::from_str(message.text.as_ref().unwrap()).expect("Failed to parse client keys JSON");
+    let client_ecc_pk = client_response["ecc"].as_str().expect("Parsing client ECC key failed");
+    let client_pq_ciphertext = client_response["pq"].as_str().expect("Parsing client PQ key failed");
+
+    //DECAPSULATE PQ
+    let pq_secret = crypto::decapsulate_pq(&pq_sk, client_pq_ciphertext);
+
     //CALCULATE SHARED SECRET AND UPDATE CONNECTION
-    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap(), None)
+    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, client_ecc_pk.to_string(), Some(pq_secret))
         .inspect(|k| update_client_keys(peer_addr, k))
         .unwrap_or((Zeroizing::new(vec![]), Zeroizing::new(vec![])));
 }

@@ -87,8 +87,15 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
         if received.code == Some(MessageCode::KeyExchange) { break received; }
     };
 
+    let message_text = message.text.as_ref().unwrap();
+
+    //PARSE SERVER KEYS JSON
+    let server_keys: Value = serde_json::from_str(message_text).expect("Failed to parse server keys JSON");
+    let server_ecc_pk = server_keys["ecc"].as_str().expect("Parsing server ECC key failed");
+    let server_pq_pk = server_keys["pq"].as_str().expect("Parsing server PQ key failed");
+
     //VERIFY PUBKEY VALIDITY (TOFU)
-    match config::server_keys_check(&stream.peer_addr().unwrap().ip().to_string(), message.text.as_ref().unwrap())
+    match config::server_keys_check(&stream.peer_addr().unwrap().ip().to_string(), message_text)
     {
         TofuCode::Valid => {},
 
@@ -109,19 +116,29 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
         },
     }
 
-    //GENERATE EPHEMERAL KEYS
+    //GENERATE EPHEMERAL ECC KEYS
     let (sk, pk) = crypto::generate_ephemeral_keys();
+
+    //ENCAPSULATE PQ
+    let (pq_ciphertext, pq_secret) = crypto::encapsulate_pq(server_pq_pk);
+
+    //PREPARE RESPONSE JSON
+    let response_text = serde_json::json!
+    ({
+        "ecc": pk,
+        "pq": pq_ciphertext,
+    }).to_string();
 
     //SEND ECC PUBKEY TO SERVER
     network::send(stream, MessagePacket
     {
-        text: Some(pk),
+        text: Some(response_text),
         code: Some(MessageCode::KeyExchange),
         ..Default::default()
     }, None);
 
-    //CALCULATE SHARED SECRET
-    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, message.text.unwrap(), None).expect("Shared secret derivation failed");
+    //CALCULATE SHARED SECRET (HYBRID)
+    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, server_ecc_pk.to_string(), Some(pq_secret)).expect("Shared secret derivation failed");
 
     //SET GLOBAL KEYS VARIABLE
     options::set_keys(keys.clone());
