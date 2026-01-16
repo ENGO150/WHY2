@@ -60,7 +60,7 @@ use subtle::{ ConstantTimeEq, ConditionallySelectable };
 /// # Parameters
 /// - `input`: An [`EncryptedData`] struct containing the encrypted grids and key grid.
 ///
-/// - Ok([`DecryptedData`](crate::options::DecryptedData)) struct containing:
+/// - Ok([`DecryptedData`]) struct containing:
 ///   - `output`: A vector of decrypted `i64` values
 ///   - `key`: The original key [`Grid`](crate::Grid) flattened into a vector
 /// - Err(String) if [`Grid`](crate::Grid) area is 1

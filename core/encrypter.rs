@@ -23,13 +23,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! raw data into encrypted Grid chunks using a symmetric key.
 //!
 //! # Overview
-//! WHY2 encrypts data by converting it into fixed-size grids ([`Grid`](crate::Grid)) and applying
+//! WHY2 encrypts data by converting it into fixed-size grids ([`Grid`]) and applying
 //! nonlinear and linear transformations across multiple rounds in CTR mode. The process includes:
 //!
-//! 1. **[`Grid`](crate::Grid) Shaping**: Input is padded and split into [`Grid`](crate::Grid) chunks.
+//! 1. **[`Grid`] Shaping**: Input is padded and split into [`Grid`] chunks.
 //! 2. **Key Handling**: A symmetric key is either provided or securely generated.
 //! 3. **Nonce Generation**: A random nonce is generated for CTR mode.
-//! 4. **CTR Mode Encryption**: Each plaintext [`Grid`](crate::Grid) is XORed with a keystream
+//! 4. **CTR Mode Encryption**: Each plaintext [`Grid`] is XORed with a keystream
 //! block derived from encrypting the nonce plus block counter.
 
 use rand::{ Rng, SeedableRng };
@@ -64,7 +64,7 @@ use subtle::{ ConditionallySelectable, ConstantTimeEq };
 /// - `key`: The key [`Grid`] used for encryption.
 ///
 /// # Behavior
-/// - Splits the input into [`Grid`](crate::Grid) chunks.
+/// - Splits the input into [`Grid`] chunks.
 /// - Generates a random nonce for CTR mode.
 /// - Applies CTR mode encryption using the WHY2 block cipher.
 ///
