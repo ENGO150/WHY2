@@ -68,6 +68,7 @@ chat = [
     "dep:dirs",
     "dep:semver",
     "dep:p521",
+    "dep:ml-kem",
     "dep:hmac",
     "dep:hkdf",
 ]
@@ -109,6 +110,7 @@ wincode = { version = "0.2.5", features = ["derive"], optional = true }
 colored = { version = "3.0.0", optional = true }
 dirs = { version = "6.0.0", optional = true }
 p521 = { version = "0.13.3", features = ["ecdh", "pkcs8"], optional = true }
+ml-kem = { version = "0.2.1", optional = true }
 ureq = { version = "3.1.4", optional = true }
 semver = { version = "1.0.27", optional = true }
 toml_edit = { version = "0.24.0", optional = true }
