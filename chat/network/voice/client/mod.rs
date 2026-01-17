@@ -495,6 +495,8 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
     let vad_socket = socket.clone();
     thread::spawn(move ||
     {
+        let mut iteration_counter = 0u8;
+
         loop
         {
             //QUIT ON /leave
@@ -504,20 +506,28 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
                 return;
             }
 
+            iteration_counter += 1; //INCREMENT
+
             //SHOW VOICE ACTIVITY
             display_active_speakers(&username, &tx);
 
             //SEND PING PACKET
-            voice::send(&vad_socket, VoicePacket
+            if iteration_counter == 10
             {
-                id: Some(id),
-                code: Some(VoiceCode::PING),
-                timestamp: Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis()),
+                voice::send(&vad_socket, VoicePacket
+                {
+                    id: Some(id),
+                    code: Some(VoiceCode::PING),
+                    timestamp: Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis()),
 
-                ..Default::default()
-            }, &chat_options::get_keys().unwrap()).unwrap();
+                    ..Default::default()
+                }, &chat_options::get_keys().unwrap()).unwrap();
 
-            thread::sleep(Duration::from_millis(60));
+                //RESET COUNTER
+                iteration_counter = 0;
+            }
+
+            thread::sleep(Duration::from_millis(100));
         }
     });
 
