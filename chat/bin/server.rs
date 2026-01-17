@@ -80,7 +80,7 @@ fn main()
         Ok(l) => l,
         Err(_) =>
         {
-            log::error!("Binding failed!");
+            log::error!("Binding on {address} failed!");
             process::exit(1);
         }
     };
