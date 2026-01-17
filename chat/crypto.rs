@@ -204,7 +204,7 @@ pub fn derive_shared_secret<const W: usize, const H: usize> //DERIVE SHARED SYMK
 (
     local_key: String,
     peer_pkey: String,
-    pq_secret: Option<Vec<u8>>
+    pq_secret: Vec<u8>,
 ) -> Option<options::SharedKeys>
 {
     //PARSE KEYS
@@ -215,16 +215,16 @@ pub fn derive_shared_secret<const W: usize, const H: usize> //DERIVE SHARED SYMK
     let shared = ecdh::diffie_hellman(local_private.to_nonzero_scalar(), remote_public.as_affine());
 
     //COMBINE SECRETS
-    let mut final_secret = shared.raw_secret_bytes().to_vec();
-
-    //APPEND PQ
-    if let Some(pq) = pq_secret
-    {
-        final_secret.extend_from_slice(&pq);
-    }
+    let hkdf = Hkdf::<Sha256>::new(None, &[]);
+    let mut combined = vec![0u8; 64];
+    hkdf.expand_multi_info
+    (
+        &[&shared.raw_secret_bytes(), &pq_secret, b"WHY2-HYBRID"],
+        &mut combined
+    ).unwrap();
 
     //USE HKDF TO DERIVE SEPARATE ENCRYPTION AND MAC KEY
-    Some(derive_encryption_keys(&final_secret, misc::get_version()))
+    Some(derive_encryption_keys(&combined, misc::get_version()))
 }
 
 pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Vec<u8>)

@@ -344,7 +344,7 @@ fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut options
         let pq_secret = crypto::decapsulate_pq(&pq_sk, client_pq_ciphertext)?;
 
         //DERIVE
-        crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, client_ecc_pk.to_string(), Some(pq_secret))
+        crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, client_ecc_pk.to_string(), pq_secret)
     })();
 
     //UPDATE CLIENT KEYS
