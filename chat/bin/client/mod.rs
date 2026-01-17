@@ -381,6 +381,15 @@ fn main()
     //CREATE CHANNEL
     let (tx, rx) = mpsc::channel::<ClientEvent>();
 
+    //SPAWN PRINTER THREAD
+    thread::spawn(move ||
+    {
+        while let Ok(event) = rx.recv()
+        {
+            ui::draw_event(event);
+        }
+    });
+
     //CONFIGURATION
     misc::check_version(&tx); //CHECK WHY2 VERSION
     config::init_client_config(); //CREATE client.toml CONFIGURATION
@@ -478,15 +487,6 @@ fn main()
 
     //ENABLE RAW MODE
     let _raw_mode_guard = RawModeGuard::enable().unwrap();
-
-    //SPAWN PRINTER THREAD
-    thread::spawn(move ||
-    {
-        while let Ok(event) = rx.recv()
-        {
-            ui::draw_event(event);
-        }
-    });
 
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
