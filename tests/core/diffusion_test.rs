@@ -68,7 +68,7 @@ fn test_input_diffusion()
         let key = crypto::generate_key::<W, H>();
         let input = generate_random_data(data_len);
 
-        let base_encrypted = encrypter::encrypt::<W, H>(input.clone(), Some(key.to_vec()))
+        let base_encrypted = encrypter::encrypt::<W, H>(&input, Some(&key))
             .expect("Encryption failed")
             .output;
 
@@ -82,7 +82,7 @@ fn test_input_diffusion()
                 let mut modified_input = input.clone();
                 modified_input[i] ^= 1 << bit;
 
-                let modified_encrypted = encrypter::encrypt::<W, H>(modified_input, Some(key.to_vec()))
+                let modified_encrypted = encrypter::encrypt::<W, H>(&modified_input, Some(&key))
                     .expect("Encryption failed")
                     .output;
 
@@ -115,7 +115,7 @@ fn test_key_diffusion()
         let input = generate_random_data(data_len);
         let key = crypto::generate_key::<W, H>();
 
-        let base_encrypted = encrypter::encrypt::<W, H>(input.clone(), Some(key.to_vec()))
+        let base_encrypted = encrypter::encrypt::<W, H>(&input, Some(&key))
             .expect("Encryption failed")
             .output;
 
@@ -129,7 +129,7 @@ fn test_key_diffusion()
                 let mut modified_key = key.clone();
                 modified_key[i] ^= 1 << bit;
 
-                let modified_encrypted = encrypter::encrypt::<W, H>(input.clone(), Some(modified_key.to_vec()))
+                let modified_encrypted = encrypter::encrypt::<W, H>(&input, Some(&modified_key))
                     .expect("Encryption failed")
                     .output;
 
