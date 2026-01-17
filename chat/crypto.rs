@@ -251,8 +251,8 @@ pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Option<Vec<u8
     let ct_bytes = decode_raw_pem(ciphertext_pem)?;
 
     //DESERIALIZE
-    let dk = <MlKem768 as KemCore>::DecapsulationKey::from_bytes((&sk_bytes[..]).try_into().unwrap());
-    let ct = Ciphertext::<MlKem768>::try_from(ct_bytes.as_slice()).unwrap();
+    let dk = <MlKem768 as KemCore>::DecapsulationKey::from_bytes((&sk_bytes[..]).try_into().ok()?);
+    let ct = Ciphertext::<MlKem768>::try_from(ct_bytes.as_slice()).ok()?;
 
     dk.decapsulate(&ct).ok().map(|ss| ss.to_vec())
 }
