@@ -91,6 +91,7 @@ use crate::chat::
         {
             self,
             options,
+            VoiceCode,
             VoicePacket,
             client::sfx::SoundEffect,
         },
@@ -492,7 +493,8 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
     sfx::clear_effects();
     sfx::queue_effect(SoundEffect::Join);
 
-    //START VOICE ACTIVITY DISPLAY THREAD
+    //START VOICE ACTIVITY DISPLAY & PING THREAD
+    let vad_socket = socket.clone();
     thread::spawn(move ||
     {
         loop
@@ -504,7 +506,19 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
                 return;
             }
 
-            display_active_speakers(&username, &tx); //SHOW VOICE ACTIVITY
+            //SHOW VOICE ACTIVITY
+            display_active_speakers(&username, &tx);
+
+            //SEND PING PACKET
+            voice::send(&vad_socket, VoicePacket
+            {
+                id: Some(id),
+                code: Some(VoiceCode::PING),
+                timestamp: Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis()),
+
+                ..Default::default()
+            }, &chat_options::get_keys().unwrap()).unwrap();
+
             thread::sleep(Duration::from_millis(60));
         }
     });
@@ -556,28 +570,33 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
             add_consumer(sender_id, network_buffer.username.unwrap());
         }
 
-        //CHECK FOR VOICE IN PACKET
-        if network_buffer.voice.is_none() { continue; }
 
         if let Some((stream, peer)) = CONSUMERS.lock().unwrap().get_mut(&sender_id)
         {
-            //CALCULATE LATENCY
-            let latency = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().saturating_sub(network_buffer.timestamp);
-
-            //STORE LATENCY TO BUFFER
-            stream.latencies.push_back(latency);
-            if stream.latencies.len() > 20 //STORE ONLY LATEST 20 LATENCIES
+            //PONG RECEIVED, CALCULATE LATENCY
+            if network_buffer.code == Some(VoiceCode::PONG) && let Some(timestamp) = network_buffer.timestamp
             {
-                stream.latencies.pop_front();
+                //CALCULATE LATENCY
+                let latency = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().saturating_sub(timestamp);
+
+                //STORE LATENCY TO BUFFER
+                stream.latencies.push_back(latency);
+                if stream.latencies.len() > 20 //STORE ONLY LATEST 20 LATENCIES
+                {
+                    stream.latencies.pop_front();
+                }
+
+                //CALCULATE AVERAGE LATENCY
+                let sum: u128 = stream.latencies.iter().sum();
+                if !stream.latencies.is_empty()
+                {
+                    //STORE IN AVG_LATENCY
+                    stream.avg_latency = sum / stream.latencies.len() as u128;
+                }
             }
 
-            //CALCULATE AVERAGE LATENCY
-            let sum: u128 = stream.latencies.iter().sum();
-            if !stream.latencies.is_empty()
-            {
-                //STORE IN AVG_LATENCY
-                stream.avg_latency = sum / stream.latencies.len() as u128;
-            }
+            //CHECK FOR VOICE IN PACKET
+            if network_buffer.voice.is_none() { continue; }
 
             //DECODE
             if let Ok(decoded_len) = peer.decoder.decode_float(network_buffer.voice.as_deref(), &mut decoded_buffer[..], false)

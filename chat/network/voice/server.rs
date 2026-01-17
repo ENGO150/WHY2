@@ -222,7 +222,7 @@ pub fn listen_client_voice(socket: UdpSocket)
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
         //VALIDATE PACKET
-        if !validate_opus_packet(received.voice.as_deref()) { continue; } //IGNORE INVALID
+        if received.code.is_none() && !validate_opus_packet(received.voice.as_deref()) { continue; } //IGNORE INVALID
 
         //FIND SENDER'S CHANNEL
         let sender_channel = find_channel(&id);
@@ -255,6 +255,7 @@ pub fn listen_client_voice(socket: UdpSocket)
             {
                 voice: received.voice.clone(),
                 username: Some(username.to_string()),
+                code: received.code.clone(),
                 id: Some(id),
                 timestamp: received.timestamp,
                 ..Default::default()

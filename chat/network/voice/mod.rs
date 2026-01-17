@@ -28,7 +28,6 @@ pub mod server;
 use std::
 {
     io::Error,
-    time::{ SystemTime, UNIX_EPOCH },
     net::{ UdpSocket, SocketAddr },
 };
 
@@ -43,7 +42,7 @@ use crate::chat::
 #[cfg(not(feature = "server"))]
 use crate::chat::options as chat_options;
 
-#[derive(SchemaRead, SchemaWrite)]
+#[derive(Clone, PartialEq, SchemaRead, SchemaWrite)]
 pub enum VoiceCode
 {
     PING, //CLIENT A -> CLIENT B
@@ -58,7 +57,7 @@ pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
     pub code: Option<VoiceCode>,  //CODE
     pub id: Option<usize>,        //ID OF USER
     pub seq: usize,               //SEQUENCE NUMBER
-    pub timestamp: u128,          //TIME OF SENDING
+    pub timestamp: Option<u128>,  //TIME OF SENDING
 }
 
 impl Default for VoicePacket
@@ -72,7 +71,7 @@ impl Default for VoicePacket
             code: None,
             username: None,
             seq: 0,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
+            timestamp: None,
         }
     }
 }
