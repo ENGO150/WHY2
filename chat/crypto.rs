@@ -77,9 +77,9 @@ const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //PRIVATE
-fn decode_raw_pem(pem: &str) -> Vec<u8>
+fn decode_raw_pem(pem: &str) -> Option<Vec<u8>>
 {
-    pem::decode_vec(pem.as_bytes()).expect("Decoding PEM failed").1.to_vec()
+    pem::decode_vec(pem.as_bytes()).ok().map(|p| p.1.to_vec())
 }
 
 fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> options::SharedKeys //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
@@ -230,7 +230,7 @@ pub fn derive_shared_secret<const W: usize, const H: usize> //DERIVE SHARED SYMK
 pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Vec<u8>)
 {
     //DECODE PEM
-    let pk_bytes = decode_raw_pem(peer_pk_bytes);
+    let pk_bytes = decode_raw_pem(peer_pk_bytes).expect("Decoding PEM fialed");
 
     //DESERIALIZE KEY
     let ek = <MlKem768 as KemCore>::EncapsulationKey::from_bytes((&pk_bytes[..]).try_into().unwrap());
@@ -244,19 +244,17 @@ pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Vec<u8>)
     (ct_pem, ss.to_vec())
 }
 
-pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Vec<u8>
+pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Option<Vec<u8>>
 {
     //DECODE PEM
-    let sk_bytes = decode_raw_pem(local_sk_pem);
-    let ct_bytes = decode_raw_pem(ciphertext_pem);
+    let sk_bytes = decode_raw_pem(local_sk_pem)?;
+    let ct_bytes = decode_raw_pem(ciphertext_pem)?;
 
     //DESERIALIZE
     let dk = <MlKem768 as KemCore>::DecapsulationKey::from_bytes((&sk_bytes[..]).try_into().unwrap());
     let ct = Ciphertext::<MlKem768>::try_from(ct_bytes.as_slice()).unwrap();
 
-    let ss = dk.decapsulate(&ct).expect("Decapsulation failed");
-
-    ss.to_vec()
+    dk.decapsulate(&ct).ok().map(|ss| ss.to_vec())
 }
 
 pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING

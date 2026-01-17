@@ -332,18 +332,27 @@ fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut options
     //REMOVE READ TIMEOUT
     stream.set_read_timeout(None).expect("Failed to unset read timeout");
 
-    //PARSE CLIENT RESPONSE (JSON)
-    let client_response: Value = serde_json::from_str(message.text.as_ref().unwrap()).expect("Failed to parse client keys JSON");
-    let client_ecc_pk = client_response["ecc"].as_str().expect("Parsing client ECC key failed");
-    let client_pq_ciphertext = client_response["pq"].as_str().expect("Parsing client PQ key failed");
+    //DERIVE SHARED KEYS
+    let derived_keys = (||
+    {
+        //PARSE CLIENT RESPONSE (JSON)
+        let client_response: Value = serde_json::from_str(message.text.as_ref().unwrap()).ok()?;
+        let client_ecc_pk = client_response["ecc"].as_str()?;
+        let client_pq_ciphertext = client_response["pq"].as_str()?;
 
-    //DECAPSULATE PQ
-    let pq_secret = crypto::decapsulate_pq(&pq_sk, client_pq_ciphertext);
+        //DECAPSULATE PQ
+        let pq_secret = crypto::decapsulate_pq(&pq_sk, client_pq_ciphertext)?;
 
-    //CALCULATE SHARED SECRET AND UPDATE CONNECTION
-    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, client_ecc_pk.to_string(), Some(pq_secret))
-        .inspect(|k| update_client_keys(peer_addr, k))
-        .unwrap_or((Zeroizing::new(vec![]), Zeroizing::new(vec![])));
+        //DERIVE
+        crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, client_ecc_pk.to_string(), Some(pq_secret))
+    })();
+
+    //UPDATE CLIENT KEYS
+    if let Some(new_keys) = derived_keys
+    {
+        update_client_keys(peer_addr, &new_keys);
+        *keys = new_keys;
+    }
 }
 
 fn send_welcome_packet(stream: &mut TcpStream, keys: &options::SharedKeys) //send welcome packet you idiot
