@@ -74,15 +74,22 @@ fn main()
     //SERIALIZE ADDRESS
     let address = format!("{}:{}", config::server_config::<String>("server_ip"), config::server_config::<u16>("server_port")); //GET ADDRESS
 
-    //BIND
-    let listener = TcpListener::bind(&address).expect("Binding failed"); //TCP (TEXT)
-    let mut udp_socket: Option<UdpSocket> = None; //UDP (VOICE)
-
-    //ENABLE VOICE
-    if options::voice_chat_enabled()
+    //BIND TCP (TEXT)
+    let listener = match TcpListener::bind(&address)
     {
-        udp_socket = Some(UdpSocket::bind(&address).expect("Binding UDP failed"));
-    }
+        Ok(l) => l,
+        Err(_) =>
+        {
+            log::error!("Binding failed!");
+            process::exit(1);
+        }
+    };
+
+    //BIND UDP (VOICE)
+    let udp_socket = if options::voice_chat_enabled() //VOICE ENABLED
+    {
+        Some(UdpSocket::bind(&address).expect("Binding UDP failed"))
+    } else { None }; //VOICE DISABLED
 
     log::info!("Listening on {address}"); //PRINT INFO
 
