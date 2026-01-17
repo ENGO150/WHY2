@@ -125,7 +125,7 @@ use std::
     },
 };
 
-use zeroize::{ Zeroize, Zeroizing };
+use zeroize::Zeroize;
 
 #[cfg(feature = "constant-time")]
 use subtle::
@@ -262,12 +262,12 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// $$ Grid_{x,y} = A \oplus B \oplus i $$
     ///
     /// # Parameters
-    /// - `vec`: A vector of signed 64-bit integers representing the raw key.
+    /// - `vec`: A slice of signed 64-bit integers representing the raw key.
     ///
     /// # Returns
     /// - Ok(`Grid`) with mixed key values if dimensions are valid.
     /// - Err(`GridError`) if the grid area is too small.
-    pub fn from_key(vec: Zeroizing<Vec<i64>>) -> result::Result<Self, GridError>
+    pub fn from_key(vec: &[i64]) -> result::Result<Self, GridError>
     {
         //GRID OPTIONS
         let grid_area = W * H;

@@ -54,7 +54,7 @@ use subtle::{ ConditionallySelectable, ConstantTimeEq };
 /// round-based encryption using nonlinear and linear mixing.
 ///
 /// # Parameters
-/// - `input`: A vector of `i64` values representing the data.
+/// - `input`: A slice of `i64` values representing the data.
 /// - `key`: An optional symmetric key. If `None`, a secure key is generated automatically.
 ///          If provided, it must be exactly $2 \times W \times H$ elements long.
 ///
@@ -72,7 +72,7 @@ use subtle::{ ConditionallySelectable, ConstantTimeEq };
 /// $$ C_i = P_i \oplus E_K(\text{Nonce} + i) $$
 ///
 /// where $E_K$ denotes the WHY2 block cipher keyed with $K$, and $i$ is the block counter.
-pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
+pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]>) -> Result<EncryptedData<W, H>, GridError>
 {
     //REX OPTIONS
     let grid_area = W * H; //AREA OF REX GRID
@@ -81,7 +81,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     let key_used = match key
     {
         //KEY PASSED AS PARAMETER
-        Some(k) if k.len() == grid_area * 2 => Zeroizing::new(k),
+        Some(k) if k.len() == grid_area * 2 => Zeroizing::new(k.to_vec()),
         Some(k) => return Err(GridError::InvalidKeyLength //INVALID KEY
         {
             expected_len: grid_area,
@@ -92,11 +92,8 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
         None => crypto::generate_key::<W, H>()
     };
 
-    //GET MUTABLE input
-    let input_used = Zeroizing::new(input);
-
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut grids: Vec<Grid<W, H>> = input_used.chunks(grid_area).map(|chunk| -> Result<Grid<W, H>, GridError>
+    let mut grids: Vec<Grid<W, H>> = input.chunks(grid_area).map(|chunk| -> Result<Grid<W, H>, GridError>
     {
         let mut grid = Grid::new()?; //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
@@ -108,7 +105,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
     }).collect::<Result<Vec<_>, _>>()?;
 
     //SHAPE KEY TO 8x8 GRID
-    let key_grid = Grid::<W, H>::from_key(key_used)?;
+    let key_grid = Grid::<W, H>::from_key(&key_used)?;
 
     //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
     let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
@@ -174,7 +171,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: Vec<i64>, key: Option<Vec<
 /// - `input`: A string slice to encrypt.
 /// - `key`: An optional symmetric key. If `None`, a secure key is generated automatically.
 ///          If provided, it must be exactly $2 \times W \times H$ elements long.
-pub fn encrypt_string<const W: usize, const H: usize>(input: &str, key: Option<Vec<i64>>) -> Result<EncryptedData<W, H>, GridError>
+pub fn encrypt_string<const W: usize, const H: usize>(input: &str, key: Option<&[i64]>) -> Result<EncryptedData<W, H>, GridError>
 {
     //CONVERT input TO Vec<i64>
     let mut chars = Zeroizing::new(input.chars().collect::<Vec<char>>());
@@ -198,5 +195,5 @@ pub fn encrypt_string<const W: usize, const H: usize>(input: &str, key: Option<V
     }).collect::<Vec<i64>>());
 
     //ENCRYPT Vec<i64> AND RETURN
-    encrypt(vec_input.to_vec(), key)
+    encrypt(&vec_input, key)
 }

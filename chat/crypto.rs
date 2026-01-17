@@ -216,7 +216,7 @@ pub fn derive_shared_secret<const W: usize, const H: usize> //DERIVE SHARED SYMK
 
     //COMBINE SECRETS
     let hkdf = Hkdf::<Sha256>::new(None, &[]);
-    let mut combined = vec![0u8; 64];
+    let mut combined = Zeroizing::new(vec![0u8; 64]);
     hkdf.expand_multi_info
     (
         &[&shared.raw_secret_bytes(), &pq_secret, b"WHY2-HYBRID"],
@@ -247,7 +247,7 @@ pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Vec<u8>)
 pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Option<Vec<u8>>
 {
     //DECODE PEM
-    let sk_bytes = decode_raw_pem(local_sk_pem)?;
+    let sk_bytes = Zeroizing::new(decode_raw_pem(local_sk_pem)?);
     let ct_bytes = decode_raw_pem(ciphertext_pem)?;
 
     //DESERIALIZE
@@ -299,7 +299,7 @@ pub fn encrypt_packet(packet_bytes: Vec<u8>, keys: &options::SharedKeys) -> Vec<
     }
 
     //ENCRYPT
-    let encrypted_data = encrypter::encrypt::<GRID_W, GRID_H>(input_i64, Some(keys.0.to_vec())).expect("Encrypting packet failed");
+    let encrypted_data = encrypter::encrypt::<GRID_W, GRID_H>(&input_i64, Some(&keys.0)).expect("Encrypting packet failed");
 
     //SERIALIZE ENCRYPTED PACKET
     let mut grids = encrypted_data.output;
@@ -345,7 +345,7 @@ pub fn decrypt_packet(mut decoded_packet: Vec<u8>, keys: &options::SharedKeys) -
     let decrypted_packet = decrypter::decrypt(core_options::EncryptedData
     {
         output: grids,
-        key: Grid::from_key(keys.0.clone().into()).unwrap(),
+        key: Grid::from_key(&keys.0).unwrap(),
         nonce: nonce,
     }).ok()?;
 

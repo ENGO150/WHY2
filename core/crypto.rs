@@ -159,7 +159,7 @@ pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, 
         let key = generate_key_deterministic::<W, H>(&mut rng);
 
         //CONVERT KEY TO Grid & PUSH TO keys
-        keys.push(Grid::from_key(key)?);
+        keys.push(Grid::from_key(&key)?);
     }
 
     Ok(keys)
@@ -181,7 +181,7 @@ pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, 
 /// - The nonce will be transmitted alongside the ciphertext.
 pub fn generate_nonce<const W: usize, const H: usize>() -> Result<Grid<W, H>, GridError>
 {
-    Grid::from_key(generate_key::<W, H>())
+    Grid::from_key(&generate_key::<W, H>())
 }
 
 /// Applies CTR (Counter) mode encryption/decryption in parallel.
