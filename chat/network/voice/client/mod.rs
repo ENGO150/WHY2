@@ -229,9 +229,7 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
     //SEND HELLO PACKET
     voice::send(&socket, VoicePacket
     {
-        voice: None,
         id: Some(id),
-
         ..Default::default()
     }, &chat_options::get_keys().unwrap()).unwrap();
 
@@ -570,28 +568,49 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
             add_consumer(sender_id, network_buffer.username.unwrap());
         }
 
-
         if let Some((stream, peer)) = CONSUMERS.lock().unwrap().get_mut(&sender_id)
         {
-            //PONG RECEIVED, CALCULATE LATENCY
-            if network_buffer.code == Some(VoiceCode::PONG) && let Some(timestamp) = network_buffer.timestamp
+            //PING/PONG
+            if let Some(code) = network_buffer.code && let Some(timestamp) = network_buffer.timestamp
             {
-                //CALCULATE LATENCY
-                let latency = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().saturating_sub(timestamp);
-
-                //STORE LATENCY TO BUFFER
-                stream.latencies.push_back(latency);
-                if stream.latencies.len() > 20 //STORE ONLY LATEST 20 LATENCIES
+                match code
                 {
-                    stream.latencies.pop_front();
-                }
+                    //PING RECEIVED, SEND BACK
+                    VoiceCode::PING =>
+                    {
+                        //SEND PONG PACKET
+                        voice::send(&socket, VoicePacket
+                        {
+                            id: Some(id),
+                            target_id: Some(sender_id),
+                            code: Some(VoiceCode::PONG),
+                            timestamp: Some(timestamp),
 
-                //CALCULATE AVERAGE LATENCY
-                let sum: u128 = stream.latencies.iter().sum();
-                if !stream.latencies.is_empty()
-                {
-                    //STORE IN AVG_LATENCY
-                    stream.avg_latency = sum / stream.latencies.len() as u128;
+                            ..Default::default()
+                        }, &chat_options::get_keys().unwrap()).unwrap();
+                    },
+
+                    //PING FORWARDED BACK, CALCULATE LATENCY
+                    VoiceCode::PONG =>
+                    {
+                        //CALCULATE LATENCY
+                        let latency = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().saturating_sub(timestamp);
+
+                        //STORE LATENCY TO BUFFER
+                        stream.latencies.push_back(latency);
+                        if stream.latencies.len() > 20 //STORE ONLY LATEST 20 LATENCIES
+                        {
+                            stream.latencies.pop_front();
+                        }
+
+                        //CALCULATE AVERAGE LATENCY
+                        let sum: u128 = stream.latencies.iter().sum();
+                        if !stream.latencies.is_empty()
+                        {
+                            //STORE IN AVG_LATENCY
+                            stream.avg_latency = sum / stream.latencies.len() as u128;
+                        }
+                    }
                 }
             }
 

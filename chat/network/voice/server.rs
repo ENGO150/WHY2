@@ -35,6 +35,7 @@ use crate::chat::
         {
             self,
             options,
+            VoiceCode,
             VoicePacket,
         },
     },
@@ -223,6 +224,32 @@ pub fn listen_client_voice(socket: UdpSocket)
 
         //VALIDATE PACKET
         if received.code.is_none() && !validate_opus_packet(received.voice.as_deref()) { continue; } //IGNORE INVALID
+
+        //FORWARD PONG (UNICAST)
+        if received.code == Some(VoiceCode::PONG) && let Some(ref target_id) = received.target_id
+        {
+            if let Some(ref keys) = find_key(&target_id)
+            {
+                //FIND ADDRESS OF RECIPIENT (DA PINGA)
+                let addr = match CONNECTIONS.get(target_id)
+                    .and_then(|entry| entry.0.as_ref().map(|conn| conn.addr))
+                {
+                    Some(a) => a,
+                    None => continue
+                };
+
+                //FORWARD
+                voice::send(&socket, VoicePacket
+                {
+                    code: Some(VoiceCode::PONG),
+                    id: Some(id),
+                    timestamp: received.timestamp,
+                    ..Default::default()
+                }, &addr, target_id, keys).unwrap();
+            }
+
+            continue;
+        }
 
         //FIND SENDER'S CHANNEL
         let sender_channel = find_channel(&id);

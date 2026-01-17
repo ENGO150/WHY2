@@ -56,6 +56,7 @@ pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
     pub username: Option<String>, //USERNAME
     pub code: Option<VoiceCode>,  //CODE
     pub id: Option<usize>,        //ID OF USER
+    pub target_id: Option<usize>, //ID OF RECIPIENT
     pub seq: usize,               //SEQUENCE NUMBER
     pub timestamp: Option<u128>,  //TIME OF SENDING
 }
@@ -68,6 +69,7 @@ impl Default for VoicePacket
         {
             voice: None,
             id: None,
+            target_id: None,
             code: None,
             username: None,
             seq: 0,
