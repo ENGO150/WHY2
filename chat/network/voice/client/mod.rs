@@ -182,7 +182,7 @@ fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], id: usize
         //TRANSMIT
         voice::send(socket, VoicePacket
         {
-            voice: buffer[..len].to_vec(),
+            voice: Some(buffer[..len].to_vec()),
             id: Some(id),
 
             ..Default::default()
@@ -228,7 +228,7 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
     //SEND HELLO PACKET
     voice::send(&socket, VoicePacket
     {
-        voice: Vec::new(),
+        voice: None,
         id: Some(id),
 
         ..Default::default()
@@ -556,6 +556,9 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
             add_consumer(sender_id, network_buffer.username.unwrap());
         }
 
+        //CHECK FOR VOICE IN PACKET
+        if network_buffer.voice.is_none() { continue; }
+
         if let Some((stream, peer)) = CONSUMERS.lock().unwrap().get_mut(&sender_id)
         {
             //CALCULATE LATENCY
@@ -577,7 +580,7 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
             }
 
             //DECODE
-            if let Ok(decoded_len) = peer.decoder.decode_float(Some(&network_buffer.voice), &mut decoded_buffer[..], false)
+            if let Ok(decoded_len) = peer.decoder.decode_float(network_buffer.voice.as_deref(), &mut decoded_buffer[..], false)
             {
                 //PUSH TO RINGBUFFER
                 peer.producer.push_slice(&decoded_buffer[..decoded_len]);

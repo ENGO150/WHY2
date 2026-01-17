@@ -99,8 +99,14 @@ fn parse_opus_len(bytes: &[u8]) -> (usize, usize)
     }
 }
 
-fn validate_opus_packet(packet: &[u8]) -> bool
+fn validate_opus_packet(packet: Option<&[u8]>) -> bool
 {
+    let packet = match packet
+    {
+        Some(p) => p,
+        None => return false
+    };
+
     if packet.is_empty() { return false; }
 
     let toc = packet[0];
@@ -216,7 +222,7 @@ pub fn listen_client_voice(socket: UdpSocket)
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
         //VALIDATE PACKET
-        if !validate_opus_packet(&received.voice) { continue; } //IGNORE INVALID
+        if !validate_opus_packet(received.voice.as_deref()) { continue; } //IGNORE INVALID
 
         //FIND SENDER'S CHANNEL
         let sender_channel = find_channel(&id);

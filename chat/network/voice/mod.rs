@@ -44,10 +44,18 @@ use crate::chat::
 use crate::chat::options as chat_options;
 
 #[derive(SchemaRead, SchemaWrite)]
+pub enum VoiceCode
+{
+    PING, //CLIENT A -> CLIENT B
+    PONG, //CLIENT A <- CLIENT B
+}
+
+#[derive(SchemaRead, SchemaWrite)]
 pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
 {
-    pub voice: Vec<u8>,           //MESSAGE
+    pub voice: Option<Vec<u8>>,   //MESSAGE
     pub username: Option<String>, //USERNAME
+    pub code: Option<VoiceCode>,  //CODE
     pub id: Option<usize>,        //ID OF USER
     pub seq: usize,               //SEQUENCE NUMBER
     pub timestamp: u128,          //TIME OF SENDING
@@ -59,8 +67,9 @@ impl Default for VoicePacket
     {
         VoicePacket
         {
-            voice: Vec::new(),
+            voice: None,
             id: None,
+            code: None,
             username: None,
             seq: 0,
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
