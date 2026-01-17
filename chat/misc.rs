@@ -78,7 +78,26 @@ pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
 pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHECK FOR LATEST WHY2 VERSION
 {
     //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
-    let metadata_raw = fetch_data(options::METADATA_URL).expect("Fetching versions failed");
+    let metadata_raw = match fetch_data(options::METADATA_URL)
+    {
+        Ok(m) => m,
+        Err(_) =>
+        {
+            let print_text = "Fetching versions failed, this release could be unsafe!";
+
+            #[cfg(feature = "client")]
+            {
+                tx.send(ClientEvent::Info(print_text.to_string(), true, 0)).unwrap()
+            }
+
+            #[cfg(not(feature = "client"))]
+            {
+                log::warn!("{print_text}");
+            }
+
+            return;
+        }
+    };
 
     //PARSE METADATA TO JSON
     let metadata: Value = serde_json::from_str(&metadata_raw).expect("Parsing versions failed"); //PARSE
@@ -116,7 +135,7 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
 
         #[cfg(not(feature = "client"))]
         {
-            println!("{print_text}");
+            log::warn!("{print_text}");
         }
     }
 }
