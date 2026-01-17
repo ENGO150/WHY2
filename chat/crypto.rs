@@ -230,7 +230,7 @@ pub fn derive_shared_secret<const W: usize, const H: usize> //DERIVE SHARED SYMK
 pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Vec<u8>)
 {
     //DECODE PEM
-    let pk_bytes = decode_raw_pem(peer_pk_bytes).expect("Decoding PEM fialed");
+    let pk_bytes = decode_raw_pem(peer_pk_bytes).expect("Decoding PEM failed");
 
     //DESERIALIZE KEY
     let ek = <MlKem768 as KemCore>::EncapsulationKey::from_bytes((&pk_bytes[..]).try_into().unwrap());
