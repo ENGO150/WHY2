@@ -365,6 +365,7 @@ fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CH
     //PRINTOUT RESULT
     ui::clear_lines(2);
     print!("{message}\n\n\r>>> ");
+    io::stdout().flush().unwrap();
 }
 
 fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
@@ -561,6 +562,7 @@ fn main()
                         {
                             ui::clear_lines(2);
                             print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
+                            io::stdout().flush().unwrap();
                         },
 
                         //NON IMPLEMENTED COMMAND
