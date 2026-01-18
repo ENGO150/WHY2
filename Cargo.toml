@@ -109,7 +109,7 @@ hmac = { version = "0.12.1", optional = true }
 # CHAT
 serde_json = { version = "1.0.149", optional = true }
 wincode = { version = "0.2.5", features = ["derive"], optional = true }
-colored = { version = "3.0.0", optional = true }
+colored = { version = "3.1.1", optional = true }
 dirs = { version = "6.0.0", optional = true }
 p521 = { version = "0.13.3", features = ["ecdh", "pkcs8"], optional = true }
 ml-kem = { version = "0.2.1", optional = true }
