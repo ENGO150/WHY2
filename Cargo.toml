@@ -62,7 +62,6 @@ legacy = []
 chat = [
     "constant-time",
     "auth",
-    "dep:base91",
     "dep:serde_json",
     "dep:wincode",
     "dep:ureq",
@@ -108,7 +107,6 @@ subtle = { version = "2.6.1", optional = true }
 hmac = { version = "0.12.1", optional = true }
 
 # CHAT
-base91 = { version = "0.1.0", optional = true }
 serde_json = { version = "1.0.149", optional = true }
 wincode = { version = "0.2.5", features = ["derive"], optional = true }
 colored = { version = "3.0.0", optional = true }
