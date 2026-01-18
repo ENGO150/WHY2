@@ -47,7 +47,6 @@ use ml_kem::
 
 use sha2::{ Sha256, Digest };
 use hkdf::Hkdf;
-use hmac::{ Hmac, Mac };
 
 use zeroize::Zeroizing;
 
@@ -57,6 +56,7 @@ use crate::
     encrypter,
     decrypter,
     options as core_options,
+    auth::AuthenticatedData,
     chat::{ misc, options },
 };
 
@@ -101,32 +101,6 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> options::SharedKe
         bytes.copy_from_slice(chunk);
         i64::from_be_bytes(bytes)
     }).collect()), mac)
-}
-
-fn verify_hmac(packet: Vec<u8>, mac: &Vec<u8>) -> Option<Vec<u8>> //VERIFY HMAC
-{
-    //VERIFY MAC LENGTH
-    if packet.len() < 32
-    {
-        return None;
-    }
-
-    //SEPARATE MAC FROM CIPHERTEXT
-    let received_mac: [u8; 32] = packet[..32].try_into().unwrap();
-    let ciphertext = &packet[32..];
-
-    //COMPUTE EXPECTED HMAC
-    let mut mac = Hmac::<Sha256>::new_from_slice(mac).expect("HMAC initialization failed");
-    mac.update(ciphertext);
-
-    //VERIFY MAC
-    if mac.verify_slice(&received_mac).is_ok()
-    {
-        Some(ciphertext.to_vec())
-    } else
-    {
-        None
-    }
 }
 
 //PUBLIC
@@ -301,52 +275,27 @@ pub fn encrypt_packet(packet_bytes: Vec<u8>, keys: &options::SharedKeys) -> Vec<
     //ENCRYPT
     let encrypted_data = encrypter::encrypt::<GRID_W, GRID_H>(&input_i64, Some(&keys.0)).expect("Encrypting packet failed");
 
-    //SERIALIZE ENCRYPTED PACKET
-    let mut grids = encrypted_data.output;
-    grids.insert(0, encrypted_data.nonce); //NONCE
-
-    //CONVERT ENCRYPTED PACKET (FROM Vec<Grid>) TO Vec<u8>
-    let encrypted_bytes: Vec<u8> = grids.iter()
-        .flat_map(|grid| grid.iter()
-            .flat_map(|row| row.iter()
-                .flat_map(|&val| val.to_be_bytes()))).collect();
-
-    //COMPUTE HMAC OVER CIPHERTEXT
-    let mut mac = Hmac::<Sha256>::new_from_slice(&keys.1).expect("HMAC initialization failed");
-    mac.update(&encrypted_bytes);
-
-    let mac_tag = mac.finalize().into_bytes();
-
-    //PREPEND MAC TO CIPHERTEXT ([32-byte HMAC][CIPHERTEXT])
-    let mut transmission_bytes = Vec::with_capacity(32 + encrypted_bytes.len());
-    transmission_bytes.extend_from_slice(&mac_tag);
-    transmission_bytes.extend_from_slice(&encrypted_bytes);
-    transmission_bytes
+    //AUTHENTICATE
+    AuthenticatedData::authenticate(encrypted_data, keys.1.as_slice().try_into().unwrap()).into()
 }
 
 pub fn decrypt_packet(mut decoded_packet: Vec<u8>, keys: &options::SharedKeys) -> Option<Vec<u8>>
 {
+    //DESERIALIZE
+    let auth_packet: AuthenticatedData<GRID_W, GRID_H> = decoded_packet.as_slice().try_into().ok()?;
+
     //VERIFY HMAC
-    if let Some(ciphertext) = verify_hmac(decoded_packet, &keys.1)
-    {
-        decoded_packet = ciphertext;
-    } else
+    if !auth_packet.verify(keys.1.as_slice().try_into().ok()?)
     {
         return None;
     }
 
-    //DESERIALIZE ENCRYPTED PACKET
-    let mut grids = Grid::<GRID_W, GRID_H>::from_bytes(&decoded_packet).ok()?;
-
-    //EXTRACT NONCE
-    let nonce = grids.remove(0);
-
     //DECRYPT
     let decrypted_packet = decrypter::decrypt(core_options::EncryptedData
     {
-        output: grids,
-        key: Grid::from_key(&keys.0).unwrap(),
-        nonce: nonce,
+        output: auth_packet.encrypted_data.output,
+        key: Grid::from_key(&keys.0).ok()?,
+        nonce: auth_packet.encrypted_data.nonce,
     }).ok()?;
 
     //OVERWRITE decoded_packet

@@ -62,6 +62,8 @@ use zeroize::Zeroize;
 
 use crate::
 {
+    Grid,
+    GridError,
     options::EncryptedData,
 };
 
@@ -174,6 +176,74 @@ impl<const W: usize, const H: usize> AuthenticatedData<W, H>
     {
         //USE HANDLER FOR COMPUTING HMAC
         compute_mac(&self.encrypted_data, mac_key).verify_slice(&self.mac).is_ok()
+    }
+}
+
+impl<const W: usize, const H: usize> From<AuthenticatedData<W, H>> for Vec<u8> //SERIALIZATION
+{
+    fn from(data: AuthenticatedData<W, H>) -> Self
+    {
+        let grid_size = W * H * 8;
+        let mut bytes = Vec::with_capacity(32 + (data.encrypted_data.output.len() + 1) * grid_size); //+1 FOR NONCE
+
+        //ADD MAC
+        bytes.extend_from_slice(&data.mac);
+
+        //ADD NONCE
+        for row in data.encrypted_data.nonce.iter()
+        {
+            for val in row
+            {
+                bytes.extend_from_slice(&val.to_be_bytes());
+            }
+        }
+
+        //ADD CIPHERTEXT
+        for grid in &data.encrypted_data.output
+        {
+            for row in grid.iter()
+            {
+                for val in row
+                {
+                    bytes.extend_from_slice(&val.to_be_bytes());
+                }
+            }
+        }
+
+        bytes
+    }
+}
+
+impl<const W: usize, const H: usize> TryFrom<&[u8]> for AuthenticatedData<W, H>
+{
+    type Error = GridError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error>
+    {
+        if bytes.len() < 32
+        {
+            return Err(GridError::InvalidByteLength { expected_mod: 0, actual_len: bytes.len() });
+        }
+
+        //SEPARATE MAC
+        let (mac_slice, content) = bytes.split_at(32);
+
+        //LOAD GRIDS
+        let mut grids = Grid::<W, H>::from_bytes(content)?;
+
+        //REMOVE NONCE
+        let nonce = grids.remove(0);
+
+        Ok(Self
+        {
+            mac: mac_slice.try_into().unwrap(),
+            encrypted_data: EncryptedData
+            {
+                output: grids,
+                nonce,
+                key: Grid::new()?, //USE DUMMY KEY
+            },
+        })
     }
 }
 
