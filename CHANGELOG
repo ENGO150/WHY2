@@ -1,6 +1,85 @@
 Changelog
 =========
 
+v1.4.2:
+- b418314: disable default features for nnnoiseless dependency
+- 458a518: update dependencies
+- 891d590: fix 'invalid' message flushing
+- 9a3cd26: remove base91 dependency
+- 51f0230: send tcp packets with length prefix
+- f30d0af: move Argon2 helper functions to crypto::password module
+- 93c5001: move key exchange functions to crypto::kex module
+- 165f4c7: move crypto to chat::crypto module
+- 88bd409: implement serialization for AuthenticatedData
+- 825377a: remove ZeroizeOnDrop implementation for EncryptedData & AuthenticatedData
+- f07ce39: implement Zeroize for EncryptedData & AuthenticatedData
+- 111ed75: fix unresolved rustdoc link
+- c8ed501: update auth rustdoc
+- 8156e0b: create auth module for AuthenticatedData
+- fb5b3e9: create auth feature
+- 31b3b89: force constant-time feature for chat
+- 7e223c5: implement slice parameters in encryption test
+- fc3d75c: change encryption key to slice instead of owned vector
+- 22085dd: implement counter mode in shared symkey derivation
+- f57fb88: display address on server binding fail
+- b9f1000: spawn client printer thread before configuration
+- 7635f79: prevent crash on version fetch timeout
+- 5a69766: print error message on binding fail
+- 9f4151f: send ping packet every second
+- 54f3fc3: forward ping codes
+- 50d0053: send ping packets on client
+- 8881ac0: add code field to VoicePacket
+- 93c10d4: fix error typo
+- 4170898: remove unwrap from PQ decapsulation fn
+- d9bfbc6: harden server on key exchange
+- 6dc9c16: raise max_packet_size to 4096
+- 097e158: implement hybrid (ecc + ml-kem) key derivation on chat
+- bb776f9: implement hybrid key derivation
+- 40a30bb: generate MK-KEM keys on server startup
+- 963c8ae: add mk-kem dependency
+- 794b443: remove redundant rustdoc links
+- 0f7599e: replace sha256 chaining in generate_round_keys with csprng
+- 8f5b73e: remove ISO 10126 padding
+- 28c4895: move send_command_code fn to chat::command
+- c0bbc55: implement COMMAND_LIST on tui client
+- b7b800c: create COMMAND_LIST constant in chat::Command
+- 0cfcff9: move connect message to ClientEvent::Connected
+- b4fa36e: remove raw mode disabling from network::client to client::ui
+- 36cce12: ignore vim directory
+- 712827f: flush stdout after each draw_event call
+- 4e85066: clear vad window fully on voice leave
+- 8bb6a67: fix server send crashes
+- 8020f36: update dependencies
+- 3b503ab: remove misc::clear_lines
+- 4b48fcd: fix voice peer users is_local while sending
+- f128c9a: move voice vad window to voice::ui
+- 1a4e549: fix server check_version error
+- b26ff64: move sqc to client::ui
+- 494d1f7: move check_version client print to mpsc::Sender
+- 4a61ae5: move clears & info prints to client::ui
+- 340b414: move extra_space to client::ui
+- d76c27a: move TOFU errors to client::ui
+- e8ce461: separate client-side message printing from library
+- 70cbbdc: move client binary to separate module
+- e6c782a: fix vad window ping formatting
+- 4721fd6: display avg latency in vad window
+- 5765f70: calculate average latency on client
+- 7f5c21b: add timestamp to VoicePacket
+- 637d011: decrease SOUND_EFFECT_VOLUME to 10%
+- 1029d38: play join sound effect on channel change
+- cda28c1: fix remove_consumer implicit leave sound
+- e825229: wait for sound effects to stop playing before dropping audio streams
+- df31a47: implement voice generation guards
+- c6d91b4: play sound effects on voice state change
+- ddf66aa: add lewton dependency
+- 148a64b: add connection sound effects
+- 167d7a0: move voice::client to separate submodule
+- ff601f9: support SOCKS5 on client
+- e2752a5: use port 9150 for SOCKS5
+- e6b6040: add socks5 dependency
+- 8368b11: rename auto_connect_ip to auto_connect_addr in client config
+- 36c7900: add SOCKS5 config entries to client config
+
 v1.4.1:
 - b417037: sort clients in vad window by id
 - 31930c0: change DISPLAY_HOLD to 200ms

@@ -2124,7 +2124,7 @@ dependencies = [
 
 [[package]]
 name = "why2"
-version = "1.4.1"
+version = "1.4.2"
 dependencies = [
  "argon2",
  "audiopus",
