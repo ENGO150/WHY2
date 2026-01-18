@@ -59,6 +59,7 @@ constant-time = ["dep:subtle"]
 legacy = []
 
 chat = [
+    "constant-time",
     "dep:base91",
     "dep:serde_json",
     "dep:wincode",
