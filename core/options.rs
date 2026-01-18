@@ -66,7 +66,7 @@ pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
 /// # Notes
 /// - The key is stored in [`Grid`] form for direct use in round key generation.
 /// - The nonce does not need to be kept secret but must be unique per encryption.
-#[derive(Zeroize, ZeroizeOnDrop)]
+#[derive(Zeroize)]
 pub struct EncryptedData<const W: usize, const H: usize> //DATA FOR REX ENCRYPTER
 {
     #[zeroize(skip)]

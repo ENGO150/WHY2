@@ -58,7 +58,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use hmac::{ Hmac, Mac };
 use sha2::Sha256;
 
-use zeroize::{ Zeroize, ZeroizeOnDrop };
+use zeroize::Zeroize;
 
 use crate::
 {
@@ -85,7 +85,7 @@ use crate::
 /// - The MAC is computed over the serialized grids (nonce + ciphertext).
 /// - The nonce is included in the authenticated data to ensure freshness.
 /// - This structure preserves the original grid structure for easy decryption.
-#[derive(Zeroize, ZeroizeOnDrop)]
+#[derive(Zeroize)]
 pub struct AuthenticatedData<const W: usize, const H: usize>
 {
     pub mac: [u8; 32],
