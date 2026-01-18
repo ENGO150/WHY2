@@ -45,7 +45,7 @@ use crate::chat::
     config,
     options,
     misc,
-    crypto::{ self, kex },
+    crypto::{ kex, password },
     network::
     {
         self,
@@ -803,7 +803,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         }
 
         //SAVE PASSWORD
-        config::server_users_write(&username, &crypto::hash_password(&password.unwrap()));
+        config::server_users_write(&username, &password::hash_password(&password.unwrap()));
     } else //LOGIN
     {
         //SEND LOGIN CODE
@@ -817,7 +817,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         };
 
         //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
-        if !user_exists || response.text.is_none() || !crypto::compare_password_hash(&config::server_users_config(&username), &response.text.unwrap())
+        if !user_exists || response.text.is_none() || !password::compare_password_hash(&config::server_users_config(&username), &response.text.unwrap())
         {
             return remove_connection(&peer_addr, true);
         }

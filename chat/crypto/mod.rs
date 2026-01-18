@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 //MODULES
+#[cfg(feature = "server")]
+pub mod password;
 pub mod kex;
 
 use sha2::{ Sha256, Digest };
@@ -29,18 +31,6 @@ use crate::
     options as core_options,
     chat::options,
     auth::AuthenticatedData,
-};
-
-#[cfg(feature = "server")]
-use p521::elliptic_curve::rand_core::OsRng;
-
-#[cfg(feature = "server")]
-use argon2::
-{
-    Argon2,
-    PasswordHasher,
-    PasswordVerifier,
-    password_hash::{ PasswordHash, SaltString },
 };
 
 //CONSTS
@@ -56,26 +46,6 @@ pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 
     //FINALIZE
     hasher.finalize().into()
-}
-
-#[cfg(feature = "server")]
-pub fn hash_password(password: &str) -> String //HASH PASSWORD USING ARGON2
-{
-    //GENERATE RANDOM SALT
-    let salt = SaltString::generate(&mut OsRng);
-
-    //HASH
-    Argon2::default().hash_password(password.as_bytes(), &salt).unwrap().to_string()
-}
-
-#[cfg(feature = "server")]
-pub fn compare_password_hash(hashed: &str, password: &str) -> bool //COMPARE ARGON2 HASH WITH UNHASHED PASSWORD
-{
-    //PARSE HASH STRING
-    let parsed_hash = PasswordHash::new(hashed).unwrap();
-
-    //COMPARE
-    Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok()
 }
 
 pub fn encrypt_packet(packet_bytes: Vec<u8>, keys: &options::SharedKeys) -> Vec<u8>
