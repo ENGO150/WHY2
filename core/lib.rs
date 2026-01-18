@@ -90,6 +90,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod chat;
 
 //MODULES
+#[cfg(feature = "auth")]
+pub mod auth;
 pub mod crypto;
 pub mod decrypter;
 pub mod encrypter;
