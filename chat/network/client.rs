@@ -29,9 +29,9 @@ use serde_json::Value;
 
 use crate::chat::
 {
-    crypto,
     options,
     misc,
+    crypto::kex,
     config::{ self, TofuCode },
     network::
     {
@@ -117,10 +117,10 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
     }
 
     //GENERATE EPHEMERAL ECC KEYS
-    let (sk, pk) = crypto::generate_ephemeral_keys();
+    let (sk, pk) = kex::generate_ephemeral_keys();
 
     //ENCAPSULATE PQ
-    let (pq_ciphertext, pq_secret) = crypto::encapsulate_pq(server_pq_pk);
+    let (pq_ciphertext, pq_secret) = kex::encapsulate_pq(server_pq_pk);
 
     //PREPARE RESPONSE JSON
     let response_text = serde_json::json!
@@ -138,7 +138,7 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
     }, None);
 
     //CALCULATE SHARED SECRET (HYBRID)
-    *keys = crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, server_ecc_pk.to_string(), pq_secret).expect("Shared secret derivation failed");
+    *keys = kex::derive_shared_secret::<GRID_W, GRID_H>(sk, server_ecc_pk.to_string(), pq_secret).expect("Shared secret derivation failed");
 
     //SET GLOBAL KEYS VARIABLE
     options::set_keys(keys.clone());

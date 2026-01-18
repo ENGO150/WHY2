@@ -16,39 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use p521::
-{
-    ecdh,
-    PublicKey,
-    SecretKey,
-    elliptic_curve::rand_core::OsRng,
-    pkcs8::
-    {
-        EncodePrivateKey,
-        DecodePrivateKey,
-        EncodePublicKey,
-        DecodePublicKey,
-        der::pem::
-        {
-            self,
-            LineEnding,
-        },
-    },
-};
-
-use ml_kem::
-{
-    MlKem768,
-    KemCore,
-    EncodedSizeUser,
-    Ciphertext,
-    kem::{ Encapsulate, Decapsulate },
-};
+//MODULES
+pub mod kex;
 
 use sha2::{ Sha256, Digest };
-use hkdf::Hkdf;
-
-use zeroize::Zeroizing;
 
 use crate::
 {
@@ -56,12 +27,12 @@ use crate::
     encrypter,
     decrypter,
     options as core_options,
+    chat::options,
     auth::AuthenticatedData,
-    chat::{ misc, options },
 };
 
 #[cfg(feature = "server")]
-use std::{ fs, path::Path };
+use p521::elliptic_curve::rand_core::OsRng;
 
 #[cfg(feature = "server")]
 use argon2::
@@ -76,161 +47,7 @@ use argon2::
 const GRID_W: usize = options::GRID_DIMENSIONS.0;
 const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
-//PRIVATE
-fn decode_raw_pem(pem: &str) -> Option<Vec<u8>>
-{
-    pem::decode_vec(pem.as_bytes()).ok().map(|p| p.1.to_vec())
-}
-
-fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> options::SharedKeys //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
-{
-    let hkdf = Hkdf::<Sha256>::new(None, shared_secret);
-
-    //DERIVE KEYS FOR ENCRYPTION & MAC
-    let mut encryption_key = Zeroizing::new(vec![0u8; GRID_W * GRID_H * 16]);
-    let mut mac = Zeroizing::new(vec![0u8; 32]);
-
-    //EXPAND
-    hkdf.expand(format!("{}-encryption", info).as_bytes(), &mut encryption_key).expect("HKDF expand failed");
-    hkdf.expand(format!("{}-mac", info).as_bytes(), &mut mac).expect("HKDF expand failed");
-
-    //CONVERT ENCRYPTION KEY BYTES TO i64s & RETURN TOGETHER WITH MAC
-    (Zeroizing::new(encryption_key.chunks(8).map(|chunk|
-    {
-        let mut bytes = [0u8; 8];
-        bytes.copy_from_slice(chunk);
-        i64::from_be_bytes(bytes)
-    }).collect()), mac)
-}
-
-//PUBLIC
-pub fn generate_ephemeral_keys() -> (String, String) //CREATE ECC KEYS
-{
-    //GENERATE PRIVATE KEY
-    let private = SecretKey::random(&mut OsRng);
-
-    //ENCODE KEYS TO PEM
-    let private_pem = private.to_pkcs8_pem(Default::default()).expect("Encoding key to PEM failed");
-    let public_pem = private.public_key().to_public_key_pem(Default::default()).expect("Encoding pkey to PEM failed");
-
-    //RETURN TUPLE OF PRIVATE AND PUBLIC KEYS
-    (private_pem.to_string(), public_pem.to_string())
-}
-
-#[cfg(feature = "server")]
-pub fn generate_server_pq_keys() -> (String, String) //GENERATE POST-QUANTUM KEYS
-{
-    //GENERATE KEYS
-    let (dk, ek) = MlKem768::generate(&mut OsRng);
-
-    let dk_pem = pem::encode_string("PQ PRIVATE KEY", LineEnding::LF, &dk.as_bytes()).expect("Encoding EQ key to PEM failed");
-    let ek_pem = pem::encode_string("PQ PUBLIC KEY", LineEnding::LF, &ek.as_bytes()).expect("Encoding EQ pkey to PEM failed");
-
-    (dk_pem, ek_pem)
-}
-
-#[cfg(feature = "server")]
-pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
-{
-    //CHECK IF KEY DIRECTORY EXISTS
-    let server_keys_dir = misc::get_why2_dir() + options::SERVER_KEYS_DIR;
-    if !Path::new(&server_keys_dir).is_dir()
-    {
-        fs::create_dir_all(&server_keys_dir).expect("Failed to create WHY2 server-keys directory"); //CREATE DIRECTORY
-
-        //GENERATE KEYS
-        let (sk, pk) = generate_ephemeral_keys();   //ECC
-        let (dk, ek) = generate_server_pq_keys(); //ML-KEM
-
-        //SAVE ECC KEYS
-        fs::write(server_keys_dir.clone() + options::SERVER_SKEY, sk).expect("Saving server secret key failed");
-        fs::write(server_keys_dir.clone() + options::SERVER_PKEY, pk).expect("Saving server public key failed");
-
-        //SAVE PQ KEYS
-        fs::write(server_keys_dir.clone() + options::SERVER_PQ_SKEY, dk).expect("Saving server PQ secret key failed");
-        fs::write(server_keys_dir + options::SERVER_PQ_PKEY, ek).expect("Saving server PQ public key failed");
-    }
-}
-
-#[cfg(feature = "server")]
-pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
-{
-    let server_keys_dir = misc::get_why2_dir() + options::SERVER_KEYS_DIR;
-
-    let sk = fs::read_to_string(server_keys_dir.clone() + options::SERVER_SKEY).expect("Reading server secret key failed");
-    let pk = fs::read_to_string(server_keys_dir + options::SERVER_PKEY).expect("Reading server public key failed");
-
-    (sk, pk)
-}
-
-#[cfg(feature = "server")]
-pub fn get_server_pq_keys() -> (String, String) //GET SERVER ML-KEM KEYS
-{
-    let server_keys_dir = misc::get_why2_dir() + options::SERVER_KEYS_DIR;
-
-    let dk = fs::read_to_string(server_keys_dir.clone() + options::SERVER_PQ_SKEY).expect("Reading server PQ secret key failed");
-    let ek = fs::read_to_string(server_keys_dir + options::SERVER_PQ_PKEY).expect("Reading server PQ public key failed");
-
-    (dk, ek)
-}
-
-pub fn derive_shared_secret<const W: usize, const H: usize> //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
-(
-    local_key: String,
-    peer_pkey: String,
-    pq_secret: Vec<u8>,
-) -> Option<options::SharedKeys>
-{
-    //PARSE KEYS
-    let local_private = SecretKey::from_pkcs8_pem(&local_key).expect("Invalid key");
-    let remote_public = PublicKey::from_public_key_pem(&peer_pkey).ok()?;
-
-    //COMPUTE EDCH
-    let shared = ecdh::diffie_hellman(local_private.to_nonzero_scalar(), remote_public.as_affine());
-
-    //COMBINE SECRETS
-    let hkdf = Hkdf::<Sha256>::new(None, &[]);
-    let mut combined = Zeroizing::new(vec![0u8; 64]);
-    hkdf.expand_multi_info
-    (
-        &[&shared.raw_secret_bytes(), &pq_secret, b"WHY2-HYBRID"],
-        &mut combined
-    ).unwrap();
-
-    //USE HKDF TO DERIVE SEPARATE ENCRYPTION AND MAC KEY
-    Some(derive_encryption_keys(&combined, misc::get_version()))
-}
-
-pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Vec<u8>)
-{
-    //DECODE PEM
-    let pk_bytes = decode_raw_pem(peer_pk_bytes).expect("Decoding PEM failed");
-
-    //DESERIALIZE KEY
-    let ek = <MlKem768 as KemCore>::EncapsulationKey::from_bytes((&pk_bytes[..]).try_into().unwrap());
-
-    //ENCAPSULATE
-    let (ct, ss) = ek.encapsulate(&mut OsRng).expect("Encapsulation failed");
-
-    //ENCODE CIPHERTEXT TO PEM
-    let ct_pem = pem::encode_string("PQ CIPHERTEXT", LineEnding::LF, &ct).unwrap();
-
-    (ct_pem, ss.to_vec())
-}
-
-pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Option<Vec<u8>>
-{
-    //DECODE PEM
-    let sk_bytes = Zeroizing::new(decode_raw_pem(local_sk_pem)?);
-    let ct_bytes = decode_raw_pem(ciphertext_pem)?;
-
-    //DESERIALIZE
-    let dk = <MlKem768 as KemCore>::DecapsulationKey::from_bytes((&sk_bytes[..]).try_into().ok()?);
-    let ct = Ciphertext::<MlKem768>::try_from(ct_bytes.as_slice()).ok()?;
-
-    dk.decapsulate(&ct).ok().map(|ss| ss.to_vec())
-}
-
+//FUNCTIONS
 pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 {
     //SHA256

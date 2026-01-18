@@ -34,8 +34,8 @@ use why2::chat::
 {
     misc,
     config,
-    crypto,
     options,
+    crypto::kex,
     command::{ self, Command },
     network::
     {
@@ -63,7 +63,7 @@ fn main()
     //CONFIGURATION
     misc::check_version(); //CHECK WHY2 VERSION
     config::init_server_config(); //CREATE server.toml CONFIGURATION
-    crypto::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
+    kex::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
 
     //CHECK IF VOICE IS ENABLED
     if config::server_config("enable_voice_chat")

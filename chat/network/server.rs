@@ -43,9 +43,9 @@ use dashmap::DashMap;
 use crate::chat::
 {
     config,
-    crypto,
     options,
     misc,
+    crypto::{ self, kex },
     network::
     {
         self,
@@ -289,8 +289,8 @@ fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut options
     };
 
     //LOAD KEYS
-    let (sk, pk) = crypto::get_server_keys();          //ECC
-    let (pq_sk, pq_pk) = crypto::get_server_pq_keys(); //PQ (ML-KEM)
+    let (sk, pk) = kex::get_server_keys();          //ECC
+    let (pq_sk, pq_pk) = kex::get_server_pq_keys(); //PQ (ML-KEM)
 
     //PREPARE PAYLOAD
     let payload = serde_json::json!
@@ -341,10 +341,10 @@ fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut options
         let client_pq_ciphertext = client_response["pq"].as_str()?;
 
         //DECAPSULATE PQ
-        let pq_secret = crypto::decapsulate_pq(&pq_sk, client_pq_ciphertext)?;
+        let pq_secret = kex::decapsulate_pq(&pq_sk, client_pq_ciphertext)?;
 
         //DERIVE
-        crypto::derive_shared_secret::<GRID_W, GRID_H>(sk, client_ecc_pk.to_string(), pq_secret)
+        kex::derive_shared_secret::<GRID_W, GRID_H>(sk, client_ecc_pk.to_string(), pq_secret)
     })();
 
     //UPDATE CLIENT KEYS
