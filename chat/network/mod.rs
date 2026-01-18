@@ -236,7 +236,7 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
     //ENCODE THE PACKET STRUCT TO Vec<u8>
     let packet_bytes = wincode::serialize(&packet).expect("Encoding packet failed");
 
-    let final_bytes = if let Some(keys) = keys
+    let mut final_bytes = if let Some(keys) = keys
     {
         crypto::encrypt_packet(packet_bytes, keys)
     } else
@@ -244,15 +244,18 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
         packet_bytes //NO ENCRYPTION
     };
 
-    //ENCODE ENCRYPTED OUTPUT TO BASE91
-    let encoded_string = String::from_utf8(base91::slice_encode(&final_bytes)).expect("Encoding packet failed");
+    //CONVERT ENCRYPTED OUTPUT TO BYTES ([LENGTH][DATA])
+    let packet_len = final_bytes.len();
+    let mut transmission_packet = Vec::with_capacity(4 + packet_len);
+    transmission_packet.extend_from_slice(&(packet_len as u32).to_be_bytes());
+    transmission_packet.append(&mut final_bytes);
 
     //SEND
-    let _ = stream.write_all((encoded_string + "\n").as_bytes());
+    let _ = stream.write_all(&transmission_packet);
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&chat_options::SharedKeys>) -> Option<MessagePacket>
+pub fn receive(stream: &mut TcpStream, keys: Option<&chat_options::SharedKeys>) -> Option<MessagePacket>
 {
     //SERVER SIDE PACKET SIZE LIMIT
     #[cfg(feature = "server")]
@@ -283,171 +286,130 @@ pub fn receive(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: Option<&chat_
         };
     }
 
-    //LOOP READING UNTIL MESSAGE ARRIVES
-    loop
+    //READ MESSAGE LENGTH
+    let mut len_buf = [0u8; 4];
+    if stream.read_exact(&mut len_buf).is_err() { return None; } //READ LENGTH
+    let len = u32::from_be_bytes(len_buf) as usize;
+
+    //CHECK PACKET SIZE
+    #[cfg(feature = "server")]
+    if len > max_packet_size
     {
-        //CHECK IF THERE IS A NEWLINE IN BUFFER
-        if let Some(pos) = buffer.iter().position(|&b| b == b'\n')
+         server::remove_connection(&peer_addr, true);
+         return None;
+    }
+
+    //READ REST OF PACKET
+    let mut decoded_packet = vec![0u8; len];
+    if stream.read_exact(&mut decoded_packet).is_err() { return None; } //READ
+
+    //DECRYPT
+    if let Some(keys) = keys
+    {
+        decoded_packet = match crypto::decrypt_packet(decoded_packet, keys)
         {
-            //EXTRACT LINE (INCLUDING \n)
-            let mut line: Vec<u8> = buffer.drain(..=pos).collect();
-
-            //REMOVE \n
-            if let Some(&b'\n') = line.last() { line.pop(); }
-
-            //DECODE PACKET (BASE91)
-            let mut decoded_packet = base91::slice_decode(&line);
-
-            //DECRYPT
-            if let Some(keys) = keys
+            Some(d) => d,
+            None => //INVALID MAC
             {
-                decoded_packet = match crypto::decrypt_packet(decoded_packet, keys)
-                {
-                    Some(d) => d,
-                    None => //INVALID MAC
-                    {
-                        //LOG IF ON SERVER
-                        #[cfg(feature = "server")]
-                        log::warn!("HMAC verification failed: {}", peer_addr);
+                //LOG IF ON SERVER
+                #[cfg(feature = "server")]
+                log::warn!("HMAC verification failed: {}", peer_addr);
 
-                        return None;
-                    }
-                }
+                return None;
+            }
+        }
+    }
+
+    //ACTIVITY TIMER ON SERVER
+    #[cfg(feature = "server")]
+    {
+        let mut spam_warning = false;
+        let mut shared_key = None;
+        let mut disconnect = false;
+
+        //FIND CONNECTION AND SET last_activity
+        if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
+        {
+            //SPAM
+            if config::server_config("spam_protection") && conn.is_authenticated() &&
+                Instant::now().duration_since(*conn.last_activity()) <
+                    Duration::from_millis(config::server_config::<u64>("min_message_delay"))
+            {
+                //INCREMENT SPAM VIOLATIONS
+                *conn.spam_violations_mut().unwrap() += 1;
+
+                //WARN
+                spam_warning = true;
+                shared_key = conn.keys().cloned();
+
+                //CHECK FOR TOO MANY VIOLATIONS
+                disconnect = *conn.spam_violations().unwrap() > config::server_config::<usize>("max_message_delay_violations");
             }
 
-            //ACTIVITY TIMER ON SERVER
-            #[cfg(feature = "server")]
-            {
-                let mut spam_warning = false;
-                let mut shared_key = None;
-                let mut disconnect = false;
+            *conn.last_activity_mut() = Instant::now(); //RESET last_activity
+        }
 
-                //FIND CONNECTION AND SET last_activity
+        //SEND WARNING CODE
+        if spam_warning
+        {
+            server::send_code(stream, None, MessageCode::SpamWarning, shared_key.as_ref());
+        }
+
+        //TOO MANY VIOLATIONS, BYE
+        if disconnect
+        {
+            server::remove_connection(&peer_addr, true);
+            return None;
+        }
+    }
+
+    //DESERIALIZE AND RETURN
+    match wincode::deserialize::<MessagePacket>(&decoded_packet)
+    {
+        Ok(packet) =>
+        {
+            //VERIFY SEQUENCE NUMBER
+            #[cfg(feature = "server")] //ON SERVER
+            {
                 if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
                 {
-                    //SPAM
-                    if config::server_config("spam_protection") && conn.is_authenticated() &&
-                        Instant::now().duration_since(*conn.last_activity()) <
-                            Duration::from_millis(config::server_config::<u64>("min_message_delay"))
+                    if packet.seq > *conn.seq() //VALID SEQ
                     {
-                        //INCREMENT SPAM VIOLATIONS
-                        *conn.spam_violations_mut().unwrap() += 1;
-
-                        //WARN
-                        spam_warning = true;
-                        shared_key = conn.keys().cloned();
-
-                        //CHECK FOR TOO MANY VIOLATIONS
-                        disconnect = *conn.spam_violations().unwrap() > config::server_config::<usize>("max_message_delay_violations");
+                        //SET SEQ TO CURRENT
+                        *conn.seq_mut() = packet.seq;
+                    } else
+                    {
+                        //INVALID SEQ
+                        drop(conn); //PREVENT DEADLOCK
+                        log::warn!("SEQ verification failed: {}", &peer_addr);
+                        server::remove_connection(&peer_addr, false);
                     }
-
-                    *conn.last_activity_mut() = Instant::now(); //RESET last_activity
                 }
+            }
 
-                //SEND WARNING CODE
-                if spam_warning
+            //VERIFY SEQUENCE NUMBER
+            #[cfg(feature = "client")] //ON CLIENT
+            {
+                if packet.seq > chat_options::get_server_seq() || chat_options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
                 {
-                    server::send_code(stream, None, MessageCode::SpamWarning, shared_key.as_ref());
-                }
-
-                //TOO MANY VIOLATIONS, BYE
-                if disconnect
+                    //SET SEQ
+                    chat_options::set_server_seq(packet.seq);
+                } else //INVALID, DISCONNECT
                 {
-                    server::remove_connection(&peer_addr, true);
                     return None;
                 }
             }
 
-            //DECODE AND RETURN
-            match wincode::deserialize::<MessagePacket>(&decoded_packet)
-            {
-                Ok(packet) =>
-                {
-                    //VERIFY SEQUENCE NUMBER
-                    #[cfg(feature = "server")] //ON SERVER
-                    {
-                        if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
-                        {
-                            if packet.seq > *conn.seq() //VALID SEQ
-                            {
-                                //SET SEQ TO CURRENT
-                                *conn.seq_mut() = packet.seq;
-                            } else
-                            {
-                                //INVALID SEQ
-                                drop(conn); //PREVENT DEADLOCK
-                                log::warn!("SEQ verification failed: {}", &peer_addr);
-                                server::remove_connection(&peer_addr, false);
-                            }
-                        }
-                    }
+            return Some(packet);
+        },
 
-                    //VERIFY SEQUENCE NUMBER
-                    #[cfg(feature = "client")] //ON CLIENT
-                    {
-                        if packet.seq > chat_options::get_server_seq() || chat_options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
-                        {
-                            //SET SEQ
-                            chat_options::set_server_seq(packet.seq);
-                        } else //INVALID, DISCONNECT
-                        {
-                            return None;
-                        }
-                    }
-
-                    return Some(packet);
-                },
-
-                Err(_) =>
-                {
-                    //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
-                    #[cfg(feature = "server")]
-                    server::remove_connection(&peer_addr, false);
-
-                    return None;
-                }
-            }
-        }
-
-        //CHECK IF CLIENT IS STILL IN ACTIVE CONNECTION LIST
-        #[cfg(feature = "server")]
+        Err(_) =>
         {
-            if !server::CONNECTIONS.contains_key(&peer_addr)
-            {
-                return None;
-            }
-        }
+            //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
+            #[cfg(feature = "server")]
+            server::remove_connection(&peer_addr, false);
 
-        //READ FROM STREAM
-        let mut chunk = [0u8; 1024];
-        match stream.read(&mut chunk)
-        {
-            Ok(0) => //CLIENT DISCONNECTED
-            {
-                #[cfg(feature = "server")]
-                {
-                    server::remove_connection(&peer_addr, false);
-                }
-
-                return None;
-            },
-
-            Ok(n) => //VALID READ
-            {
-                #[cfg(feature = "server")]
-                {
-                    //CHECK MAX PACKET SIZE
-                    if buffer.len() + n > max_packet_size
-                    {
-                         server::remove_connection(&peer_addr, true);
-                         return None;
-                    }
-                }
-
-                buffer.extend_from_slice(&chunk[..n]);
-            },
-
-            Err(_) => return None //ERROR OR TIMEOUT
+            return None;
         }
     }
 }

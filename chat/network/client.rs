@@ -76,13 +76,13 @@ pub enum ClientEvent
 
 //FUNCTIONS
 //PRIVATE
-fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options::SharedKeys, tx: &Sender<ClientEvent>) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
+fn key_exchange(stream: &mut TcpStream, keys: &mut options::SharedKeys, tx: &Sender<ClientEvent>) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
     let message = loop
     {
         //READ MESSAGE
-        let received = network::receive(stream, buffer, None).unwrap();
+        let received = network::receive(stream, None).unwrap();
 
         if received.code == Some(MessageCode::KeyExchange) { break received; }
     };
@@ -149,12 +149,9 @@ fn key_exchange(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &mut options
 //PUBLIC
 pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
-    //CREATE PERSISTENT BUFFER
-    let mut buffer = Vec::new();
-
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    if !key_exchange(stream, &mut buffer, &mut keys, &tx) { return; }
+    if !key_exchange(stream, &mut keys, &tx) { return; }
 
     //SERVER INFO VARIABLES
     let mut min_pass: Option<u64> = None;
@@ -180,7 +177,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
     //LOOP READING
     loop
     {
-        let read = match network::receive(stream, &mut buffer, Some(&keys))
+        let read = match network::receive(stream, Some(&keys))
         {
             Some(packet) => packet,
             None => continue
@@ -238,7 +235,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 MessageCode::Rekey =>
                 {
                     //WAIT FOR SERVER TO INIT KEY EXCHANGE
-                    key_exchange(stream, &mut buffer, &mut keys, &tx);
+                    key_exchange(stream, &mut keys, &tx);
                 }
 
                 //PICK_USERNAME CODE - guess what

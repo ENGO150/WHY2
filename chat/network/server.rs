@@ -279,7 +279,7 @@ impl Connection
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //PRIVATE
-fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut options::SharedKeys) //KEY EXCHANGE FOR SERVER-SIDE
+fn key_exchange(peer_addr: &SocketAddr, keys: &mut options::SharedKeys) //KEY EXCHANGE FOR SERVER-SIDE
 {
     //GET CONNECTION
     let mut stream = match CONNECTIONS.get(peer_addr)
@@ -316,7 +316,7 @@ fn key_exchange(peer_addr: &SocketAddr, buffer: &mut Vec<u8>, keys: &mut options
     let message = loop
     {
         //READ MESSAGE
-        let received = match network::receive(&mut stream, buffer, None)
+        let received = match network::receive(&mut stream, None)
         {
             Some(r) => r,
             None => return
@@ -572,7 +572,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
     });
 }
 
-fn ask_version(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &options::SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
+fn ask_version(stream: &mut TcpStream, keys: &options::SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
 {
     //ASK FOR VERSION
     send_code(stream, Some(misc::get_version().to_string()), MessageCode::Version, Some(keys));
@@ -586,7 +586,7 @@ fn ask_version(stream: &mut TcpStream, buffer: &mut Vec<u8>, keys: &options::Sha
     let version = loop
     {
         //READ MESSAGE
-        let received = network::receive(stream, buffer, Some(keys))?;
+        let received = network::receive(stream, Some(keys))?;
 
         if received.code == Some(MessageCode::Version) && !received.text.is_none() { break received; }
 
@@ -679,12 +679,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         seq: 0,
     });
 
-    //CREATE PERSISTENT BUFFER FOR CLIENT
-    let mut buffer = Vec::new();
-
     //GET ENCRYPTION & MAC KEYS
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    key_exchange(&peer_addr, &mut buffer, &mut keys);
+    key_exchange(&peer_addr, &mut keys);
 
     //CHECK FOR VALID KEYS
     if keys.0.is_empty() || keys.1.is_empty()
@@ -695,7 +692,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //ASK CLIENT FOR THEIR PACKAGE VERSION
     if config::server_config("check_client_version")
     {
-        let version = ask_version(stream, &mut buffer, &keys);
+        let version = ask_version(stream, &keys);
         if version.is_none() || version != Some(misc::get_version().to_string())
         {
             return remove_connection(&peer_addr, true);
@@ -726,7 +723,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         //SEND PICK_USERNAME CODE
         send_code(stream, None, MessageCode::Username, Some(&keys));
 
-        match network::receive(stream, &mut buffer, Some(&keys))
+        match network::receive(stream, Some(&keys))
         {
             //USERNAME CONDITIONS MET, BREAK LOOP
             Some(r) =>
@@ -778,7 +775,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             send_code(stream, None, MessageCode::PasswordR, Some(&keys));
 
             //WAIT FOR ANSWER
-            match network::receive(stream, &mut buffer, Some(&keys))
+            match network::receive(stream, Some(&keys))
             {
                 Some(r) =>
                 {
@@ -810,7 +807,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         send_code(stream, None, MessageCode::PasswordL, Some(&keys));
 
         //WAIT FOR ANSWER
-        let response = match network::receive(stream, &mut buffer, Some(&keys))
+        let response = match network::receive(stream, Some(&keys))
         {
             Some(r) => r,
             None => return remove_connection(&peer_addr, false),
@@ -845,7 +842,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     loop
     {
         //READ
-        let read = match network::receive(stream, &mut buffer, Some(&keys))
+        let read = match network::receive(stream, Some(&keys))
         {
             Some(r) => r,
             None => return
@@ -857,7 +854,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         {
             //INFORM CLIENT ABOUT REKEYING
             send_code(stream, None, MessageCode::Rekey, Some(&keys));
-            key_exchange(&peer_addr, &mut buffer, &mut keys); //INIT REKEY
+            key_exchange(&peer_addr, &mut keys); //INIT REKEY
         }
 
         //CLIENT CODES
