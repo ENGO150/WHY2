@@ -18,23 +18,42 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! # REX Authentication
 //!
-//! This module provides HMAC-based authentication for encrypted WHY2 data.
-//! It ensures message integrity and authenticity by computing a keyed hash
-//! over the ciphertext and prepending it to the encrypted payload.
+//! This module implements the integrity and authenticity layer for WHY2, utilizing
+//! an **Encrypt-then-MAC** scheme backed by HMAC-SHA256.
 //!
-//! # Overview
-//! The authentication scheme uses HMAC-SHA256 to protect against tampering
-//! and forgery attacks. The MAC is computed over the serialized ciphertext
-//! and prepended to create an authenticated package:
+//! ## Overview
+//! While standard REX encryption guarantees confidentiality, it does not inherently prevent
+//! ciphertext manipulation (bit-flipping) or forgery. This module wraps encrypted data
+//! with a cryptographic authentication tag to ensure that:
 //!
-//! $$ \text{AuthData} = \text{HMAC-SHA256}(K_{\text{mac}}, C) \mathbin\| C $$
+//! 1. Data has not been modified in transit (**Integrity**).
+//! 2. Data originated from a party knowing the shared secret (**Authenticity**).
 //!
-//! where $C$ is the serialized ciphertext and $K_{\text{mac}}$ is the MAC key.
+//! ## Algorithm
+//! The authentication process computes a Message Authentication Code (MAC) over the
+//! serialized ciphertext and the initialization vector (Nonce).
 //!
-//! # Security Properties
-//! - **Integrity**: Any modification to the ciphertext will cause MAC verification to fail.
-//! - **Authenticity**: Only parties with the correct MAC key can produce valid tags.
-//! - **Encrypt-then-MAC**: The MAC is computed over ciphertext, following best practices.
+//! $$ \text{Tag} = \text{HMAC-SHA256}(K_{mac}, \text{Nonce} \mathbin\| \text{Ciphertext}) $$
+//!
+//! The final authenticated package is constructed by prepending the tag to the data:
+//!
+//! $$ \text{Packet} = \text{Tag} \mathbin\| \text{Nonce} \mathbin\| \text{Ciphertext} $$
+//!
+//! ## Binary Layout
+//! When serialized for network transmission or storage, the byte stream follows this exact order:
+//!
+//! ```text
+//! +----------------------------+-----------------------+---------------------------+
+//! | HMAC Tag (32 bytes)        | Nonce (Grid Size)     | Ciphertext (N * Grids)    |
+//! +----------------------------+-----------------------+---------------------------+
+//! | Verified first (const-time)| Used for CTR setup    | Encrypted payload         |
+//! +----------------------------+-----------------------+---------------------------+
+//! ```
+//!
+//! ## Security Notes
+//! - **Constant-Time Verification**: Tag comparison uses constant-time operations to prevent timing attacks.
+//! - **Independent Keys**: It is strongly recommended to use different keys for encryption and authentication (or derive them via HKDF).
+//! - **Order of Operations**: Verification MUST occur **before** decryption. If verification fails, the data is discarded immediately.
 
 use hmac::{ Hmac, Mac };
 use sha2::Sha256;
