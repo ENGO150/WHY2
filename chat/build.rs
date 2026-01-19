@@ -37,6 +37,12 @@ fn main()
     //USE OF SERVER AND CLIENT FEATURES COMBINED
     if client_feature && server_feature
     {
-        panic!("Features `client` and `server` cannot be enabled at the same time.");
+        panic!
+        (
+            "Error: You are trying to enable both `client` and `server` features at the same time.\n\
+             By default, the 'client' feature is enabled.\n\n\
+             To install the SERVER, use:\n\
+             cargo install why2_chat --no-default-features --features server"
+        );
     }
 }
