@@ -28,7 +28,7 @@ test-why2-encryption:
   only:
     - development
   script:
-    - cargo test encrypt_decrypt --verbose --release -- --nocapture
+    - cargo test -p why2 encrypt_decrypt --verbose --release -- --nocapture
 
 # Test WHY2 Multi Grid Overflow
 test-why2-grid-overflow:
@@ -37,7 +37,7 @@ test-why2-grid-overflow:
   only:
     - development
   script:
-    - cargo test verify_multi_grid_overflow --verbose --release -- --nocapture
+    - cargo test -p why2 verify_multi_grid_overflow --verbose --release -- --nocapture
 
 # Test WHY2 Diffusion
 test-why2-diffusion:
@@ -46,8 +46,8 @@ test-why2-diffusion:
   only:
     - development
   script:
-    - cargo test test_input_diffusion --verbose --release -- --nocapture
-    - cargo test test_key_diffusion --verbose --release -- --nocapture
+    - cargo test -p why2 test_input_diffusion --verbose --release -- --nocapture
+    - cargo test -p why2 test_key_diffusion --verbose --release -- --nocapture
 
 # Test WHY2 Legacy
 test-why2-legacy:
@@ -56,7 +56,7 @@ test-why2-legacy:
   only:
     - development
   script:
-    - cargo test legacy_encrypt_decrypt --features legacy --verbose --release -- --nocapture
+    - cargo test -p why2 legacy_encrypt_decrypt --features legacy --verbose --release -- --nocapture
 
 # Build chat for linux
 build-why2-chat-linux:

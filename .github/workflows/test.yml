@@ -42,7 +42,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Run Test
-        run: cargo test encrypt_decrypt --verbose --release -- --nocapture
+        run: cargo test -p why2 encrypt_decrypt --verbose --release -- --nocapture
 
   test-why2-grid-overflow:
     runs-on: ubuntu-latest
@@ -57,7 +57,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Run Test
-        run: cargo test verify_multi_grid_overflow --verbose --release -- --nocapture
+        run: cargo test -p why2 verify_multi_grid_overflow --verbose --release -- --nocapture
 
   test-why2-diffusion:
     runs-on: ubuntu-latest
@@ -72,10 +72,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Run Input Diffusion Test
-        run: cargo test test_input_diffusion --verbose --release -- --nocapture
+        run: cargo test -p why2 test_input_diffusion --verbose --release -- --nocapture
 
       - name: Run Key Diffusion Test
-        run: cargo test test_key_diffusion --verbose --release -- --nocapture
+        run: cargo test -p why2 test_key_diffusion --verbose --release -- --nocapture
 
   test-why2-legacy:
     runs-on: ubuntu-latest
@@ -90,4 +90,4 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Run Test
-        run: cargo test legacy_encrypt_decrypt --features legacy --verbose --release -- --nocapture
+        run: cargo test -p why2 legacy_encrypt_decrypt --features legacy --verbose --release -- --nocapture
