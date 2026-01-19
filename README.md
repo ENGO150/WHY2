@@ -43,7 +43,7 @@ fn main()
 
 ##  Links:
 
-- Downloads
+- Chat Downloads
   - [Prebuilt Binaries](https://github.com/ENGO150/WHY2/actions/workflows/chat-build.yml)
   - [Arch Linux](https://aur.archlinux.org/packages/why2)
 - [API Documentation](https://docs.rs/why2)
