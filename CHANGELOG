@@ -1,6 +1,9 @@
 Changelog
 =========
 
+v1.4.4:
+- 5649e8f: fix chat release build error
+
 v1.4.3:
 - d39524a: remove redundant rustdoc link
 - a87e485: move latex parser to core
