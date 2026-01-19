@@ -24,6 +24,7 @@ repository.workspace = true
 description = "Lightweight, fast and secure chat application powered by WHY2 encryption."
 keywords = ["encryption", "security", "cryptography", "network", "chat"]
 categories = ["cryptography", "network-programming"]
+readme = "../README.md"
 
 default-run = "why2"
 
