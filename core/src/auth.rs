@@ -119,7 +119,7 @@ impl<const W: usize, const H: usize> AuthenticatedData<W, H>
     ///
     /// # Parameters
     /// - `encrypted_data`: The [`EncryptedData`] structure containing:
-    ///   - `output`: Vector of encrypted [`Grid`](crate::Grid)s
+    ///   - `output`: Vector of encrypted [`Grid`]s
     ///   - `nonce`: The CTR mode initialization vector
     ///   - `key`: The encryption key (not used in MAC computation)
     /// - `mac_key`: A 32-byte key for HMAC-SHA256 computation.
