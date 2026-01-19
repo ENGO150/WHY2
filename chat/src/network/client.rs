@@ -27,7 +27,7 @@ use zeroize::Zeroizing;
 
 use serde_json::Value;
 
-use crate::chat::
+use crate::
 {
     options,
     misc,

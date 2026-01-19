@@ -84,11 +84,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! WHY2 is licensed under the GNU GPLv3. You are free to use, modify, and redistribute it
 //! under the terms of the license. See <https://www.gnu.org/licenses/> for details.
 
-#[cfg(feature = "chat")]
-#[path = "../chat/mod.rs"]
-#[doc(hidden)]
-pub mod chat;
-
 //MODULES
 #[cfg(feature = "auth")]
 pub mod auth;

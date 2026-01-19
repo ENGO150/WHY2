@@ -45,7 +45,7 @@ use crossterm::
     },
 };
 
-use why2::chat::
+use crate::
 {
     config::{ self, TofuCode },
     network::

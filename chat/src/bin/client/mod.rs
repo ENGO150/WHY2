@@ -53,7 +53,7 @@ use crossterm::
 
 use colored::Color;
 
-use why2::chat::
+use why2_chat::
 {
     config,
     options,

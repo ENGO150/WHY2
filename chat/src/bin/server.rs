@@ -30,7 +30,7 @@ use std::
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
 
-use why2::chat::
+use why2_chat::
 {
     misc,
     config,

@@ -2126,6 +2126,19 @@ dependencies = [
 name = "why2"
 version = "1.4.2"
 dependencies = [
+ "hmac",
+ "rand",
+ "rand_chacha",
+ "rayon",
+ "sha2",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "why2_chat"
+version = "1.4.2"
+dependencies = [
  "argon2",
  "audiopus",
  "colored",
@@ -2136,24 +2149,20 @@ dependencies = [
  "dirs",
  "gag",
  "hkdf",
- "hmac",
  "lewton",
  "log",
  "ml-kem",
  "nnnoiseless",
  "p521",
- "rand",
- "rand_chacha",
- "rayon",
  "ringbuf",
  "semver",
  "serde_json",
  "sha2",
  "simple_logger",
  "socks",
- "subtle",
  "toml_edit 0.24.0+spec-1.1.0",
  "ureq",
+ "why2",
  "wincode",
  "zeroize",
 ]

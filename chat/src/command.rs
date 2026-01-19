@@ -23,13 +23,13 @@ use std::fmt::
     Result,
 };
 
-use crate::chat::network::MessageCode;
+use crate::network::MessageCode;
 
 #[cfg(feature = "client")]
 use std::net::TcpStream;
 
 #[cfg(feature = "client")]
-use crate::chat::
+use crate::
 {
     options,
     network::{ self, MessagePacket },

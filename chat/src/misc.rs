@@ -29,13 +29,13 @@ use serde_json::Value;
 
 use semver::Version;
 
-use crate::chat::options;
+use crate::options;
 
 #[cfg(feature = "client")]
 use std::sync::mpsc::Sender;
 
 #[cfg(feature = "client")]
-use crate::chat::network::client::ClientEvent;
+use crate::network::client::ClientEvent;
 
 //PRIVATE
 fn get_dir(dir: &str) -> String
@@ -90,7 +90,7 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
                 tx.send(ClientEvent::Info(print_text.to_string(), true, 0)).unwrap()
             }
 
-            #[cfg(not(feature = "client"))]
+            #[cfg(feature = "server")]
             {
                 log::warn!("{print_text}");
             }
@@ -133,7 +133,7 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
             tx.send(ClientEvent::Info(print_text, true, 0)).unwrap()
         }
 
-        #[cfg(not(feature = "client"))]
+        #[cfg(feature = "server")]
         {
             log::warn!("{print_text}");
         }

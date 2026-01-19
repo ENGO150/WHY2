@@ -81,7 +81,7 @@ use nnnoiseless::DenoiseState;
 
 use gag::Gag;
 
-use crate::chat::
+use crate::
 {
     options as chat_options,
     network::

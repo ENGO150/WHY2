@@ -21,17 +21,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod password;
 pub mod kex;
 
-use sha2::{ Sha256, Digest };
-
-use crate::
+use why2::
 {
     Grid,
     encrypter,
     decrypter,
     options as core_options,
-    chat::options,
     auth::AuthenticatedData,
 };
+
+use sha2::{ Sha256, Digest };
+
+use crate::options;
 
 //CONSTS
 const GRID_W: usize = options::GRID_DIMENSIONS.0;

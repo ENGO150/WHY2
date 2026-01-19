@@ -56,7 +56,7 @@ use wincode::
 
 use colored::Color;
 
-use crate::chat::
+use crate::
 {
     crypto,
     options as chat_options,
@@ -66,7 +66,7 @@ use crate::chat::
 use std::time::{ Instant, Duration };
 
 #[cfg(feature = "server")]
-use crate::chat::config;
+use crate::config;
 
 //STRUCTS
 #[derive(SchemaWrite, SchemaRead, PartialEq, Clone)]

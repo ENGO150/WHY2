@@ -50,7 +50,7 @@ use hkdf::Hkdf;
 
 use zeroize::Zeroizing;
 
-use crate::chat::{ misc, options };
+use crate::{ misc, options };
 
 #[cfg(feature = "server")]
 use std::{ fs, path::Path };

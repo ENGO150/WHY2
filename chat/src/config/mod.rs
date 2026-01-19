@@ -27,13 +27,13 @@ use std::
 
 use toml_edit::{ DocumentMut, Value };
 
-use crate::chat::{ options, misc };
+use crate::{ options, misc };
 
 #[cfg(feature = "client")]
 use std::fmt::Write;
 
 #[cfg(feature = "client")]
-use crate::chat::crypto;
+use crate::crypto;
 
 //ENUMS
 #[cfg(feature = "client")]

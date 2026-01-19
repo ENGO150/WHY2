@@ -33,14 +33,14 @@ use std::
 
 use wincode::{ SchemaRead, SchemaWrite };
 
-use crate::chat::
+use crate::
 {
     crypto,
     options::SharedKeys,
 };
 
 #[cfg(not(feature = "server"))]
-use crate::chat::options as chat_options;
+use crate::options as chat_options;
 
 #[derive(Clone, PartialEq, SchemaRead, SchemaWrite)]
 pub enum VoiceCode

@@ -29,7 +29,7 @@ use std::
 
 use lewton::inside_ogg::OggStreamReader;
 
-use crate::chat::network::voice::options;
+use crate::network::voice::options;
 
 //STRUCTS
 struct ActiveEffect

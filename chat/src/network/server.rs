@@ -40,7 +40,7 @@ use serde_json::{ json, Value };
 
 use dashmap::DashMap;
 
-use crate::chat::
+use crate::
 {
     config,
     options,

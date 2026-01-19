@@ -25,7 +25,7 @@ use std::
 
 use dashmap::DashMap;
 
-use crate::chat::
+use crate::
 {
     options::SharedKeys,
     network::
