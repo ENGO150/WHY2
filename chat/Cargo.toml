@@ -28,6 +28,9 @@ readme = "../README.md"
 
 default-run = "why2"
 
+[lib]
+doc = false
+
 [[bin]]
 name = "why2"
 path = "src/bin/client/mod.rs"
