@@ -31,7 +31,7 @@ fn main()
     //DIRECT CHAT FEATURE USE
     if chat_feature && !(client_feature || server_feature)
     {
-        panic!("Do not enable `chat` directly — use `client` or `server`.");
+        panic!("Do not enable `chat` directly - use `client` or `server`.");
     }
 
     //USE OF SERVER AND CLIENT FEATURES COMBINED
@@ -42,7 +42,7 @@ fn main()
             "Error: You are trying to enable both `client` and `server` features at the same time.\n\
              By default, the 'client' feature is enabled.\n\n\
              To install the SERVER, use:\n\
-             cargo install why2_chat --no-default-features --features server"
+             cargo install why2-chat --no-default-features --features server"
         );
     }
 }

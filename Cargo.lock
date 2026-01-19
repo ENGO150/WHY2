@@ -2136,7 +2136,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "why2_chat"
+name = "why2-chat"
 version = "1.4.2"
 dependencies = [
  "argon2",

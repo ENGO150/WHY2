@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 [package]
-name = "why2_chat"
+name = "why2-chat"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

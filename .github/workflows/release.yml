@@ -38,6 +38,6 @@ jobs:
     - name: Wait for index update
       run: sleep 60
 
-    - run: cargo publish -p why2_chat
+    - run: cargo publish -p why2-chat
       env:
         CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
