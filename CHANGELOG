@@ -1,6 +1,20 @@
 Changelog
 =========
 
+v1.4.3:
+- d39524a: remove redundant rustdoc link
+- a87e485: move latex parser to core
+- 23ac8b7: disable documentation generation for chat workspace
+- a56a9fd: use readme in workspaces
+- 3eb8750: specify chat downloads in readme
+- c76f7cf: implement default client feature in pipelines
+- 9419504: use why-chat instead of why2_chat
+- cf78e48: use client feature defaultly on chat
+- 2e45cc7: update release pipeline for workspaces
+- 6fe799d: move build script to chat workspace
+- 9d34459: implement workspaces in test pipelines
+- 13e3d07: split repository on workspaces
+
 v1.4.2:
 - b418314: disable default features for nnnoiseless dependency
 - 458a518: update dependencies
