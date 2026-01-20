@@ -56,11 +56,7 @@ use wincode::
 
 use colored::Color;
 
-use crate::
-{
-    crypto,
-    options as chat_options,
-};
+use crate::{ crypto, options };
 
 #[cfg(feature = "server")]
 use std::time::{ Instant, Duration };
@@ -210,13 +206,27 @@ impl<'de> SchemaRead<'de> for SerColor
 }
 
 //FUNCTIONS
-pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&chat_options::SharedKeys>) //SEND packet TO stream
+//PRIVATE
+fn obfuscate_data(data: &[u8]) -> Vec<u8> //XOR BYTES (USED FOR OBFUSCATION)
+{
+    let mut obfuscated = data.to_vec();
+    for (i, byte) in obfuscated.iter_mut().enumerate()
+    {
+        //XOR EACH BYTE WITH OBFUSCATION KEY
+        *byte ^= options::OBFUSCATION_KEY[i % options::OBFUSCATION_KEY.len()];
+    }
+
+    obfuscated
+}
+
+//PUBLIC
+pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&options::SharedKeys>) //SEND packet TO stream
 {
     //ADD SEQUENCE NUMBER TO packet (FROM CLIENT)
     #[cfg(feature = "client")]
     {
-        packet.seq = chat_options::get_seq() + 1;
-        chat_options::set_seq(packet.seq);
+        packet.seq = options::get_seq() + 1;
+        options::set_seq(packet.seq);
     }
 
     //ADD SEQUENCE NUMBER TO packet (FROM SERVER)
@@ -241,7 +251,7 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
         crypto::encrypt_packet(packet_bytes, keys)
     } else
     {
-        packet_bytes //NO ENCRYPTION
+        obfuscate_data(&packet_bytes) //NO ENCRYPTION, OBFUSCATE
     };
 
     //CONVERT ENCRYPTED OUTPUT TO BYTES ([LENGTH][DATA])
@@ -255,7 +265,7 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, keys: Option<&chat_options::SharedKeys>) -> Option<MessagePacket>
+pub fn receive(stream: &mut TcpStream, keys: Option<&options::SharedKeys>) -> Option<MessagePacket>
 {
     //SERVER SIDE PACKET SIZE LIMIT
     #[cfg(feature = "server")]
@@ -318,6 +328,9 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_options::SharedKeys>) 
                 return None;
             }
         }
+    } else
+    {
+        decoded_packet = obfuscate_data(&decoded_packet); //NO ENCRYPTION, REMOVE OBFUSCATION
     }
 
     //ACTIVITY TIMER ON SERVER
@@ -390,10 +403,10 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_options::SharedKeys>) 
             //VERIFY SEQUENCE NUMBER
             #[cfg(feature = "client")] //ON CLIENT
             {
-                if packet.seq > chat_options::get_server_seq() || chat_options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
+                if packet.seq > options::get_server_seq() || options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
                 {
                     //SET SEQ
-                    chat_options::set_server_seq(packet.seq);
+                    options::set_server_seq(packet.seq);
                 } else //INVALID, DISCONNECT
                 {
                     return None;
