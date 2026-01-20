@@ -26,6 +26,7 @@ version = "1.4.4"
 authors = ["Václav Šmejkal <engo@satan.red>"]
 edition = "2024"
 license = "GPL-3.0-only"
+homepage = "https://why2.satan.red"
 repository = "https://git.satan.red/ENGO150/WHY2"
 
 [workspace.dependencies]
