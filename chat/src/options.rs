@@ -53,8 +53,8 @@ pub const FETCH_TIMEOUT: u64        = 5000;                                     
 pub const REKEY_INTERVAL: u64       = 600;                                                                //INTERVAL FOR RE-REKEYING (SECS)
 
 //DO NOT CHANGE CONST BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
-pub const GRID_DIMENSIONS: (usize, usize) = (8, 8);                             //DIMENSIONS OF REX GRID
-pub const OBFUSCATION_KEY: &[u8; 32]      =                                     //KEY FOR OBFUSCATING NON-ENCRYPTED PACKETS (NOT A SECURITY FEATURE)
+pub const GRID_DIMENSIONS: (usize, usize) = (8, 8); //DIMENSIONS OF REX GRID
+pub const OBFUSCATION_KEY: &[u8; 32]      =         //KEY FOR OBFUSCATING NON-ENCRYPTED PACKETS (NOT A SECURITY FEATURE)
 &[
     0x9A, 0xF7, 0x1C, 0xD4, 0x62, 0x3E, 0x8B, 0x5A,
     0x0F, 0x2D, 0xE1, 0x79, 0x4C, 0xB8, 0x63, 0x90,
