@@ -1043,7 +1043,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         }
 
         if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
-        let message = read.text.unwrap();
+        let message = read.text.unwrap().trim().to_string(); //TRIM MESSAGE
 
         //SEND MESSAGE TO ALL USERS
         send_to_all(MessagePacket
