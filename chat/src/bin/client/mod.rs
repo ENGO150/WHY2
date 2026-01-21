@@ -331,7 +331,15 @@ fn read_input() -> String
         }
     }
 
-    input.iter().collect::<String>()
+    //COLLECT AND TRIM (NOT PASSWORDS)
+    let read = input.iter().collect::<String>();
+    if !options::get_asking_password()
+    {
+        read.trim().to_string()
+    } else
+    {
+        read
+    }
 }
 
 fn to_color(color: &str) -> Result<SerColor, ()>
