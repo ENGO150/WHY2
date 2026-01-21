@@ -77,6 +77,36 @@ jobs:
       - name: Run Key Diffusion Test
         run: cargo test -p why2 test_key_diffusion --verbose --release -- --nocapture
 
+  test-why2-auth:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: development
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run MAC Test
+        run: cargo test -p why2 test_auth_tamper_resistance --verbose --release -- --nocapture
+
+  test-why2-entropy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: development
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Entropy Test
+        run: cargo test -p why2 test_ciphertext_entropy --verbose --release -- --nocapture
+
   test-why2-legacy:
     runs-on: ubuntu-latest
 
