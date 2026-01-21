@@ -22,7 +22,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.4.4"
+version = "1.4.5"
 authors = ["Václav Šmejkal <engo@satan.red>"]
 edition = "2024"
 license = "GPL-3.0-only"
@@ -30,7 +30,7 @@ homepage = "https://why2.satan.red"
 repository = "https://git.satan.red/ENGO150/WHY2"
 
 [workspace.dependencies]
-why2 = { path = "core", version = "1.4.4" }
+why2 = { path = "core", version = "1.4.5" }
 sha2 = "0.10.9"
 zeroize = { version = "1.8.2", features = ["derive"] }
 

@@ -1,6 +1,19 @@
 Changelog
 =========
 
+v1.4.5:
+- dbb9e06: implement default Grid size on server
+- 755b259: implement default Grid size
+- ed6a4a6: implement MAC & entropy tests in pipelines
+- d9502e6: add entropy test
+- a9e635a: add AuthenticatedData test
+- 086c648: implement workspace structure in tests
+- dd8956a: add dryoc warning
+- 87414c1: fix auth::verify rustdoc latex formatting
+- 8900a9b: fix options formatting
+- 2d1f66f: obfuscate unencrypted chat data
+- 60f0463: add homepage to package metadata
+
 v1.4.4:
 - 5649e8f: fix chat release build error
 
