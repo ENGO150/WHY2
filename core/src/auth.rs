@@ -154,10 +154,12 @@ impl<const W: usize, const H: usize> AuthenticatedData<W, H>
     ///    into bytes using the exact same order as during authentication (Big-Endian).
     ///
     /// 2. **MAC Re-computation**: Calculate the expected tag using the provided key:
-    ///    $ \text{expected\_tag} = \text{HMAC-SHA256}(K_{\text{mac}}, C) $
+    ///    $$ T' = \text{HMAC-SHA256}(K_{\text{mac}}, C) $$
     ///
     /// 3. **Constant-Time Comparison**: Compare the calculated tag with the stored `self.mac`:
-    ///    $ \text{valid} \iff \text{CT\_EQ}(\text{tag}, \text{expected\_tag}) $
+    ///    $$ \text{valid} \iff T' \stackrel{?}{=} T $$
+    ///
+    /// where $T$ is the stored tag and $T'$ is the recomputed tag.
     ///
     /// # Parameters
     /// - `mac_key`: The 32-byte key used for HMAC-SHA256 computation.
