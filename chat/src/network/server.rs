@@ -275,6 +275,36 @@ impl Connection
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //PRIVATE
+fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&options::SharedKeys>) -> Option<MessagePacket>
+{
+    //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
+    stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
+
+    let mut invalid_packets = 0; //INVALID KEY EXCHANGE PACKETS COUNTER
+
+    //WAIT FOR KeyExchange
+    let message = loop
+    {
+        //READ MESSAGE
+        let received = match network::receive(stream, keys)
+        {
+            Some(r) => r,
+            None => return None
+        };
+
+        if received.code == Some(code.clone()) && !received.text.is_none() { break received; }
+
+        //CHECK INVALID PACKETS COUNTER
+        if invalid_packets == 3 { return None; }
+        invalid_packets += 1; //INCREMENT
+    };
+
+    //REMOVE READ TIMEOUT
+    stream.set_read_timeout(None).expect("Failed to unset read timeout");
+
+    Some(message)
+}
+
 fn key_exchange(peer_addr: &SocketAddr, keys: &mut options::SharedKeys) //KEY EXCHANGE FOR SERVER-SIDE
 {
     //GET CONNECTION
@@ -303,30 +333,12 @@ fn key_exchange(peer_addr: &SocketAddr, keys: &mut options::SharedKeys) //KEY EX
         ..Default::default()
     }, None);
 
-    //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
-    stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
-
-    let mut invalid_packets = 0; //INVALID KEY EXCHANGE PACKETS COUNTER
-
-    //WAIT FOR KeyExchange
-    let message = loop
+    //READ FROM UNTRUSTED CLIENT
+    let message = match untrusted_read(&mut stream, MessageCode::KeyExchange, None)
     {
-        //READ MESSAGE
-        let received = match network::receive(&mut stream, None)
-        {
-            Some(r) => r,
-            None => return
-        };
-
-        if received.code == Some(MessageCode::KeyExchange) && !received.text.is_none() { break received; }
-
-        //CHECK INVALID PACKETS COUNTER
-        if invalid_packets == 3 { return; }
-        invalid_packets += 1; //INCREMENT
+        Some(r) => r,
+        None => return
     };
-
-    //REMOVE READ TIMEOUT
-    stream.set_read_timeout(None).expect("Failed to unset read timeout");
 
     //DERIVE SHARED KEYS
     let derived_keys = (||
@@ -573,28 +585,8 @@ fn ask_version(stream: &mut TcpStream, keys: &options::SharedKeys) -> Option<Str
     //ASK FOR VERSION
     send_code(stream, Some(misc::get_version().to_string()), MessageCode::Version, Some(keys));
 
-    //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
-    stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
-
-    let mut invalid_packets = 0; //INVALID PACKETS COUNTER
-
-    //WAIT FOR RESPONSE FROM CLIENT
-    let version = loop
-    {
-        //READ MESSAGE
-        let received = network::receive(stream, Some(keys))?;
-
-        if received.code == Some(MessageCode::Version) && !received.text.is_none() { break received; }
-
-        //CHECK INVALID PACKETS COUNTER
-        if invalid_packets == 3 { return None; }
-        invalid_packets += 1; //INCREMENT
-    };
-
-    //REMOVE READ TIMEOUT
-    stream.set_read_timeout(None).expect("Failed to unset read timeout");
-
-    version.text
+    //READ FROM UNTRUSTED CLIENT
+    untrusted_read(stream, MessageCode::Version, Some(keys))?.text
 }
 
 fn send_voice_clients(stream: &mut TcpStream, keys: &options::SharedKeys, id: usize)
