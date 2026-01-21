@@ -48,4 +48,4 @@ rustdoc-args = ["--html-in-header", "docs-header.html"]
 
 [[test]]
 name = "why2_integration"
-path = "../tests/lib.rs"
+path = "../tests/mod.rs"

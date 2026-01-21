@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 //MODULES
+pub mod auth_test;
 pub mod encryption_test;
 pub mod diffusion_test;
 
