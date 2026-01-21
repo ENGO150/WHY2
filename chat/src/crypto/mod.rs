@@ -26,17 +26,17 @@ use why2::
     Grid,
     encrypter,
     decrypter,
-    options as core_options,
     auth::AuthenticatedData,
+    options::
+    {
+        self as core_options,
+        EncryptedData,
+    },
 };
 
 use sha2::{ Sha256, Digest };
 
 use crate::options;
-
-//CONSTS
-const GRID_W: usize = options::GRID_DIMENSIONS.0;
-const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //FUNCTIONS
 pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
@@ -61,7 +61,7 @@ pub fn encrypt_packet(packet_bytes: Vec<u8>, keys: &options::SharedKeys) -> Vec<
     }
 
     //ENCRYPT
-    let encrypted_data = encrypter::encrypt::<GRID_W, GRID_H>(&input_i64, Some(&keys.0)).expect("Encrypting packet failed");
+    let encrypted_data: EncryptedData = encrypter::encrypt(&input_i64, Some(&keys.0)).expect("Encrypting packet failed");
 
     //AUTHENTICATE
     AuthenticatedData::authenticate(encrypted_data, keys.1.as_slice().try_into().unwrap()).into()
@@ -70,7 +70,7 @@ pub fn encrypt_packet(packet_bytes: Vec<u8>, keys: &options::SharedKeys) -> Vec<
 pub fn decrypt_packet(mut decoded_packet: Vec<u8>, keys: &options::SharedKeys) -> Option<Vec<u8>>
 {
     //DESERIALIZE
-    let auth_packet: AuthenticatedData<GRID_W, GRID_H> = decoded_packet.as_slice().try_into().ok()?;
+    let auth_packet: AuthenticatedData = decoded_packet.as_slice().try_into().ok()?;
 
     //VERIFY HMAC
     if !auth_packet.verify(keys.1.as_slice().try_into().ok()?)

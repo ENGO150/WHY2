@@ -50,14 +50,12 @@ use hkdf::Hkdf;
 
 use zeroize::Zeroizing;
 
+use why2::options as core_options;
+
 use crate::{ misc, options };
 
 #[cfg(feature = "server")]
 use std::{ fs, path::Path };
-
-//CONSTS
-const GRID_W: usize = options::GRID_DIMENSIONS.0;
-const GRID_H: usize = options::GRID_DIMENSIONS.1;
 
 //FUNCTIONS
 //PRIVATE
@@ -71,7 +69,7 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> options::SharedKe
     let hkdf = Hkdf::<Sha256>::new(None, shared_secret);
 
     //DERIVE KEYS FOR ENCRYPTION & MAC
-    let mut encryption_key = Zeroizing::new(vec![0u8; GRID_W * GRID_H * 16]);
+    let mut encryption_key = Zeroizing::new(vec![0u8; core_options::DEFAULT_GRID_WIDTH * core_options::DEFAULT_GRID_HEIGHT * 16]);
     let mut mac = Zeroizing::new(vec![0u8; 32]);
 
     //EXPAND
@@ -158,7 +156,7 @@ pub fn get_server_pq_keys() -> (String, String) //GET SERVER ML-KEM KEYS
     (dk, ek)
 }
 
-pub fn derive_shared_secret<const W: usize, const H: usize> //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
+pub fn derive_shared_secret //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
 (
     local_key: String,
     peer_pkey: String,

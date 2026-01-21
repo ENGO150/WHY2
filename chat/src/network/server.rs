@@ -55,10 +55,6 @@ use crate::
     },
 };
 
-//CONSTS
-const GRID_W: usize = options::GRID_DIMENSIONS.0;
-const GRID_H: usize = options::GRID_DIMENSIONS.1;
-
 //ENUMS
 #[derive(Clone)]
 pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
@@ -344,7 +340,7 @@ fn key_exchange(peer_addr: &SocketAddr, keys: &mut options::SharedKeys) //KEY EX
         let pq_secret = kex::decapsulate_pq(&pq_sk, client_pq_ciphertext)?;
 
         //DERIVE
-        kex::derive_shared_secret::<GRID_W, GRID_H>(sk, client_ecc_pk.to_string(), pq_secret)
+        kex::derive_shared_secret(sk, client_ecc_pk.to_string(), pq_secret)
     })();
 
     //UPDATE CLIENT KEYS

@@ -46,10 +46,6 @@ use crate::
     },
 };
 
-//CONSTS
-const GRID_W: usize = options::GRID_DIMENSIONS.0;
-const GRID_H: usize = options::GRID_DIMENSIONS.1;
-
 //STRUCTS
 pub struct VoiceUser
 {
@@ -138,7 +134,7 @@ fn key_exchange(stream: &mut TcpStream, keys: &mut options::SharedKeys, tx: &Sen
     }, None);
 
     //CALCULATE SHARED SECRET (HYBRID)
-    *keys = kex::derive_shared_secret::<GRID_W, GRID_H>(sk, server_ecc_pk.to_string(), pq_secret).expect("Shared secret derivation failed");
+    *keys = kex::derive_shared_secret(sk, server_ecc_pk.to_string(), pq_secret).expect("Shared secret derivation failed");
 
     //SET GLOBAL KEYS VARIABLE
     options::set_keys(keys.clone());
