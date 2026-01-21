@@ -51,6 +51,12 @@ fn main()
 ## Getting Help
 For help, DM me directly on [Discord](https://discord.com/users/634385503956893737) :)
 
+## Warning
+WHY2 is an experimental algorithm loosely inspired by
+AES. It has not undergone formal cryptographic audit.
+Use for educational purposes and personal privacy experiments, not for high-assurance systems or
+production environments where security is critical.
+
 #### License
 <sup>
 WHY2 is licensed under the GNU GPLv3. You are free to use, modify, and redistribute it under the terms of the license. See <a href="https://www.gnu.org/licenses/" target="_blank">https://www.gnu.org/licenses/</a> for details.
