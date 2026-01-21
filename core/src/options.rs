@@ -51,6 +51,17 @@ pub const SUBCELL_ROUNDS: u32 = 32;
 /// This value is cryptographically sensitive and should not be changed casually.
 pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
 
+/// The default width ($W$) of the [`Grid`].
+///
+/// This constant defines the number of columns in the standard grid configuration.
+/// Together with [`DEFAULT_GRID_HEIGHT`], it determines the total state size.
+pub const DEFAULT_GRID_WIDTH: usize = 8;
+
+/// The default height ($H$) of the [`Grid`].
+///
+/// This constant defines the number of rows in the standard grid configuration.
+pub const DEFAULT_GRID_HEIGHT: usize = 8;
+
 //STRUCTS
 /// Container for encrypted output.
 ///
@@ -67,7 +78,11 @@ pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
 /// - The key is stored in [`Grid`] form for direct use in round key generation.
 /// - The nonce does not need to be kept secret but must be unique per encryption.
 #[derive(Zeroize)]
-pub struct EncryptedData<const W: usize, const H: usize> //DATA FOR REX ENCRYPTER
+pub struct EncryptedData //DATA FOR REX ENCRYPTER
+<
+    const W: usize = { DEFAULT_GRID_WIDTH },
+    const H: usize = { DEFAULT_GRID_HEIGHT },
+>
 {
     #[zeroize(skip)]
     pub output: Vec<Grid<W, H>>, //OUTPUT VALUE

@@ -148,7 +148,11 @@ use subtle::
 /// across rounds is unsupported and may lead to incorrect results or undefined behavior.
 #[derive(Clone, Debug, Zeroize)]
 #[zeroize(drop)]
-pub struct Grid<const W: usize, const H: usize>([[i64; W]; H]); //GRID FOR REX DATA
+pub struct Grid //GRID FOR REX DATA
+<
+    const W: usize = { options::DEFAULT_GRID_WIDTH },
+    const H: usize = { options::DEFAULT_GRID_HEIGHT },
+>([[i64; W]; H]);
 
 /// Represents structured errors that can occur during Grid operations.
 ///

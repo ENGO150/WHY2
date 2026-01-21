@@ -64,7 +64,7 @@ use crate::
 {
     Grid,
     GridError,
-    options::EncryptedData,
+    options::{ self, EncryptedData },
 };
 
 //STRUCTS
@@ -88,7 +88,11 @@ use crate::
 /// - The nonce is included in the authenticated data to ensure freshness.
 /// - This structure preserves the original grid structure for easy decryption.
 #[derive(Zeroize)]
-pub struct AuthenticatedData<const W: usize, const H: usize>
+pub struct AuthenticatedData
+<
+    const W: usize = { options::DEFAULT_GRID_WIDTH },
+    const H: usize = { options::DEFAULT_GRID_HEIGHT },
+>
 {
     pub mac: [u8; 32],
     pub encrypted_data: EncryptedData<W, H>,
