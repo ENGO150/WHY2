@@ -46,6 +46,10 @@ legacy = []
 features = ["legacy"]
 rustdoc-args = ["--html-in-header", "docs-header.html"]
 
+[[example]]
+name = "basic_encryption"
+path = "../examples/basic_encryption.rs"
+
 [[test]]
 name = "why2_integration"
 path = "../tests/mod.rs"
