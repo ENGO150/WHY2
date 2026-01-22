@@ -1,0 +1,72 @@
+SECURITY POLICY FOR WHY2
+========================
+
+1. REPORTING A VULNERABILITY
+----------------------------
+We take the security of WHY2 seriously. If you discover a security vulnerability,
+please bring it to our attention strictly via email.
+
+DO NOT report security vulnerabilities through public GitHub/GitLab issues.
+
+Please send a detailed description of the vulnerability to the project maintainer:
+
+    Email: engo@satan.red
+
+We will acknowledge receipt of your vulnerability report within 48 hours and
+strive to send you regular updates about our progress.
+
+2. SECURITY ARCHITECTURE & FEATURES
+-----------------------------------
+WHY2 is designed with a "defense-in-depth" approach, leveraging modern Rust
+features and cryptographic best practices where possible. However, it relies on
+a custom cryptographic primitive.
+
+A) Cryptographic Primitives
+   - Algorithm: WHY2 (REX) is a symmetric block cipher based on a configurable
+     Grid (matrix) of 64-bit cells.
+   - Design Principle: ARX (Add-Rotate-XOR) network for nonlinear mixing.
+     No S-boxes are used, eliminating cache-timing attacks related to memory lookups.
+   - Mode of Operation: CTR (Counter) mode is used for encryption.
+   - Randomness: Uses ChaCha20Rng (via `rand` crate) for CSPRNG requirements.
+
+B) Implementation Security
+   - Memory Safety: Written in pure Rust to prevent buffer overflows and
+     memory-related vulnerabilities.
+   - Secure Erasure: Implements the `zeroize` trait to scrub sensitive data
+     (keys, plaintexts, grids) from memory immediately after use.
+   - Constant-Time Execution: The core mixing functions (subcell, shift_rows)
+     implement constant-time logic when the `constant-time` feature is enabled.
+
+C) Integrity & Authenticity
+   - Encrypt-then-MAC: The `auth` module implements a standard Encrypt-then-MAC scheme.
+   - Algorithm: Uses HMAC-SHA256 to guarantee data integrity and authenticity.
+   - Verification: MAC verification is performed in constant time before any
+     decryption takes place.
+
+3. SECURITY LIMITATIONS & RISK ASSESSMENT
+-----------------------------------------
+Users must be aware of the following limitations. WHY2 is experimental software.
+
+A) No Formal Audit
+   WHY2 has NOT undergone a formal external security audit by a professional
+   cryptographer. There may be undiscovered weaknesses in the algorithm design
+   or implementation.
+
+B) Custom Cryptography
+   WHY2 is NOT a NIST-standardized algorithm. It should not be used in environments
+   requiring FIPS compliance or high-assurance security (e.g., banking, medical data).
+
+C) Side-Channel Resistance
+   While we use constant-time coding practices, WHY2 does not have hardware-level
+   protection (unlike AES-NI). Power analysis or sophisticated electromagnetic
+   side-channel attacks may still be possible on physical access.
+
+4. SUPPORTED VERSIONS
+---------------------
+Only the latest development version and the latest stable release are supported
+with security updates.
+
+Version | Supported | Notes
+------- | --------- | ------------------------
+1.4.x   | Yes       | Current REX architecture
+< 1.0   | No        | Legacy / Pre-rewrite
