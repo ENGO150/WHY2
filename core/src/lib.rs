@@ -72,6 +72,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! * **Legacy**: Refers to older, deprecated encryption routines found in the [`legacy`] module.
 //! These are retained for compatibility but are considered insecure.
 //!
+//! ## Examples
+//!
+//! For comprehensive usage examples, including global algorithm usage and specific edge cases,
+//! please refer to the [examples directory](https://git.satan.red/ENGO150/WHY2/-/tree/stable/examples)
+//! in the official repository.
+//!
 //! ## Security Disclaimer
 //!
 //! WHY2 is an experimental encryption algorithm. While it draws inspiration from established designs like AES,
