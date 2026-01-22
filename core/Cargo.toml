@@ -54,6 +54,10 @@ path = "../examples/basic_encryption.rs"
 name = "custom_key"
 path = "../examples/custom_key.rs"
 
+[[example]]
+name = "binary_data"
+path = "../examples/binary_data.rs"
+
 [[test]]
 name = "why2_integration"
 path = "../tests/mod.rs"
