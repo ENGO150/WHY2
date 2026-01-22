@@ -25,6 +25,21 @@ permissions:
   actions: read
 
 jobs:
+  build-why2-examples:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: development
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Examples
+        run: cargo build --examples --release -p why2 --verbose
+
   build-why2-chat:
     runs-on: ${{ matrix.os }}
     strategy:
