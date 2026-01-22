@@ -1,6 +1,36 @@
 Changelog
 =========
 
+v1.4.6:
+- ec0d6d4: match code of conduct formatting to contributing file
+- c3fc28e: add security file
+- 3d1fb35: fix underlined titles formatting
+- 92281cd: use https link for origin
+- 97eb3c2: remove markdown from code of conduct
+- 3dc04b4: remove md suffix from code of conduct
+- 9aa8fe1: add examples build to github actions
+- f5d4f86: rename github chat-build to build
+- da681ac: build examples in gitlab pipelines
+- 928e404: fix grid_size example compile error
+- 16c5e54: add authenticated encryption code example
+- 0f9e37d: fix binary_data example code formatting
+- 792e8a3: add examples section to rustdoc root
+- f8142a3: add file encryption code example
+- 4ea8442: add grid sizes code example
+- e8fe11f: add binary data encryption code example
+- c015821: add custom key code example
+- 975764d: implement GridError::InvalidUnicode on decrypter::decrypt_string failure
+- 5017667: add Covenant 3.0 code of conduct
+- 66e1cc4: add basic encryption example
+- 77fbcfa: add basic contribution guidelines
+- e46d4e9: move Grid to grid module
+- d32d650: rename options module to types
+- 1029ab4: move core constants to consts module
+- df4abc6: trim messages on client
+- a4cdbdf: trim messages on server
+- 0da4d4f: update dependencies
+- cb45eac: add untrusted_read helper for server
+
 v1.4.5:
 - dbb9e06: implement default Grid size on server
 - 755b259: implement default Grid size
