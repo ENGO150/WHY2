@@ -144,6 +144,18 @@ pub enum GridError
         expected_len: usize,
         actual_len: usize,
     },
+
+    /// Indicates that decryption produced an invalid Unicode scalar value.
+    ///
+    /// This typically happens when the provided key is incorrect, resulting in
+    /// random garbage data that does not represent valid text.
+    ///
+    /// # Fields
+    /// - `value`: The invalid Unicode scalar value.
+    InvalidUnicode
+    {
+        value: u32,
+    },
 }
 
 //IMPLEMENTATIONS
@@ -807,6 +819,11 @@ impl Display for GridError
             GridError::InvalidKeyLength { expected_len, actual_len } =>
             {
                 write!(f, "Invalid key length: expected length {expected_len}, got {actual_len}")
+            },
+
+            GridError::InvalidUnicode { value } =>
+            {
+                write!(f, "Invalid unicode scalar value: {value:#X} (possible wrong key)")
             },
         }
     }

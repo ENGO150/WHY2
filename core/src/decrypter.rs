@@ -192,8 +192,8 @@ pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>
         let lo = u32::from_be_bytes(buf[4..8].try_into().unwrap()); //LOW
 
         //PUSH CHARS TO STRING
-        if hi != 0 { output.push(char::from_u32(hi).unwrap()); }
-        if lo != 0 { output.push(char::from_u32(lo).unwrap()); }
+        if hi != 0 { output.push(char::from_u32(hi).ok_or(GridError::InvalidUnicode { value: hi })?); }
+        if lo != 0 { output.push(char::from_u32(lo).ok_or(GridError::InvalidUnicode { value: lo })?); }
     }
 
     Ok(output)
