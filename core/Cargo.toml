@@ -62,6 +62,10 @@ path = "../examples/binary_data.rs"
 name = "grid_sizes"
 path = "../examples/grid_sizes.rs"
 
+[[example]]
+name = "file_encryption"
+path = "../examples/file_encryption.rs"
+
 [[test]]
 name = "why2_integration"
 path = "../tests/mod.rs"
