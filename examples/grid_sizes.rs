@@ -54,10 +54,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-fn test_grid_size<const W: usize, const H: usize
+fn test_grid_size<const W: usize, const H: usize>
 (
     message: &str,
-    label: &str
+    label: &str,
 ) -> Result<(), Box<dyn std::error::Error>>
 {
     //ENCRYPTION
