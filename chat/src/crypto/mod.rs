@@ -26,12 +26,8 @@ use why2::
     Grid,
     encrypter,
     decrypter,
+    types::EncryptedData,
     auth::AuthenticatedData,
-    options::
-    {
-        self as core_options,
-        EncryptedData,
-    },
 };
 
 use sha2::{ Sha256, Digest };
@@ -79,7 +75,7 @@ pub fn decrypt_packet(mut decoded_packet: Vec<u8>, keys: &options::SharedKeys) -
     }
 
     //DECRYPT
-    let decrypted_packet = decrypter::decrypt(core_options::EncryptedData
+    let decrypted_packet = decrypter::decrypt(EncryptedData
     {
         output: auth_packet.encrypted_data.output,
         key: Grid::from_key(&keys.0).ok()?,

@@ -16,11 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//! REX options
+//! # REX Types
 //!
-//! This module defines core parameters and data structures used throughout the WHY2 encryption
-//! and decryption pipeline. It includes round configuration constants, mixing parameters, and
-//! the input/output formats for both encryption and decryption.
+//! This module defines the high-level data containers used for exchanging data
+//! throughout the encryption and decryption pipeline. It includes structures for
+//! holding ciphertext, keys, and nonces in a type-safe manner.
 
 use zeroize::{ Zeroize, ZeroizeOnDrop };
 

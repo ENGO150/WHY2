@@ -65,7 +65,7 @@ use crate::
     Grid,
     GridError,
     consts,
-    options::EncryptedData,
+    types::EncryptedData,
 };
 
 //STRUCTS

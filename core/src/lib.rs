@@ -91,7 +91,7 @@ pub mod consts;
 pub mod crypto;
 pub mod decrypter;
 pub mod encrypter;
-pub mod options;
+pub mod types;
 
 #[cfg(feature = "legacy")]
 #[deprecated(since = "0.2.0-rex", note = "Legacy encryption is unsecure. Use REX module (why2::core) instead.")]

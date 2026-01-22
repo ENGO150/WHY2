@@ -42,7 +42,7 @@ use crate::
     crypto,
     Grid,
     GridError,
-    options::EncryptedData,
+    types::EncryptedData,
 };
 
 #[cfg(feature = "constant-time")]
