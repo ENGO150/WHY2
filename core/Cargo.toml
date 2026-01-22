@@ -50,6 +50,10 @@ rustdoc-args = ["--html-in-header", "docs-header.html"]
 name = "basic_encryption"
 path = "../examples/basic_encryption.rs"
 
+[[example]]
+name = "custom_key"
+path = "../examples/custom_key.rs"
+
 [[test]]
 name = "why2_integration"
 path = "../tests/mod.rs"
