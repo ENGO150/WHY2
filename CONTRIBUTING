@@ -1,0 +1,102 @@
+CONTRIBUTING TO WHY2
+====================
+
+Thank you for your interest in contributing to WHY2!
+Before you submit your code, please read the following guidelines.
+
+1. LICENSE & LEGAL
+------------------
+By contributing to WHY2, you agree that your contributions will be licensed
+under its GNU General Public License v3.0 (GPLv3).
+See the LICENSE file for details.
+
+2. CODE STYLE & FORMATTING
+--------------------------
+WHY2 uses a strict and non-standard coding style (Allman style).
+DO NOT run standard `cargo fmt` or `rustfmt` on the codebase, as it will
+break the existing formatting.
+
+Please follow these rules:
+
+- BRACES: Always place opening braces on a new line.
+  Correct:
+  fn function()
+  {
+      // code
+  }
+
+  Incorrect:
+  fn function() {
+      // code
+  }
+
+- INDENTATION: Use 4 spaces. No tabs.
+
+- LINE LENGTH: Avoid extremely long lines. Use line wrapping where appropriate
+  to maintain readability. While some existing parts of the codebase contain
+  long lines, new contributions should strive for reasonable limits.
+
+- COMMENTS: Use uppercase for section headers and inline comments where appropriate.
+  Example: //STRUCTS, //IMPLEMENTATIONS
+
+- IMPORTS: Group imports cleanly with braces on new lines.
+
+If your IDE auto-formats on save, please disable it for this project or configure
+it to match the project's style.
+
+3. PROJECT STRUCTURE
+--------------------
+The project is a workspace consisting of:
+- core/    : The cryptographic library (REX implementation, package `why2`).
+- chat/    : The reference chat application (client & server).
+- tests/   : Integration tests for the core module.
+
+Ensure your changes happen in the correct module.
+
+4. TESTING
+----------
+Before submitting a Pull Request, ensure all tests pass.
+Tests for the core cryptographic library (`why2`) should be run in release mode
+due to the performance requirements of diffusion and entropy checks.
+
+To run all core tests:
+
+    cargo test -p why2 --release
+
+To reproduce specific checks from our CI pipeline, use the following commands:
+
+- Encryption & Decryption:
+    cargo test -p why2 encrypt_decrypt --verbose --release -- --nocapture
+
+- Diffusion Analysis:
+    cargo test -p why2 test_input_diffusion --verbose --release -- --nocapture
+    cargo test -p why2 test_key_diffusion --verbose --release -- --nocapture
+
+- Integrity & Auth (MAC):
+    cargo test -p why2 test_auth_tamper_resistance --verbose --release -- --nocapture
+
+- Entropy / Randomness:
+    cargo test -p why2 test_ciphertext_entropy --verbose --release -- --nocapture
+
+- Grid Overflow Verification:
+    cargo test -p why2 verify_multi_grid_overflow --verbose --release -- --nocapture
+
+5. PULL REQUEST PROCESS & MIRROR STATUS
+---------------------------------------
+**IMPORTANT:** This repository is likely a mirror of the official upstream
+repository hosted at `git.satan.red`.
+
+- **Mirror PRs:** We DO accept Pull Requests on public mirrors (e.g., GitHub)!
+  They will be reviewed and merged into the origin manually.
+- **Long-term Contribution:** If you plan to contribute regularly, we strongly
+  prefer that you request an account on our official GitLab instance (git.satan.red)
+  and contribute there directly.
+
+To contribute:
+1. Fork the repository.
+2. Create a new branch for your feature or fix.
+3. Commit your changes.
+4. Push to your fork and submit a Pull Request (or Merge Request).
+5. Provide a clear description of what your changes do.
+
+Thank you for helping make WHY2 better!
