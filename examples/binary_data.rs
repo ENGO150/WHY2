@@ -27,7 +27,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! Run with: cargo run --example binary_data
 
-use why2::{ encrypter, decrypter, crypto };
+use why2::
+{
+    encrypter,
+    decrypter,
+    crypto,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
