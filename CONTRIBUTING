@@ -84,7 +84,7 @@ To reproduce specific checks from our CI pipeline, use the following commands:
 5. PULL REQUEST PROCESS & MIRROR STATUS
 ---------------------------------------
 **IMPORTANT:** This repository is likely a mirror of the official upstream
-repository hosted at `git.satan.red`.
+repository hosted at https://git.satan.red.
 
 - **Mirror PRs:** We DO accept Pull Requests on public mirrors (e.g., GitHub)!
   They will be reviewed and merged into the origin manually.
