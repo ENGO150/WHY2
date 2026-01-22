@@ -91,6 +91,14 @@ build-why2-chat-linux:
       - ./target/release/why2
       - ./target/release/why2-server
 
+# Build WHY2 Examples (API Drift Prevention)
+build-why2-examples:
+  stage: build
+  only:
+    - development
+  script:
+    - cargo build --examples --release -p why2 --verbose
+
 # Upload to Arch Linux User Repository
 upload-to-aur:
   stage: aur
