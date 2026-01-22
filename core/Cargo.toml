@@ -58,6 +58,10 @@ path = "../examples/custom_key.rs"
 name = "binary_data"
 path = "../examples/binary_data.rs"
 
+[[example]]
+name = "grid_sizes"
+path = "../examples/grid_sizes.rs"
+
 [[test]]
 name = "why2_integration"
 path = "../tests/mod.rs"
