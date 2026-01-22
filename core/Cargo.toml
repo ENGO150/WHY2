@@ -66,6 +66,10 @@ path = "../examples/grid_sizes.rs"
 name = "file_encryption"
 path = "../examples/file_encryption.rs"
 
+[[example]]
+name = "authenticated_encryption"
+path = "../examples/authenticated_encryption.rs"
+
 [[test]]
 name = "why2_integration"
 path = "../tests/mod.rs"
