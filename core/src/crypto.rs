@@ -42,7 +42,7 @@ use zeroize::Zeroizing;
 
 use crate::
 {
-    options,
+    consts,
     Grid,
     GridError,
 };
@@ -125,7 +125,7 @@ pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 
 /// Derives a sequence of round keys from a master Grid using a deterministic CSPRNG stream.
 ///
-/// This function generates [`options::ROUND_KEYS`] round keys by expanding the master key
+/// This function generates [`consts::ROUND_KEYS`] round keys by expanding the master key
 /// using a CSPRNG stream.
 ///
 /// $$ S = \text{Hash}(\text{MasterKey}) $$
@@ -147,13 +147,13 @@ pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 /// - This method ensures reproducible round key generation without external randomness.
 pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Result<Vec<Grid<W, H>>, GridError>
 {
-    let mut keys: Vec<Grid<W, H>> = Vec::with_capacity(options::ROUND_KEYS);
+    let mut keys: Vec<Grid<W, H>> = Vec::with_capacity(consts::ROUND_KEYS);
 
     //CREATE CSPRNG FROM THE MASTER KEY
     let mut rng = ChaCha20Rng::from_seed(sha256_seed_grid(master_key)); //DERIVE SEED FROM MASTER KEY HASH
 
     //GENERATE KEYS
-    for _ in 0..(options::ROUND_KEYS)
+    for _ in 0..(consts::ROUND_KEYS)
     {
         //USE SEED OF LAST KEY TO GENERATE NEW KEY
         let key = generate_key_deterministic::<W, H>(&mut rng);

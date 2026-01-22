@@ -24,45 +24,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use zeroize::{ Zeroize, ZeroizeOnDrop };
 
-use crate::Grid;
+use crate::{ consts, Grid };
 
-/// Number of round keys used in the WHY2 cipher.
-///
-/// Each round key introduces nonlinear and linear mixing. This value controls the depth
-/// of encryption and decryption. Increasing it strengthens diffusion but adds computational cost.
-///
-/// Do not modify unless you're fully aware of the cryptographic implications.
-pub const ROUND_KEYS: usize = 14;
-
-/// Number of ARX mixing iterations per cell in the [`subcell`](crate::Grid::subcell) transformation.
-///
-/// This controls how many rounds of Add-Rotate-XOR are applied to each cell. More rounds
-/// increase diffusion and resistance to pattern leakage.
-///
-/// Changing this affects the cipher’s nonlinear behavior.
-pub const SUBCELL_ROUNDS: u32 = 32;
-
-/// Constant used to break symmetry in ARX mixing.
-///
-/// This is derived from $\lfloor 2^{32} / \varphi \rfloor$, where $\varphi = \frac{1 + \sqrt{5}}{2}$
-/// is the golden ratio. It ensures that each round introduces asymmetry and avoids cyclic patterns in the
-/// [`subcell`](crate::Grid::subcell) transformation.
-///
-/// This value is cryptographically sensitive and should not be changed casually.
-pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
-
-/// The default width ($W$) of the [`Grid`].
-///
-/// This constant defines the number of columns in the standard grid configuration.
-/// Together with [`DEFAULT_GRID_HEIGHT`], it determines the total state size.
-pub const DEFAULT_GRID_WIDTH: usize = 8;
-
-/// The default height ($H$) of the [`Grid`].
-///
-/// This constant defines the number of rows in the standard grid configuration.
-pub const DEFAULT_GRID_HEIGHT: usize = 8;
-
-//STRUCTS
 /// Container for encrypted output.
 ///
 /// This struct holds the encrypted Grid chunks, the key Grid and the IV used during encryption.
@@ -80,8 +43,8 @@ pub const DEFAULT_GRID_HEIGHT: usize = 8;
 #[derive(Zeroize)]
 pub struct EncryptedData //DATA FOR REX ENCRYPTER
 <
-    const W: usize = { DEFAULT_GRID_WIDTH },
-    const H: usize = { DEFAULT_GRID_HEIGHT },
+    const W: usize = { consts::DEFAULT_GRID_WIDTH },
+    const H: usize = { consts::DEFAULT_GRID_HEIGHT },
 >
 {
     #[zeroize(skip)]

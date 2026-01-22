@@ -64,7 +64,8 @@ use crate::
 {
     Grid,
     GridError,
-    options::{ self, EncryptedData },
+    consts,
+    options::EncryptedData,
 };
 
 //STRUCTS
@@ -90,8 +91,8 @@ use crate::
 #[derive(Zeroize)]
 pub struct AuthenticatedData
 <
-    const W: usize = { options::DEFAULT_GRID_WIDTH },
-    const H: usize = { options::DEFAULT_GRID_HEIGHT },
+    const W: usize = { consts::DEFAULT_GRID_WIDTH },
+    const H: usize = { consts::DEFAULT_GRID_HEIGHT },
 >
 {
     pub mac: [u8; 32],

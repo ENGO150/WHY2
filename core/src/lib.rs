@@ -87,6 +87,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //MODULES
 #[cfg(feature = "auth")]
 pub mod auth;
+pub mod consts;
 pub mod crypto;
 pub mod decrypter;
 pub mod encrypter;
@@ -150,8 +151,8 @@ use subtle::
 #[zeroize(drop)]
 pub struct Grid //GRID FOR REX DATA
 <
-    const W: usize = { options::DEFAULT_GRID_WIDTH },
-    const H: usize = { options::DEFAULT_GRID_HEIGHT },
+    const W: usize = { consts::DEFAULT_GRID_WIDTH },
+    const H: usize = { consts::DEFAULT_GRID_HEIGHT },
 >([[i64; W]; H]);
 
 /// Represents structured errors that can occur during Grid operations.
@@ -447,13 +448,13 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Behavior
     /// Each 64-bit cell is split into two 32-bit halves $v_0, v_1$.
-    /// For [`SUBCELL_ROUNDS`](crate::options::SUBCELL_ROUNDS) iterations, the Feistel-like network applies:
+    /// For [`SUBCELL_ROUNDS`](crate::consts::SUBCELL_ROUNDS) iterations, the Feistel-like network applies:
     ///
     /// $$ v_0 \leftarrow v_0 + (((v_1 \ll 4) \oplus (v_1 \gg 5)) + v_1) \oplus \text{sum} $$
     ///
     /// $$ v_1 \leftarrow v_1 + (((v_0 \ll 4) \oplus (v_0 \gg 5)) + v_0) \oplus \text{sum} $$
     ///
-    /// where $\text{sum}$ is incremented by a constant $\delta = $ [`SUBCELL_DELTA`](crate::options::SUBCELL_DELTA) in each round:
+    /// where $\text{sum}$ is incremented by a constant $\delta = $ [`SUBCELL_DELTA`](crate::consts::SUBCELL_DELTA) in each round:
     ///
     /// $$ \text{sum} \leftarrow \text{sum} + \delta $$
     ///
@@ -478,9 +479,9 @@ impl<const W: usize, const H: usize> Grid<W, H>
 
                 //ARX-LIKE ROUNDS (INSPIRED BY XTEA/TEA)
                 let mut sum: u32 = 0;
-                for _ in 0..(options::SUBCELL_ROUNDS)
+                for _ in 0..(consts::SUBCELL_ROUNDS)
                 {
-                    sum = sum.wrapping_add(options::SUBCELL_DELTA);
+                    sum = sum.wrapping_add(consts::SUBCELL_DELTA);
 
                     //MIX V1 INTO V0
                     v0 = v0.wrapping_add(((v1 << 4) ^ (v1 >> 5)).wrapping_add(v1) ^ sum);

@@ -50,7 +50,7 @@ use hkdf::Hkdf;
 
 use zeroize::Zeroizing;
 
-use why2::options as core_options;
+use why2::consts;
 
 use crate::{ misc, options };
 
@@ -69,7 +69,7 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> options::SharedKe
     let hkdf = Hkdf::<Sha256>::new(None, shared_secret);
 
     //DERIVE KEYS FOR ENCRYPTION & MAC
-    let mut encryption_key = Zeroizing::new(vec![0u8; core_options::DEFAULT_GRID_WIDTH * core_options::DEFAULT_GRID_HEIGHT * 16]);
+    let mut encryption_key = Zeroizing::new(vec![0u8; consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT * 16]);
     let mut mac = Zeroizing::new(vec![0u8; 32]);
 
     //EXPAND
