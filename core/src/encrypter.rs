@@ -40,8 +40,7 @@ use zeroize::Zeroizing;
 use crate::
 {
     crypto,
-    Grid,
-    GridError,
+    grid::{ Grid, GridError },
     types::EncryptedData,
 };
 

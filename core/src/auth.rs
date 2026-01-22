@@ -62,9 +62,8 @@ use zeroize::Zeroize;
 
 use crate::
 {
-    Grid,
-    GridError,
     consts,
+    grid::{ Grid, GridError },
     types::EncryptedData,
 };
 

@@ -23,9 +23,9 @@ pub mod kex;
 
 use why2::
 {
-    Grid,
     encrypter,
     decrypter,
+    grid::Grid,
     types::EncryptedData,
     auth::AuthenticatedData,
 };

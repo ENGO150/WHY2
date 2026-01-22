@@ -22,7 +22,7 @@ use why2::
 {
     encrypter,
     crypto,
-    Grid,
+    grid::Grid,
 };
 
 use std::io::{ self, Write };

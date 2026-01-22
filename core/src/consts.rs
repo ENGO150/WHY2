@@ -30,7 +30,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 /// Do not modify unless you're fully aware of the cryptographic implications.
 pub const ROUND_KEYS: usize = 14;
 
-/// Number of ARX mixing iterations per cell in the [`subcell`](crate::Grid::subcell) transformation.
+/// Number of ARX mixing iterations per cell in the [`subcell`](crate::grid::Grid::subcell) transformation.
 ///
 /// This controls how many rounds of Add-Rotate-XOR are applied to each cell. More rounds
 /// increase diffusion and resistance to pattern leakage.
@@ -42,18 +42,18 @@ pub const SUBCELL_ROUNDS: u32 = 32;
 ///
 /// This is derived from $\lfloor 2^{32} / \varphi \rfloor$, where $\varphi = \frac{1 + \sqrt{5}}{2}$
 /// is the golden ratio. It ensures that each round introduces asymmetry and avoids cyclic patterns in the
-/// [`subcell`](crate::Grid::subcell) transformation.
+/// [`subcell`](crate::grid::Grid::subcell) transformation.
 ///
 /// This value is cryptographically sensitive and should not be changed casually.
 pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
 
-/// The default width ($W$) of the [`Grid`](crate::Grid).
+/// The default width ($W$) of the [`Grid`](crate::grid::Grid).
 ///
 /// This constant defines the number of columns in the standard grid configuration.
 /// Together with [`DEFAULT_GRID_HEIGHT`], it determines the total state size.
 pub const DEFAULT_GRID_WIDTH: usize = 8;
 
-/// The default height ($H$) of the [`Grid`](crate::Grid).
+/// The default height ($H$) of the [`Grid`](crate::grid::Grid).
 ///
 /// This constant defines the number of rows in the standard grid configuration.
 pub const DEFAULT_GRID_HEIGHT: usize = 8;

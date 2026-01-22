@@ -24,7 +24,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use zeroize::{ Zeroize, ZeroizeOnDrop };
 
-use crate::{ consts, Grid };
+use crate::
+{
+    consts,
+    grid::Grid,
+};
 
 /// Container for encrypted output.
 ///
