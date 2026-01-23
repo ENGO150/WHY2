@@ -514,8 +514,26 @@ impl<const W: usize, const H: usize> Grid<W, H>
                     //USE ROTATED COEFFICIENTS BASED ON KEY
                     let coeff_idx = (k + row + rotation) % consts::MC_COEFFICIENTS.len();
 
+                    let coeff: i64;
+
+                    #[cfg(feature = "constant-time")]
+                    {
+                        let mut selected = 0i64;
+                        for (i, &val) in consts::MC_COEFFICIENTS.iter().enumerate()
+                        {
+                            selected.conditional_assign(&val, i.ct_eq(&coeff_idx));
+                        }
+
+                        coeff = selected;
+                    }
+
+                    #[cfg(not(feature = "constant-time"))]
+                    {
+                        coeff = consts::MC_COEFFICIENTS[coeff_idx];
+                    }
+
                     //ACCUMULATE (MDS MIXING)
-                    sum = sum.wrapping_add(self[k][col].wrapping_mul(consts::MC_COEFFICIENTS[coeff_idx]));
+                    sum = sum.wrapping_add(self[k][col].wrapping_mul(coeff));
                 }
 
                 new_grid[row][col] = sum;
