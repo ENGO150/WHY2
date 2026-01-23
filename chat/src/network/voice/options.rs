@@ -41,6 +41,9 @@ pub const DISPLAY_HOLD: usize       = 200;                                      
 
 pub const JITTER_BUFFER_SIZE: usize = 20;                                       //FRAME SIZE OF JITTER BUFFER
 
+pub const GRID_WIDTH: usize         = 4;                                        //GRID WIDTH FOR VOICE PACKETS
+pub const GRID_HEIGHT: usize        = 4;                                        //GRID HEIGHT FOR VOICE PACKETS
+
 //GLOBAL VARIABLES
 #[cfg(feature = "client")]
 static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT -> SERVER)

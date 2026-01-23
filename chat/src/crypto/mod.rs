@@ -45,7 +45,7 @@ pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
     hasher.finalize().into()
 }
 
-pub fn encrypt_packet(packet_bytes: Vec<u8>, keys: &options::SharedKeys) -> Vec<u8>
+pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: Vec<u8>, keys: &options::SharedKeys) -> Vec<u8>
 {
     //CONVERT packet_bytes to BINARY
     let mut input_i64 = Vec::with_capacity((packet_bytes.len() + 7) / 8);
@@ -57,16 +57,16 @@ pub fn encrypt_packet(packet_bytes: Vec<u8>, keys: &options::SharedKeys) -> Vec<
     }
 
     //ENCRYPT
-    let encrypted_data: EncryptedData = encrypter::encrypt(&input_i64, Some(&keys.0)).expect("Encrypting packet failed");
+    let encrypted_data = encrypter::encrypt::<W, H>(&input_i64, Some(&keys.0)).expect("Encrypting packet failed");
 
     //AUTHENTICATE
     AuthenticatedData::authenticate(encrypted_data, keys.1.as_slice().try_into().unwrap()).into()
 }
 
-pub fn decrypt_packet(mut decoded_packet: Vec<u8>, keys: &options::SharedKeys) -> Option<Vec<u8>>
+pub fn decrypt_packet<const W: usize, const H: usize>(mut decoded_packet: Vec<u8>, keys: &options::SharedKeys) -> Option<Vec<u8>>
 {
     //DESERIALIZE
-    let auth_packet: AuthenticatedData = decoded_packet.as_slice().try_into().ok()?;
+    let auth_packet: AuthenticatedData<W, H> = decoded_packet.as_slice().try_into().ok()?;
 
     //VERIFY HMAC
     if !auth_packet.verify(keys.1.as_slice().try_into().ok()?)

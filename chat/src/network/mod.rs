@@ -56,6 +56,8 @@ use wincode::
 
 use colored::Color;
 
+use why2::consts;
+
 use crate::{ crypto, options };
 
 #[cfg(feature = "server")]
@@ -248,7 +250,7 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&opt
 
     let mut final_bytes = if let Some(keys) = keys
     {
-        crypto::encrypt_packet(packet_bytes, keys)
+        crypto::encrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(packet_bytes, keys)
     } else
     {
         obfuscate_data(&packet_bytes) //NO ENCRYPTION, OBFUSCATE
@@ -316,7 +318,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&options::SharedKeys>) -> Op
     //DECRYPT
     if let Some(keys) = keys
     {
-        decoded_packet = match crypto::decrypt_packet(decoded_packet, keys)
+        decoded_packet = match crypto::decrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(decoded_packet, keys)
         {
             Some(d) => d,
             None => //INVALID MAC

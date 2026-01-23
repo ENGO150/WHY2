@@ -115,7 +115,7 @@ pub fn send //SEND DATA TO UDP
     #[cfg(not(feature = "server"))]
     let mut encrypted_bytes: Vec<u8>;
 
-    encrypted_bytes = crypto::encrypt_packet(packet_bytes, keys);
+    encrypted_bytes = crypto::encrypt_packet::< { options::GRID_WIDTH }, { options::GRID_HEIGHT } >(packet_bytes, keys);
 
     //PREPEND ID TO PACKET
     #[cfg(feature = "client")]
@@ -184,7 +184,8 @@ pub fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //RECEIV
         };
 
         //DECRYPT
-        let decrypted_bytes = match crypto::decrypt_packet(buffer[buffer_offset..len].to_vec(), &keys)
+        let decrypted_bytes = match crypto::decrypt_packet::<{ options::GRID_WIDTH }, { options::GRID_HEIGHT }>
+            (buffer[buffer_offset..len].to_vec(), &keys)
         {
             Some(d) => d,
             None => continue
