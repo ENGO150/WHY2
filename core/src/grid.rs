@@ -354,9 +354,9 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// $$ v_1 \leftarrow v_1 + (((v_0 \ll 4) \oplus (v_0 \gg 5)) + v_0) \oplus \text{sum} $$
     ///
-    /// where $\text{sum}$ is incremented by a constant $\delta = $ [`DELTA_32`](crate::consts::DELTA_32) in each round:
+    /// where $\text{sum}$ is incremented by a constant $\delta_{32} = $ [`DELTA_32`](crate::consts::DELTA_32) in each round:
     ///
-    /// $$ \text{sum} \leftarrow \text{sum} + \delta $$
+    /// $$ \text{sum} \leftarrow \text{sum} + \delta_{32} $$
     ///
     /// # Notes
     /// - This method mutates the [`Grid`] in-place.
@@ -468,12 +468,12 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Algorithm
     /// For each column $c$, compute a key-dependent rotation:
-    /// $$ R_c = \left(\sum_{i=0}^{H-1} K_{i,c} \right) \bmod |C| $$
+    /// $$ R_c = \left( \left(\sum_{i=0}^{H-1} K_{i,c} \right) \cdot c \cdot \delta_{64} \right) \bmod |C| $$
     ///
-    /// Then for each row $r$:
-    /// $$ \text{Grid}'[r][c] = \sum_{k=0}^{H-1} \text{Grid}[k][c] \cdot C_{(k+r+R_c) \bmod |C|} $$
-    ///
-    /// Where $C$ are the constants defined in [`MC_COEFFICIENTS`](consts::MC_COEFFICIENTS).
+    /// Where:
+    /// - $K$ is the round key grid.
+    /// - $\delta_{64}$ is the [`DELTA_64`](crate::consts::DELTA_64) constant.
+    /// - $C$ are the constants defined in [`MC_COEFFICIENTS`](crate::consts::MC_COEFFICIENTS).
     ///
     /// # Parameters
     /// - `key_grid`: The round key used to derive column-specific rotations
@@ -482,7 +482,6 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - **MDS-like**: Near-optimal branch number for diffusion
     /// - **Key-dependent**: Each column uses a different coefficient rotation
     /// - **Round-variant**: Different keys produce different transformations
-    /// - **Invertible**: All coefficients are odd, ensuring reversibility
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
