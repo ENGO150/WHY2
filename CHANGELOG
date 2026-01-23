@@ -1,6 +1,10 @@
 Changelog
 =========
 
+v1.4.7:
+- cb01821: update dependencies
+- 5284c89: fix invalid CONFIG_URL const
+
 v1.4.6:
 - ec0d6d4: match code of conduct formatting to contributing file
 - c3fc28e: add security file
