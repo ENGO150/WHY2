@@ -18,9 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! REX Encrypter
 //!
-//! This module defines the full encryption pipeline for WHY2, including Grid shaping,
-//! deterministic shuffling and round-based mixing. It transforms
-//! raw data into encrypted Grid chunks using a symmetric key.
+//! This module defines the full encryption pipeline for WHY2, including Grid shaping
+//! and round-based mixing. It transforms raw data into encrypted Grid chunks using
+//! a symmetric key.
 //!
 //! # Overview
 //! WHY2 encrypts data by converting it into fixed-size grids ([`Grid`]) and applying
@@ -32,9 +32,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! 4. **CTR Mode Encryption**: Each plaintext [`Grid`] is XORed with a keystream
 //! block derived from encrypting the nonce plus block counter.
 
-use rand::{ Rng, SeedableRng };
-use rand_chacha::ChaCha20Rng;
-
 use zeroize::Zeroizing;
 
 use crate::
@@ -43,9 +40,6 @@ use crate::
     grid::{ Grid, GridError },
     types::EncryptedData,
 };
-
-#[cfg(feature = "constant-time")]
-use subtle::{ ConditionallySelectable, ConstantTimeEq };
 
 /// Encrypts a vector of `i64` values.
 ///
@@ -105,43 +99,6 @@ pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]
 
     //SHAPE KEY TO 8x8 GRID
     let key_grid = Grid::<W, H>::from_key(&key_used)?;
-
-    //SHUFFLE INPUT GRID USING DETERMINISTIC PRNG SEEDED BY KEY HASH
-    let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
-    for grid in &mut grids
-    {
-        //FLATTEN CHUNK
-        let mut flattened = Zeroizing::new(grid.iter().flatten().copied().collect::<Vec<i64>>());
-
-        //SHUFFLE
-        for i in (1..flattened.len()).rev()
-        {
-            let j = dprng.random_range(0..=i);
-
-            #[cfg(feature = "constant-time")]
-            {
-                for k in 0..=i
-                {
-                    let is_match = k.ct_eq(&j);
-                    let (a, b) = (flattened[i], flattened[k]);
-
-                    flattened[i].conditional_assign(&b, is_match);
-                    flattened[k].conditional_assign(&a, is_match);
-                }
-            }
-
-            #[cfg(not(feature = "constant-time"))]
-            {
-                flattened.swap(i, j);
-            }
-        }
-
-        //REBUILD
-        for (i, val) in flattened.iter().enumerate()
-        {
-            grid[i / W][i % W] = *val;
-        }
-    }
 
     //GENERATE ROUND KEYS
     let round_keys = crypto::generate_round_keys(&key_grid)?;

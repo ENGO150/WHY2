@@ -18,9 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! REX Decrypter
 //!
-//! This module defines the core decryption for WHY2, including round-key reversal,
-//! Grid unmixing and deterministic unshuffling. It reconstructs
-//! the original data from encrypted Grid chunks using a symmetric key.
+//! This module defines the core decryption for WHY2, including round-key reversal
+//! and Grid unmixing. It reconstructs the original data from encrypted Grid
+//! chunks using a symmetric key.
 //!
 //! # Overview
 //! WHY2 encrypts data by transforming it into fixed-size grids ([`Grid`](crate::grid::Grid)) using
@@ -31,9 +31,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! Since CTR mode is symmetric, the same encryption function is used for both encryption and decryption.
 
-use rand::{ Rng, SeedableRng };
-use rand_chacha::ChaCha20Rng;
-
 use zeroize::Zeroizing;
 
 use crate::
@@ -42,9 +39,6 @@ use crate::
     grid::GridError,
     types::{ EncryptedData, DecryptedData },
 };
-
-#[cfg(feature = "constant-time")]
-use subtle::{ ConstantTimeEq, ConditionallySelectable };
 
 /// Decrypts a WHY2-encrypted data into raw `i64` values.
 ///
@@ -75,76 +69,6 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 
     //APPLY CTR MODE (PARALLEL)
     crypto::apply_ctr(&mut grids, &input.nonce, &round_keys);
-
-    //DE-SHUFFLING VARIABLES
-    let grid_area = W * H; //AREA OF A GRID
-    let mut dprng = ChaCha20Rng::from_seed(crypto::sha256_seed_grid(&key_grid)); //DETERMINISTIC PSEUDO RANDOM NUMBER GENERATOR
-
-    //DE-SHUFFLE INPUT GRIDS USING DPRNG SEEDED BY KEY HASH
-    for grid in &mut grids
-    {
-        //SHUFFLE-MAP
-        let mut shuffle_map = Zeroizing::new((0..grid_area).collect::<Vec<usize>>()); //UNSUFFLED MAP (0, 1, 2 ... 64)
-
-        //SHUFFLE
-        for i in (1..shuffle_map.len()).rev()
-        {
-            let j = dprng.random_range(0..=i);
-
-            #[cfg(feature = "constant-time")]
-            {
-                for k in 0..=i
-                {
-                    let is_match = k.ct_eq(&j);
-
-                    //CAST SHUFFLE MAP TO u64s
-                    let mut val_i = shuffle_map[i] as u64;
-                    let mut val_k = shuffle_map[k] as u64;
-
-                    //SWAP
-                    u64::conditional_swap(&mut val_i, &mut val_k, is_match);
-
-                    //WRITE TO shuffle_map
-                    shuffle_map[i] = val_i as usize;
-                    shuffle_map[k] = val_k as usize;
-                }
-            }
-
-            #[cfg(not(feature = "constant-time"))]
-            {
-                shuffle_map.swap(i, j);
-            }
-        }
-
-        //FLATTEN CHUNK
-        let flattened = Zeroizing::new(grid.iter().flatten().copied().collect::<Vec<i64>>());
-
-        //APPLY INVERSE PERMUTATION
-        let mut unshuffled = Zeroizing::new(vec![0i64; grid_area]);
-        for (i, &shuffled_i) in shuffle_map.iter().enumerate()
-        {
-            #[cfg(feature = "constant-time")]
-            {
-                //O(N) SCAN FOR EACH CELL -> O(N^2)
-                for j in 0..grid_area
-                {
-                    let is_match = j.ct_eq(&shuffled_i);
-                    unshuffled[j].conditional_assign(&flattened[i], is_match);
-                }
-            }
-
-            #[cfg(not(feature = "constant-time"))]
-            {
-                unshuffled[shuffled_i] = flattened[i];
-            }
-        }
-
-        //REBUILD
-        for (i, val) in unshuffled.iter().enumerate()
-        {
-            grid[i / W][i % W] = *val;
-        }
-    }
 
     //FLATTEN Vec<Grid> TO Vec<i64>
     let flattened = Zeroizing::new(grids.iter()
