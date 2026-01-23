@@ -28,7 +28,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 /// of encryption and decryption. Increasing it strengthens diffusion but adds computational cost.
 ///
 /// Do not modify unless you're fully aware of the cryptographic implications.
-pub const ROUND_KEYS: usize = 14;
+pub const ROUND_KEYS: usize = 16;
 
 /// Number of ARX mixing iterations per cell in the [`subcell`](crate::grid::Grid::subcell) transformation.
 ///
