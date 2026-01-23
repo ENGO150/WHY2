@@ -30,11 +30,46 @@ use why2::
     auth::AuthenticatedData,
 };
 
+use zeroize::Zeroizing;
+
+use hkdf::Hkdf;
 use sha2::{ Sha256, Digest };
 
 use crate::options;
 
-//FUNCTIONS
+//PRIVATE
+pub fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) -> Zeroizing<Vec<i64>> //DERIVE VALID KEYDIM USING HKDF
+{
+    //CONVERT KEY TO BYTES
+    let mut key_bytes = Vec::with_capacity(key.len() * 8);
+    for val in key.iter()
+    {
+        key_bytes.extend_from_slice(&val.to_be_bytes());
+    }
+
+    //INIT HKDF
+    let hkdf = Hkdf::<Sha256>::new(None, &key_bytes);
+
+    let required_len = W * H * 2;
+    let needed_bytes = required_len * 8;
+    let mut output_bytes = vec![0u8; needed_bytes];
+
+    //EXPAND
+    hkdf.expand(format!("WHY2-DERIVED-KEY-{W}x{H}").as_bytes(), &mut output_bytes).expect("Key derivation failed");
+
+    //CONVERT BACK TO i64
+    let mut derived_key = Vec::with_capacity(required_len);
+    for chunk in output_bytes.chunks_exact(8)
+    {
+        let mut buf = [0u8; 8];
+        buf.copy_from_slice(chunk);
+        derived_key.push(i64::from_be_bytes(buf));
+    }
+
+    Zeroizing::new(derived_key)
+}
+
+//PUBLIC
 pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 {
     //SHA256
@@ -56,8 +91,18 @@ pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: Vec<u8>, key
         input_i64.push(i64::from_be_bytes(buf));
     }
 
+    //GET VALID KEY
+    let key = if keys.0.len() == W * H * 2
+    {
+        &keys.0
+    } else
+    {
+        &get_correct_key::<W, H>(&keys.0)
+    };
+
     //ENCRYPT
-    let encrypted_data = encrypter::encrypt::<W, H>(&input_i64, Some(&keys.0)).expect("Encrypting packet failed");
+    let encrypted_data = encrypter::encrypt::<W, H>(&input_i64, Some(key))
+        .expect("Encrypting packet failed");
 
     //AUTHENTICATE
     AuthenticatedData::authenticate(encrypted_data, keys.1.as_slice().try_into().unwrap()).into()
@@ -74,11 +119,20 @@ pub fn decrypt_packet<const W: usize, const H: usize>(mut decoded_packet: Vec<u8
         return None;
     }
 
+    //GET VALID KEY
+    let key = if keys.0.len() == W * H * 2
+    {
+        &keys.0
+    } else
+    {
+        &get_correct_key::<W, H>(&keys.0)
+    };
+
     //DECRYPT
     let decrypted_packet = decrypter::decrypt(EncryptedData
     {
         output: auth_packet.encrypted_data.output,
-        key: Grid::from_key(&keys.0).ok()?,
+        key: Grid::from_key(&key).ok()?,
         nonce: auth_packet.encrypted_data.nonce,
     }).ok()?;
 
