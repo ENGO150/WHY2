@@ -241,7 +241,7 @@ pub fn apply_ctr<const W: usize, const H: usize>
             keystream_block ^= round_key;                     //XOR
             keystream_block.subcell(i);                //SUBCELL (ARX)
             keystream_block.shift_rows(round_key);  //SHIFT ROWS
-            keystream_block.mix_columns(round_key); //MIX COLUMNS (MDS)
+            keystream_block.mix_columns(i, round_key); //MIX COLUMNS (MDS)
         }
 
         //XOR KEYSTREAM AND DATA

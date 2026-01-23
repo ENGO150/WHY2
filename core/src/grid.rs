@@ -464,28 +464,38 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// This transformation provides vertical diffusion by treating each column as a vector
     /// and multiplying it by a circulating matrix of large odd coefficients. The matrix
-    /// rotation is derived from the round key, making each round structurally different.
+    /// rotation is derived from both the round key and the round index, making each round
+    /// structurally unique and preventing slide attacks.
     ///
     /// # Algorithm
-    /// For each column $c$, compute a key-dependent rotation:
-    /// $$ R_c = \left( \left(\sum_{i=0}^{H-1} K_{i,c} \right) \cdot c \cdot \delta_{64} \right) \bmod |C| $$
+    /// For each column $c$ in round $r$, compute a key-dependent rotation:
+    /// $$ R_{c,r} = \left( \left(\sum_{i=0}^{H-1} K_{i,c} \right) \cdot c \cdot r \cdot \delta_{64} \right) \bmod |C| $$
     ///
     /// Where:
     /// - $K$ is the round key grid.
+    /// - $c$ is the column index.
+    /// - $r$ is the round index (0-based).
     /// - $\delta_{64}$ is the [`DELTA_64`](crate::consts::DELTA_64) constant.
     /// - $C$ are the constants defined in [`MC_COEFFICIENTS`](crate::consts::MC_COEFFICIENTS).
     ///
+    /// The coefficient selection for matrix multiplication then becomes:
+    /// $$ \text{coeff\_idx} = (k + \text{row} + R_{c,r}) \bmod |C| $$
+    ///
     /// # Parameters
+    /// - `round_index`: The current round number (0 to [`ROUND_KEYS`](crate::consts::ROUND_KEYS) - 1)
     /// - `key_grid`: The round key used to derive column-specific rotations
     ///
     /// # Security Properties
     /// - **MDS-like**: Near-optimal branch number for diffusion
     /// - **Key-dependent**: Each column uses a different coefficient rotation
-    /// - **Round-variant**: Different keys produce different transformations
+    /// - **Round-variant**: Different rounds produce different transformations, preventing slide attacks
+    /// - **Domain separation**: Round index ensures structural uniqueness across rounds
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
-    pub fn mix_columns(&mut self, key_grid: &Grid<W, H>)
+    /// - The round index multiplication prevents related-key attacks by ensuring
+    ///   that identical keys in different rounds still produce distinct transformations.
+    pub fn mix_columns(&mut self, round_index: usize, key_grid: &Grid<W, H>)
     {
         //RESULT BUFFER
         let mut new_grid = [[0i64; W]; H];
@@ -503,6 +513,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
             //USE WRAPPING ARITHMETIC TO STAY IN i64 RANGE
             let rotation = ((key_sum as u64)
                 .wrapping_mul(col as u64)
+                .wrapping_mul(round_index as u64)
                 .wrapping_mul(consts::DELTA_64)) as usize % consts::MC_COEFFICIENTS.len();
 
             for row in 0..H
