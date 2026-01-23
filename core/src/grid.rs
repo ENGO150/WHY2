@@ -479,7 +479,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - $C$ are the constants defined in [`MC_COEFFICIENTS`](crate::consts::MC_COEFFICIENTS).
     ///
     /// The coefficient selection for matrix multiplication then becomes:
-    /// $$ \text{coeff\_idx} = (k + \text{row} + R_{c,r}) \bmod |C| $$
+    /// $$ \text{coeff}\_\text{idx} = (k + \text{row} + R_{c,r}) \bmod |C| $$
     ///
     /// # Parameters
     /// - `round_index`: The current round number (0 to [`ROUND_KEYS`](crate::consts::ROUND_KEYS) - 1)
