@@ -522,17 +522,29 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
-    #[inline]
     pub fn mix_columns(&mut self)
     {
-        for col in 0..(self.width())
+        //RESULT BUFFER
+        let mut new_grid = [[0i64; W]; H];
+
+        for col in 0..W
         {
-            let next_col = (col + 1) % W;
-            for row in 0..self.height()
+            for row in 0..H
             {
-                self[row][col] ^= self[row][next_col];
+                let mut sum: i64 = 0;
+
+                for k in 0..H
+                {
+                    //ACCUMULATE (ARX: Add-Mul)
+                    sum = sum.wrapping_add(self[k][col].wrapping_mul(consts::MC_COEFFICIENTS[(k + row) % consts::MC_COEFFICIENTS.len()]));
+                }
+
+                new_grid[row][col] = sum;
             }
         }
+
+        //STORE RESULT
+        self.0 = new_grid;
     }
 
     /// Applies a matrix-based affine transformation to mix rows.
