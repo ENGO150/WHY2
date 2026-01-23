@@ -354,7 +354,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// $$ v_1 \leftarrow v_1 + (((v_0 \ll 4) \oplus (v_0 \gg 5)) + v_0) \oplus \text{sum} $$
     ///
-    /// where $\text{sum}$ is incremented by a constant $\delta = $ [`SUBCELL_DELTA`](crate::consts::SUBCELL_DELTA) in each round:
+    /// where $\text{sum}$ is incremented by a constant $\delta = $ [`DELTA_32`](crate::consts::DELTA_32) in each round:
     ///
     /// $$ \text{sum} \leftarrow \text{sum} + \delta $$
     ///
@@ -381,7 +381,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
                 let mut sum: u32 = 0;
                 for _ in 0..(consts::SUBCELL_ROUNDS)
                 {
-                    sum = sum.wrapping_add(consts::SUBCELL_DELTA);
+                    sum = sum.wrapping_add(consts::DELTA_32);
 
                     //MIX V1 INTO V0
                     v0 = v0.wrapping_add(((v1 << 4) ^ (v1 >> 5)).wrapping_add(v1) ^ sum);

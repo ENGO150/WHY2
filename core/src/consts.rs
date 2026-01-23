@@ -45,7 +45,14 @@ pub const SUBCELL_ROUNDS: u32 = 32;
 /// [`subcell`](crate::grid::Grid::subcell) transformation.
 ///
 /// This value is cryptographically sensitive and should not be changed casually.
-pub const SUBCELL_DELTA: u32 = 0x9E3779B9;
+pub const DELTA_32: u32 = 0x9E3779B9;
+
+/// Constant used to break symmetry in ARX mixing.
+///
+/// This is derived from $\lfloor 2^{64} / \varphi \rfloor$. See [`DELTA_32`].
+///
+/// This value is cryptographically sensitive and should not be changed casually.
+pub const DELTA_64: u64 = 0x9E3779B97F4A7C15;
 
 /// The default width ($W$) of the [`Grid`](crate::grid::Grid).
 ///
