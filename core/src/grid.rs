@@ -27,10 +27,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! - **Encryption State**: Holding the plaintext/ciphertext during round transformations.
 //!
 //! ## Core Operations
-//! This module implements all arithmetic and logical transformations applied to the state, including:
-//! - **Nonlinear Mixing**: ARX-based [`subcell`](crate::grid::Grid::subcell) operations.
-//! - **Linear Diffusion**: Row shifting, column mixing, and diagonal mixing.
-//! - **Matrix Operations**: Affine transformations via [`mix_matrix`](crate::grid::Grid::mix_matrix).
+//! This module implements all arithmetic and logical transformations applied to the state.
+//! The logic follows a defined SPN (Substitution-Permutation Network) structure:
+//! - **Nonlinear Mixing**: ARX-based [`subcell`](Grid::subcell) operations acting as a variable S-box.
+//! - **Row Permutation**: Cyclical row shifting via [`shift_rows`](Grid::shift_rows) for horizontal diffusion.
+//! - **Column Diffusion**: MDS-based mixing via [`mix_columns`](Grid::mix_columns) for vertical diffusion and high avalanche effect.
 //!
 //! ## Safety & Errors
 //! Grid initialization is strictly validated to ensure cryptographic stability. Invalid dimensions
@@ -39,7 +40,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     result,
-    ops::Range,
     error::Error,
     iter::Flatten,
     array::IntoIter,
@@ -316,57 +316,6 @@ impl<const W: usize, const H: usize> Grid<W, H>
     }
 
     //ENCRYPTION
-    //PRIVATE HANDLERS
-    fn mix_matrix_handler
-    (
-        &mut self,
-        i_range: impl Iterator<Item = usize>,
-        j_range: impl Fn(usize) -> Range<usize>,
-        key_grid: &Grid<W, H>,
-    )
-    {
-        for i in i_range
-        {
-            for j in j_range(i)
-            {
-                let scalar = key_grid[i][j]; //USE KEY VALUE AS COEFFICIENT
-
-                //LWE NOISE
-                let noise = key_grid[j][i].wrapping_add(i as i64);
-
-                for col in 0..self.width()
-                {
-                    let val_j = self[j][col];
-                    let mixing = val_j.wrapping_mul(scalar).wrapping_add(noise); //ADD NOISE
-
-                    //Row[i] = Row[i] + (Row[j] * scalar + noise)
-                    self[i][col] = self[i][col].wrapping_add(mixing); //MIX
-                }
-            }
-        }
-    }
-
-    fn mix_diagonals_handler(&mut self, row: usize, col: usize) //MIX DIAGONALS IN GRID
-    {
-        //COPY PARAMETERS AS MUTABLE
-        let mut row = row;
-        let mut col = col;
-
-        //WALK ALONG THIS DIAGONAL
-        while row < self.height() - 1 && col < self.width() - 1
-        {
-            let next_row = row + 1;
-            let next_col = col + 1;
-
-            //XOR CURRENT CELL WITH NEXT DIAGONAL CELL
-            self[row][col] ^= self[next_row][next_col];
-
-            row = next_row;
-            col = next_col;
-        }
-    }
-
-    //PUBLIC
     /// Computes the cell-wise XOR of two Grids.
     ///
     /// This function takes two [`Grid`]s of equal dimensions and modifies the [`Grid`] in-place:
@@ -511,14 +460,18 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    /// Applies column-wise mixing to the grid using linear XOR diffusion.
+    /// Applies column-wise mixing using an MDS-like matrix transformation.
     ///
-    /// This transformation modifies each column by XORing it with its adjacent column,
-    /// introducing horizontal diffusion across the grid.
+    /// This transformation provides vertical diffusion by treating each column as a vector
+    /// and multiplying it by a circulating matrix of large odd coefficients.
+    /// This ensures that a change in a single cell affects all other cells in the same column.
     ///
     /// # Behavior
-    /// For each column $c \in \{0, \dots, W-1\}$, compute:
-    /// $$ G_{r, c} \leftarrow G_{r, c} \oplus G_{r, (c + 1) \bmod W} $$
+    /// For each column $c$ and row $r$, the new value is computed as:
+    ///
+    /// $$ \text{Grid}'[r][c] = \sum_{k=0}^{H-1} \text{Grid}[k][c] \cdot C_{(k+r) \bmod |C|} $$
+    ///
+    /// Where $C$ are the constants defined in [`MC_COEFFICIENTS`](consts::MC_COEFFICIENTS).
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
@@ -545,61 +498,6 @@ impl<const W: usize, const H: usize> Grid<W, H>
 
         //STORE RESULT
         self.0 = new_grid;
-    }
-
-    /// Applies a matrix-based affine transformation to mix rows.
-    ///
-    /// This function treats the [`Grid`] as a matrix and multiplies it by a key-dependent transformation
-    /// matrix, while adding a deterministic noise term. This converts the transformation from
-    /// purely linear ($Ax$) to affine:
-    ///
-    /// $$ G' = (L \cdot U) \cdot G + \text{noise} $$
-    ///
-    /// To ensure the operation is reversible (invertible) in modular arithmetic, the transformation
-    /// is constructed as a product of a **Lower triangular matrix ($L$)** and an **Upper triangular matrix ($U$)**.
-    ///
-    /// # Behavior
-    /// - **Lower Pass ($L$):** Each row adds a multiple of previous rows ($i > j$).
-    /// - **Upper Pass ($U$):** Each row adds a multiple of following rows ($i < j$).
-    ///
-    /// # Notes
-    /// - This method mutates the [`Grid`] in-place.
-    /// - All additions and multiplications are wrapping (modulo $2^{64}$).
-    pub fn mix_matrix(&mut self, key_grid: &Grid<W, H>)
-    {
-        //LOWER TRIANGULAR PASS (TOP -> DOWN)
-        self.mix_matrix_handler(1..H, |i| 0..i, key_grid);
-
-        //UPPER TRIANGULAR PASS (BOTTOM -> UP)
-        self.mix_matrix_handler((0..H - 1).rev(), |i| (i + 1)..H, key_grid);
-    }
-
-    /// Applies diagonal-wise mixing to the grid using XOR diffusion.
-    ///
-    /// This transformation modifies each diagonal line by XORing each element with
-    /// the next element along that diagonal.
-    ///
-    /// # Behavior
-    /// - Processes all diagonals parallel to the main diagonal.
-    /// - For each cell $(r, c)$, compute:
-    ///   $$ G_{r,c} \leftarrow G_{r,c} \oplus G_{r+1, c+1} $$
-    ///
-    /// # Notes
-    /// - This method mutates the grid in-place.
-    #[inline]
-    pub fn mix_diagonals(&mut self)
-    {
-        //PROCESS DIAGONALS BEGINNING IN THE FIRST COLUMN
-        for start_row in 0..self.height()
-        {
-            self.mix_diagonals_handler(start_row, 0);
-        }
-
-        //PROCESS DIAGONALS STARTING FROM THE FIRST ROW (EXCLUDING [0,0])
-        for start_col in 1..self.width()
-        {
-            self.mix_diagonals_handler(0, start_col);
-        }
     }
 
     //UTILS

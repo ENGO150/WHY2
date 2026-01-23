@@ -239,11 +239,9 @@ pub fn apply_ctr<const W: usize, const H: usize>
         for (i, round_key) in round_keys[1..].iter().enumerate()
         {
             keystream_block ^= round_key;                    //XOR
-            keystream_block.subcell(i);               //SUBCELL
+            keystream_block.subcell(i);               //SUBCELL (ARX)
             keystream_block.shift_rows(round_key); //SHIFT ROWS
-            keystream_block.mix_columns();                   //MIX COLUMNS
-            keystream_block.mix_diagonals();                 //MIX DIAGONALS
-            keystream_block.mix_matrix(round_key); //MIX MATRIX
+            keystream_block.mix_columns();                   //MIX COLUMNS (MDS)
         }
 
         //XOR KEYSTREAM AND DATA
