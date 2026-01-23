@@ -1,6 +1,24 @@
 Changelog
 =========
 
+v1.4.8:
+- 6a05524: add icons to rustdoc
+- 4af3d1e: fix MixColumns coeff LaTeX notation
+- a9aa293: use round_index in MixColumns
+- 28c6861: remove redundant input grid shuffling
+- db4fc59: use valid 4x4 keys on voice
+- f89cfec: use 4x4 Grid for voice packets
+- 7c76279: use conditional compilation for auth_test
+- 7990c7b: implement CT for MixColumns
+- 766f7a9: use delta variations in Grid rustdoc
+- 2faac6f: introduce key dependent rotation to MixColumns
+- 6e60e5f: rename SUBCELL_DELTA to DELTA_32
+- f8e32b5: increase round iterations to 16
+- bafabaf: add encryption_test note for large text
+- 5f7cf70: remove MixColumns & MixMatrix operations
+- 59cbeb3: implement MDS MixColumns
+- 8ca2508: update prebuilt binaries link
+
 v1.4.7:
 - cb01821: update dependencies
 - 5284c89: fix invalid CONFIG_URL const
