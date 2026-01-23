@@ -40,6 +40,7 @@ irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nul
 pariatur 🔒🔐🛡️";
 
 //LARGE - 10+ GRIDS FOR PARALLEL ENCRYPTION TEST
+//(NOTE THAT THE TEXT MAY NOT BE UP-TO-DATE WITH LATEST WHY2 IMPLEMENTATION)
 const TEST_TEXT_LARGE: &str = "\
 The WHY2 encryption system represents a modern approach to cryptographic security, \
 combining grid-based transformations with ARX (Add-Rotate-XOR) operations. Unlike \
