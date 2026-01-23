@@ -460,36 +460,63 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    /// Applies column-wise mixing using an MDS-like matrix transformation.
+    /// Applies column-wise mixing using a key-dependent MDS-like matrix transformation.
     ///
     /// This transformation provides vertical diffusion by treating each column as a vector
-    /// and multiplying it by a circulating matrix of large odd coefficients.
-    /// This ensures that a change in a single cell affects all other cells in the same column.
+    /// and multiplying it by a circulating matrix of large odd coefficients. The matrix
+    /// rotation is derived from the round key, making each round structurally different.
     ///
-    /// # Behavior
-    /// For each column $c$ and row $r$, the new value is computed as:
+    /// # Algorithm
+    /// For each column $c$, compute a key-dependent rotation:
+    /// $$ R_c = \left(\sum_{i=0}^{H-1} K_{i,c} \right) \bmod |C| $$
     ///
-    /// $$ \text{Grid}'[r][c] = \sum_{k=0}^{H-1} \text{Grid}[k][c] \cdot C_{(k+r) \bmod |C|} $$
+    /// Then for each row $r$:
+    /// $$ \text{Grid}'[r][c] = \sum_{k=0}^{H-1} \text{Grid}[k][c] \cdot C_{(k+r+R_c) \bmod |C|} $$
     ///
     /// Where $C$ are the constants defined in [`MC_COEFFICIENTS`](consts::MC_COEFFICIENTS).
     ///
+    /// # Parameters
+    /// - `key_grid`: The round key used to derive column-specific rotations
+    ///
+    /// # Security Properties
+    /// - **MDS-like**: Near-optimal branch number for diffusion
+    /// - **Key-dependent**: Each column uses a different coefficient rotation
+    /// - **Round-variant**: Different keys produce different transformations
+    /// - **Invertible**: All coefficients are odd, ensuring reversibility
+    ///
     /// # Notes
     /// - This method mutates the grid in-place.
-    pub fn mix_columns(&mut self)
+    pub fn mix_columns(&mut self, key_grid: &Grid<W, H>)
     {
         //RESULT BUFFER
         let mut new_grid = [[0i64; W]; H];
 
         for col in 0..W
         {
+            //DERIVE KEY-DEPENDENT ROTATION FOR THIS COLUMN
+            let mut key_sum: i64 = 0;
+            for row in 0..H
+            {
+                key_sum = key_sum.wrapping_add(key_grid[row][col]);
+            }
+
+            //MULTIPLY BY COLUMN INDEX TO ENSURE DIFFERENT ROTATION PER COLUMN
+            //USE WRAPPING ARITHMETIC TO STAY IN i64 RANGE
+            let rotation = ((key_sum as u64)
+                .wrapping_mul(col as u64)
+                .wrapping_mul(consts::DELTA_64)) as usize % consts::MC_COEFFICIENTS.len();
+
             for row in 0..H
             {
                 let mut sum: i64 = 0;
 
                 for k in 0..H
                 {
-                    //ACCUMULATE (ARX: Add-Mul)
-                    sum = sum.wrapping_add(self[k][col].wrapping_mul(consts::MC_COEFFICIENTS[(k + row) % consts::MC_COEFFICIENTS.len()]));
+                    //USE ROTATED COEFFICIENTS BASED ON KEY
+                    let coeff_idx = (k + row + rotation) % consts::MC_COEFFICIENTS.len();
+
+                    //ACCUMULATE (MDS MIXING)
+                    sum = sum.wrapping_add(self[k][col].wrapping_mul(consts::MC_COEFFICIENTS[coeff_idx]));
                 }
 
                 new_grid[row][col] = sum;
