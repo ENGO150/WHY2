@@ -90,6 +90,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! WHY2 is licensed under the GNU GPLv3. You are free to use, modify, and redistribute it
 //! under the terms of the license. See <https://www.gnu.org/licenses/> for details.
 
+//DOCS
+#![doc(html_logo_url = "https://why2.satan.red/apple-icon.png")]
+#![doc(html_favicon_url = "https://why2.satan.red/icon-dark-32x32.png")]
+
 //MODULES
 #[cfg(feature = "auth")]
 pub mod auth;
