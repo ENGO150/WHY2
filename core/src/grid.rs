@@ -514,7 +514,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
             let rotation = ((key_sum as u64)
                 .wrapping_mul(col as u64)
                 .wrapping_mul(round_index as u64)
-                .wrapping_mul(consts::DELTA_64)) as usize % consts::MC_COEFFICIENTS.len();
+                .wrapping_mul(consts::DELTA_64)) as usize & (consts::MC_COEFFICIENTS.len() - 1);
 
             for row in 0..H
             {
@@ -523,7 +523,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
                 for k in 0..H
                 {
                     //USE ROTATED COEFFICIENTS BASED ON KEY
-                    let coeff_idx = (k + row + rotation) % consts::MC_COEFFICIENTS.len();
+                    let coeff_idx = (k + row + rotation) & (consts::MC_COEFFICIENTS.len() - 1);
 
                     let coeff: i64;
 
