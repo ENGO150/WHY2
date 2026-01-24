@@ -87,7 +87,7 @@ use crate::
 /// - The MAC is computed over the serialized grids (nonce + ciphertext).
 /// - The nonce is included in the authenticated data to ensure freshness.
 /// - This structure preserves the original grid structure for easy decryption.
-#[derive(Zeroize)]
+#[derive(Zeroize, Clone)]
 pub struct AuthenticatedData
 <
     const W: usize = { consts::DEFAULT_GRID_WIDTH },

@@ -44,7 +44,7 @@ use crate::
 /// # Notes
 /// - The key is stored in [`Grid`] form for direct use in round key generation.
 /// - The nonce does not need to be kept secret but must be unique per encryption.
-#[derive(Zeroize)]
+#[derive(Zeroize, Clone)]
 pub struct EncryptedData //DATA FOR REX ENCRYPTER
 <
     const W: usize = { consts::DEFAULT_GRID_WIDTH },
