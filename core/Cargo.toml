@@ -35,6 +35,7 @@ rayon = "1.11.0"
 zeroize = { workspace = true }
 subtle = { version = "2.6.1", optional = true }
 hmac = { version = "0.12.1", optional = true }
+wide = "1.1.1"
 
 [features]
 default = ["constant-time", "auth"]
