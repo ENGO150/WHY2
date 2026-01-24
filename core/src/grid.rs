@@ -324,7 +324,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Parameters
     /// - `key_grid`: Input Grid for XOR
-    #[inline]
+    #[inline(always)]
     pub fn xor_grids(&mut self, key_grid: &Grid<W, H>)
     {
         for y in 0..(self.height()) //Y DIM
@@ -362,6 +362,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - This method mutates the [`Grid`] in-place.
     /// - It is inspired by TEA/XTEA but adapted for WHY2’s [`Grid`] architecture.
     /// - The transformation is deterministic for a given round and [`Grid`] state.
+    #[inline(always)]
     pub fn subcell(&mut self, round: usize)
     {
         //APPLY ON EACH CELL
@@ -412,7 +413,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
-    #[inline]
+    #[inline(always)]
     pub fn shift_rows(&mut self, key_grid: &Grid<W, H>)
     {
         #[cfg(not(feature = "constant-time"))]
@@ -495,6 +496,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - This method mutates the grid in-place.
     /// - The round index multiplication prevents related-key attacks by ensuring
     ///   that identical keys in different rounds still produce distinct transformations.
+    #[inline(always)]
     pub fn mix_columns(&mut self, round_index: usize, key_grid: &Grid<W, H>)
     {
         //RESULT BUFFER
@@ -578,6 +580,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// # Security
     /// - When the **`constant-time`** feature is enabled, this function always iterates
     ///   through the entire grid to prevent timing leaks via carry propagation analysis.
+    #[inline(always)]
     pub fn increment(&mut self, amount: &mut u64)
     {
         for row in self.iter_mut()
