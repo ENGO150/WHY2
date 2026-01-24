@@ -327,14 +327,9 @@ impl<const W: usize, const H: usize> Grid<W, H>
     #[inline(always)]
     pub fn xor_grids(&mut self, key_grid: &Grid<W, H>)
     {
-        for y in 0..(self.height()) //Y DIM
-        {
-            for x in 0..(self.width()) //X DIM
-            {
-                //XOR
-                self[y][x] ^= key_grid[y][x];
-            }
-        }
+        self.0.iter_mut().flatten()
+            .zip(key_grid.0.iter().flatten())
+            .for_each(|(a, b)| *a ^= *b);
     }
 
     /// Applies nonlinear ARX-style mixing to each cell in the grid.
