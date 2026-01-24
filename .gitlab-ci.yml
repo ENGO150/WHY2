@@ -18,6 +18,7 @@ image: rust:latest
 
 stages:
   - test
+  - bench
   - build
   - aur
 
@@ -75,6 +76,21 @@ test-why2-legacy:
     - development
   script:
     - cargo test -p why2 legacy_encrypt_decrypt --features legacy --verbose --release -- --nocapture
+
+# Comprehensive Benchmark
+benchmark-why2:
+  stage: bench
+  image: rust:latest
+  only:
+    - stable
+  tags:
+    - rpi
+  cache:
+    key: "why2-bench-cache"
+    paths:
+      - target/criterion
+  script:
+    - cargo bench --bench comprehensive --verbose
 
 # Build chat for linux
 build-why2-chat-linux:
