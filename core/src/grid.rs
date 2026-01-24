@@ -294,28 +294,28 @@ impl<const W: usize, const H: usize> Grid<W, H>
     }
 
     /// Returns an iterator over rows in the Grid
-    #[inline]
+    #[inline(always)]
     pub fn iter(&self) -> Iter<'_, [i64; W]>
     {
         self.0.iter()
     }
 
     /// Returns a mutable iterator over rows in the Grid
-    #[inline]
+    #[inline(always)]
     pub fn iter_mut(&mut self) -> IterMut<'_, [i64; W]>
     {
         self.0.iter_mut()
     }
 
     /// Returns width (number of columns) in the Grid
-    #[inline]
+    #[inline(always)]
     pub fn width(&self) -> usize
     {
         W
     }
 
     /// Returns height (number of rows) in the Grid
-    #[inline]
+    #[inline(always)]
     pub fn height(&self) -> usize
     {
         H
@@ -413,6 +413,32 @@ impl<const W: usize, const H: usize> Grid<W, H>
             let res_vec: i64x4 = (v1 << 32) | v0;
             let res_arr: [i64; 4] = res_vec.into();
             chunk.copy_from_slice(&res_arr);
+        }
+
+        //SCALAR FALLBACK (WHEN (W * H) % 4 != 0)
+        //SAME LOGIC AS SIMD, I WON'T BOTHER COMMENTING :)
+        for cell in chunks_iter.into_remainder()
+        {
+            let x = *cell as u64;
+            let mut v0 = (x & 0xFFFF_FFFF) as u32;
+            let mut v1 = ((x >> 32) & 0xFFFF_FFFF) as u32;
+
+            v0 ^= round as u32;
+            let mut sum: u32 = 0;
+
+            for _ in 0..consts::SUBCELL_ROUNDS
+            {
+                sum = sum.wrapping_add(consts::DELTA_32);
+
+                let t1 = ((v1 << 4) ^ (v1 >> 5)).wrapping_add(v1) ^ sum;
+                v0 = v0.wrapping_add(t1);
+
+                let t2 = ((v0 << 4) ^ (v0 >> 5)).wrapping_add(v0) ^ sum;
+                v1 = v1.wrapping_add(t2);
+            }
+
+            v1 ^= round as u32;
+            *cell = (((v1 as u64) << 32) | (v0 as u64)) as i64;
         }
     }
 
