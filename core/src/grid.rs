@@ -43,14 +43,18 @@ use std::
     error::Error,
     iter::Flatten,
     array::IntoIter,
-    slice::{ Iter, IterMut },
+    slice::
+    {
+        self,
+        Iter,
+        IterMut,
+    },
     ops::
     {
         Index,
         IndexMut,
         BitXorAssign,
     },
-
     fmt::
     {
         Display,
@@ -62,6 +66,10 @@ use std::
 
 use zeroize::Zeroize;
 
+use wide::i64x4;
+
+use crate::consts;
+
 #[cfg(feature = "constant-time")]
 use subtle::
 {
@@ -69,8 +77,6 @@ use subtle::
     ConstantTimeEq,
     ConditionallySelectable,
 };
-
-use crate::consts;
 
 //TYPES
 /// A 2D matrix of 64-bit signed integers used as the core data structure in WHY2 encryption.
@@ -360,39 +366,53 @@ impl<const W: usize, const H: usize> Grid<W, H>
     #[inline(always)]
     pub fn subcell(&mut self, round: usize)
     {
-        //APPLY ON EACH CELL
-        for col in self.iter_mut()
+        //CONVERT DATA TO u64 SLICE
+        let data: &mut [i64] = unsafe
         {
-            for cell in col
+            slice::from_raw_parts_mut(self.0.as_mut_ptr() as *mut i64, W * H)
+        };
+
+        //256-BIT AVX / 2x128-BiT NEON
+        let mut chunks_iter = data.chunks_exact_mut(4);
+
+        //CONSTS FOR i64x4
+        let mask_low = i64x4::splat(0xFFFF_FFFF);
+        let delta = i64x4::splat(consts::DELTA_32 as i64);
+        let round_tweak = i64x4::splat(round as i64);
+
+        //APPLY ON EACH CELL
+        for chunk in &mut chunks_iter
+        {
+            //SPLIT CELL TO HIGH32 AND LOW32
+            let x = i64x4::from(&chunk[..]);
+            let mut v0 = x & mask_low; //LOW
+            let mut v1 = (x >> 32) & mask_low; //HIGH
+
+            //XOR TWEAK -> MAKE ROUNDS DIFFERENT
+            v0 ^= round_tweak;
+
+            //ARX-LIKE ROUNDS (INSPIRED BY XTEA/TEA)
+            let mut sum = i64x4::ZERO;
+            for _ in 0..consts::SUBCELL_ROUNDS
             {
-                //SPLIT CELL TO HIGH32 AND LOW32
-                let x = *cell as u64;
-                let mut v0 = (x & 0xFFFF_FFFF) as u32; //LOW
-                let mut v1 = ((x >> 32) & 0xFFFF_FFFF) as u32; //HIGH
+                sum += delta;
 
-                //XOR TWEAK -> MAKE ROUNDS DIFFERENT
-                v0 ^= round as u32;
+                //MIX V1 INTO V0
+                let t1 = ((v1 << 4) ^ (v1 >> 5)) + v1 ^ sum;
+                v0 = (v0 + t1) & mask_low;
 
-                //ARX-LIKE ROUNDS (INSPIRED BY XTEA/TEA)
-                let mut sum: u32 = 0;
-                for _ in 0..(consts::SUBCELL_ROUNDS)
-                {
-                    sum = sum.wrapping_add(consts::DELTA_32);
-
-                    //MIX V1 INTO V0
-                    v0 = v0.wrapping_add(((v1 << 4) ^ (v1 >> 5)).wrapping_add(v1) ^ sum);
-
-                    //MIX V0 INTO V1
-                    v1 = v1.wrapping_add(((v0 << 4) ^ (v0 >> 5)).wrapping_add(v0) ^ sum);
-                }
-
-                //XOR TWEAK
-                v1 ^= round as u32;
-
-                //REBUILD AND APPLY
-                let out = ((v1 as u64) << 32) | (v0 as u64);
-                *cell = out as i64;
+                //MIX V0 INTO V1
+                let t2 = ((v0 << 4) ^ (v0 >> 5)) + v0 ^ sum;
+                v1 = (v1 + t2) & mask_low;
             }
+
+            //XOR TWEAK
+            v1 ^= round_tweak;
+
+            //RECONSTRUCT AND STORE
+            let res_vec: i64x4 = (v1 << 32) | v0;
+            let res_arr: [i64; 4] = res_vec.into();
+            chunk.copy_from_slice(&res_arr);
         }
     }
 
