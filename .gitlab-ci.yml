@@ -81,8 +81,10 @@ test-why2-legacy:
 benchmark-why2:
   stage: bench
   image: rust:latest
-  only:
-    - stable
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "stable" && $CI_SERVER_URL == "https://git.satan.red"'
+      when: always
+    - when: never
   tags:
     - rpi
   cache:
@@ -91,6 +93,8 @@ benchmark-why2:
       - target/criterion
   script:
     - cargo bench --bench comprehensive --verbose
+    - rm -rf /report/*
+    - cp -r target/criterion/* /report/
 
 # Build chat for linux
 build-why2-chat-linux:
