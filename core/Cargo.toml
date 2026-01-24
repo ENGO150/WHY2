@@ -50,6 +50,11 @@ legacy = []
 features = ["legacy"]
 rustdoc-args = ["--html-in-header", "docs-header.html"]
 
+[[bench]]
+name = "comprehensive"
+path = "../benches/comprehensive.rs"
+harness = false
+
 [[example]]
 name = "basic_encryption"
 path = "../examples/basic_encryption.rs"
