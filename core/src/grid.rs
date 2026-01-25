@@ -67,6 +67,7 @@ use std::
 use zeroize::Zeroize;
 
 use wide::i64x4;
+use rayon::prelude::{ ParallelSlice, ParallelIterator };
 
 use crate::consts;
 
@@ -276,7 +277,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
             return Err(GridError::InvalidByteLength { expected_mod: matrix_size, actual_len: bytes.len() });
         }
 
-        bytes.chunks(matrix_size).map(|chunk|
+        bytes.par_chunks(matrix_size).map(|chunk|
         {
             let mut grid = Grid::new()?;
             for j in 0..H
