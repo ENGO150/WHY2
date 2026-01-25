@@ -455,52 +455,107 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    /// Applies row-wise shifting to the [`Grid`] based on a key [`Grid`].
+    /// Precomputes row shift amounts from the current Grid state.
     ///
-    /// This transformation rotates each row of the [`Grid`] by a variable amount derived from
-    /// the corresponding row in `key_grid`. The shift amount $S_i$ for row $i$ is computed as:
+    /// This function derives a deterministic shift value for each row by XOR-folding
+    /// all elements in that row and applying a modulo operation. The resulting array
+    /// can be reused across multiple rounds or operations without redundant computation.
     ///
-    /// $$ S_i = \left( \bigoplus_{j=0}^{W-1} K_{i,j} \right) \bmod W $$
+    /// # Algorithm
+    /// For each row $i$, the shift amount $S_i$ is computed as:
     ///
-    /// # Behavior
-    /// - Each row is rotated left by $S_i$.
+    /// $$ H_i = \bigoplus_{j=0}^{W-1} G_{i,j} $$
     ///
-    /// # Notes
-    /// - This method mutates the grid in-place.
+    /// **Constant-time variant:**
+    /// $$ S_i = \left\lfloor \frac{H_i \cdot W}{2^{64}} \right\rfloor $$
+    ///
+    /// **Non-constant-time variant:**
+    /// $$ S_i = H_i \bmod W $$
+    ///
+    /// where $G_{i,j}$ represents the cell at row $i$, column $j$.
+    ///
+    /// # Returns
+    /// An array of length $H$ containing shift amounts in the range $[0, W)$ for each row.
+    ///
+    /// # Security Notes
+    /// - The constant-time variant uses Barrett reduction to prevent timing attacks.
+    /// - The XOR-fold ensures each row's shift is influenced by all cells in that row.
+    /// - Output shifts are deterministic for a given Grid state.
+    ///
+    /// # Performance
+    /// This function should be called once per round key, not per grid, to avoid
+    /// redundant computation. The precomputed shifts can be reused for all grids
+    /// in a single encryption/decryption round.
     #[inline(always)]
-    pub fn shift_rows(&mut self, key_grid: &Grid<W, H>)
+    pub fn precalculate_shifts(&self) -> [usize; H]
     {
-        #[cfg(not(feature = "constant-time"))]
-        let rows = self.width() as i64;
+        let mut shifts = [0usize; H];
 
         //SHIFT EACH ROW
-        for (i, row) in self.iter_mut().enumerate()
+        for (i, row) in self.iter().enumerate()
         {
-            let hash_chunk = key_grid[i].iter().fold(0i64, |acc, &x| acc ^ x);
-            let shift: usize;
+            let hash_chunk = row.iter().fold(0i64, |acc, &x| acc ^ x);
 
             #[cfg(feature = "constant-time")]
             {
-                shift = ((hash_chunk as u64 as u128 * W as u128) >> 64) as usize;
+                shifts[i] = ((hash_chunk as u64 as u128 * W as u128) >> 64) as usize;
             }
 
             #[cfg(not(feature = "constant-time"))]
             {
                 //SPLIT key_grid TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
-                shift = hash_chunk.rem_euclid(rows) as usize;
+                shifts[i] = hash_chunk.rem_euclid(W as i64) as usize;
             }
+        }
+
+        shifts
+    }
+
+    /// Applies precomputed row-wise shifting to the Grid.
+    ///
+    /// This transformation rotates each row of the Grid left by a precalculated amount,
+    /// providing horizontal diffusion.
+    ///
+    /// # Algorithm
+    /// For each row $i$, apply a left rotation by shift amount $S_i$:
+    ///
+    /// $$ R'_i = \text{RotateLeft}(R_i, S_i) $$
+    ///
+    /// where $R_i$ is the original row and $R'_i$ is the transformed row.
+    ///
+    /// # Parameters
+    /// - `shifts`: A precomputed array of shift amounts for each row, typically obtained
+    ///   from [`precalculate_shifts`](Self::precalculate_shifts) called on a round key Grid.
+    ///
+    /// # Security Notes
+    /// - The constant-time implementation prevents side-channel attacks via memory access patterns.
+    /// - Shift amounts must come from a cryptographically secure source (e.g., round keys).
+    /// - This operation is reversible if shift amounts are known.
+    ///
+    /// # Notes
+    /// - This method mutates the Grid in-place.
+    /// - The shifts array must have exactly $H$ elements.
+    /// - All shift values must be in the range $[0, W)$.
+    #[inline(always)]
+    pub fn shift_rows(&mut self, shifts: &[usize; H])
+    {
+        //SHIFT EACH ROW
+        for (i, row) in self.iter_mut().enumerate()
+        {
+            #[cfg(not(feature = "constant-time"))]
+            if shifts[i] == 0 { continue; }
 
             //ROTATE THE ROW
             #[cfg(feature = "constant-time")]
             {
                 let mut new_row = [0i64; W]; //BUFFER
 
-                for i in 0..W
+                for x in 0..W
                 {
-                    let target_src_idx = (i + shift) % W;
+                    let target_src_idx = (x + shifts[i]) % W;
                     for src_idx in 0..W
                     {
-                        new_row[i].conditional_assign(&row[src_idx], src_idx.ct_eq(&target_src_idx));
+                        new_row[x].conditional_assign(&row[src_idx], src_idx.ct_eq(&target_src_idx));
                     }
                 }
 
@@ -510,7 +565,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
 
             #[cfg(not(feature = "constant-time"))]
             {
-                row.rotate_left(shift);
+                row.rotate_left(shifts[i]);
             }
         }
     }
