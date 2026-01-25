@@ -330,12 +330,47 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Parameters
     /// - `key_grid`: Input Grid for XOR
+    ///
+    /// # Implementation
+    /// Uses SIMD acceleration to process 4 cells simultaneously when possible.
     #[inline(always)]
     pub fn xor_grids(&mut self, key_grid: &Grid<W, H>)
     {
-        self.0.iter_mut().flatten()
-            .zip(key_grid.0.iter().flatten())
-            .for_each(|(a, b)| *a ^= *b);
+        //CONVERT TO FLAT SLICES
+        let self_data: &mut [i64] = unsafe
+        {
+            slice::from_raw_parts_mut(self.0.as_mut_ptr() as *mut i64, W * H)
+        };
+
+        let key_data: &[i64] = unsafe
+        {
+            slice::from_raw_parts(key_grid.0.as_ptr() as *const i64, W * H)
+        };
+
+        //SIMD LOOP (4xi64 AT ONCE [256 BITS])
+        let mut chunks = self_data.chunks_exact_mut(4);
+        let mut key_chunks = key_data.chunks_exact(4);
+
+        for (self_chunk, key_chunk) in chunks.by_ref().zip(key_chunks.by_ref())
+        {
+            let mut self_arr = [0i64; 4];
+            self_arr.copy_from_slice(self_chunk);
+            let self_vec = i64x4::from(self_arr);
+
+            let mut key_arr = [0i64; 4];
+            key_arr.copy_from_slice(key_chunk);
+            let key_vec = i64x4::from(key_arr);
+
+            let result_vec = self_vec ^ key_vec;
+            let result_arr: [i64; 4] = result_vec.into();
+            self_chunk.copy_from_slice(&result_arr);
+        }
+
+        //SCALAR FALLBACK
+        for (s, k) in chunks.into_remainder().iter_mut().zip(key_chunks.remainder())
+        {
+            *s ^= k;
+        }
     }
 
     /// Applies nonlinear ARX-style mixing to each cell in the grid.
