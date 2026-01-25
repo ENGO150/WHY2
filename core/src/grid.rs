@@ -756,25 +756,34 @@ impl<const W: usize, const H: usize> Grid<W, H>
     #[inline(always)]
     pub fn increment(&mut self, amount: &mut u64)
     {
-        for row in self.iter_mut()
+        //FLATTEN
+        let data: &mut [i64] = unsafe
         {
-            for cell in row.iter_mut()
+            slice::from_raw_parts_mut(self.0.as_mut_ptr() as *mut i64, W * H)
+        };
+
+        let mut carry = *amount;
+        for cell in data.iter_mut()
+        {
+            let (result, overflow) = (*cell as u64).overflowing_add(carry);
+            *cell = result as i64;
+
+            //NO CARRY (OVERFLOW), DONE
+            #[cfg(not(feature = "constant-time"))]
             {
-                let (result, overflow) = (*cell as u64).overflowing_add(*amount);
-                *cell = result as i64;
-
-                //NO CARRY (OVERFLOW), DONE
-                #[cfg(not(feature = "constant-time"))]
-                {
-                    if !overflow { return; }
-                    *amount = 1;
-                }
-
-                #[cfg(feature = "constant-time")]
-                {
-                    *amount = overflow as u64;
-                }
+                if !overflow { return; }
+                carry = 1;
             }
+
+            #[cfg(feature = "constant-time")]
+            {
+                carry = overflow as u64;
+            }
+        }
+
+        #[cfg(feature = "constant-time")]
+        {
+            *amount = carry;
         }
     }
 }
