@@ -1,6 +1,29 @@
 Changelog
 =========
 
+v1.4.9:
+- abdf4d5: update dependencies
+- dac24de: remove chat from rustdocs
+- c518016: optimize Grid::increment
+- 620e592: parallelize Grid::from_bytes
+- f3044f3: use RUSTFLAGS for gitlab benchmarking
+- 73208ac: implement SIMD for Xor Grid operation
+- 5f856a3: implement shift precalculation in WHY2 implementation
+- af6d83f: precalculate row shifts before running ShiftRows
+- 21717b4: store criterion report locally
+- 52fa23a: add why2 bench to gitlab pipelines
+- b05cd46: add comprehensive benchmark
+- 81e02dd: add criterion dev-dependency
+- be3dbca: implement SIMD for MixColumns
+- 8d650c4: implement scalar fallback for Subcell
+- a277d1c: implement SIMD for Subcell
+- 80e0831: add wide dependency
+- c6a44dd: decrease SUBCELL_ROUND to 4
+- 5bb3b02: optimize XOR Grid operation
+- f6d74a6: use inlining for heavy Grid operations
+- ca4b54b: replace MixColumns modulus with BitAnd
+- 405a3aa: implement Clone trait for WHY2 data structures
+
 v1.4.8:
 - 6a05524: add icons to rustdoc
 - 4af3d1e: fix MixColumns coeff LaTeX notation

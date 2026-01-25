@@ -2372,7 +2372,7 @@ dependencies = [
 
 [[package]]
 name = "why2"
-version = "1.4.8"
+version = "1.4.9"
 dependencies = [
  "criterion",
  "hmac",
@@ -2387,7 +2387,7 @@ dependencies = [
 
 [[package]]
 name = "why2-chat"
-version = "1.4.8"
+version = "1.4.9"
 dependencies = [
  "argon2",
  "audiopus",
