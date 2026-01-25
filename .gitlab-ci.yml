@@ -92,7 +92,7 @@ benchmark-why2:
     paths:
       - target/criterion
   script:
-    - cargo bench --bench comprehensive --verbose
+    - RUSTFLAGS="-C target-cpu=native" cargo bench --bench comprehensive --verbose
     - rm -rf /report/*
     - cp -r target/criterion/* /report/
 
