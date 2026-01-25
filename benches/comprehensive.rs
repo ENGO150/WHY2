@@ -70,11 +70,12 @@ fn bench_grid_internals(c: &mut Criterion)
     });
 
     //SHIFT ROWS
+    let shifts = key_grid.precalculate_shifts();
     group.bench_function("ShiftRows", |b|
     {
         b.iter(||
         {
-            black_box(&mut grid).shift_rows(black_box(&key_grid));
+            black_box(&mut grid).shift_rows(black_box(&shifts));
         })
     });
 
