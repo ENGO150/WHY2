@@ -677,7 +677,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// for the coefficients is provided by the `rotations` array.
     ///
     /// The coefficient selection for matrix multiplication at row $i$ for column $c$ is:
-    /// $$ \text{coeff}\_\text{idx} = (k + i + \text{rotations}[c]) \bmod |C| $$
+    /// $$ \text{coeff}\_\text{idx} = (k + i + \text{rotations}\[c\]) \bmod |C| $$
     ///
     /// # Parameters
     /// - `rotations`: An array of column-specific rotation indices, typically obtained
