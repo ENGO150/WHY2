@@ -1,6 +1,18 @@
 Changelog
 =========
 
+v1.4.10:
+- 0d9a0eb: fix chat readme license link
+- fd7d44d: remove chat mentions from rex readme
+- 11672bd: link chat readme in Cargo
+- 104a672: add chat readme
+- 7419cbe: englishify operation rustdocs
+- ca7900e: expand architecture section in security doc
+- 8835012: modernize rustdoc main page
+- 3087225: fix MixColumns rustdoc unresolved link
+- 8b251bc: implement rotation precalculation in comprehensive benchmark
+- 58e5e1c: precalculate rotations for MixColumns
+
 v1.4.9:
 - abdf4d5: update dependencies
 - dac24de: remove chat from rustdocs
