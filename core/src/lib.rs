@@ -18,50 +18,82 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! # WHY2
 //!
-//! WHY2 is a modern, fast, and secure encryption crate designed for privacy-first applications.
+//! WHY2 is a modern, high-performance symmetric encryption system designed for
+//! privacy-first applications where transparency and freedom are non-negotiable.
 //!
-//! ## Design Overview
-//! The WHY2 encryption algorithm is loosely inspired by AES, but with a twist. Instead of relying on S-boxes,
-//! WHY2 uses a nonlinear ARX-style transformation (Addition, Rotation, XOR) for symmetric diffusion.
+//! ## What is WHY2?
 //!
-//! Key mechanics include:
-//! - **Grid-based State**: Input and key data are formatted into 2D grids of 64-bit cells.
-//! - **Key Expansion**: The key grid is shuffled and seeded to generate round keys.
-//! - **Nonlinear Mixing**: Each round applies a transformation to the input grids using round tweaks to ensure variability.
+//! WHY2 is a **grid-based block cipher** that organizes data into configurable
+//! 2D matrices of 64-bit cells. Unlike traditional table-based designs, it achieves
+//! nonlinearity through **ARX operations** (Add-Rotate-XOR), eliminating cache-timing
+//! vulnerabilities inherent to lookup table approaches.
 //!
-//! This crate serves as the core cryptographic backend, providing primitives for encryption, decryption,
-//! and authentication.
+//! The cipher uses a **Substitution-Permutation Network** structure with multiple
+//! rounds of mixing operations, combining nonlinear transformations with linear
+//! diffusion layers. Encryption is performed in **Counter (CTR) mode**, enabling
+//! parallel processing of multiple blocks.
+//!
+//! ## Key Characteristics
+//!
+//! - **Configurable Block Sizes**: From 4×4 to 16×16 grids (1024-16384 bits per block)
+//! - **Cache-Timing Resistant**: ARX-based design eliminates table lookups
+//! - **SIMD-Optimized**: Vectorized operations for modern CPUs (AVX2, NEON)
+//! - **Constant-Time**: All cryptographic operations avoid timing side-channels
+//! - **Memory-Safe**: Pure Rust implementation prevents buffer overflows
+//! - **Parallel Encryption**: CTR mode enables multi-core processing
+//!
+//! ## Design Philosophy
+//!
+//! WHY2 draws from established cryptographic principles while introducing
+//! innovations suited for modern hardware:
+//!
+//! - **SPN Architecture**: Proven approach used by standardized ciphers
+//! - **ARX Operations**: Memory-hard-free construction (inspired by TEA/XTEA/Salsa20)
+//! - **Key-Dependent Transformations**: Enhanced security through round-variant operations
+//! - **Native 64-bit Operations**: Optimized for contemporary processor architectures
+//!
+//! For detailed security architecture and implementation specifics, see the
+//! [SECURITY](https://git.satan.red/ENGO150/WHY2/-/blob/stable/SECURITY) documentation.
 //!
 //! ## Features
-//! - Grid-based encryption with customizable layout
-//! - ARX-style nonlinear mixing instead of S-boxes
-//! - Round-key generation from seeded, shuffled keys
-//! - Authenticated data integrity via HMAC-SHA256 (optional)
-//! - Maximal customization
+//!
+//! - Grid-based encryption with customizable dimensions
+//! - ARX-style nonlinear mixing (cache-timing resistant)
+//! - SIMD-accelerated operations (4× i64 vector processing)
+//! - Round-key expansion via ChaCha20 CSPRNG
+//! - Optional authenticated encryption (HMAC-SHA256)
+//! - Constant-time implementation (via `subtle` crate)
+//! - Memory safety through Rust ownership system
+//! - Automatic key material zeroization on drop
 //!
 //! ## Cargo Features
 //!
 //! This crate allows selective enabling of components to keep the build lightweight.
 //!
 //! - **`auth`** (default):
-//!   Enables the [`auth`] module for verifying data integrity and authenticity using an Encrypt-then-MAC scheme (HMAC-SHA256).
+//!   Enables the [`auth`] module for verifying data integrity and authenticity using an
+//!   Encrypt-then-MAC scheme (HMAC-SHA256).
 //!
 //! - **`constant-time`** (default):
 //!   Enables constant-time comparison for cryptographic operations using the [`subtle`] crate.
-//!   Disabling this may improve performance on non-sensitive data but opens the system to timing attacks.
+//!   Disabling this may improve performance on non-sensitive data but opens the system to
+//!   timing attacks.
 //!
 //! - **`legacy`**:
-//!   Enables the deprecated `legacy` module containing older, insecure versions of the encryption routines.
-//!   This feature should only be used for migration or compatibility testing.
+//!   Enables the deprecated [`legacy`] module containing older, insecure versions of the
+//!   encryption routines. This feature should only be used for migration or compatibility testing.
 //!
 //! ## Philosophy
+//!
 //! - **Privacy is a right**, not a subscription feature.
-//! - **No government insight**: no telemetry, no backdoors, no metadata leakage.
+//! - **No government oversight**: no telemetry, no backdoors, no metadata leakage.
 //! - **No payment required**: encryption should be free as in freedom.
+//! - **Full transparency**: all design decisions documented, all code auditable.
 //!
 //! ## Terminology
 //!
-//! The codebase is organized to distinguish between the current implementation and deprecated versions:
+//! The codebase is organized to distinguish between the current implementation and
+//! deprecated versions:
 //!
 //! * **REX**: Refers to the modern, secure implementation of the WHY2 algorithm.
 //! These are the modules exposed directly at the crate root (e.g., [`encrypter`], [`decrypter`]).
