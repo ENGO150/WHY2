@@ -17,31 +17,42 @@ strive to send you regular updates about our progress.
 
 2. SECURITY ARCHITECTURE & FEATURES
 -----------------------------------
-WHY2 is designed with a "defense-in-depth" approach, leveraging modern Rust
-features and cryptographic best practices where possible. However, it relies on
-a custom cryptographic primitive.
+WHY2 implements defense-in-depth through multiple cryptographic layers and
+secure implementation practices.
 
-A) Cryptographic Primitives
-   - Algorithm: WHY2 (REX) is a symmetric block cipher based on a configurable
-     Grid (matrix) of 64-bit cells.
-   - Design Principle: ARX (Add-Rotate-XOR) network for nonlinear mixing.
-     No S-boxes are used, eliminating cache-timing attacks related to memory lookups.
-   - Mode of Operation: CTR (Counter) mode is used for encryption.
-   - Randomness: Uses ChaCha20Rng (via `rand` crate) for CSPRNG requirements.
+A) Core Algorithm Design
+   - **Cipher Type**: Symmetric block cipher with configurable grid dimensions
+   - **Block Structure**: 2D matrix of 64-bit signed integers (i64)
+   - **Default Size**: 8×8 grid (4096-bit blocks), customizable to 2×2 through 16×16+
+
+   **Nonlinear Layer (SubCell)**:
+   - ARX (Add-Rotate-XOR) construction inspired by TEA/XTEA
+   - Operates on 32-bit halves via Feistel-like network
+   - 4 rounds per cell with golden ratio constant (DELTA_32)
+   - **Security Benefit**: No lookup tables → immune to cache-timing attacks
+
+   **Diffusion Layers**:
+   - ShiftRows: Key-dependent row rotations (not fixed like in AES)
+   - MixColumns: MDS matrix with 16 irrational-derived coefficients
+   - Key mixing: XOR with ChaCha20-expanded round keys
+
+   **Mode**: Counter (CTR) with grid-based nonce + block index
 
 B) Implementation Security
-   - Memory Safety: Written in pure Rust to prevent buffer overflows and
-     memory-related vulnerabilities.
-   - Secure Erasure: Implements the `zeroize` trait to scrub sensitive data
-     (keys, plaintexts, grids) from memory immediately after use.
-   - Constant-Time Execution: The core mixing functions (subcell, shift_rows)
-     implement constant-time logic when the `constant-time` feature is enabled.
+   - **Memory Safety**: Pure Rust prevents buffer overflows and use-after-free
+   - **Secure Erasure**: `zeroize` trait scrubs sensitive data on drop
+   - **Constant-Time Execution**:
+     * Conditional operations use `subtle` crate's CT primitives
+     * Grid::increment, shift_rows, coefficient selection all CT when enabled
+     * Barrett reduction for modulo operations
+   - **SIMD Optimizations**: Vectorized operations (4× i64) without timing leaks
 
-C) Integrity & Authenticity
-   - Encrypt-then-MAC: The `auth` module implements a standard Encrypt-then-MAC scheme.
-   - Algorithm: Uses HMAC-SHA256 to guarantee data integrity and authenticity.
-   - Verification: MAC verification is performed in constant time before any
-     decryption takes place.
+C) Authenticated Encryption
+   - **Construction**: Encrypt-then-MAC (EtM)
+   - **MAC Algorithm**: HMAC-SHA256
+   - **Tag Size**: 256 bits (32 bytes)
+   - **Verification**: Constant-time comparison via `Mac::verify_slice`
+   - **Key Separation**: Encryption and MAC keys MUST be independently derived
 
 3. SECURITY LIMITATIONS & RISK ASSESSMENT
 -----------------------------------------
