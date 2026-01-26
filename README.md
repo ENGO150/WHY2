@@ -41,21 +41,21 @@ fn main()
 }
 ```
 
-##  Links:
+## Links
 
-- Chat Downloads
-  - [Prebuilt Binaries](https://github.com/ENGO150/WHY2/actions/workflows/build.yml)
-  - [Arch Linux](https://aur.archlinux.org/packages/why2)
 - [API Documentation](https://docs.rs/why2)
+- [Examples Directory](https://git.satan.red/ENGO150/WHY2/-/tree/stable/examples)
+- [Security Policy](https://git.satan.red/ENGO150/WHY2/-/blob/stable/SECURITY)
+- [Contributing Guidelines](https://git.satan.red/ENGO150/WHY2/-/blob/stable/CONTRIBUTING)
 
 ## Getting Help
 For help, DM me directly on [Discord](https://discord.com/users/634385503956893737) :)
 
-## Warning
-WHY2 is an experimental algorithm loosely inspired by
-AES. It has not undergone formal cryptographic audit.
-Use for educational purposes and personal privacy experiments, not for high-assurance systems or
-production environments where security is critical.
+## Security Notice
+
+WHY2 is an **experimental symmetric encryption algorithm**. While it employs
+proven cryptographic techniques (SPN structure, ARX operations, MDS mixing),
+it has **not been formally audited or peer-reviewed**.
 
 #### License
 <sup>
