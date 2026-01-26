@@ -27,8 +27,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! - **Encryption State**: Holding the plaintext/ciphertext during round transformations.
 //!
 //! ## Core Operations
-//! This module implements all arithmetic and logical transformations applied to the state.
-//! The logic follows a defined SPN (Substitution-Permutation Network) structure:
+//! This module implements the fundamental transformations of the WHY2 cipher.
+//! The architecture follows a Substitution-Permutation Network (SPN) pattern:
 //! - **Nonlinear Mixing**: ARX-based [`subcell`](Grid::subcell) operations acting as a variable S-box.
 //! - **Row Permutation**: Cyclical row shifting via [`shift_rows`](Grid::shift_rows) for horizontal diffusion.
 //! - **Column Diffusion**: MDS-based mixing via [`mix_columns`](Grid::mix_columns) for vertical diffusion and high avalanche effect.

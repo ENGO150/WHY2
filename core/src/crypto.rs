@@ -16,9 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//! # REX Crypto
+//! # REX Crypto Utilities
 //!
-//! This module contains cryptographic utilities, used by REX module
+//! Provides key derivation, round key expansion, and CTR mode application
+//! for the WHY2 encryption system.
 
 use sha2::{ Sha256, Digest };
 
