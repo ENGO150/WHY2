@@ -606,30 +606,83 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
+    /// Precomputes column rotation amounts for the MixColumns step.
+    ///
+    /// This function derives a deterministic rotation index for each column by summing
+    /// its elements and mixing them with the column index and round number. The resulting
+    /// array allows [`mix_columns`](Self::mix_columns) to skip redundant calculations
+    /// during bulk encryption.
+    ///
+    /// # Algorithm
+    /// For each column $c$, the rotation amount $Rot_c$ is computed as:
+    ///
+    /// $$ K_c = \sum_{r=0}^{H-1} G_{r,c} $$
+    ///
+    /// $$ Rot_c = (K_c \cdot c \cdot \text{round} \cdot \delta_{64}) \bmod |C| $$
+    ///
+    /// where $G_{r,c}$ is the key cell at row $r$, column $c$, and $|C|$ is the size
+    /// of the coefficient table.
+    ///
+    /// # Parameters
+    /// - `round_index`: The current round number (0 to [`ROUND_KEYS`](crate::consts::ROUND_KEYS) - 1).
+    ///   This ensures domain separation between rounds.
+    ///
+    /// # Returns
+    /// An array of length $W$ containing rotation indices for the coefficient matrix.
+    ///
+    /// # Security Notes
+    /// - The inclusion of `round_index` prevents related-key attacks where identical
+    ///   keys in different rounds could produce identical transformations.
+    /// - The operation is deterministic and does not use external randomness.
+    ///
+    /// # Performance
+    /// This function should be called once per round key setup. The resulting array
+    /// can be reused for processing millions of blocks in CTR mode without re-deriving
+    /// the rotations.
+    #[inline(always)]
+    pub fn precalculate_rotations(&self, round_index: usize) -> [usize; W]
+    {
+        const MASK: usize = consts::MC_COEFFICIENTS.len() - 1;
+        let mut rotations = [0usize; W];
+
+        for col in 0..W
+        {
+            //DERIVE KEY-DEPENDENT ROTATION FOR THIS COLUMN
+            let mut key_sum: i64 = 0;
+            for row in 0..H
+            {
+                key_sum = key_sum.wrapping_add(self[row][col]);
+            }
+
+            //MULTIPLY BY COLUMN INDEX TO ENSURE DIFFERENT ROTATION PER COLUMN
+            rotations[col] = ((key_sum as u64)
+                .wrapping_mul(col as u64)
+                .wrapping_mul(round_index as u64)
+                .wrapping_mul(consts::DELTA_64)) as usize & MASK;
+        }
+
+        rotations
+    }
+
     /// Applies column-wise mixing using a key-dependent MDS-like matrix transformation.
     ///
     /// This transformation provides vertical diffusion by treating each column as a vector
     /// and multiplying it by a circulating matrix of large odd coefficients. The matrix
-    /// rotation is derived from both the round key and the round index, making each round
-    /// structurally unique and preventing slide attacks.
+    /// rotation is derived from the round key and round index (via precalculated rotations),
+    /// making each round structurally unique.
     ///
     /// # Algorithm
-    /// For each column $c$ in round $r$, compute a key-dependent rotation:
-    /// $$ R_{c,r} = \left( \left(\sum_{i=0}^{H-1} K_{i,c} \right) \cdot c \cdot r \cdot \delta_{64} \right) \bmod |C| $$
+    /// The transformation multiplies the column vector by a circulating matrix defined by
+    /// [`MC_COEFFICIENTS`](crate::consts::MC_COEFFICIENTS). The starting offset (rotation)
+    /// for the coefficients is provided by the `rotations` array.
     ///
-    /// Where:
-    /// - $K$ is the round key grid.
-    /// - $c$ is the column index.
-    /// - $r$ is the round index (0-based).
-    /// - $\delta_{64}$ is the [`DELTA_64`](crate::consts::DELTA_64) constant.
-    /// - $C$ are the constants defined in [`MC_COEFFICIENTS`](crate::consts::MC_COEFFICIENTS).
-    ///
-    /// The coefficient selection for matrix multiplication then becomes:
-    /// $$ \text{coeff}\_\text{idx} = (k + \text{row} + R_{c,r}) \bmod |C| $$
+    /// The coefficient selection for matrix multiplication at row $i$ for column $c$ is:
+    /// $$ \text{coeff}\_\text{idx} = (k + i + \text{rotations}[c]) \bmod |C| $$
     ///
     /// # Parameters
-    /// - `round_index`: The current round number (0 to [`ROUND_KEYS`](crate::consts::ROUND_KEYS) - 1)
-    /// - `key_grid`: The round key used to derive column-specific rotations
+    /// - `rotations`: An array of column-specific rotation indices, typically obtained
+    ///   from [`precalculate_rotations`](Self::precalculate_rotations). These encapsulate
+    ///   the dependency on the round key and round index.
     ///
     /// # Implementation
     /// The function uses SIMD acceleration to process 4 coefficients at once during the
@@ -638,19 +691,18 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// table lookups to prevent timing side-channels.
     ///
     /// # Security Properties
-    /// - **MDS-like**: Near-optimal branch number for diffusion
-    /// - **Key-dependent**: Each column uses a different coefficient rotation
-    /// - **Round-variant**: Different rounds produce different transformations, preventing slide attacks
-    /// - **Domain separation**: Round index ensures structural uniqueness across rounds
-    /// - **Constant-time**: When enabled, coefficient lookup is timing-attack resistant
+    /// - **MDS-like**: Near-optimal branch number for diffusion.
+    /// - **Key-dependent**: Each column uses a different coefficient rotation (encoded in `rotations`).
+    /// - **Round-variant**: Rotations depend on the round index, preventing slide attacks.
+    /// - **Constant-time**: When enabled, coefficient lookup is timing-attack resistant.
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
-    /// - The round index multiplication prevents related-key attacks by ensuring
-    ///   that identical keys in different rounds still produce distinct transformations.
+    /// - Using precalculated rotations avoids redundant key summation during bulk encryption,
+    ///   significantly improving throughput in CTR mode.
     /// - SIMD optimization provides moderate speedup (1.5-2×) for the accumulation phase.
     #[inline(always)]
-    pub fn mix_columns(&mut self, round_index: usize, key_grid: &Grid<W, H>)
+    pub fn mix_columns(&mut self, rotations: &[usize; W])
     {
         const MASK: usize = consts::MC_COEFFICIENTS.len() - 1;
 
@@ -666,19 +718,8 @@ impl<const W: usize, const H: usize> Grid<W, H>
                 col_in[r] = self[r][col];
             }
 
-            //DERIVE KEY-DEPENDENT ROTATION FOR THIS COLUMN
-            let mut key_sum: i64 = 0;
-            for row in 0..H
-            {
-                key_sum = key_sum.wrapping_add(key_grid[row][col]);
-            }
-
-            //MULTIPLY BY COLUMN INDEX TO ENSURE DIFFERENT ROTATION PER COLUMN
-            //USE WRAPPING ARITHMETIC TO STAY IN i64 RANGE
-            let rotation = ((key_sum as u64)
-                .wrapping_mul(col as u64)
-                .wrapping_mul(round_index as u64)
-                .wrapping_mul(consts::DELTA_64)) as usize & MASK;
+            //GET ROTATION FOR THIS COLUMN
+            let rotation = rotations[col];
 
             for row in 0..H
             {
