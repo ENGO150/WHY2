@@ -246,8 +246,7 @@ See [CONTRIBUTING](https://git.satan.red/ENGO150/WHY2/-/blob/stable/CONTRIBUTING
 
 WHY2 Chat is licensed under the **GNU GPLv3**.
 
-You are free to use, modify, and redistribute it under the terms of the license.
-See [LICENSE](../LICENSE) or <https://www.gnu.org/licenses/> for details.
+You are free to use, modify, and redistribute it under the terms of the license. See <a href="https://www.gnu.org/licenses/" target="_blank">https://www.gnu.org/licenses/</a> for details.
 
 ---
 
