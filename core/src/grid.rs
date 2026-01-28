@@ -165,6 +165,29 @@ pub enum GridError
     },
 }
 
+//MACROS
+macro_rules! subcell //SUBCELL CORE LOGIC
+{
+    ($v0:ident, $v1:ident, $sum:ident, $delta:expr, $round_tweak:expr, $mask:expr) =>
+    {
+        //XOR TWEAK -> MAKE ROUNDS DIFFERENT
+        $v0 = ($v0 ^ $round_tweak) & $mask;
+
+        //ARX-LIKE ROUNDS (INSPIRED BY XTEA/TEA)
+        for _ in 0..consts::SUBCELL_ROUNDS
+        {
+            $sum += $delta;
+
+            //MIX
+            $v0 = ($v0 + ((($v1 << 4) ^ ($v1 >> 5)) + $v1 ^ $sum)) & $mask; //MIX V1 INTO V0
+            $v1 = ($v1 + ((($v0 << 4) ^ ($v0 >> 5)) + $v0 ^ $sum)) & $mask; //MIX V0 INTO V1
+        }
+
+        //XOR TWEAK
+        $v1 = ($v1 ^ $round_tweak) & $mask;
+    }
+}
+
 //IMPLEMENTATIONS
 /// Implementation of core Grid operations for fixed-size grids.
 ///
@@ -416,47 +439,29 @@ impl<const W: usize, const H: usize> Grid<W, H>
         //256-BIT AVX / 2x128-BiT NEON
         let mut chunks_iter = data.chunks_exact_mut(4);
 
-        //SIMD CONSTS
-        let mask_low = i64x4::splat(0xFFFF_FFFF);
-        let delta = i64x4::splat(consts::DELTA_32 as i64);
-        let round_tweak = i64x4::splat(round as i64);
-
         //SIMD LOOP
+        let mask_simd = i64x4::splat(0xFFFF_FFFF); //LOW MASK FOR SIMD
         for chunk in &mut chunks_iter
         {
             //LOAD 4 i64 VALUES
-            let x = i64x4::new
-            ([
-                chunk[0],
-                chunk[1],
-                chunk[2],
-                chunk[3],
-            ]);
+            let x = i64x4::new([chunk[0], chunk[1], chunk[2], chunk[3]]);
 
             //SPLIT CELL TO HIGH32 AND LOW32
-            let mut v0 = x & mask_low; //LOW
-            let mut v1 = (x >> 32) & mask_low; //HIGH
+            let mut v0 = x & mask_simd; //LOW
+            let mut v1 = (x >> 32) & mask_simd; //HIGH
 
-            //XOR TWEAK -> MAKE ROUNDS DIFFERENT
-            v0 ^= round_tweak;
-
-            //ARX-LIKE ROUNDS (INSPIRED BY XTEA/TEA)
             let mut sum = i64x4::ZERO;
-            for _ in 0..consts::SUBCELL_ROUNDS
-            {
-                sum += delta;
 
-                //MIX V1 INTO V0
-                let t1 = ((v1 << 4) ^ (v1 >> 5)) + v1 ^ sum;
-                v0 = (v0 + t1) & mask_low;
-
-                //MIX V0 INTO V1
-                let t2 = ((v0 << 4) ^ (v0 >> 5)) + v0 ^ sum;
-                v1 = (v1 + t2) & mask_low;
-            }
-
-            //XOR TWEAK
-            v1 ^= round_tweak;
+            //MIX
+            subcell!
+            (
+                v0,
+                v1,
+                sum,
+                i64x4::splat(consts::DELTA_32 as i64),
+                i64x4::splat(round as i64),
+                mask_simd
+            );
 
             //RECONSTRUCT AND STORE
             let res_vec: i64x4 = (v1 << 32) | v0;
@@ -465,28 +470,28 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
 
         //SCALAR FALLBACK (WHEN (W * H) % 4 != 0)
-        //SAME LOGIC AS SIMD, I WON'T BOTHER COMMENTING :)
+        let mask_scalar = 0xFFFF_FFFF;
         for cell in chunks_iter.into_remainder()
         {
+            //SPLIT CELL TO HIGH32 AND LOW32
             let x = *cell as u64;
-            let mut v0 = (x & 0xFFFF_FFFF) as u32;
-            let mut v1 = ((x >> 32) & 0xFFFF_FFFF) as u32;
+            let mut v0 = (x & mask_scalar) as u32;
+            let mut v1 = ((x >> 32) & mask_scalar) as u32;
 
-            v0 ^= round as u32;
-            let mut sum: u32 = 0;
+            let mut sum = 0u32;
 
-            for _ in 0..consts::SUBCELL_ROUNDS
-            {
-                sum = sum.wrapping_add(consts::DELTA_32);
+            //MIX
+            subcell!
+            (
+                v0,
+                v1,
+                sum,
+                consts::DELTA_32,
+                round as u32,
+                mask_scalar as u32
+            );
 
-                let t1 = ((v1 << 4) ^ (v1 >> 5)).wrapping_add(v1) ^ sum;
-                v0 = v0.wrapping_add(t1);
-
-                let t2 = ((v0 << 4) ^ (v0 >> 5)).wrapping_add(v0) ^ sum;
-                v1 = v1.wrapping_add(t2);
-            }
-
-            v1 ^= round as u32;
+            //RECONSTRUCT AND STORE
             *cell = (((v1 as u64) << 32) | (v0 as u64)) as i64;
         }
     }
