@@ -26,8 +26,9 @@ use std::
     env,
     thread,
     process,
-    io::{ self, Write },
     net::TcpStream,
+    time::Duration,
+    io::{ self, Write },
     sync::
     {
         mpsc,
@@ -37,6 +38,7 @@ use std::
     },
 };
 
+use socket2::{ Socket, TcpKeepalive };
 use socks::Socks5Stream;
 
 use crossterm::
@@ -484,6 +486,13 @@ fn main()
             process::exit(1);
         }
     };
+
+    //SET KEEP-ALIVE
+    let socket = Socket::from(stream);
+    socket.set_tcp_keepalive(&TcpKeepalive::new()
+        .with_time(Duration::from_secs(60))
+        .with_interval(Duration::from_secs(10))).expect("Failed to set KEEPALIVE");
+    stream = socket.into();
 
     //SET TCP_NODELAY
     stream.set_nodelay(true).expect("Failed to set TCP_NODELAY");
