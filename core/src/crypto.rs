@@ -209,9 +209,7 @@ pub fn generate_nonce<const W: usize, const H: usize>() -> Result<Grid<W, H>, Gr
 ///    * **Key Addition**: $B \leftarrow B \oplus K_r$
 ///    * **Nonlinear Mixing**: $B \leftarrow \text{Subcell}(B, r)$
 ///    * **Row Permutation**: $B \leftarrow \text{ShiftRows}(B, K_r)$
-///    * **Column Diffusion**: $B \leftarrow \text{MixColumns}(B)$
-///    * **Diagonal Diffusion**: $B \leftarrow \text{MixDiagonals}(B)$
-///    * **Matrix Mixing**: $B \leftarrow \text{MixMatrix}(B, K_r)$
+///    * **Column Diffusion**: $B \leftarrow \text{MixColumns}(B, K_r)$
 ///
 /// # Parameters
 /// - `grids`: A mutable slice of [`Grid`]s representing the plaintext or ciphertext.
