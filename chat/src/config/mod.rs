@@ -50,9 +50,18 @@ fn config_path(filename: &str) -> String //GET CONFIGURATION PATH
     misc::get_why2_dir() + filename
 }
 
-fn fetch_config(filename: &str) -> String //FETCH CONFIG FROM GIT
+fn get_config() -> &'static str //GET CONFIG FROM BINARY
 {
-    misc::fetch_data(&(options::CONFIG_URL.to_owned() + filename)).expect("Fetching config failed")
+    //TODO: FIGURE OUT A BETTER WAY TO USE CONSTANTS
+    #[cfg(feature = "client")]
+    {
+        include_str!("./client.toml")
+    }
+
+    #[cfg(feature = "server")]
+    {
+        include_str!("./server.toml")
+    }
 }
 
 fn get_data(path: &str) -> DocumentMut //GET DocumentMut FROM path
@@ -84,7 +93,7 @@ where
     }
 
     //key NOT FOUND IN CONFIG, FETCH CONFIG AND INSERT NEW KEY
-    let mut new_config: DocumentMut = fetch_config(filename).parse().expect("Failed to parse config");
+    let mut new_config: DocumentMut = get_config().parse().expect("Failed to parse config");
 
     //LOAD OLD CONFIG
     for (key, old_value) in data.as_table()
@@ -149,7 +158,7 @@ pub fn init_config() //INITIALIZE CONFIG FILES
         {
             let mut config_file = File::create(config_path).expect("Failed to create WHY2 config"); //CREATE CONFIG
 
-            let mut config = Cursor::new(fetch_config(filename));
+            let mut config = Cursor::new(get_config());
             io::copy(&mut config, &mut config_file).expect("Failed writing to config file");
         }
     }

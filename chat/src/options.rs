@@ -39,7 +39,6 @@ pub const CONFIG_DIR: &str          = "/WHY2";                                  
 pub const SERVER_CONFIG: &str       = "/server.toml";                                                         //SERVER CONFIG FILE
 pub const CLIENT_CONFIG: &str       = "/client.toml";                                                         //CLIENT CONFIG FILE
 pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                   //SERVER USERS CONFIG FILE
-pub const CONFIG_URL: &str          = "https://git.satan.red/ENGO150/WHY2/-/raw/development/chat/src/config"; //CONFIG FILE DOWNLOAD URL
 
 pub const SERVER_KEYS_CONFIG: &str  = "/server_keys.toml";                                                    //SERVER PUBKEY CONFIG FILE
 pub const SERVER_KEYS_DIR: &str     = "/server_keys";                                                         //SERVER KEYS DIRECTORY
