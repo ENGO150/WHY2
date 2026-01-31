@@ -62,7 +62,7 @@ fn main()
 
     //CONFIGURATION
     misc::check_version(); //CHECK WHY2 VERSION
-    config::init_server_config(); //CREATE server.toml CONFIGURATION
+    config::init_config(); //CREATE server.toml CONFIGURATION
     kex::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
 
     //CHECK IF VOICE IS ENABLED

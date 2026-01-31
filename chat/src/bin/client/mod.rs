@@ -403,7 +403,7 @@ fn main()
 
     //CONFIGURATION
     misc::check_version(&tx); //CHECK WHY2 VERSION
-    config::init_client_config(); //CREATE client.toml CONFIGURATION
+    config::init_config(); //CREATE client.toml CONFIGURATION
 
     //CHECK FOR PARAMETERS
     if let Some(arg) = env::args().nth(1)

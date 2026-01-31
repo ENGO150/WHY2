@@ -55,20 +55,6 @@ fn fetch_config(filename: &str) -> String //FETCH CONFIG FROM GIT
     misc::fetch_data(&(options::CONFIG_URL.to_owned() + filename)).expect("Fetching config failed")
 }
 
-fn init_config(filename: &str) //CREATE CONFIG IF MISSING
-{
-    misc::check_directory(); //CREATE USER CONFIG DIRECTORY IF MISSING
-
-    let config_path = config_path(filename);
-    if !Path::new(&config_path).is_file()
-    {
-        let mut config_file = File::create(config_path).expect("Failed to create WHY2 config"); //CREATE CONFIG
-
-        let mut config = Cursor::new(fetch_config(filename));
-        io::copy(&mut config, &mut config_file).expect("Failed writing to config file");
-    }
-}
-
 fn get_data(path: &str) -> DocumentMut //GET DocumentMut FROM path
 {
     let content = fs::read_to_string(path).expect("Failed to read config"); //READ CONFIG FILE
@@ -140,28 +126,51 @@ fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
 }
 
 //PUBLIC
-#[cfg(feature = "server")]
-pub fn init_server_config() //INITIALIZE SERVER CONFIG FILES
+pub fn init_config() //INITIALIZE CONFIG FILES
 {
-    init_config(options::SERVER_CONFIG); //DOWNLOAD server.toml
+    misc::check_directory(); //CREATE USER CONFIG DIRECTORY IF MISSING
 
-    let users_dir_path = config_path(options::SERVER_USERS_CONFIG);
-    if !Path::new(&users_dir_path).is_file()
     {
-        fs::write(&users_dir_path, "#*#**#*###**#***###*#").expect("Writing to config failed");
+        let filename =
+        {
+            #[cfg(feature = "client")]
+            {
+                options::CLIENT_CONFIG
+            }
+
+            #[cfg(feature = "server")]
+            {
+                options::SERVER_CONFIG
+            }
+        };
+
+        let config_path = config_path(filename);
+        if !Path::new(&config_path).is_file()
+        {
+            let mut config_file = File::create(config_path).expect("Failed to create WHY2 config"); //CREATE CONFIG
+
+            let mut config = Cursor::new(fetch_config(filename));
+            io::copy(&mut config, &mut config_file).expect("Failed writing to config file");
+        }
     }
-}
 
-#[cfg(feature = "client")]
-pub fn init_client_config()
-{
-    init_config(options::CLIENT_CONFIG); //DOWNLOAD client.toml
-
-    //CRETE CONFIG FOR TOFU
-    let server_keys_path = config_path(options::SERVER_KEYS_CONFIG);
-    if !Path::new(&server_keys_path).is_file()
+    let runtime_path =
     {
-        File::create(server_keys_path).expect("Failed to create server-keys config"); //CREATE CONFIG
+        #[cfg(feature = "client")]
+        {
+            config_path(options::SERVER_KEYS_CONFIG)
+        }
+
+        #[cfg(feature = "server")]
+        {
+            config_path(options::SERVER_USERS_CONFIG)
+        }
+    };
+
+    //CREATE RUNTIME CONFIG
+    if !Path::new(&runtime_path).is_file()
+    {
+        fs::write(&runtime_path, "#*#**#*###**#***###*#").expect("Writing to config failed");
     }
 }
 
