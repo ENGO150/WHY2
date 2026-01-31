@@ -275,7 +275,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&options::SharedKeys>) -> Op
 
     //SERVER SIDE SPAM PROTECTION
     #[cfg(feature = "server")]
-    let spam_protection = config::server_config::<bool>("spam_protection");
+    let spam_protection = config::read_config::<bool>("spam_protection");
 
     #[cfg(feature = "server")]
     let peer_addr = stream.peer_addr().ok()?; //GET CURRENT PEER ADDRESS
@@ -294,7 +294,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&options::SharedKeys>) -> Op
             usize::MAX
         } else //SET MAX PACKET SIZE IF SPAM PROTECTION IS ENABLED
         {
-            config::server_config("max_packet_size")
+            config::read_config("max_packet_size")
         };
     }
 
@@ -346,9 +346,9 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&options::SharedKeys>) -> Op
         if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
         {
             //SPAM
-            if config::server_config("spam_protection") && conn.is_authenticated() &&
+            if config::read_config("spam_protection") && conn.is_authenticated() &&
                 Instant::now().duration_since(*conn.last_activity()) <
-                    Duration::from_millis(config::server_config::<u64>("min_message_delay"))
+                    Duration::from_millis(config::read_config::<u64>("min_message_delay"))
             {
                 //INCREMENT SPAM VIOLATIONS
                 *conn.spam_violations_mut().unwrap() += 1;
@@ -358,7 +358,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&options::SharedKeys>) -> Op
                 shared_key = conn.keys().cloned();
 
                 //CHECK FOR TOO MANY VIOLATIONS
-                disconnect = *conn.spam_violations().unwrap() > config::server_config::<usize>("max_message_delay_violations");
+                disconnect = *conn.spam_violations().unwrap() > config::read_config::<usize>("max_message_delay_violations");
             }
 
             *conn.last_activity_mut() = Instant::now(); //RESET last_activity

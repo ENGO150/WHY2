@@ -251,7 +251,7 @@ impl Connection
     //CHECK IF CONNECTION IS INACTIVE
     fn is_inactive(&self, now: Option<Instant>) -> bool
     {
-        now.unwrap_or(Instant::now()).duration_since(*self.last_activity()) > Duration::from_secs(config::server_config::<u64>("communication_time"))
+        now.unwrap_or(Instant::now()).duration_since(*self.last_activity()) > Duration::from_secs(config::read_config::<u64>("communication_time"))
     }
 
     //CLONE STREAM
@@ -368,10 +368,10 @@ fn send_welcome_packet(stream: &mut TcpStream, keys: &options::SharedKeys) //sen
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
     {
-        "min_pass": config::server_config::<usize>("min_password_length"),
-        "max_uname": config::server_config::<usize>("max_username_length"),
-        "min_uname": config::server_config::<usize>("min_username_length"),
-        "server_name": config::server_config::<String>("server_name"),
+        "min_pass": config::read_config::<usize>("min_password_length"),
+        "max_uname": config::read_config::<usize>("max_username_length"),
+        "min_uname": config::read_config::<usize>("min_username_length"),
+        "server_name": config::read_config::<String>("server_name"),
     }).to_string();
 
     //SEND
@@ -448,7 +448,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         send_to_all(MessagePacket
         {
             text: Some(connection.username().unwrap().to_string()),
-            username: Some(config::server_config::<String>("server_username")),
+            username: Some(config::read_config::<String>("server_username")),
             id: connection.id().copied(),
             code: Some(MessageCode::Leave),
 
@@ -546,7 +546,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
             username: username.to_string(),
             id: id,
             keys: old_connection.keys().unwrap().to_owned(),
-            last_activity: Instant::now() - Duration::from_millis(config::server_config("min_message_delay")),
+            last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
             last_key_exchange: *old_connection.last_key_exchange().unwrap_or(&Instant::now()),
             spam_violations: 0,
             channel: None,
@@ -678,7 +678,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     }
 
     //ASK CLIENT FOR THEIR PACKAGE VERSION
-    if config::server_config("check_client_version")
+    if config::read_config("check_client_version")
     {
         let version = ask_version(stream, &keys);
         if version.is_none() || version != Some(misc::get_version().to_string())
@@ -694,12 +694,12 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let mut username: Option<String> = None; //USER ENTERED USERNAME
 
     //USERNAME CONFIGS
-    let max_tries = config::server_config::<usize>("max_auth_tries"); //MAX n
-    let min_len = config::server_config::<usize>("min_username_length");
-    let max_len = config::server_config::<usize>("max_username_length");
+    let max_tries = config::read_config::<usize>("max_auth_tries"); //MAX n
+    let min_len = config::read_config::<usize>("min_username_length");
+    let max_len = config::read_config::<usize>("max_username_length");
 
     //TELL USER IF REGISTRATIONS ARE DISABLED
-    let disabled_registration = !config::server_config::<bool>("allow_register");
+    let disabled_registration = !config::read_config::<bool>("allow_register");
     if disabled_registration
     {
         send_code(stream, None, MessageCode::RegisterDisabled, Some(&keys));
@@ -753,7 +753,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //ASK FOR PASSWORD
     if !user_exists && !disabled_registration //REGISTRATION (ENTER "FAKE" LOGIN ON DISABLED REGISTER)
     {
-        let max_tries = config::server_config::<usize>("max_auth_tries"); //MAX n
+        let max_tries = config::read_config::<usize>("max_auth_tries"); //MAX n
         let mut password: Option<String> = None;
 
         //KEEP ASKING FOR PASSWORD n TIMES
@@ -770,7 +770,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     if let Some(pass) = r.text
                     {
                         //CHECK LENGTH
-                        if pass.len() > config::server_config("min_password_length")
+                        if pass.len() > config::read_config("min_password_length")
                         {
                             password = Some(pass);
                             break;
@@ -821,7 +821,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     send_to_all(MessagePacket
     {
         text: Some(username.clone()),
-        username: Some(config::server_config::<String>("server_username")),
+        username: Some(config::read_config::<String>("server_username")),
         code: Some(MessageCode::Join),
         ..Default::default()
     });
@@ -912,7 +912,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::Channel =>
                 {
                     //CHECK PARAMETER VALIDITY
-                    if read.text.iter().all(|s| !s.is_empty() && s.len() <= config::server_config("max_channel_length") && s.chars().all(|c| c.is_ascii_alphanumeric() && c != ' '))
+                    if read.text.iter().all(|s| !s.is_empty() && s.len() <= config::read_config("max_channel_length") && s.chars().all(|c| c.is_ascii_alphanumeric() && c != ' '))
                     {
                         //SEND ChannelLeave CODE TO OLD CHANNEL
                         if options::voice_chat_enabled()

@@ -60,7 +60,7 @@ fn colorize(text: String, color: Option<SerColor>) -> String //COLORIZE text IF 
 {
     match color
     {
-        Some(c) if !config::client_config::<bool>("disable_colors") => text.color(c.0).to_string(),
+        Some(c) if !config::read_config::<bool>("disable_colors") => text.color(c.0).to_string(),
         _ => text
     }
 }
@@ -84,7 +84,7 @@ pub fn draw_event(event: ClientEvent)
                 "{}{}: {}\n",
 
                 colorize(message.username.unwrap(), message.colors.username_color),                                   //USERNAME
-                if config::client_config("show_id") { format!(" ({})", message.id.unwrap()) } else { String::new() }, //ID
+                if config::read_config("show_id") { format!(" ({})", message.id.unwrap()) } else { String::new() }, //ID
                 colorize(message.text.unwrap(), message.colors.message_color)                                         //MESSAGE
             );
         },

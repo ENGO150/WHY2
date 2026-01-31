@@ -66,13 +66,13 @@ fn main()
     kex::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
 
     //CHECK IF VOICE IS ENABLED
-    if config::server_config("enable_voice_chat")
+    if config::read_config("enable_voice_chat")
     {
         options::enable_voice_chat();
     }
 
     //SERIALIZE ADDRESS
-    let address = format!("{}:{}", config::server_config::<String>("server_ip"), config::server_config::<u16>("server_port")); //GET ADDRESS
+    let address = format!("{}:{}", config::read_config::<String>("server_ip"), config::read_config::<u16>("server_port")); //GET ADDRESS
 
     //BIND TCP (TEXT)
     let listener = match TcpListener::bind(&address)
@@ -103,7 +103,7 @@ fn main()
                 Ok(mut stream) =>
                 {
                     //CHECK FOR MAXIMAL CONNECTIONS
-                    if server::CONNECTIONS.len() >= config::server_config::<usize>("max_clients")
+                    if server::CONNECTIONS.len() >= config::read_config::<usize>("max_clients")
                     {
                         log::error!
                         (

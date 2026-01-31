@@ -382,8 +382,8 @@ fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
 {
     MessageColors
     {
-        username_color: to_color(&config::client_config::<String>("username_color")).ok(),
-        message_color: to_color(&config::client_config::<String>("message_color")).ok(),
+        username_color: to_color(&config::read_config::<String>("username_color")).ok(),
+        message_color: to_color(&config::read_config::<String>("message_color")).ok(),
     }
 }
 
@@ -423,9 +423,9 @@ fn main()
     println!("Welcome.\n");
 
     //GET CONNECTING ADDRESS
-    let mut connecting_addr = if config::client_config::<bool>("auto_connect") //USER ENABLED AUTOMATIC CONNECTION
+    let mut connecting_addr = if config::read_config::<bool>("auto_connect") //USER ENABLED AUTOMATIC CONNECTION
     {
-        let addr = config::client_config("auto_connect_addr"); //USE CONFIG ADDR
+        let addr = config::read_config("auto_connect_addr"); //USE CONFIG ADDR
 
         //PRINT OUT IP
         println!(">>> {addr}");
@@ -451,7 +451,7 @@ fn main()
     if !connecting_addr.contains(':')
     {
         //APPEND DEFAULT PORT TO connecting_ip
-        connecting_addr.push_str(&format!(":{}", config::client_config::<u16>("default_port")));
+        connecting_addr.push_str(&format!(":{}", config::read_config::<u16>("default_port")));
     } else
     {
         spacer_add_spaces += connecting_addr.len() - connecting_addr.find(":").unwrap();
@@ -464,7 +464,7 @@ fn main()
     options::set_server_address(&connecting_addr);
 
     //CHECK IF SOCKS5 IS ENABLED
-    if config::client_config("socks5_enabled")
+    if config::read_config("socks5_enabled")
     {
         options::enable_socks5();
     }
@@ -475,7 +475,7 @@ fn main()
         TcpStream::connect(connecting_addr)
     } else //USE PROXY
     {
-        Socks5Stream::connect(config::client_config::<String>("socks5_addr"), connecting_addr.as_str())
+        Socks5Stream::connect(config::read_config::<String>("socks5_addr"), connecting_addr.as_str())
             .map(|s| s.into_inner())
     }
     {

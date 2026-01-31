@@ -165,20 +165,19 @@ pub fn init_client_config()
     }
 }
 
-#[cfg(feature = "server")]
-pub fn server_config<T: FromStr>(key: &str) -> T //RETURN key FROM server.toml
+pub fn read_config<T: FromStr>(key: &str) -> T //RETURN key FROM TOML CONFIG
 where
     T::Err: Debug,
 {
-    config_read(options::SERVER_CONFIG, key)
-}
+    #[cfg(feature = "client")]
+    {
+        config_read(options::CLIENT_CONFIG, key)
+    }
 
-#[cfg(feature = "client")]
-pub fn client_config<T: FromStr>(key: &str) -> T //RETURN key FROM client.toml
-where
-    T::Err: Debug,
-{
-    config_read(options::CLIENT_CONFIG, key)
+    #[cfg(feature = "server")]
+    {
+        config_read(options::SERVER_CONFIG, key)
+    }
 }
 
 #[cfg(feature = "server")]
