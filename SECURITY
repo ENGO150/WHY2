@@ -71,13 +71,3 @@ C) Side-Channel Resistance
    While we use constant-time coding practices, WHY2 does not have hardware-level
    protection (unlike AES-NI). Power analysis or sophisticated electromagnetic
    side-channel attacks may still be possible on physical access.
-
-4. SUPPORTED VERSIONS
----------------------
-Only the latest development version and the latest stable release are supported
-with security updates.
-
-Version | Supported | Notes
-------- | --------- | ------------------------
-1.4.x   | Yes       | Current REX architecture
-< 1.0   | No        | Legacy / Pre-rewrite
