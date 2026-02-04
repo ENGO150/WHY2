@@ -47,6 +47,7 @@ use wincode::
     WriteResult,
     ReadResult,
     error::ReadError,
+    config::Config,
     io::
     {
         Writer,
@@ -178,31 +179,31 @@ impl FromStr for SerColor //PARSE STRING TO SerColor
 }
 
 //SERIALIZE SerColor
-impl SchemaWrite for SerColor
+unsafe impl<C: Config> SchemaWrite<C> for SerColor
 {
     type Src = Self;
     const TYPE_META: TypeMeta = TypeMeta::Dynamic;
 
     fn size_of(src: &Self::Src) -> WriteResult<usize>
     {
-        <String as SchemaWrite>::size_of(&src.to_string())
+        <String as SchemaWrite<C>>::size_of(&src.to_string())
     }
 
     fn write(writer: &mut impl Writer, src: &Self::Src) -> WriteResult<()>
     {
-        <String as SchemaWrite>::write(writer, &src.to_string())
+        <String as SchemaWrite<C>>::write(writer, &src.to_string())
     }
 }
 
 //DESERIALIZE SerColor
-impl<'de> SchemaRead<'de> for SerColor
+unsafe impl<'de, C: Config> SchemaRead<'de, C> for SerColor
 {
     type Dst = Self;
     const TYPE_META: TypeMeta = TypeMeta::Dynamic;
 
     fn read(reader: &mut impl Reader<'de>, dst: &mut MaybeUninit<Self::Dst>) -> ReadResult<()>
     {
-        dst.write(<String as SchemaRead>::get(reader)?.parse::<SerColor>()?);
+        dst.write(<String as SchemaRead<C>>::get(reader)?.parse::<SerColor>()?);
         Ok(())
     }
 }

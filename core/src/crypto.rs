@@ -23,12 +23,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use sha2::{ Sha256, Digest };
 
-use rand_chacha::ChaCha20Rng;
+use rand_chacha::
+{
+    ChaCha20Rng,
+    rand_core::{ SeedableRng, Rng },
+};
+
 use rand::
 {
-    SeedableRng,
     TryRngCore,
-    RngCore,
     rngs::OsRng,
 };
 
