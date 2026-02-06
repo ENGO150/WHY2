@@ -21,38 +21,38 @@ WHY2 implements defense-in-depth through multiple cryptographic layers and
 secure implementation practices.
 
 A) Core Algorithm Design
-   - **Cipher Type**: Symmetric block cipher with configurable grid dimensions
-   - **Block Structure**: 2D matrix of 64-bit signed integers (i64)
-   - **Default Size**: 8×8 grid (4096-bit blocks), customizable to 2×2 through 16×16+
+   - Cipher Type: Symmetric block cipher with configurable grid dimensions
+   - Block Structure: 2D matrix of 64-bit signed integers (i64)
+   - Default Size: 8×8 grid (4096-bit blocks), customizable to 2×2 through 16×16+
 
-   **Nonlinear Layer (SubCell)**:
+   Nonlinear Layer (SubCell):
    - ARX (Add-Rotate-XOR) construction inspired by TEA/XTEA
    - Operates on 32-bit halves via Feistel-like network
    - 4 rounds per cell with golden ratio constant (DELTA_32)
-   - **Security Benefit**: No lookup tables → immune to cache-timing attacks
+   - Security Benefit: No lookup tables → immune to cache-timing attacks
 
-   **Diffusion Layers**:
+   Diffusion Layers:
    - ShiftRows: Key-dependent row rotations (not fixed like in AES)
    - MixColumns: MDS matrix with 16 irrational-derived coefficients
    - Key mixing: XOR with ChaCha20-expanded round keys
 
-   **Mode**: Counter (CTR) with grid-based nonce + block index
+   Mode: Counter (CTR) with grid-based nonce + block index
 
 B) Implementation Security
-   - **Memory Safety**: Pure Rust prevents buffer overflows and use-after-free
-   - **Secure Erasure**: `zeroize` trait scrubs sensitive data on drop
-   - **Constant-Time Execution**:
-     * Conditional operations use `subtle` crate's CT primitives
-     * Grid::increment, shift_rows, coefficient selection all CT when enabled
-     * Barrett reduction for modulo operations
-   - **SIMD Optimizations**: Vectorized operations (4× i64) without timing leaks
+   - Memory Safety: Pure Rust prevents buffer overflows and use-after-free
+   - Secure Erasure: `zeroize` trait scrubs sensitive data on drop
+   - Constant-Time Execution:
+     - Conditional operations use `subtle` crate's CT primitives
+     - Grid::increment, shift_rows, coefficient selection all CT when enabled
+     - Barrett reduction for modulo operations
+   - SIMD Optimizations: Vectorized operations (4× i64) without timing leaks
 
 C) Authenticated Encryption
-   - **Construction**: Encrypt-then-MAC (EtM)
-   - **MAC Algorithm**: HMAC-SHA256
-   - **Tag Size**: 256 bits (32 bytes)
-   - **Verification**: Constant-time comparison via `Mac::verify_slice`
-   - **Key Separation**: Encryption and MAC keys MUST be independently derived
+   - Construction: Encrypt-then-MAC (EtM)
+   - MAC Algorithm: HMAC-SHA256
+   - Tag Size: 256 bits (32 bytes)
+   - Verification: Constant-time comparison via `Mac::verify_slice`
+   - Key Separation: Encryption and MAC keys MUST be independently derived
 
 3. SECURITY LIMITATIONS & RISK ASSESSMENT
 -----------------------------------------
