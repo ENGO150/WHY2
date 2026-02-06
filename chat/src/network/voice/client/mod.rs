@@ -161,15 +161,18 @@ where
     I: Iterator<Item = Device>,
     G: FnOnce() -> Option<Device>,
 {
-    let preferred = get_devices().ok()?.find(|d|
+    let preferred = get_devices().ok().and_then(|mut devices|
     {
-        if let Ok(desc) = d.description()
-        {
-            let name = desc.to_string().to_lowercase();
-            name.contains("pipewire") || name.contains("pulse")
-        } else { false }
+        devices.find(|d|
+            if let Ok(desc) = d.description()
+            {
+                let name = desc.to_string().to_lowercase();
+                name.contains("pipewire") || name.contains("pulse")
+            } else { false }
+        )
     });
 
+    //TRY TO GET DEFAULT DEVICE IF NOTHING WAS FOUND
     preferred.or_else(get_default)
 }
 
