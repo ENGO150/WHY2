@@ -22,7 +22,7 @@ pub mod sfx;
 use std::
 {
     thread,
-    net::UdpSocket,
+    net::{ UdpSocket, TcpStream },
     collections::{ HashMap, VecDeque },
     time::
     {
@@ -44,6 +44,7 @@ use cpal::
 {
     Device,
     Stream,
+    DevicesError,
     StreamConfig,
     SupportedStreamConfig,
     SupportedStreamConfigRange,
@@ -83,6 +84,7 @@ use gag::Gag;
 
 use crate::
 {
+    command::{ self, Command },
     options as chat_options,
     network::
     {
@@ -153,16 +155,22 @@ impl Drop for StreamGuard
 }
 
 //PRIVATE
-fn find_device(mut devices: impl Iterator<Item = Device>) -> Option<Device>
+fn find_device<F, G, I>(get_devices: F, get_default: G) -> Option<Device>
+where
+    F: FnOnce() -> Result<I, DevicesError>,
+    I: Iterator<Item = Device>,
+    G: FnOnce() -> Option<Device>,
 {
-    devices.find(|d|
+    let preferred = get_devices().ok()?.find(|d|
     {
         if let Ok(desc) = d.description()
         {
             let name = desc.to_string().to_lowercase();
             name.contains("pipewire") || name.contains("pulse")
         } else { false }
-    })
+    });
+
+    preferred.or_else(get_default)
 }
 
 fn configure_device(supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig) -> StreamConfig
@@ -192,7 +200,7 @@ fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], id: usize
 }
 
 //PUBLIC
-pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
+pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>, tcp_stream: &mut TcpStream)
 {
     //RESET SEQs
     options::set_seq(0);
@@ -215,13 +223,21 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>)
     //SUPPRESS STDERR (AVOID ALSA ERRORS)
     let stderr_gag = Gag::stderr().unwrap();
 
-    //FIND INPUT DEVICE
-    let input_device = find_device(host.input_devices().expect("No input device found"))
-        .or_else(|| host.default_input_device()).unwrap();
-
-    //FIND OUTPUT DEVICE
-    let output_device = find_device(host.output_devices().expect("No output device found"))
-        .or_else(|| host.default_output_device()).unwrap();
+    //FIND INPUT/OUTPUT DEVICE
+    let (input_device, output_device) = match
+    (
+        find_device(|| host.input_devices(), || host.default_input_device()),
+        find_device(|| host.output_devices(), || host.default_output_device()),
+    )
+    {
+        (Some(input), Some(output)) => (input, output), //FOUND
+        _ => //NOT FOUND
+        {
+            //LEAVE VOICE
+            command::send_command_code(tcp_stream, &Command::Voice, &None);
+            return;
+        }
+    };
 
     //DISABLE SUPPRESSION
     drop(stderr_gag);

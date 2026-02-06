@@ -356,7 +356,8 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     {
                         let username = username.clone();
                         let voice_tx = tx.clone();
-                        thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap(), voice_tx));
+                        let mut stream = stream.try_clone().unwrap();
+                        thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap(), voice_tx, &mut stream));
                         "en"
                     } else
                     {
