@@ -89,7 +89,8 @@ pub fn draw_event(event: ClientEvent)
             );
         },
 
-        ClientEvent::Info(message, newline, lines) =>
+        ClientEvent::Info(message, newline, lines) |
+            ClientEvent::Warn(message, newline, lines) =>
         {
             clear_lines(lines);
             print!("{message}");

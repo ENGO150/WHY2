@@ -62,6 +62,7 @@ pub enum ClientEvent
     Connected(String),             //SUCCESSFUL CONNECTION MESSAGE
     Message(MessagePacket),        //RECEIVED MESSAGE
     Info(String, bool, usize),     //INFO/STATUS LOG, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
+    Warn(String, bool, usize),     //WARN LOG/POPUP, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
     Prompt(String, String),        //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
     TofuError(TofuCode),           //TOFU VERIFICATION FAILED
     VoiceActivity(Vec<VoiceUser>), //VOICE OVERLAY
@@ -198,7 +199,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     //NON MATCHING VERSION (WILL GET DISCONNECTED)
                     if server_version != version
                     {
-                        tx.send(ClientEvent::Info(String::from("Incompatible version! ({version}/{server_version})"), true, 1)).unwrap();
+                        tx.send(ClientEvent::Warn(String::from("Incompatible version! ({version}/{server_version})"), true, 1)).unwrap();
                     }
 
                     //RESPOND
@@ -243,7 +244,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     if invalid_username
                     {
                         tx.send(ClientEvent::Clear(2)).unwrap();
-                        tx.send(ClientEvent::Info(String::from("Username rejected!"), false, 0)).unwrap();
+                        tx.send(ClientEvent::Warn(String::from("Username rejected!"), false, 0)).unwrap();
                     } else //VALID
                     {
                         //SET INVALID USERNAME FOR POSSIBLE NEXT CODE
@@ -273,7 +274,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     //INVALID PASS
                     if invalid_password
                     {
-                        tx.send(ClientEvent::Info(format!("Password rejected! Enter at least {} characters.", min_pass.unwrap()), false, 3)).unwrap();
+                        tx.send(ClientEvent::Warn(format!("Password rejected! Enter at least {} characters.", min_pass.unwrap()), false, 3)).unwrap();
                     } else
                     {
                         invalid_password = true;
@@ -347,7 +348,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 {
                     if options::socks5_enabled()
                     {
-                        tx.send(ClientEvent::Info(String::from("Voice chat cannot be enabled while using SOCKS5.\n"), true, 2)).unwrap();
+                        tx.send(ClientEvent::Warn(String::from("Voice chat cannot be enabled while using SOCKS5.\n"), true, 2)).unwrap();
                         continue;
                     }
 
@@ -442,7 +443,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 //SPAM WARNING
                 MessageCode::SpamWarning =>
                 {
-                    tx.send(ClientEvent::Info(String::from("Slow down! You're sending messages too quickly.\n"), true, 2)).unwrap();
+                    tx.send(ClientEvent::Warn(String::from("Slow down! You're sending messages too quickly.\n"), true, 2)).unwrap();
                 },
 
                 //REGISTRATION DISABLED
@@ -460,7 +461,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 //CLIENTED REQUESTED DISABLED FEATURE
                 MessageCode::InvalidFeature =>
                 {
-                    tx.send(ClientEvent::Info(String::from("Server has disabled the feature you requested.\n"), true, 2)).unwrap();
+                    tx.send(ClientEvent::Warn(String::from("Server has disabled the feature you requested.\n"), true, 2)).unwrap();
                 },
 
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
