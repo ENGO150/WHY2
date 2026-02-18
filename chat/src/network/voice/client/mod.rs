@@ -42,9 +42,7 @@ use std::
 
 use cpal::
 {
-    Device,
     Stream,
-    DevicesError,
     StreamConfig,
     SupportedStreamConfig,
     SupportedStreamConfigRange,
@@ -155,27 +153,6 @@ impl Drop for StreamGuard
 }
 
 //PRIVATE
-fn find_device<F, G, I>(get_devices: F, get_default: G) -> Option<Device>
-where
-    F: FnOnce() -> Result<I, DevicesError>,
-    I: Iterator<Item = Device>,
-    G: FnOnce() -> Option<Device>,
-{
-    let preferred = get_devices().ok().and_then(|mut devices|
-    {
-        devices.find(|d|
-            if let Ok(desc) = d.description()
-            {
-                let name = desc.to_string().to_lowercase();
-                name.contains("pipewire") || name.contains("pulse")
-            } else { false }
-        )
-    });
-
-    //TRY TO GET DEFAULT DEVICE IF NOTHING WAS FOUND
-    preferred.or_else(get_default)
-}
-
 fn configure_device(supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig) -> StreamConfig
 {
     supported_configs
@@ -229,8 +206,8 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
     //FIND INPUT/OUTPUT DEVICE
     let (input_device, output_device) = match
     (
-        find_device(|| host.input_devices(), || host.default_input_device()),
-        find_device(|| host.output_devices(), || host.default_output_device()),
+        host.default_input_device(),
+        host.default_output_device(),
     )
     {
         (Some(input), Some(output)) => (input, output), //FOUND
