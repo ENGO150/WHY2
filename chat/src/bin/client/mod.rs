@@ -71,6 +71,7 @@ use why2_chat::
         MessagePacket,
         MessageColors,
         SerColor,
+        voice::client::device,
         client::{ self, ClientEvent },
     },
 };
@@ -412,6 +413,9 @@ fn main()
         {
             config::server_keys_save(&env::args().nth(2).unwrap(), &env::args().nth(3).unwrap());
             println!("Key saved.");
+        } else if arg == "--audio-setup" && env::args().len() == 2
+        {
+            device::setup_devices();
         } else if arg == "--help" && env::args().len() == 2
         {
             println!
@@ -420,6 +424,7 @@ fn main()
                 ================\n\n\
                 Usage: why2 [options]\n\n\
                 --verify (HOST) (PUBKEY HASH) - Whitelist server keys\n\
+                --audio-setup                 - Select audio devices for voice chat\n\
                 --help                        - Display this"
             );
         } else //INVALID CMD
