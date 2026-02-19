@@ -27,7 +27,7 @@ use why2::
 
 use std::io::{ self, Write };
 
-use rand::Rng;
+use rand::RngExt;
 
 //GRID SIZE
 const W: usize = 8;
