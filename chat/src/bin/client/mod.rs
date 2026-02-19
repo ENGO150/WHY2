@@ -412,9 +412,19 @@ fn main()
         {
             config::server_keys_save(&env::args().nth(2).unwrap(), &env::args().nth(3).unwrap());
             println!("Key saved.");
+        } else if arg == "--help" && env::args().len() == 2
+        {
+            println!
+            (
+                "WHY2 Chat Client\n\
+                ================\n\n\
+                Usage: why2 [options]\n\n\
+                --verify (HOST) (PUBKEY HASH) - Whitelist server keys\n\
+                --help                        - Display this"
+            );
         } else //INVALID CMD
         {
-            println!("Invalid command! Aborting...");
+            println!("Invalid usage! Use 'why2 --help'.");
         }
 
         return;
