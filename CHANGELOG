@@ -1,6 +1,41 @@
 Changelog
 =========
 
+v1.4.11:
+- cdcfe8b: fix comprehensive benchmark RngExt
+- 450af8c: fix rustdoc SysRng link
+- 0694d8e: remove deprecated legacy encryption module
+- a4491f0: replace Rng with RngExt for diffusion test
+- 4ad32c8: fix dependency update breaking changes
+- 1a4dead: update dependencies
+- 5837718: implement configured audio device usage
+- 8953f37: add default device note
+- 775acef: implement audio device selection
+- 1bf6e09: add audio devices into client config
+- 1ce3f21: add audio setup command
+- fc4ff47: add help command for client binary
+- 9b1b37d: add voice::device module
+- 15ca6ac: use default audio device natively
+- 18dec7b: implement ClientEvent::Warn
+- cd9d540: prevent find_device enumeration failure
+- e6e5fb1: prevent crash on voice-incompatible client
+- e5b021f: update dependencies
+- 3d9caf4: merge dependabot PR #3
+- 38ae541: remove markdown elements from security notice
+- 46c7d9c: Bump time from 0.3.46 to 0.3.47
+- e2e9580: upgrade dependencies & fix breaking changes
+- 3c79231: merge GitHub PR #2
+- 09d350f: Bump bytes from 1.11.0 to 1.11.1
+- d4a99bd: remove outdated round operations from crypto::apply_ctr rustdoc
+- dc8eabd: include default configuration in binary file
+- 9befe94: merge configs init fns
+- 571c478: merge config::client_config & config::server_config
+- 70b77ce: remove supported versions section
+- cfd7bfb: implement TCP Keep-Alive on client
+- 6db609c: add socket2 dependency
+- 0866740: remove duplicate Subcell code
+- 81fd3d1: update dependencies
+
 v1.4.10:
 - 0d9a0eb: fix chat readme license link
 - fd7d44d: remove chat mentions from rex readme
