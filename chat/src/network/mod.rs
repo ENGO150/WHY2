@@ -189,7 +189,7 @@ unsafe impl<C: Config> SchemaWrite<C> for SerColor
         <String as SchemaWrite<C>>::size_of(&src.to_string())
     }
 
-    fn write(writer: &mut impl Writer, src: &Self::Src) -> WriteResult<()>
+    fn write(writer: impl Writer, src: &Self::Src) -> WriteResult<()>
     {
         <String as SchemaWrite<C>>::write(writer, &src.to_string())
     }
@@ -201,7 +201,7 @@ unsafe impl<'de, C: Config> SchemaRead<'de, C> for SerColor
     type Dst = Self;
     const TYPE_META: TypeMeta = TypeMeta::Dynamic;
 
-    fn read(reader: &mut impl Reader<'de>, dst: &mut MaybeUninit<Self::Dst>) -> ReadResult<()>
+    fn read(reader: impl Reader<'de>, dst: &mut MaybeUninit<Self::Dst>) -> ReadResult<()>
     {
         dst.write(<String as SchemaRead<C>>::get(reader)?.parse::<SerColor>()?);
         Ok(())

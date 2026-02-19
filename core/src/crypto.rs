@@ -31,8 +31,8 @@ use rand_chacha::
 
 use rand::
 {
-    TryRngCore,
-    rngs::OsRng,
+    TryRng,
+    rngs::SysRng,
 };
 
 use rayon::prelude::
@@ -121,7 +121,7 @@ pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 {
     //CREATE SEED FOR ChaCha20Rng
     let mut seed = [0u8; 32];
-    OsRng.try_fill_bytes(&mut seed).expect("Creating seed failed"); //FILL
+    SysRng.try_fill_bytes(&mut seed).expect("Creating seed failed"); //FILL
 
     generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
 }
