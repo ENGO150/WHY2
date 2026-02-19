@@ -18,7 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::hint::black_box;
 
-use rand::Rng;
+use rand::RngExt;
+
 use criterion::
 {
     criterion_group,
