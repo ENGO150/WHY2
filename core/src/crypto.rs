@@ -105,7 +105,7 @@ pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaC
 
 /// Generates a symmetric WHY2 key using secure system entropy.
 ///
-/// This function creates a 32-byte seed using [`OsRng`], then initializes
+/// This function creates a 32-byte seed using [`SysRng`], then initializes
 /// a [`ChaCha20Rng`] with that seed to produce a deterministic
 /// stream of pseudorandom values. The output is a flat `Vec<i64>` of length $2 \times W \times H$,
 /// suitable for use with [`Grid::from_key`](crate::grid::Grid::from_key).
