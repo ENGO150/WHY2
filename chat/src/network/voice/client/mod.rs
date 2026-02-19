@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 //MODULES
+pub mod device;
 pub mod sfx;
 
 use std::
