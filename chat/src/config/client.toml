@@ -23,6 +23,10 @@ socks5_addr = "127.0.0.1:9150" # Local proxy address
 auto_connect = false # Automatic connection to 'auto_connect_addr'
 auto_connect_addr = "0.0.0.0" # See 'auto_connect'
 
+# Voice chat devices (set via --audio-setup)
+input_device = ""
+output_device = ""
+
 # Colors
 disable_colors = false # Disable message colors
 username_color = "none" # Color of username (change via command)
