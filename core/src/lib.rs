@@ -79,9 +79,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!   Disabling this may improve performance on non-sensitive data but opens the system to
 //!   timing attacks.
 //!
-//! - **`legacy`**:
-//!   Enables the deprecated [`legacy`] module containing older, insecure versions of the
-//!   encryption routines. This feature should only be used for migration or compatibility testing.
+//! - ~~**`legacy`**:
+//!   Enables the deprecated \[`legacy`\] module containing older, insecure versions of the
+//!   encryption routines. This feature should only be used for migration or compatibility
+//!   testing.~~
 //!
 //! ## Philosophy
 //!
@@ -97,8 +98,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! * **REX**: Refers to the modern, secure implementation of the WHY2 algorithm.
 //! These are the modules exposed directly at the crate root (e.g., [`encrypter`], [`decrypter`]).
-//! * **Legacy**: Refers to older, deprecated encryption routines found in the [`legacy`] module.
-//! These are retained for compatibility but are considered insecure.
+//! * ~~**Legacy**: Refers to older, deprecated encryption routines found in the \[`legacy`\] module.
+//! These are retained for compatibility but are considered insecure.~~
 //!
 //! ## Examples
 //!
@@ -131,7 +132,3 @@ pub mod decrypter;
 pub mod encrypter;
 pub mod grid;
 pub mod types;
-
-#[cfg(feature = "legacy")]
-#[deprecated(since = "0.2.0-rex", note = "Legacy encryption is unsecure. Use REX module (why2::core) instead.")]
-pub mod legacy;

@@ -44,10 +44,8 @@ criterion = "0.8.2"
 default = ["constant-time", "auth"]
 constant-time = ["dep:subtle"]
 auth = ["dep:hmac"]
-legacy = []
 
 [package.metadata.docs.rs]
-features = ["legacy"]
 rustdoc-args = ["--html-in-header", "docs-header.html"]
 
 [[bench]]

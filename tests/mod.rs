@@ -23,6 +23,3 @@ pub mod randomness_test;
 
 #[cfg(feature = "auth")]
 pub mod auth_test;
-
-#[cfg(feature = "legacy")]
-pub mod legacy;

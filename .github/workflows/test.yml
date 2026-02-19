@@ -106,18 +106,3 @@ jobs:
 
       - name: Run Entropy Test
         run: cargo test -p why2 test_ciphertext_entropy --verbose --release -- --nocapture
-
-  test-why2-legacy:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: development
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Run Test
-        run: cargo test -p why2 legacy_encrypt_decrypt --features legacy --verbose --release -- --nocapture

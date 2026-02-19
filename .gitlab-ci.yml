@@ -68,15 +68,6 @@ test-why2-entropy:
   script:
     - cargo test -p why2 test_ciphertext_entropy --verbose --release -- --nocapture
 
-# Test WHY2 Legacy
-test-why2-legacy:
-  stage: test
-  image: rust:latest
-  only:
-    - development
-  script:
-    - cargo test -p why2 legacy_encrypt_decrypt --features legacy --verbose --release -- --nocapture
-
 # Comprehensive Benchmark
 benchmark-why2:
   stage: bench
