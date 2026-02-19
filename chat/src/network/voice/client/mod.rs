@@ -43,7 +43,9 @@ use std::
 
 use cpal::
 {
+    Host,
     Stream,
+    Device,
     StreamConfig,
     SupportedStreamConfig,
     SupportedStreamConfigRange,
@@ -83,6 +85,7 @@ use gag::Gag;
 
 use crate::
 {
+    config,
     command::{ self, Command },
     options as chat_options,
     network::
@@ -154,6 +157,27 @@ impl Drop for StreamGuard
 }
 
 //PRIVATE
+fn find_devices(host: &Host) -> Option<(Device, Device)> //FIND CONFIGURED/DEFAULT DEVICE
+{
+    //GET DEVICES FROM CONFIG
+    let input_device = config::read_config::<String>("input_device");
+    let output_device = config::read_config::<String>("output_device");
+
+    //GET INPUT DEVICE (OR DEFAULT IF EMPTY)
+    let input_device = if !input_device.is_empty()
+    {
+        host.input_devices().ok()?.find(|d| d.description().is_ok_and(|desc| desc.to_string() == input_device))
+    } else { host.default_input_device() };
+
+    //GET OUTPUT DEVICE (OR DEFAULT IF EMPTY)
+    let output_device = if !output_device.is_empty()
+    {
+        host.output_devices().ok()?.find(|d| d.description().is_ok_and(|desc| desc.to_string() == output_device))
+    } else { host.default_output_device() };
+
+    Some((input_device?, output_device?))
+}
+
 fn configure_device(supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig) -> StreamConfig
 {
     supported_configs
@@ -205,13 +229,9 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
     let stderr_gag = Gag::stderr().unwrap();
 
     //FIND INPUT/OUTPUT DEVICE
-    let (input_device, output_device) = match
-    (
-        host.default_input_device(),
-        host.default_output_device(),
-    )
+    let (input_device, output_device) = match find_devices(&host)
     {
-        (Some(input), Some(output)) => (input, output), //FOUND
+        Some((input, output)) => (input, output), //FOUND
         _ => //NOT FOUND
         {
             //LEAVE VOICE
