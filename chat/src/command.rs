@@ -41,6 +41,7 @@ pub enum Command
 {
     Exit,           //DISCONNECT FROM SERVER
     Voice,          //ENABLE VOICE CHAT
+    Mute,           //TOGGLE-MUTE USER/YOURSELF
     Channel,        //SWITCH CHANNEL
     Help,           //PRINT COMMANDS
     List,           //LIST USERS
@@ -81,6 +82,14 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "VOICE", "VOIP", "CALL" ],
         args: &[],
         description: "Toggles voice chat",
+    },
+
+    CommandInfo
+    {
+        command: Command::Mute,
+        triggers: &[ "MUTE", "SILENCE", "STFU" ],
+        args: &[CommandArg { name: "ID", required: false }],
+        description: "Toggle-mutes user/yourself",
     },
 
     CommandInfo
