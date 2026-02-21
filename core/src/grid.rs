@@ -262,7 +262,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
             //APPLY NONLINEAR MIX TO KEY
             let mut a = vec[i].wrapping_add(vec[i + grid_area]);
             let mut b = vec[i] ^ vec[i + grid_area];
-            let rot = (i % 64) as u32;
+            let rot = (i & 63) as u32;
 
             //ROTATE
             a = a.rotate_left(rot);
