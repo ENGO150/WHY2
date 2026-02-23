@@ -646,7 +646,7 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
             if network_buffer.voice.is_none() { continue; }
 
             //CHECK FOR MUTED CLIENT
-            if chat_options::is_muted(sender_id) { continue; }
+            if chat_options::is_muted(Some(sender_id)) { continue; }
 
             //DECODE
             if let Ok(decoded_len) = peer.decoder.decode_float(network_buffer.voice.as_deref(), &mut decoded_buffer[..], false)

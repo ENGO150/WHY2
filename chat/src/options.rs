@@ -207,9 +207,15 @@ pub fn toggle_mute(id: Option<usize>) -> bool //ENABLE/DISABLE MUTE
 }
 
 #[cfg(feature = "client")]
-pub fn is_muted(id: usize) -> bool //CHECK IF CLIENT ID IS MUTED LOCALLY
+pub fn is_muted(id: Option<usize>) -> bool //CHECK IF CLIENT IS MUTED
 {
-    MUTED.lock().unwrap().contains(&id)
+    if let Some(id) = id
+    {
+        MUTED.lock().unwrap().contains(&id)
+    } else
+    {
+        MUTE.load(Ordering::Relaxed)
+    }
 }
 
 //SOCKS5
