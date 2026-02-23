@@ -180,6 +180,7 @@ cargo build --bin why2-server --no-default-features --features server --release
 ### Prebuilt Binaries
 - [GitHub Actions Artifacts](https://github.com/ENGO150/WHY2/actions/workflows/build.yml)
 - [Arch Linux (AUR)](https://aur.archlinux.org/packages/why2)
+- [Gentoo Linux (GURU)](https://cgit.gentoo.org/repo/proj/guru.git/tree/net-im/why2)
 
 ---
 
