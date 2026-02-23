@@ -29,7 +29,7 @@ use std::
 
 use lewton::inside_ogg::OggStreamReader;
 
-use crate::network::voice::options;
+use crate::network::voice::consts;
 
 //STRUCTS
 struct ActiveEffect
@@ -124,7 +124,7 @@ pub fn play_effects(mixed_sample: &mut f32) //PLAY ALL SOUND IN ACTIVE_EFFECTS
         {
             if effect.position < effect.buffer.len() //SOUND STILL PLAYING
             {
-                *mixed_sample += effect.buffer[effect.position] * options::SOUND_EFFECT_VOLUME;
+                *mixed_sample += effect.buffer[effect.position] * consts::SOUND_EFFECT_VOLUME;
                 effect.position += 1;
 
                 true

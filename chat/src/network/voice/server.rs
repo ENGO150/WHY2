@@ -34,7 +34,7 @@ use crate::
         voice::
         {
             self,
-            options,
+            consts,
             VoiceCode,
             VoicePacket,
         },
@@ -199,7 +199,7 @@ pub fn listen_client_voice(socket: UdpSocket)
 
                 //ACTIVITY TIMER
                 conn.packet_accumulator += 1;
-                if conn.packet_accumulator >= options::ACTIVITY_TRESHOLD
+                if conn.packet_accumulator >= consts::ACTIVITY_TRESHOLD
                 {
                     conn.packet_accumulator = 0; //RESET ACCUM
                     reset_last_activity(&id); //RESET ACTIVITY TIMER

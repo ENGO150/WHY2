@@ -93,6 +93,7 @@ use crate::
         client::{ ClientEvent, VoiceUser },
         voice::
         {
+            consts,
             self,
             options,
             VoiceCode,
@@ -181,9 +182,9 @@ fn find_devices(host: &Host) -> Option<(Device, Device)> //FIND CONFIGURED/DEFAU
 fn configure_device(supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig) -> StreamConfig
 {
     supported_configs
-        .filter(|c| c.min_sample_rate() <= options::SAMPLE_RATE && c.max_sample_rate() >= options::SAMPLE_RATE)
+        .filter(|c| c.min_sample_rate() <= consts::SAMPLE_RATE && c.max_sample_rate() >= consts::SAMPLE_RATE)
         .next()
-        .map(|c| c.with_sample_rate(options::SAMPLE_RATE))
+        .map(|c| c.with_sample_rate(consts::SAMPLE_RATE))
         .unwrap_or(default_config)
         .into()
 }
@@ -259,19 +260,19 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
     //PREPARE OPUS ENCODER
     let opus_encoder = Encoder::new
     (
-        <SampleRate as TryFrom<i32>>::try_from(options::SAMPLE_RATE as i32).unwrap(),
+        <SampleRate as TryFrom<i32>>::try_from(consts::SAMPLE_RATE as i32).unwrap(),
         Channels::Mono,
         Application::Voip
     ).unwrap();
 
     //INPUT BUFFERS
-    let mut input_accum: Vec<f32> = Vec::with_capacity(options::FRAME_SIZE * 2);
+    let mut input_accum: Vec<f32> = Vec::with_capacity(consts::FRAME_SIZE * 2);
     let mut encoded_buffer = [0u8; 1500]; //ALLOCATE BUFFER TO STANDARD MTU
 
     //INPUT RESAMPLING
     let input_channels = input_config.channels as usize;
     let input_source_rate = input_config.sample_rate as f32;
-    let input_target_rate = options::SAMPLE_RATE as f32;
+    let input_target_rate = consts::SAMPLE_RATE as f32;
 
     //INPUT INTERPOLATION
     let input_resample_step = input_source_rate / input_target_rate;
@@ -284,7 +285,7 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
 
     //NOISE REDUCTION
     let mut denoiser = DenoiseState::new();
-    let mut denoise_buffer = [0.0f32; options::SAMPLE_RATE as usize / 100];
+    let mut denoise_buffer = [0.0f32; consts::SAMPLE_RATE as usize / 100];
 
     //CONFIGURE INPUT STREAM
     let send_socket = socket.clone();
@@ -334,14 +335,14 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
         input_resample_pos -= frames_in_buffer as f32;
 
         //PROCESS
-        while input_accum.len() >= options::FRAME_SIZE
+        while input_accum.len() >= consts::FRAME_SIZE
         {
-            let mut frame: Vec<f32> = input_accum.drain(0..options::FRAME_SIZE).collect();
+            let mut frame: Vec<f32> = input_accum.drain(0..consts::FRAME_SIZE).collect();
 
             //NOISE REDUCTION
-            for chunk in frame.chunks_mut(options::SAMPLE_RATE as usize / 100)
+            for chunk in frame.chunks_mut(consts::SAMPLE_RATE as usize / 100)
             {
-                if chunk.len() == options::SAMPLE_RATE as usize / 100
+                if chunk.len() == consts::SAMPLE_RATE as usize / 100
                 {
                     //SCALE UP
                     for sample in chunk.iter_mut()
@@ -367,7 +368,7 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
             let mut hold_frames = hold_frames_remaining.lock().unwrap();
 
             //HYSTERESIS
-            if !*gate && rms > options::TRESHOLD_OPEN
+            if !*gate && rms > consts::TRESHOLD_OPEN
             {
                 *gate = true; //SPEAKING
 
@@ -378,8 +379,8 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
                 }
 
                 preroll.clear();
-                *hold_frames = options::HOLD_FRAMES;
-            } else if *gate && rms < options::TRESHOLD_CLOSE
+                *hold_frames = consts::HOLD_FRAMES;
+            } else if *gate && rms < consts::TRESHOLD_CLOSE
             {
                 if *hold_frames > 0 //SILENT FRAME, DECREMENT
                 {
@@ -388,9 +389,9 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
                 {
                     *gate = false;
                 }
-            } else if *gate && rms >= options::TRESHOLD_CLOSE //SPEAKING CONTINUES, RESET HOLD TIMER
+            } else if *gate && rms >= consts::TRESHOLD_CLOSE //SPEAKING CONTINUES, RESET HOLD TIMER
             {
-                *hold_frames = options::HOLD_FRAMES;
+                *hold_frames = consts::HOLD_FRAMES;
             }
 
             //STORE TO PRE-ROLL BUFFER (MAX 3 FRAMES)
@@ -406,7 +407,7 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
             //TRANSMIT ONLY IF GATE IS OPEN
             if *gate
             {
-                LOCAL_DISPLAY_HOLD.store((options::SAMPLE_RATE * options::DISPLAY_HOLD as u32 / 1000) as usize, Ordering::Relaxed);
+                LOCAL_DISPLAY_HOLD.store((consts::SAMPLE_RATE * consts::DISPLAY_HOLD as u32 / 1000) as usize, Ordering::Relaxed);
                 transmit_audio(&opus_encoder, &frame, &mut encoded_buffer, id, &send_socket);
             }
         }
@@ -414,7 +415,7 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
 
     //OUTPUT RESAMPLING
     let output_channels = output_config.channels as usize;
-    let output_source_rate = options::SAMPLE_RATE as f32;
+    let output_source_rate = consts::SAMPLE_RATE as f32;
     let output_target_rate = output_config.sample_rate as f32;
 
     //OUTPUT INTERPOLATION
@@ -452,10 +453,10 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
                 stream.resample_pos += output_resample_step; //MOVE RESAMPLER POSITION FOR THIS CLIENT
 
                 //ACTIVE SPEAKER DETECTION
-                if interpolated.abs() > options::MIXING_TRESHOLD
+                if interpolated.abs() > consts::MIXING_TRESHOLD
                 {
-                    stream.activity_hold = options::ACTIVITY_HOLD; //SET TIMER TO ~100ms
-                    stream.display_hold = (options::SAMPLE_RATE * options::DISPLAY_HOLD as u32 / 1000) as usize; //SET DISPLAY FOR ~1000ms
+                    stream.activity_hold = consts::ACTIVITY_HOLD; //SET TIMER TO ~100ms
+                    stream.display_hold = (consts::SAMPLE_RATE * consts::DISPLAY_HOLD as u32 / 1000) as usize; //SET DISPLAY FOR ~1000ms
                 }
 
                 if stream.activity_hold > 0
@@ -549,7 +550,7 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
     });
 
     //OUTPUT BUFFERS
-    let mut decoded_buffer = [0.0f32; options::FRAME_SIZE];
+    let mut decoded_buffer = [0.0f32; consts::FRAME_SIZE];
 
     loop
     {
@@ -676,12 +677,12 @@ pub fn add_consumer(id: usize, username: String)
     //OPUS DECODER
     let decoder = Decoder::new
     (
-        <SampleRate as TryFrom<i32>>::try_from(options::SAMPLE_RATE as i32).unwrap(),
+        <SampleRate as TryFrom<i32>>::try_from(consts::SAMPLE_RATE as i32).unwrap(),
         Channels::Mono,
     ).unwrap();
 
     //JITTER BUFFER
-    let rb = HeapRb::<f32>::new(options::FRAME_SIZE * options::JITTER_BUFFER_SIZE);
+    let rb = HeapRb::<f32>::new(consts::FRAME_SIZE * consts::JITTER_BUFFER_SIZE);
     let (producer, mut consumer) = rb.split();
 
     let first_sample = consumer.try_pop().unwrap_or(0.0);
