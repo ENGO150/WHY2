@@ -292,7 +292,25 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
     let input_stream = input_device.build_input_stream(&input_config, move |data: &[f32], _: &_|
     {
         //CHECK FOR MUTING
-        if chat_options::is_muted(None) { return; }
+        if chat_options::is_muted(None)
+        {
+            LOCAL_DISPLAY_HOLD.store(0, Ordering::Relaxed); //CLEAR VAD WINDOW
+            input_accum.clear(); //REMOVE BLOB REMAINING IN BUFFER
+
+            //CLOSE GATE
+            if let Ok(mut gate) = gate_open.lock()
+            {
+                *gate = false;
+            }
+
+            //CLEAR PREROLL
+            if let Ok(mut preroll) = preroll_buffer.lock()
+            {
+                preroll.clear();
+            }
+
+            return;
+        }
 
         //CHECK GENERATION
         if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
