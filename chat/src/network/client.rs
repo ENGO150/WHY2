@@ -181,6 +181,9 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
             None => continue
         };
 
+        //CHECK FOR MUTED CLIENT
+        if options::is_muted(read.id) { continue; }
+
         extra_space = false; //RESET EXTRA SPACE
 
         //EXTRA SPACE
