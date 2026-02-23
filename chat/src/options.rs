@@ -185,7 +185,7 @@ pub fn set_server_address(address: &str) //SET SERVER ADDRESS
 
 //MUTING
 #[cfg(feature = "client")]
-pub fn toggle_mute(id: Option<usize>) -> bool
+pub fn toggle_mute(id: Option<usize>) -> bool //ENABLE/DISABLE MUTE
 {
     if let Some(id) = id //MUTE CLIENT
     {
@@ -204,6 +204,12 @@ pub fn toggle_mute(id: Option<usize>) -> bool
     {
         !MUTE.fetch_xor(true, Ordering::Relaxed)
     }
+}
+
+#[cfg(feature = "client")]
+pub fn is_muted(id: usize) -> bool //CHECK IF CLIENT ID IS MUTED LOCALLY
+{
+    MUTED.lock().unwrap().contains(&id)
 }
 
 //SOCKS5
