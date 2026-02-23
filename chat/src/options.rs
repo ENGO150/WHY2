@@ -19,14 +19,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::sync::atomic::{ AtomicBool, Ordering };
 
 #[cfg(feature = "client")]
-use std::sync::
+use std::
 {
-    Arc,
-    Mutex,
-    RwLock,
-    LazyLock,
-    OnceLock,
-    atomic::AtomicUsize,
+    collections::HashSet,
+    sync::
+    {
+        Arc,
+        Mutex,
+        RwLock,
+        LazyLock,
+        OnceLock,
+        atomic::AtomicUsize,
+    },
 };
 
 #[cfg(feature = "client")]
@@ -65,6 +69,11 @@ static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (
 
 #[cfg(feature = "client")]
 static SERVER_ADDRESS: OnceLock<String> = OnceLock::new();
+
+#[cfg(feature = "client")]
+static MUTE: AtomicBool = AtomicBool::new(false); //MUTE LOCAL CLIENT
+#[cfg(feature = "client")]
+static MUTED: LazyLock<Mutex<HashSet<usize>>> = LazyLock::new(|| Mutex::new(HashSet::new())); //MUTED CLIENTS
 
 #[cfg(feature = "client")]
 static SOCKS5: AtomicBool = AtomicBool::new(false); //USE SOCKS5 (TOR)
@@ -172,6 +181,29 @@ pub fn get_server_address() -> String //GET SERVER ADDRESS
 pub fn set_server_address(address: &str) //SET SERVER ADDRESS
 {
     SERVER_ADDRESS.set(address.to_owned()).unwrap();
+}
+
+//MUTING
+#[cfg(feature = "client")]
+pub fn toggle_mute(id: Option<usize>) -> bool
+{
+    if let Some(id) = id //MUTE CLIENT
+    {
+        let mut muted = MUTED.lock().unwrap();
+
+        if muted.remove(&id)
+        {
+            true
+        } else
+        {
+            muted.insert(id);
+            false
+        }
+
+    } else //MUTE LOCAL CLIENT
+    {
+        !MUTE.fetch_xor(true, Ordering::Relaxed)
+    }
 }
 
 //SOCKS5
