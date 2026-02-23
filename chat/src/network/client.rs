@@ -32,6 +32,7 @@ use crate::
     options,
     misc,
     crypto::kex,
+    consts,
     config::{ self, TofuCode },
     network::
     {
@@ -73,7 +74,7 @@ pub enum ClientEvent
 
 //FUNCTIONS
 //PRIVATE
-fn key_exchange(stream: &mut TcpStream, keys: &mut options::SharedKeys, tx: &Sender<ClientEvent>) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
+fn key_exchange(stream: &mut TcpStream, keys: &mut consts::SharedKeys, tx: &Sender<ClientEvent>) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
     let message = loop

@@ -52,7 +52,11 @@ use zeroize::Zeroizing;
 
 use why2::consts;
 
-use crate::{ misc, options };
+use crate::
+{
+    misc,
+    consts as consts_chat,
+};
 
 #[cfg(feature = "server")]
 use std::{ fs, path::Path };
@@ -64,7 +68,7 @@ fn decode_raw_pem(pem: &str) -> Option<Vec<u8>>
     pem::decode_vec(pem.as_bytes()).ok().map(|p| p.1.to_vec())
 }
 
-fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> options::SharedKeys //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
+fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::SharedKeys //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
 {
     let hkdf = Hkdf::<Sha256>::new(None, shared_secret);
 
@@ -115,7 +119,7 @@ pub fn generate_server_pq_keys() -> (String, String) //GENERATE POST-QUANTUM KEY
 pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
 {
     //CHECK IF KEY DIRECTORY EXISTS
-    let server_keys_dir = misc::get_why2_dir() + options::SERVER_KEYS_DIR;
+    let server_keys_dir = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR;
     if !Path::new(&server_keys_dir).is_dir()
     {
         fs::create_dir_all(&server_keys_dir).expect("Failed to create WHY2 server-keys directory"); //CREATE DIRECTORY
@@ -125,22 +129,22 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
         let (dk, ek) = generate_server_pq_keys(); //ML-KEM
 
         //SAVE ECC KEYS
-        fs::write(server_keys_dir.clone() + options::SERVER_SKEY, sk).expect("Saving server secret key failed");
-        fs::write(server_keys_dir.clone() + options::SERVER_PKEY, pk).expect("Saving server public key failed");
+        fs::write(server_keys_dir.clone() + consts_chat::SERVER_SKEY, sk).expect("Saving server secret key failed");
+        fs::write(server_keys_dir.clone() + consts_chat::SERVER_PKEY, pk).expect("Saving server public key failed");
 
         //SAVE PQ KEYS
-        fs::write(server_keys_dir.clone() + options::SERVER_PQ_SKEY, dk).expect("Saving server PQ secret key failed");
-        fs::write(server_keys_dir + options::SERVER_PQ_PKEY, ek).expect("Saving server PQ public key failed");
+        fs::write(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY, dk).expect("Saving server PQ secret key failed");
+        fs::write(server_keys_dir + consts_chat::SERVER_PQ_PKEY, ek).expect("Saving server PQ public key failed");
     }
 }
 
 #[cfg(feature = "server")]
 pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
 {
-    let server_keys_dir = misc::get_why2_dir() + options::SERVER_KEYS_DIR;
+    let server_keys_dir = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR;
 
-    let sk = fs::read_to_string(server_keys_dir.clone() + options::SERVER_SKEY).expect("Reading server secret key failed");
-    let pk = fs::read_to_string(server_keys_dir + options::SERVER_PKEY).expect("Reading server public key failed");
+    let sk = fs::read_to_string(server_keys_dir.clone() + consts_chat::SERVER_SKEY).expect("Reading server secret key failed");
+    let pk = fs::read_to_string(server_keys_dir + consts_chat::SERVER_PKEY).expect("Reading server public key failed");
 
     (sk, pk)
 }
@@ -148,10 +152,10 @@ pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
 #[cfg(feature = "server")]
 pub fn get_server_pq_keys() -> (String, String) //GET SERVER ML-KEM KEYS
 {
-    let server_keys_dir = misc::get_why2_dir() + options::SERVER_KEYS_DIR;
+    let server_keys_dir = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR;
 
-    let dk = fs::read_to_string(server_keys_dir.clone() + options::SERVER_PQ_SKEY).expect("Reading server PQ secret key failed");
-    let ek = fs::read_to_string(server_keys_dir + options::SERVER_PQ_PKEY).expect("Reading server PQ public key failed");
+    let dk = fs::read_to_string(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY).expect("Reading server PQ secret key failed");
+    let ek = fs::read_to_string(server_keys_dir + consts_chat::SERVER_PQ_PKEY).expect("Reading server PQ public key failed");
 
     (dk, ek)
 }
@@ -161,7 +165,7 @@ pub fn derive_shared_secret //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPT
     local_key: String,
     peer_pkey: String,
     pq_secret: Vec<u8>,
-) -> Option<options::SharedKeys>
+) -> Option<consts_chat::SharedKeys>
 {
     //PARSE KEYS
     let local_private = SecretKey::from_pkcs8_pem(&local_key).expect("Invalid key");

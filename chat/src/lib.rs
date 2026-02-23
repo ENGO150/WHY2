@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod command;
 pub mod config;
+pub mod consts;
 pub mod crypto;
 pub mod misc;
 pub mod network;

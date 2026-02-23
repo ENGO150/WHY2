@@ -36,7 +36,7 @@ use wincode::{ SchemaRead, SchemaWrite };
 use crate::
 {
     crypto,
-    options::SharedKeys,
+    consts::SharedKeys,
 };
 
 #[cfg(not(feature = "server"))]

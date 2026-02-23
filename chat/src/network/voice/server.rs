@@ -27,7 +27,7 @@ use dashmap::DashMap;
 
 use crate::
 {
-    options::SharedKeys,
+    consts::SharedKeys,
     network::
     {
         server,

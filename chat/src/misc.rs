@@ -29,7 +29,7 @@ use serde_json::Value;
 
 use semver::Version;
 
-use crate::options;
+use crate::consts;
 
 #[cfg(feature = "client")]
 use std::sync::mpsc::Sender;
@@ -45,7 +45,7 @@ fn get_dir(dir: &str) -> String
 
 fn get_config_dir() -> String
 {
-    get_dir(options::USER_CONFIG_DIR)
+    get_dir(consts::USER_CONFIG_DIR)
 }
 
 //PUBLIC
@@ -63,7 +63,7 @@ pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
 {
     //CREATE CUSTOM CLIENT (WITH TIMEOUT)
     let agent: Agent = Agent::config_builder()
-        .timeout_global(Some(Duration::from_millis(options::FETCH_TIMEOUT)))
+        .timeout_global(Some(Duration::from_millis(consts::FETCH_TIMEOUT)))
         .build()
         .into();
 
@@ -78,7 +78,7 @@ pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
 pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHECK FOR LATEST WHY2 VERSION
 {
     //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
-    let metadata_raw = match fetch_data(options::METADATA_URL)
+    let metadata_raw = match fetch_data(consts::METADATA_URL)
     {
         Ok(m) => m,
         Err(_) =>
@@ -142,7 +142,7 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
 
 pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
 {
-    let config = get_config_dir() + options::CONFIG_DIR;
+    let config = get_config_dir() + consts::CONFIG_DIR;
 
     //CREATE WHY2 CONFIG DIRECTORY
     if !Path::new(&config).is_dir()
@@ -153,5 +153,5 @@ pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
 
 pub fn get_why2_dir() -> String //RETURN PATH TO WHY2 CONFIG DIRECTORY
 {
-    get_config_dir() + options::CONFIG_DIR
+    get_config_dir() + consts::CONFIG_DIR
 }

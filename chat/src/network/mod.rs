@@ -59,7 +59,14 @@ use colored::Color;
 
 use why2::consts;
 
-use crate::{ crypto, options };
+use crate::
+{
+    crypto,
+    consts as chat_consts,
+};
+
+#[cfg(feature = "client")]
+use crate::options;
 
 #[cfg(feature = "server")]
 use std::time::{ Instant, Duration };
@@ -216,14 +223,14 @@ fn obfuscate_data(data: &[u8]) -> Vec<u8> //XOR BYTES (USED FOR OBFUSCATION)
     for (i, byte) in obfuscated.iter_mut().enumerate()
     {
         //XOR EACH BYTE WITH OBFUSCATION KEY
-        *byte ^= options::OBFUSCATION_KEY[i % options::OBFUSCATION_KEY.len()];
+        *byte ^= chat_consts::OBFUSCATION_KEY[i % chat_consts::OBFUSCATION_KEY.len()];
     }
 
     obfuscated
 }
 
 //PUBLIC
-pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&options::SharedKeys>) //SEND packet TO stream
+pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&chat_consts::SharedKeys>) //SEND packet TO stream
 {
     //ADD SEQUENCE NUMBER TO packet (FROM CLIENT)
     #[cfg(feature = "client")]
@@ -268,7 +275,7 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&opt
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, keys: Option<&options::SharedKeys>) -> Option<MessagePacket>
+pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -> Option<MessagePacket>
 {
     //SERVER SIDE PACKET SIZE LIMIT
     #[cfg(feature = "server")]

@@ -27,7 +27,7 @@ use std::
 
 use toml_edit::{ DocumentMut, Value };
 
-use crate::{ options, misc };
+use crate::{ consts, misc };
 
 #[cfg(feature = "client")]
 use std::fmt::Write;
@@ -144,12 +144,12 @@ pub fn init_config() //INITIALIZE CONFIG FILES
         {
             #[cfg(feature = "client")]
             {
-                options::CLIENT_CONFIG
+                consts::CLIENT_CONFIG
             }
 
             #[cfg(feature = "server")]
             {
-                options::SERVER_CONFIG
+                consts::SERVER_CONFIG
             }
         };
 
@@ -167,12 +167,12 @@ pub fn init_config() //INITIALIZE CONFIG FILES
     {
         #[cfg(feature = "client")]
         {
-            config_path(options::SERVER_KEYS_CONFIG)
+            config_path(consts::SERVER_KEYS_CONFIG)
         }
 
         #[cfg(feature = "server")]
         {
-            config_path(options::SERVER_USERS_CONFIG)
+            config_path(consts::SERVER_USERS_CONFIG)
         }
     };
 
@@ -189,37 +189,37 @@ where
 {
     #[cfg(feature = "client")]
     {
-        config_read(options::CLIENT_CONFIG, key)
+        config_read(consts::CLIENT_CONFIG, key)
     }
 
     #[cfg(feature = "server")]
     {
-        config_read(options::SERVER_CONFIG, key)
+        config_read(consts::SERVER_CONFIG, key)
     }
 }
 
 #[cfg(feature = "server")]
 pub fn server_users_config(key: &str) -> String //RETURN key FROM server_users.toml
 {
-    config_read(options::SERVER_USERS_CONFIG, key)
+    config_read(consts::SERVER_USERS_CONFIG, key)
 }
 
 #[cfg(feature = "client")]
 pub fn client_write(key: &str, value: &str) //WRITE TO client.toml
 {
-    config_write(options::CLIENT_CONFIG, key, value);
+    config_write(consts::CLIENT_CONFIG, key, value);
 }
 
 #[cfg(feature = "server")]
 pub fn server_users_write(key: &str, value: &str) //WRITE TO server_users.toml
 {
-    config_write(options::SERVER_USERS_CONFIG, key, value);
+    config_write(consts::SERVER_USERS_CONFIG, key, value);
 }
 
 #[cfg(feature = "server")]
 pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml contains
 {
-    get_data(&config_path(options::SERVER_USERS_CONFIG)).get(key).is_some()
+    get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(key).is_some()
 }
 
 #[cfg(feature = "client")]
@@ -236,10 +236,10 @@ pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VA
     }
 
     //PEER PUBKEY STORED, CHECK VALIDITY
-    if get_data(&config_path(options::SERVER_KEYS_CONFIG)).get(host).is_some()
+    if get_data(&config_path(consts::SERVER_KEYS_CONFIG)).get(host).is_some()
     {
         //COMPARE
-        return if config_read::<String>(options::SERVER_KEYS_CONFIG, host) == pubkey_string
+        return if config_read::<String>(consts::SERVER_KEYS_CONFIG, host) == pubkey_string
         {
             TofuCode::Valid
         } else
@@ -255,5 +255,5 @@ pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VA
 pub fn server_keys_save(host: &str, pubkey_hash: &str) //SAVE KEY
 {
     //WRITE
-    config_write(options::SERVER_KEYS_CONFIG, host, pubkey_hash);
+    config_write(consts::SERVER_KEYS_CONFIG, host, pubkey_hash);
 }

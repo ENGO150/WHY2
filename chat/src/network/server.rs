@@ -43,6 +43,7 @@ use dashmap::DashMap;
 use crate::
 {
     config,
+    consts,
     options,
     misc,
     crypto::{ kex, password },
@@ -65,7 +66,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         peer_addr: SocketAddr,         //ADDRESS & PORT
         username: String,              //USERNAME
         id: usize,                     //ID OF USER
-        keys: options::SharedKeys,     //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
+        keys: consts::SharedKeys,     //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
         last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
         last_key_exchange: Instant,    //TIME OF LAST REKEY
         spam_violations: usize,        //SPAM VIOLATIONS (unexpected, huh?)
@@ -79,7 +80,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         stream: Arc<Mutex<TcpStream>>,     //STREAM
         peer_addr: SocketAddr,             //ADDRESS & PORT
         username: Option<String>,          //CHOSEN USERNAME
-        keys: Option<options::SharedKeys>, //SHARED KEYS
+        keys: Option<consts::SharedKeys>, //SHARED KEYS
         last_activity: Instant,            //TIME OF LAST MESSAGE
         seq: usize,                        //SEQUENCE NUMBER
     },
@@ -139,7 +140,7 @@ impl Connection
     }
 
     //GET SHARED KEYS FROM Connection
-    pub fn keys(&self) -> Option<&options::SharedKeys>
+    pub fn keys(&self) -> Option<&consts::SharedKeys>
     {
         match self
         {
@@ -275,7 +276,7 @@ impl Connection
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //PRIVATE
-fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&options::SharedKeys>) -> Option<MessagePacket>
+fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&consts::SharedKeys>) -> Option<MessagePacket>
 {
     //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
     stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
@@ -305,7 +306,7 @@ fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&optio
     Some(message)
 }
 
-fn key_exchange(peer_addr: &SocketAddr, keys: &mut options::SharedKeys) //KEY EXCHANGE FOR SERVER-SIDE
+fn key_exchange(peer_addr: &SocketAddr, keys: &mut consts::SharedKeys) //KEY EXCHANGE FOR SERVER-SIDE
 {
     //GET CONNECTION
     let mut stream = match CONNECTIONS.get(peer_addr)
@@ -363,7 +364,7 @@ fn key_exchange(peer_addr: &SocketAddr, keys: &mut options::SharedKeys) //KEY EX
     }
 }
 
-fn send_welcome_packet(stream: &mut TcpStream, keys: &options::SharedKeys) //send welcome packet you idiot
+fn send_welcome_packet(stream: &mut TcpStream, keys: &consts::SharedKeys) //send welcome packet you idiot
 {
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
@@ -493,7 +494,7 @@ fn get_latest_id() -> usize
     unreachable!("what the fuck");
 }
 
-fn update_client_keys(peer_addr: &SocketAddr, keys: &options::SharedKeys) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
+fn update_client_keys(peer_addr: &SocketAddr, keys: &consts::SharedKeys) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
 {
     //UPDATE CONNECTION
     CONNECTIONS.alter(peer_addr, |_, old_connection|
@@ -580,7 +581,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
     });
 }
 
-fn ask_version(stream: &mut TcpStream, keys: &options::SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
+fn ask_version(stream: &mut TcpStream, keys: &consts::SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
 {
     //ASK FOR VERSION
     send_code(stream, Some(misc::get_version().to_string()), MessageCode::Version, Some(keys));
@@ -589,7 +590,7 @@ fn ask_version(stream: &mut TcpStream, keys: &options::SharedKeys) -> Option<Str
     untrusted_read(stream, MessageCode::Version, Some(keys))?.text
 }
 
-fn send_voice_clients(stream: &mut TcpStream, keys: &options::SharedKeys, id: usize)
+fn send_voice_clients(stream: &mut TcpStream, keys: &consts::SharedKeys, id: usize)
 {
     //FIND CHANNEL
     let sender_channel = match CONNECTIONS.iter().find(|e| e.value().id() == Some(&id))
@@ -636,7 +637,7 @@ fn send_voice_clients(stream: &mut TcpStream, keys: &options::SharedKeys, id: us
 }
 
 //PUBLIC
-pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, keys: Option<&options::SharedKeys>) //SEND CODE TO CLIENT
+pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, keys: Option<&consts::SharedKeys>) //SEND CODE TO CLIENT
 {
     network::send(stream, MessagePacket
     {
@@ -838,7 +839,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
         //REKEY EVERY 10 MINUTES
         if Instant::now().duration_since(*CONNECTIONS.get(&peer_addr).unwrap().last_key_exchange().unwrap()) >=
-            Duration::from_secs(options::REKEY_INTERVAL)
+            Duration::from_secs(consts::REKEY_INTERVAL)
         {
             //INFORM CLIENT ABOUT REKEYING
             send_code(stream, None, MessageCode::Rekey, Some(&keys));
