@@ -217,16 +217,15 @@ unsafe impl<'de, C: Config> SchemaRead<'de, C> for SerColor
 
 //FUNCTIONS
 //PRIVATE
-fn obfuscate_data(data: &[u8]) -> Vec<u8> //XOR BYTES (USED FOR OBFUSCATION)
+fn obfuscate_data(mut data: Vec<u8>) -> Vec<u8> //XOR BYTES (USED FOR OBFUSCATION)
 {
-    let mut obfuscated = data.to_vec();
-    for (i, byte) in obfuscated.iter_mut().enumerate()
+    for (i, byte) in data.iter_mut().enumerate()
     {
         //XOR EACH BYTE WITH OBFUSCATION KEY
         *byte ^= chat_consts::OBFUSCATION_KEY[i % chat_consts::OBFUSCATION_KEY.len()];
     }
 
-    obfuscated
+    data
 }
 
 //PUBLIC
@@ -261,7 +260,7 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
         crypto::encrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(packet_bytes, keys)
     } else
     {
-        obfuscate_data(&packet_bytes) //NO ENCRYPTION, OBFUSCATE
+        obfuscate_data(packet_bytes) //NO ENCRYPTION, OBFUSCATE
     };
 
     //CONVERT ENCRYPTED OUTPUT TO BYTES ([LENGTH][DATA])
@@ -340,7 +339,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
         }
     } else
     {
-        decoded_packet = obfuscate_data(&decoded_packet); //NO ENCRYPTION, REMOVE OBFUSCATION
+        decoded_packet = obfuscate_data(decoded_packet); //NO ENCRYPTION, REMOVE OBFUSCATION
     }
 
     //ACTIVITY TIMER ON SERVER
