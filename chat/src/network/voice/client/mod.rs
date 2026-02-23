@@ -291,6 +291,9 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
     let send_socket = socket.clone();
     let input_stream = input_device.build_input_stream(&input_config, move |data: &[f32], _: &_|
     {
+        //CHECK FOR MUTING
+        if chat_options::is_muted(None) { return; }
+
         //CHECK GENERATION
         if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
 
