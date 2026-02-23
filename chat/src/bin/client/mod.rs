@@ -123,6 +123,35 @@ fn redraw_removed(input: &Vec<char>, cursor_position: usize) //REDRAW TEXT AFTER
     }
 }
 
+fn mute(parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
+{
+    ui::clear_lines(2);
+
+    //GET ID PARAMETER
+    let id = if let Some(parameters) = parameters
+    {
+        match parameters.parse::<usize>()
+        {
+            Ok(i) => Some(i),
+            Err(_) =>
+            {
+                return print!("Invalid usage! Press Ctrl+H for help.\n\n\r>>> ");
+            }
+        }
+    } else { None };
+
+    //INFO LOG
+    print!
+    (
+        "Sucessfully {}muted{}.\n\n\r>>> ",
+        if options::toggle_mute(id) { "" } else { "un" },
+        if let Some(id) = id
+        {
+            format!(" ID {id}")
+        } else { String::new() }
+    );
+}
+
 fn read_input() -> String
 {
     //CREATE/RESET PARTIAL INPUT VARIABLES
@@ -147,6 +176,12 @@ fn read_input() -> String
                     {
                         ui::clear_lines(1);
                         return Command::List.to_string();
+                    },
+
+                    //CTRL+S (MUTE LOCAL)
+                    KeyCode::Char('s') =>
+                    {
+                        mute(None);
                     },
 
                     //CTRL+C (EXIT)
@@ -589,31 +624,7 @@ fn main()
 
                         Command::Mute =>
                         {
-                            //GET ID PARAMETER
-                            let id = if let Some(parameters) = parameters
-                            {
-                                match parameters.parse::<usize>()
-                                {
-                                    Ok(i) => Some(i),
-                                    Err(_) =>
-                                    {
-                                        print!("Invalid usage! Press Ctrl+H for help.\n\n\r>>> ");
-                                        continue;
-                                    }
-                                }
-                            } else { None };
-
-                            //INFO LOG
-                            ui::clear_lines(2);
-                            print!
-                            (
-                                "Sucessfully {}muted{}.\n\n\r>>> ",
-                                if options::toggle_mute(id) { "" } else { "un" },
-                                if let Some(id) = id
-                                {
-                                    format!(" ID {id}")
-                                } else { String::new() }
-                            );
+                            mute(parameters);
                         },
 
                         //INVALID COMMAND
