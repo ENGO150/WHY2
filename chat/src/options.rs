@@ -193,11 +193,11 @@ pub fn toggle_mute(id: Option<usize>) -> bool
 
         if muted.remove(&id)
         {
-            true
+            false
         } else
         {
             muted.insert(id);
-            false
+            true
         }
 
     } else //MUTE LOCAL CLIENT
