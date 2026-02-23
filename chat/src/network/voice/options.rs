@@ -90,7 +90,5 @@ pub fn get_use_voice() -> bool //GET USE VOICE
 #[cfg(feature = "client")]
 pub fn swap_use_voice() -> bool //SET USE VOICE
 {
-    let value = !USE_VOICE.load(Ordering::Relaxed);
-    USE_VOICE.store(value, Ordering::Relaxed);
-    value
+    !USE_VOICE.fetch_xor(true, Ordering::Relaxed)
 }
