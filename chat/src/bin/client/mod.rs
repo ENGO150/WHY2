@@ -376,7 +376,6 @@ fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CH
     //PRINTOUT RESULT
     ui::clear_lines(2);
     print!("{message}\n\n\r>>> ");
-    io::stdout().flush().unwrap();
 }
 
 fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
@@ -576,7 +575,6 @@ fn main()
 
                             //PRINT PROMPT BAR
                             print!("\n\r>>> ");
-                            io::stdout().flush().unwrap();
                         },
 
                         Command::UsernameColor =>
@@ -589,12 +587,40 @@ fn main()
                             color_handler("message_color", parameters);
                         },
 
+                        Command::Mute =>
+                        {
+                            //GET ID PARAMETER
+                            let id = if let Some(parameters) = parameters
+                            {
+                                match parameters.parse::<usize>()
+                                {
+                                    Ok(i) => Some(i),
+                                    Err(_) =>
+                                    {
+                                        print!("Invalid usage! Press Ctrl+H for help.\n\n\r>>> ");
+                                        continue;
+                                    }
+                                }
+                            } else { None };
+
+                            //INFO LOG
+                            ui::clear_lines(2);
+                            print!
+                            (
+                                "Sucessfully {}muted{}.\n\n\r>>> ",
+                                if options::toggle_mute(id) { "" } else { "un" },
+                                if let Some(id) = id
+                                {
+                                    format!(" ID {id}")
+                                } else { String::new() }
+                            );
+                        },
+
                         //INVALID COMMAND
                         Command::Invalid =>
                         {
                             ui::clear_lines(2);
                             print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
-                            io::stdout().flush().unwrap();
                         },
 
                         //NON IMPLEMENTED COMMAND
@@ -602,6 +628,7 @@ fn main()
                     }
                 }
 
+                io::stdout().flush().unwrap(); //FLUSH COMMAND OUTPUT
                 command_used = true;
             }
 
