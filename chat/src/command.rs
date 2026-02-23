@@ -87,7 +87,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     CommandInfo
     {
         command: Command::Mute,
-        triggers: &[ "MUTE", "SILENCE", "STFU" ],
+        triggers: &[ "MUTE", "UNMUTE", "SILENCE", "STFU" ],
         args: &[CommandArg { name: "ID", required: false }],
         description: "Toggle-mutes user/yourself",
     },
