@@ -612,6 +612,58 @@ fn main()
                             print!("\n\r>>> ");
                         },
 
+                        Command::Info =>
+                        {
+                            ui::clear_lines(2);
+                            let mut valid = false;
+
+                            //PARAMETERS PASSED
+                            if let Some(parameters) = parameters
+                            {
+                                //CHECK IF COMMAND/ALIAS EXISTS
+                                if let Some(command) = command::COMMAND_LIST.iter()
+                                    .find(|c| c.triggers.iter()
+                                        .find(|t| t.eq_ignore_ascii_case(&parameters)).is_some())
+                                {
+                                    options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
+                                    print!
+                                    (
+                                        "\n\rCommand: {command}
+                                        \rAliases: {aliases}
+                                        \rShortcut: {shortcut}
+                                        \rParameters: {args}
+                                        \rDescription: {description}
+                                        \n\r>>> ",
+
+                                        command = command.triggers[0],
+                                        aliases = command.triggers[1..].join(", "),
+                                        shortcut = command.shortcut.map(|s| format!("Ctrl+{}", s.to_ascii_uppercase())).unwrap_or(String::from("None")),
+                                        description = command.description,
+                                        args = if !command.args.is_empty()
+                                        {
+                                            command.args.iter().map(|arg|
+                                            {
+                                                if arg.required
+                                                {
+                                                    format!("({})", arg.name)
+                                                } else
+                                                {
+                                                    format!("[{}]", arg.name)
+                                                }
+                                            }).collect::<Vec<String>>().join(" ")
+                                        } else { String::from("None") },
+                                    );
+
+                                    valid = true;
+                                }
+                            }
+
+                            if !valid
+                            {
+                                print!("Invalid usage! Press Ctrl+H for help.\n\n\r>>> ");
+                            }
+                        },
+
                         Command::UsernameColor =>
                         {
                             color_handler("username_color", parameters);
