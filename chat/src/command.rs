@@ -62,6 +62,7 @@ pub struct CommandInfo //COMMAND INFO
 {
     pub command: Command,
     pub triggers: &'static [&'static str],
+    pub shortcut: Option<char>,
     pub args: &'static [CommandArg],
     pub description: &'static str,
 }
@@ -72,6 +73,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     {
         command: Command::Help,
         triggers: &[ "HELP", "H", "COMMANDS", "USAGE", "GUIDE" ],
+        shortcut: Some('h'),
         args: &[],
         description: "Prints all available commands",
     },
@@ -80,6 +82,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     {
         command: Command::Voice,
         triggers: &[ "VOICE", "VOIP", "CALL" ],
+        shortcut: None,
         args: &[],
         description: "Toggles voice chat",
     },
@@ -88,6 +91,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     {
         command: Command::Mute,
         triggers: &[ "MUTE", "UNMUTE", "SILENCE", "STFU" ],
+        shortcut: Some('s'),
         args: &[CommandArg { name: "ID", required: false }],
         description: "Toggle-mutes user/yourself",
     },
@@ -96,6 +100,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     {
         command: Command::Channel,
         triggers: &[ "CHANNEL", "SWITCH", "CHECKOUT", "AREA" ],
+        shortcut: None,
         args: &[CommandArg { name: "NAME", required: false }],
         description: "Switches to channel/lobby if NAME is omitted",
     },
@@ -104,6 +109,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     {
         command: Command::List,
         triggers: &[ "LIST", "USERS", "CLIENTS", "CHANNELS", "IDS", "ID" ],
+        shortcut: Some('l'),
         args: &[],
         description: "Shows connected users and their IDs",
     },
@@ -112,6 +118,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     {
         command: Command::PrivateMessage,
         triggers: &[ "PM", "DM", "MSG", "TELL" ],
+        shortcut: None,
         args:
         &[
             CommandArg { name: "ID", required: true },
@@ -124,6 +131,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     {
         command: Command::UsernameColor,
         triggers: &[ "UCOLOR", "USERNAME" ],
+        shortcut: None,
         args: &[CommandArg { name: "COLOR", required: true }],
         description: "Sets color of username",
     },
@@ -132,6 +140,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     {
         command: Command::MessageColor,
         triggers: &[ "COLOR", "MESSAGE" ],
+        shortcut: None,
         args: &[CommandArg { name: "COLOR", required: true }],
         description: "Sets color of message",
     },
@@ -140,6 +149,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     {
         command: Command::Exit,
         triggers: &[ "EXIT", "LEAVE", "QUIT", "DISCONNECT" ],
+        shortcut: Some('c'),
         args: &[],
         description: "Disconnects from the server",
     },
