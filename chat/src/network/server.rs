@@ -390,20 +390,24 @@ fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
     });
 
     //COLLECT EACH CLIENT IN SAME CHANNEL
-    let addrs: Vec<SocketAddr> = CONNECTIONS.iter().filter_map(|entry| match entry.value()
+    let entries: Vec<Connection> = CONNECTIONS.iter().filter_map(|entry|
     {
-        Connection::Authenticated { channel: c, peer_addr, .. } if c == &channel =>
+        match entry.value()
         {
-            Some(*peer_addr)
-        },
-        _ => None,
+            Connection::Authenticated { channel: c, .. } if c == &channel =>
+            {
+                //FOUND, COLLECT
+                Some(entry.value().clone())
+            },
+            _ => None,
+        }
     }).collect();
 
-    for addr in addrs
+    for ref entry in entries
     {
-        if let Some(conn) = CONNECTIONS.get(&addr)
+        if let Ok(mut stream) = entry.stream().lock()
         {
-            network::send(&mut conn.stream().lock().unwrap(), packet.clone(), conn.keys());
+            network::send(&mut *stream, packet.clone(), entry.keys());
         }
     }
 }
