@@ -44,6 +44,7 @@ pub enum Command
     Mute,           //TOGGLE-MUTE USER/YOURSELF
     Channel,        //SWITCH CHANNEL
     Help,           //PRINT COMMANDS
+    Info,           //COMMAND INFO
     List,           //LIST USERS
     PrivateMessage, //ONE TO ONE MESSAGE
     UsernameColor,  //SET COLOR OF USERNAME
@@ -76,6 +77,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
         shortcut: Some('h'),
         args: &[],
         description: "Prints all available commands",
+    },
+
+    CommandInfo
+    {
+        command: Command::Info,
+        triggers: &[ "INFO", "COMMAND", "MAN" ],
+        shortcut: None,
+        args: &[CommandArg { name: "COMMAND", required: true }],
+        description: "Shows command info",
     },
 
     CommandInfo
