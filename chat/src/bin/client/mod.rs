@@ -171,32 +171,6 @@ fn read_input() -> String
             {
                 match key_event.code
                 {
-                    //CTRL+L (LIST)
-                    KeyCode::Char('l') =>
-                    {
-                        ui::clear_lines(1);
-                        return Command::List.to_string();
-                    },
-
-                    //CTRL+S (MUTE LOCAL)
-                    KeyCode::Char('s') =>
-                    {
-                        mute(None);
-                    },
-
-                    //CTRL+C (EXIT)
-                    KeyCode::Char('c') =>
-                    {
-                        ui::clear_lines(2);
-                        return Command::Exit.to_string();
-                    },
-
-                    //CTRL+H (HELP)
-                    KeyCode::Char('h') =>
-                    {
-                        return Command::Help.to_string();
-                    },
-
                     //CTRL+A (MOVE TO LINE START)
                     KeyCode::Char('a') =>
                     {
@@ -216,6 +190,32 @@ fn read_input() -> String
                         {
                             print!("\x1B[{}C", input_len - cursor_position);
                             cursor_position = input_len;
+                        }
+                    },
+
+                    //COMMAND SHORTCUTS
+                    KeyCode::Char(c) =>
+                    {
+                        if let Some(command) = command::COMMAND_LIST.iter().find(|i| i.shortcut == Some(c))
+                        {
+                            match command.command
+                            {
+                                //CTRL+L (LIST)
+                                Command::List =>
+                                {
+                                    ui::clear_lines(1);
+                                },
+
+                                //CTRL+C (EXIT)
+                                Command::Exit =>
+                                {
+                                    ui::clear_lines(2);
+                                },
+
+                                _ => {} //NORMAL COMMAND
+                            }
+
+                            return command.command.to_string();
                         }
                     },
 
