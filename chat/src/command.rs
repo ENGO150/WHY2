@@ -241,7 +241,7 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
 pub fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: &Option<String>) -> bool //SEND CODE FROM COMMAND IF POSSIBLE
 {
     //CODE COMMAND
-    if let Some(code) = command.to_code()
+    if let Some(code) = command.to_code() && command != &Command::Upload
     {
         network::send(stream, MessagePacket
         {

@@ -26,9 +26,15 @@ use std::
     env,
     thread,
     process,
+    fs::File,
     net::TcpStream,
     time::Duration,
-    io::{ self, Write },
+    io::
+    {
+        self,
+        Read,
+        Write,
+    },
     sync::
     {
         mpsc,
@@ -37,6 +43,8 @@ use std::
         Mutex,
     },
 };
+
+use sha2::{ Sha256, Digest };
 
 use socket2::{ Socket, TcpKeepalive };
 use socks::Socks5Stream;
@@ -657,6 +665,47 @@ fn main()
                             }
 
                             if !valid { invalid_usage(None); }
+                        },
+
+                        Command::Upload =>
+                        {
+                            ui::clear_lines(2);
+
+                            //CHECK PATH
+                            if let Some(parameters) = parameters
+                            {
+                                //TRY TO OPEN FILE
+                                if let Ok(mut file) = File::open(parameters.trim()) &&
+                                    let Ok(metadata) = file.metadata() && metadata.is_file()
+                                {
+                                    //GET SHA256 FILE HASH
+                                    let mut hasher = Sha256::new();
+                                    let mut buffer = vec![0; 1024 * 1024];
+
+                                    //LOOP READING
+                                    let success = loop
+                                    {
+                                        match file.read(&mut buffer)
+                                        {
+                                            Ok(0) => break true,
+                                            Ok(bytes) => hasher.update(&buffer[..bytes]),
+                                            Err(_) => break false,
+                                        }
+                                    };
+
+                                    //FINALIZE
+                                    if success
+                                    {
+                                        print!("{:x}\n\n\r>>> ", hasher.finalize());
+                                    } else //HASHING FAILED
+                                    {
+                                        print!("Error reading file!\n\n\r>>> ");
+                                    }
+                                } else //NON-EXISTING FILE
+                                {
+                                    print!("File not found!\n\n\r>>> ");
+                                }
+                            } else { invalid_usage(None); }
                         },
 
                         Command::UsernameColor =>
