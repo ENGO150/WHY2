@@ -123,6 +123,11 @@ fn redraw_removed(input: &Vec<char>, cursor_position: usize) //REDRAW TEXT AFTER
     }
 }
 
+fn invalid_usage(subject: Option<&str>) //PRINT 'INVALID' MESSAGE
+{
+    print!("Invalid {}! Press Ctrl+H for help.\n\n\r>>> ", subject.unwrap_or("usage"))
+}
+
 fn mute(parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
 {
     ui::clear_lines(2);
@@ -133,10 +138,7 @@ fn mute(parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
         match parameters.parse::<usize>()
         {
             Ok(i) => Some(i),
-            Err(_) =>
-            {
-                return print!("Invalid usage! Press Ctrl+H for help.\n\n\r>>> ");
-            }
+            Err(_) => return invalid_usage(None)
         }
     } else { None };
 
@@ -387,30 +389,26 @@ fn to_color(color: &str) -> Result<SerColor, ()>
 
 fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CHANGE
 {
-    let message: &str;
+    ui::clear_lines(2);
 
     //CHECK FOR PARAMETERS
     if let Some(parameters) = parameters
     {
         //CHECK FOR COLOR VALIDITY
-        if to_color(&parameters).is_ok()
+        print!("{}\n\n\r>>> ", if to_color(&parameters).is_ok()
         {
             //SAVE COLOR TO CONFIG
             config::client_write(config_key, &parameters.to_lowercase());
 
-            message = "Color set successfully.";
+            "Color set successfully."
         } else
         {
-            message = "Invalid color! See \x1b]8;;https://docs.rs/colored/latest/colored/enum.Color.html\x1b\\colored API\x1b]8;;\x1b\\ for help.";
-        }
+            "Invalid color! See \x1b]8;;https://docs.rs/colored/latest/colored/enum.Color.html\x1b\\colored API\x1b]8;;\x1b\\ for help."
+        });
     } else
     {
-        message = "Invalid usage! Press Ctrl+H for help.";
+        invalid_usage(None);
     }
-
-    //PRINTOUT RESULT
-    ui::clear_lines(2);
-    print!("{message}\n\n\r>>> ");
 }
 
 fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
@@ -658,10 +656,7 @@ fn main()
                                 }
                             }
 
-                            if !valid
-                            {
-                                print!("Invalid usage! Press Ctrl+H for help.\n\n\r>>> ");
-                            }
+                            if !valid { invalid_usage(None); }
                         },
 
                         Command::UsernameColor =>
@@ -683,7 +678,7 @@ fn main()
                         Command::Invalid =>
                         {
                             ui::clear_lines(2);
-                            print!("Invalid command! Press Ctrl+H for help.\n\n\r>>> ");
+                            invalid_usage(Some("command"));
                         },
 
                         //NON IMPLEMENTED COMMAND
