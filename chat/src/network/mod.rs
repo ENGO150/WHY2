@@ -99,6 +99,7 @@ pub enum MessageCode //CONTROL CODES
     ChannelJoin,        //SERVER -> CLIENT | CLIENT JOINED VOICE CHANNEL
     ChannelLeave,       //SERVER -> CLIENT | CLIENT LEFT VOICE CHANNEL
     VoiceClients,       //SERVER -> CLIENT | TELL CLIENT ALL CONNECTED VOICE CLIENTS
+    Upload,             //CLIENT -> SERVER | REQUEST FILE UPLOAD
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
     InvalidFeature,     //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE
 }
