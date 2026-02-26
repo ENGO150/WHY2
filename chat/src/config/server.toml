@@ -32,6 +32,7 @@ communication_time = 300 # Seconds waiting for client message before stopping co
 allow_register = true # Allow new users to register
 check_client_version = true # Allow only clients with same version as server
 max_clients = 20 # Maximal number of clients connected at the same time
+max_upload_size = 50 # Maximal size (MB) of file uploads
 
 # Auth
 max_auth_tries = 3 # Times asking client for username/registration password (a valid, long enough password)
