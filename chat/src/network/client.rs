@@ -19,8 +19,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     thread,
+    path::PathBuf,
     net::TcpStream,
-    sync::mpsc::Sender,
+    collections::HashMap,
+    sync::
+    {
+        Arc,
+        Mutex,
+        LazyLock,
+        mpsc::Sender,
+    },
 };
 
 use zeroize::Zeroizing;
@@ -71,6 +79,12 @@ pub enum ClientEvent
     ExtraSpace,                    //JUST RANDOM NEWLINE
     Quit,                          //SERVER QUIT COMMUNICATION
 }
+
+//LISTS
+pub static ACTIVE_UPLOADS: LazyLock<Arc<Mutex<HashMap<String, PathBuf>>>> = LazyLock::new(|| //ACTIVE UPLOADS
+{
+    Arc::new(Mutex::new(HashMap::new()))
+});
 
 //FUNCTIONS
 //PRIVATE
