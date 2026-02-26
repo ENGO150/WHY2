@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    fs::File,
     collections::HashSet,
     time::{ Instant, Duration },
     net::
@@ -55,6 +56,18 @@ use crate::
         voice::server as voice_server,
     },
 };
+
+//STRUCTS
+pub struct ActiveUpload //ACTIVE FILE UPLOAD
+{
+    pub file: File,             //TARGET FILE (SERVER-SIDE)
+    pub size: u64,              //EXPECTED FILE SIZE
+    pub current_size: u64,      //CURRENT SIZE
+    pub hash: String,           //SHA256 HASH OF FINAL FILE
+    pub filename: String,       //FILENAME
+    pub username: String,       //SENDER
+    pub last_activity: Instant, //LAST CHUNK UPLOAD ACTIVITY (unexpected)
+}
 
 //ENUMS
 #[derive(Clone)]
@@ -274,6 +287,7 @@ impl Connection
 
 //LISTS
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
+pub static ACTIVE_UPLOADS: LazyLock<DashMap<u64, ActiveUpload>> = LazyLock::new(|| DashMap::new());   //LIST FOR ACTIVE FILE UPLOADS
 
 //PRIVATE
 fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&consts::SharedKeys>) -> Option<MessagePacket>
