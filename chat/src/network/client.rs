@@ -432,6 +432,12 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     options::set_extra_space(true);
                 },
 
+                //UPLOAD APPROVAL
+                MessageCode::Upload =>
+                {
+                    tx.send(ClientEvent::Info(String::from("skibidi\n"), false, 2)).unwrap();
+                }
+
                 //PRIVATE MESSAGE INCOMING
                 MessageCode::PrivateMessage =>
                 {
