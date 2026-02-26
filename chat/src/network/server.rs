@@ -989,6 +989,35 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     }, Some(&keys));
                 },
 
+                //FILE UPLOAD
+                MessageCode::Upload =>
+                {
+                    let mut valid = false;
+
+                    if let Some(file) = read.file //CHECK FOR FILE PAYLOAD
+                    {
+                        //CHECK IF UPLOAD ALREADY STARTED
+                        if let Some(_active) = ACTIVE_UPLOADS.get_mut(&file.uid)
+                        {
+                            //TODO: Implement chunks
+                        } else //NEW UPLOAD, VERIFY SIZE
+                        {
+                            if let Some(size) = file.size && size / 1_000_000 <= config::read_config("max_upload_size")
+                            {
+                                //SEND APPROVAL TO CLIENT
+                                send_code(stream, None, MessageCode::Upload, Some(&keys));
+                                valid = true;
+                            }
+                        }
+                    }
+
+                    //NO FILE PAYLOAD, HUH?
+                    if !valid
+                    {
+                        return remove_connection(&peer_addr, true);
+                    }
+                },
+
                 //PRIVATE MESSAGE
                 MessageCode::PrivateMessage =>
                 {
