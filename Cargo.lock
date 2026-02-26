@@ -2536,6 +2536,7 @@ dependencies = [
  "ml-kem",
  "nnnoiseless",
  "p521",
+ "rand",
  "ringbuf",
  "semver",
  "serde_json",
