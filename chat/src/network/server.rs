@@ -18,7 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    fs::File,
+    env,
+    fs::{ self, File },
     collections::HashSet,
     time::{ Instant, Duration },
     net::
@@ -53,6 +54,7 @@ use crate::
         self,
         MessageCode,
         MessagePacket,
+        FilePayload,
         voice::server as voice_server,
     },
 };
@@ -1002,10 +1004,41 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                             //TODO: Implement chunks
                         } else //NEW UPLOAD, VERIFY SIZE
                         {
-                            if let Some(size) = file.size && size / 1_000_000 <= config::read_config("max_upload_size")
+                            if let Some(size) = file.size &&
+                                let Some(hash) = file.hash &&
+                                let Some(filename) = file.filename &&
+                                size / 1_000_000 <= config::read_config::<u64>("max_upload_size")
                             {
+                                //GENERATE RANDOM UID
+                                let uid = rand::random::<u64>();
+
+                                //CREATE TEMP UPLOAD DIRECTORY
+                                let temp_dir = env::temp_dir().join(consts::UPLOADS_DIR).join(&username);
+                                fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
+
+                                //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
+                                ACTIVE_UPLOADS.insert(uid, ActiveUpload
+                                {
+                                    file: File::create_new(temp_dir.join(&filename)).expect("Creating upload file failed"),
+                                    size,
+                                    current_size: 0,
+                                    hash,
+                                    filename,
+                                    username: username.clone(),
+                                    last_activity: Instant::now(),
+                                });
+
                                 //SEND APPROVAL TO CLIENT
-                                send_code(stream, None, MessageCode::Upload, Some(&keys));
+                                network::send(stream, MessagePacket
+                                {
+                                    code: Some(MessageCode::Upload),
+                                    file: Some(FilePayload
+                                    {
+                                        uid,
+                                        ..Default::default()
+                                    }),
+                                    ..Default::default()
+                                }, Some(&keys));
                                 valid = true;
                             }
                         }
