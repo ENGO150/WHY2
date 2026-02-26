@@ -79,6 +79,7 @@ use why2_chat::
         self,
         MessagePacket,
         MessageColors,
+        FilePayload,
         SerColor,
         voice::client::device,
         client::{ self, ClientEvent },
@@ -679,7 +680,8 @@ fn main()
 
                                 //TRY TO OPEN FILE
                                 if let Ok(metadata) = path.metadata() && path.is_file() &&
-                                    let Ok(mut file) = File::open(path)
+                                    let Ok(mut file) = File::open(path) &&
+                                    let Some(filename) = path.file_name().and_then(|n| n.to_str())
                                 {
                                     //GET SHA256 FILE HASH
                                     let mut hasher = Sha256::new();
@@ -699,7 +701,19 @@ fn main()
                                     //FINALIZE
                                     if success
                                     {
-                                        print!("{:x}\n\n\r>>> ", hasher.finalize());
+                                        //SEND UPLOAD REQUEST
+                                        network::send(&mut client_stream, MessagePacket
+                                        {
+                                            code: command.to_code(),
+                                            file: Some(FilePayload
+                                            {
+                                                size: Some(metadata.len()),
+                                                filename: Some(filename.to_owned()),
+                                                hash: Some(format!("{:x}", hasher.finalize())),
+                                                ..Default::default()
+                                            }),
+                                            ..Default::default()
+                                        }, options::get_keys().as_ref());
                                     } else //HASHING FAILED
                                     {
                                         print!("Error reading file!\n\n\r>>> ");
