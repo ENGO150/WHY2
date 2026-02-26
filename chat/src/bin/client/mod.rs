@@ -698,9 +698,15 @@ fn main()
                                         }
                                     };
 
-                                    //FINALIZE
+                                    //REQUEST FILE UPLOAD
                                     if success
                                     {
+                                        //FINALIZE HASH
+                                        let hash = format!("{:x}", hasher.finalize());
+
+                                        //STORE UPLOAD IN ACTIVE UPLOADS LIST
+                                        client::ACTIVE_UPLOADS.lock().unwrap().insert(hash.clone(), path.canonicalize().unwrap());
+
                                         //SEND UPLOAD REQUEST
                                         network::send(&mut client_stream, MessagePacket
                                         {
@@ -709,7 +715,7 @@ fn main()
                                             {
                                                 size: Some(metadata.len()),
                                                 filename: Some(filename.to_owned()),
-                                                hash: Some(format!("{:x}", hasher.finalize())),
+                                                hash: Some(hash),
                                                 ..Default::default()
                                             }),
                                             ..Default::default()
