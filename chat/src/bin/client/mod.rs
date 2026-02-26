@@ -27,6 +27,7 @@ use std::
     thread,
     process,
     fs::File,
+    path::Path,
     net::TcpStream,
     time::Duration,
     io::
@@ -674,9 +675,11 @@ fn main()
                             //CHECK PATH
                             if let Some(parameters) = parameters
                             {
+                                let path = Path::new(parameters.trim());
+
                                 //TRY TO OPEN FILE
-                                if let Ok(mut file) = File::open(parameters.trim()) &&
-                                    let Ok(metadata) = file.metadata() && metadata.is_file()
+                                if let Ok(metadata) = path.metadata() && path.is_file() &&
+                                    let Ok(mut file) = File::open(path)
                                 {
                                     //GET SHA256 FILE HASH
                                     let mut hasher = Sha256::new();
