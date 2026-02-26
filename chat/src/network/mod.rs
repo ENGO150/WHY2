@@ -115,6 +115,17 @@ pub struct MessageColors //COLORS OF MESSAGE (ALL OF THE STRING VALUES WILL GET 
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
+pub struct FilePayload //FILE CHUNK
+{
+    pub transfer_id: u64,           //UPLOAD UID
+    pub data: Option<Vec<u8>>,      //BINARY DATA
+    pub size: Option<usize>,        //FILE SIZE
+    pub filename: Option<String>,   //FILE NAME
+    pub hash: Option<String>,       //FILE HASH
+    pub chunk_index: Option<usize>, //CHUNK SEQ
+}
+
+#[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 {
     pub text: Option<String>,      //MESSAGE
@@ -123,6 +134,7 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub code: Option<MessageCode>, //CONTROL CODE
     pub colors: MessageColors,     //MESSAGE COLORS
     pub seq: usize,                //SEQUENCE NUMBER
+    pub file: Option<FilePayload>, //FILE UPLOADED BY CLIENT
 }
 
 //IMPLEMENTATIONS
@@ -142,6 +154,7 @@ impl Default for MessagePacket //DEFAULT
                 message_color: None,
             },
             seq: 0,
+            file: None,
         }
     }
 }
