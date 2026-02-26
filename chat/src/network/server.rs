@@ -1019,7 +1019,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
                                 ACTIVE_UPLOADS.insert(uid, ActiveUpload
                                 {
-                                    file: File::create_new(temp_dir.join(&filename)).expect("Creating upload file failed"),
+                                    file: File::create_new(temp_dir.join(uid.to_string())).expect("Creating upload file failed"),
                                     size,
                                     current_size: 0,
                                     hash,
