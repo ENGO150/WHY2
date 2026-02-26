@@ -23,6 +23,7 @@ pub const METADATA_URL: &str        = "https://crates.io/api/v1/crates/why2";   
 
 pub const USER_CONFIG_DIR: &str     = "{HOME}/.config";                                                       //USER CONFIG DIRECTORY
 pub const CONFIG_DIR: &str          = "/WHY2";                                                                //DIRECTORY FOR CONFIG FILES
+pub const UPLOADS_DIR: &str         = "WHY2-Uploads";                                                         //DIRECTORY FOR FILE UPLOADS
 pub const SERVER_CONFIG: &str       = "/server.toml";                                                         //SERVER CONFIG FILE
 pub const CLIENT_CONFIG: &str       = "/client.toml";                                                         //CLIENT CONFIG FILE
 pub const SERVER_USERS_CONFIG: &str = "/server_users.toml";                                                   //SERVER USERS CONFIG FILE
