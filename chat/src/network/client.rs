@@ -467,7 +467,6 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     {
                         let mut file = File::open(path).expect("Cannot open file for upload");
                         let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
-                        let mut chunk_idx = 0;
 
                         //LOOP READING
                         loop
@@ -485,14 +484,10 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                                         {
                                             uid: payload.uid,
                                             data: Some(buffer[..bytes].to_vec()),
-                                            chunk_index: Some(chunk_idx),
                                             ..Default::default()
                                         }),
                                         ..Default::default()
                                     }, options::get_keys().as_ref());
-
-                                    //INCREMENT INDEX
-                                    chunk_idx += 1;
                                 },
                                 Err(_) => {}, //TODO: Implement
                             }

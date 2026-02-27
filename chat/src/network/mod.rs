@@ -122,7 +122,6 @@ pub struct FilePayload //FILE CHUNK
     pub size: Option<u64>,        //FILE SIZE
     pub filename: Option<String>,   //FILE NAME
     pub hash: Option<String>,       //FILE HASH
-    pub chunk_index: Option<usize>, //CHUNK SEQ
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
@@ -170,7 +169,6 @@ impl Default for FilePayload
             size: None,
             filename: None,
             hash: None,
-            chunk_index: None,
         }
     }
 }
