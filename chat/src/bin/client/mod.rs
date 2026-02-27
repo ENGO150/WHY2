@@ -67,6 +67,7 @@ use colored::Color;
 use why2_chat::
 {
     config,
+    consts,
     options,
     misc,
     command::
@@ -685,7 +686,7 @@ fn main()
                                 {
                                     //GET SHA256 FILE HASH
                                     let mut hasher = Sha256::new();
-                                    let mut buffer = vec![0; 1024 * 1024];
+                                    let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
 
                                     //LOOP READING
                                     let success = loop
