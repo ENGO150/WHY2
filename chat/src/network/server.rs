@@ -69,7 +69,6 @@ pub struct ActiveUpload //ACTIVE FILE UPLOAD
     pub hash: String,           //SHA256 HASH OF FINAL FILE
     pub filename: String,       //FILENAME
     pub username: String,       //SENDER
-    pub last_activity: Instant, //LAST CHUNK UPLOAD ACTIVITY (unexpected)
 }
 
 //ENUMS
@@ -1006,9 +1005,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                             //WRITE
                             if active.file.write_all(&chunk_data).is_ok()
                             {
-                                //UPDATE ACTIVITY
+                                //UPDATE SIZE
                                 active.current_size += chunk_data.len() as u64;
-                                active.last_activity = Instant::now();
                                 if active.current_size <= active.size { valid = true; }
 
                                 //CHECK SIZE
@@ -1044,7 +1042,6 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     hash: hash.clone(),
                                     filename,
                                     username: username.clone(),
-                                    last_activity: Instant::now(),
                                 });
 
                                 //SEND APPROVAL TO CLIENT
