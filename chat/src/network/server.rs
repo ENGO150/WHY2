@@ -1022,7 +1022,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     file: File::create_new(temp_dir.join(uid.to_string())).expect("Creating upload file failed"),
                                     size,
                                     current_size: 0,
-                                    hash,
+                                    hash: hash.clone(),
                                     filename,
                                     username: username.clone(),
                                     last_activity: Instant::now(),
@@ -1035,6 +1035,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     file: Some(FilePayload
                                     {
                                         uid,
+                                        hash: Some(hash),
                                         ..Default::default()
                                     }),
                                     ..Default::default()
