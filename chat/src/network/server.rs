@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     env,
+    io::Write,
     fs::{ self, File },
     collections::HashSet,
     time::{ Instant, Duration },
@@ -999,9 +1000,27 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     if let Some(file) = read.file //CHECK FOR FILE PAYLOAD
                     {
                         //CHECK IF UPLOAD ALREADY STARTED
-                        if let Some(_active) = ACTIVE_UPLOADS.get_mut(&file.uid)
+                        if let Some(mut active) = ACTIVE_UPLOADS.get_mut(&file.uid) &&
+                            let Some(chunk_data) = file.data
                         {
-                            //TODO: Implement chunks
+                            //WRITE
+                            if active.file.write_all(&chunk_data).is_ok()
+                            {
+                                //UPDATE ACTIVITY
+                                active.current_size += chunk_data.len() as u64;
+                                active.last_activity = Instant::now();
+                                if active.current_size <= active.size { valid = true; }
+
+                                //CHECK SIZE
+                                if active.current_size == active.size
+                                {
+                                    //REMOVE ACTIVE UPLOAD
+                                    drop(active);
+                                    ACTIVE_UPLOADS.remove(&file.uid);
+
+                                    //TODO: Implement file renaming
+                                }
+                            }
                         } else //NEW UPLOAD, VERIFY SIZE
                         {
                             if let Some(size) = file.size &&
