@@ -370,59 +370,41 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
         decoded_packet = obfuscate_data(decoded_packet); //NO ENCRYPTION, REMOVE OBFUSCATION
     }
 
-    //ACTIVITY TIMER ON SERVER
-    #[cfg(feature = "server")]
-    {
-        let mut spam_warning = false;
-        let mut shared_key = None;
-        let mut disconnect = false;
-
-        //FIND CONNECTION AND SET last_activity
-        if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
-        {
-            //SPAM
-            if config::read_config("spam_protection") && conn.is_authenticated() &&
-                Instant::now().duration_since(*conn.last_activity()) <
-                    Duration::from_millis(config::read_config::<u64>("min_message_delay"))
-            {
-                //INCREMENT SPAM VIOLATIONS
-                *conn.spam_violations_mut().unwrap() += 1;
-
-                //WARN
-                spam_warning = true;
-                shared_key = conn.keys().cloned();
-
-                //CHECK FOR TOO MANY VIOLATIONS
-                disconnect = *conn.spam_violations().unwrap() > config::read_config::<usize>("max_message_delay_violations");
-            }
-
-            *conn.last_activity_mut() = Instant::now(); //RESET last_activity
-        }
-
-        //SEND WARNING CODE
-        if spam_warning
-        {
-            server::send_code(stream, None, MessageCode::SpamWarning, shared_key.as_ref());
-        }
-
-        //TOO MANY VIOLATIONS, BYE
-        if disconnect
-        {
-            server::remove_connection(&peer_addr, true);
-            return None;
-        }
-    }
-
     //DESERIALIZE AND RETURN
     match wincode::deserialize::<MessagePacket>(&decoded_packet)
     {
         Ok(packet) =>
         {
-            //VERIFY SEQUENCE NUMBER
-            #[cfg(feature = "server")] //ON SERVER
+            //SPAM & SEQ CHECKS (SERVER)
+            #[cfg(feature = "server")]
             {
+                //ACTIVITY TIMER
+                let mut spam_warning = false;
+                let mut shared_key = None;
+                let mut disconnect = false;
+                let mut grace = true;
+
                 if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
                 {
+                    //SPAM
+                    if config::read_config("spam_protection") && conn.is_authenticated() &&
+                        packet.file.is_none() && Instant::now().duration_since(*conn.last_activity()) <
+                            Duration::from_millis(config::read_config::<u64>("min_message_delay"))
+                    {
+                        //INCREMENT SPAM VIOLATIONS
+                        *conn.spam_violations_mut().unwrap() += 1;
+
+                        //WARN
+                        spam_warning = true;
+                        shared_key = conn.keys().cloned();
+
+                        //CHECK FOR TOO MANY VIOLATIONS
+                        disconnect = *conn.spam_violations().unwrap() > config::read_config::<usize>("max_message_delay_violations");
+                    }
+
+                    *conn.last_activity_mut() = Instant::now(); //RESET last_activity
+
+                    //SEQ
                     if packet.seq > *conn.seq() //VALID SEQ
                     {
                         //SET SEQ TO CURRENT
@@ -430,9 +412,23 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
                     } else
                     {
                         //INVALID SEQ
-                        drop(conn); //PREVENT DEADLOCK
                         log::warn!("SEQ verification failed: {}", &peer_addr);
-                        server::remove_connection(&peer_addr, false);
+                        grace = false;
+                        disconnect = true;
+                    }
+                    drop(conn); //PREVENT DEADLOCK
+
+                    //SEND WARNING CODE
+                    if spam_warning
+                    {
+                        server::send_code(stream, None, MessageCode::SpamWarning, shared_key.as_ref());
+                    }
+
+                    //TOO MANY VIOLATIONS, BYE
+                    if disconnect
+                    {
+                        server::remove_connection(&peer_addr, grace);
+                        return None;
                     }
                 }
             }
