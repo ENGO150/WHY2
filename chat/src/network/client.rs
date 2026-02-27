@@ -458,6 +458,8 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
 
                     //GET FILE PATH
                     let path = ACTIVE_UPLOADS.lock().unwrap().remove(&file_hash).unwrap(); //(CRASHES IF SERVER REQUESTS FILE THAT ISN'T FOR UPLOAD)
+                    let filename = path.clone().file_name().and_then(|n| n.to_str()
+                        .map(|s| s.to_string())).unwrap_or(String::from("Unknown")); //GET FILENAME FOR CONSOLE LOG
 
                     //CLONE SERVER STREAM FOR UPLOAD THREAD
                     let mut upload_stream = stream.try_clone().unwrap();
@@ -493,6 +495,8 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                             }
                         }
                     });
+
+                    tx.send(ClientEvent::Info(format!("Uploading file \"{}\"...\n", filename), true, 1)).unwrap();
                 }
 
                 //PRIVATE MESSAGE INCOMING
