@@ -18,6 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    fs::File,
+    io::Read,
     thread,
     path::PathBuf,
     net::TcpStream,
@@ -47,6 +49,7 @@ use crate::
         self,
         MessageCode,
         MessagePacket,
+        FilePayload,
         voice::
         {
             client as voice_client,
@@ -449,7 +452,52 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 //UPLOAD APPROVAL
                 MessageCode::Upload =>
                 {
-                    tx.send(ClientEvent::Info(String::from("skibidi\n"), false, 2)).unwrap();
+                    //UPLOAD CONSTANTS
+                    let payload = read.file.unwrap();
+                    let file_hash = payload.hash.unwrap();
+
+                    //GET FILE PATH
+                    let path = ACTIVE_UPLOADS.lock().unwrap().remove(&file_hash).unwrap(); //(CRASHES IF SERVER REQUESTS FILE THAT ISN'T FOR UPLOAD)
+
+                    //CLONE SERVER STREAM FOR UPLOAD THREAD
+                    let mut upload_stream = stream.try_clone().unwrap();
+
+                    //SPAWN UPLOAD THREAD
+                    thread::spawn(move ||
+                    {
+                        let mut file = File::open(path).expect("Cannot open file for upload");
+                        let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+                        let mut chunk_idx = 0;
+
+                        //LOOP READING
+                        loop
+                        {
+                            match file.read(&mut buffer)
+                            {
+                                Ok(0) => break, //EOF
+                                Ok(bytes) =>
+                                {
+                                    //SEND FILE CHUNK
+                                    network::send(&mut upload_stream, MessagePacket
+                                    {
+                                        code: Some(MessageCode::Upload),
+                                        file: Some(FilePayload
+                                        {
+                                            uid: payload.uid,
+                                            data: Some(buffer[..bytes].to_vec()),
+                                            chunk_index: Some(chunk_idx),
+                                            ..Default::default()
+                                        }),
+                                        ..Default::default()
+                                    }, options::get_keys().as_ref());
+
+                                    //INCREMENT INDEX
+                                    chunk_idx += 1;
+                                },
+                                Err(_) => {}, //TODO: Implement
+                            }
+                        }
+                    });
                 }
 
                 //PRIVATE MESSAGE INCOMING
