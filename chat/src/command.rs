@@ -46,6 +46,7 @@ pub enum Command
     Help,           //PRINT COMMANDS
     Info,           //COMMAND INFO
     List,           //LIST USERS
+    Files,          //LIST FILES
     Upload,         //UPLOAD FILE TO SERVER
     PrivateMessage, //ONE TO ONE MESSAGE
     UsernameColor,  //SET COLOR OF USERNAME
@@ -136,6 +137,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Files,
+        triggers: &[ "FILES", "LISTFILES", "UPLOADS", "DOWNLOADS", "SHARES" ],
+        shortcut: Some('u'),
+        args: &[],
+        description: "Shows available files and their IDs",
+    },
+
+    CommandInfo
+    {
         command: Command::PrivateMessage,
         triggers: &[ "PM", "DM", "MSG", "TELL" ],
         shortcut: None,
@@ -192,6 +202,7 @@ impl Command
             Command::List => Some(MessageCode::List),
             Command::PrivateMessage => Some(MessageCode::PrivateMessage),
             Command::Upload => Some(MessageCode::Upload),
+            Command::Files => Some(MessageCode::Files),
 
             _ => None,
         }
