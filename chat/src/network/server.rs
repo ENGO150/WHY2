@@ -78,8 +78,9 @@ pub struct ActiveUpload //ACTIVE FILE UPLOAD
 
 pub struct AvailableFile //UPLOADED FILE
 {
-    pub hash: [u8; 32], //FILE HASH
-    pub path: PathBuf,  //PATH
+    pub hash: [u8; 32],   //FILE HASH
+    pub path: PathBuf,    //PATH
+    pub filename: String, //FILENAME
 }
 
 //ENUMS
@@ -1078,10 +1079,12 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                         //LOG FILE UPLOAD
                                         log::info!("Upload done: {peer_addr}");
 
+                                        let filename = new_filename.and_then(|f| f.to_str()).unwrap_or("unnamed_file").to_owned();
+
                                         //ANNOUNCE FILE UPLOAD
                                         send_to_all(MessagePacket
                                         {
-                                            text: Some(new_filename.and_then(|f| f.to_str()).unwrap_or("unnamed_file").to_owned()),
+                                            text: Some(filename.clone()),
                                             username: Some(username.clone()),
                                             code: Some(MessageCode::Uploaded),
                                             ..Default::default()
@@ -1092,6 +1095,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                         {
                                             hash: final_hash,
                                             path: final_path.unwrap(),
+                                            filename,
                                         });
                                     }
 
