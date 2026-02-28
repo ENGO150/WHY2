@@ -1049,6 +1049,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     let current_path = temp_dir.join(file.uid.to_string());
                                     let mut new_filename = None;
                                     let mut final_path = None;
+                                    let mut insert = false;
                                     let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
 
                                     //CHECK HASHES
@@ -1061,6 +1062,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                         let new_path = temp_dir.join(filename);
 
                                         //RENAME FILE
+                                        insert = !new_path.is_file();
                                         delete = fs::rename(&current_path, &new_path).is_err();
 
                                         //SET NEW FILE VARIABLES
@@ -1091,13 +1093,16 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                             ..Default::default()
                                         });
 
-                                        //ADD FILE TO AVAILABLE FILES
-                                        AVAILABLE_FILES.get_mut(&username).unwrap().push(AvailableFile
+                                        if insert
                                         {
-                                            hash: final_hash,
-                                            path: final_path.unwrap(),
-                                            filename,
-                                        });
+                                            //ADD FILE TO AVAILABLE FILES
+                                            AVAILABLE_FILES.get_mut(&username).unwrap().push(AvailableFile
+                                            {
+                                                hash: final_hash,
+                                                path: final_path.unwrap(),
+                                                filename,
+                                            });
+                                        }
                                     }
 
                                     //REMOVE ACTIVE UPLOAD
