@@ -703,7 +703,7 @@ fn main()
                                     if success
                                     {
                                         //FINALIZE HASH
-                                        let hash = format!("{:x}", hasher.finalize());
+                                        let hash: [u8; 32] = hasher.finalize().into();
 
                                         //STORE UPLOAD IN ACTIVE UPLOADS LIST
                                         client::ACTIVE_UPLOADS.lock().unwrap().insert(hash.clone(), path.canonicalize().unwrap());

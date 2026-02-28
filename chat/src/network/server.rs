@@ -70,7 +70,7 @@ pub struct ActiveUpload //ACTIVE FILE UPLOAD
     pub file: File,             //TARGET FILE (SERVER-SIDE)
     pub size: u64,              //EXPECTED FILE SIZE
     pub current_size: u64,      //CURRENT SIZE
-    pub hash: String,           //SHA256 HASH OF FINAL FILE
+    pub hash: [u8; 32],         //SHA256 HASH OF FINAL FILE
     pub hasher: Sha256,         //HASHER
     pub filename: String,       //FILENAME
     pub client_id: usize,       //ID OF SENDER

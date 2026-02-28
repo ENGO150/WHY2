@@ -117,11 +117,11 @@ pub struct MessageColors //COLORS OF MESSAGE (ALL OF THE STRING VALUES WILL GET 
 #[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct FilePayload //FILE CHUNK
 {
-    pub uid: u64,                   //UPLOAD UID
-    pub data: Option<Vec<u8>>,      //BINARY DATA
+    pub uid: u64,                 //UPLOAD UID
+    pub data: Option<Vec<u8>>,    //BINARY DATA
     pub size: Option<u64>,        //FILE SIZE
-    pub filename: Option<String>,   //FILE NAME
-    pub hash: Option<String>,       //FILE HASH
+    pub filename: Option<String>, //FILE NAME
+    pub hash: Option<[u8; 32]>,   //FILE HASH
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]

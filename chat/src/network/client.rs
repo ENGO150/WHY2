@@ -84,7 +84,7 @@ pub enum ClientEvent
 }
 
 //LISTS
-pub static ACTIVE_UPLOADS: LazyLock<Arc<Mutex<HashMap<String, PathBuf>>>> = LazyLock::new(|| //ACTIVE UPLOADS
+pub static ACTIVE_UPLOADS: LazyLock<Arc<Mutex<HashMap<[u8; 32], PathBuf>>>> = LazyLock::new(|| //ACTIVE UPLOADS
 {
     Arc::new(Mutex::new(HashMap::new()))
 });
