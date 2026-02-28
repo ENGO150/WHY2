@@ -1030,22 +1030,35 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 //CHECK SIZE
                                 if active.current_size == active.size //UPLOAD DONE
                                 {
-                                    //GET NEW FILE PATH
+                                    let delete: bool;
+
+                                    //GET FILE PATH
                                     let temp_dir = get_upload_dir(&username);
                                     let current_path = temp_dir.join(file.uid.to_string());
-                                    let final_path = temp_dir.join(Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
-                                        .file_name()
-                                        .unwrap_or(OsStr::new("unnamed_file")));
 
-                                    //RENAME FILE
-                                    if fs::rename(&current_path, &final_path).is_ok()
+                                    //CHECK HASHES
+                                    if active.hash[..] == active.hasher.clone().finalize()[..]
                                     {
-                                        //LOG FILE UPLOAD
-                                        log::info!("Upload done: {peer_addr}");
-                                    } else
+                                        //GET NEW FILE PATH
+                                        let final_path = temp_dir.join(Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
+                                            .file_name()
+                                            .unwrap_or(OsStr::new("unnamed_file")));
+
+                                        //RENAME FILE
+                                        delete = fs::rename(&current_path, &final_path).is_err();
+                                    } else { delete = true; }
+
+                                    if delete
                                     {
                                         //REMOVE JUNK FILE
                                         let _ = fs::remove_file(&current_path);
+
+                                        //LOG FILE UPLOAD
+                                        log::error!("Upload failed: {peer_addr}");
+                                    } else
+                                    {
+                                        //LOG FILE UPLOAD
+                                        log::info!("Upload done: {peer_addr}");
                                     }
 
                                     //REMOVE ACTIVE UPLOAD
