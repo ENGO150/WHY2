@@ -509,7 +509,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 MessageCode::Files =>
                 {
                     //PARSE JSON
-                    let uploads_json: BTreeMap<String, Vec<String>> = serde_json::from_str(&read.text.unwrap()).unwrap();
+                    let uploads_json: BTreeMap<String, Vec<(String, usize)>> = serde_json::from_str(&read.text.unwrap()).unwrap();
 
                     if uploads_json.is_empty()
                     {
@@ -524,9 +524,9 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                             tx.send(ClientEvent::Info(format!("\r{}:", user), true, 0)).unwrap();
 
                             //GET FILENAMES
-                            for upload in uploads
+                            for (upload, id) in uploads
                             {
-                                tx.send(ClientEvent::Info(format!("\r - {}", upload), true, 0)).unwrap();
+                                tx.send(ClientEvent::Info(format!("\r - {} ({})", upload, id), true, 0)).unwrap();
                             }
                         }
 
