@@ -1029,6 +1029,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     //RENAME FILE
                                     if fs::rename(&current_path, &final_path).is_ok()
                                     {
+                                        //LOG FILE UPLOAD
+                                        log::info!("Upload done: {peer_addr}");
                                     }
 
                                     //REMOVE ACTIVE UPLOAD
@@ -1060,6 +1062,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     filename,
                                 });
 
+                                //LOG FILE UPLOAD
+                                log::info!("Upload request: {peer_addr}");
+
                                 //SEND APPROVAL TO CLIENT
                                 network::send(stream, MessagePacket
                                 {
@@ -1080,6 +1085,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     //NO FILE PAYLOAD, HUH?
                     if !valid
                     {
+                        //LOG FILE REJECT
+                        log::warn!("Upload reject: {peer_addr}");
+
                         return remove_connection(&peer_addr, true);
                     }
                 },
