@@ -300,9 +300,9 @@ impl Connection
 }
 
 //LISTS
-pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());        //LIST FOR EACH CLIENT CONNECTION
-pub static ACTIVE_UPLOADS: LazyLock<DashMap<u64, ActiveUpload>> = LazyLock::new(|| DashMap::new());          //LIST FOR ACTIVE FILE UPLOADS
-pub static AVAILABLE_FILES: LazyLock<DashMap<usize, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
+pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());         //LIST FOR EACH CLIENT CONNECTION
+pub static ACTIVE_UPLOADS: LazyLock<DashMap<u64, ActiveUpload>> = LazyLock::new(|| DashMap::new());           //LIST FOR ACTIVE FILE UPLOADS
+pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
 fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&consts::SharedKeys>) -> Option<MessagePacket>
@@ -482,9 +482,10 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         }
 
         //REMOVE UPLOADS
-        let _ = fs::remove_dir_all(get_upload_dir(connection.username().unwrap())); //REMOVE FILES
+        let username = connection.username().unwrap();
+        let _ = fs::remove_dir_all(get_upload_dir(username)); //REMOVE FILES
         ACTIVE_UPLOADS.retain(|_, u| u.client_id != *connection.id().unwrap());
-        AVAILABLE_FILES.remove(connection.id().unwrap()); //REMOVE AVAILABLE FILES
+        AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
 
         //SEND LEAVE MESSAGE
         send_to_all(MessagePacket
@@ -597,7 +598,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
     });
 
     //CREATE AVAILABLE FILES ENTRY
-    AVAILABLE_FILES.insert(id, Vec::new());
+    AVAILABLE_FILES.insert(username.to_string(), Vec::new());
 
     log::info!("Authenticate connection: {}", peer_addr);
 }
@@ -1091,7 +1092,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                         });
 
                                         //ADD FILE TO AVAILABLE FILES
-                                        AVAILABLE_FILES.get_mut(&id).unwrap().push(AvailableFile
+                                        AVAILABLE_FILES.get_mut(&username).unwrap().push(AvailableFile
                                         {
                                             hash: final_hash,
                                             path: final_path.unwrap(),
