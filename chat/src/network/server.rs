@@ -481,7 +481,6 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         send_to_all(MessagePacket
         {
             text: Some(connection.username().unwrap().to_string()),
-            username: Some(config::read_config::<String>("server_username")),
             id: connection.id().copied(),
             code: Some(MessageCode::Leave),
 
@@ -854,7 +853,6 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     send_to_all(MessagePacket
     {
         text: Some(username.clone()),
-        username: Some(config::read_config::<String>("server_username")),
         code: Some(MessageCode::Join),
         ..Default::default()
     });

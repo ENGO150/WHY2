@@ -337,13 +337,13 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                         first_message = false;
                     }
 
-                    tx.send(ClientEvent::Info(format!("[{}]: {} connected.\n", read.username.unwrap(), user), true, 0)).unwrap();
+                    tx.send(ClientEvent::Info(format!("[{}]: {} connected.\n", &server_uname, user), true, 0)).unwrap();
                 }
 
                 //LEAVE MESSAGE (CLIENT DISCONNECTED)
                 MessageCode::Leave =>
                 {
-                    tx.send(ClientEvent::Info(format!("[{}]: {} disconnected.\n", read.username.unwrap(), read.text.unwrap()), true, 2)).unwrap();
+                    tx.send(ClientEvent::Info(format!("[{}]: {} disconnected.\n", &server_uname, read.text.unwrap()), true, 2)).unwrap();
                     voice_client::remove_consumer(&read.id.unwrap());
                 },
 
