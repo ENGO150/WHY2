@@ -39,6 +39,8 @@ use std::
     },
 };
 
+use sha2::{ Sha256, Digest };
+
 use zeroize::Zeroizing;
 
 use serde_json::{ json, Value };
@@ -69,6 +71,7 @@ pub struct ActiveUpload //ACTIVE FILE UPLOAD
     pub size: u64,              //EXPECTED FILE SIZE
     pub current_size: u64,      //CURRENT SIZE
     pub hash: String,           //SHA256 HASH OF FINAL FILE
+    pub hasher: Sha256,         //HASHER
     pub filename: String,       //FILENAME
     pub client_id: usize,       //ID OF SENDER
 }
@@ -1021,6 +1024,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 active.current_size += chunk_data.len() as u64;
                                 if active.current_size <= active.size { valid = true; }
 
+                                //UPDATE HASHER
+                                active.hasher.update(&chunk_data);
+
                                 //CHECK SIZE
                                 if active.current_size == active.size //UPLOAD DONE
                                 {
@@ -1068,6 +1074,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     size,
                                     current_size: 0,
                                     hash: hash.clone(),
+                                    hasher: Sha256::new(),
                                     filename,
                                     client_id: id,
                                 });
