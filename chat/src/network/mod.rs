@@ -342,8 +342,8 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
     #[cfg(feature = "server")]
     if len > max_packet_size
     {
-         server::remove_connection(&peer_addr, true);
-         return None;
+        server::remove_connection(&peer_addr, true);
+        return None;
     }
 
     //READ REST OF PACKET
