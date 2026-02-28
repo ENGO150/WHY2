@@ -22,9 +22,9 @@ use std::
     io::Write,
     ffi::OsStr,
     fs::{ self, File },
-    collections::HashSet,
     path::{ Path, PathBuf },
     time::{ Instant, Duration },
+    collections::{ HashSet, BTreeMap },
     net::
     {
         TcpStream,
@@ -1164,20 +1164,25 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 //LIST FILES
                 MessageCode::Files =>
                 {
-                    //GET ALL UPLOADS AS ARRAYS
-                    let mut files = Vec::new();
-                    for uploads in AVAILABLE_FILES.iter()
+                    //GET ALL UPLOADS
+                    let mut grouped_files: BTreeMap<String, Vec<String>> = BTreeMap::new();
+                    for entry in AVAILABLE_FILES.iter()
                     {
-                        for upload in uploads.iter()
+                        //GET VALUES
+                        let username = entry.key();
+                        let uploads = entry.value();
+
+                        //ADD TO MAP
+                        if !uploads.is_empty()
                         {
-                            files.push(json!({ "username": uploads.key(), "filename": upload.filename }));
+                            grouped_files.insert(username.clone(), uploads.iter().map(|u| u.filename.clone()).collect());
                         }
                     }
 
                     //SEND LIST BACK TO CLIENT
                     network::send(stream, MessagePacket
                     {
-                        text: Some(json!(files).to_string()),
+                        text: Some(json!(grouped_files).to_string()),
                         code: Some(MessageCode::Files),
                         ..Default::default()
                     }, Some(&keys));
