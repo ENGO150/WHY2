@@ -70,6 +70,7 @@ pub struct ActiveUpload //ACTIVE FILE UPLOAD
     pub current_size: u64,      //CURRENT SIZE
     pub hash: String,           //SHA256 HASH OF FINAL FILE
     pub filename: String,       //FILENAME
+    pub client_id: usize,       //ID OF SENDER
 }
 
 //ENUMS
@@ -469,7 +470,8 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         }
 
         //REMOVE UPLOADS
-        let _ = fs::remove_dir_all(get_upload_dir(connection.username().unwrap()));
+        let _ = fs::remove_dir_all(get_upload_dir(connection.username().unwrap())); //REMOVE FILES
+        ACTIVE_UPLOADS.retain(|_, u| u.client_id != *connection.id().unwrap());
 
         //SEND LEAVE MESSAGE
         send_to_all(MessagePacket
@@ -1067,6 +1069,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     current_size: 0,
                                     hash: hash.clone(),
                                     filename,
+                                    client_id: id,
                                 });
 
                                 //LOG FILE UPLOAD
