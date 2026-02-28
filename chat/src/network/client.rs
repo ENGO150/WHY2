@@ -497,7 +497,13 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     });
 
                     tx.send(ClientEvent::Info(format!("Uploading file \"{}\"...\n", filename), true, 1)).unwrap();
-                }
+                },
+
+                //UPLOADED ANNOUNCEMENT
+                MessageCode::Uploaded =>
+                {
+                    tx.send(ClientEvent::Info(format!("[{}]: {} uploaded file \"{}\".\n", &server_uname, read.username.unwrap(), read.text.unwrap()), true, 2)).unwrap();
+                },
 
                 //PRIVATE MESSAGE INCOMING
                 MessageCode::PrivateMessage =>
