@@ -172,7 +172,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
     let mut min_pass: Option<u64> = None;
     let mut max_uname: Option<u64> = None;
     let mut min_uname: Option<u64> = None;
-    let mut server_name: &str;
+    let mut server_uname = String::new();
 
     let mut invalid_username = false; //PRINT "Invalid Username!"
     let mut invalid_password = false;
@@ -244,9 +244,9 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     min_pass = Some(welcome_json["min_pass"].as_u64().expect("Invalid welcome json"));
                     max_uname = Some(welcome_json["max_uname"].as_u64().expect("Invalid welcome json"));
                     min_uname = Some(welcome_json["min_uname"].as_u64().expect("Invalid welcome json"));
-                    server_name = welcome_json["server_name"].as_str().expect("Invalid welcome json");
+                    server_uname = welcome_json["server_uname"].as_str().expect("Invalid welcome json").to_string();
 
-                    tx.send(ClientEvent::Connected(server_name.to_string())).unwrap();
+                    tx.send(ClientEvent::Connected(welcome_json["server_name"].as_str().expect("Invalid welcome json").to_string())).unwrap();
                 },
 
                 //REKEY - CHANGE KEYS
