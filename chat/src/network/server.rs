@@ -69,7 +69,6 @@ pub struct ActiveUpload //ACTIVE FILE UPLOAD
     pub current_size: u64,      //CURRENT SIZE
     pub hash: String,           //SHA256 HASH OF FINAL FILE
     pub filename: String,       //FILENAME
-    pub username: String,       //SENDER
 }
 
 //ENUMS
@@ -1048,7 +1047,6 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     current_size: 0,
                                     hash: hash.clone(),
                                     filename,
-                                    username: username.clone(),
                                 });
 
                                 //SEND APPROVAL TO CLIENT
