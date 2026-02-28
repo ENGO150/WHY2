@@ -20,6 +20,7 @@ use std::
 {
     env,
     io::Write,
+    path::PathBuf,
     fs::{ self, File },
     collections::HashSet,
     time::{ Instant, Duration },
@@ -428,6 +429,12 @@ fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
     }
 }
 
+fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOAD
+{
+    env::temp_dir().join(consts::UPLOADS_DIR).join(username)
+}
+
+//PUBLIC
 pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTION BY TcpStream
 {
     //REMOVE CONNECTION
@@ -1030,7 +1037,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 let uid = rand::random::<u64>();
 
                                 //CREATE TEMP UPLOAD DIRECTORY
-                                let temp_dir = env::temp_dir().join(consts::UPLOADS_DIR).join(&username);
+                                let temp_dir = get_upload_dir(&username);
                                 fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
 
                                 //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
