@@ -468,6 +468,9 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
             voice_server::remove_connection(connection.id().unwrap());
         }
 
+        //REMOVE UPLOADS
+        let _ = fs::remove_dir_all(get_upload_dir(connection.username().unwrap()));
+
         //SEND LEAVE MESSAGE
         send_to_all(MessagePacket
         {
