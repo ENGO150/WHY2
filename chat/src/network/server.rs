@@ -1035,14 +1035,18 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     //GET FILE PATH
                                     let temp_dir = get_upload_dir(&username);
                                     let current_path = temp_dir.join(file.uid.to_string());
+                                    let mut new_filename = None;
 
                                     //CHECK HASHES
                                     if active.hash[..] == active.hasher.clone().finalize()[..]
                                     {
                                         //GET NEW FILE PATH
-                                        let final_path = temp_dir.join(Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
+                                        let filename = Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
                                             .file_name()
-                                            .unwrap_or(OsStr::new("unnamed_file")));
+                                            .unwrap_or(OsStr::new("unnamed_file"));
+                                        let final_path = temp_dir.join(filename);
+
+                                        new_filename = Some(filename);
 
                                         //RENAME FILE
                                         delete = fs::rename(&current_path, &final_path).is_err();
@@ -1059,6 +1063,15 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     {
                                         //LOG FILE UPLOAD
                                         log::info!("Upload done: {peer_addr}");
+
+                                        //ANNOUNCE FILE UPLOAD
+                                        send_to_all(MessagePacket
+                                        {
+                                            text: Some(new_filename.and_then(|f| f.to_str()).unwrap_or("unnamed_file").to_owned()),
+                                            username: Some(username.clone()),
+                                            code: Some(MessageCode::Uploaded),
+                                            ..Default::default()
+                                        });
                                     }
 
                                     //REMOVE ACTIVE UPLOAD
