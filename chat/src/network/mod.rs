@@ -375,7 +375,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
     {
         Ok(packet) =>
         {
-            //SPAM & SEQ CHECKS (SERVER)
+            //SPAM, SEQ & LENGTH CHECKS (SERVER)
             #[cfg(feature = "server")]
             {
                 //ACTIVITY TIMER
@@ -386,8 +386,14 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
 
                 if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
                 {
+                    //MESSAGE SIZE (ONLY FOR AUTHENTICATED)
+                    if let Some(text) = &packet.text && conn.is_authenticated()
+                    {
+                        disconnect = text.len() > config::read_config("max_message_length");
+                    }
+
                     //SPAM
-                    if config::read_config("spam_protection") && conn.is_authenticated() &&
+                    if !disconnect && config::read_config("spam_protection") && conn.is_authenticated() &&
                         packet.file.is_none() && Instant::now().duration_since(*conn.last_activity()) <
                             Duration::from_millis(config::read_config::<u64>("min_message_delay"))
                     {
