@@ -76,6 +76,12 @@ pub struct ActiveUpload //ACTIVE FILE UPLOAD
     pub client_id: usize,       //ID OF SENDER
 }
 
+pub struct AvailableFile //UPLOADED FILE
+{
+    pub hash: [u8; 32], //FILE HASH
+    pub path: PathBuf,  //PATH
+}
+
 //ENUMS
 #[derive(Clone)]
 pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
@@ -293,8 +299,9 @@ impl Connection
 }
 
 //LISTS
-pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
-pub static ACTIVE_UPLOADS: LazyLock<DashMap<u64, ActiveUpload>> = LazyLock::new(|| DashMap::new());   //LIST FOR ACTIVE FILE UPLOADS
+pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());        //LIST FOR EACH CLIENT CONNECTION
+pub static ACTIVE_UPLOADS: LazyLock<DashMap<u64, ActiveUpload>> = LazyLock::new(|| DashMap::new());          //LIST FOR ACTIVE FILE UPLOADS
+pub static AVAILABLE_FILES: LazyLock<DashMap<usize, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
 fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&consts::SharedKeys>) -> Option<MessagePacket>
@@ -476,6 +483,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         //REMOVE UPLOADS
         let _ = fs::remove_dir_all(get_upload_dir(connection.username().unwrap())); //REMOVE FILES
         ACTIVE_UPLOADS.retain(|_, u| u.client_id != *connection.id().unwrap());
+        AVAILABLE_FILES.remove(connection.id().unwrap()); //REMOVE AVAILABLE FILES
 
         //SEND LEAVE MESSAGE
         send_to_all(MessagePacket
@@ -586,6 +594,9 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
             server_seq: 0,
         }
     });
+
+    //CREATE AVAILABLE FILES ENTRY
+    AVAILABLE_FILES.insert(id, Vec::new());
 
     log::info!("Authenticate connection: {}", peer_addr);
 }
@@ -1035,20 +1046,24 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     let temp_dir = get_upload_dir(&username);
                                     let current_path = temp_dir.join(file.uid.to_string());
                                     let mut new_filename = None;
+                                    let mut final_path = None;
+                                    let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
 
                                     //CHECK HASHES
-                                    if active.hash[..] == active.hasher.clone().finalize()[..]
+                                    if active.hash == final_hash
                                     {
                                         //GET NEW FILE PATH
                                         let filename = Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
                                             .file_name()
                                             .unwrap_or(OsStr::new("unnamed_file"));
-                                        let final_path = temp_dir.join(filename);
-
-                                        new_filename = Some(filename);
+                                        let new_path = temp_dir.join(filename);
 
                                         //RENAME FILE
-                                        delete = fs::rename(&current_path, &final_path).is_err();
+                                        delete = fs::rename(&current_path, &new_path).is_err();
+
+                                        //SET NEW FILE VARIABLES
+                                        new_filename = Some(filename);
+                                        final_path = Some(new_path);
                                     } else { delete = true; }
 
                                     if delete
@@ -1070,6 +1085,13 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                             username: Some(username.clone()),
                                             code: Some(MessageCode::Uploaded),
                                             ..Default::default()
+                                        });
+
+                                        //ADD FILE TO AVAILABLE FILES
+                                        AVAILABLE_FILES.get_mut(&id).unwrap().push(AvailableFile
+                                        {
+                                            hash: final_hash,
+                                            path: final_path.unwrap(),
                                         });
                                     }
 
