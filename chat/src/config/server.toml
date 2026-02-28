@@ -42,7 +42,8 @@ min_username_length = 4 # Minimal username length
 
 # Spam
 spam_protection = true # Spam protection
-max_packet_size = 4096 # Maximal message length
+max_packet_size = 2000000 # Maximal packet size (2MB)
+max_message_length = 256 # Maximal text message length
 min_message_delay = 750 # Minimal ms delay between user messages (to prevent spamming)
 max_message_delay_violations = 3 # Maximal 'spam' messages that can be sent without getting disconnected
 
