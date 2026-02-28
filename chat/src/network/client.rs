@@ -23,7 +23,7 @@ use std::
     thread,
     path::PathBuf,
     net::TcpStream,
-    collections::HashMap,
+    collections::{ HashMap, BTreeMap },
     sync::
     {
         Arc,
@@ -503,6 +503,38 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 MessageCode::Uploaded =>
                 {
                     tx.send(ClientEvent::Info(format!("[{}]: {} uploaded file \"{}\".\n", &server_uname, read.username.unwrap(), read.text.unwrap()), true, 2)).unwrap();
+                },
+
+                //FILE LIST
+                MessageCode::Files =>
+                {
+                    //PARSE JSON
+                    let uploads_json: BTreeMap<String, Vec<String>> = serde_json::from_str(&read.text.unwrap()).unwrap();
+
+                    if uploads_json.is_empty()
+                    {
+                        tx.send(ClientEvent::Info(String::from("No available files.\n"), true, 2)).unwrap();
+                    } else
+                    {
+                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
+                        tx.send(ClientEvent::Info(String::from("Available files:"), true, 2)).unwrap();
+
+                        for (user, uploads) in uploads_json
+                        {
+                            tx.send(ClientEvent::Info(format!("\r{}:", user), true, 0)).unwrap();
+
+                            //GET FILENAMES
+                            for upload in uploads
+                            {
+                                tx.send(ClientEvent::Info(format!("\r - {}", upload), true, 0)).unwrap();
+                            }
+                        }
+
+                        tx.send(ClientEvent::ExtraSpace).unwrap();
+
+                        extra_space = true;
+                        options::set_extra_space(true);
+                    }
                 },
 
                 //PRIVATE MESSAGE INCOMING
