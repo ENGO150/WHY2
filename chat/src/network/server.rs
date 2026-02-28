@@ -1031,6 +1031,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                     {
                                         //LOG FILE UPLOAD
                                         log::info!("Upload done: {peer_addr}");
+                                    } else
+                                    {
+                                        //REMOVE JUNK FILE
+                                        let _ = fs::remove_file(&current_path);
                                     }
 
                                     //REMOVE ACTIVE UPLOAD
