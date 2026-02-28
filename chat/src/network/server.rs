@@ -20,9 +20,10 @@ use std::
 {
     env,
     io::Write,
-    path::PathBuf,
+    ffi::OsStr,
     fs::{ self, File },
     collections::HashSet,
+    path::{ Path, PathBuf },
     time::{ Instant, Duration },
     net::
     {
@@ -1016,13 +1017,23 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 if active.current_size <= active.size { valid = true; }
 
                                 //CHECK SIZE
-                                if active.current_size == active.size
+                                if active.current_size == active.size //UPLOAD DONE
                                 {
+                                    //GET NEW FILE PATH
+                                    let temp_dir = get_upload_dir(&username);
+                                    let current_path = temp_dir.join(file.uid.to_string());
+                                    let final_path = temp_dir.join(Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
+                                        .file_name()
+                                        .unwrap_or(OsStr::new("unnamed_file")));
+
+                                    //RENAME FILE
+                                    if fs::rename(&current_path, &final_path).is_ok()
+                                    {
+                                    }
+
                                     //REMOVE ACTIVE UPLOAD
                                     drop(active);
                                     ACTIVE_UPLOADS.remove(&file.uid);
-
-                                    //TODO: Implement file renaming
                                 }
                             }
                         } else //NEW UPLOAD, VERIFY SIZE
