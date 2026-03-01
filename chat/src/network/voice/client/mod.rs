@@ -206,7 +206,13 @@ fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], id: usize
 }
 
 //PUBLIC
-pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>, tcp_stream: &mut TcpStream)
+pub fn listen_server_voice //SERVER -> CLIENT
+(
+    id: usize,
+    username: String,
+    tx: Sender<ClientEvent>,
+    write_stream: Arc<Mutex<TcpStream>>
+)
 {
     //RESET SEQs
     options::set_seq(0);
@@ -236,7 +242,7 @@ pub fn listen_server_voice(id: usize, username: String, tx: Sender<ClientEvent>,
         _ => //NOT FOUND
         {
             //LEAVE VOICE
-            command::send_command_code(tcp_stream, &Command::Voice, &None);
+            command::send_command_code(&mut write_stream.lock().unwrap(), &Command::Voice, &None);
             return;
         }
     };

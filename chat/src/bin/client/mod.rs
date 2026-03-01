@@ -555,11 +555,14 @@ fn main()
     //SET TCP_NODELAY
     stream.set_nodelay(true).expect("Failed to set TCP_NODELAY");
 
+    //CREATE STREAM LOCK
+    let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
+
     //CLONE SOCKET FOR CLIENT INPUT
-    let mut client_stream = stream.try_clone().expect("Failed cloning stream");
+    let write_stream_listen = write_stream.clone();
 
     //LISTEN TO SERVER
-    thread::spawn(move || client::listen_server(&mut stream, tx));
+    thread::spawn(move || client::listen_server(&mut (&mut stream, write_stream_listen), tx));
 
     //ENABLE RAW MODE
     let _raw_mode_guard = RawModeGuard::enable().unwrap();
@@ -578,7 +581,7 @@ fn main()
             if let (Some(command), parameters) = command::get_command(&input)
             {
                 //SEND CODE ON A SIMPLE COMMAND, CONTINUE OTHERWISE
-                if !command::send_command_code(&mut client_stream, &command, &parameters)
+                if !command::send_command_code(&mut write_stream.lock().unwrap(), &command, &parameters)
                 {
                     match command
                     {
@@ -709,7 +712,7 @@ fn main()
                                         client::ACTIVE_UPLOADS.lock().unwrap().insert(hash.clone(), path.canonicalize().unwrap());
 
                                         //SEND UPLOAD REQUEST
-                                        network::send(&mut client_stream, MessagePacket
+                                        network::send(&mut write_stream.lock().unwrap(), MessagePacket
                                         {
                                             code: command.to_code(),
                                             file: Some(FilePayload
@@ -781,7 +784,7 @@ fn main()
         options::set_asking_password(false);
 
         //SEND input TO SERVER
-        network::send(&mut client_stream, MessagePacket
+        network::send(&mut write_stream.lock().unwrap(), MessagePacket
         {
             text: Some(input),
             colors: get_colors(),

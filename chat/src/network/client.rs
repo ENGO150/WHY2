@@ -20,7 +20,6 @@ use std::
 {
     thread,
     io::Write,
-    net::TcpStream,
     collections::HashMap,
     fs::{ self, File },
     path::{ Path, PathBuf },
@@ -44,7 +43,7 @@ use crate::
     options,
     misc,
     crypto::kex,
-    consts,
+    consts::{ self, Streams },
     config::{ self, TofuCode },
     network::
     {
@@ -93,13 +92,18 @@ pub static ACTIVE_UPLOADS: LazyLock<Arc<Mutex<HashMap<[u8; 32], PathBuf>>>> = La
 
 //FUNCTIONS
 //PRIVATE
-fn key_exchange(stream: &mut TcpStream, keys: &mut consts::SharedKeys, tx: &Sender<ClientEvent>) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
+fn key_exchange
+(
+    streams: &mut Streams,
+    keys: &mut consts::SharedKeys,
+    tx: &Sender<ClientEvent>
+) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
     let message = loop
     {
         //READ MESSAGE
-        let received = network::receive(stream, None).unwrap();
+        let received = network::receive(streams, None).unwrap();
 
         if received.code == Some(MessageCode::KeyExchange) { break received; }
     };
@@ -112,14 +116,14 @@ fn key_exchange(stream: &mut TcpStream, keys: &mut consts::SharedKeys, tx: &Send
     let server_pq_pk = server_keys["pq"].as_str().expect("Parsing server PQ key failed");
 
     //VERIFY PUBKEY VALIDITY (TOFU)
-    match config::server_keys_check(&stream.peer_addr().unwrap().ip().to_string(), message_text)
+    match config::server_keys_check(&streams.0.peer_addr().unwrap().ip().to_string(), message_text)
     {
         TofuCode::Valid => {},
 
         status @ (TofuCode::Mismatch | TofuCode::Unknown(_, _)) =>
         {
             //GRACEFULLY DISCONNECT FROM SERVER
-            network::send(stream, MessagePacket
+            network::send(&mut streams.1.lock().unwrap(), MessagePacket
             {
                 code: Some(MessageCode::Disconnect),
                 ..Default::default()
@@ -147,7 +151,7 @@ fn key_exchange(stream: &mut TcpStream, keys: &mut consts::SharedKeys, tx: &Send
     }).to_string();
 
     //SEND ECC PUBKEY TO SERVER
-    network::send(stream, MessagePacket
+    network::send(&mut streams.1.lock().unwrap(), MessagePacket
     {
         text: Some(response_text),
         code: Some(MessageCode::KeyExchange),
@@ -164,11 +168,11 @@ fn key_exchange(stream: &mut TcpStream, keys: &mut consts::SharedKeys, tx: &Send
 }
 
 //PUBLIC
-pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
+pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    if !key_exchange(stream, &mut keys, &tx) { return; }
+    if !key_exchange(streams, &mut keys, &tx) { return; }
 
     //SERVER INFO VARIABLES
     let mut min_pass: Option<u64> = None;
@@ -194,7 +198,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
     //LOOP READING
     loop
     {
-        let read = match network::receive(stream, Some(&keys))
+        let read = match network::receive(streams, Some(&keys))
         {
             Some(packet) => packet,
             None => continue
@@ -226,7 +230,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     }
 
                     //RESPOND
-                    network::send(stream, MessagePacket
+                    network::send(&mut streams.1.lock().unwrap(), MessagePacket
                     {
                         text: Some(version),
                         code: Some(MessageCode::Version),
@@ -255,7 +259,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 MessageCode::Rekey =>
                 {
                     //WAIT FOR SERVER TO INIT KEY EXCHANGE
-                    key_exchange(stream, &mut keys, &tx);
+                    key_exchange(streams, &mut keys, &tx);
                 }
 
                 //PICK_USERNAME CODE - guess what
@@ -380,8 +384,8 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     {
                         let username = username.clone();
                         let voice_tx = tx.clone();
-                        let mut stream = stream.try_clone().unwrap();
-                        thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap(), voice_tx, &mut stream));
+                        let stream = streams.1.clone();
+                        thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap(), voice_tx, stream));
                         "en"
                     } else
                     {
@@ -464,11 +468,11 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                         .map(|s| s.to_string())).unwrap_or(String::from("Unknown")); //GET FILENAME FOR CONSOLE LOG
 
                     //CLONE SERVER STREAM FOR UPLOAD THREAD
-                    let mut upload_stream = stream.try_clone().unwrap();
+                    let upload_stream = streams.1.clone();
 
                     //SPAWN UPLOAD THREAD
-                    thread::spawn(move || network::send_file(path, &mut upload_stream,
-                            payload.uid, MessageCode::Upload, options::get_keys().as_ref()));
+                    thread::spawn(move || network::send_file(path, upload_stream,
+                        payload.uid, MessageCode::Upload, options::get_keys().as_ref()));
 
                     tx.send(ClientEvent::Info(format!("Uploading file \"{}\"...\n", filename), true, 1)).unwrap();
                 },

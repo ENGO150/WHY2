@@ -16,6 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::
+{
+    net::TcpStream,
+    sync::{ Arc, Mutex },
+};
+
 use zeroize::Zeroizing;
 
 //CONSTS
@@ -51,4 +57,5 @@ pub const OBFUSCATION_KEY: &[u8; 32] = //KEY FOR OBFUSCATING NON-ENCRYPTED PACKE
 ];
 
 //TYPES
-pub type SharedKeys = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);
+pub type SharedKeys  = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);  //WHY2 KEY, HMAC
+pub type Streams<'a> = (&'a mut TcpStream, Arc<Mutex<TcpStream>>); //READ STREAM, WRITE STREAM

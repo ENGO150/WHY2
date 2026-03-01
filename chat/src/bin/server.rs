@@ -24,6 +24,7 @@ use std::
     thread,
     process,
     time::Duration,
+    sync::{ Arc, Mutex },
     net::{ TcpListener, UdpSocket },
 };
 
@@ -124,7 +125,8 @@ fn main()
                         Err(_) => continue
                     }
 
-                    thread::spawn(move || server::listen_client(&mut stream));
+                    let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
+                    thread::spawn(move || server::listen_client(&mut (&mut stream, write_stream)));
                 },
 
                 Err(e) =>

@@ -30,10 +30,15 @@ use std::
     fs::File,
     str::FromStr,
     path::PathBuf,
-    sync::LazyLock,
     net::TcpStream,
     mem::MaybeUninit,
     io::{ Read, Write },
+    sync::
+    {
+        Arc,
+        Mutex,
+        LazyLock,
+    },
     fmt::
     {
         self,
@@ -69,7 +74,11 @@ use why2::consts;
 use crate::
 {
     crypto,
-    consts as chat_consts,
+    consts::
+    {
+        Streams,
+        self as chat_consts,
+    },
 };
 
 #[cfg(feature = "client")]
@@ -326,7 +335,7 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -> Option<MessagePacket>
+pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) -> Option<MessagePacket>
 {
     //SERVER SIDE PACKET SIZE LIMIT
     #[cfg(feature = "server")]
@@ -337,7 +346,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
     let spam_protection = config::read_config::<bool>("spam_protection");
 
     #[cfg(feature = "server")]
-    let peer_addr = stream.peer_addr().ok()?; //GET CURRENT PEER ADDRESS
+    let peer_addr = streams.0.peer_addr().ok()?; //GET CURRENT PEER ADDRESS
 
     //SETUP LIMITS
     #[cfg(feature = "server")]
@@ -359,7 +368,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
 
     //READ MESSAGE LENGTH
     let mut len_buf = [0u8; 4];
-    if stream.read_exact(&mut len_buf).is_err() { return None; } //READ LENGTH
+    if streams.0.read_exact(&mut len_buf).is_err() { return None; } //READ LENGTH
     let len = u32::from_be_bytes(len_buf) as usize;
 
     //CHECK PACKET SIZE
@@ -372,7 +381,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
 
     //READ REST OF PACKET
     let mut decoded_packet = vec![0u8; len];
-    if stream.read_exact(&mut decoded_packet).is_err() { return None; } //READ
+    if streams.0.read_exact(&mut decoded_packet).is_err() { return None; } //READ
 
     //DECRYPT
     if let Some(keys) = keys
@@ -451,7 +460,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
                     //SEND WARNING CODE
                     if spam_warning
                     {
-                        server::send_code(stream, None, MessageCode::SpamWarning, shared_key.as_ref());
+                        server::send_code(&mut streams.1.lock().unwrap(), None, MessageCode::SpamWarning, shared_key.as_ref());
                     }
 
                     //TOO MANY VIOLATIONS, BYE
@@ -493,7 +502,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
 pub fn send_file //CHUNK FILE AND SEND TO STREAM
 (
     path: PathBuf,
-    stream: &mut TcpStream,
+    write_stream: Arc<Mutex<TcpStream>>,
     uid: u64,
     code: MessageCode,
     keys: Option<&chat_consts::SharedKeys>
@@ -511,7 +520,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
             Ok(bytes) =>
             {
                 //SEND FILE CHUNK
-                send(stream, MessagePacket
+                send(&mut write_stream.lock().unwrap(), MessagePacket
                 {
                     code: Some(code.clone()),
                     file: Some(FilePayload

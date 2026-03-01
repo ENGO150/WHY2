@@ -34,9 +34,9 @@ use std::
     },
     sync::
     {
-        LazyLock,
         Arc,
         Mutex,
+        LazyLock,
     },
 };
 
@@ -51,10 +51,15 @@ use dashmap::DashMap;
 use crate::
 {
     config,
-    consts,
     options,
     misc,
     crypto::{ kex, password },
+    consts::
+    {
+        self,
+        SharedKeys,
+        Streams,
+    },
     network::
     {
         self,
@@ -82,27 +87,27 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
     Authenticated
     {
-        stream: Arc<Mutex<TcpStream>>, //STREAM
-        peer_addr: SocketAddr,         //ADDRESS & PORT
-        username: String,              //USERNAME
-        id: usize,                     //ID OF USER
-        keys: consts::SharedKeys,     //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
-        last_activity: Instant,        //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
-        last_key_exchange: Instant,    //TIME OF LAST REKEY
-        spam_violations: usize,        //SPAM VIOLATIONS (unexpected, huh?)
-        channel: Option<String>,       //CHANNEL
-        seq: usize,                    //SEQUENCE NUMBER (CLIENT -> SERVER)
-        server_seq: usize,             //SEQUENCE NUMBER (SERVER -> CLIENT)
+        write_stream: Arc<Mutex<TcpStream>>, //STREAM
+        peer_addr: SocketAddr,               //ADDRESS & PORT
+        username: String,                    //USERNAME
+        id: usize,                           //ID OF USER
+        keys: SharedKeys,                    //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
+        last_activity: Instant,              //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
+        last_key_exchange: Instant,          //TIME OF LAST REKEY
+        spam_violations: usize,              //SPAM VIOLATIONS (unexpected, huh?)
+        channel: Option<String>,             //CHANNEL
+        seq: usize,                          //SEQUENCE NUMBER (CLIENT -> SERVER)
+        server_seq: usize,                   //SEQUENCE NUMBER (SERVER -> CLIENT)
     },
 
     NonAuthenticated
     {
-        stream: Arc<Mutex<TcpStream>>,     //STREAM
-        peer_addr: SocketAddr,             //ADDRESS & PORT
-        username: Option<String>,          //CHOSEN USERNAME
-        keys: Option<consts::SharedKeys>, //SHARED KEYS
-        last_activity: Instant,            //TIME OF LAST MESSAGE
-        seq: usize,                        //SEQUENCE NUMBER
+        write_stream: Arc<Mutex<TcpStream>>, //STREAM
+        peer_addr: SocketAddr,               //ADDRESS & PORT
+        username: Option<String>,            //CHOSEN USERNAME
+        keys: Option<SharedKeys>,            //SHARED KEYS
+        last_activity: Instant,              //TIME OF LAST MESSAGE
+        seq: usize,                          //SEQUENCE NUMBER
     },
 }
 
@@ -110,12 +115,12 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 impl Connection
 {
     //GET STREAM FROM Connection
-    pub fn stream(&self) -> &Arc<Mutex<TcpStream>>
+    pub fn write_stream(&self) -> &Arc<Mutex<TcpStream>>
     {
         match self
         {
-            Self::Authenticated { stream, .. } => stream,
-            Self::NonAuthenticated { stream, .. } => stream,
+            Self::Authenticated { write_stream, .. } => write_stream,
+            Self::NonAuthenticated { write_stream, .. } => write_stream,
         }
     }
 
@@ -160,7 +165,7 @@ impl Connection
     }
 
     //GET SHARED KEYS FROM Connection
-    pub fn keys(&self) -> Option<&consts::SharedKeys>
+    pub fn keys(&self) -> Option<&SharedKeys>
     {
         match self
         {
@@ -275,12 +280,6 @@ impl Connection
         now.unwrap_or(Instant::now()).duration_since(*self.last_activity()) > Duration::from_secs(config::read_config::<u64>("communication_time"))
     }
 
-    //CLONE STREAM
-    fn cloned_stream(&self) -> Option<TcpStream>
-    {
-        self.stream().lock().ok()?.try_clone().ok()
-    }
-
     //IS AUTHENTICATED
     pub fn is_authenticated(&self) -> bool
     {
@@ -297,10 +296,10 @@ pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::ne
 static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
-fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&consts::SharedKeys>) -> Option<MessagePacket>
+fn untrusted_read(streams: &mut Streams, code: MessageCode, keys: Option<&SharedKeys>) -> Option<MessagePacket>
 {
     //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
-    stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
+    streams.0.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
 
     let mut invalid_packets = 0; //INVALID KEY EXCHANGE PACKETS COUNTER
 
@@ -308,7 +307,7 @@ fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&const
     let message = loop
     {
         //READ MESSAGE
-        let received = match network::receive(stream, keys)
+        let received = match network::receive(streams, keys)
         {
             Some(r) => r,
             None => return None
@@ -322,20 +321,13 @@ fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&const
     };
 
     //REMOVE READ TIMEOUT
-    stream.set_read_timeout(None).expect("Failed to unset read timeout");
+    streams.0.set_read_timeout(None).expect("Failed to unset read timeout");
 
     Some(message)
 }
 
-fn key_exchange(peer_addr: &SocketAddr, keys: &mut consts::SharedKeys) //KEY EXCHANGE FOR SERVER-SIDE
+fn key_exchange(streams: &mut Streams, peer_addr: &SocketAddr, keys: &mut SharedKeys) //KEY EXCHANGE FOR SERVER-SIDE
 {
-    //GET CONNECTION
-    let mut stream = match CONNECTIONS.get(peer_addr)
-    {
-        Some(conn) => conn.cloned_stream().unwrap(),
-        None => return
-    };
-
     //LOAD KEYS
     let (sk, pk) = kex::get_server_keys();          //ECC
     let (pq_sk, pq_pk) = kex::get_server_pq_keys(); //PQ (ML-KEM)
@@ -348,7 +340,7 @@ fn key_exchange(peer_addr: &SocketAddr, keys: &mut consts::SharedKeys) //KEY EXC
     }).to_string();
 
     //SEND ECC PUBKEY TO CLIENT
-    network::send(&mut stream, MessagePacket
+    network::send(&mut streams.1.lock().unwrap(), MessagePacket
     {
         text: Some(payload),
         code: Some(MessageCode::KeyExchange),
@@ -356,7 +348,7 @@ fn key_exchange(peer_addr: &SocketAddr, keys: &mut consts::SharedKeys) //KEY EXC
     }, None);
 
     //READ FROM UNTRUSTED CLIENT
-    let message = match untrusted_read(&mut stream, MessageCode::KeyExchange, None)
+    let message = match untrusted_read(streams, MessageCode::KeyExchange, None)
     {
         Some(r) => r,
         None => return
@@ -385,7 +377,7 @@ fn key_exchange(peer_addr: &SocketAddr, keys: &mut consts::SharedKeys) //KEY EXC
     }
 }
 
-fn send_welcome_packet(stream: &mut TcpStream, keys: &consts::SharedKeys) //send welcome packet you idiot
+fn send_welcome_packet(write_stream: &mut TcpStream, keys: &SharedKeys) //send welcome packet you idiot
 {
     //CREATE JSON WITH ALL THE INFO
     let welcome_json = json!(
@@ -398,7 +390,7 @@ fn send_welcome_packet(stream: &mut TcpStream, keys: &consts::SharedKeys) //send
     }).to_string();
 
     //SEND
-    send_code(stream, Some(welcome_json), MessageCode::Welcome, Some(keys));
+    send_code(write_stream, Some(welcome_json), MessageCode::Welcome, Some(keys));
 }
 
 fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
@@ -427,10 +419,7 @@ fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
 
     for ref entry in entries
     {
-        if let Ok(mut stream) = entry.stream().lock()
-        {
-            network::send(&mut *stream, packet.clone(), entry.keys());
-        }
+        network::send(&mut entry.write_stream().lock().unwrap(), packet.clone(), entry.keys());
     }
 }
 
@@ -449,10 +438,8 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         None => return
     };
 
-    let stream = connection.stream();
-
     //DISCONNECT
-    if let Ok(mut stream) = stream.lock()
+    if let Ok(mut stream) = connection.write_stream().lock()
     {
         //SEND DISCONNECT CODE IF GRACEFUL
         if grace
@@ -527,41 +514,42 @@ fn get_latest_id() -> usize
     unreachable!("what the fuck");
 }
 
-fn update_client_keys(peer_addr: &SocketAddr, keys: &consts::SharedKeys) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
+fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
 {
     //UPDATE CONNECTION
     CONNECTIONS.alter(peer_addr, |_, old_connection|
     {
         match old_connection
         {
-            Connection::NonAuthenticated { stream, seq, peer_addr, .. } =>
+            Connection::NonAuthenticated { write_stream, seq, peer_addr, .. } =>
             {
                 Connection::NonAuthenticated
                 {
-                    stream: stream,
-                    peer_addr: peer_addr,
+                    write_stream,
+                    peer_addr,
                     username: None,
                     keys: Some(keys.to_owned()),
                     last_activity: Instant::now(),
-                    seq: seq,
+                    seq,
                 }
             },
 
-            Connection::Authenticated { stream, username, id, last_activity, spam_violations, channel, seq, server_seq, peer_addr, .. } =>
+            Connection::Authenticated { write_stream, username, id, last_activity,
+                spam_violations, channel, seq, server_seq, peer_addr, .. } =>
             {
                 Connection::Authenticated
                 {
-                    stream: stream,
-                    peer_addr: peer_addr,
-                    username: username,
-                    id: id,
+                    write_stream,
+                    peer_addr,
+                    username,
+                    id,
                     keys: keys.to_owned(),
-                    last_activity: last_activity,
+                    last_activity,
                     last_key_exchange: Instant::now(),
-                    spam_violations: spam_violations,
-                    channel: channel,
-                    seq: seq,
-                    server_seq: server_seq,
+                    spam_violations,
+                    channel,
+                    seq,
+                    server_seq,
                 }
             }
         }
@@ -575,7 +563,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
     {
         Connection::Authenticated
         {
-            stream: old_connection.stream().clone(),
+            write_stream: old_connection.write_stream().clone(),
             peer_addr: *old_connection.peer_addr(),
             username: username.to_string(),
             id: id,
@@ -602,7 +590,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
     {
         Connection::Authenticated
         {
-            stream: old_connection.stream().clone(),
+            write_stream: old_connection.write_stream().clone(),
             peer_addr: *old_connection.peer_addr(),
             username: old_connection.username().unwrap().clone(),
             id: *old_connection.id().unwrap(),
@@ -617,16 +605,16 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
     });
 }
 
-fn ask_version(stream: &mut TcpStream, keys: &consts::SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
+fn ask_version(streams: &mut Streams, keys: &SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
 {
     //ASK FOR VERSION
-    send_code(stream, Some(misc::get_version().to_string()), MessageCode::Version, Some(keys));
+    send_code(&mut streams.1.lock().unwrap(), Some(misc::get_version().to_string()), MessageCode::Version, Some(keys));
 
     //READ FROM UNTRUSTED CLIENT
-    untrusted_read(stream, MessageCode::Version, Some(keys))?.text
+    untrusted_read(streams, MessageCode::Version, Some(keys))?.text
 }
 
-fn send_voice_clients(stream: &mut TcpStream, keys: &consts::SharedKeys, id: usize)
+fn send_voice_clients(stream: &mut TcpStream, keys: &SharedKeys, id: usize)
 {
     //FIND CHANNEL
     let sender_channel = match CONNECTIONS.iter().find(|e| e.value().id() == Some(&id))
@@ -673,9 +661,15 @@ fn send_voice_clients(stream: &mut TcpStream, keys: &consts::SharedKeys, id: usi
 }
 
 //PUBLIC
-pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode, keys: Option<&consts::SharedKeys>) //SEND CODE TO CLIENT
+pub fn send_code //SEND CODE TO CLIENT
+(
+    write_stream: &mut TcpStream,
+    text: Option<String>,
+    code: MessageCode,
+    keys: Option<&SharedKeys>
+)
 {
-    network::send(stream, MessagePacket
+    network::send(write_stream, MessagePacket
     {
         text: text,
         code: Some(code),
@@ -683,9 +677,9 @@ pub fn send_code(stream: &mut TcpStream, text: Option<String>, code: MessageCode
     }, keys);
 }
 
-pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
+pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
 {
-    let peer_addr = match stream.peer_addr()
+    let peer_addr = match streams.0.peer_addr()
     {
         Ok(addr) => addr,
         Err(_) => return,
@@ -696,7 +690,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //PUSH NEW CONNECTION
     CONNECTIONS.insert(peer_addr, Connection::NonAuthenticated
     {
-        stream: Arc::new(Mutex::new(stream.try_clone().expect("Failed to clone client stream"))),
+        write_stream: streams.1.clone(),
         peer_addr: peer_addr,
         username: None,
         keys: None,
@@ -706,7 +700,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
     //GET ENCRYPTION & MAC KEYS
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    key_exchange(&peer_addr, &mut keys);
+    key_exchange(streams, &peer_addr, &mut keys);
 
     //CHECK FOR VALID KEYS
     if keys.0.is_empty() || keys.1.is_empty()
@@ -717,7 +711,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     //ASK CLIENT FOR THEIR PACKAGE VERSION
     if config::read_config("check_client_version")
     {
-        let version = ask_version(stream, &keys);
+        let version = ask_version(streams, &keys);
         if version.is_none() || version != Some(misc::get_version().to_string())
         {
             return remove_connection(&peer_addr, true);
@@ -725,7 +719,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     }
 
     //SEND PACKET WITH REQUIRED SERVER INFO
-    send_welcome_packet(stream, &keys);
+    send_welcome_packet(&mut streams.1.lock().unwrap(), &keys);
 
     //GET USERNAME FROM USER
     let mut username: Option<String> = None; //USER ENTERED USERNAME
@@ -739,16 +733,16 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     let disabled_registration = !config::read_config::<bool>("allow_register");
     if disabled_registration
     {
-        send_code(stream, None, MessageCode::RegisterDisabled, Some(&keys));
+        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::RegisterDisabled, Some(&keys));
     }
 
     //ASK n TIMES
     for _ in 0..max_tries
     {
         //SEND PICK_USERNAME CODE
-        send_code(stream, None, MessageCode::Username, Some(&keys));
+        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::Username, Some(&keys));
 
-        match network::receive(stream, Some(&keys))
+        match network::receive(streams, Some(&keys))
         {
             //USERNAME CONDITIONS MET, BREAK LOOP
             Some(r) =>
@@ -799,10 +793,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
         for _ in 0..max_tries
         {
             //SEND REGISTER CODE
-            send_code(stream, None, MessageCode::PasswordR, Some(&keys));
+            send_code(&mut streams.1.lock().unwrap(), None, MessageCode::PasswordR, Some(&keys));
 
             //WAIT FOR ANSWER
-            match network::receive(stream, Some(&keys))
+            match network::receive(streams, Some(&keys))
             {
                 Some(r) =>
                 {
@@ -831,10 +825,10 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     } else //LOGIN
     {
         //SEND LOGIN CODE
-        send_code(stream, None, MessageCode::PasswordL, Some(&keys));
+        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::PasswordL, Some(&keys));
 
         //WAIT FOR ANSWER
-        let response = match network::receive(stream, Some(&keys))
+        let response = match network::receive(streams, Some(&keys))
         {
             Some(r) => r,
             None => return remove_connection(&peer_addr, false),
@@ -854,7 +848,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     authenticate_client(&peer_addr, &username, id);
 
     //TELL CLIENT TO START CHATTING
-    send_code(stream, Some(id.to_string()), MessageCode::Accept, Some(&keys));
+    send_code(&mut streams.1.lock().unwrap(), Some(id.to_string()), MessageCode::Accept, Some(&keys));
 
     //SEND JOIN MESSAGE
     send_to_all(MessagePacket
@@ -868,7 +862,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
     loop
     {
         //READ
-        let read = match network::receive(stream, Some(&keys))
+        let read = match network::receive(streams, Some(&keys))
         {
             Some(r) => r,
             None => return
@@ -879,8 +873,8 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             Duration::from_secs(consts::REKEY_INTERVAL)
         {
             //INFORM CLIENT ABOUT REKEYING
-            send_code(stream, None, MessageCode::Rekey, Some(&keys));
-            key_exchange(&peer_addr, &mut keys); //INIT REKEY
+            send_code(&mut streams.1.lock().unwrap(), None, MessageCode::Rekey, Some(&keys));
+            key_exchange(streams, &peer_addr, &mut keys); //INIT REKEY
         }
 
         //CLIENT CODES
@@ -901,11 +895,11 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     //CHECK DISABLED FEATURE
                     if !options::voice_chat_enabled()
                     {
-                        send_code(stream, None, MessageCode::InvalidFeature, Some(&keys));
+                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidFeature, Some(&keys));
                     } else
                     {
                         //ACKNOWLEDGE
-                        send_code(stream, None, MessageCode::Voice, Some(&keys));
+                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::Voice, Some(&keys));
 
                         if !voice_server::CONNECTIONS.contains_key(&id) //IS NOT USING VOICE
                         {
@@ -925,7 +919,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                             }
 
                             //SEND CONNECTED CLIENTS
-                            send_voice_clients(stream, &keys, id);
+                            send_voice_clients(&mut streams.1.lock().unwrap(), &keys, id);
                         } else //IS USING VOICE
                         {
                             //SEND CODE TO LAST CHANNEL
@@ -966,7 +960,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
                         //UPDATE CHANNEL
                         update_client_channel(&peer_addr, &read.text);
-                        send_code(stream, read.text, MessageCode::Channel, Some(&keys));
+                        send_code(&mut streams.1.lock().unwrap(), read.text, MessageCode::Channel, Some(&keys));
 
                         //SEND CODE TO CHANNEL
                         if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
@@ -981,11 +975,11 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         }
 
                         //SEND CONNECTED CLIENTS
-                        send_voice_clients(stream, &keys, id);
+                        send_voice_clients(&mut streams.1.lock().unwrap(), &keys, id);
                     } else //INVALID CHANNEL
                     {
                         //SEND InvalidUsage CODE
-                        send_code(stream, None, MessageCode::InvalidUsage, Some(&keys));
+                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
                     }
                 },
 
@@ -1004,7 +998,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     }
 
                     //SEND LIST BACK TO CLIENT
-                    network::send(stream, MessagePacket
+                    network::send(&mut streams.1.lock().unwrap(), MessagePacket
                     {
                         text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
                         code: Some(MessageCode::List),
@@ -1135,7 +1129,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 log::info!("Upload request: {peer_addr}");
 
                                 //SEND APPROVAL TO CLIENT
-                                network::send(stream, MessagePacket
+                                network::send(&mut streams.1.lock().unwrap(), MessagePacket
                                 {
                                     code: Some(MessageCode::Upload),
                                     file: Some(FilePayload
@@ -1182,14 +1176,14 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     if let Some(file) = parse_result
                     {
                         //LOAD SHARE VARIABLES
-                        let mut file_stream = stream.try_clone().unwrap();
+                        let file_stream = streams.1.clone();
                         let file_keys = keys.clone();
 
                         //GENERATE RANDOM SHARE UID
                         let uid = rand::random::<u64>();
 
                         //SEND FILE METADATA
-                        network::send(stream, MessagePacket
+                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
                         {
                             code: Some(MessageCode::Download),
                             file: Some(FilePayload
@@ -1209,7 +1203,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                             //LOG START
                             log::info!("Download request: {peer_addr}");
 
-                            network::send_file(file.path.clone(), &mut file_stream,
+                            network::send_file(file.path.clone(), file_stream,
                                 uid, MessageCode::Download, Some(&file_keys));
 
                             //LOG END
@@ -1217,7 +1211,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         });
                     } else
                     {
-                        send_code(stream, None, MessageCode::InvalidUsage, Some(&keys));
+                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
                     }
                 },
 
@@ -1254,7 +1248,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     }
 
                     //SEND LIST BACK TO CLIENT
-                    network::send(stream, MessagePacket
+                    network::send(&mut streams.1.lock().unwrap(), MessagePacket
                     {
                         text: Some(json!(grouped_files).to_string()),
                         code: Some(MessageCode::Files),
@@ -1286,16 +1280,16 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                             let recipient_data = if let Some(recipient) =
                                 CONNECTIONS.get(&recipient_addr)
                             {
-                                Some((recipient.cloned_stream().unwrap(), recipient.keys().cloned()))
+                                Some((recipient.write_stream().clone(), recipient.keys().cloned()))
                             } else
                             {
                                 None
                             };
 
                             //SEND
-                            if let Some((mut recipient_stream, recipient_keys)) = recipient_data
+                            if let Some((recipient_stream, recipient_keys)) = recipient_data
                             {
-                                network::send(&mut recipient_stream, MessagePacket
+                                network::send(&mut recipient_stream.lock().unwrap(), MessagePacket
                                 {
                                     text: Some(private_message.clone()),
                                     username: Some(username.clone()),
@@ -1308,7 +1302,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         }
 
                         //SEND CONFIRMATION BACK TO SENDER
-                        network::send(stream, MessagePacket
+                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
                         {
                             text: Some(private_message),
                             username: CONNECTIONS.get(&recipient_addr).and_then(|e| e.username().cloned()),
@@ -1320,7 +1314,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     } else
                     {
                         //INVALID PM FORMAT
-                        send_code(stream, None, MessageCode::InvalidUsage, Some(&keys));
+                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
                     }
                 },
 
