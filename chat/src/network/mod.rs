@@ -102,6 +102,7 @@ pub enum MessageCode //CONTROL CODES
     ChannelLeave,       //SERVER -> CLIENT | CLIENT LEFT VOICE CHANNEL
     VoiceClients,       //SERVER -> CLIENT | TELL CLIENT ALL CONNECTED VOICE CLIENTS
     Upload,             //CLIENT <> SERVER | REQUEST FILE UPLOAD (OR APPROVAL FROM SERVER)
+    Download,           //CLIENT <> SERVER | DOWNLOAD FILE FROM SERVER
     Uploaded,           //SERVER -> CLIENT | ANNOUNCE NEW UPLOADED FILE
     Files,              //CLIENT <> SERVER | LIST UPLOADED FILES
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND

@@ -48,6 +48,7 @@ pub enum Command
     List,           //LIST USERS
     Files,          //LIST FILES
     Upload,         //UPLOAD FILE TO SERVER
+    Download,       //DOWNLOAD FILE FROM SERVER
     PrivateMessage, //ONE TO ONE MESSAGE
     UsernameColor,  //SET COLOR OF USERNAME
     MessageColor,   //SET COLOR OF MESSAGE
@@ -128,6 +129,19 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Download,
+        triggers: &[ "DOWNLOAD", "FILEDOWN", "PULL", "DOWN", "FETCH" ],
+        shortcut: None,
+        args:
+        &[
+            CommandArg { name: "USER ID", required: true },
+            CommandArg { name: "FILE ID", required: true },
+        ],
+        description: "Downloads file from server",
+    },
+
+    CommandInfo
+    {
         command: Command::List,
         triggers: &[ "LIST", "USERS", "CLIENTS", "CHANNELS", "IDS", "ID" ],
         shortcut: Some('l'),
@@ -202,6 +216,7 @@ impl Command
             Command::List => Some(MessageCode::List),
             Command::PrivateMessage => Some(MessageCode::PrivateMessage),
             Command::Upload => Some(MessageCode::Upload),
+            Command::Download => Some(MessageCode::Download),
             Command::Files => Some(MessageCode::Files),
 
             _ => None,
