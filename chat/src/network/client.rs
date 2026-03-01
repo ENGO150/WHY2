@@ -526,8 +526,8 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
 
                         network::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
                         {
-                            file: File::create_new(Path::new(&download_dir)
-                                      .join(&filename)).expect("Creating download file failed"),
+                            file: File::create(Path::new(&download_dir)
+                                .join(&filename)).expect("Creating download file failed"),
                             size: file.size.unwrap(),
                             current_size: 0,
                             hash: file.hash.unwrap(),
