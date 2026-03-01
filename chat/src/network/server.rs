@@ -66,23 +66,23 @@ use crate::
 };
 
 //STRUCTS
-pub struct ActiveUpload //ACTIVE FILE UPLOAD
+struct ActiveUpload //ACTIVE FILE UPLOAD
 {
-    pub file: File,             //TARGET FILE (SERVER-SIDE)
-    pub size: u64,              //EXPECTED FILE SIZE
-    pub current_size: u64,      //CURRENT SIZE
-    pub hash: [u8; 32],         //SHA256 HASH OF FINAL FILE
-    pub hasher: Sha256,         //HASHER
-    pub filename: String,       //FILENAME
-    pub client_id: usize,       //ID OF SENDER
+    file: File,             //TARGET FILE (SERVER-SIDE)
+    size: u64,              //EXPECTED FILE SIZE
+    current_size: u64,      //CURRENT SIZE
+    hash: [u8; 32],         //SHA256 HASH OF FINAL FILE
+    hasher: Sha256,         //HASHER
+    filename: String,       //FILENAME
+    client_id: usize,       //ID OF SENDER
 }
 
 #[derive(Clone)]
-pub struct AvailableFile //UPLOADED FILE
+struct AvailableFile //UPLOADED FILE
 {
-    pub hash: [u8; 32],   //FILE HASH
-    pub path: PathBuf,    //PATH
-    pub filename: String, //FILENAME
+    hash: [u8; 32],   //FILE HASH
+    path: PathBuf,    //PATH
+    filename: String, //FILENAME
 }
 
 //ENUMS
@@ -302,9 +302,9 @@ impl Connection
 }
 
 //LISTS
-pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());         //LIST FOR EACH CLIENT CONNECTION
-pub static ACTIVE_UPLOADS: LazyLock<DashMap<u64, ActiveUpload>> = LazyLock::new(|| DashMap::new());           //LIST FOR ACTIVE FILE UPLOADS
-pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
+pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
+static ACTIVE_UPLOADS: LazyLock<DashMap<u64, ActiveUpload>> = LazyLock::new(|| DashMap::new());           //LIST FOR ACTIVE FILE UPLOADS
+static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
 fn untrusted_read(stream: &mut TcpStream, code: MessageCode, keys: Option<&consts::SharedKeys>) -> Option<MessagePacket>
