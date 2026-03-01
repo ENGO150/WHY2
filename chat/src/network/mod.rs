@@ -475,8 +475,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
 (
     path: PathBuf,
     stream: &mut TcpStream,
-    uid: u64,
-    filename: Option<String>,
+    mut payload: FilePayload,
     code: MessageCode,
     keys: Option<&chat_consts::SharedKeys>
 )
@@ -492,17 +491,14 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
             Ok(0) => break, //EOF
             Ok(bytes) =>
             {
+                //OVERWRITE PAYLOAD DATA
+                payload.data = Some(buffer[..bytes].to_vec());
+
                 //SEND FILE CHUNK
                 send(stream, MessagePacket
                 {
                     code: Some(code.clone()),
-                    file: Some(FilePayload
-                    {
-                        uid,
-                        data: Some(buffer[..bytes].to_vec()),
-                        filename: filename.clone(),
-                        ..Default::default()
-                    }),
+                    file: Some(payload.clone()),
                     ..Default::default()
                 }, keys);
             },

@@ -49,6 +49,7 @@ use crate::
         self,
         MessageCode,
         MessagePacket,
+        FilePayload,
         voice::
         {
             client as voice_client,
@@ -464,8 +465,15 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     let mut upload_stream = stream.try_clone().unwrap();
 
                     //SPAWN UPLOAD THREAD
-                    thread::spawn(move || network::send_file(path, &mut upload_stream,
-                            payload.uid, None, MessageCode::Upload, options::get_keys().as_ref()));
+                    thread::spawn(move || network::send_file
+                    (
+                        path, &mut upload_stream,
+                        FilePayload
+                        {
+                            uid: payload.uid,
+                            ..Default::default()
+                        }, MessageCode::Upload, options::get_keys().as_ref()
+                    ));
 
                     tx.send(ClientEvent::Info(format!("Uploading file \"{}\"...\n", filename), true, 1)).unwrap();
                 },
