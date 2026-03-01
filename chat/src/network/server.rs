@@ -1204,8 +1204,17 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         }, Some(&keys));
 
                         //SPAWN UPLOAD THREAD
-                        thread::spawn(move || network::send_file(file.path.clone(),
-                            &mut file_stream, uid, MessageCode::Download, Some(&file_keys)));
+                        thread::spawn(move ||
+                        {
+                            //LOG START
+                            log::info!("Download request: {peer_addr}");
+
+                            network::send_file(file.path.clone(), &mut file_stream,
+                                uid, MessageCode::Download, Some(&file_keys));
+
+                            //LOG END
+                            log::info!("Download done: {peer_addr}");
+                        });
                     } else
                     {
                         send_code(stream, None, MessageCode::InvalidUsage, Some(&keys));
