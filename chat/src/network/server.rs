@@ -1192,20 +1192,31 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
                     if let Some(file) = parse_result
                     {
-                        //SEND FILE TO CLIENT
+                        //LOAD SHARE VARIABLES
                         let mut file_stream = stream.try_clone().unwrap();
                         let file_keys = keys.clone();
-                        thread::spawn(move || network::send_file
-                        (
-                            file.path.clone(), &mut file_stream,
-                            FilePayload
+
+                        //GENERATE RANDOM SHARE UID
+                        let uid = rand::random::<u64>();
+
+                        //SEND FILE METADATA
+                        network::send(stream, MessagePacket
+                        {
+                            code: Some(MessageCode::Download),
+                            file: Some(FilePayload
                             {
-                                uid: rand::random::<u64>(),
+                                uid,
+                                hash: Some(file.hash),
+                                size: Some(file.size),
                                 filename: Some(file.filename),
-                                size: file.path.metadata().map(|m| m.len()).ok(),
                                 ..Default::default()
-                            }, MessageCode::Download, Some(&file_keys)
-                        ));
+                            }),
+                            ..Default::default()
+                        }, Some(&keys));
+
+                        //SPAWN UPLOAD THREAD
+                        thread::spawn(move || network::send_file(file.path.clone(),
+                            &mut file_stream, uid, MessageCode::Download, Some(&file_keys)));
                     } else
                     {
                         send_code(stream, None, MessageCode::InvalidUsage, Some(&keys));
