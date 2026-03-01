@@ -83,6 +83,7 @@ struct AvailableFile //UPLOADED FILE
     hash: [u8; 32],   //FILE HASH
     path: PathBuf,    //PATH
     filename: String, //FILENAME
+    size: u64,        //FILE SIZE
 }
 
 //ENUMS
@@ -1105,6 +1106,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                                 hash: final_hash,
                                                 path: final_path.unwrap(),
                                                 filename,
+                                                size: active.current_size,
                                             });
                                         }
                                     }
