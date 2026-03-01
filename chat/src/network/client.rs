@@ -19,9 +19,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     thread,
-    path::PathBuf,
+    io::Write,
     net::TcpStream,
     collections::HashMap,
+    fs::{ self, File },
+    path::{ Path, PathBuf },
     sync::
     {
         Arc,
@@ -468,10 +470,30 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     tx.send(ClientEvent::Info(format!("Uploading file \"{}\"...\n", filename), true, 1)).unwrap();
                 },
 
+                //DOWNLOAD
+                MessageCode::Download =>
+                {
+                    //GET DOWNLOADS DIR
+                    let home_dir = config::read_config::<String>("download_directory")
+                        .replace("{HOME}", dirs::home_dir().expect("Could not determine home directory")
+                        .to_str().expect("Invalid home directory"));
+                    let download_dir = Path::new(&home_dir);
+
+                    let file = read.file.unwrap();
+
+                    //CREATE DOWNLOAD DIR & FILE
+                    fs::create_dir_all(download_dir).expect("Creating download directory failed");
+                    let mut downloaded = File::create(download_dir.join(file.filename.unwrap()))
+                        .expect("Creating download file failed");
+
+                    downloaded.write_all(&file.data.unwrap()).expect("Writing to download file failed");
+                },
+
                 //UPLOADED ANNOUNCEMENT
                 MessageCode::Uploaded =>
                 {
-                    tx.send(ClientEvent::Info(format!("[{}]: {} uploaded file \"{}\".\n", &server_uname, read.username.unwrap(), read.text.unwrap()), true, 2)).unwrap();
+                    tx.send(ClientEvent::Info(format!("[{}]: {} uploaded file \"{}\".\n", &server_uname,
+                        read.username.unwrap(), read.text.unwrap()), true, 2)).unwrap();
                 },
 
                 //FILE LIST
