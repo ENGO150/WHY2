@@ -1195,11 +1195,12 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         let file_keys = keys.clone();
                         thread::spawn(move || network::send_file
                         (
-                            file.path, &mut file_stream,
+                            file.path.clone(), &mut file_stream,
                             FilePayload
                             {
                                 uid: rand::random::<u64>(),
                                 filename: Some(file.filename),
+                                size: file.path.metadata().map(|m| m.len()).ok(),
                                 ..Default::default()
                             }, MessageCode::Download, Some(&file_keys)
                         ));

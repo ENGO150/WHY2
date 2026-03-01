@@ -488,13 +488,27 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     let download_dir = Path::new(&home_dir);
 
                     let file = read.file.unwrap();
+                    let filename = file.filename.unwrap();
+
+                    //CHECK IF FILE EXISTS
+                    let downloaded = download_dir.join(&filename);
+                    if !downloaded.is_file()
+                    {
+                        tx.send(ClientEvent::Info(format!("Downloading file \"{filename}\"...\n"), true, 2)).unwrap();
+                    }
 
                     //CREATE DOWNLOAD DIR & FILE
                     fs::create_dir_all(download_dir).expect("Creating download directory failed");
-                    let mut downloaded = File::create(download_dir.join(file.filename.unwrap()))
-                        .expect("Creating download file failed");
+                    let mut downloaded = File::create(downloaded).expect("Creating download file failed");
 
+                    //WRITE
                     downloaded.write_all(&file.data.unwrap()).expect("Writing to download file failed");
+
+                    //CHECK FOR FINISH
+                    if downloaded.metadata().map(|m| m.len()).ok() == file.size
+                    {
+                        tx.send(ClientEvent::Info(format!("File \"{filename}\" downloaded.\n"), true, 2)).unwrap();
+                    }
                 },
 
                 //UPLOADED ANNOUNCEMENT
