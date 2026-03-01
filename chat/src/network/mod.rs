@@ -27,7 +27,9 @@ pub mod voice;
 
 use std::
 {
+    fs::File,
     str::FromStr,
+    path::PathBuf,
     net::TcpStream,
     mem::MaybeUninit,
     io::{ Read, Write },
@@ -464,6 +466,37 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
             server::remove_connection(&peer_addr, false);
 
             return None;
+        }
+    }
+}
+
+pub fn send_file(path: PathBuf, stream: &mut TcpStream, uid: u64, keys: Option<&chat_consts::SharedKeys>) //CHUNK FILE AND SEND TO STREAM
+{
+    let mut file = File::open(path).expect("Cannot open file for upload");
+    let mut buffer = vec![0; chat_consts::UPLOAD_CHUNK_SIZE];
+
+    //LOOP READING
+    loop
+    {
+        match file.read(&mut buffer)
+        {
+            Ok(0) => break, //EOF
+            Ok(bytes) =>
+            {
+                //SEND FILE CHUNK
+                send(stream, MessagePacket
+                {
+                    code: Some(MessageCode::Upload),
+                    file: Some(FilePayload
+                    {
+                        uid,
+                        data: Some(buffer[..bytes].to_vec()),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }, keys);
+            },
+            Err(_) => {}, //TODO: Implement
         }
     }
 }

@@ -18,8 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    fs::File,
-    io::Read,
     thread,
     path::PathBuf,
     net::TcpStream,
@@ -49,7 +47,6 @@ use crate::
         self,
         MessageCode,
         MessagePacket,
-        FilePayload,
         voice::
         {
             client as voice_client,
@@ -465,36 +462,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                     let mut upload_stream = stream.try_clone().unwrap();
 
                     //SPAWN UPLOAD THREAD
-                    thread::spawn(move ||
-                    {
-                        let mut file = File::open(path).expect("Cannot open file for upload");
-                        let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
-
-                        //LOOP READING
-                        loop
-                        {
-                            match file.read(&mut buffer)
-                            {
-                                Ok(0) => break, //EOF
-                                Ok(bytes) =>
-                                {
-                                    //SEND FILE CHUNK
-                                    network::send(&mut upload_stream, MessagePacket
-                                    {
-                                        code: Some(MessageCode::Upload),
-                                        file: Some(FilePayload
-                                        {
-                                            uid: payload.uid,
-                                            data: Some(buffer[..bytes].to_vec()),
-                                            ..Default::default()
-                                        }),
-                                        ..Default::default()
-                                    }, options::get_keys().as_ref());
-                                },
-                                Err(_) => {}, //TODO: Implement
-                            }
-                        }
-                    });
+                    thread::spawn(move || network::send_file(path, &mut upload_stream, payload.uid, options::get_keys().as_ref()));
 
                     tx.send(ClientEvent::Info(format!("Uploading file \"{}\"...\n", filename), true, 1)).unwrap();
                 },
