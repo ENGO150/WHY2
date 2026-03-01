@@ -21,7 +21,7 @@ use std::
     thread,
     path::PathBuf,
     net::TcpStream,
-    collections::{ HashMap, BTreeMap },
+    collections::HashMap,
     sync::
     {
         Arc,
@@ -477,7 +477,7 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                 MessageCode::Files =>
                 {
                     //PARSE JSON
-                    let uploads_json: BTreeMap<String, Vec<(String, usize)>> = serde_json::from_str(&read.text.unwrap()).unwrap();
+                    let uploads_json: Vec<Value> = serde_json::from_str(&read.text.unwrap()).unwrap();
 
                     if uploads_json.is_empty()
                     {
@@ -487,14 +487,17 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                         if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
                         tx.send(ClientEvent::Info(String::from("Available files:"), true, 2)).unwrap();
 
-                        for (user, uploads) in uploads_json
+                        for user_obj in uploads_json
                         {
-                            tx.send(ClientEvent::Info(format!("\r{}:", user), true, 0)).unwrap();
+                            let username = user_obj["username"].as_str().unwrap();
+                            let id = user_obj["id"].as_u64().unwrap();
+
+                            tx.send(ClientEvent::Info(format!("\r{} ({}):", username, id), true, 0)).unwrap();
 
                             //GET FILENAMES
-                            for (upload, id) in uploads
+                            for file in user_obj["uploads"].as_array().unwrap()
                             {
-                                tx.send(ClientEvent::Info(format!("\r - {} ({})", upload, id), true, 0)).unwrap();
+                                tx.send(ClientEvent::Info(format!("\r - {} ({})", file[0], file[1]), true, 0)).unwrap();
                             }
                         }
 

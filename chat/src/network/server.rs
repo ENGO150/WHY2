@@ -21,10 +21,10 @@ use std::
     env,
     io::Write,
     ffi::OsStr,
+    collections::HashSet,
     fs::{ self, File },
     path::{ Path, PathBuf },
     time::{ Instant, Duration },
-    collections::{ HashSet, BTreeMap },
     net::
     {
         TcpStream,
@@ -1170,7 +1170,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::Files =>
                 {
                     //GET ALL UPLOADS
-                    let mut grouped_files: BTreeMap<(String, usize), Vec<(String, usize)>> = BTreeMap::new();
+                    let mut grouped_files = Vec::new();
                     for entry in AVAILABLE_FILES.iter()
                     {
                         //GET VALUES
@@ -1185,11 +1185,16 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 .and_then(|c| c.id().copied()).unwrap();
 
                             //GET USER'S UPLOADS
-                            let uploads = uploads.iter().enumerate()
+                            let uploads: Vec<(String, usize)> = uploads.iter().enumerate()
                                 .map(|(idx, u)| (u.filename.clone(), idx)).collect();
 
-                            //ADD TO MAP
-                            grouped_files.insert((username.clone(), id), uploads);
+                            //ADD TO LIST
+                            grouped_files.push(json!
+                            ({
+                                "username": username,
+                                "id": id,
+                                "uploads": uploads,
+                            }));
                         }
                     }
 
