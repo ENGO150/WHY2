@@ -507,6 +507,10 @@ pub fn listen_server(stream: &mut TcpStream, tx: Sender<ClientEvent>) //SERVER -
                                 {
                                     tx.send(ClientEvent::Warn(format!("Downloading \"{filename}\" failed.\n"), true, 2)).unwrap();
                                 }
+
+                                //REMOVE ACTIVE STREAM
+                                drop(active);
+                                network::ACTIVE_FILESHARES.remove(&uid);
                             }
                         }
                     } else
