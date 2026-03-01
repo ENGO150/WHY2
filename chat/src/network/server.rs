@@ -1194,7 +1194,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         let mut file_stream = stream.try_clone().unwrap();
                         let file_keys = keys.clone();
                         thread::spawn(move || network::send_file(file.path, &mut file_stream,
-                                rand::random::<u64>(), MessageCode::Download, Some(&file_keys)));
+                            rand::random::<u64>(), Some(file.filename), MessageCode::Download, Some(&file_keys)));
                     } else
                     {
                         send_code(stream, None, MessageCode::InvalidUsage, Some(&keys));
