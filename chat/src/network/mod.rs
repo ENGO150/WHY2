@@ -471,7 +471,7 @@ pub fn receive(stream: &mut TcpStream, keys: Option<&chat_consts::SharedKeys>) -
     }
 }
 
-pub fn send_file(path: PathBuf, stream: &mut TcpStream, uid: u64, keys: Option<&chat_consts::SharedKeys>) //CHUNK FILE AND SEND TO STREAM
+pub fn send_file(path: PathBuf, stream: &mut TcpStream, uid: u64, code: MessageCode, keys: Option<&chat_consts::SharedKeys>) //CHUNK FILE AND SEND TO STREAM
 {
     let mut file = File::open(path).expect("Cannot open file for upload");
     let mut buffer = vec![0; chat_consts::UPLOAD_CHUNK_SIZE];
@@ -487,7 +487,7 @@ pub fn send_file(path: PathBuf, stream: &mut TcpStream, uid: u64, keys: Option<&
                 //SEND FILE CHUNK
                 send(stream, MessagePacket
                 {
-                    code: Some(MessageCode::Upload),
+                    code: Some(code.clone()),
                     file: Some(FilePayload
                     {
                         uid,
