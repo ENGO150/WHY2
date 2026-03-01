@@ -61,22 +61,12 @@ use crate::
         MessageCode,
         MessagePacket,
         FilePayload,
+        ActiveFileshare,
         voice::server as voice_server,
     },
 };
 
 //STRUCTS
-struct ActiveUpload //ACTIVE FILE UPLOAD
-{
-    file: File,             //TARGET FILE (SERVER-SIDE)
-    size: u64,              //EXPECTED FILE SIZE
-    current_size: u64,      //CURRENT SIZE
-    hash: [u8; 32],         //SHA256 HASH OF FINAL FILE
-    hasher: Sha256,         //HASHER
-    filename: String,       //FILENAME
-    client_id: usize,       //ID OF SENDER
-}
-
 #[derive(Clone)]
 struct AvailableFile //UPLOADED FILE
 {
@@ -304,7 +294,7 @@ impl Connection
 
 //LISTS
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
-static ACTIVE_UPLOADS: LazyLock<DashMap<u64, ActiveUpload>> = LazyLock::new(|| DashMap::new());           //LIST FOR ACTIVE FILE UPLOADS
+static ACTIVE_UPLOADS: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new());        //LIST FOR ACTIVE FILE UPLOADS
 static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
@@ -1131,7 +1121,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
 
                                 //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
-                                ACTIVE_UPLOADS.insert(uid, ActiveUpload
+                                ACTIVE_UPLOADS.insert(uid, ActiveFileshare
                                 {
                                     file: File::create_new(temp_dir.join(uid.to_string())).expect("Creating upload file failed"),
                                     size,
