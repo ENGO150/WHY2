@@ -1170,18 +1170,26 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::Files =>
                 {
                     //GET ALL UPLOADS
-                    let mut grouped_files: BTreeMap<String, Vec<(String, usize)>> = BTreeMap::new();
+                    let mut grouped_files: BTreeMap<(String, usize), Vec<(String, usize)>> = BTreeMap::new();
                     for entry in AVAILABLE_FILES.iter()
                     {
                         //GET VALUES
                         let username = entry.key();
                         let uploads = entry.value();
 
-                        //ADD TO MAP
-                        if !uploads.is_empty()
+                        if !uploads.is_empty() //DO NOT ADD USERS WITH NO UPLOADS
                         {
-                            grouped_files.insert(username.clone(), uploads.iter()
-                                .enumerate().map(|(idx, u)| (u.filename.clone(), idx)).collect());
+                            //GET ID TO THE USERNAME
+                            let id = CONNECTIONS.iter()
+                                .find(|c| c.username() == Some(&username))
+                                .and_then(|c| c.id().copied()).unwrap();
+
+                            //GET USER'S UPLOADS
+                            let uploads = uploads.iter().enumerate()
+                                .map(|(idx, u)| (u.filename.clone(), idx)).collect();
+
+                            //ADD TO MAP
+                            grouped_files.insert((username.clone(), id), uploads);
                         }
                     }
 
