@@ -60,6 +60,7 @@ semver = { version = "1.0.27", optional = true }
 toml_edit = { version = "0.25.3", optional = true }
 hkdf = { version = "0.12.4", optional = true }
 socks = { version = "0.3.4", optional = true }
+dashmap = { version = "6.1.0", optional = true }
 
 # CHAT (CLIENT SPECIFIC)
 crossterm = { version = "0.29.0", optional = true }
@@ -76,7 +77,6 @@ lewton = { version = "0.10.2", optional = true }
 # CHAT (SERVER SPECIFIC)
 argon2 = { version = "0.5.3", optional = true }
 ctrlc = { version = "3.5.2", optional = true }
-dashmap = { version = "6.1.0", optional = true }
 log = { version = "0.4.29", optional = true }
 simple_logger = { version = "5.2.0", optional = true }
 rand = { version = "0.10.0", optional = true }
@@ -95,6 +95,7 @@ chat = [
     "dep:p521",
     "dep:ml-kem",
     "dep:hkdf",
+    "dep:dashmap",
 ]
 
 client = [
@@ -114,7 +115,6 @@ server = [
     "chat",
     "dep:ctrlc",
     "dep:argon2",
-    "dep:dashmap",
     "dep:log",
     "dep:simple_logger",
     "dep:rand",
