@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     env,
+    thread,
     io::Write,
     ffi::OsStr,
     collections::HashSet,
@@ -76,6 +77,7 @@ pub struct ActiveUpload //ACTIVE FILE UPLOAD
     pub client_id: usize,       //ID OF SENDER
 }
 
+#[derive(Clone)]
 pub struct AvailableFile //UPLOADED FILE
 {
     pub hash: [u8; 32],   //FILE HASH
@@ -1165,6 +1167,37 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                         log::warn!("Upload reject: {peer_addr}");
 
                         return remove_connection(&peer_addr, true);
+                    }
+                },
+
+                //DOWNLOAD
+                MessageCode::Download =>
+                {
+                    let parse_result = read.text.as_ref().and_then(|text|
+                    {
+                        let (id_str, fid_str) = text.split_once(' ')?;
+                        let id = id_str.parse::<usize>().ok()?;
+                        let fid = fid_str.parse::<usize>().ok()?;
+
+                        //FIND USERNAME BY ID
+                        let username = CONNECTIONS.iter()
+                            .find(|entry| entry.value().id() == Some(&id))
+                            .map(|entry| entry.value().username().cloned())??;
+
+                        //GET USER UPLOADS
+                        Some(AVAILABLE_FILES.get(&username)?.value().get(fid).cloned()?)
+                    });
+
+                    if let Some(file) = parse_result
+                    {
+                        //SEND FILE TO CLIENT
+                        let mut file_stream = stream.try_clone().unwrap();
+                        let file_keys = keys.clone();
+                        thread::spawn(move || network::send_file(file.path, &mut file_stream,
+                                rand::random::<u64>(), MessageCode::Download, Some(&file_keys)));
+                    } else
+                    {
+                        send_code(stream, None, MessageCode::InvalidUsage, Some(&keys));
                     }
                 },
 
