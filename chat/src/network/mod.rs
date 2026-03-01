@@ -30,6 +30,7 @@ use std::
     fs::File,
     str::FromStr,
     path::PathBuf,
+    sync::LazyLock,
     net::TcpStream,
     mem::MaybeUninit,
     io::{ Read, Write },
@@ -58,6 +59,8 @@ use wincode::
 };
 
 use sha2::Sha256;
+
+use dashmap::DashMap;
 
 use colored::Color;
 
@@ -153,6 +156,9 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
     pub filename: String,                            //FILENAME
     #[cfg(feature = "server")] pub client_id: usize, //ID OF SENDER
 }
+
+//LISTS
+pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new()); //LIST FOR ACTIVE FILE UPLOADS
 
 //IMPLEMENTATIONS
 impl Default for MessagePacket //DEFAULT

@@ -294,7 +294,6 @@ impl Connection
 
 //LISTS
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
-static ACTIVE_UPLOADS: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new());        //LIST FOR ACTIVE FILE UPLOADS
 static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
@@ -477,7 +476,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         //REMOVE UPLOADS
         let username = connection.username().unwrap();
         let _ = fs::remove_dir_all(get_upload_dir(username)); //REMOVE FILES
-        ACTIVE_UPLOADS.retain(|_, u| u.client_id != *connection.id().unwrap());
+        network::ACTIVE_FILESHARES.retain(|_, u| u.client_id != *connection.id().unwrap());
         AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
 
         //SEND LEAVE MESSAGE
@@ -1021,7 +1020,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                     if let Some(file) = read.file //CHECK FOR FILE PAYLOAD
                     {
                         //CHECK IF UPLOAD ALREADY STARTED
-                        if let Some(mut active) = ACTIVE_UPLOADS.get_mut(&file.uid) &&
+                        if let Some(mut active) = network::ACTIVE_FILESHARES.get_mut(&file.uid) &&
                             let Some(chunk_data) = file.data
                         {
                             //WRITE
@@ -1103,7 +1102,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
 
                                     //REMOVE ACTIVE UPLOAD
                                     drop(active);
-                                    ACTIVE_UPLOADS.remove(&file.uid);
+                                    network::ACTIVE_FILESHARES.remove(&file.uid);
                                 }
                             }
                         } else //NEW UPLOAD, VERIFY SIZE
@@ -1121,7 +1120,7 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
                                 fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
 
                                 //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
-                                ACTIVE_UPLOADS.insert(uid, ActiveFileshare
+                                network::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
                                 {
                                     file: File::create_new(temp_dir.join(uid.to_string())).expect("Creating upload file failed"),
                                     size,
