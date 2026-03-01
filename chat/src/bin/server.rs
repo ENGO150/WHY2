@@ -71,6 +71,9 @@ fn main()
         options::enable_voice_chat();
     }
 
+    //SET SERVER USERNAME
+    options::set_server_username(&config::read_config::<String>("server_username"));
+
     //SERIALIZE ADDRESS
     let address = format!("{}:{}", config::read_config::<String>("server_ip"), config::read_config::<u16>("server_port")); //GET ADDRESS
 

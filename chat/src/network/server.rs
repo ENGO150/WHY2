@@ -402,7 +402,7 @@ fn send_welcome_packet(stream: &mut TcpStream, keys: &consts::SharedKeys) //send
         "max_uname": config::read_config::<usize>("max_username_length"),
         "min_uname": config::read_config::<usize>("min_username_length"),
         "server_name": config::read_config::<String>("server_name"),
-        "server_uname": config::read_config::<String>("server_username"),
+        "server_uname": options::get_server_username(),
     }).to_string();
 
     //SEND

@@ -16,7 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::sync::atomic::{ AtomicBool, Ordering };
+use std::sync::
+{
+    OnceLock,
+    atomic::{ AtomicBool, Ordering },
+};
 
 #[cfg(feature = "client")]
 use std::
@@ -28,7 +32,6 @@ use std::
         Mutex,
         RwLock,
         LazyLock,
-        OnceLock,
         atomic::AtomicUsize,
     },
 };
@@ -39,6 +42,9 @@ use crate::consts::SharedKeys;
 //SETTINGS
 #[cfg(feature = "server")]
 static VOICE_CHAT: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "server")]
+static SERVER_USERNAME: OnceLock<String> = OnceLock::new();
 
 #[cfg(feature = "client")]
 static KEYS: LazyLock<RwLock<Option<SharedKeys>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
@@ -90,6 +96,19 @@ pub fn enable_voice_chat() //SET VOICE CHAT TO TRUE
 pub fn voice_chat_enabled() -> bool //GET VOICE CHAT
 {
     VOICE_CHAT.load(Ordering::Relaxed)
+}
+
+//SERVER USERNAME
+#[cfg(feature = "server")]
+pub fn get_server_username() -> String //GET SERVER USERNAME
+{
+    SERVER_USERNAME.get().unwrap().to_owned()
+}
+
+#[cfg(feature = "server")]
+pub fn set_server_username(username: &str) //SET SERVER USERNAME
+{
+    SERVER_USERNAME.set(username.to_owned()).unwrap();
 }
 
 //SHARED KEYS

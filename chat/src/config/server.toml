@@ -23,7 +23,7 @@ enable_voice_chat = true # Enable (changing requires restart)
 
 # Appearance
 server_name = "WHY2 Server" # Name of the server
-server_username = "server" # Username server will use
+server_username = "server" # Username server will use (changing requires restart)
 
 # Cleanup
 communication_time = 300 # Seconds waiting for client message before stopping communication (+- 5 seconds)
