@@ -763,7 +763,9 @@ pub fn listen_client(stream: &mut TcpStream) //CLIENT -> SERVER COMMUNICATION
             {
                 if let Some(uname) = r.text
                 {
-                    if uname.len() >= min_len && uname.len() <= max_len && uname.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') && !user_connected(&uname)
+                    if uname.len() >= min_len && uname.len() <= max_len &&
+                        uname.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') &&
+                        !user_connected(&uname) && uname != options::get_server_username()
                     {
                         username = Some(uname);
                         break;
