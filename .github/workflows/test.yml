@@ -41,6 +41,9 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name Rust Cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Run Test
         run: cargo test -p why2 encrypt_decrypt --verbose --release -- --nocapture
 
@@ -56,6 +59,9 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name Rust Cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Run Test
         run: cargo test -p why2 verify_multi_grid_overflow --verbose --release -- --nocapture
 
@@ -70,6 +76,9 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name Rust Cache
+        uses: Swatinem/rust-cache@v2
 
       - name: Run Input Diffusion Test
         run: cargo test -p why2 test_input_diffusion --verbose --release -- --nocapture
@@ -89,6 +98,9 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name Rust Cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Run MAC Test
         run: cargo test -p why2 test_auth_tamper_resistance --verbose --release -- --nocapture
 
@@ -103,6 +115,9 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name Rust Cache
+        uses: Swatinem/rust-cache@v2
 
       - name: Run Entropy Test
         run: cargo test -p why2 test_ciphertext_entropy --verbose --release -- --nocapture

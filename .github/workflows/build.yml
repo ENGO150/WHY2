@@ -37,6 +37,9 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name Rust Cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Build Examples
         run: cargo build --examples --release -p why2 --verbose
 
@@ -62,6 +65,9 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name Rust Cache
+        uses: Swatinem/rust-cache@v2
 
       - name: Build Client
         run: cargo build --release
