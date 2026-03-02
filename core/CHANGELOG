@@ -1,0 +1,245 @@
+WHY2 (Core) Changelog
+=====================
+
+v1.4.11:
+- 450af8c: fix rustdoc SysRng link
+- 0694d8e: remove deprecated legacy encryption module
+- 4ad32c8: fix dependency update breaking changes
+- 1a4dead: update dependencies
+- e2e9580: upgrade dependencies & fix breaking changes
+- d4a99bd: remove outdated round operations from crypto::apply_ctr rustdoc
+- 0866740: remove duplicate Subcell code
+
+v1.4.10:
+- 7419cbe: englishify operation rustdocs
+- 8835012: modernize rustdoc main page
+- 3087225: fix MixColumns rustdoc unresolved link
+- 58e5e1c: precalculate rotations for MixColumns
+
+v1.4.9:
+- dac24de: remove chat from rustdocs
+- c518016: optimize Grid::increment
+- 620e592: parallelize Grid::from_bytes
+- 73208ac: implement SIMD for Xor Grid operation
+- 5f856a3: implement shift precalculation in WHY2 implementation
+- af6d83f: precalculate row shifts before running ShiftRows
+- b05cd46: add comprehensive benchmark
+- 81e02dd: add criterion dev-dependency
+- be3dbca: implement SIMD for MixColumns
+- 8d650c4: implement scalar fallback for Subcell
+- a277d1c: implement SIMD for Subcell
+- 80e0831: add wide dependency
+- c6a44dd: decrease SUBCELL_ROUND to 4
+- 5bb3b02: optimize XOR Grid operation
+- f6d74a6: use inlining for heavy Grid operations
+- ca4b54b: replace MixColumns modulus with BitAnd
+- 405a3aa: implement Clone trait for WHY2 data structures
+
+v1.4.8:
+- 6a05524: add icons to rustdoc
+- 4af3d1e: fix MixColumns coeff LaTeX notation
+- a9aa293: use round_index in MixColumns
+- 28c6861: remove redundant input grid shuffling
+- 7990c7b: implement CT for MixColumns
+- 766f7a9: use delta variations in Grid rustdoc
+- 2faac6f: introduce key dependent rotation to MixColumns
+- 6e60e5f: rename SUBCELL_DELTA to DELTA_32
+- f8e32b5: increase round iterations to 16
+- 5f7cf70: remove MixColumns & MixMatrix operations
+- 59cbeb3: implement MDS MixColumns
+
+v1.4.6:
+- 16c5e54: add authenticated encryption code example
+- 792e8a3: add examples section to rustdoc root
+- f8142a3: add file encryption code example
+- 4ea8442: add grid sizes code example
+- e8fe11f: add binary data encryption code example
+- c015821: add custom key code example
+- 975764d: implement GridError::InvalidUnicode on decrypter::decrypt_string failure
+- 66e1cc4: add basic encryption example
+- e46d4e9: move Grid to grid module
+- d32d650: rename options module to types
+- 1029ab4: move core constants to consts module
+
+v1.4.5:
+- 755b259: implement default Grid size
+- 086c648: implement workspace structure in tests
+- 87414c1: fix auth::verify rustdoc latex formatting
+- 60f0463: add homepage to package metadata
+
+v1.4.3:
+- d39524a: remove redundant rustdoc link
+- a87e485: move latex parser to core
+- a56a9fd: use readme in workspaces
+
+v1.4.3:
+- 13e3d07: split repository on workspaces
+
+v1.4.2:
+- b418314: disable default features for nnnoiseless dependency
+- 458a518: update dependencies
+- 9a3cd26: remove base91 dependency
+- 88bd409: implement serialization for AuthenticatedData
+- 825377a: remove ZeroizeOnDrop implementation for EncryptedData & AuthenticatedData
+- f07ce39: implement Zeroize for EncryptedData & AuthenticatedData
+- 111ed75: fix unresolved rustdoc link
+- c8ed501: update auth rustdoc
+- 8156e0b: create auth module for AuthenticatedData
+- fb5b3e9: create auth feature
+- 31b3b89: force constant-time feature for chat
+- fc3d75c: change encryption key to slice instead of owned vector
+- 963c8ae: add mk-kem dependency
+- 794b443: remove redundant rustdoc links
+- 0f7599e: replace sha256 chaining in generate_round_keys with csprng
+- 8f5b73e: remove ISO 10126 padding
+- 8020f36: update dependencies
+- 70cbbdc: move client binary to separate module
+- ddf66aa: add lewton dependency
+- e6b6040: add socks5 dependency
+
+v1.4.1:
+- 35ddc5a: prioritize release profile speed over binary size
+- 1256e01: simplify encrypter key parameter pattern matching
+
+v1.4.0:
+- 8e95779: mention voice chat in rustdoc
+- 173ad3d: make voice chat default on client
+- fd9e130: add logging dependencies
+- 38536da: add nnnoiseless dependency
+- 480a644: update dependencies
+- c4f781a: update license year
+- f68976e: use gag for supressing alsa errors
+- 1a93bc0: add voice chat dependencies
+
+v1.3.5:
+- 1cef7a8: update documentation for new ctr mode implementation
+- 637a536: optimize Grid IntoIterator implementation
+- 080d64b: use string slice as encrypt_string input parameter
+- 4e9db00: use byte slice as Grid::from_bytes parameter
+- 38638b1: move shared CTR application from to crypto::apply_ctr
+- 5266540: implement parallel CTR
+- d23e58f: add rayon dependency
+- b3c701b: implement constant-time array rotation for Grid::shift_rows
+- 7898f14: implement fisher-yates for constant-time shuffle
+
+v1.3.4:
+- f165f8b: move serde_json dependency to chat only
+- a64b501: replace bincode with wincode
+- 422e7be: implement constant-time for Grid::shift_rows
+- ff775ba: implement constant-time in decrypter
+- cb59426: implement constant-time for Grid::increment
+- bb5e236: replace native-endian with BE in docs
+- e2522db: use legacy feature in docs
+- 2ada555: add legacy & constant-time features to doc
+- 5e5021a: make doc LaTeX notations more explicit
+- a919e29: disable legacy modules by default
+- 762a9a3: use new structure in docs
+- e1ee99c: move WHY2 legacy to separate module
+- 3fe9780: add missing LaTeX notations
+- c182c91: update old pkcs usage in doc
+- ca61359: use LaTeX syntax in rustdoc
+- 9dc397e: clean unused Grid CBC invert operations
+- 72cc4ab: use CTR instead of CBC
+- b61047b: change Grid BitXorAssign implementation to Grid<W, H>
+- a0c2314: fix rustdoc unresolved links
+- 23090a1: include noise in rustdoc for mix_matrix
+
+v1.3.3:
+- 29a64d0: implement zeroize on whole REX
+- af7e987: implement PartialEq for non constant-time usage
+- c325f7a: add constant-time eq default feature
+- c124c97: check for invalid padding on decryption
+- a18ba36: implement LowerHex display for Grid
+- ed5b624: replace REX String errors with GridError
+- e863e58: implement Zeroize for Grid
+- 2f89495: add zeroize dependency
+- 3b0ed6d: fix mix_matrix code duplicity
+- 0dee53d: add LWE noise to mix_matrix operation
+
+v1.3.2:
+- 112f190: update dependencies
+- da22dfd: replace reqwest with ureq
+- 4240bbc: optimize release builds
+- a20f786: remove default client feature
+- fb46bf8: add cargo features to root doc
+- fbbf11d: update root docs
+- f20664e: remove chat module lib
+
+v0.3.0-rex:
+- cd4b916: fix crates.io problems caused by rust workspaces
+
+v0.3.0-rex:
+- 053ae48: use inline on cheap rex grid operations
+- f97480d: use big endian instead of native endian
+- 3711acf: implement diagonal mixing to round iterations
+- 3095ec9: increase SUBCELL_ROUNDS TO 32
+- 8857910: implement random initialization vector for cipher block chaining mode
+- e6639a9: use ISO 10126 padding instead of PKCS#7
+- 9de1e32: move core/tests to separate workspace
+- 90ef62b: typo fix
+- f5faa9c: split on core & chat workspaces
+- f1984be: update dependencies
+
+v0.2.9-rex:
+- 8bfeb2f: add changelog to cargo build
+- f682e7c: add binary optimization for release profile
+- 2a7a798: add argon2 dependency for chat::server
+- 3ed5561: add colored dependency for chat
+
+v0.2.8-rex:
+- 6d42f8a: prevent from incorrect feature usage
+
+v0.2.7-rex:
+- 082b68e: use reqwest only in chat module
+- af4b239: remove chat feature from docs
+
+v0.2.6-rex:
+- 7b0b3ec: use markdown readme instead of plaintext
+
+v0.2.5-rex:
+- fb4acc3: enable docs for all features
+
+v0.2.3-rex:
+- 4404541: rename chat binaries to have why2 prefix
+
+v0.2.2-rex:
+- 75e4295: add semver dependency
+- fcc8b45: use valid license expression
+- 3b724f9: make chat dependencies optional
+- 5aea26b: replace openssl crate with r521 crate
+- faaee7a: add compile condition to chat module
+- fd9c55e: replace once_cell crate with std
+
+v0.2.1-rex:
+- d205a46: update repository url to private mirror
+- 8d1ebdd: auto-update configuration files
+- 08f6818: use crossterm dependency only on client
+- 904b169: feature typo fix
+- 97218c3: create client feature
+- 29fbd86: replace is_server with feature conditional compilation
+- e7560cb: version typo fix
+
+v0.2.0-rex:
+- ef5e07d: replace StdRng with ChaCha20Rng in rex
+- 49ac88d: replace termios with own crossterm implementation
+- 745c018: add crossterm dependency
+- 80ec17d: add ctrl+c handler to server
+- a375b33: replace hex with base91
+- c948d94: replace rpassword with termios
+- 6162014: add rpassword dependency
+- 2bdb90f: replace lazy_static with once_cell
+- dd838d5: add serde & bincode dependency
+- 0fc425d: add hex dependency
+- a454e43: add openssl dependency
+- 391283c: add cargo dependency
+- 5c2c582: add more info to Cargo.toml
+- 1c48710: create chat modules
+- 6e03992: use sha2 crate
+- 8f998ee: replace curl with reqwest
+- b6c3c5a: use dirs crate as replacement for env
+- 5845a99: add rust crate
+- 8e6c624: swap json crate for serde_json
+- 05bda93: add json crate
+- 4948726: add curl dependency
+- aa2b998: use lazy_static dependency
+- 51ad286: create very basic rust project
