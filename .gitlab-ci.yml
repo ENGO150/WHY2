@@ -26,7 +26,6 @@ cache:
   paths:
     - .cargo/registry/index/
     - .cargo/registry/cache/
-    - .cargo/git/db/
     - target/
   policy: pull-push
 
