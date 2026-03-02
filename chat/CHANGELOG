@@ -1,6 +1,118 @@
 WHY2 (Chat) Changelog
 =====================
 
+v1.5.0:
+- 889b83d: use why2-chat crate for version checking
+- 5737ed9: split changelog on chat & core
+- 04a5c9f: prepare workspace for version split
+- 86d5098: add server upload client_id check
+- ed9fd99: prevent from storing malicious chunks on server
+- 7e83a56: prevent from path traversal on client
+- 9f50ce4: use binary MB definition for max_upload_size
+- 5ec7f59: update dependencies
+- ecda04b: use read_stream & write_stream instead of single shared TcpStream
+- bf15acc: prevent client from crashing on duplicate download
+- 8d2fd5d: remove ActiveFileshare on client download finish
+- 9af4785: log downloads on server
+- ee87c4f: harden client download stream handling
+- f2e3585: move dashmap dependency to chat feature
+- 5782489: move server::ACTIVE_UPLOADS to network::ACTIVE_FILESHARES
+- d5f2652: move server::ActiveUpload to network::ActiveFileshare
+- 79a9454: send metadata first on server download
+- 41b6328: replace network::send_file payload parameter with uid
+- b14d97d: add size field to AvailableFile
+- d303d3e: make server file structs private
+- 5834b09: log download finish
+- 77600a9: add FilePayload parameter to network::send_file
+- de9a317: handle download file stream on client
+- 90abd6d: add download_directory to client config
+- 21df65f: add filename parameter to network::send_file fn
+- 5bd57d2: implement download code on server
+- f3db143: add code parameter to send_file
+- cc549a0: add download command
+- 488c439: reject same login as server_username
+- 0eb9173: send uploads as Vec instead of BTreeMap
+- e44ccf1: send user id along with their uploads
+- ca94959: cache server_username config on server startup
+- 8314ebf: move file chunking & upload to network module
+- 1802ed6: display upload id in file command output
+- 9fba440: prevent from duplicate available files
+- 4e0a267: implement Files command output on client
+- 0b13450: serialize uploads on user level
+- 537a4c0: serialize uploaded files into json on server file command
+- 41ddc09: change AVAILABLE_FILES key type to String
+- 3ead8c2: add Files command
+- b4dfeb2: add Files code
+- 0287b69: add filename field to AvailableFile
+- 8b88264: add uploaded file to AVAILABLE_FILES map
+- 70f2795: removed redundant server_username sharing
+- e507f1f: display uploaded file announcements on client
+- 1f477ef: add server username to welcome packet
+- 8a968c1: announce file uploads to clients
+- e069c47: add Uploaded code
+- a9fb918: compare file hashes on upload complete
+- 6552033: use array for upload file hash instead of string
+- 6d6c37b: feed each upload data chunk to hasher on server
+- bd18a6b: remove active upload on disconnect
+- 674fb8c: remove client upload files on disconnect
+- b7f74ac: implement message size check for authenticated users
+- 6e0cf21: separate message length and packet size in server config
+- 3bc6e35: remove junk upload file on failed rename
+- f2f60ad: fix max_packet_size check indentation
+- 6d17415: log file uploads on server
+- fcef0e0: implement uploaded file renaming
+- 5d5550a: remove username field from ActiveUpload
+- 7477e74: create get_upload_dir helper fn
+- 5838c2b: print uploading file log to chat window
+- 356236c: avoid spam warnings on file uploads
+- d1ce6d0: remove last_activity field from FilePayload
+- df01e7f: implement upload chunk storing on server
+- 4064e42: remove chunk_index field from FilePayload
+- 74c5544: implement file chunking & upload on client-side
+- 0c19386: implement UPLOAD_CHUNK_SIZE on upload request init hash
+- 2879401: add UPLOAD_CHUNK_SIZE const
+- a8d8ed0: send upload hash on upload accept
+- 77c9d3f: store requested uploads on client-side ACTIVE_UPLOADS
+- 1ac257a: add ACTIVE_UPLOADS list on client-side
+- 875a775: use uid for temp filenames
+- 7f7a2a1: create upload file in tmpdir on server
+- 0a0be7e: add UPLOADS_DIR const
+- c9c55b4: add rand dependency for server
+- 1452c4f: debug log upload approval on client
+- f481c2d: approve new file uploads on server
+- e140f3e: create server list for active file upload
+- a00b40f: add max_upload_size entry to server config
+- 8d451fe: send upload request to server
+- 8cbba5b: implement Default trait for FilePayload
+- 5c6250e: add FilePayload struct to MessagePacket
+- 569076f: use Path for file upload check instead of File
+- dda4874: calculate file sha256 hash on upload command
+- 91c4447: simplify client invalid messages
+- 15852e3: add upload command & code
+- c2a4d14: revert "optimize send_to_all channel member lookup"
+- 5dc8a74: implement Info command
+- 5996f97: add Info command
+- f2e0d52: implement automatical command shortcut handling
+- 56d5bf9: add shortcut field to CommandInfo
+- d08a3b2: clear voice buffers on mute
+- de98cfe: remove redundant obfuscate_data allocation
+- f9b83bd: optimize send_to_all channel member lookup
+- 5991634: add gentoo GURU link to chat readme
+- a1df85a: bind local mute to C-s
+- 3248661: accept unmute as mute alias
+- 17b7580: implement chat client muting
+- 70400ea: implement local voice client muting
+- 4718387: accept None in is_muted for local client
+- 2d72b69: implement peer voice client muting
+- 1e4ae5c: add is_muted check fn
+- d76f234: implement mute command on frontend
+- d8f4f37: fix toggle_mute bool logic
+- d33c241: separate voice chat constants to const module
+- af22d2e: smartify voice::swap_use_voice
+- beb50f4: add options::toggle_mute function
+- 86c1553: separate chat constants to const module
+- c5aec51: add mute command
+
 v1.4.11:
 - 4ad32c8: fix dependency update breaking changes
 - 1a4dead: update dependencies
