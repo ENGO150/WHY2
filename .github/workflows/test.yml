@@ -41,7 +41,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name Rust Cache
+      - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
       - name: Run Test
@@ -59,7 +59,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name Rust Cache
+      - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
       - name: Run Test
@@ -77,7 +77,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name Rust Cache
+      - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
       - name: Run Input Diffusion Test
@@ -98,7 +98,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name Rust Cache
+      - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
       - name: Run MAC Test
@@ -116,7 +116,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name Rust Cache
+      - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
       - name: Run Entropy Test
