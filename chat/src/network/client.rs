@@ -523,7 +523,13 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                         let download_dir = config::read_config::<String>("download_directory")
                             .replace("{HOME}", dirs::home_dir().expect("Could not determine home directory")
                             .to_str().expect("Invalid home directory"));
-                        let filename = file.filename.unwrap();
+
+                        //GET SAFE FILENAME
+                        let filename = Path::new(&file.filename.unwrap())
+                            .file_name()
+                            .and_then(|f| f.to_str())
+                            .unwrap_or("unnamed_file")
+                            .to_string();
 
                         //CREATE DOWNLOAD DIR
                         fs::create_dir_all(&download_dir).expect("Creating download directory failed");
