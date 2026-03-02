@@ -133,7 +133,7 @@ upload-to-aur:
     - git config --global user.email "gitlab@satan.red"
 
     # Extract version
-    - VERSION=$(grep '^version =' Cargo.toml | head -n1 | sed -E 's/version\s*=\s*"(.*)"/\1/')
+    - VERSION=$(grep '^version =' chat/Cargo.toml | head -n1 | sed -E 's/version\s*=\s*"(.*)"/\1/')
 
     # Clone & modify AUR repository
     - git clone ssh://aur@aur.archlinux.org/why2.git
