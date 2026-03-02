@@ -25,28 +25,28 @@ use std::
 use zeroize::Zeroizing;
 
 //CONSTS
-pub const METADATA_URL: &str         = "https://crates.io/api/v1/crates/why2";                                 //URL FOR PROJECT METADATA
+pub const METADATA_URL: &str         = "https://crates.io/api/v1/crates/why2-chat"; //URL FOR PROJECT METADATA
 
-pub const USER_CONFIG_DIR: &str      = "{HOME}/.config";                                                       //USER CONFIG DIRECTORY
-pub const CONFIG_DIR: &str           = "/WHY2";                                                                //DIRECTORY FOR CONFIG FILES
-pub const UPLOADS_DIR: &str          = "WHY2-Uploads";                                                         //DIRECTORY FOR FILE UPLOADS
-pub const SERVER_CONFIG: &str        = "/server.toml";                                                         //SERVER CONFIG FILE
-pub const CLIENT_CONFIG: &str        = "/client.toml";                                                         //CLIENT CONFIG FILE
-pub const SERVER_USERS_CONFIG: &str  = "/server_users.toml";                                                   //SERVER USERS CONFIG FILE
+pub const USER_CONFIG_DIR: &str      = "{HOME}/.config";                            //USER CONFIG DIRECTORY
+pub const CONFIG_DIR: &str           = "/WHY2";                                     //DIRECTORY FOR CONFIG FILES
+pub const UPLOADS_DIR: &str          = "WHY2-Uploads";                              //DIRECTORY FOR FILE UPLOADS
+pub const SERVER_CONFIG: &str        = "/server.toml";                              //SERVER CONFIG FILE
+pub const CLIENT_CONFIG: &str        = "/client.toml";                              //CLIENT CONFIG FILE
+pub const SERVER_USERS_CONFIG: &str  = "/server_users.toml";                        //SERVER USERS CONFIG FILE
 
-pub const SERVER_KEYS_CONFIG: &str   = "/server_keys.toml";                                                    //SERVER PUBKEY CONFIG FILE
-pub const SERVER_KEYS_DIR: &str      = "/server_keys";                                                         //SERVER KEYS DIRECTORY
-pub const SERVER_SKEY: &str          = "/private";                                                             //SERVER PRIVATE KEY FILE
-pub const SERVER_PKEY: &str          = "/public";                                                              //SERVER PUBLIC KEY FILE
-pub const SERVER_PQ_SKEY: &str       = "/private_pq";                                                          //SERVER POST-QUANTUM PRIVATE KEY FILE
-pub const SERVER_PQ_PKEY: &str       = "/public_pq";                                                           //SERVER POST-QUANTUM PUBLIC KEY FILE
+pub const SERVER_KEYS_CONFIG: &str   = "/server_keys.toml";                         //SERVER PUBKEY CONFIG FILE
+pub const SERVER_KEYS_DIR: &str      = "/server_keys";                              //SERVER KEYS DIRECTORY
+pub const SERVER_SKEY: &str          = "/private";                                  //SERVER PRIVATE KEY FILE
+pub const SERVER_PKEY: &str          = "/public";                                   //SERVER PUBLIC KEY FILE
+pub const SERVER_PQ_SKEY: &str       = "/private_pq";                               //SERVER POST-QUANTUM PRIVATE KEY FILE
+pub const SERVER_PQ_PKEY: &str       = "/public_pq";                                //SERVER POST-QUANTUM PUBLIC KEY FILE
 
-pub const FETCH_TIMEOUT: u64         = 5000;                                                                   //TIMOUT FOR FETCHING DATA (MS)
+pub const FETCH_TIMEOUT: u64         = 5000;                                        //TIMOUT FOR FETCHING DATA (MS)
 
-pub const REKEY_INTERVAL: u64        = 600;                                                                    //INTERVAL FOR RE-REKEYING (SECS)
+pub const REKEY_INTERVAL: u64        = 600;                                         //INTERVAL FOR RE-REKEYING (SECS)
 
 //DO NOT CHANGE CONSTS BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
-pub const UPLOAD_CHUNK_SIZE: usize   = 1_048_576;                                                              //FILE UPLOAD CHUNK (1MB)
+pub const UPLOAD_CHUNK_SIZE: usize   = 1_048_576;                                   //FILE UPLOAD CHUNK (1MB)
 
 pub const OBFUSCATION_KEY: &[u8; 32] = //KEY FOR OBFUSCATING NON-ENCRYPTED PACKETS (NOT A SECURITY FEATURE)
 &[
