@@ -1104,7 +1104,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                             if let Some(size) = file.size &&
                                 let Some(hash) = file.hash &&
                                 let Some(filename) = file.filename &&
-                                size / 1_000_000 <= config::read_config::<u64>("max_upload_size")
+                                size / 1_048_576 <= config::read_config::<u64>("max_upload_size")
                             {
                                 //GENERATE RANDOM UID
                                 let uid = rand::random::<u64>();
