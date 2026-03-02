@@ -1017,8 +1017,8 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                         if let Some(mut active) = network::ACTIVE_FILESHARES.get_mut(&file.uid) &&
                             let Some(chunk_data) = file.data
                         {
-                            //WRITE
-                            if active.file.write_all(&chunk_data).is_ok()
+                            if chunk_data.len() <= consts::UPLOAD_CHUNK_SIZE && //CHECK PACKET SIZE
+                                active.file.write_all(&chunk_data).is_ok() //WRITE
                             {
                                 //UPDATE SIZE
                                 active.current_size += chunk_data.len() as u64;
