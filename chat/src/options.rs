@@ -40,11 +40,10 @@ use std::
 use crate::consts::SharedKeys;
 
 //SETTINGS
-#[cfg(feature = "server")]
-static VOICE_CHAT: AtomicBool = AtomicBool::new(false);
+static SERVER_USERNAME: OnceLock<String> = OnceLock::new();
 
 #[cfg(feature = "server")]
-static SERVER_USERNAME: OnceLock<String> = OnceLock::new();
+static VOICE_CHAT: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "client")]
 static KEYS: LazyLock<RwLock<Option<SharedKeys>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
@@ -85,6 +84,17 @@ static MUTED: LazyLock<Mutex<HashSet<usize>>> = LazyLock::new(|| Mutex::new(Hash
 static SOCKS5: AtomicBool = AtomicBool::new(false); //USE SOCKS5 (TOR)
 
 //FUNCTIONS
+//SERVER USERNAME
+pub fn get_server_username() -> String //GET SERVER USERNAME
+{
+    SERVER_USERNAME.get().unwrap().to_owned()
+}
+
+pub fn set_server_username(username: &str) //SET SERVER USERNAME
+{
+    SERVER_USERNAME.set(username.to_owned()).unwrap();
+}
+
 //VOICE CHAT
 #[cfg(feature = "server")]
 pub fn enable_voice_chat() //SET VOICE CHAT TO TRUE
@@ -96,19 +106,6 @@ pub fn enable_voice_chat() //SET VOICE CHAT TO TRUE
 pub fn voice_chat_enabled() -> bool //GET VOICE CHAT
 {
     VOICE_CHAT.load(Ordering::Relaxed)
-}
-
-//SERVER USERNAME
-#[cfg(feature = "server")]
-pub fn get_server_username() -> String //GET SERVER USERNAME
-{
-    SERVER_USERNAME.get().unwrap().to_owned()
-}
-
-#[cfg(feature = "server")]
-pub fn set_server_username(username: &str) //SET SERVER USERNAME
-{
-    SERVER_USERNAME.set(username.to_owned()).unwrap();
 }
 
 //SHARED KEYS

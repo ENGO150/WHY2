@@ -178,7 +178,6 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
     let mut min_pass: Option<u64> = None;
     let mut max_uname: Option<u64> = None;
     let mut min_uname: Option<u64> = None;
-    let mut server_uname = String::new();
 
     let mut invalid_username = false; //PRINT "Invalid Username!"
     let mut invalid_password = false;
@@ -250,7 +249,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     min_pass = Some(welcome_json["min_pass"].as_u64().expect("Invalid welcome json"));
                     max_uname = Some(welcome_json["max_uname"].as_u64().expect("Invalid welcome json"));
                     min_uname = Some(welcome_json["min_uname"].as_u64().expect("Invalid welcome json"));
-                    server_uname = welcome_json["server_uname"].as_str().expect("Invalid welcome json").to_string();
+                    options::set_server_username(welcome_json["server_uname"].as_str().expect("Invalid welcome json"));
 
                     tx.send(ClientEvent::Connected(welcome_json["server_name"].as_str().expect("Invalid welcome json").to_string())).unwrap();
                 },
@@ -343,13 +342,13 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                         first_message = false;
                     }
 
-                    tx.send(ClientEvent::Info(format!("[{}]: {} connected.\n", &server_uname, user), true, 0)).unwrap();
+                    tx.send(ClientEvent::Info(format!("[{}]: {} connected.\n", options::get_server_username(), user), true, 0)).unwrap();
                 }
 
                 //LEAVE MESSAGE (CLIENT DISCONNECTED)
                 MessageCode::Leave =>
                 {
-                    tx.send(ClientEvent::Info(format!("[{}]: {} disconnected.\n", &server_uname, read.text.unwrap()), true, 2)).unwrap();
+                    tx.send(ClientEvent::Info(format!("[{}]: {} disconnected.\n", options::get_server_username(), read.text.unwrap()), true, 2)).unwrap();
                     voice_client::remove_consumer(&read.id.unwrap());
                 },
 
@@ -553,7 +552,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //UPLOADED ANNOUNCEMENT
                 MessageCode::Uploaded =>
                 {
-                    tx.send(ClientEvent::Info(format!("[{}]: {} uploaded file \"{}\".\n", &server_uname,
+                    tx.send(ClientEvent::Info(format!("[{}]: {} uploaded file \"{}\".\n", options::get_server_username(),
                         read.username.unwrap(), read.text.unwrap()), true, 2)).unwrap();
                 },
 
