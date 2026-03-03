@@ -72,6 +72,9 @@ pub struct VoiceUser
 //ENUMS
 pub enum ClientEvent
 {
+    Register,
+    Login,
+    Authenticated,
     Connected(String),             //SUCCESSFUL CONNECTION MESSAGE
     Message(MessagePacket),        //RECEIVED MESSAGE
     Info(String, bool, usize),     //INFO/STATUS LOG, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
@@ -308,20 +311,20 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                         invalid_password = true;
                     }
 
-                    tx.send(ClientEvent::Info(String::from("\n\rEnter password: (REGISTER)"), true, 0)).unwrap();
+                    tx.send(ClientEvent::Register).unwrap();
                 },
 
                 //LOGIN
                 MessageCode::PasswordL =>
                 {
                     options::set_asking_password(true);
-                    tx.send(ClientEvent::Info(String::from("\nEnter password: (LOGIN)"), true, 3)).unwrap();
+                    tx.send(ClientEvent::Login).unwrap();
                 },
 
                 //START CHATTING
                 MessageCode::Accept =>
                 {
-                    tx.send(ClientEvent::Info(String::from("Login successful. Press Ctrl+H for help.\n"), true, 3)).unwrap();
+                    tx.send(ClientEvent::Authenticated).unwrap();
 
                     //SET SERVER-SIDE ID
                     id = read.text.unwrap_or("0".to_string()).parse().unwrap();

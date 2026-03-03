@@ -71,6 +71,23 @@ pub fn draw_event(event: ClientEvent)
 {
     match event
     {
+        ClientEvent::Register =>
+        {
+            println!("\n\rEnter password: (REGISTER)");
+        },
+
+        ClientEvent::Login =>
+        {
+            clear_lines(3);
+            println!("\nEnter password: (LOGIN)");
+        },
+
+        ClientEvent::Authenticated =>
+        {
+            clear_lines(3);
+            println!("Login successful. Press Ctrl+H for help.\n");
+        },
+
         ClientEvent::Connected(server_name) =>
         {
             println!("Successfully connected to {server_name}.\n");
