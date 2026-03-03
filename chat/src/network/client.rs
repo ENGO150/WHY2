@@ -87,6 +87,7 @@ pub enum ClientEvent
     Join(String),                              //CLIENT CONNECTED
     Leave(String),                             //CLIENT DISCONNECTED
     Clear(usize),                              //CLEAR n LINES
+    InvalidUsage,                              //INVALID COMMAND USAGE
     ExtraSpace,                                //JUST RANDOM NEWLINE
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
@@ -625,7 +626,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //CLIENT MESSED SOME COMMAND UP
                 MessageCode::InvalidUsage =>
                 {
-                    tx.send(ClientEvent::Info(String::from("Invalid usage! Press Ctrl+H for help.\n"), true, 2)).unwrap();
+                    tx.send(ClientEvent::InvalidUsage).unwrap();
                 },
 
                 //CLIENTED REQUESTED DISABLED FEATURE

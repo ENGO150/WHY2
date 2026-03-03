@@ -276,6 +276,12 @@ pub fn draw_event(event: ClientEvent)
             println!("[{}]: {uname} disconnected.\n", options::get_server_username());
         },
 
+        ClientEvent::InvalidUsage =>
+        {
+            clear_lines(2);
+            println!("Invalid usage! Press Ctrl+H for help.\n");
+        },
+
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),
         ClientEvent::Quit =>
