@@ -118,7 +118,19 @@ pub fn draw_event(event: ClientEvent)
 
         ClientEvent::Prompt(channel, message) => //SHOW PROMPT BAR
         {
-            print!("\r{}>>> {}", channel, message);
+            print!("\r{channel}>>> {message}");
+        },
+
+        ClientEvent::PrivateMessageSent(to, id, msg) =>
+        {
+            clear_lines(2);
+            println!("[PM TO] {to} ({id}): {msg}\n");
+        },
+
+        ClientEvent::PrivateMessageRecv(from, id, msg) =>
+        {
+            clear_lines(2);
+            println!("[PM FROM] {from} ({id}): {msg}\n");
         },
 
         ClientEvent::TofuError(status) =>
@@ -255,13 +267,13 @@ pub fn draw_event(event: ClientEvent)
 
         ClientEvent::Join(uname) =>
         {
-            println!("[{}]: {} connected.\n", options::get_server_username(), uname);
+            println!("[{}]: {uname} connected.\n", options::get_server_username());
         },
 
         ClientEvent::Leave(uname) =>
         {
             clear_lines(2);
-            println!("[{}]: {} disconnected.\n", options::get_server_username(), uname);
+            println!("[{}]: {uname} disconnected.\n", options::get_server_username());
         },
 
         ClientEvent::Clear(n) => clear_lines(n),

@@ -72,21 +72,23 @@ pub struct VoiceUser
 //ENUMS
 pub enum ClientEvent
 {
-    Register,
-    Login,
-    Authenticated,
-    Connected(String),             //SUCCESSFUL CONNECTION MESSAGE
-    Message(MessagePacket),        //RECEIVED MESSAGE
-    Info(String, bool, usize),     //INFO/STATUS LOG, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
-    Warn(String, bool, usize),     //WARN LOG/POPUP, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
-    Prompt(String, String),        //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
-    TofuError(TofuCode),           //TOFU VERIFICATION FAILED
-    VoiceActivity(Vec<VoiceUser>), //VOICE OVERLAY
-    Join(String),                  //CLIENT CONNECTED
-    Leave(String),                 //CLIENT DISCONNECTED
-    Clear(usize),                  //CLEAR n LINES
-    ExtraSpace,                    //JUST RANDOM NEWLINE
-    Quit,                          //SERVER QUIT COMMUNICATION
+    Register,                                  //REGISTER PROMPT
+    Login,                                     //LOGIN PROMPT
+    Authenticated,                             //LOGIN SUCCESSFUL
+    Connected(String),                         //SUCCESSFUL CONNECTION MESSAGE
+    Message(MessagePacket),                    //RECEIVED MESSAGE
+    Info(String, bool, usize),                 //INFO/STATUS LOG, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
+    Warn(String, bool, usize),                 //WARN LOG/POPUP, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
+    Prompt(String, String),                    //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
+    PrivateMessageSent(String, usize, String), //SENT PM
+    PrivateMessageRecv(String, usize, String), //RECEIVED PM
+    TofuError(TofuCode),                       //TOFU VERIFICATION FAILED
+    VoiceActivity(Vec<VoiceUser>),             //VOICE OVERLAY
+    Join(String),                              //CLIENT CONNECTED
+    Leave(String),                             //CLIENT DISCONNECTED
+    Clear(usize),                              //CLEAR n LINES
+    ExtraSpace,                                //JUST RANDOM NEWLINE
+    Quit,                                      //SERVER QUIT COMMUNICATION
 }
 
 //LISTS
@@ -599,13 +601,13 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //PRIVATE MESSAGE INCOMING
                 MessageCode::PrivateMessage =>
                 {
-                    tx.send(ClientEvent::Info(format!("[PM FROM] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap()), true, 2)).unwrap();
+                    tx.send(ClientEvent::PrivateMessageRecv(read.username.unwrap(), read.id.unwrap(), read.text.unwrap())).unwrap();
                 },
 
                 //PRIVATE MESSAGE INCOMING
                 MessageCode::PrivateMessageBack =>
                 {
-                    tx.send(ClientEvent::Info(format!("[PM TO] {} ({}): {}\n", read.username.unwrap(), read.id.unwrap(), read.text.unwrap()), true, 2)).unwrap();
+                    tx.send(ClientEvent::PrivateMessageSent(read.username.unwrap(), read.id.unwrap(), read.text.unwrap())).unwrap();
                 },
 
                 //SPAM WARNING
