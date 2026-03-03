@@ -47,6 +47,7 @@ use crossterm::
 
 use crate::
 {
+    options,
     config::{ self, TofuCode },
     network::
     {
@@ -233,7 +234,18 @@ pub fn draw_event(event: ClientEvent)
             }
 
             stdout.queue(RestorePosition).unwrap();
-        }
+        },
+
+        ClientEvent::Join(uname) =>
+        {
+            println!("[{}]: {} connected.\n", options::get_server_username(), uname);
+        },
+
+        ClientEvent::Leave(uname) =>
+        {
+            clear_lines(2);
+            println!("[{}]: {} disconnected.\n", options::get_server_username(), uname);
+        },
 
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),

@@ -79,6 +79,8 @@ pub enum ClientEvent
     Prompt(String, String),        //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
     TofuError(TofuCode),           //TOFU VERIFICATION FAILED
     VoiceActivity(Vec<VoiceUser>), //VOICE OVERLAY
+    Join(String),                  //CLIENT CONNECTED
+    Leave(String),                 //CLIENT DISCONNECTED
     Clear(usize),                  //CLEAR n LINES
     ExtraSpace,                    //JUST RANDOM NEWLINE
     Quit,                          //SERVER QUIT COMMUNICATION
@@ -342,13 +344,13 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                         first_message = false;
                     }
 
-                    tx.send(ClientEvent::Info(format!("[{}]: {} connected.\n", options::get_server_username(), user), true, 0)).unwrap();
+                    tx.send(ClientEvent::Join(user)).unwrap();
                 }
 
                 //LEAVE MESSAGE (CLIENT DISCONNECTED)
                 MessageCode::Leave =>
                 {
-                    tx.send(ClientEvent::Info(format!("[{}]: {} disconnected.\n", options::get_server_username(), read.text.unwrap()), true, 2)).unwrap();
+                    tx.send(ClientEvent::Leave(read.text.unwrap())).unwrap();
                     voice_client::remove_consumer(&read.id.unwrap());
                 },
 
