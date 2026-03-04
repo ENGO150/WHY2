@@ -315,6 +315,30 @@ pub fn draw_event(event: ClientEvent)
             println!("Voice disabled.\n");
         },
 
+        ClientEvent::List(users_json) =>
+        {
+            clear_lines(2);
+
+            println!("Online clients:");
+
+            //PRINT USERS
+            for user in users_json.as_array().unwrap()
+            {
+                //GET CHANNEL
+                let c = if let Some(c) = user["channel"].as_str().map(String::from)
+                {
+                    format!(" | #{c}")
+                } else
+                {
+                    String::new()
+                };
+
+                println!("\r{} ({}){}", user["username"].as_str().unwrap(), user["id"], c);
+            }
+
+            println!();
+        },
+
         ClientEvent::VersionFailed => println!("Fetching versions failed, this release could be unsafe!"),
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),

@@ -95,6 +95,7 @@ pub enum ClientEvent
     Username(bool, u64, u64),                  //USERNAME PROMPT
     VoiceEnabled,                              //VOICE CHAT ENABLED
     VoiceDisabled,                             //VOICE CHAT DISABLED
+    List(Value),                               //LIST OF USERS
     ExtraSpace,                                //JUST RANDOM NEWLINE
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
@@ -429,28 +430,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 MessageCode::List =>
                 {
                     if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
-                    tx.send(ClientEvent::Info(String::from("Online clients:"), true, 2)).unwrap();
-
-                    //PARSE JSON
-                    let users_json: Value = serde_json::from_str(&read.text.unwrap()).unwrap();
-
-                    //PRINT USERS
-                    for user in users_json.as_array().unwrap()
-                    {
-                        //GET CHANNEL
-                        let c = if let Some(c) = user["channel"].as_str().map(String::from)
-                        {
-                            format!(" | #{c}")
-                        } else
-                        {
-                            String::new()
-                        };
-
-                        tx.send(ClientEvent::Info(format!("\r{} ({}){}", user["username"].as_str().unwrap(), user["id"], c), true, 0)).unwrap();
-                    }
-
-                    tx.send(ClientEvent::ExtraSpace).unwrap();
-
+                    tx.send(ClientEvent::List(serde_json::from_str(&read.text.unwrap()).unwrap())).unwrap();
                     extra_space = true;
                     options::set_extra_space(true);
                 },
