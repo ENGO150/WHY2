@@ -282,6 +282,7 @@ pub fn draw_event(event: ClientEvent)
             println!("Invalid usage! Press Ctrl+H for help.\n");
         },
 
+        ClientEvent::VersionFailed => println!("Fetching versions failed, this release could be unsafe!"),
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),
         ClientEvent::Quit =>

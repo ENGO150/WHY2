@@ -83,16 +83,14 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
         Ok(m) => m,
         Err(_) =>
         {
-            let print_text = "Fetching versions failed, this release could be unsafe!";
-
             #[cfg(feature = "client")]
             {
-                tx.send(ClientEvent::Info(print_text.to_string(), true, 0)).unwrap()
+                tx.send(ClientEvent::VersionFailed).unwrap();
             }
 
             #[cfg(feature = "server")]
             {
-                log::warn!("{print_text}");
+                log::warn!("Fetching versions failed, this release could be unsafe!");
             }
 
             return;

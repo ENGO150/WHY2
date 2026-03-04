@@ -88,6 +88,7 @@ pub enum ClientEvent
     Leave(String),                             //CLIENT DISCONNECTED
     Clear(usize),                              //CLEAR n LINES
     InvalidUsage,                              //INVALID COMMAND USAGE
+    VersionFailed,                             //FETCHING VERSIONS FAILED
     ExtraSpace,                                //JUST RANDOM NEWLINE
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
