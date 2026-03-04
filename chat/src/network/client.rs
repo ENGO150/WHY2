@@ -38,6 +38,8 @@ use zeroize::Zeroizing;
 
 use serde_json::Value;
 
+use semver::Version;
+
 use crate::
 {
     options,
@@ -89,6 +91,7 @@ pub enum ClientEvent
     Clear(usize),                              //CLEAR n LINES
     InvalidUsage,                              //INVALID COMMAND USAGE
     VersionFailed,                             //FETCHING VERSIONS FAILED
+    UnsafeVersion(usize, Version, String),     //OLD VERSION
     ExtraSpace,                                //JUST RANDOM NEWLINE
     Quit,                                      //SERVER QUIT COMMUNICATION
 }

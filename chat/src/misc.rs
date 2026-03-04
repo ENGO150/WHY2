@@ -110,7 +110,7 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
     {
         //GET ARRAY OF VERSIONS
         let versions = metadata.get("versions").and_then(|v| v.as_array()).unwrap();
-        let mut newer_versions = 0;
+        let mut newer_versions = 0usize;
         let current_version = Version::parse(current_version).expect("Invalid version");
 
         //CALCULATE
@@ -124,16 +124,14 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
             }
         }
 
-        let print_text = format!("This release could be unsafe! You are {newer_versions} versions behind! ({current_version}/{newest_version})");
-
         #[cfg(feature = "client")]
         {
-            tx.send(ClientEvent::Info(print_text, true, 0)).unwrap()
+            tx.send(ClientEvent::UnsafeVersion(newer_versions, current_version, newest_version.to_owned())).unwrap();
         }
 
         #[cfg(feature = "server")]
         {
-            log::warn!("{print_text}");
+            log::warn!("This release could be unsafe! You are {newer_versions} versions behind! ({current_version}/{newest_version})");
         }
     }
 }
