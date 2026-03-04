@@ -108,6 +108,7 @@ pub enum ClientEvent
     PasswordRejected(u64),                     //PASSWORD REJECTED BY SERVER
     SpamWarning,                               //SPAM WARNING
     Socks5Voice,                               //DISABLED VOICE ON SOCKS5
+    DisabledFeature,                           //DISABLED FEATURE
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
 
@@ -594,7 +595,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //CLIENTED REQUESTED DISABLED FEATURE
                 MessageCode::InvalidFeature =>
                 {
-                    tx.send(ClientEvent::Warn(String::from("Server has disabled the feature you requested.\n"), true, 2)).unwrap();
+                    tx.send(ClientEvent::DisabledFeature).unwrap();
                 },
 
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
