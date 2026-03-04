@@ -339,6 +339,65 @@ pub fn draw_event(event: ClientEvent)
             println!();
         },
 
+        ClientEvent::Upload(filename) =>
+        {
+            clear_lines(1);
+            println!("Uploading file \"{filename}\"...\n");
+        },
+
+        ClientEvent::Uploaded(username, filename) =>
+        {
+            clear_lines(2);
+            println!("[{}]: {username} uploaded file \"{filename}\".\n", options::get_server_username());
+        },
+
+        ClientEvent::Download(filename) =>
+        {
+            clear_lines(2);
+            println!("Downloading file \"{filename}\"...\n");
+        },
+
+        ClientEvent::Downloaded(filename) =>
+        {
+            clear_lines(2);
+            println!("File \"{filename}\" downloaded.\n");
+        },
+
+        ClientEvent::DownloadFailed(filename) =>
+        {
+            clear_lines(2);
+            println!("Downloading \"{filename}\" failed.\n");
+        },
+
+        ClientEvent::Files(uploads_json) =>
+        {
+            clear_lines(2);
+            if uploads_json.is_empty()
+            {
+                println!("No available files.\n");
+            } else
+            {
+                if !options::get_extra_space() { println!(); }
+                println!("Available files:");
+
+                for user_obj in uploads_json
+                {
+                    let username = user_obj["username"].as_str().unwrap();
+                    let id = user_obj["id"].as_u64().unwrap();
+
+                    println!("\r{} ({}):", username, id);
+
+                    //GET FILENAMES
+                    for file in user_obj["uploads"].as_array().unwrap()
+                    {
+                        println!("\r - {} ({})", file[0], file[1]);
+                    }
+                }
+
+                println!();
+            }
+        },
+
         ClientEvent::VersionFailed => println!("Fetching versions failed, this release could be unsafe!"),
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),

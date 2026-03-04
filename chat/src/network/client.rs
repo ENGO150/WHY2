@@ -96,6 +96,12 @@ pub enum ClientEvent
     VoiceEnabled,                              //VOICE CHAT ENABLED
     VoiceDisabled,                             //VOICE CHAT DISABLED
     List(Value),                               //LIST OF USERS
+    Upload(String),                            //UPLOADING FILE
+    Uploaded(String, String),                  //USER UPLOADED FILE
+    Download(String),                          //DOWNLOADING FILE
+    Downloaded(String),                        //DOWNLOADED FILE
+    DownloadFailed(String),                    //DOWNLOADING FAILED
+    Files(Vec<Value>),                         //FILE LIST
     ExtraSpace,                                //JUST RANDOM NEWLINE
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
@@ -454,7 +460,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     thread::spawn(move || network::send_file(path, upload_stream,
                         payload.uid, MessageCode::Upload, options::get_keys().as_ref()));
 
-                    tx.send(ClientEvent::Info(format!("Uploading file \"{}\"...\n", filename), true, 1)).unwrap();
+                    tx.send(ClientEvent::Upload(filename)).unwrap();
                 },
 
                 //DOWNLOAD
@@ -484,13 +490,13 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                                 let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
 
                                 //CHECK HASHES
-                                if active.hash == final_hash
+                                tx.send(if active.hash == final_hash
                                 {
-                                    tx.send(ClientEvent::Info(format!("File \"{filename}\" downloaded.\n"), true, 2)).unwrap();
+                                    ClientEvent::Downloaded(filename)
                                 } else
                                 {
-                                    tx.send(ClientEvent::Warn(format!("Downloading \"{filename}\" failed.\n"), true, 2)).unwrap();
-                                }
+                                    ClientEvent::DownloadFailed(filename)
+                                }).unwrap();
 
                                 //REMOVE ACTIVE STREAM
                                 drop(active);
@@ -526,15 +532,14 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                         });
 
                         //LOG
-                        tx.send(ClientEvent::Info(format!("Downloading file \"{filename}\"...\n"), true, 2)).unwrap();
+                        tx.send(ClientEvent::Download(filename)).unwrap();
                     }
                 },
 
                 //UPLOADED ANNOUNCEMENT
                 MessageCode::Uploaded =>
                 {
-                    tx.send(ClientEvent::Info(format!("[{}]: {} uploaded file \"{}\".\n", options::get_server_username(),
-                        read.username.unwrap(), read.text.unwrap()), true, 2)).unwrap();
+                    tx.send(ClientEvent::Uploaded(read.username.unwrap(), read.text.unwrap())).unwrap();
                 },
 
                 //FILE LIST
@@ -543,33 +548,13 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     //PARSE JSON
                     let uploads_json: Vec<Value> = serde_json::from_str(&read.text.unwrap()).unwrap();
 
-                    if uploads_json.is_empty()
+                    if !uploads_json.is_empty()
                     {
-                        tx.send(ClientEvent::Info(String::from("No available files.\n"), true, 2)).unwrap();
-                    } else
-                    {
-                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
-                        tx.send(ClientEvent::Info(String::from("Available files:"), true, 2)).unwrap();
-
-                        for user_obj in uploads_json
-                        {
-                            let username = user_obj["username"].as_str().unwrap();
-                            let id = user_obj["id"].as_u64().unwrap();
-
-                            tx.send(ClientEvent::Info(format!("\r{} ({}):", username, id), true, 0)).unwrap();
-
-                            //GET FILENAMES
-                            for file in user_obj["uploads"].as_array().unwrap()
-                            {
-                                tx.send(ClientEvent::Info(format!("\r - {} ({})", file[0], file[1]), true, 0)).unwrap();
-                            }
-                        }
-
-                        tx.send(ClientEvent::ExtraSpace).unwrap();
-
                         extra_space = true;
                         options::set_extra_space(true);
                     }
+
+                    tx.send(ClientEvent::Files(uploads_json)).unwrap();
                 },
 
                 //PRIVATE MESSAGE INCOMING
