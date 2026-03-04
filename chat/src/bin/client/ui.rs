@@ -398,6 +398,12 @@ pub fn draw_event(event: ClientEvent)
             }
         },
 
+        ClientEvent::IncompatibleVersion(version, server_version) =>
+        {
+            clear_lines(1);
+            println!("Incompatible version! ({version}/{server_version})");
+        },
+
         ClientEvent::VersionFailed => println!("Fetching versions failed, this release could be unsafe!"),
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),

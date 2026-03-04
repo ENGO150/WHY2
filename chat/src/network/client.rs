@@ -103,6 +103,7 @@ pub enum ClientEvent
     DownloadFailed(String),                    //DOWNLOADING FAILED
     Files(Vec<Value>),                         //FILE LIST
     ExtraSpace,                                //JUST RANDOM NEWLINE
+    IncompatibleVersion(String, String),       //INCOMPATIBLE SERVER VERSION
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
 
@@ -247,7 +248,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     //NON MATCHING VERSION (WILL GET DISCONNECTED)
                     if server_version != version
                     {
-                        tx.send(ClientEvent::Warn(String::from("Incompatible version! ({version}/{server_version})"), true, 1)).unwrap();
+                        tx.send(ClientEvent::IncompatibleVersion(version.clone(), server_version)).unwrap();
                     }
 
                     //RESPOND
