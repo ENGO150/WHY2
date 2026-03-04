@@ -92,6 +92,7 @@ pub enum ClientEvent
     InvalidUsage,                              //INVALID COMMAND USAGE
     VersionFailed,                             //FETCHING VERSIONS FAILED
     UnsafeVersion(usize, Version, String),     //OLD VERSION
+    Username(bool, u64, u64),                  //USERNAME PROMPT
     ExtraSpace,                                //JUST RANDOM NEWLINE
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
@@ -289,18 +290,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                         invalid_username = true;
                     }
 
-                    tx.send(ClientEvent::Info(format!
-                    (
-                        "\n\rEnter username ({}):",
-
-                        if disabled_registration
-                        {
-                            String::from("Registration disabled!")
-                        } else
-                        {
-                            format!("a-Z, 0-9; {}-{} characters", min_uname.unwrap(), max_uname.unwrap())
-                        }
-                    ), true, 0)).unwrap();
+                    tx.send(ClientEvent::Username(disabled_registration, min_uname.unwrap(), max_uname.unwrap())).unwrap();
                 },
 
                 //REGISTER

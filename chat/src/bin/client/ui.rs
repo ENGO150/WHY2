@@ -285,7 +285,23 @@ pub fn draw_event(event: ClientEvent)
         ClientEvent::UnsafeVersion(newer_versions, current_version, newest_version) =>
         {
             println!("This release could be unsafe! You are {newer_versions} versions behind! ({current_version}/{newest_version})");
-        }
+        },
+
+        ClientEvent::Username(disabled_registration, min_uname, max_uname) =>
+        {
+            println!
+            (
+                "\n\rEnter username ({}):",
+
+                if disabled_registration
+                {
+                    String::from("Registration disabled!")
+                } else
+                {
+                    format!("a-Z, 0-9; {min_uname}-{max_uname} characters")
+                }
+            );
+        },
 
         ClientEvent::VersionFailed => println!("Fetching versions failed, this release could be unsafe!"),
         ClientEvent::Clear(n) => clear_lines(n),
