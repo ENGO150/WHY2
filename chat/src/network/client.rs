@@ -79,8 +79,6 @@ pub enum ClientEvent
     Authenticated,                             //LOGIN SUCCESSFUL
     Connected(String),                         //SUCCESSFUL CONNECTION MESSAGE
     Message(MessagePacket),                    //RECEIVED MESSAGE
-    Info(String, bool, usize),                 //INFO/STATUS LOG, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
-    Warn(String, bool, usize),                 //WARN LOG/POPUP, WITH NEWLINE BOOLEAN AND LINES TO CLEAR
     Prompt(String, String),                    //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
     PrivateMessageSent(String, usize, String), //SENT PM
     PrivateMessageRecv(String, usize, String), //RECEIVED PM

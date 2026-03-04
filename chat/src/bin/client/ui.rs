@@ -107,15 +107,6 @@ pub fn draw_event(event: ClientEvent)
             );
         },
 
-        ClientEvent::Info(message, newline, lines) |
-            ClientEvent::Warn(message, newline, lines) =>
-        {
-            clear_lines(lines);
-            print!("{message}");
-
-            if newline { println!() }
-        },
-
         ClientEvent::Prompt(channel, message) => //SHOW PROMPT BAR
         {
             print!("\r{channel}>>> {message}");
