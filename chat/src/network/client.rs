@@ -93,6 +93,8 @@ pub enum ClientEvent
     VersionFailed,                             //FETCHING VERSIONS FAILED
     UnsafeVersion(usize, Version, String),     //OLD VERSION
     Username(bool, u64, u64),                  //USERNAME PROMPT
+    VoiceEnabled,                              //VOICE CHAT ENABLED
+    VoiceDisabled,                             //VOICE CHAT DISABLED
     ExtraSpace,                                //JUST RANDOM NEWLINE
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
@@ -380,21 +382,18 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                         continue;
                     }
 
-                    //TOGGLE VOICE
-                    let status = if voice_options::swap_use_voice()
+                    //TOGGLE VOICE (& PRINT STATUS)
+                    tx.send(if voice_options::swap_use_voice()
                     {
                         let username = username.clone();
                         let voice_tx = tx.clone();
                         let stream = streams.1.clone();
                         thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap(), voice_tx, stream));
-                        "en"
+                        ClientEvent::VoiceEnabled
                     } else
                     {
-                        "dis"
-                    };
-
-                    //PRINT STATUS
-                    tx.send(ClientEvent::Info(format!("Voice {}abled.\n", status), true, 2)).unwrap();
+                        ClientEvent::VoiceDisabled
+                    }).unwrap();
                 },
 
                 //VOICE CLIENTS

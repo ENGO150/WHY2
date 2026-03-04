@@ -303,6 +303,18 @@ pub fn draw_event(event: ClientEvent)
             );
         },
 
+        ClientEvent::VoiceEnabled =>
+        {
+            clear_lines(2);
+            println!("Voice enabled.\n");
+        },
+
+        ClientEvent::VoiceDisabled =>
+        {
+            clear_lines(2);
+            println!("Voice disabled.\n");
+        },
+
         ClientEvent::VersionFailed => println!("Fetching versions failed, this release could be unsafe!"),
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),
