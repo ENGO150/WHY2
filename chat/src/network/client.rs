@@ -107,6 +107,7 @@ pub enum ClientEvent
     UsernameRejected,                          //USERNAME REJECTED BY SERVER
     PasswordRejected(u64),                     //PASSWORD REJECTED BY SERVER
     SpamWarning,                               //SPAM WARNING
+    Socks5Voice,                               //DISABLED VOICE ON SOCKS5
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
 
@@ -388,7 +389,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 {
                     if options::socks5_enabled()
                     {
-                        tx.send(ClientEvent::Warn(String::from("Voice chat cannot be enabled while using SOCKS5.\n"), true, 2)).unwrap();
+                        tx.send(ClientEvent::Socks5Voice).unwrap();
                         continue;
                     }
 

@@ -422,6 +422,12 @@ pub fn draw_event(event: ClientEvent)
             println!("Slow down! You're sending messages too quickly.\n");
         },
 
+        ClientEvent::Socks5Voice =>
+        {
+            clear_lines(2);
+            println!("Voice chat cannot be enabled while using SOCKS5.\n");
+        },
+
         ClientEvent::VersionFailed => println!("Fetching versions failed, this release could be unsafe!"),
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),
