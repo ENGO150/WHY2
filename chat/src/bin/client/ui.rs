@@ -404,6 +404,18 @@ pub fn draw_event(event: ClientEvent)
             println!("Incompatible version! ({version}/{server_version})");
         },
 
+        ClientEvent::UsernameRejected =>
+        {
+            clear_lines(2);
+            print!("Username rejected!");
+        },
+
+        ClientEvent::PasswordRejected(min_pass) =>
+        {
+            clear_lines(1);
+            print!("Password rejected! Enter at least {min_pass} characters.");
+        },
+
         ClientEvent::VersionFailed => println!("Fetching versions failed, this release could be unsafe!"),
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),

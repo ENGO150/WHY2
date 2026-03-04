@@ -104,6 +104,8 @@ pub enum ClientEvent
     Files(Vec<Value>),                         //FILE LIST
     ExtraSpace,                                //JUST RANDOM NEWLINE
     IncompatibleVersion(String, String),       //INCOMPATIBLE SERVER VERSION
+    UsernameRejected,                          //USERNAME REJECTED BY SERVER
+    PasswordRejected(u64),                     //PASSWORD REJECTED BY SERVER
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
 
@@ -292,8 +294,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     //INVALID UNAME
                     if invalid_username
                     {
-                        tx.send(ClientEvent::Clear(2)).unwrap();
-                        tx.send(ClientEvent::Warn(String::from("Username rejected!"), false, 0)).unwrap();
+                        tx.send(ClientEvent::UsernameRejected).unwrap();
                     } else //VALID
                     {
                         //SET INVALID USERNAME FOR POSSIBLE NEXT CODE
@@ -312,7 +313,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     //INVALID PASS
                     if invalid_password
                     {
-                        tx.send(ClientEvent::Warn(format!("Password rejected! Enter at least {} characters.", min_pass.unwrap()), false, 3)).unwrap();
+                        tx.send(ClientEvent::PasswordRejected(min_pass.unwrap())).unwrap();
                     } else
                     {
                         invalid_password = true;
