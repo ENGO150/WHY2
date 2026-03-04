@@ -106,6 +106,7 @@ pub enum ClientEvent
     IncompatibleVersion(String, String),       //INCOMPATIBLE SERVER VERSION
     UsernameRejected,                          //USERNAME REJECTED BY SERVER
     PasswordRejected(u64),                     //PASSWORD REJECTED BY SERVER
+    SpamWarning,                               //SPAM WARNING
     Quit,                                      //SERVER QUIT COMMUNICATION
 }
 
@@ -574,7 +575,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //SPAM WARNING
                 MessageCode::SpamWarning =>
                 {
-                    tx.send(ClientEvent::Warn(String::from("Slow down! You're sending messages too quickly.\n"), true, 2)).unwrap();
+                    tx.send(ClientEvent::SpamWarning).unwrap();
                 },
 
                 //REGISTRATION DISABLED

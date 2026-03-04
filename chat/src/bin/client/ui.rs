@@ -416,6 +416,12 @@ pub fn draw_event(event: ClientEvent)
             print!("Password rejected! Enter at least {min_pass} characters.");
         },
 
+        ClientEvent::SpamWarning =>
+        {
+            clear_lines(2);
+            println!("Slow down! You're sending messages too quickly.\n");
+        },
+
         ClientEvent::VersionFailed => println!("Fetching versions failed, this release could be unsafe!"),
         ClientEvent::Clear(n) => clear_lines(n),
         ClientEvent::ExtraSpace => println!(),
