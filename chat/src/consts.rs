@@ -27,8 +27,7 @@ use zeroize::Zeroizing;
 //CONSTS
 pub const METADATA_URL: &str         = "https://crates.io/api/v1/crates/why2-chat"; //URL FOR PROJECT METADATA
 
-pub const USER_CONFIG_DIR: &str      = env!("WHY2_USER_CONFIG_DIR");                //USER CONFIG DIRECTORY
-pub const CONFIG_DIR: &str           = "/WHY2";                                     //DIRECTORY FOR CONFIG FILES
+pub const CONFIG_DIR: &str           = env!("WHY2_CONFIG_DIR");                     //DIRECTORY FOR CONFIG FILES
 pub const UPLOADS_DIR: &str          = "WHY2-Uploads";                              //DIRECTORY FOR FILE UPLOADS
 pub const SERVER_CONFIG: &str        = "/server.toml";                              //SERVER CONFIG FILE
 pub const CLIENT_CONFIG: &str        = "/client.toml";                              //CLIENT CONFIG FILE

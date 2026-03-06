@@ -21,7 +21,7 @@ RUN apk add --no-cache musl-dev
 WORKDIR /app
 COPY . .
 
-ENV WHY2_USER_CONFIG_DIR="/data"
+ENV WHY2_CONFIG_DIR="/data"
 RUN cargo build --bin why2-server --no-default-features --features server --release
 
 FROM alpine AS runtime

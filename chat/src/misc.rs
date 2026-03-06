@@ -133,7 +133,7 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
 
 pub fn get_why2_dir() -> String //RETURN PATH TO WHY2 CONFIG DIRECTORY
 {
-    get_dir(consts::USER_CONFIG_DIR) + consts::CONFIG_DIR
+    get_dir(consts::CONFIG_DIR)
 }
 
 pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
