@@ -564,6 +564,7 @@ fn main()
     let write_stream_listen = write_stream.clone();
 
     //LISTEN TO SERVER
+    network::send(&mut write_stream.lock().unwrap(), MessagePacket::default(), None); //WAKE SERVER
     thread::spawn(move || client::listen_server(&mut (&mut stream, write_stream_listen), tx));
 
     //ENABLE RAW MODE
