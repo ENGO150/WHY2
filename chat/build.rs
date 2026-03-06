@@ -45,4 +45,9 @@ fn main()
              cargo install why2-chat --no-default-features --features server"
         );
     }
+
+    //CONFIG DIRECTORY
+    let config_dir = env::var("WHY2_USER_CONFIG_DIR").unwrap_or_else(|_| "{HOME}/.config".to_string());
+    println!("cargo:rustc-env=WHY2_USER_CONFIG_DIR={config_dir}");
+    println!("cargo:rerun-if-env-changed=WHY2_USER_CONFIG_DIR");
 }
