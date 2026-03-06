@@ -28,7 +28,13 @@ FROM alpine AS runtime
 
 RUN apk add --no-cache libgcc
 
+RUN addgroup -S why2 && adduser -S why2 -G why2
+
 COPY --from=builder /app/target/release/why2-server /usr/local/bin/why2-server
+
+RUN mkdir -p /data && chown -R why2:why2 /data
+
+USER why2
 
 VOLUME /data
 
