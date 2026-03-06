@@ -81,7 +81,6 @@ use why2_chat::
         MessagePacket,
         MessageColors,
         FilePayload,
-        SerColor,
         voice::client::device,
         client::{ self, ClientEvent },
     },
@@ -393,9 +392,11 @@ fn read_input() -> String
     }
 }
 
-fn to_color(color: &str) -> Result<SerColor, ()>
+fn to_color(color: &str) -> Result<u8, ()> //CONVERT STRING TO COLOR CODE
 {
-    color.parse::<Color>().map(SerColor)
+    color.parse::<Color>()
+        .map(|c| network::color_to_u8(&c))
+        .map_err(|_| ())
 }
 
 fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CHANGE

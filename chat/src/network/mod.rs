@@ -28,10 +28,8 @@ pub mod voice;
 use std::
 {
     fs::File,
-    str::FromStr,
     path::PathBuf,
     net::TcpStream,
-    mem::MaybeUninit,
     io::{ Read, Write },
     sync::
     {
@@ -39,29 +37,9 @@ use std::
         Mutex,
         LazyLock,
     },
-    fmt::
-    {
-        self,
-        Display,
-        Formatter,
-    },
 };
 
-use wincode::
-{
-    SchemaWrite,
-    SchemaRead,
-    TypeMeta,
-    WriteResult,
-    ReadResult,
-    error::ReadError,
-    config::Config,
-    io::
-    {
-        Writer,
-        Reader,
-    },
-};
+use wincode::{ SchemaWrite, SchemaRead };
 
 use sha2::Sha256;
 
@@ -123,14 +101,11 @@ pub enum MessageCode //CONTROL CODES
     InvalidFeature,     //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE
 }
 
-#[derive(Clone)]
-pub struct SerColor(pub Color); //SERIALIZABLE Color
-
 #[derive(SchemaWrite, SchemaRead, Clone)]
-pub struct MessageColors //COLORS OF MESSAGE (ALL OF THE STRING VALUES WILL GET COVERTED TO colored::Color)
+pub struct MessageColors //COLORS OF MESSAGE
 {
-    pub username_color: Option<SerColor>, //COLOR OF SENDER
-    pub message_color: Option<SerColor>,  //COLOR OF MESSAGE
+    pub username_color: Option<u8>, //COLOR OF USERNAME
+    pub message_color: Option<u8>,  //COLOR OF MESSAGE
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
@@ -206,73 +181,51 @@ impl Default for FilePayload
     }
 }
 
-impl Display for SerColor //PARSE SerColor TO STRING
+pub fn color_to_u8(color: &Color) -> u8 //MAP COLOR TO COLOR CODE
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result
+    match color
     {
-        let color_str = match self.0
-        {
-            Color::Black => "black",
-            Color::Red => "red",
-            Color::Green => "green",
-            Color::Yellow => "yellow",
-            Color::Blue => "blue",
-            Color::Magenta => "magenta",
-            Color::Cyan => "cyan",
-            Color::BrightBlack => "bright black",
-            Color::BrightRed => "bright red",
-            Color::BrightGreen => "bright green",
-            Color::BrightYellow => "bright yellow",
-            Color::BrightBlue => "bright blue",
-            Color::BrightMagenta => "bright magenta",
-            Color::BrightCyan => "bright cyan",
-            Color::BrightWhite => "bright white",
-
-            _ => "white",
-        };
-
-        write!(f, "{color_str}")
+        Color::Black => 0,
+        Color::Red => 1,
+        Color::Green => 2,
+        Color::Yellow => 3,
+        Color::Blue => 4,
+        Color::Magenta => 5,
+        Color::Cyan => 6,
+        Color::White => 7,
+        Color::BrightBlack => 8,
+        Color::BrightRed => 9,
+        Color::BrightGreen => 10,
+        Color::BrightYellow => 11,
+        Color::BrightBlue => 12,
+        Color::BrightMagenta => 13,
+        Color::BrightCyan => 14,
+        Color::BrightWhite => 15,
+        _ => 255, //UNKNOWN
     }
 }
 
-impl FromStr for SerColor //PARSE STRING TO SerColor
+pub fn u8_to_color(val: u8) -> Option<Color> //COLOR CODE TO COLOR
 {
-    type Err = ReadError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Color::from_str(s)
-            .map(SerColor)
-            .map_err(|_| ReadError::Custom("Invalid color string"))
-    }
-}
-
-//SERIALIZE SerColor
-unsafe impl<C: Config> SchemaWrite<C> for SerColor
-{
-    type Src = Self;
-    const TYPE_META: TypeMeta = TypeMeta::Dynamic;
-
-    fn size_of(src: &Self::Src) -> WriteResult<usize>
+    match val
     {
-        <String as SchemaWrite<C>>::size_of(&src.to_string())
-    }
-
-    fn write(writer: impl Writer, src: &Self::Src) -> WriteResult<()>
-    {
-        <String as SchemaWrite<C>>::write(writer, &src.to_string())
-    }
-}
-
-//DESERIALIZE SerColor
-unsafe impl<'de, C: Config> SchemaRead<'de, C> for SerColor
-{
-    type Dst = Self;
-    const TYPE_META: TypeMeta = TypeMeta::Dynamic;
-
-    fn read(reader: impl Reader<'de>, dst: &mut MaybeUninit<Self::Dst>) -> ReadResult<()>
-    {
-        dst.write(<String as SchemaRead<C>>::get(reader)?.parse::<SerColor>()?);
-        Ok(())
+        0 => Some(Color::Black),
+        1 => Some(Color::Red),
+        2 => Some(Color::Green),
+        3 => Some(Color::Yellow),
+        4 => Some(Color::Blue),
+        5 => Some(Color::Magenta),
+        6 => Some(Color::Cyan),
+        7 => Some(Color::White),
+        8 => Some(Color::BrightBlack),
+        9 => Some(Color::BrightRed),
+        10 => Some(Color::BrightGreen),
+        11 => Some(Color::BrightYellow),
+        12 => Some(Color::BrightBlue),
+        13 => Some(Color::BrightMagenta),
+        14 => Some(Color::BrightCyan),
+        15 => Some(Color::BrightWhite),
+        _ => None,
     }
 }
 
