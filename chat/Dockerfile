@@ -16,7 +16,7 @@
 
 FROM rust:alpine AS builder
 
-RUN apk add --no-cache musl-dev opus-dev
+RUN apk add --no-cache musl-dev
 
 WORKDIR /app
 COPY . .
@@ -25,7 +25,7 @@ RUN cargo build --bin why2-server --no-default-features --features server --rele
 
 FROM alpine AS runtime
 
-RUN apk add --no-cache opus libgcc
+RUN apk add --no-cache libgcc
 
 COPY --from=builder /app/target/release/why2-server /usr/local/bin/why2-server
 
