@@ -49,17 +49,13 @@ use crate::
 {
     options,
     config::{ self, TofuCode },
-    network::
-    {
-        self,
-        client::ClientEvent
-    },
+    network::client::{ self, ClientEvent },
 };
 
 //PRIVATE
 fn colorize(text: String, color: Option<u8>) -> String //COLORIZE text IF PASSED COLOR
 {
-    match color.and_then(|c| network::u8_to_color(c))
+    match color.and_then(|c| client::u8_to_color(c))
     {
         Some(c) if !config::read_config::<bool>("disable_colors") => text.color(c).to_string(),
         _ => text

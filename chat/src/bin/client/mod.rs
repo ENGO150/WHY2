@@ -395,7 +395,7 @@ fn read_input() -> String
 fn to_color(color: &str) -> Result<u8, ()> //CONVERT STRING TO COLOR CODE
 {
     color.parse::<Color>()
-        .map(|c| network::color_to_u8(&c))
+        .map(|c| client::color_to_u8(&c))
         .map_err(|_| ())
 }
 
