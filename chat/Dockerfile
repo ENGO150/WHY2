@@ -21,6 +21,7 @@ RUN apk add --no-cache musl-dev
 WORKDIR /app
 COPY . .
 
+ENV WHY2_USER_CONFIG_DIR="/data"
 RUN cargo build --bin why2-server --no-default-features --features server --release
 
 FROM alpine AS runtime
@@ -29,7 +30,7 @@ RUN apk add --no-cache libgcc
 
 COPY --from=builder /app/target/release/why2-server /usr/local/bin/why2-server
 
-VOLUME /root/.config/WHY2
+VOLUME /data
 
 EXPOSE 1204/tcp
 EXPOSE 1204/udp
