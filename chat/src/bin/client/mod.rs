@@ -578,6 +578,8 @@ fn main()
         //APPEND MESSAGE TO HISTORY
         if options::get_sending_messages()
         {
+            if input.is_empty() { continue; } //DO NOT FORWARD EMPTY MESSAGES
+
             //USER COMMANDS
             let mut command_used = false;
             if let (Some(command), parameters) = command::get_command(&input)
