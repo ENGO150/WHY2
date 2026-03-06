@@ -43,11 +43,6 @@ fn get_dir(dir: &str) -> String
     dir.replace("{HOME}", dirs::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"))
 }
 
-fn get_config_dir() -> String
-{
-    get_dir(consts::USER_CONFIG_DIR)
-}
-
 //PUBLIC
 pub fn get_version<'a>() -> &'a str //GET COMPILED PACKAGE VERSION
 {
@@ -136,18 +131,18 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
     }
 }
 
+pub fn get_why2_dir() -> String //RETURN PATH TO WHY2 CONFIG DIRECTORY
+{
+    get_dir(consts::USER_CONFIG_DIR) + consts::CONFIG_DIR
+}
+
 pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
 {
-    let config = get_config_dir() + consts::CONFIG_DIR;
+    let config = get_why2_dir();
 
     //CREATE WHY2 CONFIG DIRECTORY
     if !Path::new(&config).is_dir()
     {
         fs::create_dir_all(config).expect("Failed to create WHY2 config directory");
     }
-}
-
-pub fn get_why2_dir() -> String //RETURN PATH TO WHY2 CONFIG DIRECTORY
-{
-    get_config_dir() + consts::CONFIG_DIR
 }
