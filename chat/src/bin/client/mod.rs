@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #![cfg(feature = "client")]
 
 //MODULES
+pub mod colors;
 pub mod ui;
 
 use std::
@@ -395,7 +396,7 @@ fn read_input() -> String
 fn to_color(color: &str) -> Result<u8, ()> //CONVERT STRING TO COLOR CODE
 {
     color.parse::<Color>()
-        .map(|c| client::color_to_u8(&c))
+        .map(|c| colors::color_to_u8(&c))
         .map_err(|_| ())
 }
 
