@@ -166,22 +166,32 @@ fn main()
     {
         //READ INPUT
         let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
-
-        input = input.trim().to_owned(); //TRIM
-
-        //EXIT
-        if let (Some(command), _) = command::get_command(&input.to_uppercase())
+        match io::stdin().read_line(&mut input)
         {
-            match command
+            Ok(0) | Err(_) => //EOF/ERROR (Docker, pipe, etc.)
             {
-                Command::Exit =>
-                {
-                    quit(); //DISCONNECT ALL USERS
-                    break;
-                },
+                thread::sleep(Duration::from_secs(1));
+                continue;
+            },
 
-                _ => {}
+            Ok(_) =>
+            {
+                input = input.trim().to_owned(); //TRIM
+
+                //EXIT
+                if let (Some(command), _) = command::get_command(&input.to_uppercase())
+                {
+                    match command
+                    {
+                        Command::Exit =>
+                        {
+                            quit(); //DISCONNECT ALL USERS
+                            break;
+                        },
+
+                        _ => {}
+                    }
+                }
             }
         }
     }
