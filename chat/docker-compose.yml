@@ -17,6 +17,8 @@
 services:
   why2-server:
     container_name: why2-server
+    tty: true
+    stdin_open: true
     build:
       context: ..
       dockerfile: chat/Dockerfile
