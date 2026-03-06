@@ -190,8 +190,14 @@ pub fn listen_client_voice(socket: UdpSocket)
             //FOUND, CHECK ADDRESS
             if let Some(conn) = conn.0.as_mut()
             {
-                //IGNORE NON-MATCHING ADDRESS
-                if conn.addr != addr { continue; }
+                //NAT PORT SHIFTING
+                if conn.addr != addr
+                {
+                    if conn.addr.ip() == addr.ip()
+                    {
+                        conn.addr = addr;
+                    } else { continue; } //IGNORE NON-MATCHING ADDRESS (SPOOFING)
+                }
 
                 //VERIFY SEQ
                 if received.seq <= conn.seq { continue; } //IGNORE INVALID SEQs
