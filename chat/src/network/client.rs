@@ -226,7 +226,11 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
         let read = match network::receive(streams, Some(&keys))
         {
             Some(packet) => packet,
-            None => continue
+            None => MessagePacket
+            {
+                code: Some(MessageCode::Disconnect),
+                ..Default::default()
+            }
         };
 
         //CHECK FOR MUTED CLIENT
