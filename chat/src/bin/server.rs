@@ -28,6 +28,8 @@ use std::
     net::{ TcpListener, UdpSocket },
 };
 
+use socket2::{ Socket, TcpKeepalive };
+
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
 
@@ -117,6 +119,13 @@ fn main()
 
                         continue;
                     }
+
+                    //SET KEEP-ALIVE
+                    let socket = Socket::from(stream);
+                    socket.set_tcp_keepalive(&TcpKeepalive::new()
+                        .with_time(Duration::from_secs(60))
+                        .with_interval(Duration::from_secs(10))).expect("Failed to set KEEPALIVE");
+                    stream = socket.into();
 
                     //SET TCP_NODELAY
                     match stream.set_nodelay(true)
