@@ -293,12 +293,12 @@ impl Connection
     }
 
     //SET CONNECTION TO ALIVE
-    pub fn alive(&mut self)
+    pub fn set_alive(&mut self, val: bool)
     {
         match self
         {
-            Self::Authenticated { alive, .. } => *alive = true,
-            Self::NonAuthenticated { alive, .. } => *alive = true,
+            Self::Authenticated { alive, .. } => *alive = val,
+            Self::NonAuthenticated { alive, .. } => *alive = val,
         }
     }
 
@@ -1351,7 +1351,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                     //SET TO ALIVE
                     if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
                     {
-                        conn.alive();
+                        conn.set_alive(true);
                     }
                 },
 
@@ -1410,13 +1410,27 @@ pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
         .map(|entry| entry.value().clone())
         .collect();
 
-    //SEND KEEPALIVES
     for conn in connections
     {
+        //DISCONENCT DEAD CONNECTIONS
+        if !conn.is_alive()
+        {
+            remove_connection(conn.peer_addr(), false);
+            continue;
+        }
+
+        //SEND KEEPALIVES
         network::send(&mut conn.write_stream().lock().unwrap(), MessagePacket
         {
             code: Some(MessageCode::KeepAlive),
             ..Default::default()
         }, conn.keys());
+
+        //PRONOUNCE AS DEAD UNTIL ECHO
+        if let Some(mut conn) = CONNECTIONS.iter_mut()
+            .find(|entry| entry.value().peer_addr() == conn.peer_addr())
+        {
+            conn.set_alive(false);
+        }
     }
 }
