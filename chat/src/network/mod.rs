@@ -271,7 +271,12 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
 
     //READ MESSAGE LENGTH
     let mut len_buf = [0u8; 4];
-    if streams.0.read_exact(&mut len_buf).is_err() { return None; } //READ LENGTH
+    if streams.0.read_exact(&mut len_buf).is_err() //READ LENGTH
+    {
+        #[cfg(feature = "server")]
+        server::remove_connection(&peer_addr, false);
+        return None;
+    }
     let len = u32::from_be_bytes(len_buf) as usize;
 
     //CHECK PACKET SIZE
@@ -284,7 +289,12 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
 
     //READ REST OF PACKET
     let mut decoded_packet = vec![0u8; len];
-    if streams.0.read_exact(&mut decoded_packet).is_err() { return None; } //READ
+    if streams.0.read_exact(&mut decoded_packet).is_err() //READ
+    {
+        #[cfg(feature = "server")]
+        server::remove_connection(&peer_addr, false);
+        return None;
+    }
 
     //DECRYPT
     if let Some(keys) = keys
