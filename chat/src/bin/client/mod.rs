@@ -180,7 +180,8 @@ fn read_input() -> String
             if key_event.is_release() { continue; }
 
             //CTRL SHORTCUTS
-            if key_event.modifiers.contains(KeyModifiers::CONTROL)
+            if key_event.modifiers.contains(KeyModifiers::CONTROL) &&
+                !key_event.modifiers.contains(KeyModifiers::ALT) //EXCLUDE ALTGR
             {
                 match key_event.code
                 {
