@@ -30,7 +30,6 @@ use std::
     fs::File,
     path::Path,
     net::TcpStream,
-    time::Duration,
     io::
     {
         self,
@@ -48,7 +47,6 @@ use std::
 
 use sha2::{ Sha256, Digest };
 
-use socket2::{ Socket, TcpKeepalive };
 use socks::Socks5Stream;
 
 use crossterm::
@@ -547,13 +545,6 @@ fn main()
             process::exit(1);
         }
     };
-
-    //SET KEEP-ALIVE
-    let socket = Socket::from(stream);
-    socket.set_tcp_keepalive(&TcpKeepalive::new()
-        .with_time(Duration::from_secs(25))
-        .with_interval(Duration::from_secs(10))).expect("Failed to set KEEPALIVE");
-    stream = socket.into();
 
     //SET TCP_NODELAY
     stream.set_nodelay(true).expect("Failed to set TCP_NODELAY");
