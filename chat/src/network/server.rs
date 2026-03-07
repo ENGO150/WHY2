@@ -98,6 +98,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         channel: Option<String>,             //CHANNEL
         seq: usize,                          //SEQUENCE NUMBER (CLIENT -> SERVER)
         server_seq: usize,                   //SEQUENCE NUMBER (SERVER -> CLIENT)
+        alive: bool,                         //RESPONDED TO KEEPALIVE
     },
 
     NonAuthenticated
@@ -108,6 +109,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         keys: Option<SharedKeys>,            //SHARED KEYS
         last_activity: Instant,              //TIME OF LAST MESSAGE
         seq: usize,                          //SEQUENCE NUMBER
+        alive: bool,                         //RESPONDED TO KEEPALIVE
     },
 }
 
@@ -287,6 +289,26 @@ impl Connection
         {
             Self::Authenticated { .. } => true,
             Self::NonAuthenticated { .. } => false,
+        }
+    }
+
+    //SET CONNECTION TO ALIVE
+    pub fn alive(&mut self)
+    {
+        match self
+        {
+            Self::Authenticated { alive, .. } => *alive = true,
+            Self::NonAuthenticated { alive, .. } => *alive = true,
+        }
+    }
+
+    //CHECK IF CONNECTION IS ALIVE
+    pub fn is_alive(&self) -> &bool
+    {
+        match self
+        {
+            Self::Authenticated { alive, .. } => alive,
+            Self::NonAuthenticated { alive, .. } => alive,
         }
     }
 }
@@ -521,7 +543,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
     {
         match old_connection
         {
-            Connection::NonAuthenticated { write_stream, seq, peer_addr, .. } =>
+            Connection::NonAuthenticated { write_stream, seq, peer_addr, alive, .. } =>
             {
                 Connection::NonAuthenticated
                 {
@@ -531,11 +553,12 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     keys: Some(keys.to_owned()),
                     last_activity: Instant::now(),
                     seq,
+                    alive,
                 }
             },
 
             Connection::Authenticated { write_stream, username, id, last_activity,
-                spam_violations, channel, seq, server_seq, peer_addr, .. } =>
+                spam_violations, channel, seq, server_seq, peer_addr, alive, .. } =>
             {
                 Connection::Authenticated
                 {
@@ -550,6 +573,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     channel,
                     seq,
                     server_seq,
+                    alive,
                 }
             }
         }
@@ -574,6 +598,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
             channel: None,
             seq: *old_connection.seq(),
             server_seq: 0,
+            alive: *old_connection.is_alive(),
         }
     });
 
@@ -601,6 +626,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             channel: channel.clone(),
             seq: *old_connection.seq(),
             server_seq: *old_connection.server_seq().unwrap(),
+            alive: *old_connection.is_alive(),
         }
     });
 }
@@ -696,6 +722,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
         keys: None,
         last_activity: Instant::now(),
         seq: 0,
+        alive: true,
     });
 
     //GET ENCRYPTION & MAC KEYS
