@@ -1365,3 +1365,21 @@ pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
         remove_connection(addr, true);
     }
 }
+
+pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
+{
+    //COLLECT ALL CONNECTIONS
+    let connections: Vec<Connection> = CONNECTIONS.iter()
+        .map(|entry| entry.value().clone())
+        .collect();
+
+    //SEND KEEPALIVES
+    for conn in connections
+    {
+        network::send(&mut conn.write_stream().lock().unwrap(), MessagePacket
+        {
+            code: Some(MessageCode::KeepAlive),
+            ..Default::default()
+        }, conn.keys());
+    }
+}

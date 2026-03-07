@@ -143,13 +143,23 @@ fn main()
         thread::spawn(move || voice_server::listen_client_voice(udp_socket.unwrap()));
     }
 
-    //CREATE INACTIVITY WATCHDOG THREAD
+    //CREATE KEEPALIVE & INACTIVITY WATCHDOG THREAD
     thread::spawn(move ||
     {
+        let mut n = 0;
+
         loop
         {
+            //DISCONNECT INACTIVE CLIENTS
             thread::sleep(Duration::from_secs(5));
             server::disconnect_inactive();
+
+            //SEND KEEPALIVE PACKET TO ALL CLIENTS
+            n = (n + 1) % 6;
+            if n == 0
+            {
+                server::send_keepalive();
+            }
         }
     });
 
