@@ -97,6 +97,7 @@ pub enum MessageCode //CONTROL CODES
     Files,              //CLIENT <> SERVER | LIST UPLOADED FILES
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
     InvalidFeature,     //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE
+    KeepAlive,          //SERVER <> CLIENT | A BIT LESS STUPID KEEP-ALIVE
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
