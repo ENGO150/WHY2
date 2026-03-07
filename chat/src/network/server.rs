@@ -1345,6 +1345,16 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                     }
                 },
 
+                //KEEPALIVE
+                MessageCode::KeepAlive =>
+                {
+                    //SET TO ALIVE
+                    if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
+                    {
+                        conn.alive();
+                    }
+                },
+
                 _ => {}
             }
 
