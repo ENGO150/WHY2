@@ -340,22 +340,25 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
                     }
 
                     //SPAM
-                    if !disconnect && config::read_config("spam_protection") && conn.is_authenticated() &&
-                        packet.file.is_none() && Instant::now().duration_since(*conn.last_activity()) <
-                            Duration::from_millis(config::read_config::<u64>("min_message_delay"))
+                    if packet.code != Some(MessageCode::KeepAlive)
                     {
-                        //INCREMENT SPAM VIOLATIONS
-                        *conn.spam_violations_mut().unwrap() += 1;
+                        if !disconnect && config::read_config("spam_protection") && conn.is_authenticated() &&
+                            packet.file.is_none() && Instant::now().duration_since(*conn.last_activity()) <
+                            Duration::from_millis(config::read_config::<u64>("min_message_delay"))
+                        {
+                            //INCREMENT SPAM VIOLATIONS
+                            *conn.spam_violations_mut().unwrap() += 1;
 
-                        //WARN
-                        spam_warning = true;
-                        shared_key = conn.keys().cloned();
+                            //WARN
+                            spam_warning = true;
+                            shared_key = conn.keys().cloned();
 
-                        //CHECK FOR TOO MANY VIOLATIONS
-                        disconnect = *conn.spam_violations().unwrap() > config::read_config::<usize>("max_message_delay_violations");
+                            //CHECK FOR TOO MANY VIOLATIONS
+                            disconnect = *conn.spam_violations().unwrap() > config::read_config::<usize>("max_message_delay_violations");
+                        }
+
+                        *conn.last_activity_mut() = Instant::now(); //RESET last_activity
                     }
-
-                    *conn.last_activity_mut() = Instant::now(); //RESET last_activity
 
                     //SEQ
                     if packet.seq > *conn.seq() //VALID SEQ
