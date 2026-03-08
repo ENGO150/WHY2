@@ -774,6 +774,8 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
             //USERNAME CONDITIONS MET, BREAK LOOP
             Some(r) =>
             {
+                if r.code == Some(MessageCode::KeepAlive) { continue; } //IGNORE KEEPALIVES
+
                 if let Some(uname) = r.text
                 {
                     if uname.len() >= min_len && uname.len() <= max_len &&
@@ -811,7 +813,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
     let user_exists = config::server_users_contains(&username);
 
     //ASK FOR PASSWORD
-    if !user_exists && !disabled_registration //REGISTRATION (ENTER "FAKE" LOGIN ON DISABLED REGISTER)
+    if !user_exists && !disabled_registration //REGISTRATION (OR "FAKE" LOGIN ON DISABLED REGISTER)
     {
         let max_tries = config::read_config::<usize>("max_auth_tries"); //MAX n
         let mut password: Option<String> = None;
@@ -827,6 +829,8 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
             {
                 Some(r) =>
                 {
+                    if r.code == Some(MessageCode::KeepAlive) { continue; } //IGNORE KEEPALIVES
+
                     if let Some(pass) = r.text
                     {
                         //CHECK LENGTH
@@ -855,14 +859,24 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
         send_code(&mut streams.1.lock().unwrap(), None, MessageCode::PasswordL, Some(&keys));
 
         //WAIT FOR ANSWER
-        let response = match network::receive(streams, Some(&keys))
+        let response = loop
         {
-            Some(r) => r,
-            None => return remove_connection(&peer_addr, false),
+            match network::receive(streams, Some(&keys))
+            {
+                Some(r) =>
+                {
+                    if r.code == Some(MessageCode::KeepAlive) { continue; } //IGNORE KEEPALIVES
+                    break r
+                },
+
+                None => return remove_connection(&peer_addr, false),
+            }
         };
 
         //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
-        if !user_exists || response.text.is_none() || !password::compare_password_hash(&config::server_users_config(&username), &response.text.unwrap())
+        if !user_exists || response.text.is_none() ||
+            !password::compare_password_hash(&config::server_users_config(&username),
+                &response.text.unwrap())
         {
             return remove_connection(&peer_addr, true);
         }
