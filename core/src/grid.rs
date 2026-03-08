@@ -591,12 +591,12 @@ impl<const W: usize, const H: usize> Grid<W, H>
             {
                 let mut new_row = [0i64; W]; //BUFFER
 
-                for x in 0..W
+                for s in 0..W
                 {
-                    let target_src_idx = (x + shifts[i]) % W;
-                    for src_idx in 0..W
+                    let is_match: Choice = (s as u64).ct_eq(&(shifts[i] as u64));
+                    for dst in 0..W
                     {
-                        new_row[x].conditional_assign(&row[src_idx], src_idx.ct_eq(&target_src_idx));
+                        new_row[dst].conditional_assign(&row[(dst + s) % W], is_match);
                     }
                 }
 
