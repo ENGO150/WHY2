@@ -626,7 +626,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             channel: channel.clone(),
             seq: *old_connection.seq(),
             server_seq: *old_connection.server_seq().unwrap(),
-            alive: *old_connection.is_alive(),
+            alive: true,
         }
     });
 }
