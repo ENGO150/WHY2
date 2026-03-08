@@ -569,6 +569,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
 
                     if !uploads_json.is_empty()
                     {
+                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
                         extra_space = true;
                         options::set_extra_space(true);
                     }
