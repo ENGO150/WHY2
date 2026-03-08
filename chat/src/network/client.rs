@@ -604,11 +604,14 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 MessageCode::KeepAlive =>
                 {
                     //ECHO
-                    network::send(&mut streams.1.lock().unwrap(), MessagePacket
+                    if options::get_sending_messages() //DO NOT ECHO ON AUTH
                     {
-                        code: Some(MessageCode::KeepAlive),
-                        ..Default::default()
-                    }, options::get_keys().as_ref());
+                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
+                        {
+                            code: Some(MessageCode::KeepAlive),
+                            ..Default::default()
+                        }, options::get_keys().as_ref());
+                    }
                 },
 
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
