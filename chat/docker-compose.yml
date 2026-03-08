@@ -17,9 +17,7 @@
 services:
   why2-server:
     container_name: why2-server
-    build:
-      context: ..
-      dockerfile: chat/Dockerfile
+    image: ghcr.io/engo150/why2:latest
     ports:
       - "1204:1204/tcp"
       - "1204:1204/udp"
