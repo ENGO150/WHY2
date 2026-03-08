@@ -1449,7 +1449,6 @@ pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
     //DISCONENCT DEAD CONNECTIONS
     for dead in dead_clients
     {
-        log::warn!("Disconnecting: {dead}");
         //HAIL SATAN, AVE CLIENT
         remove_connection(&dead, false);
     }
