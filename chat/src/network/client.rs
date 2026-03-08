@@ -236,6 +236,18 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
         //CHECK FOR MUTED CLIENT
         if options::is_muted(read.id) { continue; }
 
+        //KEEPALIVE
+        if read.code == Some(MessageCode::KeepAlive)
+        {
+            //ECHO
+            network::send(&mut streams.1.lock().unwrap(), MessagePacket
+            {
+                code: Some(MessageCode::KeepAlive),
+                ..Default::default()
+            }, options::get_keys().as_ref());
+            continue;
+        }
+
         extra_space = false; //RESET EXTRA SPACE
 
         //EXTRA SPACE
@@ -598,17 +610,6 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 MessageCode::InvalidFeature =>
                 {
                     tx.send(ClientEvent::DisabledFeature).unwrap();
-                },
-
-                //KEEPALIVE
-                MessageCode::KeepAlive =>
-                {
-                    //ECHO
-                    network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                    {
-                        code: Some(MessageCode::KeepAlive),
-                        ..Default::default()
-                    }, options::get_keys().as_ref());
                 },
 
                 //SERVER DOESN'T LIKE YA ANYMORE - EXIT
