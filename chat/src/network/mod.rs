@@ -340,10 +340,10 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
                     }
 
                     //SPAM
-                    if packet.code != Some(MessageCode::KeepAlive)
+                    if packet.code != Some(MessageCode::KeepAlive) && packet.file.is_none()
                     {
                         if !disconnect && config::read_config("spam_protection") && conn.is_authenticated() &&
-                            packet.file.is_none() && Instant::now().duration_since(*conn.last_activity()) <
+                            Instant::now().duration_since(*conn.last_activity()) <
                             Duration::from_millis(config::read_config::<u64>("min_message_delay"))
                         {
                             //INCREMENT SPAM VIOLATIONS
