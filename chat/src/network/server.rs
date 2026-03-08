@@ -598,7 +598,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
             channel: None,
             seq: *old_connection.seq(),
             server_seq: 0,
-            alive: *old_connection.is_alive(),
+            alive: true,
         }
     });
 
