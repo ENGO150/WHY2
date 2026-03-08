@@ -1405,32 +1405,52 @@ pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
 
 pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
 {
-    //COLLECT ALL CONNECTIONS
-    let connections: Vec<Connection> = CONNECTIONS.iter()
-        .map(|entry| entry.value().clone())
+    //COLLECT ALL CLIENT ADDRESSES
+    let addresses: Vec<SocketAddr> = CONNECTIONS.iter()
+        .map(|entry| *entry.key())
         .collect();
 
-    for conn in connections
+    let mut dead_clients = Vec::new();
+
+    //PREPARE
+    for addr in addresses
     {
-        //DISCONENCT DEAD CONNECTIONS
-        if !conn.is_alive()
+        let mut stream = None;
+        let mut keys = None;
+
+        if let Some(mut conn) = CONNECTIONS.get_mut(&addr)
         {
-            remove_connection(conn.peer_addr(), false);
-            continue;
+            //COLLECT DEAD BODIES
+            if !conn.is_alive()
+            {
+                dead_clients.push(addr);
+                continue;
+            }
+
+            //COPY STREAM & KEYS
+            stream = Some(conn.write_stream().clone());
+            keys = conn.keys().cloned();
+
+            //PRONOUNCE DEAD UNTIL ECHO
+            conn.set_alive(false);
         }
 
         //SEND KEEPALIVES
-        network::send(&mut conn.write_stream().lock().unwrap(), MessagePacket
+        if let Some(mut stream) = stream.as_ref().and_then(|s| s.lock().ok())
         {
-            code: Some(MessageCode::KeepAlive),
-            ..Default::default()
-        }, conn.keys());
-
-        //PRONOUNCE AS DEAD UNTIL ECHO
-        if let Some(mut conn) = CONNECTIONS.iter_mut()
-            .find(|entry| entry.value().peer_addr() == conn.peer_addr())
-        {
-            conn.set_alive(false);
+            network::send(&mut stream, MessagePacket
+            {
+                code: Some(MessageCode::KeepAlive),
+                ..Default::default()
+            }, keys.as_ref());
         }
+    }
+
+    //DISCONENCT DEAD CONNECTIONS
+    for dead in dead_clients
+    {
+        log::warn!("Disconnecting: {dead}");
+        //HAIL SATAN, AVE CLIENT
+        remove_connection(&dead, false);
     }
 }
