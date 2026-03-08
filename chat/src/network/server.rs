@@ -834,7 +834,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                     if let Some(pass) = r.text
                     {
                         //CHECK LENGTH
-                        if pass.len() > config::read_config("min_password_length")
+                        if pass.len() >= config::read_config("min_password_length")
                         {
                             password = Some(pass);
                             break;
