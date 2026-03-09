@@ -279,7 +279,20 @@ impl Connection
     //CHECK IF CONNECTION IS INACTIVE
     fn is_inactive(&self, now: Option<Instant>) -> bool
     {
-        now.unwrap_or(Instant::now()).duration_since(*self.last_activity()) > Duration::from_secs(config::read_config::<u64>("communication_time"))
+        match self
+        {
+            Self::Authenticated { last_activity, .. } =>
+            {
+                now.unwrap_or(Instant::now()).duration_since(*last_activity) >
+                    Duration::from_secs(config::read_config::<u64>("communication_time"))
+            },
+
+            Self::NonAuthenticated { connect, .. } =>
+            {
+                now.unwrap_or(Instant::now()).duration_since(*connect) >
+                    Duration::from_secs(config::read_config::<u64>("max_auth_time"))
+            },
+        }
     }
 
     //IS AUTHENTICATED
