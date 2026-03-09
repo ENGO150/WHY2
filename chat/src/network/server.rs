@@ -900,7 +900,8 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
 
         //REKEY EVERY 10 MINUTES
         if Instant::now().duration_since(*CONNECTIONS.get(&peer_addr).unwrap().last_key_exchange().unwrap()) >=
-            Duration::from_secs(consts::REKEY_INTERVAL)
+            Duration::from_secs(consts::REKEY_INTERVAL) &&
+            !network::ACTIVE_FILESHARES.iter().any(|entry| entry.client_id == id) //DO NOT REKEY ON FILE UPLOAD
         {
             //INFORM CLIENT ABOUT REKEYING
             send_code(&mut streams.1.lock().unwrap(), None, MessageCode::Rekey, Some(&keys));
