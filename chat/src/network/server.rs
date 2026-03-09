@@ -109,7 +109,6 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         keys: Option<SharedKeys>,            //SHARED KEYS
         last_activity: Instant,              //TIME OF LAST MESSAGE
         seq: usize,                          //SEQUENCE NUMBER
-        alive: bool,                         //RESPONDED TO KEEPALIVE
     },
 }
 
@@ -298,7 +297,7 @@ impl Connection
         match self
         {
             Self::Authenticated { alive, .. } => *alive = val,
-            Self::NonAuthenticated { alive, .. } => *alive = val,
+            _ => {}
         }
     }
 
@@ -308,7 +307,7 @@ impl Connection
         match self
         {
             Self::Authenticated { alive, .. } => alive,
-            Self::NonAuthenticated { alive, .. } => alive,
+            Self::NonAuthenticated { .. } => &false,
         }
     }
 }
@@ -543,7 +542,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
     {
         match old_connection
         {
-            Connection::NonAuthenticated { write_stream, seq, peer_addr, alive, .. } =>
+            Connection::NonAuthenticated { write_stream, seq, peer_addr, .. } =>
             {
                 Connection::NonAuthenticated
                 {
@@ -553,7 +552,6 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     keys: Some(keys.to_owned()),
                     last_activity: Instant::now(),
                     seq,
-                    alive,
                 }
             },
 
@@ -722,7 +720,6 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
         keys: None,
         last_activity: Instant::now(),
         seq: 0,
-        alive: true,
     });
 
     //GET ENCRYPTION & MAC KEYS
@@ -774,8 +771,6 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
             //USERNAME CONDITIONS MET, BREAK LOOP
             Some(r) =>
             {
-                if r.code == Some(MessageCode::KeepAlive) { continue; } //IGNORE KEEPALIVES
-
                 if let Some(uname) = r.text
                 {
                     if uname.len() >= min_len && uname.len() <= max_len &&
@@ -829,8 +824,6 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
             {
                 Some(r) =>
                 {
-                    if r.code == Some(MessageCode::KeepAlive) { continue; } //IGNORE KEEPALIVES
-
                     if let Some(pass) = r.text
                     {
                         //CHECK LENGTH
@@ -863,11 +856,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
         {
             match network::receive(streams, Some(&keys))
             {
-                Some(r) =>
-                {
-                    if r.code == Some(MessageCode::KeepAlive) { continue; } //IGNORE KEEPALIVES
-                    break r
-                },
+                Some(r) => break r,
 
                 None => return remove_connection(&peer_addr, false),
             }
@@ -1421,6 +1410,7 @@ pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
 {
     //COLLECT ALL CLIENT ADDRESSES
     let addresses: Vec<SocketAddr> = CONNECTIONS.iter()
+        .filter(|entry| entry.is_authenticated())
         .map(|entry| *entry.key())
         .collect();
 
