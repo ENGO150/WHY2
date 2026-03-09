@@ -109,6 +109,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         keys: Option<SharedKeys>,            //SHARED KEYS
         last_activity: Instant,              //TIME OF LAST MESSAGE
         seq: usize,                          //SEQUENCE NUMBER
+        connect: Instant,                    //TIME OF CONNECTION
     },
 }
 
@@ -542,7 +543,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
     {
         match old_connection
         {
-            Connection::NonAuthenticated { write_stream, seq, peer_addr, .. } =>
+            Connection::NonAuthenticated { write_stream, seq, peer_addr, connect, .. } =>
             {
                 Connection::NonAuthenticated
                 {
@@ -552,6 +553,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     keys: Some(keys.to_owned()),
                     last_activity: Instant::now(),
                     seq,
+                    connect,
                 }
             },
 
@@ -720,6 +722,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
         keys: None,
         last_activity: Instant::now(),
         seq: 0,
+        connect: Instant::now(),
     });
 
     //GET ENCRYPTION & MAC KEYS
