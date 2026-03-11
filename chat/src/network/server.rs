@@ -464,7 +464,7 @@ fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOAD
 }
 
 //PUBLIC
-pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTION BY TcpStream
+pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTION BY TcpStream
 {
     //REMOVE CONNECTION
     let connection = match CONNECTIONS.remove(peer_addr)
@@ -512,7 +512,15 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool) //REMOVE CONNECTIO
         });
     }
 
-    log::info!("Close connection: {}", peer_addr);
+    log::info!
+    (
+        "Close connection{}: {peer_addr}",
+
+        if let Some(info) = info
+        {
+            format!(" ({info})")
+        } else { String::new() }
+    );
 }
 
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
@@ -745,7 +753,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
     //CHECK FOR VALID KEYS
     if keys.0.is_empty() || keys.1.is_empty()
     {
-        return remove_connection(&peer_addr, false)
+        return remove_connection(&peer_addr, false, None)
     }
 
     //ASK CLIENT FOR THEIR PACKAGE VERSION
@@ -754,7 +762,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
         let version = ask_version(streams, &keys);
         if version.is_none() || version != Some(misc::get_version().to_string())
         {
-            return remove_connection(&peer_addr, true);
+            return remove_connection(&peer_addr, true, Some("version"));
         }
     }
 
@@ -799,14 +807,14 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                 }
             },
 
-            None => return remove_connection(&peer_addr, false),
+            None => return remove_connection(&peer_addr, false, Some("username")),
         }
     }
 
     //NO USERNAME RECEIVED, DISCONNECT CLIENT
     if username.is_none()
     {
-        return remove_connection(&peer_addr, true);
+        return remove_connection(&peer_addr, true, Some("username"));
     }
 
     let username = username.unwrap();
@@ -851,13 +859,13 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                     }
                 },
 
-                None => return remove_connection(&peer_addr, false)
+                None => return remove_connection(&peer_addr, false, Some("register"))
             };
         }
 
         if password.is_none()
         {
-            return remove_connection(&peer_addr, true);
+            return remove_connection(&peer_addr, true, Some("register"));
         }
 
         //SAVE PASSWORD
@@ -874,7 +882,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
             {
                 Some(r) => break r,
 
-                None => return remove_connection(&peer_addr, false),
+                None => return remove_connection(&peer_addr, false, Some("login")),
             }
         };
 
@@ -883,7 +891,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
             !password::compare_password_hash(&config::server_users_config(&username),
                 &response.text.unwrap())
         {
-            return remove_connection(&peer_addr, true);
+            return remove_connection(&peer_addr, true, Some("login"));
         }
     }
 
@@ -933,7 +941,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                 MessageCode::Disconnect =>
                 {
                     //DISCONNECT CLIENT
-                    return remove_connection(&peer_addr, true);
+                    return remove_connection(&peer_addr, true, None);
                 },
 
                 //VOICE CALL
@@ -1196,9 +1204,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                     if !valid
                     {
                         //LOG FILE REJECT
-                        log::warn!("Upload reject: {peer_addr}");
-
-                        return remove_connection(&peer_addr, true);
+                        return remove_connection(&peer_addr, true, Some("upload"));
                     }
                 },
 
@@ -1402,7 +1408,7 @@ pub fn disconnect_all() //DISCONNECT ALL CLIENTS
     let addrs: Vec<SocketAddr> = CONNECTIONS.iter().map(|conn| *conn.peer_addr()).collect();
     for addr in &addrs
     {
-        remove_connection(addr, true); //REMOVE GRACEFULLY
+        remove_connection(addr, true, None); //REMOVE GRACEFULLY
     }
 }
 
@@ -1419,7 +1425,7 @@ pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
     //DISCONNECT INACTIVE CLIENTS
     for addr in &inactive_addrs
     {
-        remove_connection(addr, true);
+        remove_connection(addr, true, Some("inactive"));
     }
 }
 
@@ -1471,6 +1477,6 @@ pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
     for dead in dead_clients
     {
         //HAIL SATAN, AVE CLIENT
-        remove_connection(&dead, false);
+        remove_connection(&dead, false, Some("dead"));
     }
 }

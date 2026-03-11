@@ -275,7 +275,7 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
     if streams.0.read_exact(&mut len_buf).is_err() //READ LENGTH
     {
         #[cfg(feature = "server")]
-        server::remove_connection(&peer_addr, false);
+        server::remove_connection(&peer_addr, false, Some("length"));
         return None;
     }
     let len = u32::from_be_bytes(len_buf) as usize;
@@ -284,7 +284,7 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
     #[cfg(feature = "server")]
     if len > max_packet_size
     {
-        server::remove_connection(&peer_addr, true);
+        server::remove_connection(&peer_addr, true, Some("length"));
         return None;
     }
 
@@ -293,7 +293,7 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
     if streams.0.read_exact(&mut decoded_packet).is_err() //READ
     {
         #[cfg(feature = "server")]
-        server::remove_connection(&peer_addr, false);
+        server::remove_connection(&peer_addr, false, Some("length"));
         return None;
     }
 
@@ -368,7 +368,6 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
                     } else
                     {
                         //INVALID SEQ
-                        log::warn!("SEQ verification failed: {}", &peer_addr);
                         grace = false;
                         disconnect = true;
                     }
@@ -383,7 +382,7 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
                     //TOO MANY VIOLATIONS, BYE
                     if disconnect
                     {
-                        server::remove_connection(&peer_addr, grace);
+                        server::remove_connection(&peer_addr, grace, Some(if !grace { "SEQ" } else { "SPAM" }));
                         return None;
                     }
                 }
@@ -409,7 +408,7 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
         {
             //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
             #[cfg(feature = "server")]
-            server::remove_connection(&peer_addr, false);
+            server::remove_connection(&peer_addr, false, Some("packet"));
 
             return None;
         }
