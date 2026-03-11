@@ -340,7 +340,9 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
                     }
 
                     //SPAM
-                    if packet.code != Some(MessageCode::KeepAlive) && packet.file.is_none()
+                    if packet.code != Some(MessageCode::KeepAlive) &&
+                        packet.code != Some(MessageCode::KeyExchange) &&
+                        packet.file.is_none()
                     {
                         if !disconnect && config::read_config("spam_protection") && conn.is_authenticated() &&
                             Instant::now().duration_since(*conn.last_activity()) <
