@@ -106,8 +106,12 @@ fn main()
             {
                 Ok(mut stream) =>
                 {
+                    let auth_clients = server::CONNECTIONS.iter().filter(|c| c.is_authenticated()).count();
+                    let unauth_clients = server::CONNECTIONS.len() - auth_clients;
+
                     //CHECK FOR MAXIMAL CONNECTIONS
-                    if server::CONNECTIONS.len() >= config::read_config::<usize>("max_clients")
+                    if auth_clients >= config::read_config::<usize>("max_clients") ||
+                        unauth_clients >= config::read_config::<usize>("max_unauth_clients")
                     {
                         log::error!
                         (
