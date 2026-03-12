@@ -726,13 +726,8 @@ pub fn send_code //SEND CODE TO CLIENT
 
 pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
 {
-    let peer_addr = match streams.0.peer_addr()
-    {
-        Ok(addr) => addr,
-        Err(_) => return,
-    };
-
-    log::info!("New connection: {}", peer_addr);
+    let peer_addr = streams.0.peer_addr().unwrap();
+    log::info!("New connection: {peer_addr}");
 
     //PUSH NEW CONNECTION
     CONNECTIONS.insert(peer_addr, Connection::NonAuthenticated

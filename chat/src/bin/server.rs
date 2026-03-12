@@ -136,19 +136,26 @@ fn main()
         {
             Ok(mut stream) =>
             {
+                //GET PEER ADDR
+                let peer_addr = match stream.peer_addr()
+                {
+                    Ok(p) => p,
+                    Err(_) => continue
+                };
+
+                //COUNT SLOTS
                 let auth_clients = server::CONNECTIONS.iter().filter(|c| c.is_authenticated()).count();
                 let unauth_clients = server::CONNECTIONS.len() - auth_clients;
 
+                //COUNT CONNECTIONS FROM SAME IP
+                let ip_clients = server::CONNECTIONS.iter().filter(|c| c.peer_addr().ip() == peer_addr.ip()).count();
+
                 //CHECK FOR MAXIMAL CONNECTIONS
                 if auth_clients >= config::read_config::<usize>("max_clients") ||
-                    unauth_clients >= config::read_config::<usize>("max_unauth_clients")
+                    unauth_clients >= config::read_config::<usize>("max_unauth_clients") ||
+                    ip_clients > config::read_config::<usize>("max_ip_clients")
                 {
-                    log::error!
-                    (
-                        "Connection rejected (Server full): {}",
-                        stream.peer_addr().map(|a| a.to_string()).unwrap_or_else(|_| "unknown".to_string())
-                    );
-
+                    log::error!("Connection rejected (Server full): {peer_addr}");
                     continue;
                 }
 
