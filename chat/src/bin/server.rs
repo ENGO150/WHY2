@@ -24,7 +24,12 @@ use std::
     process,
     time::Duration,
     sync::{ Arc, Mutex },
-    net::{ TcpListener, UdpSocket },
+    net::
+    {
+        TcpListener,
+        UdpSocket,
+        Shutdown,
+    },
 };
 
 use log::LevelFilter;
@@ -153,9 +158,10 @@ fn main()
                 //CHECK FOR MAXIMAL CONNECTIONS
                 if auth_clients >= config::read_config::<usize>("max_clients") ||
                     unauth_clients >= config::read_config::<usize>("max_unauth_clients") ||
-                    ip_clients > config::read_config::<usize>("max_ip_clients")
+                    ip_clients >= config::read_config::<usize>("max_ip_clients")
                 {
-                    log::error!("Connection rejected (Server full): {peer_addr}");
+                    log::error!("Connection rejected (limit): {peer_addr}");
+                    stream.shutdown(Shutdown::Both).ok();
                     continue;
                 }
 
