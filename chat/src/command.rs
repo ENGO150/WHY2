@@ -25,10 +25,8 @@ use std::fmt::
 
 use crate::network::MessageCode;
 
-#[cfg(feature = "client")]
 use std::net::TcpStream;
 
-#[cfg(feature = "client")]
 use crate::
 {
     options,
@@ -263,7 +261,6 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
     (Some(Command::Invalid), None)
 }
 
-#[cfg(feature = "client")]
 pub fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: &Option<String>) -> bool //SEND CODE FROM COMMAND IF POSSIBLE
 {
     //CODE COMMAND

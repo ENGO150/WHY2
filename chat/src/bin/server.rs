@@ -20,7 +20,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    io,
     thread,
     process,
     time::Duration,
@@ -37,7 +36,6 @@ use why2_chat::
     config,
     options,
     crypto::kex,
-    command::{ self, Command },
     network::
     {
         server,
@@ -97,56 +95,6 @@ fn main()
 
     log::info!("Listening on {address}"); //PRINT INFO
 
-    //CREATE THREAD FOR ACCEPTING CLIENTS
-    thread::spawn(move ||
-    {
-        for stream in listener.incoming()
-        {
-            match stream
-            {
-                Ok(mut stream) =>
-                {
-                    let auth_clients = server::CONNECTIONS.iter().filter(|c| c.is_authenticated()).count();
-                    let unauth_clients = server::CONNECTIONS.len() - auth_clients;
-
-                    //CHECK FOR MAXIMAL CONNECTIONS
-                    if auth_clients >= config::read_config::<usize>("max_clients") ||
-                        unauth_clients >= config::read_config::<usize>("max_unauth_clients")
-                    {
-                        log::error!
-                        (
-                            "Connection rejected (Server full): {}",
-                            stream.peer_addr().map(|a| a.to_string()).unwrap_or_else(|_| "unknown".to_string())
-                        );
-
-                        continue;
-                    }
-
-                    //SET TCP_NODELAY
-                    match stream.set_nodelay(true)
-                    {
-                        Ok(_) => {},
-                        Err(_) => continue
-                    }
-
-                    let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-                    thread::spawn(move || server::listen_client(&mut (&mut stream, write_stream)));
-                },
-
-                Err(e) =>
-                {
-                    log::error!("Connection failed: {}", e);
-                }
-            }
-        }
-    });
-
-    //CREATE THREAD FOR VOICE
-    if options::voice_chat_enabled()
-    {
-        thread::spawn(move || voice_server::listen_client_voice(udp_socket.unwrap()));
-    }
-
     //CREATE KEEPALIVE & INACTIVITY WATCHDOG THREAD
     thread::spawn(move ||
     {
@@ -175,37 +123,49 @@ fn main()
         process::exit(0);
     }).expect("Setting Ctrl+C handler failed");
 
-    //LOOP FOR SERVER-SIDE USER INPUT
-    loop
+    //CREATE THREAD FOR VOICE
+    if options::voice_chat_enabled()
     {
-        //READ INPUT
-        let mut input = String::new();
-        match io::stdin().read_line(&mut input)
+        thread::spawn(move || voice_server::listen_client_voice(udp_socket.unwrap()));
+    }
+
+    //CREATE THREAD FOR ACCEPTING CLIENTS
+    for stream in listener.incoming()
+    {
+        match stream
         {
-            Ok(0) | Err(_) => //EOF/ERROR (Docker, pipe, etc.)
+            Ok(mut stream) =>
             {
-                thread::sleep(Duration::from_secs(1));
-                continue;
+                let auth_clients = server::CONNECTIONS.iter().filter(|c| c.is_authenticated()).count();
+                let unauth_clients = server::CONNECTIONS.len() - auth_clients;
+
+                //CHECK FOR MAXIMAL CONNECTIONS
+                if auth_clients >= config::read_config::<usize>("max_clients") ||
+                    unauth_clients >= config::read_config::<usize>("max_unauth_clients")
+                {
+                    log::error!
+                    (
+                        "Connection rejected (Server full): {}",
+                        stream.peer_addr().map(|a| a.to_string()).unwrap_or_else(|_| "unknown".to_string())
+                    );
+
+                    continue;
+                }
+
+                //SET TCP_NODELAY
+                match stream.set_nodelay(true)
+                {
+                    Ok(_) => {},
+                    Err(_) => continue
+                }
+
+                let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
+                thread::spawn(move || server::listen_client(&mut (&mut stream, write_stream)));
             },
 
-            Ok(_) =>
+            Err(e) =>
             {
-                input = input.trim().to_owned(); //TRIM
-
-                //EXIT
-                if let (Some(command), _) = command::get_command(&input.to_uppercase())
-                {
-                    match command
-                    {
-                        Command::Exit =>
-                        {
-                            quit(); //DISCONNECT ALL USERS
-                            break;
-                        },
-
-                        _ => {}
-                    }
-                }
+                log::error!("Connection failed: {}", e);
             }
         }
     }
