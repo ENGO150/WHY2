@@ -578,8 +578,8 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                 }
             },
 
-            Connection::Authenticated { write_stream, username, id, last_activity,
-                spam_violations, channel, seq, server_seq, peer_addr, alive, .. } =>
+            Connection::Authenticated { write_stream, username, id, last_activity, channel,
+                seq, server_seq, peer_addr, alive, .. } =>
             {
                 Connection::Authenticated
                 {
@@ -590,7 +590,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     keys: keys.to_owned(),
                     last_activity,
                     last_key_exchange: Instant::now(),
-                    spam_violations,
+                    spam_violations: 0,
                     channel,
                     seq,
                     server_seq,
