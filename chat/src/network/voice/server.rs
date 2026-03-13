@@ -18,8 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    time::Instant,
     sync::LazyLock,
+    time::{ Instant, Duration },
     net::{ UdpSocket, SocketAddr },
 };
 
@@ -27,6 +27,7 @@ use dashmap::DashMap;
 
 use crate::
 {
+    config,
     consts::SharedKeys,
     network::
     {
@@ -162,7 +163,8 @@ pub fn reset_last_activity(id: &usize)
     if let Some(mut conn) = server::CONNECTIONS.iter_mut()
         .find(|entry| entry.value().id() == Some(id))
     {
-        *conn.last_activity_mut() = Instant::now();
+        *conn.last_activity_mut() = Instant::now() -
+            Duration::from_millis(config::read_config("min_message_delay"));
     }
 }
 
