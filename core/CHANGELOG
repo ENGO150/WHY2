@@ -1,6 +1,13 @@
 WHY2 (Core) Changelog
 =====================
 
+v1.4.12:
+- eebb294: optimize ShiftRows
+- 5737ed9: split changelog on chat & core
+- 04a5c9f: prepare workspace for version split
+- c528bdf: fix crypto::apply_ctr formatting
+- c0e1d7a: optimize Grid::from_key modulo operation
+
 v1.4.11:
 - 450af8c: fix rustdoc SysRng link
 - 0694d8e: remove deprecated legacy encryption module

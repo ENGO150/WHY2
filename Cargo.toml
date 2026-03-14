@@ -29,7 +29,7 @@ homepage = "https://why2.satan.red"
 repository = "https://git.satan.red/ENGO150/WHY2"
 
 [workspace.dependencies]
-why2 = { path = "core", version = "1.4.11" }
+why2 = { path = "core", version = "1.4.12" }
 sha2 = "0.10.9"
 zeroize = { version = "1.8.2", features = ["derive"] }
 
