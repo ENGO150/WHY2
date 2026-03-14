@@ -1,6 +1,89 @@
 WHY2 (Chat) Changelog
 =====================
 
+v1.5.1:
+- 821d08a: update chat dependencies
+- dd6d008: exclude keyexchange from spam (length) filter
+- fd5a5ca: reset spam violations on rekey
+- ef493f8: fix spam warning on voice packets
+- 835c3dc: shutdown stream on connection limit
+- b73524f: block connections from same ip
+- 094a55f: add max_ip_clients server config entry
+- 007839f: remove commands from server
+- d269fbb: separate auth slots from non-auth
+- 61e802f: add max_unauth_clients server config entry
+- 152e6fc: exclude keyexchange from spam filter
+- aeb1dba: log disconnect cause
+- 6a3d0b0: implement max authentication time
+- 8c540fe: add max_auth_time server config entry
+- 9c46d3b: add connect field to NonAuthenticated Connection
+- 1224be8: prevent from rekeying on file upload
+- b8154db: send keepalives only to authenticated clients
+- c12a4c0: set connection to alive on channel update
+- 1f63599: fix passworld length check
+- d62ad0e: prevent from spam warning on file upload
+- a516636: prevent from spam warning on KeepAlive
+- 5f3eabd: fix upload list formatting
+- a196782: echo client keepalive before formatting checks
+- d44d02a: set connection to alive on auth
+- 4496d89: ignore keepalives on auth
+- f7959d5: update dependencies
+- a15208c: add why2 image to docker-compose example
+- 798b76f: revert "send empty packet to server on connection"
+- f485b21: remove keepalive debug print
+- 10ca3df: prevent client from responding to keepalive during auth
+- b11c458: optimize send_keepalive fn
+- 2bfefd5: disconnect dead connections
+- 5e09420: set connection to alive on received keepalive
+- 53e4dcf: add alive field to Connection
+- 1283138: echo keepalives on client
+- d9bce8f: implement custom keepalive on server
+- 48ce23e: add KeepAlive code
+- c974db4: remove socket2 dependency
+- 12ed89f: remove keepalive packets
+- b5b7eec: handle invalid packets on client
+- 448e269: decrease keepalive probe time to 25s
+- 4e33f5d: exclude AltGr from client shortcuts
+- 3cb1421: implement keepalive on server
+- c6bcf72: move socket2 dependency to chat feature
+- e946ae7: prevent zombie connections on invalid read_exact
+- cccb3fe: implement NAT port shift handling
+- 414e69d: run server container as unprivileged user
+- ae01f26: use /data dir in docker compose
+- a8976e7: merge USER_CONFIG_DIR & CONFIG_DIR
+- f1a1a47: merge get_config_dir & get_why2_dir
+- a3fec3f: use custom WHY2_USER_CONFIG_DIR in docker build
+- bc0e75d: remove opus dependency from docker build
+- 1f140b5: make build script initialize USER_CONFIG_DIR
+- 7778993: send empty packet to server on connection
+- 2771d19: revert "add tty to docker-compose"
+- f82e0e5: add chat gitignore
+- 51775be: check for command errors on server
+- 0ef7afd: add tty to docker-compose
+- 0c732ab: create chat server docker compose
+- a4f1ebc: create chat server dockerfile
+- 164bb00: prevent from sending blank messages to server
+- c9a56ba: move colors to client binary
+- d55f9b4: move colors to client feature
+- a2ab341: replace SerColor with u8 color codes
+- e88f926: remove redundant Info & Warn ClientEvents
+- 329c0ae: implement DisabledFeature ClientEvent
+- 4929388: implement Socks5Voice ClientEvent
+- 86ae807: implement SpamWarning ClientEvent
+- 9c54bcb: implement auth ClientEvents
+- 53567d0: implement IncompatibleVersion ClientEvent
+- d0ebb16: implement file share ClientEvents
+- d5315e3: implement List ClientEvent
+- b4a292b: implement voice toggle ClientEvents
+- d2b2d77: implement Username ClientEvent
+- 2ec64fe: implement UnsafeVersion ClientEvent
+- 1fb5e04: implement VersionFailed ClientEvent
+- 1c2111d: implement InvalidUsage ClientEvent
+- a0b050b: implement PM ClientEvents
+- 8f290e1: implement login ClientEvents
+- f2a6beb: implement Join & Leave ClientEvent
+- b39e149: set server_uname globally on client
+
 v1.5.0:
 - 889b83d: use why2-chat crate for version checking
 - 5737ed9: split changelog on chat & core
