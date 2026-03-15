@@ -119,9 +119,6 @@ client = [
     "dep:lewton",
     "dep:zstd",
     "dep:scrap",
-    "dep:wayland-client",
-    "dep:wayland-protocols-wlr",
-    "dep:memmap2",
 ]
 
 server = [
@@ -131,4 +128,10 @@ server = [
     "dep:log",
     "dep:simple_logger",
     "dep:rand",
+]
+
+wayland = [
+    "dep:wayland-client",
+    "dep:wayland-protocols-wlr",
+    "dep:memmap2",
 ]

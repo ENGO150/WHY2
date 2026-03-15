@@ -18,4 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //MODULES
 pub mod scrap;
+
+#[cfg(feature = "wayland")]
 pub mod wayland;

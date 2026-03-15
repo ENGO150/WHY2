@@ -22,10 +22,12 @@ pub mod backends;
 use std::sync::{ Arc, Mutex };
 
 use backends::scrap as scrap_backend;
-use backends::wayland as wayland_backend;
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "wayland"))]
 use std::env;
+
+#[cfg(all(target_os = "linux", feature = "wayland"))]
+use backends::wayland as wayland_backend;
 
 //STRUCTS
 pub struct CaptureInfo
@@ -52,7 +54,7 @@ pub fn decompress(compressed: &[u8], out: &mut Vec<u8>)
 pub fn start(monitor_idx: usize) -> (CaptureInfo, SharedFrame)
 {
     //TRY WAYLAND ON LINUX FIRST
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "wayland"))]
     if env::var("WAYLAND_DISPLAY").is_ok()
     {
         return wayland_backend::start(monitor_idx);
