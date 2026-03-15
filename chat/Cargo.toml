@@ -75,6 +75,7 @@ lewton = { version = "0.10.2", optional = true }
 
 # SCREEN SHARE (CLIENT)
 zstd = { version = "0.13.3", optional = true }
+scrap = { version = "0.5.0", optional = true }
 
 # CHAT (SERVER SPECIFIC)
 argon2 = { version = "0.5.3", optional = true }
@@ -111,6 +112,7 @@ client = [
     "dep:nnnoiseless",
     "dep:lewton",
     "dep:zstd",
+    "dep:scrap",
 ]
 
 server = [
