@@ -221,6 +221,7 @@ impl Command
             Command::Exit => Some(MessageCode::Disconnect),
             Command::Voice => Some(MessageCode::Voice),
             Command::Channel => Some(MessageCode::Channel),
+            Command::Screen => Some(MessageCode::Screen),
             Command::List => Some(MessageCode::List),
             Command::PrivateMessage => Some(MessageCode::PrivateMessage),
             Command::Upload => Some(MessageCode::Upload),
