@@ -93,7 +93,7 @@ rand = { version = "0.10.0", optional = true }
 [features]
 default = ["client"]
 
-chat = [
+_chat = [
     "dep:serde_json",
     "dep:wincode",
     "dep:ureq",
@@ -107,7 +107,7 @@ chat = [
 ]
 
 client = [
-    "chat",
+    "_chat",
     "dep:socks",
     "dep:crossterm",
     "dep:colored",
@@ -125,7 +125,7 @@ client = [
 ]
 
 server = [
-    "chat",
+    "_chat",
     "dep:ctrlc",
     "dep:argon2",
     "dep:log",
