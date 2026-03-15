@@ -18,3 +18,46 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //MODULES
 pub mod backends;
+
+use std::sync::{ Arc, Mutex };
+
+use backends::scrap as scrap_backend;
+use backends::wayland as wayland_backend;
+
+#[cfg(target_os = "linux")]
+use std::env;
+
+//STRUCTS
+pub struct CaptureInfo
+{
+    pub width:  usize, //SCREEN WIDTH
+    pub height: usize, //SCREEN HEIGHT
+    pub stride: usize, //STRIDE
+}
+
+//TYPES
+pub type SharedFrame = Arc<Mutex<(Vec<u8>, bool)>>;
+
+//FUNCTIONS
+pub fn compress(raw: &[u8]) -> Vec<u8>
+{
+    zstd::encode_all(raw, 1).unwrap_or_else(|_| Vec::new()) //IGNORE ERRORS
+}
+
+pub fn decompress(compressed: &[u8], out: &mut Vec<u8>)
+{
+    *out = zstd::decode_all(compressed).unwrap_or_else(|_| Vec::new()); //IGNORE ERRORS
+}
+
+pub fn start(monitor_idx: usize) -> (CaptureInfo, SharedFrame)
+{
+    //TRY WAYLAND ON LINUX FIRST
+    #[cfg(target_os = "linux")]
+    if env::var("WAYLAND_DISPLAY").is_ok()
+    {
+        return wayland_backend::start(monitor_idx);
+    }
+
+    //FALLBACK TO SCRAP
+    scrap_backend::start(monitor_idx)
+}
