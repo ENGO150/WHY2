@@ -28,7 +28,7 @@ categories = ["cryptography"]
 readme = "../README.md"
 
 [dependencies]
-rand = "0.10.0"
+rand = "0.10.1"
 rand_chacha = "0.10.0"
 sha2 = { workspace = true }
 rayon = "1.11.0"
