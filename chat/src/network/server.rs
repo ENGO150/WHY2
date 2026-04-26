@@ -1033,6 +1033,20 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                     }
                 },
 
+                //SCREEN SHARE
+                MessageCode::Screen =>
+                {
+                    //PREVENT SCREEN SHARING WITHOUT VOICE
+                    let is_voice = voice_server::CONNECTIONS.get_mut(&id)
+                        .map(|mut entry| entry.0.as_mut().map(|conn|
+                        {
+                            *conn.screen_mut() = true;
+                        }).is_some()).unwrap_or(false);
+
+                    send_code(&mut streams.1.lock().unwrap(), None,
+                        if is_voice { MessageCode::Screen } else { MessageCode::InvalidUsage }, Some(&keys));
+                },
+
                 //CLIENT REQUESTED LIST OF ONLINE USERS
                 MessageCode::List =>
                 {
