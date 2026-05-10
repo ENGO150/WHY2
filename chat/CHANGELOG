@@ -1,6 +1,26 @@
 WHY2 (Chat) Changelog
 =====================
 
+v1.5.2:
+- f7cf9d6: add PQ key auto migration code
+- 2a3e09a: fix breaking changes
+- d7cfdd6: update core & chat dependencies
+- 070e051: drop screen sharing support indefinitely
+- cdeebeb: start screen capture on screen approval
+- bcafdbc: update dependencies
+- 5b019f5: prevent from enabling screen without voice
+- 761b4fe: pair screen command to code
+- dae06e1: add screen command
+- acae9b7: fix non-linux build dependency problems
+- 8d21020: move wayland backend to wayland feature
+- c4f63d2: remove chat feature usage check from build script
+- aa9b7bc: rename chat feature to _chat
+- 9f53a7a: add screen backend code
+- 74f9d62: add memmap2 & wayland client dependencies (linux only)
+- 8e50a4e: add scrap client dependency
+- b5fb8f8: add zstd client dependency
+- ac46b22: add client screen files
+
 v1.5.1:
 - 821d08a: update chat dependencies
 - dd6d008: exclude keyexchange from spam (length) filter
