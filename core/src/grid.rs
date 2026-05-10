@@ -69,7 +69,7 @@ use zeroize::Zeroize;
 use wide::i64x4;
 use rayon::prelude::{ ParallelSlice, ParallelIterator };
 
-use crate::consts;
+use crate::consts::{ self, mds };
 
 #[cfg(feature = "constant-time")]
 use subtle::
@@ -186,6 +186,24 @@ macro_rules! subcell //SUBCELL CORE LOGIC
         //XOR TWEAK
         $v1 = ($v1 ^ $round_tweak) & $mask;
     }
+}
+
+//PRIVATE HELPERS
+#[inline(always)]
+fn gf_mul(mut a: u64, mut b: u64) -> u64 //FINITE FIELD ARITHMETICS
+{
+    let mut result = 0u64;
+
+    for _ in 0..64
+    {
+        if b & 1 == 1 { result ^= a; }
+        let carry = (a >> 63) & 1;
+        a <<= 1;
+        if carry == 1 { a ^= 0x1B; } //IRREDUCIBLE POLYNOMIAL
+        b >>= 1;
+    }
+
+    result
 }
 
 //IMPLEMENTATIONS
@@ -614,6 +632,43 @@ impl<const W: usize, const H: usize> Grid<W, H>
     #[inline(always)]
     pub fn mix_columns(&mut self)
     {
+        let mut col_in = [0u64; H];
+        let mut col_out = [0u64; H];
+
+        for col in 0..W
+        {
+            //LOAD COLUMN AS u64
+            for r in 0..H
+            {
+                col_in[r] = self[r][col] as u64;
+            }
+
+            for row in 0..H
+            {
+                let mut acc = 0u64;
+                for k in 0..H
+                {
+                    //PICK CORRECT MDS MATRIX
+                    let coeff = match H
+                    {
+                        4 => mds::MDS_4[row][k],
+                        8 => mds::MDS_8[row][k],
+                        16 => mds::MDS_16[row][k],
+                        _ => unreachable!("tf")
+                    };
+
+                    acc ^= gf_mul(col_in[k], coeff);
+                }
+
+                col_out[row] = acc;
+            }
+
+            //SAVE RESULT
+            for r in 0..H
+            {
+                self[r][col] = col_out[r] as i64;
+            }
+        }
     }
 
     //UTILS
