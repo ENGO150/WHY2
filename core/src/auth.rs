@@ -55,13 +55,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! - **Independent Keys**: It is strongly recommended to use different keys for encryption and authentication (or derive them via HKDF).
 //! - **Order of Operations**: Verification MUST occur **before** decryption. If verification fails, the data is discarded immediately.
 
+use hmac::{ Hmac, Mac };
 use sha2::Sha256;
-use hmac::
-{
-    Hmac,
-    Mac,
-    KeyInit,
-};
 
 use zeroize::Zeroize;
 

@@ -53,7 +53,6 @@ use crate::
         MessageCode,
         MessagePacket,
         ActiveFileshare,
-        screen::client as screen_client,
         voice::
         {
             client as voice_client,
@@ -421,13 +420,6 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     {
                         ClientEvent::VoiceDisabled
                     }).unwrap();
-                },
-
-                //SERVER ALLOWED SCREEN SHARING
-                MessageCode::Screen =>
-                {
-                    //START SCREEN SHARE
-                    screen_client::start(0);
                 },
 
                 //VOICE CLIENTS

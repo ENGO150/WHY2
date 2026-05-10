@@ -23,7 +23,6 @@ pub mod server;
 #[cfg(feature = "client")]
 pub mod client;
 
-pub mod screen;
 pub mod voice;
 
 use std::
@@ -96,7 +95,6 @@ pub enum MessageCode //CONTROL CODES
     Download,           //CLIENT <> SERVER | DOWNLOAD FILE FROM SERVER
     Uploaded,           //SERVER -> CLIENT | ANNOUNCE NEW UPLOADED FILE
     Files,              //CLIENT <> SERVER | LIST UPLOADED FILES
-    Screen,             //CLIENT <> SERVER | ENABLE SCREEN SHARE
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
     InvalidFeature,     //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE
     KeepAlive,          //SERVER <> CLIENT | A BIT LESS STUPID KEEP-ALIVE

@@ -26,6 +26,13 @@ fn main()
     //ENSURE CORRECT FEATURE USAGE
     let client_feature = env::var("CARGO_FEATURE_CLIENT").is_ok();
     let server_feature = env::var("CARGO_FEATURE_SERVER").is_ok();
+    let chat_feature = env::var("CARGO_FEATURE_CHAT").is_ok();
+
+    //DIRECT CHAT FEATURE USE
+    if chat_feature && !(client_feature || server_feature)
+    {
+        panic!("Do not enable `chat` directly - use `client` or `server`.");
+    }
 
     //USE OF SERVER AND CLIENT FEATURES COMBINED
     if client_feature && server_feature

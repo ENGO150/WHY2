@@ -49,7 +49,6 @@ pub struct Connection
     seq: usize,                //SEQUENCE NUMBER
     server_seq: usize,         //SERVER SEQUENCE NUMBER
     packet_accumulator: usize, //PACKET ACCUMULATOR
-    screen: bool,              //IS SCREEN SHARING
 }
 
 //LISTS
@@ -80,18 +79,6 @@ impl Connection
     pub fn server_seq_mut(&mut self) -> &mut usize
     {
         &mut self.server_seq
-    }
-
-    //GET SCREEN SHARING
-    pub fn screen(&self) -> &bool
-    {
-        &self.screen
-    }
-
-    //GET SCREEN SHARING AS MUTABLE
-    pub fn screen_mut(&mut self) -> &mut bool
-    {
-        &mut self.screen
     }
 }
 
@@ -234,7 +221,6 @@ pub fn listen_client_voice(socket: UdpSocket)
                     seq: 0,
                     server_seq: 0,
                     packet_accumulator: 0,
-                    screen: false,
                 });
 
                 log::info!("New voice connection: {}", addr);

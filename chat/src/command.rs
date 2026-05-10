@@ -41,7 +41,6 @@ pub enum Command
     Voice,          //ENABLE VOICE CHAT
     Mute,           //TOGGLE-MUTE USER/YOURSELF
     Channel,        //SWITCH CHANNEL
-    Screen,         //SCREENSHARE
     Help,           //PRINT COMMANDS
     Info,           //COMMAND INFO
     List,           //LIST USERS
@@ -115,15 +114,6 @@ pub const COMMAND_LIST: &[CommandInfo] =
         shortcut: None,
         args: &[CommandArg { name: "NAME", required: false }],
         description: "Switches to channel/lobby if NAME is omitted",
-    },
-
-    CommandInfo
-    {
-        command: Command::Screen,
-        triggers: &[ "SCREEN", "SCREENSHARE", "VIDEO", "DISPLAY" ],
-        shortcut: None,
-        args: &[CommandArg { name: "DISPLAY ID", required: false }],
-        description: "Toggles screen share",
     },
 
     CommandInfo
@@ -221,7 +211,6 @@ impl Command
             Command::Exit => Some(MessageCode::Disconnect),
             Command::Voice => Some(MessageCode::Voice),
             Command::Channel => Some(MessageCode::Channel),
-            Command::Screen => Some(MessageCode::Screen),
             Command::List => Some(MessageCode::List),
             Command::PrivateMessage => Some(MessageCode::PrivateMessage),
             Command::Upload => Some(MessageCode::Upload),
