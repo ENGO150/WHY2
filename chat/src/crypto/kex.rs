@@ -39,9 +39,11 @@ use p521::
 use ml_kem::
 {
     MlKem768,
-    KemCore,
-    EncodedSizeUser,
     Ciphertext,
+    DecapsulationKey768,
+    EncapsulationKey768,
+    KeyInit,
+    TryKeyInit,
     kem::{ Encapsulate, Decapsulate },
 };
 
@@ -59,7 +61,18 @@ use crate::
 };
 
 #[cfg(feature = "server")]
-use std::{ fs, path::Path };
+use std::
+{
+    fs,
+    path::Path,
+};
+
+#[cfg(feature = "server")]
+use ml_kem::
+{
+    KeyExport,
+    kem::Kem,
+};
 
 //FUNCTIONS
 //PRIVATE
@@ -107,10 +120,12 @@ pub fn generate_ephemeral_keys() -> (String, String) //CREATE ECC KEYS
 pub fn generate_server_pq_keys() -> (String, String) //GENERATE POST-QUANTUM KEYS
 {
     //GENERATE KEYS
-    let (dk, ek) = MlKem768::generate(&mut OsRng);
+    let (dk, ek) = MlKem768::generate_keypair();
 
-    let dk_pem = pem::encode_string("PQ PRIVATE KEY", LineEnding::LF, &dk.as_bytes()).expect("Encoding EQ key to PEM failed");
-    let ek_pem = pem::encode_string("PQ PUBLIC KEY", LineEnding::LF, &ek.as_bytes()).expect("Encoding EQ pkey to PEM failed");
+    let dk_pem = pem::encode_string("PQ PRIVATE KEY", LineEnding::LF, dk.to_bytes().as_slice())
+        .expect("Encoding EQ key to PEM failed");
+    let ek_pem = pem::encode_string("PQ PUBLIC KEY", LineEnding::LF, ek.to_bytes().as_slice())
+        .expect("Encoding EQ pkey to PEM failed");
 
     (dk_pem, ek_pem)
 }
@@ -193,15 +208,15 @@ pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Vec<u8>)
     let pk_bytes = decode_raw_pem(peer_pk_bytes).expect("Decoding PEM failed");
 
     //DESERIALIZE KEY
-    let ek = <MlKem768 as KemCore>::EncapsulationKey::from_bytes((&pk_bytes[..]).try_into().unwrap());
+    let ek = EncapsulationKey768::new_from_slice(&pk_bytes).expect("Invalid encapsulation key");
 
     //ENCAPSULATE
-    let (ct, ss) = ek.encapsulate(&mut OsRng).expect("Encapsulation failed");
+    let (ct, ss) = ek.encapsulate();
 
     //ENCODE CIPHERTEXT TO PEM
     let ct_pem = pem::encode_string("PQ CIPHERTEXT", LineEnding::LF, &ct).unwrap();
 
-    (ct_pem, ss.to_vec())
+    (ct_pem, ss.as_slice().to_vec())
 }
 
 pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Option<Vec<u8>>
@@ -211,8 +226,8 @@ pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Option<Vec<u8
     let ct_bytes = decode_raw_pem(ciphertext_pem)?;
 
     //DESERIALIZE
-    let dk = <MlKem768 as KemCore>::DecapsulationKey::from_bytes((&sk_bytes[..]).try_into().ok()?);
+    let dk = DecapsulationKey768::new_from_slice(&sk_bytes).ok()?;
     let ct = Ciphertext::<MlKem768>::try_from(ct_bytes.as_slice()).ok()?;
 
-    dk.decapsulate(&ct).ok().map(|ss| ss.to_vec())
+    Some(dk.decapsulate(&ct).as_slice().to_vec())
 }
