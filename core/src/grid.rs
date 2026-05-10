@@ -208,16 +208,16 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// This constructor sets up an empty Grid where all cells are set to `0`.
     ///
     /// # Returns
-    /// - Ok(`Grid`) instance with all values set to zero and area is larger than 1.
-    /// - Err(`GridError`) if the area is 1
+    /// - Ok(`Grid`) instance with all values set to zero.
+    /// - Err(`GridError`) if the area is invalid.
     ///
     /// # Notes
     /// - This method does not perform any encryption or transformation.
+    /// - Valid area is defined by $W > 0$ and $H \in \lbrace4, 8, 16\rbrace$
     #[inline]
     pub fn new() -> result::Result<Self, GridError>
     {
-        let area = W * H;
-        if area > 1 && W > 1
+        if W > 0 && (H == 4 || H == 8 || H == 16)
         {
             Ok(Self([[0i64; W]; H]))
         } else
@@ -838,12 +838,12 @@ impl Display for GridError
         {
             GridError::InvalidDimensions { width, height } =>
             {
-                if *width <= 1
+                if *width == 0
                 {
-                    write!(f, "Invalid dimensions: expected width larger than 1, got {width}")
+                    write!(f, "Invalid dimensions: expected width larger than 0")
                 } else
                 {
-                    write!(f, "Invalid dimensions: expected area larger than 1, got {width}x{height} ({})", width * height)
+                    write!(f, "Invalid dimensions: expected height is 4, 8 or 16, got {height}")
                 }
             },
 
