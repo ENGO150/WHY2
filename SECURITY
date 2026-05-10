@@ -29,11 +29,11 @@ A) Core Algorithm Design
    - ARX (Add-Rotate-XOR) construction inspired by TEA/XTEA
    - Operates on 32-bit halves via Feistel-like network
    - 4 rounds per cell with golden ratio constant (DELTA_32)
-   - Security Benefit: No lookup tables → immune to cache-timing attacks
+   - Security Benefit: No lookup tables => immune to cache-timing attacks
 
    Diffusion Layers:
    - ShiftRows: Key-dependent row rotations (not fixed like in AES)
-   - MixColumns: MDS matrix with 16 irrational-derived coefficients
+   - MixColumns: True MDS matrix multiplication
    - Key mixing: XOR with ChaCha20-expanded round keys
 
    Mode: Counter (CTR) with grid-based nonce + block index
