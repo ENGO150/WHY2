@@ -150,6 +150,24 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
         //SAVE PQ KEYS
         fs::write(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY, dk).expect("Saving server PQ secret key failed");
         fs::write(server_keys_dir + consts_chat::SERVER_PQ_PKEY, ek).expect("Saving server PQ public key failed");
+    } else
+    {
+        //MIGRATE PQ KEYS FROM OLD EXPANDED FORMAT (ml-kem 0.2) TO NEW SEED FORMAT (ml-kem 0.3)
+        let pq_sk_path = server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY;
+        let needs_migration = match fs::read_to_string(&pq_sk_path)
+        {
+            Ok(pem_str) => decode_raw_pem(&pem_str).map_or(true, |bytes| bytes.len() != 64), //SEED IS 64 BYTES
+            Err(_) => true, //MISSING FILE, REGENERATE
+        };
+
+        if needs_migration
+        {
+            log::warn!("PQ keys are in old format or missing, regenerating...");
+
+            let (dk, ek) = generate_server_pq_keys();
+            fs::write(&pq_sk_path, dk).expect("Saving server PQ secret key failed");
+            fs::write(server_keys_dir + consts_chat::SERVER_PQ_PKEY, ek).expect("Saving server PQ public key failed");
+        }
     }
 }
 
