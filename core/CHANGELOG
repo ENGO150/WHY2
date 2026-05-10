@@ -1,6 +1,13 @@
 WHY2 (Core) Changelog
 =====================
 
+v1.4.13:
+- 2a3e09a: fix breaking changes
+- d7cfdd6: update core & chat dependencies
+- 070e051: drop screen sharing support indefinitely
+- eb0914d: fix dependency update breaking changes
+- bcafdbc: update dependencies
+
 v1.4.12:
 - eebb294: optimize ShiftRows
 - 5737ed9: split changelog on chat & core

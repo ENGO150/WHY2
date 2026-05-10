@@ -2581,7 +2581,7 @@ dependencies = [
 
 [[package]]
 name = "why2"
-version = "1.4.12"
+version = "1.4.13"
 dependencies = [
  "criterion",
  "hmac 0.13.0",
