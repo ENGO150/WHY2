@@ -84,7 +84,7 @@ fn encrypt_decrypt() -> Result<(), Box<dyn Error>>
 
     //PART 2: GRID SIZE COMPARISON
     let text = TEST_TEXT_LARGE.to_owned();
-    
+
     println!("=== Grid Size Comparison ({} chars) ===\n", text.len());
     println!("┌───────────┬────────┬───────────┐");
     println!("│ Grid      │ Grids  │ Time      │");
@@ -96,11 +96,11 @@ fn encrypt_decrypt() -> Result<(), Box<dyn Error>>
     let time_8x8 = start.elapsed();
     println!("│ 8x8  (64) │ {:6} │ {:7.2}ms │", enc_8x8.output.len(), time_8x8.as_secs_f64() * 1000.0);
 
-    //11x7 GRIDS (77 CELLS)
+    //5x16 GRIDS (80 CELLS)
     let start = Instant::now();
-    let enc_11x7 = encrypter::encrypt_string::<11, 7>(&text, None)?;
+    let enc_11x7 = encrypter::encrypt_string::<5, 16>(&text, None)?;
     let time_11x7 = start.elapsed();
-    println!("│ 11x7 (77) │ {:6} │ {:7.2}ms │", enc_11x7.output.len(), time_11x7.as_secs_f64() * 1000.0);
+    println!("│ 5x16 (80) │ {:6} │ {:7.2}ms │", enc_11x7.output.len(), time_11x7.as_secs_f64() * 1000.0);
 
     //16x4 GRIDS (64 CELLS)
     let start = Instant::now();
@@ -123,7 +123,7 @@ fn test_encryption(text: &str, label: &str) -> Result<(), Box<dyn Error>>
     let measure_start = Instant::now();
 
     //ENCRYPT & DECRYPT
-    let encrypted = encrypter::encrypt_string::<11, 7>(&text.to_owned(), None)?;
+    let encrypted = encrypter::encrypt_string::<5, 16>(&text.to_owned(), None)?;
 
     let num_grids = encrypted.output.len();
     let encrypter_measure = measure_start.elapsed();
@@ -163,7 +163,7 @@ fn test_encryption(text: &str, label: &str) -> Result<(), Box<dyn Error>>
 #[test]
 fn verify_multi_grid_overflow()
 {
-    let encrypted = encrypter::encrypt_string::<11, 7>(&TEST_TEXT_LARGE.to_owned(), None)
+    let encrypted = encrypter::encrypt_string::<5, 16>(&TEST_TEXT_LARGE.to_owned(), None)
         .expect("Encryption failed");
 
     assert!
