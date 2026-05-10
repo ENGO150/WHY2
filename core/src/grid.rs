@@ -192,6 +192,12 @@ macro_rules! subcell //SUBCELL CORE LOGIC
 #[inline(always)]
 fn gf_mul(a: u64, b: u64) -> u64
 {
+    gf_mul2(a, b, 0, 0).0
+}
+
+#[inline(always)]
+fn gf_mul2(a0: u64, b0: u64, a1: u64, b1: u64) -> (u64, u64)
+{
     #[cfg(target_arch = "x86_64")]
     if is_x86_feature_detected!("pclmulqdq")
     {
@@ -199,15 +205,18 @@ fn gf_mul(a: u64, b: u64) -> u64
         {
             use std::arch::x86_64::*;
 
-            let a_vec = _mm_set_epi64x(0, a as i64);
-            let b_vec = _mm_set_epi64x(0, b as i64);
-            let product = _mm_clmulepi64_si128(a_vec, b_vec, 0x00);
+            let a_vec = _mm_set_epi64x(a1 as i64, a0 as i64);
+            let b_vec = _mm_set_epi64x(b1 as i64, b0 as i64);
 
-            let lo = _mm_extract_epi64(product, 0) as u64;
-            let hi = _mm_extract_epi64(product, 1) as u64;
+            let lo_vec = _mm_clmulepi64_si128(a_vec, b_vec, 0x00); // a0 * b0
+            let hi_vec = _mm_clmulepi64_si128(a_vec, b_vec, 0x11); // a1 * b1
 
-            //REDUCTION
-            gf_reduce(lo, hi)
+            let lo0 = _mm_extract_epi64(lo_vec, 0) as u64;
+            let hi0 = _mm_extract_epi64(lo_vec, 1) as u64;
+            let lo1 = _mm_extract_epi64(hi_vec, 0) as u64;
+            let hi1 = _mm_extract_epi64(hi_vec, 1) as u64;
+
+            (gf_reduce(lo0, hi0), gf_reduce(lo1, hi1))
         };
     }
 
@@ -216,15 +225,36 @@ fn gf_mul(a: u64, b: u64) -> u64
     {
         use std::arch::aarch64::*;
 
-        let product = vmull_p64(a, b);
-        let lo = vgetq_lane_u64(vreinterpretq_u64_p128(product), 0);
-        let hi = vgetq_lane_u64(vreinterpretq_u64_p128(product), 1);
+        let a_vec = vcombine_u64(vcreate_u64(a0), vcreate_u64(a1));
+        let b_vec = vcombine_u64(vcreate_u64(b0), vcreate_u64(b1));
 
-        //REDUCTION
-        gf_reduce(lo, hi)
+        let lo_vec = vmull_p64
+        (
+            vgetq_lane_u64(a_vec, 0),
+            vgetq_lane_u64(b_vec, 0)
+        );
+
+        let hi_vec = vmull_high_p64
+        (
+            vreinterpretq_p64_u64(a_vec),
+            vreinterpretq_p64_u64(b_vec)
+        );
+
+        let lo0 = vgetq_lane_u64(vreinterpretq_u64_p128(lo_vec), 0);
+        let hi0 = vgetq_lane_u64(vreinterpretq_u64_p128(lo_vec), 1);
+        let lo1 = vgetq_lane_u64(vreinterpretq_u64_p128(hi_vec), 0);
+        let hi1 = vgetq_lane_u64(vreinterpretq_u64_p128(hi_vec), 1);
+
+        (gf_reduce(lo0, hi0), gf_reduce(lo1, hi1))
     };
 
-    //SOFTWARE FALLBACK
+    //SW FALLBACK
+    (gf_mul_soft(a0, b0), gf_mul_soft(a1, b1))
+}
+
+#[inline(always)]
+fn gf_mul_soft(a: u64, b: u64) -> u64
+{
     let mut result: u64 = 0;
     let mut a = a;
     let mut b = b;
@@ -692,9 +722,39 @@ impl<const W: usize, const H: usize> Grid<W, H>
             for row in 0..H
             {
                 let mut acc = 0u64;
-                for k in 0..H
+                let mut k = 0;
+
+                while k + 1 < H
                 {
-                    //PICK CORRECT MDS MATRIX
+                    let coeff0 = match H
+                    {
+                        4 => mds::MDS_4[row][k],
+                        8 => mds::MDS_8[row][k],
+                        16 => mds::MDS_16[row][k],
+                        _ => unreachable!("tf")
+                    };
+
+                    let coeff1 = match H
+                    {
+                        4 => mds::MDS_4[row][k + 1],
+                        8 => mds::MDS_8[row][k + 1],
+                        16 => mds::MDS_16[row][k + 1],
+                        _ => unreachable!("tf")
+                    };
+
+                    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+                    let (r0, r1) = gf_mul2(col_in[k], coeff0, col_in[k+1], coeff1);
+
+                    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+                    let (r0, r1) = (gf_mul(col_in[k], coeff0), gf_mul(col_in[k+1], coeff1));
+
+                    acc ^= r0 ^ r1;
+                    k += 2;
+                }
+
+                //FALLBACK FOR ODD REMAINDER
+                if k < H
+                {
                     let coeff = match H
                     {
                         4 => mds::MDS_4[row][k],
