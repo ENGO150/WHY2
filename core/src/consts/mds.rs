@@ -35,7 +35,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! defined by two disjoint sequences $X = (x_1, \dots, x_n)$ and $Y = (y_1, \dots, y_n)$.
 //! The individual elements of the matrix $A$ are generated according to the formula:
 //!
-//! $$ A_{i,j} = \frac{1}{x_i - y_j} $$
+//! $$ M_{ij} = (x_i \oplus y_j)^{-1} $$
 //!
 //! An inherent mathematical property of Cauchy matrices is that every square submatrix is
 //! strictly invertible (non-singular). When operations are evaluated over the cipher's
