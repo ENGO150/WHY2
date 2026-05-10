@@ -49,7 +49,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! - **SPN Architecture**: Proven approach used by standardized ciphers
 //! - **ARX Operations**: Memory-hard-free construction (inspired by TEA/XTEA/Salsa20)
-//! - **Key-Dependent Transformations**: Enhanced security through round-variant operations
+//! - **True MDS Diffusion**: Cauchy MDS matrix over $\mathbb{F}_{2^{64}}$ provides
+//!   provably optimal branch number, enabling formal security bounds.
 //! - **Native 64-bit Operations**: Optimized for contemporary processor architectures
 //!
 //! For detailed security architecture and implementation specifics, see the

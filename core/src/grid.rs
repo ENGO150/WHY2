@@ -31,7 +31,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! The architecture follows a Substitution-Permutation Network (SPN) pattern:
 //! - **Nonlinear Mixing**: ARX-based [`subcell`](Grid::subcell) operations acting as a variable S-box.
 //! - **Row Permutation**: Cyclical row shifting via [`shift_rows`](Grid::shift_rows) for horizontal diffusion.
-//! - **Column Diffusion**: MDS-based mixing via [`mix_columns`](Grid::mix_columns) for vertical diffusion and high avalanche effect.
+//! - **Column Diffusion**: True MDS matrix multiplication via [`mix_columns`](Grid::mix_columns)
+//!   over $\mathbb{F}_{2^{64}}$ for vertical diffusion and provably optimal branch number.
 //!
 //! ## Safety & Errors
 //! Grid initialization is strictly validated to ensure cryptographic stability. Invalid dimensions
@@ -705,6 +706,49 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
+    /// Applies column-wise mixing using a fixed Cauchy MDS matrix over $\mathbb{F}_{2^{64}}$.
+    ///
+    /// This transformation provides vertical diffusion by treating each column as a vector
+    /// of elements in $\mathbb{F}_{2^{64}}$ and multiplying it by a precomputed Cauchy MDS matrix.
+    /// Unlike the previous implementation, the matrix is **fixed and independent of the round key**,
+    /// enabling formal cryptographic analysis.
+    ///
+    /// # Algorithm
+    /// For each column $c$, the output vector is computed as:
+    ///
+    /// $$ \text{out}\[r\] = \sum_{k=0}^{H-1} M\[r\]\[k\] \cdot \text{col}\[k\] $$
+    ///
+    /// Multiplication uses carry-less multiplication modulo the irreducible polynomial
+    /// $p(x) = x^{64} + x^4 + x^3 + x + 1$ in $\mathbb{F}_{2^{64}}$.
+    /// Addition corresponds to XOR.
+    ///
+    /// The matrix $M$ is a Cauchy MDS matrix constructed from disjoint sets
+    /// $x = \{0, \ldots, H-1\}$ and $y = \{H, \ldots, 2H-1\}$ over $\mathbb{F}_{2^{64}}$:
+    ///
+    /// $$ M_{ij} = (x_i \oplus y_j)^{-1} $$
+    ///
+    /// # Security Properties
+    /// - **True MDS**: Branch number is provably $H + 1$ — the theoretical maximum.
+    ///   Any nonzero input with $k$ nonzero elements produces an output with at least $H+1-k$
+    ///   nonzero elements.
+    /// - **Formally analyzable**: Fixed matrix enables standard differential/linear cryptanalysis bounds.
+    /// - **Nothing-up-my-sleeve**: Matrix derived from smallest possible disjoint sets,
+    ///   demonstrating no hidden weaknesses.
+    ///
+    /// # Implementation
+    /// Uses hardware-accelerated carry-less multiplication:
+    /// - **x86_64**: `PCLMULQDQ` instruction, processing 2 multiplications per instruction.
+    /// - **AArch64**: `PMULL`/`PMULL2` instructions, processing 2 multiplications per instruction.
+    /// - **Fallback**: Software implementation for other architectures.
+    ///
+    /// # Supported Grid Heights
+    /// - $H = 4$: Uses [`MDS_4`](mds::MDS_4)
+    /// - $H = 8$: Uses [`MDS_8`](mds::MDS_8)
+    /// - $H = 16$: Uses [`MDS_16`](mds::MDS_16)
+    ///
+    /// # Notes
+    /// - This method mutates the grid in-place.
+    /// - Grid heights outside the supported set will panic.
     #[inline(always)]
     pub fn mix_columns(&mut self)
     {
