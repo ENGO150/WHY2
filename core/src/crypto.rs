@@ -230,11 +230,6 @@ pub fn apply_ctr<const W: usize, const H: usize>
         .map(|k| k.precalculate_shifts())
         .collect();
 
-    //PRECALCULATE ROTATIONS
-    let round_rotations: Vec<[usize; W]> = round_keys[1..].iter().enumerate()
-        .map(|(i, k)| k.precalculate_rotations(i))
-        .collect();
-
     //APPLY ENCRYPTION TO EACH GRID (PARALLEL)
     grids.par_iter_mut().enumerate().for_each(|(i, grid)|
     {
@@ -250,10 +245,10 @@ pub fn apply_ctr<const W: usize, const H: usize>
         //ROUND OPERATIONS
         for (i, round_key) in round_keys[1..].iter().enumerate()
         {
-            keystream_block ^= round_key;                     //XOR
-            keystream_block.subcell(i);                       //SUBCELL (ARX)
-            keystream_block.shift_rows(&round_shifts[i]);     //SHIFT ROWS
-            keystream_block.mix_columns(&round_rotations[i]); //MIX COLUMNS (MDS)
+            keystream_block ^= round_key;                 //XOR
+            keystream_block.subcell(i);                   //SUBCELL (ARX)
+            keystream_block.shift_rows(&round_shifts[i]); //SHIFT ROWS
+            keystream_block.mix_columns();                //MIX COLUMNS (MDS)
         }
 
         //XOR KEYSTREAM AND DATA

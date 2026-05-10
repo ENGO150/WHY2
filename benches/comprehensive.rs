@@ -62,12 +62,11 @@ fn bench_grid_internals(c: &mut Criterion)
     });
 
     //MIX COLUMNS
-    let rotations = key_grid.precalculate_rotations(0);
     group.bench_function("MixColumns", |b|
     {
         b.iter(||
         {
-            black_box(&mut grid).mix_columns(black_box(&rotations));
+            black_box(&mut grid).mix_columns();
         })
     });
 
