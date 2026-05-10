@@ -188,22 +188,68 @@ macro_rules! subcell //SUBCELL CORE LOGIC
     }
 }
 
-//PRIVATE HELPERS
+//PRIVATE HELPERS FOR FINITE FIELD ARITHMETICS
 #[inline(always)]
-fn gf_mul(mut a: u64, mut b: u64) -> u64 //FINITE FIELD ARITHMETICS
+fn gf_mul(a: u64, b: u64) -> u64
 {
-    let mut result = 0u64;
+    #[cfg(target_arch = "x86_64")]
+    if is_x86_feature_detected!("pclmulqdq")
+    {
+        return unsafe
+        {
+            use std::arch::x86_64::*;
+
+            let a_vec = _mm_set_epi64x(0, a as i64);
+            let b_vec = _mm_set_epi64x(0, b as i64);
+            let product = _mm_clmulepi64_si128(a_vec, b_vec, 0x00);
+
+            let lo = _mm_extract_epi64(product, 0) as u64;
+            let hi = _mm_extract_epi64(product, 1) as u64;
+
+            //REDUCTION
+            gf_reduce(lo, hi)
+        };
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    return unsafe
+    {
+        use std::arch::aarch64::*;
+
+        let product = vmull_p64(a, b);
+        let lo = vgetq_lane_u64(vreinterpretq_u64_p128(product), 0);
+        let hi = vgetq_lane_u64(vreinterpretq_u64_p128(product), 1);
+
+        //REDUCTION
+        gf_reduce(lo, hi)
+    };
+
+    //SOFTWARE FALLBACK
+    let mut result: u64 = 0;
+    let mut a = a;
+    let mut b = b;
+    let poly = 0x1Bu64;
 
     for _ in 0..64
     {
         if b & 1 == 1 { result ^= a; }
         let carry = (a >> 63) & 1;
         a <<= 1;
-        if carry == 1 { a ^= 0x1B; } //IRREDUCIBLE POLYNOMIAL
+        if carry == 1 { a ^= poly; }
         b >>= 1;
     }
 
     result
+}
+
+#[inline(always)]
+fn gf_reduce(lo: u64, hi: u64) -> u64
+{
+    let mid = (hi << 4) ^ (hi << 3) ^ (hi << 1) ^ hi;
+    let overflow = (hi >> 60) ^ (hi >> 61) ^ (hi >> 63);
+    let extra = (overflow << 4) ^ (overflow << 3) ^ (overflow << 1) ^ overflow;
+
+    lo ^ mid ^ extra
 }
 
 //IMPLEMENTATIONS
