@@ -38,11 +38,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     println!("│ Grid Size   │ Grids  │ Encrypt (ms) │ Decrypt (ms) │");
     println!("├─────────────┼────────┼──────────────┼──────────────┤");
 
+    test_grid_size::<4, 4>(&message, "4x4 (16)")?;
+    test_grid_size::<7, 4>(&message, "7x4 (18)")?;
     test_grid_size::<8, 8>(&message, "8x8 (64)")?;
-    test_grid_size::<11, 7>(&message, "11x7 (77)")?;
-    test_grid_size::<16, 4>(&message, "16x4 (64)")?;
-    test_grid_size::<13, 5>(&message, "13x5 (65)")?;
-    test_grid_size::<10, 10>(&message, "10x10 (100)")?;
+    test_grid_size::<15, 8>(&message, "15x8 (120)")?;
+    test_grid_size::<16, 16>(&message, "16x16 (256)")?;
+    test_grid_size::<31, 16>(&message, "31x16 (496)")?;
 
     println!("└─────────────┴────────┴──────────────┴──────────────┘");
 

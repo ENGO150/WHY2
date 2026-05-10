@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     println!("\n--- Large Dataset Example ---");
 
     let large_data: Vec<i64> = (0..1000).map(|i| i * 13 + 7).collect();
-    let encrypted_large = encrypter::encrypt::<11, 7>(&large_data, None)?;
+    let encrypted_large = encrypter::encrypt::<16, 16>(&large_data, None)?;
 
     println!("Encrypted {} values into {} grids (11x7)", large_data.len(), encrypted_large.output.len());
 
