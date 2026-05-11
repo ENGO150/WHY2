@@ -740,19 +740,32 @@ impl<const W: usize, const H: usize> Grid<W, H>
             //ROTATE THE ROW
             #[cfg(feature = "constant-time")]
             {
-                let mut new_row = [0i64; W]; //BUFFER
+                let shift = shifts[i];
+                let mut tmp = *row;
+                let mut stride = 1usize;
+                let mut bit = 0usize;
 
-                for s in 0..W
+                //BARREL-SHIFTER
+                while stride < W
                 {
-                    let is_match: Choice = (s as u64).ct_eq(&(shifts[i] as u64));
-                    for dst in 0..W
+                    let do_rotate = Choice::from(((shift >> bit) & 1) as u8);
+                    let mut rotated = [0i64; W];
+
+                    for j in 0..W
                     {
-                        new_row[dst].conditional_assign(&row[(dst + s) % W], is_match);
+                        rotated[j] = tmp[(j + stride) % W];
                     }
+
+                    for j in 0..W
+                    {
+                        tmp[j].conditional_assign(&rotated[j], do_rotate);
+                    }
+
+                    bit += 1;
+                    stride <<= 1;
                 }
 
-                //WRITE RESULT
-                *row = new_row;
+                *row = tmp;
             }
 
             #[cfg(not(feature = "constant-time"))]
