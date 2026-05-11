@@ -26,12 +26,13 @@ use sha2::{ Sha256, Digest };
 use rand_chacha::
 {
     ChaCha20Rng,
-    rand_core::{ SeedableRng, Rng },
+    rand_core::SeedableRng,
 };
 
 use rand::
 {
     TryRng,
+    RngExt,
     rngs::SysRng,
 };
 
@@ -100,7 +101,11 @@ pub fn sha256_seed_grid<const W: usize, const H: usize>(key: &Grid<W, H>) -> [u8
 /// - The output is deterministic for a given RNG seed.
 pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaCha20Rng) -> Zeroizing<Vec<i64>>
 {
-    Zeroizing::new((0..(2 * W * H)).map(|_| rng.next_u64() as i64).collect())
+    //FILL WITH RANDOM BYTES
+    let mut key = vec![0i64; 2 * W * H];
+    rng.fill(&mut key[..]);
+
+    Zeroizing::new(key)
 }
 
 /// Generates a symmetric WHY2 key using secure system entropy.
