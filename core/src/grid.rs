@@ -250,6 +250,7 @@ fn gf_mul2(a0: u64, b0: u64, a1: u64, b1: u64) -> (u64, u64)
     };
 
     //SW FALLBACK
+    #[cfg(not(target_arch = "aarch64"))]
     (gf_mul_soft(a0, b0), gf_mul_soft(a1, b1))
 }
 
@@ -306,6 +307,7 @@ fn gf_mul_const2(a0: u64, a1: u64, coeff: u64) -> (u64, u64)
         (gf_reduce(lo0, hi0), gf_reduce(lo1, hi1))
     };
 
+    #[cfg(not(target_arch = "aarch64"))]
     (gf_mul_soft(a0, coeff), gf_mul_soft(a1, coeff))
 }
 
