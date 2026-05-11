@@ -254,6 +254,62 @@ fn gf_mul2(a0: u64, b0: u64, a1: u64, b1: u64) -> (u64, u64)
 }
 
 #[inline(always)]
+fn gf_mul_const2(a0: u64, a1: u64, coeff: u64) -> (u64, u64)
+{
+    #[cfg(target_arch = "x86_64")]
+    if is_x86_feature_detected!("pclmulqdq")
+    {
+        return unsafe
+        {
+            use std::arch::x86_64::*;
+
+            let a_vec = _mm_set_epi64x(a1 as i64, a0 as i64);
+            let b_vec = _mm_set1_epi64x(coeff as i64); //BROADCAST
+
+            let lo_vec = _mm_clmulepi64_si128(a_vec, b_vec, 0x00); // a0 * coeff
+            let hi_vec = _mm_clmulepi64_si128(a_vec, b_vec, 0x11); // a1 * coeff
+
+            let lo0 = _mm_extract_epi64(lo_vec, 0) as u64;
+            let hi0 = _mm_extract_epi64(lo_vec, 1) as u64;
+            let lo1 = _mm_extract_epi64(hi_vec, 0) as u64;
+            let hi1 = _mm_extract_epi64(hi_vec, 1) as u64;
+
+            (gf_reduce(lo0, hi0), gf_reduce(lo1, hi1))
+        };
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    return unsafe
+    {
+        use std::arch::aarch64::*;
+
+        let a_vec = vcombine_u64(vcreate_u64(a0), vcreate_u64(a1));
+        let b_vec = vdupq_n_u64(coeff); //BROADCAST
+
+        let lo_vec = vmull_p64
+        (
+            vgetq_lane_u64(a_vec, 0),
+            vgetq_lane_u64(b_vec, 0)
+        );
+
+        let hi_vec = vmull_high_p64
+        (
+            vreinterpretq_p64_u64(a_vec),
+            vreinterpretq_p64_u64(b_vec)
+        );
+
+        let lo0 = vgetq_lane_u64(vreinterpretq_u64_p128(lo_vec), 0);
+        let hi0 = vgetq_lane_u64(vreinterpretq_u64_p128(lo_vec), 1);
+        let lo1 = vgetq_lane_u64(vreinterpretq_u64_p128(hi_vec), 0);
+        let hi1 = vgetq_lane_u64(vreinterpretq_u64_p128(hi_vec), 1);
+
+        (gf_reduce(lo0, hi0), gf_reduce(lo1, hi1))
+    };
+
+    (gf_mul_soft(a0, coeff), gf_mul_soft(a1, coeff))
+}
+
+#[inline(always)]
 fn gf_mul_soft(a: u64, b: u64) -> u64
 {
     let mut result: u64 = 0;
@@ -752,71 +808,63 @@ impl<const W: usize, const H: usize> Grid<W, H>
     #[inline(always)]
     pub fn mix_columns(&mut self)
     {
-        let mut col_in = [0u64; H];
-        let mut col_out = [0u64; H];
+        let mut out = [[0u64; W]; H];
 
-        for col in 0..W
+        for k in 0..H
         {
-            //LOAD COLUMN AS u64
             for r in 0..H
             {
-                col_in[r] = self[r][col] as u64;
-            }
-
-            for row in 0..H
-            {
-                let mut acc = 0u64;
-                let mut k = 0;
-
-                while k + 1 < H
+                //PICK CORRECT MATRIX (AND ITS COEFFICIENT)
+                let coeff = match H
                 {
-                    let coeff0 = match H
-                    {
-                        4 => mds::MDS_4[row][k],
-                        8 => mds::MDS_8[row][k],
-                        16 => mds::MDS_16[row][k],
-                        _ => unreachable!("tf")
-                    };
+                    4  => mds::MDS_4[r][k],
+                    8  => mds::MDS_8[r][k],
+                    16 => mds::MDS_16[r][k],
+                    _  => unreachable!("tf")
+                };
 
-                    let coeff1 = match H
-                    {
-                        4 => mds::MDS_4[row][k + 1],
-                        8 => mds::MDS_8[row][k + 1],
-                        16 => mds::MDS_16[row][k + 1],
-                        _ => unreachable!("tf")
-                    };
+                let acc = &mut out[r];
+                let src = &self.0[k]; // ROW-MAJOR READ, SEQUENTIAL
+                let mut c = 0usize;
 
-                    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-                    let (r0, r1) = gf_mul2(col_in[k], coeff0, col_in[k+1], coeff1);
+                //PROCESS 4 COLUMNS AT ONCE
+                while c + 3 < W
+                {
+                    let (p0, p1) = gf_mul_const2(src[c] as u64, src[c + 1] as u64, coeff);
+                    let (p2, p3) = gf_mul_const2(src[c + 2] as u64, src[c + 3] as u64, coeff);
 
-                    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-                    let (r0, r1) = (gf_mul(col_in[k], coeff0), gf_mul(col_in[k+1], coeff1));
+                    acc[c]     ^= p0;
+                    acc[c + 1] ^= p1;
+                    acc[c + 2] ^= p2;
+                    acc[c + 3] ^= p3;
 
-                    acc ^= r0 ^ r1;
-                    k += 2;
+                    c += 4;
                 }
 
-                //FALLBACK FOR ODD REMAINDER
-                if k < H
+                while c + 1 < W
                 {
-                    let coeff = match H
-                    {
-                        4 => mds::MDS_4[row][k],
-                        8 => mds::MDS_8[row][k],
-                        16 => mds::MDS_16[row][k],
-                        _ => unreachable!("tf")
-                    };
+                    let (p0, p1) = gf_mul_const2(src[c] as u64, src[c + 1] as u64, coeff);
 
-                    acc ^= gf_mul(col_in[k], coeff);
+                    acc[c]     ^= p0;
+                    acc[c + 1] ^= p1;
+
+                    c += 2;
                 }
 
-                col_out[row] = acc;
+                //REMAINDER
+                if c < W
+                {
+                    acc[c] ^= gf_mul(src[c] as u64, coeff);
+                }
             }
+        }
 
-            //SAVE RESULT
-            for r in 0..H
+        //SAVE RESULT
+        for r in 0..H
+        {
+            for c in 0..W
             {
-                self[r][col] = col_out[r] as i64;
+                self[r][c] = out[r][c] as i64;
             }
         }
     }
