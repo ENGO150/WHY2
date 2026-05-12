@@ -386,6 +386,12 @@ pub fn draw_event(event: ClientEvent)
             }
         },
 
+        ClientEvent::UploadLimit =>
+        {
+            clear_lines(2);
+            println!("Maximum concurrent uploads reached!\n");
+        },
+
         ClientEvent::IncompatibleVersion(version, server_version) =>
         {
             clear_lines(1);

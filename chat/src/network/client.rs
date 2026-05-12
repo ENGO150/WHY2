@@ -100,6 +100,7 @@ pub enum ClientEvent
     Downloaded(String),                        //DOWNLOADED FILE
     DownloadFailed(String),                    //DOWNLOADING FAILED
     Files(Vec<Value>),                         //FILE LIST
+    UploadLimit,                               //MAX CONCURRENT UPLOADS REACHED
     ExtraSpace,                                //JUST RANDOM NEWLINE
     IncompatibleVersion(String, String),       //INCOMPATIBLE SERVER VERSION
     UsernameRejected,                          //USERNAME REJECTED BY SERVER
@@ -575,6 +576,12 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     }
 
                     tx.send(ClientEvent::Files(uploads_json)).unwrap();
+                },
+
+                //MAX PARALLEL UPLOADS
+                MessageCode::UploadLimit =>
+                {
+                    tx.send(ClientEvent::UploadLimit).unwrap();
                 },
 
                 //PRIVATE MESSAGE INCOMING
