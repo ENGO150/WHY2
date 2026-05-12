@@ -311,6 +311,7 @@ fn gf_mul_const2(a0: u64, a1: u64, coeff: u64) -> (u64, u64)
     (gf_mul_soft(a0, coeff), gf_mul_soft(a1, coeff))
 }
 
+#[cfg(not(target_arch = "aarch64"))]
 #[inline(always)]
 fn gf_mul_soft(a: u64, b: u64) -> u64
 {
