@@ -86,29 +86,29 @@ fn encrypt_decrypt() -> Result<(), Box<dyn Error>>
     let text = TEST_TEXT_LARGE.to_owned();
 
     println!("=== Grid Size Comparison ({} chars) ===\n", text.len());
-    println!("┌───────────┬────────┬───────────┐");
-    println!("│ Grid      │ Grids  │ Time      │");
-    println!("├───────────┼────────┼───────────┤");
+    println!("┌─────────────┬───────┬──────────┐");
+    println!("│ Grid        │ Grids │ Time     │");
+    println!("├─────────────┼───────┼──────────┤");
+
+    //4x4 GRID (16 CELLS)
+    let start = Instant::now();
+    let enc_4x4 = encrypter::encrypt_string::<4, 4>(&text, None)?;
+    let time_4x4 = start.elapsed();
+    println!("│ 4x4   (16)  │{:6} │{:7.2}ms │", enc_4x4.output.len(), time_4x4.as_secs_f64() * 1000.0);
 
     //8x8 GRIDS (64 CELLS)
     let start = Instant::now();
     let enc_8x8 = encrypter::encrypt_string::<8, 8>(&text, None)?;
     let time_8x8 = start.elapsed();
-    println!("│ 8x8  (64) │ {:6} │ {:7.2}ms │", enc_8x8.output.len(), time_8x8.as_secs_f64() * 1000.0);
+    println!("│ 8x8   (64)  │{:6} │{:7.2}ms │", enc_8x8.output.len(), time_8x8.as_secs_f64() * 1000.0);
 
-    //5x16 GRIDS (80 CELLS)
+    //16x16 GRIDS (256 CELLS)
     let start = Instant::now();
-    let enc_11x7 = encrypter::encrypt_string::<5, 16>(&text, None)?;
-    let time_11x7 = start.elapsed();
-    println!("│ 5x16 (80) │ {:6} │ {:7.2}ms │", enc_11x7.output.len(), time_11x7.as_secs_f64() * 1000.0);
+    let enc_16x16 = encrypter::encrypt_string::<16, 16>(&text, None)?;
+    let time_16x16 = start.elapsed();
+    println!("│ 16x16 (256) │{:6} │{:7.2}ms │", enc_16x16.output.len(), time_16x16.as_secs_f64() * 1000.0);
 
-    //16x4 GRIDS (64 CELLS)
-    let start = Instant::now();
-    let enc_16x4 = encrypter::encrypt_string::<16, 4>(&text, None)?;
-    let time_16x4 = start.elapsed();
-    println!("│ 16x4 (64) │ {:6} │ {:7.2}ms │", enc_16x4.output.len(), time_16x4.as_secs_f64() * 1000.0);
-
-    println!("└───────────┴────────┴───────────┘\n");
+    println!("└─────────────┴───────┴──────────┘\n");
 
     Ok(())
 }
