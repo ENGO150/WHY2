@@ -95,6 +95,7 @@ pub enum MessageCode //CONTROL CODES
     Download,           //CLIENT <> SERVER | DOWNLOAD FILE FROM SERVER
     Uploaded,           //SERVER -> CLIENT | ANNOUNCE NEW UPLOADED FILE
     Files,              //CLIENT <> SERVER | LIST UPLOADED FILES
+    UploadLimit,        //SERVER -> CLIENT | MAX CONCURRENT UPLOADS REACHED
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
     InvalidFeature,     //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE
     KeepAlive,          //SERVER <> CLIENT | A BIT LESS STUPID KEEP-ALIVE

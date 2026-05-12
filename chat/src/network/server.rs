@@ -1151,7 +1151,15 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
                             }
                         } else //NEW UPLOAD, VERIFY SIZE
                         {
-                            if let Some(size) = file.size &&
+                            //CHECK FOR CONCURRENT UPLOADS
+                            if network::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count() >=
+                                config::read_config("max_client_parallel_uploads")
+                            {
+                                valid = true; //SKIP FILE UPLOAD
+                                send_code(&mut streams.1.lock().unwrap(), None, MessageCode::UploadLimit, Some(&keys));
+                            }
+
+                            if !valid && let Some(size) = file.size &&
                                 let Some(hash) = file.hash &&
                                 let Some(filename) = file.filename &&
                                 size / 1_048_576 <= config::read_config::<u64>("max_upload_size")
