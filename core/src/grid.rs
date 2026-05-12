@@ -909,7 +909,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - When the **`constant-time`** feature is enabled, this function always iterates
     ///   through the entire grid to prevent timing leaks via carry propagation analysis.
     #[inline(always)]
-    pub fn increment(&mut self, amount: &mut u64)
+    pub fn increment(&mut self, amount: u64)
     {
         //FLATTEN
         let data: &mut [i64] = unsafe
@@ -917,7 +917,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
             slice::from_raw_parts_mut(self.0.as_mut_ptr() as *mut i64, W * H)
         };
 
-        let mut carry = *amount;
+        let mut carry = amount;
         for cell in data.iter_mut()
         {
             let (result, overflow) = (*cell as u64).overflowing_add(carry);
@@ -934,11 +934,6 @@ impl<const W: usize, const H: usize> Grid<W, H>
             {
                 carry = overflow as u64;
             }
-        }
-
-        #[cfg(feature = "constant-time")]
-        {
-            *amount = carry;
         }
     }
 }

@@ -242,7 +242,7 @@ pub fn apply_ctr<const W: usize, const H: usize>
         let mut keystream_block = nonce.clone();
 
         //BLOCK INDEX
-        keystream_block.increment(&mut (i as u64));
+        keystream_block.increment(i as u64);
 
         //INITIAL XOR
         keystream_block ^= &round_keys[0];
