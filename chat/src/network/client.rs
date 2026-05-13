@@ -89,6 +89,7 @@ pub enum ClientEvent
     Clear(usize),                              //CLEAR n LINES
     InvalidUsage,                              //INVALID COMMAND USAGE
     VersionFailed,                             //FETCHING VERSIONS FAILED
+    VersionMismatch(String, String),           //MISMATCH GIT HASH
     UnsafeVersion(usize, Version, String),     //OLD VERSION
     Username(bool, u64, u64),                  //USERNAME PROMPT
     VoiceEnabled,                              //VOICE CHAT ENABLED
