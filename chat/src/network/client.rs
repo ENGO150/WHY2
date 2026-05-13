@@ -295,6 +295,15 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     min_uname = Some(welcome_json["min_uname"].as_u64().expect("Invalid welcome json"));
                     options::set_server_username(welcome_json["server_uname"].as_str().expect("Invalid welcome json"));
 
+                    //COMPARSE HASHES
+                    let client_hash = env!("WHY2_GIT_HASH");
+                    let server_hash = welcome_json["git_hash"].as_str().expect("Invalid welcome json");
+                    if !client_hash.is_empty() && !server_hash.is_empty() && client_hash != server_hash
+                    {
+                        //DISPLAY VERSION MISMATCH
+                        tx.send(ClientEvent::VersionMismatch(client_hash.to_string(), server_hash.to_string())).unwrap();
+                    }
+
                     tx.send(ClientEvent::Connected(welcome_json["server_name"].as_str().expect("Invalid welcome json").to_string())).unwrap();
                 },
 
