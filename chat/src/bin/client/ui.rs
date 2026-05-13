@@ -388,7 +388,7 @@ pub fn draw_event(event: ClientEvent)
 
         ClientEvent::UploadLimit =>
         {
-            clear_lines(2);
+            clear_lines(1);
             println!("Maximum concurrent uploads reached!\n");
         },
 
