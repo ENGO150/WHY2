@@ -422,6 +422,7 @@ fn send_welcome_packet(write_stream: &mut TcpStream, keys: &SharedKeys) //send w
         "min_uname": config::read_config::<usize>("min_username_length"),
         "server_name": config::read_config::<String>("server_name"),
         "server_uname": options::get_server_username(),
+        "git_hash": env!("WHY2_GIT_HASH"),
     }).to_string();
 
     //SEND
