@@ -398,6 +398,12 @@ pub fn draw_event(event: ClientEvent)
             println!("Incompatible version! ({version}/{server_version})");
         },
 
+        ClientEvent::VersionMismatch(client_version, server_version) =>
+        {
+            clear_lines(1);
+            println!("Version mismatch - some features may not work ({client_version}/{server_version})\r");
+        },
+
         ClientEvent::UsernameRejected =>
         {
             clear_lines(2);
