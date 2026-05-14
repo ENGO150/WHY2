@@ -22,6 +22,7 @@ use std::
 {
     thread,
     process,
+    io::Read,
     time::Duration,
     sync::{ Arc, Mutex },
     net::
@@ -44,6 +45,7 @@ use why2_chat::
     network::
     {
         server,
+        ConnectionType,
         voice::server as voice_server,
     },
 };
@@ -148,32 +150,55 @@ fn main()
                     Err(_) => continue
                 };
 
-                //COUNT SLOTS
-                let auth_clients = server::CONNECTIONS.iter().filter(|c| c.is_authenticated()).count();
-                let unauth_clients = server::CONNECTIONS.len() - auth_clients;
+                //SET TIMEOUT
+                stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout"); //SET TIMEOUT
 
-                //COUNT CONNECTIONS FROM SAME IP
-                let ip_clients = server::CONNECTIONS.iter().filter(|c| c.peer_addr().ip() == peer_addr.ip()).count();
-
-                //CHECK FOR MAXIMAL CONNECTIONS
-                if auth_clients >= config::read_config::<usize>("max_clients") ||
-                    unauth_clients >= config::read_config::<usize>("max_unauth_clients") ||
-                    ip_clients >= config::read_config::<usize>("max_ip_clients")
+                //READ CONNECTION TYPE
+                let mut opcode = [0u8; 1];
+                if let Ok(_) = stream.read_exact(&mut opcode)
                 {
-                    log::error!("Connection rejected (limit): {peer_addr}");
-                    stream.shutdown(Shutdown::Both).ok();
-                    continue;
+                    //REMOVE TIMEOUT
+                    stream.set_read_timeout(None).expect("Failed to set read timeout");
+
+                    //SET TCP_NODELAY
+                    match stream.set_nodelay(true)
+                    {
+                        Ok(_) => {},
+                        Err(_) => continue
+                    }
+
+                    match ConnectionType::try_from(opcode[0])
+                    {
+                        Ok(ConnectionType::Chat) =>
+                        {
+                            //COUNT SLOTS
+                            let auth_clients = server::CONNECTIONS.iter().filter(|c| c.is_authenticated()).count();
+                            let unauth_clients = server::CONNECTIONS.len() - auth_clients;
+
+                            //COUNT CONNECTIONS FROM SAME IP
+                            let ip_clients = server::CONNECTIONS.iter().filter(|c| c.peer_addr().ip() == peer_addr.ip()).count();
+
+                            //CHECK FOR MAXIMAL CONNECTIONS
+                            if auth_clients >= config::read_config::<usize>("max_clients") ||
+                                unauth_clients >= config::read_config::<usize>("max_unauth_clients") ||
+                                ip_clients >= config::read_config::<usize>("max_ip_clients")
+                            {
+                                log::error!("Connection rejected (limit): {peer_addr}");
+                                stream.shutdown(Shutdown::Both).ok();
+                                continue;
+                            }
+
+                            let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
+                            thread::spawn(move || server::listen_client(&mut (&mut stream, write_stream)));
+                            continue;
+                        },
+
+                        _ => {} //INVALID OPCODE
+                    }
                 }
 
-                //SET TCP_NODELAY
-                match stream.set_nodelay(true)
-                {
-                    Ok(_) => {},
-                    Err(_) => continue
-                }
-
-                let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-                thread::spawn(move || server::listen_client(&mut (&mut stream, write_stream)));
+                log::error!("Connection rejected (opcode): {peer_addr}");
+                stream.shutdown(Shutdown::Both).ok();
             },
 
             Err(e) =>
