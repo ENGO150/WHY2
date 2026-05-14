@@ -53,6 +53,7 @@ use crate::
     network::
     {
         self,
+        ConnectionType,
         MessageCode,
         MessagePacket,
         ActiveFileshare,
@@ -201,6 +202,9 @@ fn key_exchange
 //PUBLIC
 pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
+    //SEND CONNECTION TYPE
+    streams.1.lock().unwrap().write_all(&[ConnectionType::Chat as u8]).unwrap();
+
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
     if !key_exchange(streams, &mut keys, &tx) { return; }
