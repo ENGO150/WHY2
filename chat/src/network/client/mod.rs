@@ -251,7 +251,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
         };
 
         //CHECK FOR MUTED CLIENT
-        if options::is_muted(read.id) { continue; }
+        if read.id.is_some() && options::is_muted(read.id) { continue; }
 
         //KEEPALIVE
         if read.code == Some(MessageCode::KeepAlive)
