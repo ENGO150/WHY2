@@ -66,7 +66,12 @@ use std::time::{ Instant, Duration };
 #[cfg(feature = "server")]
 use crate::config;
 
-//STRUCTS
+//ENUMS
+pub enum ConnectionType
+{
+    Chat = 0x01,
+}
+
 #[derive(SchemaWrite, SchemaRead, PartialEq, Clone)]
 pub enum MessageCode //CONTROL CODES
 {
@@ -101,6 +106,7 @@ pub enum MessageCode //CONTROL CODES
     KeepAlive,          //SERVER <> CLIENT | A BIT LESS STUPID KEEP-ALIVE
 }
 
+//STRUCTS
 #[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct MessageColors //COLORS OF MESSAGE
 {
@@ -145,6 +151,19 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
 pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new()); //LIST FOR ACTIVE FILE UPLOADS
 
 //IMPLEMENTATIONS
+impl TryFrom<u8> for ConnectionType
+{
+    type Error = &'static str;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error>
+    {
+        match value {
+            0x01 => Ok(ConnectionType::Chat),
+            _ => Err("Unknown ConnectionType"),
+        }
+    }
+}
+
 impl Default for MessagePacket //DEFAULT
 {
     fn default() -> Self
