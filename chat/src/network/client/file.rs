@@ -35,7 +35,7 @@ use crate::
     },
 };
 
-pub fn listen_server(payload: FilePayload, tx: Sender<ClientEvent>)
+pub fn upload(payload: FilePayload, tx: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
     let mut stream = client::connect(options::get_server_address()).expect("File connection failed");

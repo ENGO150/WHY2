@@ -511,7 +511,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 {
                     //SPAWN UPLOAD THREAD
                     let file_tx = tx.clone(); //CLONE TX
-                    thread::spawn(move || file::listen_server(read.file.unwrap(), file_tx));
+                    thread::spawn(move || file::upload(read.file.unwrap(), file_tx));
                 },
 
                 //DOWNLOAD
