@@ -21,7 +21,7 @@ use std::
     fs,
     env,
     time::Duration,
-    path::{ Path, PathBuf },
+    path::Path,
 };
 
 use ureq::{ Error, Agent };
@@ -37,6 +37,9 @@ use std::sync::mpsc::Sender;
 
 #[cfg(feature = "client")]
 use crate::network::client::ClientEvent;
+
+#[cfg(feature = "server")]
+use std::path::PathBuf;
 
 //PRIVATE
 fn get_dir(dir: &str) -> String

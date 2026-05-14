@@ -48,24 +48,33 @@ pub fn download(id: usize, streams: &mut Streams)
         Err(_) => return
     };
 
-    //GET CONNECTION
-    let conn = match server::CONNECTIONS.get(&peer_addr)
+    //GET CLIENT INFO
+    let (keys, username) =
     {
-        Some(c) => c,
-        None => return
-    };
+        //FIND CONNECTION BY ID
+        let conn = server::CONNECTIONS.iter()
+            .find(|e| e.value().id() == Some(&id));
 
-    //GET INFO
-    let keys = match conn.keys()
-    {
-        Some(k) => k,
-        None => return
-    };
+        match conn
+        {
+            Some(c) =>
+            {
+                let keys = match c.keys()
+                {
+                    Some(k) => k.clone(),
+                    None => return
+                };
 
-    let username = match conn.username()
-    {
-        Some(u) => u,
-        None => return
+                let username = match c.username()
+                {
+                    Some(u) => u.clone(),
+                    None => return
+                };
+
+                (keys, username)
+            },
+            None => return
+        }
     };
 
     //LOOP READING
@@ -88,7 +97,19 @@ pub fn download(id: usize, streams: &mut Streams)
                 {
                     //UPDATE SIZE
                     active.current_size += chunk_data.len() as u64;
-                    //if active.current_size <= active.size { valid = true; }
+
+                    if active.current_size > active.size
+                    {
+                        //REMOVE JUNK FILE
+                        let temp_dir = misc::get_upload_dir(&username);
+                        let _ = fs::remove_file(temp_dir.join(file.uid.to_string()));
+
+                        drop(active);
+                        network::ACTIVE_FILESHARES.remove(&file.uid);
+
+                        log::error!("Upload overflow: {peer_addr}");
+                        return; //DISCONNECT FILE CHANNEL
+                    }
 
                     //UPDATE HASHER
                     active.hasher.update(&chunk_data);
