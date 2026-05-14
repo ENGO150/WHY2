@@ -236,7 +236,8 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
         {
             #[cfg(feature = "server")]
             {
-                server::CONNECTIONS.get(&stream.peer_addr().unwrap())
+                stream.peer_addr().ok()
+                    .and_then(|addr| server::CONNECTIONS.get(&addr))
                     .and_then(|c| c.obfuscation_key().cloned())
                     .unwrap_or_else(|| [0u8; 32])
             }
