@@ -35,6 +35,12 @@ use std::
     },
 };
 
+use rand::
+{
+    TryRng,
+    rngs::SysRng,
+};
+
 use sha2::{ Sha256, Digest };
 
 use zeroize::Zeroizing;
@@ -53,7 +59,6 @@ use crate::
     network::
     {
         self,
-        ConnectionType,
         MessageCode,
         MessagePacket,
         ActiveFileshare,
@@ -202,8 +207,10 @@ fn key_exchange
 //PUBLIC
 pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
-    //SEND CONNECTION TYPE
-    streams.1.lock().unwrap().write_all(&[ConnectionType::Chat as u8]).unwrap();
+    //SEND HEADER
+    let mut header = [0u8; 32];
+    SysRng.try_fill_bytes(&mut header).unwrap(); //GENERATE RANDOM HEADER
+    streams.1.lock().unwrap().write_all(&header).unwrap();
 
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));

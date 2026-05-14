@@ -66,6 +66,7 @@ use crate::
     network::
     {
         self,
+        ConnectionType,
         MessageCode,
         MessagePacket,
         FilePayload,
@@ -330,6 +331,7 @@ impl Connection
 }
 
 //LISTS
+pub static PENDING_HEADERS: LazyLock<DashMap<[u8; 32], (usize, ConnectionType)>> = LazyLock::new(|| DashMap::new());
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
 static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 

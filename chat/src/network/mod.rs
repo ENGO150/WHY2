@@ -67,9 +67,9 @@ use std::time::{ Instant, Duration };
 use crate::config;
 
 //ENUMS
-pub enum ConnectionType
+pub enum ConnectionType //TYPES OF TCP CHANNEL
 {
-    Chat = 0x01,
+    File,
 }
 
 #[derive(SchemaWrite, SchemaRead, PartialEq, Clone)]
@@ -151,19 +151,6 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
 pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new()); //LIST FOR ACTIVE FILE UPLOADS
 
 //IMPLEMENTATIONS
-impl TryFrom<u8> for ConnectionType
-{
-    type Error = &'static str;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error>
-    {
-        match value {
-            0x01 => Ok(ConnectionType::Chat),
-            _ => Err("Unknown ConnectionType"),
-        }
-    }
-}
-
 impl Default for MessagePacket //DEFAULT
 {
     fn default() -> Self
