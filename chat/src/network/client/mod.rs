@@ -22,7 +22,8 @@ pub mod file;
 use std::
 {
     thread,
-    io::Write,
+    net::TcpStream,
+    io::{ Error, Write },
     collections::HashMap,
     fs::{ self, File },
     path::{ Path, PathBuf },
@@ -40,6 +41,8 @@ use rand::
     TryRng,
     rngs::SysRng,
 };
+
+use socks::Socks5Stream;
 
 use sha2::{ Sha256, Digest };
 
@@ -205,6 +208,23 @@ fn key_exchange
 }
 
 //PUBLIC
+pub fn connect(connecting_addr: String) -> Result<TcpStream, Error> //CONNECT TO SERVER
+{
+    if !options::socks5_enabled() //NO SOCKS5
+    {
+        TcpStream::connect(connecting_addr)
+    } else //USE PROXY
+    {
+        Socks5Stream::connect(config::read_config::<String>("socks5_addr"), connecting_addr.as_str())
+            .map(|s| s.into_inner())
+    }.and_then(|s|
+    {
+        //SET TCP_NODELAY
+        s.set_nodelay(true)?;
+        Ok(s)
+    })
+}
+
 pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
     //SEND HEADER

@@ -29,7 +29,6 @@ use std::
     process,
     fs::File,
     path::Path,
-    net::TcpStream,
     io::
     {
         self,
@@ -46,8 +45,6 @@ use std::
 };
 
 use sha2::{ Sha256, Digest };
-
-use socks::Socks5Stream;
 
 use crossterm::
 {
@@ -529,14 +526,7 @@ fn main()
     }
 
     //CONNECT TO SERVER
-    let mut stream = match if !options::socks5_enabled() //NO SOCKS5
-    {
-        TcpStream::connect(connecting_addr)
-    } else //USE PROXY
-    {
-        Socks5Stream::connect(config::read_config::<String>("socks5_addr"), connecting_addr.as_str())
-            .map(|s| s.into_inner())
-    }
+    let mut stream = match client::connect(connecting_addr)
     {
         Ok(s) => s,
         Err(e) =>
@@ -545,9 +535,6 @@ fn main()
             process::exit(1);
         }
     };
-
-    //SET TCP_NODELAY
-    stream.set_nodelay(true).expect("Failed to set TCP_NODELAY");
 
     //CREATE STREAM LOCK
     let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
