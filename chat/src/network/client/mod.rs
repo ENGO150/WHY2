@@ -509,23 +509,9 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //UPLOAD APPROVAL
                 MessageCode::Upload =>
                 {
-                    //UPLOAD CONSTANTS
-                    let payload = read.file.unwrap();
-                    let file_hash = payload.hash.unwrap();
-
-                    //GET FILE PATH
-                    let path = ACTIVE_UPLOADS.lock().unwrap().remove(&file_hash).unwrap(); //(CRASHES IF SERVER REQUESTS FILE THAT ISN'T FOR UPLOAD)
-                    let filename = path.clone().file_name().and_then(|n| n.to_str()
-                        .map(|s| s.to_string())).unwrap_or(String::from("Unknown")); //GET FILENAME FOR CONSOLE LOG
-
-                    //CLONE SERVER STREAM FOR UPLOAD THREAD
-                    let upload_stream = streams.1.clone();
-
                     //SPAWN UPLOAD THREAD
-                    thread::spawn(move || network::send_file(path, upload_stream,
-                        payload.uid, MessageCode::Upload, options::get_keys().as_ref()));
-
-                    tx.send(ClientEvent::Upload(filename)).unwrap();
+                    let file_tx = tx.clone(); //CLONE TX
+                    thread::spawn(move || file::listen_server(read.file.unwrap(), file_tx));
                 },
 
                 //DOWNLOAD

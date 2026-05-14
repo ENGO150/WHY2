@@ -30,13 +30,8 @@ use std::
     fs::File,
     path::PathBuf,
     net::TcpStream,
+    sync::LazyLock,
     io::{ Read, Write },
-    sync::
-    {
-        Arc,
-        Mutex,
-        LazyLock,
-    },
 };
 
 use wincode::{ SchemaWrite, SchemaRead };
@@ -460,7 +455,7 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
 pub fn send_file //CHUNK FILE AND SEND TO STREAM
 (
     path: PathBuf,
-    write_stream: Arc<Mutex<TcpStream>>,
+    mut stream: TcpStream,
     uid: u64,
     code: MessageCode,
     keys: Option<&chat_consts::SharedKeys>
@@ -478,7 +473,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
             Ok(bytes) =>
             {
                 //SEND FILE CHUNK
-                send(&mut write_stream.lock().unwrap(), MessagePacket
+                send(&mut stream, MessagePacket
                 {
                     code: Some(code.clone()),
                     file: Some(FilePayload
