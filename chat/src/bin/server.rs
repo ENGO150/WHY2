@@ -167,10 +167,9 @@ fn main()
                         Err(_) => continue
                     }
 
-
-                    if let Some(header) = server::PENDING_HEADERS.get(&header)
+                    if let Some((_, (_id, conn_type))) = server::PENDING_HEADERS.remove(&header)
                     {
-                        match header.1
+                        match conn_type
                         {
                             ConnectionType::File => {},
                         }
