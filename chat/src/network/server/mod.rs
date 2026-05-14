@@ -742,9 +742,8 @@ pub fn send_code //SEND CODE TO CLIENT
     }, keys);
 }
 
-pub fn listen_client(streams: &mut Streams, obfuscation_key: [u8; 32]) //CLIENT -> SERVER COMMUNICATION
+pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_key: [u8; 32]) //CLIENT -> SERVER COMMUNICATION
 {
-    let peer_addr = streams.0.peer_addr().unwrap();
     log::info!("New connection: {peer_addr}");
 
     //PUSH NEW CONNECTION
