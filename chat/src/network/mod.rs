@@ -117,6 +117,7 @@ pub struct MessageColors //COLORS OF MESSAGE
 #[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct FilePayload //FILE CHUNK
 {
+    pub token: Option<[u8; 32]>,  //UPLOAD CHANNEL TOKEN
     pub uid: u64,                 //UPLOAD UID
     pub data: Option<Vec<u8>>,    //BINARY DATA
     pub size: Option<u64>,        //FILE SIZE
@@ -178,6 +179,7 @@ impl Default for FilePayload
     {
         Self
         {
+            token: None,
             uid: 0,
             data: None,
             size: None,

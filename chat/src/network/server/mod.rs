@@ -43,6 +43,12 @@ use std::
     },
 };
 
+use rand::
+{
+    TryRng,
+    rngs::SysRng,
+};
+
 use sha2::{ Sha256, Digest };
 
 use zeroize::Zeroizing;
@@ -1185,6 +1191,10 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                                 //GENERATE RANDOM UID
                                 let uid = rand::random::<u64>();
 
+                                //GENERATE RANDOM TOKEN
+                                let mut token = [0u8; 32];
+                                SysRng.try_fill_bytes(&mut token).unwrap();
+
                                 //CREATE TEMP UPLOAD DIRECTORY
                                 let temp_dir = get_upload_dir(&username);
                                 fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
@@ -1210,6 +1220,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                                     code: Some(MessageCode::Upload),
                                     file: Some(FilePayload
                                     {
+                                        token: Some(token),
                                         uid,
                                         hash: Some(hash),
                                         ..Default::default()
