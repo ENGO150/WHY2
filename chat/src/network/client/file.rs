@@ -19,7 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     io::Write,
-    thread,
     sync::mpsc::Sender,
 };
 
@@ -51,9 +50,9 @@ pub fn upload(payload: FilePayload, tx: Sender<ClientEvent>)
     let filename = path.clone().file_name().and_then(|n| n.to_str()
         .map(|s| s.to_string())).unwrap_or(String::from("Unknown")); //GET FILENAME FOR CONSOLE LOG
 
-    //SPAWN UPLOAD THREAD
-    thread::spawn(move || network::send_file(path, stream,
-        payload.uid, MessageCode::Upload, options::get_keys().as_ref()));
-
+    //LOG
     tx.send(ClientEvent::Upload(filename)).unwrap();
+
+    //UPLOAD
+    network::send_file(path, stream, payload.uid, MessageCode::Upload, options::get_keys().as_ref());
 }
