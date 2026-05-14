@@ -189,12 +189,12 @@ impl Default for FilePayload
 
 //FUNCTIONS
 //PRIVATE
-fn obfuscate_data(mut data: Vec<u8>) -> Vec<u8> //XOR BYTES (USED FOR OBFUSCATION)
+fn obfuscate_data(mut data: Vec<u8>, obfuscation_key: [u8; 32]) -> Vec<u8> //XOR BYTES (USED FOR OBFUSCATION)
 {
     for (i, byte) in data.iter_mut().enumerate()
     {
         //XOR EACH BYTE WITH OBFUSCATION KEY
-        *byte ^= chat_consts::OBFUSCATION_KEY[i % chat_consts::OBFUSCATION_KEY.len()];
+        *byte ^= obfuscation_key[i % obfuscation_key.len()];
     }
 
     data
@@ -232,7 +232,22 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
         crypto::encrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(packet_bytes, keys)
     } else
     {
-        obfuscate_data(packet_bytes) //NO ENCRYPTION, OBFUSCATE
+        let key =
+        {
+            #[cfg(feature = "server")]
+            {
+                server::CONNECTIONS.get(&stream.peer_addr().unwrap())
+                    .and_then(|c| c.obfuscation_key().cloned())
+                    .unwrap_or_else(|| [0u8; 32])
+            }
+
+            #[cfg(feature = "client")]
+            {
+                options::get_obfuscation_key()
+            }
+        };
+
+        obfuscate_data(packet_bytes, key) //NO ENCRYPTION, OBFUSCATE
     };
 
     //CONVERT ENCRYPTED OUTPUT TO BYTES ([LENGTH][DATA])
@@ -321,7 +336,22 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
         }
     } else
     {
-        decoded_packet = obfuscate_data(decoded_packet); //NO ENCRYPTION, REMOVE OBFUSCATION
+        let key =
+        {
+            #[cfg(feature = "server")]
+            {
+                server::CONNECTIONS.get(&peer_addr)
+                    .and_then(|c| c.obfuscation_key().cloned())
+                    .unwrap_or_else(|| [0u8; 32])
+            }
+
+            #[cfg(feature = "client")]
+            {
+                options::get_obfuscation_key()
+            }
+        };
+
+        decoded_packet = obfuscate_data(decoded_packet, key); //NO ENCRYPTION, REMOVE OBFUSCATION
     }
 
     //DESERIALIZE AND RETURN

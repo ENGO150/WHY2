@@ -210,6 +210,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
     //SEND HEADER
     let mut header = [0u8; 32];
     SysRng.try_fill_bytes(&mut header).unwrap(); //GENERATE RANDOM HEADER
+    options::set_obfuscation_key(&header);
     streams.1.lock().unwrap().write_all(&header).unwrap();
 
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY

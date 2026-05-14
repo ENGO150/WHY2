@@ -76,6 +76,9 @@ static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (
 static SERVER_ADDRESS: OnceLock<String> = OnceLock::new();
 
 #[cfg(feature = "client")]
+static OBFUSCATION_KEY: OnceLock<[u8; 32]> = OnceLock::new();
+
+#[cfg(feature = "client")]
 static MUTE: AtomicBool = AtomicBool::new(false); //MUTE LOCAL CLIENT
 #[cfg(feature = "client")]
 static MUTED: LazyLock<Mutex<HashSet<usize>>> = LazyLock::new(|| Mutex::new(HashSet::new())); //MUTED CLIENTS
@@ -197,6 +200,19 @@ pub fn get_server_address() -> String //GET SERVER ADDRESS
 pub fn set_server_address(address: &str) //SET SERVER ADDRESS
 {
     SERVER_ADDRESS.set(address.to_owned()).unwrap();
+}
+
+//OBFUSCATION KEY
+#[cfg(feature = "client")]
+pub fn get_obfuscation_key() -> [u8; 32] //GET OBFUSCATION KEY
+{
+    *OBFUSCATION_KEY.get().unwrap()
+}
+
+#[cfg(feature = "client")]
+pub fn set_obfuscation_key(key: &[u8; 32]) //SET OBFUSCATION KEY
+{
+    OBFUSCATION_KEY.set(*key).unwrap();
 }
 
 //MUTING

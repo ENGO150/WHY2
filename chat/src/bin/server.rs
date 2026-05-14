@@ -194,7 +194,7 @@ fn main()
                         }
 
                         let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-                        thread::spawn(move || server::listen_client(&mut (&mut stream, write_stream)));
+                        thread::spawn(move || server::listen_client(&mut (&mut stream, write_stream), header));
                         continue;
                     }
                 }

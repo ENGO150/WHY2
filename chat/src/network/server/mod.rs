@@ -111,6 +111,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         peer_addr: SocketAddr,               //ADDRESS & PORT
         username: Option<String>,            //CHOSEN USERNAME
         keys: Option<SharedKeys>,            //SHARED KEYS
+        obfuscation_key: [u8; 32],           //OBFUSCATION KEY FROM PLAIN PACKETS
         last_activity: Instant,              //TIME OF LAST MESSAGE
         seq: usize,                          //SEQUENCE NUMBER
         connect: Instant,                    //TIME OF CONNECTION
@@ -177,6 +178,16 @@ impl Connection
         {
             Self::Authenticated { keys, .. } => Some(keys),
             Self::NonAuthenticated { keys, .. } => keys.as_ref(),
+        }
+    }
+
+    //GET OBFUSCATION KEY
+    pub fn obfuscation_key(&self) -> Option<&[u8; 32]>
+    {
+        match self
+        {
+            Self::Authenticated { .. } => None,
+            Self::NonAuthenticated { obfuscation_key, .. } => Some(obfuscation_key),
         }
     }
 
@@ -570,7 +581,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
     {
         match old_connection
         {
-            Connection::NonAuthenticated { write_stream, seq, peer_addr, connect, .. } =>
+            Connection::NonAuthenticated { write_stream, seq, peer_addr, connect, obfuscation_key, .. } =>
             {
                 Connection::NonAuthenticated
                 {
@@ -578,6 +589,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     peer_addr,
                     username: None,
                     keys: Some(keys.to_owned()),
+                    obfuscation_key,
                     last_activity: Instant::now(),
                     seq,
                     connect,
@@ -730,7 +742,7 @@ pub fn send_code //SEND CODE TO CLIENT
     }, keys);
 }
 
-pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
+pub fn listen_client(streams: &mut Streams, obfuscation_key: [u8; 32]) //CLIENT -> SERVER COMMUNICATION
 {
     let peer_addr = streams.0.peer_addr().unwrap();
     log::info!("New connection: {peer_addr}");
@@ -742,6 +754,7 @@ pub fn listen_client(streams: &mut Streams) //CLIENT -> SERVER COMMUNICATION
         peer_addr: peer_addr,
         username: None,
         keys: None,
+        obfuscation_key,
         last_activity: Instant::now(),
         seq: 0,
         connect: Instant::now(),
