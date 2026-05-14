@@ -44,8 +44,8 @@ use why2_chat::
     crypto::kex,
     network::
     {
-        server,
         ConnectionType,
+        server::{ self, file },
         voice::server as voice_server,
     },
 };
@@ -167,11 +167,16 @@ fn main()
                         Err(_) => continue
                     }
 
-                    if let Some((_, (_id, conn_type))) = server::PENDING_HEADERS.remove(&header)
+                    if let Some((_, (id, conn_type))) = server::PENDING_HEADERS.remove(&header)
                     {
                         match conn_type
                         {
-                            ConnectionType::File => {},
+                            ConnectionType::File =>
+                            {
+                                let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
+                                thread::spawn(move || file::download(id, &mut (&mut stream, write_stream)));
+                                continue;
+                            },
                         }
                     } else
                     {

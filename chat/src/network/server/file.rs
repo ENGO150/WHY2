@@ -15,3 +15,157 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
+use std::
+{
+    fs,
+    io::Write,
+    ffi::OsStr,
+    path::Path,
+};
+
+use sha2::Digest;
+
+use crate::
+{
+    misc,
+    consts::{ self, Streams },
+    network::
+    {
+        self,
+        server::{ self, AvailableFile },
+        MessagePacket,
+        MessageCode,
+    },
+};
+
+pub fn download(id: usize, streams: &mut Streams)
+{
+    //GET SOCKET ADDR
+    let peer_addr = match streams.0.peer_addr()
+    {
+        Ok(s) => s,
+        Err(_) => return
+    };
+
+    //GET CONNECTION
+    let conn = match server::CONNECTIONS.get(&peer_addr)
+    {
+        Some(c) => c,
+        None => return
+    };
+
+    //GET INFO
+    let keys = match conn.keys()
+    {
+        Some(k) => k,
+        None => return
+    };
+
+    let username = match conn.username()
+    {
+        Some(u) => u,
+        None => return
+    };
+
+    //LOOP READING
+    loop
+    {
+        //READ
+        let read = match network::receive(streams, Some(&keys))
+        {
+            Some(r) => r,
+            None => return
+        };
+
+        if let Some(file) = read.file //CHECK FOR FILE PAYLOAD
+        {
+            if let Some(mut active) = network::ACTIVE_FILESHARES.get_mut(&file.uid) &&
+                let Some(chunk_data) = file.data && active.client_id == id
+            {
+                if chunk_data.len() <= consts::UPLOAD_CHUNK_SIZE && //CHECK PACKET SIZE
+                    active.file.write_all(&chunk_data).is_ok() //WRITE
+                {
+                    //UPDATE SIZE
+                    active.current_size += chunk_data.len() as u64;
+                    //if active.current_size <= active.size { valid = true; }
+
+                    //UPDATE HASHER
+                    active.hasher.update(&chunk_data);
+
+                    //CHECK SIZE
+                    if active.current_size == active.size //UPLOAD DONE
+                    {
+                        let delete: bool;
+
+                        //GET FILE PATH
+                        let temp_dir = misc::get_upload_dir(&username);
+                        let current_path = temp_dir.join(file.uid.to_string());
+                        let mut new_filename = None;
+                        let mut final_path = None;
+                        let mut insert = false;
+                        let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
+
+                        //CHECK HASHES
+                        if active.hash == final_hash
+                        {
+                            //GET NEW FILE PATH
+                            let filename = Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
+                                .file_name()
+                                .unwrap_or(OsStr::new("unnamed_file"));
+                            let new_path = temp_dir.join(filename);
+
+                            //RENAME FILE
+                            insert = !new_path.is_file();
+                            delete = fs::rename(&current_path, &new_path).is_err();
+
+                            //SET NEW FILE VARIABLES
+                            new_filename = Some(filename);
+                            final_path = Some(new_path);
+                        } else { delete = true; }
+
+                        if delete
+                        {
+                            //REMOVE JUNK FILE
+                            let _ = fs::remove_file(&current_path);
+
+                            //LOG FILE UPLOAD
+                            log::error!("Upload failed: {peer_addr}");
+                        } else
+                        {
+                            //LOG FILE UPLOAD
+                            log::info!("Upload done: {peer_addr}");
+
+                            let filename = new_filename.and_then(|f| f.to_str()).unwrap_or("unnamed_file").to_owned();
+
+                            //ANNOUNCE FILE UPLOAD
+                            server::send_to_all(MessagePacket
+                            {
+                                text: Some(filename.clone()),
+                                username: Some(username.clone()),
+                                code: Some(MessageCode::Uploaded),
+                                ..Default::default()
+                            });
+
+                            if insert
+                            {
+                                //ADD FILE TO AVAILABLE FILES
+                                server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
+                                {
+                                    hash: final_hash,
+                                    path: final_path.unwrap(),
+                                    filename,
+                                    size: active.current_size,
+                                });
+                            }
+                        }
+
+                        //REMOVE ACTIVE UPLOAD
+                        drop(active);
+                        network::ACTIVE_FILESHARES.remove(&file.uid);
+                    }
+                }
+            }
+        }
+    }
+}

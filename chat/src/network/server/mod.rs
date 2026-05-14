@@ -23,11 +23,9 @@ use std::
 {
     env,
     thread,
-    io::Write,
-    ffi::OsStr,
+    path::PathBuf,
     collections::HashSet,
     fs::{ self, File },
-    path::{ Path, PathBuf },
     time::{ Instant, Duration },
     net::
     {
@@ -451,7 +449,8 @@ fn send_welcome_packet(write_stream: &mut TcpStream, keys: &SharedKeys) //send w
     send_code(write_stream, Some(welcome_json), MessageCode::Welcome, Some(keys));
 }
 
-fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
+//PUBLIC
+pub fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
 {
     //GET SENDER'S CHANNEL
     let channel = packet.username.as_ref().and_then(|username|
@@ -481,12 +480,6 @@ fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
     }
 }
 
-fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOAD
-{
-    env::temp_dir().join(consts::UPLOADS_DIR).join(username)
-}
-
-//PUBLIC
 pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTION BY TcpStream
 {
     //REMOVE CONNECTION
@@ -520,7 +513,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
 
         //REMOVE UPLOADS
         let username = connection.username().unwrap();
-        let _ = fs::remove_dir_all(get_upload_dir(username)); //REMOVE FILES
+        let _ = fs::remove_dir_all(misc::get_upload_dir(username)); //REMOVE FILES
         network::ACTIVE_FILESHARES.retain(|_, u| u.client_id != *connection.id().unwrap());
         AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
 
@@ -1080,155 +1073,69 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     }, Some(&keys));
                 },
 
-                //FILE UPLOAD
+                //NEW FILE UPLOAD
                 MessageCode::Upload =>
                 {
                     let mut valid = false;
 
-                    if let Some(file) = read.file //CHECK FOR FILE PAYLOAD
+                    if let Some(file) = read.file
                     {
-                        //CHECK IF UPLOAD ALREADY STARTED
-                        if let Some(mut active) = network::ACTIVE_FILESHARES.get_mut(&file.uid) &&
-                            let Some(chunk_data) = file.data && active.client_id == id
+                        //CHECK FOR CONCURRENT UPLOADS
+                        if network::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count() >=
+                            config::read_config("max_client_parallel_uploads")
                         {
-                            if chunk_data.len() <= consts::UPLOAD_CHUNK_SIZE && //CHECK PACKET SIZE
-                                active.file.write_all(&chunk_data).is_ok() //WRITE
-                            {
-                                //UPDATE SIZE
-                                active.current_size += chunk_data.len() as u64;
-                                if active.current_size <= active.size { valid = true; }
+                            valid = true; //SKIP FILE UPLOAD
+                            send_code(&mut streams.1.lock().unwrap(), None, MessageCode::UploadLimit, Some(&keys));
+                        }
 
-                                //UPDATE HASHER
-                                active.hasher.update(&chunk_data);
-
-                                //CHECK SIZE
-                                if active.current_size == active.size //UPLOAD DONE
-                                {
-                                    let delete: bool;
-
-                                    //GET FILE PATH
-                                    let temp_dir = get_upload_dir(&username);
-                                    let current_path = temp_dir.join(file.uid.to_string());
-                                    let mut new_filename = None;
-                                    let mut final_path = None;
-                                    let mut insert = false;
-                                    let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
-
-                                    //CHECK HASHES
-                                    if active.hash == final_hash
-                                    {
-                                        //GET NEW FILE PATH
-                                        let filename = Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
-                                            .file_name()
-                                            .unwrap_or(OsStr::new("unnamed_file"));
-                                        let new_path = temp_dir.join(filename);
-
-                                        //RENAME FILE
-                                        insert = !new_path.is_file();
-                                        delete = fs::rename(&current_path, &new_path).is_err();
-
-                                        //SET NEW FILE VARIABLES
-                                        new_filename = Some(filename);
-                                        final_path = Some(new_path);
-                                    } else { delete = true; }
-
-                                    if delete
-                                    {
-                                        //REMOVE JUNK FILE
-                                        let _ = fs::remove_file(&current_path);
-
-                                        //LOG FILE UPLOAD
-                                        log::error!("Upload failed: {peer_addr}");
-                                    } else
-                                    {
-                                        //LOG FILE UPLOAD
-                                        log::info!("Upload done: {peer_addr}");
-
-                                        let filename = new_filename.and_then(|f| f.to_str()).unwrap_or("unnamed_file").to_owned();
-
-                                        //ANNOUNCE FILE UPLOAD
-                                        send_to_all(MessagePacket
-                                        {
-                                            text: Some(filename.clone()),
-                                            username: Some(username.clone()),
-                                            code: Some(MessageCode::Uploaded),
-                                            ..Default::default()
-                                        });
-
-                                        if insert
-                                        {
-                                            //ADD FILE TO AVAILABLE FILES
-                                            AVAILABLE_FILES.get_mut(&username).unwrap().push(AvailableFile
-                                            {
-                                                hash: final_hash,
-                                                path: final_path.unwrap(),
-                                                filename,
-                                                size: active.current_size,
-                                            });
-                                        }
-                                    }
-
-                                    //REMOVE ACTIVE UPLOAD
-                                    drop(active);
-                                    network::ACTIVE_FILESHARES.remove(&file.uid);
-                                }
-                            }
-                        } else //NEW UPLOAD, VERIFY SIZE
+                        if !valid && let Some(size) = file.size &&
+                            let Some(hash) = file.hash &&
+                            let Some(filename) = file.filename &&
+                            size / 1_048_576 <= config::read_config::<u64>("max_upload_size")
                         {
-                            //CHECK FOR CONCURRENT UPLOADS
-                            if network::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count() >=
-                                config::read_config("max_client_parallel_uploads")
+                            //GENERATE RANDOM UID
+                            let uid = rand::random::<u64>();
+
+                            //GENERATE RANDOM TOKEN
+                            let mut token = [0u8; 32];
+                            SysRng.try_fill_bytes(&mut token).unwrap();
+
+                            //CREATE TEMP UPLOAD DIRECTORY
+                            let temp_dir = misc::get_upload_dir(&username);
+                            fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
+
+                            //OPEN NEW CONNECTION
+                            PENDING_HEADERS.insert(token, (id, ConnectionType::File));
+
+                            //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
+                            network::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
                             {
-                                valid = true; //SKIP FILE UPLOAD
-                                send_code(&mut streams.1.lock().unwrap(), None, MessageCode::UploadLimit, Some(&keys));
-                            }
+                                file: File::create_new(temp_dir.join(uid.to_string())).expect("Creating upload file failed"),
+                                size,
+                                current_size: 0,
+                                hash: hash.clone(),
+                                hasher: Sha256::new(),
+                                filename,
+                                client_id: id,
+                            });
 
-                            if !valid && let Some(size) = file.size &&
-                                let Some(hash) = file.hash &&
-                                let Some(filename) = file.filename &&
-                                size / 1_048_576 <= config::read_config::<u64>("max_upload_size")
+                            //LOG FILE UPLOAD
+                            log::info!("Upload request: {peer_addr}");
+
+                            //SEND APPROVAL TO CLIENT
+                            network::send(&mut streams.1.lock().unwrap(), MessagePacket
                             {
-                                //GENERATE RANDOM UID
-                                let uid = rand::random::<u64>();
-
-                                //GENERATE RANDOM TOKEN
-                                let mut token = [0u8; 32];
-                                SysRng.try_fill_bytes(&mut token).unwrap();
-
-                                //CREATE TEMP UPLOAD DIRECTORY
-                                let temp_dir = get_upload_dir(&username);
-                                fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
-
-                                //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
-                                network::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
+                                code: Some(MessageCode::Upload),
+                                file: Some(FilePayload
                                 {
-                                    file: File::create_new(temp_dir.join(uid.to_string())).expect("Creating upload file failed"),
-                                    size,
-                                    current_size: 0,
-                                    hash: hash.clone(),
-                                    hasher: Sha256::new(),
-                                    filename,
-                                    client_id: id,
-                                });
-
-                                //LOG FILE UPLOAD
-                                log::info!("Upload request: {peer_addr}");
-
-                                //SEND APPROVAL TO CLIENT
-                                network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                                {
-                                    code: Some(MessageCode::Upload),
-                                    file: Some(FilePayload
-                                    {
-                                        token: Some(token),
-                                        uid,
-                                        hash: Some(hash),
-                                        ..Default::default()
-                                    }),
+                                    token: Some(token),
+                                    uid,
+                                    hash: Some(hash),
                                     ..Default::default()
-                                }, Some(&keys));
-                                valid = true;
-                            }
+                                }),
+                                ..Default::default()
+                            }, Some(&keys));
+                            valid = true;
                         }
                     }
 
@@ -1288,8 +1195,8 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             //LOG START
                             log::info!("Download request: {peer_addr}");
 
-                            network::send_file(file.path.clone(), file_stream,
-                                uid, MessageCode::Download, Some(&file_keys));
+                            /*network::send_file(file.path.clone(), file_stream,
+                                uid, MessageCode::Download, Some(&file_keys));*/
 
                             //LOG END
                             log::info!("Download done: {peer_addr}");

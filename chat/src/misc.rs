@@ -19,8 +19,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     fs,
-    path::Path,
+    env,
     time::Duration,
+    path::{ Path, PathBuf },
 };
 
 use ureq::{ Error, Agent };
@@ -145,4 +146,10 @@ pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
     {
         fs::create_dir_all(config).expect("Failed to create WHY2 config directory");
     }
+}
+
+#[cfg(feature = "server")]
+pub fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOAD
+{
+    env::temp_dir().join(consts::UPLOADS_DIR).join(username)
 }
