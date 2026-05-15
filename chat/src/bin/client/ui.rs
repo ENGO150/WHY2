@@ -104,8 +104,14 @@ pub fn draw_event(event: ClientEvent)
             );
         },
 
-        ClientEvent::Prompt(channel, message) => //SHOW PROMPT BAR
+        ClientEvent::Prompt(message) => //SHOW PROMPT BAR
         {
+            let channel = match options::get_channel()
+            {
+                c if c.is_empty() => String::new(),
+                c => format!("#{c} | "),
+            };
+
             print!("\r{channel}>>> {message}");
         },
 

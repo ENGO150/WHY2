@@ -87,7 +87,7 @@ pub enum ClientEvent
     Authenticated,                             //LOGIN SUCCESSFUL
     Connected(String),                         //SUCCESSFUL CONNECTION MESSAGE
     Message(MessagePacket),                    //RECEIVED MESSAGE
-    Prompt(String, String),                    //">>>" PROMPT, WITH CHANNEL AND WRITTEN MESSAGE
+    Prompt(String),                            //">>>" PROMPT, WITH WRITTEN MESSAGE
     PrivateMessageSent(String, usize, String), //SENT PM
     PrivateMessageRecv(String, usize, String), //RECEIVED PM
     TofuError(TofuCode),                       //TOFU VERIFICATION FAILED
@@ -246,8 +246,6 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
     //FORMATTING SHIT
     let mut first_message = true;
     let mut extra_space: bool;
-
-    let mut channel = String::new();
 
     //CONNECTION PROPERTIES
     let mut id = 0usize; //ID SET BY SERVER
@@ -430,13 +428,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     //REMOVE ALL STORED VOICE CLIENTS
                     voice_client::remove_all_consumers();
 
-                    channel = if let Some(c) = read.text
-                    {
-                        format!("#{c} | ")
-                    } else
-                    {
-                        String::new()
-                    };
+                    options::set_channel(read.text.unwrap_or_else(|| String::new()));
 
                     tx.send(ClientEvent::Clear(1)).unwrap();
                 },
@@ -597,7 +589,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
         }
 
         //PRINT INPUT PROMPT
-        tx.send(ClientEvent::Prompt(channel.clone(), options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
+        tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
         if !extra_space { options::set_extra_space(false); } //DISABLE EXTRA SPACE
     }
 }

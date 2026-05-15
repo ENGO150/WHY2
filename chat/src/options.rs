@@ -79,6 +79,9 @@ static SERVER_ADDRESS: OnceLock<String> = OnceLock::new();
 static OBFUSCATION_KEY: OnceLock<[u8; 32]> = OnceLock::new();
 
 #[cfg(feature = "client")]
+static CHANNEL: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String::new())); //ACTIVE CHANNEL
+
+#[cfg(feature = "client")]
 static MUTE: AtomicBool = AtomicBool::new(false); //MUTE LOCAL CLIENT
 #[cfg(feature = "client")]
 static MUTED: LazyLock<Mutex<HashSet<usize>>> = LazyLock::new(|| Mutex::new(HashSet::new())); //MUTED CLIENTS
@@ -213,6 +216,19 @@ pub fn get_obfuscation_key() -> [u8; 32] //GET OBFUSCATION KEY
 pub fn set_obfuscation_key(key: &[u8; 32]) //SET OBFUSCATION KEY
 {
     OBFUSCATION_KEY.set(*key).unwrap();
+}
+
+//CHANNEL
+#[cfg(feature = "client")]
+pub fn get_channel() -> String //GET CHANNEL
+{
+    CHANNEL.read().unwrap().clone()
+}
+
+#[cfg(feature = "client")]
+pub fn set_channel(channel: String) //SET CHANNEL
+{
+    *CHANNEL.write().unwrap() = channel;
 }
 
 //MUTING
