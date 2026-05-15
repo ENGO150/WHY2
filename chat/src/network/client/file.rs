@@ -63,6 +63,7 @@ pub fn upload(payload: FilePayload, tx: Sender<ClientEvent>)
 
     //LOG
     tx.send(ClientEvent::Upload(filename)).unwrap();
+    tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
 
     //UPLOAD
     network::send_file(path, stream, payload.uid, MessageCode::Upload, options::get_keys().as_ref());
@@ -108,6 +109,7 @@ pub fn download(payload: FilePayload, tx: Sender<ClientEvent>)
 
     //LOG
     tx.send(ClientEvent::Download(filename)).unwrap();
+    tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
 
     //INIT SEQ
     let mut seq = 0usize;
@@ -152,6 +154,7 @@ pub fn download(payload: FilePayload, tx: Sender<ClientEvent>)
                     {
                         ClientEvent::DownloadFailed(filename)
                     }).unwrap();
+                    tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
 
                     //REMOVE ACTIVE STREAM
                     drop(active);
