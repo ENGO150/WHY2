@@ -377,7 +377,10 @@ impl Connection
     {
         if let Self::Authenticated { file_streams, .. } = self
         {
-            file_streams.lock().unwrap().remove(&uid);
+            if let Some(stream) = file_streams.lock().unwrap().remove(&uid)
+            {
+                stream.shutdown(Shutdown::Both).ok();
+            }
         }
     }
 }
