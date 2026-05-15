@@ -40,7 +40,7 @@ use crate::
     },
 };
 
-pub fn download(id: usize, streams: &mut Streams)
+pub fn download(id: usize, streams: &mut Streams, uid: u64)
 {
     //GET SOCKET ADDR
     let peer_addr = match streams.0.peer_addr()
@@ -71,6 +71,9 @@ pub fn download(id: usize, streams: &mut Streams)
                     Some(u) => u.clone(),
                     None => return
                 };
+
+                //ADD FILE STREAM
+                c.add_file_stream(uid, streams.0.try_clone().unwrap());
 
                 (keys, username)
             },
@@ -216,12 +219,18 @@ pub fn upload(id: usize, stream: TcpStream, path: PathBuf, uid: u64)
         {
             Some(c) =>
             {
-                match c.keys()
+                let keys = match c.keys()
                 {
                     Some(k) => k.clone(),
                     None => return
-                }
+                };
+
+                //ADD FILE STREAM
+                c.add_file_stream(uid, stream.try_clone().unwrap());
+
+                keys
             },
+
             None => return
         }
     };

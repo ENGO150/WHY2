@@ -178,7 +178,7 @@ fn main()
                             ConnectionType::FileUpload { uid } =>
                             {
                                 let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-                                thread::spawn(move || file::download(id, &mut (&mut stream, write_stream)));
+                                thread::spawn(move || file::download(id, &mut (&mut stream, write_stream), uid));
                                 continue;
                             },
 
