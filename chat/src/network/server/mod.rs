@@ -362,6 +362,24 @@ impl Connection
             Self::NonAuthenticated { .. } => &false,
         }
     }
+
+    //ADD FILE STREAM
+    pub fn add_file_stream(&self, uid: u64, stream: TcpStream)
+    {
+        if let Self::Authenticated { file_streams, .. } = self
+        {
+            file_streams.lock().unwrap().insert(uid, stream);
+        }
+    }
+
+    //REMOVE FILE STREAM
+    pub fn remove_file_stream(&self, uid: u64)
+    {
+        if let Self::Authenticated { file_streams, .. } = self
+        {
+            file_streams.lock().unwrap().remove(&uid);
+        }
+    }
 }
 
 //LISTS
