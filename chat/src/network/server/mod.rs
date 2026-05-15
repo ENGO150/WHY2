@@ -350,7 +350,7 @@ impl Connection
 }
 
 //LISTS
-pub static PENDING_HEADERS: LazyLock<DashMap<[u8; 32], (usize, ConnectionType)>> = LazyLock::new(|| DashMap::new());
+pub static PENDING_TOKENS: LazyLock<DashMap<[u8; 32], (usize, ConnectionType)>> = LazyLock::new(|| DashMap::new());
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
 static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
@@ -1109,7 +1109,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
 
                             //OPEN NEW CONNECTION
-                            PENDING_HEADERS.insert(token, (id, ConnectionType::FileUpload));
+                            PENDING_TOKENS.insert(token, (id, ConnectionType::FileUpload));
 
                             //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
                             network::ACTIVE_FILESHARES.insert(uid, ActiveFileshare

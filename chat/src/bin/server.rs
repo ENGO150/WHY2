@@ -157,9 +157,9 @@ fn main()
                 //SET TIMEOUT
                 stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout"); //SET TIMEOUT
 
-                //READ HEADER
-                let mut header = [0u8; 32];
-                if let Ok(_) = stream.read_exact(&mut header)
+                //READ TOKEN
+                let mut token = [0u8; 32];
+                if let Ok(_) = stream.read_exact(&mut token)
                 {
                     //REMOVE TIMEOUT
                     stream.set_read_timeout(None).expect("Failed to set read timeout");
@@ -171,7 +171,7 @@ fn main()
                         Err(_) => continue
                     }
 
-                    if let Some((_, (id, conn_type))) = server::PENDING_HEADERS.remove(&header)
+                    if let Some((_, (id, conn_type))) = server::PENDING_TOKENS.remove(&token)
                     {
                         match conn_type
                         {
@@ -202,7 +202,7 @@ fn main()
                         }
 
                         let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-                        thread::spawn(move || server::listen_client(&mut (&mut stream, write_stream), peer_addr, header));
+                        thread::spawn(move || server::listen_client(&mut (&mut stream, write_stream), peer_addr, token));
                         continue;
                     }
                 }
