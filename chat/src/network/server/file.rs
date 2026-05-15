@@ -40,6 +40,28 @@ use crate::
     },
 };
 
+//PRIVATE
+//STRUCTS
+struct FileTransferGuard
+{
+    id: usize,
+    uid: u64,
+}
+
+//IMPLEMENTATIONS
+impl Drop for FileTransferGuard
+{
+    fn drop(&mut self)
+    {
+        if let Some(conn) = server::CONNECTIONS.iter().find(|c| c.id() == Some(&self.id))
+        {
+            //REMOVE FILE STREAM
+            conn.remove_file_stream(self.uid);
+        }
+    }
+}
+
+//PUBLIC
 pub fn download(id: usize, streams: &mut Streams, uid: u64)
 {
     //GET SOCKET ADDR
@@ -79,6 +101,13 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
             },
             None => return
         }
+    };
+
+    //DISCONNECT GUARD
+    let _guard = FileTransferGuard
+    {
+        id,
+        uid,
     };
 
     //LOCAL SEQ
@@ -233,6 +262,13 @@ pub fn upload(id: usize, stream: TcpStream, path: PathBuf, uid: u64)
 
             None => return
         }
+    };
+
+    //DISCONNECT GUARD
+    let _guard = FileTransferGuard
+    {
+        id,
+        uid,
     };
 
     //START UPLOAD
