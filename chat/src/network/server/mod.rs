@@ -90,11 +90,11 @@ struct AvailableFile //UPLOADED FILE
 //ENUMS
 pub enum ConnectionType //TYPES OF TCP CHANNEL
 {
-    FileUpload,
+    FileUpload { uid: u64 },
     FileDownload
     {
-        path: PathBuf,
         uid: u64,
+        path: PathBuf,
     },
 }
 
@@ -1121,7 +1121,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
 
                             //OPEN NEW CONNECTION
-                            let token = open_connection(id, ConnectionType::FileUpload);
+                            let token = open_connection(id, ConnectionType::FileUpload { uid });
 
                             //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
                             network::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
