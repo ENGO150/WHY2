@@ -1393,6 +1393,15 @@ pub fn disconnect_all() //DISCONNECT ALL CLIENTS
     for addr in &addrs
     {
         remove_connection(addr, true, None); //REMOVE GRACEFULLY
+
+        //CLOSE ALL FILE STREAMS
+        if let Some(conn) = CONNECTIONS.get(addr) && let Some(streams) = conn.file_streams()
+        {
+            for uid in streams.lock().unwrap().keys()
+            {
+                conn.remove_file_stream(*uid);
+            }
+        }
     }
 }
 
