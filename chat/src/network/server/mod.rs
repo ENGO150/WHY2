@@ -386,7 +386,7 @@ impl Connection
 }
 
 //LISTS
-pub static PENDING_TOKENS: LazyLock<DashMap<[u8; 32], (usize, ConnectionType)>> = LazyLock::new(|| DashMap::new());
+pub static PENDING_TOKENS: LazyLock<DashMap<[u8; 32], (usize, ConnectionType, Instant)>> = LazyLock::new(|| DashMap::new());
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
 static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
@@ -786,7 +786,7 @@ fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW T
     SysRng.try_fill_bytes(&mut token).unwrap();
 
     //OPEN NEW CONNECTION
-    PENDING_TOKENS.insert(token, (id, conn_type));
+    PENDING_TOKENS.insert(token, (id, conn_type, Instant::now()));
 
     token
 }

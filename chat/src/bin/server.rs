@@ -113,9 +113,13 @@ fn main()
 
         loop
         {
-            //DISCONNECT INACTIVE CLIENTS
             thread::sleep(Duration::from_secs(5));
+
+            //DISCONNECT INACTIVE CLIENTS
             server::disconnect_inactive();
+
+            //REMOVE OLD PENDING TOKENS
+            server::PENDING_TOKENS.retain(|_, (_, _, created)| created.elapsed().as_secs() < 5);
 
             //SEND KEEPALIVE PACKET TO ALL CLIENTS
             n = (n + 1) % 6;
@@ -171,7 +175,7 @@ fn main()
                         Err(_) => continue
                     }
 
-                    if let Some((_, (id, conn_type))) = server::PENDING_TOKENS.remove(&token)
+                    if let Some((_, (id, conn_type, _))) = server::PENDING_TOKENS.remove(&token)
                     {
                         match conn_type
                         {
