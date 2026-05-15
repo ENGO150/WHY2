@@ -73,15 +73,8 @@ impl Drop for FileTransferGuard
 //PUBLIC
 pub fn download(id: usize, streams: &mut Streams, uid: u64)
 {
-    //GET SOCKET ADDR
-    let peer_addr = match streams.0.peer_addr()
-    {
-        Ok(s) => s,
-        Err(_) => return
-    };
-
     //GET CLIENT INFO
-    let (keys, username) =
+    let (keys, username, peer_addr) =
     {
         //FIND CONNECTION BY ID
         let conn = server::CONNECTIONS.iter()
@@ -106,7 +99,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
                 //ADD FILE STREAM
                 c.add_file_stream(uid, streams.0.try_clone().unwrap());
 
-                (keys, username)
+                (keys, username, c.peer_addr().clone())
             },
             None => return
         }
@@ -220,15 +213,8 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
 
 pub fn upload(id: usize, stream: TcpStream, path: PathBuf, uid: u64)
 {
-    //GET SOCKET ADDR
-    let peer_addr = match stream.peer_addr()
-    {
-        Ok(s) => s,
-        Err(_) => return
-    };
-
     //GET CLIENT INFO
-    let keys =
+    let (keys, peer_addr) =
     {
         //FIND CONNECTION BY ID
         let conn = server::CONNECTIONS.iter()
@@ -247,7 +233,7 @@ pub fn upload(id: usize, stream: TcpStream, path: PathBuf, uid: u64)
                 //ADD FILE STREAM
                 c.add_file_stream(uid, stream.try_clone().unwrap());
 
-                keys
+                (keys, c.peer_addr().clone())
             },
 
             None => return
