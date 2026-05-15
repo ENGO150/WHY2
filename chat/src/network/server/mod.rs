@@ -22,7 +22,6 @@ pub mod file;
 use std::
 {
     env,
-    thread,
     path::PathBuf,
     collections::HashSet,
     fs::{ self, File },
@@ -92,6 +91,11 @@ struct AvailableFile //UPLOADED FILE
 pub enum ConnectionType //TYPES OF TCP CHANNEL
 {
     FileUpload,
+    FileDownload
+    {
+        path: PathBuf,
+        uid: u64,
+    },
 }
 
 #[derive(Clone)]
@@ -404,7 +408,7 @@ fn key_exchange(streams: &mut Streams, peer_addr: &SocketAddr, keys: &mut Shared
         text: Some(payload),
         code: Some(MessageCode::KeyExchange),
         ..Default::default()
-    }, None);
+    }, None, None);
 
     //READ FROM UNTRUSTED CLIENT
     let message = match untrusted_read(streams, MessageCode::KeyExchange, None)
@@ -480,7 +484,7 @@ pub fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
 
     for ref entry in entries
     {
-        network::send(&mut entry.write_stream().lock().unwrap(), packet.clone(), entry.keys());
+        network::send(&mut entry.write_stream().lock().unwrap(), packet.clone(), entry.keys(), None);
     }
 }
 
@@ -725,7 +729,7 @@ fn send_voice_clients(stream: &mut TcpStream, keys: &SharedKeys, id: usize)
         text: Some(json!(clients).to_string()),
         code: Some(MessageCode::VoiceClients),
         ..Default::default()
-    }, Some(keys));
+    }, Some(keys), None);
 }
 
 fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW TOKEN
@@ -754,7 +758,7 @@ pub fn send_code //SEND CODE TO CLIENT
         text: text,
         code: Some(code),
         ..Default::default()
-    }, keys);
+    }, keys, None);
 }
 
 pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_key: [u8; 32]) //CLIENT -> SERVER COMMUNICATION
@@ -1086,7 +1090,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
                         code: Some(MessageCode::List),
                         ..Default::default()
-                    }, Some(&keys));
+                    }, Some(&keys), None);
                 },
 
                 //NEW FILE UPLOAD
@@ -1146,7 +1150,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                                     ..Default::default()
                                 }),
                                 ..Default::default()
-                            }, Some(&keys));
+                            }, Some(&keys), None);
                             valid = true;
                         }
                     }
@@ -1179,12 +1183,15 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
 
                     if let Some(file) = parse_result
                     {
-                        //LOAD SHARE VARIABLES
-                        let file_stream = streams.1.clone();
-                        let file_keys = keys.clone();
-
                         //GENERATE RANDOM SHARE UID
                         let uid = rand::random::<u64>();
+
+                        //OPEN NEW CONNECTION
+                        let token = open_connection(id, ConnectionType::FileDownload
+                        {
+                            path: file.path,
+                            uid,
+                        });
 
                         //SEND FILE METADATA
                         network::send(&mut streams.1.lock().unwrap(), MessagePacket
@@ -1192,6 +1199,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             code: Some(MessageCode::Download),
                             file: Some(FilePayload
                             {
+                                token: Some(token),
                                 uid,
                                 hash: Some(file.hash),
                                 size: Some(file.size),
@@ -1199,20 +1207,10 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                                 ..Default::default()
                             }),
                             ..Default::default()
-                        }, Some(&keys));
+                        }, Some(&keys), None);
 
-                        //SPAWN UPLOAD THREAD
-                        thread::spawn(move ||
-                        {
-                            //LOG START
-                            log::info!("Download request: {peer_addr}");
-
-                            /*network::send_file(file.path.clone(), file_stream,
-                                uid, MessageCode::Download, Some(&file_keys));*/
-
-                            //LOG END
-                            log::info!("Download done: {peer_addr}");
-                        });
+                        //LOG START
+                        log::info!("Download request: {peer_addr}");
                     } else
                     {
                         send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
@@ -1257,7 +1255,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         text: Some(json!(grouped_files).to_string()),
                         code: Some(MessageCode::Files),
                         ..Default::default()
-                    }, Some(&keys));
+                    }, Some(&keys), None);
                 },
 
                 //PRIVATE MESSAGE
@@ -1301,7 +1299,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                                     code: Some(MessageCode::PrivateMessage),
 
                                     ..Default::default()
-                                }, recipient_keys.as_ref());
+                                }, recipient_keys.as_ref(), None);
                             }
                         }
 
@@ -1314,7 +1312,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             code: Some(MessageCode::PrivateMessageBack),
 
                             ..Default::default()
-                        }, Some(&keys));
+                        }, Some(&keys), None);
                     } else
                     {
                         //INVALID PM FORMAT
@@ -1420,7 +1418,7 @@ pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
             {
                 code: Some(MessageCode::KeepAlive),
                 ..Default::default()
-            }, keys.as_ref());
+            }, keys.as_ref(), None);
         }
     }
 

@@ -21,7 +21,8 @@ use std::
     fs,
     io::Write,
     ffi::OsStr,
-    path::Path,
+    net::TcpStream,
+    path::{ Path, PathBuf },
 };
 
 use sha2::Digest;
@@ -184,9 +185,47 @@ pub fn download(id: usize, streams: &mut Streams)
                         //REMOVE ACTIVE UPLOAD
                         drop(active);
                         network::ACTIVE_FILESHARES.remove(&file.uid);
+                        return;
                     }
                 }
             }
         }
     }
+}
+
+pub fn upload(id: usize, stream: TcpStream, path: PathBuf, uid: u64)
+{
+    //GET SOCKET ADDR
+    let peer_addr = match stream.peer_addr()
+    {
+        Ok(s) => s,
+        Err(_) => return
+    };
+
+    //GET CLIENT INFO
+    let keys =
+    {
+        //FIND CONNECTION BY ID
+        let conn = server::CONNECTIONS.iter()
+            .find(|e| e.value().id() == Some(&id));
+
+        match conn
+        {
+            Some(c) =>
+            {
+                match c.keys()
+                {
+                    Some(k) => k.clone(),
+                    None => return
+                }
+            },
+            None => return
+        }
+    };
+
+    //START UPLOAD
+    network::send_file(path, stream, uid, MessageCode::Download, Some(&keys));
+
+    //LOG END
+    log::info!("Download done: {peer_addr}");
 }

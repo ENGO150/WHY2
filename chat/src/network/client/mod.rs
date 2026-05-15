@@ -25,8 +25,7 @@ use std::
     net::TcpStream,
     io::{ Error, Write },
     collections::HashMap,
-    fs::{ self, File },
-    path::{ Path, PathBuf },
+    path::PathBuf,
     sync::
     {
         Arc,
@@ -43,8 +42,6 @@ use rand::
 };
 
 use socks::Socks5Stream;
-
-use sha2::{ Sha256, Digest };
 
 use zeroize::Zeroizing;
 
@@ -64,7 +61,6 @@ use crate::
         self,
         MessageCode,
         MessagePacket,
-        ActiveFileshare,
         voice::
         {
             client as voice_client,
@@ -143,7 +139,7 @@ fn key_exchange
     let message = loop
     {
         //READ MESSAGE
-        let received = network::receive(streams, None).unwrap();
+        let received = network::receive(streams, None, None).unwrap();
 
         if received.code == Some(MessageCode::KeyExchange) { break received; }
     };
@@ -260,7 +256,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
     //LOOP READING
     loop
     {
-        let read = match network::receive(streams, Some(&keys))
+        let read = match network::receive(streams, Some(&keys), None)
         {
             Some(packet) => packet,
             None => MessagePacket
@@ -517,74 +513,9 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //DOWNLOAD
                 MessageCode::Download =>
                 {
-                    let file = read.file.unwrap();
-                    let uid = file.uid;
-
-                    //CHECK IF UPLOAD IS ALREADY ACTIVE
-                    if let Some(mut active) = network::ACTIVE_FILESHARES.get_mut(&uid)
-                    {
-                        let chunk_data = file.data.unwrap();
-
-                        //WRITE
-                        if active.file.write_all(&chunk_data).is_ok()
-                        {
-                            //UPDATE SIZE
-                            active.current_size += chunk_data.len() as u64;
-
-                            //UPDATE HASHER
-                            active.hasher.update(&chunk_data);
-
-                            //CHECK IF DOWNLOADING FINISHED
-                            if active.current_size == active.size
-                            {
-                                let filename = active.filename.clone();
-                                let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
-
-                                //CHECK HASHES
-                                tx.send(if active.hash == final_hash
-                                {
-                                    ClientEvent::Downloaded(filename)
-                                } else
-                                {
-                                    ClientEvent::DownloadFailed(filename)
-                                }).unwrap();
-
-                                //REMOVE ACTIVE STREAM
-                                drop(active);
-                                network::ACTIVE_FILESHARES.remove(&uid);
-                            }
-                        }
-                    } else
-                    {
-                        //NEW DOWNLOAD, GET NEW FILE
-                        let download_dir = config::read_config::<String>("download_directory")
-                            .replace("{HOME}", dirs::home_dir().expect("Could not determine home directory")
-                            .to_str().expect("Invalid home directory"));
-
-                        //GET SAFE FILENAME
-                        let filename = Path::new(&file.filename.unwrap())
-                            .file_name()
-                            .and_then(|f| f.to_str())
-                            .unwrap_or("unnamed_file")
-                            .to_string();
-
-                        //CREATE DOWNLOAD DIR
-                        fs::create_dir_all(&download_dir).expect("Creating download directory failed");
-
-                        network::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
-                        {
-                            file: File::create(Path::new(&download_dir)
-                                .join(&filename)).expect("Creating download file failed"),
-                            size: file.size.unwrap(),
-                            current_size: 0,
-                            hash: file.hash.unwrap(),
-                            hasher: Sha256::new(),
-                            filename: filename.clone(),
-                        });
-
-                        //LOG
-                        tx.send(ClientEvent::Download(filename)).unwrap();
-                    }
+                    //SPAWN DOWNLOAD THREAD
+                    let file_tx = tx.clone(); //CLONE TX
+                    thread::spawn(move || file::download(read.file.unwrap(), file_tx));
                 },
 
                 //UPLOADED ANNOUNCEMENT

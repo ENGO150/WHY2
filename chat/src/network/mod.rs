@@ -193,7 +193,13 @@ fn obfuscate_data(mut data: Vec<u8>, obfuscation_key: [u8; 32]) -> Vec<u8> //XOR
 }
 
 //PUBLIC
-pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&chat_consts::SharedKeys>) //SEND packet TO stream
+pub fn send //SEND packet TO stream
+(
+    stream: &mut TcpStream,
+    mut packet: MessagePacket,
+    keys: Option<&chat_consts::SharedKeys>,
+    #[cfg(feature = "server")] seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
+)
 {
     //ADD SEQUENCE NUMBER TO packet (FROM CLIENT)
     #[cfg(feature = "client")]
@@ -205,13 +211,25 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
     //ADD SEQUENCE NUMBER TO packet (FROM SERVER)
     #[cfg(feature = "server")]
     {
-        let peer_addr = stream.peer_addr().ok();
-        if peer_addr.is_some() && let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr.unwrap())
+        match seq
         {
-            if conn.is_authenticated()
+            Some(local_seq) =>
             {
-                packet.seq = conn.server_seq().unwrap() + 1;
-                *conn.server_seq_mut().unwrap() = packet.seq;
+                *local_seq += 1;
+                packet.seq = *local_seq;
+            },
+
+            None =>
+            {
+                let peer_addr = stream.peer_addr().ok();
+                if peer_addr.is_some() && let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr.unwrap())
+                {
+                    if conn.is_authenticated()
+                    {
+                        packet.seq = conn.server_seq().unwrap() + 1;
+                        *conn.server_seq_mut().unwrap() = packet.seq;
+                    }
+                }
             }
         }
     }
@@ -254,7 +272,12 @@ pub fn send(stream: &mut TcpStream, mut packet: MessagePacket, keys: Option<&cha
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) -> Option<MessagePacket>
+pub fn receive
+(
+    streams: &mut Streams,
+    keys: Option<&chat_consts::SharedKeys>,
+    #[cfg(feature = "client")] seq: Option<&mut usize> //LOCAL/GLOBAL SEQ
+) -> Option<MessagePacket>
 {
     //SERVER SIDE PACKET SIZE LIMIT
     #[cfg(feature = "server")]
@@ -423,10 +446,22 @@ pub fn receive(streams: &mut Streams, keys: Option<&chat_consts::SharedKeys>) ->
             //VERIFY SEQUENCE NUMBER
             #[cfg(feature = "client")] //ON CLIENT
             {
-                if packet.seq > options::get_server_seq() || options::get_server_seq() == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
+                let used_seq = match seq
+                {
+                    Some(ref s) => **s,
+                    None => options::get_server_seq(),
+                };
+
+                if packet.seq > used_seq || used_seq == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
                 {
                     //SET SEQ
-                    options::set_server_seq(packet.seq);
+                    if let Some(seq) = seq
+                    {
+                        *seq = packet.seq;
+                    } else
+                    {
+                        options::set_server_seq(packet.seq);
+                    }
                 } else //INVALID, DISCONNECT
                 {
                     return None;
@@ -453,11 +488,14 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
     mut stream: TcpStream,
     uid: u64,
     code: MessageCode,
-    keys: Option<&chat_consts::SharedKeys>
+    keys: Option<&chat_consts::SharedKeys>,
 )
 {
     let mut file = File::open(path).expect("Cannot open file for upload");
     let mut buffer = vec![0; chat_consts::UPLOAD_CHUNK_SIZE];
+
+    #[cfg(feature = "server")]
+    let mut seq = 0usize;
 
     //LOOP READING
     loop
@@ -478,7 +516,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
                         ..Default::default()
                     }),
                     ..Default::default()
-                }, keys);
+                }, keys, #[cfg(feature = "server")] Some(&mut seq));
             },
             Err(_) => {}, //TODO: Implement
         }

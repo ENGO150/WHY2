@@ -181,6 +181,12 @@ fn main()
                                 thread::spawn(move || file::download(id, &mut (&mut stream, write_stream)));
                                 continue;
                             },
+
+                            ConnectionType::FileDownload { path, uid } =>
+                            {
+                                thread::spawn(move || file::upload(id, stream, path, uid));
+                                continue;
+                            },
                         }
                     } else
                     {
