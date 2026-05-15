@@ -542,6 +542,18 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
         stream.shutdown(Shutdown::Both).ok();
     }
 
+    //CLOSE ALL FILE STREAMS
+    if let Some(streams) = connection.file_streams()
+    {
+        //COLLECT UIDS
+        let uids: Vec<u64> = streams.lock().unwrap().keys().copied().collect();
+
+        for uid in uids
+        {
+            connection.remove_file_stream(uid);
+        }
+    }
+
     //AUTHENTICATED ACTIONS
     if connection.is_authenticated()
     {
@@ -1393,15 +1405,6 @@ pub fn disconnect_all() //DISCONNECT ALL CLIENTS
     for addr in &addrs
     {
         remove_connection(addr, true, None); //REMOVE GRACEFULLY
-
-        //CLOSE ALL FILE STREAMS
-        if let Some(conn) = CONNECTIONS.get(addr) && let Some(streams) = conn.file_streams()
-        {
-            for uid in streams.lock().unwrap().keys()
-            {
-                conn.remove_file_stream(*uid);
-            }
-        }
     }
 }
 
