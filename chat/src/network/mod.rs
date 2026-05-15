@@ -64,7 +64,7 @@ use crate::config;
 //ENUMS
 pub enum ConnectionType //TYPES OF TCP CHANNEL
 {
-    File,
+    FileUpload,
 }
 
 #[derive(SchemaWrite, SchemaRead, PartialEq, Clone)]

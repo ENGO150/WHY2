@@ -1105,7 +1105,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
 
                             //OPEN NEW CONNECTION
-                            PENDING_HEADERS.insert(token, (id, ConnectionType::File));
+                            PENDING_HEADERS.insert(token, (id, ConnectionType::FileUpload));
 
                             //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
                             network::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
