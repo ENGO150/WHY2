@@ -57,6 +57,14 @@ impl Drop for FileTransferGuard
         {
             //REMOVE FILE STREAM
             conn.remove_file_stream(self.uid);
+
+            //REMOVE JUNK FILE
+            if network::ACTIVE_FILESHARES.remove(&self.uid).is_some() && let Some(uname) = conn.username()
+            {
+                let temp_dir = misc::get_upload_dir(uname);
+                let junk_file = temp_dir.join(self.uid.to_string());
+                let _ = fs::remove_file(&junk_file);
+            }
         }
     }
 }
