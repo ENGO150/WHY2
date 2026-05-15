@@ -64,6 +64,7 @@ impl Drop for FileTransferGuard
                 let temp_dir = misc::get_upload_dir(uname);
                 let junk_file = temp_dir.join(self.uid.to_string());
                 let _ = fs::remove_file(&junk_file);
+                log::error!("Upload failed: {}", conn.peer_addr());
             }
         }
     }
@@ -142,18 +143,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
                     //UPDATE SIZE
                     active.current_size += chunk_data.len() as u64;
 
-                    if active.current_size > active.size
-                    {
-                        //REMOVE JUNK FILE
-                        let temp_dir = misc::get_upload_dir(&username);
-                        let _ = fs::remove_file(temp_dir.join(file.uid.to_string()));
-
-                        drop(active);
-                        network::ACTIVE_FILESHARES.remove(&file.uid);
-
-                        log::error!("Upload overflow: {peer_addr}");
-                        return; //DISCONNECT FILE CHANNEL
-                    }
+                    if active.current_size > active.size { return; }
 
                     //UPDATE HASHER
                     active.hasher.update(&chunk_data);
@@ -161,7 +151,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
                     //CHECK SIZE
                     if active.current_size == active.size //UPLOAD DONE
                     {
-                        let delete: bool;
+                        let valid: bool;
 
                         //GET FILE PATH
                         let temp_dir = misc::get_upload_dir(&username);
@@ -182,47 +172,39 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
 
                             //RENAME FILE
                             insert = !new_path.is_file();
-                            delete = fs::rename(&current_path, &new_path).is_err();
+                            valid = fs::rename(&current_path, &new_path).is_ok();
 
                             //SET NEW FILE VARIABLES
                             new_filename = Some(filename);
                             final_path = Some(new_path);
-                        } else { delete = true; }
+                        } else { valid = false; }
 
-                        if delete
+                        if !valid { return; }
+
+                        //LOG FILE UPLOAD
+                        log::info!("Upload done: {peer_addr}");
+
+                        let filename = new_filename.and_then(|f| f.to_str()).unwrap_or("unnamed_file").to_owned();
+
+                        //ANNOUNCE FILE UPLOAD
+                        server::send_to_all(MessagePacket
                         {
-                            //REMOVE JUNK FILE
-                            let _ = fs::remove_file(&current_path);
+                            text: Some(filename.clone()),
+                            username: Some(username.clone()),
+                            code: Some(MessageCode::Uploaded),
+                            ..Default::default()
+                        });
 
-                            //LOG FILE UPLOAD
-                            log::error!("Upload failed: {peer_addr}");
-                        } else
+                        if insert
                         {
-                            //LOG FILE UPLOAD
-                            log::info!("Upload done: {peer_addr}");
-
-                            let filename = new_filename.and_then(|f| f.to_str()).unwrap_or("unnamed_file").to_owned();
-
-                            //ANNOUNCE FILE UPLOAD
-                            server::send_to_all(MessagePacket
+                            //ADD FILE TO AVAILABLE FILES
+                            server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
                             {
-                                text: Some(filename.clone()),
-                                username: Some(username.clone()),
-                                code: Some(MessageCode::Uploaded),
-                                ..Default::default()
+                                hash: final_hash,
+                                path: final_path.unwrap(),
+                                filename,
+                                size: active.current_size,
                             });
-
-                            if insert
-                            {
-                                //ADD FILE TO AVAILABLE FILES
-                                server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
-                                {
-                                    hash: final_hash,
-                                    path: final_path.unwrap(),
-                                    filename,
-                                    size: active.current_size,
-                                });
-                            }
                         }
 
                         //REMOVE ACTIVE UPLOAD
