@@ -23,9 +23,9 @@ use std::
 {
     env,
     path::PathBuf,
-    collections::HashSet,
     fs::{ self, File },
     time::{ Instant, Duration },
+    collections::{ HashSet, HashMap },
     net::
     {
         TcpStream,
@@ -103,18 +103,19 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
     Authenticated
     {
-        write_stream: Arc<Mutex<TcpStream>>, //STREAM
-        peer_addr: SocketAddr,               //ADDRESS & PORT
-        username: String,                    //USERNAME
-        id: usize,                           //ID OF USER
-        keys: SharedKeys,                    //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
-        last_activity: Instant,              //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
-        last_key_exchange: Instant,          //TIME OF LAST REKEY
-        spam_violations: usize,              //SPAM VIOLATIONS (unexpected, huh?)
-        channel: Option<String>,             //CHANNEL
-        seq: usize,                          //SEQUENCE NUMBER (CLIENT -> SERVER)
-        server_seq: usize,                   //SEQUENCE NUMBER (SERVER -> CLIENT)
-        alive: bool,                         //RESPONDED TO KEEPALIVE
+        write_stream: Arc<Mutex<TcpStream>>,               //STREAM
+        file_streams: Arc<Mutex<HashMap<u64, TcpStream>>>, //ACTIVE FILE STREAMS
+        peer_addr: SocketAddr,                             //ADDRESS & PORT
+        username: String,                                  //USERNAME
+        id: usize,                                         //ID OF USER
+        keys: SharedKeys,                                  //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
+        last_activity: Instant,                            //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
+        last_key_exchange: Instant,                        //TIME OF LAST REKEY
+        spam_violations: usize,                            //SPAM VIOLATIONS (unexpected, huh?)
+        channel: Option<String>,                           //CHANNEL
+        seq: usize,                                        //SEQUENCE NUMBER (CLIENT -> SERVER)
+        server_seq: usize,                                 //SEQUENCE NUMBER (SERVER -> CLIENT)
+        alive: bool,                                       //RESPONDED TO KEEPALIVE
     },
 
     NonAuthenticated
@@ -140,6 +141,16 @@ impl Connection
         {
             Self::Authenticated { write_stream, .. } => write_stream,
             Self::NonAuthenticated { write_stream, .. } => write_stream,
+        }
+    }
+
+    //GET ALL ACTIVE FILE STREAMS
+    pub fn file_streams(&self) -> Option<&Arc<Mutex<HashMap<u64, TcpStream>>>>
+    {
+        match self
+        {
+            Self::Authenticated { file_streams, .. } => Some(file_streams),
+            Self::NonAuthenticated { .. } => None,
         }
     }
 
@@ -603,12 +614,13 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                 }
             },
 
-            Connection::Authenticated { write_stream, username, id, last_activity, channel,
+            Connection::Authenticated { write_stream, file_streams, username, id, last_activity, channel,
                 seq, server_seq, peer_addr, alive, .. } =>
             {
                 Connection::Authenticated
                 {
                     write_stream,
+                    file_streams,
                     peer_addr,
                     username,
                     id,
@@ -634,6 +646,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
         Connection::Authenticated
         {
             write_stream: old_connection.write_stream().clone(),
+            file_streams: Arc::new(Mutex::new(HashMap::new())),
             peer_addr: *old_connection.peer_addr(),
             username: username.to_string(),
             id: id,
@@ -662,6 +675,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
         Connection::Authenticated
         {
             write_stream: old_connection.write_stream().clone(),
+            file_streams: old_connection.file_streams().unwrap().clone(),
             peer_addr: *old_connection.peer_addr(),
             username: old_connection.username().unwrap().clone(),
             id: *old_connection.id().unwrap(),
