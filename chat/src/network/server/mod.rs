@@ -728,6 +728,18 @@ fn send_voice_clients(stream: &mut TcpStream, keys: &SharedKeys, id: usize)
     }, Some(keys));
 }
 
+fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW TOKEN
+{
+    //GENERATE RANDOM TOKEN
+    let mut token = [0u8; 32];
+    SysRng.try_fill_bytes(&mut token).unwrap();
+
+    //OPEN NEW CONNECTION
+    PENDING_TOKENS.insert(token, (id, conn_type));
+
+    token
+}
+
 //PUBLIC
 pub fn send_code //SEND CODE TO CLIENT
 (
@@ -1100,16 +1112,12 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             //GENERATE RANDOM UID
                             let uid = rand::random::<u64>();
 
-                            //GENERATE RANDOM TOKEN
-                            let mut token = [0u8; 32];
-                            SysRng.try_fill_bytes(&mut token).unwrap();
-
                             //CREATE TEMP UPLOAD DIRECTORY
                             let temp_dir = misc::get_upload_dir(&username);
                             fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
 
                             //OPEN NEW CONNECTION
-                            PENDING_TOKENS.insert(token, (id, ConnectionType::FileUpload));
+                            let token = open_connection(id, ConnectionType::FileUpload);
 
                             //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
                             network::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
