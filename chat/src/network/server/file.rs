@@ -78,11 +78,14 @@ pub fn download(id: usize, streams: &mut Streams)
         }
     };
 
+    //LOCAL SEQ
+    let mut seq = 0usize;
+
     //LOOP READING
     loop
     {
         //READ
-        let read = match network::receive(streams, Some(&keys))
+        let read = match network::receive(streams, Some(&keys), Some(&mut seq))
         {
             Some(r) => r,
             None => return

@@ -370,7 +370,7 @@ fn untrusted_read(streams: &mut Streams, code: MessageCode, keys: Option<&Shared
     let message = loop
     {
         //READ MESSAGE
-        let received = match network::receive(streams, keys)
+        let received = match network::receive(streams, keys, None)
         {
             Some(r) => r,
             None => return None
@@ -822,7 +822,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
         //SEND PICK_USERNAME CODE
         send_code(&mut streams.1.lock().unwrap(), None, MessageCode::Username, Some(&keys));
 
-        match network::receive(streams, Some(&keys))
+        match network::receive(streams, Some(&keys), None)
         {
             //USERNAME CONDITIONS MET, BREAK LOOP
             Some(r) =>
@@ -876,7 +876,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
             send_code(&mut streams.1.lock().unwrap(), None, MessageCode::PasswordR, Some(&keys));
 
             //WAIT FOR ANSWER
-            match network::receive(streams, Some(&keys))
+            match network::receive(streams, Some(&keys), None)
             {
                 Some(r) =>
                 {
@@ -910,7 +910,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
         //WAIT FOR ANSWER
         let response = loop
         {
-            match network::receive(streams, Some(&keys))
+            match network::receive(streams, Some(&keys), None)
             {
                 Some(r) => break r,
 
@@ -948,7 +948,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     loop
     {
         //READ
-        let read = match network::receive(streams, Some(&keys))
+        let read = match network::receive(streams, Some(&keys), None)
         {
             Some(r) => r,
             None => return

@@ -276,7 +276,7 @@ pub fn receive
 (
     streams: &mut Streams,
     keys: Option<&chat_consts::SharedKeys>,
-    #[cfg(feature = "client")] seq: Option<&mut usize> //LOCAL/GLOBAL SEQ
+    seq: Option<&mut usize> //LOCAL/GLOBAL SEQ
 ) -> Option<MessagePacket>
 {
     //SERVER SIDE PACKET SIZE LIMIT
@@ -378,14 +378,22 @@ pub fn receive
             //SPAM, SEQ & LENGTH CHECKS (SERVER)
             #[cfg(feature = "server")]
             {
-                //ACTIVITY TIMER
-                let mut spam_warning = false;
-                let mut shared_key = None;
-                let mut disconnect = false;
-                let mut grace = true;
-
-                if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
+                //LOCAL SEQ COUNTER
+                if let Some(seq) = seq
                 {
+                    if packet.seq > *seq //VALID SEQ
+                    {
+                        //SET SEQ TO CURRENT
+                        *seq = packet.seq;
+                    } else { return None; }
+                } else if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
+                {
+                    //ACTIVITY TIMER
+                    let mut spam_warning = false;
+                    let mut shared_key = None;
+                    let mut disconnect = false;
+                    let mut grace = true;
+
                     //SPAM
                     if packet.code != Some(MessageCode::KeepAlive) &&
                         packet.code != Some(MessageCode::KeyExchange) &&
