@@ -70,7 +70,6 @@ use crate::
     network::
     {
         self,
-        ConnectionType,
         MessageCode,
         MessagePacket,
         FilePayload,
@@ -90,6 +89,11 @@ struct AvailableFile //UPLOADED FILE
 }
 
 //ENUMS
+pub enum ConnectionType //TYPES OF TCP CHANNEL
+{
+    FileUpload,
+}
+
 #[derive(Clone)]
 pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {

@@ -62,11 +62,6 @@ use std::time::{ Instant, Duration };
 use crate::config;
 
 //ENUMS
-pub enum ConnectionType //TYPES OF TCP CHANNEL
-{
-    FileUpload,
-}
-
 #[derive(SchemaWrite, SchemaRead, PartialEq, Clone)]
 pub enum MessageCode //CONTROL CODES
 {
