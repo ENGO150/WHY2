@@ -181,6 +181,9 @@ fn main()
                         {
                             ConnectionType::FileUpload { uid } =>
                             {
+                                //SET READ TIMEOUT
+                                stream.set_read_timeout(Some(Duration::from_millis(5000))).expect("Failed to set read timeout");
+
                                 let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
                                 thread::spawn(move || file::download(id, &mut (&mut stream, write_stream), uid));
                                 continue;
