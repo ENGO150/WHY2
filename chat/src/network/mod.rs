@@ -30,15 +30,10 @@ use std::
     fs::File,
     path::PathBuf,
     net::TcpStream,
-    sync::LazyLock,
     io::{ Read, Write },
 };
 
 use wincode::{ SchemaWrite, SchemaRead };
-
-use sha2::Sha256;
-
-use dashmap::DashMap;
 
 use why2::consts;
 
@@ -126,20 +121,6 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub seq: usize,                //SEQUENCE NUMBER
     pub file: Option<FilePayload>, //FILE UPLOADED BY CLIENT
 }
-
-pub struct ActiveFileshare //ACTIVE FILE UPLOAD
-{
-    pub file: File,                                  //TARGET FILE (SERVER-SIDE)
-    pub size: u64,                                   //EXPECTED FILE SIZE
-    pub current_size: u64,                           //CURRENT SIZE
-    pub hash: [u8; 32],                              //SHA256 HASH OF FINAL FILE
-    pub hasher: Sha256,                              //HASHER
-    pub filename: String,                            //FILENAME
-    #[cfg(feature = "server")] pub client_id: usize, //ID OF SENDER
-}
-
-//LISTS
-pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new()); //LIST FOR ACTIVE FILE UPLOADS
 
 //IMPLEMENTATIONS
 impl Default for MessagePacket //DEFAULT

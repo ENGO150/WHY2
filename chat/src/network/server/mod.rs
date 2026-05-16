@@ -72,7 +72,7 @@ use crate::
         MessageCode,
         MessagePacket,
         FilePayload,
-        ActiveFileshare,
+        server::file::ActiveFileshare,
         voice::server as voice_server,
     },
 };
@@ -566,7 +566,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
         //REMOVE UPLOADS
         let username = connection.username().unwrap();
         let _ = fs::remove_dir_all(misc::get_upload_dir(username)); //REMOVE FILES
-        network::ACTIVE_FILESHARES.retain(|_, u| u.client_id != *connection.id().unwrap());
+        file::ACTIVE_FILESHARES.retain(|_, u| u.client_id != *connection.id().unwrap());
         AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
 
         //SEND LEAVE MESSAGE
@@ -1004,7 +1004,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
         //REKEY EVERY 10 MINUTES
         if Instant::now().duration_since(*CONNECTIONS.get(&peer_addr).unwrap().last_key_exchange().unwrap()) >=
             Duration::from_secs(consts::REKEY_INTERVAL) &&
-            !network::ACTIVE_FILESHARES.iter().any(|entry| entry.client_id == id) //DO NOT REKEY ON FILE UPLOAD
+            !file::ACTIVE_FILESHARES.iter().any(|entry| entry.client_id == id) //DO NOT REKEY ON FILE UPLOAD
         {
             //INFORM CLIENT ABOUT REKEYING
             send_code(&mut streams.1.lock().unwrap(), None, MessageCode::Rekey, Some(&keys));
@@ -1148,7 +1148,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     if let Some(file) = read.file
                     {
                         //CHECK FOR CONCURRENT UPLOADS
-                        if network::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count() >=
+                        if file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count() >=
                             config::read_config("max_client_parallel_uploads")
                         {
                             valid = true; //SKIP FILE UPLOAD
@@ -1171,7 +1171,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             let token = open_connection(id, ConnectionType::FileUpload { uid });
 
                             //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
-                            network::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
+                            file::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
                             {
                                 file: File::create_new(temp_dir.join(uid.to_string())).expect("Creating upload file failed"),
                                 size,

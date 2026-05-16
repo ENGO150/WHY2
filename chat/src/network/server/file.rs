@@ -18,14 +18,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    fs,
     io::Write,
     ffi::OsStr,
     net::TcpStream,
+    sync::LazyLock,
+    fs::{ self, File },
     path::{ Path, PathBuf },
 };
 
-use sha2::Digest;
+use dashmap::DashMap;
+
+use sha2::{ Sha256, Digest };
 
 use crate::
 {
@@ -59,7 +62,7 @@ impl Drop for FileTransferGuard
             conn.remove_file_stream(self.uid);
 
             //REMOVE JUNK FILE
-            if network::ACTIVE_FILESHARES.remove(&self.uid).is_some() && let Some(uname) = conn.username()
+            if ACTIVE_FILESHARES.remove(&self.uid).is_some() && let Some(uname) = conn.username()
             {
                 let temp_dir = misc::get_upload_dir(uname);
                 let junk_file = temp_dir.join(self.uid.to_string());
@@ -71,6 +74,20 @@ impl Drop for FileTransferGuard
 }
 
 //PUBLIC
+pub struct ActiveFileshare //ACTIVE FILE UPLOAD
+{
+    pub file: File,                                  //TARGET FILE (SERVER-SIDE)
+    pub size: u64,                                   //EXPECTED FILE SIZE
+    pub current_size: u64,                           //CURRENT SIZE
+    pub hash: [u8; 32],                              //SHA256 HASH OF FINAL FILE
+    pub hasher: Sha256,                              //HASHER
+    pub filename: String,                            //FILENAME
+    #[cfg(feature = "server")] pub client_id: usize, //ID OF SENDER
+}
+
+//LISTS
+pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new()); //LIST FOR ACTIVE FILE UPLOADS
+
 pub fn download(id: usize, streams: &mut Streams, uid: u64)
 {
     //GET CLIENT INFO
@@ -127,7 +144,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
 
         if let Some(file) = read.file //CHECK FOR FILE PAYLOAD
         {
-            if let Some(mut active) = network::ACTIVE_FILESHARES.get_mut(&file.uid) &&
+            if let Some(mut active) = ACTIVE_FILESHARES.get_mut(&file.uid) &&
                 let Some(chunk_data) = file.data && active.client_id == id
             {
                 if chunk_data.len() <= consts::UPLOAD_CHUNK_SIZE && //CHECK PACKET SIZE
@@ -202,7 +219,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
 
                         //REMOVE ACTIVE UPLOAD
                         drop(active);
-                        network::ACTIVE_FILESHARES.remove(&file.uid);
+                        ACTIVE_FILESHARES.remove(&file.uid);
                         return;
                     }
                 }
