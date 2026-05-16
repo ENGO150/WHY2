@@ -41,7 +41,6 @@ use crate::
         client::{ self, ClientEvent },
         FilePayload,
         MessageCode,
-        ActiveFileshare,
     },
 };
 
@@ -96,23 +95,17 @@ pub fn download(payload: FilePayload, tx: Sender<ClientEvent>)
     //CREATE DOWNLOAD DIR
     fs::create_dir_all(&download_dir).expect("Creating download directory failed");
 
-    network::ACTIVE_FILESHARES.insert(payload.uid, ActiveFileshare
-    {
-        file: File::create(Path::new(&download_dir)
-            .join(&filename)).expect("Creating download file failed"),
-        size: payload.size.unwrap(),
-        current_size: 0,
-        hash: payload.hash.unwrap(),
-        hasher: Sha256::new(),
-        filename: filename.clone(),
-    });
-
     //LOG
-    tx.send(ClientEvent::Download(filename)).unwrap();
+    tx.send(ClientEvent::Download(filename.clone())).unwrap();
     tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
 
-    //INIT SEQ
+    //INIT COUNTERS
     let mut seq = 0usize;
+    let size = payload.size.unwrap();
+    let hash = payload.hash.unwrap();
+    let mut current_size = 0u64;
+    let mut file = File::create(Path::new(&download_dir).join(&filename)).expect("Creating download file failed");
+    let mut hasher = Sha256::new();
 
     //LOOP READING
     loop
@@ -124,43 +117,33 @@ pub fn download(payload: FilePayload, tx: Sender<ClientEvent>)
             None => return
         };
 
-        let file = read.file.unwrap();
+        let chunk_data = read.file.and_then(|f| f.data).unwrap();
 
-        //CHECK IF UPLOAD IS ALREADY ACTIVE
-        if let Some(mut active) = network::ACTIVE_FILESHARES.get_mut(&file.uid)
+        //WRITE
+        if file.write_all(&chunk_data).is_ok()
         {
-            let chunk_data = file.data.unwrap();
+            //UPDATE SIZE
+            current_size += chunk_data.len() as u64;
 
-            //WRITE
-            if active.file.write_all(&chunk_data).is_ok()
+            //UPDATE HASHER
+            hasher.update(&chunk_data);
+
+            //CHECK IF DOWNLOADING FINISHED
+            if current_size == size
             {
-                //UPDATE SIZE
-                active.current_size += chunk_data.len() as u64;
+                let final_hash: [u8; 32] = hasher.clone().finalize().into();
 
-                //UPDATE HASHER
-                active.hasher.update(&chunk_data);
-
-                //CHECK IF DOWNLOADING FINISHED
-                if active.current_size == active.size
+                //CHECK HASHES
+                tx.send(if hash == final_hash
                 {
-                    let filename = active.filename.clone();
-                    let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
+                    ClientEvent::Downloaded(filename)
+                } else
+                {
+                    ClientEvent::DownloadFailed(filename)
+                }).unwrap();
 
-                    //CHECK HASHES
-                    tx.send(if active.hash == final_hash
-                    {
-                        ClientEvent::Downloaded(filename)
-                    } else
-                    {
-                        ClientEvent::DownloadFailed(filename)
-                    }).unwrap();
-                    tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
-
-                    //REMOVE ACTIVE STREAM
-                    drop(active);
-                    network::ACTIVE_FILESHARES.remove(&file.uid);
-                    return;
-                }
+                tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
+                return;
             }
         }
     }
