@@ -132,14 +132,15 @@ fn key_exchange
 (
     streams: &mut Streams,
     keys: &mut consts::SharedKeys,
-    tx: &Sender<ClientEvent>
+    tx: &Sender<ClientEvent>,
+    exchange_keys: Option<&consts::SharedKeys>,
 ) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
     let message = loop
     {
         //READ MESSAGE
-        let received = network::receive(streams, None, None).unwrap();
+        let received = network::receive(streams, exchange_keys, None).unwrap();
 
         if received.code == Some(MessageCode::KeyExchange) { break received; }
     };
@@ -192,7 +193,7 @@ fn key_exchange
         text: Some(response_text),
         code: Some(MessageCode::KeyExchange),
         ..Default::default()
-    }, None);
+    }, exchange_keys);
 
     //CALCULATE SHARED SECRET (HYBRID)
     *keys = kex::derive_shared_secret(sk, server_ecc_pk.to_string(), pq_secret).expect("Shared secret derivation failed");
@@ -231,7 +232,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
 
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    if !key_exchange(streams, &mut keys, &tx) { return; }
+    if !key_exchange(streams, &mut keys, &tx, None) { return; }
 
     //SERVER INFO VARIABLES
     let mut min_pass: Option<u64> = None;
@@ -340,7 +341,8 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 MessageCode::Rekey =>
                 {
                     //WAIT FOR SERVER TO INIT KEY EXCHANGE
-                    key_exchange(streams, &mut keys, &tx);
+                    let current_keys = keys.clone();
+                    key_exchange(streams, &mut keys, &tx, Some(&current_keys));
                 }
 
                 //PICK_USERNAME CODE - guess what

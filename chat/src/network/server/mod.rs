@@ -421,7 +421,13 @@ fn untrusted_read(streams: &mut Streams, code: MessageCode, keys: Option<&Shared
     Some(message)
 }
 
-fn key_exchange(streams: &mut Streams, peer_addr: &SocketAddr, keys: &mut SharedKeys) //KEY EXCHANGE FOR SERVER-SIDE
+fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
+(
+    streams: &mut Streams,
+    peer_addr: &SocketAddr,
+    keys: &mut SharedKeys,
+    rekey_trigger: Option<&SharedKeys>,
+)
 {
     //LOAD KEYS
     let (sk, pk) = kex::get_server_keys();          //ECC
@@ -434,16 +440,40 @@ fn key_exchange(streams: &mut Streams, peer_addr: &SocketAddr, keys: &mut Shared
         "pq": pq_pk,
     }).to_string();
 
-    //SEND ECC PUBKEY TO CLIENT
-    network::send(&mut streams.1.lock().unwrap(), MessagePacket
+    //ATOMIC SEND
     {
-        text: Some(payload),
-        code: Some(MessageCode::KeyExchange),
-        ..Default::default()
-    }, None, None);
+        let mut write = streams.1.lock().unwrap();
+
+        //TRIGGER REKEY
+        if let Some(current_keys) = rekey_trigger
+        {
+            network::send(&mut write, MessagePacket
+            {
+                code: Some(MessageCode::Rekey),
+                ..Default::default()
+            }, Some(current_keys), None);
+
+            //SEND ENCRYPTED PUBKEYS TO CLIENT
+            network::send(&mut write, MessagePacket
+            {
+                text: Some(payload),
+                code: Some(MessageCode::KeyExchange),
+                ..Default::default()
+            }, Some(current_keys), None);
+        } else
+        {
+            //SEND OBFUSCATED PUBKEYS TO CLIENT
+            network::send(&mut write, MessagePacket
+            {
+                text: Some(payload),
+                code: Some(MessageCode::KeyExchange),
+                ..Default::default()
+            }, None, None);
+        }
+    }
 
     //READ FROM UNTRUSTED CLIENT
-    let message = match untrusted_read(streams, MessageCode::KeyExchange, None)
+    let message = match untrusted_read(streams, MessageCode::KeyExchange, rekey_trigger)
     {
         Some(r) => r,
         None => return
@@ -827,7 +857,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
 
     //GET ENCRYPTION & MAC KEYS
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    key_exchange(streams, &peer_addr, &mut keys);
+    key_exchange(streams, &peer_addr, &mut keys, None);
 
     //CHECK FOR VALID KEYS
     if keys.0.is_empty() || keys.1.is_empty()
@@ -1007,8 +1037,8 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
             !file::ACTIVE_FILESHARES.iter().any(|entry| entry.client_id == id) //DO NOT REKEY ON FILE UPLOAD
         {
             //INFORM CLIENT ABOUT REKEYING
-            send_code(&mut streams.1.lock().unwrap(), None, MessageCode::Rekey, Some(&keys));
-            key_exchange(streams, &peer_addr, &mut keys); //INIT REKEY
+            let current_keys = keys.clone();
+            key_exchange(streams, &peer_addr, &mut keys, Some(&current_keys)); //INIT REKEY
         }
 
         //CLIENT CODES
