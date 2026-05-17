@@ -58,7 +58,7 @@ pub fn upload(payload: FilePayload, tx: Sender<ClientEvent>)
     //GET FILE PATH
     let path = client::ACTIVE_UPLOADS.lock().unwrap().remove(&file_hash).unwrap(); //(CRASHES IF SERVER REQUESTS FILE THAT ISN'T FOR UPLOAD)
     let filename = path.clone().file_name().and_then(|n| n.to_str()
-        .map(|s| s.to_string())).unwrap_or(String::from("Unknown")); //GET FILENAME FOR CONSOLE LOG
+        .map(|s| s.to_string())).unwrap_or_else(|| String::from("Unknown")); //GET FILENAME FOR CONSOLE LOG
 
     //LOG
     tx.send(ClientEvent::Upload(filename)).unwrap();

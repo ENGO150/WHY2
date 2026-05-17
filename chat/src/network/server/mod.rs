@@ -321,13 +321,13 @@ impl Connection
         {
             Self::Authenticated { last_activity, .. } =>
             {
-                now.unwrap_or(Instant::now()).duration_since(*last_activity) >
+                now.unwrap_or_else(Instant::now).duration_since(*last_activity) >
                     Duration::from_secs(config::read_config::<u64>("communication_time"))
             },
 
             Self::NonAuthenticated { connect, .. } =>
             {
-                now.unwrap_or(Instant::now()).duration_since(*connect) >
+                now.unwrap_or_else(Instant::now).duration_since(*connect) >
                     Duration::from_secs(config::read_config::<u64>("max_auth_time"))
             },
         }
@@ -715,7 +715,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
             id: id,
             keys: old_connection.keys().unwrap().to_owned(),
             last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
-            last_key_exchange: *old_connection.last_key_exchange().unwrap_or(&Instant::now()),
+            last_key_exchange: old_connection.last_key_exchange().copied().unwrap_or_else(Instant::now),
             spam_violations: 0,
             channel: None,
             seq: *old_connection.seq(),

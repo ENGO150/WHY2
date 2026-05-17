@@ -632,7 +632,8 @@ fn main()
 
                                         command = command.triggers[0],
                                         aliases = command.triggers[1..].join(", "),
-                                        shortcut = command.shortcut.map(|s| format!("Ctrl+{}", s.to_ascii_uppercase())).unwrap_or(String::from("None")),
+                                        shortcut = command.shortcut.map(|s| format!("Ctrl+{}", s.to_ascii_uppercase()))
+                                            .unwrap_or_else(|| String::from("None")),
                                         description = command.description,
                                         args = if !command.args.is_empty()
                                         {

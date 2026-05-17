@@ -230,7 +230,7 @@ impl Display for Command
         let name = COMMAND_LIST.iter()
             .find(|info| info.command == *self)
             .map(|info| info.triggers[0].to_lowercase())
-            .unwrap_or(String::new()); //HANDLE INVALID
+            .unwrap_or_default(); //HANDLE INVALID
 
         write!(f, "{}{}", COMMAND_PREFIX, name)
     }

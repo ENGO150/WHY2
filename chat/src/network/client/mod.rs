@@ -394,7 +394,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     tx.send(ClientEvent::Authenticated).unwrap();
 
                     //SET SERVER-SIDE ID
-                    id = read.text.unwrap_or("0".to_string()).parse().unwrap();
+                    id = read.text.unwrap_or_else(|| "0".to_string()).parse().unwrap();
 
                     //ALLOW MESSAGE HISTORY & COMMANDS
                     options::set_sending_messages(true);
