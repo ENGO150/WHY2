@@ -10,14 +10,14 @@
 
 **Privacy-focused encrypted chat application powered by WHY2 encryption.**
 
-WHY2 Chat is a reference implementation demonstrating the WHY2 encryption system in a real-world application. It provides end-to-end encrypted text and voice communication with no metadata collection, no backdoors, and complete transparency.
+WHY2 Chat is a reference implementation demonstrating the WHY2 encryption system in a real-world application. It provides encrypted text and voice communication with no metadata collection, no backdoors, and complete transparency.
 
 ---
 
 ## Features
 
 ### Security
-- **End-to-End Encryption**: All messages encrypted with WHY2 before transmission
+- **REX Encryption**: All messages encrypted with WHY2 before transmission
 - **Hybrid Key Exchange**: ECC + ML-KEM post-quantum key encapsulation
 - **Forward Secrecy**: Automatic rekeying invalidates old session keys
 - **Authenticated Encryption**: HMAC-SHA256 ensures message integrity
@@ -26,7 +26,7 @@ WHY2 Chat is a reference implementation demonstrating the WHY2 encryption system
 
 ### Communication
 - **Text Messaging**: Real-time encrypted chat with message history
-- **Voice Channels**: End-to-end encrypted voice communication
+- **Voice Channels**: Encrypted voice communication
   - Opus codec compression
   - Noise reduction (nnnoiseless)
   - Voice activity detection
