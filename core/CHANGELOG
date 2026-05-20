@@ -1,6 +1,23 @@
 WHY2 (Core) Changelog
 =====================
 
+v1.5.0:
+- cfcfed8: remove unused carry propagation from Increment
+- 585d4e4: fix aarch64 unused function warning
+- 7c2672c: optimize key generation overhead
+- 3f65ffc: fix aarch64 unreachable expression warning
+- 39463b9: use barrel-shifter for ShiftRows
+- 27905fb: use broadcast for gl_mul
+- 5d4268a: fix cauchy matrix rustdoc
+- 33bfaec: update MixColumns rustdocs for MDS
+- ed25ca6: parallelize MixColumns
+- 765ae7e: optimize gf arithmetic
+- 5c679ce: implemend MDS matrix multiplication to MixColumns
+- d308101: limit grid height only to 4,8,16
+- 42df670: remove MixColumns function body
+- 643bedc: add MDS matrix consts
+- 8a8d119: add MDS submodule to core consts
+
 v1.4.13:
 - 2a3e09a: fix breaking changes
 - d7cfdd6: update core & chat dependencies
