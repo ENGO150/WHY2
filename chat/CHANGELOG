@@ -1,6 +1,63 @@
 WHY2 (Chat) Changelog
 =====================
 
+v1.5.3:
+- d8090c4: update chat dependencies
+- 267bbba: remove end-to-end inaccuracy from chat readme
+- 4e71fc3: remove unnecessary unwrap allocations
+- 9c1255b: use old symkey for rekeying instead of obfuscation
+- 695bc88: move ACTIVE_FILESHARES to server-side file transfer backend
+- 92d403a: remove ACTIVE_FILESHARES usage from client-side file downloads
+- 4efaf67: add 5s read timeout to server-side file uploads
+- cd62c8f: remove old pending tokens
+- ea16799: fix client prompt bar formatting on file transfers
+- 01e4ca1: move client channel to global context
+- b41a5a5: log main peer_addr in file transfers
+- a79bf1c: simplify server file upload error handling
+- d950d75: remove junk files on failed upload
+- 082c14e: fix dangling file streams bug
+- ebdc1f2: close all file streams on disconnect_all
+- 4786bcd: shutdown file stream on remove_file_stream
+- b376191: add FileTransferGuard to remove file streams
+- d5984f1: add file streams to hashmap on init
+- f7c3d9c: add file stream handler functions
+- f158100: add file_streams map to Authenticated Connection
+- 1394e7e: add uid to FileUpload
+- 0e3f2e4: prevent from replay attacks on file upload
+- 6ae24a2: move file downloads to separate connection
+- 5656a68: add server token generator helper
+- 920dbee: rename PENDING_HEADERS to PENDING_TOKENS
+- 5419859: move ConnectionType to server internals
+- 1455668: rename File ConnectionType to FileUpload
+- 9945287: remove redundant client upload thread
+- 6ad70c0: fix server uploader lookup
+- 3bd9271: move server file upload logic to file connection
+- 3df2933: rename file::listen_server to upload
+- cf2b33c: move client-side file upload to file connection
+- 4411f5b: add server connection helper fn
+- f75cd66: add token field to FilePayload
+- 03fa26a: fix mute voice connection bug
+- 9050742: remove pending headers in server accept loop
+- b02321b: pass peer_addr to listen_server from accept loop
+- 9d9bc00: remove unwrap from send obfuscation
+- 3ca6034: use header as key-exchange obfuscation key
+- 24afeaa: replace opcodes with token header
+- 49adaf6: move rand dependency to shared chat feature
+- 87c39ab: send ConnectionType on listen_server init
+- 452914f: check ConnectionType on new server connections
+- aa20dad: add ConnectionType enum
+- 7afed47: add file sharing backend files
+- 2adac2c: move client & server to separate network subdirectories
+- 56b5462: implement VersionMismatch frontend
+- 595364a: implement hash version checking on client backend
+- 2cf1442: add VersionMismatch ClientEvent
+- ba491d6: send git_hash in welcome packet
+- 077d5c1: compile git commit hash into env
+- bb2cd50: fix client UploadLimit formatting
+- 914e445: add UploadLimit frontend on client
+- 4e05764: check for concurrent uploads on server
+- 99c3814: add max_client_parallel_uploads server config entry
+
 v1.5.2:
 - f7cf9d6: add PQ key auto migration code
 - 2a3e09a: fix breaking changes
