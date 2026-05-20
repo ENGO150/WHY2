@@ -131,7 +131,7 @@ fn redraw_removed(input: &Vec<char>, cursor_position: usize) //REDRAW TEXT AFTER
 
 fn invalid_usage(subject: Option<&str>) //PRINT 'INVALID' MESSAGE
 {
-    print!("Invalid {}! Press Ctrl+H for help.\n\n\r>>> ", subject.unwrap_or("usage"))
+    println!("Invalid {}! Press Ctrl+H for help.\n", subject.unwrap_or("usage"))
 }
 
 fn mute(parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
@@ -149,9 +149,9 @@ fn mute(parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
     } else { None };
 
     //INFO LOG
-    print!
+    println!
     (
-        "Sucessfully {}muted{}.\n\n\r>>> ",
+        "Sucessfully {}muted{}.\n",
         if options::toggle_mute(id) { "" } else { "un" },
         if let Some(id) = id
         {
@@ -160,12 +160,10 @@ fn mute(parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
     );
 }
 
-fn read_input() -> String
+fn read_input(input: &mut Vec<char>, cursor_position: &mut usize) -> String
 {
     //CREATE/RESET PARTIAL INPUT VARIABLES
-    *options::INPUT_READ.lock().unwrap() = Vec::new(); //RESET INPUT_READ
-    let mut input: Vec<char> = Vec::new();
-    let mut cursor_position = 0;
+    *options::INPUT_READ.lock().unwrap() = input.clone();
 
     loop
     {
@@ -183,10 +181,10 @@ fn read_input() -> String
                     //CTRL+A (MOVE TO LINE START)
                     KeyCode::Char('a') =>
                     {
-                        if cursor_position > 0
+                        if *cursor_position > 0
                         {
                             print!("\x1B[{}D", cursor_position);
-                            cursor_position = 0;
+                            *cursor_position = 0;
                         }
                     },
 
@@ -195,10 +193,10 @@ fn read_input() -> String
                     {
                         let input_len = input.len();
 
-                        if cursor_position < input_len
+                        if *cursor_position < input_len
                         {
-                            print!("\x1B[{}C", input_len - cursor_position);
-                            cursor_position = input_len;
+                            print!("\x1B[{}C", input_len - *cursor_position);
+                            *cursor_position = input_len;
                         }
                     },
 
@@ -237,23 +235,23 @@ fn read_input() -> String
                     //CHAR INPUT, APPEND
                     KeyCode::Char(c) =>
                     {
-                        input.insert(cursor_position, c); //LOCAL VARIABLE
-                        options::INPUT_READ.lock().unwrap().insert(cursor_position, c); //GLOBAL VARIABLE
-                        cursor_position += 1; //CURSOR
+                        input.insert(*cursor_position, c); //LOCAL VARIABLE
+                        options::INPUT_READ.lock().unwrap().insert(*cursor_position, c); //GLOBAL VARIABLE
+                        *cursor_position += 1; //CURSOR
 
                         print!("\x1B[0K");
 
                         //PRINT ENTERED CHAR
                         if !options::get_asking_password() //DO NOT PRINT PASSWORD AS TEXT
                         {
-                            print!("{}", input[(cursor_position - 1)..].iter().collect::<String>());
+                            print!("{}", input[(*cursor_position - 1)..].iter().collect::<String>());
                         } else //PRINT PASSWORD AS ASTERISKS
                         {
-                            print!("{}", "*".repeat((input.len() - cursor_position) + 1));
+                            print!("{}", "*".repeat((input.len() - *cursor_position) + 1));
                         }
 
                         //MOVE CURSOR BACK WHERE IS SHOULD BE
-                        let tail_len = input.len() - cursor_position;
+                        let tail_len = input.len() - *cursor_position;
                         if tail_len > 0
                         {
                             print!("\x1B[{}D", tail_len);
@@ -263,49 +261,49 @@ fn read_input() -> String
                     //CONTROL CHARACTERS
                     KeyCode::Backspace => //BACKSPACE - REMOVE LAST CHAR
                     {
-                        if cursor_position > 0
+                        if *cursor_position > 0
                         {
-                            cursor_position -= 1; //CURSOR
-                            input.remove(cursor_position); //LOCAL VARIABLE
-                            options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
+                            *cursor_position -= 1; //CURSOR
+                            input.remove(*cursor_position); //LOCAL VARIABLE
+                            options::INPUT_READ.lock().unwrap().remove(*cursor_position); //GLOBAL VARIABLE
 
                             //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
                             print!("\x1B[1D\x1B[0K");
 
                             //PRINT REMAINING CHARS
-                            redraw_removed(&input, cursor_position);
+                            redraw_removed(&input, *cursor_position);
                         }
                     },
 
                     KeyCode::Delete => //DELETE - REMOVE NEXT CHAR
                     {
-                        if cursor_position < input.len()
+                        if *cursor_position < input.len()
                         {
-                            input.remove(cursor_position); //LOCAL VARIABLE
-                            options::INPUT_READ.lock().unwrap().remove(cursor_position); //GLOBAL VARIABLE
+                            input.remove(*cursor_position); //LOCAL VARIABLE
+                            options::INPUT_READ.lock().unwrap().remove(*cursor_position); //GLOBAL VARIABLE
 
                             //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
                             print!("\x1B[0K");
 
                             //PRINT REMAINING CHARS
-                            redraw_removed(&input, cursor_position);
+                            redraw_removed(&input, *cursor_position);
                         }
                     },
 
                     KeyCode::Left => //ARROW LEFT - MOVE CURSOR
                     {
-                        if cursor_position > 0
+                        if *cursor_position > 0
                         {
-                            cursor_position -= 1;
+                            *cursor_position -= 1;
                             print!("\x1B[1D");
                         }
                     },
 
                     KeyCode::Right => //ARROW RIGHT - MOVE CURSOR
                     {
-                        if cursor_position < input.len()
+                        if *cursor_position < input.len()
                         {
-                            cursor_position += 1;
+                            *cursor_position += 1;
                             print!("\x1B[1C");
                         }
                     },
@@ -318,7 +316,7 @@ fn read_input() -> String
                         if history.0.is_empty() || history.1 == 0 { continue; }
 
                         //CLEAR CURRENT INPUT
-                        if cursor_position > 0
+                        if *cursor_position > 0
                         {
                             print!("\x1B[{}D\x1B[0K", cursor_position);
                         }
@@ -329,9 +327,9 @@ fn read_input() -> String
                         let new_input = &history.0[history.1]; //SELECTED INPUT IN HISTORY
 
                         //REPLACE CURRENT INPUT
-                        input = new_input.chars().collect(); //LOCAL VARIABLE
+                        *input = new_input.chars().collect(); //LOCAL VARIABLE
                         *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
-                        cursor_position = input.len(); //CURSOR
+                        *cursor_position = input.len(); //CURSOR
 
                         print!("{}", new_input); //PRINT
                     },
@@ -344,7 +342,7 @@ fn read_input() -> String
                         if history.1 == history.0.len() { continue; }
 
                         //CLEAR CURRENT INPUT
-                        if cursor_position > 0
+                        if *cursor_position > 0
                         {
                             print!("\x1B[{}D\x1B[0K", cursor_position);
                         }
@@ -362,9 +360,9 @@ fn read_input() -> String
                         };
 
                         //REPLACE CURRENT INPUT
-                        input = new_input.chars().collect(); //LOCAL VARIABLE
+                        *input = new_input.chars().collect(); //LOCAL VARIABLE
                         *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
-                        cursor_position = input.len(); //CURSOR
+                        *cursor_position = input.len(); //CURSOR
 
                         print!("{}", new_input); //PRINT
                     },
@@ -378,8 +376,15 @@ fn read_input() -> String
         }
     }
 
-    //COLLECT AND TRIM (NOT PASSWORDS)
+    //COLLECT
     let read = input.iter().collect::<String>();
+
+    //CLEAR INPUT BUFFERS
+    input.clear();
+    *cursor_position = 0;
+    *options::INPUT_READ.lock().unwrap() = Vec::new();
+
+    //TRIM
     if !options::get_asking_password()
     {
         read.trim().to_string()
@@ -404,7 +409,7 @@ fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CH
     if let Some(parameters) = parameters
     {
         //CHECK FOR COLOR VALIDITY
-        print!("{}\n\n\r>>> ", if to_color(&parameters).is_ok()
+        println!("{}\n", if to_color(&parameters).is_ok()
         {
             //SAVE COLOR TO CONFIG
             config::client_write(config_key, &parameters.to_lowercase());
@@ -543,16 +548,21 @@ fn main()
     let write_stream_listen = write_stream.clone();
 
     //LISTEN TO SERVER
-    thread::spawn(move || client::listen_server(&mut (&mut stream, write_stream_listen), tx));
+    let client_tx = tx.clone();
+    thread::spawn(move || client::listen_server(&mut (&mut stream, write_stream_listen), client_tx));
 
     //ENABLE RAW MODE
     let _raw_mode_guard = RawModeGuard::enable().unwrap();
+
+    //INPUT STATE
+    let mut current_input: Vec<char> = Vec::new();
+    let mut cursor_position = 0usize;
 
     //LOOP FOR CLIENT-SIDE USER INPUT
     loop
     {
         //READ STDIN
-        let input = read_input();
+        let input = read_input(&mut current_input, &mut cursor_position);
 
         //APPEND MESSAGE TO HISTORY
         if options::get_sending_messages()
@@ -603,8 +613,7 @@ fn main()
                                 );
                             }
 
-                            //PRINT PROMPT BAR
-                            print!("\n\r>>> ");
+                            println!();
                         },
 
                         Command::Info =>
@@ -621,14 +630,13 @@ fn main()
                                         .find(|t| t.eq_ignore_ascii_case(&parameters)).is_some())
                                 {
                                     options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
-                                    print!
+                                    println!
                                     (
                                         "\n\rCommand: {command}
                                         \rAliases: {aliases}
                                         \rShortcut: {shortcut}
                                         \rParameters: {args}
-                                        \rDescription: {description}
-                                        \n\r>>> ",
+                                        \rDescription: {description}\n",
 
                                         command = command.triggers[0],
                                         aliases = command.triggers[1..].join(", "),
@@ -710,11 +718,11 @@ fn main()
                                         }, options::get_keys().as_ref());
                                     } else //HASHING FAILED
                                     {
-                                        print!("Error reading file!\n\n\r>>> ");
+                                        println!("Error reading file!\n");
                                     }
                                 } else //NON-EXISTING FILE
                                 {
-                                    print!("File not found!\n\n\r>>> ");
+                                    println!("File not found!\n");
                                 }
                             } else { invalid_usage(None); }
                         },
@@ -746,7 +754,8 @@ fn main()
                     }
                 }
 
-                io::stdout().flush().unwrap(); //FLUSH COMMAND OUTPUT
+                tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
+
                 command_used = true;
             }
 
