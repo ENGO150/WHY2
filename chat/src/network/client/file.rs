@@ -62,7 +62,7 @@ pub fn upload(payload: FilePayload, tx: Sender<ClientEvent>)
 
     //LOG
     tx.send(ClientEvent::Upload(filename)).unwrap();
-    tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
+    tx.send(ClientEvent::Prompt).unwrap();
 
     //UPLOAD
     network::send_file(path, stream, payload.uid, MessageCode::Upload, options::get_keys().as_ref());
@@ -97,7 +97,7 @@ pub fn download(payload: FilePayload, tx: Sender<ClientEvent>)
 
     //LOG
     tx.send(ClientEvent::Download(filename.clone())).unwrap();
-    tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
+    tx.send(ClientEvent::Prompt).unwrap();
 
     //INIT COUNTERS
     let mut seq = 0usize;
@@ -142,7 +142,7 @@ pub fn download(payload: FilePayload, tx: Sender<ClientEvent>)
                     ClientEvent::DownloadFailed(filename)
                 }).unwrap();
 
-                tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
+                tx.send(ClientEvent::Prompt).unwrap();
                 return;
             }
         }

@@ -87,7 +87,7 @@ pub enum ClientEvent
     Authenticated,                             //LOGIN SUCCESSFUL
     Connected(String),                         //SUCCESSFUL CONNECTION MESSAGE
     Message(MessagePacket),                    //RECEIVED MESSAGE
-    Prompt(String),                            //">>>" PROMPT, WITH WRITTEN MESSAGE
+    Prompt,                                    //">>>" PROMPT
     PrivateMessageSent(String, usize, String), //SENT PM
     PrivateMessageRecv(String, usize, String), //RECEIVED PM
     TofuError(TofuCode),                       //TOFU VERIFICATION FAILED
@@ -593,7 +593,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
         }
 
         //PRINT INPUT PROMPT
-        tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
+        tx.send(ClientEvent::Prompt).unwrap();
         if !extra_space { options::set_extra_space(false); } //DISABLE EXTRA SPACE
     }
 }

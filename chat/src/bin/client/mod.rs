@@ -754,7 +754,7 @@ fn main()
                     }
                 }
 
-                tx.send(ClientEvent::Prompt(options::INPUT_READ.lock().unwrap().iter().collect::<String>())).unwrap();
+                tx.send(ClientEvent::Prompt).unwrap();
 
                 command_used = true;
             }

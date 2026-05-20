@@ -104,7 +104,7 @@ pub fn draw_event(event: ClientEvent)
             );
         },
 
-        ClientEvent::Prompt(message) => //SHOW PROMPT BAR
+        ClientEvent::Prompt => //SHOW PROMPT BAR
         {
             let channel = match options::get_channel()
             {
@@ -112,7 +112,7 @@ pub fn draw_event(event: ClientEvent)
                 c => format!("#{c} | "),
             };
 
-            print!("\r{channel}>>> {message}");
+            print!("\r{channel}>>> {}", options::INPUT_READ.lock().unwrap().iter().collect::<String>());
         },
 
         ClientEvent::PrivateMessageSent(to, id, msg) =>
