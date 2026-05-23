@@ -41,9 +41,11 @@ use crate::
 /// - `key`: The key [`Grid`] used for encryption and required for decryption.
 /// - `nonce`: The nonce used for CTR mode.
 ///
-/// # Notes
-/// - The key is stored in [`Grid`] form for direct use in round key generation.
-/// - The nonce does not need to be kept secret but must be unique per encryption.
+/// # Security Notes
+/// - The `key` field is provided as a convenience for the encrypt/decrypt round-trip.
+///   It is **not** intended for serialization or transmission alongside ciphertext.
+///   When persisting or transmitting encrypted data, always store the key separately
+///   and reconstruct [`EncryptedData`] manually before decryption.
 #[derive(Zeroize, Clone)]
 pub struct EncryptedData //DATA FOR REX ENCRYPTER
 <
