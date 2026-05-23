@@ -74,12 +74,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]
     let key_used = match key
     {
         //KEY PASSED AS PARAMETER
-        Some(k) if k.len() == grid_area * 2 => Zeroizing::new(k.to_vec()),
-        Some(k) => return Err(GridError::InvalidKeyLength //INVALID KEY
-        {
-            expected_len: grid_area,
-            actual_len: k.len(),
-        }),
+        Some(k) => Zeroizing::new(k.to_vec()),
 
         //NO KEY, GENERATE ONE
         None => crypto::generate_key::<W, H>()

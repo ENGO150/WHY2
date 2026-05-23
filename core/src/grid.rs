@@ -409,6 +409,16 @@ impl<const W: usize, const H: usize> Grid<W, H>
         //GRID OPTIONS
         let grid_area = W * H;
 
+        //CHECK INVALID KEY LENGTH
+        if vec.len() < grid_area * 2
+        {
+            return Err(GridError::InvalidKeyLength
+            {
+                expected_len: grid_area * 2,
+                actual_len: vec.len(),
+            });
+        }
+
         //SHAPE
         let mut key_grid = Self::new()?;
         for i in 0..grid_area
