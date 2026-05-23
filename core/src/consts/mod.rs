@@ -22,8 +22,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! for the WHY2 algorithm. It includes round counts, mixing coefficients, and
 //! default grid dimensions used to initialize the cipher state.
 
-//MODULES
-pub mod mds;
+//PRIVATE MODULES
+mod mds;
+pub(crate) use mds::
+{
+    MDS_4,
+    MDS_8,
+    MDS_16,
+};
 
 /// Number of round keys used in the WHY2 cipher.
 ///

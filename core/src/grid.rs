@@ -70,7 +70,7 @@ use zeroize::Zeroize;
 use wide::i64x4;
 use rayon::prelude::{ ParallelSlice, ParallelIterator };
 
-use crate::consts::{ self, mds };
+use crate::consts;
 
 #[cfg(feature = "constant-time")]
 use subtle::
@@ -863,9 +863,9 @@ impl<const W: usize, const H: usize> Grid<W, H>
                 //PICK CORRECT MATRIX (AND ITS COEFFICIENT)
                 let coeff = match H
                 {
-                    4  => mds::MDS_4[r][k],
-                    8  => mds::MDS_8[r][k],
-                    16 => mds::MDS_16[r][k],
+                    4  => consts::MDS_4[r][k],
+                    8  => consts::MDS_8[r][k],
+                    16 => consts::MDS_16[r][k],
                     _  => unreachable!("tf")
                 };
 
