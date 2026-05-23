@@ -382,28 +382,42 @@ impl<const W: usize, const H: usize> Grid<W, H>
 
     /// Initializes a key Grid from a vector of signed 64-bit integers.
     ///
-    /// Each cell is built from two key parts using nonlinear mixing.
-    /// addition, XOR, and rotation. This improves diffusion and avoids
-    /// simple linear patterns in the key.
+    /// Each cell is built from two key parts using nonlinear mixing:
+    /// addition, XOR, and key-dependent rotation. This improves diffusion
+    /// and ensures that both the values and the mixing angles depend on
+    /// the key material.
     ///
     /// # Algorithm
-    /// For each cell index $i$, the key parts $A$ and $B$ are derived from the input vector $V$:
+    /// For each cell index $i$, two intermediate values are derived from the input vector $V$:
     ///
-    /// $$ A = (V_i + V_{i + \text{Area}}) \lll (i \bmod 64) $$
+    /// $$ A = V_i + V_{i + \text{Area}} $$
     ///
-    /// $$ B = (V_i \oplus V_{i + \text{Area}}) \ggg (i \bmod 64) $$
+    /// $$ B = V_i \oplus V_{i + \text{Area}} $$
+    ///
+    /// Rotation amounts are derived via cross-dependence — each value is rotated
+    /// by an angle derived from the other:
+    ///
+    /// $$ A' = A \lll (B \bmod 64) $$
+    ///
+    /// $$ B' = B \ggg (A \bmod 64) $$
     ///
     /// where $\lll$ and $\ggg$ denote left and right rotation respectively.
     ///
     /// The final grid value is computed as:
-    /// $$ Grid_{x,y} = A \oplus B \oplus i $$
+    ///
+    /// $$ \text{Grid}_{x,y} = A' \oplus B' \oplus i $$
+    ///
+    /// where $i$ acts as domain separation, ensuring distinct positions
+    /// produce distinct output even for identical key values.
     ///
     /// # Parameters
     /// - `vec`: A slice of signed 64-bit integers representing the raw key.
+    ///   Must contain at least $2 \times W \times H$ elements.
     ///
     /// # Returns
-    /// - Ok(`Grid`) with mixed key values if dimensions are valid.
-    /// - Err(`GridError`) if the grid area is too small.
+    /// - Ok(`Grid`) with mixed key values if input is valid.
+    /// - Err([`GridError::InvalidKeyLength`]) if `vec.len() < 2 × W × H`.
+    /// - Err([`GridError::InvalidDimensions`]) if grid dimensions are invalid.
     pub fn from_key(vec: &[i64]) -> result::Result<Self, GridError>
     {
         //GRID OPTIONS
@@ -426,11 +440,14 @@ impl<const W: usize, const H: usize> Grid<W, H>
             //APPLY NONLINEAR MIX TO KEY
             let mut a = vec[i].wrapping_add(vec[i + grid_area]);
             let mut b = vec[i] ^ vec[i + grid_area];
-            let rot = (i & 63) as u32;
+
+            //CALCULATE ROTATIONS
+            let rot_a = (b as u32) & 63;
+            let rot_b = (a as u32) & 63;
 
             //ROTATE
-            a = a.rotate_left(rot);
-            b = b.rotate_right(rot);
+            a = a.rotate_left(rot_a);
+            b = b.rotate_right(rot_b);
 
             //APPLY
             key_grid[i / W][i % W] = a ^ b ^ (i as i64);
