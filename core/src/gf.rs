@@ -16,6 +16,28 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::
+{
+    _mm_set_epi64x,
+    _mm_set1_epi64x,
+    _mm_clmulepi64_si128,
+    _mm_extract_epi64,
+};
+
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::
+{
+    vcombine_u64,
+    vcreate_u64,
+    vmull_p64,
+    vmull_high_p64,
+    vreinterpretq_p64_u64,
+    vreinterpretq_u64_p128,
+    vgetq_lane_u64,
+    vdupq_n_u64,
+};
+
 //PRIVATE
 #[inline(always)]
 fn mul2(a0: u64, b0: u64, a1: u64, b1: u64) -> (u64, u64)
@@ -25,8 +47,6 @@ fn mul2(a0: u64, b0: u64, a1: u64, b1: u64) -> (u64, u64)
     {
         return unsafe
         {
-            use std::arch::x86_64::*;
-
             let a_vec = _mm_set_epi64x(a1 as i64, a0 as i64);
             let b_vec = _mm_set_epi64x(b1 as i64, b0 as i64);
 
@@ -45,8 +65,6 @@ fn mul2(a0: u64, b0: u64, a1: u64, b1: u64) -> (u64, u64)
     #[cfg(target_arch = "aarch64")]
     return unsafe
     {
-        use std::arch::aarch64::*;
-
         let a_vec = vcombine_u64(vcreate_u64(a0), vcreate_u64(a1));
         let b_vec = vcombine_u64(vcreate_u64(b0), vcreate_u64(b1));
 
@@ -121,8 +139,6 @@ pub fn mul_const2(a0: u64, a1: u64, coeff: u64) -> (u64, u64)
     {
         return unsafe
         {
-            use std::arch::x86_64::*;
-
             let a_vec = _mm_set_epi64x(a1 as i64, a0 as i64);
             let b_vec = _mm_set1_epi64x(coeff as i64); //BROADCAST
 
@@ -141,8 +157,6 @@ pub fn mul_const2(a0: u64, a1: u64, coeff: u64) -> (u64, u64)
     #[cfg(target_arch = "aarch64")]
     return unsafe
     {
-        use std::arch::aarch64::*;
-
         let a_vec = vcombine_u64(vcreate_u64(a0), vcreate_u64(a1));
         let b_vec = vdupq_n_u64(coeff); //BROADCAST
 
