@@ -124,7 +124,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #![doc(html_logo_url = "https://why2.satan.red/apple-icon.png")]
 #![doc(html_favicon_url = "https://why2.satan.red/icon-dark-32x32.png")]
 
-//MODULES
+//PRIVATE MODULES
+mod gf;
+
+//PUBLIC MODULES
 #[cfg(feature = "auth")]
 pub mod auth;
 pub mod consts;
