@@ -142,6 +142,7 @@ impl<const W: usize, const H: usize> AuthenticatedData<W, H>
     /// - The MAC key must be derived independently from the encryption key.
     /// - The nonce is included in the authenticated data to prevent replay attacks.
     /// - Use HKDF or similar KDF to derive separate encryption and MAC keys.
+    #[must_use]
     pub fn authenticate(encrypted_data: EncryptedData<W, H>, mac_key: &[u8; 32]) -> Self //CREATE HMAC
     {
         Self
@@ -183,6 +184,7 @@ impl<const W: usize, const H: usize> AuthenticatedData<W, H>
     ///   timing side-channel attacks.
     /// - If this function returns `false`, the `encrypted_data` MUST be discarded
     ///   and NOT treated as valid ciphertext.
+    #[must_use]
     pub fn verify(&self, mac_key: &[u8; 32]) -> bool
     {
         //USE HANDLER FOR COMPUTING HMAC

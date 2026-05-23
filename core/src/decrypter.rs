@@ -58,6 +58,7 @@ use crate::
 ///   - `output`: A vector of decrypted `i64` values
 ///   - `key`: The original key [`Grid`](crate::grid::Grid) flattened into a vector
 /// - Err(String) if [`Grid`](crate::grid::Grid) area is 1
+#[must_use]
 pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<DecryptedData, GridError>
 {
     //GET MUTABLE input
@@ -100,6 +101,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 /// - Uses CTR mode for decryption (same as encryption).
 /// - Uses big-endian decoding for each `i64` value.
 /// - Each decrypted value contributes up to two Unicode scalar values.
+#[must_use]
 pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<Zeroizing<String>, GridError>
 {
     //DECRYPT

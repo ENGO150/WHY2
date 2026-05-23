@@ -65,6 +65,7 @@ use crate::
 /// $$ C_i = P_i \oplus E_K(\text{Nonce} + i) $$
 ///
 /// where $E_K$ denotes the WHY2 block cipher keyed with $K$, and $i$ is the block counter.
+#[must_use]
 pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]>) -> Result<EncryptedData<W, H>, GridError>
 {
     //REX OPTIONS
@@ -122,6 +123,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]
 /// - `input`: A string slice to encrypt.
 /// - `key`: An optional symmetric key. If `None`, a secure key is generated automatically.
 ///          If provided, it must be exactly $2 \times W \times H$ elements long.
+#[must_use]
 pub fn encrypt_string<const W: usize, const H: usize>(input: &str, key: Option<&[i64]>) -> Result<EncryptedData<W, H>, GridError>
 {
     //CONVERT input TO Vec<i64>

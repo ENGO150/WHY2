@@ -369,6 +369,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - This method does not perform any encryption or transformation.
     /// - Valid area is defined by $W > 0$ and $H \in \lbrace4, 8, 16\rbrace$
     #[inline]
+    #[must_use]
     pub fn new() -> result::Result<Self, GridError>
     {
         if W > 0 && (H == 4 || H == 8 || H == 16)
@@ -418,6 +419,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - Ok(`Grid`) with mixed key values if input is valid.
     /// - Err([`GridError::InvalidKeyLength`]) if `vec.len() < 2 × W × H`.
     /// - Err([`GridError::InvalidDimensions`]) if grid dimensions are invalid.
+    #[must_use]
     pub fn from_key(vec: &[i64]) -> result::Result<Self, GridError>
     {
         //GRID OPTIONS
@@ -471,6 +473,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// # Notes
     /// - No transformation is applied
     /// - Use this for raw Grid construction, not for secure key loading
+    #[must_use]
     pub fn from_bytes(bytes: &[u8]) -> result::Result<Vec<Self>, GridError>
     {
         let matrix_size = W * H * 8; //EACH i64 IS 8 BYTES
