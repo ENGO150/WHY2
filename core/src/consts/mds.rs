@@ -16,38 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//! # Maximum Distance Separable (MDS) Matrices
-//!
-//! This module provides precomputed Cauchy matrices used for the linear diffusion layer
-//! in the WHY2 algorithm. These matrices are essential for the `MixColumns` transformation,
-//! ensuring optimal diffusion across the cipher's state for various grid sizes.
-//!
-//! ## The MDS Property
-//!
-//! A Maximum Distance Separable (MDS) matrix of dimensions $n \times n$ guarantees an optimal
-//! branch number of $\mathcal{B} = n + 1$. In cryptographic terms, this means that a change in
-//! a single input word will propagate to all $n$ output words. This property provides perfect,
-//! rapid avalanche characteristics, effectively thwarting differential and linear cryptanalysis.
-//!
-//! ## Cauchy Matrix Construction
-//!
-//! The matrices defined in this module are constructed as Cauchy matrices. A Cauchy matrix is
-//! defined by two disjoint sequences $X = (x_1, \dots, x_n)$ and $Y = (y_1, \dots, y_n)$.
-//! The individual elements of the matrix $A$ are generated according to the formula:
-//!
-//! $$ M_{ij} = (x_i \oplus y_j)^{-1} $$
-//!
-//! An inherent mathematical property of Cauchy matrices is that every square submatrix is
-//! strictly invertible (non-singular). When operations are evaluated over the cipher's
-//! algebraic structure, this guarantees the strict MDS property without the need for
-//! computationally expensive search algorithms to verify maximum distance separability.
-
-/// A 4×4 MDS Cauchy matrix.
-///
-/// This matrix provides optimal linear diffusion for WHY2 configurations utilizing a
-/// 4-column grid state (e.g., $4 \times 4$ configurations). It achieves a branch number of 5.
-///
-/// This value is cryptographically sensitive and should not be changed casually.
 pub const MDS_4: [[u64; 4]; 4] =
 [
     [0xC00000000000000B, 0x5555555555555552, 0x7FFFFFFFFFFFFFFB, 0xB6DB6DB6DB6DB6D4],
@@ -56,13 +24,6 @@ pub const MDS_4: [[u64; 4]; 4] =
     [0xB6DB6DB6DB6DB6D4, 0x7FFFFFFFFFFFFFFB, 0x5555555555555552, 0xC00000000000000B],
 ];
 
-/// An 8×8 MDS Cauchy matrix.
-///
-/// This matrix provides optimal linear diffusion for the default WHY2 grid configuration
-/// (width $W = 8$). It strictly ensures a branch number of 9, maximizing the avalanche
-/// effect across standard block sizes.
-///
-/// This value is cryptographically sensitive and should not be changed casually.
 pub const MDS_8: [[u64; 8]; 8] =
 [
     [0xE000000000000008, 0x9249249249249245, 0x2AAAAAAAAAAAAAA9, 0xCB972E5CB972E5C0, 0xBFFFFFFFFFFFFFF0, 0xE9D3A74E9D3A74E1, 0x5B6DB6DB6DB6DB6A, 0xCCCCCCCCCCCCCCC7],
@@ -75,13 +36,6 @@ pub const MDS_8: [[u64; 8]; 8] =
     [0xCCCCCCCCCCCCCCC7, 0x5B6DB6DB6DB6DB6A, 0xE9D3A74E9D3A74E1, 0xBFFFFFFFFFFFFFF0, 0xCB972E5CB972E5C0, 0x2AAAAAAAAAAAAAA9, 0x9249249249249245, 0xE000000000000008],
 ];
 
-/// A 16×16 MDS Cauchy matrix.
-///
-/// This extended matrix provides linear diffusion for maximum-width WHY2 configurations
-/// (width $W = 16$, processing 16384 bits per block). It achieves an exceptional branch
-/// number of 17.
-///
-/// This value is cryptographically sensitive and should not be changed casually.
 pub const MDS_16: [[u64; 16]; 16] =
 [
     [0x7000000000000004, 0xBBBBBBBBBBBBBBB4, 0xC92492492492492F, 0x5E26BC4D789AF132, 0x9555555555555559, 0xE79E79E79E79E796, 0x65CB972E5CB972E0, 0x58B162C58B162C5F, 0x5FFFFFFFFFFFFFF8, 0xC8F591EB23D647A7, 0xF4E9D3A74E9D3A7D, 0x71C71C71C71C71C3, 0x2DB6DB6DB6DB6DB5, 0x468D1A3468D1A340, 0xE66666666666666E, 0x94A5294A5294A525],

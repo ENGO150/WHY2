@@ -843,11 +843,6 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// - **AArch64**: `PMULL`/`PMULL2` instructions, processing 2 multiplications per instruction.
     /// - **Fallback**: Software implementation for other architectures.
     ///
-    /// # Supported Grid Heights
-    /// - $H = 4$: Uses [`MDS_4`](mds::MDS_4)
-    /// - $H = 8$: Uses [`MDS_8`](mds::MDS_8)
-    /// - $H = 16$: Uses [`MDS_16`](mds::MDS_16)
-    ///
     /// # Notes
     /// - This method mutates the grid in-place.
     /// - Grid heights outside the supported set will panic.
