@@ -2097,10 +2097,8 @@ checksum = "c6f3fdd0d3c6644b9682cdfbfdbe750af27f9e00ce92dfc7671e080d3cc894e1"
 dependencies = [
  "drm 0.15.0",
  "gbm",
- "gl",
  "image",
  "memmap2",
- "r-egl-wayland",
  "rustix 1.1.4",
  "thiserror 2.0.18",
  "tracing",
@@ -3327,28 +3325,6 @@ name = "r-efi"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
-
-[[package]]
-name = "r-egl"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74c68c047fb54b1eb9a0e751d9b238ff41195a4fcdae90ddc6b43b5903e2b09b"
-dependencies = [
- "libc",
- "pkg-config",
-]
-
-[[package]]
-name = "r-egl-wayland"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9b502a04cf38d8ab73fded506bb3a84999fc6cfea9801d1b459402a79f963d4"
-dependencies = [
- "r-egl",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols",
-]
 
 [[package]]
 name = "rand"

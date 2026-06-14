@@ -132,4 +132,4 @@ server = [
 ]
 
 [target.'cfg(target_os = "linux")'.dependencies]
-libwayshot = { version = "0.8.0", optional = true }
+libwayshot = { version = "0.8.0", default-features = false, optional = true }
