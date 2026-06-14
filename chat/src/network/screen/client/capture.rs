@@ -31,6 +31,7 @@ use std::
 use crossbeam_channel::Sender;
 
 
+#[cfg(target_os = "linux")]
 use libwayshot::WayshotConnection;
 use xcap::Monitor;
 
@@ -60,7 +61,6 @@ pub fn get_primary_monitor() -> Monitor
 
 pub fn capture_loop //CAPTURE LOOP
 (
-    monitor: Monitor,
     frame_tx: Sender<CompressedFrame>,
     running: Arc<AtomicBool>,
     fps: u32,
@@ -68,11 +68,15 @@ pub fn capture_loop //CAPTURE LOOP
     if cfg!(target_os = "linux") &&
         (env::var("WAYLAND_DISPLAY").is_ok() || env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland")
     {
-        capture_loop_wayshot(&monitor, frame_tx, running, fps);
+        #[cfg(target_os = "linux")]
+        {
+            let monitor = get_primary_monitor();
+            capture_loop_wayshot(&monitor, frame_tx, running, fps);
+        }
         return;
     }
 
-    capture_loop_xcap(monitor, frame_tx, running, fps);
+    capture_loop_xcap(get_primary_monitor(), frame_tx, running, fps);
 }
 
 fn capture_loop_xcap
@@ -110,6 +114,7 @@ fn capture_loop_xcap
     }
 }
 
+#[cfg(target_os = "linux")]
 fn capture_loop_wayshot
 (
     monitor: &Monitor,

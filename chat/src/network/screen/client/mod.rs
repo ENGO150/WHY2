@@ -48,7 +48,7 @@ pub fn foo()
 
     //SPAWN CAPTURE THREAD
     let running_capture = running.clone();
-    let _capture_thread = thread::spawn(move || capture::capture_loop(monitor, tx, running_capture, 30));
+    let _capture_thread = thread::spawn(move || capture::capture_loop(tx, running_capture, 30));
     let _audio_capture_thread = audio::spawn_audio_capture(audio_tx, running.clone());
 
     //TODO: Send
