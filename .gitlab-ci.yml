@@ -106,7 +106,7 @@ build-why2-chat-linux:
   only:
     - development
   script:
-    - apt-get update && apt-get install -y pkg-config libasound2-dev libopus-dev
+    - apt-get update && apt-get install -y pkg-config libasound2-dev libopus-dev libpipewire-0.3-dev
     - cargo build --release
     - cargo build --bin why2-server --no-default-features --features server --release
   artifacts:
@@ -132,7 +132,7 @@ upload-to-aur:
     - when: never
   script:
     # Install dependencies
-    - apt update && apt install -y git grep sed
+    - apt-get update && apt-get install -y git grep sed
 
     # Setup SSH
     - mkdir -p ~/.ssh
