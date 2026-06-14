@@ -77,7 +77,6 @@ lewton = { version = "0.10.2", optional = true }
 # SCREEN SHARE (CLIENT SPECIFIC)
 crossbeam-channel = { version = "0.5.15", optional = true }
 winit = { version = "0.30.13", optional = true }
-libwayshot = { version = "0.8.0", optional = true }
 xcap = { version = "0.9.6", optional = true }
 zstd = { version = "0.13.3", optional = true }
 image = { version = "0.25.10", default-features = false, features = ["jpeg"], optional = true }
@@ -131,3 +130,6 @@ server = [
     "dep:log",
     "dep:simple_logger",
 ]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libwayshot = { version = "0.8.0", optional = true }
