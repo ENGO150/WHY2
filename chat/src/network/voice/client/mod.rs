@@ -295,7 +295,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
 
     //CONFIGURE INPUT STREAM
     let send_socket = socket.clone();
-    let input_stream = input_device.build_input_stream(&input_config, move |data: &[f32], _: &_|
+    let input_stream = input_device.build_input_stream(input_config, move |data: &[f32], _: &_|
     {
         //CHECK FOR MUTING
         if chat_options::is_muted(None)
@@ -449,7 +449,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
     let output_resample_step = output_source_rate / output_target_rate;
 
     //CONFIGURE OUTPUT STREAM
-    let output_stream = output_device.build_output_stream(&output_config, move |data: &mut [f32], _: &_|
+    let output_stream = output_device.build_output_stream(output_config, move |data: &mut [f32], _: &_|
     {
         //CHECK GENERATION
         if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
