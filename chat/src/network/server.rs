@@ -1402,6 +1402,31 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     }, Some(&keys), None);
                 },
 
+                //LIST SCREENSHARES
+                MessageCode::Screens =>
+                {
+                    let mut user_list = Vec::new();
+
+                    //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
+                    for connection_enum in CONNECTIONS.iter()
+                    {
+                        if let Connection::Authenticated { username: uname, id: user_id, screen_upload_stream, .. } = connection_enum.value()
+                        {
+                            if screen_upload_stream.is_none() { continue; }
+
+                            user_list.push(json!({ "username": uname, "id": user_id }));
+                        }
+                    }
+
+                    //SEND LIST BACK TO CLIENT
+                    network::send(&mut streams.1.lock().unwrap(), MessagePacket
+                    {
+                        text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
+                        code: Some(MessageCode::Screens),
+                        ..Default::default()
+                    }, Some(&keys), None);
+                },
+
                 //PRIVATE MESSAGE
                 MessageCode::PrivateMessage =>
                 {

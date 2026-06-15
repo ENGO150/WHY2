@@ -45,6 +45,7 @@ pub enum Command
     Info,           //COMMAND INFO
     List,           //LIST USERS
     Files,          //LIST FILES
+    Screens,        //LIST SCREENSHARES
     Upload,         //UPLOAD FILE TO SERVER
     Download,       //DOWNLOAD FILE FROM SERVER
     Screen,         //TOGGLE SCREEN SHARING
@@ -160,10 +161,19 @@ pub const COMMAND_LIST: &[CommandInfo] =
     CommandInfo
     {
         command: Command::Files,
-        triggers: &[ "FILES", "LISTFILES", "UPLOADS", "DOWNLOADS", "SHARES" ],
+        triggers: &[ "FILES", "LISTFILES", "UPLOADS", "DOWNLOADS" ],
         shortcut: Some('u'),
         args: &[],
         description: "Shows available files and their IDs",
+    },
+
+    CommandInfo
+    {
+        command: Command::Screens,
+        triggers: &[ "SCREENS", "LISTSCREENS", "SCREENSHARES", "SHARES" ],
+        shortcut: None,
+        args: &[],
+        description: "Shows all screensharing clients.",
     },
 
     CommandInfo
@@ -227,6 +237,7 @@ impl Command
             Command::Download => Some(MessageCode::Download),
             Command::Screen => Some(MessageCode::ScreenUpload),
             Command::Files => Some(MessageCode::Files),
+            Command::Screens => Some(MessageCode::Screens),
 
             _ => None,
         }

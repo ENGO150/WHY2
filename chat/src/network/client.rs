@@ -108,6 +108,7 @@ pub enum ClientEvent
     Downloaded(String),                        //DOWNLOADED FILE
     DownloadFailed(String),                    //DOWNLOADING FAILED
     Files(Vec<Value>),                         //FILE LIST
+    Screens(Vec<Value>),                       //SCREENSHARE LIST
     UploadLimit,                               //MAX CONCURRENT UPLOADS REACHED
     ScreenUpload(bool),                        //TOGGLED SCREENSHARE
     ExtraSpace,                                //JUST RANDOM NEWLINE
@@ -534,6 +535,22 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     }
 
                     tx.send(ClientEvent::Files(uploads_json)).unwrap();
+                },
+
+                //SCREENSHARE LIST
+                MessageCode::Screens =>
+                {
+                    //PARSE JSON
+                    let screens_json: Vec<Value> = serde_json::from_str(&read.text.unwrap()).unwrap();
+
+                    if !screens_json.is_empty()
+                    {
+                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
+                        extra_space = true;
+                        options::set_extra_space(true);
+                    }
+
+                    tx.send(ClientEvent::Screens(screens_json)).unwrap();
                 },
 
                 //MAX PARALLEL UPLOADS

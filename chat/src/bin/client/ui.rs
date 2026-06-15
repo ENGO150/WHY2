@@ -392,6 +392,29 @@ pub fn draw_event(event: ClientEvent)
             }
         },
 
+        ClientEvent::Screens(screens_json) =>
+        {
+            clear_lines(2);
+            if screens_json.is_empty()
+            {
+                println!("No available screenshares.\n");
+            } else
+            {
+                if !options::get_extra_space() { println!(); }
+                println!("Screensharing clients:");
+
+                for user_obj in screens_json
+                {
+                    let username = user_obj["username"].as_str().unwrap();
+                    let id = user_obj["id"].as_u64().unwrap();
+
+                    println!("\r - {} ({})", username, id);
+                }
+
+                println!();
+            }
+        },
+
         ClientEvent::UploadLimit =>
         {
             clear_lines(1);
