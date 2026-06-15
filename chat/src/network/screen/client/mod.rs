@@ -31,10 +31,15 @@ use std::
     {
         Arc,
         Mutex,
+        OnceLock,
         mpsc::Sender,
         atomic::{ AtomicBool, Ordering },
     },
 };
+
+use crossbeam_channel::Receiver;
+
+use winit::event_loop::EventLoopProxy;
 
 use crate::
 {
@@ -43,22 +48,26 @@ use crate::
     {
         self,
         MessagePacket,
+        CompressedFrame,
         client::{ self, ClientEvent },
     },
 };
 
-#[cfg(target_os = "linux")]
-use winit::platform::
+//STRUCTS
+pub struct ScreenShareRequest
 {
-    wayland::EventLoopBuilderExtWayland,
-    x11::EventLoopBuilderExtX11,
-};
+    pub rx: Receiver<CompressedFrame>,
+    pub running: Arc<AtomicBool>,
+}
 
-#[cfg(target_os = "windows")]
-use winit::platform::windows::EventLoopBuilderExtWindows;
+//ENUMS
+pub enum UserEvent //CUSTOM WINIT EVENTS
+{
+    NewSession(ScreenShareRequest),
+}
 
-#[cfg(target_os = "macos")]
-use winit::platform::macos::EventLoopBuilderExtMacOS;
+//GLOBAL VARIABLES
+pub static SCREEN_SHARE_PROXY: OnceLock<EventLoopProxy<UserEvent>> = OnceLock::new();
 
 pub fn screen_upload(token: [u8; 32], tx: Sender<ClientEvent>)
 {
@@ -118,31 +127,6 @@ pub fn screen_download(token: [u8; 32])
     let (tx, rx) = crossbeam_channel::bounded(2);
     let running = Arc::new(AtomicBool::new(true));
 
-    //CREATE EVENT LOOP
-    let event_loop =
-    {
-        let mut builder = winit::event_loop::EventLoop::builder();
-
-        #[cfg(target_os = "linux")]
-        {
-            EventLoopBuilderExtX11::with_any_thread(&mut builder, true);
-            EventLoopBuilderExtWayland::with_any_thread(&mut builder, true);
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            builder.with_any_thread(true);
-        }
-
-        #[cfg(target_os = "macos")]
-        {
-            builder.with_any_thread(true);
-        }
-
-        builder.build().expect("Failed to create event loop")
-    };
-    let proxy = event_loop.create_proxy();
-
     //SPAWN NETWORK READER THREAD
     let running_net = running.clone();
     thread::spawn(move ||
@@ -166,12 +150,12 @@ pub fn screen_download(token: [u8; 32])
             if let Some(frame) = read.frame
             {
                 tx.send(frame).ok();
-                proxy.send_event(()).ok();
             }
         }
     });
 
-    //RUN DISPLAY ON CURRENT THREAD
-    let mut app = display::App::new(rx, 1920, 1080, running);
-    event_loop.run_app(&mut app).expect("Event loop terminated with error");
+    if let Some(proxy) = SCREEN_SHARE_PROXY.get()
+    {
+        proxy.send_event(UserEvent::NewSession(ScreenShareRequest { rx, running })).ok();
+    }
 }

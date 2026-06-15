@@ -37,10 +37,10 @@ use std::
     },
     sync::
     {
-        mpsc,
         LazyLock,
         Arc,
         Mutex,
+        mpsc::{ self, Sender },
     },
 };
 
@@ -59,6 +59,8 @@ use crossterm::
 };
 
 use colored::Color;
+
+use winit::event_loop::EventLoop;
 
 use why2_chat::
 {
@@ -79,6 +81,12 @@ use why2_chat::
         FilePayload,
         voice::client::device,
         client::{ self, ClientEvent },
+        screen::client::
+        {
+            self as screen,
+            UserEvent,
+            display::ScreenShareApp,
+        },
     },
 };
 
@@ -483,6 +491,20 @@ fn main()
 
     println!("Welcome.\n");
 
+    let event_loop = EventLoop::<UserEvent>::with_user_event()
+        .build().expect("Failed to create event loop");
+
+    screen::SCREEN_SHARE_PROXY.set(event_loop.create_proxy()).ok();
+
+    //RUN REST OF CLIENT IN NEW THREAD
+    thread::spawn(move || run_client(tx));
+
+    let mut app = ScreenShareApp::new();
+    event_loop.run_app(&mut app).expect("Event loop terminated with error");
+}
+
+fn run_client(tx: Sender<ClientEvent>)
+{
     //GET CONNECTING ADDRESS
     let mut connecting_addr = if config::read_config::<bool>("auto_connect") //USER ENABLED AUTOMATIC CONNECTION
     {
