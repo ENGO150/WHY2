@@ -1,0 +1,94 @@
+/*
+This is part of WHY2
+Copyright (C) 2022-2026 Václav Šmejkal
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+use std::sync::{ Arc, Mutex };
+
+use crate::network::
+{
+    self,
+    server,
+    Streams,
+};
+
+//PRIVATE
+//STRUCTS
+struct ScreenTransferGuard
+{
+    id: usize,
+}
+
+//IMPLEMENTATIONS
+impl Drop for ScreenTransferGuard
+{
+    fn drop(&mut self)
+    {
+        if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&self.id))
+        {
+            //REMOVE SCREEN STREAM
+            conn.remove_screen_upload_stream();
+        }
+    }
+}
+
+//PUBLIC
+//FUNCTIONS
+pub fn screen_download(id: usize, streams: &mut Streams)
+{
+    //GET CLIENT KEYS
+    let keys =
+    {
+        //FIND CONNECTION BY ID
+        let conn = server::CONNECTIONS.iter_mut()
+            .find(|e| e.value().id() == Some(&id));
+
+        match conn
+        {
+            Some(mut c) =>
+            {
+                let keys = match c.keys()
+                {
+                    Some(k) => k.clone(),
+                    None => return
+                };
+
+                //ADD FILE STREAM
+                c.set_screen_upload_stream(Arc::new(Mutex::new(streams.0.try_clone().unwrap())));
+
+                keys
+            },
+            None => return
+        }
+    };
+
+    //DISCONNECT GUARD
+    let _guard = ScreenTransferGuard { id };
+
+    //LOCAL SEQ
+    let mut seq = 0usize;
+
+    //LOOP READING
+    loop
+    {
+        //READ
+        let _read = match network::receive(streams, Some(&keys), Some(&mut seq))
+        {
+            Some(r) => r,
+            None => return
+        };
+    }
+}

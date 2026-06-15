@@ -45,6 +45,7 @@ use why2_chat::
     network::
     {
         file::server as file,
+        screen::server as screen,
         voice::server as voice_server,
         server::{ self, ConnectionType },
     },
@@ -193,6 +194,11 @@ fn main()
 
                             ConnectionType::ScreenUpload { .. } =>
                             {
+                                //SET READ TIMEOUT
+                                stream.set_read_timeout(Some(Duration::from_millis(5000))).expect("Failed to set read timeout");
+
+                                let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
+                                thread::spawn(move || screen::screen_download(id, &mut (&mut stream, write_stream)));
                                 continue;
                             },
                         }

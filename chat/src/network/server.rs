@@ -105,19 +105,20 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
     Authenticated
     {
-        write_stream: Arc<Mutex<TcpStream>>,               //STREAM
-        file_streams: Arc<Mutex<HashMap<u64, TcpStream>>>, //ACTIVE FILE STREAMS
-        peer_addr: SocketAddr,                             //ADDRESS & PORT
-        username: String,                                  //USERNAME
-        id: usize,                                         //ID OF USER
-        keys: SharedKeys,                                  //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
-        last_activity: Instant,                            //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
-        last_key_exchange: Instant,                        //TIME OF LAST REKEY
-        spam_violations: usize,                            //SPAM VIOLATIONS (unexpected, huh?)
-        channel: Option<String>,                           //CHANNEL
-        seq: usize,                                        //SEQUENCE NUMBER (CLIENT -> SERVER)
-        server_seq: usize,                                 //SEQUENCE NUMBER (SERVER -> CLIENT)
-        alive: bool,                                       //RESPONDED TO KEEPALIVE
+        write_stream: Arc<Mutex<TcpStream>>,                 //STREAM
+        file_streams: Arc<Mutex<HashMap<u64, TcpStream>>>,   //ACTIVE FILE STREAMS
+        screen_upload_stream: Option<Arc<Mutex<TcpStream>>>, //SCREEN UPLOAD STREAM
+        peer_addr: SocketAddr,                               //ADDRESS & PORT
+        username: String,                                    //USERNAME
+        id: usize,                                           //ID OF USER
+        keys: SharedKeys,                                    //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
+        last_activity: Instant,                              //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
+        last_key_exchange: Instant,                          //TIME OF LAST REKEY
+        spam_violations: usize,                              //SPAM VIOLATIONS (unexpected, huh?)
+        channel: Option<String>,                             //CHANNEL
+        seq: usize,                                          //SEQUENCE NUMBER (CLIENT -> SERVER)
+        server_seq: usize,                                   //SEQUENCE NUMBER (SERVER -> CLIENT)
+        alive: bool,                                         //RESPONDED TO KEEPALIVE
     },
 
     NonAuthenticated
@@ -385,6 +386,36 @@ impl Connection
             }
         }
     }
+
+    //GET SCREEN UPLOAD STREAM
+    pub fn screen_upload_stream(&self) -> &Option<Arc<Mutex<TcpStream>>>
+    {
+        match self
+        {
+            Self::Authenticated { screen_upload_stream, .. } => screen_upload_stream,
+            Self::NonAuthenticated { .. } => &None,
+        }
+    }
+
+    //ADD SCREEN UPLOAD STREAM
+    pub fn set_screen_upload_stream(&mut self, stream: Arc<Mutex<TcpStream>>)
+    {
+        match self
+        {
+            Self::Authenticated { screen_upload_stream, .. } => *screen_upload_stream = Some(stream),
+            _ => {},
+        }
+    }
+
+    //REMOVE SCREEN UPLOAD STREAM
+    pub fn remove_screen_upload_stream(&mut self)
+    {
+        match self
+        {
+            Self::Authenticated { screen_upload_stream, .. } => *screen_upload_stream = None,
+            _ => {},
+        }
+    }
 }
 
 //LISTS
@@ -586,6 +617,12 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
         }
     }
 
+    //CLOSE SCREEN UPLOAD STREAM
+    if let Some(stream) = connection.screen_upload_stream()
+    {
+        stream.lock().unwrap().shutdown(Shutdown::Both).ok();
+    }
+
     //AUTHENTICATED ACTIONS
     if connection.is_authenticated()
     {
@@ -679,13 +716,14 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                 }
             },
 
-            Connection::Authenticated { write_stream, file_streams, username, id, last_activity, channel,
+            Connection::Authenticated { write_stream, file_streams, screen_upload_stream, username, id, last_activity, channel,
                 seq, server_seq, peer_addr, alive, .. } =>
             {
                 Connection::Authenticated
                 {
                     write_stream,
                     file_streams,
+                    screen_upload_stream,
                     peer_addr,
                     username,
                     id,
@@ -712,6 +750,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
         {
             write_stream: old_connection.write_stream().clone(),
             file_streams: Arc::new(Mutex::new(HashMap::new())),
+            screen_upload_stream: None,
             peer_addr: *old_connection.peer_addr(),
             username: username.to_string(),
             id: id,
@@ -741,6 +780,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
         {
             write_stream: old_connection.write_stream().clone(),
             file_streams: old_connection.file_streams().unwrap().clone(),
+            screen_upload_stream: old_connection.screen_upload_stream().clone(),
             peer_addr: *old_connection.peer_addr(),
             username: old_connection.username().unwrap().clone(),
             id: *old_connection.id().unwrap(),
