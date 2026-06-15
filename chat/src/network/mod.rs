@@ -88,6 +88,7 @@ pub enum MessageCode //CONTROL CODES
     Uploaded,           //SERVER -> CLIENT | ANNOUNCE NEW UPLOADED FILE
     Files,              //CLIENT <> SERVER | LIST UPLOADED FILES
     Screens,            //CLIENT <> SERVER | LIST SCREENSHARES
+    Attach,             //CLIENT <> SERVER | ATTACH CLIENT SCREENSHARE
     UploadLimit,        //SERVER -> CLIENT | MAX CONCURRENT UPLOADS REACHED
     ScreenUpload,       //CLIENT <> SERVER | TOGGLE SCREENSHARE
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND

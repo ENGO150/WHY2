@@ -49,6 +49,7 @@ pub enum Command
     Upload,         //UPLOAD FILE TO SERVER
     Download,       //DOWNLOAD FILE FROM SERVER
     Screen,         //TOGGLE SCREEN SHARING
+    Attach,         //ATTACH SCREEN SHARE
     PrivateMessage, //ONE TO ONE MESSAGE
     UsernameColor,  //SET COLOR OF USERNAME
     MessageColor,   //SET COLOR OF MESSAGE
@@ -151,6 +152,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Attach,
+        triggers: &[ "ATTACH", "WATCH", "DISPLAY", "JOIN" ],
+        shortcut: None,
+        args: &[CommandArg { name: "ID", required: true }],
+        description: "Attaches client screenshare.",
+    },
+
+    CommandInfo
+    {
         command: Command::List,
         triggers: &[ "LIST", "USERS", "CLIENTS", "CHANNELS", "IDS", "ID" ],
         shortcut: Some('l'),
@@ -236,6 +246,7 @@ impl Command
             Command::Upload => Some(MessageCode::Upload),
             Command::Download => Some(MessageCode::Download),
             Command::Screen => Some(MessageCode::ScreenUpload),
+            Command::Attach => Some(MessageCode::Attach),
             Command::Files => Some(MessageCode::Files),
             Command::Screens => Some(MessageCode::Screens),
 
