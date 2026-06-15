@@ -400,7 +400,7 @@ pub fn draw_event(event: ClientEvent)
 
         ClientEvent::ScreenUpload(enabled) =>
         {
-            clear_lines(1);
+            clear_lines(2);
             println!("{} screen sharing.\n", if enabled { "Started" } else { "Stopped" });
         },
 
