@@ -1295,6 +1295,18 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     }
                 },
 
+                //SCREEN SHARE
+                MessageCode::Screen =>
+                {
+                    //CHECK FOR ENABLED SCREENSHARE
+                    if config::read_config("enable_screenshare")
+                    {
+                    } else
+                    {
+                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidFeature, Some(&keys));
+                    }
+                },
+
                 //LIST FILES
                 MessageCode::Files =>
                 {
