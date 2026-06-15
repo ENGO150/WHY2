@@ -123,6 +123,7 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub colors: MessageColors,     //MESSAGE COLORS
     pub seq: usize,                //SEQUENCE NUMBER
     pub file: Option<FilePayload>, //FILE UPLOADED BY CLIENT
+    pub token: Option<[u8; 32]>,   //CONNECTION TOKEN
 }
 
 //IMPLEMENTATIONS
@@ -143,6 +144,7 @@ impl Default for MessagePacket //DEFAULT
             },
             seq: 0,
             file: None,
+            token: None,
         }
     }
 }

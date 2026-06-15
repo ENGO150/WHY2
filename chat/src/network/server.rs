@@ -97,6 +97,7 @@ pub enum ConnectionType //TYPES OF TCP CHANNEL
         uid: u64,
         path: PathBuf,
     },
+    ScreenUpload { uid: u64 },
 }
 
 #[derive(Clone)]
@@ -1301,6 +1302,19 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     //CHECK FOR ENABLED SCREENSHARE
                     if config::read_config("enable_screenshare")
                     {
+                        //GENERATE RANDOM SHARE UID
+                        let uid = rand::random::<u64>();
+
+                        //SEND SCREEN ACCEPT
+                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
+                        {
+                            code: Some(MessageCode::Screen),
+                            token: Some(open_connection(id, ConnectionType::ScreenUpload { uid })),
+                            ..Default::default()
+                        }, Some(&keys), None);
+
+                        //LOG START
+                        log::info!("ScreenUpload request: {peer_addr}");
                     } else
                     {
                         send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidFeature, Some(&keys));

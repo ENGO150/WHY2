@@ -190,6 +190,11 @@ fn main()
                                 thread::spawn(move || file::upload(id, stream, path, uid));
                                 continue;
                             },
+
+                            ConnectionType::ScreenUpload { .. } =>
+                            {
+                                continue;
+                            },
                         }
                     } else
                     {
