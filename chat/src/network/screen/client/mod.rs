@@ -37,7 +37,12 @@ use std::
 use crate::
 {
     options,
-    network::client::{ self, ClientEvent },
+    network::
+    {
+        self,
+        MessagePacket,
+        client::{ self, ClientEvent },
+    },
 };
 
 pub fn screen_upload(token: [u8; 32], tx: Sender<ClientEvent>)
@@ -51,14 +56,6 @@ pub fn screen_upload(token: [u8; 32], tx: Sender<ClientEvent>)
     //LOG
     tx.send(ClientEvent::ScreenUpload(true)).unwrap();
     tx.send(ClientEvent::Prompt).unwrap();
-}
-
-pub fn foo()
-{
-    //FIND PRIMARY MONITOR
-    let monitor = capture::get_primary_monitor();
-    let width = monitor.width().expect("Failed to get monitor width");
-    let height = monitor.height().expect("Failed to get monitor height");
 
     //SHARED STATE
     let (tx, rx) = crossbeam_channel::bounded(2);
@@ -77,13 +74,17 @@ pub fn foo()
         //HANDLE VIDEO FRAMES
         if let Ok(compressed_frame) = rx.try_recv()
         {
-            //let bytes_to_send = compressed_frame.compressed_data.len();
+            network::send(&mut stream, MessagePacket
+            {
+                frame: Some(compressed_frame),
+                ..Default::default()
+            }, options::get_keys().as_ref());
         }
 
         //HANDLE AUDIO FRAMES
-        if let Ok(audio_chunk) = audio_rx.try_recv()
+        if let Ok(_audio_chunk) = audio_rx.try_recv()
         {
-            //let chunk_size = audio_chunk.data.len();
+            //TODO
         }
     }
 }

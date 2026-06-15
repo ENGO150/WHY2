@@ -35,10 +35,14 @@ use crossbeam_channel::Sender;
 use libwayshot::WayshotConnection;
 use xcap::Monitor;
 
-use crate::network::screen::client::
+use crate::network::
 {
-    compress,
-    frame::{ Frame, CompressedFrame },
+    CompressedFrame,
+    screen::client::
+    {
+        compress,
+        frame::Frame,
+    },
 };
 
 pub fn get_primary_monitor() -> Monitor

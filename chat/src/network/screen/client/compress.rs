@@ -22,10 +22,14 @@ use std::
     convert::TryInto,
 };
 
-use crate::network::screen::
+use crate::network::
 {
-    consts,
-    client::frame::{ CompressedFrame, Frame },
+    CompressedFrame,
+    screen::
+    {
+        consts,
+        client::frame::Frame,
+    },
 };
 
 use image::

@@ -24,14 +24,6 @@ pub struct Frame //SINGLE FRAME
     pub data: Vec<u32>, //PIXEL DATA (0RGB)
 }
 
-pub struct CompressedFrame //COMPRESSED FRAME
-{
-    pub width: u32,
-    pub height: u32,
-    pub compressed_data: Vec<u8>,
-    pub pixel_count: usize,
-}
-
 impl Frame
 {
     pub fn as_bytes(&self) -> &[u8]

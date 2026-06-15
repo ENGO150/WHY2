@@ -114,16 +114,26 @@ pub struct FilePayload //FILE CHUNK
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
+pub struct CompressedFrame //COMPRESSED FRAME
+{
+    pub width: u32,
+    pub height: u32,
+    pub compressed_data: Vec<u8>,
+    pub pixel_count: usize,
+}
+
+#[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 {
-    pub text: Option<String>,      //MESSAGE
-    pub username: Option<String>,  //USERNAME (SENT ONLY BY SERVER, AS SERVER DOESN'T ACCEPT USERNAMES FROM CLIENT)
-    pub id: Option<usize>,         //ID OF USER
-    pub code: Option<MessageCode>, //CONTROL CODE
-    pub colors: MessageColors,     //MESSAGE COLORS
-    pub seq: usize,                //SEQUENCE NUMBER
-    pub file: Option<FilePayload>, //FILE UPLOADED BY CLIENT
-    pub token: Option<[u8; 32]>,   //CONNECTION TOKEN
+    pub text: Option<String>,           //MESSAGE
+    pub username: Option<String>,       //USERNAME (SENT ONLY BY SERVER, AS SERVER DOESN'T ACCEPT USERNAMES FROM CLIENT)
+    pub id: Option<usize>,              //ID OF USER
+    pub code: Option<MessageCode>,      //CONTROL CODE
+    pub colors: MessageColors,          //MESSAGE COLORS
+    pub seq: usize,                     //SEQUENCE NUMBER
+    pub file: Option<FilePayload>,      //FILE UPLOADED BY CLIENT
+    pub frame: Option<CompressedFrame>, //SCREENSHARING FRAME
+    pub token: Option<[u8; 32]>,        //CONNECTION TOKEN
 }
 
 //IMPLEMENTATIONS
@@ -144,6 +154,7 @@ impl Default for MessagePacket //DEFAULT
             },
             seq: 0,
             file: None,
+            frame: None,
             token: None,
         }
     }
