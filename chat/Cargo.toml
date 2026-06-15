@@ -80,6 +80,7 @@ winit = { version = "0.30.13", optional = true }
 xcap = { version = "0.9.6", default-features = false, optional = true }
 zstd = { version = "0.13.3", optional = true }
 image = { version = "0.25.10", default-features = false, features = ["jpeg"], optional = true }
+softbuffer = { version = "0.4.8", optional = true }
 
 # CHAT (SERVER SPECIFIC)
 argon2 = { version = "0.5.3", optional = true }
@@ -121,6 +122,7 @@ client = [
     "dep:xcap",
     "dep:zstd",
     "dep:image",
+    "dep:softbuffer",
 ]
 
 server = [
