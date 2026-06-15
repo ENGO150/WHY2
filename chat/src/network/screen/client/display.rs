@@ -112,19 +112,14 @@ impl App
                                     *l = *d;
                                 }
                             }
-                        } else
-                        {
-                            self.last_frame = Some(diff_frame);
                         }
-                    } else
-                    {
-                        self.last_frame = Some(diff_frame);
                     }
-                }
+                },
+
                 DecompressedFrame::JpegFull(full_frame) =>
                 {
                     self.last_frame = Some(full_frame);
-                }
+                },
             }
 
             got_new_frame = true;
