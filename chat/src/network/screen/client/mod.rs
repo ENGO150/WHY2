@@ -83,18 +83,20 @@ pub fn screen_upload(token: [u8; 32], tx: Sender<ClientEvent>)
     let _capture_thread = thread::spawn(move || capture::capture_loop(tx, running_capture, 30));
     let _audio_capture_thread = audio::spawn_audio_capture(audio_tx, running.clone());
 
-    //TODO: Send
     loop
     {
-        //HANDLE VIDEO FRAMES
-        if let Ok(compressed_frame) = rx.try_recv()
+        //HANDLE VIDEO FRAMES (BLOCKING)
+        let compressed_frame = match rx.recv()
         {
-            network::send(&mut stream, MessagePacket
-            {
-                frame: Some(compressed_frame),
-                ..Default::default()
-            }, options::get_keys().as_ref());
-        }
+            Ok(f) => f,
+            Err(_) => return,
+        };
+
+        network::send(&mut stream, MessagePacket
+        {
+            frame: Some(compressed_frame),
+            ..Default::default()
+        }, options::get_keys().as_ref());
 
         //HANDLE AUDIO FRAMES
         if let Ok(_audio_chunk) = audio_rx.try_recv()

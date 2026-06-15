@@ -35,7 +35,7 @@ use winit::
     application::ApplicationHandler,
     dpi::PhysicalSize,
     event::WindowEvent,
-    event_loop::ActiveEventLoop,
+    event_loop::{ ActiveEventLoop, ControlFlow },
     window::
     {
         Window,
@@ -94,10 +94,23 @@ impl App
 
     fn process_pending_frames(&mut self)
     {
-        let mut got_new_frame = false;
+        //DRAIN ALL PENDING FRAMES
+        let mut pending: Vec<CompressedFrame> = Vec::new();
         while let Ok(compressed) = self.frame_rx.try_recv()
         {
-            match compress::decompress(&compressed)
+            pending.push(compressed);
+        }
+
+        if pending.is_empty() { return; }
+
+        //SKIP FRAMES BEFORE LAST JPEG KEYFRAME
+        let start = pending.iter()
+            .rposition(|f| !f.compressed_data.is_empty() && f.compressed_data[0] == 1)
+            .unwrap_or(0);
+
+        for compressed in &pending[start..]
+        {
+            match compress::decompress(compressed)
             {
                 DecompressedFrame::ZstdDiff(diff_frame) =>
                 {
@@ -121,16 +134,11 @@ impl App
                     self.last_frame = Some(full_frame);
                 },
             }
-
-            got_new_frame = true;
         }
 
-        if got_new_frame
+        if let Some(gfx) = &self.gfx
         {
-            if let Some(gfx) = &self.gfx
-            {
-                gfx.window.request_redraw();
-            }
+            gfx.window.request_redraw();
         }
     }
 }
@@ -139,6 +147,9 @@ impl ApplicationHandler<()> for App
 {
     fn resumed(&mut self, event_loop: &ActiveEventLoop)
     {
+        //SLEEP UNTIL WOKEN BY PROXY EVENT (PREVENTS 100%)
+        event_loop.set_control_flow(ControlFlow::Wait);
+
         //CREATE WINDOW ONLY ONCE
         if self.gfx.is_some() { return; }
 
