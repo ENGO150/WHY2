@@ -23,6 +23,7 @@ pub mod server;
 #[cfg(feature = "client")]
 pub mod client;
 
+pub mod file;
 pub mod screen;
 pub mod voice;
 

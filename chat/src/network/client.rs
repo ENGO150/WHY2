@@ -16,9 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//MODULES
-pub mod file;
-
 use std::
 {
     thread,
@@ -61,6 +58,7 @@ use crate::
         self,
         MessageCode,
         MessagePacket,
+        file::client as file,
         voice::
         {
             client as voice_client,

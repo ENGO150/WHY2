@@ -16,9 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//MODULES
-pub mod file;
-
 use std::
 {
     env,
@@ -72,19 +69,23 @@ use crate::
         MessageCode,
         MessagePacket,
         FilePayload,
-        server::file::ActiveFileshare,
         voice::server as voice_server,
+        file::server::
+        {
+            self as file,
+            ActiveFileshare,
+        },
     },
 };
 
 //STRUCTS
 #[derive(Clone)]
-struct AvailableFile //UPLOADED FILE
+pub struct AvailableFile //UPLOADED FILE
 {
-    hash: [u8; 32],   //FILE HASH
-    path: PathBuf,    //PATH
-    filename: String, //FILENAME
-    size: u64,        //FILE SIZE
+    pub hash: [u8; 32],   //FILE HASH
+    pub path: PathBuf,    //PATH
+    pub filename: String, //FILENAME
+    pub size: u64,        //FILE SIZE
 }
 
 //ENUMS
@@ -165,7 +166,7 @@ impl Connection
     }
 
     //GET USERNAME FROM Connection
-    fn username(&self) -> Option<&String>
+    pub fn username(&self) -> Option<&String>
     {
         match self
         {
@@ -388,7 +389,7 @@ impl Connection
 //LISTS
 pub static PENDING_TOKENS: LazyLock<DashMap<[u8; 32], (usize, ConnectionType, Instant)>> = LazyLock::new(|| DashMap::new());
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
-static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
+pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
 fn untrusted_read(streams: &mut Streams, code: MessageCode, keys: Option<&SharedKeys>) -> Option<MessagePacket>

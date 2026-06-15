@@ -44,13 +44,9 @@ use why2_chat::
     crypto::kex,
     network::
     {
+        file::server as file,
         voice::server as voice_server,
-        server::
-        {
-            self,
-            file,
-            ConnectionType,
-        },
+        server::{ self, ConnectionType },
     },
 };
 
