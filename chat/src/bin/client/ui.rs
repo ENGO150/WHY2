@@ -98,9 +98,9 @@ pub fn draw_event(event: ClientEvent)
             (
                 "{}{}: {}\n",
 
-                colorize(message.username.unwrap(), message.colors.username_color),                                   //USERNAME
+                colorize(message.username.unwrap(), message.colors.username_color),                                 //USERNAME
                 if config::read_config("show_id") { format!(" ({})", message.id.unwrap()) } else { String::new() }, //ID
-                colorize(message.text.unwrap(), message.colors.message_color)                                         //MESSAGE
+                colorize(message.text.unwrap(), message.colors.message_color)                                       //MESSAGE
             );
         },
 
@@ -396,6 +396,12 @@ pub fn draw_event(event: ClientEvent)
         {
             clear_lines(1);
             println!("Maximum concurrent uploads reached!\n");
+        },
+
+        ClientEvent::ScreenUpload(enabled) =>
+        {
+            clear_lines(1);
+            println!("{} screen sharing.\n", if enabled { "Started" } else { "Stopped" });
         },
 
         ClientEvent::IncompatibleVersion(version, server_version) =>

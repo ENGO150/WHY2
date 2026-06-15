@@ -59,6 +59,7 @@ use crate::
         MessageCode,
         MessagePacket,
         file::client as file,
+        screen::client as screen,
         voice::
         {
             client as voice_client,
@@ -108,6 +109,7 @@ pub enum ClientEvent
     DownloadFailed(String),                    //DOWNLOADING FAILED
     Files(Vec<Value>),                         //FILE LIST
     UploadLimit,                               //MAX CONCURRENT UPLOADS REACHED
+    ScreenUpload(bool),                        //TOGGLED SCREENSHARE
     ExtraSpace,                                //JUST RANDOM NEWLINE
     IncompatibleVersion(String, String),       //INCOMPATIBLE SERVER VERSION
     UsernameRejected,                          //USERNAME REJECTED BY SERVER
@@ -538,6 +540,15 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 MessageCode::UploadLimit =>
                 {
                     tx.send(ClientEvent::UploadLimit).unwrap();
+                },
+
+                //SCREEN UPLOAD APPROVAL
+                MessageCode::ScreenUpload =>
+                {
+                    //SPAWN UPLOAD THREAD
+                    let file_tx = tx.clone(); //CLONE TX
+                    thread::spawn(move || screen::screen_upload(read.token.unwrap(), file_tx));
+                    continue;
                 },
 
                 //PRIVATE MESSAGE INCOMING

@@ -25,13 +25,33 @@ pub mod frame;
 use std::
 {
     thread,
+    io::Write,
     sync::
     {
         Arc,
+        mpsc::Sender,
         atomic::AtomicBool,
     },
 };
 
+use crate::
+{
+    options,
+    network::client::{ self, ClientEvent },
+};
+
+pub fn screen_upload(token: [u8; 32], tx: Sender<ClientEvent>)
+{
+    //INIT FILE CONNECTION
+    let mut stream = client::connect(options::get_server_address()).expect("Screen upload connection failed");
+
+    //SEND TOKEN
+    stream.write_all(&token).unwrap();
+
+    //LOG
+    tx.send(ClientEvent::ScreenUpload(true)).unwrap();
+    tx.send(ClientEvent::Prompt).unwrap();
+}
 
 pub fn foo()
 {

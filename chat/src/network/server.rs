@@ -1337,7 +1337,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 },
 
                 //SCREEN SHARE
-                MessageCode::Screen =>
+                MessageCode::ScreenUpload =>
                 {
                     //CHECK FOR ENABLED SCREENSHARE
                     if config::read_config("enable_screenshare")
@@ -1348,13 +1348,13 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         //SEND SCREEN ACCEPT
                         network::send(&mut streams.1.lock().unwrap(), MessagePacket
                         {
-                            code: Some(MessageCode::Screen),
+                            code: Some(MessageCode::ScreenUpload),
                             token: Some(open_connection(id, ConnectionType::ScreenUpload { uid })),
                             ..Default::default()
                         }, Some(&keys), None);
 
                         //LOG START
-                        log::info!("ScreenUpload request: {peer_addr}");
+                        log::info!("Screen upload: {peer_addr}");
                     } else
                     {
                         send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidFeature, Some(&keys));

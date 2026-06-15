@@ -225,7 +225,7 @@ impl Command
             Command::PrivateMessage => Some(MessageCode::PrivateMessage),
             Command::Upload => Some(MessageCode::Upload),
             Command::Download => Some(MessageCode::Download),
-            Command::Screen => Some(MessageCode::Screen),
+            Command::Screen => Some(MessageCode::ScreenUpload),
             Command::Files => Some(MessageCode::Files),
 
             _ => None,
