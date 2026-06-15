@@ -16,13 +16,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::sync::{ Arc, Mutex };
-
-use crate::network::
+use std::
 {
-    self,
-    server,
-    Streams,
+    net::TcpStream,
+    sync::{ Arc, Mutex },
+};
+
+use crate::
+{
+    consts::SharedKeys,
+    network::
+    {
+        self,
+        Streams,
+        server::{ self, Connection },
+    },
 };
 
 //PRIVATE
@@ -85,10 +93,39 @@ pub fn screen_download(id: usize, streams: &mut Streams)
     loop
     {
         //READ
-        let _read = match network::receive(streams, Some(&keys), Some(&mut seq))
+        let read = match network::receive(streams, Some(&keys), Some(&mut seq))
         {
             Some(r) => r,
             None => return
         };
+
+        if read.frame.is_none() { continue; } //DO NOT FORWARD INVALID FRAMES
+
+        //COLLECT ALL ATTACHED CLIENT STREAMS
+        let entries: Vec<(Arc<TcpStream>, Option<SharedKeys>)> = server::CONNECTIONS.iter().filter_map(|entry|
+        {
+            match entry.value()
+            {
+                Connection::Authenticated { screen_download, .. } =>
+                {
+                    //FILTER ATTACHED CLIENTS
+                    if let Some(screen_download) = screen_download && screen_download.target_id == id
+                    {
+                        //FOUND, COLLECT
+                        Some((screen_download.stream.clone(), entry.value().keys().cloned()))
+                    } else { None }
+                },
+                _ => None,
+            }
+        }).collect();
+
+        //FORWARD PACKET
+        for ref mut entry in entries
+        {
+            if let Ok(mut stream) = entry.0.try_clone()
+            {
+                network::send(&mut stream, read.clone(), entry.1.as_ref(), None);
+            }
+        }
     }
 }

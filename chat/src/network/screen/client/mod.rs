@@ -29,6 +29,7 @@ use std::
     sync::
     {
         Arc,
+        Mutex,
         mpsc::Sender,
         atomic::AtomicBool,
     },
@@ -97,5 +98,21 @@ pub fn screen_download(token: [u8; 32])
     //SEND TOKEN
     stream.write_all(&token).unwrap();
 
-    //TODO
+    //CREATE STREAM PAIR
+    let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
+    let mut streams = (&mut stream, write_stream);
+
+    //INIT LOCAL SEQ
+    let mut seq = 0usize;
+
+    //LOOP READING
+    loop
+    {
+        //READ
+        let _read = match network::receive(&mut streams, options::get_keys().as_ref(), Some(&mut seq))
+        {
+            Some(r) => r,
+            None => return
+        };
+    }
 }
