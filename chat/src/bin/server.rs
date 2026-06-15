@@ -192,13 +192,18 @@ fn main()
                                 continue;
                             },
 
-                            ConnectionType::ScreenUpload { .. } =>
+                            ConnectionType::ScreenUpload =>
                             {
                                 //SET READ TIMEOUT
                                 stream.set_read_timeout(Some(Duration::from_millis(5000))).expect("Failed to set read timeout");
 
                                 let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
                                 thread::spawn(move || screen::screen_download(id, &mut (&mut stream, write_stream)));
+                                continue;
+                            },
+
+                            ConnectionType::ScreenDownload { .. } =>
+                            {
                                 continue;
                             },
                         }

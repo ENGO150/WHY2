@@ -91,13 +91,20 @@ pub struct AvailableFile //UPLOADED FILE
 //ENUMS
 pub enum ConnectionType //TYPES OF TCP CHANNEL
 {
-    FileUpload { uid: u64 },
+    FileUpload
+    {
+        uid: u64,
+    },
     FileDownload
     {
         uid: u64,
         path: PathBuf,
     },
-    ScreenUpload { uid: u64 },
+    ScreenUpload,
+    ScreenDownload
+    {
+        stream: Arc<Mutex<TcpStream>>,
+    },
 }
 
 #[derive(Clone)]
@@ -1356,14 +1363,11 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     //CHECK FOR ENABLED SCREENSHARE
                     if config::read_config("enable_screenshare")
                     {
-                        //GENERATE RANDOM SHARE UID
-                        let uid = rand::random::<u64>();
-
                         //SEND SCREEN ACCEPT
                         network::send(&mut streams.1.lock().unwrap(), MessagePacket
                         {
                             code: Some(MessageCode::ScreenUpload),
-                            token: Some(open_connection(id, ConnectionType::ScreenUpload { uid })),
+                            token: Some(open_connection(id, ConnectionType::ScreenUpload)),
                             ..Default::default()
                         }, Some(&keys), None);
 
@@ -1372,6 +1376,45 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     } else
                     {
                         send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidFeature, Some(&keys));
+                    }
+                },
+
+                //SCREENSHARE ATTACH
+                MessageCode::Attach =>
+                {
+                    let sharer_stream = read.text.as_ref().and_then(|text|
+                    {
+                        let sharer_id = text.parse::<usize>().ok()?;
+
+                        //FIND SHARER ADDRESS BY ID
+                        CONNECTIONS.iter()
+                            .find(|entry| entry.value().id() == Some(&sharer_id) && entry.screen_upload_stream().is_some())
+                            .and_then(|entry| entry.value().screen_upload_stream().clone())
+                    });
+
+                    //VALID SHARER FOUND
+                    if let Some(sharer_stream) = sharer_stream
+                    {
+                        //OPEN NEW CONNECTION
+                        let token = open_connection(id, ConnectionType::ScreenDownload
+                        {
+                            stream: sharer_stream,
+                        });
+
+                        //SEND FILE METADATA
+                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
+                        {
+                            code: Some(MessageCode::Attach),
+                            token: Some(token),
+                            ..Default::default()
+                        }, Some(&keys), None);
+
+                        //LOG START
+                        log::info!("Screen download: {peer_addr}");
+                    } else
+                    {
+                        //INVALID ARGS
+                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
                     }
                 },
 
