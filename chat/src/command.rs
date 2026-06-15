@@ -47,6 +47,7 @@ pub enum Command
     Files,          //LIST FILES
     Upload,         //UPLOAD FILE TO SERVER
     Download,       //DOWNLOAD FILE FROM SERVER
+    Screen,         //TOGGLE SCREEN SHARING
     PrivateMessage, //ONE TO ONE MESSAGE
     UsernameColor,  //SET COLOR OF USERNAME
     MessageColor,   //SET COLOR OF MESSAGE
@@ -140,6 +141,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Screen,
+        triggers: &[ "SCREEN", "SCREENSHARE", "PRESENTATION", "SHARE" ],
+        shortcut: None,
+        args: &[],
+        description: "Toggles screensharing",
+    },
+
+    CommandInfo
+    {
         command: Command::List,
         triggers: &[ "LIST", "USERS", "CLIENTS", "CHANNELS", "IDS", "ID" ],
         shortcut: Some('l'),
@@ -215,6 +225,7 @@ impl Command
             Command::PrivateMessage => Some(MessageCode::PrivateMessage),
             Command::Upload => Some(MessageCode::Upload),
             Command::Download => Some(MessageCode::Download),
+            Command::Screen => Some(MessageCode::Screen),
             Command::Files => Some(MessageCode::Files),
 
             _ => None,
