@@ -563,8 +563,16 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 MessageCode::ScreenUpload =>
                 {
                     //SPAWN UPLOAD THREAD
-                    let file_tx = tx.clone(); //CLONE TX
-                    thread::spawn(move || screen::screen_upload(read.token.unwrap(), file_tx));
+                    let screen_tx = tx.clone(); //CLONE TX
+                    thread::spawn(move || screen::screen_upload(read.token.unwrap(), screen_tx));
+                    continue;
+                },
+
+                //SCREENSHARE ATTACH
+                MessageCode::Attach =>
+                {
+                    //SPAWN DOWNLOAD THREAD
+                    thread::spawn(move || screen::screen_download(read.token.unwrap()));
                     continue;
                 },
 

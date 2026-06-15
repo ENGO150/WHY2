@@ -91,7 +91,7 @@ pub struct AvailableFile //UPLOADED FILE
 #[derive(Clone)]
 pub struct ScreenDownload
 {
-    pub stream: Arc<Mutex<TcpStream>>,
+    pub stream: Arc<TcpStream>,
     pub target_id: usize,
 }
 
@@ -110,7 +110,7 @@ pub enum ConnectionType //TYPES OF TCP CHANNEL
     ScreenUpload,
     ScreenDownload
     {
-        stream: Arc<Mutex<TcpStream>>,
+        id: usize,
     },
 }
 
@@ -419,6 +419,20 @@ impl Connection
         {
             Self::Authenticated { screen_download, .. } => screen_download,
             Self::NonAuthenticated { .. } => &None,
+        }
+    }
+
+    //SET ATTACHED SCREENSHARE
+    pub fn set_screen_download(&mut self, target_id: usize, stream: Arc<TcpStream>)
+    {
+        match self
+        {
+            Self::Authenticated { screen_download, .. } => *screen_download = Some(ScreenDownload
+            {
+                target_id,
+                stream,
+            }),
+            _ => {},
         }
     }
 
@@ -1389,26 +1403,31 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 //SCREENSHARE ATTACH
                 MessageCode::Attach =>
                 {
-                    let sharer_stream = read.text.as_ref().and_then(|text|
+                    let sharer_id = read.text.as_ref().and_then(|text|
                     {
                         let sharer_id = text.parse::<usize>().ok()?;
 
                         //FIND SHARER ADDRESS BY ID
-                        CONNECTIONS.iter()
-                            .find(|entry| entry.value().id() == Some(&sharer_id) && entry.screen_upload_stream().is_some())
-                            .and_then(|entry| entry.value().screen_upload_stream().clone())
+                        if CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&sharer_id) &&
+                            entry.screen_upload_stream().is_some()).is_some()
+                        {
+                            Some(sharer_id)
+                        } else
+                        {
+                            None
+                        }
                     });
 
                     //VALID SHARER FOUND
-                    if let Some(sharer_stream) = sharer_stream
+                    if let Some(sharer_id) = sharer_id
                     {
                         //OPEN NEW CONNECTION
                         let token = open_connection(id, ConnectionType::ScreenDownload
                         {
-                            stream: sharer_stream,
+                            id: sharer_id,
                         });
 
-                        //SEND FILE METADATA
+                        //SEND ACCEPT
                         network::send(&mut streams.1.lock().unwrap(), MessagePacket
                         {
                             code: Some(MessageCode::Attach),

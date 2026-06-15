@@ -202,8 +202,13 @@ fn main()
                                 continue;
                             },
 
-                            ConnectionType::ScreenDownload { .. } =>
+                            ConnectionType::ScreenDownload { id: sharer_id } =>
                             {
+                                if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
+                                {
+                                    conn.set_screen_download(sharer_id, Arc::new(stream));
+                                }
+
                                 continue;
                             },
                         }

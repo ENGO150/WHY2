@@ -88,3 +88,14 @@ pub fn screen_upload(token: [u8; 32], tx: Sender<ClientEvent>)
         }
     }
 }
+
+pub fn screen_download(token: [u8; 32])
+{
+    //INIT FILE CONNECTION
+    let mut stream = client::connect(options::get_server_address()).expect("Screen download connection failed");
+
+    //SEND TOKEN
+    stream.write_all(&token).unwrap();
+
+    //TODO
+}
