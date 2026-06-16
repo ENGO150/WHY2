@@ -131,37 +131,38 @@ fn capture_loop_wayshot
 
     let mut prev_data: Vec<u32> = Vec::new();
     let mut prev_was_jpeg = false;
-
-    let wayshot = WayshotConnection::new().expect("Failed to connect to wayland via libwayshot");
-    let outputs = wayshot.get_all_outputs();
-    let mut target_output = outputs.first().expect("No wayland outputs found").clone();
-
-    if let Ok(name) = monitor.name()
-    {
-        for out in outputs
-        {
-            if out.name == name
-            {
-                target_output = out.clone();
-                break;
-            }
-        }
-    }
+    let target_name = monitor.name().unwrap_or_default();
 
     while running.load(Ordering::Relaxed)
     {
         let tick_start = Instant::now();
 
-        if let Ok(image) = wayshot.screenshot_single_output(&target_output, true)
+        if let Ok(wayshot) = WayshotConnection::new()
         {
-            let rgba = image.to_rgba8();
-            let compressed = compress
-            (
-                image.width(), image.height(), &rgba,
-                &mut prev_data, &mut prev_was_jpeg
-            );
+            let outputs = wayshot.get_all_outputs();
+            if let Some(mut target_output) = outputs.first().cloned()
+            {
+                for out in outputs
+                {
+                    if out.name == target_name
+                    {
+                        target_output = out.clone();
+                        break;
+                    }
+                }
 
-            let _ = frame_tx.send(compressed);
+                if let Ok(image) = wayshot.screenshot_single_output(&target_output, true)
+                {
+                    let rgba = image.to_rgba8();
+                    let compressed = compress
+                    (
+                        image.width(), image.height(), &rgba,
+                        &mut prev_data, &mut prev_was_jpeg
+                    );
+
+                    let _ = frame_tx.send(compressed);
+                }
+            }
         }
 
         let tick_elapsed = tick_start.elapsed();
