@@ -179,6 +179,7 @@ impl Session
 pub struct ScreenShareApp //DISPATCHER
 {
     sessions: HashMap<WindowId, Session>,
+    close_pending: bool,
 }
 
 //IMPLEMENTATIONS
@@ -186,7 +187,11 @@ impl ScreenShareApp
 {
     pub fn new() -> Self
     {
-        Self { sessions: HashMap::new() }
+        Self
+        {
+            sessions: HashMap::new(),
+            close_pending: false,
+        }
     }
 
     fn create_session(&mut self, event_loop: &ActiveEventLoop, request: ScreenShareRequest)
@@ -194,7 +199,7 @@ impl ScreenShareApp
         //CHECK IF ANOTHER ATTACH IS ALIVE (RECYCLE WINDOW)
         if let Some(session) = self.sessions.values_mut().next()
         {
-            session.running.store(false, Ordering::Relaxed);
+            let old_running = session.running.clone();
 
             //RESET
             session.frame_rx = request.rx;
@@ -205,6 +210,7 @@ impl ScreenShareApp
             session.last_fps_time = Instant::now();
 
             session.gfx.window.request_redraw();
+            old_running.store(false, Ordering::Relaxed);
 
             return;
         }
@@ -249,7 +255,16 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
     {
         match event
         {
-            UserEvent::NewSession(request) => self.create_session(event_loop, request),
+            UserEvent::NewSession(request) =>
+            {
+                self.close_pending = false;
+                self.create_session(event_loop, request);
+            },
+
+            UserEvent::Closed =>
+            {
+                self.close_pending = true;
+            },
         }
     }
 
@@ -295,7 +310,11 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop)
     {
-        self.sessions.retain(|_, session| session.running.load(Ordering::Relaxed));
+        if self.close_pending
+        {
+            self.sessions.retain(|_, session| session.running.load(Ordering::Relaxed));
+            self.close_pending = false;
+        }
 
         for session in self.sessions.values_mut()
         {
