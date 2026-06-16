@@ -64,6 +64,7 @@ jobs:
         run: brew update && brew install opus pkg-config
 
       - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
         run: choco install nasm
 
       - name: Setup Rust
