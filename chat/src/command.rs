@@ -50,6 +50,7 @@ pub enum Command
     Download,       //DOWNLOAD FILE FROM SERVER
     Screen,         //TOGGLE SCREEN SHARING
     Attach,         //ATTACH SCREEN SHARE
+    Deattach,       //DEATTACH SCREEN SHARE
     PrivateMessage, //ONE TO ONE MESSAGE
     UsernameColor,  //SET COLOR OF USERNAME
     MessageColor,   //SET COLOR OF MESSAGE
@@ -161,6 +162,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Deattach,
+        triggers: &[ "DEATTACH", "STOP", "CLOSE" ],
+        shortcut: None,
+        args: &[],
+        description: "Dettaches client screenshare.",
+    },
+
+    CommandInfo
+    {
         command: Command::List,
         triggers: &[ "LIST", "USERS", "CLIENTS", "CHANNELS", "IDS", "ID" ],
         shortcut: Some('l'),
@@ -247,6 +257,7 @@ impl Command
             Command::Download => Some(MessageCode::Download),
             Command::Screen => Some(MessageCode::Screen),
             Command::Attach => Some(MessageCode::Attach),
+            Command::Deattach => Some(MessageCode::Deattach),
             Command::Files => Some(MessageCode::Files),
             Command::Screens => Some(MessageCode::Screens),
 

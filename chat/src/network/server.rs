@@ -1491,6 +1491,38 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     }
                 },
 
+                //SCREENSHARE DEATTACH
+                MessageCode::Deattach =>
+                {
+                    //DEATTACH
+                    if let Some(sharer_id) = if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
+                    {
+                        if let Some(target_id) = conn.attached_screen().as_ref().map(|a| a.target_id)
+                        {
+                            conn.deattach_screen();
+                            Some(target_id)
+                        } else { None }
+                    } else { None }
+                    {
+                        //FIND SHARER USERNAME
+                        let sharer_uname = CONNECTIONS.iter()
+                            .find(|c| c.value().id() == Some(&sharer_id))
+                            .and_then(|c| c.value().username().cloned());
+
+                        //SEND ACCEPT
+                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
+                        {
+                            code: Some(MessageCode::Deattach),
+                            username: sharer_uname,
+                            ..Default::default()
+                        }, Some(&keys), None);
+                    } else
+                    {
+                        //NOT ATTACHED
+                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
+                    }
+                },
+
                 //LIST FILES
                 MessageCode::Files =>
                 {

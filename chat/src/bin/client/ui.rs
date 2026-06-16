@@ -433,6 +433,12 @@ pub fn draw_event(event: ClientEvent)
             println!("Attached {username}'s screen sharing.\n");
         },
 
+        ClientEvent::Deattach(username) =>
+        {
+            clear_lines(2);
+            println!("Deattached {username}'s screen sharing.\n");
+        },
+
         ClientEvent::IncompatibleVersion(version, server_version) =>
         {
             clear_lines(1);
