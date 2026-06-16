@@ -436,6 +436,20 @@ impl Connection
         }
     }
 
+    //UNSET ATTACHED SCREENSHARE
+    pub fn deattach_screen(&mut self)
+    {
+        match self
+        {
+            Self::Authenticated { attached_screen, .. } =>
+            {
+                *attached_screen = None;
+                log::info!("Stop screen attach: {}", self.peer_addr());
+            },
+            _ => {},
+        }
+    }
+
     //ADD SCREEN UPLOAD STREAM
     pub fn set_screen_stream(&mut self, stream: Arc<Mutex<TcpStream>>)
     {
@@ -449,20 +463,20 @@ impl Connection
     }
 
     //REMOVE SCREEN UPLOAD STREAM
-    pub fn remove_screen_stream(&mut self)
+    pub fn remove_screen_stream(&mut self) -> Option<usize>
     {
-        match self
+        if let Self::Authenticated { screen_stream, peer_addr, id, .. } = self
         {
-            Self::Authenticated { screen_stream, .. } =>
+            if let Some(old_stream) = screen_stream.take()
             {
-                //SHUTDOWN STREAM IF POSSIBLE, SET TO NONE
-                if let Some(screen_stream) = screen_stream.take()
-                {
-                    screen_stream.lock().unwrap().shutdown(Shutdown::Both).ok();
-                }
-            },
-            _ => {},
+                old_stream.lock().unwrap().shutdown(Shutdown::Both).ok();
+                log::info!("Stop screenshare: {}", peer_addr);
+
+                return Some(*id);
+            }
         }
+
+        None
     }
 }
 
@@ -1387,6 +1401,26 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 //SCREEN SHARE
                 MessageCode::Screen =>
                 {
+                    //CHECK FOR DISABLING SCREEN SHARE
+                    if let Some(removed_id) = CONNECTIONS.get_mut(&peer_addr)
+                        .and_then(|mut conn| conn.remove_screen_stream())
+                    {
+                        //DEATTACH ALL CLIENTS
+                        for mut conn in CONNECTIONS.iter_mut()
+                            .filter(|conn| conn.attached_screen().as_ref().is_some_and(|a| a.target_id == removed_id))
+                        {
+                            conn.deattach_screen();
+                        }
+
+                        //SEND SCREEN DISABLE NOTIFICATION
+                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
+                        {
+                            code: Some(MessageCode::Screen),
+                            ..Default::default()
+                        }, Some(&keys), None);
+                        continue;
+                    }
+
                     //CHECK FOR ENABLED SCREENSHARE
                     if config::read_config("enable_screenshare")
                     {

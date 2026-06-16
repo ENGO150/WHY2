@@ -563,10 +563,16 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //SCREEN UPLOAD APPROVAL
                 MessageCode::Screen =>
                 {
-                    //SPAWN UPLOAD THREAD
-                    let screen_tx = tx.clone(); //CLONE TX
-                    thread::spawn(move || screen::screen(read.token.unwrap(), screen_tx));
-                    continue;
+                    if let Some(token) = read.token //SCREEN ENABLED
+                    {
+                        //SPAWN UPLOAD THREAD
+                        let screen_tx = tx.clone(); //CLONE TX
+                        thread::spawn(move || screen::screen(token, screen_tx));
+                        continue;
+                    } else //SCREEN DISABLED
+                    {
+                        tx.send(ClientEvent::Screen(false)).unwrap();
+                    }
                 },
 
                 //SCREENSHARE ATTACH
