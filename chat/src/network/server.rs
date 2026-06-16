@@ -439,10 +439,12 @@ impl Connection
     //ADD SCREEN UPLOAD STREAM
     pub fn set_screen_stream(&mut self, stream: Arc<Mutex<TcpStream>>)
     {
-        match self
+        //CLEAN OLD STREAM
+        self.remove_screen_stream();
+
+        if let Self::Authenticated { screen_stream, .. } = self
         {
-            Self::Authenticated { screen_stream, .. } => *screen_stream = Some(stream),
-            _ => {},
+            *screen_stream = Some(stream);
         }
     }
 
@@ -451,7 +453,14 @@ impl Connection
     {
         match self
         {
-            Self::Authenticated { screen_stream, .. } => *screen_stream = None,
+            Self::Authenticated { screen_stream, .. } =>
+            {
+                //SHUTDOWN STREAM IF POSSIBLE, SET TO NONE
+                if let Some(screen_stream) = screen_stream.take()
+                {
+                    screen_stream.lock().unwrap().shutdown(Shutdown::Both).ok();
+                }
+            },
             _ => {},
         }
     }
@@ -625,7 +634,7 @@ pub fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
 pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTION BY TcpStream
 {
     //REMOVE CONNECTION
-    let connection = match CONNECTIONS.remove(peer_addr)
+    let mut connection = match CONNECTIONS.remove(peer_addr)
     {
         Some((_, conn)) => conn,
         None => return
@@ -657,10 +666,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
     }
 
     //CLOSE SCREEN UPLOAD STREAM
-    if let Some(stream) = connection.screen_stream()
-    {
-        stream.lock().unwrap().shutdown(Shutdown::Both).ok();
-    }
+    connection.remove_screen_stream();
 
     //AUTHENTICATED ACTIONS
     if connection.is_authenticated()
@@ -1393,7 +1399,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         }, Some(&keys), None);
 
                         //LOG START
-                        log::info!("Screen upload: {peer_addr}");
+                        log::info!("Screen share: {peer_addr}");
                     } else
                     {
                         send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidFeature, Some(&keys));
@@ -1434,7 +1440,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         }, Some(&keys), None);
 
                         //LOG START
-                        log::info!("Screen download: {peer_addr}");
+                        log::info!("Screen attach: {peer_addr}");
                     } else
                     {
                         //INVALID ARGS
