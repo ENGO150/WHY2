@@ -421,7 +421,7 @@ pub fn draw_event(event: ClientEvent)
             println!("Maximum concurrent uploads reached!\n");
         },
 
-        ClientEvent::ScreenUpload(enabled) =>
+        ClientEvent::Screen(enabled) =>
         {
             clear_lines(2);
             println!("{} screen sharing.\n", if enabled { "Started" } else { "Stopped" });

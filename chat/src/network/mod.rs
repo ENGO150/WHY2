@@ -90,7 +90,7 @@ pub enum MessageCode //CONTROL CODES
     Screens,            //CLIENT <> SERVER | LIST SCREENSHARES
     Attach,             //CLIENT <> SERVER | ATTACH CLIENT SCREENSHARE
     UploadLimit,        //SERVER -> CLIENT | MAX CONCURRENT UPLOADS REACHED
-    ScreenUpload,       //CLIENT <> SERVER | TOGGLE SCREENSHARE
+    Screen,             //CLIENT <> SERVER | TOGGLE SCREENSHARE
     InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
     InvalidFeature,     //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE
     KeepAlive,          //SERVER <> CLIENT | A BIT LESS STUPID KEEP-ALIVE

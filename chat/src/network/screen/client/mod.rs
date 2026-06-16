@@ -69,7 +69,7 @@ pub enum UserEvent //CUSTOM WINIT EVENTS
 //GLOBAL VARIABLES
 pub static SCREEN_SHARE_PROXY: OnceLock<EventLoopProxy<UserEvent>> = OnceLock::new();
 
-pub fn screen_upload(token: [u8; 32], tx: Sender<ClientEvent>)
+pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
     let mut stream = client::connect(options::get_server_address()).expect("Screen upload connection failed");
@@ -78,7 +78,7 @@ pub fn screen_upload(token: [u8; 32], tx: Sender<ClientEvent>)
     stream.write_all(&token).unwrap();
 
     //LOG
-    tx.send(ClientEvent::ScreenUpload(true)).unwrap();
+    tx.send(ClientEvent::Screen(true)).unwrap();
     tx.send(ClientEvent::Prompt).unwrap();
 
     //SHARED STATE
@@ -115,7 +115,7 @@ pub fn screen_upload(token: [u8; 32], tx: Sender<ClientEvent>)
     }
 }
 
-pub fn screen_download(token: [u8; 32])
+pub fn attach(token: [u8; 32])
 {
     //INIT FILE CONNECTION
     let mut stream = client::connect(options::get_server_address()).expect("Screen download connection failed");

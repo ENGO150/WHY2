@@ -89,7 +89,7 @@ pub struct AvailableFile //UPLOADED FILE
 }
 
 #[derive(Clone)]
-pub struct ScreenDownload
+pub struct Attach
 {
     pub stream: Arc<TcpStream>,
     pub target_id: usize,
@@ -107,8 +107,8 @@ pub enum ConnectionType //TYPES OF TCP CHANNEL
         uid: u64,
         path: PathBuf,
     },
-    ScreenUpload,
-    ScreenDownload
+    Screen,
+    Attach
     {
         id: usize,
     },
@@ -119,21 +119,21 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
     Authenticated
     {
-        write_stream: Arc<Mutex<TcpStream>>,                 //STREAM
-        file_streams: Arc<Mutex<HashMap<u64, TcpStream>>>,   //ACTIVE FILE STREAMS
-        screen_upload_stream: Option<Arc<Mutex<TcpStream>>>, //SCREEN UPLOAD STREAM
-        screen_download: Option<ScreenDownload>,             //SCREEN DOWNLOAD STREAM & TARGET ID
-        peer_addr: SocketAddr,                               //ADDRESS & PORT
-        username: String,                                    //USERNAME
-        id: usize,                                           //ID OF USER
-        keys: SharedKeys,                                    //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
-        last_activity: Instant,                              //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
-        last_key_exchange: Instant,                          //TIME OF LAST REKEY
-        spam_violations: usize,                              //SPAM VIOLATIONS (unexpected, huh?)
-        channel: Option<String>,                             //CHANNEL
-        seq: usize,                                          //SEQUENCE NUMBER (CLIENT -> SERVER)
-        server_seq: usize,                                   //SEQUENCE NUMBER (SERVER -> CLIENT)
-        alive: bool,                                         //RESPONDED TO KEEPALIVE
+        write_stream: Arc<Mutex<TcpStream>>,               //STREAM
+        file_streams: Arc<Mutex<HashMap<u64, TcpStream>>>, //ACTIVE FILE STREAMS
+        screen_stream: Option<Arc<Mutex<TcpStream>>>,      //SCREEN UPLOAD STREAM
+        peer_addr: SocketAddr,                             //ADDRESS & PORT
+        username: String,                                  //USERNAME
+        id: usize,                                         //ID OF USER
+        keys: SharedKeys,                                  //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
+        attached_screen: Option<Attach>,                   //SCREEN DOWNLOAD STREAM & TARGET ID
+        last_activity: Instant,                            //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
+        last_key_exchange: Instant,                        //TIME OF LAST REKEY
+        spam_violations: usize,                            //SPAM VIOLATIONS (unexpected, huh?)
+        channel: Option<String>,                           //CHANNEL
+        seq: usize,                                        //SEQUENCE NUMBER (CLIENT -> SERVER)
+        server_seq: usize,                                 //SEQUENCE NUMBER (SERVER -> CLIENT)
+        alive: bool,                                       //RESPONDED TO KEEPALIVE
     },
 
     NonAuthenticated
@@ -403,31 +403,31 @@ impl Connection
     }
 
     //GET SCREEN UPLOAD STREAM
-    pub fn screen_upload_stream(&self) -> &Option<Arc<Mutex<TcpStream>>>
+    pub fn screen_stream(&self) -> &Option<Arc<Mutex<TcpStream>>>
     {
         match self
         {
-            Self::Authenticated { screen_upload_stream, .. } => screen_upload_stream,
+            Self::Authenticated { screen_stream, .. } => screen_stream,
             Self::NonAuthenticated { .. } => &None,
         }
     }
 
     //GET ATTACHED SCREENSHARE
-    pub fn screen_download(&self) -> &Option<ScreenDownload>
+    pub fn attached_screen(&self) -> &Option<Attach>
     {
         match self
         {
-            Self::Authenticated { screen_download, .. } => screen_download,
+            Self::Authenticated { attached_screen, .. } => attached_screen,
             Self::NonAuthenticated { .. } => &None,
         }
     }
 
     //SET ATTACHED SCREENSHARE
-    pub fn set_screen_download(&mut self, target_id: usize, stream: Arc<TcpStream>)
+    pub fn attach_screen(&mut self, target_id: usize, stream: Arc<TcpStream>)
     {
         match self
         {
-            Self::Authenticated { screen_download, .. } => *screen_download = Some(ScreenDownload
+            Self::Authenticated { attached_screen, .. } => *attached_screen = Some(Attach
             {
                 target_id,
                 stream,
@@ -437,21 +437,21 @@ impl Connection
     }
 
     //ADD SCREEN UPLOAD STREAM
-    pub fn set_screen_upload_stream(&mut self, stream: Arc<Mutex<TcpStream>>)
+    pub fn set_screen_stream(&mut self, stream: Arc<Mutex<TcpStream>>)
     {
         match self
         {
-            Self::Authenticated { screen_upload_stream, .. } => *screen_upload_stream = Some(stream),
+            Self::Authenticated { screen_stream, .. } => *screen_stream = Some(stream),
             _ => {},
         }
     }
 
     //REMOVE SCREEN UPLOAD STREAM
-    pub fn remove_screen_upload_stream(&mut self)
+    pub fn remove_screen_stream(&mut self)
     {
         match self
         {
-            Self::Authenticated { screen_upload_stream, .. } => *screen_upload_stream = None,
+            Self::Authenticated { screen_stream, .. } => *screen_stream = None,
             _ => {},
         }
     }
@@ -657,7 +657,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
     }
 
     //CLOSE SCREEN UPLOAD STREAM
-    if let Some(stream) = connection.screen_upload_stream()
+    if let Some(stream) = connection.screen_stream()
     {
         stream.lock().unwrap().shutdown(Shutdown::Both).ok();
     }
@@ -755,19 +755,19 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                 }
             },
 
-            Connection::Authenticated { write_stream, file_streams, screen_upload_stream, screen_download, username, id, last_activity, channel,
+            Connection::Authenticated { write_stream, file_streams, screen_stream, username, id, attached_screen, last_activity, channel,
                 seq, server_seq, peer_addr, alive, .. } =>
             {
                 Connection::Authenticated
                 {
                     write_stream,
                     file_streams,
-                    screen_upload_stream,
-                    screen_download,
+                    screen_stream,
                     peer_addr,
                     username,
                     id,
                     keys: keys.to_owned(),
+                    attached_screen,
                     last_activity,
                     last_key_exchange: Instant::now(),
                     spam_violations: 0,
@@ -790,12 +790,12 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
         {
             write_stream: old_connection.write_stream().clone(),
             file_streams: Arc::new(Mutex::new(HashMap::new())),
-            screen_upload_stream: None,
-            screen_download: None,
+            screen_stream: None,
             peer_addr: *old_connection.peer_addr(),
             username: username.to_string(),
             id: id,
             keys: old_connection.keys().unwrap().to_owned(),
+            attached_screen: None,
             last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
             last_key_exchange: old_connection.last_key_exchange().copied().unwrap_or_else(Instant::now),
             spam_violations: 0,
@@ -821,12 +821,12 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
         {
             write_stream: old_connection.write_stream().clone(),
             file_streams: old_connection.file_streams().unwrap().clone(),
-            screen_upload_stream: old_connection.screen_upload_stream().clone(),
-            screen_download: old_connection.screen_download().clone(),
+            screen_stream: old_connection.screen_stream().clone(),
             peer_addr: *old_connection.peer_addr(),
             username: old_connection.username().unwrap().clone(),
             id: *old_connection.id().unwrap(),
             keys: old_connection.keys().unwrap().to_owned(),
+            attached_screen: old_connection.attached_screen().clone(),
             last_activity: Instant::now(),
             last_key_exchange: *old_connection.last_key_exchange().unwrap(),
             spam_violations: *old_connection.spam_violations().unwrap(),
@@ -1379,7 +1379,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 },
 
                 //SCREEN SHARE
-                MessageCode::ScreenUpload =>
+                MessageCode::Screen =>
                 {
                     //CHECK FOR ENABLED SCREENSHARE
                     if config::read_config("enable_screenshare")
@@ -1387,8 +1387,8 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         //SEND SCREEN ACCEPT
                         network::send(&mut streams.1.lock().unwrap(), MessagePacket
                         {
-                            code: Some(MessageCode::ScreenUpload),
-                            token: Some(open_connection(id, ConnectionType::ScreenUpload)),
+                            code: Some(MessageCode::Screen),
+                            token: Some(open_connection(id, ConnectionType::Screen)),
                             ..Default::default()
                         }, Some(&keys), None);
 
@@ -1409,7 +1409,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
 
                         //FIND SHARER ADDRESS BY ID
                         if CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&sharer_id) &&
-                            entry.screen_upload_stream().is_some()).is_some()
+                            entry.screen_stream().is_some()).is_some()
                         {
                             Some(sharer_id)
                         } else
@@ -1422,7 +1422,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     if let Some(sharer_id) = sharer_id
                     {
                         //OPEN NEW CONNECTION
-                        let token = open_connection(id, ConnectionType::ScreenDownload
+                        let token = open_connection(id, ConnectionType::Attach
                         {
                             id: sharer_id,
                         });
@@ -1493,9 +1493,9 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
                     for connection_enum in CONNECTIONS.iter()
                     {
-                        if let Connection::Authenticated { username: uname, id: user_id, screen_upload_stream, .. } = connection_enum.value()
+                        if let Connection::Authenticated { username: uname, id: user_id, screen_stream, .. } = connection_enum.value()
                         {
-                            if screen_upload_stream.is_none() { continue; }
+                            if screen_stream.is_none() { continue; }
 
                             user_list.push(json!({ "username": uname, "id": user_id }));
                         }

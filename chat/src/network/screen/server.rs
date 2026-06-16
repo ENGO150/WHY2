@@ -48,14 +48,14 @@ impl Drop for ScreenTransferGuard
         if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&self.id))
         {
             //REMOVE SCREEN STREAM
-            conn.remove_screen_upload_stream();
+            conn.remove_screen_stream();
         }
     }
 }
 
 //PUBLIC
 //FUNCTIONS
-pub fn screen_download(id: usize, streams: &mut Streams)
+pub fn screen(id: usize, streams: &mut Streams)
 {
     //GET CLIENT KEYS
     let keys =
@@ -75,7 +75,7 @@ pub fn screen_download(id: usize, streams: &mut Streams)
                 };
 
                 //ADD FILE STREAM
-                c.set_screen_upload_stream(Arc::new(Mutex::new(streams.0.try_clone().unwrap())));
+                c.set_screen_stream(Arc::new(Mutex::new(streams.0.try_clone().unwrap())));
 
                 keys
             },
@@ -106,13 +106,13 @@ pub fn screen_download(id: usize, streams: &mut Streams)
         {
             match entry.value()
             {
-                Connection::Authenticated { screen_download, .. } =>
+                Connection::Authenticated { attached_screen, .. } =>
                 {
                     //FILTER ATTACHED CLIENTS
-                    if let Some(screen_download) = screen_download && screen_download.target_id == id
+                    if let Some(attached_screen) = attached_screen && attached_screen.target_id == id
                     {
                         //FOUND, COLLECT
-                        Some((screen_download.stream.clone(), entry.value().keys().cloned()))
+                        Some((attached_screen.stream.clone(), entry.value().keys().cloned()))
                     } else { None }
                 },
                 _ => None,

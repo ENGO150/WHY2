@@ -110,7 +110,7 @@ pub enum ClientEvent
     Files(Vec<Value>),                         //FILE LIST
     Screens(Vec<Value>),                       //SCREENSHARE LIST
     UploadLimit,                               //MAX CONCURRENT UPLOADS REACHED
-    ScreenUpload(bool),                        //TOGGLED SCREENSHARE
+    Screen(bool),                              //TOGGLED SCREENSHARE
     ExtraSpace,                                //JUST RANDOM NEWLINE
     IncompatibleVersion(String, String),       //INCOMPATIBLE SERVER VERSION
     UsernameRejected,                          //USERNAME REJECTED BY SERVER
@@ -560,11 +560,11 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 },
 
                 //SCREEN UPLOAD APPROVAL
-                MessageCode::ScreenUpload =>
+                MessageCode::Screen =>
                 {
                     //SPAWN UPLOAD THREAD
                     let screen_tx = tx.clone(); //CLONE TX
-                    thread::spawn(move || screen::screen_upload(read.token.unwrap(), screen_tx));
+                    thread::spawn(move || screen::screen(read.token.unwrap(), screen_tx));
                     continue;
                 },
 
@@ -572,7 +572,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 MessageCode::Attach =>
                 {
                     //SPAWN DOWNLOAD THREAD
-                    thread::spawn(move || screen::screen_download(read.token.unwrap()));
+                    thread::spawn(move || screen::attach(read.token.unwrap()));
                     continue;
                 },
 
