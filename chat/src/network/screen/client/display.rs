@@ -75,23 +75,8 @@ struct Session
     frame_rx: Receiver<CompressedFrame>,
     last_frame: Option<Frame>,
     running: Arc<AtomicBool>,
-}
-
-//FUNCTIONS
-#[inline(always)]
-fn blerp //BILINEAR INTERPOLATION BETWEEN 4 CORNER VALUES
-(
-    c00: f32,
-    c10: f32,
-    c01: f32,
-    c11: f32,
-    fx: f32,
-    fy: f32,
-) -> f32
-{
-    let top = c00 + (c10 - c00) * fx;
-    let bot = c01 + (c11 - c01) * fx;
-    top + (bot - top) * fy
+    frame_count: u32,
+    last_fps_time: Instant,
 }
 
 //IMPLEMENTATIONS
@@ -194,63 +179,57 @@ impl Session
 
                     buffer.fill(0);
 
-                    //BILINEAR INTERPOLATION
-                    let src_w = w as f32;
-                    let src_h = h as f32;
-                    let dst_wf = dst_w as f32;
-                    let dst_hf = dst_h as f32;
+                    //INTEGER BILINEAR INTERPOLATION
+                    let scale_x = (w << 16) / dst_w;
+                    let scale_y = (h << 16) / dst_h;
 
                     for dy in 0..dst_h
                     {
-                        let sy = (dy as f32 + 0.5) * src_h / dst_hf - 0.5;
-                        let sy0 = sy.floor() as i32;
-                        let sy1 = sy0 + 1;
-                        let fy = sy - sy0 as f32;
-
-                        let sy0 = sy0.clamp(0, h as i32 - 1) as u32;
-                        let sy1 = sy1.clamp(0, h as i32 - 1) as u32;
+                        let sy_fix = dy * scale_y + (scale_y >> 1);
+                        let sy0 = (sy_fix >> 16).min(h - 1);
+                        let sy1 = (sy0 + 1).min(h - 1);
+                        let fy = ((sy_fix & 0xFFFF) >> 8) as u32;
 
                         let dst_row = (dy + offset_y) * nw_u32 + offset_x;
+                        let src_row0 = sy0 * w;
+                        let src_row1 = sy1 * w;
 
                         for dx in 0..dst_w
                         {
-                            let sx = (dx as f32 + 0.5) * src_w / dst_wf - 0.5;
-                            let sx0 = sx.floor() as i32;
-                            let sx1 = sx0 + 1;
-                            let fx = sx - sx0 as f32;
+                            let sx_fix = dx * scale_x + (scale_x >> 1);
+                            let sx0 = (sx_fix >> 16).min(w - 1);
+                            let sx1 = (sx0 + 1).min(w - 1);
+                            let fx = ((sx_fix & 0xFFFF) >> 8) as u32;
 
-                            let sx0 = sx0.clamp(0, w as i32 - 1) as u32;
-                            let sx1 = sx1.clamp(0, w as i32 - 1) as u32;
+                            let p00 = frame.data[(src_row0 + sx0) as usize];
+                            let p10 = frame.data[(src_row0 + sx1) as usize];
+                            let p01 = frame.data[(src_row1 + sx0) as usize];
+                            let p11 = frame.data[(src_row1 + sx1) as usize];
 
-                            let p00 = frame.data[(sy0 * w + sx0) as usize];
-                            let p10 = frame.data[(sy0 * w + sx1) as usize];
-                            let p01 = frame.data[(sy1 * w + sx0) as usize];
-                            let p11 = frame.data[(sy1 * w + sx1) as usize];
+                            let r00 = (p00 >> 16) & 0xFF;
+                            let r10 = (p10 >> 16) & 0xFF;
+                            let r01 = (p01 >> 16) & 0xFF;
+                            let r11 = (p11 >> 16) & 0xFF;
+                            let g00 = (p00 >> 8) & 0xFF;
+                            let g10 = (p10 >> 8) & 0xFF;
+                            let g01 = (p01 >> 8) & 0xFF;
+                            let g11 = (p11 >> 8) & 0xFF;
+                            let b00 = p00 & 0xFF;
+                            let b10 = p10 & 0xFF;
+                            let b01 = p01 & 0xFF;
+                            let b11 = p11 & 0xFF;
 
-                            let r = blerp
-                            (
-                                ((p00 >> 16) & 0xFF) as f32,
-                                ((p10 >> 16) & 0xFF) as f32,
-                                ((p01 >> 16) & 0xFF) as f32,
-                                ((p11 >> 16) & 0xFF) as f32,
-                                fx, fy,
-                            ) as u32;
-                            let g = blerp
-                            (
-                                ((p00 >> 8) & 0xFF) as f32,
-                                ((p10 >> 8) & 0xFF) as f32,
-                                ((p01 >> 8) & 0xFF) as f32,
-                                ((p11 >> 8) & 0xFF) as f32,
-                                fx, fy,
-                            ) as u32;
-                            let b = blerp
-                            (
-                                (p00 & 0xFF) as f32,
-                                (p10 & 0xFF) as f32,
-                                (p01 & 0xFF) as f32,
-                                (p11 & 0xFF) as f32,
-                                fx, fy,
-                            ) as u32;
+                            let r_top = r00 + ((r10 as i32 - r00 as i32) * fx as i32 / 256) as u32;
+                            let r_bot = r01 + ((r11 as i32 - r01 as i32) * fx as i32 / 256) as u32;
+                            let r = r_top + ((r_bot as i32 - r_top as i32) * fy as i32 / 256) as u32;
+
+                            let g_top = g00 + ((g10 as i32 - g00 as i32) * fx as i32 / 256) as u32;
+                            let g_bot = g01 + ((g11 as i32 - g01 as i32) * fx as i32 / 256) as u32;
+                            let g = g_top + ((g_bot as i32 - g_top as i32) * fy as i32 / 256) as u32;
+
+                            let b_top = b00 + ((b10 as i32 - b00 as i32) * fx as i32 / 256) as u32;
+                            let b_bot = b01 + ((b11 as i32 - b01 as i32) * fx as i32 / 256) as u32;
+                            let b = b_top + ((b_bot as i32 - b_top as i32) * fy as i32 / 256) as u32;
 
                             buffer[(dst_row + dx) as usize] = 0xFF000000 | (r << 16) | (g << 8) | b;
                         }
@@ -300,6 +279,8 @@ impl ScreenShareApp
             frame_rx: request.rx,
             last_frame: None,
             running: request.running,
+            frame_count: 0,
+            last_fps_time: Instant::now(),
         });
     }
 }
@@ -351,6 +332,14 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
         {
             if session.process_pending_frames()
             {
+                session.frame_count += 1;
+                if session.last_fps_time.elapsed() >= std::time::Duration::from_secs(1)
+                {
+                    session.gfx.window.set_title(&format!("WHY2 Screenshare ({} FPS)", session.frame_count));
+                    session.frame_count = 0;
+                    session.last_fps_time = Instant::now();
+                }
+
                 session.gfx.window.request_redraw();
             }
         }

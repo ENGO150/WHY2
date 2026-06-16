@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    io::Cursor,
+    slice,
     convert::TryInto,
 };
 
@@ -32,11 +32,13 @@ use crate::network::
     },
 };
 
-use image::
+use turbojpeg::
 {
-    ImageDecoder,
-    ColorType,
-    codecs::jpeg::{ JpegEncoder, JpegDecoder },
+    Compressor,
+    Decompressor,
+    Subsamp,
+    Image,
+    PixelFormat,
 };
 
 use zstd::bulk;
@@ -67,15 +69,27 @@ pub fn compress_zstd(frame: &Frame) -> CompressedFrame
     }
 }
 
-pub fn compress_jpeg(width: u32, height: u32, rgb_data: &[u8]) -> CompressedFrame
+pub fn compress_jpeg(width: u32, height: u32, rgba_data: &[u8]) -> CompressedFrame
 {
-    let mut out = Vec::with_capacity(rgb_data.len() / 10);
+    let mut out = Vec::with_capacity(rgba_data.len() / 10);
     out.push(1);
     out.extend_from_slice(&width.to_le_bytes());
     out.extend_from_slice(&height.to_le_bytes());
 
-    let mut enc = JpegEncoder::new_with_quality(&mut out, 80);
-    enc.encode(rgb_data, width, height, ColorType::Rgb8.into()).expect("JPEG encode failed");
+    let mut comp = Compressor::new().expect("Failed to init turbojpeg compressor");
+    comp.set_quality(80).ok();
+    comp.set_subsamp(Subsamp::Sub2x2).ok();
+
+    let image = Image
+    {
+        pixels: rgba_data,
+        width: width as usize,
+        pitch: width as usize * 4,
+        height: height as usize,
+        format: PixelFormat::RGBA,
+    };
+    let compressed_jpeg = comp.compress_to_owned(image).expect("JPEG encode failed");
+    out.extend_from_slice(&compressed_jpeg);
 
     CompressedFrame
     {
@@ -93,18 +107,23 @@ pub fn decompress(compressed: &CompressedFrame) -> DecompressedFrame
         let w = u32::from_le_bytes(compressed.compressed_data[1..5].try_into().unwrap());
         let h = u32::from_le_bytes(compressed.compressed_data[5..9].try_into().unwrap());
 
-        let cursor = Cursor::new(&compressed.compressed_data[9..]);
-        let dec = JpegDecoder::new(cursor).expect("JPEG decode failed");
-        let mut rgb = vec![0u8; (w * h * 3) as usize];
-        ImageDecoder::read_image(dec, &mut rgb).expect("JPEG read failed");
+        let mut decomp = Decompressor::new().expect("Failed to init turbojpeg decompressor");
+        let mut rgba = vec![0u8; (w * h * 4) as usize];
+        let image = Image
+        {
+            pixels: rgba.as_mut_slice(),
+            width: w as usize,
+            pitch: w as usize * 4,
+            height: h as usize,
+            format: PixelFormat::RGBA,
+        };
+        decomp.decompress(&compressed.compressed_data[9..], image).expect("JPEG decode failed");
 
         let mut data = Vec::with_capacity((w * h) as usize);
-        for chunk in rgb.chunks_exact(3)
+        let rgba_u32 = unsafe { slice::from_raw_parts(rgba.as_ptr() as *const u32, rgba.len() / 4) };
+        for &pixel in rgba_u32.iter()
         {
-            let r = chunk[0] as u32;
-            let g = chunk[1] as u32;
-            let b = chunk[2] as u32;
-            data.push(0xFF000000 | (r << 16) | (g << 8) | b);
+            data.push(0xFF000000 | (pixel.to_be() >> 8));
         }
 
         DecompressedFrame::JpegFull(Frame { width: w, height: h, data })

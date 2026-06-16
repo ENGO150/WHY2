@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     env,
+    slice,
     thread,
     time::{ Duration, Instant },
     sync::
@@ -32,7 +33,6 @@ use crossbeam_channel::Sender;
 
 
 #[cfg(target_os = "linux")]
-use libwayshot::WayshotConnection;
 use xcap::Monitor;
 
 use crate::network::
@@ -131,38 +131,53 @@ fn capture_loop_wayshot
 
     let mut prev_data: Vec<u32> = Vec::new();
     let mut prev_was_jpeg = false;
-    let target_name = monitor.name().unwrap_or_default();
+
+    let mut wayshot = match libwayshot::WayshotConnection::new()
+    {
+        Ok(w) => w,
+        Err(_) => return,
+    };
+
+    let mut target_output = match wayshot.get_all_outputs().iter()
+        .find(|o| o.name == monitor.name().unwrap_or_default()).cloned()
+    {
+        Some(o) => o,
+        None => return,
+    };
+
+    let mut frame_count = 0;
 
     while running.load(Ordering::Relaxed)
     {
-        let tick_start = Instant::now();
-
-        if let Ok(wayshot) = WayshotConnection::new()
+        if frame_count > 300
         {
-            let outputs = wayshot.get_all_outputs();
-            if let Some(mut target_output) = outputs.first().cloned()
+            if let Ok(w) = libwayshot::WayshotConnection::new()
             {
-                for out in outputs
+                let o_opt = w.get_all_outputs().iter().find(|o| o.name == monitor.name().unwrap_or_default()).cloned();
+                if let Some(o) = o_opt
                 {
-                    if out.name == target_name
-                    {
-                        target_output = out.clone();
-                        break;
-                    }
-                }
-
-                if let Ok(image) = wayshot.screenshot_single_output(&target_output, true)
-                {
-                    let rgba = image.to_rgba8();
-                    let compressed = compress
-                    (
-                        image.width(), image.height(), &rgba,
-                        &mut prev_data, &mut prev_was_jpeg
-                    );
-
-                    let _ = frame_tx.send(compressed);
+                    wayshot = w;
+                    target_output = o;
                 }
             }
+            frame_count = 0;
+        }
+        frame_count += 1;
+
+        let tick_start = Instant::now();
+
+        if let Ok(image) = wayshot.screenshot_single_output(&target_output, true)
+        {
+            let rgba = image.into_rgba8();
+            let rgba_raw = rgba.as_raw();
+
+            let compressed = compress
+            (
+                rgba.width(), rgba.height(), rgba_raw,
+                &mut prev_data, &mut prev_was_jpeg
+            );
+
+            let _ = frame_tx.send(compressed);
         }
 
         let tick_elapsed = tick_start.elapsed();
@@ -177,24 +192,19 @@ fn compress(w: u32, h: u32, rgba: &[u8], prev_data: &mut Vec<u32>, prev_was_jpeg
 {
     let mut data = Vec::with_capacity((w * h) as usize);
     let mut differences = 0;
-    let mut rgb_data = Vec::with_capacity((w * h * 3) as usize);
+
+    let rgba_u32 = unsafe { slice::from_raw_parts(rgba.as_ptr() as *const u32, rgba.len() / 4) };
 
     if prev_data.len() == (w * h) as usize
     {
-        for (i, chunk) in rgba.chunks_exact(4).enumerate()
+        for (i, &pixel) in rgba_u32.iter().enumerate()
         {
-            let r = chunk[0] as u32;
-            let g = chunk[1] as u32;
-            let b = chunk[2] as u32;
-            rgb_data.push(chunk[0]);
-            rgb_data.push(chunk[1]);
-            rgb_data.push(chunk[2]);
+            let current = 0xFF000000 | (pixel.to_be() >> 8);
 
-            let current = 0xFF000000 | (r << 16) | (g << 8) | b;
+            let prev = prev_data[i];
+            if prev != current { differences += 1; }
 
-            if prev_data[i] != current { differences += 1; }
-
-            if *prev_was_jpeg || prev_data[i] != current
+            if *prev_was_jpeg || prev != current
             {
                 data.push(current);
                 prev_data[i] = current;
@@ -203,33 +213,24 @@ fn compress(w: u32, h: u32, rgba: &[u8], prev_data: &mut Vec<u32>, prev_was_jpeg
     } else
     {
         prev_data.clear();
-        for chunk in rgba.chunks_exact(4)
+        for &pixel in rgba_u32.iter()
         {
-            let r = chunk[0] as u32;
-            let g = chunk[1] as u32;
-            let b = chunk[2] as u32;
-            rgb_data.push(chunk[0]);
-            rgb_data.push(chunk[1]);
-            rgb_data.push(chunk[2]);
-
-            let current = 0xFF000000 | (r << 16) | (g << 8) | b;
+            let current = 0xFF000000 | (pixel.to_be() >> 8);
             data.push(current);
             prev_data.push(current);
         }
-
         differences = w * h;
     }
 
-    *prev_was_jpeg = differences > (w * h) / 2;
-
-    let compressed = if *prev_was_jpeg
+    if differences > (w * h) / 100
     {
-        compress::compress_jpeg(w, h, &rgb_data)
+        *prev_was_jpeg = true;
+        compress::compress_jpeg(w, h, rgba)
     } else
     {
+        *prev_was_jpeg = false;
+
         let frame = Frame { width: w, height: h, data };
         compress::compress_zstd(&frame)
-    };
-
-    compressed
+    }
 }

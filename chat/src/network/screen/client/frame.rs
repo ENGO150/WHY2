@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::slice;
+
 //STRUCTS
 pub struct Frame //SINGLE FRAME
 {
@@ -30,17 +32,17 @@ impl Frame
     {
         unsafe
         {
-            std::slice::from_raw_parts(self.data.as_ptr() as *const u8, self.data.len() * 4)
+            slice::from_raw_parts(self.data.as_ptr() as *const u8, self.data.len() * 4)
         }
     }
 
     //RECONSTRUCT A FRAME
     pub fn from_bytes(width: u32, height: u32, bytes: &[u8]) -> Self
     {
-        let data: Vec<u32> = bytes
-            .chunks_exact(4)
-            .map(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]]))
-            .collect();
+        let data: Vec<u32> = unsafe
+        {
+            slice::from_raw_parts(bytes.as_ptr() as *const u32, bytes.len() / 4).to_vec()
+        };
 
         Self
         {
