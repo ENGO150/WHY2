@@ -31,8 +31,6 @@ use std::
 
 use crossbeam_channel::Sender;
 
-
-#[cfg(target_os = "linux")]
 use xcap::Monitor;
 
 use crate::network::
