@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    num,
     collections::HashMap,
     time::{ Duration, Instant },
     sync::
@@ -30,7 +29,7 @@ use std::
 
 use crossbeam_channel::Receiver;
 
-use softbuffer::{ Surface, Context };
+use pixels::{ Pixels, SurfaceTexture };
 
 use winit::
 {
@@ -65,8 +64,7 @@ const FRAME_POLL_INTERVAL: Duration = Duration::from_millis(33); //~30 FPS POLL
 struct GraphicsContext
 {
     window: Arc<Window>,
-    _context: Context<Arc<Window>>,
-    surface: Surface<Arc<Window>, Arc<Window>>,
+    pixels: Pixels<'static>,
 }
 
 struct Session
@@ -74,6 +72,7 @@ struct Session
     gfx: GraphicsContext,
     frame_rx: Receiver<CompressedFrame>,
     last_frame: Option<Frame>,
+    frame_dirty: bool,
     running: Arc<AtomicBool>,
     frame_count: u32,
     last_fps_time: Instant,
@@ -114,6 +113,7 @@ impl Session
                                     *l = *d;
                                 }
                             }
+                            self.frame_dirty = true;
                         }
                     }
                 },
@@ -121,6 +121,7 @@ impl Session
                 DecompressedFrame::JpegFull(full_frame) =>
                 {
                     self.last_frame = Some(full_frame);
+                    self.frame_dirty = true;
                 },
             }
         }
@@ -131,115 +132,35 @@ impl Session
     fn redraw(&mut self)
     {
         let size = self.gfx.window.inner_size();
-        let nw_u32 = size.width;
-        let nh_u32 = size.height;
+        self.gfx.pixels.resize_surface(size.width, size.height).ok();
 
-        let (Some(nw), Some(nh)) = (num::NonZeroU32::new(nw_u32), num::NonZeroU32::new(nh_u32))
-            else { return; };
-
-        let Some(frame) = self.last_frame.as_ref()
-            else
-            {
-                if let Ok(()) = self.gfx.surface.resize(nw, nh)
-                {
-                    if let Ok(mut buffer) = self.gfx.surface.buffer_mut()
-                    {
-                        buffer.fill(0);
-                        let _ = buffer.present();
-                    }
-                }
-
-                return;
-            };
-
-        let w = frame.width;
-        let h = frame.height;
-
-        if self.gfx.surface.resize(nw, nh).is_err() { return; }
-
-        match self.gfx.surface.buffer_mut()
+        if let Some(frame) = self.last_frame.as_ref()
         {
-            Ok(mut buffer) =>
+            let w = frame.width;
+            let h = frame.height;
+            self.gfx.pixels.resize_buffer(w, h).ok();
+
+            if self.frame_dirty
             {
-                //COPY 1:1 IF POSSIBLE
-                if nw_u32 == w && nh_u32 == h
+                let frame_data = self.gfx.pixels.frame_mut();
+
+                //CHECK IF LENGTH MATCHES TO PREVENT PANIC
+                if frame_data.len() == (w * h * 4) as usize && frame.data.len() == (w * h) as usize
                 {
-                    buffer.copy_from_slice(&frame.data);
-                } else
-                {
-                    let scale_w = nw_u32 as f32 / w as f32;
-                    let scale_h = nh_u32 as f32 / h as f32;
-                    let scale = scale_w.min(scale_h);
-
-                    let dst_w = (w as f32 * scale).round() as u32;
-                    let dst_h = (h as f32 * scale).round() as u32;
-
-                    let offset_x = (nw_u32 - dst_w) / 2;
-                    let offset_y = (nh_u32 - dst_h) / 2;
-
-                    buffer.fill(0);
-
-                    //INTEGER BILINEAR INTERPOLATION
-                    let scale_x = (w << 16) / dst_w;
-                    let scale_y = (h << 16) / dst_h;
-
-                    for dy in 0..dst_h
+                    for (i, &pixel) in frame.data.iter().enumerate()
                     {
-                        let sy_fix = dy * scale_y + (scale_y >> 1);
-                        let sy0 = (sy_fix >> 16).min(h - 1);
-                        let sy1 = (sy0 + 1).min(h - 1);
-                        let fy = ((sy_fix & 0xFFFF) >> 8) as u32;
-
-                        let dst_row = (dy + offset_y) * nw_u32 + offset_x;
-                        let src_row0 = sy0 * w;
-                        let src_row1 = sy1 * w;
-
-                        for dx in 0..dst_w
-                        {
-                            let sx_fix = dx * scale_x + (scale_x >> 1);
-                            let sx0 = (sx_fix >> 16).min(w - 1);
-                            let sx1 = (sx0 + 1).min(w - 1);
-                            let fx = ((sx_fix & 0xFFFF) >> 8) as u32;
-
-                            let p00 = frame.data[(src_row0 + sx0) as usize];
-                            let p10 = frame.data[(src_row0 + sx1) as usize];
-                            let p01 = frame.data[(src_row1 + sx0) as usize];
-                            let p11 = frame.data[(src_row1 + sx1) as usize];
-
-                            let r00 = (p00 >> 16) & 0xFF;
-                            let r10 = (p10 >> 16) & 0xFF;
-                            let r01 = (p01 >> 16) & 0xFF;
-                            let r11 = (p11 >> 16) & 0xFF;
-                            let g00 = (p00 >> 8) & 0xFF;
-                            let g10 = (p10 >> 8) & 0xFF;
-                            let g01 = (p01 >> 8) & 0xFF;
-                            let g11 = (p11 >> 8) & 0xFF;
-                            let b00 = p00 & 0xFF;
-                            let b10 = p10 & 0xFF;
-                            let b01 = p01 & 0xFF;
-                            let b11 = p11 & 0xFF;
-
-                            let r_top = r00 + ((r10 as i32 - r00 as i32) * fx as i32 / 256) as u32;
-                            let r_bot = r01 + ((r11 as i32 - r01 as i32) * fx as i32 / 256) as u32;
-                            let r = r_top + ((r_bot as i32 - r_top as i32) * fy as i32 / 256) as u32;
-
-                            let g_top = g00 + ((g10 as i32 - g00 as i32) * fx as i32 / 256) as u32;
-                            let g_bot = g01 + ((g11 as i32 - g01 as i32) * fx as i32 / 256) as u32;
-                            let g = g_top + ((g_bot as i32 - g_top as i32) * fy as i32 / 256) as u32;
-
-                            let b_top = b00 + ((b10 as i32 - b00 as i32) * fx as i32 / 256) as u32;
-                            let b_bot = b01 + ((b11 as i32 - b01 as i32) * fx as i32 / 256) as u32;
-                            let b = b_top + ((b_bot as i32 - b_top as i32) * fy as i32 / 256) as u32;
-
-                            buffer[(dst_row + dx) as usize] = 0xFF000000 | (r << 16) | (g << 8) | b;
-                        }
+                        let idx = i * 4;
+                        frame_data[idx]     = ((pixel >> 16) & 0xFF) as u8; // R
+                        frame_data[idx + 1] = ((pixel >> 8) & 0xFF) as u8;  // G
+                        frame_data[idx + 2] = (pixel & 0xFF) as u8;         // B
+                        frame_data[idx + 3] = 255;                          // A
                     }
                 }
-
-                buffer.present().ok();
+                self.frame_dirty = false;
             }
-            _ => {},
         }
+
+        self.gfx.pixels.render().ok();
     }
 }
 
@@ -267,17 +188,20 @@ impl ScreenShareApp
         let Ok(window) = event_loop.create_window(attrs) else { return; };
         let window = Arc::new(window);
 
-        let Ok(context) = Context::new(window.clone()) else { return; };
-        let Ok(surface) = Surface::new(&context, window.clone()) else { return; };
+        let size = window.inner_size();
+        let surface_texture = SurfaceTexture::new(size.width, size.height, window.clone());
+        let Ok(mut pixels) = Pixels::new(1920, 1080, surface_texture) else { return; };
+        pixels.set_scaling_mode(pixels::ScalingMode::Fill);
 
         let window_id = window.id();
         window.request_redraw();
 
         self.sessions.insert(window_id, Session
         {
-            gfx: GraphicsContext { window, _context: context, surface },
+            gfx: GraphicsContext { window, pixels },
             frame_rx: request.rx,
             last_frame: None,
+            frame_dirty: false,
             running: request.running,
             frame_count: 0,
             last_fps_time: Instant::now(),
@@ -309,6 +233,15 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
                 if let Some(session) = self.sessions.get_mut(&window_id)
                 {
                     session.redraw();
+                }
+            },
+
+            WindowEvent::Resized(size) =>
+            {
+                if let Some(session) = self.sessions.get_mut(&window_id)
+                {
+                    session.gfx.pixels.resize_surface(size.width, size.height).ok();
+                    session.gfx.window.request_redraw();
                 }
             },
 
