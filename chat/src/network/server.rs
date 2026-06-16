@@ -680,7 +680,11 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
     }
 
     //CLOSE SCREEN UPLOAD STREAM
-    connection.remove_screen_stream();
+    if let Some(id) = connection.remove_screen_stream()
+    {
+        //DEATTACH ALL ATTACHED CLIENTS
+        deattach(id);
+    }
 
     //AUTHENTICATED ACTIONS
     if connection.is_authenticated()
@@ -923,6 +927,15 @@ fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW T
     PENDING_TOKENS.insert(token, (id, conn_type, Instant::now()));
 
     token
+}
+
+fn deattach(sharer_id: usize) //DEATTACH ALL ATTACHED CLIENTS
+{
+    for mut conn in CONNECTIONS.iter_mut()
+        .filter(|conn| conn.attached_screen().as_ref().is_some_and(|a| a.target_id == sharer_id))
+    {
+        conn.deattach_screen();
+    }
 }
 
 //PUBLIC
@@ -1406,11 +1419,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         .and_then(|mut conn| conn.remove_screen_stream())
                     {
                         //DEATTACH ALL CLIENTS
-                        for mut conn in CONNECTIONS.iter_mut()
-                            .filter(|conn| conn.attached_screen().as_ref().is_some_and(|a| a.target_id == removed_id))
-                        {
-                            conn.deattach_screen();
-                        }
+                        deattach(removed_id);
 
                         //SEND SCREEN DISABLE NOTIFICATION
                         network::send(&mut streams.1.lock().unwrap(), MessagePacket
