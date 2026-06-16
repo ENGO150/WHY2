@@ -18,11 +18,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    net::TcpStream,
     collections::HashMap,
     time::{ Duration, Instant },
     sync::
     {
         Arc,
+        Mutex,
         atomic::{ AtomicBool, Ordering },
     }
 };
@@ -45,15 +47,22 @@ use winit::
     },
 };
 
-use crate::network::
+use crate::
 {
-    CompressedFrame,
-    screen::client::
+    options,
+    network::
     {
-        frame::Frame,
-        compress::{ self, DecompressedFrame },
-        ScreenShareRequest,
-        UserEvent,
+        self,
+        MessageCode,
+        MessagePacket,
+        CompressedFrame,
+        screen::client::
+        {
+            frame::Frame,
+            compress::{ self, DecompressedFrame },
+            ScreenShareRequest,
+            UserEvent,
+        },
     },
 };
 
@@ -74,6 +83,7 @@ struct Session
     last_frame: Option<Frame>,
     frame_dirty: bool,
     running: Arc<AtomicBool>,
+    main_stream: Arc<Mutex<TcpStream>>,
     frame_count: u32,
     last_fps_time: Instant,
 }
@@ -221,6 +231,7 @@ impl ScreenShareApp
             last_frame: None,
             frame_dirty: false,
             running: request.running,
+            main_stream: request.main_stream,
             frame_count: 0,
             last_fps_time: Instant::now(),
         });
@@ -268,6 +279,13 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
                 if let Some(session) = self.sessions.remove(&window_id)
                 {
                     session.running.store(false, Ordering::Relaxed);
+
+                    //DEATTACH ON SERVER
+                    network::send(&mut session.main_stream.lock().unwrap(), MessagePacket
+                    {
+                        code: Some(MessageCode::Deattach),
+                        ..Default::default()
+                    }, options::get_keys().as_ref());
                 }
             },
 

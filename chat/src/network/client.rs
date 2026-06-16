@@ -580,7 +580,8 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 MessageCode::Attach =>
                 {
                     //SPAWN DOWNLOAD THREAD
-                    thread::spawn(move || screen::attach(read.token.unwrap()));
+                    let main_stream = streams.1.clone();
+                    thread::spawn(move || screen::attach(read.token.unwrap(), main_stream));
                     tx.send(ClientEvent::Attach(read.username.unwrap())).unwrap();
                 },
 

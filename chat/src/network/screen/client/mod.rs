@@ -27,6 +27,7 @@ use std::
 {
     thread,
     io::Write,
+    net::TcpStream,
     sync::
     {
         Arc,
@@ -58,6 +59,7 @@ pub struct ScreenShareRequest
 {
     pub rx: Receiver<CompressedFrame>,
     pub running: Arc<AtomicBool>,
+    pub main_stream: Arc<Mutex<TcpStream>>
 }
 
 //ENUMS
@@ -115,7 +117,7 @@ pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
     }
 }
 
-pub fn attach(token: [u8; 32])
+pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
 {
     //INIT FILE CONNECTION
     let mut stream = client::connect(options::get_server_address()).expect("Screen download connection failed");
@@ -156,6 +158,11 @@ pub fn attach(token: [u8; 32])
 
     if let Some(proxy) = SCREEN_SHARE_PROXY.get()
     {
-        proxy.send_event(UserEvent::NewSession(ScreenShareRequest { rx, running })).ok();
+        proxy.send_event(UserEvent::NewSession(ScreenShareRequest
+        {
+            rx,
+            running,
+            main_stream,
+        })).ok();
     }
 }
