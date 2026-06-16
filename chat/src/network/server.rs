@@ -1403,24 +1403,21 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 //SCREENSHARE ATTACH
                 MessageCode::Attach =>
                 {
-                    let sharer_id = read.text.as_ref().and_then(|text|
+                    if let Some((sharer_id, sharer_username)) = read.text.as_ref().and_then(|text|
                     {
                         let sharer_id = text.parse::<usize>().ok()?;
 
                         //FIND SHARER ADDRESS BY ID
-                        if CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&sharer_id) &&
-                            entry.screen_stream().is_some()).is_some()
+                        if let Some(conn) = CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&sharer_id) &&
+                            entry.screen_stream().is_some())
                         {
-                            Some(sharer_id)
+                            Some((sharer_id, conn.username()?.to_owned()))
                         } else
                         {
                             None
                         }
-                    });
-
-                    //VALID SHARER FOUND
-                    if let Some(sharer_id) = sharer_id
-                    {
+                    })
+                    { //VALID SHARER FOUND
                         //OPEN NEW CONNECTION
                         let token = open_connection(id, ConnectionType::Attach
                         {
@@ -1431,6 +1428,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         network::send(&mut streams.1.lock().unwrap(), MessagePacket
                         {
                             code: Some(MessageCode::Attach),
+                            username: Some(sharer_username),
                             token: Some(token),
                             ..Default::default()
                         }, Some(&keys), None);

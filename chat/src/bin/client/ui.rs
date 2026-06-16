@@ -427,6 +427,12 @@ pub fn draw_event(event: ClientEvent)
             println!("{} screen sharing.\n", if enabled { "Started" } else { "Stopped" });
         },
 
+        ClientEvent::Attach(username) =>
+        {
+            clear_lines(2);
+            println!("Attached {username}'s screen sharing.\n");
+        },
+
         ClientEvent::IncompatibleVersion(version, server_version) =>
         {
             clear_lines(1);

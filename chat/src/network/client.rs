@@ -111,6 +111,7 @@ pub enum ClientEvent
     Screens(Vec<Value>),                       //SCREENSHARE LIST
     UploadLimit,                               //MAX CONCURRENT UPLOADS REACHED
     Screen(bool),                              //TOGGLED SCREENSHARE
+    Attach(String),                            //ATTACHED SCREENSHARE
     ExtraSpace,                                //JUST RANDOM NEWLINE
     IncompatibleVersion(String, String),       //INCOMPATIBLE SERVER VERSION
     UsernameRejected,                          //USERNAME REJECTED BY SERVER
@@ -573,7 +574,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 {
                     //SPAWN DOWNLOAD THREAD
                     thread::spawn(move || screen::attach(read.token.unwrap()));
-                    continue;
+                    tx.send(ClientEvent::Attach(read.username.unwrap())).unwrap();
                 },
 
                 //PRIVATE MESSAGE INCOMING
