@@ -181,6 +181,24 @@ impl ScreenShareApp
 
     fn create_session(&mut self, event_loop: &ActiveEventLoop, request: ScreenShareRequest)
     {
+        //CHECK IF ANOTHER ATTACH IS ALIVE (RECYCLE WINDOW)
+        if let Some(session) = self.sessions.values_mut().next()
+        {
+            session.running.store(false, Ordering::Relaxed);
+
+            //RESET
+            session.frame_rx = request.rx;
+            session.running = request.running;
+            session.last_frame = None;
+            session.frame_dirty = false;
+            session.frame_count = 0;
+            session.last_fps_time = Instant::now();
+
+            session.gfx.window.request_redraw();
+
+            return;
+        }
+
         let attrs = WindowAttributes::default()
             .with_title("WHY2 ScreenShare")
             .with_inner_size(PhysicalSize::new(1920u32, 1080u32));
@@ -266,7 +284,7 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
             if session.process_pending_frames()
             {
                 session.frame_count += 1;
-                if session.last_fps_time.elapsed() >= std::time::Duration::from_secs(1)
+                if session.last_fps_time.elapsed() >= Duration::from_secs(1)
                 {
                     session.gfx.window.set_title(&format!("WHY2 Screenshare ({} FPS)", session.frame_count));
                     session.frame_count = 0;
