@@ -106,7 +106,7 @@ build-why2-chat-linux:
   only:
     - development
   script:
-    - apt-get update && apt-get install -y pkg-config libasound2-dev libopus-dev libpipewire-0.3-dev libegl-dev clang libclang-dev libgbm-dev
+    - apt-get update && apt-get install -y pkg-config libasound2-dev libopus-dev libpipewire-0.3-dev libegl-dev clang libclang-dev libgbm-dev nasm
     - cargo build --release
     - cargo build --bin why2-server --no-default-features --features server --release
   artifacts:
