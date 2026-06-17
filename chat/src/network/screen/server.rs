@@ -106,11 +106,17 @@ pub fn screen(id: usize, streams: &mut Streams)
         {
             match entry.value()
             {
-                Connection::Authenticated { attached_screen, .. } =>
+                Connection::Authenticated { id: client_id, attached_screen, .. } =>
                 {
                     //FILTER ATTACHED CLIENTS
                     if let Some(attached_screen) = attached_screen && attached_screen.target_id == id
                     {
+                        //PREVENT FEEDBACK
+                        if *client_id == id && read.screen.as_ref().is_some_and(|s| s.frame.is_none())
+                        {
+                            return None;
+                        }
+
                         //FOUND, COLLECT
                         Some((attached_screen.stream.clone(), entry.value().keys().cloned()))
                     } else { None }
