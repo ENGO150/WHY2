@@ -56,19 +56,21 @@ use crate::
         MessageCode,
         MessagePacket,
         CompressedFrame,
-        screen::client::
+        screen::
         {
-            frame::Frame,
-            compress::{ self, DecompressedFrame },
-            ScreenShareRequest,
-            UserEvent,
+            consts,
+            client::
+            {
+                frame::Frame,
+                compress::{ self, DecompressedFrame },
+                ScreenShareRequest,
+                UserEvent,
+            },
         },
     },
 };
 
 //PRIVATE
-const FRAME_POLL_INTERVAL: Duration = Duration::from_millis(33); //~30 FPS POLL
-
 //STRUCTS
 struct GraphicsContext
 {
@@ -217,14 +219,14 @@ impl ScreenShareApp
 
         let attrs = WindowAttributes::default()
             .with_title("WHY2 ScreenShare")
-            .with_inner_size(PhysicalSize::new(1920u32, 1080u32));
+            .with_inner_size(PhysicalSize::new(consts::WINIT_SIZE.0, consts::WINIT_SIZE.1));
 
         let Ok(window) = event_loop.create_window(attrs) else { return; };
         let window = Arc::new(window);
 
         let size = window.inner_size();
         let surface_texture = SurfaceTexture::new(size.width, size.height, window.clone());
-        let Ok(mut pixels) = Pixels::new(1920, 1080, surface_texture) else { return; };
+        let Ok(mut pixels) = Pixels::new(consts::WINIT_SIZE.0, consts::WINIT_SIZE.1, surface_texture) else { return; };
         pixels.set_scaling_mode(pixels::ScalingMode::Fill);
 
         let window_id = window.id();
@@ -248,7 +250,7 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
 {
     fn resumed(&mut self, event_loop: &ActiveEventLoop)
     {
-        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + FRAME_POLL_INTERVAL));
+        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + consts::FRAME_POLL_INTERVAL));
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent)
@@ -332,6 +334,6 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
             }
         }
 
-        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + FRAME_POLL_INTERVAL));
+        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + consts::FRAME_POLL_INTERVAL));
     }
 }

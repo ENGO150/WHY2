@@ -77,7 +77,7 @@ pub fn compress_jpeg(width: u32, height: u32, rgba_data: &[u8]) -> CompressedFra
     out.extend_from_slice(&height.to_le_bytes());
 
     let mut comp = Compressor::new().expect("Failed to init turbojpeg compressor");
-    comp.set_quality(80).ok();
+    comp.set_quality(consts::JPEG_QUALITY).ok();
     comp.set_subsamp(Subsamp::Sub2x2).ok();
 
     let image = Image

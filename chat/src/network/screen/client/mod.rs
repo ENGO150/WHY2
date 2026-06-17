@@ -51,6 +51,7 @@ use crate::
         MessagePacket,
         ScreenPayload,
         CompressedFrame,
+        screen::consts,
         client::{ self, ClientEvent },
     },
 };
@@ -86,14 +87,14 @@ pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
     tx.send(ClientEvent::Prompt).unwrap();
 
     //SHARED STATE
-    let (tx, rx) = crossbeam_channel::bounded(2);
-    let (audio_tx, audio_rx) = crossbeam_channel::bounded(2);
+    let (tx, rx) = crossbeam_channel::bounded(consts::MULTIPLEX_CHANNEL_BOUND);
+    let (audio_tx, audio_rx) = crossbeam_channel::bounded(consts::MULTIPLEX_CHANNEL_BOUND);
 
     let running = Arc::new(AtomicBool::new(true));
 
     //SPAWN CAPTURE THREAD
     let running_capture = running.clone();
-    let _capture_thread = thread::spawn(move || capture::capture_loop(tx, running_capture, 30));
+    let _capture_thread = thread::spawn(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
     let _audio_capture_thread = audio::spawn_audio_capture(audio_tx, running.clone());
 
     //LOOP SENDING FRAMES
@@ -153,8 +154,8 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
     stream.write_all(&token).unwrap();
 
     //SHARED STATE
-    let (tx, rx) = crossbeam_channel::bounded(2);
-    let (audio_tx, audio_rx) = crossbeam_channel::bounded(16);
+    let (tx, rx) = crossbeam_channel::bounded(consts::MULTIPLEX_CHANNEL_BOUND);
+    let (audio_tx, audio_rx) = crossbeam_channel::bounded(consts::NETWORK_CHANNEL_BOUND);
     let running = Arc::new(AtomicBool::new(true));
 
     let _audio_playback_thread = audio::spawn_audio_playback(audio_rx, running.clone());

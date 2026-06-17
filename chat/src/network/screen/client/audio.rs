@@ -29,7 +29,10 @@ use std::
 
 use cpal::
 {
+    BufferSize,
     StreamConfig,
+    InputCallbackInfo,
+    OutputCallbackInfo,
     traits::
     {
         DeviceTrait,
@@ -49,10 +52,14 @@ use audiopus::
     coder::{ Encoder, Decoder },
 };
 
-use crate::network::voice::
+use crate::network::
 {
-    consts,
-    client as voice,
+    screen::consts as screen_consts,
+    voice::
+    {
+        consts,
+        client as voice,
+    },
 };
 
 //STRUCTS
@@ -112,8 +119,7 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) -> 
             voice::configure_device(device.supported_input_configs().unwrap(), device.default_input_config().unwrap())
         };
 
-        config.buffer_size = cpal::BufferSize::Fixed(960);
-        let opus_frame_samples = 1920;
+        config.buffer_size = BufferSize::Fixed(screen_consts::BUFFER_SIZE);
 
         let encoder = Encoder::new
         (
@@ -122,7 +128,7 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) -> 
             Application::LowDelay,
         ).unwrap();
 
-        let (chunk_tx, chunk_rx) = crossbeam_channel::bounded::<Vec<f32>>(8);
+        let (chunk_tx, chunk_rx) = crossbeam_channel::bounded::<Vec<f32>>(screen_consts::CAPTURE_CHANNEL_BOUND);
 
         let input_channels = config.channels as usize;
         let input_source_rate = config.sample_rate as f32;
@@ -130,9 +136,9 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) -> 
         let input_resample_step = input_source_rate / input_target_rate;
         let mut input_resample_pos = 0.;
 
-        let mut input_accum: Vec<f32> = Vec::with_capacity(opus_frame_samples * 2);
+        let mut input_accum: Vec<f32> = Vec::with_capacity(screen_consts::FRAME_SAMPLES * 2);
 
-        let stream = device.build_input_stream(config.clone(), move |data: &[f32], _: &cpal::InputCallbackInfo|
+        let stream = device.build_input_stream(config.clone(), move |data: &[f32], _: &InputCallbackInfo|
         {
             let frames_in_buffer = data.len() / input_channels;
             let mut chunk = Vec::with_capacity((frames_in_buffer as f32 / input_resample_step * 2.0) as usize + 2);
@@ -180,7 +186,7 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) -> 
 
         stream.play().unwrap();
 
-        let mut out = vec![0u8; 4000];
+        let mut out = vec![0u8; screen_consts::MAX_PACKET_SIZE];
 
         while running.load(Ordering::Relaxed)
         {
@@ -201,9 +207,9 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) -> 
             }
 
             //ENCODE OPUS FRAMES
-            while input_accum.len() >= opus_frame_samples
+            while input_accum.len() >= screen_consts::FRAME_SAMPLES
             {
-                match encoder.encode_float(&input_accum[..opus_frame_samples], &mut out)
+                match encoder.encode_float(&input_accum[..screen_consts::FRAME_SAMPLES], &mut out)
                 {
                     Ok(len) =>
                     {
@@ -212,7 +218,7 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) -> 
 
                     _ => {},
                 }
-                input_accum.drain(..opus_frame_samples);
+                input_accum.drain(..screen_consts::FRAME_SAMPLES);
             }
         }
     })
@@ -229,12 +235,15 @@ pub fn spawn_audio_playback
         let host = cpal::default_host();
         let device = host.default_output_device().expect("No audio output device found");
         let mut config: StreamConfig = voice::configure_device(device.supported_output_configs().unwrap(), device.default_output_config().unwrap());
-        config.buffer_size = cpal::BufferSize::Fixed(960);
+        config.buffer_size = BufferSize::Fixed(screen_consts::BUFFER_SIZE);
 
-        let mut decoder = Decoder::new(<SampleRate as TryFrom<i32>>::try_from(48000).unwrap(), Channels::Stereo).unwrap();
-        let opus_frame_samples = 1920;
+        let mut decoder = Decoder::new
+        (
+            <SampleRate as TryFrom<i32>>::try_from(consts::SAMPLE_RATE as i32).unwrap(),
+            Channels::Stereo,
+        ).unwrap();
 
-        let (chunk_tx, chunk_rx) = crossbeam_channel::bounded::<Vec<f32>>(3);
+        let (chunk_tx, chunk_rx) = crossbeam_channel::bounded::<Vec<f32>>(screen_consts::PLAYBACK_CHANNEL_BOUND);
 
         let mut drain_buf: Vec<f32> = Vec::new();
         let mut drain_pos: usize = 0;
@@ -248,7 +257,7 @@ pub fn spawn_audio_playback
         let mut current_frame = (0., 0.);
         let mut next_frame = (0., 0.);
 
-        let stream = device.build_output_stream(config.clone(), move |data: &mut [f32], _: &cpal::OutputCallbackInfo|
+        let stream = device.build_output_stream(config.clone(), move |data: &mut [f32], _: &OutputCallbackInfo|
         {
             let frames_to_write = data.len() / output_channels;
             for i in 0..frames_to_write
@@ -310,7 +319,7 @@ pub fn spawn_audio_playback
 
         stream.play().unwrap();
 
-        let mut out = vec![0f32; opus_frame_samples];
+        let mut out = vec![0f32; screen_consts::FRAME_SAMPLES];
 
         while running.load(Ordering::Relaxed)
         {

@@ -36,10 +36,14 @@ use xcap::Monitor;
 use crate::network::
 {
     CompressedFrame,
-    screen::client::
+    screen::
     {
-        compress,
-        frame::Frame,
+        consts,
+        client::
+        {
+            compress,
+            frame::Frame,
+        },
     },
 };
 
@@ -147,7 +151,7 @@ fn capture_loop_wayshot
 
     while running.load(Ordering::Relaxed)
     {
-        if frame_count > 300
+        if frame_count > (consts::TARGET_FPS * 10)
         {
             if let Ok(w) = libwayshot::WayshotConnection::new()
             {
@@ -220,7 +224,7 @@ fn compress(w: u32, h: u32, rgba: &[u8], prev_data: &mut Vec<u32>, prev_was_jpeg
         differences = w * h;
     }
 
-    if differences > (w * h) / 100
+    if differences > (w * h) / (consts::COMPRESSION_TRESHOLD * 100)
     {
         *prev_was_jpeg = true;
         compress::compress_jpeg(w, h, rgba)
