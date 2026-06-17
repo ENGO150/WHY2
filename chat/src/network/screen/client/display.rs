@@ -31,7 +31,12 @@ use std::
 
 use crossbeam_channel::Receiver;
 
-use pixels::{ Pixels, SurfaceTexture };
+use pixels::
+{
+    Pixels,
+    SurfaceTexture,
+    ScalingMode,
+};
 
 use winit::
 {
@@ -72,15 +77,10 @@ use crate::
 
 //PRIVATE
 //STRUCTS
-struct GraphicsContext
+struct Session
 {
     window: Arc<Window>,
     pixels: Pixels<'static>,
-}
-
-struct Session
-{
-    gfx: GraphicsContext,
     frame_rx: Receiver<CompressedFrame>,
     last_frame: Option<Frame>,
     frame_dirty: bool,
@@ -144,18 +144,18 @@ impl Session
 
     fn redraw(&mut self)
     {
-        let size = self.gfx.window.inner_size();
-        self.gfx.pixels.resize_surface(size.width, size.height).ok();
+        let size = self.window.inner_size();
+        self.pixels.resize_surface(size.width, size.height).ok();
 
         if let Some(frame) = self.last_frame.as_ref()
         {
             let w = frame.width;
             let h = frame.height;
-            self.gfx.pixels.resize_buffer(w, h).ok();
+            self.pixels.resize_buffer(w, h).ok();
 
             if self.frame_dirty
             {
-                let frame_data = self.gfx.pixels.frame_mut();
+                let frame_data = self.pixels.frame_mut();
 
                 //CHECK IF LENGTH MATCHES TO PREVENT PANIC
                 if frame_data.len() == (w * h * 4) as usize && frame.data.len() == (w * h) as usize
@@ -173,7 +173,7 @@ impl Session
             }
         }
 
-        self.gfx.pixels.render().ok();
+        self.pixels.render().ok();
     }
 }
 
@@ -211,7 +211,7 @@ impl ScreenShareApp
             session.last_fps_time = Instant::now();
             session.close_requested_at = None;
 
-            session.gfx.window.request_redraw();
+            session.window.request_redraw();
             old_running.store(false, Ordering::Relaxed);
 
             return;
@@ -227,14 +227,15 @@ impl ScreenShareApp
         let size = window.inner_size();
         let surface_texture = SurfaceTexture::new(size.width, size.height, window.clone());
         let Ok(mut pixels) = Pixels::new(consts::WINIT_SIZE.0, consts::WINIT_SIZE.1, surface_texture) else { return; };
-        pixels.set_scaling_mode(pixels::ScalingMode::Fill);
+        pixels.set_scaling_mode(ScalingMode::Fill);
 
         let window_id = window.id();
         window.request_redraw();
 
         self.sessions.insert(window_id, Session
         {
-            gfx: GraphicsContext { window, pixels },
+            window,
+            pixels,
             frame_rx: request.rx,
             last_frame: None,
             frame_dirty: false,
@@ -281,8 +282,8 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
             {
                 if let Some(session) = self.sessions.get_mut(&window_id)
                 {
-                    session.gfx.pixels.resize_surface(size.width, size.height).ok();
-                    session.gfx.window.request_redraw();
+                    session.pixels.resize_surface(size.width, size.height).ok();
+                    session.window.request_redraw();
                 }
             },
 
@@ -331,12 +332,12 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
                 session.frame_count += 1;
                 if session.last_fps_time.elapsed() >= Duration::from_secs(1)
                 {
-                    session.gfx.window.set_title(&format!("WHY2 Screenshare ({} FPS)", session.frame_count));
+                    session.window.set_title(&format!("WHY2 Screenshare ({} FPS)", session.frame_count));
                     session.frame_count = 0;
                     session.last_fps_time = Instant::now();
                 }
 
-                session.gfx.window.request_redraw();
+                session.window.request_redraw();
             }
         }
 

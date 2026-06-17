@@ -16,11 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::
-{
-    slice,
-    convert::TryInto,
-};
+use std::slice;
 
 use crate::network::
 {
@@ -53,29 +49,20 @@ pub enum DecompressedFrame
 //FUNCTIONS
 pub fn compress_zstd(frame: &Frame) -> CompressedFrame
 {
-    let mut out = Vec::with_capacity(frame.data.len() + 1);
-    out.push(0);
-
     let raw_bytes = frame.as_bytes();
-    let compressed_data = bulk::compress(raw_bytes, consts::ZSTD_LEVEL).expect("zstd compression failed");
-    out.extend_from_slice(&compressed_data);
+    let mut compressed_data = bulk::compress(raw_bytes, consts::ZSTD_LEVEL).expect("zstd compression failed");
+    compressed_data.insert(0, 0);
 
     CompressedFrame
     {
         width: frame.width,
         height: frame.height,
-        compressed_data: out,
-        pixel_count: frame.data.len(),
+        compressed_data,
     }
 }
 
 pub fn compress_jpeg(width: u32, height: u32, rgba_data: &[u8]) -> CompressedFrame
 {
-    let mut out = Vec::with_capacity(rgba_data.len() / 10);
-    out.push(1);
-    out.extend_from_slice(&width.to_le_bytes());
-    out.extend_from_slice(&height.to_le_bytes());
-
     let mut comp = Compressor::new().expect("Failed to init turbojpeg compressor");
     comp.set_quality(consts::JPEG_QUALITY).ok();
     comp.set_subsamp(Subsamp::Sub2x2).ok();
@@ -89,24 +76,25 @@ pub fn compress_jpeg(width: u32, height: u32, rgba_data: &[u8]) -> CompressedFra
         format: PixelFormat::RGBA,
     };
     let compressed_jpeg = comp.compress_to_owned(image).expect("JPEG encode failed");
-    out.extend_from_slice(&compressed_jpeg);
+    let mut compressed_data = Vec::with_capacity(compressed_jpeg.len() + 1);
+    compressed_data.push(1);
+    compressed_data.extend_from_slice(&compressed_jpeg);
 
     CompressedFrame
     {
         width,
         height,
-        compressed_data: out,
-        pixel_count: (width * height) as usize,
+        compressed_data,
     }
 }
 
 pub fn decompress(compressed: &CompressedFrame) -> DecompressedFrame
 {
+    let w = compressed.width;
+    let h = compressed.height;
+
     if compressed.compressed_data[0] == 1
     {
-        let w = u32::from_le_bytes(compressed.compressed_data[1..5].try_into().unwrap());
-        let h = u32::from_le_bytes(compressed.compressed_data[5..9].try_into().unwrap());
-
         let mut decomp = Decompressor::new().expect("Failed to init turbojpeg decompressor");
         let mut rgba = vec![0u8; (w * h * 4) as usize];
         let image = Image
@@ -117,7 +105,7 @@ pub fn decompress(compressed: &CompressedFrame) -> DecompressedFrame
             height: h as usize,
             format: PixelFormat::RGBA,
         };
-        decomp.decompress(&compressed.compressed_data[9..], image).expect("JPEG decode failed");
+        decomp.decompress(&compressed.compressed_data[1..], image).expect("JPEG decode failed");
 
         let mut data = Vec::with_capacity((w * h) as usize);
         let rgba_u32 = unsafe { slice::from_raw_parts(rgba.as_ptr() as *const u32, rgba.len() / 4) };
@@ -129,10 +117,10 @@ pub fn decompress(compressed: &CompressedFrame) -> DecompressedFrame
         DecompressedFrame::JpegFull(Frame { width: w, height: h, data })
     } else
     {
-        let max_decompressed_size = compressed.pixel_count * 4;
+        let max_decompressed_size = (w * h * 4) as usize;
         let bytes = bulk::decompress(&compressed.compressed_data[1..], max_decompressed_size)
             .expect("zstd decompression failed");
 
-        DecompressedFrame::ZstdDiff(Frame::from_bytes(compressed.width, compressed.height, &bytes))
+        DecompressedFrame::ZstdDiff(Frame::from_bytes(w, h, &bytes))
     }
 }

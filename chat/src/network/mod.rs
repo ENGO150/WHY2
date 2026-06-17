@@ -122,7 +122,6 @@ pub struct CompressedFrame //COMPRESSED FRAME
     pub width: u32,
     pub height: u32,
     pub compressed_data: Vec<u8>,
-    pub pixel_count: usize,
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]

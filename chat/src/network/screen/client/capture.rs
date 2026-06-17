@@ -192,7 +192,7 @@ fn capture_loop_wayshot
 
 fn compress(w: u32, h: u32, rgba: &[u8], prev_data: &mut Vec<u32>, prev_was_jpeg: &mut bool) -> CompressedFrame
 {
-    let mut data = Vec::with_capacity((w * h) as usize);
+    let mut data = vec![0u32; (w * h) as usize];
     let mut differences = 0;
 
     let rgba_u32 = unsafe { slice::from_raw_parts(rgba.as_ptr() as *const u32, rgba.len() / 4) };
@@ -208,17 +208,17 @@ fn compress(w: u32, h: u32, rgba: &[u8], prev_data: &mut Vec<u32>, prev_was_jpeg
 
             if *prev_was_jpeg || prev != current
             {
-                data.push(current);
+                data[i] = current;
                 prev_data[i] = current;
-            } else { data.push(0); }
+            }
         }
     } else
     {
         prev_data.clear();
-        for &pixel in rgba_u32.iter()
+        for (i, &pixel) in rgba_u32.iter().enumerate()
         {
             let current = 0xFF000000 | (pixel.to_be() >> 8);
-            data.push(current);
+            data[i] = current;
             prev_data.push(current);
         }
         differences = w * h;
