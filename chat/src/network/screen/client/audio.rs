@@ -228,7 +228,7 @@ pub fn spawn_audio_playback
 (
     rx: Receiver<AudioFrame>,
     running: Arc<AtomicBool>,
-) -> thread::JoinHandle<()>
+) -> JoinHandle<()>
 {
     thread::spawn(move ||
         {
