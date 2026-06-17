@@ -99,7 +99,7 @@ pub fn screen(id: usize, streams: &mut Streams)
             None => return
         };
 
-        if read.frame.is_none() { continue; } //DO NOT FORWARD INVALID FRAMES
+        if read.screen.is_none() { continue; } //DO NOT FORWARD INVALID FRAMES
 
         //COLLECT ALL ATTACHED CLIENT STREAMS
         let entries: Vec<(Arc<TcpStream>, Option<SharedKeys>)> = server::CONNECTIONS.iter().filter_map(|entry|

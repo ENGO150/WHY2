@@ -49,6 +49,7 @@ use crate::
     {
         self,
         MessagePacket,
+        ScreenPayload,
         CompressedFrame,
         client::{ self, ClientEvent },
     },
@@ -95,25 +96,50 @@ pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
     let _capture_thread = thread::spawn(move || capture::capture_loop(tx, running_capture, 30));
     let _audio_capture_thread = audio::spawn_audio_capture(audio_tx, running.clone());
 
+    //LOOP SENDING FRAMES
     loop
     {
-        //HANDLE VIDEO FRAMES (BLOCKING)
-        let compressed_frame = match rx.recv()
+        crossbeam_channel::select!
         {
-            Ok(f) => f,
-            Err(_) => return,
-        };
+            //VIDEO FRAME
+            recv(rx) -> msg =>
+            {
+                let compressed_frame = match msg
+                {
+                    Ok(f) => f,
+                    Err(_) => return,
+                };
 
-        network::send(&mut stream, MessagePacket
-        {
-            frame: Some(compressed_frame),
-            ..Default::default()
-        }, options::get_keys().as_ref());
+                network::send(&mut stream, MessagePacket
+                {
+                    screen: Some(ScreenPayload
+                    {
+                        frame: Some(compressed_frame),
+                        audio: None,
+                    }),
+                    ..Default::default()
+                }, options::get_keys().as_ref());
+            },
 
-        //HANDLE AUDIO FRAMES
-        if let Ok(_audio_chunk) = audio_rx.try_recv()
-        {
-            //TODO
+            //AUDIO FRAME
+            recv(audio_rx) -> msg =>
+            {
+                let audio_frame = match msg
+                {
+                    Ok(f) => f,
+                    Err(_) => return,
+                };
+
+                network::send(&mut stream, MessagePacket
+                {
+                    screen: Some(ScreenPayload
+                    {
+                        frame: None,
+                        audio: Some(audio_frame.data),
+                    }),
+                    ..Default::default()
+                }, options::get_keys().as_ref());
+            }
         }
     }
 }
@@ -128,7 +154,10 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
 
     //SHARED STATE
     let (tx, rx) = crossbeam_channel::bounded(2);
+    let (audio_tx, audio_rx) = crossbeam_channel::bounded(16);
     let running = Arc::new(AtomicBool::new(true));
+
+    let _audio_playback_thread = audio::spawn_audio_playback(audio_rx, running.clone());
 
     //SPAWN NETWORK READER THREAD
     let running_net = running.clone();
@@ -156,9 +185,17 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
                 }
             };
 
-            if let Some(frame) = read.frame
+            if let Some(screen_payload) = read.screen
             {
-                tx.send(frame).ok();
+                if let Some(frame) = screen_payload.frame
+                {
+                    tx.send(frame).ok();
+                }
+
+                if let Some(audio) = screen_payload.audio
+                {
+                    audio_tx.send(audio::AudioFrame { data: audio }).ok();
+                }
             }
         }
     });

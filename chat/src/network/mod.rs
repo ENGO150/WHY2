@@ -126,6 +126,13 @@ pub struct CompressedFrame //COMPRESSED FRAME
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
+pub struct ScreenPayload //SCREEN PAYLOAD
+{
+    pub frame: Option<CompressedFrame>, //COMPRESSED FRAME
+    pub audio: Option<Vec<u8>>,         //AUDIO FRAME
+}
+
+#[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 {
     pub text: Option<String>,           //MESSAGE
@@ -135,7 +142,7 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub colors: MessageColors,          //MESSAGE COLORS
     pub seq: usize,                     //SEQUENCE NUMBER
     pub file: Option<FilePayload>,      //FILE UPLOADED BY CLIENT
-    pub frame: Option<CompressedFrame>, //SCREENSHARING FRAME
+    pub screen: Option<ScreenPayload>,  //SCREENSHARE PAYLOAD
     pub token: Option<[u8; 32]>,        //CONNECTION TOKEN
 }
 
@@ -157,7 +164,7 @@ impl Default for MessagePacket //DEFAULT
             },
             seq: 0,
             file: None,
-            frame: None,
+            screen: None,
             token: None,
         }
     }

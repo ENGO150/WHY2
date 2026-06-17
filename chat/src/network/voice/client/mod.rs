@@ -179,7 +179,7 @@ fn find_devices(host: &Host) -> Option<(Device, Device)> //FIND CONFIGURED/DEFAU
     Some((input_device?, output_device?))
 }
 
-fn configure_device(supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig) -> StreamConfig
+pub fn configure_device(supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig) -> StreamConfig
 {
     supported_configs
         .filter(|c| c.min_sample_rate() <= consts::SAMPLE_RATE && c.max_sample_rate() >= consts::SAMPLE_RATE)
