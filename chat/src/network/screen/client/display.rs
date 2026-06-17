@@ -88,6 +88,7 @@ struct Session
     main_stream: Arc<Mutex<TcpStream>>,
     frame_count: u32,
     last_fps_time: Instant,
+    close_requested_at: Option<Instant>,
 }
 
 //IMPLEMENTATIONS
@@ -181,7 +182,6 @@ impl Session
 pub struct ScreenShareApp //DISPATCHER
 {
     sessions: HashMap<WindowId, Session>,
-    close_pending: bool,
 }
 
 //IMPLEMENTATIONS
@@ -192,7 +192,6 @@ impl ScreenShareApp
         Self
         {
             sessions: HashMap::new(),
-            close_pending: false,
         }
     }
 
@@ -210,6 +209,7 @@ impl ScreenShareApp
             session.frame_dirty = false;
             session.frame_count = 0;
             session.last_fps_time = Instant::now();
+            session.close_requested_at = None;
 
             session.gfx.window.request_redraw();
             old_running.store(false, Ordering::Relaxed);
@@ -242,6 +242,7 @@ impl ScreenShareApp
             main_stream: request.main_stream,
             frame_count: 0,
             last_fps_time: Instant::now(),
+            close_requested_at: None,
         });
     }
 }
@@ -259,13 +260,7 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
         {
             UserEvent::NewSession(request) =>
             {
-                self.close_pending = false;
                 self.create_session(event_loop, request);
-            },
-
-            UserEvent::Closed =>
-            {
-                self.close_pending = true;
             },
         }
     }
@@ -312,11 +307,22 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop)
     {
-        if self.close_pending
+        self.sessions.retain(|_, session|
         {
-            self.sessions.retain(|_, session| session.running.load(Ordering::Relaxed));
-            self.close_pending = false;
-        }
+            if session.running.load(Ordering::Relaxed)
+            {
+                session.close_requested_at = None;
+                true
+            } else
+            {
+                if session.close_requested_at.is_none()
+                {
+                    session.close_requested_at = Some(Instant::now());
+                }
+
+                session.close_requested_at.unwrap().elapsed() < Duration::from_millis(250)
+            }
+        });
 
         for session in self.sessions.values_mut()
         {

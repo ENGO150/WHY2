@@ -68,7 +68,6 @@ pub struct ScreenShareRequest
 pub enum UserEvent //CUSTOM WINIT EVENTS
 {
     NewSession(ScreenShareRequest),
-    Closed,
 }
 
 //GLOBAL VARIABLES
@@ -176,12 +175,6 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
                 None =>
                 {
                     running_net.store(false, Ordering::Relaxed);
-
-                    if let Some(proxy) = SCREEN_SHARE_PROXY.get()
-                    {
-                        proxy.send_event(UserEvent::Closed).ok();
-                    }
-
                     return;
                 }
             };
