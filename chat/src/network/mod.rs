@@ -304,8 +304,8 @@ pub fn receive
             .map(|conn| conn.is_authenticated())
             .unwrap_or(false);
 
-        //ALLOW BIG MESSAGES WHEN SPAM PROTECTION IS OFF AND CLIENT IS AUTHENTICATED
-        max_packet_size = if !spam_protection && authenticated
+        //ALLOW BIG MESSAGES WHEN SPAM PROTECTION IS OFF AND CLIENT IS AUTHENTICATED OR WHEN STREAM IS AUXILIARY
+        max_packet_size = if (!spam_protection && authenticated) || seq.is_some()
         {
             usize::MAX
         } else //SET MAX PACKET SIZE IF SPAM PROTECTION IS ENABLED
