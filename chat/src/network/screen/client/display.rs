@@ -263,6 +263,7 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
             {
                 self.create_session(event_loop, request);
             },
+            UserEvent::NewFrame => {}, //WAKES UP EVENT LOOP
         }
     }
 

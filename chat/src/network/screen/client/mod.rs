@@ -68,6 +68,7 @@ pub struct ScreenShareRequest
 pub enum UserEvent //CUSTOM WINIT EVENTS
 {
     NewSession(ScreenShareRequest),
+    NewFrame,
 }
 
 //GLOBAL VARIABLES
@@ -184,6 +185,10 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
                 if let Some(frame) = screen_payload.frame
                 {
                     tx.send(frame).ok();
+                    if let Some(proxy) = SCREEN_SHARE_PROXY.get()
+                    {
+                        proxy.send_event(UserEvent::NewFrame).ok();
+                    }
                 }
 
                 if let Some(audio) = screen_payload.audio
