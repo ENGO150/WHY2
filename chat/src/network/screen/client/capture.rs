@@ -29,8 +29,9 @@ use std::
     },
 };
 
-use crossbeam_channel::Sender;
+use crossbeam_channel::{ Sender, Receiver };
 
+use image::RgbaImage;
 use xcap::Monitor;
 
 use crate::network::
@@ -76,13 +77,53 @@ pub fn capture_loop //CAPTURE LOOP
     {
         #[cfg(target_os = "linux")]
         {
-            let monitor = get_primary_monitor();
-            capture_loop_wayshot(&monitor, frame_tx, running, fps);
+            capture_loop_wayshot(&get_primary_monitor(), frame_tx, running, fps);
         }
         return;
     }
 
     capture_loop_xcap(get_primary_monitor(), frame_tx, running, fps);
+}
+
+fn spawn_compressor_thread
+(
+    running: Arc<AtomicBool>,
+    image_rx: Receiver<RgbaImage>,
+    frame_tx: Sender<CompressedFrame>,
+) {
+    thread::spawn(move ||
+    {
+        let mut prev_data: Vec<u32> = Vec::new();
+        let mut prev_was_jpeg = false;
+
+        while running.load(Ordering::Relaxed)
+        {
+            if let Ok(image) = image_rx.recv()
+            {
+                let compressed = compress
+                (
+                    image.width(), image.height(), image.as_raw(),
+                    &mut prev_data, &mut prev_was_jpeg
+                );
+
+                frame_tx.send(compressed).ok();
+            } else { break; }
+        }
+    });
+}
+
+fn sleep_until_next_tick(next_tick: &mut Instant, target_interval: Duration)
+{
+    let now = Instant::now();
+    if *next_tick > now
+    {
+        thread::sleep(*next_tick - now);
+    } else
+    {
+        *next_tick = now;
+    }
+
+    *next_tick += target_interval;
 }
 
 fn capture_loop_xcap
@@ -94,48 +135,20 @@ fn capture_loop_xcap
 )
 {
     let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
-    let (image_tx, image_rx) = crossbeam_channel::bounded::<image::RgbaImage>(2);
+    let (image_tx, image_rx) = crossbeam_channel::bounded::<RgbaImage>(consts::MULTIPLEX_CHANNEL_BOUND);
 
-    let running_compress = running.clone();
-    thread::spawn(move ||
-    {
-        let mut prev_data: Vec<u32> = Vec::new();
-        let mut prev_was_jpeg = false;
+    spawn_compressor_thread(running.clone(), image_rx, frame_tx);
 
-        while running_compress.load(Ordering::Relaxed)
-        {
-            if let Ok(image) = image_rx.recv()
-            {
-                let width = image.width();
-                let height = image.height();
-                let compressed = compress
-                (
-                    width, height, image.as_raw(),
-                    &mut prev_data, &mut prev_was_jpeg
-                );
-                frame_tx.send(compressed).ok();
-            } else { break; }
-        }
-    });
-
-    let mut next_tick = Instant::now();
+    let mut next_tick = Instant::now() + target_interval;
 
     while running.load(Ordering::Relaxed)
     {
-        next_tick += target_interval;
-
         if let Ok(image) = monitor.capture_image()
         {
             image_tx.try_send(image).ok();
         }
 
-        let now = Instant::now();
-        if next_tick > now
-        {
-            thread::sleep(next_tick - now);
-        } else {
-            next_tick = now;
-        }
+        sleep_until_next_tick(&mut next_tick, target_interval);
     }
 }
 
@@ -149,29 +162,9 @@ fn capture_loop_wayshot
 )
 {
     let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
-    let (image_tx, image_rx) = crossbeam_channel::bounded::<image::RgbaImage>(2);
+    let (image_tx, image_rx) = crossbeam_channel::bounded::<RgbaImage>(consts::MULTIPLEX_CHANNEL_BOUND);
 
-    let running_compress = running.clone();
-    thread::spawn(move ||
-    {
-        let mut prev_data: Vec<u32> = Vec::new();
-        let mut prev_was_jpeg = false;
-
-        while running_compress.load(Ordering::Relaxed)
-        {
-            if let Ok(rgba) = image_rx.recv()
-            {
-                let width = rgba.width();
-                let height = rgba.height();
-                let compressed = compress
-                (
-                    width, height, rgba.as_raw(),
-                    &mut prev_data, &mut prev_was_jpeg
-                );
-                frame_tx.send(compressed).ok();
-            } else { break; }
-        }
-    });
+    spawn_compressor_thread(running.clone(), image_rx, frame_tx);
 
     let mut wayshot = match libwayshot::WayshotConnection::new()
     {
@@ -187,12 +180,10 @@ fn capture_loop_wayshot
     };
 
     let mut frame_count = 0;
-    let mut next_tick = Instant::now();
+    let mut next_tick = Instant::now() + target_interval;
 
     while running.load(Ordering::Relaxed)
     {
-        next_tick += target_interval;
-
         if frame_count > (consts::TARGET_FPS * 10)
         {
             if let Ok(w) = libwayshot::WayshotConnection::new()
@@ -210,18 +201,10 @@ fn capture_loop_wayshot
 
         if let Ok(image) = wayshot.screenshot_single_output(&target_output, true)
         {
-            let rgba = image.into_rgba8();
-            image_tx.try_send(rgba).ok();
+            image_tx.try_send(image.into_rgba8()).ok();
         }
 
-        let now = Instant::now();
-        if next_tick > now
-        {
-            thread::sleep(next_tick - now);
-        } else
-        {
-            next_tick = now;
-        }
+        sleep_until_next_tick(&mut next_tick, target_interval);
     }
 }
 
@@ -237,7 +220,8 @@ fn compress(w: u32, h: u32, rgba: &[u8], prev_data: &mut Vec<u32>, prev_was_jpeg
         for (i, &pixel) in rgba_u32.iter().enumerate()
         {
             let current = 0xFF000000 | (pixel.to_be() >> 8);
-            if prev_data[i] != current {
+            if prev_data[i] != current
+            {
                 differences += 1;
             }
         }
@@ -282,7 +266,6 @@ fn compress(w: u32, h: u32, rgba: &[u8], prev_data: &mut Vec<u32>, prev_was_jpeg
             }
         }
 
-        let frame = Frame { width: w, height: h, data };
-        compress::compress_zstd(&frame)
+        compress::compress_zstd(&Frame { width: w, height: h, data })
     }
 }
