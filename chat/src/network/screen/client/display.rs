@@ -52,6 +52,12 @@ use winit::
     },
 };
 
+use openh264::
+{
+    decoder::Decoder,
+    formats::YUVSource,
+};
+
 use crate::
 {
     options,
@@ -64,13 +70,7 @@ use crate::
         screen::
         {
             consts,
-            client::
-            {
-                frame::Frame,
-                compress::{ self, DecompressedFrame },
-                ScreenShareRequest,
-                UserEvent,
-            },
+            client::{ ScreenShareRequest, UserEvent },
         },
     },
 };
@@ -82,7 +82,9 @@ struct Session
     window: Arc<Window>,
     pixels: Pixels<'static>,
     frame_rx: Receiver<CompressedFrame>,
-    last_frame: Option<Frame>,
+    decoder: Decoder,
+    last_width: u32,
+    last_height: u32,
     frame_dirty: bool,
     running: Arc<AtomicBool>,
     main_stream: Arc<Mutex<TcpStream>>,
@@ -104,38 +106,34 @@ impl Session
 
         if pending.is_empty() { return false; }
 
-        //SKIP FRAMES BEFORE LAST JPEG KEYFRAME
-        let start = pending.iter()
-            .rposition(|f| !f.compressed_data.is_empty() && f.compressed_data[0] == 1)
-            .unwrap_or(0);
-
-        for compressed in &pending[start..]
+        for compressed in &pending
         {
-            match compress::decompress(compressed)
+            //DECODE H.264 BITSTREAM
+            if let Ok(Some(yuv)) = self.decoder.decode(&compressed.compressed_data)
             {
-                DecompressedFrame::ZstdDiff(diff_frame) =>
-                {
-                    if let Some(ref mut last) = self.last_frame
-                    {
-                        if last.width == diff_frame.width && last.height == diff_frame.height
-                        {
-                            for (l, d) in last.data.iter_mut().zip(diff_frame.data.iter())
-                            {
-                                if *d & 0xFF000000 != 0
-                                {
-                                    *l = *d;
-                                }
-                            }
-                            self.frame_dirty = true;
-                        }
-                    }
-                },
+                let dim = yuv.dimensions();
+                let w = dim.0 as u32;
+                let h = dim.1 as u32;
 
-                DecompressedFrame::JpegFull(full_frame) =>
+                if self.last_width != w || self.last_height != h
                 {
-                    self.last_frame = Some(full_frame);
-                    self.frame_dirty = true;
-                },
+                    self.last_width = w;
+                    self.last_height = h;
+
+                    //RESIZE PIXEL BUFFER TO MATCH DECODED DIMENSIONS
+                    self.pixels.resize_buffer(w, h).ok();
+                }
+
+                let frame_data = self.pixels.frame_mut();
+
+                //WRITE RGBA DIRECTLY INTO THE PIXEL BUFFER
+                let wanted = dim.0 * dim.1 * 4;
+                if frame_data.len() == wanted
+                {
+                    yuv.write_rgba8(frame_data);
+                }
+
+                self.frame_dirty = true;
             }
         }
 
@@ -146,32 +144,6 @@ impl Session
     {
         let size = self.window.inner_size();
         self.pixels.resize_surface(size.width, size.height).ok();
-
-        if let Some(frame) = self.last_frame.as_ref()
-        {
-            let w = frame.width;
-            let h = frame.height;
-            self.pixels.resize_buffer(w, h).ok();
-
-            if self.frame_dirty
-            {
-                let frame_data = self.pixels.frame_mut();
-
-                //CHECK IF LENGTH MATCHES TO PREVENT PANIC
-                if frame_data.len() == (w * h * 4) as usize && frame.data.len() == (w * h) as usize
-                {
-                    for (i, &pixel) in frame.data.iter().enumerate()
-                    {
-                        let idx = i * 4;
-                        frame_data[idx]     = ((pixel >> 16) & 0xFF) as u8; // R
-                        frame_data[idx + 1] = ((pixel >> 8) & 0xFF) as u8;  // G
-                        frame_data[idx + 2] = (pixel & 0xFF) as u8;         // B
-                        frame_data[idx + 3] = 255;                          // A
-                    }
-                }
-                self.frame_dirty = false;
-            }
-        }
 
         self.pixels.render().ok();
     }
@@ -205,7 +177,9 @@ impl ScreenShareApp
             //RESET
             session.frame_rx = request.rx;
             session.running = request.running;
-            session.last_frame = None;
+            session.decoder = Decoder::new().expect("Failed to create H.264 decoder");
+            session.last_width = 0;
+            session.last_height = 0;
             session.frame_dirty = false;
             session.frame_count = 0;
             session.last_fps_time = Instant::now();
@@ -237,7 +211,9 @@ impl ScreenShareApp
             window,
             pixels,
             frame_rx: request.rx,
-            last_frame: None,
+            decoder: Decoder::new().expect("Failed to create H.264 decoder"),
+            last_width: 0,
+            last_height: 0,
             frame_dirty: false,
             running: request.running,
             main_stream: request.main_stream,

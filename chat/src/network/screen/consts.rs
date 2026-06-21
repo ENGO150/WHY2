@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::time::Duration;
 
-pub const ZSTD_LEVEL: i32                = 1;                                               //LEVEL OF ZSTD COMPRESSION
+pub const H264_BITRATE: u32              = 4_000_000;                                       //H.264 ENCODER TARGET BITRATE (4 Mbps)
 
 pub const BUFFER_SIZE: u32               = 960;                                             //CPAL BUFFER SIZE
 pub const MAX_PACKET_SIZE: usize         = 4000;                                            //MAX OPUS PACKET SIZE
@@ -27,9 +27,6 @@ pub const FRAME_SAMPLES: usize           = 1920;                                
 
 pub const TARGET_FPS: u32                = 60;                                              //TARGET FPS
 pub const FRAME_POLL_INTERVAL: Duration  = Duration::from_millis(1000 / TARGET_FPS as u64); //~30 FPS POLL
-
-pub const JPEG_QUALITY: i32              = 80;                                              //JPEG COMPRESSION QUALITY
-pub const COMPRESSION_TRESHOLD: u32      = 1;                                               //TRESHOLD FOR JPEG/ZSTD (IN %)
 
 pub const WINIT_SIZE: (u32, u32)         = (1920, 1080);                                    //DEFAULT WINIT WINDOW SIZE
 

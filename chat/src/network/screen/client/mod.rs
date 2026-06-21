@@ -19,9 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //MODULES
 pub mod audio;
 pub mod capture;
-pub mod compress;
 pub mod display;
-pub mod frame;
 
 use std::
 {

@@ -19,7 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     env,
-    slice,
     thread,
     time::{ Duration, Instant },
     sync::
@@ -29,23 +28,31 @@ use std::
     },
 };
 
-use crossbeam_channel::{ Sender, Receiver };
+use crossbeam_channel::Sender;
 
-use image::RgbaImage;
 use xcap::Monitor;
+
+use openh264::
+{
+    OpenH264API,
+    formats::{ RgbaSliceU8, YUVBuffer },
+    encoder::
+    {
+        Encoder,
+        EncoderConfig,
+        BitRate,
+        FrameRate,
+        IntraFramePeriod,
+        Complexity,
+        UsageType,
+        RateControlMode,
+    },
+};
 
 use crate::network::
 {
     CompressedFrame,
-    screen::
-    {
-        consts,
-        client::
-        {
-            compress,
-            frame::Frame,
-        },
-    },
+    screen::consts,
 };
 
 pub fn get_primary_monitor() -> Monitor
@@ -71,7 +78,8 @@ pub fn capture_loop //CAPTURE LOOP
     frame_tx: Sender<CompressedFrame>,
     running: Arc<AtomicBool>,
     fps: u32,
-) {
+)
+{
     if cfg!(target_os = "linux") &&
         (env::var("WAYLAND_DISPLAY").is_ok() || env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland")
     {
@@ -85,31 +93,40 @@ pub fn capture_loop //CAPTURE LOOP
     capture_loop_xcap(get_primary_monitor(), frame_tx, running, fps);
 }
 
-fn spawn_compressor_thread
-(
-    running: Arc<AtomicBool>,
-    image_rx: Receiver<RgbaImage>,
-    frame_tx: Sender<CompressedFrame>,
-) {
-    thread::spawn(move ||
+fn create_encoder(fps: f32) -> Encoder
+{
+    let config = EncoderConfig::new()
+        .max_frame_rate(FrameRate::from_hz(fps))
+        .rate_control_mode(RateControlMode::Bitrate)
+        .bitrate(BitRate::from_bps(consts::H264_BITRATE))
+        .intra_frame_period(IntraFramePeriod::from_num_frames((fps * 2.0) as u32))
+        .complexity(Complexity::Low)
+        .usage_type(UsageType::ScreenContentRealTime)
+        .skip_frames(true)
+        .adaptive_quantization(false)
+        .background_detection(false);
+
+    Encoder::with_api_config(OpenH264API::from_source(), config).expect("Failed to create H.264 encoder")
+}
+
+fn encode_rgba(encoder: &mut Encoder, width: u32, height: u32, rgba: &[u8]) -> Option<CompressedFrame>
+{
+    let src = RgbaSliceU8::new(rgba, (width as usize, height as usize));
+    let yuv = YUVBuffer::from_rgb_source(src);
+
+    let bitstream = encoder.encode(&yuv).expect("H.264 encode failed");
+
+    let data = bitstream.to_vec();
+
+    //SKIP EMPTY FRAMES (ENCODER MAY DECIDE NO DATA IS NEEDED)
+    if data.is_empty() { return None; }
+
+    Some(CompressedFrame
     {
-        let mut prev_data: Vec<u32> = Vec::new();
-        let mut prev_was_jpeg = false;
-
-        while running.load(Ordering::Relaxed)
-        {
-            if let Ok(image) = image_rx.recv()
-            {
-                let compressed = compress
-                (
-                    image.width(), image.height(), image.as_raw(),
-                    &mut prev_data, &mut prev_was_jpeg
-                );
-
-                frame_tx.send(compressed).ok();
-            } else { break; }
-        }
-    });
+        width,
+        height,
+        compressed_data: data,
+    })
 }
 
 fn sleep_until_next_tick(next_tick: &mut Instant, target_interval: Duration)
@@ -135,9 +152,17 @@ fn capture_loop_xcap
 )
 {
     let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
-    let (image_tx, image_rx) = crossbeam_channel::bounded::<RgbaImage>(consts::MULTIPLEX_CHANNEL_BOUND);
 
-    spawn_compressor_thread(running.clone(), image_rx, frame_tx);
+    let mut encoder = create_encoder(fps as f32);
+
+    //GET INITIAL DIMENSIONS FOR ENCODER
+    let first_image = monitor.capture_image().expect("Failed initial capture");
+
+    //ENCODE AND SEND FIRST FRAME
+    if let Some(compressed) = encode_rgba(&mut encoder, first_image.width(), first_image.height(), first_image.as_raw())
+    {
+        frame_tx.try_send(compressed).ok();
+    }
 
     let mut next_tick = Instant::now() + target_interval;
 
@@ -145,7 +170,10 @@ fn capture_loop_xcap
     {
         if let Ok(image) = monitor.capture_image()
         {
-            image_tx.try_send(image).ok();
+            if let Some(compressed) = encode_rgba(&mut encoder, image.width(), image.height(), image.as_raw())
+            {
+                frame_tx.try_send(compressed).ok();
+            }
         }
 
         sleep_until_next_tick(&mut next_tick, target_interval);
@@ -162,9 +190,6 @@ fn capture_loop_wayshot
 )
 {
     let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
-    let (image_tx, image_rx) = crossbeam_channel::bounded::<RgbaImage>(consts::MULTIPLEX_CHANNEL_BOUND);
-
-    spawn_compressor_thread(running.clone(), image_rx, frame_tx);
 
     let mut wayshot = match libwayshot::WayshotConnection::new()
     {
@@ -178,6 +203,21 @@ fn capture_loop_wayshot
         Some(o) => o,
         None => return,
     };
+
+    let mut encoder = create_encoder(fps as f32);
+
+    //GET INITIAL DIMENSIONS FOR ENCODER
+    let first_image = match wayshot.screenshot_single_output(&target_output, true)
+    {
+        Ok(img) => img.into_rgba8(),
+        Err(_) => return,
+    };
+
+    //ENCODE AND SEND FIRST FRAME
+    if let Some(compressed) = encode_rgba(&mut encoder, first_image.width(), first_image.height(), first_image.as_raw())
+    {
+        frame_tx.try_send(compressed).ok();
+    }
 
     let mut frame_count = 0;
     let mut next_tick = Instant::now() + target_interval;
@@ -201,71 +241,14 @@ fn capture_loop_wayshot
 
         if let Ok(image) = wayshot.screenshot_single_output(&target_output, true)
         {
-            image_tx.try_send(image.into_rgba8()).ok();
+            let image = image.into_rgba8();
+
+            if let Some(compressed) = encode_rgba(&mut encoder, image.width(), image.height(), image.as_raw())
+            {
+                frame_tx.try_send(compressed).ok();
+            }
         }
 
         sleep_until_next_tick(&mut next_tick, target_interval);
-    }
-}
-
-fn compress(w: u32, h: u32, rgba: &[u8], prev_data: &mut Vec<u32>, prev_was_jpeg: &mut bool) -> CompressedFrame
-{
-    let total_pixels = (w * h) as usize;
-    let mut differences = 0;
-
-    let rgba_u32 = unsafe { slice::from_raw_parts(rgba.as_ptr() as *const u32, rgba.len() / 4) };
-
-    if prev_data.len() == total_pixels
-    {
-        for (i, &pixel) in rgba_u32.iter().enumerate()
-        {
-            let current = 0xFF000000 | (pixel.to_be() >> 8);
-            if prev_data[i] != current
-            {
-                differences += 1;
-            }
-        }
-    } else
-    {
-        differences = total_pixels;
-    }
-
-    if differences > total_pixels / (consts::COMPRESSION_TRESHOLD as usize * 100)
-    {
-        *prev_was_jpeg = true;
-
-        if prev_data.len() != total_pixels
-        {
-            prev_data.resize(total_pixels, 0);
-        }
-
-        for (i, &pixel) in rgba_u32.iter().enumerate()
-        {
-            let current = 0xFF000000 | (pixel.to_be() >> 8);
-            prev_data[i] = current;
-        }
-
-        compress::compress_jpeg(w, h, rgba)
-    } else
-    {
-        *prev_was_jpeg = false;
-
-        let mut data = vec![0u32; total_pixels];
-        if prev_data.len() != total_pixels
-        {
-            prev_data.resize(total_pixels, 0);
-        }
-
-        for (i, &pixel) in rgba_u32.iter().enumerate()
-        {
-            let current = 0xFF000000 | (pixel.to_be() >> 8);
-            if prev_data[i] != current
-            {
-                data[i] = current;
-                prev_data[i] = current;
-            }
-        }
-
-        compress::compress_zstd(&Frame { width: w, height: h, data })
     }
 }
