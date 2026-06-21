@@ -143,27 +143,30 @@ fn capture_loop_xcap
 )
 {
     let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
+    let mut next_tick = Instant::now() + target_interval;
 
     let mut encoder = create_encoder(fps as f32);
 
-    //GET INITIAL DIMENSIONS FOR ENCODER
-    let first_image = monitor.capture_image().expect("Failed initial capture");
-
-    //ENCODE AND SEND FIRST FRAME
-    if let Some(compressed) = encode_rgba(&mut encoder, first_image.width(), first_image.height(), first_image.as_raw())
-    {
-        frame_tx.try_send(compressed).ok();
-    }
-
-    let mut next_tick = Instant::now() + target_interval;
+    let mut last_raw = Vec::new();
+    let mut last_encode_time = Instant::now();
 
     while running.load(Ordering::Relaxed)
     {
         if let Ok(image) = monitor.capture_image()
         {
-            if let Some(compressed) = encode_rgba(&mut encoder, image.width(), image.height(), image.as_raw())
+            let raw = image.as_raw();
+            let force_encode = last_encode_time.elapsed() >= Duration::from_secs(2);
+
+            if force_encode || raw != &last_raw
             {
-                frame_tx.try_send(compressed).ok();
+                if let Some(compressed) = encode_rgba(&mut encoder, image.width(), image.height(), raw)
+                {
+                    frame_tx.try_send(compressed).ok();
+                }
+
+                last_raw.clear();
+                last_raw.extend_from_slice(raw);
+                last_encode_time = Instant::now();
             }
         }
 
