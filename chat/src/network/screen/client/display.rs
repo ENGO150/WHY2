@@ -66,7 +66,6 @@ use crate::
         self,
         MessageCode,
         MessagePacket,
-        CompressedFrame,
         screen::
         {
             consts,
@@ -81,7 +80,7 @@ struct Session
 {
     window: Arc<Window>,
     pixels: Pixels<'static>,
-    frame_rx: Receiver<CompressedFrame>,
+    frame_rx: Receiver<Vec<u8>>,
     decoder: Decoder,
     last_width: u32,
     last_height: u32,
@@ -98,7 +97,7 @@ impl Session
 {
     fn process_pending_frames(&mut self) -> bool
     {
-        let mut pending: Vec<CompressedFrame> = Vec::new();
+        let mut pending: Vec<Vec<u8>> = Vec::new();
         while let Ok(compressed) = self.frame_rx.try_recv()
         {
             pending.push(compressed);
@@ -109,7 +108,7 @@ impl Session
         for compressed in &pending
         {
             //DECODE H.264 BITSTREAM
-            if let Ok(Some(yuv)) = self.decoder.decode(&compressed.compressed_data)
+            if let Ok(Some(yuv)) = self.decoder.decode(&compressed)
             {
                 let dim = yuv.dimensions();
                 let w = dim.0 as u32;

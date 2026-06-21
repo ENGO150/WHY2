@@ -49,11 +49,7 @@ use openh264::
     },
 };
 
-use crate::network::
-{
-    CompressedFrame,
-    screen::consts,
-};
+use crate::network::screen::consts;
 
 pub fn get_primary_monitor() -> Monitor
 {
@@ -75,7 +71,7 @@ pub fn get_primary_monitor() -> Monitor
 
 pub fn capture_loop //CAPTURE LOOP
 (
-    frame_tx: Sender<CompressedFrame>,
+    frame_tx: Sender<Vec<u8>>,
     running: Arc<AtomicBool>,
     fps: u32,
 )
@@ -109,7 +105,7 @@ fn create_encoder(fps: f32) -> Encoder
     Encoder::with_api_config(OpenH264API::from_source(), config).expect("Failed to create H.264 encoder")
 }
 
-fn encode_rgba(encoder: &mut Encoder, width: u32, height: u32, rgba: &[u8]) -> Option<CompressedFrame>
+fn encode_rgba(encoder: &mut Encoder, width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>>
 {
     let src = RgbaSliceU8::new(rgba, (width as usize, height as usize));
     let yuv = YUVBuffer::from_rgb_source(src);
@@ -121,12 +117,7 @@ fn encode_rgba(encoder: &mut Encoder, width: u32, height: u32, rgba: &[u8]) -> O
     //SKIP EMPTY FRAMES (ENCODER MAY DECIDE NO DATA IS NEEDED)
     if data.is_empty() { return None; }
 
-    Some(CompressedFrame
-    {
-        width,
-        height,
-        compressed_data: data,
-    })
+    Some(data)
 }
 
 fn sleep_until_next_tick(next_tick: &mut Instant, target_interval: Duration)
@@ -146,7 +137,7 @@ fn sleep_until_next_tick(next_tick: &mut Instant, target_interval: Duration)
 fn capture_loop_xcap
 (
     monitor: Monitor,
-    frame_tx: Sender<CompressedFrame>,
+    frame_tx: Sender<Vec<u8>>,
     running: Arc<AtomicBool>,
     fps: u32,
 )
@@ -184,7 +175,7 @@ fn capture_loop_xcap
 fn capture_loop_wayshot
 (
     monitor: &Monitor,
-    frame_tx: Sender<CompressedFrame>,
+    frame_tx: Sender<Vec<u8>>,
     running: Arc<AtomicBool>,
     fps: u32,
 )

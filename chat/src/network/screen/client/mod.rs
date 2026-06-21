@@ -48,7 +48,6 @@ use crate::
         self,
         MessagePacket,
         ScreenPayload,
-        CompressedFrame,
         screen::consts,
         client::{ self, ClientEvent },
     },
@@ -57,7 +56,7 @@ use crate::
 //STRUCTS
 pub struct ScreenShareRequest
 {
-    pub rx: Receiver<CompressedFrame>,
+    pub rx: Receiver<Vec<u8>>,
     pub running: Arc<AtomicBool>,
     pub main_stream: Arc<Mutex<TcpStream>>
 }

@@ -117,18 +117,10 @@ pub struct FilePayload //FILE CHUNK
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
-pub struct CompressedFrame //COMPRESSED FRAME
-{
-    pub width: u32,
-    pub height: u32,
-    pub compressed_data: Vec<u8>,
-}
-
-#[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct ScreenPayload //SCREEN PAYLOAD
 {
-    pub frame: Option<CompressedFrame>, //COMPRESSED FRAME
-    pub audio: Option<Vec<u8>>,         //AUDIO FRAME
+    pub frame: Option<Vec<u8>>, //COMPRESSED FRAME
+    pub audio: Option<Vec<u8>>, //AUDIO FRAME
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
