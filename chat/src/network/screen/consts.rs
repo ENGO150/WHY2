@@ -25,7 +25,7 @@ pub const MAX_PACKET_SIZE: usize         = 4000;                                
 
 pub const FRAME_SAMPLES: usize           = 1920;                                            //OPUS FRAME SAMPLES
 
-pub const TARGET_FPS: u32                = 60;                                              //TARGET FPS
+pub const TARGET_FPS: u32                = 30;                                              //TARGET FPS
 pub const FRAME_POLL_INTERVAL: Duration  = Duration::from_millis(1000 / TARGET_FPS as u64); //~30 FPS POLL
 
 pub const WINIT_SIZE: (u32, u32)         = (1920, 1080);                                    //DEFAULT WINIT WINDOW SIZE
