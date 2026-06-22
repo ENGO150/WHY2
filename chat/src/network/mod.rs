@@ -35,7 +35,12 @@ use std::
     io::{ Read, Write },
 };
 
-use wincode::{ SchemaWrite, SchemaRead };
+use wincode::
+{
+    config::DefaultConfig,
+    SchemaWrite,
+    SchemaRead,
+};
 
 use why2::consts;
 
@@ -61,6 +66,13 @@ use std::
 
 #[cfg(feature = "server")]
 use crate::config;
+
+//TRAITS
+pub trait SequencedPacket: SchemaWrite<DefaultConfig, Src = Self>
+{
+    fn seq(&self) -> usize;
+    fn set_seq(&mut self, seq: usize);
+}
 
 //ENUMS
 #[derive(SchemaWrite, SchemaRead, PartialEq, Clone)]
@@ -148,6 +160,12 @@ pub struct ReadResult //RESULT OF TCP READ
 }
 
 //IMPLEMENTATIONS
+impl SequencedPacket for MessagePacket
+{
+    fn seq(&self) -> usize { self.seq }
+    fn set_seq(&mut self, seq: usize) { self.seq = seq; }
+}
+
 impl Default for MessagePacket //DEFAULT
 {
     fn default() -> Self
@@ -201,10 +219,11 @@ fn obfuscate_data(mut data: Vec<u8>, obfuscation_key: [u8; 32]) -> Vec<u8> //XOR
 }
 
 //PUBLIC
-pub fn send //SEND packet TO stream
+//HANDLERS
+pub fn send_tcp //SEND packet TO stream
 (
     stream: &mut TcpStream,
-    mut packet: MessagePacket,
+    mut packet: impl SequencedPacket,
     keys: Option<&chat_consts::SharedKeys>,
     #[cfg(feature = "server")] seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
 )
@@ -212,8 +231,8 @@ pub fn send //SEND packet TO stream
     //ADD SEQUENCE NUMBER TO packet (FROM CLIENT)
     #[cfg(feature = "client")]
     {
-        packet.seq = options::get_seq() + 1;
-        options::set_seq(packet.seq);
+        packet.set_seq(options::get_seq() + 1);
+        options::set_seq(packet.seq());
     }
 
     //ADD SEQUENCE NUMBER TO packet (FROM SERVER)
@@ -224,7 +243,7 @@ pub fn send //SEND packet TO stream
             Some(local_seq) =>
             {
                 *local_seq += 1;
-                packet.seq = *local_seq;
+                packet.set_seq(*local_seq);
             },
 
             None =>
@@ -234,8 +253,8 @@ pub fn send //SEND packet TO stream
                 {
                     if conn.is_authenticated()
                     {
-                        packet.seq = conn.server_seq().unwrap() + 1;
-                        *conn.server_seq_mut().unwrap() = packet.seq;
+                        packet.set_seq(conn.server_seq().unwrap() + 1);
+                        *conn.server_seq_mut().unwrap() = packet.seq();
                     }
                 }
             }
@@ -276,7 +295,7 @@ pub fn send //SEND packet TO stream
     transmission_packet.append(&mut final_bytes);
 
     //SEND
-    let _ = stream.write_all(&transmission_packet);
+    stream.write_all(&transmission_packet).ok();
     stream.flush().expect("Flushing stream failed");
 }
 
@@ -384,6 +403,24 @@ pub fn read_tcp
         #[cfg(feature = "server")] peer_addr,
         data: decoded_packet,
     })
+}
+
+//UTILS
+pub fn send //SEND packet TO stream
+(
+    stream: &mut TcpStream,
+    packet: MessagePacket,
+    keys: Option<&chat_consts::SharedKeys>,
+    #[cfg(feature = "server")] seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
+)
+{
+    send_tcp
+    (
+        stream,
+        packet,
+        keys,
+        #[cfg(feature = "server")] seq,
+    );
 }
 
 pub fn receive
@@ -543,7 +580,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
             Ok(bytes) =>
             {
                 //SEND FILE CHUNK
-                send(&mut stream, MessagePacket
+                send_tcp(&mut stream, MessagePacket
                 {
                     code: Some(code.clone()),
                     file: Some(FilePayload
