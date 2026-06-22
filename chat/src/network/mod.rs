@@ -53,7 +53,11 @@ use crate::
 use crate::options;
 
 #[cfg(feature = "server")]
-use std::time::{ Instant, Duration };
+use std::
+{
+    net::SocketAddr,
+    time::{ Instant, Duration },
+};
 
 #[cfg(feature = "server")]
 use crate::config;
@@ -135,6 +139,12 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub file: Option<FilePayload>,      //FILE UPLOADED BY CLIENT
     pub screen: Option<ScreenPayload>,  //SCREENSHARE PAYLOAD
     pub token: Option<[u8; 32]>,        //CONNECTION TOKEN
+}
+
+pub struct ReadResult //RESULT OF TCP READ
+{
+    #[cfg(feature = "server")] pub peer_addr: SocketAddr,
+    pub data: Vec<u8>,
 }
 
 //IMPLEMENTATIONS
@@ -270,12 +280,12 @@ pub fn send //SEND packet TO stream
     stream.flush().expect("Flushing stream failed");
 }
 
-pub fn receive
+pub fn read_tcp
 (
     streams: &mut Streams,
     keys: Option<&chat_consts::SharedKeys>,
-    seq: Option<&mut usize> //LOCAL/GLOBAL SEQ
-) -> Option<MessagePacket>
+    #[cfg(feature = "server")] auxiliary: bool,
+) -> Option<ReadResult>
 {
     //SERVER SIDE PACKET SIZE LIMIT
     #[cfg(feature = "server")]
@@ -297,7 +307,7 @@ pub fn receive
             .unwrap_or(false);
 
         //ALLOW BIG MESSAGES WHEN SPAM PROTECTION IS OFF AND CLIENT IS AUTHENTICATED OR WHEN STREAM IS AUXILIARY
-        max_packet_size = if (!spam_protection && authenticated) || seq.is_some()
+        max_packet_size = if (!spam_protection && authenticated) || auxiliary
         {
             usize::MAX
         } else //SET MAX PACKET SIZE IF SPAM PROTECTION IS ENABLED
@@ -368,8 +378,30 @@ pub fn receive
         decoded_packet = obfuscate_data(decoded_packet, key); //NO ENCRYPTION, REMOVE OBFUSCATION
     }
 
+    //RETURN SERIALIZED PACKET
+    Some(ReadResult
+    {
+        #[cfg(feature = "server")] peer_addr,
+        data: decoded_packet,
+    })
+}
+
+pub fn receive
+(
+    streams: &mut Streams,
+    keys: Option<&chat_consts::SharedKeys>,
+    seq: Option<&mut usize> //LOCAL/GLOBAL SEQ
+) -> Option<MessagePacket>
+{
+    let read = read_tcp
+    (
+        streams,
+        keys,
+        #[cfg(feature = "server")] false,
+    )?;
+
     //DESERIALIZE AND RETURN
-    match wincode::deserialize::<MessagePacket>(&decoded_packet)
+    match wincode::deserialize::<MessagePacket>(&read.data)
     {
         Ok(packet) =>
         {
@@ -384,7 +416,7 @@ pub fn receive
                         //SET SEQ TO CURRENT
                         *seq = packet.seq;
                     } else { return None; }
-                } else if let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr)
+                } else if let Some(mut conn) = server::CONNECTIONS.get_mut(&read.peer_addr)
                 {
                     //ACTIVITY TIMER
                     let mut spam_warning = false;
@@ -394,8 +426,7 @@ pub fn receive
 
                     //SPAM
                     if packet.code != Some(MessageCode::KeepAlive) &&
-                        packet.code != Some(MessageCode::KeyExchange) &&
-                        packet.file.is_none()
+                        packet.code != Some(MessageCode::KeyExchange)
                     {
                         //MESSAGE SIZE (ONLY FOR AUTHENTICATED)
                         if let Some(text) = &packet.text && conn.is_authenticated()
@@ -443,7 +474,7 @@ pub fn receive
                     //TOO MANY VIOLATIONS, BYE
                     if disconnect
                     {
-                        server::remove_connection(&peer_addr, grace, Some(if !grace { "SEQ" } else { "SPAM" }));
+                        server::remove_connection(&read.peer_addr, grace, Some(if !grace { "SEQ" } else { "SPAM" }));
                         return None;
                     }
                 }
@@ -481,7 +512,7 @@ pub fn receive
         {
             //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
             #[cfg(feature = "server")]
-            server::remove_connection(&peer_addr, false, Some("packet"));
+            server::remove_connection(&read.peer_addr, false, Some("packet"));
 
             return None;
         }
