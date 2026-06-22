@@ -32,6 +32,7 @@ use sha2::{ Sha256, Digest };
 
 use crate::
 {
+    config,
     misc,
     consts::{ self, Streams },
     network::
@@ -144,15 +145,17 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
 
     //CHECK FOR CONCURRENT UPLOADS
     if ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count() >=
-        crate::config::read_config("max_client_parallel_uploads")
+        config::read_config("max_client_parallel_uploads")
     {
-        valid = true; //SKIP FILE UPLOAD
+        //REJECT INSTEAD OF CONSUMING DATA
+        log::warn!("Client reached max parallel uploads: {peer_addr}");
+        return;
     }
 
     if !valid && let Some(size) = metadata_packet.size &&
         let Some(hash) = metadata_packet.hash &&
         let Some(filename) = metadata_packet.filename &&
-        size / 1_048_576 <= crate::config::read_config::<u64>("max_upload_size")
+        size / 1_048_576 <= config::read_config::<u64>("max_upload_size")
     {
         //CREATE TEMP UPLOAD DIRECTORY
         let temp_dir = misc::get_upload_dir(&username);

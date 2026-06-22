@@ -35,7 +35,12 @@ use wincode::{ SchemaRead, SchemaWrite };
 
 use crate::
 {
-    network::{ self, SequencedPacket },
+    network::
+    {
+        self,
+        server as chat_server,
+        SequencedPacket,
+    },
     consts::
     {
         self,
@@ -144,7 +149,7 @@ pub fn receive_file
         {
             //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
             #[cfg(feature = "server")]
-            crate::network::server::remove_connection(&read.peer_addr, false, Some("packet"));
+            chat_server::remove_connection(&read.peer_addr, false, Some("packet"));
 
             None
         }

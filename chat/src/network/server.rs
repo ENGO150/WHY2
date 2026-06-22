@@ -1288,6 +1288,14 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 {
                     if let Some(text) = read.text
                     {
+                        //PREVENT TOKEN SPAM
+                        let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count();
+                        if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
+                        {
+                            send_code(&mut streams.1.lock().unwrap(), None, MessageCode::UploadLimit, Some(&keys));
+                            continue;
+                        }
+
                         //GENERATE RANDOM UID
                         let uid = rand::random::<u64>();
                         let token = open_connection(id, ConnectionType::FileUpload { uid });
