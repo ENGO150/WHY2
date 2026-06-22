@@ -18,9 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    fs,
     env,
     path::PathBuf,
-    fs::{ self, File },
     time::{ Instant, Duration },
     collections::{ HashSet, HashMap },
     net::
@@ -42,8 +42,6 @@ use rand::
     TryRng,
     rngs::SysRng,
 };
-
-use sha2::{ Sha256, Digest };
 
 use zeroize::Zeroizing;
 
@@ -68,12 +66,10 @@ use crate::
         self,
         MessageCode,
         MessagePacket,
-        FilePayload,
         voice::server as voice_server,
         file::server::
         {
             self as file,
-            ActiveFileshare,
         },
     },
 };
@@ -105,7 +101,7 @@ pub enum ConnectionType //TYPES OF TCP CHANNEL
     FileDownload
     {
         uid: u64,
-        path: PathBuf,
+        file: AvailableFile,
     },
     Screen,
     Attach
@@ -1290,67 +1286,24 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 //NEW FILE UPLOAD
                 MessageCode::Upload =>
                 {
-                    let mut valid = false;
-
-                    if let Some(file) = read.file
+                    if let Some(text) = read.text
                     {
-                        //CHECK FOR CONCURRENT UPLOADS
-                        if file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count() >=
-                            config::read_config("max_client_parallel_uploads")
+                        //GENERATE RANDOM UID
+                        let uid = rand::random::<u64>();
+                        let token = open_connection(id, ConnectionType::FileUpload { uid });
+
+                        //LOG FILE UPLOAD
+                        log::info!("Upload request: {peer_addr}");
+
+                        //SEND APPROVAL TO CLIENT
+                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
                         {
-                            valid = true; //SKIP FILE UPLOAD
-                            send_code(&mut streams.1.lock().unwrap(), None, MessageCode::UploadLimit, Some(&keys));
-                        }
-
-                        if !valid && let Some(size) = file.size &&
-                            let Some(hash) = file.hash &&
-                            let Some(filename) = file.filename &&
-                            size / 1_048_576 <= config::read_config::<u64>("max_upload_size")
-                        {
-                            //GENERATE RANDOM UID
-                            let uid = rand::random::<u64>();
-
-                            //CREATE TEMP UPLOAD DIRECTORY
-                            let temp_dir = misc::get_upload_dir(&username);
-                            fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
-
-                            //OPEN NEW CONNECTION
-                            let token = open_connection(id, ConnectionType::FileUpload { uid });
-
-                            //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
-                            file::ACTIVE_FILESHARES.insert(uid, ActiveFileshare
-                            {
-                                file: File::create_new(temp_dir.join(uid.to_string())).expect("Creating upload file failed"),
-                                size,
-                                current_size: 0,
-                                hash: hash.clone(),
-                                hasher: Sha256::new(),
-                                filename,
-                                client_id: id,
-                            });
-
-                            //LOG FILE UPLOAD
-                            log::info!("Upload request: {peer_addr}");
-
-                            //SEND APPROVAL TO CLIENT
-                            network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                            {
-                                code: Some(MessageCode::Upload),
-                                file: Some(FilePayload
-                                {
-                                    token: Some(token),
-                                    uid,
-                                    hash: Some(hash),
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            }, Some(&keys), None);
-                            valid = true;
-                        }
-                    }
-
-                    //NO FILE PAYLOAD, HUH?
-                    if !valid
+                            code: Some(MessageCode::Upload),
+                            token: Some(token),
+                            text: Some(format!("{} {}", text, uid)),
+                            ..Default::default()
+                        }, Some(&keys), None);
+                    } else
                     {
                         //LOG FILE REJECT
                         return remove_connection(&peer_addr, true, Some("upload"));
@@ -1381,25 +1334,13 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         let uid = rand::random::<u64>();
 
                         //OPEN NEW CONNECTION
-                        let token = open_connection(id, ConnectionType::FileDownload
-                        {
-                            path: file.path,
-                            uid,
-                        });
+                        let token = open_connection(id, ConnectionType::FileDownload { uid, file });
 
-                        //SEND FILE METADATA
                         network::send(&mut streams.1.lock().unwrap(), MessagePacket
                         {
                             code: Some(MessageCode::Download),
-                            file: Some(FilePayload
-                            {
-                                token: Some(token),
-                                uid,
-                                hash: Some(file.hash),
-                                size: Some(file.size),
-                                filename: Some(file.filename),
-                                ..Default::default()
-                            }),
+                            token: Some(token),
+                            text: Some(uid.to_string()),
                             ..Default::default()
                         }, Some(&keys), None);
 

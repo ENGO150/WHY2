@@ -502,18 +502,31 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //UPLOAD APPROVAL
                 MessageCode::Upload =>
                 {
-                    //SPAWN UPLOAD THREAD
-                    let file_tx = tx.clone(); //CLONE TX
-                    thread::spawn(move || file::upload(read.file.unwrap(), file_tx));
+                    //PARSE UID AND HASH FROM TEXT
+                    if let Some(text) = read.text.as_ref()
+                    {
+                        if let Some((hash_json, uid_str)) = text.rsplit_once(' ')
+                        {
+                            let hash: [u8; 32] = serde_json::from_str(hash_json).unwrap();
+                            let uid: u64 = uid_str.parse().unwrap();
+                            let token = read.token.unwrap();
+
+                            //SPAWN UPLOAD THREAD
+                            let file_tx = tx.clone(); //CLONE TX
+                            thread::spawn(move || file::upload(token, uid, hash, file_tx));
+                        }
+                    }
                     continue;
                 },
 
                 //DOWNLOAD
                 MessageCode::Download =>
                 {
+                    let token = read.token.unwrap();
+
                     //SPAWN DOWNLOAD THREAD
                     let file_tx = tx.clone(); //CLONE TX
-                    thread::spawn(move || file::download(read.file.unwrap(), file_tx));
+                    thread::spawn(move || file::download(token, file_tx));
                     continue;
                 },
 

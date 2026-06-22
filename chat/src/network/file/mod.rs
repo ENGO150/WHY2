@@ -22,3 +22,131 @@ pub mod client;
 
 #[cfg(feature = "server")]
 pub mod server;
+
+use std::
+{
+    fs::File,
+    io::Read,
+    path::PathBuf,
+    net::TcpStream,
+};
+
+use wincode::{ SchemaRead, SchemaWrite };
+
+use crate::
+{
+    network::{ self, SequencedPacket },
+    consts::
+    {
+        self,
+        SharedKeys,
+        Streams,
+    },
+};
+
+//STRUCTS
+#[derive(SchemaWrite, SchemaRead, Clone)]
+pub struct FilePacket //FILE CHUNK
+{
+    pub uid: u64,                 //UPLOAD UID
+    pub data: Option<Vec<u8>>,    //BINARY DATA
+    pub size: Option<u64>,        //FILE SIZE
+    pub filename: Option<String>, //FILE NAME
+    pub hash: Option<[u8; 32]>,   //FILE HASH
+    pub seq: usize,               //SEQUENCE NUMBER
+}
+
+//IMPLEMENTATIONS
+impl Default for FilePacket
+{
+    fn default() -> Self
+    {
+        Self
+        {
+            uid: 0,
+            data: None,
+            size: None,
+            filename: None,
+            hash: None,
+            seq: 0,
+        }
+    }
+}
+
+impl SequencedPacket for FilePacket
+{
+    fn seq(&self) -> usize { self.seq }
+    fn set_seq(&mut self, seq: usize) { self.seq = seq; }
+}
+
+//FUNCTIONS
+pub fn send_file //CHUNK FILE AND SEND TO STREAM
+(
+    path: PathBuf,
+    mut stream: TcpStream,
+    uid: u64,
+    keys: Option<&SharedKeys>,
+    #[cfg(feature = "server")] seq: &mut usize,
+)
+{
+    let mut file = File::open(path).expect("Cannot open file for upload");
+    let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+
+    //LOOP READING
+    loop
+    {
+        match file.read(&mut buffer)
+        {
+            Ok(0) => break, //EOF
+            Ok(bytes) =>
+            {
+                //SEND FILE CHUNK
+                network::send_tcp(&mut stream, FilePacket
+                {
+                    uid,
+                    data: Some(buffer[..bytes].to_vec()),
+                    ..Default::default()
+                }, keys, #[cfg(feature = "server")] Some(seq));
+            },
+            Err(_) => {}, //TODO: Implement
+        }
+    }
+}
+
+pub fn receive_file
+(
+    streams: &mut Streams,
+    keys: Option<&SharedKeys>,
+    seq: &mut usize
+) -> Option<FilePacket>
+{
+    let read = network::read_tcp
+    (
+        streams,
+        keys,
+        #[cfg(feature = "server")] true,
+    )?;
+
+    //DESERIALIZE AND RETURN
+    match wincode::deserialize::<FilePacket>(&read.data)
+    {
+        Ok(packet) =>
+        {
+            //VERIFY SEQUENCE NUMBER (CLIENT)
+            if packet.seq > *seq || *seq == 0 //VALID
+            {
+                *seq = packet.seq;
+            } else { return None; }
+
+            Some(packet)
+        },
+        Err(_) =>
+        {
+            //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
+            #[cfg(feature = "server")]
+            crate::network::server::remove_connection(&read.peer_addr, false, Some("packet"));
+
+            None
+        }
+    }
+}

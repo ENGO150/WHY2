@@ -29,8 +29,6 @@ pub mod voice;
 
 use std::
 {
-    fs::File,
-    path::PathBuf,
     net::TcpStream,
     io::{ Read, Write },
 };
@@ -122,17 +120,6 @@ pub struct MessageColors //COLORS OF MESSAGE
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
-pub struct FilePayload //FILE CHUNK
-{
-    pub token: Option<[u8; 32]>,  //UPLOAD CHANNEL TOKEN
-    pub uid: u64,                 //UPLOAD UID
-    pub data: Option<Vec<u8>>,    //BINARY DATA
-    pub size: Option<u64>,        //FILE SIZE
-    pub filename: Option<String>, //FILE NAME
-    pub hash: Option<[u8; 32]>,   //FILE HASH
-}
-
-#[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct ScreenPayload //SCREEN PAYLOAD
 {
     pub frame: Option<Vec<u8>>, //COMPRESSED FRAME
@@ -148,7 +135,6 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub code: Option<MessageCode>,      //CONTROL CODE
     pub colors: MessageColors,          //MESSAGE COLORS
     pub seq: usize,                     //SEQUENCE NUMBER
-    pub file: Option<FilePayload>,      //FILE UPLOADED BY CLIENT
     pub screen: Option<ScreenPayload>,  //SCREENSHARE PAYLOAD
     pub token: Option<[u8; 32]>,        //CONNECTION TOKEN
 }
@@ -182,25 +168,8 @@ impl Default for MessagePacket //DEFAULT
                 message_color: None,
             },
             seq: 0,
-            file: None,
             screen: None,
             token: None,
-        }
-    }
-}
-
-impl Default for FilePayload
-{
-    fn default() -> Self
-    {
-        Self
-        {
-            token: None,
-            uid: 0,
-            data: None,
-            size: None,
-            filename: None,
-            hash: None,
         }
     }
 }
@@ -556,43 +525,3 @@ pub fn receive
     }
 }
 
-pub fn send_file //CHUNK FILE AND SEND TO STREAM
-(
-    path: PathBuf,
-    mut stream: TcpStream,
-    uid: u64,
-    code: MessageCode,
-    keys: Option<&chat_consts::SharedKeys>,
-)
-{
-    let mut file = File::open(path).expect("Cannot open file for upload");
-    let mut buffer = vec![0; chat_consts::UPLOAD_CHUNK_SIZE];
-
-    #[cfg(feature = "server")]
-    let mut seq = 0usize;
-
-    //LOOP READING
-    loop
-    {
-        match file.read(&mut buffer)
-        {
-            Ok(0) => break, //EOF
-            Ok(bytes) =>
-            {
-                //SEND FILE CHUNK
-                send_tcp(&mut stream, MessagePacket
-                {
-                    code: Some(code.clone()),
-                    file: Some(FilePayload
-                    {
-                        uid,
-                        data: Some(buffer[..bytes].to_vec()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }, keys, #[cfg(feature = "server")] Some(&mut seq));
-            },
-            Err(_) => {}, //TODO: Implement
-        }
-    }
-}

@@ -186,9 +186,9 @@ fn main()
                                 continue;
                             },
 
-                            ConnectionType::FileDownload { uid, path } =>
+                            ConnectionType::FileDownload { uid, file: file_data } =>
                             {
-                                thread::spawn(move || file::upload(id, stream, path, uid));
+                                thread::spawn(move || file::upload(id, stream, file_data, uid));
                                 continue;
                             },
 

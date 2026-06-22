@@ -23,7 +23,7 @@ use std::
     net::TcpStream,
     sync::LazyLock,
     fs::{ self, File },
-    path::{ Path, PathBuf },
+    path::Path,
 };
 
 use dashmap::DashMap;
@@ -37,6 +37,7 @@ use crate::
     network::
     {
         self,
+        file::{ self, FilePacket },
         server::{ self, AvailableFile },
         MessagePacket,
         MessageCode,
@@ -132,20 +133,66 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
     //LOCAL SEQ
     let mut seq = 0usize;
 
-    //LOOP READING
+    //WAIT FOR FIRST PACKET (METADATA)
+    let metadata_packet = match file::receive_file(streams, Some(&keys), &mut seq)
+    {
+        Some(p) => p,
+        None => return
+    };
+
+    let mut valid = false;
+
+    //CHECK FOR CONCURRENT UPLOADS
+    if ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count() >=
+        crate::config::read_config("max_client_parallel_uploads")
+    {
+        valid = true; //SKIP FILE UPLOAD
+    }
+
+    if !valid && let Some(size) = metadata_packet.size &&
+        let Some(hash) = metadata_packet.hash &&
+        let Some(filename) = metadata_packet.filename &&
+        size / 1_048_576 <= crate::config::read_config::<u64>("max_upload_size")
+    {
+        //CREATE TEMP UPLOAD DIRECTORY
+        let temp_dir = misc::get_upload_dir(&username);
+        fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
+
+        //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
+        ACTIVE_FILESHARES.insert(uid, ActiveFileshare
+        {
+            file: File::create_new(temp_dir.join(uid.to_string())).expect("Creating upload file failed"),
+            size,
+            current_size: 0,
+            hash,
+            hasher: Sha256::new(),
+            filename,
+            client_id: id,
+        });
+
+        valid = true;
+    }
+
+    if !valid
+    {
+        //LOG FILE REJECT
+        log::info!("Upload rejected: {peer_addr}");
+        return;
+    }
+
+    //LOOP READING CHUNKS
     loop
     {
         //READ
-        let read = match network::receive(streams, Some(&keys), Some(&mut seq))
+        let read = match file::receive_file(streams, Some(&keys), &mut seq)
         {
             Some(r) => r,
             None => return
         };
 
-        if let Some(file) = read.file //CHECK FOR FILE PAYLOAD
+        if let Some(chunk_data) = read.data
         {
-            if let Some(mut active) = ACTIVE_FILESHARES.get_mut(&file.uid) &&
-                let Some(chunk_data) = file.data && active.client_id == id
+            if let Some(mut active) = ACTIVE_FILESHARES.get_mut(&read.uid) && active.client_id == id
             {
                 if chunk_data.len() <= consts::UPLOAD_CHUNK_SIZE && //CHECK PACKET SIZE
                     active.file.write_all(&chunk_data).is_ok() //WRITE
@@ -165,7 +212,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
 
                         //GET FILE PATH
                         let temp_dir = misc::get_upload_dir(&username);
-                        let current_path = temp_dir.join(file.uid.to_string());
+                        let current_path = temp_dir.join(read.uid.to_string());
                         let mut new_filename = None;
                         let mut final_path = None;
                         let mut insert = false;
@@ -185,7 +232,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
                             valid = fs::rename(&current_path, &new_path).is_ok();
 
                             //SET NEW FILE VARIABLES
-                            new_filename = Some(filename);
+                            new_filename = Some(filename.to_os_string());
                             final_path = Some(new_path);
                         } else { valid = false; }
 
@@ -194,7 +241,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
                         //LOG FILE UPLOAD
                         log::info!("Upload done: {peer_addr}");
 
-                        let filename = new_filename.and_then(|f| f.to_str()).unwrap_or("unnamed_file").to_owned();
+                        let filename = new_filename.and_then(|f| f.into_string().ok()).unwrap_or("unnamed_file".to_string());
 
                         //ANNOUNCE FILE UPLOAD
                         server::send_to_all(MessagePacket
@@ -219,7 +266,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
 
                         //REMOVE ACTIVE UPLOAD
                         drop(active);
-                        ACTIVE_FILESHARES.remove(&file.uid);
+                        ACTIVE_FILESHARES.remove(&read.uid);
                         return;
                     }
                 }
@@ -228,7 +275,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
     }
 }
 
-pub fn upload(id: usize, stream: TcpStream, path: PathBuf, uid: u64)
+pub fn upload(id: usize, mut stream: TcpStream, file: AvailableFile, uid: u64)
 {
     //GET CLIENT INFO
     let (keys, peer_addr) =
@@ -264,8 +311,19 @@ pub fn upload(id: usize, stream: TcpStream, path: PathBuf, uid: u64)
         uid,
     };
 
+    //SEND FIRST PACKET (METADATA)
+    let mut seq = 0usize;
+    network::send_tcp(&mut stream, FilePacket
+    {
+        uid,
+        size: Some(file.size),
+        filename: Some(file.filename.clone()),
+        hash: Some(file.hash),
+        ..Default::default()
+    }, Some(&keys), Some(&mut seq));
+
     //START UPLOAD
-    network::send_file(path, stream, uid, MessageCode::Download, Some(&keys));
+    file::send_file(file.path, stream, uid, Some(&keys), &mut seq);
 
     //LOG END
     log::info!("Download done: {peer_addr}");

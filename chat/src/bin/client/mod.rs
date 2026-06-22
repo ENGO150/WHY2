@@ -78,7 +78,6 @@ use why2_chat::
         self,
         MessagePacket,
         MessageColors,
-        FilePayload,
         voice::client::device,
         client::{ self, ClientEvent },
         screen::client::
@@ -697,9 +696,8 @@ fn run_client(tx: Sender<ClientEvent>)
                                 let path = Path::new(parameters.trim());
 
                                 //TRY TO OPEN FILE
-                                if let Ok(metadata) = path.metadata() && path.is_file() &&
-                                    let Ok(mut file) = File::open(path) &&
-                                    let Some(filename) = path.file_name().and_then(|n| n.to_str())
+                                if let Ok(mut file) = File::open(path) && path.metadata().is_ok() &&
+                                    path.is_file() && path.file_name().and_then(|n| n.to_str()).is_some()
                                 {
                                     //GET SHA256 FILE HASH
                                     let mut hasher = Sha256::new();
@@ -729,13 +727,7 @@ fn run_client(tx: Sender<ClientEvent>)
                                         network::send(&mut write_stream.lock().unwrap(), MessagePacket
                                         {
                                             code: command.to_code(),
-                                            file: Some(FilePayload
-                                            {
-                                                size: Some(metadata.len()),
-                                                filename: Some(filename.to_owned()),
-                                                hash: Some(hash),
-                                                ..Default::default()
-                                            }),
+                                            text: Some(serde_json::to_string(&hash).unwrap()),
                                             ..Default::default()
                                         }, options::get_keys().as_ref());
                                     } else //HASHING FAILED

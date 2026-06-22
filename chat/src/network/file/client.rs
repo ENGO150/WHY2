@@ -38,47 +38,67 @@ use crate::
     network::
     {
         self,
+        file::{ self, FilePacket },
         client::{ self, ClientEvent },
-        FilePayload,
-        MessageCode,
     },
 };
 
-pub fn upload(payload: FilePayload, tx: Sender<ClientEvent>)
+pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
     let mut stream = client::connect(options::get_server_address()).expect("File connection failed");
 
     //SEND TOKEN
-    stream.write_all(&payload.token.unwrap()).unwrap();
-
-    //UPLOAD CONSTANTS
-    let file_hash = payload.hash.unwrap();
+    stream.write_all(&token).unwrap();
 
     //GET FILE PATH
     let path = client::ACTIVE_UPLOADS.lock().unwrap().remove(&file_hash).unwrap(); //(CRASHES IF SERVER REQUESTS FILE THAT ISN'T FOR UPLOAD)
     let filename = path.clone().file_name().and_then(|n| n.to_str()
         .map(|s| s.to_string())).unwrap_or_else(|| String::from("Unknown")); //GET FILENAME FOR CONSOLE LOG
 
+    let size = path.metadata().unwrap().len();
+
     //LOG
-    tx.send(ClientEvent::Upload(filename)).unwrap();
+    tx.send(ClientEvent::Upload(filename.clone())).unwrap();
     tx.send(ClientEvent::Prompt).unwrap();
 
+    //SEND FIRST PACKET (METADATA)
+    network::send_tcp(&mut stream, FilePacket
+    {
+        uid,
+        size: Some(size),
+        filename: Some(filename),
+        hash: Some(file_hash),
+        ..Default::default()
+    }, options::get_keys().as_ref());
+
     //UPLOAD
-    network::send_file(path, stream, payload.uid, MessageCode::Upload, options::get_keys().as_ref());
+    file::send_file(path, stream, uid, options::get_keys().as_ref());
 }
 
-pub fn download(payload: FilePayload, tx: Sender<ClientEvent>)
+pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
     let mut stream = client::connect(options::get_server_address()).expect("File connection failed");
 
     //SEND TOKEN
-    stream.write_all(&payload.token.unwrap()).unwrap();
+    stream.write_all(&token).unwrap();
 
     //CREATE STREAM PAIR
     let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
     let mut streams = (&mut stream, write_stream);
+
+    let mut seq = 0usize;
+
+    //RECEIVE FIRST PACKET (METADATA)
+    let metadata_packet = match file::receive_file(&mut streams, options::get_keys().as_ref(), &mut seq)
+    {
+        Some(p) => p,
+        None => return,
+    };
+
+    let size = metadata_packet.size.unwrap();
+    let hash = metadata_packet.hash.unwrap();
 
     //NEW DOWNLOAD, GET NEW FILE
     let download_dir = config::read_config::<String>("download_directory")
@@ -86,7 +106,7 @@ pub fn download(payload: FilePayload, tx: Sender<ClientEvent>)
         .to_str().expect("Invalid home directory"));
 
     //GET SAFE FILENAME
-    let filename = Path::new(&payload.filename.unwrap())
+    let filename = Path::new(&metadata_packet.filename.unwrap())
         .file_name()
         .and_then(|f| f.to_str())
         .unwrap_or("unnamed_file")
@@ -100,9 +120,6 @@ pub fn download(payload: FilePayload, tx: Sender<ClientEvent>)
     tx.send(ClientEvent::Prompt).unwrap();
 
     //INIT COUNTERS
-    let mut seq = 0usize;
-    let size = payload.size.unwrap();
-    let hash = payload.hash.unwrap();
     let mut current_size = 0u64;
     let mut file = File::create(Path::new(&download_dir).join(&filename)).expect("Creating download file failed");
     let mut hasher = Sha256::new();
@@ -111,13 +128,13 @@ pub fn download(payload: FilePayload, tx: Sender<ClientEvent>)
     loop
     {
         //READ
-        let read = match network::receive(&mut streams, options::get_keys().as_ref(), Some(&mut seq))
+        let read = match file::receive_file(&mut streams, options::get_keys().as_ref(), &mut seq)
         {
             Some(r) => r,
             None => return
         };
 
-        let chunk_data = read.file.and_then(|f| f.data).unwrap();
+        let chunk_data = read.data.unwrap();
 
         //WRITE
         if file.write_all(&chunk_data).is_ok()
