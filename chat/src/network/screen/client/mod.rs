@@ -45,11 +45,13 @@ use crate::
     options,
     network::
     {
-        self,
-        MessagePacket,
-        ScreenPayload,
-        screen::consts,
         client::{ self, ClientEvent },
+        screen::
+        {
+            self,
+            consts,
+            ScreenPacket,
+        },
     },
 };
 
@@ -108,13 +110,10 @@ pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
                     Err(_) => return,
                 };
 
-                network::send(&mut stream, MessagePacket
+                screen::send_frame(&mut stream, ScreenPacket
                 {
-                    screen: Some(ScreenPayload
-                    {
-                        frame: Some(compressed_frame),
-                        audio: None,
-                    }),
+                    frame: Some(compressed_frame),
+                    audio: None,
                     ..Default::default()
                 }, options::get_keys().as_ref());
             },
@@ -128,13 +127,10 @@ pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
                     Err(_) => return,
                 };
 
-                network::send(&mut stream, MessagePacket
+                screen::send_frame(&mut stream, ScreenPacket
                 {
-                    screen: Some(ScreenPayload
-                    {
-                        frame: None,
-                        audio: Some(audio_frame.data),
-                    }),
+                    frame: None,
+                    audio: Some(audio_frame.data),
                     ..Default::default()
                 }, options::get_keys().as_ref());
             }
@@ -167,7 +163,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
 
         while running_net.load(Ordering::Relaxed)
         {
-            let read = match network::receive(&mut streams, options::get_keys().as_ref(), Some(&mut seq))
+            let read = match screen::receive_frame(&mut streams, options::get_keys().as_ref(), &mut seq)
             {
                 Some(r) => r,
                 None =>
@@ -177,21 +173,18 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
                 }
             };
 
-            if let Some(screen_payload) = read.screen
+            if let Some(frame) = read.frame
             {
-                if let Some(frame) = screen_payload.frame
+                tx.send(frame).ok();
+                if let Some(proxy) = SCREEN_SHARE_PROXY.get()
                 {
-                    tx.send(frame).ok();
-                    if let Some(proxy) = SCREEN_SHARE_PROXY.get()
-                    {
-                        proxy.send_event(UserEvent::NewFrame).ok();
-                    }
+                    proxy.send_event(UserEvent::NewFrame).ok();
                 }
+            }
 
-                if let Some(audio) = screen_payload.audio
-                {
-                    audio_tx.send(audio::AudioFrame { data: audio }).ok();
-                }
+            if let Some(audio) = read.audio
+            {
+                audio_tx.send(audio::AudioFrame { data: audio }).ok();
             }
         }
     });

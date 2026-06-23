@@ -120,13 +120,6 @@ pub struct MessageColors //COLORS OF MESSAGE
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
-pub struct ScreenPayload //SCREEN PAYLOAD
-{
-    pub frame: Option<Vec<u8>>, //COMPRESSED FRAME
-    pub audio: Option<Vec<u8>>, //AUDIO FRAME
-}
-
-#[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 {
     pub text: Option<String>,           //MESSAGE
@@ -135,7 +128,6 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
     pub code: Option<MessageCode>,      //CONTROL CODE
     pub colors: MessageColors,          //MESSAGE COLORS
     pub seq: usize,                     //SEQUENCE NUMBER
-    pub screen: Option<ScreenPayload>,  //SCREENSHARE PAYLOAD
     pub token: Option<[u8; 32]>,        //CONNECTION TOKEN
 }
 
@@ -168,7 +160,6 @@ impl Default for MessagePacket //DEFAULT
                 message_color: None,
             },
             seq: 0,
-            screen: None,
             token: None,
         }
     }
@@ -524,4 +515,3 @@ pub fn receive
         }
     }
 }
-

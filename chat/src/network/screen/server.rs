@@ -27,7 +27,7 @@ use crate::
     consts::SharedKeys,
     network::
     {
-        self,
+        screen,
         Streams,
         server::{ self, Connection },
     },
@@ -93,13 +93,11 @@ pub fn screen(id: usize, streams: &mut Streams)
     loop
     {
         //READ
-        let read = match network::receive(streams, Some(&keys), Some(&mut seq))
+        let read = match screen::receive_frame(streams, Some(&keys), &mut seq)
         {
             Some(r) => r,
             None => return
         };
-
-        if read.screen.is_none() { continue; } //DO NOT FORWARD INVALID FRAMES
 
         //COLLECT ALL ATTACHED CLIENT STREAMS
         let entries: Vec<(Arc<TcpStream>, Option<SharedKeys>)> = server::CONNECTIONS.iter().filter_map(|entry|
@@ -112,7 +110,7 @@ pub fn screen(id: usize, streams: &mut Streams)
                     if let Some(attached_screen) = attached_screen && attached_screen.target_id == id
                     {
                         //PREVENT FEEDBACK
-                        if *client_id == id && read.screen.as_ref().is_some_and(|s| s.frame.is_none())
+                        if *client_id == id && read.frame.is_none()
                         {
                             return None;
                         }
@@ -130,7 +128,7 @@ pub fn screen(id: usize, streams: &mut Streams)
         {
             if let Ok(mut stream) = entry.0.try_clone()
             {
-                network::send(&mut stream, read.clone(), entry.1.as_ref(), None);
+                screen::send_frame(&mut stream, read.clone(), entry.1.as_ref(), None);
             }
         }
     }
