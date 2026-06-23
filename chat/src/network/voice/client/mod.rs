@@ -44,6 +44,7 @@ use std::
 use cpal::
 {
     Host,
+    HostId,
     Stream,
     Device,
     StreamConfig,
@@ -230,7 +231,13 @@ pub fn listen_server_voice //SERVER -> CLIENT
     socket.set_read_timeout(Some(Duration::from_millis(200))).expect("Setting socket timeout failed");
 
     //INIT AUDIO HOST
-    let host = cpal::default_host();
+    let host = if cfg!(target_os = "linux")
+    {
+        cpal::host_from_id(HostId::Alsa).unwrap_or_else(|_| cpal::default_host())
+    } else
+    {
+        cpal::default_host()
+    };
 
     //SUPPRESS STDERR (AVOID ALSA ERRORS)
     let stderr_gag = Gag::stderr().unwrap();
