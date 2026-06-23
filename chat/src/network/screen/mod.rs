@@ -94,7 +94,7 @@ pub fn receive_frame
     (
         streams,
         keys,
-        #[cfg(feature = "server")] false,
+        #[cfg(feature = "server")] true,
     )?;
 
     //DESERIALIZE AND RETURN
