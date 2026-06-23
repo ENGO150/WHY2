@@ -38,7 +38,6 @@ use crate::
     network::
     {
         self,
-        server as chat_server,
         SequencedPacket,
     },
     consts::
@@ -48,6 +47,9 @@ use crate::
         Streams,
     },
 };
+
+#[cfg(feature = "server")]
+use crate::network::server as chat_server;
 
 //STRUCTS
 #[derive(SchemaWrite, SchemaRead, Clone)]
