@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod audio;
 pub mod capture;
 pub mod display;
+pub mod options;
 
 use std::
 {
@@ -31,7 +32,6 @@ use std::
         Arc,
         Mutex,
         OnceLock,
-        mpsc::Sender,
         atomic::{ AtomicBool, Ordering },
     },
 };
@@ -42,10 +42,10 @@ use winit::event_loop::EventLoopProxy;
 
 use crate::
 {
-    options,
+    options as chat_options,
     network::
     {
-        client::{ self, ClientEvent },
+        client,
         screen::
         {
             self,
@@ -73,17 +73,13 @@ pub enum UserEvent //CUSTOM WINIT EVENTS
 //GLOBAL VARIABLES
 pub static SCREEN_SHARE_PROXY: OnceLock<EventLoopProxy<UserEvent>> = OnceLock::new();
 
-pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
+pub fn screen(token: [u8; 32])
 {
     //INIT FILE CONNECTION
-    let mut stream = client::connect(options::get_server_address()).expect("Screen upload connection failed");
+    let mut stream = client::connect(chat_options::get_server_address()).expect("Screen upload connection failed");
 
     //SEND TOKEN
     stream.write_all(&token).unwrap();
-
-    //LOG
-    tx.send(ClientEvent::Screen(true)).unwrap();
-    tx.send(ClientEvent::Prompt).unwrap();
 
     //SHARED STATE
     let (tx, rx) = crossbeam_channel::bounded(consts::MULTIPLEX_CHANNEL_BOUND);
@@ -93,12 +89,15 @@ pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
 
     //SPAWN CAPTURE THREAD
     let running_capture = running.clone();
-    let _capture_thread = thread::spawn(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
-    let _audio_capture_thread = audio::spawn_audio_capture(audio_tx, running.clone());
+    thread::spawn(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
+    audio::spawn_audio_capture(audio_tx, running.clone());
 
     //LOOP SENDING FRAMES
     loop
     {
+        //EXIT ON DISABLED SCREEN
+        if !options::get_use_screen() { return; }
+
         crossbeam_channel::select!
         {
             //VIDEO FRAME
@@ -115,7 +114,7 @@ pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
                     frame: Some(compressed_frame),
                     audio: None,
                     ..Default::default()
-                }, options::get_keys().as_ref());
+                }, chat_options::get_keys().as_ref());
             },
 
             //AUDIO FRAME
@@ -132,7 +131,7 @@ pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
                     frame: None,
                     audio: Some(audio_frame.data),
                     ..Default::default()
-                }, options::get_keys().as_ref());
+                }, chat_options::get_keys().as_ref());
             }
         }
     }
@@ -141,7 +140,7 @@ pub fn screen(token: [u8; 32], tx: Sender<ClientEvent>)
 pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
 {
     //INIT FILE CONNECTION
-    let mut stream = client::connect(options::get_server_address()).expect("Screen download connection failed");
+    let mut stream = client::connect(chat_options::get_server_address()).expect("Screen download connection failed");
 
     //SEND TOKEN (HAHA, SLEEP TOKEN)
     stream.write_all(&token).unwrap();
@@ -163,7 +162,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
 
         while running_net.load(Ordering::Relaxed)
         {
-            let read = match screen::receive_frame(&mut streams, options::get_keys().as_ref(), &mut seq)
+            let read = match screen::receive_frame(&mut streams, chat_options::get_keys().as_ref(), &mut seq)
             {
                 Some(r) => r,
                 None =>

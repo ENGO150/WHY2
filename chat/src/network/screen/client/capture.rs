@@ -49,7 +49,11 @@ use openh264::
     },
 };
 
-use crate::network::screen::consts;
+use crate::network::screen::
+{
+    consts,
+    client::options,
+};
 
 pub fn get_primary_monitor() -> Monitor
 {
@@ -152,6 +156,9 @@ fn capture_loop_xcap
 
     while running.load(Ordering::Relaxed)
     {
+        //EXIT ON DISABLED SCREEN
+        if !options::get_use_screen() { return; }
+
         if let Ok(image) = monitor.capture_image()
         {
             let raw = image.as_raw();
@@ -218,6 +225,9 @@ fn capture_loop_wayshot
 
     while running.load(Ordering::Relaxed)
     {
+        //EXIT ON DISABLED SCREEN
+        if !options::get_use_screen() { return; }
+
         if frame_count > (consts::TARGET_FPS * 10)
         {
             if let Ok(w) = libwayshot::WayshotConnection::new()

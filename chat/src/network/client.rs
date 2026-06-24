@@ -59,12 +59,16 @@ use crate::
         MessageCode,
         MessagePacket,
         file::client as file,
-        screen::client as screen,
         voice::client::
         {
             self as voice_client,
             options as voice_options,
-        }
+        },
+        screen::client::
+        {
+            self as screen,
+            options as screen_options,
+        },
     },
 };
 
@@ -577,16 +581,15 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //SCREEN UPLOAD APPROVAL
                 MessageCode::Screen =>
                 {
-                    if let Some(token) = read.token //SCREEN ENABLED
+                    tx.send(if screen_options::swap_use_screen()
                     {
                         //SPAWN UPLOAD THREAD
-                        let screen_tx = tx.clone(); //CLONE TX
-                        thread::spawn(move || screen::screen(token, screen_tx));
-                        continue;
-                    } else //SCREEN DISABLED
+                        thread::spawn(move || screen::screen(read.token.unwrap()));
+                        ClientEvent::Screen(true)
+                    } else
                     {
-                        tx.send(ClientEvent::Screen(false)).unwrap();
-                    }
+                        ClientEvent::Screen(false)
+                    }).unwrap();
                 },
 
                 //SCREENSHARE ATTACH

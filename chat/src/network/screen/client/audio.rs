@@ -54,7 +54,11 @@ use audiopus::
 
 use crate::network::
 {
-    screen::consts as screen_consts,
+    screen::
+    {
+        client::options,
+        consts as screen_consts,
+    },
     voice::
     {
         consts,
@@ -190,6 +194,9 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) -> 
 
         while running.load(Ordering::Relaxed)
         {
+            //EXIT ON DISABLED SCREEN
+            if !options::get_use_screen() { return; }
+
             match chunk_rx.recv_timeout(Duration::from_millis(100))
             {
                 Ok(chunk) => input_accum.extend_from_slice(&chunk),
@@ -231,7 +238,7 @@ pub fn spawn_audio_playback
 ) -> JoinHandle<()>
 {
     thread::spawn(move ||
-        {
+    {
         let host = cpal::default_host();
         let device = host.default_output_device().expect("No audio output device found");
         let mut config: StreamConfig = voice::configure_device(device.supported_output_configs().unwrap(), device.default_output_config().unwrap());
