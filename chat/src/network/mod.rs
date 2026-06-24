@@ -112,14 +112,14 @@ pub enum MessageCode //CONTROL CODES
 }
 
 //STRUCTS
-#[derive(SchemaWrite, SchemaRead, Clone)]
+#[derive(SchemaWrite, SchemaRead, Clone, Default)]
 pub struct MessageColors //COLORS OF MESSAGE
 {
     pub username_color: Option<u8>, //COLOR OF USERNAME
     pub message_color: Option<u8>,  //COLOR OF MESSAGE
 }
 
-#[derive(SchemaWrite, SchemaRead, Clone)]
+#[derive(SchemaWrite, SchemaRead, Clone, Default)]
 pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 {
     pub text: Option<String>,           //MESSAGE
@@ -142,27 +142,6 @@ impl SequencedPacket for MessagePacket
 {
     fn seq(&self) -> usize { self.seq }
     fn set_seq(&mut self, seq: usize) { self.seq = seq; }
-}
-
-impl Default for MessagePacket //DEFAULT
-{
-    fn default() -> Self
-    {
-        Self
-        {
-            text: None,
-            username: None,
-            id: None,
-            code: None,
-            colors: MessageColors
-            {
-                username_color: None,
-                message_color: None,
-            },
-            seq: 0,
-            token: None,
-        }
-    }
 }
 
 //FUNCTIONS

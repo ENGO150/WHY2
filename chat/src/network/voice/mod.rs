@@ -50,7 +50,7 @@ pub enum VoiceCode
     PONG, //CLIENT A <- CLIENT B
 }
 
-#[derive(SchemaRead, SchemaWrite)]
+#[derive(SchemaRead, SchemaWrite, Default)]
 pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
 {
     pub voice: Option<Vec<u8>>,   //MESSAGE
@@ -60,23 +60,6 @@ pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
     pub target_id: Option<usize>, //ID OF RECIPIENT
     pub seq: usize,               //SEQUENCE NUMBER
     pub timestamp: Option<u128>,  //TIME OF SENDING
-}
-
-impl Default for VoicePacket
-{
-    fn default() -> Self
-    {
-        VoicePacket
-        {
-            voice: None,
-            id: None,
-            target_id: None,
-            code: None,
-            username: None,
-            seq: 0,
-            timestamp: None,
-        }
-    }
 }
 
 pub fn send //SEND DATA TO UDP

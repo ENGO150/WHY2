@@ -36,7 +36,7 @@ use crate::
 };
 
 //STRUCTS
-#[derive(SchemaWrite, SchemaRead, Clone)]
+#[derive(SchemaWrite, SchemaRead, Clone, Default)]
 pub struct ScreenPacket //SCREEN PACKET
 {
     pub frame: Option<Vec<u8>>, //COMPRESSED FRAME
@@ -45,19 +45,6 @@ pub struct ScreenPacket //SCREEN PACKET
 }
 
 //IMPLEMENTATIONS
-impl Default for ScreenPacket
-{
-    fn default() -> Self
-    {
-        Self
-        {
-            frame: None,
-            audio: None,
-            seq: 0,
-        }
-    }
-}
-
 impl SequencedPacket for ScreenPacket
 {
     fn seq(&self) -> usize { self.seq }

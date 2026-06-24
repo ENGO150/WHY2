@@ -52,7 +52,7 @@ use crate::
 use crate::network::server as chat_server;
 
 //STRUCTS
-#[derive(SchemaWrite, SchemaRead, Clone)]
+#[derive(SchemaWrite, SchemaRead, Clone, Default)]
 pub struct FilePacket //FILE CHUNK
 {
     pub uid: u64,                 //UPLOAD UID
@@ -64,22 +64,6 @@ pub struct FilePacket //FILE CHUNK
 }
 
 //IMPLEMENTATIONS
-impl Default for FilePacket
-{
-    fn default() -> Self
-    {
-        Self
-        {
-            uid: 0,
-            data: None,
-            size: None,
-            filename: None,
-            hash: None,
-            seq: 0,
-        }
-    }
-}
-
 impl SequencedPacket for FilePacket
 {
     fn seq(&self) -> usize { self.seq }
