@@ -90,7 +90,7 @@ pub fn screen(token: [u8; 32])
     //SPAWN CAPTURE THREAD
     let running_capture = running.clone();
     thread::spawn(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
-    audio::spawn_audio_capture(audio_tx, running.clone());
+    thread::spawn(move || audio::spawn_audio_capture(audio_tx, running));
 
     //LOOP SENDING FRAMES
     loop
@@ -150,7 +150,8 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
     let (audio_tx, audio_rx) = crossbeam_channel::bounded(consts::NETWORK_CHANNEL_BOUND);
     let running = Arc::new(AtomicBool::new(true));
 
-    let _audio_playback_thread = audio::spawn_audio_playback(audio_rx, running.clone());
+    let running_audio = running.clone();
+    thread::spawn(move || audio::spawn_audio_playback(audio_rx, running_audio));
 
     //SPAWN NETWORK READER THREAD
     let running_net = running.clone();
