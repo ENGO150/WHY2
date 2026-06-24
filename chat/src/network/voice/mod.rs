@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //MODULES
 pub mod consts;
-pub mod options;
 
 #[cfg(feature = "client")]
 pub mod client;
@@ -39,6 +38,9 @@ use crate::
     crypto,
     consts::SharedKeys,
 };
+
+#[cfg(feature = "client")]
+use crate::network::voice::client::options;
 
 #[cfg(not(feature = "server"))]
 use crate::options as chat_options;

@@ -60,9 +60,9 @@ use crate::
         MessagePacket,
         file::client as file,
         screen::client as screen,
-        voice::
+        voice::client::
         {
-            client as voice_client,
+            self as voice_client,
             options as voice_options,
         }
     },

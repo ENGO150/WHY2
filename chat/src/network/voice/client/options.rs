@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#[cfg(feature = "client")]
 use std::sync::atomic::
 {
     AtomicBool,
@@ -25,49 +24,40 @@ use std::sync::atomic::
 };
 
 //OPTIONS
-#[cfg(feature = "client")]
 static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT -> SERVER)
 
-#[cfg(feature = "client")]
 static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (SERVER -> CLIENT)
 
-#[cfg(feature = "client")]
 static USE_VOICE: AtomicBool = AtomicBool::new(false);
 
 //SEQ
-#[cfg(feature = "client")]
 pub fn get_seq() -> usize //GET SEQUENCE NUMBER
 {
     SEQ.load(Ordering::Relaxed)
 }
 
-#[cfg(feature = "client")]
 pub fn set_seq(value: usize) //SET SEQUENCE NUMBER
 {
     SEQ.store(value, Ordering::Relaxed)
 }
 
 //SERVER SEQ
-#[cfg(feature = "client")]
 pub fn get_server_seq() -> usize //GET SERVER SEQUENCE NUMBER
 {
     SERVER_SEQ.load(Ordering::Relaxed)
 }
 
-#[cfg(feature = "client")]
 pub fn set_server_seq(value: usize) //SET SERVER SEQUENCE NUMBER
 {
     SERVER_SEQ.store(value, Ordering::Relaxed)
 }
 
 //USE VOICE
-#[cfg(feature = "client")]
 pub fn get_use_voice() -> bool //GET USE VOICE
 {
     USE_VOICE.load(Ordering::Relaxed)
 }
 
-#[cfg(feature = "client")]
 pub fn swap_use_voice() -> bool //SET USE VOICE
 {
     !USE_VOICE.fetch_xor(true, Ordering::Relaxed)

@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //MODULES
 pub mod device;
 pub mod sfx;
+pub mod options;
 
 use std::
 {
@@ -95,7 +96,6 @@ use crate::
         {
             consts,
             self,
-            options,
             VoiceCode,
             VoicePacket,
             client::sfx::SoundEffect,
