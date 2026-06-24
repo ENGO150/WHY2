@@ -927,10 +927,31 @@ fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW T
 
 fn deattach(sharer_id: usize) //DEATTACH ALL ATTACHED CLIENTS
 {
+    //FIND SHARER USERNAME
+    let sharer_uname = CONNECTIONS.iter()
+        .find(|c| c.value().id() == Some(&sharer_id))
+        .and_then(|c| c.value().username().cloned());
+
+    let mut to_notify = Vec::new();
+
     for mut conn in CONNECTIONS.iter_mut()
         .filter(|conn| conn.attached_screen().as_ref().is_some_and(|a| a.target_id == sharer_id))
     {
         conn.deattach_screen();
+        to_notify.push((conn.write_stream().clone(), conn.keys().cloned()));
+    }
+
+    for (stream_mutex, keys) in to_notify
+    {
+        if let Ok(mut stream) = stream_mutex.lock()
+        {
+            network::send(&mut stream, MessagePacket
+            {
+                code: Some(MessageCode::Deattach),
+                username: sharer_uname.clone(),
+                ..Default::default()
+            }, keys.as_ref(), None);
+        }
     }
 }
 
