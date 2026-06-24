@@ -321,6 +321,9 @@ pub fn spawn_audio_playback(rx: Receiver<AudioFrame>, running: Arc<AtomicBool>)
 
     while running.load(Ordering::Relaxed)
     {
+        //EXIT ON DISABLED ATTACH
+        if !options::get_attach_screen() { return; }
+
         match rx.recv_timeout(Duration::from_millis(50))
         {
             Ok(frame) =>

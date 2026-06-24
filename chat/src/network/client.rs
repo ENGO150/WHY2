@@ -595,6 +595,9 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //SCREENSHARE ATTACH
                 MessageCode::Attach =>
                 {
+                    //ENABLE ATTACH
+                    screen_options::set_attach_screen(true);
+
                     //SPAWN DOWNLOAD THREAD
                     let main_stream = streams.1.clone();
                     thread::spawn(move || screen::attach(read.token.unwrap(), main_stream));
@@ -604,6 +607,9 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 //SCREENSHARE DEATTACH
                 MessageCode::Deattach =>
                 {
+                    //DISABLE ATTACH
+                    screen_options::set_attach_screen(false);
+
                     tx.send(ClientEvent::Deattach(read.username.unwrap())).unwrap();
                 },
 

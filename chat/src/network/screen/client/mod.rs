@@ -163,6 +163,9 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
 
         while running_net.load(Ordering::Relaxed)
         {
+            //EXIT ON DISABLED ATTACH
+            if !options::get_attach_screen() { return; }
+
             let read = match screen::receive_frame(&mut streams, chat_options::get_keys().as_ref(), &mut seq)
             {
                 Some(r) => r,

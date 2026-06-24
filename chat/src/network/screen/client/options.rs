@@ -20,6 +20,7 @@ use std::sync::atomic::{ AtomicBool, Ordering };
 
 //OPTIONS
 static USE_SCREEN: AtomicBool = AtomicBool::new(false);
+static ATTACH_SCREEN: AtomicBool = AtomicBool::new(false);
 
 //USE SCREEN
 pub fn get_use_screen() -> bool
@@ -30,4 +31,15 @@ pub fn get_use_screen() -> bool
 pub fn swap_use_screen() -> bool
 {
     !USE_SCREEN.fetch_xor(true, Ordering::Relaxed)
+}
+
+//ATTACH SCREEN
+pub fn get_attach_screen() -> bool
+{
+    ATTACH_SCREEN.load(Ordering::Relaxed)
+}
+
+pub fn set_attach_screen(attach: bool)
+{
+    ATTACH_SCREEN.store(attach, Ordering::Relaxed)
 }
