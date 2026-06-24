@@ -193,7 +193,11 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) //C
     while running.load(Ordering::Relaxed)
     {
         //EXIT ON DISABLED SCREEN
-        if !options::get_use_screen() { return; }
+        if !options::get_use_screen()
+        {
+            running.store(false, Ordering::Relaxed);
+            return;
+        }
 
         match chunk_rx.recv_timeout(Duration::from_millis(100))
         {
@@ -322,7 +326,11 @@ pub fn spawn_audio_playback(rx: Receiver<AudioFrame>, running: Arc<AtomicBool>)
     while running.load(Ordering::Relaxed)
     {
         //EXIT ON DISABLED ATTACH
-        if !options::get_attach_screen() { return; }
+        if !options::get_attach_screen()
+        {
+            running.store(false, Ordering::Relaxed);
+            return;
+        }
 
         match rx.recv_timeout(Duration::from_millis(50))
         {

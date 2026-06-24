@@ -157,7 +157,11 @@ fn capture_loop_xcap
     while running.load(Ordering::Relaxed)
     {
         //EXIT ON DISABLED SCREEN
-        if !options::get_use_screen() { return; }
+        if !options::get_use_screen()
+        {
+            running.store(false, Ordering::Relaxed);
+            return;
+        }
 
         if let Ok(image) = monitor.capture_image()
         {
@@ -226,7 +230,11 @@ fn capture_loop_wayshot
     while running.load(Ordering::Relaxed)
     {
         //EXIT ON DISABLED SCREEN
-        if !options::get_use_screen() { return; }
+        if !options::get_use_screen()
+        {
+            running.store(false, Ordering::Relaxed);
+            return;
+        }
 
         if frame_count > (consts::TARGET_FPS * 10)
         {

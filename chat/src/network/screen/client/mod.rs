@@ -89,14 +89,19 @@ pub fn screen(token: [u8; 32])
 
     //SPAWN CAPTURE THREAD
     let running_capture = running.clone();
+    let running_audio = running.clone();
     thread::spawn(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
-    thread::spawn(move || audio::spawn_audio_capture(audio_tx, running));
+    thread::spawn(move || audio::spawn_audio_capture(audio_tx, running_audio));
 
     //LOOP SENDING FRAMES
     loop
     {
         //EXIT ON DISABLED SCREEN
-        if !options::get_use_screen() { return; }
+        if !options::get_use_screen()
+        {
+            running.store(false, Ordering::Relaxed);
+            return;
+        }
 
         crossbeam_channel::select!
         {
@@ -164,7 +169,11 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
         while running_net.load(Ordering::Relaxed)
         {
             //EXIT ON DISABLED ATTACH
-            if !options::get_attach_screen() { return; }
+            if !options::get_attach_screen()
+            {
+                running_net.store(false, Ordering::Relaxed);
+                return;
+            }
 
             let read = match screen::receive_frame(&mut streams, chat_options::get_keys().as_ref(), &mut seq)
             {
