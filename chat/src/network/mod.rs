@@ -245,8 +245,10 @@ pub fn send_tcp //SEND packet TO stream
     transmission_packet.append(&mut final_bytes);
 
     //SEND
-    stream.write_all(&transmission_packet).ok();
-    stream.flush().expect("Flushing stream failed");
+    if stream.write_all(&transmission_packet).is_ok()
+    {
+        stream.flush().ok();
+    }
 }
 
 pub fn read_tcp

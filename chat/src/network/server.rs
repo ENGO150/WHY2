@@ -20,6 +20,7 @@ use std::
 {
     fs,
     env,
+    thread,
     path::PathBuf,
     time::{ Instant, Duration },
     collections::{ HashSet, HashMap },
@@ -637,7 +638,17 @@ pub fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
 
     for ref entry in entries
     {
-        network::send(&mut entry.write_stream().lock().unwrap(), packet.clone(), entry.keys());
+        let write_stream = entry.write_stream().clone();
+        let packet = packet.clone();
+        let keys = entry.keys().cloned();
+
+        thread::spawn(move ||
+        {
+            if let Ok(mut stream) = write_stream.lock()
+            {
+                network::send(&mut stream, packet, keys.as_ref());
+            }
+        });
     }
 }
 
