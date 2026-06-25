@@ -77,7 +77,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
     mut stream: TcpStream,
     uid: u64,
     keys: Option<&SharedKeys>,
-    #[cfg(feature = "server")] seq: &mut usize,
+    mut seq: Option<&mut usize>,
 )
 {
     let mut file = File::open(path).expect("Cannot open file for upload");
@@ -97,7 +97,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
                     uid,
                     data: Some(buffer[..bytes].to_vec()),
                     ..Default::default()
-                }, keys, #[cfg(feature = "server")] Some(seq));
+                }, keys, seq.as_deref_mut());
             },
             Err(_) => {}, //TODO: Implement
         }

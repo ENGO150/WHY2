@@ -58,7 +58,7 @@ pub fn send_frame //SEND frame TO stream
     stream: &mut TcpStream,
     packet: ScreenPacket,
     keys: Option<&SharedKeys>,
-    #[cfg(feature = "server")] seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
+    seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
 )
 {
     network::send_tcp
@@ -66,7 +66,7 @@ pub fn send_frame //SEND frame TO stream
         stream,
         packet,
         keys,
-        #[cfg(feature = "server")] seq,
+        seq,
     );
 }
 

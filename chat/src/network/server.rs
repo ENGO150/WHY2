@@ -542,7 +542,7 @@ fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
             {
                 code: Some(MessageCode::Rekey),
                 ..Default::default()
-            }, Some(current_keys), None);
+            }, Some(current_keys));
 
             //SEND ENCRYPTED PUBKEYS TO CLIENT
             network::send(&mut write, MessagePacket
@@ -550,7 +550,7 @@ fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
                 text: Some(payload),
                 code: Some(MessageCode::KeyExchange),
                 ..Default::default()
-            }, Some(current_keys), None);
+            }, Some(current_keys));
         } else
         {
             //SEND OBFUSCATED PUBKEYS TO CLIENT
@@ -559,7 +559,7 @@ fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
                 text: Some(payload),
                 code: Some(MessageCode::KeyExchange),
                 ..Default::default()
-            }, None, None);
+            }, None);
         }
     }
 
@@ -637,7 +637,7 @@ pub fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
 
     for ref entry in entries
     {
-        network::send(&mut entry.write_stream().lock().unwrap(), packet.clone(), entry.keys(), None);
+        network::send(&mut entry.write_stream().lock().unwrap(), packet.clone(), entry.keys());
     }
 }
 
@@ -910,7 +910,7 @@ fn send_voice_clients(stream: &mut TcpStream, keys: &SharedKeys, id: usize)
         text: Some(json!(clients).to_string()),
         code: Some(MessageCode::VoiceClients),
         ..Default::default()
-    }, Some(keys), None);
+    }, Some(keys));
 }
 
 fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW TOKEN
@@ -950,7 +950,7 @@ fn deattach(sharer_id: usize) //DEATTACH ALL ATTACHED CLIENTS
                 code: Some(MessageCode::Deattach),
                 username: sharer_uname.clone(),
                 ..Default::default()
-            }, keys.as_ref(), None);
+            }, keys.as_ref());
         }
     }
 }
@@ -969,7 +969,7 @@ pub fn send_code //SEND CODE TO CLIENT
         text: text,
         code: Some(code),
         ..Default::default()
-    }, keys, None);
+    }, keys);
 }
 
 pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_key: [u8; 32]) //CLIENT -> SERVER COMMUNICATION
@@ -1301,7 +1301,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
                         code: Some(MessageCode::List),
                         ..Default::default()
-                    }, Some(&keys), None);
+                    }, Some(&keys));
                 },
 
                 //NEW FILE UPLOAD
@@ -1331,7 +1331,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             token: Some(token),
                             text: Some(format!("{} {}", text, uid)),
                             ..Default::default()
-                        }, Some(&keys), None);
+                        }, Some(&keys));
                     } else
                     {
                         //LOG FILE REJECT
@@ -1371,7 +1371,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             token: Some(token),
                             text: Some(uid.to_string()),
                             ..Default::default()
-                        }, Some(&keys), None);
+                        }, Some(&keys));
 
                         //LOG START
                         log::info!("Download request: {peer_addr}");
@@ -1396,7 +1396,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         {
                             code: Some(MessageCode::Screen),
                             ..Default::default()
-                        }, Some(&keys), None);
+                        }, Some(&keys));
                         continue;
                     }
 
@@ -1409,7 +1409,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             code: Some(MessageCode::Screen),
                             token: Some(open_connection(id, ConnectionType::Screen)),
                             ..Default::default()
-                        }, Some(&keys), None);
+                        }, Some(&keys));
 
                         //LOG START
                         log::info!("Screen share: {peer_addr}");
@@ -1450,7 +1450,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             username: Some(sharer_username),
                             token: Some(token),
                             ..Default::default()
-                        }, Some(&keys), None);
+                        }, Some(&keys));
 
                         //LOG START
                         log::info!("Screen attach: {peer_addr}");
@@ -1485,7 +1485,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             code: Some(MessageCode::Deattach),
                             username: sharer_uname,
                             ..Default::default()
-                        }, Some(&keys), None);
+                        }, Some(&keys));
                     } else
                     {
                         //NOT ATTACHED
@@ -1531,7 +1531,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         text: Some(json!(grouped_files).to_string()),
                         code: Some(MessageCode::Files),
                         ..Default::default()
-                    }, Some(&keys), None);
+                    }, Some(&keys));
                 },
 
                 //LIST SCREENSHARES
@@ -1556,7 +1556,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
                         code: Some(MessageCode::Screens),
                         ..Default::default()
-                    }, Some(&keys), None);
+                    }, Some(&keys));
                 },
 
                 //PRIVATE MESSAGE
@@ -1600,7 +1600,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                                     code: Some(MessageCode::PrivateMessage),
 
                                     ..Default::default()
-                                }, recipient_keys.as_ref(), None);
+                                }, recipient_keys.as_ref());
                             }
                         }
 
@@ -1613,7 +1613,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                             code: Some(MessageCode::PrivateMessageBack),
 
                             ..Default::default()
-                        }, Some(&keys), None);
+                        }, Some(&keys));
                     } else
                     {
                         //INVALID PM FORMAT
@@ -1719,7 +1719,7 @@ pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
             {
                 code: Some(MessageCode::KeepAlive),
                 ..Default::default()
-            }, keys.as_ref(), None);
+            }, keys.as_ref());
         }
     }
 

@@ -93,6 +93,9 @@ pub fn screen(token: [u8; 32])
     thread::spawn(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
     thread::spawn(move || audio::spawn_audio_capture(audio_tx, running_audio));
 
+    //LOCAL SEQ COUNTER
+    let mut seq = 0usize;
+
     //LOOP SENDING FRAMES
     loop
     {
@@ -119,7 +122,7 @@ pub fn screen(token: [u8; 32])
                     frame: Some(compressed_frame),
                     audio: None,
                     ..Default::default()
-                }, chat_options::get_keys().as_ref());
+                }, chat_options::get_keys().as_ref(), Some(&mut seq));
             },
 
             //AUDIO FRAME
@@ -136,7 +139,7 @@ pub fn screen(token: [u8; 32])
                     frame: None,
                     audio: Some(audio_frame.data),
                     ..Default::default()
-                }, chat_options::get_keys().as_ref());
+                }, chat_options::get_keys().as_ref(), Some(&mut seq));
             }
         }
     }

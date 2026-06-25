@@ -326,7 +326,7 @@ pub fn upload(id: usize, mut stream: TcpStream, file: AvailableFile, uid: u64)
     }, Some(&keys), Some(&mut seq));
 
     //START UPLOAD
-    file::send_file(file.path, stream, uid, Some(&keys), &mut seq);
+    file::send_file(file.path, stream, uid, Some(&keys), Some(&mut seq));
 
     //LOG END
     log::info!("Download done: {peer_addr}");

@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     net::TcpStream,
+    collections::HashMap,
     sync::{ Arc, Mutex },
 };
 
@@ -88,6 +89,7 @@ pub fn screen(id: usize, streams: &mut Streams)
 
     //LOCAL SEQ
     let mut seq = 0usize;
+    let mut viewer_seqs = HashMap::<usize, usize>::new();
 
     //LOOP READING
     loop
@@ -100,7 +102,7 @@ pub fn screen(id: usize, streams: &mut Streams)
         };
 
         //COLLECT ALL ATTACHED CLIENT STREAMS
-        let entries: Vec<(Arc<TcpStream>, Option<SharedKeys>)> = server::CONNECTIONS.iter().filter_map(|entry|
+        let entries: Vec<(usize, Arc<TcpStream>, Option<SharedKeys>)> = server::CONNECTIONS.iter().filter_map(|entry|
         {
             match entry.value()
             {
@@ -116,7 +118,7 @@ pub fn screen(id: usize, streams: &mut Streams)
                         }
 
                         //FOUND, COLLECT
-                        Some((attached_screen.stream.clone(), entry.value().keys().cloned()))
+                        Some((*client_id, attached_screen.stream.clone(), entry.value().keys().cloned()))
                     } else { None }
                 },
                 _ => None,
@@ -124,11 +126,12 @@ pub fn screen(id: usize, streams: &mut Streams)
         }).collect();
 
         //FORWARD PACKET
-        for ref mut entry in entries
+        for (client_id, stream, keys) in entries
         {
-            if let Ok(mut stream) = entry.0.try_clone()
+            if let Ok(mut cloned_stream) = stream.try_clone()
             {
-                screen::send_frame(&mut stream, read.clone(), entry.1.as_ref(), None);
+                let viewer_seq = viewer_seqs.entry(client_id).or_insert(0);
+                screen::send_frame(&mut cloned_stream, read.clone(), keys.as_ref(), Some(viewer_seq));
             }
         }
     }

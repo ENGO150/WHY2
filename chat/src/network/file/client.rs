@@ -62,6 +62,9 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
     tx.send(ClientEvent::Upload(filename.clone())).unwrap();
     tx.send(ClientEvent::Prompt).unwrap();
 
+    //LOCAL SEQ COUNTER
+    let mut seq = 0usize;
+
     //SEND FIRST PACKET (METADATA)
     network::send_tcp(&mut stream, FilePacket
     {
@@ -70,10 +73,10 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
         filename: Some(filename),
         hash: Some(file_hash),
         ..Default::default()
-    }, options::get_keys().as_ref());
+    }, options::get_keys().as_ref(), Some(&mut seq));
 
     //UPLOAD
-    file::send_file(path, stream, uid, options::get_keys().as_ref());
+    file::send_file(path, stream, uid, options::get_keys().as_ref(), Some(&mut seq));
 }
 
 pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
@@ -88,6 +91,7 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
     let mut streams = (&mut stream, write_stream);
 
+    //LOCAL SEQ COUNTER
     let mut seq = 0usize;
 
     //RECEIVE FIRST PACKET (METADATA)

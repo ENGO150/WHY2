@@ -164,14 +164,25 @@ pub fn send_tcp //SEND packet TO stream
     stream: &mut TcpStream,
     mut packet: impl SequencedPacket,
     keys: Option<&chat_consts::SharedKeys>,
-    #[cfg(feature = "server")] seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
+    seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
 )
 {
     //ADD SEQUENCE NUMBER TO packet (FROM CLIENT)
     #[cfg(feature = "client")]
     {
-        packet.set_seq(options::get_seq() + 1);
-        options::set_seq(packet.seq());
+        match seq
+        {
+            Some(local_seq) =>
+            {
+                *local_seq += 1;
+                packet.set_seq(*local_seq);
+            },
+            None =>
+            {
+                packet.set_seq(options::get_seq() + 1);
+                options::set_seq(packet.seq());
+            }
+        }
     }
 
     //ADD SEQUENCE NUMBER TO packet (FROM SERVER)
@@ -350,7 +361,6 @@ pub fn send //SEND packet TO stream
     stream: &mut TcpStream,
     packet: MessagePacket,
     keys: Option<&chat_consts::SharedKeys>,
-    #[cfg(feature = "server")] seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
 )
 {
     send_tcp
@@ -358,7 +368,7 @@ pub fn send //SEND packet TO stream
         stream,
         packet,
         keys,
-        #[cfg(feature = "server")] seq,
+        None,
     );
 }
 
