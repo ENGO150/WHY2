@@ -155,8 +155,9 @@ fn main()
                     Err(_) => continue
                 };
 
-                //SET TIMEOUT
-                stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout"); //SET TIMEOUT
+                //SET TIMEOUTS
+                stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
+                stream.set_write_timeout(Some(Duration::from_millis(5000))).expect("Failed to set write timeout");
 
                 //READ TOKEN
                 let mut token = [0u8; 32];
