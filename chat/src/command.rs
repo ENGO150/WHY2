@@ -37,24 +37,24 @@ use crate::
 #[derive(Clone, PartialEq)]
 pub enum Command
 {
-    Exit,           //DISCONNECT FROM SERVER
-    Voice,          //ENABLE VOICE CHAT
-    Mute,           //TOGGLE-MUTE USER/YOURSELF
-    Channel,        //SWITCH CHANNEL
-    Help,           //PRINT COMMANDS
-    Info,           //COMMAND INFO
-    List,           //LIST USERS
-    Files,          //LIST FILES
-    Screens,        //LIST SCREENSHARES
-    Upload,         //UPLOAD FILE TO SERVER
-    Download,       //DOWNLOAD FILE FROM SERVER
-    Screen,         //TOGGLE SCREEN SHARING
-    Attach,         //ATTACH SCREEN SHARE
-    Deattach,       //DEATTACH SCREEN SHARE
-    PrivateMessage, //ONE TO ONE MESSAGE
-    UsernameColor,  //SET COLOR OF USERNAME
-    MessageColor,   //SET COLOR OF MESSAGE
-    Invalid,        //INVALID COMMAND
+    Exit,                                       //DISCONNECT FROM SERVER
+    #[cfg(feature = "client_voice")] Voice,     //ENABLE VOICE CHAT
+    #[cfg(feature = "client_voice")] Mute,      //TOGGLE-MUTE USER/YOURSELF
+    Channel,                                    //SWITCH CHANNEL
+    Help,                                       //PRINT COMMANDS
+    Info,                                       //COMMAND INFO
+    List,                                       //LIST USERS
+    Files,                                      //LIST FILES
+    #[cfg(feature = "client_screen")] Screens,  //LIST SCREENSHARES
+    Upload,                                     //UPLOAD FILE TO SERVER
+    Download,                                   //DOWNLOAD FILE FROM SERVER
+    #[cfg(feature = "client_screen")] Screen,   //TOGGLE SCREEN SHARING
+    #[cfg(feature = "client_screen")] Attach,   //ATTACH SCREEN SHARE
+    #[cfg(feature = "client_screen")] Deattach, //DEATTACH SCREEN SHARE
+    PrivateMessage,                             //ONE TO ONE MESSAGE
+    UsernameColor,                              //SET COLOR OF USERNAME
+    MessageColor,                               //SET COLOR OF MESSAGE
+    Invalid,                                    //INVALID COMMAND
 }
 
 //STRUCTS
@@ -93,6 +93,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         description: "Shows command info",
     },
 
+    #[cfg(feature = "client_voice")]
     CommandInfo
     {
         command: Command::Voice,
@@ -102,6 +103,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         description: "Toggles voice chat",
     },
 
+    #[cfg(feature = "client_voice")]
     CommandInfo
     {
         command: Command::Mute,
@@ -142,6 +144,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         description: "Downloads file from server",
     },
 
+    #[cfg(feature = "client_screen")]
     CommandInfo
     {
         command: Command::Screen,
@@ -151,6 +154,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         description: "Toggles screensharing",
     },
 
+    #[cfg(feature = "client_screen")]
     CommandInfo
     {
         command: Command::Attach,
@@ -160,6 +164,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         description: "Attaches client screenshare.",
     },
 
+    #[cfg(feature = "client_screen")]
     CommandInfo
     {
         command: Command::Deattach,
@@ -187,6 +192,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         description: "Shows available files and their IDs",
     },
 
+    #[cfg(feature = "client_screen")]
     CommandInfo
     {
         command: Command::Screens,
@@ -249,17 +255,17 @@ impl Command
         match self
         {
             Command::Exit => Some(MessageCode::Disconnect),
-            Command::Voice => Some(MessageCode::Voice),
+            #[cfg(feature = "client_voice")] Command::Voice => Some(MessageCode::Voice),
             Command::Channel => Some(MessageCode::Channel),
             Command::List => Some(MessageCode::List),
             Command::PrivateMessage => Some(MessageCode::PrivateMessage),
             Command::Upload => Some(MessageCode::Upload),
             Command::Download => Some(MessageCode::Download),
-            Command::Screen => Some(MessageCode::Screen),
-            Command::Attach => Some(MessageCode::Attach),
-            Command::Deattach => Some(MessageCode::Deattach),
+            #[cfg(feature = "client_screen")] Command::Screen => Some(MessageCode::Screen),
+            #[cfg(feature = "client_screen")] Command::Attach => Some(MessageCode::Attach),
+            #[cfg(feature = "client_screen")] Command::Deattach => Some(MessageCode::Deattach),
             Command::Files => Some(MessageCode::Files),
-            Command::Screens => Some(MessageCode::Screens),
+            #[cfg(feature = "client_screen")] Command::Screens => Some(MessageCode::Screens),
 
             _ => None,
         }
