@@ -29,14 +29,14 @@ use toml_edit::{ DocumentMut, Value };
 
 use crate::{ consts, misc };
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 use std::fmt::Write;
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 use crate::crypto;
 
 //ENUMS
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub enum TofuCode //POSSIBLE KEY VERIFICATION RESULTS
 {
     Valid, //KEY MATCHES LOCAL CONFIG
@@ -53,7 +53,7 @@ fn config_path(filename: &str) -> String //GET CONFIGURATION PATH
 fn get_config() -> &'static str //GET CONFIG FROM BINARY
 {
     //TODO: FIGURE OUT A BETTER WAY TO USE CONSTANTS
-    #[cfg(feature = "client")]
+    #[cfg(feature = "client_base")]
     {
         include_str!("./client.toml")
     }
@@ -142,7 +142,7 @@ pub fn init_config() //INITIALIZE CONFIG FILES
     {
         let filename =
         {
-            #[cfg(feature = "client")]
+            #[cfg(feature = "client_base")]
             {
                 consts::CLIENT_CONFIG
             }
@@ -165,7 +165,7 @@ pub fn init_config() //INITIALIZE CONFIG FILES
 
     let runtime_path =
     {
-        #[cfg(feature = "client")]
+        #[cfg(feature = "client_base")]
         {
             config_path(consts::SERVER_KEYS_CONFIG)
         }
@@ -187,7 +187,7 @@ pub fn read_config<T: FromStr>(key: &str) -> T //RETURN key FROM TOML CONFIG
 where
     T::Err: Debug,
 {
-    #[cfg(feature = "client")]
+    #[cfg(feature = "client_base")]
     {
         config_read(consts::CLIENT_CONFIG, key)
     }
@@ -204,7 +204,7 @@ pub fn server_users_config(key: &str) -> String //RETURN key FROM server_users.t
     config_read(consts::SERVER_USERS_CONFIG, key)
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn client_write(key: &str, value: &str) //WRITE TO client.toml
 {
     config_write(consts::CLIENT_CONFIG, key, value);
@@ -222,7 +222,7 @@ pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml con
     get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(key).is_some()
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VALIDITY (TOFU)
 {
     //HASH PUBKEY
@@ -251,7 +251,7 @@ pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VA
     TofuCode::Unknown(pubkey_string, host.to_string())
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn server_keys_save(host: &str, pubkey_hash: &str) //SAVE KEY
 {
     //WRITE

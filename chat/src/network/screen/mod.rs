@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //MODULES
 pub mod consts;
 
-#[cfg(feature = "client")]
+#[cfg(all(feature = "client_base"))]
 pub mod client;
 
 #[cfg(feature = "server")]

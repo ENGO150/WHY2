@@ -32,10 +32,10 @@ use semver::Version;
 
 use crate::consts;
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 use std::sync::mpsc::Sender;
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 use crate::network::client::ClientEvent;
 
 #[cfg(feature = "server")]
@@ -74,7 +74,7 @@ pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
         .read_to_string()
 }
 
-pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHECK FOR LATEST WHY2 VERSION
+pub fn check_version(#[cfg(feature = "client_base")] tx: &Sender<ClientEvent>) //CHECK FOR LATEST WHY2 VERSION
 {
     //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
     let metadata_raw = match fetch_data(consts::METADATA_URL)
@@ -82,7 +82,7 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
         Ok(m) => m,
         Err(_) =>
         {
-            #[cfg(feature = "client")]
+            #[cfg(feature = "client_base")]
             {
                 tx.send(ClientEvent::VersionFailed).unwrap();
             }
@@ -123,7 +123,7 @@ pub fn check_version(#[cfg(feature = "client")] tx: &Sender<ClientEvent>) //CHEC
             }
         }
 
-        #[cfg(feature = "client")]
+        #[cfg(feature = "client_base")]
         {
             tx.send(ClientEvent::UnsafeVersion(newer_versions, current_version, newest_version.to_owned())).unwrap();
         }

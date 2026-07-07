@@ -35,7 +35,7 @@ doc = false
 [[bin]]
 name = "why2"
 path = "src/bin/client/mod.rs"
-required-features = ["client"]
+required-features = ["client_base"]
 doc = false
 
 [[bin]]
@@ -104,23 +104,36 @@ chat = [
     "dep:rand",
 ]
 
-client = [
+client_base = [
     "chat",
     "dep:socks",
     "dep:crossterm",
     "dep:colored",
+]
+
+client_voice = [
     "dep:cpal",
     "dep:ringbuf",
     "dep:audiopus",
     "dep:gag",
     "dep:nnnoiseless",
     "dep:lewton",
+]
+
+client_screen = [
+    "client_voice",
     "dep:crossbeam-channel",
     "dep:winit",
     "dep:libwayshot",
     "dep:xcap",
     "dep:pixels",
     "dep:openh264",
+]
+
+client = [
+    "client_base",
+    "client_voice",
+    "client_screen",
 ]
 
 server = [

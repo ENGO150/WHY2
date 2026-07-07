@@ -59,17 +59,21 @@ use crate::
         MessageCode,
         MessagePacket,
         file::client as file,
-        voice::client::
-        {
-            self as voice_client,
-            options as voice_options,
-        },
-        screen::client::
-        {
-            self as screen,
-            options as screen_options,
-        },
     },
+};
+
+#[cfg(feature = "client_voice")]
+use crate::network::voice::client::
+{
+    self as voice_client,
+    options as voice_options,
+};
+
+#[cfg(feature = "client_screen")]
+use crate::network::screen::client::
+{
+    self as screen,
+    options as screen_options,
 };
 
 //STRUCTS
@@ -256,7 +260,9 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
     let mut extra_space: bool;
 
     //CONNECTION PROPERTIES
+    #[cfg(feature = "client_voice")]
     let mut id = 0usize; //ID SET BY SERVER
+    #[cfg(feature = "client_voice")]
     let mut username: Option<String> = None;
 
     //LOOP READING
@@ -273,6 +279,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
         };
 
         //CHECK FOR MUTED CLIENT
+        #[cfg(feature = "client_voice")]
         if read.id.is_some() && options::is_muted(read.id) { continue; }
 
         //KEEPALIVE
@@ -401,7 +408,10 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     tx.send(ClientEvent::Authenticated).unwrap();
 
                     //SET SERVER-SIDE ID
-                    id = read.text.unwrap_or_else(|| "0".to_string()).parse().unwrap();
+                    #[cfg(feature = "client_voice")]
+                    {
+                        id = read.text.unwrap_or_else(|| "0".to_string()).parse().unwrap();
+                    }
 
                     //ALLOW MESSAGE HISTORY & COMMANDS
                     options::set_sending_messages(true);
@@ -417,8 +427,12 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     if first_message
                     {
                         tx.send(ClientEvent::ExtraSpace).unwrap();
-                        username = Some(user.clone());
                         first_message = false;
+
+                        #[cfg(feature = "client_voice")]
+                        {
+                            username = Some(user.clone());
+                        }
                     }
 
                     tx.send(ClientEvent::Join(user)).unwrap();
@@ -428,6 +442,8 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 MessageCode::Leave =>
                 {
                     tx.send(ClientEvent::Leave(read.text.unwrap())).unwrap();
+
+                    #[cfg(feature = "client_voice")]
                     voice_client::remove_consumer(&read.id.unwrap());
                 },
 
@@ -435,6 +451,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 MessageCode::Channel =>
                 {
                     //REMOVE ALL STORED VOICE CLIENTS
+                    #[cfg(feature = "client_voice")]
                     voice_client::remove_all_consumers();
 
                     options::set_channel(read.text.unwrap_or_else(|| String::new()));
@@ -443,6 +460,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 },
 
                 //SERVER ALLOWED VOICE
+                #[cfg(feature = "client_voice")]
                 MessageCode::Voice =>
                 {
                     if options::socks5_enabled()
@@ -466,6 +484,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 },
 
                 //VOICE CLIENTS
+                #[cfg(feature = "client_voice")]
                 MessageCode::VoiceClients =>
                 {
                     //PARSE JSON
@@ -479,6 +498,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 }
 
                 //CLIENT JOINED VOICE CHANNEL
+                #[cfg(feature = "client_voice")]
                 MessageCode::ChannelJoin =>
                 {
                     let joined_id = read.id.unwrap();
@@ -489,6 +509,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 },
 
                 //CLIENT LEFT VOICE CHANNEL
+                #[cfg(feature = "client_voice")]
                 MessageCode::ChannelLeave =>
                 {
                     voice_client::remove_consumer(&read.id.unwrap());
@@ -579,6 +600,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 },
 
                 //SCREEN UPLOAD APPROVAL
+                #[cfg(feature = "client_screen")]
                 MessageCode::Screen =>
                 {
                     tx.send(if screen_options::swap_use_screen()
@@ -593,6 +615,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 },
 
                 //SCREENSHARE ATTACH
+                #[cfg(feature = "client_screen")]
                 MessageCode::Attach =>
                 {
                     //ENABLE ATTACH
@@ -605,6 +628,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                 },
 
                 //SCREENSHARE DEATTACH
+                #[cfg(feature = "client_screen")]
                 MessageCode::Deattach =>
                 {
                     //DISABLE ATTACH

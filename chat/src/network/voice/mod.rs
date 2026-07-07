@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //MODULES
 pub mod consts;
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub mod client;
 
 #[cfg(feature = "server")]
@@ -39,7 +39,7 @@ use crate::
     consts::SharedKeys,
 };
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 use crate::network::voice::client::options;
 
 #[cfg(not(feature = "server"))]
@@ -85,7 +85,7 @@ pub fn send //SEND DATA TO UDP
     }
 
     //SET SEQ
-    #[cfg(feature = "client")]
+    #[cfg(feature = "client_base")]
     {
         packet.seq = options::get_seq() + 1;
         options::set_seq(packet.seq);
@@ -104,7 +104,7 @@ pub fn send //SEND DATA TO UDP
     encrypted_bytes = crypto::encrypt_packet::< { consts::GRID_WIDTH }, { consts::GRID_HEIGHT } >(packet_bytes, keys);
 
     //PREPEND ID TO PACKET
-    #[cfg(feature = "client")]
+    #[cfg(feature = "client_base")]
     {
         let id_be_bytes = packet.id.unwrap().to_be_bytes();
         encrypted_bytes.splice(0..0, id_be_bytes);
@@ -121,14 +121,13 @@ pub fn send //SEND DATA TO UDP
     }
 }
 
-
 pub fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //RECEIVE UDP PACKET & DECODE
 {
     let mut buffer = [0u8; 2048];
     loop //BLOCK READING UNTIL PACKET ARRIVES
     {
         //CHECK FOR VOICE DISABLE
-        #[cfg(feature = "client")]
+        #[cfg(feature = "client_base")]
         if !options::get_use_voice() { break None; }
 
         let (len, addr) = match socket.recv_from(&mut buffer)

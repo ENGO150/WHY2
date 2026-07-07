@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 //MODULES
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub mod client;
 
 #[cfg(feature = "server")]

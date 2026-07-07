@@ -20,11 +20,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #[cfg(feature = "server")]
 pub mod server;
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub mod client;
 
 pub mod file;
+
+#[cfg(any(feature = "server", feature = "client_screen"))]
 pub mod screen;
+
+#[cfg(any(feature = "server", feature = "client_voice"))]
 pub mod voice;
 
 use std::
@@ -52,7 +56,7 @@ use crate::
     },
 };
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 use crate::options;
 
 #[cfg(feature = "server")]
@@ -168,7 +172,7 @@ pub fn send_tcp //SEND packet TO stream
 )
 {
     //ADD SEQUENCE NUMBER TO packet (FROM CLIENT)
-    #[cfg(feature = "client")]
+    #[cfg(feature = "client_base")]
     {
         match seq
         {
@@ -229,7 +233,7 @@ pub fn send_tcp //SEND packet TO stream
                     .unwrap_or_else(|| [0u8; 32])
             }
 
-            #[cfg(feature = "client")]
+            #[cfg(feature = "client_base")]
             {
                 options::get_obfuscation_key()
             }
@@ -340,7 +344,7 @@ pub fn read_tcp
                     .unwrap_or_else(|| [0u8; 32])
             }
 
-            #[cfg(feature = "client")]
+            #[cfg(feature = "client_base")]
             {
                 options::get_obfuscation_key()
             }
@@ -469,7 +473,7 @@ pub fn receive
             }
 
             //VERIFY SEQUENCE NUMBER
-            #[cfg(feature = "client")] //ON CLIENT
+            #[cfg(feature = "client_base")] //ON CLIENT
             {
                 let used_seq = match seq
                 {

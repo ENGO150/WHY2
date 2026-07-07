@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#![cfg(feature = "client")]
+#![cfg(feature = "client_base")]
 
 //MODULES
 pub mod colors;
@@ -60,8 +60,6 @@ use crossterm::
 
 use colored::Color;
 
-use winit::event_loop::EventLoop;
-
 use why2_chat::
 {
     config,
@@ -78,15 +76,22 @@ use why2_chat::
         self,
         MessagePacket,
         MessageColors,
-        voice::client::device,
         client::{ self, ClientEvent },
-        screen::client::
-        {
-            self as screen,
-            UserEvent,
-            display::ScreenShareApp,
-        },
     },
+};
+
+#[cfg(feature = "client_screen")]
+use winit::event_loop::EventLoop;
+
+#[cfg(feature = "client_voice")]
+use why2_chat::network::voice::client::device;
+
+#[cfg(feature = "client_screen")]
+use why2_chat::network::screen::client::
+{
+    self as screen,
+    UserEvent,
+    display::ScreenShareApp,
 };
 
 //STRUCTS
@@ -141,6 +146,7 @@ fn invalid_usage(subject: Option<&str>) //PRINT 'INVALID' MESSAGE
     println!("Invalid {}! Press Ctrl+H for help.\n", subject.unwrap_or("usage"))
 }
 
+#[cfg(feature = "client_voice")]
 fn mute(parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
 {
     ui::clear_lines(2);
@@ -468,6 +474,7 @@ fn main()
             println!("Key saved.");
         } else if arg == "--audio-setup" && env::args().len() == 2
         {
+            #[cfg(feature = "client_voice")]
             device::setup_devices();
         } else if arg == "--help" && env::args().len() == 2
         {
@@ -490,16 +497,24 @@ fn main()
 
     println!("Welcome.\n");
 
-    let event_loop = EventLoop::<UserEvent>::with_user_event()
-        .build().expect("Failed to create event loop");
-
-    screen::SCREEN_SHARE_PROXY.set(event_loop.create_proxy()).ok();
 
     //RUN REST OF CLIENT IN NEW THREAD
+    #[cfg(feature = "client_screen")]
     thread::spawn(move || run_client(tx));
 
-    let mut app = ScreenShareApp::new();
-    event_loop.run_app(&mut app).expect("Event loop terminated with error");
+    #[cfg(not(feature = "client_screen"))]
+    run_client(tx);
+
+    #[cfg(feature = "client_screen")]
+    {
+        let event_loop = EventLoop::<UserEvent>::with_user_event()
+            .build().expect("Failed to create event loop");
+
+        screen::SCREEN_SHARE_PROXY.set(event_loop.create_proxy()).ok();
+
+        let mut app = ScreenShareApp::new();
+        event_loop.run_app(&mut app).expect("Event loop terminated with error");
+    }
 }
 
 fn run_client(tx: Sender<ClientEvent>)
@@ -751,6 +766,7 @@ fn run_client(tx: Sender<ClientEvent>)
                             color_handler("message_color", parameters);
                         },
 
+                        #[cfg(feature = "client_voice")]
                         Command::Mute =>
                         {
                             mute(parameters);

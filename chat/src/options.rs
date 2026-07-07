@@ -22,10 +22,9 @@ use std::sync::
     atomic::{ AtomicBool, Ordering },
 };
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 use std::
 {
-    collections::HashSet,
     sync::
     {
         Arc,
@@ -36,7 +35,10 @@ use std::
     },
 };
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_voice")]
+use std::collections::HashSet;
+
+#[cfg(feature = "client_base")]
 use crate::consts::SharedKeys;
 
 //SETTINGS
@@ -45,48 +47,48 @@ static SERVER_USERNAME: OnceLock<String> = OnceLock::new();
 #[cfg(feature = "server")]
 static VOICE_CHAT: AtomicBool = AtomicBool::new(false);
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 static KEYS: LazyLock<RwLock<Option<SharedKeys>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
 {
     RwLock::new(None)
 });
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING PASSWORD (DISABLE ECHO)
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 static EXTRA_SPACE: AtomicBool = AtomicBool::new(false); //CLIENT DISPLAYED SOME MENU (/help ETC.), ADD EXTRA SPACE ON NEXT MESSAGE
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 static SENDING_MESSAGES: AtomicBool = AtomicBool::new(false); //SENDING MESSAGES BOOL (CONDITION FOR ADDING MESSAGES TO HISTORY)
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub static INPUT_READ: LazyLock<Arc<Mutex<Vec<char>>>> = LazyLock::new(|| //INPUT READ FROM CLIENT
 {
     Arc::new(Mutex::new(Vec::new()))
 });
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT -> SERVER)
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (SERVER -> CLIENT)
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 static SERVER_ADDRESS: OnceLock<String> = OnceLock::new();
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 static OBFUSCATION_KEY: OnceLock<[u8; 32]> = OnceLock::new();
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 static CHANNEL: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String::new())); //ACTIVE CHANNEL
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_voice")]
 static MUTE: AtomicBool = AtomicBool::new(false); //MUTE LOCAL CLIENT
-#[cfg(feature = "client")]
+#[cfg(feature = "client_voice")]
 static MUTED: LazyLock<Mutex<HashSet<usize>>> = LazyLock::new(|| Mutex::new(HashSet::new())); //MUTED CLIENTS
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 static SOCKS5: AtomicBool = AtomicBool::new(false); //USE SOCKS5 (TOR)
 
 //FUNCTIONS
@@ -115,14 +117,14 @@ pub fn voice_chat_enabled() -> bool //GET VOICE CHAT
 }
 
 //SHARED KEYS
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn set_keys(keys: SharedKeys) //SET KEY
 {
     let mut shared_key = KEYS.write().unwrap();
     *shared_key = Some(keys);
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn get_keys() -> Option<SharedKeys> //RETURN KEY
 {
     let shared_key = KEYS.read().unwrap();
@@ -130,109 +132,109 @@ pub fn get_keys() -> Option<SharedKeys> //RETURN KEY
 }
 
 //ASKING PASSWORD
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn set_asking_password(value: bool) //SET ASKING_PASSWORD
 {
     ASKING_PASSWORD.store(value, Ordering::Relaxed);
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn get_asking_password() -> bool //GET ASKING_PASSWORD
 {
     ASKING_PASSWORD.load(Ordering::Relaxed)
 }
 
 //ADD EXTRA SPACE
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn set_extra_space(value: bool) //SET EXTRA_SPACE
 {
     EXTRA_SPACE.store(value, Ordering::Relaxed);
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn get_extra_space() -> bool //GET EXTRA_SPACE
 {
     EXTRA_SPACE.load(Ordering::Relaxed)
 }
 
 //SENDING MESSAGES
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn get_sending_messages() -> bool //GET SENDING_MESSAGES
 {
     SENDING_MESSAGES.load(Ordering::Relaxed)
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn set_sending_messages(value: bool) //SET SENDING_MESSAGES
 {
     SENDING_MESSAGES.store(value, Ordering::Relaxed);
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn get_seq() -> usize //GET SEQUENCE NUMBER
 {
     SEQ.load(Ordering::Relaxed)
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn set_seq(value: usize) //SET SEQUENCE NUMBER
 {
     SEQ.store(value, Ordering::Relaxed)
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn get_server_seq() -> usize //GET SERVER SEQUENCE NUMBER
 {
     SERVER_SEQ.load(Ordering::Relaxed)
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn set_server_seq(value: usize) //SET SERVER SEQUENCE NUMBER
 {
     SERVER_SEQ.store(value, Ordering::Relaxed)
 }
 
 //SERVER ADDRESS
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn get_server_address() -> String //GET SERVER ADDRESS
 {
     SERVER_ADDRESS.get().unwrap().to_owned()
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn set_server_address(address: &str) //SET SERVER ADDRESS
 {
     SERVER_ADDRESS.set(address.to_owned()).unwrap();
 }
 
 //OBFUSCATION KEY
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn get_obfuscation_key() -> [u8; 32] //GET OBFUSCATION KEY
 {
     *OBFUSCATION_KEY.get().unwrap()
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn set_obfuscation_key(key: &[u8; 32]) //SET OBFUSCATION KEY
 {
     OBFUSCATION_KEY.set(*key).unwrap();
 }
 
 //CHANNEL
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn get_channel() -> String //GET CHANNEL
 {
     CHANNEL.read().unwrap().clone()
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn set_channel(channel: String) //SET CHANNEL
 {
     *CHANNEL.write().unwrap() = channel;
 }
 
 //MUTING
-#[cfg(feature = "client")]
+#[cfg(feature = "client_voice")]
 pub fn toggle_mute(id: Option<usize>) -> bool //ENABLE/DISABLE MUTE
 {
     if let Some(id) = id //MUTE CLIENT
@@ -254,7 +256,7 @@ pub fn toggle_mute(id: Option<usize>) -> bool //ENABLE/DISABLE MUTE
     }
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_voice")]
 pub fn is_muted(id: Option<usize>) -> bool //CHECK IF CLIENT IS MUTED
 {
     if let Some(id) = id
@@ -267,13 +269,13 @@ pub fn is_muted(id: Option<usize>) -> bool //CHECK IF CLIENT IS MUTED
 }
 
 //SOCKS5
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn enable_socks5() //SET SOCKS5 TO TRUE
 {
     SOCKS5.store(true, Ordering::Relaxed);
 }
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub fn socks5_enabled() -> bool //GET SOCKS5
 {
     SOCKS5.load(Ordering::Relaxed)

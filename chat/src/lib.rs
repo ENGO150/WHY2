@@ -23,5 +23,5 @@ pub mod misc;
 pub mod network;
 pub mod options;
 
-#[cfg(feature = "client")]
+#[cfg(feature = "client_base")]
 pub mod command;

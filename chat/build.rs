@@ -28,7 +28,7 @@ fn main()
     if env::var("WHY2_DEV_BYPASS").is_ok() { return; }
 
     //ENSURE CORRECT FEATURE USAGE
-    let client_feature = env::var("CARGO_FEATURE_CLIENT").is_ok();
+    let client_feature = env::var("CARGO_FEATURE_CLIENT_BASE").is_ok();
     let server_feature = env::var("CARGO_FEATURE_SERVER").is_ok();
     let chat_feature = env::var("CARGO_FEATURE_CHAT").is_ok();
 
