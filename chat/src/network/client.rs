@@ -98,6 +98,7 @@ pub enum ClientEvent
     PrivateMessageSent(String, usize, String), //SENT PM
     PrivateMessageRecv(String, usize, String), //RECEIVED PM
     TofuError(TofuCode),                       //TOFU VERIFICATION FAILED
+    TofuSkip(String),                          //TOFU VERIFICATION SKIPPED
     VoiceActivity(Vec<VoiceUser>),             //VOICE OVERLAY
     Join(String),                              //CLIENT CONNECTED
     Leave(String),                             //CLIENT DISCONNECTED
@@ -164,25 +165,31 @@ fn key_exchange
     let server_pq_pk = server_keys["pq"].as_str().expect("Parsing server PQ key failed");
 
     //VERIFY PUBKEY VALIDITY (TOFU)
-    match config::server_keys_check(&streams.0.peer_addr().unwrap().ip().to_string(), message_text)
+    if env!("WHY2_SKIP_TOFU") == "false"
     {
-        TofuCode::Valid => {},
-
-        status @ (TofuCode::Mismatch | TofuCode::Unknown(_, _)) =>
+        match config::server_keys_check(&streams.0.peer_addr().unwrap().ip().to_string(), message_text)
         {
-            //GRACEFULLY DISCONNECT FROM SERVER
-            network::send(&mut streams.1.lock().unwrap(), MessagePacket
+            TofuCode::Valid => {},
+
+            status @ (TofuCode::Mismatch | TofuCode::Unknown(_, _)) =>
             {
-                code: Some(MessageCode::Disconnect),
-                ..Default::default()
-            }, None);
+                //GRACEFULLY DISCONNECT FROM SERVER
+                network::send(&mut streams.1.lock().unwrap(), MessagePacket
+                {
+                    code: Some(MessageCode::Disconnect),
+                    ..Default::default()
+                }, None);
 
-            //PRINT SECURITY MESSAGE
-            tx.send(ClientEvent::TofuError(status)).unwrap();
+                //PRINT SECURITY MESSAGE
+                tx.send(ClientEvent::TofuError(status)).unwrap();
 
-            //EXIT
-            return false;
-        },
+                //EXIT
+                return false;
+            },
+        }
+    } else
+    {
+        tx.send(ClientEvent::TofuSkip(config::server_keys_hash(message_text))).unwrap();
     }
 
     //GENERATE EPHEMERAL ECC KEYS

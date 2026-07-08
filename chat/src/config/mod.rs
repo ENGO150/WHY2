@@ -223,7 +223,7 @@ pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml con
 }
 
 #[cfg(feature = "client_base")]
-pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VALIDITY (TOFU)
+pub fn server_keys_hash(pubkey: &str) -> String //HASH SERVER KEYS
 {
     //HASH PUBKEY
     let pubkey_hash = crypto::sha256(pubkey);
@@ -234,6 +234,14 @@ pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VA
     {
         write!(pubkey_string, "{:02x}", byte).unwrap();
     }
+
+    pubkey_string
+}
+
+#[cfg(feature = "client_base")]
+pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VALIDITY (TOFU)
+{
+    let pubkey_string = server_keys_hash(pubkey);
 
     //PEER PUBKEY STORED, CHECK VALIDITY
     if get_data(&config_path(consts::SERVER_KEYS_CONFIG)).get(host).is_some()

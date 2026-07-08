@@ -168,6 +168,18 @@ pub fn draw_event(event: ClientEvent)
             process::exit(1);
         },
 
+        ClientEvent::TofuSkip(hash) =>
+        {
+            print!
+            (
+                "\n\rSECURITY WARNING: UNKNOWN SERVER IDENTITY
+                \n\rThe server's identity key cannot be verified
+                \rdue to disabled ToFU verification. If you don't
+                \rrecognize the identity key below, disconnect immediately!
+                \r{hash}\n\n\r",
+            );
+        },
+
         ClientEvent::VoiceActivity(users) =>
         {
             //PREPARE TERMINAL

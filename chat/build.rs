@@ -67,4 +67,8 @@ fn main()
     println!("cargo:rustc-env=WHY2_GIT_HASH={git_hash}");
     println!("cargo:rerun-if-changed=../.git/HEAD");
     println!("cargo:rerun-if-changed=../.git/index");
+
+    //TOFU SKIP (ON LIVE SYSTEM)
+    println!("cargo:rustc-env=WHY2_SKIP_TOFU={}", env::var("WHY2_SKIP_TOFU").is_ok());
+    println!("cargo::rerun-if-env-changed=WHY2_SKIP_TOFU");
 }
