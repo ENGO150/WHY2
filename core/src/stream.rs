@@ -47,7 +47,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! number of processed [`Grid`] blocks since the stream's initialization. The keystream for each
 //! block $G_i$ within any given chunk is thus derived as:
 //!
-//! $$ G_i \leftarrow G_i \oplus E_K(\text{Nonce} + \text{block\_counter} + i) $$
+//! $$ G_i \leftarrow G_i \oplus E_K(\text{Nonce} + \text{block}_{\text{counter}} + i) $$
 
 use std::slice;
 
