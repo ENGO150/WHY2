@@ -110,4 +110,95 @@ impl<const W: usize, const H: usize> RexStream<W, H>
             buffer: Vec::with_capacity(W * H),
         })
     }
+
+    /// Processes a chunk of data and returns the resulting encrypted or decrypted values.
+    ///
+    /// This method consumes the input `data`, combining it with any leftover elements
+    /// from previous calls. It processes data strictly in full [`Grid`] blocks. Any
+    /// incomplete block at the end of the input is buffered internally until the next
+    /// call to `update` or until `finalize` is called.
+    ///
+    /// Because CTR mode is symmetric, this identical method is used for both encryption
+    /// and decryption streams.
+    ///
+    /// # Parameters
+    /// - `data`: A slice of `i64` values representing the incoming plaintext or ciphertext chunk.
+    ///
+    /// # Returns
+    /// - `Ok(Vec<i64>)`: A vector containing the processed output. Note that the length
+    ///   of this vector may be shorter than the input slice if the data is buffered,
+    ///   or longer if previously buffered data now completes a grid.
+    /// - `Err(GridError)`: If grid creation or internal processing fails.
+    ///
+    /// # State Management
+    /// This method automatically handles the CTR mode block counter. The internal counter
+    /// is incremented strictly by the number of *full grids* processed during this specific
+    /// invocation, ensuring cryptographic safety and preventing nonce reuse across batches.
+    pub fn update(&mut self, mut data: &[i64]) -> Result<Vec<i64>, GridError>
+    {
+        let grid_area = W * H;
+        let mut output = Vec::new();
+
+        //PROCESS LEFTOVERS FROM PREVIOUS CALL
+        if !self.buffer.is_empty()
+        {
+            //FIX SIZE
+            let needed = grid_area - self.buffer.len();
+            let take = needed.min(data.len());
+            self.buffer.extend_from_slice(&data[..take]);
+            data = &data[take..];
+
+            //IF BUFFER REACHED CORRECT SIZE, ENCRYPT
+            if self.buffer.len() == grid_area
+            {
+                //FILL GRID
+                let mut grid = Grid::new()?;
+                for (i, &val) in self.buffer.iter().enumerate()
+                {
+                    grid[i / W][i % W] = val;
+                }
+
+                //ENCRYPT
+                crypto::apply_ctr(&mut [grid.clone()], &self.nonce, &self.round_keys, Some(self.block_counter));
+                self.block_counter += 1; //INCREMENT COUNTER
+
+                //APPEND TO OUTPUT
+                output.extend(grid.iter().flat_map(|row| row.iter()));
+                self.buffer.clear(); //CLEAR BUFFER
+            }
+        }
+
+        //PROCESS FULL GRIDS FROM CURRENT CALL
+        let full_grids_count = data.len() / grid_area;
+        if full_grids_count > 0 //CONTINUE ONLY IF FULL GRID PASSED
+        {
+            let chunk_size = full_grids_count * grid_area;
+
+            //GATHER GRIDS
+            let mut grids: Vec<Grid<W, H>> = data[..chunk_size].chunks(grid_area).map(|chunk|
+            {
+                //FILL GRID
+                let mut grid = Grid::new()?;
+                for (i, &val) in chunk.iter().enumerate()
+                {
+                    grid[i / W][i % W] = val;
+                }
+
+                Ok(grid)
+            }).collect::<Result<Vec<_>, _>>()?;
+
+            //ENCRYPT GRIDS
+            crypto::apply_ctr(&mut grids, &self.nonce, &self.round_keys, Some(self.block_counter));
+            self.block_counter += full_grids_count as u64; //INCREMENT COUNTER
+
+            //APPEND TO OUTPUT
+            output.extend(grids.iter().flat_map(|grid| grid.iter().flat_map(|row| row.iter())));
+            data = &data[chunk_size..];
+        }
+
+        //STORE ANY REMAINDER FOR NEXT CALL
+        self.buffer.extend_from_slice(data);
+
+        Ok(output)
+    }
 }
