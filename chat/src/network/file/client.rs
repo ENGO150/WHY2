@@ -37,6 +37,7 @@ use crate::
 {
     config,
     options,
+    crypto as chat_crypto,
     network::
     {
         self,
@@ -70,7 +71,7 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
 
     //GENERATE STREAM NONCE
     let nonce = crypto::generate_nonce::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>().unwrap();
-    let nonce_vec: Vec<i64> = nonce.clone().into_iter().collect();
+    let nonce_vec: Vec<i64> = nonce.into_iter().collect();
 
     //SEND FIRST PACKET (METADATA)
     network::send_tcp(&mut stream, FilePacket
@@ -79,12 +80,19 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
         size: Some(size),
         filename: Some(filename),
         hash: Some(file_hash),
-        nonce: Some(nonce_vec),
+        nonce: Some(nonce_vec.clone()),
         ..Default::default()
     }, EncryptionMode::OneShot(options::get_keys().as_ref()), Some(&mut seq));
 
+    //INIT REX STREAM
+    let mut rex_stream = chat_crypto::init_rex_stream::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
+    (
+        options::get_keys().as_ref().unwrap(),
+        &nonce_vec,
+    ).unwrap();
+
     //UPLOAD
-    file::send_file(path, stream, uid, options::get_keys().as_ref(), Some(&mut seq));
+    file::send_file(path, stream, uid, &mut rex_stream, Some(&mut seq));
 }
 
 pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
@@ -103,14 +111,16 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     let mut seq = 0usize;
 
     //RECEIVE FIRST PACKET (METADATA)
-    let metadata_packet = match file::receive_file(&mut streams, options::get_keys().as_ref(), &mut seq)
+    let metadata_packet = match file::receive_file(&mut streams, EncryptionMode::OneShot(options::get_keys().as_ref()), &mut seq)
     {
         Some(p) => p,
         None => return,
     };
 
+    //METADATA
     let size = metadata_packet.size.unwrap();
     let hash = metadata_packet.hash.unwrap();
+    let nonce_vec = metadata_packet.nonce.unwrap();
 
     //NEW DOWNLOAD, GET NEW FILE
     let download_dir = config::read_config::<String>("download_directory")
@@ -136,11 +146,18 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     let mut file = File::create(Path::new(&download_dir).join(&filename)).expect("Creating download file failed");
     let mut hasher = Sha256::new();
 
+    //INIT REX STREAM
+    let mut rex_stream = chat_crypto::init_rex_stream::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
+    (
+        options::get_keys().as_ref().unwrap(),
+        &nonce_vec,
+    ).unwrap();
+
     //LOOP READING
     loop
     {
         //READ
-        let read = match file::receive_file(&mut streams, options::get_keys().as_ref(), &mut seq)
+        let read = match file::receive_file(&mut streams, EncryptionMode::Stream(&mut rex_stream), &mut seq)
         {
             Some(r) => r,
             None => return

@@ -33,19 +33,20 @@ use std::
 
 use wincode::{ SchemaRead, SchemaWrite };
 
+use why2::
+{
+    consts as core_consts,
+    stream::RexStream,
+};
+
 use crate::
 {
+    consts::{ self, Streams },
     network::
     {
         self,
         EncryptionMode,
         SequencedPacket,
-    },
-    consts::
-    {
-        self,
-        SharedKeys,
-        Streams,
     },
 };
 
@@ -78,7 +79,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
     path: PathBuf,
     mut stream: TcpStream,
     uid: u64,
-    keys: Option<&SharedKeys>,
+    rex_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
     mut seq: Option<&mut usize>,
 )
 {
@@ -99,7 +100,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
                     uid,
                     data: Some(buffer[..bytes].to_vec()),
                     ..Default::default()
-                }, EncryptionMode::OneShot(keys), seq.as_deref_mut());
+                }, EncryptionMode::Stream(rex_stream), seq.as_deref_mut());
             },
             Err(_) => {}, //TODO: Implement
         }
@@ -109,14 +110,14 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
 pub fn receive_file
 (
     streams: &mut Streams,
-    keys: Option<&SharedKeys>,
+    encryption_mode: EncryptionMode,
     seq: &mut usize
 ) -> Option<FilePacket>
 {
     let read = network::read_tcp
     (
         streams,
-        EncryptionMode::OneShot(keys),
+        encryption_mode,
         #[cfg(feature = "server")] true,
     )?;
 

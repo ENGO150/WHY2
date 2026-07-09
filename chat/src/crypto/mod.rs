@@ -35,6 +35,8 @@ use zeroize::Zeroizing;
 use hkdf::Hkdf;
 use sha2::{ Sha256, Digest };
 
+use why2::stream::RexStream;
+
 use crate::consts;
 
 //PRIVATE
@@ -144,4 +146,27 @@ pub fn decrypt_packet<const W: usize, const H: usize>(mut decoded_packet: Vec<u8
     }
 
     Some(decoded_packet)
+}
+
+pub fn init_rex_stream<const W: usize, const H: usize>(keys: &consts::SharedKeys, nonce_vec: &[i64]) -> Option<RexStream<W, H>>
+{
+    let key = if keys.0.len() == W * H * 2
+    {
+        keys.0.clone()
+    } else
+    {
+        get_correct_key::<W, H>(&keys.0)
+    };
+
+    let key_grid = Grid::from_key(&key).ok()?;
+
+    //RECONSTRUCT NONCE GRID
+    let mut nonce_grid = Grid::new().ok()?;
+    for (i, &val) in nonce_vec.iter().enumerate()
+    {
+        nonce_grid[i / W][i % W] = val;
+    }
+
+    //INIT & RETURN
+    RexStream::new(&key_grid, nonce_grid).ok()
 }

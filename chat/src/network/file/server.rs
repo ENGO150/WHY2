@@ -30,9 +30,16 @@ use dashmap::DashMap;
 
 use sha2::{ Sha256, Digest };
 
+use why2::
+{
+    consts as core_consts,
+    crypto as core_crypto,
+};
+
 use crate::
 {
     config,
+    crypto,
     misc,
     consts::{ self, Streams },
     network::
@@ -136,7 +143,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
     let mut seq = 0usize;
 
     //WAIT FOR FIRST PACKET (METADATA)
-    let metadata_packet = match file::receive_file(streams, Some(&keys), &mut seq)
+    let metadata_packet = match file::receive_file(streams, EncryptionMode::OneShot(Some(&keys)), &mut seq)
     {
         Some(p) => p,
         None => return
@@ -177,18 +184,27 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
         valid = true;
     }
 
-    if !valid
+    if !valid || metadata_packet.nonce.is_none()
     {
         //LOG FILE REJECT
         log::info!("Upload rejected: {peer_addr}");
         return;
     }
 
+    let nonce_vec = metadata_packet.nonce.unwrap();
+
+    //INIT REX STREAM
+    let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
+    (
+        &keys,
+        &nonce_vec,
+    ).unwrap();
+
     //LOOP READING CHUNKS
     loop
     {
         //READ
-        let read = match file::receive_file(streams, Some(&keys), &mut seq)
+        let read = match file::receive_file(streams, EncryptionMode::Stream(&mut rex_stream), &mut seq)
         {
             Some(r) => r,
             None => return
@@ -315,6 +331,10 @@ pub fn upload(id: usize, mut stream: TcpStream, file: AvailableFile, uid: u64)
         uid,
     };
 
+    //GENERATE STREAM NONCE
+    let nonce_grid = core_crypto::generate_nonce::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>().unwrap();
+    let nonce_vec: Vec<i64> = nonce_grid.into_iter().collect();
+
     //SEND FIRST PACKET (METADATA)
     let mut seq = 0usize;
     network::send_tcp(&mut stream, FilePacket
@@ -323,11 +343,19 @@ pub fn upload(id: usize, mut stream: TcpStream, file: AvailableFile, uid: u64)
         size: Some(file.size),
         filename: Some(file.filename.clone()),
         hash: Some(file.hash),
+        nonce: Some(nonce_vec.clone()),
         ..Default::default()
     }, EncryptionMode::OneShot(Some(&keys)), Some(&mut seq));
 
+    //INIT REX STREAM
+    let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
+    (
+        &keys,
+        &nonce_vec,
+    ).unwrap();
+
     //START UPLOAD
-    file::send_file(file.path, stream, uid, Some(&keys), Some(&mut seq));
+    file::send_file(file.path, stream, uid, &mut rex_stream, Some(&mut seq));
 
     //LOG END
     log::info!("Download done: {peer_addr}");
