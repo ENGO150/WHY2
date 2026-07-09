@@ -135,4 +135,5 @@ pub mod crypto;
 pub mod decrypter;
 pub mod encrypter;
 pub mod grid;
+pub mod stream;
 pub mod types;
