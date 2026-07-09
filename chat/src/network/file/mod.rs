@@ -60,6 +60,7 @@ pub struct FilePacket //FILE CHUNK
     pub size: Option<u64>,        //FILE SIZE
     pub filename: Option<String>, //FILE NAME
     pub hash: Option<[u8; 32]>,   //FILE HASH
+    pub nonce: Option<Vec<i64>>,  //STREAM ENCRYPTION NONCE
     pub seq: usize,               //SEQUENCE NUMBER
 }
 

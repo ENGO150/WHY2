@@ -31,6 +31,8 @@ use std::
 
 use sha2::{ Sha256, Digest };
 
+use why2::{ consts, crypto };
+
 use crate::
 {
     config,
@@ -65,6 +67,10 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
     //LOCAL SEQ COUNTER
     let mut seq = 0usize;
 
+    //GENERATE STREAM NONCE
+    let nonce = crypto::generate_nonce::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>().unwrap();
+    let nonce_vec: Vec<i64> = nonce.clone().into_iter().collect();
+
     //SEND FIRST PACKET (METADATA)
     network::send_tcp(&mut stream, FilePacket
     {
@@ -72,6 +78,7 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
         size: Some(size),
         filename: Some(filename),
         hash: Some(file_hash),
+        nonce: Some(nonce_vec),
         ..Default::default()
     }, options::get_keys().as_ref(), Some(&mut seq));
 
