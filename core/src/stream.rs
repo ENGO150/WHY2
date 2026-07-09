@@ -48,3 +48,66 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! block $G_i$ within any given chunk is thus derived as:
 //!
 //! $$ G_i \leftarrow G_i \oplus E_K(\text{Nonce} + \text{block\_counter} + i) $$
+
+use crate::
+{
+    crypto,
+    grid::{ Grid, GridError },
+};
+
+//STRUCTS
+/// A stateful container for incremental encryption and decryption using the REX cipher in CTR mode.
+///
+/// `RexStream` maintains the cryptographic context and internal buffering required to process
+/// data chunks of arbitrary length. It buffers incoming elements until a complete [`Grid`]
+/// can be formed, making it suitable for streaming I/O operations such as network sockets
+/// or file streams.
+///
+/// Since CTR mode is symmetric, the same stream instance is used for both encryption
+/// and decryption operations.
+///
+/// # Type Parameters
+/// - `W`: The width of the REX [`Grid`].
+/// - `H`: The height of the REX [`Grid`].
+///
+/// # Cryptographic Safety
+/// This structure enforces strict block counter continuity across consecutive updates.
+/// To maintain semantic security, a unique `nonce` must be paired with the master key
+/// for every separate stream lifecycle to prevent keystream reuse.
+pub struct RexStream<const W: usize, const H: usize>
+{
+    round_keys: Vec<Grid<W, H>>,
+    nonce: Grid<W, H>,
+    block_counter: u64,
+    buffer: Vec<i64>,
+}
+
+//IMPLEMENTATIONS
+impl<const W: usize, const H: usize> RexStream<W, H>
+{
+    /// Creates a new stateful `RexStream` instance.
+    ///
+    /// This initializes the internal buffer and triggers the key expansion phase,
+    /// deriving the full set of round keys from the provided master key grid.
+    ///
+    /// # Parameters
+    /// - `key_grid`: A reference to the master [`Grid`] used as the base symmetric key.
+    /// - `nonce`: A unique counter initialization [`Grid`] (Initialization Vector).
+    ///            Must be distinct for every message encrypted under the same key.
+    ///
+    /// # Returns
+    /// - `Ok(Self)` containing the initialized stream state machine.
+    /// - `Err(GridError)` if the round key generation fails (e.g., due to invalid grid dimensions).
+    pub fn new(key_grid: &Grid<W, H>, nonce: Grid<W, H>) -> Result<Self, GridError>
+    {
+        let round_keys = crypto::generate_round_keys(key_grid)?;
+
+        Ok(Self
+        {
+            round_keys,
+            nonce,
+            block_counter: 0,
+            buffer: Vec::with_capacity(W * H),
+        })
+    }
+}
