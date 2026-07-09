@@ -68,9 +68,6 @@ use crate::
 #[must_use]
 pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]>) -> Result<EncryptedData<W, H>, GridError>
 {
-    //REX OPTIONS
-    let grid_area = W * H; //AREA OF REX GRID
-
     //GET KEY THAT WILL BE USED FOR ENCRYPTION
     let key_used = match key
     {
@@ -82,7 +79,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]
     };
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut grids: Vec<Grid<W, H>> = input.chunks(grid_area).map(|chunk| -> Result<Grid<W, H>, GridError>
+    let mut grids: Vec<Grid<W, H>> = input.chunks(W * H).map(|chunk| -> Result<Grid<W, H>, GridError>
     {
         let mut grid = Grid::new()?; //CREATE GRID
         for (i, &val) in chunk.iter().enumerate()
