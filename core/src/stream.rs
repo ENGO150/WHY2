@@ -201,4 +201,46 @@ impl<const W: usize, const H: usize> RexStream<W, H>
 
         Ok(output)
     }
+
+    /// Finalizes the stream, processing any remaining buffered data.
+    ///
+    /// In CTR mode, if the total data length is not a multiple of the block size,
+    /// the final partial block is XORed with a truncated keystream block. This method
+    /// applies that final transformation and returns the remaining elements.
+    ///
+    /// # Returns
+    /// - `Ok(Vec<i64>)`: The final chunk of encrypted or decrypted data.
+    /// - `Err(GridError)`: If grid operations fail.
+    pub fn finalize(&mut self) -> Result<Vec<i64>, GridError>
+    {
+        //RETURN EMPTY VECTOR ON EMPTY BUFFER
+        if self.buffer.is_empty() { return Ok(Vec::new()) }
+
+        //CREATE A TEMPORARY FULL GRID
+        let mut temp_grid = Grid::new()?;
+
+        //FILL IT WITH LEFTOVERS (THE REST WILL REMAIN ZEROES)
+        for (i, &val) in self.buffer.iter().enumerate()
+        {
+            temp_grid[i / W][i % W] = val;
+        }
+
+        //ENCRYPT
+        crypto::apply_ctr(&mut [temp_grid.clone()], &self.nonce, &self.round_keys, Some(self.block_counter));
+
+        //INCREMENT COUNTER (OPTIONAL, BUT *STATE CONTINUITY*)
+        self.block_counter += 1;
+
+        //EXTRACT ONLY THE EXACT AMOUNT OF ELEMENTS WE NEED
+        let output: Vec<i64> = temp_grid.iter()
+            .flat_map(|row| row.iter())
+            .take(self.buffer.len()) //TRUNCATE TO ORIGINAL BUFFER LENGTH
+            .copied()
+            .collect();
+
+        //CLEAR BUFFER
+        self.buffer.clear();
+
+        Ok(output)
+    }
 }
