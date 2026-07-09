@@ -49,6 +49,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! $$ G_i \leftarrow G_i \oplus E_K(\text{Nonce} + \text{block\_counter} + i) $$
 
+use std::slice;
+
+use zeroize::Zeroizing;
+
 use crate::
 {
     crypto,
@@ -76,10 +80,10 @@ use crate::
 /// for every separate stream lifecycle to prevent keystream reuse.
 pub struct RexStream<const W: usize, const H: usize>
 {
-    round_keys: Vec<Grid<W, H>>,
+    round_keys: Zeroizing<Vec<Grid<W, H>>>,
     nonce: Grid<W, H>,
     block_counter: u64,
-    buffer: Vec<i64>,
+    buffer: Zeroizing<Vec<i64>>,
 }
 
 //IMPLEMENTATIONS
@@ -100,14 +104,14 @@ impl<const W: usize, const H: usize> RexStream<W, H>
     /// - `Err(GridError)` if the round key generation fails (e.g., due to invalid grid dimensions).
     pub fn new(key_grid: &Grid<W, H>, nonce: Grid<W, H>) -> Result<Self, GridError>
     {
-        let round_keys = crypto::generate_round_keys(key_grid)?;
+        let round_keys = Zeroizing::new(crypto::generate_round_keys(key_grid)?);
 
         Ok(Self
         {
             round_keys,
             nonce,
             block_counter: 0,
-            buffer: Vec::with_capacity(W * H),
+            buffer: Zeroizing::new(Vec::with_capacity(W * H)),
         })
     }
 
@@ -217,7 +221,7 @@ impl<const W: usize, const H: usize> RexStream<W, H>
         if self.buffer.is_empty() { return Ok(Vec::new()) }
 
         //CREATE A TEMPORARY FULL GRID
-        let mut temp_grid = Grid::new()?;
+        let mut temp_grid = Zeroizing::new(Grid::new()?);
 
         //FILL IT WITH LEFTOVERS (THE REST WILL REMAIN ZEROES)
         for (i, &val) in self.buffer.iter().enumerate()
@@ -226,7 +230,13 @@ impl<const W: usize, const H: usize> RexStream<W, H>
         }
 
         //ENCRYPT
-        crypto::apply_ctr(&mut [temp_grid.clone()], &self.nonce, &self.round_keys, Some(self.block_counter));
+        crypto::apply_ctr
+        (
+            slice::from_mut(&mut *temp_grid),
+            &self.nonce,
+            &self.round_keys,
+            Some(self.block_counter)
+        );
 
         //INCREMENT COUNTER (OPTIONAL, BUT *STATE CONTINUITY*)
         self.block_counter += 1;
