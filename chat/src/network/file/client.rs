@@ -40,6 +40,7 @@ use crate::
     network::
     {
         self,
+        EncryptionMode,
         file::{ self, FilePacket },
         client::{ self, ClientEvent },
     },
@@ -80,7 +81,7 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
         hash: Some(file_hash),
         nonce: Some(nonce_vec),
         ..Default::default()
-    }, options::get_keys().as_ref(), Some(&mut seq));
+    }, EncryptionMode::OneShot(options::get_keys().as_ref()), Some(&mut seq));
 
     //UPLOAD
     file::send_file(path, stream, uid, options::get_keys().as_ref(), Some(&mut seq));

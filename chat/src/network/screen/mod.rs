@@ -32,7 +32,12 @@ use wincode::{ SchemaRead, SchemaWrite };
 use crate::
 {
     consts::{ Streams, SharedKeys },
-    network::{ self, SequencedPacket },
+    network::
+    {
+        self,
+        EncryptionMode,
+        SequencedPacket,
+    },
 };
 
 //STRUCTS
@@ -65,7 +70,7 @@ pub fn send_frame //SEND frame TO stream
     (
         stream,
         packet,
-        keys,
+        EncryptionMode::OneShot(keys),
         seq,
     );
 }
@@ -80,7 +85,7 @@ pub fn receive_frame
     let read = network::read_tcp
     (
         streams,
-        keys,
+        EncryptionMode::OneShot(keys),
         #[cfg(feature = "server")] true,
     )?;
 

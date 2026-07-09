@@ -40,6 +40,7 @@ use crate::
         self,
         file::{ self, FilePacket },
         server::{ self, AvailableFile },
+        EncryptionMode,
         MessagePacket,
         MessageCode,
     },
@@ -323,7 +324,7 @@ pub fn upload(id: usize, mut stream: TcpStream, file: AvailableFile, uid: u64)
         filename: Some(file.filename.clone()),
         hash: Some(file.hash),
         ..Default::default()
-    }, Some(&keys), Some(&mut seq));
+    }, EncryptionMode::OneShot(Some(&keys)), Some(&mut seq));
 
     //START UPLOAD
     file::send_file(file.path, stream, uid, Some(&keys), Some(&mut seq));

@@ -44,7 +44,11 @@ use wincode::
     SchemaRead,
 };
 
-use why2::consts;
+use why2::
+{
+    consts,
+    stream::RexStream,
+};
 
 use crate::
 {
@@ -115,6 +119,12 @@ pub enum MessageCode //CONTROL CODES
     KeepAlive,          //SERVER <> CLIENT | A BIT LESS STUPID KEEP-ALIVE
 }
 
+pub enum EncryptionMode<'a> //MODE OF ENCRYPTION
+{
+    OneShot(Option<&'a chat_consts::SharedKeys>),
+    Stream(&'a mut RexStream<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>),
+}
+
 //STRUCTS
 #[derive(SchemaWrite, SchemaRead, Clone, Default)]
 pub struct MessageColors //COLORS OF MESSAGE
@@ -167,7 +177,7 @@ pub fn send_tcp //SEND packet TO stream
 (
     stream: &mut TcpStream,
     mut packet: impl SequencedPacket,
-    keys: Option<&chat_consts::SharedKeys>,
+    encryption_mode: EncryptionMode,
     seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
 )
 {
@@ -218,28 +228,67 @@ pub fn send_tcp //SEND packet TO stream
     //ENCODE THE PACKET STRUCT TO Vec<u8>
     let packet_bytes = wincode::serialize(&packet).expect("Encoding packet failed");
 
-    let mut final_bytes = if let Some(keys) = keys
+    let mut final_bytes = match encryption_mode
     {
-        crypto::encrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(packet_bytes, keys)
-    } else
-    {
-        let key =
+        //KEYS PASSED
+        EncryptionMode::OneShot(Some(keys)) =>
         {
-            #[cfg(feature = "server")]
+            crypto::encrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(packet_bytes, keys)
+        },
+
+        //NO KEYS
+        EncryptionMode::OneShot(None) =>
+        {
+            let key =
             {
-                stream.peer_addr().ok()
-                    .and_then(|addr| server::CONNECTIONS.get(&addr))
-                    .and_then(|c| c.obfuscation_key().cloned())
-                    .unwrap_or_else(|| [0u8; 32])
+                #[cfg(feature = "server")]
+                {
+                    stream.peer_addr().ok()
+                        .and_then(|addr| server::CONNECTIONS.get(&addr))
+                        .and_then(|c| c.obfuscation_key().cloned())
+                        .unwrap_or_else(|| [0u8; 32])
+                }
+
+                #[cfg(feature = "client_base")]
+                {
+                    options::get_obfuscation_key()
+                }
+            };
+
+            obfuscate_data(packet_bytes, key) //NO ENCRYPTION, OBFUSCATE
+        },
+
+        //STREAMED ENCRYPTION
+        EncryptionMode::Stream(rex_stream) =>
+        {
+            //CONVERT PACKET BYTES TO i64
+            let mut input_i64 = Vec::with_capacity((packet_bytes.len() + 7) / 8);
+            for chunk in packet_bytes.chunks(8)
+            {
+                let mut buf = [0u8; 8];
+                buf[..chunk.len()].copy_from_slice(chunk);
+                input_i64.push(i64::from_be_bytes(buf));
             }
 
-            #[cfg(feature = "client_base")]
-            {
-                options::get_obfuscation_key()
-            }
-        };
+            //ENCRYPT
+            let mut encrypted_i64 = rex_stream.update(&input_i64).expect("Stream encryption failed");
 
-        obfuscate_data(packet_bytes, key) //NO ENCRYPTION, OBFUSCATE
+            //FLUSH
+            let leftovers = rex_stream.finalize().expect("Stream finalize failed");
+            encrypted_i64.extend(leftovers);
+
+            //CONVERT ENCRYPTED BYTES BACK TO u8
+            let mut final_bytes = Vec::with_capacity(encrypted_i64.len() * 8);
+            for val in encrypted_i64
+            {
+                final_bytes.extend_from_slice(&val.to_be_bytes());
+            }
+
+            //TRUNCATE PADDING
+            final_bytes.truncate(packet_bytes.len());
+
+            final_bytes
+        },
     };
 
     //CONVERT ENCRYPTED OUTPUT TO BYTES ([LENGTH][DATA])
@@ -258,7 +307,7 @@ pub fn send_tcp //SEND packet TO stream
 pub fn read_tcp
 (
     streams: &mut Streams,
-    keys: Option<&chat_consts::SharedKeys>,
+    encryption_mode: EncryptionMode,
     #[cfg(feature = "server")] auxiliary: bool,
 ) -> Option<ReadResult>
 {
@@ -319,39 +368,80 @@ pub fn read_tcp
     }
 
     //DECRYPT
-    if let Some(keys) = keys
+    decoded_packet = match encryption_mode
     {
-        decoded_packet = match crypto::decrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(decoded_packet, keys)
+        //KEYS PASSED
+        EncryptionMode::OneShot(Some(keys)) =>
         {
-            Some(d) => d,
-            None => //INVALID MAC
+            match crypto::decrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(decoded_packet, keys)
             {
-                //LOG IF ON SERVER
+                Some(d) => d,
+                None => //INVALID MAC
+                {
+                    //LOG IF ON SERVER
+                    #[cfg(feature = "server")]
+                    log::warn!("HMAC verification failed: {}", peer_addr);
+
+                    return None;
+                }
+            }
+        },
+
+        //NO KEYS
+        EncryptionMode::OneShot(None) =>
+        {
+            let key =
+            {
                 #[cfg(feature = "server")]
-                log::warn!("HMAC verification failed: {}", peer_addr);
+                {
+                    server::CONNECTIONS.get(&peer_addr)
+                        .and_then(|c| c.obfuscation_key().cloned())
+                        .unwrap_or_else(|| [0u8; 32])
+                }
 
-                return None;
-            }
-        }
-    } else
-    {
-        let key =
+                #[cfg(feature = "client_base")]
+                {
+                    options::get_obfuscation_key()
+                }
+            };
+
+            obfuscate_data(decoded_packet, key) //NO ENCRYPTION, REMOVE OBFUSCATION
+        },
+
+        //STREAMED ENCRYPTION
+        EncryptionMode::Stream(rex_stream) =>
         {
-            #[cfg(feature = "server")]
+            let original_len = decoded_packet.len();
+
+            //CONVERT u8 TO i64
+            let mut input_i64 = Vec::with_capacity((decoded_packet.len() + 7) / 8);
+            for chunk in decoded_packet.chunks(8)
             {
-                server::CONNECTIONS.get(&peer_addr)
-                    .and_then(|c| c.obfuscation_key().cloned())
-                    .unwrap_or_else(|| [0u8; 32])
+                let mut buf = [0u8; 8];
+                buf[..chunk.len()].copy_from_slice(chunk);
+                input_i64.push(i64::from_be_bytes(buf));
             }
 
-            #[cfg(feature = "client_base")]
-            {
-                options::get_obfuscation_key()
-            }
-        };
+            //DECRYPTION
+            let mut decrypted_i64 = rex_stream.update(&input_i64).expect("Stream decryption failed");
 
-        decoded_packet = obfuscate_data(decoded_packet, key); //NO ENCRYPTION, REMOVE OBFUSCATION
-    }
+            //FLUSH
+            let leftovers = rex_stream.finalize().expect("Stream finalize failed");
+            decrypted_i64.extend(leftovers);
+
+            //CONVERT BACK TO u8
+            let mut output_bytes = Vec::with_capacity(decrypted_i64.len() * 8);
+            for val in decrypted_i64
+            {
+                output_bytes.extend_from_slice(&val.to_be_bytes());
+            }
+
+            //TRUNCATE PADDING
+            output_bytes.truncate(original_len);
+
+            output_bytes
+        }
+    };
 
     //RETURN SERIALIZED PACKET
     Some(ReadResult
@@ -373,7 +463,7 @@ pub fn send //SEND packet TO stream
     (
         stream,
         packet,
-        keys,
+        EncryptionMode::OneShot(keys),
         None,
     );
 }
@@ -388,7 +478,7 @@ pub fn receive
     let read = read_tcp
     (
         streams,
-        keys,
+        EncryptionMode::OneShot(keys),
         #[cfg(feature = "server")] false,
     )?;
 

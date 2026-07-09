@@ -38,6 +38,7 @@ use crate::
     network::
     {
         self,
+        EncryptionMode,
         SequencedPacket,
     },
     consts::
@@ -98,7 +99,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
                     uid,
                     data: Some(buffer[..bytes].to_vec()),
                     ..Default::default()
-                }, keys, seq.as_deref_mut());
+                }, EncryptionMode::OneShot(keys), seq.as_deref_mut());
             },
             Err(_) => {}, //TODO: Implement
         }
@@ -115,7 +116,7 @@ pub fn receive_file
     let read = network::read_tcp
     (
         streams,
-        keys,
+        EncryptionMode::OneShot(keys),
         #[cfg(feature = "server")] true,
     )?;
 
