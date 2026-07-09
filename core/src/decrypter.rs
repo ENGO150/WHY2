@@ -69,7 +69,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     let round_keys = crypto::generate_round_keys(&key_grid)?;
 
     //APPLY CTR MODE (PARALLEL)
-    crypto::apply_ctr(&mut grids, &input.nonce, &round_keys);
+    crypto::apply_ctr(&mut grids, &input.nonce, &round_keys, None);
 
     //FLATTEN Vec<Grid> TO Vec<i64>
     let flattened = Zeroizing::new(grids.iter()

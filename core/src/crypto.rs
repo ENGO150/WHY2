@@ -201,17 +201,17 @@ pub fn generate_nonce<const W: usize, const H: usize>() -> Result<Grid<W, H>, Gr
 /// # Overview
 /// For each grid block $G_i$ at index $i$, the transformation is defined as:
 ///
-/// $$ G_i \leftarrow G_i \oplus E_K(\text{Nonce} + i) $$
+/// $$ G_i \leftarrow G_i \oplus E_K(\text{Nonce} + \text{offset} + i) $$
 ///
 /// Where $E_K$ denotes the WHY2 block cipher keyed with the provided `round_keys`.
-/// The block counter is computed by adding the index $i$ to the base `nonce` using
-/// wrapping arithmetic.
+/// The block counter is computed by adding the global `counter_offset` and the local
+/// index $i$ to the base `nonce` using wrapping arithmetic.
 ///
 /// # Parallelism
 /// This function utilizes [`rayon`] to process blocks concurrently. The keystream
 /// for each block is generated independently through the following pipeline:
 ///
-/// 1. **Counter Initialization**: $B = \text{Nonce} + i$
+/// 1. **Counter Initialization**: $B = \text{Nonce} + \text{offset} + i$
 /// 2. **Initial Whitening**: $B \leftarrow B \oplus K_0$
 /// 3. **Round Operations**: For each round $r$ and key $K_r$ (from 1 to $N$):
 ///    * **Key Addition**: $B \leftarrow B \oplus K_r$
@@ -223,11 +223,14 @@ pub fn generate_nonce<const W: usize, const H: usize>() -> Result<Grid<W, H>, Gr
 /// - `grids`: A mutable slice of [`Grid`]s representing the plaintext or ciphertext.
 /// - `nonce`: The initial counter [`Grid`] (IV).
 /// - `round_keys`: A sequence of round keys derived from the master key.
+/// - `counter_offset`: An optional offset for the block counter. Essential for stream processing
+///   to prevent nonce reuse across consecutive data chunks. Defaults to `0` if `None`.
 pub fn apply_ctr<const W: usize, const H: usize>
 (
     grids: &mut [Grid<W, H>],
     nonce: &Grid<W, H>,
     round_keys: &[Grid<W, H>],
+    counter_offset: Option<u64>,
 )
 {
     //PRECALCULATE SHIFTS
@@ -242,7 +245,7 @@ pub fn apply_ctr<const W: usize, const H: usize>
         let mut keystream_block = nonce.clone();
 
         //BLOCK INDEX
-        keystream_block.increment(i as u64);
+        keystream_block.increment(counter_offset.unwrap_or(0) + i as u64);
 
         //INITIAL XOR
         keystream_block ^= &round_keys[0];

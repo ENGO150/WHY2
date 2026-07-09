@@ -100,7 +100,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]
     let nonce = crypto::generate_nonce()?; //RANDOM GRID
 
     //APPLY CTR MODE (PARALLEL)
-    crypto::apply_ctr(&mut grids, &nonce, &round_keys);
+    crypto::apply_ctr(&mut grids, &nonce, &round_keys, None);
 
     //RETURN OUTPUT
     Ok(EncryptedData
