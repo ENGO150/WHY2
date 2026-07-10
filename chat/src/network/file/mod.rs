@@ -62,7 +62,6 @@ pub struct FilePacket //FILE CHUNK
     pub size: Option<u64>,        //FILE SIZE
     pub filename: Option<String>, //FILE NAME
     pub hash: Option<[u8; 32]>,   //FILE HASH
-    pub nonce: Option<Vec<i64>>,  //STREAM ENCRYPTION NONCE
     pub seq: usize,               //SEQUENCE NUMBER
 }
 
@@ -110,14 +109,14 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
 pub fn receive_file
 (
     streams: &mut Streams,
-    encryption_mode: EncryptionMode,
+    rex_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
     seq: &mut usize
 ) -> Option<FilePacket>
 {
     let read = network::read_tcp
     (
         streams,
-        encryption_mode,
+        EncryptionMode::Stream(rex_stream),
         #[cfg(feature = "server")] true,
     )?;
 
