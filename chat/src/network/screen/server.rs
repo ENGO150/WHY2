@@ -23,9 +23,15 @@ use std::
     sync::{ Arc, Mutex },
 };
 
+use why2::
+{
+    consts,
+    stream::RexStream,
+};
+
 use crate::
 {
-    consts::SharedKeys,
+    crypto,
     network::
     {
         screen,
@@ -59,7 +65,7 @@ impl Drop for ScreenTransferGuard
 pub fn screen(id: usize, streams: &mut Streams)
 {
     //GET CLIENT KEYS
-    let keys =
+    let (keys, nonce) =
     {
         //FIND CONNECTION BY ID
         let conn = server::CONNECTIONS.iter_mut()
@@ -75,10 +81,16 @@ pub fn screen(id: usize, streams: &mut Streams)
                     None => return
                 };
 
+                let nonce = match c.nonce()
+                {
+                    Some(n) => n.clone(),
+                    None => return
+                };
+
                 //ADD FILE STREAM
                 c.set_screen_stream(Arc::new(Mutex::new(streams.0.try_clone().unwrap())));
 
-                keys
+                (keys, nonce)
             },
             None => return
         }
@@ -89,28 +101,52 @@ pub fn screen(id: usize, streams: &mut Streams)
 
     //LOCAL SEQ
     let mut seq = 0usize;
+
+    //VIEWER MAPS
     let mut viewer_seqs = HashMap::<usize, usize>::new();
+    let mut viewer_streams = HashMap::<usize, RexStream<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>>::new();
+
+    //INIT REX STREAM
+    let mut rex_stream = crypto::init_rex_stream::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
+    (
+        &keys,
+        &nonce,
+    ).unwrap();
 
     //LOOP READING
     loop
     {
         //READ
-        let read = match screen::receive_frame(streams, Some(&keys), &mut seq)
+        let read = match screen::receive_frame(streams, &mut rex_stream, &mut seq)
         {
             Some(r) => r,
             None => return
         };
 
         //COLLECT ALL ATTACHED CLIENT STREAMS
-        let entries: Vec<(usize, Arc<TcpStream>, Option<SharedKeys>)> = server::CONNECTIONS.iter().filter_map(|entry|
+        let entries: Vec<(usize, Arc<TcpStream>)> = server::CONNECTIONS.iter().filter_map(|entry|
         {
             match entry.value()
             {
-                Connection::Authenticated { id: client_id, attached_screen, .. } =>
+                Connection::Authenticated { id: client_id, attached_screen, keys, nonce, .. } =>
                 {
                     //FILTER ATTACHED CLIENTS
                     if let Some(attached_screen) = attached_screen && attached_screen.target_id == id
                     {
+                        //CHECK FOR EXISTING REX STREAM
+                        if !viewer_streams.contains_key(client_id)
+                        {
+                            //INIT REX STREAM
+                            let rex_stream = crypto::init_rex_stream::
+                                <{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
+                            (
+                                &keys,
+                                &nonce,
+                            ).unwrap();
+
+                            viewer_streams.insert(*client_id, rex_stream);
+                        }
+
                         //PREVENT FEEDBACK
                         if *client_id == id && read.frame.is_none()
                         {
@@ -118,7 +154,7 @@ pub fn screen(id: usize, streams: &mut Streams)
                         }
 
                         //FOUND, COLLECT
-                        Some((*client_id, attached_screen.stream.clone(), entry.value().keys().cloned()))
+                        Some((*client_id, attached_screen.stream.clone()))
                     } else { None }
                 },
                 _ => None,
@@ -126,12 +162,14 @@ pub fn screen(id: usize, streams: &mut Streams)
         }).collect();
 
         //FORWARD PACKET
-        for (client_id, stream, keys) in entries
+        for (client_id, stream) in entries
         {
             if let Ok(mut cloned_stream) = stream.try_clone()
             {
                 let viewer_seq = viewer_seqs.entry(client_id).or_insert(0);
-                screen::send_frame(&mut cloned_stream, read.clone(), keys.as_ref(), Some(viewer_seq));
+                let viewer_stream = viewer_streams.get_mut(&client_id).unwrap();
+
+                screen::send_frame(&mut cloned_stream, read.clone(), viewer_stream, Some(viewer_seq));
             }
         }
     }

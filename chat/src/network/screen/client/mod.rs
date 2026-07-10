@@ -40,8 +40,11 @@ use crossbeam_channel::Receiver;
 
 use winit::event_loop::EventLoopProxy;
 
+use why2::consts as core_consts;
+
 use crate::
 {
+    crypto,
     options as chat_options,
     network::
     {
@@ -96,6 +99,13 @@ pub fn screen(token: [u8; 32])
     //LOCAL SEQ COUNTER
     let mut seq = 0usize;
 
+    //INIT REX STREAM
+    let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
+    (
+        chat_options::get_keys().as_ref().unwrap(),
+        chat_options::get_nonce().as_ref().unwrap(),
+    ).unwrap();
+
     //LOOP SENDING FRAMES
     loop
     {
@@ -122,7 +132,7 @@ pub fn screen(token: [u8; 32])
                     frame: Some(compressed_frame),
                     audio: None,
                     ..Default::default()
-                }, chat_options::get_keys().as_ref(), Some(&mut seq));
+                }, &mut rex_stream, Some(&mut seq));
             },
 
             //AUDIO FRAME
@@ -139,7 +149,7 @@ pub fn screen(token: [u8; 32])
                     frame: None,
                     audio: Some(audio_frame.data),
                     ..Default::default()
-                }, chat_options::get_keys().as_ref(), Some(&mut seq));
+                }, &mut rex_stream, Some(&mut seq));
             }
         }
     }
@@ -161,6 +171,13 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
     let running_audio = running.clone();
     thread::spawn(move || audio::spawn_audio_playback(audio_rx, running_audio));
 
+    //INIT REX STREAM
+    let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
+    (
+        chat_options::get_keys().as_ref().unwrap(),
+        chat_options::get_nonce().as_ref().unwrap(),
+    ).unwrap();
+
     //SPAWN NETWORK READER THREAD
     let running_net = running.clone();
     thread::spawn(move ||
@@ -178,7 +195,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
                 return;
             }
 
-            let read = match screen::receive_frame(&mut streams, chat_options::get_keys().as_ref(), &mut seq)
+            let read = match screen::receive_frame(&mut streams, &mut rex_stream, &mut seq)
             {
                 Some(r) => r,
                 None =>

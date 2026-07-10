@@ -29,9 +29,15 @@ use std::net::TcpStream;
 
 use wincode::{ SchemaRead, SchemaWrite };
 
+use why2::
+{
+    stream::RexStream,
+    consts as core_consts,
+};
+
 use crate::
 {
-    consts::{ Streams, SharedKeys },
+    consts::Streams,
     network::
     {
         self,
@@ -62,7 +68,7 @@ pub fn send_frame //SEND frame TO stream
 (
     stream: &mut TcpStream,
     packet: ScreenPacket,
-    keys: Option<&SharedKeys>,
+    rex_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
     seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
 )
 {
@@ -70,7 +76,7 @@ pub fn send_frame //SEND frame TO stream
     (
         stream,
         packet,
-        EncryptionMode::OneShot(keys),
+        EncryptionMode::Stream(rex_stream),
         seq,
     );
 }
@@ -78,14 +84,14 @@ pub fn send_frame //SEND frame TO stream
 pub fn receive_frame
 (
     streams: &mut Streams,
-    keys: Option<&SharedKeys>,
+    rex_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
     seq: &mut usize //LOCAL/GLOBAL SEQ
 ) -> Option<ScreenPacket>
 {
     let read = network::read_tcp
     (
         streams,
-        EncryptionMode::OneShot(keys),
+        EncryptionMode::Stream(rex_stream),
         #[cfg(feature = "server")] true,
     )?;
 
