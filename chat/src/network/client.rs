@@ -227,8 +227,9 @@ fn key_exchange
     //CALCULATE SHARED SECRET (HYBRID)
     *keys = kex::derive_shared_secret(sk, server_ecc_pk.to_string(), pq_secret).expect("Shared secret derivation failed");
 
-    //SET GLOBAL KEYS VARIABLE
+    //SET GLOBAL VARIABLES
     options::set_keys(keys.clone());
+    options::set_nonce(nonce_vec);
 
     true
 }
