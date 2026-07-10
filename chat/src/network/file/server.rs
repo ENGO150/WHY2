@@ -172,7 +172,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
     if !valid && let Some(size) = metadata_packet.size &&
         let Some(hash) = metadata_packet.hash &&
         let Some(filename) = metadata_packet.filename &&
-        size / 1_048_576 <= config::read_config::<u64>("max_upload_size")
+        size / consts::MEGABYTE as u64 <= config::read_config::<u64>("max_upload_size")
     {
         //CREATE TEMP UPLOAD DIRECTORY
         let temp_dir = misc::get_upload_dir(&username);

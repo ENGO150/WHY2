@@ -45,7 +45,8 @@ pub const FETCH_TIMEOUT: u64         = 5000;                                    
 pub const REKEY_INTERVAL: u64        = 600;                                         //INTERVAL FOR RE-REKEYING (SECS)
 
 //DO NOT CHANGE CONSTS BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
-pub const UPLOAD_CHUNK_SIZE: usize   = 1_048_576;                                   //FILE UPLOAD CHUNK (1MB)
+pub const MEGABYTE: usize            = 1_000_000;                                   //MEGABYTE DEFINITION
+pub const UPLOAD_CHUNK_SIZE: usize   = MEGABYTE;                                    //FILE UPLOAD CHUNK (1MB)
 
 //TYPES
 pub type SharedKeys  = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);  //WHY2 KEY, HMAC
