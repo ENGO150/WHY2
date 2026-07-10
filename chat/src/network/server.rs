@@ -710,7 +710,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
     if let Some(id) = connection.remove_screen_stream()
     {
         //DEATTACH ALL ATTACHED CLIENTS
-        deattach(id);
+        deattach(id, connection.username().unwrap());
     }
 
     //AUTHENTICATED ACTIONS
@@ -960,13 +960,8 @@ fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW T
     token
 }
 
-fn deattach(sharer_id: usize) //DEATTACH ALL ATTACHED CLIENTS
+fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLIENTS
 {
-    //FIND SHARER USERNAME
-    let sharer_uname = CONNECTIONS.iter()
-        .find(|c| c.value().id() == Some(&sharer_id))
-        .and_then(|c| c.value().username().cloned());
-
     let mut to_notify = Vec::new();
 
     for mut conn in CONNECTIONS.iter_mut()
@@ -983,7 +978,7 @@ fn deattach(sharer_id: usize) //DEATTACH ALL ATTACHED CLIENTS
             network::send(&mut stream, MessagePacket
             {
                 code: Some(MessageCode::Deattach),
-                username: sharer_uname.clone(),
+                username: Some(sharer_uname.clone()),
                 ..Default::default()
             }, keys.as_ref());
         }
@@ -1421,11 +1416,11 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 MessageCode::Screen =>
                 {
                     //CHECK FOR DISABLING SCREEN SHARE
-                    if let Some(removed_id) = CONNECTIONS.get_mut(&peer_addr)
-                        .and_then(|mut conn| conn.remove_screen_stream())
+                    if let Some((Some(removed_id), Some(username))) = CONNECTIONS.get_mut(&peer_addr)
+                        .and_then(|mut conn| Some((conn.remove_screen_stream(), conn.username().cloned())))
                     {
                         //DEATTACH ALL CLIENTS
-                        deattach(removed_id);
+                        deattach(removed_id, &username);
 
                         //SEND SCREEN DISABLE NOTIFICATION
                         network::send(&mut streams.1.lock().unwrap(), MessagePacket
