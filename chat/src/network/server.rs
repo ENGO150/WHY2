@@ -123,6 +123,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         username: String,                                  //USERNAME
         id: usize,                                         //ID OF USER
         keys: SharedKeys,                                  //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
+        nonce: Vec<i64>,                                   //NONCE FOR STREAM ENCRYPTION
         attached_screen: Option<Attach>,                   //SCREEN DOWNLOAD STREAM & TARGET ID
         last_activity: Instant,                            //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
         last_key_exchange: Instant,                        //TIME OF LAST REKEY
@@ -139,6 +140,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         peer_addr: SocketAddr,               //ADDRESS & PORT
         username: Option<String>,            //CHOSEN USERNAME
         keys: Option<SharedKeys>,            //SHARED KEYS
+        nonce: Option<Vec<i64>>,             //NONCE FOR STREAM ENCRYPTION
         obfuscation_key: [u8; 32],           //OBFUSCATION KEY FROM PLAIN PACKETS
         last_activity: Instant,              //TIME OF LAST MESSAGE
         seq: usize,                          //SEQUENCE NUMBER
@@ -216,6 +218,16 @@ impl Connection
         {
             Self::Authenticated { keys, .. } => Some(keys),
             Self::NonAuthenticated { keys, .. } => keys.as_ref(),
+        }
+    }
+
+    //GET NONCE FOR STREAM ENCRYPTION
+    pub fn nonce(&self) -> Option<&Vec<i64>>
+    {
+        match self
+        {
+            Self::Authenticated { nonce, .. } => Some(nonce),
+            Self::NonAuthenticated { nonce, .. } => nonce.as_ref(),
         }
     }
 
@@ -572,24 +584,32 @@ fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
     };
 
     //DERIVE SHARED KEYS
-    let derived_keys = (||
+    let shared = (||
     {
         //PARSE CLIENT RESPONSE (JSON)
         let client_response: Value = serde_json::from_str(message.text.as_ref().unwrap()).ok()?;
         let client_ecc_pk = client_response["ecc"].as_str()?;
         let client_pq_ciphertext = client_response["pq"].as_str()?;
+        let client_nonce = client_response["nonce"]
+            .as_array()?
+            .iter()
+            .map(|v| v.as_i64())
+            .collect::<Option<Vec<i64>>>()?;
 
         //DECAPSULATE PQ
         let pq_secret = kex::decapsulate_pq(&pq_sk, client_pq_ciphertext)?;
 
+        //DERIVE KEYS
+        let keys = kex::derive_shared_secret(sk, client_ecc_pk.to_string(), pq_secret)?;
+
         //DERIVE
-        kex::derive_shared_secret(sk, client_ecc_pk.to_string(), pq_secret)
+        Some((keys, client_nonce))
     })();
 
     //UPDATE CLIENT KEYS
-    if let Some(new_keys) = derived_keys
+    if let Some((new_keys, nonce)) = shared
     {
-        update_client_keys(peer_addr, &new_keys);
+        update_client_keys(peer_addr, &new_keys, nonce);
         *keys = new_keys;
     }
 }
@@ -764,7 +784,7 @@ fn get_latest_id() -> usize
     unreachable!("what the fuck");
 }
 
-fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
+fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys, nonce: Vec<i64>) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
 {
     //UPDATE CONNECTION
     CONNECTIONS.alter(peer_addr, |_, old_connection|
@@ -779,6 +799,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     peer_addr,
                     username: None,
                     keys: Some(keys.to_owned()),
+                    nonce: Some(nonce),
                     obfuscation_key,
                     last_activity: Instant::now(),
                     seq,
@@ -798,6 +819,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     username,
                     id,
                     keys: keys.to_owned(),
+                    nonce: nonce,
                     attached_screen,
                     last_activity,
                     last_key_exchange: Instant::now(),
@@ -826,6 +848,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
             username: username.to_string(),
             id: id,
             keys: old_connection.keys().unwrap().to_owned(),
+            nonce: old_connection.nonce().unwrap().to_owned(),
             attached_screen: None,
             last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
             last_key_exchange: old_connection.last_key_exchange().copied().unwrap_or_else(Instant::now),
@@ -857,6 +880,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             username: old_connection.username().unwrap().clone(),
             id: *old_connection.id().unwrap(),
             keys: old_connection.keys().unwrap().to_owned(),
+            nonce: old_connection.nonce().unwrap().to_owned(),
             attached_screen: old_connection.attached_screen().clone(),
             last_activity: Instant::now(),
             last_key_exchange: *old_connection.last_key_exchange().unwrap(),
@@ -994,6 +1018,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
         peer_addr: peer_addr,
         username: None,
         keys: None,
+        nonce: None,
         obfuscation_key,
         last_activity: Instant::now(),
         seq: 0,
