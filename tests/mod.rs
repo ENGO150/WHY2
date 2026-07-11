@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod diffusion_test;
 pub mod encryption_test;
 pub mod randomness_test;
+pub mod stream_test;
 
 #[cfg(feature = "auth")]
 pub mod auth_test;
