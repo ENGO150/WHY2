@@ -46,12 +46,6 @@ use serde_json::Value;
 
 use semver::Version;
 
-use why2::
-{
-    crypto,
-    consts as core_consts,
-};
-
 use crate::
 {
     options,
@@ -204,19 +198,14 @@ fn key_exchange
     //ENCAPSULATE PQ
     let (pq_ciphertext, pq_secret) = kex::encapsulate_pq(server_pq_pk);
 
-    //GENERATE NEW STREAM NONCE
-    let nonce_grid = crypto::generate_nonce::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>().unwrap();
-    let nonce_vec: Vec<i64> = nonce_grid.into_iter().collect();
-
     //PREPARE RESPONSE JSON
     let response_text = serde_json::json!
     ({
         "ecc": pk,
         "pq": pq_ciphertext,
-        "nonce": nonce_vec,
     }).to_string();
 
-    //SEND PUBKEYS & NONCE TO SERVER
+    //SEND PUBKEYS TO SERVER
     network::send(&mut streams.1.lock().unwrap(), MessagePacket
     {
         text: Some(response_text),
@@ -229,7 +218,6 @@ fn key_exchange
 
     //SET GLOBAL VARIABLES
     options::set_keys(keys.clone());
-    options::set_nonce(nonce_vec);
 
     true
 }

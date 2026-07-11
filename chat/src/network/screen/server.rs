@@ -62,10 +62,10 @@ impl Drop for ScreenTransferGuard
 
 //PUBLIC
 //FUNCTIONS
-pub fn screen(id: usize, streams: &mut Streams)
+pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
 {
     //GET CLIENT KEYS
-    let (keys, nonce) =
+    let keys =
     {
         //FIND CONNECTION BY ID
         let conn = server::CONNECTIONS.iter_mut()
@@ -81,16 +81,10 @@ pub fn screen(id: usize, streams: &mut Streams)
                     None => return
                 };
 
-                let nonce = match c.nonce()
-                {
-                    Some(n) => n.clone(),
-                    None => return
-                };
-
                 //ADD FILE STREAM
                 c.set_screen_stream(Arc::new(Mutex::new(streams.0.try_clone().unwrap())));
 
-                (keys, nonce)
+                keys
             },
             None => return
         }
@@ -110,7 +104,7 @@ pub fn screen(id: usize, streams: &mut Streams)
     let mut rex_stream = crypto::init_rex_stream::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
     (
         &keys,
-        &nonce,
+        &token,
     ).unwrap();
 
     //LOOP READING
@@ -128,7 +122,7 @@ pub fn screen(id: usize, streams: &mut Streams)
         {
             match entry.value()
             {
-                Connection::Authenticated { id: client_id, attached_screen, keys, nonce, .. } =>
+                Connection::Authenticated { id: client_id, attached_screen, keys, .. } =>
                 {
                     //FILTER ATTACHED CLIENTS
                     if let Some(attached_screen) = attached_screen && attached_screen.target_id == id
@@ -141,7 +135,7 @@ pub fn screen(id: usize, streams: &mut Streams)
                                 <{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
                             (
                                 &keys,
-                                &nonce,
+                                &attached_screen.token,
                             ).unwrap();
 
                             viewer_streams.insert(*client_id, rex_stream);

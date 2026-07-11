@@ -54,12 +54,6 @@ static KEYS: LazyLock<RwLock<Option<SharedKeys>>> = LazyLock::new(|| //SHARED SY
 });
 
 #[cfg(feature = "client_base")]
-static NONCE: LazyLock<RwLock<Option<Vec<i64>>>> = LazyLock::new(|| //NONCE
-{
-    RwLock::new(None)
-});
-
-#[cfg(feature = "client_base")]
 static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING PASSWORD (DISABLE ECHO)
 
 #[cfg(feature = "client_base")]
@@ -135,19 +129,6 @@ pub fn get_keys() -> Option<SharedKeys> //RETURN KEY
 {
     let shared_key = KEYS.read().unwrap();
     shared_key.clone()
-}
-
-//NONCE
-#[cfg(feature = "client_base")]
-pub fn set_nonce(nonce: Vec<i64>) //SET NONCE
-{
-    *NONCE.write().unwrap() = Some(nonce);
-}
-
-#[cfg(feature = "client_base")]
-pub fn get_nonce() -> Option<Vec<i64>> //RETURN NONCE
-{
-    NONCE.read().unwrap().clone()
 }
 
 //ASKING PASSWORD

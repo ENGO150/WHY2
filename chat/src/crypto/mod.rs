@@ -37,10 +37,10 @@ use sha2::{ Sha256, Digest };
 
 use why2::stream::RexStream;
 
-use crate::consts;
+use crate::consts::SharedKeys;
 
 //PRIVATE
-pub fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) -> Zeroizing<Vec<i64>> //DERIVE VALID KEYDIM USING HKDF
+fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) -> Zeroizing<Vec<i64>> //DERIVE VALID KEYDIM USING HKDF
 {
     //CONVERT KEY TO BYTES
     let mut key_bytes = Vec::with_capacity(key.len() * 8);
@@ -71,6 +71,16 @@ pub fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>
     Zeroizing::new(derived_key)
 }
 
+fn derive_stream_nonce<const W: usize, const H: usize>(context: &[u8]) -> Vec<i64>
+{
+    let hkdf = Hkdf::<Sha256>::new(None, context);
+
+    let mut okm = vec![0u8; W * H * 8];
+    hkdf.expand(b"WHY2-STREAM-NONCE", &mut okm).expect("HKDF expand failed");
+
+    okm.chunks_exact(8).map(|c| i64::from_be_bytes(c.try_into().unwrap())).collect()
+}
+
 //PUBLIC
 pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 {
@@ -82,7 +92,7 @@ pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
     hasher.finalize().into()
 }
 
-pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: Vec<u8>, keys: &consts::SharedKeys) -> Vec<u8>
+pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: Vec<u8>, keys: &SharedKeys) -> Vec<u8>
 {
     //CONVERT packet_bytes to BINARY
     let mut input_i64 = Vec::with_capacity((packet_bytes.len() + 7) / 8);
@@ -110,7 +120,7 @@ pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: Vec<u8>, key
     AuthenticatedData::authenticate(encrypted_data, keys.1.as_slice().try_into().unwrap()).into()
 }
 
-pub fn decrypt_packet<const W: usize, const H: usize>(mut decoded_packet: Vec<u8>, keys: &consts::SharedKeys) -> Option<Vec<u8>>
+pub fn decrypt_packet<const W: usize, const H: usize>(mut decoded_packet: Vec<u8>, keys: &SharedKeys) -> Option<Vec<u8>>
 {
     //DESERIALIZE
     let auth_packet: AuthenticatedData<W, H> = decoded_packet.as_slice().try_into().ok()?;
@@ -148,21 +158,16 @@ pub fn decrypt_packet<const W: usize, const H: usize>(mut decoded_packet: Vec<u8
     Some(decoded_packet)
 }
 
-pub fn init_rex_stream<const W: usize, const H: usize>(keys: &consts::SharedKeys, nonce_vec: &[i64]) -> Option<RexStream<W, H>>
+pub fn init_rex_stream<const W: usize, const H: usize>(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexStream<W, H>>
 {
-    let key = if keys.0.len() == W * H * 2
-    {
-        keys.0.clone()
-    } else
-    {
-        get_correct_key::<W, H>(&keys.0)
-    };
-
+    let key = if keys.0.len() == W * H * 2 { keys.0.clone() } else { get_correct_key::<W, H>(&keys.0) };
     let key_grid = Grid::from_key(&key).ok()?;
 
-    //RECONSTRUCT NONCE GRID
+    let derived = derive_stream_nonce::<W, H>(token);
+
+    //RECONSRUCT NONCE GRID
     let mut nonce_grid = Grid::new().ok()?;
-    for (i, &val) in nonce_vec.iter().enumerate()
+    for (i, &val) in derived.iter().enumerate()
     {
         nonce_grid[i / W][i % W] = val;
     }

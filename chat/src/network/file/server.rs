@@ -94,10 +94,10 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
 //LISTS
 pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new()); //LIST FOR ACTIVE FILE UPLOADS
 
-pub fn download(id: usize, streams: &mut Streams, uid: u64)
+pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
 {
     //GET CLIENT INFO
-    let (keys, nonce, username, peer_addr) =
+    let (keys, username, peer_addr) =
     {
         //FIND CONNECTION BY ID
         let conn = server::CONNECTIONS.iter()
@@ -113,12 +113,6 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
                     None => return
                 };
 
-                let nonce = match c.nonce()
-                {
-                    Some(n) => n.clone(),
-                    None => return
-                };
-
                 let username = match c.username()
                 {
                     Some(u) => u.clone(),
@@ -128,7 +122,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
                 //ADD FILE STREAM
                 c.add_file_stream(uid, streams.0.try_clone().unwrap());
 
-                (keys, nonce, username, c.peer_addr().clone())
+                (keys, username, c.peer_addr().clone())
             },
             None => return
         }
@@ -148,7 +142,7 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
     let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
     (
         &keys,
-        &nonce,
+        &token,
     ).unwrap();
 
     //WAIT FOR FIRST PACKET (METADATA)
@@ -295,10 +289,10 @@ pub fn download(id: usize, streams: &mut Streams, uid: u64)
     }
 }
 
-pub fn upload(id: usize, mut stream: TcpStream, file: AvailableFile, uid: u64)
+pub fn upload(token: [u8; 32], id: usize, mut stream: TcpStream, file: AvailableFile, uid: u64)
 {
     //GET CLIENT INFO
-    let (keys, nonce, peer_addr) =
+    let (keys, peer_addr) =
     {
         //FIND CONNECTION BY ID
         let conn = server::CONNECTIONS.iter()
@@ -314,16 +308,10 @@ pub fn upload(id: usize, mut stream: TcpStream, file: AvailableFile, uid: u64)
                     None => return
                 };
 
-                let nonce = match c.nonce()
-                {
-                    Some(n) => n.clone(),
-                    None => return
-                };
-
                 //ADD FILE STREAM
                 c.add_file_stream(uid, stream.try_clone().unwrap());
 
-                (keys, nonce, c.peer_addr().clone())
+                (keys, c.peer_addr().clone())
             },
 
             None => return
@@ -344,7 +332,7 @@ pub fn upload(id: usize, mut stream: TcpStream, file: AvailableFile, uid: u64)
     let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
     (
         &keys,
-        &nonce,
+        &token,
     ).unwrap();
 
     //SEND FIRST PACKET (METADATA)

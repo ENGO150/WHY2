@@ -73,7 +73,7 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
     let mut rex_stream = chat_crypto::init_rex_stream::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
     (
         options::get_keys().as_ref().unwrap(),
-        options::get_nonce().as_ref().unwrap(),
+        &token,
     ).unwrap();
 
     //SEND FIRST PACKET (METADATA)
@@ -109,7 +109,7 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     let mut rex_stream = chat_crypto::init_rex_stream::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
     (
         options::get_keys().as_ref().unwrap(),
-        options::get_nonce().as_ref().unwrap(),
+        &token,
     ).unwrap();
 
     //RECEIVE FIRST PACKET (METADATA)

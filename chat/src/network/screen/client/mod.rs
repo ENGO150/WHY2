@@ -103,7 +103,7 @@ pub fn screen(token: [u8; 32])
     let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
     (
         chat_options::get_keys().as_ref().unwrap(),
-        chat_options::get_nonce().as_ref().unwrap(),
+        &token,
     ).unwrap();
 
     //LOOP SENDING FRAMES
@@ -175,7 +175,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
     let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
     (
         chat_options::get_keys().as_ref().unwrap(),
-        chat_options::get_nonce().as_ref().unwrap(),
+        &token,
     ).unwrap();
 
     //SPAWN NETWORK READER THREAD

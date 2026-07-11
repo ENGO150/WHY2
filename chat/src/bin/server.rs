@@ -183,13 +183,13 @@ fn main()
                                 stream.set_read_timeout(Some(Duration::from_millis(5000))).expect("Failed to set read timeout");
 
                                 let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-                                thread::spawn(move || file::download(id, &mut (&mut stream, write_stream), uid));
+                                thread::spawn(move || file::download(token, id, &mut (&mut stream, write_stream), uid));
                                 continue;
                             },
 
                             ConnectionType::FileDownload { uid, file: file_data } =>
                             {
-                                thread::spawn(move || file::upload(id, stream, file_data, uid));
+                                thread::spawn(move || file::upload(token, id, stream, file_data, uid));
                                 continue;
                             },
 
@@ -199,7 +199,7 @@ fn main()
                                 stream.set_read_timeout(Some(Duration::from_millis(5000))).expect("Failed to set read timeout");
 
                                 let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-                                thread::spawn(move || screen::screen(id, &mut (&mut stream, write_stream)));
+                                thread::spawn(move || screen::screen(token, id, &mut (&mut stream, write_stream)));
                                 continue;
                             },
 
@@ -207,7 +207,7 @@ fn main()
                             {
                                 if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
                                 {
-                                    conn.attach_screen(sharer_id, Arc::new(stream));
+                                    conn.attach_screen(sharer_id, Arc::new(stream), token);
                                 }
 
                                 continue;
