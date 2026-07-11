@@ -98,7 +98,7 @@ pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
 
     //VIEWER MAPS
     let mut viewer_seqs = HashMap::<usize, usize>::new();
-    let mut viewer_streams = HashMap::<usize, RexStream<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>>::new();
+    let mut viewer_streams = HashMap::<usize, ([u8; 32], RexStream<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>)>::new();
 
     //INIT REX STREAM
     let mut rex_stream = crypto::init_rex_stream::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
@@ -128,7 +128,7 @@ pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
                     if let Some(attached_screen) = attached_screen && attached_screen.target_id == id
                     {
                         //CHECK FOR EXISTING REX STREAM
-                        if !viewer_streams.contains_key(client_id)
+                        if viewer_streams.get(client_id).map(|(t, _)| t != &attached_screen.token).unwrap_or(true)
                         {
                             //INIT REX STREAM
                             let rex_stream = crypto::init_rex_stream::
@@ -138,7 +138,7 @@ pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
                                 &attached_screen.token,
                             ).unwrap();
 
-                            viewer_streams.insert(*client_id, rex_stream);
+                            viewer_streams.insert(*client_id, (attached_screen.token, rex_stream));
                         }
 
                         //PREVENT FEEDBACK
@@ -163,7 +163,7 @@ pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
                 let viewer_seq = viewer_seqs.entry(client_id).or_insert(0);
                 let viewer_stream = viewer_streams.get_mut(&client_id).unwrap();
 
-                screen::send_frame(&mut cloned_stream, read.clone(), viewer_stream, Some(viewer_seq));
+                screen::send_frame(&mut cloned_stream, read.clone(), &mut viewer_stream.1, Some(viewer_seq));
             }
         }
     }
