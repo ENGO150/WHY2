@@ -35,6 +35,7 @@ use why2::
     decrypter,
     crypto,
     grid::Grid,
+    stream::RexStream,
 };
 
 //GRID SIZE
@@ -155,5 +156,49 @@ fn bench_throughput(c: &mut Criterion)
     group.finish();
 }
 
-criterion_group!(benches, bench_grid_internals, bench_latency, bench_throughput);
+//STREAMING
+fn bench_stream(c: &mut Criterion)
+{
+    let mut group = c.benchmark_group("Stream Encryption Throughput");
+
+    let sizes = [128, 64 * 1024, 1024 * 1024];
+
+    let mut rng = rand::rng();
+    let key_data: Vec<i64> = (0..(W * H * 2)).map(|_| rng.random()).collect();
+    let key_grid = Grid::<W, H>::from_key(&key_data).unwrap();
+
+    for size in sizes.iter()
+    {
+        let element_count = size / 8;
+        let mut rng_iter = rand::rng();
+        let input: Vec<i64> = (0..element_count).map(|_| rng_iter.random()).collect();
+
+        group.throughput(Throughput::Bytes(*size as u64));
+
+        group.bench_with_input(BenchmarkId::new("Stream Encrypt", size), size, |b, &_s|
+        {
+            b.iter_batched
+            (
+                ||
+                {
+                    let mut temp_rng = rand::rng();
+                    let nonce_data: Vec<i64> = (0..(W * H * 2)).map(|_| temp_rng.random()).collect();
+                    let nonce_grid = Grid::<W, H>::from_key(&nonce_data).unwrap();
+                    RexStream::<W, H>::new(&key_grid, nonce_grid).unwrap()
+                },
+                |mut stream|
+                {
+                    let mut out = stream.update(black_box(&input)).unwrap();
+                    out.extend(stream.finalize().unwrap());
+                    out
+                },
+                criterion::BatchSize::SmallInput,
+            )
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, bench_grid_internals, bench_latency, bench_throughput, bench_stream);
 criterion_main!(benches);
