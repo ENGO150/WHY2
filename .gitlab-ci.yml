@@ -60,8 +60,7 @@ test-why2-diffusion:
   only:
     - development
   script:
-    - cargo test -p why2 test_input_diffusion --verbose --release -- --nocapture
-    - cargo test -p why2 test_key_diffusion --verbose --release -- --nocapture
+    - cargo test -p why2 diffusion_test --verbose --release -- --nocapture
 
 # Test WHY2 MAC
 test-why2-auth:
@@ -80,6 +79,15 @@ test-why2-entropy:
     - development
   script:
     - cargo test -p why2 test_ciphertext_entropy --verbose --release -- --nocapture
+
+# Test WHY2 Stream
+test-why2-stream:
+  stage: test
+  image: rust:latest
+  only:
+    - development
+  script:
+    - cargo test -p why2 stream_test --verbose --release -- --nocapture
 
 # Comprehensive Benchmark
 benchmark-why2:

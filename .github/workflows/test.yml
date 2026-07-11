@@ -80,11 +80,8 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Run Input Diffusion Test
-        run: cargo test -p why2 test_input_diffusion --verbose --release -- --nocapture
-
-      - name: Run Key Diffusion Test
-        run: cargo test -p why2 test_key_diffusion --verbose --release -- --nocapture
+      - name: Run Diffusion Test
+        run: cargo test -p why2 diffusion_test --verbose --release -- --nocapture
 
   test-why2-auth:
     runs-on: ubuntu-latest
@@ -121,3 +118,21 @@ jobs:
 
       - name: Run Entropy Test
         run: cargo test -p why2 test_ciphertext_entropy --verbose --release -- --nocapture
+
+  test-why2-stream:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: development
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run Stream Test
+        run: cargo test -p why2 stream_test --verbose --release -- --nocapture
