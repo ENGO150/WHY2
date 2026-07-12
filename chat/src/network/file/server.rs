@@ -185,7 +185,7 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
 
         //CREATE REXSTREAM FOR FILE ENCRYPTION ON DISK
         let disk_stream = RexStream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>::
-            new(&Grid::from_flat(&keys.0).unwrap(), disk_nonce.clone()).unwrap();
+            new(&Grid::from_key(&keys.0).unwrap(), disk_nonce.clone()).unwrap();
 
         //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
         ACTIVE_FILESHARES.insert(uid, ActiveFileshare
