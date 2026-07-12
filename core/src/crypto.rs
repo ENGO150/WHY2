@@ -125,10 +125,10 @@ pub fn generate_key_deterministic<const W: usize, const H: usize>(rng: &mut ChaC
 pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 {
     //CREATE SEED FOR ChaCha20Rng
-    let mut seed = [0u8; 32];
-    SysRng.try_fill_bytes(&mut seed).expect("Creating seed failed"); //FILL
+    let mut seed = Zeroizing::new([0u8; 32]);
+    SysRng.try_fill_bytes(seed.as_mut_slice()).expect("Creating seed failed"); //FILL
 
-    generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(seed)) //USE HANDLER
+    generate_key_deterministic::<W, H>(&mut ChaCha20Rng::from_seed(*seed)) //USE HANDLER
 }
 
 /// Derives a sequence of round keys from a master Grid using a deterministic CSPRNG stream.
@@ -153,12 +153,13 @@ pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 /// - The CSPRNG is initialized once using the `master_key` hash.
 /// - All keys are generated from a single stream, acting as a KDF-Expand phase.
 /// - This method ensures reproducible round key generation without external randomness.
-pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Result<Vec<Grid<W, H>>, GridError>
+pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Result<Zeroizing<Vec<Grid<W, H>>>, GridError>
 {
-    let mut keys: Vec<Grid<W, H>> = Vec::with_capacity(consts::ROUND_KEYS);
+    let mut keys = Zeroizing::new(Vec::with_capacity(consts::ROUND_KEYS));
 
     //CREATE CSPRNG FROM THE MASTER KEY
-    let mut rng = ChaCha20Rng::from_seed(sha256_seed_grid(master_key)); //DERIVE SEED FROM MASTER KEY HASH
+    let seed = Zeroizing::new(sha256_seed_grid(master_key));
+    let mut rng = ChaCha20Rng::from_seed(*seed); //DERIVE SEED FROM MASTER KEY HASH
 
     //GENERATE KEYS
     for _ in 0..(consts::ROUND_KEYS)

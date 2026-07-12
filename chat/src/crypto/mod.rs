@@ -43,7 +43,7 @@ use crate::consts::SharedKeys;
 fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) -> Zeroizing<Vec<i64>> //DERIVE VALID KEYDIM USING HKDF
 {
     //CONVERT KEY TO BYTES
-    let mut key_bytes = Vec::with_capacity(key.len() * 8);
+    let mut key_bytes = Zeroizing::new(Vec::with_capacity(key.len() * 8));
     for val in key.iter()
     {
         key_bytes.extend_from_slice(&val.to_be_bytes());
@@ -54,7 +54,7 @@ fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) ->
 
     let required_len = W * H * 2;
     let needed_bytes = required_len * 8;
-    let mut output_bytes = vec![0u8; needed_bytes];
+    let mut output_bytes = Zeroizing::new(vec![0u8; needed_bytes]);
 
     //EXPAND
     hkdf.expand(format!("WHY2-DERIVED-KEY-{W}x{H}").as_bytes(), &mut output_bytes).expect("Key derivation failed");
@@ -71,14 +71,14 @@ fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) ->
     Zeroizing::new(derived_key)
 }
 
-fn derive_stream_nonce<const W: usize, const H: usize>(context: &[u8]) -> Vec<i64>
+fn derive_stream_nonce<const W: usize, const H: usize>(context: &[u8]) -> Zeroizing<Vec<i64>>
 {
     let hkdf = Hkdf::<Sha256>::new(None, context);
 
-    let mut okm = vec![0u8; W * H * 8];
+    let mut okm = Zeroizing::new(vec![0u8; W * H * 8]);
     hkdf.expand(b"WHY2-STREAM-NONCE", &mut okm).expect("HKDF expand failed");
 
-    okm.chunks_exact(8).map(|c| i64::from_be_bytes(c.try_into().unwrap())).collect()
+    Zeroizing::new(okm.chunks_exact(8).map(|c| i64::from_be_bytes(c.try_into().unwrap())).collect())
 }
 
 //PUBLIC
@@ -92,10 +92,10 @@ pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
     hasher.finalize().into()
 }
 
-pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: Vec<u8>, keys: &SharedKeys) -> Vec<u8>
+pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: &[u8], keys: &SharedKeys) -> Vec<u8>
 {
     //CONVERT packet_bytes to BINARY
-    let mut input_i64 = Vec::with_capacity((packet_bytes.len() + 7) / 8);
+    let mut input_i64 = Zeroizing::new(Vec::with_capacity((packet_bytes.len() + 7) / 8));
     for chunk in packet_bytes.chunks(8)
     {
         let mut buf = [0u8; 8];
@@ -120,7 +120,7 @@ pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: Vec<u8>, key
     AuthenticatedData::authenticate(encrypted_data, keys.1.as_slice().try_into().unwrap()).into()
 }
 
-pub fn decrypt_packet<const W: usize, const H: usize>(mut decoded_packet: Vec<u8>, keys: &SharedKeys) -> Option<Vec<u8>>
+pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, keys: &SharedKeys) -> Option<Zeroizing<Vec<u8>>>
 {
     //DESERIALIZE
     let auth_packet: AuthenticatedData<W, H> = decoded_packet.as_slice().try_into().ok()?;
@@ -149,13 +149,13 @@ pub fn decrypt_packet<const W: usize, const H: usize>(mut decoded_packet: Vec<u8
     }).ok()?;
 
     //OVERWRITE decoded_packet
-    decoded_packet = Vec::with_capacity(decrypted_packet.output.len() * 8);
+    let mut output = Zeroizing::new(Vec::with_capacity(decrypted_packet.output.len() * 8));
     for &val in decrypted_packet.output.iter()
     {
-        decoded_packet.extend_from_slice(&val.to_be_bytes());
+        output.extend_from_slice(&val.to_be_bytes());
     }
 
-    Some(decoded_packet)
+    Some(output)
 }
 
 pub fn init_rex_stream<const W: usize, const H: usize>(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexStream<W, H>>

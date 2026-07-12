@@ -104,7 +104,7 @@ impl<const W: usize, const H: usize> RexStream<W, H>
     /// - `Err(GridError)` if the round key generation fails (e.g., due to invalid grid dimensions).
     pub fn new(key_grid: &Grid<W, H>, nonce: Grid<W, H>) -> Result<Self, GridError>
     {
-        let round_keys = Zeroizing::new(crypto::generate_round_keys(key_grid)?);
+        let round_keys = crypto::generate_round_keys(key_grid)?;
 
         Ok(Self
         {

@@ -44,6 +44,8 @@ use wincode::
     SchemaRead,
 };
 
+use zeroize::Zeroizing;
+
 use why2::
 {
     consts,
@@ -148,7 +150,7 @@ pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
 pub struct ReadResult //RESULT OF TCP READ
 {
     #[cfg(feature = "server")] pub peer_addr: SocketAddr,
-    pub data: Vec<u8>,
+    pub data: Zeroizing<Vec<u8>>,
 }
 
 //IMPLEMENTATIONS
@@ -160,15 +162,16 @@ impl SequencedPacket for MessagePacket
 
 //FUNCTIONS
 //PRIVATE
-fn obfuscate_data(mut data: Vec<u8>, obfuscation_key: [u8; 32]) -> Vec<u8> //XOR BYTES (USED FOR OBFUSCATION)
+fn obfuscate_data(data: &[u8], obfuscation_key: [u8; 32]) -> Vec<u8> //XOR BYTES (USED FOR OBFUSCATION)
 {
-    for (i, byte) in data.iter_mut().enumerate()
+    let mut result = Vec::with_capacity(data.len());
+    for (i, byte) in data.iter().enumerate()
     {
         //XOR EACH BYTE WITH OBFUSCATION KEY
-        *byte ^= obfuscation_key[i % obfuscation_key.len()];
+        result.push(*byte ^ obfuscation_key[i % obfuscation_key.len()]);
     }
 
-    data
+    result
 }
 
 //PUBLIC
@@ -226,14 +229,14 @@ pub fn send_tcp //SEND packet TO stream
     }
 
     //ENCODE THE PACKET STRUCT TO Vec<u8>
-    let packet_bytes = wincode::serialize(&packet).expect("Encoding packet failed");
+    let packet_bytes = Zeroizing::new(wincode::serialize(&packet).expect("Encoding packet failed"));
 
     let mut final_bytes = match encryption_mode
     {
         //KEYS PASSED
         EncryptionMode::OneShot(Some(keys)) =>
         {
-            crypto::encrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(packet_bytes, keys)
+            crypto::encrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(&packet_bytes, keys)
         },
 
         //NO KEYS
@@ -255,14 +258,14 @@ pub fn send_tcp //SEND packet TO stream
                 }
             };
 
-            obfuscate_data(packet_bytes, key) //NO ENCRYPTION, OBFUSCATE
+            obfuscate_data(&packet_bytes, key) //NO ENCRYPTION, OBFUSCATE
         },
 
         //STREAMED ENCRYPTION
         EncryptionMode::Stream(rex_stream) =>
         {
             //CONVERT PACKET BYTES TO i64
-            let mut input_i64 = Vec::with_capacity((packet_bytes.len() + 7) / 8);
+            let mut input_i64 = Zeroizing::new(Vec::with_capacity((packet_bytes.len() + 7) / 8));
             for chunk in packet_bytes.chunks(8)
             {
                 let mut buf = [0u8; 8];
@@ -271,7 +274,7 @@ pub fn send_tcp //SEND packet TO stream
             }
 
             //ENCRYPT
-            let mut encrypted_i64 = rex_stream.update(&input_i64).expect("Stream encryption failed");
+            let mut encrypted_i64 = Zeroizing::new(rex_stream.update(&input_i64).expect("Stream encryption failed"));
 
             //FLUSH
             let leftovers = rex_stream.finalize().expect("Stream finalize failed");
@@ -279,7 +282,7 @@ pub fn send_tcp //SEND packet TO stream
 
             //CONVERT ENCRYPTED BYTES BACK TO u8
             let mut final_bytes = Vec::with_capacity(encrypted_i64.len() * 8);
-            for val in encrypted_i64
+            for val in encrypted_i64.iter()
             {
                 final_bytes.extend_from_slice(&val.to_be_bytes());
             }
@@ -359,7 +362,7 @@ pub fn read_tcp
     }
 
     //READ REST OF PACKET
-    let mut decoded_packet = vec![0u8; len];
+    let mut decoded_packet = Zeroizing::new(vec![0u8; len]);
     if streams.0.read_exact(&mut decoded_packet).is_err() //READ
     {
         #[cfg(feature = "server")]
@@ -373,7 +376,7 @@ pub fn read_tcp
         //KEYS PASSED
         EncryptionMode::OneShot(Some(keys)) =>
         {
-            match crypto::decrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(decoded_packet, keys)
+            match crypto::decrypt_packet::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>(decoded_packet.to_vec(), keys)
             {
                 Some(d) => d,
                 None => //INVALID MAC
@@ -405,7 +408,7 @@ pub fn read_tcp
                 }
             };
 
-            obfuscate_data(decoded_packet, key) //NO ENCRYPTION, REMOVE OBFUSCATION
+            Zeroizing::new(obfuscate_data(&decoded_packet, key)) //NO ENCRYPTION, REMOVE OBFUSCATION
         },
 
         //STREAMED ENCRYPTION
@@ -414,7 +417,7 @@ pub fn read_tcp
             let original_len = decoded_packet.len();
 
             //CONVERT u8 TO i64
-            let mut input_i64 = Vec::with_capacity((decoded_packet.len() + 7) / 8);
+            let mut input_i64 = Zeroizing::new(Vec::with_capacity((decoded_packet.len() + 7) / 8));
             for chunk in decoded_packet.chunks(8)
             {
                 let mut buf = [0u8; 8];
@@ -423,15 +426,15 @@ pub fn read_tcp
             }
 
             //DECRYPTION
-            let mut decrypted_i64 = rex_stream.update(&input_i64).expect("Stream decryption failed");
+            let mut decrypted_i64 = Zeroizing::new(rex_stream.update(&input_i64).expect("Stream decryption failed"));
 
             //FLUSH
             let leftovers = rex_stream.finalize().expect("Stream finalize failed");
             decrypted_i64.extend(leftovers);
 
             //CONVERT BACK TO u8
-            let mut output_bytes = Vec::with_capacity(decrypted_i64.len() * 8);
-            for val in decrypted_i64
+            let mut output_bytes = Zeroizing::new(Vec::with_capacity(decrypted_i64.len() * 8));
+            for val in decrypted_i64.iter()
             {
                 output_bytes.extend_from_slice(&val.to_be_bytes());
             }

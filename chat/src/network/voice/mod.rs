@@ -101,7 +101,7 @@ pub fn send //SEND DATA TO UDP
     #[cfg(not(feature = "server"))]
     let mut encrypted_bytes: Vec<u8>;
 
-    encrypted_bytes = crypto::encrypt_packet::< { consts::GRID_WIDTH }, { consts::GRID_HEIGHT } >(packet_bytes, keys);
+    encrypted_bytes = crypto::encrypt_packet::< { consts::GRID_WIDTH }, { consts::GRID_HEIGHT } >(&packet_bytes, keys);
 
     //PREPEND ID TO PACKET
     #[cfg(feature = "client_base")]

@@ -103,7 +103,7 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::Shar
 }
 
 //PUBLIC
-pub fn generate_ephemeral_keys() -> (String, String) //CREATE ECC KEYS
+pub fn generate_ephemeral_keys() -> (Zeroizing<String>, String) //CREATE ECC KEYS
 {
     //GENERATE PRIVATE KEY
     let private = SecretKey::random(&mut OsRng);
@@ -113,11 +113,11 @@ pub fn generate_ephemeral_keys() -> (String, String) //CREATE ECC KEYS
     let public_pem = private.public_key().to_public_key_pem(Default::default()).expect("Encoding pkey to PEM failed");
 
     //RETURN TUPLE OF PRIVATE AND PUBLIC KEYS
-    (private_pem.to_string(), public_pem.to_string())
+    (private_pem, public_pem.to_string())
 }
 
 #[cfg(feature = "server")]
-pub fn generate_server_pq_keys() -> (String, String) //GENERATE POST-QUANTUM KEYS
+pub fn generate_server_pq_keys() -> (Zeroizing<String>, String) //GENERATE POST-QUANTUM KEYS
 {
     //GENERATE KEYS
     let (dk, ek) = MlKem768::generate_keypair();
@@ -127,7 +127,7 @@ pub fn generate_server_pq_keys() -> (String, String) //GENERATE POST-QUANTUM KEY
     let ek_pem = pem::encode_string("PQ PUBLIC KEY", LineEnding::LF, ek.to_bytes().as_slice())
         .expect("Encoding EQ pkey to PEM failed");
 
-    (dk_pem, ek_pem)
+    (Zeroizing::new(dk_pem), ek_pem)
 }
 
 #[cfg(feature = "server")]
@@ -144,11 +144,11 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
         let (dk, ek) = generate_server_pq_keys(); //ML-KEM
 
         //SAVE ECC KEYS
-        fs::write(server_keys_dir.clone() + consts_chat::SERVER_SKEY, sk).expect("Saving server secret key failed");
+        fs::write(server_keys_dir.clone() + consts_chat::SERVER_SKEY, sk.as_str()).expect("Saving server secret key failed");
         fs::write(server_keys_dir.clone() + consts_chat::SERVER_PKEY, pk).expect("Saving server public key failed");
 
         //SAVE PQ KEYS
-        fs::write(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY, dk).expect("Saving server PQ secret key failed");
+        fs::write(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY, dk.as_str()).expect("Saving server PQ secret key failed");
         fs::write(server_keys_dir + consts_chat::SERVER_PQ_PKEY, ek).expect("Saving server PQ public key failed");
     } else
     {
@@ -165,39 +165,39 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
             log::warn!("PQ keys are in old format or missing, regenerating...");
 
             let (dk, ek) = generate_server_pq_keys();
-            fs::write(&pq_sk_path, dk).expect("Saving server PQ secret key failed");
+            fs::write(&pq_sk_path, dk.as_str()).expect("Saving server PQ secret key failed");
             fs::write(server_keys_dir + consts_chat::SERVER_PQ_PKEY, ek).expect("Saving server PQ public key failed");
         }
     }
 }
 
 #[cfg(feature = "server")]
-pub fn get_server_keys() -> (String, String) //GET SERVER ECC KEYS
+pub fn get_server_keys() -> (Zeroizing<String>, String) //GET SERVER ECC KEYS
 {
     let server_keys_dir = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR;
 
     let sk = fs::read_to_string(server_keys_dir.clone() + consts_chat::SERVER_SKEY).expect("Reading server secret key failed");
     let pk = fs::read_to_string(server_keys_dir + consts_chat::SERVER_PKEY).expect("Reading server public key failed");
 
-    (sk, pk)
+    (Zeroizing::new(sk), pk)
 }
 
 #[cfg(feature = "server")]
-pub fn get_server_pq_keys() -> (String, String) //GET SERVER ML-KEM KEYS
+pub fn get_server_pq_keys() -> (Zeroizing<String>, String) //GET SERVER ML-KEM KEYS
 {
     let server_keys_dir = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR;
 
     let dk = fs::read_to_string(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY).expect("Reading server PQ secret key failed");
     let ek = fs::read_to_string(server_keys_dir + consts_chat::SERVER_PQ_PKEY).expect("Reading server PQ public key failed");
 
-    (dk, ek)
+    (Zeroizing::new(dk), ek)
 }
 
 pub fn derive_shared_secret //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
 (
-    local_key: String,
+    local_key: Zeroizing<String>,
     peer_pkey: String,
-    pq_secret: Vec<u8>,
+    pq_secret: Zeroizing<Vec<u8>>,
 ) -> Option<consts_chat::SharedKeys>
 {
     //PARSE KEYS
@@ -220,7 +220,7 @@ pub fn derive_shared_secret //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPT
     Some(derive_encryption_keys(&combined, misc::get_version()))
 }
 
-pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Vec<u8>)
+pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Zeroizing<Vec<u8>>)
 {
     //DECODE PEM
     let pk_bytes = decode_raw_pem(peer_pk_bytes).expect("Decoding PEM failed");
@@ -234,10 +234,10 @@ pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Vec<u8>)
     //ENCODE CIPHERTEXT TO PEM
     let ct_pem = pem::encode_string("PQ CIPHERTEXT", LineEnding::LF, &ct).unwrap();
 
-    (ct_pem, ss.as_slice().to_vec())
+    (ct_pem, Zeroizing::new(ss.as_slice().to_vec()))
 }
 
-pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Option<Vec<u8>>
+pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Option<Zeroizing<Vec<u8>>>
 {
     //DECODE PEM
     let sk_bytes = Zeroizing::new(decode_raw_pem(local_sk_pem)?);
@@ -247,5 +247,5 @@ pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Option<Vec<u8
     let dk = DecapsulationKey768::new_from_slice(&sk_bytes).ok()?;
     let ct = Ciphertext::<MlKem768>::try_from(ct_bytes.as_slice()).ok()?;
 
-    Some(dk.decapsulate(&ct).as_slice().to_vec())
+    Some(Zeroizing::new(dk.decapsulate(&ct).as_slice().to_vec()))
 }

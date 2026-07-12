@@ -1086,7 +1086,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     if !user_exists && !disabled_registration //REGISTRATION (OR "FAKE" LOGIN ON DISABLED REGISTER)
     {
         let max_tries = config::read_config::<usize>("max_auth_tries"); //MAX n
-        let mut password: Option<String> = None;
+        let mut password: Option<Zeroizing<String>> = None;
 
         //KEEP ASKING FOR PASSWORD n TIMES
         for _ in 0..max_tries
@@ -1097,10 +1097,11 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
             //WAIT FOR ANSWER
             match network::receive(streams, Some(&keys), None)
             {
-                Some(r) =>
+                Some(mut r) =>
                 {
-                    if let Some(pass) = r.text
+                    if let Some(pass) = r.text.take()
                     {
+                        let pass = Zeroizing::new(pass);
                         //CHECK LENGTH
                         if pass.len() >= config::read_config("min_password_length")
                         {
@@ -1120,14 +1121,14 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
         }
 
         //SAVE PASSWORD
-        config::server_users_write(&username, &password::hash_password(&password.unwrap()));
+        config::server_users_write(&username, &password::hash_password(password.as_ref().unwrap().as_str()));
     } else //LOGIN
     {
         //SEND LOGIN CODE
         send_code(&mut streams.1.lock().unwrap(), None, MessageCode::PasswordL, Some(&keys));
 
         //WAIT FOR ANSWER
-        let response = loop
+        let mut response = loop
         {
             match network::receive(streams, Some(&keys), None)
             {
@@ -1137,10 +1138,12 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
             }
         };
 
+        let response_text = Zeroizing::new(response.text.take().unwrap_or_default());
+
         //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
-        if !user_exists || response.text.is_none() ||
+        if !user_exists || response_text.is_empty() ||
             !password::compare_password_hash(&config::server_users_config(&username),
-                &response.text.unwrap())
+                &response_text)
         {
             return remove_connection(&peer_addr, true, Some("login"));
         }
