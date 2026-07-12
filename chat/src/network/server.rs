@@ -83,6 +83,7 @@ pub struct AvailableFile //UPLOADED FILE
     pub path: PathBuf,    //PATH
     pub filename: String, //FILENAME
     pub size: u64,        //FILE SIZE
+    pub nonce: Vec<i64>,  //FOR FILE ENCRYPTION ON DISK
 }
 
 #[derive(Clone)]

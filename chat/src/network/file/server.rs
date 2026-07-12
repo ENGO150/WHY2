@@ -30,7 +30,13 @@ use dashmap::DashMap;
 
 use sha2::{ Sha256, Digest };
 
-use why2::consts as core_consts;
+use why2::
+{
+    grid::Grid,
+    stream::RexStream,
+    crypto as core_crypto,
+    consts as core_consts,
+};
 
 use crate::
 {
@@ -89,6 +95,7 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
     pub hasher: Sha256,    //HASHER
     pub filename: String,  //FILENAME
     pub client_id: usize,  //ID OF SENDER
+    pub stream: RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
 }
 
 //LISTS
@@ -163,6 +170,10 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
         return;
     }
 
+    //CREATE NONCE FOR FILE ENCRYPTION ON DISK
+    let disk_nonce = core_crypto::generate_nonce::
+            <{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>().unwrap();
+
     if !valid && let Some(size) = metadata_packet.size &&
         let Some(hash) = metadata_packet.hash &&
         let Some(filename) = metadata_packet.filename &&
@@ -171,6 +182,10 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
         //CREATE TEMP UPLOAD DIRECTORY
         let temp_dir = misc::get_upload_dir(&username);
         fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
+
+        //CREATE REXSTREAM FOR FILE ENCRYPTION ON DISK
+        let disk_stream = RexStream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>::
+            new(&Grid::from_flat(&keys.0).unwrap(), disk_nonce.clone()).unwrap();
 
         //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
         ACTIVE_FILESHARES.insert(uid, ActiveFileshare
@@ -182,6 +197,7 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
             hasher: Sha256::new(),
             filename,
             client_id: id,
+            stream: disk_stream,
         });
 
         valid = true;
@@ -275,6 +291,7 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
                                 path: final_path.unwrap(),
                                 filename,
                                 size: active.current_size,
+                                nonce: disk_nonce.to_flat(),
                             });
                         }
 
