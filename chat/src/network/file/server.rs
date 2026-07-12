@@ -82,13 +82,13 @@ impl Drop for FileTransferGuard
 //PUBLIC
 pub struct ActiveFileshare //ACTIVE FILE UPLOAD
 {
-    pub file: File,                                  //TARGET FILE (SERVER-SIDE)
-    pub size: u64,                                   //EXPECTED FILE SIZE
-    pub current_size: u64,                           //CURRENT SIZE
-    pub hash: [u8; 32],                              //SHA256 HASH OF FINAL FILE
-    pub hasher: Sha256,                              //HASHER
-    pub filename: String,                            //FILENAME
-    #[cfg(feature = "server")] pub client_id: usize, //ID OF SENDER
+    pub file: File,        //TARGET FILE (SERVER-SIDE)
+    pub size: u64,         //EXPECTED FILE SIZE
+    pub current_size: u64, //CURRENT SIZE
+    pub hash: [u8; 32],    //SHA256 HASH OF FINAL FILE
+    pub hasher: Sha256,    //HASHER
+    pub filename: String,  //FILENAME
+    pub client_id: usize,  //ID OF SENDER
 }
 
 //LISTS
