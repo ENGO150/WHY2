@@ -55,6 +55,7 @@ use zeroize::Zeroizing;
 
 use crate::
 {
+    consts,
     crypto,
     grid::{ Grid, GridError },
 };
@@ -78,7 +79,11 @@ use crate::
 /// This structure enforces strict block counter continuity across consecutive updates.
 /// To maintain semantic security, a unique `nonce` must be paired with the master key
 /// for every separate stream lifecycle to prevent keystream reuse.
-pub struct RexStream<const W: usize, const H: usize>
+pub struct RexStream
+<
+    const W: usize = { consts::DEFAULT_GRID_WIDTH },
+    const H: usize = { consts::DEFAULT_GRID_HEIGHT },
+>
 {
     round_keys: Zeroizing<Vec<Grid<W, H>>>,
     nonce: Grid<W, H>,
