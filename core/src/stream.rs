@@ -156,10 +156,10 @@ impl<const W: usize, const H: usize> RexStream<W, H>
             if self.buffer.len() == grid_area
             {
                 //FILL GRID
-                let grid = Grid::from_flat(&self.buffer)?;
+                let mut grid = Grid::from_flat(&self.buffer)?;
 
                 //ENCRYPT
-                crypto::apply_ctr(&mut [grid.clone()], &self.nonce, &self.round_keys, Some(self.block_counter));
+                crypto::apply_ctr(slice::from_mut(&mut grid), &self.nonce, &self.round_keys, Some(self.block_counter));
                 self.block_counter += 1; //INCREMENT COUNTER
 
                 //APPEND TO OUTPUT
