@@ -792,7 +792,7 @@ fn run_client(tx: Sender<ClientEvent>)
             let mut history = INPUT_HISTORY.lock().unwrap();
 
             //ADD INPUT
-            if history.0.last() != Some(&input)
+            if !options::get_asking_password() && history.0.last() != Some(&input)
             {
                 history.0.push(input.clone());
             }
