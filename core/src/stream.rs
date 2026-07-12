@@ -156,18 +156,14 @@ impl<const W: usize, const H: usize> RexStream<W, H>
             if self.buffer.len() == grid_area
             {
                 //FILL GRID
-                let mut grid = Grid::new()?;
-                for (i, &val) in self.buffer.iter().enumerate()
-                {
-                    grid[i / W][i % W] = val;
-                }
+                let grid = Grid::from_flat(&self.buffer)?;
 
                 //ENCRYPT
                 crypto::apply_ctr(&mut [grid.clone()], &self.nonce, &self.round_keys, Some(self.block_counter));
                 self.block_counter += 1; //INCREMENT COUNTER
 
                 //APPEND TO OUTPUT
-                output.extend(grid.iter().flat_map(|row| row.iter()));
+                output.extend(grid.to_flat());
                 self.buffer.clear(); //CLEAR BUFFER
             }
         }
@@ -179,24 +175,15 @@ impl<const W: usize, const H: usize> RexStream<W, H>
             let chunk_size = full_grids_count * grid_area;
 
             //GATHER GRIDS
-            let mut grids: Vec<Grid<W, H>> = data[..chunk_size].chunks(grid_area).map(|chunk|
-            {
-                //FILL GRID
-                let mut grid = Grid::new()?;
-                for (i, &val) in chunk.iter().enumerate()
-                {
-                    grid[i / W][i % W] = val;
-                }
-
-                Ok(grid)
-            }).collect::<Result<Vec<_>, _>>()?;
+            let mut grids: Vec<Grid<W, H>> = data[..chunk_size].chunks(grid_area)
+                .map(Grid::from_flat).collect::<Result<Vec<_>, _>>()?;
 
             //ENCRYPT GRIDS
             crypto::apply_ctr(&mut grids, &self.nonce, &self.round_keys, Some(self.block_counter));
             self.block_counter += full_grids_count as u64; //INCREMENT COUNTER
 
             //APPEND TO OUTPUT
-            output.extend(grids.iter().flat_map(|grid| grid.iter().flat_map(|row| row.iter())));
+            output.extend(grids.iter().flat_map(Grid::to_flat));
             data = &data[chunk_size..];
         }
 
@@ -220,19 +207,13 @@ impl<const W: usize, const H: usize> RexStream<W, H>
         //RETURN EMPTY VECTOR ON EMPTY BUFFER
         if self.buffer.is_empty() { return Ok(Vec::new()) }
 
-        //CREATE A TEMPORARY FULL GRID
-        let mut temp_grid = Zeroizing::new(Grid::new()?);
-
-        //FILL IT WITH LEFTOVERS (THE REST WILL REMAIN ZEROES)
-        for (i, &val) in self.buffer.iter().enumerate()
-        {
-            temp_grid[i / W][i % W] = val;
-        }
+        //FILL GRID WITH LEFTOVERS (THE REST WILL REMAIN ZEROES)
+        let mut grid = Zeroizing::new(Grid::from_flat(&self.buffer)?);
 
         //ENCRYPT
         crypto::apply_ctr
         (
-            slice::from_mut(&mut *temp_grid),
+            slice::from_mut(&mut *grid),
             &self.nonce,
             &self.round_keys,
             Some(self.block_counter)
@@ -242,11 +223,8 @@ impl<const W: usize, const H: usize> RexStream<W, H>
         self.block_counter += 1;
 
         //EXTRACT ONLY THE EXACT AMOUNT OF ELEMENTS WE NEED
-        let output: Vec<i64> = temp_grid.iter()
-            .flat_map(|row| row.iter())
-            .take(self.buffer.len()) //TRUNCATE TO ORIGINAL BUFFER LENGTH
-            .copied()
-            .collect();
+        let mut output = grid.to_flat();
+        output.truncate(self.buffer.len()); //TRUNCATE TO ORIGINAL BUFFER LENGTH
 
         //CLEAR BUFFER
         self.buffer.clear();

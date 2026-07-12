@@ -150,7 +150,7 @@ pub fn decrypt_packet<const W: usize, const H: usize>(mut decoded_packet: Vec<u8
 
     //OVERWRITE decoded_packet
     decoded_packet = Vec::with_capacity(decrypted_packet.output.len() * 8);
-    for val in decrypted_packet.output.to_vec()
+    for &val in decrypted_packet.output.iter()
     {
         decoded_packet.extend_from_slice(&val.to_be_bytes());
     }
@@ -166,11 +166,7 @@ pub fn init_rex_stream<const W: usize, const H: usize>(keys: &SharedKeys, token:
     let derived = derive_stream_nonce::<W, H>(token);
 
     //RECONSRUCT NONCE GRID
-    let mut nonce_grid = Grid::new().ok()?;
-    for (i, &val) in derived.iter().enumerate()
-    {
-        nonce_grid[i / W][i % W] = val;
-    }
+    let nonce_grid = Grid::from_flat(&derived).ok()?;
 
     //INIT & RETURN
     RexStream::new(&key_grid, nonce_grid).ok()

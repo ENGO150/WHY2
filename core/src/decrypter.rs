@@ -23,11 +23,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! chunks using a symmetric key.
 //!
 //! # Overview
-//! WHY2 encrypts data by transforming it into fixed-size grids ([`Grid`](crate::grid::Grid)) using
+//! WHY2 encrypts data by transforming it into fixed-size grids ([`Grid`]) using
 //! CTR mode with a block cipher. Decryption reverses this process:
 //!
 //! 1. **Round Key Generation**: Reconstructs round keys from the master key using chained SHA-256 seeds.
-//! 2. **CTR Mode Decryption**: Each ciphertext [`Grid`](crate::grid::Grid) is XORed with the keystream block (the nonce plus block counter encrypted with WHY2).
+//! 2. **CTR Mode Decryption**: Each ciphertext [`Grid`] is XORed with the keystream block (the nonce plus block counter encrypted with WHY2).
 //!
 //! Since CTR mode is symmetric, the same encryption function is used for both encryption and decryption.
 
@@ -36,7 +36,7 @@ use zeroize::Zeroizing;
 use crate::
 {
     crypto,
-    grid::GridError,
+    grid::{ Grid, GridError },
     types::{ EncryptedData, DecryptedData },
 };
 
@@ -56,8 +56,8 @@ use crate::
 ///
 /// - Ok([`DecryptedData`]) struct containing:
 ///   - `output`: A vector of decrypted `i64` values
-///   - `key`: The original key [`Grid`](crate::grid::Grid) flattened into a vector
-/// - Err(String) if [`Grid`](crate::grid::Grid) area is 1
+///   - `key`: The original key [`Grid`] flattened into a vector
+/// - Err(String) if [`Grid`] area is 1
 #[must_use]
 pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<DecryptedData, GridError>
 {
@@ -73,7 +73,7 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
 
     //FLATTEN Vec<Grid> TO Vec<i64>
     let flattened = Zeroizing::new(grids.iter()
-        .flat_map(|grid| grid.iter().flat_map(|row| row.iter())).copied().collect::<Vec<i64>>());
+        .flat_map(Grid::to_flat).collect::<Vec<i64>>());
 
     //RETURN OUTPUT
     Ok(DecryptedData

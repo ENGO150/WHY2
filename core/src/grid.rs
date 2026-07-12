@@ -348,6 +348,42 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }).collect()
     }
 
+    /// Initializes [`Grid`] from a flat slice of 64-bit integers.
+    ///
+    /// This function constructs a [`Grid`] by sequentially taking up to $W \times H$ elements
+    /// from the provided slice and placing them into the 2D grid structure, row by row.
+    ///
+    /// # Parameters
+    /// - `vec`: A slice of signed 64-bit integers (`&[i64]`). Elements beyond the grid's capacity are ignored.
+    ///   If the slice is shorter than the grid capacity, the remaining cells retain their initial (zeroed) state.
+    ///
+    /// # Returns
+    /// - Ok(`Grid`) populated with the values from the slice.
+    /// - Err([`GridError::InvalidDimensions`]) if grid dimensions are invalid.
+    #[must_use]
+    pub fn from_flat(vec: &[i64]) -> result::Result<Self, GridError>
+    {
+        let mut grid = Self::new()?;
+        for (i, &val) in vec.iter().take(W * H).enumerate()
+        {
+            grid[i / W][i % W] = val;
+        }
+        Ok(grid)
+    }
+
+    /// Converts the [`Grid`] into a flat vector of 64-bit integers.
+    ///
+    /// This method flattens the 2D grid structure by sequentially iterating over its rows
+    /// and collecting all cells into a single, continuous [`Vec<i64>`].
+    ///
+    /// # Returns
+    /// - A `Vec<i64>` containing exactly $W \times H$ elements extracted from the grid.
+    #[must_use]
+    pub fn to_flat(&self) -> Vec<i64>
+    {
+        self.iter().flat_map(|row| row.iter().copied()).collect()
+    }
+
     /// Returns an iterator over rows in the Grid
     #[inline(always)]
     pub fn iter(&self) -> Iter<'_, [i64; W]>

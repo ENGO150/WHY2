@@ -79,16 +79,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]
     };
 
     //SPLIT INTO CHUNKS OF 64 AND SHAPE TO 8x8 GRID
-    let mut grids: Vec<Grid<W, H>> = input.chunks(W * H).map(|chunk| -> Result<Grid<W, H>, GridError>
-    {
-        let mut grid = Grid::new()?; //CREATE GRID
-        for (i, &val) in chunk.iter().enumerate()
-        {
-            grid[i / W][i % W] = val;
-        }
-
-        Ok(grid)
-    }).collect::<Result<Vec<_>, _>>()?;
+    let mut grids: Vec<Grid<W, H>> = input.chunks(W * H).map(Grid::from_flat).collect::<Result<Vec<_>, _>>()?;
 
     //SHAPE KEY TO 8x8 GRID
     let key_grid = Grid::<W, H>::from_key(&key_used)?;
