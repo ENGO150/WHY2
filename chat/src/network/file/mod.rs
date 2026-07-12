@@ -33,11 +33,7 @@ use std::
 
 use wincode::{ SchemaRead, SchemaWrite };
 
-use why2::
-{
-    consts as core_consts,
-    stream::RexStream,
-};
+use why2::stream::RexStream;
 
 use crate::
 {
@@ -82,9 +78,9 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
     path: PathBuf,
     mut stream: TcpStream,
     uid: u64,
-    rex_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
+    rex_stream: &mut RexStream,
     mut seq: Option<&mut usize>,
-    #[cfg(feature = "server")] disk_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
+    #[cfg(feature = "server")] disk_stream: &mut RexStream,
 )
 {
     let mut file = File::open(path).expect("Cannot open file for upload");
@@ -133,7 +129,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
 pub fn receive_file
 (
     streams: &mut Streams,
-    rex_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
+    rex_stream: &mut RexStream,
     seq: &mut usize
 ) -> Option<FilePacket>
 {

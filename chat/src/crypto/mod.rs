@@ -35,7 +35,11 @@ use zeroize::Zeroizing;
 use hkdf::Hkdf;
 use sha2::{ Sha256, Digest };
 
-use why2::stream::RexStream;
+use why2::
+{
+    consts,
+    stream::RexStream,
+};
 
 use crate::consts::SharedKeys;
 
@@ -71,11 +75,11 @@ fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) ->
     Zeroizing::new(derived_key)
 }
 
-fn derive_stream_nonce<const W: usize, const H: usize>(context: &[u8]) -> Zeroizing<Vec<i64>>
+fn derive_stream_nonce(context: &[u8]) -> Zeroizing<Vec<i64>>
 {
     let hkdf = Hkdf::<Sha256>::new(None, context);
 
-    let mut okm = Zeroizing::new(vec![0u8; W * H * 8]);
+    let mut okm = Zeroizing::new(vec![0u8; consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT * 8]);
     hkdf.expand(b"WHY2-STREAM-NONCE", &mut okm).expect("HKDF expand failed");
 
     Zeroizing::new(okm.chunks_exact(8).map(|c| i64::from_be_bytes(c.try_into().unwrap())).collect())
@@ -161,12 +165,11 @@ pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, k
     Some(Zeroizing::new(i64_to_bytes(&decrypted_packet.output)))
 }
 
-pub fn init_rex_stream<const W: usize, const H: usize>(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexStream<W, H>>
+pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexStream>
 {
-    let key = if keys.0.len() == W * H * 2 { keys.0.clone() } else { get_correct_key::<W, H>(&keys.0) };
-    let key_grid = Grid::from_key(&key).ok()?;
+    let key_grid = Grid::from_key(&keys.0).ok()?;
 
-    let derived = derive_stream_nonce::<W, H>(token);
+    let derived = derive_stream_nonce(token);
 
     //RECONSRUCT NONCE GRID
     let nonce_grid = Grid::from_flat(&derived).ok()?;

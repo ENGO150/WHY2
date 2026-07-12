@@ -40,8 +40,6 @@ use crossbeam_channel::Receiver;
 
 use winit::event_loop::EventLoopProxy;
 
-use why2::consts as core_consts;
-
 use crate::
 {
     crypto,
@@ -100,11 +98,7 @@ pub fn screen(token: [u8; 32])
     let mut seq = 0usize;
 
     //INIT REX STREAM
-    let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
-    (
-        chat_options::get_keys().as_ref().unwrap(),
-        &token,
-    ).unwrap();
+    let mut rex_stream = crypto::init_rex_stream(chat_options::get_keys().as_ref().unwrap(), &token).unwrap();
 
     //LOOP SENDING FRAMES
     loop
@@ -172,11 +166,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
     thread::spawn(move || audio::spawn_audio_playback(audio_rx, running_audio));
 
     //INIT REX STREAM
-    let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
-    (
-        chat_options::get_keys().as_ref().unwrap(),
-        &token,
-    ).unwrap();
+    let mut rex_stream = crypto::init_rex_stream(chat_options::get_keys().as_ref().unwrap(), &token).unwrap();
 
     //SPAWN NETWORK READER THREAD
     let running_net = running.clone();

@@ -23,11 +23,7 @@ use std::
     sync::{ Arc, Mutex },
 };
 
-use why2::
-{
-    consts,
-    stream::RexStream,
-};
+use why2::stream::RexStream;
 
 use crate::
 {
@@ -98,14 +94,10 @@ pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
 
     //VIEWER MAPS
     let mut viewer_seqs = HashMap::<usize, usize>::new();
-    let mut viewer_streams = HashMap::<usize, ([u8; 32], RexStream<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>)>::new();
+    let mut viewer_streams = HashMap::<usize, ([u8; 32], RexStream)>::new();
 
     //INIT REX STREAM
-    let mut rex_stream = crypto::init_rex_stream::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
-    (
-        &keys,
-        &token,
-    ).unwrap();
+    let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
 
     //LOOP READING
     loop
@@ -131,12 +123,7 @@ pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
                         if viewer_streams.get(client_id).map(|(t, _)| t != &attached_screen.token).unwrap_or(true)
                         {
                             //INIT REX STREAM
-                            let rex_stream = crypto::init_rex_stream::
-                                <{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
-                            (
-                                &keys,
-                                &attached_screen.token,
-                            ).unwrap();
+                            let rex_stream = crypto::init_rex_stream(&keys, &attached_screen.token).unwrap();
 
                             viewer_streams.insert(*client_id, (attached_screen.token, rex_stream));
                         }

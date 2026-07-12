@@ -31,8 +31,6 @@ use std::
 
 use sha2::{ Sha256, Digest };
 
-use why2::consts;
-
 use crate::
 {
     config,
@@ -70,11 +68,7 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
     let mut seq = 0usize;
 
     //INIT REX STREAM
-    let mut rex_stream = chat_crypto::init_rex_stream::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
-    (
-        options::get_keys().as_ref().unwrap(),
-        &token,
-    ).unwrap();
+    let mut rex_stream = chat_crypto::init_rex_stream(options::get_keys().as_ref().unwrap(), &token).unwrap();
 
     //SEND FIRST PACKET (METADATA)
     network::send_tcp(&mut stream, FilePacket
@@ -106,11 +100,7 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     let mut seq = 0usize;
 
     //INIT REX STREAM
-    let mut rex_stream = chat_crypto::init_rex_stream::<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>
-    (
-        options::get_keys().as_ref().unwrap(),
-        &token,
-    ).unwrap();
+    let mut rex_stream = chat_crypto::init_rex_stream(options::get_keys().as_ref().unwrap(), &token).unwrap();
 
     //RECEIVE FIRST PACKET (METADATA)
     let metadata_packet = match file::receive_file(&mut streams, &mut rex_stream, &mut seq)

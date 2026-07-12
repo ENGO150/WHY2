@@ -95,7 +95,7 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
     pub hasher: Sha256,    //HASHER
     pub filename: String,  //FILENAME
     pub client_id: usize,  //ID OF SENDER
-    pub stream: RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
+    pub stream: RexStream,
 }
 
 //LISTS
@@ -146,11 +146,7 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
     let mut seq = 0usize;
 
     //INIT REX STREAM
-    let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
-    (
-        &keys,
-        &token,
-    ).unwrap();
+    let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
 
     //WAIT FOR FIRST PACKET (METADATA)
     let metadata_packet = match file::receive_file(streams, &mut rex_stream, &mut seq)
@@ -184,8 +180,7 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
         fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
 
         //CREATE REXSTREAM FOR FILE ENCRYPTION ON DISK
-        let disk_stream = RexStream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>::
-            new(&Grid::from_key(&keys.0).unwrap(), disk_nonce.clone()).unwrap();
+        let disk_stream = RexStream::new(&Grid::from_key(&keys.0).unwrap(), disk_nonce.clone()).unwrap();
 
         //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
         ACTIVE_FILESHARES.insert(uid, ActiveFileshare
@@ -353,11 +348,7 @@ pub fn upload(token: [u8; 32], id: usize, mut stream: TcpStream, file: Available
     let mut seq = 0usize;
 
     //INIT REX STREAM
-    let mut rex_stream = crypto::init_rex_stream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>
-    (
-        &keys,
-        &token,
-    ).unwrap();
+    let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
 
     //SEND FIRST PACKET (METADATA)
     network::send_tcp(&mut stream, FilePacket
@@ -370,8 +361,7 @@ pub fn upload(token: [u8; 32], id: usize, mut stream: TcpStream, file: Available
     }, EncryptionMode::Stream(&mut rex_stream), Some(&mut seq));
 
     //INIT DISK REX STREAM
-    let mut disk_stream = RexStream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>::
-        new(&Grid::from_key(&keys.0).unwrap(), Grid::from_flat(&file.nonce).unwrap()).unwrap();
+    let mut disk_stream = RexStream::new(&Grid::from_key(&keys.0).unwrap(), Grid::from_flat(&file.nonce).unwrap()).unwrap();
 
     //START UPLOAD
     file::send_file(file.path, stream, uid, &mut rex_stream, Some(&mut seq), &mut disk_stream);

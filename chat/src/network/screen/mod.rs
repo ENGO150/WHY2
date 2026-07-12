@@ -29,11 +29,7 @@ use std::net::TcpStream;
 
 use wincode::{ SchemaRead, SchemaWrite };
 
-use why2::
-{
-    stream::RexStream,
-    consts as core_consts,
-};
+use why2::stream::RexStream;
 
 use crate::
 {
@@ -68,7 +64,7 @@ pub fn send_frame //SEND frame TO stream
 (
     stream: &mut TcpStream,
     packet: ScreenPacket,
-    rex_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
+    rex_stream: &mut RexStream,
     seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
 )
 {
@@ -84,7 +80,7 @@ pub fn send_frame //SEND frame TO stream
 pub fn receive_frame
 (
     streams: &mut Streams,
-    rex_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
+    rex_stream: &mut RexStream,
     seq: &mut usize //LOCAL/GLOBAL SEQ
 ) -> Option<ScreenPacket>
 {

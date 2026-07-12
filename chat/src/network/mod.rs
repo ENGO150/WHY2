@@ -123,8 +123,8 @@ pub enum MessageCode //CONTROL CODES
 
 pub enum EncryptionMode<'a> //MODE OF ENCRYPTION
 {
-    OneShot(Option<&'a chat_consts::SharedKeys>),
-    Stream(&'a mut RexStream<{ consts::DEFAULT_GRID_WIDTH }, { consts::DEFAULT_GRID_HEIGHT }>),
+    OneShot(Option<&'a chat_consts::SharedKeys>), //ONE-SHOT ENCRYPTION
+    Stream(&'a mut RexStream),                    //STREAM ENCRYPTION
 }
 
 //STRUCTS
