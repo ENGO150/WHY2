@@ -81,6 +81,22 @@ fn derive_stream_nonce<const W: usize, const H: usize>(context: &[u8]) -> Zeroiz
     Zeroizing::new(okm.chunks_exact(8).map(|c| i64::from_be_bytes(c.try_into().unwrap())).collect())
 }
 
+//CRATE PUBLIC
+pub(crate) fn bytes_to_i64(bytes: &[u8]) -> Vec<i64>
+{
+    bytes.chunks(8).map(|chunk|
+    {
+        let mut buf = [0u8; 8];
+        buf[..chunk.len()].copy_from_slice(chunk);
+        i64::from_be_bytes(buf)
+    }).collect()
+}
+
+pub(crate) fn i64_to_bytes(vals: &[i64]) -> Vec<u8>
+{
+    vals.iter().flat_map(|v| v.to_be_bytes()).collect()
+}
+
 //PUBLIC
 pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 {
@@ -95,13 +111,7 @@ pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
 pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: &[u8], keys: &SharedKeys) -> Vec<u8>
 {
     //CONVERT packet_bytes to BINARY
-    let mut input_i64 = Zeroizing::new(Vec::with_capacity((packet_bytes.len() + 7) / 8));
-    for chunk in packet_bytes.chunks(8)
-    {
-        let mut buf = [0u8; 8];
-        buf[..chunk.len()].copy_from_slice(chunk);
-        input_i64.push(i64::from_be_bytes(buf));
-    }
+    let input_i64 = Zeroizing::new(bytes_to_i64(&packet_bytes));
 
     //GET VALID KEY
     let key = if keys.0.len() == W * H * 2
@@ -148,14 +158,7 @@ pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, k
         nonce: auth_packet.encrypted_data.nonce,
     }).ok()?;
 
-    //OVERWRITE decoded_packet
-    let mut output = Zeroizing::new(Vec::with_capacity(decrypted_packet.output.len() * 8));
-    for &val in decrypted_packet.output.iter()
-    {
-        output.extend_from_slice(&val.to_be_bytes());
-    }
-
-    Some(output)
+    Some(Zeroizing::new(i64_to_bytes(&decrypted_packet.output)))
 }
 
 pub fn init_rex_stream<const W: usize, const H: usize>(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexStream<W, H>>

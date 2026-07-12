@@ -265,27 +265,16 @@ pub fn send_tcp //SEND packet TO stream
         EncryptionMode::Stream(rex_stream) =>
         {
             //CONVERT PACKET BYTES TO i64
-            let mut input_i64 = Zeroizing::new(Vec::with_capacity((packet_bytes.len() + 7) / 8));
-            for chunk in packet_bytes.chunks(8)
-            {
-                let mut buf = [0u8; 8];
-                buf[..chunk.len()].copy_from_slice(chunk);
-                input_i64.push(i64::from_be_bytes(buf));
-            }
+            let input_i64 = Zeroizing::new(crypto::bytes_to_i64(&packet_bytes));
 
             //ENCRYPT
             let mut encrypted_i64 = Zeroizing::new(rex_stream.update(&input_i64).expect("Stream encryption failed"));
 
             //FLUSH
-            let leftovers = rex_stream.finalize().expect("Stream finalize failed");
-            encrypted_i64.extend(leftovers);
+            encrypted_i64.extend(rex_stream.finalize().expect("Stream finalize failed"));
 
             //CONVERT ENCRYPTED BYTES BACK TO u8
-            let mut final_bytes = Vec::with_capacity(encrypted_i64.len() * 8);
-            for val in encrypted_i64.iter()
-            {
-                final_bytes.extend_from_slice(&val.to_be_bytes());
-            }
+            let mut final_bytes = crypto::i64_to_bytes(&encrypted_i64);
 
             //TRUNCATE PADDING
             final_bytes.truncate(packet_bytes.len());
@@ -417,27 +406,16 @@ pub fn read_tcp
             let original_len = decoded_packet.len();
 
             //CONVERT u8 TO i64
-            let mut input_i64 = Zeroizing::new(Vec::with_capacity((decoded_packet.len() + 7) / 8));
-            for chunk in decoded_packet.chunks(8)
-            {
-                let mut buf = [0u8; 8];
-                buf[..chunk.len()].copy_from_slice(chunk);
-                input_i64.push(i64::from_be_bytes(buf));
-            }
+            let input_i64 = Zeroizing::new(crypto::bytes_to_i64(&decoded_packet));
 
             //DECRYPTION
             let mut decrypted_i64 = Zeroizing::new(rex_stream.update(&input_i64).expect("Stream decryption failed"));
 
             //FLUSH
-            let leftovers = rex_stream.finalize().expect("Stream finalize failed");
-            decrypted_i64.extend(leftovers);
+            decrypted_i64.extend(rex_stream.finalize().expect("Stream finalize failed"));
 
             //CONVERT BACK TO u8
-            let mut output_bytes = Zeroizing::new(Vec::with_capacity(decrypted_i64.len() * 8));
-            for val in decrypted_i64.iter()
-            {
-                output_bytes.extend_from_slice(&val.to_be_bytes());
-            }
+            let mut output_bytes = Zeroizing::new(crypto::i64_to_bytes(&decrypted_i64));
 
             //TRUNCATE PADDING
             output_bytes.truncate(original_len);
