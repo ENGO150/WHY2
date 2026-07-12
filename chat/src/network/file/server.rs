@@ -224,8 +224,15 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
         {
             if let Some(mut active) = ACTIVE_FILESHARES.get_mut(&read.uid) && active.client_id == id
             {
+                //ENCRYPT
+                let input_i64 = crypto::bytes_to_i64(&chunk_data);
+                let mut encrypted_i64 = active.stream.update(&input_i64).expect("Disk stream encryption failed");
+                encrypted_i64.extend(active.stream.finalize().expect("Disk stream finalize failed"));
+                let mut encrypted_bytes = crypto::i64_to_bytes(&encrypted_i64);
+                encrypted_bytes.truncate(chunk_data.len()); //REMOVE PADDING
+
                 if chunk_data.len() <= consts::UPLOAD_CHUNK_SIZE && //CHECK PACKET SIZE
-                    active.file.write_all(&chunk_data).is_ok() //WRITE
+                    active.file.write_all(&encrypted_bytes).is_ok() //WRITE
                 {
                     //UPDATE SIZE
                     active.current_size += chunk_data.len() as u64;
@@ -362,8 +369,12 @@ pub fn upload(token: [u8; 32], id: usize, mut stream: TcpStream, file: Available
         ..Default::default()
     }, EncryptionMode::Stream(&mut rex_stream), Some(&mut seq));
 
+    //INIT DISK REX STREAM
+    let mut disk_stream = RexStream::<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>::
+        new(&Grid::from_key(&keys.0).unwrap(), Grid::from_flat(&file.nonce).unwrap()).unwrap();
+
     //START UPLOAD
-    file::send_file(file.path, stream, uid, &mut rex_stream, Some(&mut seq));
+    file::send_file(file.path, stream, uid, &mut rex_stream, Some(&mut seq), &mut disk_stream);
 
     //LOG END
     log::info!("Download done: {peer_addr}");

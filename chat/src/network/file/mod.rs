@@ -51,7 +51,11 @@ use crate::
 };
 
 #[cfg(feature = "server")]
-use crate::network::server as chat_server;
+use crate::
+{
+    crypto,
+    network::server as chat_server,
+};
 
 //STRUCTS
 #[derive(SchemaWrite, SchemaRead, Clone, Default)]
@@ -80,6 +84,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
     uid: u64,
     rex_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
     mut seq: Option<&mut usize>,
+    #[cfg(feature = "server")] disk_stream: &mut RexStream<{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>,
 )
 {
     let mut file = File::open(path).expect("Cannot open file for upload");
@@ -93,11 +98,30 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
             Ok(0) => break, //EOF
             Ok(bytes) =>
             {
+                let plaintext =
+                {
+                    //DECRYPT FILE
+                    #[cfg(feature = "server")]
+                    {
+                        let input_i64 = crypto::bytes_to_i64(&buffer[..bytes]);
+                        let mut decrypted_i64 = disk_stream.update(&input_i64).expect("Disk stream decryption failed");
+                        decrypted_i64.extend(disk_stream.finalize().expect("Disk stream finalize failed"));
+                        let mut out = crypto::i64_to_bytes(&decrypted_i64);
+                        out.truncate(bytes);
+                        out
+                    }
+
+                    #[cfg(feature = "client")]
+                    {
+                        buffer[..bytes].to_vec()
+                    }
+                };
+
                 //SEND FILE CHUNK
                 network::send_tcp(&mut stream, FilePacket
                 {
                     uid,
-                    data: Some(buffer[..bytes].to_vec()),
+                    data: Some(plaintext),
                     ..Default::default()
                 }, EncryptionMode::Stream(rex_stream), seq.as_deref_mut());
             },
