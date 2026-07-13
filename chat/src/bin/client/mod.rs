@@ -97,6 +97,11 @@ use why2_chat::network::screen::client::
 struct RawModeGuard;
 
 //GLOBAL VARIABLES
+pub static INPUT_READ: LazyLock<Arc<Mutex<Vec<char>>>> = LazyLock::new(|| //PARTIAL INPUT READ FROM CLIENT
+{
+    Arc::new(Mutex::new(Vec::new()))
+});
+
 static INPUT_HISTORY: LazyLock<Arc<Mutex<(Vec<String>, usize)>>> = LazyLock::new(|| //INPUTS READ FROM CLIENT
 {
     Arc::new(Mutex::new((Vec::new(), 0)))
@@ -175,7 +180,7 @@ fn mute(parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
 fn read_input(input: &mut Vec<char>, cursor_position: &mut usize) -> String
 {
     //CREATE/RESET PARTIAL INPUT VARIABLES
-    *options::INPUT_READ.lock().unwrap() = input.clone();
+    *INPUT_READ.lock().unwrap() = input.clone();
 
     loop
     {
@@ -248,7 +253,7 @@ fn read_input(input: &mut Vec<char>, cursor_position: &mut usize) -> String
                     KeyCode::Char(c) =>
                     {
                         input.insert(*cursor_position, c); //LOCAL VARIABLE
-                        options::INPUT_READ.lock().unwrap().insert(*cursor_position, c); //GLOBAL VARIABLE
+                        INPUT_READ.lock().unwrap().insert(*cursor_position, c); //GLOBAL VARIABLE
                         *cursor_position += 1; //CURSOR
 
                         print!("\x1B[0K");
@@ -277,7 +282,7 @@ fn read_input(input: &mut Vec<char>, cursor_position: &mut usize) -> String
                         {
                             *cursor_position -= 1; //CURSOR
                             input.remove(*cursor_position); //LOCAL VARIABLE
-                            options::INPUT_READ.lock().unwrap().remove(*cursor_position); //GLOBAL VARIABLE
+                            INPUT_READ.lock().unwrap().remove(*cursor_position); //GLOBAL VARIABLE
 
                             //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
                             print!("\x1B[1D\x1B[0K");
@@ -292,7 +297,7 @@ fn read_input(input: &mut Vec<char>, cursor_position: &mut usize) -> String
                         if *cursor_position < input.len()
                         {
                             input.remove(*cursor_position); //LOCAL VARIABLE
-                            options::INPUT_READ.lock().unwrap().remove(*cursor_position); //GLOBAL VARIABLE
+                            INPUT_READ.lock().unwrap().remove(*cursor_position); //GLOBAL VARIABLE
 
                             //MOVE CURSOR TO LEFT AND DELETE REST OF THE LINE
                             print!("\x1B[0K");
@@ -340,7 +345,7 @@ fn read_input(input: &mut Vec<char>, cursor_position: &mut usize) -> String
 
                         //REPLACE CURRENT INPUT
                         *input = new_input.chars().collect(); //LOCAL VARIABLE
-                        *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
+                        *INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
                         *cursor_position = input.len(); //CURSOR
 
                         print!("{}", new_input); //PRINT
@@ -373,7 +378,7 @@ fn read_input(input: &mut Vec<char>, cursor_position: &mut usize) -> String
 
                         //REPLACE CURRENT INPUT
                         *input = new_input.chars().collect(); //LOCAL VARIABLE
-                        *options::INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
+                        *INPUT_READ.lock().unwrap() = input.clone(); //GLOBAL VARIABLE
                         *cursor_position = input.len(); //CURSOR
 
                         print!("{}", new_input); //PRINT
@@ -394,7 +399,7 @@ fn read_input(input: &mut Vec<char>, cursor_position: &mut usize) -> String
     //CLEAR INPUT BUFFERS
     input.clear();
     *cursor_position = 0;
-    *options::INPUT_READ.lock().unwrap() = Vec::new();
+    *INPUT_READ.lock().unwrap() = Vec::new();
 
     //TRIM
     if !options::get_asking_password()

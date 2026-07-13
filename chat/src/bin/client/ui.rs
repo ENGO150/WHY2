@@ -115,7 +115,7 @@ pub fn draw_event(event: ClientEvent)
                 c => format!("#{c} | "),
             };
 
-            print!("\r{channel}>>> {}", options::INPUT_READ.lock().unwrap().iter().collect::<String>());
+            print!("\r{channel}>>> {}", crate::INPUT_READ.lock().unwrap().iter().collect::<String>());
         },
 
         ClientEvent::PrivateMessageSent(to, id, msg) =>

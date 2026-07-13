@@ -27,7 +27,6 @@ use std::
 {
     sync::
     {
-        Arc,
         Mutex,
         RwLock,
         LazyLock,
@@ -61,12 +60,6 @@ static EXTRA_SPACE: AtomicBool = AtomicBool::new(false); //CLIENT DISPLAYED SOME
 
 #[cfg(feature = "client_base")]
 static SENDING_MESSAGES: AtomicBool = AtomicBool::new(false); //SENDING MESSAGES BOOL (CONDITION FOR ADDING MESSAGES TO HISTORY)
-
-#[cfg(feature = "client_base")]
-pub static INPUT_READ: LazyLock<Arc<Mutex<Vec<char>>>> = LazyLock::new(|| //INPUT READ FROM CLIENT
-{
-    Arc::new(Mutex::new(Vec::new()))
-});
 
 #[cfg(feature = "client_base")]
 static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT -> SERVER)
