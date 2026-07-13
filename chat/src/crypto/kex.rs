@@ -21,7 +21,7 @@ use p521::
     ecdh,
     PublicKey,
     SecretKey,
-    elliptic_curve::rand_core::OsRng,
+    elliptic_curve::Generate,
     pkcs8::
     {
         EncodePrivateKey,
@@ -106,7 +106,7 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::Shar
 pub fn generate_ephemeral_keys() -> (Zeroizing<String>, String) //CREATE ECC KEYS
 {
     //GENERATE PRIVATE KEY
-    let private = SecretKey::random(&mut OsRng);
+    let private = SecretKey::generate();
 
     //ENCODE KEYS TO PEM
     let private_pem = private.to_pkcs8_pem(Default::default()).expect("Encoding key to PEM failed");

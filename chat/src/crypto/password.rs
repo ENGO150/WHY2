@@ -16,8 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use p521::elliptic_curve::rand_core::OsRng;
-
 use argon2::
 {
     Argon2,
@@ -29,7 +27,8 @@ use argon2::
 pub fn hash_password(password: &str) -> String //HASH PASSWORD USING ARGON2
 {
     //GENERATE RANDOM SALT
-    let salt = SaltString::generate(&mut OsRng);
+    let salt_bytes: [u8; 16] = rand::random();
+    let salt = SaltString::encode_b64(&salt_bytes).expect("Generating hash salt failed");
 
     //HASH
     Argon2::default().hash_password(password.as_bytes(), &salt).unwrap().to_string()
