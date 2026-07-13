@@ -180,14 +180,37 @@ fn find_devices(host: &Host) -> Option<(Device, Device)> //FIND CONFIGURED/DEFAU
     Some((input_device?, output_device?))
 }
 
-pub fn configure_device(supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig) -> StreamConfig
+pub fn configure_device(device: &cpal::Device, supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig, is_input_stream: bool) -> StreamConfig
 {
-    supported_configs
+    let mut config: StreamConfig = supported_configs
         .filter(|c| c.min_sample_rate() <= consts::SAMPLE_RATE && c.max_sample_rate() >= consts::SAMPLE_RATE)
         .next()
         .map(|c| c.with_sample_rate(consts::SAMPLE_RATE))
-        .unwrap_or(default_config)
-        .into()
+        .unwrap_or(default_config.clone())
+        .into();
+
+    //TEST CONFIG (WASAPI FALLBACK)
+    if is_input_stream
+    {
+        if let Ok(test_stream) = device.build_input_stream(config.clone(), |_: &[f32], _| {}, |_| {}, None)
+        {
+            drop(test_stream); //WORKS, PROCEED
+        } else
+        {
+            config = default_config.into(); //FALLBACK TO DEFAULT
+        }
+    } else
+    {
+        if let Ok(test_stream) = device.build_output_stream(config.clone(), |_: &mut [f32], _| {}, |_| {}, None)
+        {
+            drop(test_stream); //WORKS, PROCEED
+        } else
+        {
+            config = default_config.into(); //FALLBACK TO DEFAULT
+        }
+    }
+
+    config
 }
 
 fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], id: usize, socket: &UdpSocket)
@@ -270,10 +293,10 @@ pub fn listen_server_voice //SERVER -> CLIENT
     }, &chat_options::get_keys().unwrap()).unwrap();
 
     //CONFIGURE CPAL INPUT
-    let input_config = configure_device(input_device.supported_input_configs().unwrap(), input_device.default_input_config().unwrap());
+    let input_config = configure_device(&input_device, input_device.supported_input_configs().unwrap(), input_device.default_input_config().unwrap(), true);
 
     //CONFIGURE CPAL OUTPUT
-    let output_config = configure_device(output_device.supported_output_configs().unwrap(), output_device.default_output_config().unwrap());
+    let output_config = configure_device(&output_device, output_device.supported_output_configs().unwrap(), output_device.default_output_config().unwrap(), false);
 
     //PREPARE OPUS ENCODER
     let opus_encoder = Encoder::new

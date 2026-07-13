@@ -115,10 +115,10 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) //C
 
     let mut config: StreamConfig = if cfg!(target_os = "windows")
     {
-        voice::configure_device(device.supported_output_configs().unwrap(), device.default_output_config().unwrap())
+        voice::configure_device(&device, device.supported_output_configs().unwrap(), device.default_output_config().unwrap(), true)
     } else
     {
-        voice::configure_device(device.supported_input_configs().unwrap(), device.default_input_config().unwrap())
+        voice::configure_device(&device, device.supported_input_configs().unwrap(), device.default_input_config().unwrap(), true)
     };
 
     config.buffer_size = BufferSize::Fixed(screen_consts::BUFFER_SIZE);
@@ -236,7 +236,7 @@ pub fn spawn_audio_playback(rx: Receiver<AudioFrame>, running: Arc<AtomicBool>)
 {
     let host = cpal::default_host();
     let device = host.default_output_device().expect("No audio output device found");
-    let mut config: StreamConfig = voice::configure_device(device.supported_output_configs().unwrap(), device.default_output_config().unwrap());
+    let mut config: StreamConfig = voice::configure_device(&device, device.supported_output_configs().unwrap(), device.default_output_config().unwrap(), false);
     config.buffer_size = BufferSize::Fixed(screen_consts::BUFFER_SIZE);
 
     let mut decoder = Decoder::new
