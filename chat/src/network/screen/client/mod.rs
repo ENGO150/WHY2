@@ -31,7 +31,7 @@ use std::
     {
         Arc,
         Mutex,
-        OnceLock,
+        RwLock,
         atomic::{ AtomicBool, Ordering },
     },
 };
@@ -72,7 +72,7 @@ pub enum UserEvent //CUSTOM WINIT EVENTS
 }
 
 //GLOBAL VARIABLES
-pub static SCREEN_SHARE_PROXY: OnceLock<EventLoopProxy<UserEvent>> = OnceLock::new();
+pub static SCREEN_SHARE_PROXY: RwLock<Option<EventLoopProxy<UserEvent>>> = RwLock::new(None);
 
 pub fn screen(token: [u8; 32])
 {
@@ -198,7 +198,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
             if let Some(frame) = read.frame
             {
                 tx.send(frame).ok();
-                if let Some(proxy) = SCREEN_SHARE_PROXY.get()
+                if let Some(proxy) = SCREEN_SHARE_PROXY.read().unwrap().as_ref()
                 {
                     proxy.send_event(UserEvent::NewFrame).ok();
                 }
@@ -211,7 +211,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
         }
     });
 
-    if let Some(proxy) = SCREEN_SHARE_PROXY.get()
+    if let Some(proxy) = SCREEN_SHARE_PROXY.read().unwrap().as_ref()
     {
         proxy.send_event(UserEvent::NewSession(ScreenShareRequest
         {

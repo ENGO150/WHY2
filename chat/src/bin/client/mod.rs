@@ -37,7 +37,6 @@ use std::
     },
     sync::
     {
-        LazyLock,
         Arc,
         Mutex,
         mpsc::{ self, Sender },
@@ -97,15 +96,8 @@ use why2_chat::network::screen::client::
 struct RawModeGuard;
 
 //GLOBAL VARIABLES
-pub static INPUT_READ: LazyLock<Arc<Mutex<Vec<char>>>> = LazyLock::new(|| //PARTIAL INPUT READ FROM CLIENT
-{
-    Arc::new(Mutex::new(Vec::new()))
-});
-
-static INPUT_HISTORY: LazyLock<Arc<Mutex<(Vec<String>, usize)>>> = LazyLock::new(|| //INPUTS READ FROM CLIENT
-{
-    Arc::new(Mutex::new((Vec::new(), 0)))
-});
+pub static INPUT_READ: Mutex<Vec<char>> = Mutex::new(Vec::new()); //PARTIAL INPUT READ FROM CLIENT
+static INPUT_HISTORY: Mutex<(Vec<String>, usize)> = Mutex::new((Vec::new(), 0)); //INPUTS READ FROM CLIENT
 
 //IMPLEMENTATIONS
 impl RawModeGuard
@@ -521,7 +513,7 @@ fn main()
         let event_loop = EventLoop::<UserEvent>::with_user_event()
             .build().expect("Failed to create event loop");
 
-        screen::SCREEN_SHARE_PROXY.set(event_loop.create_proxy()).ok();
+        *screen::SCREEN_SHARE_PROXY.write().unwrap() = Some(event_loop.create_proxy());
 
         let mut app = ScreenShareApp::new();
         event_loop.run_app(&mut app).expect("Event loop terminated with error");

@@ -25,7 +25,7 @@ use std::
 {
     thread,
     net::{ UdpSocket, TcpStream },
-    collections::{ HashMap, VecDeque },
+    collections::{ BTreeMap, VecDeque },
     time::
     {
         SystemTime,
@@ -36,7 +36,6 @@ use std::
     {
         Arc,
         Mutex,
-        LazyLock,
         mpsc::Sender,
         atomic::{ AtomicUsize, Ordering },
     },
@@ -138,8 +137,8 @@ pub struct PeerData
 }
 
 //GLOBAL VARIABLES
-static LOCAL_STREAMS: LazyLock<Mutex<Option<LocalStream>>> = LazyLock::new(|| Mutex::new(None));
-static CONSUMERS: LazyLock<Mutex<HashMap<usize, (RemoteStream, PeerData)>>> = LazyLock::new(|| Mutex::new(HashMap::new())); //OTHER CLIENTS
+static LOCAL_STREAMS: Mutex<Option<LocalStream>> = Mutex::new(None);
+static CONSUMERS: Mutex<BTreeMap<usize, (RemoteStream, PeerData)>> = Mutex::new(BTreeMap::new()); //OTHER CLIENTS
 
 static LOCAL_DISPLAY_HOLD: AtomicUsize = AtomicUsize::new(0);
 static AUDIO_GENERATION: AtomicUsize = AtomicUsize::new(0);

@@ -46,7 +46,7 @@ pub enum SoundEffect
 }
 
 //GLOBAL VARIABLES
-static ACTIVE_EFFECTS: LazyLock<Mutex<Vec<ActiveEffect>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+static ACTIVE_EFFECTS: Mutex<Vec<ActiveEffect>> = Mutex::new(Vec::new());
 
 //ASSETS
 pub static JOIN_SOUND: LazyLock<Arc<Vec<f32>>> = LazyLock::new(|| //DI DING

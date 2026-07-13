@@ -21,13 +21,11 @@ use std::
     thread,
     net::TcpStream,
     io::{ Error, Write },
-    collections::HashMap,
+    collections::BTreeMap,
     path::PathBuf,
     sync::
     {
-        Arc,
         Mutex,
-        LazyLock,
         mpsc::Sender,
     },
 };
@@ -133,10 +131,7 @@ pub enum ClientEvent
 }
 
 //LISTS
-pub static ACTIVE_UPLOADS: LazyLock<Arc<Mutex<HashMap<[u8; 32], PathBuf>>>> = LazyLock::new(|| //ACTIVE UPLOADS
-{
-    Arc::new(Mutex::new(HashMap::new()))
-});
+pub static ACTIVE_UPLOADS: Mutex<BTreeMap<[u8; 32], PathBuf>> = Mutex::new(BTreeMap::new()); //ACTIVE UPLOADS
 
 //FUNCTIONS
 //PRIVATE

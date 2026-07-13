@@ -28,13 +28,12 @@ use std::
     sync::
     {
         Mutex,
-        LazyLock,
         atomic::AtomicUsize,
     },
 };
 
 #[cfg(feature = "client_voice")]
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 #[cfg(feature = "client_base")]
 use crate::consts::SharedKeys;
@@ -46,10 +45,7 @@ static SERVER_USERNAME: RwLock<String> = RwLock::new(String::new());
 static VOICE_CHAT: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "client_base")]
-static KEYS: LazyLock<RwLock<Option<SharedKeys>>> = LazyLock::new(|| //SHARED SYMMETRIC KEY
-{
-    RwLock::new(None)
-});
+static KEYS: RwLock<Option<SharedKeys>> = RwLock::new(None); //SHARED SYMMETRIC KEY
 
 #[cfg(feature = "client_base")]
 static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING PASSWORD (DISABLE ECHO)
@@ -73,12 +69,12 @@ static SERVER_ADDRESS: RwLock<String> = RwLock::new(String::new());
 static OBFUSCATION_KEY: RwLock<[u8; 32]> = RwLock::new([0; 32]);
 
 #[cfg(feature = "client_base")]
-static CHANNEL: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String::new())); //ACTIVE CHANNEL
+static CHANNEL: RwLock<String> = RwLock::new(String::new()); //ACTIVE CHANNEL
 
 #[cfg(feature = "client_voice")]
 static MUTE: AtomicBool = AtomicBool::new(false); //MUTE LOCAL CLIENT
 #[cfg(feature = "client_voice")]
-static MUTED: LazyLock<Mutex<HashSet<usize>>> = LazyLock::new(|| Mutex::new(HashSet::new())); //MUTED CLIENTS
+static MUTED: Mutex<BTreeSet<usize>> = Mutex::new(BTreeSet::new()); //MUTED CLIENTS
 
 #[cfg(feature = "client_base")]
 static SOCKS5: AtomicBool = AtomicBool::new(false); //USE SOCKS5 (TOR)
