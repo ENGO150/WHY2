@@ -107,7 +107,7 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
                         out
                     }
 
-                    #[cfg(feature = "client")]
+                    #[cfg(feature = "client_base")]
                     {
                         buffer[..bytes].to_vec()
                     }
