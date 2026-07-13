@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::sync::
 {
-    OnceLock,
+    RwLock,
     atomic::{ AtomicBool, Ordering },
 };
 
@@ -28,7 +28,6 @@ use std::
     sync::
     {
         Mutex,
-        RwLock,
         LazyLock,
         atomic::AtomicUsize,
     },
@@ -41,7 +40,7 @@ use std::collections::HashSet;
 use crate::consts::SharedKeys;
 
 //SETTINGS
-static SERVER_USERNAME: OnceLock<String> = OnceLock::new();
+static SERVER_USERNAME: RwLock<String> = RwLock::new(String::new());
 
 #[cfg(feature = "server")]
 static VOICE_CHAT: AtomicBool = AtomicBool::new(false);
@@ -68,10 +67,10 @@ static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT 
 static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (SERVER -> CLIENT)
 
 #[cfg(feature = "client_base")]
-static SERVER_ADDRESS: OnceLock<String> = OnceLock::new();
+static SERVER_ADDRESS: RwLock<String> = RwLock::new(String::new());
 
 #[cfg(feature = "client_base")]
-static OBFUSCATION_KEY: OnceLock<[u8; 32]> = OnceLock::new();
+static OBFUSCATION_KEY: RwLock<[u8; 32]> = RwLock::new([0; 32]);
 
 #[cfg(feature = "client_base")]
 static CHANNEL: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String::new())); //ACTIVE CHANNEL
@@ -88,12 +87,12 @@ static SOCKS5: AtomicBool = AtomicBool::new(false); //USE SOCKS5 (TOR)
 //SERVER USERNAME
 pub fn get_server_username() -> String //GET SERVER USERNAME
 {
-    SERVER_USERNAME.get().unwrap().to_owned()
+    SERVER_USERNAME.read().unwrap().to_owned()
 }
 
 pub fn set_server_username(username: &str) //SET SERVER USERNAME
 {
-    SERVER_USERNAME.set(username.to_owned()).unwrap();
+    *SERVER_USERNAME.write().unwrap() = username.to_owned();
 }
 
 //VOICE CHAT
@@ -191,26 +190,26 @@ pub fn set_server_seq(value: usize) //SET SERVER SEQUENCE NUMBER
 #[cfg(feature = "client_base")]
 pub fn get_server_address() -> String //GET SERVER ADDRESS
 {
-    SERVER_ADDRESS.get().unwrap().to_owned()
+    SERVER_ADDRESS.read().unwrap().to_owned()
 }
 
 #[cfg(feature = "client_base")]
 pub fn set_server_address(address: &str) //SET SERVER ADDRESS
 {
-    SERVER_ADDRESS.set(address.to_owned()).unwrap();
+    *SERVER_ADDRESS.write().unwrap() = address.to_owned();
 }
 
 //OBFUSCATION KEY
 #[cfg(feature = "client_base")]
 pub fn get_obfuscation_key() -> [u8; 32] //GET OBFUSCATION KEY
 {
-    *OBFUSCATION_KEY.get().unwrap()
+    *OBFUSCATION_KEY.read().unwrap()
 }
 
 #[cfg(feature = "client_base")]
 pub fn set_obfuscation_key(key: &[u8; 32]) //SET OBFUSCATION KEY
 {
-    OBFUSCATION_KEY.set(*key).unwrap();
+    *OBFUSCATION_KEY.write().unwrap() = *key;
 }
 
 //CHANNEL
