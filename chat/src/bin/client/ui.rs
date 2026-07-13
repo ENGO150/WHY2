@@ -23,19 +23,21 @@ use std::
     io::{ self, Write },
 };
 
-use colored::Colorize;
 use crossterm::
 {
     terminal,
     QueueableCommand,
     style::
     {
-        Print,
-        SetForegroundColor,
         Color,
+        Print,
+        Stylize,
+        Attribute,
         ResetColor,
         SetAttribute,
-        Attribute
+        ContentStyle,
+        StyledContent,
+        SetForegroundColor,
     },
     cursor::
     {
@@ -58,7 +60,8 @@ fn colorize(text: String, color: Option<u8>) -> String //COLORIZE text IF PASSED
 {
     match color.and_then(|c| colors::u8_to_color(c))
     {
-        Some(c) if !config::read_config::<bool>("disable_colors") => text.color(c).to_string(),
+        Some(c) if !config::read_config::<bool>("disable_colors") =>
+            StyledContent::new(ContentStyle::new().with(c), text).to_string(),
         _ => text
     }
 }

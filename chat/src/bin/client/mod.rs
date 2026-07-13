@@ -49,6 +49,7 @@ use sha2::{ Sha256, Digest };
 use crossterm::
 {
     terminal,
+    style::Color,
     event::
     {
         self,
@@ -57,8 +58,6 @@ use crossterm::
         Event,
     },
 };
-
-use colored::Color;
 
 use why2_chat::
 {
@@ -407,10 +406,17 @@ fn read_input(input: &mut Vec<char>, cursor_position: &mut usize) -> String
     }
 }
 
-fn to_color(color: &str) -> Result<u8, ()> //CONVERT STRING TO COLOR CODE
+fn to_color(color: &str) -> Result<(u8, String), ()> //CONVERT STRING TO COLOR CODE
 {
-    color.parse::<Color>()
-        .map(|c| colors::color_to_u8(&c))
+    //FORMAT COLOR STRING
+    let mut formatted_color = color.replace(" ", "_").to_lowercase();
+    if formatted_color.starts_with("dark") && !formatted_color.starts_with("dark_")
+    {
+        formatted_color = formatted_color.replacen("dark", "dark_", 1);
+    }
+
+    Color::try_from(formatted_color.as_str())
+        .map(|c| (colors::color_to_u8(&c), formatted_color))
         .map_err(|_| ())
 }
 
@@ -422,15 +428,15 @@ fn color_handler(config_key: &str, parameters: Option<String>) //HANDLE COLOR CH
     if let Some(parameters) = parameters
     {
         //CHECK FOR COLOR VALIDITY
-        println!("{}\n", if to_color(&parameters).is_ok()
+        println!("{}\n", if let Ok((_, formatted_name)) = to_color(&parameters)
         {
             //SAVE COLOR TO CONFIG
-            config::client_write(config_key, &parameters.to_lowercase());
+            config::client_write(config_key, &formatted_name);
 
             "Color set successfully."
         } else
         {
-            "Invalid color! See \x1b]8;;https://docs.rs/colored/latest/colored/enum.Color.html\x1b\\colored API\x1b]8;;\x1b\\ for help."
+            "Invalid color! See \x1b]8;;https://docs.rs/crossterm/latest/crossterm/style/enum.Color.html\x1b\\crossterm API\x1b]8;;\x1b\\ for help."
         });
     } else
     {
@@ -442,8 +448,8 @@ fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
 {
     MessageColors
     {
-        username_color: to_color(&config::read_config::<String>("username_color")).ok(),
-        message_color: to_color(&config::read_config::<String>("message_color")).ok(),
+        username_color: to_color(&config::read_config::<String>("username_color")).ok().map(|(c, _)| c),
+        message_color: to_color(&config::read_config::<String>("message_color")).ok().map(|(c, _)| c),
     }
 }
 

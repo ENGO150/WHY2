@@ -5187,7 +5187,6 @@ version = "1.5.3"
 dependencies = [
  "argon2",
  "audiopus",
- "colored",
  "cpal",
  "crossbeam-channel",
  "crossterm",
