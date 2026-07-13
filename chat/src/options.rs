@@ -23,17 +23,14 @@ use std::sync::
 };
 
 #[cfg(feature = "client_base")]
-use std::
-{
-    sync::
-    {
-        Mutex,
-        atomic::AtomicUsize,
-    },
-};
+use std::sync::atomic::AtomicUsize;
 
 #[cfg(feature = "client_voice")]
-use std::collections::BTreeSet;
+use std::
+{
+    sync::Mutex,
+    collections::BTreeSet,
+};
 
 #[cfg(feature = "client_base")]
 use crate::consts::SharedKeys;
