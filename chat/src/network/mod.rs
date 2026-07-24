@@ -103,6 +103,8 @@ pub enum MessageCode //CONTROL CODES
     RegisterDisabled,   //SERVER -> CLIENT | REGISTRATION IS DISABLED
     Version,            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
     Channel,            //SERVER <> CLIENT | CHANNEL CHANGE
+    ChannelCreated,     //SERVER -> CLIENT | CHANNEL CREATED
+    ChannelDestroyed,   //SERVER -> CLIENT | CHANNEL ABANDONED
     Voice,              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
     ChannelJoin,        //SERVER -> CLIENT | CLIENT JOINED VOICE CHANNEL
     ChannelLeave,       //SERVER -> CLIENT | CLIENT LEFT VOICE CHANNEL

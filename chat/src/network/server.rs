@@ -851,9 +851,14 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
 
 fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOVE CLIENT TO CHANNEL
 {
+    let mut old_channel = None; //PREVIOUS CHANNEL
+
     //UPDATE CONNECTION
     CONNECTIONS.alter(&peer_addr, |_, old_connection|
     {
+        //GET PREVIOUS CHANNEL
+        old_channel = old_connection.channel().clone();
+
         Connection::Authenticated
         {
             write_stream: old_connection.write_stream().clone(),
@@ -873,6 +878,39 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             alive: true,
         }
     });
+
+    //RETURN IF CLIENT SWITCHED TO SAME CHANNEL
+    if old_channel == *channel { return; }
+
+    //CHECK IF CHANNEL WAS ABANDONED
+    if let Some(old_channel) = old_channel
+    {
+        if !CONNECTIONS.iter().any(|c| c.channel().as_ref() == Some(&old_channel))
+        {
+            //NO CLIENT IS IN OLD CHANNEL
+            send_to_all(MessagePacket
+            {
+                code: Some(MessageCode::ChannelDestroyed),
+                text: Some(old_channel),
+                ..Default::default()
+            }, false);
+        }
+    }
+
+    //CHECK IF CHANNEL WAS CREATED
+    if let Some(channel) = channel
+    {
+        if CONNECTIONS.iter().filter(|c| c.channel().as_ref() == Some(channel)).count() == 1
+        {
+            //CLIENT IS FIRST IN CHANNEL
+            send_to_all(MessagePacket
+            {
+                code: Some(MessageCode::ChannelCreated),
+                text: Some(channel.clone()),
+                ..Default::default()
+            }, false);
+        }
+    }
 }
 
 fn ask_version(streams: &mut Streams, keys: &SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
