@@ -100,6 +100,8 @@ pub enum ClientEvent
     VoiceActivity(Vec<VoiceUser>),             //VOICE OVERLAY
     Join(String),                              //CLIENT CONNECTED
     Leave(String),                             //CLIENT DISCONNECTED
+    ChannelCreated(String),                    //CHANNEL CREATED
+    ChannelDestroyed(String),                  //CHANNEL ABANDONED
     Clear(usize),                              //CLEAR n LINES
     InvalidUsage,                              //INVALID COMMAND USAGE
     VersionFailed,                             //FETCHING VERSIONS FAILED
@@ -459,6 +461,18 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     options::set_channel(read.text.unwrap_or_else(|| String::new()));
 
                     tx.send(ClientEvent::Clear(1)).unwrap();
+                },
+
+                //CHANNEL CREATED
+                MessageCode::ChannelCreated =>
+                {
+                    tx.send(ClientEvent::ChannelCreated(read.text.unwrap())).unwrap();
+                },
+
+                //CHANNEL ABANDONED
+                MessageCode::ChannelDestroyed =>
+                {
+                    tx.send(ClientEvent::ChannelDestroyed(read.text.unwrap())).unwrap();
                 },
 
                 //SERVER ALLOWED VOICE

@@ -505,6 +505,9 @@ pub fn draw_event(event: ClientEvent)
             println!("\nServer quit communication.");
             process::exit(0);
         },
+
+        //IGNORE THOSE
+        ClientEvent::ChannelCreated(_) | ClientEvent::ChannelDestroyed(_) => {},
     }
 
     //FLUSH STDOUT
