@@ -615,22 +615,25 @@ fn send_welcome_packet(write_stream: &mut TcpStream, keys: &SharedKeys) //send w
 }
 
 //PUBLIC
-pub fn send_to_all(packet: MessagePacket) //SEND PACKET TO ALL CLIENTS
+pub fn send_to_all(packet: MessagePacket, filter_channel: bool) //SEND PACKET TO ALL CLIENTS
 {
     //GET SENDER'S CHANNEL
-    let channel = packet.username.as_ref().and_then(|username|
+    let channel = if filter_channel
     {
-        CONNECTIONS.iter()
-            .find(|entry| entry.username() == Some(username))
-            .and_then(|entry| entry.channel().clone())
-    });
+        packet.username.as_ref().and_then(|username|
+        {
+            CONNECTIONS.iter()
+                .find(|entry| entry.username() == Some(username))
+                .and_then(|entry| entry.channel().clone())
+        })
+    } else { None };
 
     //COLLECT EACH CLIENT IN SAME CHANNEL
     let entries: Vec<Connection> = CONNECTIONS.iter().filter_map(|entry|
     {
         match entry.value()
         {
-            Connection::Authenticated { channel: c, .. } if c == &channel =>
+            Connection::Authenticated { channel: c, .. } if !filter_channel || c == &channel =>
             {
                 //FOUND, COLLECT
                 Some(entry.value().clone())
@@ -719,7 +722,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
             code: Some(MessageCode::Leave),
 
             ..Default::default()
-        });
+        }, false);
     }
 
     log::info!
@@ -1165,7 +1168,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
         text: Some(username.clone()),
         code: Some(MessageCode::Join),
         ..Default::default()
-    });
+    }, false);
 
     //LOOP READING
     loop
@@ -1225,7 +1228,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                                     username: Some(username.clone()),
                                     id: Some(id),
                                     ..Default::default()
-                                });
+                                }, true);
                             }
 
                             //SEND CONNECTED CLIENTS
@@ -1241,7 +1244,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                                     username: Some(username.clone()),
                                     id: Some(id),
                                     ..Default::default()
-                                });
+                                }, true);
                             }
 
                             //REMOVE FROM VOICE
@@ -1265,7 +1268,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                                 username: Some(username.clone()),
                                 id: Some(id),
                                 ..Default::default()
-                            });
+                            }, true);
                         }
 
                         //UPDATE CHANNEL
@@ -1281,7 +1284,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                                 username: Some(username.clone()),
                                 id: Some(id),
                                 ..Default::default()
-                            });
+                            }, true);
                         }
 
                         //SEND CONNECTED CLIENTS
@@ -1660,7 +1663,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
             id: Some(id),
             colors: read.colors,
             ..Default::default()
-        });
+        }, true);
     }
 }
 

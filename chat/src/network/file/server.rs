@@ -282,7 +282,7 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
                             username: Some(username.clone()),
                             code: Some(MessageCode::Uploaded),
                             ..Default::default()
-                        });
+                        }, false);
 
                         if insert
                         {
