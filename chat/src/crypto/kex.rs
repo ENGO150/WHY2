@@ -63,8 +63,23 @@ use crate::
 #[cfg(feature = "server")]
 use std::
 {
-    fs,
     path::Path,
+    io::Write,
+    fs::
+    {
+        self,
+        DirBuilder,
+        OpenOptions,
+    },
+};
+
+
+#[cfg(all(feature = "server", unix))]
+use std::os::unix::fs::
+{
+    DirBuilderExt,
+    OpenOptionsExt,
+    PermissionsExt,
 };
 
 #[cfg(feature = "server")]
@@ -137,19 +152,78 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
     let server_keys_dir = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR;
     if !Path::new(&server_keys_dir).is_dir()
     {
-        fs::create_dir_all(&server_keys_dir).expect("Failed to create WHY2 server-keys directory"); //CREATE DIRECTORY
+        let mut builder = DirBuilder::new();
+        builder.recursive(true);
+
+        //SET DIRECTORY PERMS ON UNIX-LIKE OS
+        #[cfg(unix)]
+        {
+            builder.mode(0o700);
+        }
+
+        builder.create(&server_keys_dir).expect("Failed to create WHY2 server-keys directory");
 
         //GENERATE KEYS
-        let (sk, pk) = generate_ephemeral_keys();   //ECC
+        let (sk, pk) = generate_ephemeral_keys(); //ECC
         let (dk, ek) = generate_server_pq_keys(); //ML-KEM
 
+        //WRITE CLOSURE
+        let write_secure_key = |path: String, data: &[u8]|
+        {
+            let mut options = OpenOptions::new();
+            options.write(true).create(true).truncate(true);
+
+            //SET FILE PERMS ON UNIX-LIKE OS
+            #[cfg(unix)]
+            {
+                options.mode(0o600);
+            }
+
+            let mut file = options.open(&path)
+                .unwrap_or_else(|_| panic!("Failed to open {} for writing", path));
+
+            file.write_all(data)
+                .unwrap_or_else(|_| panic!("Failed to write key to {}", path));
+        };
+
         //SAVE ECC KEYS
-        fs::write(server_keys_dir.clone() + consts_chat::SERVER_SKEY, sk.as_str()).expect("Saving server secret key failed");
-        fs::write(server_keys_dir.clone() + consts_chat::SERVER_PKEY, pk).expect("Saving server public key failed");
+        write_secure_key(server_keys_dir.clone() + consts_chat::SERVER_SKEY, sk.as_bytes());
+        write_secure_key(server_keys_dir.clone() + consts_chat::SERVER_PKEY, pk.as_bytes());
 
         //SAVE PQ KEYS
-        fs::write(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY, dk.as_str()).expect("Saving server PQ secret key failed");
-        fs::write(server_keys_dir + consts_chat::SERVER_PQ_PKEY, ek).expect("Saving server PQ public key failed");
+        write_secure_key(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY, dk.as_bytes());
+        write_secure_key(server_keys_dir + consts_chat::SERVER_PQ_PKEY, ek.as_bytes());
+    } else
+    {
+        //ENFORCE STRICT FILE PERMISSIONS
+        #[cfg(unix)]
+        {
+            //ENFORCE 700 PERMS ON DIR
+            if let Ok(metadata) = fs::metadata(&server_keys_dir)
+            {
+                let mut perms = metadata.permissions();
+                perms.set_mode(0o700);
+                fs::set_permissions(&server_keys_dir, perms).ok();
+            }
+
+            //FILE PERMS ENFORCE CLOSURE
+            let enforce_file_perms = |file_name: &str|
+            {
+                let path = server_keys_dir.clone() + file_name;
+                if let Ok(metadata) = fs::metadata(&path)
+                {
+                    let mut perms = metadata.permissions();
+                    perms.set_mode(0o600);
+                    fs::set_permissions(&path, perms).ok();
+                }
+            };
+
+            //ENFORCE 600 PERMS ON FILES
+            enforce_file_perms(consts_chat::SERVER_SKEY);
+            enforce_file_perms(consts_chat::SERVER_PKEY);
+            enforce_file_perms(consts_chat::SERVER_PQ_SKEY);
+            enforce_file_perms(consts_chat::SERVER_PQ_PKEY);
+        }
     }
 }
 
