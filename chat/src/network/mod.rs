@@ -56,6 +56,7 @@ use why2::
 use crate::
 {
     crypto,
+    network::codes::PacketCode,
     consts::
     {
         Streams,
@@ -84,46 +85,6 @@ pub trait SequencedPacket: SchemaWrite<DefaultConfig, Src = Self>
 }
 
 //ENUMS
-#[derive(SchemaWrite, SchemaRead, PartialEq, Clone)]
-pub enum MessageCode //CONTROL CODES
-{
-    KeyExchange,        //SERVER <> CLIENT | KEY EXCHANGE
-    Rekey,              //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)
-    Welcome,            //SERVER -> CLIENT | INFORMATIONS
-    Disconnect,         //SERVER <> CLIENT | QUIT COMMUNICATION
-    Username,           //SERVER -> CLIENT | PICK USERNAME
-    PasswordL,          //SERVER -> CLIENT | LOGIN
-    PasswordR,          //SERVER -> CLIENT | REGISTER
-    Accept,             //SERVER -> CLIENT | START CHATTING
-    Join,               //SERVER -> CLIENT | CLIENT JOIN MESSAGE
-    Leave,              //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
-    List,               //CLIENT <> SERVER | PRINT CONNECTED USERS
-    PrivateMessage,     //CLIENT <> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
-    PrivateMessageBack, //SERVER -> CLIENT | SEND MESSAGE BACK TO SENDER
-    SpamWarning,        //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN
-    RegisterDisabled,   //SERVER -> CLIENT | REGISTRATION IS DISABLED
-    Version,            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
-    Channel,            //SERVER <> CLIENT | CHANNEL CHANGE
-    ChannelCreated,     //SERVER -> CLIENT | CHANNEL CREATED
-    ChannelDestroyed,   //SERVER -> CLIENT | CHANNEL ABANDONED
-    Voice,              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
-    ChannelJoin,        //SERVER -> CLIENT | CLIENT JOINED VOICE CHANNEL
-    ChannelLeave,       //SERVER -> CLIENT | CLIENT LEFT VOICE CHANNEL
-    VoiceClients,       //SERVER -> CLIENT | TELL CLIENT ALL CONNECTED VOICE CLIENTS
-    Upload,             //CLIENT <> SERVER | REQUEST FILE UPLOAD (OR APPROVAL FROM SERVER)
-    Download,           //CLIENT <> SERVER | DOWNLOAD FILE FROM SERVER
-    Uploaded,           //SERVER -> CLIENT | ANNOUNCE NEW UPLOADED FILE
-    Files,              //CLIENT <> SERVER | LIST UPLOADED FILES
-    Screens,            //CLIENT <> SERVER | LIST SCREENSHARES
-    Attach,             //CLIENT <> SERVER | ATTACH CLIENT SCREENSHARE
-    Deattach,           //CLIENT <> SERVER | DEATTACH CLIENT SCREENSHARE
-    UploadLimit,        //SERVER -> CLIENT | MAX CONCURRENT UPLOADS REACHED
-    Screen,             //CLIENT <> SERVER | TOGGLE SCREENSHARE
-    InvalidUsage,       //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
-    InvalidFeature,     //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE
-    KeepAlive,          //SERVER <> CLIENT | A BIT LESS STUPID KEEP-ALIVE
-}
-
 pub enum EncryptionMode<'a> //MODE OF ENCRYPTION
 {
     OneShot(Option<&'a chat_consts::SharedKeys>), //ONE-SHOT ENCRYPTION
@@ -131,23 +92,11 @@ pub enum EncryptionMode<'a> //MODE OF ENCRYPTION
 }
 
 //STRUCTS
-#[derive(SchemaWrite, SchemaRead, Clone, Default)]
-pub struct MessageColors //COLORS OF MESSAGE
+#[derive(SchemaWrite, SchemaRead, Clone)]
+pub struct Packet //MESSAGE PACKET (WHAT IS BEING SENT)
 {
-    pub username_color: Option<u8>, //COLOR OF USERNAME
-    pub message_color: Option<u8>,  //COLOR OF MESSAGE
-}
-
-#[derive(SchemaWrite, SchemaRead, Clone, Default)]
-pub struct MessagePacket //MESSAGE PACKET (WHAT IS BEING SENT)
-{
-    pub text: Option<String>,           //MESSAGE
-    pub username: Option<String>,       //USERNAME (SENT ONLY BY SERVER, AS SERVER DOESN'T ACCEPT USERNAMES FROM CLIENT)
-    pub id: Option<usize>,              //ID OF USER
-    pub code: Option<MessageCode>,      //CONTROL CODE
-    pub colors: MessageColors,          //MESSAGE COLORS
-    pub seq: usize,                     //SEQUENCE NUMBER
-    pub token: Option<[u8; 32]>,        //CONNECTION TOKEN
+    pub code: PacketCode, //CONTROL CODE
+    pub seq: usize,       //SEQUENCE NUMBER
 }
 
 pub struct ReadResult //RESULT OF TCP READ
@@ -157,7 +106,7 @@ pub struct ReadResult //RESULT OF TCP READ
 }
 
 //IMPLEMENTATIONS
-impl SequencedPacket for MessagePacket
+impl SequencedPacket for Packet
 {
     fn seq(&self) -> usize { self.seq }
     fn set_seq(&mut self, seq: usize) { self.seq = seq; }
@@ -439,14 +388,18 @@ pub fn read_tcp
 pub fn send //SEND packet TO stream
 (
     stream: &mut TcpStream,
-    packet: MessagePacket,
+    code: PacketCode,
     keys: Option<&chat_consts::SharedKeys>,
 )
 {
     send_tcp
     (
         stream,
-        packet,
+        Packet
+        {
+            code,
+            seq: 0,
+        },
         EncryptionMode::OneShot(keys),
         None,
     );
@@ -457,7 +410,7 @@ pub fn receive
     streams: &mut Streams,
     keys: Option<&chat_consts::SharedKeys>,
     seq: Option<&mut usize> //LOCAL/GLOBAL SEQ
-) -> Option<MessagePacket>
+) -> Option<PacketCode>
 {
     let read = read_tcp
     (
@@ -467,7 +420,7 @@ pub fn receive
     )?;
 
     //DESERIALIZE AND RETURN
-    match wincode::deserialize::<MessagePacket>(&read.data)
+    match wincode::deserialize::<Packet>(&read.data)
     {
         Ok(packet) =>
         {
@@ -555,7 +508,7 @@ pub fn receive
                     None => options::get_server_seq(),
                 };
 
-                if packet.seq > used_seq || used_seq == 0 || packet.code == Some(MessageCode::Disconnect) //VALID
+                if packet.seq > used_seq || used_seq == 0 || packet.code == PacketCode::Disconnect //VALID
                 {
                     //SET SEQ
                     if let Some(seq) = seq
@@ -571,7 +524,7 @@ pub fn receive
                 }
             }
 
-            return Some(packet);
+            return Some(packet.code);
         },
 
         Err(_) =>
