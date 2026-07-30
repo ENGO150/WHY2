@@ -46,8 +46,6 @@ use rand::
 
 use zeroize::Zeroizing;
 
-use serde_json::{ json, Value };
-
 use dashmap::DashMap;
 
 use crate::
@@ -65,12 +63,14 @@ use crate::
     network::
     {
         self,
-        MessageCode,
-        MessagePacket,
         voice::server as voice_server,
-        file::server::
+        file::server as file,
+        codes::
         {
-            self as file,
+            PacketCode,
+            OnlineUser,
+            UserFile,
+            UserScreen,
         },
     },
 };
@@ -486,7 +486,9 @@ pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::ne
 pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
-fn untrusted_read(streams: &mut Streams, code: MessageCode, keys: Option<&SharedKeys>) -> Option<MessagePacket>
+fn untrusted_read<F>(streams: &mut Streams, is_match: F, keys: Option<&SharedKeys>) -> Option<PacketCode>
+where
+    F: Fn(&PacketCode) -> bool
 {
     //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
     streams.0.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
@@ -503,7 +505,7 @@ fn untrusted_read(streams: &mut Streams, code: MessageCode, keys: Option<&Shared
             None => return None
         };
 
-        if received.code == Some(code.clone()) && !received.text.is_none() { break received; }
+        if is_match(&received) { break received; }
 
         //CHECK INVALID PACKETS COUNTER
         if invalid_packets == 3 { return None; }
@@ -528,47 +530,25 @@ fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
     let (sk, pk) = kex::get_server_keys();          //ECC
     let (pq_sk, pq_pk) = kex::get_server_pq_keys(); //PQ (ML-KEM)
 
-    //PREPARE PAYLOAD
-    let payload = serde_json::json!
-    ({
-        "ecc": pk,
-        "pq": pq_pk,
-    }).to_string();
-
     //ATOMIC SEND
     {
         let mut write = streams.1.lock().unwrap();
 
         //TRIGGER REKEY
-        if let Some(current_keys) = rekey_trigger
+        let keys = if let Some(current_keys) = rekey_trigger
         {
-            network::send(&mut write, MessagePacket
-            {
-                code: Some(MessageCode::Rekey),
-                ..Default::default()
-            }, Some(current_keys));
+            network::send(&mut write, PacketCode::Rekey, Some(current_keys));
 
-            //SEND ENCRYPTED PUBKEYS TO CLIENT
-            network::send(&mut write, MessagePacket
-            {
-                text: Some(payload),
-                code: Some(MessageCode::KeyExchange),
-                ..Default::default()
-            }, Some(current_keys));
-        } else
-        {
-            //SEND OBFUSCATED PUBKEYS TO CLIENT
-            network::send(&mut write, MessagePacket
-            {
-                text: Some(payload),
-                code: Some(MessageCode::KeyExchange),
-                ..Default::default()
-            }, None);
-        }
+            //ENCRYPT PUBKEYS
+            Some(current_keys)
+        } else { None }; //OBFUSCATE PUBKEYS
+
+        //SEND ENCRYPTED PUBKEYS TO CLIENT
+        network::send(&mut write, PacketCode::KeyExchange { ecc: pk, pq: pq_pk }, keys);
     }
 
     //READ FROM UNTRUSTED CLIENT
-    let message = match untrusted_read(streams, MessageCode::KeyExchange, rekey_trigger)
+    let message = match untrusted_read(streams, |code| matches!(code, PacketCode::KeyExchange { .. }), rekey_trigger)
     {
         Some(r) => r,
         None => return
@@ -577,16 +557,14 @@ fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
     //DERIVE SHARED KEYS
     let new_keys = (||
     {
-        //PARSE CLIENT RESPONSE (JSON)
-        let client_response: Value = serde_json::from_str(message.text.as_ref().unwrap()).ok()?;
-        let client_ecc_pk = client_response["ecc"].as_str()?;
-        let client_pq_ciphertext = client_response["pq"].as_str()?;
+        if let PacketCode::KeyExchange { ecc, pq } = message
+        {
+            //DECAPSULATE PQ
+            let pq_secret = kex::decapsulate_pq(&pq_sk, &pq)?;
 
-        //DECAPSULATE PQ
-        let pq_secret = kex::decapsulate_pq(&pq_sk, client_pq_ciphertext)?;
-
-        //DERIVE KEYS
-        kex::derive_shared_secret(sk, client_ecc_pk.to_string(), pq_secret)
+            //DERIVE KEYS
+            kex::derive_shared_secret(sk, ecc, pq_secret)
+        } else { unreachable!("what"); }
     })();
 
     //UPDATE CLIENT KEYS
@@ -599,41 +577,27 @@ fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
 
 fn send_welcome_packet(write_stream: &mut TcpStream, keys: &SharedKeys) //send welcome packet you idiot
 {
-    //CREATE JSON WITH ALL THE INFO
-    let welcome_json = json!(
-    {
-        "min_pass": config::read_config::<usize>("min_password_length"),
-        "max_uname": config::read_config::<usize>("max_username_length"),
-        "min_uname": config::read_config::<usize>("min_username_length"),
-        "server_name": config::read_config::<String>("server_name"),
-        "server_uname": options::get_server_username(),
-        "git_hash": env!("WHY2_GIT_HASH"),
-    }).to_string();
-
     //SEND
-    send_code(write_stream, Some(welcome_json), MessageCode::Welcome, Some(keys));
+    network::send(write_stream, PacketCode::Welcome
+    {
+        min_pass: config::read_config::<u64>("min_password_length"),
+        max_uname: config::read_config::<u64>("max_username_length"),
+        min_uname: config::read_config::<u64>("min_username_length"),
+        server_name: config::read_config::<String>("server_name"),
+        server_uname: options::get_server_username(),
+        git_hash: env!("WHY2_GIT_HASH").to_owned(),
+    }, Some(keys));
 }
 
 //PUBLIC
-pub fn send_to_all(packet: MessagePacket, filter_channel: bool) //SEND PACKET TO ALL CLIENTS
+pub fn send_to_all(code: PacketCode, channel: Option<&str>) //SEND PACKET TO ALL CLIENTS
 {
-    //GET SENDER'S CHANNEL
-    let channel = if filter_channel
-    {
-        packet.username.as_ref().and_then(|username|
-        {
-            CONNECTIONS.iter()
-                .find(|entry| entry.username() == Some(username))
-                .and_then(|entry| entry.channel().clone())
-        })
-    } else { None };
-
     //COLLECT EACH CLIENT IN SAME CHANNEL
     let entries: Vec<Connection> = CONNECTIONS.iter().filter_map(|entry|
     {
         match entry.value()
         {
-            Connection::Authenticated { channel: c, .. } if !filter_channel || c == &channel =>
+            Connection::Authenticated { channel: c, .. } if channel.is_none() || c.as_deref() == channel =>
             {
                 //FOUND, COLLECT
                 Some(entry.value().clone())
@@ -645,14 +609,14 @@ pub fn send_to_all(packet: MessagePacket, filter_channel: bool) //SEND PACKET TO
     for ref entry in entries
     {
         let write_stream = entry.write_stream().clone();
-        let packet = packet.clone();
+        let code = code.clone();
         let keys = entry.keys().cloned();
 
         thread::spawn(move ||
         {
             if let Ok(mut stream) = write_stream.lock()
             {
-                network::send(&mut stream, packet, keys.as_ref());
+                network::send(&mut stream, code, keys.as_ref());
             }
         });
     }
@@ -673,7 +637,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
         //SEND DISCONNECT CODE IF GRACEFUL
         if grace
         {
-            send_code(&mut stream, None, MessageCode::Disconnect, connection.keys());
+            network::send(&mut stream, PacketCode::Disconnect, connection.keys());
         }
 
         //SHUTDOWN STREAM
@@ -715,14 +679,11 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
         AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
 
         //SEND LEAVE MESSAGE
-        send_to_all(MessagePacket
+        send_to_all(PacketCode::Leave
         {
-            text: Some(connection.username().unwrap().to_string()),
-            id: connection.id().copied(),
-            code: Some(MessageCode::Leave),
-
-            ..Default::default()
-        }, false);
+            username: connection.username().unwrap().to_string(),
+            id: *connection.id().unwrap(),
+        }, None);
     }
 
     log::info!
@@ -888,12 +849,10 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
         if !CONNECTIONS.iter().any(|c| c.channel().as_ref() == Some(&old_channel))
         {
             //NO CLIENT IS IN OLD CHANNEL
-            send_to_all(MessagePacket
+            send_to_all(PacketCode::ChannelDestroyed
             {
-                code: Some(MessageCode::ChannelDestroyed),
-                text: Some(old_channel),
-                ..Default::default()
-            }, false);
+                name: old_channel,
+            }, None);
         }
     }
 
@@ -903,12 +862,10 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
         if CONNECTIONS.iter().filter(|c| c.channel().as_ref() == Some(channel)).count() == 1
         {
             //CLIENT IS FIRST IN CHANNEL
-            send_to_all(MessagePacket
+            send_to_all(PacketCode::ChannelCreated
             {
-                code: Some(MessageCode::ChannelCreated),
-                text: Some(channel.clone()),
-                ..Default::default()
-            }, false);
+                name: channel.clone(),
+            }, None);
         }
     }
 }
@@ -916,10 +873,16 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
 fn ask_version(streams: &mut Streams, keys: &SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
 {
     //ASK FOR VERSION
-    send_code(&mut streams.1.lock().unwrap(), Some(misc::get_version().to_string()), MessageCode::Version, Some(keys));
+    network::send(&mut streams.1.lock().unwrap(),
+        PacketCode::Version { version: Some(misc::get_version().to_string()) }, Some(keys));
 
     //READ FROM UNTRUSTED CLIENT
-    untrusted_read(streams, MessageCode::Version, Some(keys))?.text
+    let read = untrusted_read(streams, |code| matches!(code, PacketCode::Version { .. }), Some(keys))?;
+
+    if let PacketCode::Version { version } = read
+    {
+        return version;
+    } { unreachable!("what"); }
 }
 
 fn send_voice_clients(stream: &mut TcpStream, keys: &SharedKeys, id: usize)
@@ -960,12 +923,7 @@ fn send_voice_clients(stream: &mut TcpStream, keys: &SharedKeys, id: usize)
     }
 
     //SEND
-    network::send(stream, MessagePacket
-    {
-        text: Some(json!(clients).to_string()),
-        code: Some(MessageCode::VoiceClients),
-        ..Default::default()
-    }, Some(keys));
+    network::send(stream, PacketCode::VoiceClients { clients }, Some(keys));
 }
 
 fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW TOKEN
@@ -995,33 +953,12 @@ fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLI
     {
         if let Ok(mut stream) = stream_mutex.lock()
         {
-            network::send(&mut stream, MessagePacket
-            {
-                code: Some(MessageCode::Deattach),
-                username: Some(sharer_uname.clone()),
-                ..Default::default()
-            }, keys.as_ref());
+            network::send(&mut stream, PacketCode::Deattach { username: Some(sharer_uname.to_owned()) }, keys.as_ref());
         }
     }
 }
 
 //PUBLIC
-pub fn send_code //SEND CODE TO CLIENT
-(
-    write_stream: &mut TcpStream,
-    text: Option<String>,
-    code: MessageCode,
-    keys: Option<&SharedKeys>
-)
-{
-    network::send(write_stream, MessagePacket
-    {
-        text: text,
-        code: Some(code),
-        ..Default::default()
-    }, keys);
-}
-
 pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_key: [u8; 32]) //CLIENT -> SERVER COMMUNICATION
 {
     log::info!("New connection: {peer_addr}");
@@ -1074,21 +1011,21 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     let disabled_registration = !config::read_config::<bool>("allow_register");
     if disabled_registration
     {
-        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::RegisterDisabled, Some(&keys));
+        network::send(&mut streams.1.lock().unwrap(), PacketCode::RegisterDisabled, Some(&keys));
     }
 
     //ASK n TIMES
     for _ in 0..max_tries
     {
         //SEND PICK_USERNAME CODE
-        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::Username, Some(&keys));
+        network::send(&mut streams.1.lock().unwrap(), PacketCode::Username { username: None }, Some(&keys));
 
         match network::receive(streams, Some(&keys), None)
         {
             //USERNAME CONDITIONS MET, BREAK LOOP
-            Some(r) =>
+            Some(PacketCode::Username { username: uname }) =>
             {
-                if let Some(uname) = r.text
+                if let Some(uname) = uname
                 {
                     if uname.len() >= min_len && uname.len() <= max_len &&
                         uname.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') &&
@@ -1100,7 +1037,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 }
             },
 
-            None => return remove_connection(&peer_addr, false, Some("username")),
+            _ => return remove_connection(&peer_addr, false, Some("username")),
         }
     }
 
@@ -1134,14 +1071,14 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
         for _ in 0..max_tries
         {
             //SEND REGISTER CODE
-            send_code(&mut streams.1.lock().unwrap(), None, MessageCode::PasswordR, Some(&keys));
+            network::send(&mut streams.1.lock().unwrap(), PacketCode::PasswordR { password: None }, Some(&keys));
 
             //WAIT FOR ANSWER
             match network::receive(streams, Some(&keys), None)
             {
-                Some(mut r) =>
+                Some(PacketCode::PasswordR { password: pass }) =>
                 {
-                    if let Some(pass) = r.text.take()
+                    if let Some(pass) = pass
                     {
                         let pass = Zeroizing::new(pass);
                         //CHECK LENGTH
@@ -1153,7 +1090,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     }
                 },
 
-                None => return remove_connection(&peer_addr, false, Some("register"))
+                _ => return remove_connection(&peer_addr, false, Some("register"))
             };
         }
 
@@ -1167,25 +1104,22 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     } else //LOGIN
     {
         //SEND LOGIN CODE
-        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::PasswordL, Some(&keys));
+        network::send(&mut streams.1.lock().unwrap(), PacketCode::PasswordL { password: None }, Some(&keys));
 
         //WAIT FOR ANSWER
-        let mut response = loop
+        let password = loop
         {
             match network::receive(streams, Some(&keys), None)
             {
-                Some(r) => break r,
+                Some(PacketCode::PasswordL { password: Some(password) }) => break Zeroizing::new(password),
 
-                None => return remove_connection(&peer_addr, false, Some("login")),
+                _ => return remove_connection(&peer_addr, false, Some("login")),
             }
         };
 
-        let response_text = Zeroizing::new(response.text.take().unwrap_or_default());
-
         //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
-        if !user_exists || response_text.is_empty() ||
-            !password::compare_password_hash(&config::server_users_config(&username),
-                &response_text)
+        if !user_exists || password.is_empty() ||
+            !password::compare_password_hash(&config::server_users_config(&username), &password)
         {
             return remove_connection(&peer_addr, true, Some("login"));
         }
@@ -1194,19 +1128,16 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     //GENERATE ID FOR CLIENT
     let id = get_latest_id();
 
+    let mut channel: Option<String> = None; //CURRENT CLIENT CHANNEL
+
     //AUTHENTICATE CLIENT
     authenticate_client(&peer_addr, &username, id);
 
     //TELL CLIENT TO START CHATTING
-    send_code(&mut streams.1.lock().unwrap(), Some(id.to_string()), MessageCode::Accept, Some(&keys));
+    network::send(&mut streams.1.lock().unwrap(), PacketCode::Accept { id }, Some(&keys));
 
     //SEND JOIN MESSAGE
-    send_to_all(MessagePacket
-    {
-        text: Some(username.clone()),
-        code: Some(MessageCode::Join),
-        ..Default::default()
-    }, false);
+    send_to_all(PacketCode::Join { username: username.clone() }, None);
 
     //LOOP READING
     loop
@@ -1229,479 +1160,393 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
         }
 
         //CLIENT CODES
-        if let Some(code) = read.code
+        match read
         {
-            match code
+            //MESSAGE
+            PacketCode::Message { text, colors, .. } =>
             {
-                //CLIENT QUITS
-                MessageCode::Disconnect =>
+                //SEND MESSAGE TO ALL USERS
+                send_to_all(PacketCode::Message
                 {
-                    //DISCONNECT CLIENT
-                    return remove_connection(&peer_addr, true, None);
-                },
+                    text: text.trim().to_owned(),
+                    username: Some(username.clone()),
+                    id: Some(id),
+                    colors,
+                }, channel.as_deref());
+            }
 
-                //VOICE CALL
-                MessageCode::Voice =>
+            //CLIENT QUITS
+            PacketCode::Disconnect =>
+            {
+                //DISCONNECT CLIENT
+                return remove_connection(&peer_addr, true, None);
+            },
+
+            //VOICE CALL
+            PacketCode::Voice =>
+            {
+                //CHECK DISABLED FEATURE
+                if !options::voice_chat_enabled()
                 {
-                    //CHECK DISABLED FEATURE
-                    if !options::voice_chat_enabled()
-                    {
-                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidFeature, Some(&keys));
-                    } else
-                    {
-                        //ACKNOWLEDGE
-                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::Voice, Some(&keys));
-
-                        if !voice_server::CONNECTIONS.contains_key(&id) //IS NOT USING VOICE
-                        {
-                            //ADD CLIENT ID TO VOICE CONNECTIONS MAP
-                            voice_server::CONNECTIONS.insert(id, (None, username.clone()));
-
-                            //SEND CODE TO CHANNEL
-                            if options::voice_chat_enabled()
-                            {
-                                send_to_all(MessagePacket
-                                {
-                                    code: Some(MessageCode::ChannelJoin),
-                                    username: Some(username.clone()),
-                                    id: Some(id),
-                                    ..Default::default()
-                                }, true);
-                            }
-
-                            //SEND CONNECTED CLIENTS
-                            send_voice_clients(&mut streams.1.lock().unwrap(), &keys, id);
-                        } else //IS USING VOICE
-                        {
-                            //SEND CODE TO LAST CHANNEL
-                            if options::voice_chat_enabled()
-                            {
-                                send_to_all(MessagePacket
-                                {
-                                    code: Some(MessageCode::ChannelLeave),
-                                    username: Some(username.clone()),
-                                    id: Some(id),
-                                    ..Default::default()
-                                }, true);
-                            }
-
-                            //REMOVE FROM VOICE
-                            voice_server::remove_connection(&id);
-                        }
-                    }
-                },
-
-                //SWITCH CHANNEL
-                MessageCode::Channel =>
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidFeature, Some(&keys));
+                } else
                 {
-                    //CHECK PARAMETER VALIDITY
-                    if read.text.iter().all(|s| !s.is_empty() && s.len() <= config::read_config("max_channel_length") && s.chars().all(|c| c.is_ascii_alphanumeric() && c != ' '))
-                    {
-                        //SEND ChannelLeave CODE TO OLD CHANNEL
-                        if options::voice_chat_enabled()
-                        {
-                            send_to_all(MessagePacket
-                            {
-                                code: Some(MessageCode::ChannelLeave),
-                                username: Some(username.clone()),
-                                id: Some(id),
-                                ..Default::default()
-                            }, true);
-                        }
+                    //ACKNOWLEDGE
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Voice, Some(&keys));
 
-                        //UPDATE CHANNEL
-                        update_client_channel(&peer_addr, &read.text);
-                        send_code(&mut streams.1.lock().unwrap(), read.text, MessageCode::Channel, Some(&keys));
+                    if !voice_server::CONNECTIONS.contains_key(&id) //IS NOT USING VOICE
+                    {
+                        //ADD CLIENT ID TO VOICE CONNECTIONS MAP
+                        voice_server::CONNECTIONS.insert(id, (None, username.clone()));
 
                         //SEND CODE TO CHANNEL
-                        if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
+                        if options::voice_chat_enabled()
                         {
-                            send_to_all(MessagePacket
-                            {
-                                code: Some(MessageCode::ChannelJoin),
-                                username: Some(username.clone()),
-                                id: Some(id),
-                                ..Default::default()
-                            }, true);
+                            send_to_all(PacketCode::ChannelJoin { username: username.clone(), id }, channel.as_deref());
                         }
 
                         //SEND CONNECTED CLIENTS
                         send_voice_clients(&mut streams.1.lock().unwrap(), &keys, id);
-                    } else //INVALID CHANNEL
+                    } else //IS USING VOICE
                     {
-                        //SEND InvalidUsage CODE
-                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
-                    }
-                },
-
-                //CLIENT REQUESTED LIST OF ONLINE USERS
-                MessageCode::List =>
-                {
-                    let mut user_list = Vec::new();
-
-                    //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
-                    for connection_enum in CONNECTIONS.iter()
-                    {
-                        if let Connection::Authenticated { username: uname, id: user_id, channel, .. } = connection_enum.value()
+                        //SEND CODE TO LAST CHANNEL
+                        if options::voice_chat_enabled()
                         {
-                            user_list.push(json!({ "username": uname, "id": user_id, "channel": channel }));
+                            send_to_all(PacketCode::ChannelLeave { id }, channel.as_deref());
                         }
+
+                        //REMOVE FROM VOICE
+                        voice_server::remove_connection(&id);
+                    }
+                }
+            },
+
+            //SWITCH CHANNEL
+            PacketCode::Channel { channel: tchannel } =>
+            {
+                //CHECK PARAMETER VALIDITY
+                if tchannel.iter().all(|s| !s.is_empty() && s.len() <= config::read_config("max_channel_length") && s.chars().all(|c| c.is_ascii_alphanumeric() && c != ' '))
+                {
+                    //SEND ChannelLeave CODE TO OLD CHANNEL
+                    if options::voice_chat_enabled()
+                    {
+                        send_to_all(PacketCode::ChannelLeave { id }, channel.as_deref());
                     }
 
-                    //SEND LIST BACK TO CLIENT
-                    network::send(&mut streams.1.lock().unwrap(), MessagePacket
+                    //UPDATE CHANNEL
+                    update_client_channel(&peer_addr, &tchannel);
+                    channel = tchannel.clone();
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Channel { channel: tchannel }, Some(&keys));
+
+                    //SEND CODE TO CHANNEL
+                    if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
                     {
-                        text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
-                        code: Some(MessageCode::List),
-                        ..Default::default()
+                        send_to_all(PacketCode::ChannelJoin { username: username.clone(), id }, channel.as_deref());
+                    }
+
+                    //SEND CONNECTED CLIENTS
+                    send_voice_clients(&mut streams.1.lock().unwrap(), &keys, id);
+                } else //INVALID CHANNEL
+                {
+                    //SEND InvalidUsage CODE
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidUsage, Some(&keys));
+                }
+            },
+
+            //CLIENT REQUESTED LIST OF ONLINE USERS
+            PacketCode::List { .. } =>
+            {
+                let mut users = Vec::new();
+
+                //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
+                for connection_enum in CONNECTIONS.iter()
+                {
+                    if let Connection::Authenticated { username: uname, id: user_id, channel, .. } = connection_enum.value()
+                    {
+                        users.push(OnlineUser
+                        {
+                            username: uname.clone(),
+                            id: *user_id,
+                            channel: channel.clone(),
+                        });
+                    }
+                }
+
+                //SEND LIST BACK TO CLIENT
+                network::send(&mut streams.1.lock().unwrap(), PacketCode::List { users: Some(users) }, Some(&keys));
+            },
+
+            //NEW FILE UPLOAD
+            PacketCode::Upload { hash, .. } =>
+            {
+                //PREVENT TOKEN SPAM
+                let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count();
+                if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
+                {
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::UploadLimit, Some(&keys));
+                    continue;
+                }
+
+                //GENERATE RANDOM UID
+                let uid = rand::random::<u64>();
+                let token = open_connection(id, ConnectionType::FileUpload { uid });
+
+                //LOG FILE UPLOAD
+                log::info!("Upload request: {peer_addr}");
+
+                //SEND APPROVAL TO CLIENT
+                network::send(&mut streams.1.lock().unwrap(), PacketCode::Upload
+                {
+                    hash,
+                    token: Some(token),
+                    uid: Some(uid),
+                }, Some(&keys));
+            },
+
+            //DOWNLOAD
+            PacketCode::Download { id: owner_id, file_id, .. } =>
+            {
+                //FIND USERNAME BY ID
+                let username = CONNECTIONS.iter()
+                    .find(|entry| entry.value().id() == owner_id.as_ref())
+                    .and_then(|entry| entry.value().username().cloned());
+
+                //GET USER UPLOADS
+                if let Some(username) = username &&
+                    let Some(file_id) = file_id &&
+                    let Some(file) = AVAILABLE_FILES.get(&username).and_then(|f| f.value().get(file_id).cloned())
+                {
+                    //GENERATE RANDOM SHARE UID
+                    let uid = rand::random::<u64>();
+
+                    //OPEN NEW CONNECTION
+                    let token = open_connection(id, ConnectionType::FileDownload { uid, file });
+
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Download
+                    {
+                        token: Some(token),
+                        file_id: None,
+                        id: None,
                     }, Some(&keys));
-                },
 
-                //NEW FILE UPLOAD
-                MessageCode::Upload =>
+                    //LOG START
+                    log::info!("Download request: {peer_addr}");
+                } else
                 {
-                    if let Some(text) = read.text
-                    {
-                        //PREVENT TOKEN SPAM
-                        let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count();
-                        if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
-                        {
-                            send_code(&mut streams.1.lock().unwrap(), None, MessageCode::UploadLimit, Some(&keys));
-                            continue;
-                        }
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidUsage, Some(&keys));
+                }
+            },
 
-                        //GENERATE RANDOM UID
-                        let uid = rand::random::<u64>();
-                        let token = open_connection(id, ConnectionType::FileUpload { uid });
-
-                        //LOG FILE UPLOAD
-                        log::info!("Upload request: {peer_addr}");
-
-                        //SEND APPROVAL TO CLIENT
-                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                        {
-                            code: Some(MessageCode::Upload),
-                            token: Some(token),
-                            text: Some(format!("{} {}", text, uid)),
-                            ..Default::default()
-                        }, Some(&keys));
-                    } else
-                    {
-                        //LOG FILE REJECT
-                        return remove_connection(&peer_addr, true, Some("upload"));
-                    }
-                },
-
-                //DOWNLOAD
-                MessageCode::Download =>
+            //SCREEN SHARE
+            PacketCode::Screen { .. } =>
+            {
+                //CHECK FOR DISABLING SCREEN SHARE
+                if let Some((Some(removed_id), Some(username))) = CONNECTIONS.get_mut(&peer_addr)
+                    .and_then(|mut conn| Some((conn.remove_screen_stream(), conn.username().cloned())))
                 {
-                    let parse_result = read.text.as_ref().and_then(|text|
+                    //DEATTACH ALL CLIENTS
+                    deattach(removed_id, &username);
+
+                    //SEND SCREEN DISABLE NOTIFICATION
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Screen { token: None }, Some(&keys));
+                    continue;
+                }
+
+                //CHECK FOR ENABLED SCREENSHARE
+                if config::read_config("enable_screenshare")
+                {
+                    //SEND SCREEN ACCEPT
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Screen
                     {
-                        let (id_str, fid_str) = text.split_once(' ')?;
-                        let id = id_str.parse::<usize>().ok()?;
-                        let fid = fid_str.parse::<usize>().ok()?;
+                        token: Some(open_connection(id, ConnectionType::Screen))
+                    }, Some(&keys));
 
-                        //FIND USERNAME BY ID
-                        let username = CONNECTIONS.iter()
-                            .find(|entry| entry.value().id() == Some(&id))
-                            .map(|entry| entry.value().username().cloned())??;
+                    //LOG START
+                    log::info!("Screen share: {peer_addr}");
+                } else
+                {
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidFeature, Some(&keys));
+                }
+            },
 
-                        //GET USER UPLOADS
-                        Some(AVAILABLE_FILES.get(&username)?.value().get(fid).cloned()?)
+            //SCREENSHARE ATTACH
+            PacketCode::Attach { id: sharer_id, .. } =>
+            {
+                //FIND SHARER ADDRESS BY ID
+                if let Some(sharer_id) = sharer_id && let Some(conn) =
+                    CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&sharer_id) && entry.screen_stream().is_some()) &&
+                    let Some(sharer_username) = conn.username()
+                { //VALID SHARER FOUND
+                    //OPEN NEW CONNECTION
+                    let token = open_connection(id, ConnectionType::Attach
+                    {
+                        id: sharer_id,
                     });
 
-                    if let Some(file) = parse_result
+                    //SEND ACCEPT
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Attach
                     {
-                        //GENERATE RANDOM SHARE UID
-                        let uid = rand::random::<u64>();
+                        id: None,
+                        username: Some(sharer_username.to_owned()),
+                        token: Some(token),
+                    }, Some(&keys));
 
-                        //OPEN NEW CONNECTION
-                        let token = open_connection(id, ConnectionType::FileDownload { uid, file });
-
-                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                        {
-                            code: Some(MessageCode::Download),
-                            token: Some(token),
-                            text: Some(uid.to_string()),
-                            ..Default::default()
-                        }, Some(&keys));
-
-                        //LOG START
-                        log::info!("Download request: {peer_addr}");
-                    } else
-                    {
-                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
-                    }
-                },
-
-                //SCREEN SHARE
-                MessageCode::Screen =>
+                    //LOG START
+                    log::info!("Screen attach: {peer_addr}");
+                } else
                 {
-                    //CHECK FOR DISABLING SCREEN SHARE
-                    if let Some((Some(removed_id), Some(username))) = CONNECTIONS.get_mut(&peer_addr)
-                        .and_then(|mut conn| Some((conn.remove_screen_stream(), conn.username().cloned())))
-                    {
-                        //DEATTACH ALL CLIENTS
-                        deattach(removed_id, &username);
+                    //INVALID ARGS
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidUsage, Some(&keys));
+                }
+            },
 
-                        //SEND SCREEN DISABLE NOTIFICATION
-                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                        {
-                            code: Some(MessageCode::Screen),
-                            ..Default::default()
-                        }, Some(&keys));
-                        continue;
-                    }
-
-                    //CHECK FOR ENABLED SCREENSHARE
-                    if config::read_config("enable_screenshare")
-                    {
-                        //SEND SCREEN ACCEPT
-                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                        {
-                            code: Some(MessageCode::Screen),
-                            token: Some(open_connection(id, ConnectionType::Screen)),
-                            ..Default::default()
-                        }, Some(&keys));
-
-                        //LOG START
-                        log::info!("Screen share: {peer_addr}");
-                    } else
-                    {
-                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidFeature, Some(&keys));
-                    }
-                },
-
-                //SCREENSHARE ATTACH
-                MessageCode::Attach =>
+            //SCREENSHARE DEATTACH
+            PacketCode::Deattach { .. } =>
+            {
+                //DEATTACH
+                if let Some(sharer_id) = if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
                 {
-                    if let Some((sharer_id, sharer_username)) = read.text.as_ref().and_then(|text|
+                    if let Some(target_id) = conn.attached_screen().as_ref().map(|a| a.target_id)
                     {
-                        let sharer_id = text.parse::<usize>().ok()?;
+                        conn.deattach_screen();
+                        Some(target_id)
+                    } else { None }
+                } else { None }
+                {
+                    //FIND SHARER USERNAME
+                    let sharer_uname = CONNECTIONS.iter()
+                        .find(|c| c.value().id() == Some(&sharer_id))
+                        .and_then(|c| c.value().username().cloned());
 
-                        //FIND SHARER ADDRESS BY ID
-                        if let Some(conn) = CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&sharer_id) &&
-                            entry.screen_stream().is_some())
+                    //SEND ACCEPT
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Deattach { username: sharer_uname }, Some(&keys));
+                } else
+                {
+                    //NOT ATTACHED
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidUsage, Some(&keys));
+                }
+            },
+
+            //LIST FILES
+            PacketCode::Files { .. } =>
+            {
+                //GET ALL UPLOADS
+                let mut users = Vec::new();
+                for entry in AVAILABLE_FILES.iter()
+                {
+                    //GET VALUES
+                    let username = entry.key();
+                    let uploads = entry.value();
+
+                    if !uploads.is_empty() //DO NOT ADD USERS WITH NO UPLOADS
+                    {
+                        //GET ID TO THE USERNAME
+                        let id = CONNECTIONS.iter()
+                            .find(|c| c.username() == Some(&username))
+                            .and_then(|c| c.id().copied()).unwrap();
+
+                        //GET USER'S UPLOADS
+                        let upload: Vec<(String, usize)> = uploads.iter().enumerate()
+                            .map(|(idx, u)| (u.filename.clone(), idx)).collect();
+
+                        //ADD TO LIST
+                        users.push(UserFile
                         {
-                            Some((sharer_id, conn.username()?.to_owned()))
+                            username: username.to_string(),
+                            id,
+                            upload,
+                        });
+                    }
+                }
+
+                //SEND LIST BACK TO CLIENT
+                network::send(&mut streams.1.lock().unwrap(), PacketCode::Files { users: Some(users) }, Some(&keys));
+            },
+
+            //LIST SCREENSHARES
+            PacketCode::Screens { .. } =>
+            {
+                let mut users = Vec::new();
+
+                //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
+                for connection_enum in CONNECTIONS.iter()
+                {
+                    if let Connection::Authenticated { username: uname, id: user_id, screen_stream, .. } = connection_enum.value()
+                    {
+                        if screen_stream.is_none() { continue; }
+
+                        users.push(UserScreen
+                        {
+                            username: uname.clone(),
+                            id: *user_id,
+                        });
+                    }
+                }
+
+                //SEND LIST BACK TO CLIENT
+                network::send(&mut streams.1.lock().unwrap(), PacketCode::Screens { users: Some(users) }, Some(&keys));
+            },
+
+            //PRIVATE MESSAGE
+            PacketCode::PrivateMessage { text, id: recipient_id, .. } =>
+            {
+                //FIND RECIPIENT BY ID
+                let recipient_addr = CONNECTIONS.iter()
+                    .find(|entry| entry.value().id() == Some(&recipient_id))
+                    .map(|entry| *entry.key());
+
+                if let Some(recipient_addr) = recipient_addr
+                {
+                    //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
+                    if recipient_id != id
+                    {
+                        let recipient_data = if let Some(recipient) =
+                            CONNECTIONS.get(&recipient_addr)
+                        {
+                            Some((recipient.write_stream().clone(), recipient.keys().cloned()))
                         } else
                         {
                             None
-                        }
-                    })
-                    { //VALID SHARER FOUND
-                        //OPEN NEW CONNECTION
-                        let token = open_connection(id, ConnectionType::Attach
+                        };
+
+                        //SEND
+                        if let Some((recipient_stream, recipient_keys)) = recipient_data
                         {
-                            id: sharer_id,
-                        });
-
-                        //SEND ACCEPT
-                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                        {
-                            code: Some(MessageCode::Attach),
-                            username: Some(sharer_username),
-                            token: Some(token),
-                            ..Default::default()
-                        }, Some(&keys));
-
-                        //LOG START
-                        log::info!("Screen attach: {peer_addr}");
-                    } else
-                    {
-                        //INVALID ARGS
-                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
-                    }
-                },
-
-                //SCREENSHARE DEATTACH
-                MessageCode::Deattach =>
-                {
-                    //DEATTACH
-                    if let Some(sharer_id) = if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
-                    {
-                        if let Some(target_id) = conn.attached_screen().as_ref().map(|a| a.target_id)
-                        {
-                            conn.deattach_screen();
-                            Some(target_id)
-                        } else { None }
-                    } else { None }
-                    {
-                        //FIND SHARER USERNAME
-                        let sharer_uname = CONNECTIONS.iter()
-                            .find(|c| c.value().id() == Some(&sharer_id))
-                            .and_then(|c| c.value().username().cloned());
-
-                        //SEND ACCEPT
-                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                        {
-                            code: Some(MessageCode::Deattach),
-                            username: sharer_uname,
-                            ..Default::default()
-                        }, Some(&keys));
-                    } else
-                    {
-                        //NOT ATTACHED
-                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
-                    }
-                },
-
-                //LIST FILES
-                MessageCode::Files =>
-                {
-                    //GET ALL UPLOADS
-                    let mut grouped_files = Vec::new();
-                    for entry in AVAILABLE_FILES.iter()
-                    {
-                        //GET VALUES
-                        let username = entry.key();
-                        let uploads = entry.value();
-
-                        if !uploads.is_empty() //DO NOT ADD USERS WITH NO UPLOADS
-                        {
-                            //GET ID TO THE USERNAME
-                            let id = CONNECTIONS.iter()
-                                .find(|c| c.username() == Some(&username))
-                                .and_then(|c| c.id().copied()).unwrap();
-
-                            //GET USER'S UPLOADS
-                            let uploads: Vec<(String, usize)> = uploads.iter().enumerate()
-                                .map(|(idx, u)| (u.filename.clone(), idx)).collect();
-
-                            //ADD TO LIST
-                            grouped_files.push(json!
-                            ({
-                                "username": username,
-                                "id": id,
-                                "uploads": uploads,
-                            }));
+                            network::send(&mut recipient_stream.lock().unwrap(), PacketCode::PrivateMessage
+                            {
+                                text: text.clone(),
+                                username: Some(username.clone()),
+                                id,
+                            }, recipient_keys.as_ref());
                         }
                     }
 
-                    //SEND LIST BACK TO CLIENT
-                    network::send(&mut streams.1.lock().unwrap(), MessagePacket
+                    //SEND CONFIRMATION BACK TO SENDER
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::PrivateMessageBack
                     {
-                        text: Some(json!(grouped_files).to_string()),
-                        code: Some(MessageCode::Files),
-                        ..Default::default()
+                        text,
+                        id: recipient_id,
+                        username: CONNECTIONS.get(&recipient_addr).and_then(|e| e.username().cloned()).unwrap(),
                     }, Some(&keys));
-                },
-
-                //LIST SCREENSHARES
-                MessageCode::Screens =>
+                } else
                 {
-                    let mut user_list = Vec::new();
+                    //INVALID PM FORMAT
+                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidUsage, Some(&keys));
+                }
+            },
 
-                    //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
-                    for connection_enum in CONNECTIONS.iter()
-                    {
-                        if let Connection::Authenticated { username: uname, id: user_id, screen_stream, .. } = connection_enum.value()
-                        {
-                            if screen_stream.is_none() { continue; }
-
-                            user_list.push(json!({ "username": uname, "id": user_id }));
-                        }
-                    }
-
-                    //SEND LIST BACK TO CLIENT
-                    network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                    {
-                        text: Some(json!(user_list).to_string()), //BUILD JSON FROM user_list
-                        code: Some(MessageCode::Screens),
-                        ..Default::default()
-                    }, Some(&keys));
-                },
-
-                //PRIVATE MESSAGE
-                MessageCode::PrivateMessage =>
+            //KEEPALIVE
+            PacketCode::KeepAlive =>
+            {
+                //SET TO ALIVE
+                if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
                 {
-                    let parse_result = read.text.as_ref().and_then(|text|
-                    {
-                        let (id_str, message) = text.split_once(' ')?;
-                        let recipient_id = id_str.parse::<usize>().ok()?;
+                    conn.set_alive(true);
+                }
+            },
 
-                        //FIND RECIPIENT BY ID
-                        let recipient_addr = CONNECTIONS.iter()
-                            .find(|entry| entry.value().id() == Some(&recipient_id))
-                            .map(|entry| *entry.key())?;
-
-                        Some((recipient_addr, recipient_id, message.to_string()))
-                    });
-
-                    if let Some((recipient_addr, recipient_id, private_message)) = parse_result
-                    {
-                        //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
-                        if recipient_id != id
-                        {
-                            let recipient_data = if let Some(recipient) =
-                                CONNECTIONS.get(&recipient_addr)
-                            {
-                                Some((recipient.write_stream().clone(), recipient.keys().cloned()))
-                            } else
-                            {
-                                None
-                            };
-
-                            //SEND
-                            if let Some((recipient_stream, recipient_keys)) = recipient_data
-                            {
-                                network::send(&mut recipient_stream.lock().unwrap(), MessagePacket
-                                {
-                                    text: Some(private_message.clone()),
-                                    username: Some(username.clone()),
-                                    id: Some(id),
-                                    code: Some(MessageCode::PrivateMessage),
-
-                                    ..Default::default()
-                                }, recipient_keys.as_ref());
-                            }
-                        }
-
-                        //SEND CONFIRMATION BACK TO SENDER
-                        network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                        {
-                            text: Some(private_message),
-                            username: CONNECTIONS.get(&recipient_addr).and_then(|e| e.username().cloned()),
-                            id: Some(recipient_id),
-                            code: Some(MessageCode::PrivateMessageBack),
-
-                            ..Default::default()
-                        }, Some(&keys));
-                    } else
-                    {
-                        //INVALID PM FORMAT
-                        send_code(&mut streams.1.lock().unwrap(), None, MessageCode::InvalidUsage, Some(&keys));
-                    }
-                },
-
-                //KEEPALIVE
-                MessageCode::KeepAlive =>
-                {
-                    //SET TO ALIVE
-                    if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
-                    {
-                        conn.set_alive(true);
-                    }
-                },
-
-                _ => {}
-            }
-
-            continue;
+            _ => {}
         }
-
-        if read.text.is_none() { continue; } //NO MESSAGE, CONTINUE
-        let message = read.text.unwrap().trim().to_string(); //TRIM MESSAGE
-
-        //SEND MESSAGE TO ALL USERS
-        send_to_all(MessagePacket
-        {
-            text: Some(message),
-            username: Some(username.clone()),
-            id: Some(id),
-            colors: read.colors,
-            ..Default::default()
-        }, true);
     }
 }
 
@@ -1768,11 +1613,7 @@ pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
         //SEND KEEPALIVES
         if let Some(mut stream) = stream.as_ref().and_then(|s| s.lock().ok())
         {
-            network::send(&mut stream, MessagePacket
-            {
-                code: Some(MessageCode::KeepAlive),
-                ..Default::default()
-            }, keys.as_ref());
+            network::send(&mut stream, PacketCode::KeepAlive, keys.as_ref());
         }
     }
 

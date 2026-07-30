@@ -444,11 +444,11 @@ pub fn receive
                     let mut grace = true;
 
                     //SPAM
-                    if packet.code != Some(MessageCode::KeepAlive) &&
-                        packet.code != Some(MessageCode::KeyExchange)
+                    if packet.code != PacketCode::KeepAlive &&
+                        !matches!(packet.code, PacketCode::KeyExchange { .. })
                     {
                         //MESSAGE SIZE (ONLY FOR AUTHENTICATED)
-                        if let Some(text) = &packet.text && conn.is_authenticated()
+                        if let PacketCode::Message { ref text, .. } = packet.code
                         {
                             disconnect = text.len() > config::read_config("max_message_length");
                         }
@@ -487,7 +487,7 @@ pub fn receive
                     //SEND WARNING CODE
                     if spam_warning
                     {
-                        server::send_code(&mut streams.1.lock().unwrap(), None, MessageCode::SpamWarning, shared_key.as_ref());
+                        send(&mut streams.1.lock().unwrap(), PacketCode::SpamWarning, shared_key.as_ref());
                     }
 
                     //TOO MANY VIOLATIONS, BYE

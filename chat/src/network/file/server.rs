@@ -47,11 +47,10 @@ use crate::
     network::
     {
         self,
+        codes::PacketCode,
         file::{ self, FilePacket },
         server::{ self, AvailableFile },
         EncryptionMode,
-        MessagePacket,
-        MessageCode,
     },
 };
 
@@ -276,13 +275,11 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
                         let filename = new_filename.and_then(|f| f.into_string().ok()).unwrap_or("unnamed_file".to_string());
 
                         //ANNOUNCE FILE UPLOAD
-                        server::send_to_all(MessagePacket
+                        server::send_to_all(PacketCode::Uploaded
                         {
-                            text: Some(filename.clone()),
-                            username: Some(username.clone()),
-                            code: Some(MessageCode::Uploaded),
-                            ..Default::default()
-                        }, false);
+                            username: username.clone(),
+                            filename: filename.clone(),
+                        }, None);
 
                         if insert
                         {
