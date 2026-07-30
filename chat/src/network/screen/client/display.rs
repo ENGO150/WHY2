@@ -64,8 +64,7 @@ use crate::
     network::
     {
         self,
-        MessageCode,
-        MessagePacket,
+        codes::PacketCode,
         screen::
         {
             consts,
@@ -270,11 +269,8 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
                     session.running.store(false, Ordering::Relaxed);
 
                     //DEATTACH ON SERVER
-                    network::send(&mut session.main_stream.lock().unwrap(), MessagePacket
-                    {
-                        code: Some(MessageCode::Deattach),
-                        ..Default::default()
-                    }, options::get_keys().as_ref());
+                    network::send(&mut session.main_stream.lock().unwrap(),
+                        PacketCode::Deattach { username: None }, options::get_keys().as_ref());
                 }
             },
 

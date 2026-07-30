@@ -16,21 +16,26 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::fmt::
+use std::
 {
-    Display,
-    Formatter,
-    Result,
+    result,
+    net::TcpStream,
+    fmt::
+    {
+        Display,
+        Formatter,
+        Result,
+    }
 };
-
-use crate::network::MessageCode;
-
-use std::net::TcpStream;
 
 use crate::
 {
     options,
-    network::{ self, MessagePacket },
+    network::
+    {
+        self,
+        codes::PacketCode,
+    },
 };
 
 //ENUMS
@@ -250,22 +255,46 @@ pub const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 impl Command
 {
     //GET CODE MATCHING TO COMMAND
-    pub fn to_code(&self) -> Option<MessageCode>
+    pub fn build_message(&self, parameters: Option<&str>) -> Option<result::Result<PacketCode, ()>>
     {
         match self
         {
-            Command::Exit => Some(MessageCode::Disconnect),
-            #[cfg(feature = "client_voice")] Command::Voice => Some(MessageCode::Voice),
-            Command::Channel => Some(MessageCode::Channel),
-            Command::List => Some(MessageCode::List),
-            Command::PrivateMessage => Some(MessageCode::PrivateMessage),
-            Command::Upload => Some(MessageCode::Upload),
-            Command::Download => Some(MessageCode::Download),
-            #[cfg(feature = "client_screen")] Command::Screen => Some(MessageCode::Screen),
-            #[cfg(feature = "client_screen")] Command::Attach => Some(MessageCode::Attach),
-            #[cfg(feature = "client_screen")] Command::Deattach => Some(MessageCode::Deattach),
-            Command::Files => Some(MessageCode::Files),
-            #[cfg(feature = "client_screen")] Command::Screens => Some(MessageCode::Screens),
+            Command::PrivateMessage =>
+            {
+                let parsed = parameters
+                    .and_then(|p| p.split_once(' '))
+                    .and_then(|(id, text)| Some((id.parse::<usize>().ok()?, text.to_string())));
+
+                Some(match parsed
+                {
+                    Some((id, text)) => Ok(PacketCode::PrivateMessage { id, text, username: None }),
+                    None => Err(()),
+                })
+            },
+
+            Command::Download =>
+            {
+                let parsed = parameters
+                    .and_then(|p| p.split_once(' '))
+                    .and_then(|(uid, fid)| Some((uid.parse::<usize>().ok()?, fid.parse::<usize>().ok()?)));
+
+                Some(match parsed
+                {
+                    Some((id, file_id)) => Ok(PacketCode::Download { id: Some(id), file_id: Some(file_id), token: None }),
+                    None => Err(()),
+                })
+            },
+
+            Command::Channel => Some(Ok(PacketCode::Channel { channel: parameters.map(str::to_string) })),
+            Command::List => Some(Ok(PacketCode::List { users: None })),
+            Command::Files => Some(Ok(PacketCode::Files { users: None })),
+            #[cfg(feature = "client_screen")] Command::Screen => Some(Ok(PacketCode::Screen { token: None })),
+            #[cfg(feature = "client_screen")] Command::Attach => Some(Ok(PacketCode::Attach { token: None, username: None })),
+            #[cfg(feature = "client_screen")] Command::Deattach => Some(Ok(PacketCode::Deattach { username: None } )),
+            #[cfg(feature = "client_screen")] Command::Screens => Some(Ok(PacketCode::Screens { users: None })),
+
+            Command::Exit => Some(Ok(PacketCode::Disconnect)),
+            #[cfg(feature = "client_voice")] Command::Voice => Some(Ok(PacketCode::Voice)),
 
             _ => None,
         }
@@ -311,17 +340,17 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
     (Some(Command::Invalid), None)
 }
 
-pub fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: &Option<String>) -> bool //SEND CODE FROM COMMAND IF POSSIBLE
+pub fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: &Option<String>) -> Option<bool> //SEND CODE FROM COMMAND IF POSSIBLE
 {
     //CODE COMMAND
-    if let Some(code) = command.to_code() && command != &Command::Upload
+    match command.build_message(parameters.as_deref())?
     {
-        network::send(stream, MessagePacket
+        Ok(message) =>
         {
-            text: parameters.clone(),
-            code: Some(code),
-            ..Default::default()
-        }, options::get_keys().as_ref());
-        true
-    } else { false }
+            network::send(stream, message, options::get_keys().as_ref());
+            Some(true)
+        },
+
+        Err(()) => Some(false),
+    }
 }

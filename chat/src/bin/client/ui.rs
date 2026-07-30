@@ -93,7 +93,7 @@ pub fn draw_event(event: ClientEvent)
             println!("Successfully connected to {server_name}.\n");
         }
 
-        ClientEvent::Message(message) => //MESSAGE RECEIVED
+        ClientEvent::Message(message, username, id, colors) => //MESSAGE RECEIVED
         {
             clear_lines(2);
 
@@ -101,9 +101,9 @@ pub fn draw_event(event: ClientEvent)
             (
                 "{}{}: {}\n",
 
-                colorize(message.username.unwrap(), message.colors.username_color),                                 //USERNAME
-                if config::read_config("show_id") { format!(" ({})", message.id.unwrap()) } else { String::new() }, //ID
-                colorize(message.text.unwrap(), message.colors.message_color)                                       //MESSAGE
+                colorize(username, colors.username_color),                                         //USERNAME
+                if config::read_config("show_id") { format!(" ({})", id) } else { String::new() }, //ID
+                colorize(message, colors.message_color)                                            //MESSAGE
             );
         },
 
@@ -324,17 +324,17 @@ pub fn draw_event(event: ClientEvent)
             println!("Voice disabled.\n");
         },
 
-        ClientEvent::List(users_json) =>
+        ClientEvent::List(users) =>
         {
             clear_lines(2);
 
             println!("Online clients:");
 
             //PRINT USERS
-            for user in users_json.as_array().unwrap()
+            for user in users
             {
                 //GET CHANNEL
-                let c = if let Some(c) = user["channel"].as_str().map(String::from)
+                let c = if let Some(c) = user.channel
                 {
                     format!(" | #{c}")
                 } else
@@ -342,7 +342,7 @@ pub fn draw_event(event: ClientEvent)
                     String::new()
                 };
 
-                println!("\r{} ({}){}", user["username"].as_str().unwrap(), user["id"], c);
+                println!("\r{} ({}){}", user.username, user.id, c);
             }
 
             println!();
@@ -378,10 +378,10 @@ pub fn draw_event(event: ClientEvent)
             println!("Downloading \"{filename}\" failed.\n");
         },
 
-        ClientEvent::Files(uploads_json) =>
+        ClientEvent::Files(users) =>
         {
             clear_lines(2);
-            if uploads_json.is_empty()
+            if users.is_empty()
             {
                 println!("No available files.\n");
             } else
@@ -389,17 +389,14 @@ pub fn draw_event(event: ClientEvent)
                 if !options::get_extra_space() { println!(); }
                 println!("Available files:");
 
-                for user_obj in uploads_json
+                for user in users
                 {
-                    let username = user_obj["username"].as_str().unwrap();
-                    let id = user_obj["id"].as_u64().unwrap();
-
-                    println!("\r{} ({}):", username, id);
+                    println!("\r{} ({}):", user.username, user.id);
 
                     //GET FILENAMES
-                    for file in user_obj["uploads"].as_array().unwrap()
+                    for upload in user.upload
                     {
-                        println!("\r - {} ({})", file[0], file[1]);
+                        println!("\r - {} ({})", upload.0, upload.1);
                     }
                 }
 
@@ -407,10 +404,10 @@ pub fn draw_event(event: ClientEvent)
             }
         },
 
-        ClientEvent::Screens(screens_json) =>
+        ClientEvent::Screens(users) =>
         {
             clear_lines(2);
-            if screens_json.is_empty()
+            if users.is_empty()
             {
                 println!("No available screenshares.\n");
             } else
@@ -418,12 +415,9 @@ pub fn draw_event(event: ClientEvent)
                 if !options::get_extra_space() { println!(); }
                 println!("Screensharing clients:");
 
-                for user_obj in screens_json
+                for user in users
                 {
-                    let username = user_obj["username"].as_str().unwrap();
-                    let id = user_obj["id"].as_u64().unwrap();
-
-                    println!("\r - {} ({})", username, id);
+                    println!("\r - {} ({})", user.username, user.id);
                 }
 
                 println!();

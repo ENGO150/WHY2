@@ -72,9 +72,8 @@ use why2_chat::
     network::
     {
         self,
-        MessagePacket,
-        MessageColors,
         client::{ self, ClientEvent },
+        codes::{ PacketCode, MessageColors },
     },
 };
 
@@ -695,177 +694,186 @@ fn run_client(tx: Sender<ClientEvent>)
             if let (Some(command), parameters) = command::get_command(&input)
             {
                 //SEND CODE ON A SIMPLE COMMAND, CONTINUE OTHERWISE
-                if !command::send_command_code(&mut write_stream.lock().unwrap(), &command, &parameters)
+                match command::send_command_code(&mut write_stream.lock().unwrap(), &command, &parameters)
                 {
-                    match command
+                    //COMMAND SENT
+                    Some(true) => {}
+
+                    //INVALID USAGE
+                    Some(false) =>
                     {
-                        //HELP
-                        Command::Help =>
+                        ui::clear_lines(2);
+                        invalid_usage(None);
+                    }
+
+                    None =>
+                    {
+                        match command
                         {
-                            ui::clear_lines(2);
-                            options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
-
-                            //PRINT COMMAND LIST
-                            println!("\nCommands:");
-
-                            for info in command::COMMAND_LIST //ITERATE OVER ALL COMMANDS
+                            //HELP
+                            Command::Help =>
                             {
-                                //[OPTIONAL], (REQUIRED)
-                                let args = info.args.iter().map(|arg|
+                                ui::clear_lines(2);
+                                options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
+
+                                //PRINT COMMAND LIST
+                                println!("\nCommands:");
+
+                                for info in command::COMMAND_LIST //ITERATE OVER ALL COMMANDS
                                 {
-                                    if arg.required
+                                    //[OPTIONAL], (REQUIRED)
+                                    let args = info.args.iter().map(|arg|
                                     {
-                                        format!("({})", arg.name)
-                                    } else
-                                    {
-                                        format!("[{}]", arg.name)
-                                    }
-                                }).collect::<Vec<String>>().join(" ");
+                                        if arg.required
+                                        {
+                                            format!("({})", arg.name)
+                                        } else
+                                        {
+                                            format!("[{}]", arg.name)
+                                        }
+                                    }).collect::<Vec<String>>().join(" ");
 
-                                let separator = if info.args.is_empty() { "" } else { " " };
+                                    let separator = if info.args.is_empty() { "" } else { " " };
 
-                                //PRINT COMMAND
-                                println!
-                                (
-                                    "\r{prefix}{name}{separator}{args} - {description}",
-                                    prefix = command::COMMAND_PREFIX,
-                                    name = info.triggers[0].to_lowercase(),
-                                    description = info.description,
-                                );
-                            }
-
-                            println!();
-                        },
-
-                        Command::Info =>
-                        {
-                            ui::clear_lines(2);
-                            let mut valid = false;
-
-                            //PARAMETERS PASSED
-                            if let Some(parameters) = parameters
-                            {
-                                //CHECK IF COMMAND/ALIAS EXISTS
-                                if let Some(command) = command::COMMAND_LIST.iter()
-                                    .find(|c| c.triggers.iter()
-                                        .find(|t| t.eq_ignore_ascii_case(&parameters)).is_some())
-                                {
-                                    options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
+                                    //PRINT COMMAND
                                     println!
                                     (
-                                        "\n\rCommand: {command}
-                                        \rAliases: {aliases}
-                                        \rShortcut: {shortcut}
-                                        \rParameters: {args}
-                                        \rDescription: {description}\n",
-
-                                        command = command.triggers[0],
-                                        aliases = command.triggers[1..].join(", "),
-                                        shortcut = command.shortcut.map(|s| format!("Ctrl+{}", s.to_ascii_uppercase()))
-                                            .unwrap_or_else(|| String::from("None")),
-                                        description = command.description,
-                                        args = if !command.args.is_empty()
-                                        {
-                                            command.args.iter().map(|arg|
-                                            {
-                                                if arg.required
-                                                {
-                                                    format!("({})", arg.name)
-                                                } else
-                                                {
-                                                    format!("[{}]", arg.name)
-                                                }
-                                            }).collect::<Vec<String>>().join(" ")
-                                        } else { String::from("None") },
+                                        "\r{prefix}{name}{separator}{args} - {description}",
+                                        prefix = command::COMMAND_PREFIX,
+                                        name = info.triggers[0].to_lowercase(),
+                                        description = info.description,
                                     );
-
-                                    valid = true;
                                 }
-                            }
 
-                            if !valid { invalid_usage(None); }
-                        },
+                                println!();
+                            },
 
-                        Command::Upload =>
-                        {
-                            ui::clear_lines(2);
-
-                            //CHECK PATH
-                            if let Some(parameters) = parameters
+                            Command::Info =>
                             {
-                                let path = Path::new(parameters.trim());
+                                ui::clear_lines(2);
+                                let mut valid = false;
 
-                                //TRY TO OPEN FILE
-                                if let Ok(mut file) = File::open(path) && path.metadata().is_ok() &&
-                                    path.is_file() && path.file_name().and_then(|n| n.to_str()).is_some()
+                                //PARAMETERS PASSED
+                                if let Some(parameters) = parameters
                                 {
-                                    //GET SHA256 FILE HASH
-                                    let mut hasher = Sha256::new();
-                                    let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
-
-                                    //LOOP READING
-                                    let success = loop
+                                    //CHECK IF COMMAND/ALIAS EXISTS
+                                    if let Some(command) = command::COMMAND_LIST.iter()
+                                        .find(|c| c.triggers.iter()
+                                            .find(|t| t.eq_ignore_ascii_case(&parameters)).is_some())
                                     {
-                                        match file.read(&mut buffer)
-                                        {
-                                            Ok(0) => break true,
-                                            Ok(bytes) => hasher.update(&buffer[..bytes]),
-                                            Err(_) => break false,
-                                        }
-                                    };
+                                        options::set_extra_space(true); //ADD EXTRA NEWLINE ON NEXT RECEIVED MESSAGE
+                                        println!
+                                        (
+                                            "\n\rCommand: {command}
+                                            \rAliases: {aliases}
+                                            \rShortcut: {shortcut}
+                                            \rParameters: {args}
+                                            \rDescription: {description}\n",
 
-                                    //REQUEST FILE UPLOAD
-                                    if success
-                                    {
-                                        //FINALIZE HASH
-                                        let hash: [u8; 32] = hasher.finalize().into();
+                                            command = command.triggers[0],
+                                            aliases = command.triggers[1..].join(", "),
+                                            shortcut = command.shortcut.map(|s| format!("Ctrl+{}", s.to_ascii_uppercase()))
+                                                .unwrap_or_else(|| String::from("None")),
+                                            description = command.description,
+                                            args = if !command.args.is_empty()
+                                            {
+                                                command.args.iter().map(|arg|
+                                                {
+                                                    if arg.required
+                                                    {
+                                                        format!("({})", arg.name)
+                                                    } else
+                                                    {
+                                                        format!("[{}]", arg.name)
+                                                    }
+                                                }).collect::<Vec<String>>().join(" ")
+                                            } else { String::from("None") },
+                                        );
 
-                                        //STORE UPLOAD IN ACTIVE UPLOADS LIST
-                                        client::ACTIVE_UPLOADS.lock().unwrap().insert(hash.clone(), path.canonicalize().unwrap());
-
-                                        //SEND UPLOAD REQUEST
-                                        network::send(&mut write_stream.lock().unwrap(), MessagePacket
-                                        {
-                                            code: command.to_code(),
-                                            text: Some(serde_json::to_string(&hash).unwrap()),
-                                            ..Default::default()
-                                        }, options::get_keys().as_ref());
-                                    } else //HASHING FAILED
-                                    {
-                                        println!("Error reading file!\n");
+                                        valid = true;
                                     }
-                                } else //NON-EXISTING FILE
-                                {
-                                    println!("File not found!\n");
                                 }
-                            } else { invalid_usage(None); }
-                        },
 
-                        Command::UsernameColor =>
-                        {
-                            color_handler("username_color", parameters);
-                        },
+                                if !valid { invalid_usage(None); }
+                            },
 
-                        Command::MessageColor =>
-                        {
-                            color_handler("message_color", parameters);
-                        },
+                            Command::Upload =>
+                            {
+                                ui::clear_lines(2);
 
-                        #[cfg(feature = "client_voice")]
-                        Command::Mute =>
-                        {
-                            mute(parameters);
-                        },
+                                //CHECK PATH
+                                if let Some(parameters) = parameters
+                                {
+                                    let path = Path::new(parameters.trim());
 
-                        //INVALID COMMAND
-                        Command::Invalid =>
-                        {
-                            ui::clear_lines(2);
-                            invalid_usage(Some("command"));
-                        },
+                                    //TRY TO OPEN FILE
+                                    if let Ok(mut file) = File::open(path) && path.metadata().is_ok() &&
+                                        path.is_file() && path.file_name().and_then(|n| n.to_str()).is_some()
+                                    {
+                                        //GET SHA256 FILE HASH
+                                        let mut hasher = Sha256::new();
+                                        let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
 
-                        //NON IMPLEMENTED COMMAND
-                        _ => panic!("Invalid command")
+                                        //LOOP READING
+                                        let success = loop
+                                        {
+                                            match file.read(&mut buffer)
+                                            {
+                                                Ok(0) => break true,
+                                                Ok(bytes) => hasher.update(&buffer[..bytes]),
+                                                Err(_) => break false,
+                                            }
+                                        };
+
+                                        //REQUEST FILE UPLOAD
+                                        if success
+                                        {
+                                            //FINALIZE HASH
+                                            let hash: [u8; 32] = hasher.finalize().into();
+
+                                            //STORE UPLOAD IN ACTIVE UPLOADS LIST
+                                            client::ACTIVE_UPLOADS.lock().unwrap().insert(hash.clone(), path.canonicalize().unwrap());
+
+                                            //SEND UPLOAD REQUEST
+                                            network::send(&mut write_stream.lock().unwrap(),
+                                                PacketCode::Upload { hash, token: None, uid: None }, options::get_keys().as_ref());
+                                        } else //HASHING FAILED
+                                        {
+                                            println!("Error reading file!\n");
+                                        }
+                                    } else //NON-EXISTING FILE
+                                    {
+                                        println!("File not found!\n");
+                                    }
+                                } else { invalid_usage(None); }
+                            },
+
+                            Command::UsernameColor =>
+                            {
+                                color_handler("username_color", parameters);
+                            },
+
+                            Command::MessageColor =>
+                            {
+                                color_handler("message_color", parameters);
+                            },
+
+                            #[cfg(feature = "client_voice")]
+                            Command::Mute =>
+                            {
+                                mute(parameters);
+                            },
+
+                            //INVALID COMMAND
+                            Command::Invalid =>
+                            {
+                                ui::clear_lines(2);
+                                invalid_usage(Some("command"));
+                            },
+
+                            //NON IMPLEMENTED COMMAND
+                            _ => panic!("Invalid command")
+                        }
                     }
                 }
 
@@ -892,11 +900,7 @@ fn run_client(tx: Sender<ClientEvent>)
         options::set_asking_password(false);
 
         //SEND input TO SERVER
-        network::send(&mut write_stream.lock().unwrap(), MessagePacket
-        {
-            text: Some(input),
-            colors: get_colors(),
-            ..Default::default()
-        }, options::get_keys().as_ref());
+        network::send(&mut write_stream.lock().unwrap(),
+            PacketCode::Message { text: input, colors: get_colors(), username: None, id: None }, options::get_keys().as_ref());
     }
 }

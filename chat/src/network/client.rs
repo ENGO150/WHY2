@@ -40,8 +40,6 @@ use socks::Socks5Stream;
 
 use zeroize::Zeroizing;
 
-use serde_json::Value;
-
 use semver::Version;
 
 use crate::
@@ -54,9 +52,15 @@ use crate::
     network::
     {
         self,
-        MessageCode,
-        MessagePacket,
         file::client as file,
+        codes::
+        {
+            PacketCode,
+            MessageColors,
+            UserFile,
+            OnlineUser,
+            UserScreen,
+        },
     },
 };
 
@@ -87,49 +91,49 @@ pub struct VoiceUser
 //ENUMS
 pub enum ClientEvent
 {
-    Register,                                  //REGISTER PROMPT
-    Login,                                     //LOGIN PROMPT
-    Authenticated,                             //LOGIN SUCCESSFUL
-    Connected(String),                         //SUCCESSFUL CONNECTION MESSAGE
-    Message(MessagePacket),                    //RECEIVED MESSAGE
-    Prompt,                                    //">>>" PROMPT
-    PrivateMessageSent(String, usize, String), //SENT PM
-    PrivateMessageRecv(String, usize, String), //RECEIVED PM
-    TofuError(TofuCode),                       //TOFU VERIFICATION FAILED
-    TofuSkip(String),                          //TOFU VERIFICATION SKIPPED
-    VoiceActivity(Vec<VoiceUser>),             //VOICE OVERLAY
-    Join(String),                              //CLIENT CONNECTED
-    Leave(String),                             //CLIENT DISCONNECTED
-    ChannelCreated(String),                    //CHANNEL CREATED
-    ChannelDestroyed(String),                  //CHANNEL ABANDONED
-    Clear(usize),                              //CLEAR n LINES
-    InvalidUsage,                              //INVALID COMMAND USAGE
-    VersionFailed,                             //FETCHING VERSIONS FAILED
-    VersionMismatch(String, String),           //MISMATCH GIT HASH
-    UnsafeVersion(usize, Version, String),     //OLD VERSION
-    Username(bool, u64, u64),                  //USERNAME PROMPT
-    VoiceEnabled,                              //VOICE CHAT ENABLED
-    VoiceDisabled,                             //VOICE CHAT DISABLED
-    List(Value),                               //LIST OF USERS
-    Upload(String),                            //UPLOADING FILE
-    Uploaded(String, String),                  //USER UPLOADED FILE
-    Download(String),                          //DOWNLOADING FILE
-    Downloaded(String),                        //DOWNLOADED FILE
-    DownloadFailed(String),                    //DOWNLOADING FAILED
-    Files(Vec<Value>),                         //FILE LIST
-    Screens(Vec<Value>),                       //SCREENSHARE LIST
-    UploadLimit,                               //MAX CONCURRENT UPLOADS REACHED
-    Screen(bool),                              //TOGGLED SCREENSHARE
-    Attach(String),                            //ATTACHED SCREENSHARE
-    Deattach(String),                          //DEATTACHED SCREENSHARE
-    ExtraSpace,                                //JUST RANDOM NEWLINE
-    IncompatibleVersion(String, String),       //INCOMPATIBLE SERVER VERSION
-    UsernameRejected,                          //USERNAME REJECTED BY SERVER
-    PasswordRejected(u64),                     //PASSWORD REJECTED BY SERVER
-    SpamWarning,                               //SPAM WARNING
-    Socks5Voice,                               //DISABLED VOICE ON SOCKS5
-    DisabledFeature,                           //DISABLED FEATURE
-    Quit,                                      //SERVER QUIT COMMUNICATION
+    Register,                                      //REGISTER PROMPT
+    Login,                                         //LOGIN PROMPT
+    Authenticated,                                 //LOGIN SUCCESSFUL
+    Connected(String),                             //SUCCESSFUL CONNECTION MESSAGE
+    Message(String, String, usize, MessageColors), //RECEIVED MESSAGE
+    Prompt,                                        //">>>" PROMPT
+    PrivateMessageSent(String, usize, String),     //SENT PM
+    PrivateMessageRecv(String, usize, String),     //RECEIVED PM
+    TofuError(TofuCode),                           //TOFU VERIFICATION FAILED
+    TofuSkip(String),                              //TOFU VERIFICATION SKIPPED
+    VoiceActivity(Vec<VoiceUser>),                 //VOICE OVERLAY
+    Join(String),                                  //CLIENT CONNECTED
+    Leave(String),                                 //CLIENT DISCONNECTED
+    ChannelCreated(String),                        //CHANNEL CREATED
+    ChannelDestroyed(String),                      //CHANNEL ABANDONED
+    Clear(usize),                                  //CLEAR n LINES
+    InvalidUsage,                                  //INVALID COMMAND USAGE
+    VersionFailed,                                 //FETCHING VERSIONS FAILED
+    VersionMismatch(String, String),               //MISMATCH GIT HASH
+    UnsafeVersion(usize, Version, String),         //OLD VERSION
+    Username(bool, u64, u64),                      //USERNAME PROMPT
+    VoiceEnabled,                                  //VOICE CHAT ENABLED
+    VoiceDisabled,                                 //VOICE CHAT DISABLED
+    List(Vec<OnlineUser>),                         //LIST OF USERS
+    Upload(String),                                //UPLOADING FILE
+    Uploaded(String, String),                      //USER UPLOADED FILE
+    Download(String),                              //DOWNLOADING FILE
+    Downloaded(String),                            //DOWNLOADED FILE
+    DownloadFailed(String),                        //DOWNLOADING FAILED
+    Files(Vec<UserFile>),                          //FILE LIST
+    Screens(Vec<UserScreen>),                      //SCREENSHARE LIST
+    UploadLimit,                                   //MAX CONCURRENT UPLOADS REACHED
+    Screen(bool),                                  //TOGGLED SCREENSHARE
+    Attach(String),                                //ATTACHED SCREENSHARE
+    Deattach(String),                              //DEATTACHED SCREENSHARE
+    ExtraSpace,                                    //JUST RANDOM NEWLINE
+    IncompatibleVersion(String, String),           //INCOMPATIBLE SERVER VERSION
+    UsernameRejected,                              //USERNAME REJECTED BY SERVER
+    PasswordRejected(u64),                         //PASSWORD REJECTED BY SERVER
+    SpamWarning,                                   //SPAM WARNING
+    Socks5Voice,                                   //DISABLED VOICE ON SOCKS5
+    DisabledFeature,                               //DISABLED FEATURE
+    Quit,                                          //SERVER QUIT COMMUNICATION
 }
 
 //LISTS
@@ -146,36 +150,28 @@ fn key_exchange
 ) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
-    let message = loop
+    let (ecc, pq) = loop
     {
         //READ MESSAGE
         let received = network::receive(streams, exchange_keys, None).unwrap();
 
-        if received.code == Some(MessageCode::KeyExchange) { break received; }
+        if let PacketCode::KeyExchange { ecc, pq } = received { break (ecc, pq); }
     };
 
-    let message_text = message.text.as_ref().unwrap();
-
-    //PARSE SERVER KEYS JSON
-    let server_keys: Value = serde_json::from_str(message_text).expect("Failed to parse server keys JSON");
-    let server_ecc_pk = server_keys["ecc"].as_str().expect("Parsing server ECC key failed");
-    let server_pq_pk = server_keys["pq"].as_str().expect("Parsing server PQ key failed");
+    //CONCAT PUBLIC KEYS
+    let pks = ecc.clone() + &pq;
 
     //VERIFY PUBKEY VALIDITY (TOFU)
     if env!("WHY2_SKIP_TOFU") == "false"
     {
-        match config::server_keys_check(&streams.0.peer_addr().unwrap().ip().to_string(), message_text)
+        match config::server_keys_check(&streams.0.peer_addr().unwrap().ip().to_string(), &pks)
         {
             TofuCode::Valid => {},
 
             status @ (TofuCode::Mismatch | TofuCode::Unknown(_, _)) =>
             {
                 //GRACEFULLY DISCONNECT FROM SERVER
-                network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                {
-                    code: Some(MessageCode::Disconnect),
-                    ..Default::default()
-                }, None);
+                network::send(&mut streams.1.lock().unwrap(), PacketCode::Disconnect, None);
 
                 //PRINT SECURITY MESSAGE
                 tx.send(ClientEvent::TofuError(status)).unwrap();
@@ -186,32 +182,24 @@ fn key_exchange
         }
     } else
     {
-        tx.send(ClientEvent::TofuSkip(config::server_keys_hash(message_text))).unwrap();
+        tx.send(ClientEvent::TofuSkip(config::server_keys_hash(&pks))).unwrap();
     }
 
     //GENERATE EPHEMERAL ECC KEYS
     let (sk, pk) = kex::generate_ephemeral_keys();
 
     //ENCAPSULATE PQ
-    let (pq_ciphertext, pq_secret) = kex::encapsulate_pq(server_pq_pk);
-
-    //PREPARE RESPONSE JSON
-    let response_text = serde_json::json!
-    ({
-        "ecc": pk,
-        "pq": pq_ciphertext,
-    }).to_string();
+    let (pq_ciphertext, pq_secret) = kex::encapsulate_pq(&pq);
 
     //SEND PUBKEYS TO SERVER
-    network::send(&mut streams.1.lock().unwrap(), MessagePacket
+    network::send(&mut streams.1.lock().unwrap(), PacketCode::KeyExchange
     {
-        text: Some(response_text),
-        code: Some(MessageCode::KeyExchange),
-        ..Default::default()
+        ecc: pk,
+        pq: pq_ciphertext,
     }, exchange_keys);
 
     //CALCULATE SHARED SECRET (HYBRID)
-    *keys = kex::derive_shared_secret(sk, server_ecc_pk.to_string(), pq_secret).expect("Shared secret derivation failed");
+    *keys = kex::derive_shared_secret(sk, ecc.to_string(), pq_secret).expect("Shared secret derivation failed");
 
     //SET GLOBAL VARIABLES
     options::set_keys(keys.clone());
@@ -274,27 +262,22 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
     {
         let read = match network::receive(streams, Some(&keys), None)
         {
-            Some(packet) => packet,
-            None => MessagePacket
-            {
-                code: Some(MessageCode::Disconnect),
-                ..Default::default()
-            }
+            Some(code) => code,
+            None => PacketCode::Disconnect,
         };
 
         //CHECK FOR MUTED CLIENT
         #[cfg(feature = "client_voice")]
-        if read.id.is_some() && options::is_muted(read.id) { continue; }
+        if let PacketCode::Message { id, .. } = read
+        {
+            if id.is_some() && options::is_muted(id) { continue; }
+        }
 
         //KEEPALIVE
-        if read.code == Some(MessageCode::KeepAlive)
+        if read == PacketCode::KeepAlive
         {
             //ECHO
-            network::send(&mut streams.1.lock().unwrap(), MessagePacket
-            {
-                code: Some(MessageCode::KeepAlive),
-                ..Default::default()
-            }, options::get_keys().as_ref());
+            network::send(&mut streams.1.lock().unwrap(), PacketCode::KeepAlive, options::get_keys().as_ref());
             continue;
         }
 
@@ -304,403 +287,376 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
         if options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
 
         //CODES
-        if let Some(code) = read.code
+        match read
         {
-            match code
+            //REGULAR MESSAGE
+            PacketCode::Message { text, username, id, colors } =>
             {
-                //VERSION CHECK
-                MessageCode::Version =>
-                {
-                    let version = misc::get_version().to_string();
-                    let server_version = read.text.unwrap();
-
-                    //NON MATCHING VERSION (WILL GET DISCONNECTED)
-                    if server_version != version
-                    {
-                        tx.send(ClientEvent::IncompatibleVersion(version.clone(), server_version)).unwrap();
-                    }
-
-                    //RESPOND
-                    network::send(&mut streams.1.lock().unwrap(), MessagePacket
-                    {
-                        text: Some(version),
-                        code: Some(MessageCode::Version),
-                        ..Default::default()
-                    }, Some(&keys));
-
-                    continue;
-                }
-
-                //WELCOME CODE - SERVER INFORMATIONS
-                MessageCode::Welcome =>
-                {
-                    //PARSE JSON
-                    let welcome_json: Value = serde_json::from_str(&read.text.unwrap()).expect("Parsing welcome json failed"); //PARSE WELCOME JSON
-
-                    //GET INFO FROM JSON
-                    min_pass = Some(welcome_json["min_pass"].as_u64().expect("Invalid welcome json"));
-                    max_uname = Some(welcome_json["max_uname"].as_u64().expect("Invalid welcome json"));
-                    min_uname = Some(welcome_json["min_uname"].as_u64().expect("Invalid welcome json"));
-                    options::set_server_username(welcome_json["server_uname"].as_str().expect("Invalid welcome json"));
-
-                    //COMPARSE HASHES
-                    let client_hash = env!("WHY2_GIT_HASH");
-                    let server_hash = welcome_json["git_hash"].as_str().expect("Invalid welcome json");
-                    if !client_hash.is_empty() && !server_hash.is_empty() && client_hash != server_hash
-                    {
-                        //DISPLAY VERSION MISMATCH
-                        tx.send(ClientEvent::VersionMismatch(client_hash.to_string(), server_hash.to_string())).unwrap();
-                    }
-
-                    tx.send(ClientEvent::Connected(welcome_json["server_name"].as_str().expect("Invalid welcome json").to_string())).unwrap();
-                },
-
-                //REKEY - CHANGE KEYS
-                MessageCode::Rekey =>
-                {
-                    //WAIT FOR SERVER TO INIT KEY EXCHANGE
-                    let current_keys = keys.clone();
-                    key_exchange(streams, &mut keys, &tx, Some(&current_keys));
-                }
-
-                //PICK_USERNAME CODE - guess what
-                MessageCode::Username =>
-                {
-                    tx.send(ClientEvent::Clear(2)).unwrap();
-
-                    //INVALID UNAME
-                    if invalid_username
-                    {
-                        tx.send(ClientEvent::UsernameRejected).unwrap();
-                    } else //VALID
-                    {
-                        //SET INVALID USERNAME FOR POSSIBLE NEXT CODE
-                        invalid_username = true;
-                    }
-
-                    tx.send(ClientEvent::Username(disabled_registration, min_uname.unwrap(), max_uname.unwrap())).unwrap();
-                },
-
-                //REGISTER
-                MessageCode::PasswordR =>
-                {
-                    tx.send(ClientEvent::Clear(3)).unwrap();
-                    options::set_asking_password(true);
-
-                    //INVALID PASS
-                    if invalid_password
-                    {
-                        tx.send(ClientEvent::PasswordRejected(min_pass.unwrap())).unwrap();
-                    } else
-                    {
-                        invalid_password = true;
-                    }
-
-                    tx.send(ClientEvent::Register).unwrap();
-                },
-
-                //LOGIN
-                MessageCode::PasswordL =>
-                {
-                    options::set_asking_password(true);
-                    tx.send(ClientEvent::Login).unwrap();
-                },
-
-                //START CHATTING
-                MessageCode::Accept =>
-                {
-                    tx.send(ClientEvent::Authenticated).unwrap();
-
-                    //SET SERVER-SIDE ID
-                    #[cfg(feature = "client_voice")]
-                    {
-                        id = read.text.unwrap_or_else(|| "0".to_string()).parse().unwrap();
-                    }
-
-                    //ALLOW MESSAGE HISTORY & COMMANDS
-                    options::set_sending_messages(true);
-                },
-
-                //JOIN MESSAGE (CLIENT CONNECTED)
-                MessageCode::Join =>
-                {
-                    tx.send(ClientEvent::Clear(2)).unwrap();
-
-                    let user = read.text.unwrap();
-
-                    if first_message
-                    {
-                        tx.send(ClientEvent::ExtraSpace).unwrap();
-                        first_message = false;
-
-                        #[cfg(feature = "client_voice")]
-                        {
-                            username = Some(user.clone());
-                        }
-                    }
-
-                    tx.send(ClientEvent::Join(user)).unwrap();
-                }
-
-                //LEAVE MESSAGE (CLIENT DISCONNECTED)
-                MessageCode::Leave =>
-                {
-                    tx.send(ClientEvent::Leave(read.text.unwrap())).unwrap();
-
-                    #[cfg(feature = "client_voice")]
-                    voice_client::remove_consumer(&read.id.unwrap());
-                },
-
-                //CHANNEL CHANGE
-                MessageCode::Channel =>
-                {
-                    //REMOVE ALL STORED VOICE CLIENTS
-                    #[cfg(feature = "client_voice")]
-                    voice_client::remove_all_consumers();
-
-                    options::set_channel(read.text.unwrap_or_else(|| String::new()));
-
-                    tx.send(ClientEvent::Clear(1)).unwrap();
-                },
-
-                //CHANNEL CREATED
-                MessageCode::ChannelCreated =>
-                {
-                    tx.send(ClientEvent::ChannelCreated(read.text.unwrap())).unwrap();
-                },
-
-                //CHANNEL ABANDONED
-                MessageCode::ChannelDestroyed =>
-                {
-                    tx.send(ClientEvent::ChannelDestroyed(read.text.unwrap())).unwrap();
-                },
-
-                //SERVER ALLOWED VOICE
-                #[cfg(feature = "client_voice")]
-                MessageCode::Voice =>
-                {
-                    if options::socks5_enabled()
-                    {
-                        tx.send(ClientEvent::Socks5Voice).unwrap();
-                        continue;
-                    }
-
-                    //TOGGLE VOICE (& PRINT STATUS)
-                    tx.send(if voice_options::swap_use_voice()
-                    {
-                        let username = username.clone();
-                        let voice_tx = tx.clone();
-                        let stream = streams.1.clone();
-                        thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap(), voice_tx, stream));
-                        ClientEvent::VoiceEnabled
-                    } else
-                    {
-                        ClientEvent::VoiceDisabled
-                    }).unwrap();
-                },
-
-                //VOICE CLIENTS
-                #[cfg(feature = "client_voice")]
-                MessageCode::VoiceClients =>
-                {
-                    //PARSE JSON
-                    let clients: Vec<(usize, String)> = serde_json::from_str(&read.text.unwrap()).expect("Parsing welcome json failed");
-
-                    //ADD CLIENTS
-                    for (id, username) in clients
-                    {
-                        voice_client::add_consumer(id, username);
-                    }
-                }
-
-                //CLIENT JOINED VOICE CHANNEL
-                #[cfg(feature = "client_voice")]
-                MessageCode::ChannelJoin =>
-                {
-                    let joined_id = read.id.unwrap();
-                    if voice_options::get_use_voice() && id != joined_id
-                    {
-                        voice_client::add_consumer(read.id.unwrap(), read.username.unwrap());
-                    }
-                },
-
-                //CLIENT LEFT VOICE CHANNEL
-                #[cfg(feature = "client_voice")]
-                MessageCode::ChannelLeave =>
-                {
-                    voice_client::remove_consumer(&read.id.unwrap());
-                },
-
-                //LIST OF ONLINE USERS
-                MessageCode::List =>
-                {
-                    if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
-                    tx.send(ClientEvent::List(serde_json::from_str(&read.text.unwrap()).unwrap())).unwrap();
-                    extra_space = true;
-                    options::set_extra_space(true);
-                },
-
-                //UPLOAD APPROVAL
-                MessageCode::Upload =>
-                {
-                    //PARSE UID AND HASH FROM TEXT
-                    if let Some(text) = read.text.as_ref()
-                    {
-                        if let Some((hash_json, uid_str)) = text.rsplit_once(' ')
-                        {
-                            let hash: [u8; 32] = serde_json::from_str(hash_json).unwrap();
-                            let uid: u64 = uid_str.parse().unwrap();
-                            let token = read.token.unwrap();
-
-                            //SPAWN UPLOAD THREAD
-                            let file_tx = tx.clone(); //CLONE TX
-                            thread::spawn(move || file::upload(token, uid, hash, file_tx));
-                        }
-                    }
-                    continue;
-                },
-
-                //DOWNLOAD
-                MessageCode::Download =>
-                {
-                    let token = read.token.unwrap();
-
-                    //SPAWN DOWNLOAD THREAD
-                    let file_tx = tx.clone(); //CLONE TX
-                    thread::spawn(move || file::download(token, file_tx));
-                    continue;
-                },
-
-                //UPLOADED ANNOUNCEMENT
-                MessageCode::Uploaded =>
-                {
-                    tx.send(ClientEvent::Uploaded(read.username.unwrap(), read.text.unwrap())).unwrap();
-                },
-
-                //FILE LIST
-                MessageCode::Files =>
-                {
-                    //PARSE JSON
-                    let uploads_json: Vec<Value> = serde_json::from_str(&read.text.unwrap()).unwrap();
-
-                    if !uploads_json.is_empty()
-                    {
-                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
-                        extra_space = true;
-                        options::set_extra_space(true);
-                    }
-
-                    tx.send(ClientEvent::Files(uploads_json)).unwrap();
-                },
-
-                //SCREENSHARE LIST
-                MessageCode::Screens =>
-                {
-                    //PARSE JSON
-                    let screens_json: Vec<Value> = serde_json::from_str(&read.text.unwrap()).unwrap();
-
-                    if !screens_json.is_empty()
-                    {
-                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
-                        extra_space = true;
-                        options::set_extra_space(true);
-                    }
-
-                    tx.send(ClientEvent::Screens(screens_json)).unwrap();
-                },
-
-                //MAX PARALLEL UPLOADS
-                MessageCode::UploadLimit =>
-                {
-                    tx.send(ClientEvent::UploadLimit).unwrap();
-                },
-
-                //SCREEN UPLOAD APPROVAL
-                #[cfg(feature = "client_screen")]
-                MessageCode::Screen =>
-                {
-                    tx.send(if screen_options::swap_use_screen()
-                    {
-                        //SPAWN UPLOAD THREAD
-                        thread::spawn(move || screen::screen(read.token.unwrap()));
-                        ClientEvent::Screen(true)
-                    } else
-                    {
-                        ClientEvent::Screen(false)
-                    }).unwrap();
-                },
-
-                //SCREENSHARE ATTACH
-                #[cfg(feature = "client_screen")]
-                MessageCode::Attach =>
-                {
-                    //ENABLE ATTACH
-                    screen_options::set_attach_screen(true);
-
-                    //SPAWN DOWNLOAD THREAD
-                    let main_stream = streams.1.clone();
-                    thread::spawn(move || screen::attach(read.token.unwrap(), main_stream));
-                    tx.send(ClientEvent::Attach(read.username.unwrap())).unwrap();
-                },
-
-                //SCREENSHARE DEATTACH
-                #[cfg(feature = "client_screen")]
-                MessageCode::Deattach =>
-                {
-                    //DISABLE ATTACH
-                    screen_options::set_attach_screen(false);
-
-                    tx.send(ClientEvent::Deattach(read.username.unwrap())).unwrap();
-                },
-
-                //PRIVATE MESSAGE INCOMING
-                MessageCode::PrivateMessage =>
-                {
-                    tx.send(ClientEvent::PrivateMessageRecv(read.username.unwrap(), read.id.unwrap(), read.text.unwrap())).unwrap();
-                },
-
-                //PRIVATE MESSAGE INCOMING
-                MessageCode::PrivateMessageBack =>
-                {
-                    tx.send(ClientEvent::PrivateMessageSent(read.username.unwrap(), read.id.unwrap(), read.text.unwrap())).unwrap();
-                },
-
-                //SPAM WARNING
-                MessageCode::SpamWarning =>
-                {
-                    tx.send(ClientEvent::SpamWarning).unwrap();
-                },
-
-                //REGISTRATION DISABLED
-                MessageCode::RegisterDisabled =>
-                {
-                    disabled_registration = true;
-                },
-
-                //CLIENT MESSED SOME COMMAND UP
-                MessageCode::InvalidUsage =>
-                {
-                    tx.send(ClientEvent::InvalidUsage).unwrap();
-                },
-
-                //CLIENTED REQUESTED DISABLED FEATURE
-                MessageCode::InvalidFeature =>
-                {
-                    tx.send(ClientEvent::DisabledFeature).unwrap();
-                },
-
-                //SERVER DOESN'T LIKE YA ANYMORE - EXIT
-                MessageCode::Disconnect =>
-                {
-                    tx.send(ClientEvent::Quit).unwrap();
-                    return;
-                },
-
-                _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
+                tx.send(ClientEvent::Message(text, username.unwrap(), id.unwrap(), colors)).unwrap();
             }
-        } else //NO CODE, PRINT MESSAGE
-        {
-            tx.send(ClientEvent::Message(read)).unwrap();
+
+            //VERSION CHECK
+            PacketCode::Version { version } =>
+            {
+                let local_version = misc::get_version().to_string();
+
+                //NON MATCHING VERSION (WILL GET DISCONNECTED)
+                if let Some(version) = version && version != local_version
+                {
+                    tx.send(ClientEvent::IncompatibleVersion(local_version.clone(), version)).unwrap();
+                }
+
+                //RESPOND
+                network::send(&mut streams.1.lock().unwrap(),
+                    PacketCode::Version { version: Some(local_version) }, Some(&keys));
+
+                continue;
+            }
+
+            //WELCOME CODE - SERVER INFORMATIONS
+            PacketCode::Welcome { min_pass: smin_pass, max_uname: smax_uname, min_uname: smin_uname, server_name, server_uname, git_hash } =>
+            {
+                options::set_server_username(&server_uname);
+
+                min_pass = Some(smin_pass);
+                max_uname = Some(smax_uname);
+                min_uname = Some(smin_uname);
+
+                //COMPARSE HASHES
+                let client_hash = env!("WHY2_GIT_HASH");
+                if !client_hash.is_empty() && !git_hash.is_empty() && client_hash != git_hash
+                {
+                    //DISPLAY VERSION MISMATCH
+                    tx.send(ClientEvent::VersionMismatch(client_hash.to_string(), git_hash.to_string())).unwrap();
+                }
+
+                tx.send(ClientEvent::Connected(server_name)).unwrap();
+            },
+
+            //REKEY - CHANGE KEYS
+            PacketCode::Rekey =>
+            {
+                //WAIT FOR SERVER TO INIT KEY EXCHANGE
+                let current_keys = keys.clone();
+                key_exchange(streams, &mut keys, &tx, Some(&current_keys));
+            }
+
+            //PICK_USERNAME CODE - guess what
+            PacketCode::Username =>
+            {
+                tx.send(ClientEvent::Clear(2)).unwrap();
+
+                //INVALID UNAME
+                if invalid_username
+                {
+                    tx.send(ClientEvent::UsernameRejected).unwrap();
+                } else //VALID
+                {
+                    //SET INVALID USERNAME FOR POSSIBLE NEXT CODE
+                    invalid_username = true;
+                }
+
+                tx.send(ClientEvent::Username(disabled_registration, min_uname.unwrap(), max_uname.unwrap())).unwrap();
+            },
+
+            //REGISTER
+            PacketCode::PasswordR =>
+            {
+                tx.send(ClientEvent::Clear(3)).unwrap();
+                options::set_asking_password(true);
+
+                //INVALID PASS
+                if invalid_password
+                {
+                    tx.send(ClientEvent::PasswordRejected(min_pass.unwrap())).unwrap();
+                } else
+                {
+                    invalid_password = true;
+                }
+
+                tx.send(ClientEvent::Register).unwrap();
+            },
+
+            //LOGIN
+            PacketCode::PasswordL =>
+            {
+                options::set_asking_password(true);
+                tx.send(ClientEvent::Login).unwrap();
+            },
+
+            //START CHATTING
+            PacketCode::Accept { id: sid } =>
+            {
+                tx.send(ClientEvent::Authenticated).unwrap();
+
+                //SET SERVER-SIDE ID
+                #[cfg(feature = "client_voice")]
+                {
+                    id = sid;
+                }
+
+                //ALLOW MESSAGE HISTORY & COMMANDS
+                options::set_sending_messages(true);
+            },
+
+            //JOIN MESSAGE (CLIENT CONNECTED)
+            PacketCode::Join { username: user } =>
+            {
+                tx.send(ClientEvent::Clear(2)).unwrap();
+
+                if first_message
+                {
+                    tx.send(ClientEvent::ExtraSpace).unwrap();
+                    first_message = false;
+
+                    #[cfg(feature = "client_voice")]
+                    {
+                        username = Some(user.clone());
+                    }
+                }
+
+                tx.send(ClientEvent::Join(user)).unwrap();
+            }
+
+            //LEAVE MESSAGE (CLIENT DISCONNECTED)
+            PacketCode::Leave { username, id } =>
+            {
+                tx.send(ClientEvent::Leave(username)).unwrap();
+
+                #[cfg(feature = "client_voice")]
+                voice_client::remove_consumer(&id);
+            },
+
+            //CHANNEL CHANGE
+            PacketCode::Channel { channel } =>
+            {
+                //REMOVE ALL STORED VOICE CLIENTS
+                #[cfg(feature = "client_voice")]
+                voice_client::remove_all_consumers();
+
+                options::set_channel(channel.unwrap_or_else(|| String::new()));
+
+                tx.send(ClientEvent::Clear(1)).unwrap();
+            },
+
+            //CHANNEL CREATED
+            PacketCode::ChannelCreated { name } =>
+            {
+                tx.send(ClientEvent::ChannelCreated(name)).unwrap();
+            },
+
+            //CHANNEL ABANDONED
+            PacketCode::ChannelDestroyed { name } =>
+            {
+                tx.send(ClientEvent::ChannelDestroyed(name)).unwrap();
+            },
+
+            //SERVER ALLOWED VOICE
+            #[cfg(feature = "client_voice")]
+            PacketCode::Voice =>
+            {
+                if options::socks5_enabled()
+                {
+                    tx.send(ClientEvent::Socks5Voice).unwrap();
+                    continue;
+                }
+
+                //TOGGLE VOICE (& PRINT STATUS)
+                tx.send(if voice_options::swap_use_voice()
+                {
+                    let username = username.clone();
+                    let voice_tx = tx.clone();
+                    let stream = streams.1.clone();
+                    thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap(), voice_tx, stream));
+                    ClientEvent::VoiceEnabled
+                } else
+                {
+                    ClientEvent::VoiceDisabled
+                }).unwrap();
+            },
+
+            //VOICE CLIENTS
+            #[cfg(feature = "client_voice")]
+            PacketCode::VoiceClients { clients } =>
+            {
+                //ADD CLIENTS
+                for (id, username) in clients
+                {
+                    voice_client::add_consumer(id, username);
+                }
+            }
+
+            //CLIENT JOINED VOICE CHANNEL
+            #[cfg(feature = "client_voice")]
+            PacketCode::ChannelJoin { username, id: sid } =>
+            {
+                if voice_options::get_use_voice() && id != sid
+                {
+                    voice_client::add_consumer(sid, username);
+                }
+            },
+
+            //CLIENT LEFT VOICE CHANNEL
+            #[cfg(feature = "client_voice")]
+            PacketCode::ChannelLeave { id } =>
+            {
+                voice_client::remove_consumer(&id);
+            },
+
+            //LIST OF ONLINE USERS
+            PacketCode::List { users } =>
+            {
+                if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
+                tx.send(ClientEvent::List(users.unwrap())).unwrap();
+                extra_space = true;
+                options::set_extra_space(true);
+            },
+
+            //UPLOAD APPROVAL
+            PacketCode::Upload { hash, token, uid } =>
+            {
+                //SPAWN UPLOAD THREAD
+                let file_tx = tx.clone(); //CLONE TX
+                thread::spawn(move || file::upload(token.unwrap(), uid.unwrap(), hash, file_tx));
+                continue;
+            },
+
+            //DOWNLOAD
+            PacketCode::Download { token, .. } =>
+            {
+                //SPAWN DOWNLOAD THREAD
+                let file_tx = tx.clone(); //CLONE TX
+                thread::spawn(move || file::download(token.unwrap(), file_tx));
+                continue;
+            },
+
+            //UPLOADED ANNOUNCEMENT
+            PacketCode::Uploaded { filename, username } =>
+            {
+                tx.send(ClientEvent::Uploaded(username, filename)).unwrap();
+            },
+
+            //FILE LIST
+            PacketCode::Files { users } =>
+            {
+                if let Some(users) = users
+                {
+                    //PARSE JSON
+                    if !users.is_empty()
+                    {
+                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
+                        extra_space = true;
+                        options::set_extra_space(true);
+                    }
+
+                    tx.send(ClientEvent::Files(users)).unwrap();
+                }
+            },
+
+            //SCREENSHARE LIST
+            PacketCode::Screens { users } =>
+            {
+                if let Some(users) = users
+                {
+                    if !users.is_empty()
+                    {
+                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
+                        extra_space = true;
+                        options::set_extra_space(true);
+                    }
+
+                    tx.send(ClientEvent::Screens(users)).unwrap();
+                }
+            },
+
+            //MAX PARALLEL UPLOADS
+            PacketCode::UploadLimit =>
+            {
+                tx.send(ClientEvent::UploadLimit).unwrap();
+            },
+
+            //SCREEN UPLOAD APPROVAL
+            #[cfg(feature = "client_screen")]
+            PacketCode::Screen { token } =>
+            {
+                tx.send(if screen_options::swap_use_screen()
+                {
+                    //SPAWN UPLOAD THREAD
+                    thread::spawn(move || screen::screen(token.unwrap()));
+                    ClientEvent::Screen(true)
+                } else
+                {
+                    ClientEvent::Screen(false)
+                }).unwrap();
+            },
+
+            //SCREENSHARE ATTACH
+            #[cfg(feature = "client_screen")]
+            PacketCode::Attach { username, token } =>
+            {
+                //ENABLE ATTACH
+                screen_options::set_attach_screen(true);
+
+                //SPAWN DOWNLOAD THREAD
+                let main_stream = streams.1.clone();
+                thread::spawn(move || screen::attach(token.unwrap(), main_stream));
+                tx.send(ClientEvent::Attach(username.unwrap())).unwrap();
+            },
+
+            //SCREENSHARE DEATTACH
+            #[cfg(feature = "client_screen")]
+            PacketCode::Deattach { username } =>
+            {
+                //DISABLE ATTACH
+                screen_options::set_attach_screen(false);
+
+                tx.send(ClientEvent::Deattach(username.unwrap())).unwrap();
+            },
+
+            //PRIVATE MESSAGE INCOMING
+            PacketCode::PrivateMessage { text, username, id } =>
+            {
+                tx.send(ClientEvent::PrivateMessageRecv(username.unwrap(), id, text)).unwrap();
+            },
+
+            //PRIVATE MESSAGE INCOMING
+            PacketCode::PrivateMessageBack { text, username, id } =>
+            {
+                tx.send(ClientEvent::PrivateMessageSent(username, id, text)).unwrap();
+            },
+
+            //SPAM WARNING
+            PacketCode::SpamWarning =>
+            {
+                tx.send(ClientEvent::SpamWarning).unwrap();
+            },
+
+            //REGISTRATION DISABLED
+            PacketCode::RegisterDisabled =>
+            {
+                disabled_registration = true;
+            },
+
+            //CLIENT MESSED SOME COMMAND UP
+            PacketCode::InvalidUsage =>
+            {
+                tx.send(ClientEvent::InvalidUsage).unwrap();
+            },
+
+            //CLIENTED REQUESTED DISABLED FEATURE
+            PacketCode::InvalidFeature =>
+            {
+                tx.send(ClientEvent::DisabledFeature).unwrap();
+            },
+
+            //SERVER DOESN'T LIKE YA ANYMORE - EXIT
+            PacketCode::Disconnect =>
+            {
+                tx.send(ClientEvent::Quit).unwrap();
+                return;
+            },
+
+            _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
         }
 
         //PRINT INPUT PROMPT
