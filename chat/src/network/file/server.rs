@@ -279,7 +279,7 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
                         {
                             username: username.clone(),
                             filename: filename.clone(),
-                        }, None);
+                        }, false, None);
 
                         if insert
                         {

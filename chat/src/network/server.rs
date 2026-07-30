@@ -590,14 +590,14 @@ fn send_welcome_packet(write_stream: &mut TcpStream, keys: &SharedKeys) //send w
 }
 
 //PUBLIC
-pub fn send_to_all(code: PacketCode, channel: Option<&str>) //SEND PACKET TO ALL CLIENTS
+pub fn send_to_all(code: PacketCode, filter_channel: bool, channel: Option<&str>) //SEND PACKET TO ALL CLIENTS
 {
     //COLLECT EACH CLIENT IN SAME CHANNEL
     let entries: Vec<Connection> = CONNECTIONS.iter().filter_map(|entry|
     {
         match entry.value()
         {
-            Connection::Authenticated { channel: c, .. } if channel.is_none() || c.as_deref() == channel =>
+            Connection::Authenticated { channel: c, .. } if !filter_channel || c.as_deref() == channel =>
             {
                 //FOUND, COLLECT
                 Some(entry.value().clone())
@@ -683,7 +683,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
         {
             username: connection.username().unwrap().to_string(),
             id: *connection.id().unwrap(),
-        }, None);
+        }, false, None);
     }
 
     log::info!
@@ -852,7 +852,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             send_to_all(PacketCode::ChannelDestroyed
             {
                 name: old_channel,
-            }, None);
+            }, false, None);
         }
     }
 
@@ -865,7 +865,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             send_to_all(PacketCode::ChannelCreated
             {
                 name: channel.clone(),
-            }, None);
+            }, false, None);
         }
     }
 }
@@ -1137,7 +1137,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     network::send(&mut streams.1.lock().unwrap(), PacketCode::Accept { id }, Some(&keys));
 
     //SEND JOIN MESSAGE
-    send_to_all(PacketCode::Join { username: username.clone() }, None);
+    send_to_all(PacketCode::Join { username: username.clone() }, false, None);
 
     //LOOP READING
     loop
@@ -1172,7 +1172,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     username: Some(username.clone()),
                     id: Some(id),
                     colors,
-                }, channel.as_deref());
+                }, true, channel.as_deref());
             }
 
             //CLIENT QUITS
@@ -1202,7 +1202,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         //SEND CODE TO CHANNEL
                         if options::voice_chat_enabled()
                         {
-                            send_to_all(PacketCode::ChannelJoin { username: username.clone(), id }, channel.as_deref());
+                            send_to_all(PacketCode::ChannelJoin { username: username.clone(), id }, true, channel.as_deref());
                         }
 
                         //SEND CONNECTED CLIENTS
@@ -1212,7 +1212,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         //SEND CODE TO LAST CHANNEL
                         if options::voice_chat_enabled()
                         {
-                            send_to_all(PacketCode::ChannelLeave { id }, channel.as_deref());
+                            send_to_all(PacketCode::ChannelLeave { id }, true, channel.as_deref());
                         }
 
                         //REMOVE FROM VOICE
@@ -1230,7 +1230,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     //SEND ChannelLeave CODE TO OLD CHANNEL
                     if options::voice_chat_enabled()
                     {
-                        send_to_all(PacketCode::ChannelLeave { id }, channel.as_deref());
+                        send_to_all(PacketCode::ChannelLeave { id }, true, channel.as_deref());
                     }
 
                     //UPDATE CHANNEL
@@ -1241,7 +1241,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     //SEND CODE TO CHANNEL
                     if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
                     {
-                        send_to_all(PacketCode::ChannelJoin { username: username.clone(), id }, channel.as_deref());
+                        send_to_all(PacketCode::ChannelJoin { username: username.clone(), id }, true, channel.as_deref());
                     }
 
                     //SEND CONNECTED CLIENTS
