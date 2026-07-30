@@ -62,13 +62,9 @@ use why2_chat::
 {
     config,
     consts,
-    options,
     misc,
-    command::
-    {
-        self,
-        Command,
-    },
+    command::{ self, Command },
+    options::{ self, LoginState },
     network::
     {
         self,
@@ -900,7 +896,14 @@ fn run_client(tx: Sender<ClientEvent>)
         options::set_asking_password(false);
 
         //SEND input TO SERVER
-        network::send(&mut write_stream.lock().unwrap(),
-            PacketCode::Message { text: input, colors: get_colors(), username: None, id: None }, options::get_keys().as_ref());
+        let packet = match options::get_login_state()
+        {
+            LoginState::Username => PacketCode::Username { username: Some(input) },
+            LoginState::PasswordLogin => PacketCode::PasswordL { password: Some(input) },
+            LoginState::PasswordRegister => PacketCode::PasswordR { password: Some(input) },
+            LoginState::None => PacketCode::Message { text: input, colors: get_colors(), username: None, id: None },
+        };
+
+        network::send(&mut write_stream.lock().unwrap(), packet, options::get_keys().as_ref());
     }
 }

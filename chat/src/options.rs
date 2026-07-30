@@ -35,6 +35,17 @@ use std::
 #[cfg(feature = "client_base")]
 use crate::consts::SharedKeys;
 
+//ENUMS
+#[cfg(feature = "client_base")]
+#[derive(Copy, Clone)]
+pub enum LoginState //STATE OF LOGIN
+{
+    None,
+    Username,
+    PasswordLogin,
+    PasswordRegister,
+}
+
 //SETTINGS
 static SERVER_USERNAME: RwLock<String> = RwLock::new(String::new());
 
@@ -49,6 +60,9 @@ static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING
 
 #[cfg(feature = "client_base")]
 static EXTRA_SPACE: AtomicBool = AtomicBool::new(false); //CLIENT DISPLAYED SOME MENU (/help ETC.), ADD EXTRA SPACE ON NEXT MESSAGE
+
+#[cfg(feature = "client_base")]
+static LOGIN_STATE: RwLock<LoginState> = RwLock::new(LoginState::None);
 
 #[cfg(feature = "client_base")]
 static SENDING_MESSAGES: AtomicBool = AtomicBool::new(false); //SENDING MESSAGES BOOL (CONDITION FOR ADDING MESSAGES TO HISTORY)
@@ -140,6 +154,19 @@ pub fn set_extra_space(value: bool) //SET EXTRA_SPACE
 pub fn get_extra_space() -> bool //GET EXTRA_SPACE
 {
     EXTRA_SPACE.load(Ordering::Relaxed)
+}
+
+//LOGIN STATE
+#[cfg(feature = "client_base")]
+pub fn set_login_state(state: LoginState)
+{
+    *LOGIN_STATE.write().unwrap() = state;
+}
+
+#[cfg(feature = "client_base")]
+pub fn get_login_state() -> LoginState
+{
+    *LOGIN_STATE.read().unwrap()
 }
 
 //SENDING MESSAGES

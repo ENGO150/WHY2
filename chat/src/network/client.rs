@@ -44,11 +44,11 @@ use semver::Version;
 
 use crate::
 {
-    options,
     misc,
     crypto::kex,
     consts::{ self, Streams },
     config::{ self, TofuCode },
+    options::{ self, LoginState },
     network::
     {
         self,
@@ -356,6 +356,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     invalid_username = true;
                 }
 
+                options::set_login_state(LoginState::Username);
                 tx.send(ClientEvent::Username(disabled_registration, min_uname.unwrap(), max_uname.unwrap())).unwrap();
             },
 
@@ -374,6 +375,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
                     invalid_password = true;
                 }
 
+                options::set_login_state(LoginState::PasswordRegister);
                 tx.send(ClientEvent::Register).unwrap();
             },
 
@@ -381,6 +383,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
             PacketCode::PasswordL { .. } =>
             {
                 options::set_asking_password(true);
+                options::set_login_state(LoginState::PasswordLogin);
                 tx.send(ClientEvent::Login).unwrap();
             },
 
@@ -397,6 +400,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
 
                 //ALLOW MESSAGE HISTORY & COMMANDS
                 options::set_sending_messages(true);
+                options::set_login_state(LoginState::None);
             },
 
             //JOIN MESSAGE (CLIENT CONNECTED)
