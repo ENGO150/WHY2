@@ -285,11 +285,23 @@ impl Command
                 })
             },
 
+            #[cfg(feature = "client_screen")]
+            Command::Attach =>
+            {
+                //PARSE TARGET ID
+                let target_id = parameters.and_then(|p| p.parse::<usize>().ok());
+
+                Some(match target_id
+                {
+                    Some(id) => Ok(PacketCode::Attach { id: Some(id), token: None, username: None }), //NOVÁ VARIANTA
+                    None => Err(()),
+                })
+            },
+
             Command::Channel => Some(Ok(PacketCode::Channel { channel: parameters.map(str::to_string) })),
             Command::List => Some(Ok(PacketCode::List { users: None })),
             Command::Files => Some(Ok(PacketCode::Files { users: None })),
             #[cfg(feature = "client_screen")] Command::Screen => Some(Ok(PacketCode::Screen { token: None })),
-            #[cfg(feature = "client_screen")] Command::Attach => Some(Ok(PacketCode::Attach { token: None, username: None })),
             #[cfg(feature = "client_screen")] Command::Deattach => Some(Ok(PacketCode::Deattach { username: None } )),
             #[cfg(feature = "client_screen")] Command::Screens => Some(Ok(PacketCode::Screens { users: None })),
 
