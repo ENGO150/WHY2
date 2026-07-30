@@ -803,40 +803,49 @@ fn run_client(tx: Sender<ClientEvent>)
                                     let path = Path::new(parameters.trim());
 
                                     //TRY TO OPEN FILE
-                                    if let Ok(mut file) = File::open(path) && path.metadata().is_ok() &&
+                                    if let Ok(file) = File::open(path) && path.metadata().is_ok() &&
                                         path.is_file() && path.file_name().and_then(|n| n.to_str()).is_some()
                                     {
-                                        //GET SHA256 FILE HASH
-                                        let mut hasher = Sha256::new();
-                                        let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+                                        let path = path.to_owned();
+                                        let mut file = file;
+                                        let write_stream = write_stream.clone();
+                                        let keys = options::get_keys();
 
-                                        //LOOP READING
-                                        let success = loop
+                                        thread::spawn(move ||
                                         {
-                                            match file.read(&mut buffer)
+                                            //GET SHA256 FILE HASH
+                                            let mut hasher = Sha256::new();
+                                            let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+
+                                            //LOOP READING
+                                            let success = loop
                                             {
-                                                Ok(0) => break true,
-                                                Ok(bytes) => hasher.update(&buffer[..bytes]),
-                                                Err(_) => break false,
+                                                match file.read(&mut buffer)
+                                                {
+                                                    Ok(0) => break true,
+                                                    Ok(bytes) => hasher.update(&buffer[..bytes]),
+                                                    Err(_) => break false,
+                                                }
+                                            };
+
+                                            //REQUEST FILE UPLOAD
+                                            if success
+                                            {
+                                                //FINALIZE HASH
+                                                let hash: [u8; 32] = hasher.finalize().into();
+
+                                                //STORE UPLOAD IN ACTIVE UPLOADS LIST
+                                                client::ACTIVE_UPLOADS.lock().unwrap()
+                                                    .insert(hash.clone(), path.canonicalize().unwrap());
+
+                                                //SEND UPLOAD REQUEST
+                                                network::send(&mut write_stream.lock().unwrap(),
+                                                    PacketCode::Upload { hash, token: None, uid: None }, keys.as_ref());
+                                            } else //HASHING FAILED
+                                            {
+                                                println!("Error reading file!\n");
                                             }
-                                        };
-
-                                        //REQUEST FILE UPLOAD
-                                        if success
-                                        {
-                                            //FINALIZE HASH
-                                            let hash: [u8; 32] = hasher.finalize().into();
-
-                                            //STORE UPLOAD IN ACTIVE UPLOADS LIST
-                                            client::ACTIVE_UPLOADS.lock().unwrap().insert(hash.clone(), path.canonicalize().unwrap());
-
-                                            //SEND UPLOAD REQUEST
-                                            network::send(&mut write_stream.lock().unwrap(),
-                                                PacketCode::Upload { hash, token: None, uid: None }, options::get_keys().as_ref());
-                                        } else //HASHING FAILED
-                                        {
-                                            println!("Error reading file!\n");
-                                        }
+                                        });
                                     } else //NON-EXISTING FILE
                                     {
                                         println!("File not found!\n");
