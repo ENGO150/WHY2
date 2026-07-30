@@ -15,3 +15,154 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
+use wincode::{ SchemaWrite, SchemaRead };
+
+//ENUMS
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub enum PacketCode //CONTROL CODES
+{
+    //CLIENT <> SERVER | TEXT MESSAGE
+    Message
+    {
+        text: String,
+        username: Option<String>,
+        id: Option<usize>,
+        colors: MessageColors,
+    },
+
+    //SERVER -> CLIENT | INFORMATIONS
+    Welcome
+    {
+        min_pass: u64,
+        max_uname: u64,
+        min_uname: u64,
+        server_name: String,
+        server_uname: String,
+        git_hash: String,
+    },
+
+    //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
+    Leave
+    {
+        username: String,
+        id: usize,
+    },
+
+    //CLIENT <> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
+    PrivateMessage
+    {
+        text: String,
+        username: Option<String>,
+        id: usize,
+    },
+
+    //SERVER -> CLIENT | SEND MESSAGE BACK TO SENDER
+    PrivateMessageBack
+    {
+        text: String,
+        username: String,
+        id: usize,
+    },
+
+    //SERVER -> CLIENT | CLIENT JOINED VOICE CHANNEL
+    ChannelJoin
+    {
+        username: String,
+        id: usize,
+    },
+
+    //SERVER -> CLIENT | CLIENT LEFT VOICE CHANNEL
+    ChannelLeave
+    {
+        id: usize,
+    },
+
+    //CLIENT <> SERVER | REQUEST FILE UPLOAD (OR APPROVAL FROM SERVER)
+    Upload
+    {
+        hash: [u8; 32],
+        token: Option<[u8; 32]>,
+        uid: Option<u64>,
+    },
+
+    //CLIENT <> SERVER | DOWNLOAD FILE FROM SERVER
+    Download
+    {
+        id: Option<usize>,
+        file_id: Option<usize>,
+        token: Option<[u8; 32]>,
+    },
+
+    //SERVER -> CLIENT | ANNOUNCE NEW UPLOADED FILE
+    Uploaded
+    {
+        filename: String,
+        username: String,
+    },
+
+    //CLIENT <> SERVER | ATTACH CLIENT SCREENSHARE
+    Attach
+    {
+        username: Option<String>,
+        token: Option<[u8; 32]>,
+    },
+
+    Version { version: Option<String> },            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
+    Channel { channel: Option<String> },            //SERVER <> CLIENT | CHANNEL CHANGE
+    ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
+    ChannelDestroyed { name: String },              //SERVER -> CLIENT | CHANNEL ABANDONED
+    VoiceClients { clients: Vec<(usize, String)> }, //SERVER -> CLIENT | TELL CLIENT ALL CONNECTED VOICE CLIENTS
+    Files { users: Option<Vec<UserFile>> },         //CLIENT <> SERVER | LIST UPLOADED FILES
+    Screens { users: Option<Vec<UserScreen>> },     //CLIENT <> SERVER | LIST SCREENSHARES
+    Deattach { username: Option<String> },          //CLIENT <> SERVER | DEATTACH CLIENT SCREENSHARE
+    Screen { token: Option<[u8; 32]> },             //CLIENT <> SERVER | TOGGLE SCREENSHARE
+    KeyExchange { ecc: String, pq: String },        //SERVER <> CLIENT | KEY EXCHANGE
+    Accept { id: usize },                           //SERVER -> CLIENT | START CHATTING
+    Join { username: String },                      //SERVER -> CLIENT | CLIENT JOIN MESSAGE
+    List { users: Option<Vec<OnlineUser>> },        //CLIENT <> SERVER | PRINT CONNECTED USERS
+
+    Rekey,            //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)
+    Disconnect,       //SERVER <> CLIENT | QUIT COMMUNICATION
+    Username,         //SERVER -> CLIENT | PICK USERNAME
+    PasswordL,        //SERVER -> CLIENT | LOGIN
+    PasswordR,        //SERVER -> CLIENT | REGISTER
+    SpamWarning,      //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN
+    RegisterDisabled, //SERVER -> CLIENT | REGISTRATION IS DISABLED
+    Voice,            //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
+    UploadLimit,      //SERVER -> CLIENT | MAX CONCURRENT UPLOADS REACHED
+    InvalidUsage,     //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
+    InvalidFeature,   //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE
+    KeepAlive,        //SERVER <> CLIENT | A BIT LESS STUPID KEEP-ALIVE
+}
+
+//STRUCTS
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub struct MessageColors //COLORS OF MESSAGE
+{
+    pub username_color: Option<u8>, //COLOR OF USERNAME
+    pub message_color: Option<u8>,  //COLOR OF MESSAGE
+}
+
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub struct UserFile //USER FILE LIST ITEM
+{
+    pub username: String,
+    pub id: usize,
+    pub upload: Vec<(String, usize)>,
+}
+
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub struct UserScreen //USER SCREEN SHARE LIST ITEM
+{
+    pub username: String,
+    pub id: usize,
+}
+
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub struct OnlineUser //USER CONNECTED TO THE SERVER
+{
+    pub username: String,
+    pub id: usize,
+    pub channel: Option<String>,
+}
