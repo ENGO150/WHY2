@@ -104,11 +104,15 @@ pub enum PacketCode //CONTROL CODES
     //CLIENT <> SERVER | ATTACH CLIENT SCREENSHARE
     Attach
     {
+        id: Option<usize>,
         username: Option<String>,
         token: Option<[u8; 32]>,
     },
 
     Version { version: Option<String> },            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
+    Username { username: Option<String> },          //SERVER <> CLIENT | PICK USERNAME
+    PasswordL { password: Option<String> },         //SERVER -> CLIENT | LOGIN
+    PasswordR { password: Option<String> },         //SERVER -> CLIENT | REGISTER
     Channel { channel: Option<String> },            //SERVER <> CLIENT | CHANNEL CHANGE
     ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
     ChannelDestroyed { name: String },              //SERVER -> CLIENT | CHANNEL ABANDONED
@@ -124,9 +128,6 @@ pub enum PacketCode //CONTROL CODES
 
     Rekey,            //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)
     Disconnect,       //SERVER <> CLIENT | QUIT COMMUNICATION
-    Username,         //SERVER -> CLIENT | PICK USERNAME
-    PasswordL,        //SERVER -> CLIENT | LOGIN
-    PasswordR,        //SERVER -> CLIENT | REGISTER
     SpamWarning,      //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN
     RegisterDisabled, //SERVER -> CLIENT | REGISTRATION IS DISABLED
     Voice,            //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION

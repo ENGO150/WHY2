@@ -342,7 +342,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
             }
 
             //PICK_USERNAME CODE - guess what
-            PacketCode::Username =>
+            PacketCode::Username { .. } =>
             {
                 tx.send(ClientEvent::Clear(2)).unwrap();
 
@@ -360,7 +360,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
             },
 
             //REGISTER
-            PacketCode::PasswordR =>
+            PacketCode::PasswordR { .. } =>
             {
                 tx.send(ClientEvent::Clear(3)).unwrap();
                 options::set_asking_password(true);
@@ -378,7 +378,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
             },
 
             //LOGIN
-            PacketCode::PasswordL =>
+            PacketCode::PasswordL { .. } =>
             {
                 options::set_asking_password(true);
                 tx.send(ClientEvent::Login).unwrap();
@@ -592,7 +592,7 @@ pub fn listen_server(streams: &mut Streams, tx: Sender<ClientEvent>) //SERVER ->
 
             //SCREENSHARE ATTACH
             #[cfg(feature = "client_screen")]
-            PacketCode::Attach { username, token } =>
+            PacketCode::Attach { username, token, .. } =>
             {
                 //ENABLE ATTACH
                 screen_options::set_attach_screen(true);
