@@ -53,16 +53,29 @@ use crate::
     network::server as chat_server,
 };
 
+//ENUMS
+#[derive(SchemaWrite, SchemaRead, Clone)]
+pub enum FilePacketCode
+{
+    //DATA
+    Data { data: Vec<u8> },
+
+    //FILE METADATA
+    Metadata
+    {
+        size: u64,        //FILE SIZE
+        filename: String, //FILENAME
+        hash: [u8; 32],   //FILE HASH
+    },
+}
+
 //STRUCTS
-#[derive(SchemaWrite, SchemaRead, Clone, Default)]
+#[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct FilePacket //FILE CHUNK
 {
-    pub uid: u64,                 //UPLOAD UID
-    pub data: Option<Vec<u8>>,    //BINARY DATA
-    pub size: Option<u64>,        //FILE SIZE
-    pub filename: Option<String>, //FILE NAME
-    pub hash: Option<[u8; 32]>,   //FILE HASH
-    pub seq: usize,               //SEQUENCE NUMBER
+    pub uid: u64,             //UPLOAD UID
+    pub code: FilePacketCode, //CODE
+    pub seq: usize,           //SEQUENCE NUMBER
 }
 
 //IMPLEMENTATIONS
@@ -117,8 +130,8 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
                 network::send_tcp(&mut stream, FilePacket
                 {
                     uid,
-                    data: Some(plaintext),
-                    ..Default::default()
+                    code: FilePacketCode::Data { data: plaintext },
+                    seq: 0,
                 }, EncryptionMode::Stream(rex_stream), seq.as_deref_mut());
             },
             Err(_) => {}, //TODO: Implement
@@ -131,7 +144,7 @@ pub fn receive_file
     streams: &mut Streams,
     rex_stream: &mut RexStream,
     seq: &mut usize
-) -> Option<FilePacket>
+) -> Option<(u64, FilePacketCode)>
 {
     let read = network::read_tcp
     (
@@ -151,7 +164,7 @@ pub fn receive_file
                 *seq = packet.seq;
             } else { return None; }
 
-            Some(packet)
+            Some((packet.uid, packet.code))
         },
         Err(_) =>
         {

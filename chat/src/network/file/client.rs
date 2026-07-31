@@ -40,8 +40,13 @@ use crate::
     {
         self,
         EncryptionMode,
-        file::{ self, FilePacket },
         client::{ self, ClientEvent },
+        file::
+        {
+            self,
+            FilePacket,
+            FilePacketCode,
+        },
     },
 };
 
@@ -74,10 +79,13 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
     network::send_tcp(&mut stream, FilePacket
     {
         uid,
-        size: Some(size),
-        filename: Some(filename),
-        hash: Some(file_hash),
-        ..Default::default()
+        code: FilePacketCode::Metadata
+        {
+            size,
+            filename,
+            hash: file_hash,
+        },
+        seq: 0,
     }, EncryptionMode::Stream(&mut rex_stream), Some(&mut seq));
 
     //UPLOAD
@@ -103,15 +111,11 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     let mut rex_stream = chat_crypto::init_rex_stream(options::get_keys().as_ref().unwrap(), &token).unwrap();
 
     //RECEIVE FIRST PACKET (METADATA)
-    let metadata_packet = match file::receive_file(&mut streams, &mut rex_stream, &mut seq)
+    let (size, filename, hash) = match file::receive_file(&mut streams, &mut rex_stream, &mut seq)
     {
-        Some(p) => p,
-        None => return,
+        Some((_, FilePacketCode::Metadata { size, filename, hash })) => (size, filename, hash),
+        _ => return,
     };
-
-    //METADATA
-    let size = metadata_packet.size.unwrap();
-    let hash = metadata_packet.hash.unwrap();
 
     //NEW DOWNLOAD, GET NEW FILE
     let download_dir = config::read_config::<String>("download_directory")
@@ -119,7 +123,7 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
         .to_str().expect("Invalid home directory"));
 
     //GET SAFE FILENAME
-    let filename = Path::new(&metadata_packet.filename.unwrap())
+    let filename = Path::new(&filename)
         .file_name()
         .and_then(|f| f.to_str())
         .unwrap_or("unnamed_file")
@@ -141,22 +145,20 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     loop
     {
         //READ
-        let read = match file::receive_file(&mut streams, &mut rex_stream, &mut seq)
+        let data = match file::receive_file(&mut streams, &mut rex_stream, &mut seq)
         {
-            Some(r) => r,
-            None => return
+            Some((_, FilePacketCode::Data { data })) => data,
+            _ => return
         };
 
-        let chunk_data = read.data.unwrap();
-
         //WRITE
-        if file.write_all(&chunk_data).is_ok()
+        if file.write_all(&data).is_ok()
         {
             //UPDATE SIZE
-            current_size += chunk_data.len() as u64;
+            current_size += data.len() as u64;
 
             //UPDATE HASHER
-            hasher.update(&chunk_data);
+            hasher.update(&data);
 
             //CHECK IF DOWNLOADING FINISHED
             if current_size == size

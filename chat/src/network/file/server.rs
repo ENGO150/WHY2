@@ -47,10 +47,15 @@ use crate::
     network::
     {
         self,
-        codes::PacketCode,
-        file::{ self, FilePacket },
-        server::{ self, AvailableFile },
         EncryptionMode,
+        codes::PacketCode,
+        server::{ self, AvailableFile },
+        file::
+        {
+            self,
+            FilePacket,
+            FilePacketCode,
+        },
     },
 };
 
@@ -148,10 +153,10 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
     let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
 
     //WAIT FOR FIRST PACKET (METADATA)
-    let metadata_packet = match file::receive_file(streams, &mut rex_stream, &mut seq)
+    let (size, hash, filename) = match file::receive_file(streams, &mut rex_stream, &mut seq)
     {
-        Some(p) => p,
-        None => return
+        Some((_, FilePacketCode::Metadata { size, filename, hash })) => (size, hash, filename),
+        _ => return
     };
 
     let mut valid = false;
@@ -169,10 +174,7 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
     let disk_nonce = core_crypto::generate_nonce::
             <{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>().unwrap();
 
-    if !valid && let Some(size) = metadata_packet.size &&
-        let Some(hash) = metadata_packet.hash &&
-        let Some(filename) = metadata_packet.filename &&
-        size / consts::MEGABYTE as u64 <= config::read_config::<u64>("max_upload_size")
+    if !valid && size / consts::MEGABYTE as u64 <= config::read_config::<u64>("max_upload_size")
     {
         //CREATE TEMP UPLOAD DIRECTORY
         let temp_dir = misc::get_upload_dir(&username);
@@ -208,97 +210,94 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
     loop
     {
         //READ
-        let read = match file::receive_file(streams, &mut rex_stream, &mut seq)
+        let (uid, data) = match file::receive_file(streams, &mut rex_stream, &mut seq)
         {
-            Some(r) => r,
-            None => return
+            Some((uid, FilePacketCode::Data { data })) => (uid, data),
+            _ => return
         };
 
-        if let Some(chunk_data) = read.data
+        if let Some(mut active) = ACTIVE_FILESHARES.get_mut(&uid) && active.client_id == id
         {
-            if let Some(mut active) = ACTIVE_FILESHARES.get_mut(&read.uid) && active.client_id == id
+            //ENCRYPT
+            let input_i64 = crypto::bytes_to_i64(&data);
+            let mut encrypted_i64 = active.stream.update(&input_i64).expect("Disk stream encryption failed");
+            encrypted_i64.extend(active.stream.finalize().expect("Disk stream finalize failed"));
+            let mut encrypted_bytes = crypto::i64_to_bytes(&encrypted_i64);
+            encrypted_bytes.truncate(data.len()); //REMOVE PADDING
+
+            if data.len() <= consts::UPLOAD_CHUNK_SIZE && //CHECK PACKET SIZE
+                active.file.write_all(&encrypted_bytes).is_ok() //WRITE
             {
-                //ENCRYPT
-                let input_i64 = crypto::bytes_to_i64(&chunk_data);
-                let mut encrypted_i64 = active.stream.update(&input_i64).expect("Disk stream encryption failed");
-                encrypted_i64.extend(active.stream.finalize().expect("Disk stream finalize failed"));
-                let mut encrypted_bytes = crypto::i64_to_bytes(&encrypted_i64);
-                encrypted_bytes.truncate(chunk_data.len()); //REMOVE PADDING
+                //UPDATE SIZE
+                active.current_size += data.len() as u64;
 
-                if chunk_data.len() <= consts::UPLOAD_CHUNK_SIZE && //CHECK PACKET SIZE
-                    active.file.write_all(&encrypted_bytes).is_ok() //WRITE
+                if active.current_size > active.size { return; }
+
+                //UPDATE HASHER
+                active.hasher.update(&data);
+
+                //CHECK SIZE
+                if active.current_size == active.size //UPLOAD DONE
                 {
-                    //UPDATE SIZE
-                    active.current_size += chunk_data.len() as u64;
+                    let valid: bool;
 
-                    if active.current_size > active.size { return; }
+                    //GET FILE PATH
+                    let temp_dir = misc::get_upload_dir(&username);
+                    let current_path = temp_dir.join(uid.to_string());
+                    let mut new_filename = None;
+                    let mut final_path = None;
+                    let mut insert = false;
+                    let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
 
-                    //UPDATE HASHER
-                    active.hasher.update(&chunk_data);
-
-                    //CHECK SIZE
-                    if active.current_size == active.size //UPLOAD DONE
+                    //CHECK HASHES
+                    if active.hash == final_hash
                     {
-                        let valid: bool;
+                        //GET NEW FILE PATH
+                        let filename = Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
+                            .file_name()
+                            .unwrap_or(OsStr::new("unnamed_file"));
+                        let new_path = temp_dir.join(filename);
 
-                        //GET FILE PATH
-                        let temp_dir = misc::get_upload_dir(&username);
-                        let current_path = temp_dir.join(read.uid.to_string());
-                        let mut new_filename = None;
-                        let mut final_path = None;
-                        let mut insert = false;
-                        let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
+                        //RENAME FILE
+                        insert = !new_path.is_file();
+                        valid = fs::rename(&current_path, &new_path).is_ok();
 
-                        //CHECK HASHES
-                        if active.hash == final_hash
+                        //SET NEW FILE VARIABLES
+                        new_filename = Some(filename.to_os_string());
+                        final_path = Some(new_path);
+                    } else { valid = false; }
+
+                    if !valid { return; }
+
+                    //LOG FILE UPLOAD
+                    log::info!("Upload done: {peer_addr}");
+
+                    let filename = new_filename.and_then(|f| f.into_string().ok()).unwrap_or("unnamed_file".to_string());
+
+                    //ANNOUNCE FILE UPLOAD
+                    server::send_to_all(PacketCode::Uploaded
+                    {
+                        username: username.clone(),
+                        filename: filename.clone(),
+                    }, false, None);
+
+                    if insert
+                    {
+                        //ADD FILE TO AVAILABLE FILES
+                        server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
                         {
-                            //GET NEW FILE PATH
-                            let filename = Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
-                                .file_name()
-                                .unwrap_or(OsStr::new("unnamed_file"));
-                            let new_path = temp_dir.join(filename);
-
-                            //RENAME FILE
-                            insert = !new_path.is_file();
-                            valid = fs::rename(&current_path, &new_path).is_ok();
-
-                            //SET NEW FILE VARIABLES
-                            new_filename = Some(filename.to_os_string());
-                            final_path = Some(new_path);
-                        } else { valid = false; }
-
-                        if !valid { return; }
-
-                        //LOG FILE UPLOAD
-                        log::info!("Upload done: {peer_addr}");
-
-                        let filename = new_filename.and_then(|f| f.into_string().ok()).unwrap_or("unnamed_file".to_string());
-
-                        //ANNOUNCE FILE UPLOAD
-                        server::send_to_all(PacketCode::Uploaded
-                        {
-                            username: username.clone(),
-                            filename: filename.clone(),
-                        }, false, None);
-
-                        if insert
-                        {
-                            //ADD FILE TO AVAILABLE FILES
-                            server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
-                            {
-                                hash: final_hash,
-                                path: final_path.unwrap(),
-                                filename,
-                                size: active.current_size,
-                                nonce: disk_nonce.to_flat(),
-                            });
-                        }
-
-                        //REMOVE ACTIVE UPLOAD
-                        drop(active);
-                        ACTIVE_FILESHARES.remove(&read.uid);
-                        return;
+                            hash: final_hash,
+                            path: final_path.unwrap(),
+                            filename,
+                            size: active.current_size,
+                            nonce: disk_nonce.to_flat(),
+                        });
                     }
+
+                    //REMOVE ACTIVE UPLOAD
+                    drop(active);
+                    ACTIVE_FILESHARES.remove(&uid);
+                    return;
                 }
             }
         }
@@ -351,10 +350,13 @@ pub fn upload(token: [u8; 32], id: usize, mut stream: TcpStream, file: Available
     network::send_tcp(&mut stream, FilePacket
     {
         uid,
-        size: Some(file.size),
-        filename: Some(file.filename.clone()),
-        hash: Some(file.hash),
-        ..Default::default()
+        code: FilePacketCode::Metadata
+        {
+            size: file.size,
+            filename: file.filename.clone(),
+            hash: file.hash,
+        },
+        seq: 0,
     }, EncryptionMode::Stream(&mut rex_stream), Some(&mut seq));
 
     //INIT DISK REX STREAM
