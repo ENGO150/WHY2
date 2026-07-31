@@ -92,10 +92,9 @@ use crate::
         client::{ ClientEvent, VoiceUser },
         voice::
         {
-            consts,
             self,
-            VoiceCode,
-            VoicePacket,
+            consts,
+            VoicePacketCode,
             client::sfx::SoundEffect,
         },
     },
@@ -219,12 +218,10 @@ fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], id: usize
     if let Ok(len) = encoder.encode_float(&frame, buffer)
     {
         //TRANSMIT
-        voice::send(socket, VoicePacket
+        voice::send(socket, id, VoicePacketCode::Audio
         {
-            voice: Some(buffer[..len].to_vec()),
-            id: Some(id),
-
-            ..Default::default()
+            data: buffer[..len].to_vec(),
+            username: None,
         }, &chat_options::get_keys().unwrap()).unwrap();
     }
 }
@@ -286,11 +283,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
     drop(stderr_gag);
 
     //SEND HELLO PACKET
-    voice::send(&socket, VoicePacket
-    {
-        id: Some(id),
-        ..Default::default()
-    }, &chat_options::get_keys().unwrap()).unwrap();
+    voice::send(&socket, id, VoicePacketCode::Hello, &chat_options::get_keys().unwrap()).unwrap();
 
     //CONFIGURE CPAL INPUT
     let input_config = configure_device(&input_device, input_device.supported_input_configs().unwrap(), input_device.default_input_config().unwrap(), true);
@@ -594,13 +587,9 @@ pub fn listen_server_voice //SERVER -> CLIENT
             //SEND PING PACKET
             if iteration_counter == 10
             {
-                voice::send(&vad_socket, VoicePacket
+                voice::send(&vad_socket, id, VoicePacketCode::Ping
                 {
-                    id: Some(id),
-                    code: Some(VoiceCode::PING),
-                    timestamp: Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis()),
-
-                    ..Default::default()
+                    timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
                 }, &chat_options::get_keys().unwrap()).unwrap();
 
                 //RESET COUNTER
@@ -645,76 +634,60 @@ pub fn listen_server_voice //SERVER -> CLIENT
         if network_buffer.seq <= options::get_server_seq() { continue; } //INGORE INVALID SEQs
         options::set_server_seq(network_buffer.seq); //SET SERVER SEQ
 
-        //GET ID OF SENDER
-        let sender_id = match network_buffer.id
+        if let Some((stream, peer)) = CONSUMERS.lock().unwrap().get_mut(&network_buffer.id)
         {
-            Some(id) => id,
-            None => continue
-        };
-
-        //CREATE NEW CLIENT CONTEXT ON UNKNOWN CLIENT
-        if !CONSUMERS.lock().unwrap().contains_key(&sender_id)
-        {
-            add_consumer(sender_id, network_buffer.username.unwrap());
-        }
-
-        if let Some((stream, peer)) = CONSUMERS.lock().unwrap().get_mut(&sender_id)
-        {
-            //PING/PONG
-            if let Some(code) = network_buffer.code && let Some(timestamp) = network_buffer.timestamp
+            //CODES
+            match network_buffer.code
             {
-                match code
+                //AUDIO RECEIVED
+                VoicePacketCode::Audio { data, .. } =>
                 {
-                    //PING RECEIVED, SEND BACK
-                    VoiceCode::PING =>
+
+                    //CHECK FOR MUTED CLIENT
+                    if chat_options::is_muted(Some(network_buffer.id)) { continue; }
+
+                    //DECODE
+                    if let Ok(decoded_len) = peer.decoder.decode_float(Some(&data), &mut decoded_buffer[..], false)
                     {
-                        //SEND PONG PACKET
-                        voice::send(&socket, VoicePacket
-                        {
-                            id: Some(id),
-                            target_id: Some(sender_id),
-                            code: Some(VoiceCode::PONG),
-                            timestamp: Some(timestamp),
-
-                            ..Default::default()
-                        }, &chat_options::get_keys().unwrap()).unwrap();
-                    },
-
-                    //PING FORWARDED BACK, CALCULATE LATENCY
-                    VoiceCode::PONG =>
-                    {
-                        //CALCULATE LATENCY
-                        let latency = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().saturating_sub(timestamp);
-
-                        //STORE LATENCY TO BUFFER
-                        stream.latencies.push_back(latency);
-                        if stream.latencies.len() > 20 //STORE ONLY LATEST 20 LATENCIES
-                        {
-                            stream.latencies.pop_front();
-                        }
-
-                        //CALCULATE AVERAGE LATENCY
-                        let sum: u128 = stream.latencies.iter().sum();
-                        if !stream.latencies.is_empty()
-                        {
-                            //STORE IN AVG_LATENCY
-                            stream.avg_latency = sum / stream.latencies.len() as u128;
-                        }
+                        //PUSH TO RINGBUFFER
+                        peer.producer.push_slice(&decoded_buffer[..decoded_len]);
                     }
-                }
-            }
+                },
 
-            //CHECK FOR VOICE IN PACKET
-            if network_buffer.voice.is_none() { continue; }
+                //PING RECEIVED, SEND BACK
+                VoicePacketCode::Ping { timestamp } =>
+                {
+                    //SEND PONG PACKET
+                    voice::send(&socket, id, VoicePacketCode::Pong
+                    {
+                        target_id: network_buffer.id,
+                        timestamp: timestamp,
+                    }, &chat_options::get_keys().unwrap()).unwrap();
+                },
 
-            //CHECK FOR MUTED CLIENT
-            if chat_options::is_muted(Some(sender_id)) { continue; }
+                //PING FORWARDED BACK, CALCULATE LATENCY
+                VoicePacketCode::Pong { timestamp, .. } =>
+                {
+                    //CALCULATE LATENCY
+                    let latency = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().saturating_sub(timestamp);
 
-            //DECODE
-            if let Ok(decoded_len) = peer.decoder.decode_float(network_buffer.voice.as_deref(), &mut decoded_buffer[..], false)
-            {
-                //PUSH TO RINGBUFFER
-                peer.producer.push_slice(&decoded_buffer[..decoded_len]);
+                    //STORE LATENCY TO BUFFER
+                    stream.latencies.push_back(latency);
+                    if stream.latencies.len() > 20 //STORE ONLY LATEST 20 LATENCIES
+                    {
+                        stream.latencies.pop_front();
+                    }
+
+                    //CALCULATE AVERAGE LATENCY
+                    let sum: u128 = stream.latencies.iter().sum();
+                    if !stream.latencies.is_empty()
+                    {
+                        //STORE IN AVG_LATENCY
+                        stream.avg_latency = sum / stream.latencies.len() as u128;
+                    }
+                },
+
+                _ => {}, //IGNORE OTHER CODES
             }
         }
     }

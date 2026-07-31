@@ -36,8 +36,7 @@ use crate::
         {
             self,
             consts,
-            VoiceCode,
-            VoicePacket,
+            VoicePacketCode,
         },
     },
 };
@@ -101,14 +100,8 @@ fn parse_opus_len(bytes: &[u8]) -> (usize, usize)
     }
 }
 
-fn validate_opus_packet(packet: Option<&[u8]>) -> bool
+fn validate_opus_packet(packet: &[u8]) -> bool
 {
-    let packet = match packet
-    {
-        Some(p) => p,
-        None => return false
-    };
-
     if packet.is_empty() { return false; }
 
     let toc = packet[0];
@@ -176,18 +169,11 @@ pub fn listen_client_voice(socket: UdpSocket)
     {
         let (received, addr) = voice::receive(&socket).unwrap();
 
-        //GET ID
-        let id = match received.id
-        {
-            Some(id) => id,
-            None => continue //IGNORE INVALID IDS
-        };
-
         //CLIENT USERNAME
         let username: String;
 
         //CHECK IF ID IS IN CONNECTIONS
-        if let Some(mut conn) = CONNECTIONS.get_mut(&id)
+        if let Some(mut conn) = CONNECTIONS.get_mut(&received.id)
         {
             //FOUND, CHECK ADDRESS
             if let Some(conn) = conn.0.as_mut()
@@ -210,14 +196,14 @@ pub fn listen_client_voice(socket: UdpSocket)
                 if conn.packet_accumulator >= consts::ACTIVITY_TRESHOLD
                 {
                     conn.packet_accumulator = 0; //RESET ACCUM
-                    reset_last_activity(&id); //RESET ACTIVITY TIMER
+                    reset_last_activity(&received.id); //RESET ACTIVITY TIMER
                 }
             } else //NOT FOUND, ADD ADDRESS
             {
                 conn.0 = Some(Connection
                 {
                     addr: addr,
-                    id: id,
+                    id: received.id,
                     seq: 0,
                     server_seq: 0,
                     packet_accumulator: 0,
@@ -230,71 +216,112 @@ pub fn listen_client_voice(socket: UdpSocket)
             username = conn.1.clone();
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
-        //VALIDATE PACKET
-        if received.code.is_none() && !validate_opus_packet(received.voice.as_deref()) { continue; } //IGNORE INVALID
-
-        //FORWARD PONG (UNICAST)
-        if received.code == Some(VoiceCode::PONG) && let Some(ref target_id) = received.target_id
+        //CODES
+        match received.code
         {
-            if let Some(ref keys) = find_key(&target_id)
+            //AUDIO
+            VoicePacketCode::Audio { data, .. } =>
             {
-                //FIND ADDRESS OF RECIPIENT (DA PINGA)
-                let addr = match CONNECTIONS.get(target_id)
-                    .and_then(|entry| entry.0.as_ref().map(|conn| conn.addr))
+                //VALIDATE PACKET IF IT CONTAINS AUDIO
+                if !validate_opus_packet(&data) { continue; }
+
+                //FIND SENDER'S CHANNEL
+                let sender_channel = find_channel(&received.id);
+
+                //COLLECT ALL ADDRESSES
+                let mut addresses: Vec<(SocketAddr, SharedKeys, usize)> = Vec::new();
+                for connection in CONNECTIONS.iter()
                 {
-                    Some(a) => a,
-                    None => continue
-                };
-
-                //FORWARD
-                voice::send(&socket, VoicePacket
-                {
-                    code: Some(VoiceCode::PONG),
-                    id: Some(id),
-                    timestamp: received.timestamp,
-                    ..Default::default()
-                }, &addr, target_id, keys).unwrap();
-            }
-
-            continue;
-        }
-
-        //FIND SENDER'S CHANNEL
-        let sender_channel = find_channel(&id);
-
-        //COLLECT ALL ADDRESSES
-        let mut addresses: Vec<(SocketAddr, SharedKeys, usize)> = Vec::new();
-        for connection in CONNECTIONS.iter()
-        {
-            if let (Some(conn), _) = connection.value()
-            {
-                //DO NOT SEND BACK TO SENDER (LOOPBACK)
-                if conn.addr != addr
-                {
-                    //SEND ONLY TO SAME CHANNEL
-                    if sender_channel != find_channel(&conn.id) { continue; }
-
-                    //FIND CONNECTION KEYS
-                    if let Some(keys) = find_key(&conn.id)
+                    if let (Some(conn), _) = connection.value()
                     {
-                        addresses.push((conn.addr, keys, conn.id));
+                        //DO NOT SEND BACK TO SENDER (LOOPBACK)
+                        if conn.addr != addr
+                        {
+                            //SEND ONLY TO SAME CHANNEL
+                            if sender_channel != find_channel(&conn.id) { continue; }
+
+                            //FIND CONNECTION KEYS
+                            if let Some(keys) = find_key(&conn.id)
+                            {
+                                addresses.push((conn.addr, keys, conn.id));
+                            }
+                        }
                     }
                 }
-            }
-        }
 
-        //SEND TO ALL
-        for (addr, keys, recipient_id) in addresses.iter()
-        {
-            voice::send(&socket, VoicePacket
+                //SEND TO ALL
+                for (addr, keys, recipient_id) in addresses.iter()
+                {
+                    voice::send(&socket, received.id, VoicePacketCode::Audio
+                    {
+                        data: data.clone(),
+                        username: Some(username.clone()),
+                    }, addr, recipient_id, keys).unwrap();
+                }
+            }
+
+            //PING - BROADCAST TO ALL CLIENTS IN SAME CHANNEL
+            VoicePacketCode::Ping { timestamp } =>
             {
-                voice: received.voice.clone(),
-                username: Some(username.to_string()),
-                code: received.code.clone(),
-                id: Some(id),
-                timestamp: received.timestamp,
-                ..Default::default()
-            }, addr, recipient_id, keys).unwrap();
+                //FIND SENDER'S CHANNEL
+                let sender_channel = find_channel(&received.id);
+
+                //COLLECT ALL ADDRESSES
+                let mut addresses: Vec<(SocketAddr, SharedKeys, usize)> = Vec::new();
+                for connection in CONNECTIONS.iter()
+                {
+                    if let (Some(conn), _) = connection.value()
+                    {
+                        //DO NOT SEND BACK TO SENDER (LOOPBACK)
+                        if conn.addr != addr
+                        {
+                            //SEND ONLY TO SAME CHANNEL
+                            if sender_channel != find_channel(&conn.id) { continue; }
+
+                            //FIND CONNECTION KEYS
+                            if let Some(keys) = find_key(&conn.id)
+                            {
+                                addresses.push((conn.addr, keys, conn.id));
+                            }
+                        }
+                    }
+                }
+
+                //SEND TO ALL
+                for (addr, keys, recipient_id) in addresses.iter()
+                {
+                    voice::send(&socket, received.id, VoicePacketCode::Ping
+                    {
+                        timestamp,
+                    }, addr, recipient_id, keys).unwrap();
+                }
+            }
+
+            //FORWARD PONG (UNICAST)
+            VoicePacketCode::Pong { target_id, timestamp } =>
+            {
+                if let Some(ref keys) = find_key(&target_id)
+                {
+                    //FIND ADDRESS OF RECIPIENT (DA PINGA)
+                    let addr = match CONNECTIONS.get(&target_id)
+                        .and_then(|entry| entry.0.as_ref().map(|conn| conn.addr))
+                    {
+                        Some(a) => a,
+                        None => continue
+                    };
+
+                    //FORWARD
+                    voice::send(&socket, received.id, VoicePacketCode::Pong
+                    {
+                        target_id,
+                        timestamp,
+                    }, &addr, &target_id, keys).unwrap();
+                }
+
+                continue;
+            },
+
+            _ => {},
         }
     }
 }

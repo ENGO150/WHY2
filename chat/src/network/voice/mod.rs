@@ -45,34 +45,59 @@ use crate::network::voice::client::options;
 #[cfg(not(feature = "server"))]
 use crate::options as chat_options;
 
-#[derive(Clone, PartialEq, SchemaRead, SchemaWrite)]
-pub enum VoiceCode
+#[derive(SchemaRead, SchemaWrite)]
+pub enum VoicePacketCode
 {
-    PING, //CLIENT A -> CLIENT B
-    PONG, //CLIENT A <- CLIENT B
+    //INIT PACKET
+    Hello,
+
+    //AUDIO TRANSMIT
+    Audio
+    {
+        data: Vec<u8>,            //DATA
+        username: Option<String>, //CLIENT USERNAME
+    },
+
+    //Pingu without you is just Ping
+    Ping
+    {
+        timestamp: u128, //LOCAL TIMESTAMP
+    },
+
+    //Chinese cousin of Pingu
+    Pong
+    {
+        target_id: usize, //REMOTE CLIENT ID
+        timestamp: u128,  //REMOTE TIMESTAMP
+    },
 }
 
-#[derive(SchemaRead, SchemaWrite, Default)]
+#[derive(SchemaRead, SchemaWrite)]
 pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
 {
-    pub voice: Option<Vec<u8>>,   //MESSAGE
-    pub username: Option<String>, //USERNAME
-    pub code: Option<VoiceCode>,  //CODE
-    pub id: Option<usize>,        //ID OF USER
-    pub target_id: Option<usize>, //ID OF RECIPIENT
-    pub seq: usize,               //SEQUENCE NUMBER
-    pub timestamp: Option<u128>,  //TIME OF SENDING
+    pub id: usize,               //LOCAL CLIENT ID
+    pub code: VoicePacketCode,   //CODE
+    pub seq: usize,              //SEQUENCE NUMBER
 }
 
 pub fn send //SEND DATA TO UDP
 (
     socket: &UdpSocket,
-    mut packet: VoicePacket,
+    id: usize,
+    code: VoicePacketCode,
     #[cfg(feature = "server")] addr: &SocketAddr,
     #[cfg(feature = "server")] recipient_id: &usize,
     keys: &SharedKeys
 ) -> Result<usize, Error>
 {
+    //INIT PACKET
+    let mut packet = VoicePacket
+    {
+        id,
+        code,
+        seq: 0,
+    };
+
     //SET SERVER SEQ
     #[cfg(feature = "server")]
     {
@@ -106,8 +131,7 @@ pub fn send //SEND DATA TO UDP
     //PREPEND ID TO PACKET
     #[cfg(feature = "client_base")]
     {
-        let id_be_bytes = packet.id.unwrap().to_be_bytes();
-        encrypted_bytes.splice(0..0, id_be_bytes);
+        encrypted_bytes.splice(0..0, id.to_be_bytes());
     }
 
     #[cfg(feature = "server")]
