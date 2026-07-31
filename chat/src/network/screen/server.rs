@@ -30,9 +30,9 @@ use crate::
     crypto,
     network::
     {
-        screen,
         Streams,
         server::{ self, Connection },
+        screen::{ self, ScreenPacketCode },
     },
 };
 
@@ -129,7 +129,7 @@ pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
                         }
 
                         //PREVENT FEEDBACK
-                        if *client_id == id && read.frame.is_none()
+                        if *client_id == id && matches!(read, ScreenPacketCode::Audio { .. })
                         {
                             return None;
                         }

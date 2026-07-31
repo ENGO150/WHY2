@@ -51,7 +51,8 @@ use crate::
         {
             self,
             consts,
-            ScreenPacket,
+            ScreenPacketCode,
+            client::audio::AudioFrame,
         },
     },
 };
@@ -121,12 +122,8 @@ pub fn screen(token: [u8; 32])
                     Err(_) => return,
                 };
 
-                screen::send_frame(&mut stream, ScreenPacket
-                {
-                    frame: Some(compressed_frame),
-                    audio: None,
-                    ..Default::default()
-                }, &mut rex_stream, Some(&mut seq));
+                screen::send_frame(&mut stream,
+                    ScreenPacketCode::Video { data: compressed_frame }, &mut rex_stream, Some(&mut seq));
             },
 
             //AUDIO FRAME
@@ -138,12 +135,8 @@ pub fn screen(token: [u8; 32])
                     Err(_) => return,
                 };
 
-                screen::send_frame(&mut stream, ScreenPacket
-                {
-                    frame: None,
-                    audio: Some(audio_frame.data),
-                    ..Default::default()
-                }, &mut rex_stream, Some(&mut seq));
+                screen::send_frame(&mut stream,
+                    ScreenPacketCode::Audio { data: audio_frame.data }, &mut rex_stream, Some(&mut seq));
             }
         }
     }
@@ -195,18 +188,21 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
                 }
             };
 
-            if let Some(frame) = read.frame
+            match read
             {
-                tx.send(frame).ok();
-                if let Some(proxy) = SCREEN_SHARE_PROXY.read().unwrap().as_ref()
+                ScreenPacketCode::Video { data } =>
                 {
-                    proxy.send_event(UserEvent::NewFrame).ok();
-                }
-            }
+                    tx.send(data).ok();
+                    if let Some(proxy) = SCREEN_SHARE_PROXY.read().unwrap().as_ref()
+                    {
+                        proxy.send_event(UserEvent::NewFrame).ok();
+                    }
+                },
 
-            if let Some(audio) = read.audio
-            {
-                audio_tx.send(audio::AudioFrame { data: audio }).ok();
+                ScreenPacketCode::Audio { data } =>
+                {
+                    audio_tx.send(AudioFrame { data }).ok();
+                },
             }
         }
     });

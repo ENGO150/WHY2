@@ -42,12 +42,19 @@ use crate::
     },
 };
 
+//ENUMS
+#[derive(SchemaWrite, SchemaRead, Clone)]
+pub enum ScreenPacketCode
+{
+    Video { data: Vec<u8> }, //VIDEO DATA
+    Audio { data: Vec<u8> }, //AUDIO DATA
+}
+
 //STRUCTS
-#[derive(SchemaWrite, SchemaRead, Clone, Default)]
+#[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct ScreenPacket //SCREEN PACKET
 {
-    pub frame: Option<Vec<u8>>, //COMPRESSED FRAME
-    pub audio: Option<Vec<u8>>, //AUDIO FRAME
+    pub code: ScreenPacketCode, //CODE
     pub seq: usize,             //SEQUENTIAL NUMBER
 }
 
@@ -63,7 +70,7 @@ impl SequencedPacket for ScreenPacket
 pub fn send_frame //SEND frame TO stream
 (
     stream: &mut TcpStream,
-    packet: ScreenPacket,
+    code: ScreenPacketCode,
     rex_stream: &mut RexStream,
     seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
 )
@@ -71,7 +78,11 @@ pub fn send_frame //SEND frame TO stream
     network::send_tcp
     (
         stream,
-        packet,
+        ScreenPacket
+        {
+            code,
+            seq: 0,
+        },
         EncryptionMode::Stream(rex_stream),
         seq,
     );
@@ -82,7 +93,7 @@ pub fn receive_frame
     streams: &mut Streams,
     rex_stream: &mut RexStream,
     seq: &mut usize //LOCAL/GLOBAL SEQ
-) -> Option<ScreenPacket>
+) -> Option<ScreenPacketCode>
 {
     let read = network::read_tcp
     (
@@ -102,7 +113,7 @@ pub fn receive_frame
                 *seq = packet.seq;
             } else { return None; }
 
-            Some(packet)
+            Some(packet.code)
         },
 
         _ => { None } //TODO: Implement
