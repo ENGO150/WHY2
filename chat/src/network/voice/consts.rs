@@ -21,8 +21,13 @@ pub const SAMPLE_RATE: u32          = 48000;                                    
 pub const FRAME_MS: u32             = 20;                                       //LENGTH OF ONE FRAME
 pub const FRAME_SIZE: usize         = (SAMPLE_RATE * FRAME_MS / 1000) as usize; //960 SAMPLES PER FRAME
 
-pub const TRESHOLD_OPEN: f32        = 0.002;                                    //INPUT THRESHOLD
-pub const TRESHOLD_CLOSE: f32       = 0.001;                                    //INPUT THRESHOLD (HYSTERESIS)
+pub const NOISE_FLOOR_ALPHA: f32    = 0.05;                                     //EMA SMOOTHING FACTOR
+pub const NOISE_OPEN_MULT: f32      = 3.5;                                      //OPEN TRESHOLD
+pub const NOISE_CLOSE_MULT: f32     = 2.0;                                      //CLOSE TRESHOLD (HYSTERESIS)
+pub const MIN_TRESHOLD_OPEN: f32    = 0.0008;                                   //HARD MINIMUM FOR OPEN
+pub const MIN_TRESHOLD_CLOSE: f32   = 0.0004;                                   //HARD MINIMUM FOR CLOSE
+pub const INITIAL_NOISE_FLOOR: f32  = 0.003;                                    //INIT
+
 pub const HOLD_FRAMES: usize        = 10;                                       //~200ms HOLD TIME
 pub const MIXING_TRESHOLD: f32      = 0.001;                                    //SPEAKER DETECTION NOISE TRESHOLD
 pub const ACTIVITY_TRESHOLD: usize  = 100;                                      //SERVER ACTIVITY TIMER RESET TRESHOLD (~2000ms)

@@ -316,6 +316,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
     let gate_open = Arc::new(Mutex::new(false)); //NOISE GATE
     let preroll_buffer = Arc::new(Mutex::new(VecDeque::<Vec<f32>>::with_capacity(3))); //PRE-ROLL BUFFER
     let hold_frames_remaining = Arc::new(Mutex::new(0usize)); //HOLD TIME
+    let noise_floor = Arc::new(Mutex::new(consts::INITIAL_NOISE_FLOOR)); //ADAPTIVE NOISE FLOOR
 
     //NOISE REDUCTION
     let mut denoiser = DenoiseState::new();
@@ -323,6 +324,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
 
     //CONFIGURE INPUT STREAM
     let send_socket = socket.clone();
+    let noise_floor_cb = noise_floor.clone();
     let input_stream = input_device.build_input_stream(input_config, move |data: &[f32], _: &_|
     {
         //CHECK FOR MUTING
@@ -421,9 +423,21 @@ pub fn listen_server_voice //SERVER -> CLIENT
             let mut gate = gate_open.lock().unwrap();
             let mut preroll = preroll_buffer.lock().unwrap();
             let mut hold_frames = hold_frames_remaining.lock().unwrap();
+            let mut nf = noise_floor_cb.lock().unwrap();
+
+            //PREVENT NOISE FLOOR CONTAMINATION BY VOICE
+            if !*gate
+            {
+                *nf += (rms - *nf) * consts::NOISE_FLOOR_ALPHA;
+            }
+
+            //DYNAMIC TRESHOLDS
+            let treshold_open = (*nf * consts::NOISE_OPEN_MULT).max(consts::MIN_TRESHOLD_OPEN);
+            let treshold_close = (*nf * consts::NOISE_CLOSE_MULT).max(consts::MIN_TRESHOLD_CLOSE);
+            drop(nf);
 
             //HYSTERESIS
-            if !*gate && rms > consts::TRESHOLD_OPEN
+            if !*gate && rms > treshold_open
             {
                 *gate = true; //SPEAKING
 
@@ -435,7 +449,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
 
                 preroll.clear();
                 *hold_frames = consts::HOLD_FRAMES;
-            } else if *gate && rms < consts::TRESHOLD_CLOSE
+            } else if *gate && rms < treshold_close
             {
                 if *hold_frames > 0 //SILENT FRAME, DECREMENT
                 {
@@ -444,7 +458,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
                 {
                     *gate = false;
                 }
-            } else if *gate && rms >= consts::TRESHOLD_CLOSE //SPEAKING CONTINUES, RESET HOLD TIMER
+            } else if *gate && rms >= treshold_close //SPEAKING CONTINUES, RESET HOLD TIMER
             {
                 *hold_frames = consts::HOLD_FRAMES;
             }
