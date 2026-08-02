@@ -21,6 +21,12 @@ pub const SAMPLE_RATE: u32          = 48000;                                    
 pub const FRAME_MS: u32             = 20;                                       //LENGTH OF ONE FRAME
 pub const FRAME_SIZE: usize         = (SAMPLE_RATE * FRAME_MS / 1000) as usize; //960 SAMPLES PER FRAME
 
+pub const AGC_TARGET_RMS: f32       = 0.05;                                     //TARGET RMS AFTER NORMALIZATION
+pub const AGC_ATTACK: f32           = 0.3;                                      //ATTACK
+pub const AGC_RELEASE: f32          = 0.0005;                                   //RELEASE
+pub const AGC_MAX_GAIN: f32         = 10.0;                                     //MAX GAIN
+pub const AGC_MIN_GAIN: f32         = 0.3;                                      //MIN GAIN
+
 pub const NOISE_FLOOR_ALPHA: f32    = 0.05;                                     //EMA SMOOTHING FACTOR
 pub const NOISE_OPEN_MULT: f32      = 3.5;                                      //OPEN TRESHOLD
 pub const NOISE_CLOSE_MULT: f32     = 2.0;                                      //CLOSE TRESHOLD (HYSTERESIS)

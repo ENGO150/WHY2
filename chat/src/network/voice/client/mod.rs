@@ -317,6 +317,8 @@ pub fn listen_server_voice //SERVER -> CLIENT
     let preroll_buffer = Arc::new(Mutex::new(VecDeque::<Vec<f32>>::with_capacity(3))); //PRE-ROLL BUFFER
     let hold_frames_remaining = Arc::new(Mutex::new(0usize)); //HOLD TIME
     let noise_floor = Arc::new(Mutex::new(consts::INITIAL_NOISE_FLOOR)); //ADAPTIVE NOISE FLOOR
+    let agc_envelope = Arc::new(Mutex::new(consts::AGC_TARGET_RMS)); //ENVELOPE
+    let agc_gain = Arc::new(Mutex::new(1.0f32)); //ACTUAL GAIN
 
     //NOISE REDUCTION
     let mut denoiser = DenoiseState::new();
@@ -325,6 +327,8 @@ pub fn listen_server_voice //SERVER -> CLIENT
     //CONFIGURE INPUT STREAM
     let send_socket = socket.clone();
     let noise_floor_cb = noise_floor.clone();
+    let agc_envelope_cb = agc_envelope.clone();
+    let agc_gain_cb = agc_gain.clone();
     let input_stream = input_device.build_input_stream(input_config, move |data: &[f32], _: &_|
     {
         //CHECK FOR MUTING
@@ -415,6 +419,28 @@ pub fn listen_server_voice //SERVER -> CLIENT
                     {
                         chunk[i] = sample / 32767.;
                     }
+                }
+            }
+
+            //AGC NORMALIZATION
+            {
+                let frame_rms = (frame.iter().map(|&x| x * x).sum::<f32>() / frame.len() as f32 + 1e-10).sqrt();
+
+                let mut envelope = agc_envelope_cb.lock().unwrap();
+                let mut gain = agc_gain_cb.lock().unwrap();
+
+                //FAST ATTACK, SLOW RELEASE
+                let smoothing = if frame_rms > *envelope { consts::AGC_ATTACK } else { consts::AGC_RELEASE };
+                *envelope += (frame_rms - *envelope) * smoothing;
+
+                //GAIN
+                let target_gain = (consts::AGC_TARGET_RMS / envelope.max(1e-6)).clamp(consts::AGC_MIN_GAIN, consts::AGC_MAX_GAIN);
+                *gain += (target_gain - *gain) * consts::AGC_ATTACK;
+
+                //APPLY
+                for sample in frame.iter_mut()
+                {
+                    *sample = (*sample * *gain).tanh();
                 }
             }
 
