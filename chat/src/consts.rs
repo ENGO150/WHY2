@@ -18,8 +18,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    net::TcpStream,
-    sync::{ Arc, Mutex },
+    net::TcpStream as TcpStreamSync,
+    sync::
+    {
+        Arc,
+        Mutex as MutexSync,
+    },
+};
+
+use tokio::
+{
+    sync::Mutex,
+    net::tcp::{ OwnedReadHalf, OwnedWriteHalf },
 };
 
 use zeroize::Zeroizing;
@@ -49,5 +59,6 @@ pub const MEGABYTE: usize            = 1_000_000;                               
 pub const UPLOAD_CHUNK_SIZE: usize   = MEGABYTE;                                    //FILE UPLOAD CHUNK (1MB)
 
 //TYPES
-pub type SharedKeys  = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);  //WHY2 KEY, HMAC
-pub type Streams<'a> = (&'a mut TcpStream, Arc<Mutex<TcpStream>>); //READ STREAM, WRITE STREAM
+pub type SharedKeys       = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);              //WHY2 KEY, HMAC
+pub type Streams<'a>      = (&'a mut TcpStreamSync, Arc<MutexSync<TcpStreamSync>>); //READ STREAM, WRITE STREAM
+pub type StreamsAsync<'a> = (&'a mut OwnedReadHalf, Arc<Mutex<OwnedWriteHalf>>);    //READ STREAM, WRITE STREAM
