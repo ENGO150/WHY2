@@ -294,7 +294,7 @@ pub async fn send_tcp_async //SEND packet TO stream
 
             None =>
             {
-                let peer_addr = stream.peer_addr().ok();
+                let peer_addr = write_stream.peer_addr().ok();
                 if peer_addr.is_some() && let Some(mut conn) = server::CONNECTIONS.get_mut(&peer_addr.unwrap())
                 {
                     if conn.is_authenticated()
@@ -325,7 +325,7 @@ pub async fn send_tcp_async //SEND packet TO stream
             {
                 #[cfg(feature = "server")]
                 {
-                    stream.peer_addr().ok()
+                    write_stream.peer_addr().ok()
                         .and_then(|addr| server::CONNECTIONS.get(&addr))
                         .and_then(|c| c.obfuscation_key().cloned())
                         .unwrap_or_else(|| [0u8; 32])
@@ -903,7 +903,7 @@ pub async fn receive_async
                     //SEND WARNING CODE
                     if spam_warning
                     {
-                        send(&mut streams.1.lock().unwrap(), PacketCode::SpamWarning, shared_key.as_ref());
+                        send_async(&mut *streams.1.lock().await, PacketCode::SpamWarning, shared_key.as_ref()).await;
                     }
 
                     //TOO MANY VIOLATIONS, BYE
