@@ -19,15 +19,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     thread,
-    net::TcpStream,
     io::{ Error, Write },
     collections::BTreeMap,
     path::PathBuf,
+    net::TcpStream as TcpStreamSync,
     sync::
     {
         Mutex,
         mpsc::Sender,
     },
+};
+
+use tokio::net::
+{
+    TcpStream,
+    tcp::{ OwnedReadHalf, OwnedWriteHalf },
 };
 
 use rand::
@@ -208,11 +214,11 @@ fn key_exchange
 }
 
 //PUBLIC
-pub fn connect(connecting_addr: String) -> Result<TcpStream, Error> //CONNECT TO SERVER
+pub fn connect(connecting_addr: String) -> Result<TcpStreamSync, Error> //CONNECT TO SERVER
 {
     if !options::socks5_enabled() //NO SOCKS5
     {
-        TcpStream::connect(connecting_addr)
+        TcpStreamSync::connect(connecting_addr)
     } else //USE PROXY
     {
         Socks5Stream::connect(config::read_config::<String>("socks5_addr"), connecting_addr.as_str())
@@ -222,6 +228,24 @@ pub fn connect(connecting_addr: String) -> Result<TcpStream, Error> //CONNECT TO
         //SET TCP_NODELAY
         s.set_nodelay(true)?;
         Ok(s)
+    })
+}
+
+pub async fn connect_async(connecting_addr: String) -> Result<(OwnedReadHalf, OwnedWriteHalf), Error> //CONNECT TO SERVER
+{
+    if !options::socks5_enabled() //NO SOCKS5
+    {
+        TcpStream::connect(connecting_addr).await
+    } else //USE PROXY
+    {
+        /*Socks5Stream::connect(config::read_config::<String>("socks5_addr"), connecting_addr.as_str())
+            .map(|s| s.into_inner())*/
+        todo!("implement me")
+    }.and_then(|s|
+    {
+        //SET TCP_NODELAY
+        s.set_nodelay(true)?;
+        Ok(s.into_split())
     })
 }
 
