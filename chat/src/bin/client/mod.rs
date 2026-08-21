@@ -578,7 +578,6 @@ async fn main()
 
     println!("Welcome.\n");
 
-
     //RUN REST OF CLIENT IN NEW THREAD
     #[cfg(feature = "client_screen")]
     thread::spawn(move || run_client(tx));
