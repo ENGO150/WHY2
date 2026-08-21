@@ -527,7 +527,8 @@ fn setup_devices() //SELECT AUDIO DEVICES AND STORE IN CLIENT CONFIG
     prompt_selection(&output_devices, "output_device"); //PROMPT
 }
 
-fn main()
+#[tokio::main]
+async fn main()
 {
     //CREATE CHANNEL
     let (tx, rx) = mpsc::channel::<ClientEvent>();

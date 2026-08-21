@@ -57,7 +57,8 @@ fn quit() //DISCONNECT ALL USERS
     server::disconnect_all(); //DISCONNECT ALL USERS
 }
 
-fn main()
+#[tokio::main]
+async fn main()
 {
     //INIT LOGGER
     SimpleLogger::new()
