@@ -16,15 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::
-{
-    net::TcpStream as TcpStreamSync,
-    sync::
-    {
-        Arc,
-        Mutex as MutexSync,
-    },
-};
+use std::sync::Arc;
 
 use tokio::
 {
@@ -54,11 +46,12 @@ pub const FETCH_TIMEOUT: u64         = 5000;                                    
 
 pub const REKEY_INTERVAL: u64        = 600;                                         //INTERVAL FOR RE-REKEYING (SECS)
 
+pub const EVENT_CHANNEL_BOUND: usize = 1024;                                        //CLIENT UI EVENT BUFFER
+
 //DO NOT CHANGE CONSTS BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const MEGABYTE: usize            = 1_000_000;                                   //MEGABYTE DEFINITION
 pub const UPLOAD_CHUNK_SIZE: usize   = MEGABYTE;                                    //FILE UPLOAD CHUNK (1MB)
 
 //TYPES
-pub type SharedKeys       = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);              //WHY2 KEY, HMAC
-pub type Streams<'a>      = (&'a mut TcpStreamSync, Arc<MutexSync<TcpStreamSync>>); //READ STREAM, WRITE STREAM
-pub type StreamsAsync<'a> = (&'a mut OwnedReadHalf, Arc<Mutex<OwnedWriteHalf>>);    //READ STREAM, WRITE STREAM
+pub type SharedKeys  = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);           //WHY2 KEY, HMAC
+pub type Streams<'a> = (&'a mut OwnedReadHalf, Arc<Mutex<OwnedWriteHalf>>); //READ STREAM, WRITE STREAM
