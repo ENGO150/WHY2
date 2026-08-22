@@ -293,10 +293,19 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             continue;
         }
 
+        //CODES WHICH PRINT NOTHING (THEY MUST NEITHER CONSUME THE EXTRA SPACE NOR REDRAW THE PROMPT)
+        let silent = matches!
+        (
+            read,
+            PacketCode::Version { .. } |
+            PacketCode::Upload { .. } |
+            PacketCode::Download { .. }
+        );
+
         extra_space = false; //RESET EXTRA SPACE
 
         //EXTRA SPACE
-        if options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).await.unwrap(); }
+        if !silent && options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).await.unwrap(); }
 
         //CODES
         match read

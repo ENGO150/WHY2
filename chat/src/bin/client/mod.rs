@@ -706,6 +706,13 @@ async fn run_client(tx: Sender<ClientEvent>)
             let mut command_used = false;
             if let (Some(command), parameters) = command::get_command(&input)
             {
+                //CONSUME PENDING EXTRA SPACE (KEEPS THE TRAILING NEWLINE OF /list, /help, ...)
+                if options::get_extra_space()
+                {
+                    println!();
+                    options::set_extra_space(false);
+                }
+
                 //SEND CODE ON A SIMPLE COMMAND, CONTINUE OTHERWISE (RELEASE THE STREAM LOCK FIRST)
                 let sent = command::send_command_code(&mut *write_stream.lock().await, &command, &parameters).await;
 
