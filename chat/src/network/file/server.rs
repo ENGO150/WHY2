@@ -182,7 +182,9 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         return;
     }
 
-    //CREATE NONCE FOR FILE ENCRYPTION ON DISK
+    //CREATE KEY & NONCE FOR FILE ENCRYPTION ON DISK
+    let disk_key = core_crypto::generate_key::
+            <{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>();
     let disk_nonce = core_crypto::generate_nonce::
             <{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>().unwrap();
 
@@ -193,7 +195,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         fs::create_dir_all(&temp_dir).await.expect("Creating upload temp directory failed");
 
         //CREATE REXSTREAM FOR FILE ENCRYPTION ON DISK
-        let disk_stream = RexStream::new(&Grid::from_key(&keys.0).unwrap(), disk_nonce.clone()).unwrap();
+        let disk_stream = RexStream::new(&Grid::from_key(&disk_key).unwrap(), disk_nonce.clone()).unwrap();
 
         //CREATE THE FILE
         let upload_file = OpenOptions::new()
@@ -343,6 +345,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
                 path: new_path,
                 filename,
                 size: final_size,
+                key: disk_key.clone(),
                 nonce: disk_nonce.to_flat(),
             });
         }
@@ -409,7 +412,7 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
     }, EncryptionMode::Stream(&mut rex_stream), Some(&mut seq)).await;
 
     //INIT DISK REX STREAM
-    let mut disk_stream = RexStream::new(&Grid::from_key(&keys.0).unwrap(), Grid::from_flat(&file.nonce).unwrap()).unwrap();
+    let mut disk_stream = RexStream::new(&Grid::from_key(&file.key).unwrap(), Grid::from_flat(&file.nonce).unwrap()).unwrap();
 
     //START UPLOAD
     file::send_file(file.path, write_stream, uid, &mut rex_stream, Some(&mut seq), &mut disk_stream).await;
