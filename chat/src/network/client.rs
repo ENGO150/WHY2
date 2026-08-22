@@ -18,16 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    thread,
-    io::{ Error, Write },
-    collections::BTreeMap,
+    io::Error,
+    sync::Mutex,
     path::PathBuf,
-    net::TcpStream as TcpStreamSync,
-    sync::
-    {
-        Mutex,
-        mpsc::Sender as SenderSync,
-    },
+    collections::BTreeMap,
 };
 
 use tokio::
@@ -47,7 +41,7 @@ use rand::
     rngs::SysRng,
 };
 
-use socks::Socks5Stream;
+use tokio_socks::tcp::Socks5Stream;
 
 use zeroize::Zeroizing;
 
@@ -63,7 +57,6 @@ use crate::
     {
         Streams,
         SharedKeys,
-        StreamsAsync,
     },
     network::
     {
@@ -157,75 +150,9 @@ pub static ACTIVE_UPLOADS: Mutex<BTreeMap<[u8; 32], PathBuf>> = Mutex::new(BTree
 
 //FUNCTIONS
 //PRIVATE
-fn key_exchange
+async fn key_exchange
 (
-    streams: &mut Streams,
-    keys: &mut SharedKeys,
-    tx: &SenderSync<ClientEvent>,
-    exchange_keys: Option<&SharedKeys>,
-) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
-{
-    //WAIT FOR KeyExchange
-    let (ecc, pq) = loop
-    {
-        //READ MESSAGE
-        let received = network::receive(streams, exchange_keys, None).unwrap();
-
-        if let PacketCode::KeyExchange { ecc, pq } = received { break (ecc, pq); }
-    };
-
-    //CONCAT PUBLIC KEYS
-    let pks = ecc.clone() + &pq;
-
-    //VERIFY PUBKEY VALIDITY (TOFU)
-    if env!("WHY2_SKIP_TOFU") == "false"
-    {
-        match config::server_keys_check(&streams.0.peer_addr().unwrap().ip().to_string(), &pks)
-        {
-            TofuCode::Valid => {},
-
-            status @ (TofuCode::Mismatch | TofuCode::Unknown(_, _)) =>
-            {
-                //GRACEFULLY DISCONNECT FROM SERVER
-                network::send(&mut streams.1.lock().unwrap(), PacketCode::Disconnect, None);
-
-                //PRINT SECURITY MESSAGE
-                tx.send(ClientEvent::TofuError(status)).unwrap();
-
-                //EXIT
-                return false;
-            },
-        }
-    } else
-    {
-        tx.send(ClientEvent::TofuSkip(config::server_keys_hash(&pks))).unwrap();
-    }
-
-    //GENERATE EPHEMERAL ECC KEYS
-    let (sk, pk) = kex::generate_ephemeral_keys();
-
-    //ENCAPSULATE PQ
-    let (pq_ciphertext, pq_secret) = kex::encapsulate_pq(&pq);
-
-    //SEND PUBKEYS TO SERVER
-    network::send(&mut streams.1.lock().unwrap(), PacketCode::KeyExchange
-    {
-        ecc: pk,
-        pq: pq_ciphertext,
-    }, exchange_keys);
-
-    //CALCULATE SHARED SECRET (HYBRID)
-    *keys = kex::derive_shared_secret(sk, ecc.to_string(), pq_secret).expect("Shared secret derivation failed");
-
-    //SET GLOBAL VARIABLES
-    options::set_keys(keys.clone());
-
-    true
-}
-
-async fn key_exchange_async
-(
-    streams: &mut StreamsAsync<'_>,
+    streams: &mut Streams<'_>,
     keys: &mut SharedKeys,
     tx: &Sender<ClientEvent>,
     exchange_keys: Option<&SharedKeys>,
@@ -235,7 +162,7 @@ async fn key_exchange_async
     let (ecc, pq) = loop
     {
         //READ MESSAGE
-        let received = network::receive_async(streams, exchange_keys, None).await.unwrap();
+        let received = network::receive(streams, exchange_keys, None).await.unwrap();
 
         if let PacketCode::KeyExchange { ecc, pq } = received { break (ecc, pq); }
     };
@@ -253,7 +180,7 @@ async fn key_exchange_async
             status @ (TofuCode::Mismatch | TofuCode::Unknown(_, _)) =>
             {
                 //GRACEFULLY DISCONNECT FROM SERVER
-                network::send_async(&mut *streams.1.lock().await, PacketCode::Disconnect, None);
+                network::send(&mut *streams.1.lock().await, PacketCode::Disconnect, None).await;
 
                 //PRINT SECURITY MESSAGE
                 tx.send(ClientEvent::TofuError(status)).await.unwrap();
@@ -274,11 +201,11 @@ async fn key_exchange_async
     let (pq_ciphertext, pq_secret) = kex::encapsulate_pq(&pq);
 
     //SEND PUBKEYS TO SERVER
-    network::send_async(&mut *streams.1.lock().await, PacketCode::KeyExchange
+    network::send(&mut *streams.1.lock().await, PacketCode::KeyExchange
     {
         ecc: pk,
         pq: pq_ciphertext,
-    }, exchange_keys);
+    }, exchange_keys).await;
 
     //CALCULATE SHARED SECRET (HYBRID)
     *keys = kex::derive_shared_secret(sk, ecc.to_string(), pq_secret).expect("Shared secret derivation failed");
@@ -290,33 +217,18 @@ async fn key_exchange_async
 }
 
 //PUBLIC
-pub fn connect(connecting_addr: String) -> Result<TcpStreamSync, Error> //CONNECT TO SERVER
-{
-    if !options::socks5_enabled() //NO SOCKS5
-    {
-        TcpStreamSync::connect(connecting_addr)
-    } else //USE PROXY
-    {
-        Socks5Stream::connect(config::read_config::<String>("socks5_addr"), connecting_addr.as_str())
-            .map(|s| s.into_inner())
-    }.and_then(|s|
-    {
-        //SET TCP_NODELAY
-        s.set_nodelay(true)?;
-        Ok(s)
-    })
-}
-
-pub async fn connect_async(connecting_addr: String) -> Result<(OwnedReadHalf, OwnedWriteHalf), Error> //CONNECT TO SERVER
+pub async fn connect(connecting_addr: String) -> Result<(OwnedReadHalf, OwnedWriteHalf), Error> //CONNECT TO SERVER
 {
     if !options::socks5_enabled() //NO SOCKS5
     {
         TcpStream::connect(connecting_addr).await
     } else //USE PROXY
     {
-        /*Socks5Stream::connect(config::read_config::<String>("socks5_addr"), connecting_addr.as_str())
-            .map(|s| s.into_inner())*/
-        todo!("implement me")
+        let proxy_addr = config::read_config::<String>("socks5_addr");
+
+        Socks5Stream::connect(proxy_addr.as_str(), connecting_addr.as_str()).await
+            .map(|s| s.into_inner())
+            .map_err(Error::other)
     }.and_then(|s|
     {
         //SET TCP_NODELAY
@@ -325,451 +237,7 @@ pub async fn connect_async(connecting_addr: String) -> Result<(OwnedReadHalf, Ow
     })
 }
 
-pub fn listen_server(streams: &mut Streams, tx: SenderSync<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
-{
-    //SEND HEADER
-    let mut header = [0u8; 32];
-    SysRng.try_fill_bytes(&mut header).unwrap(); //GENERATE RANDOM HEADER
-    options::set_obfuscation_key(&header);
-    streams.1.lock().unwrap().write_all(&header).unwrap();
-
-    //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
-    let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    if !key_exchange(streams, &mut keys, &tx, None) { return; }
-
-    //SERVER INFO VARIABLES
-    let mut min_pass: Option<u64> = None;
-    let mut max_uname: Option<u64> = None;
-    let mut min_uname: Option<u64> = None;
-
-    let mut invalid_username = false; //PRINT "Invalid Username!"
-    let mut invalid_password = false;
-
-    let mut disabled_registration = false; //PRINT "Registration disabled!"
-
-    //FORMATTING SHIT
-    let mut first_message = true;
-    let mut extra_space: bool;
-
-    //CONNECTION PROPERTIES
-    #[cfg(feature = "client_voice")]
-    let mut id = 0usize; //ID SET BY SERVER
-    #[cfg(feature = "client_voice")]
-    let mut username: Option<String> = None;
-
-    //LOOP READING
-    loop
-    {
-        let read = match network::receive(streams, Some(&keys), None)
-        {
-            Some(code) => code,
-            None => PacketCode::Disconnect,
-        };
-
-        //CHECK FOR MUTED CLIENT
-        #[cfg(feature = "client_voice")]
-        if let PacketCode::Message { id, .. } = read
-        {
-            if id.is_some() && options::is_muted(id) { continue; }
-        }
-
-        //KEEPALIVE
-        if read == PacketCode::KeepAlive
-        {
-            //ECHO
-            network::send(&mut streams.1.lock().unwrap(), PacketCode::KeepAlive, options::get_keys().as_ref());
-            continue;
-        }
-
-        extra_space = false; //RESET EXTRA SPACE
-
-        //EXTRA SPACE
-        if options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
-
-        //CODES
-        match read
-        {
-            //REGULAR MESSAGE
-            PacketCode::Message { text, username, id, colors } =>
-            {
-                tx.send(ClientEvent::Message(text, username.unwrap(), id.unwrap(), colors)).unwrap();
-            }
-
-            //VERSION CHECK
-            PacketCode::Version { version } =>
-            {
-                let local_version = misc::get_version().to_string();
-
-                //NON MATCHING VERSION (WILL GET DISCONNECTED)
-                if let Some(version) = version && version != local_version
-                {
-                    tx.send(ClientEvent::IncompatibleVersion(local_version.clone(), version)).unwrap();
-                }
-
-                //RESPOND
-                network::send(&mut streams.1.lock().unwrap(),
-                    PacketCode::Version { version: Some(local_version) }, Some(&keys));
-
-                continue;
-            }
-
-            //WELCOME CODE - SERVER INFORMATIONS
-            PacketCode::Welcome { min_pass: smin_pass, max_uname: smax_uname, min_uname: smin_uname, server_name, server_uname, git_hash } =>
-            {
-                options::set_server_username(&server_uname);
-
-                min_pass = Some(smin_pass);
-                max_uname = Some(smax_uname);
-                min_uname = Some(smin_uname);
-
-                //COMPARSE HASHES
-                let client_hash = env!("WHY2_GIT_HASH");
-                if !client_hash.is_empty() && !git_hash.is_empty() && client_hash != git_hash
-                {
-                    //DISPLAY VERSION MISMATCH
-                    tx.send(ClientEvent::VersionMismatch(client_hash.to_string(), git_hash.to_string())).unwrap();
-                }
-
-                tx.send(ClientEvent::Connected(server_name)).unwrap();
-            },
-
-            //REKEY - CHANGE KEYS
-            PacketCode::Rekey =>
-            {
-                //WAIT FOR SERVER TO INIT KEY EXCHANGE
-                let current_keys = keys.clone();
-                key_exchange(streams, &mut keys, &tx, Some(&current_keys));
-            }
-
-            //PICK_USERNAME CODE - guess what
-            PacketCode::Username { .. } =>
-            {
-                tx.send(ClientEvent::Clear(2)).unwrap();
-
-                //INVALID UNAME
-                if invalid_username
-                {
-                    tx.send(ClientEvent::UsernameRejected).unwrap();
-                } else //VALID
-                {
-                    //SET INVALID USERNAME FOR POSSIBLE NEXT CODE
-                    invalid_username = true;
-                }
-
-                options::set_login_state(LoginState::Username);
-                tx.send(ClientEvent::Username(disabled_registration, min_uname.unwrap(), max_uname.unwrap())).unwrap();
-            },
-
-            //REGISTER
-            PacketCode::PasswordR { .. } =>
-            {
-                tx.send(ClientEvent::Clear(3)).unwrap();
-                options::set_asking_password(true);
-
-                //INVALID PASS
-                if invalid_password
-                {
-                    tx.send(ClientEvent::PasswordRejected(min_pass.unwrap())).unwrap();
-                } else
-                {
-                    invalid_password = true;
-                }
-
-                options::set_login_state(LoginState::PasswordRegister);
-                tx.send(ClientEvent::Register).unwrap();
-            },
-
-            //LOGIN
-            PacketCode::PasswordL { .. } =>
-            {
-                options::set_asking_password(true);
-                options::set_login_state(LoginState::PasswordLogin);
-                tx.send(ClientEvent::Login).unwrap();
-            },
-
-            //START CHATTING
-            PacketCode::Accept { id: sid } =>
-            {
-                tx.send(ClientEvent::Authenticated).unwrap();
-
-                //SET SERVER-SIDE ID
-                #[cfg(feature = "client_voice")]
-                {
-                    id = sid;
-                }
-
-                //ALLOW MESSAGE HISTORY & COMMANDS
-                options::set_sending_messages(true);
-                options::set_login_state(LoginState::None);
-            },
-
-            //JOIN MESSAGE (CLIENT CONNECTED)
-            PacketCode::Join { username: user } =>
-            {
-                tx.send(ClientEvent::Clear(2)).unwrap();
-
-                if first_message
-                {
-                    tx.send(ClientEvent::ExtraSpace).unwrap();
-                    first_message = false;
-
-                    #[cfg(feature = "client_voice")]
-                    {
-                        username = Some(user.clone());
-                    }
-                }
-
-                tx.send(ClientEvent::Join(user)).unwrap();
-            }
-
-            //LEAVE MESSAGE (CLIENT DISCONNECTED)
-            PacketCode::Leave { username, id } =>
-            {
-                tx.send(ClientEvent::Leave(username)).unwrap();
-
-                #[cfg(feature = "client_voice")]
-                voice_client::remove_consumer(&id);
-            },
-
-            //CHANNEL CHANGE
-            PacketCode::Channel { channel } =>
-            {
-                //REMOVE ALL STORED VOICE CLIENTS
-                #[cfg(feature = "client_voice")]
-                voice_client::remove_all_consumers();
-
-                options::set_channel(channel.unwrap_or_else(|| String::new()));
-
-                tx.send(ClientEvent::Clear(1)).unwrap();
-            },
-
-            //CHANNEL CREATED
-            PacketCode::ChannelCreated { name } =>
-            {
-                tx.send(ClientEvent::ChannelCreated(name)).unwrap();
-            },
-
-            //CHANNEL ABANDONED
-            PacketCode::ChannelDestroyed { name } =>
-            {
-                tx.send(ClientEvent::ChannelDestroyed(name)).unwrap();
-            },
-
-            //SERVER ALLOWED VOICE
-            #[cfg(feature = "client_voice")]
-            PacketCode::Voice =>
-            {
-                if options::socks5_enabled()
-                {
-                    tx.send(ClientEvent::Socks5Voice).unwrap();
-                    continue;
-                }
-
-                //TOGGLE VOICE (& PRINT STATUS)
-                tx.send(if voice_options::swap_use_voice()
-                {
-                    let username = username.clone();
-                    let voice_tx = tx.clone();
-                    let stream = streams.1.clone();
-                    thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap(), voice_tx, stream));
-                    ClientEvent::VoiceEnabled
-                } else
-                {
-                    ClientEvent::VoiceDisabled
-                }).unwrap();
-            },
-
-            //VOICE CLIENTS
-            #[cfg(feature = "client_voice")]
-            PacketCode::VoiceClients { clients } =>
-            {
-                //ADD CLIENTS
-                for (id, username) in clients
-                {
-                    voice_client::add_consumer(id, username);
-                }
-            }
-
-            //CLIENT JOINED VOICE CHANNEL
-            #[cfg(feature = "client_voice")]
-            PacketCode::ChannelJoin { username, id: sid } =>
-            {
-                if voice_options::get_use_voice() && id != sid
-                {
-                    voice_client::add_consumer(sid, username);
-                }
-            },
-
-            //CLIENT LEFT VOICE CHANNEL
-            #[cfg(feature = "client_voice")]
-            PacketCode::ChannelLeave { id } =>
-            {
-                voice_client::remove_consumer(&id);
-            },
-
-            //LIST OF ONLINE USERS
-            PacketCode::List { users } =>
-            {
-                if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
-                tx.send(ClientEvent::List(users.unwrap())).unwrap();
-                extra_space = true;
-                options::set_extra_space(true);
-            },
-
-            //UPLOAD APPROVAL
-            PacketCode::Upload { hash, token, uid } =>
-            {
-                //SPAWN UPLOAD THREAD
-                let file_tx = tx.clone(); //CLONE TX
-                thread::spawn(move || file::upload(token.unwrap(), uid.unwrap(), hash, file_tx));
-                continue;
-            },
-
-            //DOWNLOAD
-            PacketCode::Download { token, .. } =>
-            {
-                //SPAWN DOWNLOAD THREAD
-                let file_tx = tx.clone(); //CLONE TX
-                thread::spawn(move || file::download(token.unwrap(), file_tx));
-                continue;
-            },
-
-            //UPLOADED ANNOUNCEMENT
-            PacketCode::Uploaded { filename, username } =>
-            {
-                tx.send(ClientEvent::Uploaded(username, filename)).unwrap();
-            },
-
-            //FILE LIST
-            PacketCode::Files { users } =>
-            {
-                if let Some(users) = users
-                {
-                    //PARSE JSON
-                    if !users.is_empty()
-                    {
-                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
-                        extra_space = true;
-                        options::set_extra_space(true);
-                    }
-
-                    tx.send(ClientEvent::Files(users)).unwrap();
-                }
-            },
-
-            //SCREENSHARE LIST
-            PacketCode::Screens { users } =>
-            {
-                if let Some(users) = users
-                {
-                    if !users.is_empty()
-                    {
-                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).unwrap(); }
-                        extra_space = true;
-                        options::set_extra_space(true);
-                    }
-
-                    tx.send(ClientEvent::Screens(users)).unwrap();
-                }
-            },
-
-            //MAX PARALLEL UPLOADS
-            PacketCode::UploadLimit =>
-            {
-                tx.send(ClientEvent::UploadLimit).unwrap();
-            },
-
-            //SCREEN UPLOAD APPROVAL
-            #[cfg(feature = "client_screen")]
-            PacketCode::Screen { token } =>
-            {
-                tx.send(if screen_options::swap_use_screen()
-                {
-                    //SPAWN UPLOAD THREAD
-                    thread::spawn(move || screen::screen(token.unwrap()));
-                    ClientEvent::Screen(true)
-                } else
-                {
-                    ClientEvent::Screen(false)
-                }).unwrap();
-            },
-
-            //SCREENSHARE ATTACH
-            #[cfg(feature = "client_screen")]
-            PacketCode::Attach { username, token, .. } =>
-            {
-                //ENABLE ATTACH
-                screen_options::set_attach_screen(true);
-
-                //SPAWN DOWNLOAD THREAD
-                let main_stream = streams.1.clone();
-                thread::spawn(move || screen::attach(token.unwrap(), main_stream));
-                tx.send(ClientEvent::Attach(username.unwrap())).unwrap();
-            },
-
-            //SCREENSHARE DEATTACH
-            #[cfg(feature = "client_screen")]
-            PacketCode::Deattach { username } =>
-            {
-                //DISABLE ATTACH
-                screen_options::set_attach_screen(false);
-
-                tx.send(ClientEvent::Deattach(username.unwrap())).unwrap();
-            },
-
-            //PRIVATE MESSAGE INCOMING
-            PacketCode::PrivateMessage { text, username, id } =>
-            {
-                tx.send(ClientEvent::PrivateMessageRecv(username.unwrap(), id, text)).unwrap();
-            },
-
-            //PRIVATE MESSAGE INCOMING
-            PacketCode::PrivateMessageBack { text, username, id } =>
-            {
-                tx.send(ClientEvent::PrivateMessageSent(username, id, text)).unwrap();
-            },
-
-            //SPAM WARNING
-            PacketCode::SpamWarning =>
-            {
-                tx.send(ClientEvent::SpamWarning).unwrap();
-            },
-
-            //REGISTRATION DISABLED
-            PacketCode::RegisterDisabled =>
-            {
-                disabled_registration = true;
-            },
-
-            //CLIENT MESSED SOME COMMAND UP
-            PacketCode::InvalidUsage =>
-            {
-                tx.send(ClientEvent::InvalidUsage).unwrap();
-            },
-
-            //CLIENTED REQUESTED DISABLED FEATURE
-            PacketCode::InvalidFeature =>
-            {
-                tx.send(ClientEvent::DisabledFeature).unwrap();
-            },
-
-            //SERVER DOESN'T LIKE YA ANYMORE - EXIT
-            PacketCode::Disconnect =>
-            {
-                tx.send(ClientEvent::Quit).unwrap();
-                return;
-            },
-
-            _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
-        }
-
-        //PRINT INPUT PROMPT
-        tx.send(ClientEvent::Prompt).unwrap();
-        if !extra_space { options::set_extra_space(false); } //DISABLE EXTRA SPACE
-    }
-}
-
-pub async fn listen_server_async(streams: &mut StreamsAsync<'_>, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
+pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
     //SEND HEADER
     let mut header = [0u8; 32];
@@ -779,7 +247,7 @@ pub async fn listen_server_async(streams: &mut StreamsAsync<'_>, tx: Sender<Clie
 
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    if !key_exchange_async(streams, &mut keys, &tx, None).await { return; }
+    if !key_exchange(streams, &mut keys, &tx, None).await { return; }
 
     //SERVER INFO VARIABLES
     let mut min_pass: Option<u64> = None;
@@ -804,7 +272,7 @@ pub async fn listen_server_async(streams: &mut StreamsAsync<'_>, tx: Sender<Clie
     //LOOP READING
     loop
     {
-        let read = match network::receive_async(streams, Some(&keys), None).await
+        let read = match network::receive(streams, Some(&keys), None).await
         {
             Some(code) => code,
             None => PacketCode::Disconnect,
@@ -821,7 +289,7 @@ pub async fn listen_server_async(streams: &mut StreamsAsync<'_>, tx: Sender<Clie
         if read == PacketCode::KeepAlive
         {
             //ECHO
-            network::send_async(&mut *streams.1.lock().await, PacketCode::KeepAlive, options::get_keys().as_ref());
+            network::send(&mut *streams.1.lock().await, PacketCode::KeepAlive, options::get_keys().as_ref()).await;
             continue;
         }
 
@@ -851,8 +319,8 @@ pub async fn listen_server_async(streams: &mut StreamsAsync<'_>, tx: Sender<Clie
                 }
 
                 //RESPOND
-                network::send_async(&mut *streams.1.lock().await,
-                    PacketCode::Version { version: Some(local_version) }, Some(&keys));
+                network::send(&mut *streams.1.lock().await,
+                    PacketCode::Version { version: Some(local_version) }, Some(&keys)).await;
 
                 continue;
             }
@@ -883,7 +351,7 @@ pub async fn listen_server_async(streams: &mut StreamsAsync<'_>, tx: Sender<Clie
             {
                 //WAIT FOR SERVER TO INIT KEY EXCHANGE
                 let current_keys = keys.clone();
-                key_exchange_async(streams, &mut keys, &tx, Some(&current_keys)).await;
+                key_exchange(streams, &mut keys, &tx, Some(&current_keys)).await;
             }
 
             //PICK_USERNAME CODE - guess what
@@ -1016,7 +484,7 @@ pub async fn listen_server_async(streams: &mut StreamsAsync<'_>, tx: Sender<Clie
                     let username = username.clone();
                     let voice_tx = tx.clone();
                     let stream = streams.1.clone();
-                    thread::spawn(move || voice_client::listen_server_voice(id, username.unwrap(), voice_tx, stream));
+                    tokio::spawn(voice_client::listen_server_voice(id, username.unwrap(), voice_tx, stream));
                     ClientEvent::VoiceEnabled
                 } else
                 {
@@ -1064,18 +532,18 @@ pub async fn listen_server_async(streams: &mut StreamsAsync<'_>, tx: Sender<Clie
             //UPLOAD APPROVAL
             PacketCode::Upload { hash, token, uid } =>
             {
-                //SPAWN UPLOAD THREAD
+                //SPAWN UPLOAD TASK
                 let file_tx = tx.clone(); //CLONE TX
-                thread::spawn(move || file::upload(token.unwrap(), uid.unwrap(), hash, file_tx));
+                tokio::spawn(file::upload(token.unwrap(), uid.unwrap(), hash, file_tx));
                 continue;
             },
 
             //DOWNLOAD
             PacketCode::Download { token, .. } =>
             {
-                //SPAWN DOWNLOAD THREAD
+                //SPAWN DOWNLOAD TASK
                 let file_tx = tx.clone(); //CLONE TX
-                thread::spawn(move || file::download(token.unwrap(), file_tx));
+                tokio::spawn(file::download(token.unwrap(), file_tx));
                 continue;
             },
 
@@ -1130,8 +598,8 @@ pub async fn listen_server_async(streams: &mut StreamsAsync<'_>, tx: Sender<Clie
             {
                 tx.send(if screen_options::swap_use_screen()
                 {
-                    //SPAWN UPLOAD THREAD
-                    thread::spawn(move || screen::screen(token.unwrap()));
+                    //SPAWN UPLOAD TASK
+                    tokio::spawn(screen::screen(token.unwrap()));
                     ClientEvent::Screen(true)
                 } else
                 {
@@ -1146,9 +614,9 @@ pub async fn listen_server_async(streams: &mut StreamsAsync<'_>, tx: Sender<Clie
                 //ENABLE ATTACH
                 screen_options::set_attach_screen(true);
 
-                //SPAWN DOWNLOAD THREAD
+                //SPAWN DOWNLOAD TASK
                 let main_stream = streams.1.clone();
-                thread::spawn(move || screen::attach(token.unwrap(), main_stream));
+                tokio::spawn(screen::attach(token.unwrap(), main_stream));
                 tx.send(ClientEvent::Attach(username.unwrap())).await.unwrap();
             },
 

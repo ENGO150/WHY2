@@ -19,7 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     result,
-    net::TcpStream,
     fmt::
     {
         Display,
@@ -27,6 +26,8 @@ use std::
         Result,
     }
 };
+
+use tokio::net::tcp::OwnedWriteHalf;
 
 use crate::
 {
@@ -352,14 +353,14 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
     (Some(Command::Invalid), None)
 }
 
-pub fn send_command_code(stream: &mut TcpStream, command: &Command, parameters: &Option<String>) -> Option<bool> //SEND CODE FROM COMMAND IF POSSIBLE
+pub async fn send_command_code(write_stream: &mut OwnedWriteHalf, command: &Command, parameters: &Option<String>) -> Option<bool> //SEND CODE FROM COMMAND IF POSSIBLE
 {
     //CODE COMMAND
     match command.build_message(parameters.as_deref())?
     {
         Ok(message) =>
         {
-            network::send(stream, message, options::get_keys().as_ref());
+            network::send(write_stream, message, options::get_keys().as_ref()).await;
             Some(true)
         },
 

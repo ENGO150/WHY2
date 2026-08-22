@@ -33,7 +33,7 @@ use semver::Version;
 use crate::consts;
 
 #[cfg(feature = "client_base")]
-use std::sync::mpsc::Sender;
+use tokio::sync::mpsc::Sender;
 
 #[cfg(feature = "client_base")]
 use crate::network::client::ClientEvent;
@@ -74,17 +74,18 @@ pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
         .read_to_string()
 }
 
-pub fn check_version(#[cfg(feature = "client_base")] tx: &Sender<ClientEvent>) //CHECK FOR LATEST WHY2 VERSION
+pub async fn check_version(#[cfg(feature = "client_base")] tx: &Sender<ClientEvent>) //CHECK FOR LATEST WHY2 VERSION
 {
-    //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK)
-    let metadata_raw = match fetch_data(consts::METADATA_URL)
+    //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK) - BLOCKING HTTP, KEEP IT OFF THE RUNTIME
+    let metadata_raw = match tokio::task::spawn_blocking(|| fetch_data(consts::METADATA_URL)).await
+        .expect("Fetching versions panicked")
     {
         Ok(m) => m,
         Err(_) =>
         {
             #[cfg(feature = "client_base")]
             {
-                tx.send(ClientEvent::VersionFailed).unwrap();
+                tx.send(ClientEvent::VersionFailed).await.unwrap();
             }
 
             #[cfg(feature = "server")]
@@ -125,7 +126,7 @@ pub fn check_version(#[cfg(feature = "client_base")] tx: &Sender<ClientEvent>) /
 
         #[cfg(feature = "client_base")]
         {
-            tx.send(ClientEvent::UnsafeVersion(newer_versions, current_version, newest_version.to_owned())).unwrap();
+            tx.send(ClientEvent::UnsafeVersion(newer_versions, current_version, newest_version.to_owned())).await.unwrap();
         }
 
         #[cfg(feature = "server")]
