@@ -231,6 +231,40 @@ fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], tx: &Send
     }
 }
 
+//NORMALIZE ONE FRAME IN PLACE, MUST BE CALLED ON EVERY TRANSMITTED FRAME IN ORDER (THE GAIN IS STATEFUL)
+fn apply_agc(frame: &mut [f32], rms: f32, is_speech: bool, envelope: &mut f32, gain: &mut f32)
+{
+    //TRACK THE SPEECH LEVEL ONLY WHILE SOMEBODY IS ACTUALLY TALKING
+    if is_speech
+    {
+        let smoothing = if rms > *envelope { consts::AGC_ATTACK } else { consts::AGC_RELEASE };
+        *envelope += (rms - *envelope) * smoothing;
+    }
+
+    //GAIN
+    let target_gain = (consts::AGC_TARGET_RMS / envelope.max(1e-6)).clamp(consts::AGC_MIN_GAIN, consts::AGC_MAX_GAIN);
+    let slew = if target_gain < *gain { consts::AGC_GAIN_DOWN } else { consts::AGC_GAIN_UP };
+    *gain += (target_gain - *gain) * slew;
+
+    //APPLY WITH A SOFT KNEE, EVERYTHING BELOW THE KNEE STAYS UNTOUCHED
+    for sample in frame.iter_mut()
+    {
+        let amplified = *sample * *gain;
+        let magnitude = amplified.abs();
+
+        *sample = if magnitude > consts::LIMITER_KNEE
+        {
+            let headroom = 1. - consts::LIMITER_KNEE;
+            let over = (magnitude - consts::LIMITER_KNEE) / headroom;
+
+            amplified.signum() * (consts::LIMITER_KNEE + headroom * over.tanh())
+        } else
+        {
+            amplified
+        };
+    }
+}
+
 //PUBLIC
 pub async fn listen_server_voice //SERVER -> CLIENT
 (
@@ -443,34 +477,14 @@ pub async fn listen_server_voice //SERVER -> CLIENT
                 }
             }
 
-            //AGC NORMALIZATION
-            {
-                let frame_rms = (frame.iter().map(|&x| x * x).sum::<f32>() / frame.len() as f32 + 1e-10).sqrt();
-
-                let mut envelope = agc_envelope_cb.lock().unwrap();
-                let mut gain = agc_gain_cb.lock().unwrap();
-
-                //FAST ATTACK, SLOW RELEASE
-                let smoothing = if frame_rms > *envelope { consts::AGC_ATTACK } else { consts::AGC_RELEASE };
-                *envelope += (frame_rms - *envelope) * smoothing;
-
-                //GAIN
-                let target_gain = (consts::AGC_TARGET_RMS / envelope.max(1e-6)).clamp(consts::AGC_MIN_GAIN, consts::AGC_MAX_GAIN);
-                *gain += (target_gain - *gain) * consts::AGC_ATTACK;
-
-                //APPLY
-                for sample in frame.iter_mut()
-                {
-                    *sample = (*sample * *gain).tanh();
-                }
-            }
-
-            //VAD
+            //VAD (RUNS ON THE CLEAN SIGNAL, BEFORE THE AGC, SO THE TRESHOLDS STAY COMPARABLE ACROSS FRAMES)
             let rms = (frame.iter().map(|&x| x * x).sum::<f32>() / frame.len() as f32 + 1e-10).sqrt(); //RMS CALCULATION (+ SMALL BIAS)
             let mut gate = gate_open.lock().unwrap();
             let mut preroll = preroll_buffer.lock().unwrap();
             let mut hold_frames = hold_frames_remaining.lock().unwrap();
             let mut nf = noise_floor_cb.lock().unwrap();
+            let mut envelope = agc_envelope_cb.lock().unwrap();
+            let mut gain = agc_gain_cb.lock().unwrap();
 
             //PREVENT NOISE FLOOR CONTAMINATION BY VOICE
             if !*gate
@@ -488,13 +502,13 @@ pub async fn listen_server_voice //SERVER -> CLIENT
             {
                 *gate = true; //SPEAKING
 
-                //SEND STORED FRAMES
-                for old_frame in preroll.iter()
+                //SEND STORED FRAMES (QUIET LEAD-IN, SO NORMALIZE THEM BUT KEEP THEM OUT OF THE ENVELOPE)
+                for mut old_frame in preroll.drain(..)
                 {
-                    transmit_audio(&opus_encoder, old_frame, &mut encoded_buffer, &packet_tx);
+                    apply_agc(&mut old_frame, rms, false, &mut envelope, &mut gain);
+                    transmit_audio(&opus_encoder, &old_frame, &mut encoded_buffer, &packet_tx);
                 }
 
-                preroll.clear();
                 *hold_frames = consts::HOLD_FRAMES;
             } else if *gate && rms < treshold_close
             {
@@ -524,6 +538,9 @@ pub async fn listen_server_voice //SERVER -> CLIENT
             if *gate
             {
                 LOCAL_DISPLAY_HOLD.store((consts::SAMPLE_RATE * consts::DISPLAY_HOLD as u32 / 1000) as usize, Ordering::Relaxed);
+
+                //ONLY FRAMES CARRYING REAL SPEECH ENERGY FEED THE ENVELOPE, HOLD-TAIL FRAMES DO NOT
+                apply_agc(&mut frame, rms, rms >= treshold_close, &mut envelope, &mut gain);
                 transmit_audio(&opus_encoder, &frame, &mut encoded_buffer, &packet_tx);
             }
         }
