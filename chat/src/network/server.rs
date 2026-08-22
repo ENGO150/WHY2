@@ -18,24 +18,25 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    fs,
-    env,
-    thread,
     path::PathBuf,
+    future::Future,
+    net::SocketAddr,
     time::{ Instant, Duration },
     collections::{ HashSet, HashMap },
-    net::
-    {
-        TcpStream,
-        SocketAddr,
-        Shutdown,
-    },
     sync::
     {
         Arc,
-        Mutex,
         LazyLock,
+        Mutex as MutexSync,
     },
+};
+
+use tokio::
+{
+    fs,
+    sync::{ Mutex, oneshot },
+    net::tcp::OwnedWriteHalf,
+    task::{ self, AbortHandle },
 };
 
 use rand::
@@ -89,9 +90,9 @@ pub struct AvailableFile //UPLOADED FILE
 #[derive(Clone)]
 pub struct Attach //SCREEN ATTACHMENT
 {
-    pub stream: Arc<TcpStream>, //RECEIVE STREAM
-    pub target_id: usize,       //ID OF SCREENSHARER
-    pub token: [u8; 32],        //TOKEN FOR REXSTREAM
+    pub stream: Arc<Mutex<OwnedWriteHalf>>, //RECEIVE STREAM
+    pub target_id: usize,                   //ID OF SCREENSHARER
+    pub token: [u8; 32],                    //TOKEN FOR REXSTREAM
 }
 
 //ENUMS
@@ -118,33 +119,35 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
     Authenticated
     {
-        write_stream: Arc<Mutex<TcpStream>>,               //STREAM
-        file_streams: Arc<Mutex<HashMap<u64, TcpStream>>>, //ACTIVE FILE STREAMS
-        screen_stream: Option<Arc<Mutex<TcpStream>>>,      //SCREEN UPLOAD STREAM
-        peer_addr: SocketAddr,                             //ADDRESS & PORT
-        username: String,                                  //USERNAME
-        id: usize,                                         //ID OF USER
-        keys: SharedKeys,                                  //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
-        attached_screen: Option<Attach>,                   //SCREEN DOWNLOAD STREAM & TARGET ID
-        last_activity: Instant,                            //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
-        last_key_exchange: Instant,                        //TIME OF LAST REKEY
-        spam_violations: usize,                            //SPAM VIOLATIONS (unexpected, huh?)
-        channel: Option<String>,                           //CHANNEL
-        seq: usize,                                        //SEQUENCE NUMBER (CLIENT -> SERVER)
-        server_seq: usize,                                 //SEQUENCE NUMBER (SERVER -> CLIENT)
-        alive: bool,                                       //RESPONDED TO KEEPALIVE
+        write_stream: Arc<Mutex<OwnedWriteHalf>>,                    //STREAM
+        task: AbortHandle,                                           //HANDLER TASK (USED TO FORCE-CLOSE THE CONNECTION)
+        file_streams: Arc<MutexSync<HashMap<u64, AbortHandle>>>,     //ACTIVE FILE TRANSFER TASKS
+        screen_stream: Option<AbortHandle>,                          //SCREEN UPLOAD TASK
+        peer_addr: SocketAddr,                                       //ADDRESS & PORT
+        username: String,                                            //USERNAME
+        id: usize,                                                   //ID OF USER
+        keys: SharedKeys,                                            //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
+        attached_screen: Option<Attach>,                             //SCREEN DOWNLOAD STREAM & TARGET ID
+        last_activity: Instant,                                      //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
+        last_key_exchange: Instant,                                  //TIME OF LAST REKEY
+        spam_violations: usize,                                      //SPAM VIOLATIONS (unexpected, huh?)
+        channel: Option<String>,                                     //CHANNEL
+        seq: usize,                                                  //SEQUENCE NUMBER (CLIENT -> SERVER)
+        server_seq: usize,                                           //SEQUENCE NUMBER (SERVER -> CLIENT)
+        alive: bool,                                                 //RESPONDED TO KEEPALIVE
     },
 
     NonAuthenticated
     {
-        write_stream: Arc<Mutex<TcpStream>>, //STREAM
-        peer_addr: SocketAddr,               //ADDRESS & PORT
-        username: Option<String>,            //CHOSEN USERNAME
-        keys: Option<SharedKeys>,            //SHARED KEYS
-        obfuscation_key: [u8; 32],           //OBFUSCATION KEY FROM PLAIN PACKETS
-        last_activity: Instant,              //TIME OF LAST MESSAGE
-        seq: usize,                          //SEQUENCE NUMBER
-        connect: Instant,                    //TIME OF CONNECTION
+        write_stream: Arc<Mutex<OwnedWriteHalf>>, //STREAM
+        task: AbortHandle,                        //HANDLER TASK
+        peer_addr: SocketAddr,                    //ADDRESS & PORT
+        username: Option<String>,                 //CHOSEN USERNAME
+        keys: Option<SharedKeys>,                 //SHARED KEYS
+        obfuscation_key: [u8; 32],                //OBFUSCATION KEY FROM PLAIN PACKETS
+        last_activity: Instant,                   //TIME OF LAST MESSAGE
+        seq: usize,                               //SEQUENCE NUMBER
+        connect: Instant,                         //TIME OF CONNECTION
     },
 }
 
@@ -152,7 +155,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 impl Connection
 {
     //GET STREAM FROM Connection
-    pub fn write_stream(&self) -> &Arc<Mutex<TcpStream>>
+    pub fn write_stream(&self) -> &Arc<Mutex<OwnedWriteHalf>>
     {
         match self
         {
@@ -161,8 +164,18 @@ impl Connection
         }
     }
 
+    //GET HANDLER TASK FROM Connection
+    pub fn task(&self) -> &AbortHandle
+    {
+        match self
+        {
+            Self::Authenticated { task, .. } => task,
+            Self::NonAuthenticated { task, .. } => task,
+        }
+    }
+
     //GET ALL ACTIVE FILE STREAMS
-    pub fn file_streams(&self) -> Option<&Arc<Mutex<HashMap<u64, TcpStream>>>>
+    pub fn file_streams(&self) -> Option<&Arc<MutexSync<HashMap<u64, AbortHandle>>>>
     {
         match self
         {
@@ -381,11 +394,11 @@ impl Connection
     }
 
     //ADD FILE STREAM
-    pub fn add_file_stream(&self, uid: u64, stream: TcpStream)
+    pub fn add_file_stream(&self, uid: u64, task: AbortHandle)
     {
         if let Self::Authenticated { file_streams, .. } = self
         {
-            file_streams.lock().unwrap().insert(uid, stream);
+            file_streams.lock().unwrap().insert(uid, task);
         }
     }
 
@@ -394,15 +407,15 @@ impl Connection
     {
         if let Self::Authenticated { file_streams, .. } = self
         {
-            if let Some(stream) = file_streams.lock().unwrap().remove(&uid)
+            if let Some(task) = file_streams.lock().unwrap().remove(&uid)
             {
-                stream.shutdown(Shutdown::Both).ok();
+                task.abort(); //DROPS THE STREAM HALVES, CLOSING THE SOCKET
             }
         }
     }
 
     //GET SCREEN UPLOAD STREAM
-    pub fn screen_stream(&self) -> &Option<Arc<Mutex<TcpStream>>>
+    pub fn screen_stream(&self) -> &Option<AbortHandle>
     {
         match self
         {
@@ -422,7 +435,7 @@ impl Connection
     }
 
     //SET ATTACHED SCREENSHARE
-    pub fn attach_screen(&mut self, target_id: usize, stream: Arc<TcpStream>, token: [u8; 32])
+    pub fn attach_screen(&mut self, target_id: usize, stream: Arc<Mutex<OwnedWriteHalf>>, token: [u8; 32])
     {
         match self
         {
@@ -451,14 +464,14 @@ impl Connection
     }
 
     //ADD SCREEN UPLOAD STREAM
-    pub fn set_screen_stream(&mut self, stream: Arc<Mutex<TcpStream>>)
+    pub fn set_screen_stream(&mut self, task: AbortHandle)
     {
         //CLEAN OLD STREAM
         self.remove_screen_stream();
 
         if let Self::Authenticated { screen_stream, .. } = self
         {
-            *screen_stream = Some(stream);
+            *screen_stream = Some(task);
         }
     }
 
@@ -467,9 +480,9 @@ impl Connection
     {
         if let Self::Authenticated { screen_stream, peer_addr, id, .. } = self
         {
-            if let Some(old_stream) = screen_stream.take()
+            if let Some(old_task) = screen_stream.take()
             {
-                old_stream.lock().unwrap().shutdown(Shutdown::Both).ok();
+                old_task.abort();
                 log::info!("Stop screenshare: {}", peer_addr);
 
                 return Some(*id);
@@ -486,23 +499,20 @@ pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::ne
 pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
-fn untrusted_read<F>(streams: &mut Streams, is_match: F, keys: Option<&SharedKeys>) -> Option<PacketCode>
+async fn untrusted_read<F>(streams: &mut Streams<'_>, is_match: F, keys: Option<&SharedKeys>) -> Option<PacketCode>
 where
     F: Fn(&PacketCode) -> bool
 {
-    //SET READ TIMEOUT FOR ZOMBIE CONNECTIONS
-    streams.0.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
-
     let mut invalid_packets = 0; //INVALID KEY EXCHANGE PACKETS COUNTER
 
     //WAIT FOR KeyExchange
     let message = loop
     {
-        //READ MESSAGE
-        let received = match network::receive(streams, keys, None)
+        //READ MESSAGE (WITH TIMEOUT FOR ZOMBIE CONNECTIONS)
+        let received = match tokio::time::timeout(Duration::from_millis(2000), network::receive(streams, keys, None)).await
         {
-            Some(r) => r,
-            None => return None
+            Ok(Some(r)) => r,
+            _ => return None
         };
 
         if is_match(&received) { break received; }
@@ -512,15 +522,12 @@ where
         invalid_packets += 1; //INCREMENT
     };
 
-    //REMOVE READ TIMEOUT
-    streams.0.set_read_timeout(None).expect("Failed to unset read timeout");
-
     Some(message)
 }
 
-fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
+async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
 (
-    streams: &mut Streams,
+    streams: &mut Streams<'_>,
     peer_addr: &SocketAddr,
     keys: &mut SharedKeys,
     rekey_trigger: Option<&SharedKeys>,
@@ -532,23 +539,23 @@ fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
 
     //ATOMIC SEND
     {
-        let mut write = streams.1.lock().unwrap();
+        let mut write = streams.1.lock().await;
 
         //TRIGGER REKEY
         let keys = if let Some(current_keys) = rekey_trigger
         {
-            network::send(&mut write, PacketCode::Rekey, Some(current_keys));
+            network::send(&mut write, PacketCode::Rekey, Some(current_keys)).await;
 
             //ENCRYPT PUBKEYS
             Some(current_keys)
         } else { None }; //OBFUSCATE PUBKEYS
 
         //SEND ENCRYPTED PUBKEYS TO CLIENT
-        network::send(&mut write, PacketCode::KeyExchange { ecc: pk, pq: pq_pk }, keys);
+        network::send(&mut write, PacketCode::KeyExchange { ecc: pk, pq: pq_pk }, keys).await;
     }
 
     //READ FROM UNTRUSTED CLIENT
-    let message = match untrusted_read(streams, |code| matches!(code, PacketCode::KeyExchange { .. }), rekey_trigger)
+    let message = match untrusted_read(streams, |code| matches!(code, PacketCode::KeyExchange { .. }), rekey_trigger).await
     {
         Some(r) => r,
         None => return
@@ -575,7 +582,7 @@ fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
     }
 }
 
-fn send_welcome_packet(write_stream: &mut TcpStream, keys: &SharedKeys) //send welcome packet you idiot
+async fn send_welcome_packet(write_stream: &mut OwnedWriteHalf, keys: &SharedKeys) //send welcome packet you idiot
 {
     //SEND
     network::send(write_stream, PacketCode::Welcome
@@ -586,10 +593,36 @@ fn send_welcome_packet(write_stream: &mut TcpStream, keys: &SharedKeys) //send w
         server_name: config::read_config::<String>("server_name"),
         server_uname: options::get_server_username(),
         git_hash: env!("WHY2_GIT_HASH").to_owned(),
-    }, Some(keys));
+    }, Some(keys)).await;
 }
 
 //PUBLIC
+pub fn spawn_with_abort<F, Fut>(f: F) -> AbortHandle //SPAWN TASK WHICH KNOWS ITS OWN AbortHandle
+where
+    F: FnOnce(AbortHandle) -> Fut + Send + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
+    //CHANNEL FOR HANDING THE HANDLE OVER TO THE TASK
+    let (tx, rx) = oneshot::channel::<AbortHandle>();
+
+    let handle = tokio::spawn(async move
+    {
+        //WAIT FOR OWN HANDLE (PREVENTS RACE WITH REGISTRATION)
+        let task = match rx.await
+        {
+            Ok(t) => t,
+            Err(_) => return
+        };
+
+        f(task).await;
+    });
+
+    let task = handle.abort_handle();
+    tx.send(task.clone()).ok();
+
+    task
+}
+
 pub fn send_to_all(code: PacketCode, filter_channel: bool, channel: Option<&str>) //SEND PACKET TO ALL CLIENTS
 {
     //COLLECT EACH CLIENT IN SAME CHANNEL
@@ -612,17 +645,14 @@ pub fn send_to_all(code: PacketCode, filter_channel: bool, channel: Option<&str>
         let code = code.clone();
         let keys = entry.keys().cloned();
 
-        thread::spawn(move ||
+        tokio::spawn(async move
         {
-            if let Ok(mut stream) = write_stream.lock()
-            {
-                network::send(&mut stream, code, keys.as_ref());
-            }
+            network::send(&mut *write_stream.lock().await, code, keys.as_ref()).await;
         });
     }
 }
 
-pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTION BY TcpStream
+pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTION BY PEER ADDRESS
 {
     //REMOVE CONNECTION
     let mut connection = match CONNECTIONS.remove(peer_addr)
@@ -631,17 +661,10 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
         None => return
     };
 
-    //DISCONNECT
-    if let Ok(mut stream) = connection.write_stream().lock()
+    //SEND DISCONNECT CODE IF GRACEFUL
+    if grace
     {
-        //SEND DISCONNECT CODE IF GRACEFUL
-        if grace
-        {
-            network::send(&mut stream, PacketCode::Disconnect, connection.keys());
-        }
-
-        //SHUTDOWN STREAM
-        stream.shutdown(Shutdown::Both).ok();
+        network::send(&mut *connection.write_stream().lock().await, PacketCode::Disconnect, connection.keys()).await;
     }
 
     //CLOSE ALL FILE STREAMS
@@ -660,7 +683,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
     if let Some(id) = connection.remove_screen_stream()
     {
         //DEATTACH ALL ATTACHED CLIENTS
-        deattach(id, connection.username().unwrap());
+        deattach(id, connection.username().unwrap()).await;
     }
 
     //AUTHENTICATED ACTIONS
@@ -674,7 +697,7 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
 
         //REMOVE UPLOADS
         let username = connection.username().unwrap();
-        let _ = fs::remove_dir_all(misc::get_upload_dir(username)); //REMOVE FILES
+        let _ = fs::remove_dir_all(misc::get_upload_dir(username)).await; //REMOVE FILES
         file::ACTIVE_FILESHARES.retain(|_, u| u.client_id != *connection.id().unwrap());
         AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
 
@@ -695,6 +718,9 @@ pub fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>
             format!(" ({info})")
         } else { String::new() }
     );
+
+    //SHUT DOWN THE HANDLER TASK (MUST BE LAST - THIS MAY BE THE CALLING TASK ITSELF)
+    connection.task().abort();
 }
 
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
@@ -738,11 +764,12 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
     {
         match old_connection
         {
-            Connection::NonAuthenticated { write_stream, seq, peer_addr, connect, obfuscation_key, .. } =>
+            Connection::NonAuthenticated { write_stream, task, seq, peer_addr, connect, obfuscation_key, .. } =>
             {
                 Connection::NonAuthenticated
                 {
                     write_stream,
+                    task,
                     peer_addr,
                     username: None,
                     keys: Some(keys.to_owned()),
@@ -753,12 +780,13 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                 }
             },
 
-            Connection::Authenticated { write_stream, file_streams, screen_stream, username, id, attached_screen, last_activity, channel,
+            Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, id, attached_screen, last_activity, channel,
                 seq, server_seq, peer_addr, alive, .. } =>
             {
                 Connection::Authenticated
                 {
                     write_stream,
+                    task,
                     file_streams,
                     screen_stream,
                     peer_addr,
@@ -787,7 +815,8 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
         Connection::Authenticated
         {
             write_stream: old_connection.write_stream().clone(),
-            file_streams: Arc::new(Mutex::new(HashMap::new())),
+            task: old_connection.task().clone(),
+            file_streams: Arc::new(MutexSync::new(HashMap::new())),
             screen_stream: None,
             peer_addr: *old_connection.peer_addr(),
             username: username.to_string(),
@@ -823,6 +852,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
         Connection::Authenticated
         {
             write_stream: old_connection.write_stream().clone(),
+            task: old_connection.task().clone(),
             file_streams: old_connection.file_streams().unwrap().clone(),
             screen_stream: old_connection.screen_stream().clone(),
             peer_addr: *old_connection.peer_addr(),
@@ -870,14 +900,14 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
     }
 }
 
-fn ask_version(streams: &mut Streams, keys: &SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
+async fn ask_version(streams: &mut Streams<'_>, keys: &SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
 {
     //ASK FOR VERSION
-    network::send(&mut streams.1.lock().unwrap(),
-        PacketCode::Version { version: Some(misc::get_version().to_string()) }, Some(keys));
+    network::send(&mut *streams.1.lock().await,
+        PacketCode::Version { version: Some(misc::get_version().to_string()) }, Some(keys)).await;
 
     //READ FROM UNTRUSTED CLIENT
-    let read = untrusted_read(streams, |code| matches!(code, PacketCode::Version { .. }), Some(keys))?;
+    let read = untrusted_read(streams, |code| matches!(code, PacketCode::Version { .. }), Some(keys)).await?;
 
     if let PacketCode::Version { version } = read
     {
@@ -885,7 +915,7 @@ fn ask_version(streams: &mut Streams, keys: &SharedKeys) -> Option<String> //ASK
     } { unreachable!("what"); }
 }
 
-fn send_voice_clients(stream: &mut TcpStream, keys: &SharedKeys, id: usize)
+async fn send_voice_clients(stream: &mut OwnedWriteHalf, keys: &SharedKeys, id: usize)
 {
     //FIND CHANNEL
     let sender_channel = match CONNECTIONS.iter().find(|e| e.value().id() == Some(&id))
@@ -923,7 +953,7 @@ fn send_voice_clients(stream: &mut TcpStream, keys: &SharedKeys, id: usize)
     }
 
     //SEND
-    network::send(stream, PacketCode::VoiceClients { clients }, Some(keys));
+    network::send(stream, PacketCode::VoiceClients { clients }, Some(keys)).await;
 }
 
 fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW TOKEN
@@ -938,7 +968,7 @@ fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW T
     token
 }
 
-fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLIENTS
+async fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLIENTS
 {
     let mut to_notify = Vec::new();
 
@@ -951,15 +981,19 @@ fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLI
 
     for (stream_mutex, keys) in to_notify
     {
-        if let Ok(mut stream) = stream_mutex.lock()
-        {
-            network::send(&mut stream, PacketCode::Deattach { username: Some(sharer_uname.to_owned()) }, keys.as_ref());
-        }
+        network::send(&mut *stream_mutex.lock().await,
+            PacketCode::Deattach { username: Some(sharer_uname.to_owned()) }, keys.as_ref()).await;
     }
 }
 
 //PUBLIC
-pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_key: [u8; 32]) //CLIENT -> SERVER COMMUNICATION
+pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
+(
+    streams: &mut Streams<'_>,
+    peer_addr: SocketAddr,
+    obfuscation_key: [u8; 32],
+    task: AbortHandle,
+)
 {
     log::info!("New connection: {peer_addr}");
 
@@ -967,6 +1001,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     CONNECTIONS.insert(peer_addr, Connection::NonAuthenticated
     {
         write_stream: streams.1.clone(),
+        task,
         peer_addr: peer_addr,
         username: None,
         keys: None,
@@ -978,26 +1013,26 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
 
     //GET ENCRYPTION & MAC KEYS
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    key_exchange(streams, &peer_addr, &mut keys, None);
+    key_exchange(streams, &peer_addr, &mut keys, None).await;
 
     //CHECK FOR VALID KEYS
     if keys.0.is_empty() || keys.1.is_empty()
     {
-        return remove_connection(&peer_addr, false, None)
+        return remove_connection(&peer_addr, false, None).await
     }
 
     //ASK CLIENT FOR THEIR PACKAGE VERSION
     if config::read_config("check_client_version")
     {
-        let version = ask_version(streams, &keys);
+        let version = ask_version(streams, &keys).await;
         if version.is_none() || version != Some(misc::get_version().to_string())
         {
-            return remove_connection(&peer_addr, true, Some("version"));
+            return remove_connection(&peer_addr, true, Some("version")).await;
         }
     }
 
     //SEND PACKET WITH REQUIRED SERVER INFO
-    send_welcome_packet(&mut streams.1.lock().unwrap(), &keys);
+    send_welcome_packet(&mut *streams.1.lock().await, &keys).await;
 
     //GET USERNAME FROM USER
     let mut username: Option<String> = None; //USER ENTERED USERNAME
@@ -1011,16 +1046,16 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     let disabled_registration = !config::read_config::<bool>("allow_register");
     if disabled_registration
     {
-        network::send(&mut streams.1.lock().unwrap(), PacketCode::RegisterDisabled, Some(&keys));
+        network::send(&mut *streams.1.lock().await, PacketCode::RegisterDisabled, Some(&keys)).await;
     }
 
     //ASK n TIMES
     for _ in 0..max_tries
     {
         //SEND PICK_USERNAME CODE
-        network::send(&mut streams.1.lock().unwrap(), PacketCode::Username { username: None }, Some(&keys));
+        network::send(&mut *streams.1.lock().await, PacketCode::Username { username: None }, Some(&keys)).await;
 
-        match network::receive(streams, Some(&keys), None)
+        match network::receive(streams, Some(&keys), None).await
         {
             //USERNAME CONDITIONS MET, BREAK LOOP
             Some(PacketCode::Username { username: uname }) =>
@@ -1037,14 +1072,14 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 }
             },
 
-            _ => return remove_connection(&peer_addr, false, Some("username")),
+            _ => return remove_connection(&peer_addr, false, Some("username")).await,
         }
     }
 
     //NO USERNAME RECEIVED, DISCONNECT CLIENT
     if username.is_none()
     {
-        return remove_connection(&peer_addr, true, Some("username"));
+        return remove_connection(&peer_addr, true, Some("username")).await;
     }
 
     let username = username.unwrap();
@@ -1071,10 +1106,10 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
         for _ in 0..max_tries
         {
             //SEND REGISTER CODE
-            network::send(&mut streams.1.lock().unwrap(), PacketCode::PasswordR { password: None }, Some(&keys));
+            network::send(&mut *streams.1.lock().await, PacketCode::PasswordR { password: None }, Some(&keys)).await;
 
             //WAIT FOR ANSWER
-            match network::receive(streams, Some(&keys), None)
+            match network::receive(streams, Some(&keys), None).await
             {
                 Some(PacketCode::PasswordR { password: pass }) =>
                 {
@@ -1090,38 +1125,52 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     }
                 },
 
-                _ => return remove_connection(&peer_addr, false, Some("register"))
+                _ => return remove_connection(&peer_addr, false, Some("register")).await
             };
         }
 
         if password.is_none()
         {
-            return remove_connection(&peer_addr, true, Some("register"));
+            return remove_connection(&peer_addr, true, Some("register")).await;
         }
 
+        //HASH PASSWORD (ARGON2 IS CPU HEAVY, KEEP IT OFF THE RUNTIME)
+        let hash = task::spawn_blocking(move || password::hash_password(password.as_ref().unwrap().as_str()))
+            .await.expect("Hashing password failed");
+
         //SAVE PASSWORD
-        config::server_users_write(&username, &password::hash_password(password.as_ref().unwrap().as_str()));
+        config::server_users_write(&username, &hash);
     } else //LOGIN
     {
         //SEND LOGIN CODE
-        network::send(&mut streams.1.lock().unwrap(), PacketCode::PasswordL { password: None }, Some(&keys));
+        network::send(&mut *streams.1.lock().await, PacketCode::PasswordL { password: None }, Some(&keys)).await;
 
         //WAIT FOR ANSWER
         let password = loop
         {
-            match network::receive(streams, Some(&keys), None)
+            match network::receive(streams, Some(&keys), None).await
             {
                 Some(PacketCode::PasswordL { password: Some(password) }) => break Zeroizing::new(password),
 
-                _ => return remove_connection(&peer_addr, false, Some("login")),
+                _ => return remove_connection(&peer_addr, false, Some("login")).await,
             }
         };
 
-        //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
-        if !user_exists || password.is_empty() ||
-            !password::compare_password_hash(&config::server_users_config(&username), &password)
+        //VERIFY PASSWORD (ARGON2 IS CPU HEAVY, KEEP IT OFF THE RUNTIME)
+        let valid = if !user_exists || password.is_empty()
         {
-            return remove_connection(&peer_addr, true, Some("login"));
+            false
+        } else
+        {
+            let hashed = config::server_users_config(&username);
+            task::spawn_blocking(move || password::compare_password_hash(&hashed, &password))
+                .await.expect("Comparing password failed")
+        };
+
+        //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
+        if !valid
+        {
+            return remove_connection(&peer_addr, true, Some("login")).await;
         }
     }
 
@@ -1134,7 +1183,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     authenticate_client(&peer_addr, &username, id);
 
     //TELL CLIENT TO START CHATTING
-    network::send(&mut streams.1.lock().unwrap(), PacketCode::Accept { id }, Some(&keys));
+    network::send(&mut *streams.1.lock().await, PacketCode::Accept { id }, Some(&keys)).await;
 
     //SEND JOIN MESSAGE
     send_to_all(PacketCode::Join { username: username.clone() }, false, None);
@@ -1143,7 +1192,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     loop
     {
         //READ
-        let read = match network::receive(streams, Some(&keys), None)
+        let read = match network::receive(streams, Some(&keys), None).await
         {
             Some(r) => r,
             None => return
@@ -1156,7 +1205,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
         {
             //INFORM CLIENT ABOUT REKEYING
             let current_keys = keys.clone();
-            key_exchange(streams, &peer_addr, &mut keys, Some(&current_keys)); //INIT REKEY
+            key_exchange(streams, &peer_addr, &mut keys, Some(&current_keys)).await; //INIT REKEY
         }
 
         //CLIENT CODES
@@ -1179,7 +1228,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
             PacketCode::Disconnect =>
             {
                 //DISCONNECT CLIENT
-                return remove_connection(&peer_addr, true, None);
+                return remove_connection(&peer_addr, true, None).await;
             },
 
             //VOICE CALL
@@ -1188,11 +1237,11 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 //CHECK DISABLED FEATURE
                 if !options::voice_chat_enabled()
                 {
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidFeature, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidFeature, Some(&keys)).await;
                 } else
                 {
                     //ACKNOWLEDGE
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Voice, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::Voice, Some(&keys)).await;
 
                     if !voice_server::CONNECTIONS.contains_key(&id) //IS NOT USING VOICE
                     {
@@ -1206,7 +1255,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         }
 
                         //SEND CONNECTED CLIENTS
-                        send_voice_clients(&mut streams.1.lock().unwrap(), &keys, id);
+                        send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
                     } else //IS USING VOICE
                     {
                         //SEND CODE TO LAST CHANNEL
@@ -1236,7 +1285,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     //UPDATE CHANNEL
                     update_client_channel(&peer_addr, &tchannel);
                     channel = tchannel.clone();
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Channel { channel: tchannel }, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::Channel { channel: tchannel }, Some(&keys)).await;
 
                     //SEND CODE TO CHANNEL
                     if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
@@ -1245,11 +1294,11 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     }
 
                     //SEND CONNECTED CLIENTS
-                    send_voice_clients(&mut streams.1.lock().unwrap(), &keys, id);
+                    send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
                 } else //INVALID CHANNEL
                 {
                     //SEND InvalidUsage CODE
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidUsage, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
 
@@ -1273,7 +1322,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 }
 
                 //SEND LIST BACK TO CLIENT
-                network::send(&mut streams.1.lock().unwrap(), PacketCode::List { users: Some(users) }, Some(&keys));
+                network::send(&mut *streams.1.lock().await, PacketCode::List { users: Some(users) }, Some(&keys)).await;
             },
 
             //NEW FILE UPLOAD
@@ -1283,7 +1332,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count();
                 if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
                 {
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::UploadLimit, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::UploadLimit, Some(&keys)).await;
                     continue;
                 }
 
@@ -1295,12 +1344,12 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 log::info!("Upload request: {peer_addr}");
 
                 //SEND APPROVAL TO CLIENT
-                network::send(&mut streams.1.lock().unwrap(), PacketCode::Upload
+                network::send(&mut *streams.1.lock().await, PacketCode::Upload
                 {
                     hash,
                     token: Some(token),
                     uid: Some(uid),
-                }, Some(&keys));
+                }, Some(&keys)).await;
             },
 
             //DOWNLOAD
@@ -1322,18 +1371,18 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     //OPEN NEW CONNECTION
                     let token = open_connection(id, ConnectionType::FileDownload { uid, file });
 
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Download
+                    network::send(&mut *streams.1.lock().await, PacketCode::Download
                     {
                         token: Some(token),
                         file_id: None,
                         id: None,
-                    }, Some(&keys));
+                    }, Some(&keys)).await;
 
                     //LOG START
                     log::info!("Download request: {peer_addr}");
                 } else
                 {
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidUsage, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
 
@@ -1345,10 +1394,10 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     .and_then(|mut conn| Some((conn.remove_screen_stream(), conn.username().cloned())))
                 {
                     //DEATTACH ALL CLIENTS
-                    deattach(removed_id, &username);
+                    deattach(removed_id, &username).await;
 
                     //SEND SCREEN DISABLE NOTIFICATION
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Screen { token: None }, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::Screen { token: None }, Some(&keys)).await;
                     continue;
                 }
 
@@ -1356,16 +1405,16 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 if config::read_config("enable_screenshare")
                 {
                     //SEND SCREEN ACCEPT
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Screen
+                    network::send(&mut *streams.1.lock().await, PacketCode::Screen
                     {
                         token: Some(open_connection(id, ConnectionType::Screen))
-                    }, Some(&keys));
+                    }, Some(&keys)).await;
 
                     //LOG START
                     log::info!("Screen share: {peer_addr}");
                 } else
                 {
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidFeature, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidFeature, Some(&keys)).await;
                 }
             },
 
@@ -1388,19 +1437,19 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                     });
 
                     //SEND ACCEPT
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Attach
+                    network::send(&mut *streams.1.lock().await, PacketCode::Attach
                     {
                         id: None,
                         username: Some(sharer_username.to_owned()),
                         token: Some(token),
-                    }, Some(&keys));
+                    }, Some(&keys)).await;
 
                     //LOG START
                     log::info!("Screen attach: {peer_addr}");
                 } else
                 {
                     //INVALID ARGS
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidUsage, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
 
@@ -1423,11 +1472,11 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         .and_then(|c| c.value().username().cloned());
 
                     //SEND ACCEPT
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::Deattach { username: sharer_uname }, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::Deattach { username: sharer_uname }, Some(&keys)).await;
                 } else
                 {
                     //NOT ATTACHED
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidUsage, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
 
@@ -1464,7 +1513,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 }
 
                 //SEND LIST BACK TO CLIENT
-                network::send(&mut streams.1.lock().unwrap(), PacketCode::Files { users: Some(users) }, Some(&keys));
+                network::send(&mut *streams.1.lock().await, PacketCode::Files { users: Some(users) }, Some(&keys)).await;
             },
 
             //LIST SCREENSHARES
@@ -1488,7 +1537,7 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                 }
 
                 //SEND LIST BACK TO CLIENT
-                network::send(&mut streams.1.lock().unwrap(), PacketCode::Screens { users: Some(users) }, Some(&keys));
+                network::send(&mut *streams.1.lock().await, PacketCode::Screens { users: Some(users) }, Some(&keys)).await;
             },
 
             //PRIVATE MESSAGE
@@ -1516,26 +1565,27 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
                         //SEND
                         if let Some((recipient_stream, recipient_keys)) = recipient_data
                         {
-                            network::send(&mut recipient_stream.lock().unwrap(), PacketCode::PrivateMessage
+                            network::send(&mut *recipient_stream.lock().await, PacketCode::PrivateMessage
                             {
                                 text: text.clone(),
                                 username: Some(username.clone()),
                                 id,
-                            }, recipient_keys.as_ref());
+                            }, recipient_keys.as_ref()).await;
                         }
                     }
 
                     //SEND CONFIRMATION BACK TO SENDER
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::PrivateMessageBack
+                    let recipient_uname = CONNECTIONS.get(&recipient_addr).and_then(|e| e.username().cloned()).unwrap();
+                    network::send(&mut *streams.1.lock().await, PacketCode::PrivateMessageBack
                     {
                         text,
                         id: recipient_id,
-                        username: CONNECTIONS.get(&recipient_addr).and_then(|e| e.username().cloned()).unwrap(),
-                    }, Some(&keys));
+                        username: recipient_uname,
+                    }, Some(&keys)).await;
                 } else
                 {
                     //INVALID PM FORMAT
-                    network::send(&mut streams.1.lock().unwrap(), PacketCode::InvalidUsage, Some(&keys));
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
 
@@ -1554,17 +1604,17 @@ pub fn listen_client(streams: &mut Streams, peer_addr: SocketAddr, obfuscation_k
     }
 }
 
-pub fn disconnect_all() //DISCONNECT ALL CLIENTS
+pub async fn disconnect_all() //DISCONNECT ALL CLIENTS
 {
     //ITERATE OVER ALL ADDRESSES, REMOVE CONNECTIONS
     let addrs: Vec<SocketAddr> = CONNECTIONS.iter().map(|conn| *conn.peer_addr()).collect();
     for addr in &addrs
     {
-        remove_connection(addr, true, None); //REMOVE GRACEFULLY
+        remove_connection(addr, true, None).await; //REMOVE GRACEFULLY
     }
 }
 
-pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
+pub async fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
 {
     let now = Instant::now();
 
@@ -1577,11 +1627,11 @@ pub fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
     //DISCONNECT INACTIVE CLIENTS
     for addr in &inactive_addrs
     {
-        remove_connection(addr, true, Some("inactive"));
+        remove_connection(addr, true, Some("inactive")).await;
     }
 }
 
-pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
+pub async fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
 {
     //COLLECT ALL CLIENT ADDRESSES
     let addresses: Vec<SocketAddr> = CONNECTIONS.iter()
@@ -1615,9 +1665,9 @@ pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
         }
 
         //SEND KEEPALIVES
-        if let Some(mut stream) = stream.as_ref().and_then(|s| s.lock().ok())
+        if let Some(stream) = stream
         {
-            network::send(&mut stream, PacketCode::KeepAlive, keys.as_ref());
+            network::send(&mut *stream.lock().await, PacketCode::KeepAlive, keys.as_ref()).await;
         }
     }
 
@@ -1625,6 +1675,6 @@ pub fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
     for dead in dead_clients
     {
         //HAIL SATAN, AVE CLIENT
-        remove_connection(&dead, false, Some("dead"));
+        remove_connection(&dead, false, Some("dead")).await;
     }
 }
