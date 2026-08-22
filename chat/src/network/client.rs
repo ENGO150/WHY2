@@ -133,6 +133,7 @@ pub enum ClientEvent
     Screens(Vec<UserScreen>),                      //SCREENSHARE LIST
     UploadLimit,                                   //MAX CONCURRENT UPLOADS REACHED
     Screen(bool),                                  //TOGGLED SCREENSHARE
+    ScreenFailed(String),                          //SCREEN CAPTURE FAILED
     Attach(String),                                //ATTACHED SCREENSHARE
     Deattach(String),                              //DEATTACHED SCREENSHARE
     ExtraSpace,                                    //JUST RANDOM NEWLINE
@@ -601,18 +602,23 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 tx.send(ClientEvent::UploadLimit).await.unwrap();
             },
 
-            //SCREEN UPLOAD APPROVAL
+            //SCREEN UPLOAD APPROVAL (OR AN UNSOLICITED STOP WHEN THE SHARE DIES SERVER-SIDE)
             #[cfg(feature = "client_screen")]
             PacketCode::Screen { token } =>
             {
-                tx.send(if screen_options::swap_use_screen()
+                //FOLLOW THE SERVER INSTEAD OF TOGGLING, SO BOTH SIDES CANNOT DRIFT APART
+                screen_options::set_use_screen(token.is_some());
+
+                tx.send(match token
                 {
-                    //SPAWN UPLOAD TASK
-                    tokio::spawn(screen::screen(token.unwrap()));
-                    ClientEvent::Screen(true)
-                } else
-                {
-                    ClientEvent::Screen(false)
+                    Some(token) =>
+                    {
+                        //SPAWN UPLOAD TASK
+                        tokio::spawn(screen::screen(token, tx.clone()));
+                        ClientEvent::Screen(true)
+                    },
+
+                    None => ClientEvent::Screen(false),
                 }).await.unwrap();
             },
 

@@ -476,21 +476,30 @@ impl Connection
         }
     }
 
-    //REMOVE SCREEN UPLOAD STREAM
-    pub fn remove_screen_stream(&mut self) -> Option<usize>
+    //TAKE SCREEN UPLOAD STREAM WITHOUT ABORTING IT (FOR THE SHARE TASK TEARING ITSELF DOWN)
+    pub fn take_screen_stream(&mut self) -> Option<(usize, AbortHandle)>
     {
         if let Self::Authenticated { screen_stream, peer_addr, id, .. } = self
         {
             if let Some(old_task) = screen_stream.take()
             {
-                old_task.abort();
                 log::info!("Stop screenshare: {}", peer_addr);
 
-                return Some(*id);
+                return Some((*id, old_task));
             }
         }
 
         None
+    }
+
+    //REMOVE SCREEN UPLOAD STREAM
+    pub fn remove_screen_stream(&mut self) -> Option<usize>
+    {
+        self.take_screen_stream().map(|(id, old_task)|
+        {
+            old_task.abort();
+            id
+        })
     }
 }
 
@@ -969,7 +978,8 @@ fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW T
     token
 }
 
-async fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLIENTS
+//PUBLIC
+pub async fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLIENTS
 {
     let mut to_notify = Vec::new();
 
@@ -987,7 +997,6 @@ async fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACH
     }
 }
 
-//PUBLIC
 pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 (
     streams: &mut Streams<'_>,

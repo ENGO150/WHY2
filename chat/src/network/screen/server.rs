@@ -36,7 +36,9 @@ use crate::
     crypto,
     network::
     {
+        self,
         Streams,
+        codes::PacketCode,
         server::{ self, Connection },
         screen::{ self, ScreenPacketCode },
     },
@@ -62,8 +64,35 @@ impl Drop for ScreenTransferGuard
     }
 }
 
-//PUBLIC
 //FUNCTIONS
+async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
+{
+    //TAKE THE SHARE STATE (WITHOUT ABORTING - WE *ARE* THE SHARE TASK)
+    let (write_stream, keys, username) =
+    {
+        let mut conn = match server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
+        {
+            Some(c) => c,
+            None => return
+        };
+
+        //ALREADY TORN DOWN (AND NOTIFIED) BY SOMEBODY ELSE
+        if conn.take_screen_stream().is_none() { return; }
+
+        (conn.write_stream().clone(), conn.keys().cloned(), conn.username().cloned())
+    };
+
+    //DEATTACH EVERY VIEWER
+    if let Some(username) = username
+    {
+        server::deattach(id, &username).await;
+    }
+
+    //TELL THE SHARER ITS SHARE IS GONE
+    network::send(&mut *write_stream.lock().await, PacketCode::Screen { token: None }, keys.as_ref()).await;
+}
+
+//PUBLIC
 pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task: AbortHandle)
 {
     //GET CLIENT KEYS
@@ -112,7 +141,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         let read = match screen::receive_frame(streams, &mut rex_stream, &mut seq).await
         {
             Some(r) => r,
-            None => return
+            None => break
         };
 
         //COLLECT ALL ATTACHED CLIENT STREAMS
@@ -157,4 +186,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             screen::send_frame(&mut *stream.lock().await, read.clone(), &mut viewer_stream.1, Some(viewer_seq)).await;
         }
     }
+
+    //THE UPLOAD SOCKET DIED - NOBODY ELSE KNOWS THE SHARE IS OVER
+    end_share(id).await;
 }

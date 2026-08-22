@@ -436,6 +436,12 @@ pub fn draw_event(event: ClientEvent)
             println!("{} screen sharing.\n", if enabled { "Started" } else { "Stopped" });
         },
 
+        ClientEvent::ScreenFailed(reason) =>
+        {
+            clear_lines(2);
+            println!("Screen sharing failed: {reason}.\n");
+        },
+
         ClientEvent::Attach(username) =>
         {
             clear_lines(2);

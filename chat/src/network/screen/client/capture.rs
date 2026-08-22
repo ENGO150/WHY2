@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    env,
     thread,
     time::{ Duration, Instant },
     sync::
@@ -55,22 +54,18 @@ use crate::network::screen::
     client::options,
 };
 
-pub fn get_primary_monitor() -> Monitor
+#[cfg(target_os = "linux")]
+use std::env;
+
+pub fn get_primary_monitor() -> Result<Monitor, String>
 {
-    let monitors = Monitor::all().expect("Failed to enumerate monitors");
+    let monitors = Monitor::all().map_err(|e| format!("failed to enumerate monitors ({e})"))?;
 
-    if monitors.is_empty()
-    {
-        panic!("No monitors found");
-    }
-
-    monitors
-        .into_iter()
+    monitors.iter()
         .find(|m| m.is_primary().unwrap_or(false))
-        .unwrap_or_else(||
-        {
-            Monitor::all().unwrap().into_iter().next().unwrap()
-        })
+        .cloned()
+        .or_else(|| monitors.into_iter().next())
+        .ok_or_else(|| "no monitors found".to_owned())
 }
 
 pub fn capture_loop //CAPTURE LOOP
@@ -78,22 +73,18 @@ pub fn capture_loop //CAPTURE LOOP
     frame_tx: Sender<Vec<u8>>,
     running: Arc<AtomicBool>,
     fps: u32,
-)
+) -> Result<(), String>
 {
-    if cfg!(target_os = "linux") &&
-        (env::var("WAYLAND_DISPLAY").is_ok() || env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland")
+    #[cfg(target_os = "linux")]
+    if env::var("WAYLAND_DISPLAY").is_ok() || env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland"
     {
-        #[cfg(target_os = "linux")]
-        {
-            capture_loop_wayshot(&get_primary_monitor(), frame_tx, running, fps);
-        }
-        return;
+        return capture_loop_wayshot(frame_tx, running, fps);
     }
 
-    capture_loop_xcap(get_primary_monitor(), frame_tx, running, fps);
+    capture_loop_xcap(get_primary_monitor()?, frame_tx, running, fps)
 }
 
-fn create_encoder(fps: f32) -> Encoder
+fn create_encoder(fps: f32) -> Result<Encoder, String>
 {
     let config = EncoderConfig::new()
         .max_frame_rate(FrameRate::from_hz(fps))
@@ -106,22 +97,23 @@ fn create_encoder(fps: f32) -> Encoder
         .adaptive_quantization(false)
         .background_detection(false);
 
-    Encoder::with_api_config(OpenH264API::from_source(), config).expect("Failed to create H.264 encoder")
+    Encoder::with_api_config(OpenH264API::from_source(), config)
+        .map_err(|e| format!("failed to create H.264 encoder ({e})"))
 }
 
-fn encode_rgba(encoder: &mut Encoder, width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>>
+fn encode_rgba(encoder: &mut Encoder, width: u32, height: u32, rgba: &[u8]) -> Result<Option<Vec<u8>>, String>
 {
     let src = RgbaSliceU8::new(rgba, (width as usize, height as usize));
     let yuv = YUVBuffer::from_rgb_source(src);
 
-    let bitstream = encoder.encode(&yuv).expect("H.264 encode failed");
+    let bitstream = encoder.encode(&yuv).map_err(|e| format!("H.264 encode failed ({e})"))?;
 
     let data = bitstream.to_vec();
 
     //SKIP EMPTY FRAMES (ENCODER MAY DECIDE NO DATA IS NEEDED)
-    if data.is_empty() { return None; }
+    if data.is_empty() { return Ok(None); }
 
-    Some(data)
+    Ok(Some(data))
 }
 
 fn sleep_until_next_tick(next_tick: &mut Instant, target_interval: Duration)
@@ -144,12 +136,12 @@ fn capture_loop_xcap
     frame_tx: Sender<Vec<u8>>,
     running: Arc<AtomicBool>,
     fps: u32,
-)
+) -> Result<(), String>
 {
     let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
     let mut next_tick = Instant::now() + target_interval;
 
-    let mut encoder = create_encoder(fps as f32);
+    let mut encoder = create_encoder(fps as f32)?;
 
     let mut last_raw = Vec::new();
     let mut last_encode_time = Instant::now();
@@ -160,7 +152,7 @@ fn capture_loop_xcap
         if !options::get_use_screen()
         {
             running.store(false, Ordering::Relaxed);
-            return;
+            return Ok(());
         }
 
         if let Ok(image) = monitor.capture_image()
@@ -170,7 +162,7 @@ fn capture_loop_xcap
 
             if force_encode || raw != &last_raw
             {
-                if let Some(compressed) = encode_rgba(&mut encoder, image.width(), image.height(), raw)
+                if let Some(compressed) = encode_rgba(&mut encoder, image.width(), image.height(), raw)?
                 {
                     frame_tx.try_send(compressed).ok();
                 }
@@ -183,43 +175,56 @@ fn capture_loop_xcap
 
         sleep_until_next_tick(&mut next_tick, target_interval);
     }
+
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn select_output(wayshot: &libwayshot::WayshotConnection) -> Result<libwayshot::output::OutputInfo, String> //PICK THE OUTPUT TO SHARE
+{
+    let outputs = wayshot.get_all_outputs();
+
+    if outputs.is_empty() { return Err("compositor reported no outputs".to_owned()); }
+
+    //PREFERRED: THE MONITOR xcap CALLS PRIMARY
+    if let Ok(name) = get_primary_monitor().and_then(|m| m.name().map_err(|e| e.to_string()))
+        && let Some(output) = outputs.iter().find(|o| o.name == name)
+    {
+        return Ok(output.clone());
+    }
+
+    //FALLBACK: THE OUTPUT AT THE ORIGIN OF THE LAYOUT, OTHERWISE THE FIRST ONE
+    Ok(outputs.iter()
+        .find(|o| o.logical_region.inner.position.x == 0 && o.logical_region.inner.position.y == 0)
+        .unwrap_or(&outputs[0])
+        .clone())
 }
 
 #[cfg(target_os = "linux")]
 fn capture_loop_wayshot
 (
-    monitor: &Monitor,
     frame_tx: Sender<Vec<u8>>,
     running: Arc<AtomicBool>,
     fps: u32,
-)
+) -> Result<(), String>
 {
     let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
 
-    let mut wayshot = match libwayshot::WayshotConnection::new()
-    {
-        Ok(w) => w,
-        Err(_) => return,
-    };
+    let mut wayshot = libwayshot::WayshotConnection::new()
+        .map_err(|e| format!("wayland screen capture is unavailable ({e})"))?;
 
-    let mut target_output = match wayshot.get_all_outputs().iter()
-        .find(|o| o.name == monitor.name().unwrap_or_default()).cloned()
-    {
-        Some(o) => o,
-        None => return,
-    };
+    let mut target_output = select_output(&wayshot)?;
 
-    let mut encoder = create_encoder(fps as f32);
+    let mut encoder = create_encoder(fps as f32)?;
 
     //GET INITIAL DIMENSIONS FOR ENCODER
-    let first_image = match wayshot.screenshot_single_output(&target_output, true)
-    {
-        Ok(img) => img.into_rgba8(),
-        Err(_) => return,
-    };
+    let first_image = wayshot.screenshot_single_output(&target_output, true)
+        .map_err(|e| format!("capturing {} failed ({e}) - your compositor must support \
+            ext-image-copy-capture-v1 or wlr-screencopy-v1", target_output.name))?
+        .into_rgba8();
 
     //ENCODE AND SEND FIRST FRAME
-    if let Some(compressed) = encode_rgba(&mut encoder, first_image.width(), first_image.height(), first_image.as_raw())
+    if let Some(compressed) = encode_rgba(&mut encoder, first_image.width(), first_image.height(), first_image.as_raw())?
     {
         frame_tx.try_send(compressed).ok();
     }
@@ -233,14 +238,14 @@ fn capture_loop_wayshot
         if !options::get_use_screen()
         {
             running.store(false, Ordering::Relaxed);
-            return;
+            return Ok(());
         }
 
         if frame_count > (consts::TARGET_FPS * 10)
         {
             if let Ok(w) = libwayshot::WayshotConnection::new()
             {
-                let o_opt = w.get_all_outputs().iter().find(|o| o.name == monitor.name().unwrap_or_default()).cloned();
+                let o_opt = w.get_all_outputs().iter().find(|o| o.name == target_output.name).cloned();
                 if let Some(o) = o_opt
                 {
                     wayshot = w;
@@ -255,7 +260,7 @@ fn capture_loop_wayshot
         {
             let image = image.into_rgba8();
 
-            if let Some(compressed) = encode_rgba(&mut encoder, image.width(), image.height(), image.as_raw())
+            if let Some(compressed) = encode_rgba(&mut encoder, image.width(), image.height(), image.as_raw())?
             {
                 frame_tx.try_send(compressed).ok();
             }
@@ -263,4 +268,6 @@ fn capture_loop_wayshot
 
         sleep_until_next_tick(&mut next_tick, target_interval);
     }
+
+    Ok(())
 }

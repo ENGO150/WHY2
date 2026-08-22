@@ -40,6 +40,7 @@ use tokio::
         mpsc::
         {
             self,
+            Sender,
             Receiver,
             UnboundedSender,
         },
@@ -55,7 +56,7 @@ use crate::
     network::
     {
         self,
-        client,
+        client::{ self, ClientEvent },
         codes::PacketCode,
         screen::
         {
@@ -85,7 +86,7 @@ pub enum UserEvent //CUSTOM WINIT EVENTS
 //GLOBAL VARIABLES
 pub static SCREEN_SHARE_PROXY: RwLock<Option<EventLoopProxy<UserEvent>>> = RwLock::new(None);
 
-pub async fn screen(token: [u8; 32])
+pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
     let (_read_stream, mut write_stream) = client::connect(chat_options::get_server_address()).await
@@ -103,7 +104,7 @@ pub async fn screen(token: [u8; 32])
     //SPAWN CAPTURE TASKS (CAPTURE IS A BLOCKING CPU LOOP, KEEP IT OFF THE RUNTIME)
     let running_capture = running.clone();
     let running_audio = running.clone();
-    task::spawn_blocking(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
+    let capture = task::spawn_blocking(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
     tokio::spawn(audio::spawn_audio_capture(audio_tx, running_audio));
 
     //LOCAL SEQ COUNTER
@@ -116,11 +117,7 @@ pub async fn screen(token: [u8; 32])
     loop
     {
         //EXIT ON DISABLED SCREEN
-        if !options::get_use_screen()
-        {
-            running.store(false, Ordering::Relaxed);
-            return;
-        }
+        if !options::get_use_screen() { break; }
 
         tokio::select!
         {
@@ -130,7 +127,7 @@ pub async fn screen(token: [u8; 32])
                 let compressed_frame = match msg
                 {
                     Some(f) => f,
-                    None => return,
+                    None => break,
                 };
 
                 screen::send_frame(&mut write_stream,
@@ -143,13 +140,29 @@ pub async fn screen(token: [u8; 32])
                 let audio_frame = match msg
                 {
                     Some(f) => f,
-                    None => return,
+                    None => break,
                 };
 
                 screen::send_frame(&mut write_stream,
                     ScreenPacketCode::Audio { data: audio_frame.data }, &mut rex_stream, Some(&mut seq)).await;
             }
         }
+    }
+
+    //STOP THE CAPTURE LOOP AND REPORT WHY IT ENDED (THE SERVER ONLY EVER SEES A DEAD SOCKET)
+    running.store(false, Ordering::Relaxed);
+
+    let reason = match capture.await
+    {
+        Ok(Err(reason)) => Some(reason),
+        Err(_) => Some("screen capture crashed".to_owned()), //PANICKED OR CANCELLED
+        Ok(Ok(())) => None,
+    };
+
+    if let Some(reason) = reason
+    {
+        events.send(ClientEvent::ScreenFailed(reason)).await.ok();
+        events.send(ClientEvent::Prompt).await.ok();
     }
 }
 

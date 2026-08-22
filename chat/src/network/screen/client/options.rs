@@ -28,9 +28,9 @@ pub fn get_use_screen() -> bool
     USE_SCREEN.load(Ordering::Relaxed)
 }
 
-pub fn swap_use_screen() -> bool
+pub fn set_use_screen(use_screen: bool)
 {
-    !USE_SCREEN.fetch_xor(true, Ordering::Relaxed)
+    USE_SCREEN.store(use_screen, Ordering::Relaxed)
 }
 
 //ATTACH SCREEN
