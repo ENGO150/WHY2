@@ -20,17 +20,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    thread,
     process,
-    io::Read,
+    sync::Arc,
     time::Duration,
-    sync::{ Arc, Mutex },
-    net::
-    {
-        TcpListener,
-        UdpSocket,
-        Shutdown,
-    },
+};
+
+use tokio::
+{
+    time,
+    signal,
+    sync::Mutex,
+    io::AsyncReadExt,
+    net::{ TcpListener, UdpSocket },
 };
 
 use log::LevelFilter;
@@ -51,10 +52,10 @@ use why2_chat::
     },
 };
 
-fn quit() //DISCONNECT ALL USERS
+async fn quit() //DISCONNECT ALL USERS
 {
     log::info!("Exiting...");
-    server::disconnect_all(); //DISCONNECT ALL USERS
+    server::disconnect_all().await; //DISCONNECT ALL USERS
 }
 
 #[tokio::main]
@@ -69,7 +70,7 @@ async fn main()
         .unwrap();
 
     //CONFIGURATION
-    misc::check_version(); //CHECK WHY2 VERSION
+    misc::check_version().await; //CHECK WHY2 VERSION
     config::init_config(); //CREATE server.toml CONFIGURATION
     kex::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
 
@@ -86,7 +87,7 @@ async fn main()
     let address = format!("{}:{}", config::read_config::<String>("server_ip"), config::read_config::<u16>("server_port")); //GET ADDRESS
 
     //BIND TCP (TEXT)
-    let listener = match TcpListener::bind(&address)
+    let listener = match TcpListener::bind(&address).await
     {
         Ok(l) => l,
         Err(_) =>
@@ -99,22 +100,22 @@ async fn main()
     //BIND UDP (VOICE)
     let udp_socket = if options::voice_chat_enabled() //VOICE ENABLED
     {
-        Some(UdpSocket::bind(&address).expect("Binding UDP failed"))
+        Some(UdpSocket::bind(&address).await.expect("Binding UDP failed"))
     } else { None }; //VOICE DISABLED
 
     log::info!("Listening on {address}"); //PRINT INFO
 
-    //CREATE KEEPALIVE & INACTIVITY WATCHDOG THREAD
-    thread::spawn(move ||
+    //CREATE KEEPALIVE & INACTIVITY WATCHDOG TASK
+    tokio::spawn(async move
     {
         let mut n = 0;
 
         loop
         {
-            thread::sleep(Duration::from_secs(5));
+            time::sleep(Duration::from_secs(5)).await;
 
             //DISCONNECT INACTIVE CLIENTS
-            server::disconnect_inactive();
+            server::disconnect_inactive().await;
 
             //REMOVE OLD PENDING TOKENS
             server::PENDING_TOKENS.retain(|_, (_, _, created)| created.elapsed().as_secs() < 5);
@@ -123,50 +124,38 @@ async fn main()
             n = (n + 1) % 6;
             if n == 0
             {
-                server::send_keepalive();
+                server::send_keepalive().await;
             }
         }
     });
 
     //SET Ctrl+C HANDLER
-    ctrlc::set_handler(move ||
+    tokio::spawn(async
     {
-        //DISCONNECT ALL USERS AND EXIT
-        quit();
-        process::exit(0);
-    }).expect("Setting Ctrl+C handler failed");
+        signal::ctrl_c().await.expect("Setting Ctrl+C handler failed");
 
-    //CREATE THREAD FOR VOICE
+        //DISCONNECT ALL USERS AND EXIT
+        quit().await;
+        process::exit(0);
+    });
+
+    //CREATE TASK FOR VOICE
     if options::voice_chat_enabled()
     {
-        thread::spawn(move || voice_server::listen_client_voice(udp_socket.unwrap()));
+        tokio::spawn(voice_server::listen_client_voice(udp_socket.unwrap()));
     }
 
-    //CREATE THREAD FOR ACCEPTING CLIENTS
-    for stream in listener.incoming()
+    //ACCEPT CLIENTS
+    loop
     {
-        match stream
+        match listener.accept().await
         {
-            Ok(mut stream) =>
+            Ok((mut stream, peer_addr)) =>
             {
-                //GET PEER ADDR
-                let peer_addr = match stream.peer_addr()
-                {
-                    Ok(p) => p,
-                    Err(_) => continue
-                };
-
-                //SET TIMEOUTS
-                stream.set_read_timeout(Some(Duration::from_millis(2000))).expect("Failed to set read timeout");
-                stream.set_write_timeout(Some(Duration::from_millis(5000))).expect("Failed to set write timeout");
-
-                //READ TOKEN
+                //READ TOKEN (WITH TIMEOUT FOR ZOMBIE CONNECTIONS)
                 let mut token = [0u8; 32];
-                if let Ok(_) = stream.read_exact(&mut token)
+                if let Ok(Ok(_)) = time::timeout(Duration::from_millis(2000), stream.read_exact(&mut token)).await
                 {
-                    //REMOVE TIMEOUT
-                    stream.set_read_timeout(None).expect("Failed to set read timeout");
-
                     //SET TCP_NODELAY
                     match stream.set_nodelay(true)
                     {
@@ -180,35 +169,42 @@ async fn main()
                         {
                             ConnectionType::FileUpload { uid } =>
                             {
-                                //SET READ TIMEOUT
-                                stream.set_read_timeout(Some(Duration::from_millis(5000))).expect("Failed to set read timeout");
-
-                                let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-                                thread::spawn(move || file::download(token, id, &mut (&mut stream, write_stream), uid));
+                                server::spawn_with_abort(move |task| async move
+                                {
+                                    let (mut read_stream, write_stream) = stream.into_split();
+                                    file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task).await;
+                                });
                                 continue;
                             },
 
                             ConnectionType::FileDownload { uid, file: file_data } =>
                             {
-                                thread::spawn(move || file::upload(token, id, stream, file_data, uid));
+                                server::spawn_with_abort(move |task| async move
+                                {
+                                    let (_read_stream, write_stream) = stream.into_split();
+                                    file::upload(token, id, write_stream, file_data, uid, task).await;
+                                });
                                 continue;
                             },
 
                             ConnectionType::Screen =>
                             {
-                                //SET READ TIMEOUT
-                                stream.set_read_timeout(Some(Duration::from_millis(5000))).expect("Failed to set read timeout");
-
-                                let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-                                thread::spawn(move || screen::screen(token, id, &mut (&mut stream, write_stream)));
+                                server::spawn_with_abort(move |task| async move
+                                {
+                                    let (mut read_stream, write_stream) = stream.into_split();
+                                    screen::screen(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), task).await;
+                                });
                                 continue;
                             },
 
                             ConnectionType::Attach { id: sharer_id } =>
                             {
+                                //ONLY THE WRITE HALF IS EVER USED FOR AN ATTACHED VIEWER
+                                let (_read_stream, write_stream) = stream.into_split();
+
                                 if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
                                 {
-                                    conn.attach_screen(sharer_id, Arc::new(stream), token);
+                                    conn.attach_screen(sharer_id, Arc::new(Mutex::new(write_stream)), token);
                                 }
 
                                 continue;
@@ -229,18 +225,19 @@ async fn main()
                             ip_clients >= config::read_config::<usize>("max_ip_clients")
                         {
                             log::error!("Connection rejected (limit): {peer_addr}");
-                            stream.shutdown(Shutdown::Both).ok();
                             continue;
                         }
 
-                        let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-                        thread::spawn(move || server::listen_client(&mut (&mut stream, write_stream), peer_addr, token));
+                        server::spawn_with_abort(move |task| async move
+                        {
+                            let (mut read_stream, write_stream) = stream.into_split();
+                            server::listen_client(&mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), peer_addr, token, task).await;
+                        });
                         continue;
                     }
                 }
 
                 log::error!("Connection rejected (header): {peer_addr}");
-                stream.shutdown(Shutdown::Both).ok();
             },
 
             Err(e) =>

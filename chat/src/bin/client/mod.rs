@@ -25,23 +25,29 @@ pub mod ui;
 use std::
 {
     env,
-    thread,
     process,
     fs::File,
     path::Path,
+    sync::{ Arc, Mutex },
     io::
     {
         self,
         Read,
         Write,
     },
+};
+
+use tokio::
+{
+    task,
     sync::
     {
-        Arc,
-        Mutex,
+        Mutex as MutexAsync,
         mpsc::{ self, Sender },
     },
 };
+
+use tokio_stream::StreamExt;
 
 use sha2::{ Sha256, Digest };
 
@@ -51,10 +57,10 @@ use crossterm::
     style::Color,
     event::
     {
-        self,
-        KeyCode,
-        KeyModifiers,
         Event,
+        KeyCode,
+        EventStream,
+        KeyModifiers,
     },
 };
 
@@ -168,14 +174,14 @@ fn mute(parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
     );
 }
 
-fn read_input(input: &mut Vec<char>, cursor_position: &mut usize) -> String
+async fn read_input(reader: &mut EventStream, input: &mut Vec<char>, cursor_position: &mut usize) -> String
 {
     //CREATE/RESET PARTIAL INPUT VARIABLES
     *INPUT_READ.lock().unwrap() = input.clone();
 
-    loop
+    while let Some(Ok(event)) = reader.next().await
     {
-        if let Event::Key(key_event) = event::read().unwrap()
+        if let Event::Key(key_event) = event
         {
             //INGORE KEY RELEASE
             if key_event.is_release() { continue; }
@@ -449,6 +455,16 @@ fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
     }
 }
 
+async fn read_line() -> String //READ ONE LINE FROM STDIN (BEFORE RAW MODE IS ENABLED)
+{
+    task::spawn_blocking(||
+    {
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        input
+    }).await.expect("Reading stdin failed")
+}
+
 #[cfg(feature = "client_voice")]
 fn prompt_selection(devices: &[String], config: &str) -> usize
 {
@@ -531,19 +547,19 @@ fn setup_devices() //SELECT AUDIO DEVICES AND STORE IN CLIENT CONFIG
 async fn main()
 {
     //CREATE CHANNEL
-    let (tx, rx) = mpsc::channel::<ClientEvent>();
+    let (tx, mut rx) = mpsc::channel::<ClientEvent>(consts::EVENT_CHANNEL_BOUND);
 
-    //SPAWN PRINTER THREAD
-    thread::spawn(move ||
+    //SPAWN PRINTER TASK
+    tokio::spawn(async move
     {
-        while let Ok(event) = rx.recv()
+        while let Some(event) = rx.recv().await
         {
             ui::draw_event(event);
         }
     });
 
     //CONFIGURATION
-    misc::check_version(&tx); //CHECK WHY2 VERSION
+    misc::check_version(&tx).await; //CHECK WHY2 VERSION
     config::init_config(); //CREATE client.toml CONFIGURATION
 
     //CHECK FOR PARAMETERS
@@ -578,12 +594,12 @@ async fn main()
 
     println!("Welcome.\n");
 
-    //RUN REST OF CLIENT IN NEW THREAD
+    //RUN REST OF CLIENT IN NEW TASK
     #[cfg(feature = "client_screen")]
-    thread::spawn(move || run_client(tx));
+    tokio::spawn(run_client(tx));
 
     #[cfg(not(feature = "client_screen"))]
-    run_client(tx);
+    run_client(tx).await;
 
     #[cfg(feature = "client_screen")]
     {
@@ -597,7 +613,7 @@ async fn main()
     }
 }
 
-fn run_client(tx: Sender<ClientEvent>)
+async fn run_client(tx: Sender<ClientEvent>)
 {
     //GET CONNECTING ADDRESS
     let mut connecting_addr = if config::read_config::<bool>("auto_connect") //USER ENABLED AUTOMATIC CONNECTION
@@ -615,10 +631,7 @@ fn run_client(tx: Sender<ClientEvent>)
         io::stdout().flush().unwrap();
 
         //GET IP FROM USER INPUT
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
-
-        input.trim().to_owned()
+        read_line().await.trim().to_owned()
     };
 
     //SPACER ("=") TO BE ADDED
@@ -647,7 +660,7 @@ fn run_client(tx: Sender<ClientEvent>)
     }
 
     //CONNECT TO SERVER
-    let mut stream = match client::connect(connecting_addr)
+    let (mut read_stream, write_half) = match client::connect(connecting_addr).await
     {
         Ok(s) => s,
         Err(e) =>
@@ -658,19 +671,23 @@ fn run_client(tx: Sender<ClientEvent>)
     };
 
     //CREATE STREAM LOCK
-    let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
+    let write_stream = Arc::new(MutexAsync::new(write_half));
 
     //CLONE SOCKET FOR CLIENT INPUT
     let write_stream_listen = write_stream.clone();
 
     //LISTEN TO SERVER
     let client_tx = tx.clone();
-    thread::spawn(move || client::listen_server(&mut (&mut stream, write_stream_listen), client_tx));
+    tokio::spawn(async move
+    {
+        client::listen_server(&mut (&mut read_stream, write_stream_listen), client_tx).await;
+    });
 
     //ENABLE RAW MODE
     let _raw_mode_guard = RawModeGuard::enable().unwrap();
 
     //INPUT STATE
+    let mut reader = EventStream::new();
     let mut current_input: Vec<char> = Vec::new();
     let mut cursor_position = 0usize;
 
@@ -678,7 +695,7 @@ fn run_client(tx: Sender<ClientEvent>)
     loop
     {
         //READ STDIN
-        let input = read_input(&mut current_input, &mut cursor_position);
+        let input = read_input(&mut reader, &mut current_input, &mut cursor_position).await;
 
         //APPEND MESSAGE TO HISTORY
         if options::get_sending_messages()
@@ -689,8 +706,10 @@ fn run_client(tx: Sender<ClientEvent>)
             let mut command_used = false;
             if let (Some(command), parameters) = command::get_command(&input)
             {
-                //SEND CODE ON A SIMPLE COMMAND, CONTINUE OTHERWISE
-                match command::send_command_code(&mut write_stream.lock().unwrap(), &command, &parameters)
+                //SEND CODE ON A SIMPLE COMMAND, CONTINUE OTHERWISE (RELEASE THE STREAM LOCK FIRST)
+                let sent = command::send_command_code(&mut *write_stream.lock().await, &command, &parameters).await;
+
+                match sent
                 {
                     //COMMAND SENT
                     Some(true) => {}
@@ -811,36 +830,39 @@ fn run_client(tx: Sender<ClientEvent>)
                                         let write_stream = write_stream.clone();
                                         let keys = options::get_keys();
 
-                                        thread::spawn(move ||
+                                        tokio::spawn(async move
                                         {
-                                            //GET SHA256 FILE HASH
-                                            let mut hasher = Sha256::new();
-                                            let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
-
-                                            //LOOP READING
-                                            let success = loop
+                                            //GET SHA256 FILE HASH (BLOCKING I/O + CPU, KEEP IT OFF THE RUNTIME)
+                                            let hash: Option<[u8; 32]> = task::spawn_blocking(move ||
                                             {
-                                                match file.read(&mut buffer)
+                                                let mut hasher = Sha256::new();
+                                                let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+
+                                                //LOOP READING
+                                                let success = loop
                                                 {
-                                                    Ok(0) => break true,
-                                                    Ok(bytes) => hasher.update(&buffer[..bytes]),
-                                                    Err(_) => break false,
-                                                }
-                                            };
+                                                    match file.read(&mut buffer)
+                                                    {
+                                                        Ok(0) => break true,
+                                                        Ok(bytes) => hasher.update(&buffer[..bytes]),
+                                                        Err(_) => break false,
+                                                    }
+                                                };
+
+                                                //FINALIZE HASH
+                                                if success { Some(hasher.finalize().into()) } else { None }
+                                            }).await.expect("Hashing file failed");
 
                                             //REQUEST FILE UPLOAD
-                                            if success
+                                            if let Some(hash) = hash
                                             {
-                                                //FINALIZE HASH
-                                                let hash: [u8; 32] = hasher.finalize().into();
-
                                                 //STORE UPLOAD IN ACTIVE UPLOADS LIST
                                                 client::ACTIVE_UPLOADS.lock().unwrap()
                                                     .insert(hash.clone(), path.canonicalize().unwrap());
 
                                                 //SEND UPLOAD REQUEST
-                                                network::send(&mut write_stream.lock().unwrap(),
-                                                    PacketCode::Upload { hash, token: None, uid: None }, keys.as_ref());
+                                                network::send(&mut *write_stream.lock().await,
+                                                    PacketCode::Upload { hash, token: None, uid: None }, keys.as_ref()).await;
                                             } else //HASHING FAILED
                                             {
                                                 println!("Error reading file!\n");
@@ -882,21 +904,23 @@ fn run_client(tx: Sender<ClientEvent>)
                     }
                 }
 
-                tx.send(ClientEvent::Prompt).unwrap();
+                tx.send(ClientEvent::Prompt).await.unwrap();
 
                 command_used = true;
             }
 
-            let mut history = INPUT_HISTORY.lock().unwrap();
-
-            //ADD INPUT
-            if !options::get_asking_password() && history.0.last() != Some(&input)
             {
-                history.0.push(input.clone());
-            }
+                let mut history = INPUT_HISTORY.lock().unwrap();
 
-            //RESET HISTORY POSITION
-            history.1 = history.0.len();
+                //ADD INPUT
+                if !options::get_asking_password() && history.0.last() != Some(&input)
+                {
+                    history.0.push(input.clone());
+                }
+
+                //RESET HISTORY POSITION
+                history.1 = history.0.len();
+            }
 
             if command_used { continue }; //DO NOT SEND COMMAND STRING
         }
@@ -913,6 +937,6 @@ fn run_client(tx: Sender<ClientEvent>)
             LoginState::None => PacketCode::Message { text: input, colors: get_colors(), username: None, id: None },
         };
 
-        network::send(&mut write_stream.lock().unwrap(), packet, options::get_keys().as_ref());
+        network::send(&mut *write_stream.lock().await, packet, options::get_keys().as_ref()).await;
     }
 }
