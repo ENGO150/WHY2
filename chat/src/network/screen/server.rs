@@ -18,9 +18,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    net::TcpStream,
+    sync::Arc,
     collections::HashMap,
-    sync::{ Arc, Mutex },
+};
+
+use tokio::
+{
+    sync::Mutex,
+    task::AbortHandle,
+    net::tcp::OwnedWriteHalf,
 };
 
 use why2::stream::RexStream;
@@ -58,7 +64,7 @@ impl Drop for ScreenTransferGuard
 
 //PUBLIC
 //FUNCTIONS
-pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
+pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task: AbortHandle)
 {
     //GET CLIENT KEYS
     let keys =
@@ -77,8 +83,8 @@ pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
                     None => return
                 };
 
-                //ADD FILE STREAM
-                c.set_screen_stream(Arc::new(Mutex::new(streams.0.try_clone().unwrap())));
+                //ADD SCREEN STREAM
+                c.set_screen_stream(task);
 
                 keys
             },
@@ -103,14 +109,14 @@ pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
     loop
     {
         //READ
-        let read = match screen::receive_frame(streams, &mut rex_stream, &mut seq)
+        let read = match screen::receive_frame(streams, &mut rex_stream, &mut seq).await
         {
             Some(r) => r,
             None => return
         };
 
         //COLLECT ALL ATTACHED CLIENT STREAMS
-        let entries: Vec<(usize, Arc<TcpStream>)> = server::CONNECTIONS.iter().filter_map(|entry|
+        let entries: Vec<(usize, Arc<Mutex<OwnedWriteHalf>>)> = server::CONNECTIONS.iter().filter_map(|entry|
         {
             match entry.value()
             {
@@ -145,13 +151,10 @@ pub fn screen(token: [u8; 32], id: usize, streams: &mut Streams)
         //FORWARD PACKET
         for (client_id, stream) in entries
         {
-            if let Ok(mut cloned_stream) = stream.try_clone()
-            {
-                let viewer_seq = viewer_seqs.entry(client_id).or_insert(0);
-                let viewer_stream = viewer_streams.get_mut(&client_id).unwrap();
+            let viewer_seq = viewer_seqs.entry(client_id).or_insert(0);
+            let viewer_stream = viewer_streams.get_mut(&client_id).unwrap();
 
-                screen::send_frame(&mut cloned_stream, read.clone(), &mut viewer_stream.1, Some(viewer_seq));
-            }
+            screen::send_frame(&mut *stream.lock().await, read.clone(), &mut viewer_stream.1, Some(viewer_seq)).await;
         }
     }
 }

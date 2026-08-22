@@ -19,9 +19,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     sync::LazyLock,
+    net::SocketAddr,
     time::{ Instant, Duration },
-    net::{ UdpSocket, SocketAddr },
 };
+
+use tokio::net::UdpSocket;
 
 use dashmap::DashMap;
 
@@ -162,12 +164,12 @@ pub fn reset_last_activity(id: &usize)
 }
 
 //MAIN FUNCTION
-pub fn listen_client_voice(socket: UdpSocket)
+pub async fn listen_client_voice(socket: UdpSocket)
 {
     //LOOP RECEIVING
     loop
     {
-        let (received, addr) = voice::receive(&socket).unwrap();
+        let (received, addr) = voice::receive(&socket).await.unwrap();
 
         //CLIENT USERNAME
         let username: String;
@@ -256,7 +258,7 @@ pub fn listen_client_voice(socket: UdpSocket)
                     {
                         data: data.clone(),
                         username: Some(username.clone()),
-                    }, addr, recipient_id, keys).unwrap();
+                    }, addr, recipient_id, keys).await.unwrap();
                 }
             }
 
@@ -293,7 +295,7 @@ pub fn listen_client_voice(socket: UdpSocket)
                     voice::send(&socket, received.id, VoicePacketCode::Ping
                     {
                         timestamp,
-                    }, addr, recipient_id, keys).unwrap();
+                    }, addr, recipient_id, keys).await.unwrap();
                 }
             }
 
@@ -315,7 +317,7 @@ pub fn listen_client_voice(socket: UdpSocket)
                     {
                         target_id,
                         timestamp,
-                    }, &addr, &target_id, keys).unwrap();
+                    }, &addr, &target_id, keys).await.unwrap();
                 }
 
                 continue;

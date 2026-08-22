@@ -22,21 +22,29 @@ pub mod capture;
 pub mod display;
 pub mod options;
 
-use std::
+use std::sync::
 {
-    thread,
-    io::Write,
-    net::TcpStream,
-    sync::
-    {
-        Arc,
-        Mutex,
-        RwLock,
-        atomic::{ AtomicBool, Ordering },
-    },
+    Arc,
+    RwLock,
+    atomic::{ AtomicBool, Ordering },
 };
 
-use crossbeam_channel::Receiver;
+use tokio::
+{
+    task,
+    io::AsyncWriteExt,
+    net::tcp::OwnedWriteHalf,
+    sync::
+    {
+        Mutex,
+        mpsc::
+        {
+            self,
+            Receiver,
+            UnboundedSender,
+        },
+    },
+};
 
 use winit::event_loop::EventLoopProxy;
 
@@ -46,7 +54,9 @@ use crate::
     options as chat_options,
     network::
     {
+        self,
         client,
+        codes::PacketCode,
         screen::
         {
             self,
@@ -62,7 +72,7 @@ pub struct ScreenShareRequest
 {
     pub rx: Receiver<Vec<u8>>,
     pub running: Arc<AtomicBool>,
-    pub main_stream: Arc<Mutex<TcpStream>>
+    pub deattach: UnboundedSender<()>, //DEATTACH REQUEST FROM THE WINDOW (SENT TO THE SERVER BY A TASK)
 }
 
 //ENUMS
@@ -75,25 +85,26 @@ pub enum UserEvent //CUSTOM WINIT EVENTS
 //GLOBAL VARIABLES
 pub static SCREEN_SHARE_PROXY: RwLock<Option<EventLoopProxy<UserEvent>>> = RwLock::new(None);
 
-pub fn screen(token: [u8; 32])
+pub async fn screen(token: [u8; 32])
 {
     //INIT FILE CONNECTION
-    let mut stream = client::connect(chat_options::get_server_address()).expect("Screen upload connection failed");
+    let (_read_stream, mut write_stream) = client::connect(chat_options::get_server_address()).await
+        .expect("Screen upload connection failed");
 
     //SEND TOKEN
-    stream.write_all(&token).unwrap();
+    write_stream.write_all(&token).await.unwrap();
 
     //SHARED STATE
-    let (tx, rx) = crossbeam_channel::bounded(consts::MULTIPLEX_CHANNEL_BOUND);
-    let (audio_tx, audio_rx) = crossbeam_channel::bounded(consts::MULTIPLEX_CHANNEL_BOUND);
+    let (tx, mut rx) = mpsc::channel(consts::MULTIPLEX_CHANNEL_BOUND);
+    let (audio_tx, mut audio_rx) = mpsc::channel(consts::MULTIPLEX_CHANNEL_BOUND);
 
     let running = Arc::new(AtomicBool::new(true));
 
-    //SPAWN CAPTURE THREAD
+    //SPAWN CAPTURE TASKS (CAPTURE IS A BLOCKING CPU LOOP, KEEP IT OFF THE RUNTIME)
     let running_capture = running.clone();
     let running_audio = running.clone();
-    thread::spawn(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
-    thread::spawn(move || audio::spawn_audio_capture(audio_tx, running_audio));
+    task::spawn_blocking(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
+    tokio::spawn(audio::spawn_audio_capture(audio_tx, running_audio));
 
     //LOCAL SEQ COUNTER
     let mut seq = 0usize;
@@ -111,62 +122,74 @@ pub fn screen(token: [u8; 32])
             return;
         }
 
-        crossbeam_channel::select!
+        tokio::select!
         {
             //VIDEO FRAME
-            recv(rx) -> msg =>
+            msg = rx.recv() =>
             {
                 let compressed_frame = match msg
                 {
-                    Ok(f) => f,
-                    Err(_) => return,
+                    Some(f) => f,
+                    None => return,
                 };
 
-                screen::send_frame(&mut stream,
-                    ScreenPacketCode::Video { data: compressed_frame }, &mut rex_stream, Some(&mut seq));
+                screen::send_frame(&mut write_stream,
+                    ScreenPacketCode::Video { data: compressed_frame }, &mut rex_stream, Some(&mut seq)).await;
             },
 
             //AUDIO FRAME
-            recv(audio_rx) -> msg =>
+            msg = audio_rx.recv() =>
             {
                 let audio_frame = match msg
                 {
-                    Ok(f) => f,
-                    Err(_) => return,
+                    Some(f) => f,
+                    None => return,
                 };
 
-                screen::send_frame(&mut stream,
-                    ScreenPacketCode::Audio { data: audio_frame.data }, &mut rex_stream, Some(&mut seq));
+                screen::send_frame(&mut write_stream,
+                    ScreenPacketCode::Audio { data: audio_frame.data }, &mut rex_stream, Some(&mut seq)).await;
             }
         }
     }
 }
 
-pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
+pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
 {
     //INIT FILE CONNECTION
-    let mut stream = client::connect(chat_options::get_server_address()).expect("Screen download connection failed");
+    let (mut read_stream, mut write_stream) = client::connect(chat_options::get_server_address()).await
+        .expect("Screen download connection failed");
 
     //SEND TOKEN (HAHA, SLEEP TOKEN)
-    stream.write_all(&token).unwrap();
+    write_stream.write_all(&token).await.unwrap();
 
     //SHARED STATE
-    let (tx, rx) = crossbeam_channel::bounded(consts::MULTIPLEX_CHANNEL_BOUND);
-    let (audio_tx, audio_rx) = crossbeam_channel::bounded(consts::NETWORK_CHANNEL_BOUND);
+    let (tx, rx) = mpsc::channel(consts::MULTIPLEX_CHANNEL_BOUND);
+    let (audio_tx, audio_rx) = mpsc::channel(consts::NETWORK_CHANNEL_BOUND);
     let running = Arc::new(AtomicBool::new(true));
 
     let running_audio = running.clone();
-    thread::spawn(move || audio::spawn_audio_playback(audio_rx, running_audio));
+    tokio::spawn(audio::spawn_audio_playback(audio_rx, running_audio));
 
     //INIT REX STREAM
     let mut rex_stream = crypto::init_rex_stream(chat_options::get_keys().as_ref().unwrap(), &token).unwrap();
 
-    //SPAWN NETWORK READER THREAD
-    let running_net = running.clone();
-    thread::spawn(move ||
+    //BRIDGE THE WINIT EVENT LOOP (NOT ASYNC) BACK TO THE SERVER
+    let (deattach_tx, mut deattach_rx) = mpsc::unbounded_channel::<()>();
+    tokio::spawn(async move
     {
-        let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-        let mut streams = (&mut stream, write_stream);
+        while deattach_rx.recv().await.is_some()
+        {
+            //DEATTACH ON SERVER
+            network::send(&mut *main_stream.lock().await,
+                PacketCode::Deattach { username: None }, chat_options::get_keys().as_ref()).await;
+        }
+    });
+
+    //SPAWN NETWORK READER TASK
+    let running_net = running.clone();
+    tokio::spawn(async move
+    {
+        let mut streams = (&mut read_stream, Arc::new(Mutex::new(write_stream)));
         let mut seq = 0usize;
 
         while running_net.load(Ordering::Relaxed)
@@ -178,7 +201,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
                 return;
             }
 
-            let read = match screen::receive_frame(&mut streams, &mut rex_stream, &mut seq)
+            let read = match screen::receive_frame(&mut streams, &mut rex_stream, &mut seq).await
             {
                 Some(r) => r,
                 None =>
@@ -192,7 +215,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
             {
                 ScreenPacketCode::Video { data } =>
                 {
-                    tx.send(data).ok();
+                    tx.send(data).await.ok();
                     if let Some(proxy) = SCREEN_SHARE_PROXY.read().unwrap().as_ref()
                     {
                         proxy.send_event(UserEvent::NewFrame).ok();
@@ -201,7 +224,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
 
                 ScreenPacketCode::Audio { data } =>
                 {
-                    audio_tx.send(AudioFrame { data }).ok();
+                    audio_tx.send(AudioFrame { data }).await.ok();
                 },
             }
         }
@@ -213,7 +236,7 @@ pub fn attach(token: [u8; 32], main_stream: Arc<Mutex<TcpStream>>)
         {
             rx,
             running,
-            main_stream,
+            deattach: deattach_tx,
         })).ok();
     }
 }

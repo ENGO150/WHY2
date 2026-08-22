@@ -18,12 +18,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    io::Write,
+    sync::Arc,
     ffi::OsStr,
-    net::TcpStream,
-    sync::LazyLock,
-    fs::{ self, File },
     path::Path,
+    sync::LazyLock,
+};
+
+use tokio::
+{
+    sync::Mutex,
+    task::AbortHandle,
+    io::AsyncWriteExt,
+    net::tcp::OwnedWriteHalf,
+    fs::
+    {
+        self,
+        File,
+        OpenOptions,
+    },
 };
 
 use dashmap::DashMap;
@@ -82,7 +94,7 @@ impl Drop for FileTransferGuard
             {
                 let temp_dir = misc::get_upload_dir(uname);
                 let junk_file = temp_dir.join(self.uid.to_string());
-                let _ = fs::remove_file(&junk_file);
+                let _ = std::fs::remove_file(&junk_file);
                 log::error!("Upload failed: {}", conn.peer_addr());
             }
         }
@@ -92,20 +104,20 @@ impl Drop for FileTransferGuard
 //PUBLIC
 pub struct ActiveFileshare //ACTIVE FILE UPLOAD
 {
-    pub file: File,        //TARGET FILE (SERVER-SIDE)
-    pub size: u64,         //EXPECTED FILE SIZE
-    pub current_size: u64, //CURRENT SIZE
-    pub hash: [u8; 32],    //SHA256 HASH OF FINAL FILE
-    pub hasher: Sha256,    //HASHER
-    pub filename: String,  //FILENAME
-    pub client_id: usize,  //ID OF SENDER
+    pub file: Arc<Mutex<File>>, //TARGET FILE (SERVER-SIDE)
+    pub size: u64,              //EXPECTED FILE SIZE
+    pub current_size: u64,      //CURRENT SIZE
+    pub hash: [u8; 32],         //SHA256 HASH OF FINAL FILE
+    pub hasher: Sha256,         //HASHER
+    pub filename: String,       //FILENAME
+    pub client_id: usize,       //ID OF SENDER
     pub stream: RexStream,
 }
 
 //LISTS
 pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new()); //LIST FOR ACTIVE FILE UPLOADS
 
-pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
+pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid: u64, task: AbortHandle)
 {
     //GET CLIENT INFO
     let (keys, username, peer_addr) =
@@ -131,7 +143,7 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
                 };
 
                 //ADD FILE STREAM
-                c.add_file_stream(uid, streams.0.try_clone().unwrap());
+                c.add_file_stream(uid, task);
 
                 (keys, username, c.peer_addr().clone())
             },
@@ -153,7 +165,7 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
     let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
 
     //WAIT FOR FIRST PACKET (METADATA)
-    let (size, hash, filename) = match file::receive_file(streams, &mut rex_stream, &mut seq)
+    let (size, hash, filename) = match file::receive_file(streams, &mut rex_stream, &mut seq).await
     {
         Some((_, FilePacketCode::Metadata { size, filename, hash })) => (size, hash, filename),
         _ => return
@@ -178,15 +190,22 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
     {
         //CREATE TEMP UPLOAD DIRECTORY
         let temp_dir = misc::get_upload_dir(&username);
-        fs::create_dir_all(&temp_dir).expect("Creating upload temp directory failed");
+        fs::create_dir_all(&temp_dir).await.expect("Creating upload temp directory failed");
 
         //CREATE REXSTREAM FOR FILE ENCRYPTION ON DISK
         let disk_stream = RexStream::new(&Grid::from_key(&keys.0).unwrap(), disk_nonce.clone()).unwrap();
 
-        //ADD ACTIVE UPLOAD (ALSO CREATE THE FILE)
+        //CREATE THE FILE
+        let upload_file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(temp_dir.join(uid.to_string()))
+            .await.expect("Creating upload file failed");
+
+        //ADD ACTIVE UPLOAD
         ACTIVE_FILESHARES.insert(uid, ActiveFileshare
         {
-            file: File::create_new(temp_dir.join(uid.to_string())).expect("Creating upload file failed"),
+            file: Arc::new(Mutex::new(upload_file)),
             size,
             current_size: 0,
             hash,
@@ -210,101 +229,131 @@ pub fn download(token: [u8; 32], id: usize, streams: &mut Streams, uid: u64)
     loop
     {
         //READ
-        let (uid, data) = match file::receive_file(streams, &mut rex_stream, &mut seq)
+        let (uid, data) = match file::receive_file(streams, &mut rex_stream, &mut seq).await
         {
             Some((uid, FilePacketCode::Data { data })) => (uid, data),
             _ => return
         };
 
-        if let Some(mut active) = ACTIVE_FILESHARES.get_mut(&uid) && active.client_id == id
+        //ENCRYPT CHUNK (NEVER HOLD THE UPLOAD ENTRY ACROSS AN AWAIT)
+        let prepared =
         {
-            //ENCRYPT
-            let input_i64 = crypto::bytes_to_i64(&data);
-            let mut encrypted_i64 = active.stream.update(&input_i64).expect("Disk stream encryption failed");
-            encrypted_i64.extend(active.stream.finalize().expect("Disk stream finalize failed"));
-            let mut encrypted_bytes = crypto::i64_to_bytes(&encrypted_i64);
-            encrypted_bytes.truncate(data.len()); //REMOVE PADDING
-
-            if data.len() <= consts::UPLOAD_CHUNK_SIZE && //CHECK PACKET SIZE
-                active.file.write_all(&encrypted_bytes).is_ok() //WRITE
+            match ACTIVE_FILESHARES.get_mut(&uid)
             {
-                //UPDATE SIZE
-                active.current_size += data.len() as u64;
-
-                if active.current_size > active.size { return; }
-
-                //UPDATE HASHER
-                active.hasher.update(&data);
-
-                //CHECK SIZE
-                if active.current_size == active.size //UPLOAD DONE
+                Some(mut active) if active.client_id == id && data.len() <= consts::UPLOAD_CHUNK_SIZE =>
                 {
-                    let valid: bool;
+                    //ENCRYPT
+                    let input_i64 = crypto::bytes_to_i64(&data);
+                    let mut encrypted_i64 = active.stream.update(&input_i64).expect("Disk stream encryption failed");
+                    encrypted_i64.extend(active.stream.finalize().expect("Disk stream finalize failed"));
+                    let mut encrypted_bytes = crypto::i64_to_bytes(&encrypted_i64);
+                    encrypted_bytes.truncate(data.len()); //REMOVE PADDING
 
-                    //GET FILE PATH
-                    let temp_dir = misc::get_upload_dir(&username);
-                    let current_path = temp_dir.join(uid.to_string());
-                    let mut new_filename = None;
-                    let mut final_path = None;
-                    let mut insert = false;
-                    let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
+                    Some((active.file.clone(), encrypted_bytes))
+                },
 
-                    //CHECK HASHES
-                    if active.hash == final_hash
-                    {
-                        //GET NEW FILE PATH
-                        let filename = Path::new(&active.filename) //PREVENT FROM PATH TRAVERSAL
-                            .file_name()
-                            .unwrap_or(OsStr::new("unnamed_file"));
-                        let new_path = temp_dir.join(filename);
-
-                        //RENAME FILE
-                        insert = !new_path.is_file();
-                        valid = fs::rename(&current_path, &new_path).is_ok();
-
-                        //SET NEW FILE VARIABLES
-                        new_filename = Some(filename.to_os_string());
-                        final_path = Some(new_path);
-                    } else { valid = false; }
-
-                    if !valid { return; }
-
-                    //LOG FILE UPLOAD
-                    log::info!("Upload done: {peer_addr}");
-
-                    let filename = new_filename.and_then(|f| f.into_string().ok()).unwrap_or("unnamed_file".to_string());
-
-                    //ANNOUNCE FILE UPLOAD
-                    server::send_to_all(PacketCode::Uploaded
-                    {
-                        username: username.clone(),
-                        filename: filename.clone(),
-                    }, false, None);
-
-                    if insert
-                    {
-                        //ADD FILE TO AVAILABLE FILES
-                        server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
-                        {
-                            hash: final_hash,
-                            path: final_path.unwrap(),
-                            filename,
-                            size: active.current_size,
-                            nonce: disk_nonce.to_flat(),
-                        });
-                    }
-
-                    //REMOVE ACTIVE UPLOAD
-                    drop(active);
-                    ACTIVE_FILESHARES.remove(&uid);
-                    return;
-                }
+                _ => None
             }
+        };
+
+        //WRITE
+        let (upload_file, encrypted_bytes) = match prepared
+        {
+            Some(p) => p,
+            None => continue
+        };
+
+        if upload_file.lock().await.write_all(&encrypted_bytes).await.is_err() { continue; }
+
+        //UPDATE UPLOAD STATE
+        let done =
+        {
+            let mut active = match ACTIVE_FILESHARES.get_mut(&uid)
+            {
+                Some(a) => a,
+                None => return
+            };
+
+            //UPDATE SIZE
+            active.current_size += data.len() as u64;
+
+            if active.current_size > active.size { return; }
+
+            //UPDATE HASHER
+            active.hasher.update(&data);
+
+            //CHECK SIZE
+            active.current_size == active.size
+        };
+
+        if !done { continue; } //UPLOAD STILL RUNNING
+
+        //UPLOAD DONE, COLLECT FINAL STATE
+        let (final_hash, expected_hash, upload_filename, final_size) =
+        {
+            let active = match ACTIVE_FILESHARES.get(&uid)
+            {
+                Some(a) => a,
+                None => return
+            };
+
+            let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
+            (final_hash, active.hash, active.filename.clone(), active.current_size)
+        };
+
+        //FLUSH TO DISK BEFORE RENAMING
+        upload_file.lock().await.flush().await.ok();
+
+        //CHECK HASHES
+        if expected_hash != final_hash { return; }
+
+        //GET FILE PATHS
+        let temp_dir = misc::get_upload_dir(&username);
+        let current_path = temp_dir.join(uid.to_string());
+
+        //GET NEW FILE PATH
+        let filename = Path::new(&upload_filename) //PREVENT FROM PATH TRAVERSAL
+            .file_name()
+            .unwrap_or(OsStr::new("unnamed_file"))
+            .to_os_string();
+        let new_path = temp_dir.join(&filename);
+
+        //RENAME FILE
+        let insert = !fs::try_exists(&new_path).await.unwrap_or(false);
+        if fs::rename(&current_path, &new_path).await.is_err() { return; }
+
+        //LOG FILE UPLOAD
+        log::info!("Upload done: {peer_addr}");
+
+        let filename = filename.into_string().unwrap_or("unnamed_file".to_string());
+
+        //ANNOUNCE FILE UPLOAD
+        server::send_to_all(PacketCode::Uploaded
+        {
+            username: username.clone(),
+            filename: filename.clone(),
+        }, false, None);
+
+        if insert
+        {
+            //ADD FILE TO AVAILABLE FILES
+            server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
+            {
+                hash: final_hash,
+                path: new_path,
+                filename,
+                size: final_size,
+                nonce: disk_nonce.to_flat(),
+            });
         }
+
+        //REMOVE ACTIVE UPLOAD
+        ACTIVE_FILESHARES.remove(&uid);
+        return;
     }
 }
 
-pub fn upload(token: [u8; 32], id: usize, mut stream: TcpStream, file: AvailableFile, uid: u64)
+pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf, file: AvailableFile, uid: u64, task: AbortHandle)
 {
     //GET CLIENT INFO
     let (keys, peer_addr) =
@@ -324,7 +373,7 @@ pub fn upload(token: [u8; 32], id: usize, mut stream: TcpStream, file: Available
                 };
 
                 //ADD FILE STREAM
-                c.add_file_stream(uid, stream.try_clone().unwrap());
+                c.add_file_stream(uid, task);
 
                 (keys, c.peer_addr().clone())
             },
@@ -347,7 +396,7 @@ pub fn upload(token: [u8; 32], id: usize, mut stream: TcpStream, file: Available
     let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
 
     //SEND FIRST PACKET (METADATA)
-    network::send_tcp(&mut stream, FilePacket
+    network::send_tcp(&mut write_stream, FilePacket
     {
         uid,
         code: FilePacketCode::Metadata
@@ -357,13 +406,13 @@ pub fn upload(token: [u8; 32], id: usize, mut stream: TcpStream, file: Available
             hash: file.hash,
         },
         seq: 0,
-    }, EncryptionMode::Stream(&mut rex_stream), Some(&mut seq));
+    }, EncryptionMode::Stream(&mut rex_stream), Some(&mut seq)).await;
 
     //INIT DISK REX STREAM
     let mut disk_stream = RexStream::new(&Grid::from_key(&keys.0).unwrap(), Grid::from_flat(&file.nonce).unwrap()).unwrap();
 
     //START UPLOAD
-    file::send_file(file.path, stream, uid, &mut rex_stream, Some(&mut seq), &mut disk_stream);
+    file::send_file(file.path, write_stream, uid, &mut rex_stream, Some(&mut seq), &mut disk_stream).await;
 
     //LOG END
     log::info!("Download done: {peer_addr}");

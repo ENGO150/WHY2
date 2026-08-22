@@ -46,3 +46,6 @@ pub const JITTER_BUFFER_SIZE: usize = 20;                                       
 
 pub const GRID_WIDTH: usize         = 4;                                        //GRID WIDTH FOR VOICE PACKETS
 pub const GRID_HEIGHT: usize        = 4;                                        //GRID HEIGHT FOR VOICE PACKETS
+
+pub const RECV_TIMEOUT: u64         = 200;                                      //UDP RECEIVE POLL TIMEOUT (MS)
+pub const SEND_CHANNEL_BOUND: usize = 8;                                        //AUDIO CALLBACK -> NETWORK TASK BUFFER

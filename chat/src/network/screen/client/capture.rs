@@ -28,7 +28,7 @@ use std::
     },
 };
 
-use crossbeam_channel::Sender;
+use tokio::sync::mpsc::Sender;
 
 use xcap::Monitor;
 

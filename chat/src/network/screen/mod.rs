@@ -25,7 +25,7 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
-use std::net::TcpStream;
+use tokio::net::tcp::OwnedWriteHalf;
 
 use wincode::{ SchemaRead, SchemaWrite };
 
@@ -67,9 +67,9 @@ impl SequencedPacket for ScreenPacket
 
 //FUNCTIONS
 //UTILS
-pub fn send_frame //SEND frame TO stream
+pub async fn send_frame //SEND frame TO stream
 (
-    stream: &mut TcpStream,
+    write_stream: &mut OwnedWriteHalf,
     code: ScreenPacketCode,
     rex_stream: &mut RexStream,
     seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
@@ -77,7 +77,7 @@ pub fn send_frame //SEND frame TO stream
 {
     network::send_tcp
     (
-        stream,
+        write_stream,
         ScreenPacket
         {
             code,
@@ -85,12 +85,12 @@ pub fn send_frame //SEND frame TO stream
         },
         EncryptionMode::Stream(rex_stream),
         seq,
-    );
+    ).await;
 }
 
-pub fn receive_frame
+pub async fn receive_frame
 (
-    streams: &mut Streams,
+    streams: &mut Streams<'_>,
     rex_stream: &mut RexStream,
     seq: &mut usize //LOCAL/GLOBAL SEQ
 ) -> Option<ScreenPacketCode>
@@ -100,7 +100,7 @@ pub fn receive_frame
         streams,
         EncryptionMode::Stream(rex_stream),
         #[cfg(feature = "server")] true,
-    )?;
+    ).await?;
 
     //DESERIALIZE AND RETURN
     match wincode::deserialize::<ScreenPacket>(&read.data)

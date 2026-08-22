@@ -22,8 +22,6 @@ pub mod options;
 
 use std::
 {
-    thread,
-    net::{ UdpSocket, TcpStream },
     collections::{ BTreeMap, VecDeque },
     time::
     {
@@ -35,8 +33,19 @@ use std::
     {
         Arc,
         Mutex,
-        mpsc::Sender,
         atomic::{ AtomicUsize, Ordering },
+    },
+};
+
+use tokio::
+{
+    time,
+    net::UdpSocket,
+    net::tcp::OwnedWriteHalf,
+    sync::
+    {
+        Mutex as MutexAsync,
+        mpsc::{ self, Sender },
     },
 };
 
@@ -212,27 +221,23 @@ pub fn configure_device(device: &cpal::Device, supported_configs: impl Iterator<
     config
 }
 
-fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], id: usize, socket: &UdpSocket)
+fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], tx: &Sender<Vec<u8>>)
 {
     //ENCODE (IGNORE ERRORS)
     if let Ok(len) = encoder.encode_float(&frame, buffer)
     {
-        //TRANSMIT
-        voice::send(socket, id, VoicePacketCode::Audio
-        {
-            data: buffer[..len].to_vec(),
-            username: None,
-        }, &chat_options::get_keys().unwrap()).unwrap();
+        //HAND OVER TO THE NETWORK TASK (NEVER BLOCK THE AUDIO CALLBACK)
+        tx.try_send(buffer[..len].to_vec()).ok();
     }
 }
 
 //PUBLIC
-pub fn listen_server_voice //SERVER -> CLIENT
+pub async fn listen_server_voice //SERVER -> CLIENT
 (
     id: usize,
     username: String,
     tx: Sender<ClientEvent>,
-    write_stream: Arc<Mutex<TcpStream>>
+    write_stream: Arc<MutexAsync<OwnedWriteHalf>>
 )
 {
     //RESET SEQs
@@ -244,11 +249,8 @@ pub fn listen_server_voice //SERVER -> CLIENT
     let _guard = StreamGuard { generation: current_generation };
 
     //CONNECT
-    let socket = Arc::new(UdpSocket::bind("0.0.0.0:0").expect("Binding UDP failed"));
-    socket.connect(chat_options::get_server_address()).expect("Connecting to server UDP failed");
-
-    //SET SOCKET TIMEOUT
-    socket.set_read_timeout(Some(Duration::from_millis(200))).expect("Setting socket timeout failed");
+    let socket = Arc::new(UdpSocket::bind("0.0.0.0:0").await.expect("Binding UDP failed"));
+    socket.connect(chat_options::get_server_address()).await.expect("Connecting to server UDP failed");
 
     //INIT AUDIO HOST
     let host =
@@ -264,26 +266,46 @@ pub fn listen_server_voice //SERVER -> CLIENT
         }
     };
 
-    //SUPPRESS STDERR (AVOID ALSA ERRORS)
-    let stderr_gag = Gag::stderr().unwrap();
+    //FIND INPUT/OUTPUT DEVICE (SUPPRESS STDERR TO AVOID ALSA ERRORS)
+    let devices =
+    {
+        let _stderr_gag = Gag::stderr().unwrap();
+        find_devices(&host)
+    };
 
-    //FIND INPUT/OUTPUT DEVICE
-    let (input_device, output_device) = match find_devices(&host)
+    let (input_device, output_device) = match devices
     {
         Some((input, output)) => (input, output), //FOUND
         _ => //NOT FOUND
         {
             //LEAVE VOICE
-            command::send_command_code(&mut write_stream.lock().unwrap(), &Command::Voice, &None);
+            command::send_command_code(&mut *write_stream.lock().await, &Command::Voice, &None).await;
             return;
         }
     };
 
-    //DISABLE SUPPRESSION
-    drop(stderr_gag);
-
     //SEND HELLO PACKET
-    voice::send(&socket, id, VoicePacketCode::Hello, &chat_options::get_keys().unwrap()).unwrap();
+    voice::send(&socket, id, VoicePacketCode::Hello, &chat_options::get_keys().unwrap()).await.ok();
+
+    //AUDIO CALLBACK -> NETWORK TASK BRIDGE
+    let (packet_tx, mut packet_rx) = mpsc::channel::<Vec<u8>>(consts::SEND_CHANNEL_BOUND);
+
+    //SPAWN TRANSMIT TASK
+    let send_socket = socket.clone();
+    tokio::spawn(async move
+    {
+        while let Some(data) = packet_rx.recv().await
+        {
+            //CHECK GENERATION
+            if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
+
+            voice::send(&send_socket, id, VoicePacketCode::Audio
+            {
+                data,
+                username: None,
+            }, &chat_options::get_keys().unwrap()).await.ok();
+        }
+    });
 
     //CONFIGURE CPAL INPUT
     let input_config = configure_device(&input_device, input_device.supported_input_configs().unwrap(), input_device.default_input_config().unwrap(), true);
@@ -325,7 +347,6 @@ pub fn listen_server_voice //SERVER -> CLIENT
     let mut denoise_buffer = [0.0f32; consts::SAMPLE_RATE as usize / 100];
 
     //CONFIGURE INPUT STREAM
-    let send_socket = socket.clone();
     let noise_floor_cb = noise_floor.clone();
     let agc_envelope_cb = agc_envelope.clone();
     let agc_gain_cb = agc_gain.clone();
@@ -470,7 +491,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
                 //SEND STORED FRAMES
                 for old_frame in preroll.iter()
                 {
-                    transmit_audio(&opus_encoder, old_frame, &mut encoded_buffer, id, &send_socket);
+                    transmit_audio(&opus_encoder, old_frame, &mut encoded_buffer, &packet_tx);
                 }
 
                 preroll.clear();
@@ -503,7 +524,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
             if *gate
             {
                 LOCAL_DISPLAY_HOLD.store((consts::SAMPLE_RATE * consts::DISPLAY_HOLD as u32 / 1000) as usize, Ordering::Relaxed);
-                transmit_audio(&opus_encoder, &frame, &mut encoded_buffer, id, &send_socket);
+                transmit_audio(&opus_encoder, &frame, &mut encoded_buffer, &packet_tx);
             }
         }
     }, |_| {}, None).unwrap();
@@ -604,9 +625,9 @@ pub fn listen_server_voice //SERVER -> CLIENT
     sfx::clear_effects();
     sfx::queue_effect(SoundEffect::Join);
 
-    //START VOICE ACTIVITY DISPLAY & PING THREAD
+    //START VOICE ACTIVITY DISPLAY & PING TASK
     let vad_socket = socket.clone();
-    thread::spawn(move ||
+    tokio::spawn(async move
     {
         let mut iteration_counter = 0u8;
 
@@ -615,14 +636,14 @@ pub fn listen_server_voice //SERVER -> CLIENT
             //QUIT ON /leave
             if !options::get_use_voice()
             {
-                tx.send(ClientEvent::VoiceActivity(Vec::new())).unwrap(); //CLEAR WINDOW
+                tx.send(ClientEvent::VoiceActivity(Vec::new())).await.unwrap(); //CLEAR WINDOW
                 return;
             }
 
             iteration_counter += 1; //INCREMENT
 
             //SHOW VOICE ACTIVITY
-            display_active_speakers(&username, &tx);
+            display_active_speakers(&username, &tx).await;
 
             //SEND PING PACKET
             if iteration_counter == 10
@@ -630,13 +651,13 @@ pub fn listen_server_voice //SERVER -> CLIENT
                 voice::send(&vad_socket, id, VoicePacketCode::Ping
                 {
                     timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
-                }, &chat_options::get_keys().unwrap()).unwrap();
+                }, &chat_options::get_keys().unwrap()).await.ok();
 
                 //RESET COUNTER
                 iteration_counter = 0;
             }
 
-            thread::sleep(Duration::from_millis(100));
+            time::sleep(Duration::from_millis(100)).await;
         }
     });
 
@@ -646,7 +667,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
     loop
     {
         //READ
-        let (network_buffer, _) = match voice::receive(&socket)
+        let (network_buffer, _) = match voice::receive(&socket).await
         {
             Some(r) => r,
             None => //READING FAILED, TIMEOUT OR CRASH PROBABLY
@@ -663,7 +684,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
                     //CHECK GENERATION AGAIN AHAHAHHAHAAH
                     if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
 
-                    thread::sleep(Duration::from_millis(50));
+                    time::sleep(Duration::from_millis(50)).await;
                 }
 
                 return;
@@ -673,6 +694,9 @@ pub fn listen_server_voice //SERVER -> CLIENT
         //VERIFY SERVER SEQ
         if network_buffer.seq <= options::get_server_seq() { continue; } //INGORE INVALID SEQs
         options::set_server_seq(network_buffer.seq); //SET SERVER SEQ
+
+        //PING HAS TO BE ANSWERED OUTSIDE OF THE CONSUMERS LOCK
+        let mut pong: Option<u128> = None;
 
         if let Some((stream, peer)) = CONSUMERS.lock().unwrap().get_mut(&network_buffer.id)
         {
@@ -697,12 +721,7 @@ pub fn listen_server_voice //SERVER -> CLIENT
                 //PING RECEIVED, SEND BACK
                 VoicePacketCode::Ping { timestamp } =>
                 {
-                    //SEND PONG PACKET
-                    voice::send(&socket, id, VoicePacketCode::Pong
-                    {
-                        target_id: network_buffer.id,
-                        timestamp: timestamp,
-                    }, &chat_options::get_keys().unwrap()).unwrap();
+                    pong = Some(timestamp);
                 },
 
                 //PING FORWARDED BACK, CALCULATE LATENCY
@@ -729,6 +748,16 @@ pub fn listen_server_voice //SERVER -> CLIENT
 
                 _ => {}, //IGNORE OTHER CODES
             }
+        }
+
+        //SEND PONG PACKET
+        if let Some(timestamp) = pong
+        {
+            voice::send(&socket, id, VoicePacketCode::Pong
+            {
+                target_id: network_buffer.id,
+                timestamp: timestamp,
+            }, &chat_options::get_keys().unwrap()).await.ok();
         }
     }
 }
@@ -787,7 +816,7 @@ pub fn add_consumer(id: usize, username: String)
     sfx::queue_effect(SoundEffect::Join);
 }
 
-fn display_active_speakers(local_username: &str, tx: &Sender<ClientEvent>)
+async fn display_active_speakers(local_username: &str, tx: &Sender<ClientEvent>)
 {
     //ALL USERS
     let mut users_to_display = Vec::new();
@@ -826,5 +855,5 @@ fn display_active_speakers(local_username: &str, tx: &Sender<ClientEvent>)
     }
 
     //DISPLAY
-    tx.send(ClientEvent::VoiceActivity(users_to_display)).unwrap();
+    tx.send(ClientEvent::VoiceActivity(users_to_display)).await.unwrap();
 }

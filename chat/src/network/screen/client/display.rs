@@ -18,18 +18,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    net::TcpStream,
     collections::HashMap,
     time::{ Duration, Instant },
     sync::
     {
         Arc,
-        Mutex,
         atomic::{ AtomicBool, Ordering },
     }
 };
 
-use crossbeam_channel::Receiver;
+use tokio::sync::mpsc::{ Receiver, UnboundedSender };
 
 use pixels::
 {
@@ -58,19 +56,10 @@ use openh264::
     formats::YUVSource,
 };
 
-use crate::
+use crate::network::screen::
 {
-    options,
-    network::
-    {
-        self,
-        codes::PacketCode,
-        screen::
-        {
-            consts,
-            client::{ ScreenShareRequest, UserEvent },
-        },
-    },
+    consts,
+    client::{ ScreenShareRequest, UserEvent },
 };
 
 //PRIVATE
@@ -85,7 +74,7 @@ struct Session
     last_height: u32,
     frame_dirty: bool,
     running: Arc<AtomicBool>,
-    main_stream: Arc<Mutex<TcpStream>>,
+    deattach: UnboundedSender<()>,
     frame_count: u32,
     last_fps_time: Instant,
     close_requested_at: Option<Instant>,
@@ -175,6 +164,7 @@ impl ScreenShareApp
             //RESET
             session.frame_rx = request.rx;
             session.running = request.running;
+            session.deattach = request.deattach;
             session.decoder = Decoder::new().expect("Failed to create H.264 decoder");
             session.last_width = 0;
             session.last_height = 0;
@@ -214,7 +204,7 @@ impl ScreenShareApp
             last_height: 0,
             frame_dirty: false,
             running: request.running,
-            main_stream: request.main_stream,
+            deattach: request.deattach,
             frame_count: 0,
             last_fps_time: Instant::now(),
             close_requested_at: None,
@@ -268,9 +258,8 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
                 {
                     session.running.store(false, Ordering::Relaxed);
 
-                    //DEATTACH ON SERVER
-                    network::send(&mut session.main_stream.lock().unwrap(),
-                        PacketCode::Deattach { username: None }, options::get_keys().as_ref());
+                    //DEATTACH ON SERVER (HANDED OVER TO THE ASYNC SIDE)
+                    session.deattach.send(()).ok();
                 }
             },
 

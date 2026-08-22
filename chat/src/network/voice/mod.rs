@@ -28,10 +28,15 @@ pub mod server;
 use std::
 {
     io::Error,
-    net::{ UdpSocket, SocketAddr },
+    net::SocketAddr,
 };
 
+use tokio::net::UdpSocket;
+
 use wincode::{ SchemaRead, SchemaWrite };
+
+#[cfg(not(feature = "server"))]
+use std::time::Duration;
 
 use crate::
 {
@@ -80,7 +85,7 @@ pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
     pub seq: usize,              //SEQUENCE NUMBER
 }
 
-pub fn send //SEND DATA TO UDP
+pub async fn send //SEND DATA TO UDP
 (
     socket: &UdpSocket,
     id: usize,
@@ -136,28 +141,44 @@ pub fn send //SEND DATA TO UDP
 
     #[cfg(feature = "server")]
     {
-        socket.send_to(&encrypted_bytes, addr)
+        socket.send_to(&encrypted_bytes, addr).await
     }
 
     #[cfg(not(feature = "server"))]
     {
-        socket.send(&encrypted_bytes)
+        socket.send(&encrypted_bytes).await
     }
 }
 
-pub fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //RECEIVE UDP PACKET & DECODE
+pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //RECEIVE UDP PACKET & DECODE
 {
     let mut buffer = [0u8; 2048];
-    loop //BLOCK READING UNTIL PACKET ARRIVES
+    loop //WAIT UNTIL PACKET ARRIVES
     {
         //CHECK FOR VOICE DISABLE
         #[cfg(feature = "client_base")]
         if !options::get_use_voice() { break None; }
 
-        let (len, addr) = match socket.recv_from(&mut buffer)
+        let (len, addr) =
         {
-            Ok(result) => result,
-            Err(_) => continue
+            #[cfg(feature = "server")]
+            {
+                match socket.recv_from(&mut buffer).await
+                {
+                    Ok(result) => result,
+                    Err(_) => continue
+                }
+            }
+
+            //POLL SO THE VOICE DISABLE CHECK ABOVE STAYS RESPONSIVE
+            #[cfg(not(feature = "server"))]
+            {
+                match tokio::time::timeout(Duration::from_millis(consts::RECV_TIMEOUT), socket.recv_from(&mut buffer)).await
+                {
+                    Ok(Ok(result)) => result,
+                    _ => continue
+                }
+            }
         };
 
         let buffer_offset: usize;

@@ -23,12 +23,13 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
-use std::
+use std::path::PathBuf;
+
+use tokio::
 {
     fs::File,
-    io::Read,
-    path::PathBuf,
-    net::TcpStream,
+    io::AsyncReadExt,
+    net::tcp::OwnedWriteHalf,
 };
 
 use wincode::{ SchemaRead, SchemaWrite };
@@ -86,23 +87,23 @@ impl SequencedPacket for FilePacket
 }
 
 //FUNCTIONS
-pub fn send_file //CHUNK FILE AND SEND TO STREAM
+pub async fn send_file //CHUNK FILE AND SEND TO STREAM
 (
     path: PathBuf,
-    mut stream: TcpStream,
+    mut write_stream: OwnedWriteHalf,
     uid: u64,
     rex_stream: &mut RexStream,
     mut seq: Option<&mut usize>,
     #[cfg(feature = "server")] disk_stream: &mut RexStream,
 )
 {
-    let mut file = File::open(path).expect("Cannot open file for upload");
+    let mut file = File::open(path).await.expect("Cannot open file for upload");
     let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
 
     //LOOP READING
     loop
     {
-        match file.read(&mut buffer)
+        match file.read(&mut buffer).await
         {
             Ok(0) => break, //EOF
             Ok(bytes) =>
@@ -127,21 +128,21 @@ pub fn send_file //CHUNK FILE AND SEND TO STREAM
                 };
 
                 //SEND FILE CHUNK
-                network::send_tcp(&mut stream, FilePacket
+                network::send_tcp(&mut write_stream, FilePacket
                 {
                     uid,
                     code: FilePacketCode::Data { data: plaintext },
                     seq: 0,
-                }, EncryptionMode::Stream(rex_stream), seq.as_deref_mut());
+                }, EncryptionMode::Stream(rex_stream), seq.as_deref_mut()).await;
             },
             Err(_) => {}, //TODO: Implement
         }
     }
 }
 
-pub fn receive_file
+pub async fn receive_file
 (
-    streams: &mut Streams,
+    streams: &mut Streams<'_>,
     rex_stream: &mut RexStream,
     seq: &mut usize
 ) -> Option<(u64, FilePacketCode)>
@@ -151,7 +152,7 @@ pub fn receive_file
         streams,
         EncryptionMode::Stream(rex_stream),
         #[cfg(feature = "server")] true,
-    )?;
+    ).await?;
 
     //DESERIALIZE AND RETURN
     match wincode::deserialize::<FilePacket>(&read.data)
@@ -170,7 +171,7 @@ pub fn receive_file
         {
             //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
             #[cfg(feature = "server")]
-            chat_server::remove_connection(&read.peer_addr, false, Some("packet"));
+            chat_server::remove_connection(&read.peer_addr, false, Some("packet")).await;
 
             None
         }

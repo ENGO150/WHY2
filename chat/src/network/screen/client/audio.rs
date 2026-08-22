@@ -18,12 +18,22 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    thread,
     time::Duration,
     sync::
     {
         Arc,
         atomic::{ AtomicBool, Ordering },
+    },
+};
+
+use tokio::
+{
+    time,
+    sync::mpsc::
+    {
+        self,
+        Sender,
+        Receiver,
     },
 };
 
@@ -40,8 +50,6 @@ use cpal::
         StreamTrait,
     },
 };
-
-use crossbeam_channel::{ Sender, Receiver };
 
 use audiopus::
 {
@@ -73,13 +81,13 @@ pub struct AudioFrame
 }
 
 //FUNCTIONS
-pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) //CAPTURE AUDIO
+pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) //CAPTURE AUDIO
 {
     if cfg!(target_os = "macos")
     {
         while running.load(Ordering::Relaxed)
         {
-            thread::sleep(Duration::from_millis(100));
+            time::sleep(Duration::from_millis(100)).await;
         }
         return;
     }
@@ -130,7 +138,7 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) //C
         Application::LowDelay,
     ).unwrap();
 
-    let (chunk_tx, chunk_rx) = crossbeam_channel::bounded::<Vec<f32>>(screen_consts::CAPTURE_CHANNEL_BOUND);
+    let (chunk_tx, mut chunk_rx) = mpsc::channel::<Vec<f32>>(screen_consts::CAPTURE_CHANNEL_BOUND);
 
     let input_channels = config.channels as usize;
     let input_source_rate = config.sample_rate as f32;
@@ -199,10 +207,10 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) //C
             return;
         }
 
-        match chunk_rx.recv_timeout(Duration::from_millis(100))
+        match time::timeout(Duration::from_millis(100), chunk_rx.recv()).await
         {
-            Ok(chunk) => input_accum.extend_from_slice(&chunk),
-            Err(_) =>
+            Ok(Some(chunk)) => input_accum.extend_from_slice(&chunk),
+            _ =>
             {
                 if !running.load(Ordering::Relaxed) { return; }
                 continue;
@@ -222,7 +230,7 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) //C
             {
                 Ok(len) =>
                 {
-                    if tx.send(AudioFrame { data: out[..len].to_vec() }).is_err() { return; }
+                    if tx.send(AudioFrame { data: out[..len].to_vec() }).await.is_err() { return; }
                 },
 
                 _ => {},
@@ -232,7 +240,7 @@ pub fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) //C
     }
 }
 
-pub fn spawn_audio_playback(rx: Receiver<AudioFrame>, running: Arc<AtomicBool>)
+pub async fn spawn_audio_playback(mut rx: Receiver<AudioFrame>, running: Arc<AtomicBool>)
 {
     let host = cpal::default_host();
     let device = host.default_output_device().expect("No audio output device found");
@@ -245,7 +253,7 @@ pub fn spawn_audio_playback(rx: Receiver<AudioFrame>, running: Arc<AtomicBool>)
         Channels::Stereo,
     ).unwrap();
 
-    let (chunk_tx, chunk_rx) = crossbeam_channel::bounded::<Vec<f32>>(screen_consts::PLAYBACK_CHANNEL_BOUND);
+    let (chunk_tx, mut chunk_rx) = mpsc::channel::<Vec<f32>>(screen_consts::PLAYBACK_CHANNEL_BOUND);
 
     let mut drain_buf: Vec<f32> = Vec::new();
     let mut drain_pos: usize = 0;
@@ -332,16 +340,16 @@ pub fn spawn_audio_playback(rx: Receiver<AudioFrame>, running: Arc<AtomicBool>)
             return;
         }
 
-        match rx.recv_timeout(Duration::from_millis(50))
+        match time::timeout(Duration::from_millis(50), rx.recv()).await
         {
-            Ok(frame) =>
+            Ok(Some(frame)) =>
             {
                 match decoder.decode_float(Some(&frame.data[..]), &mut out, false)
                 {
                     Ok(len) =>
                     {
                         let decoded = out[..len * 2].to_vec();
-                        if chunk_tx.send(decoded).is_err() { return; } //CHANNEL CLOSED
+                        if chunk_tx.send(decoded).await.is_err() { return; } //CHANNEL CLOSED
                     },
                     _ => {},
                 }

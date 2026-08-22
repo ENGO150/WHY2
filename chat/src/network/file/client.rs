@@ -18,12 +18,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    io::Write,
+    sync::Arc,
     path::Path,
+};
+
+use tokio::
+{
+    io::AsyncWriteExt,
     fs::{ self, File },
     sync::
     {
-        Arc,
         Mutex,
         mpsc::Sender,
     },
@@ -50,24 +54,24 @@ use crate::
     },
 };
 
-pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientEvent>)
+pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
-    let mut stream = client::connect(options::get_server_address()).expect("File connection failed");
+    let (_read_stream, mut write_stream) = client::connect(options::get_server_address()).await.expect("File connection failed");
 
     //SEND TOKEN
-    stream.write_all(&token).unwrap();
+    write_stream.write_all(&token).await.unwrap();
 
     //GET FILE PATH
     let path = client::ACTIVE_UPLOADS.lock().unwrap().remove(&file_hash).unwrap(); //(CRASHES IF SERVER REQUESTS FILE THAT ISN'T FOR UPLOAD)
     let filename = path.clone().file_name().and_then(|n| n.to_str()
         .map(|s| s.to_string())).unwrap_or_else(|| String::from("Unknown")); //GET FILENAME FOR CONSOLE LOG
 
-    let size = path.metadata().unwrap().len();
+    let size = fs::metadata(&path).await.unwrap().len();
 
     //LOG
-    tx.send(ClientEvent::Upload(filename.clone())).unwrap();
-    tx.send(ClientEvent::Prompt).unwrap();
+    tx.send(ClientEvent::Upload(filename.clone())).await.unwrap();
+    tx.send(ClientEvent::Prompt).await.unwrap();
 
     //LOCAL SEQ COUNTER
     let mut seq = 0usize;
@@ -76,7 +80,7 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
     let mut rex_stream = chat_crypto::init_rex_stream(options::get_keys().as_ref().unwrap(), &token).unwrap();
 
     //SEND FIRST PACKET (METADATA)
-    network::send_tcp(&mut stream, FilePacket
+    network::send_tcp(&mut write_stream, FilePacket
     {
         uid,
         code: FilePacketCode::Metadata
@@ -86,23 +90,22 @@ pub fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientE
             hash: file_hash,
         },
         seq: 0,
-    }, EncryptionMode::Stream(&mut rex_stream), Some(&mut seq));
+    }, EncryptionMode::Stream(&mut rex_stream), Some(&mut seq)).await;
 
     //UPLOAD
-    file::send_file(path, stream, uid, &mut rex_stream, Some(&mut seq));
+    file::send_file(path, write_stream, uid, &mut rex_stream, Some(&mut seq)).await;
 }
 
-pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
+pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
-    let mut stream = client::connect(options::get_server_address()).expect("File connection failed");
+    let (mut read_stream, mut write_stream) = client::connect(options::get_server_address()).await.expect("File connection failed");
 
     //SEND TOKEN
-    stream.write_all(&token).unwrap();
+    write_stream.write_all(&token).await.unwrap();
 
     //CREATE STREAM PAIR
-    let write_stream = Arc::new(Mutex::new(stream.try_clone().expect("Failed cloning stream")));
-    let mut streams = (&mut stream, write_stream);
+    let mut streams = (&mut read_stream, Arc::new(Mutex::new(write_stream)));
 
     //LOCAL SEQ COUNTER
     let mut seq = 0usize;
@@ -111,7 +114,7 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     let mut rex_stream = chat_crypto::init_rex_stream(options::get_keys().as_ref().unwrap(), &token).unwrap();
 
     //RECEIVE FIRST PACKET (METADATA)
-    let (size, filename, hash) = match file::receive_file(&mut streams, &mut rex_stream, &mut seq)
+    let (size, filename, hash) = match file::receive_file(&mut streams, &mut rex_stream, &mut seq).await
     {
         Some((_, FilePacketCode::Metadata { size, filename, hash })) => (size, filename, hash),
         _ => return,
@@ -130,29 +133,29 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
         .to_string();
 
     //CREATE DOWNLOAD DIR
-    fs::create_dir_all(&download_dir).expect("Creating download directory failed");
+    fs::create_dir_all(&download_dir).await.expect("Creating download directory failed");
 
     //LOG
-    tx.send(ClientEvent::Download(filename.clone())).unwrap();
-    tx.send(ClientEvent::Prompt).unwrap();
+    tx.send(ClientEvent::Download(filename.clone())).await.unwrap();
+    tx.send(ClientEvent::Prompt).await.unwrap();
 
     //INIT COUNTERS
     let mut current_size = 0u64;
-    let mut file = File::create(Path::new(&download_dir).join(&filename)).expect("Creating download file failed");
+    let mut file = File::create(Path::new(&download_dir).join(&filename)).await.expect("Creating download file failed");
     let mut hasher = Sha256::new();
 
     //LOOP READING
     loop
     {
         //READ
-        let data = match file::receive_file(&mut streams, &mut rex_stream, &mut seq)
+        let data = match file::receive_file(&mut streams, &mut rex_stream, &mut seq).await
         {
             Some((_, FilePacketCode::Data { data })) => data,
             _ => return
         };
 
         //WRITE
-        if file.write_all(&data).is_ok()
+        if file.write_all(&data).await.is_ok()
         {
             //UPDATE SIZE
             current_size += data.len() as u64;
@@ -165,6 +168,9 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
             {
                 let final_hash: [u8; 32] = hasher.clone().finalize().into();
 
+                //FLUSH TO DISK
+                file.flush().await.ok();
+
                 //CHECK HASHES
                 tx.send(if hash == final_hash
                 {
@@ -172,9 +178,9 @@ pub fn download(token: [u8; 32], tx: Sender<ClientEvent>)
                 } else
                 {
                     ClientEvent::DownloadFailed(filename)
-                }).unwrap();
+                }).await.unwrap();
 
-                tx.send(ClientEvent::Prompt).unwrap();
+                tx.send(ClientEvent::Prompt).await.unwrap();
                 return;
             }
         }
