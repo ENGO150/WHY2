@@ -93,35 +93,40 @@ impl Session
 
         if pending.is_empty() { return false; }
 
-        for compressed in &pending
+        let newest = pending.len() - 1;
+
+        for (index, compressed) in pending.iter().enumerate()
         {
-            //DECODE H.264 BITSTREAM
-            if let Ok(Some(yuv)) = self.decoder.decode(&compressed)
+            //DECODE H.264 BITSTREAM - EVERY FRAME MUST BE DECODED, H.264 IS TEMPORALLY PREDICTED
+            //AND SKIPPING ONE WOULD BREAK PREDICTION FOR THE FRAMES THAT FOLLOW
+            let Ok(Some(yuv)) = self.decoder.decode(compressed) else { continue; };
+
+            //ONLY THE NEWEST FRAME IS EVER SEEN, SO THE OLDER ONES SKIP THE YUV -> RGBA PASS AND THE UPLOAD
+            if index != newest { continue; }
+
+            let dim = yuv.dimensions();
+            let w = dim.0 as u32;
+            let h = dim.1 as u32;
+
+            if self.last_width != w || self.last_height != h
             {
-                let dim = yuv.dimensions();
-                let w = dim.0 as u32;
-                let h = dim.1 as u32;
+                self.last_width = w;
+                self.last_height = h;
 
-                if self.last_width != w || self.last_height != h
-                {
-                    self.last_width = w;
-                    self.last_height = h;
-
-                    //RESIZE PIXEL BUFFER TO MATCH DECODED DIMENSIONS
-                    self.pixels.resize_buffer(w, h).ok();
-                }
-
-                let frame_data = self.pixels.frame_mut();
-
-                //WRITE RGBA DIRECTLY INTO THE PIXEL BUFFER
-                let wanted = dim.0 * dim.1 * 4;
-                if frame_data.len() == wanted
-                {
-                    yuv.write_rgba8(frame_data);
-                }
-
-                self.frame_dirty = true;
+                //RESIZE PIXEL BUFFER TO MATCH DECODED DIMENSIONS
+                self.pixels.resize_buffer(w, h).ok();
             }
+
+            let frame_data = self.pixels.frame_mut();
+
+            //WRITE RGBA DIRECTLY INTO THE PIXEL BUFFER
+            let wanted = dim.0 * dim.1 * 4;
+            if frame_data.len() == wanted
+            {
+                yuv.write_rgba8(frame_data);
+            }
+
+            self.frame_dirty = true;
         }
 
         true

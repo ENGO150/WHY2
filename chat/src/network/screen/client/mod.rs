@@ -22,11 +22,14 @@ pub mod capture;
 pub mod display;
 pub mod options;
 
-use std::sync::
+use std::
 {
-    Arc,
-    RwLock,
-    atomic::{ AtomicBool, Ordering },
+    sync::
+    {
+        Arc,
+        RwLock,
+        atomic::{ AtomicBool, Ordering },
+    },
 };
 
 use tokio::

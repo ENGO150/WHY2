@@ -101,19 +101,98 @@ fn create_encoder(fps: f32) -> Result<Encoder, String>
         .map_err(|e| format!("failed to create H.264 encoder ({e})"))
 }
 
-fn encode_rgba(encoder: &mut Encoder, width: u32, height: u32, rgba: &[u8]) -> Result<Option<Vec<u8>>, String>
+struct YuvScratch //REUSABLE I420 SCRATCH BUFFER
 {
-    let src = RgbaSliceU8::new(rgba, (width as usize, height as usize));
-    let yuv = YUVBuffer::from_rgb_source(src);
+    buffer: YUVBuffer,
+    width: u32,
+    height: u32,
+}
 
-    let bitstream = encoder.encode(&yuv).map_err(|e| format!("H.264 encode failed ({e})"))?;
+impl YuvScratch
+{
+    fn new() -> Self
+    {
+        Self { buffer: YUVBuffer::new(0, 0), width: 0, height: 0 }
+    }
 
-    let data = bitstream.to_vec();
+    fn fill(&mut self, width: u32, height: u32, rgba: &[u8]) -> &YUVBuffer
+    {
+        //RESIZE ONLY WHEN THE MONITOR RESOLUTION ACTUALLY CHANGED
+        if self.width != width || self.height != height
+        {
+            self.buffer = YUVBuffer::new(width as usize, height as usize);
+            self.width = width;
+            self.height = height;
+        }
 
-    //SKIP EMPTY FRAMES (ENCODER MAY DECIDE NO DATA IS NEEDED)
-    if data.is_empty() { return Ok(None); }
+        self.buffer.read_rgb(RgbaSliceU8::new(rgba, (width as usize, height as usize)));
 
-    Ok(Some(data))
+        &self.buffer
+    }
+}
+
+struct FrameEncoder
+{
+    encoder: Encoder,
+    scratch: YuvScratch,
+    fps: f32,
+    dimensions: Option<(u32, u32)>,
+}
+
+impl FrameEncoder
+{
+    fn new(fps: f32) -> Result<Self, String>
+    {
+        Ok(Self { encoder: create_encoder(fps)?, scratch: YuvScratch::new(), fps, dimensions: None })
+    }
+
+    fn force_intra_frame(&mut self)
+    {
+        self.encoder.force_intra_frame();
+    }
+
+    fn encode(&mut self, width: u32, height: u32, rgba: &[u8]) -> Result<Option<Vec<u8>>, String>
+    {
+        //I420 CONVERSION PANICS ON ODD DIMENSIONS - FAIL CLEANLY INSTEAD
+        if width % 2 != 0 || height % 2 != 0
+        {
+            return Err(format!("unsupported capture resolution {width}x{height} (must be even)"));
+        }
+
+        //openh264 FIXES ITS RESOLUTION ON THE FIRST FRAME, SO A MONITOR RECONFIGURED MID-SHARE
+        //NEEDS A FRESH ENCODER RATHER THAN A CORRUPT STREAM
+        if self.dimensions.is_some_and(|previous| previous != (width, height))
+        {
+            self.encoder = create_encoder(self.fps)?;
+        }
+
+        self.dimensions = Some((width, height));
+
+        let scratch = &mut self.scratch;
+        let yuv = scratch.fill(width, height, rgba);
+
+        let encoder = &mut self.encoder;
+        let bitstream = encoder.encode(yuv)
+            .map_err(|e| format!("H.264 encode failed ({e})"))?;
+
+        let data = bitstream.to_vec();
+
+        //SKIP EMPTY FRAMES (ENCODER MAY DECIDE NO DATA IS NEEDED)
+        if data.is_empty()
+        {
+            return Ok(None);
+        }
+
+        Ok(Some(data))
+    }
+
+    fn dispatch(&mut self, frame_tx: &Sender<Vec<u8>>, frame: Vec<u8>) //HAND A FRAME TO THE NETWORK TASK
+    {
+        if frame_tx.try_send(frame).is_err()
+        {
+            self.force_intra_frame();
+        }
+    }
 }
 
 fn sleep_until_next_tick(next_tick: &mut Instant, target_interval: Duration)
@@ -141,9 +220,10 @@ fn capture_loop_xcap
     let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
     let mut next_tick = Instant::now() + target_interval;
 
-    let mut encoder = create_encoder(fps as f32)?;
+    let mut encoder = FrameEncoder::new(fps as f32)?;
 
-    let mut last_raw = Vec::new();
+    //PREVIOUS FRAME, KEPT BY MOVE - COPYING ITS BYTES OUT WOULD COST A FULL-FRAME memcpy EVERY TICK
+    let mut last_image: Option<xcap::image::RgbaImage> = None;
     let mut last_encode_time = Instant::now();
 
     while running.load(Ordering::Relaxed)
@@ -157,18 +237,19 @@ fn capture_loop_xcap
 
         if let Ok(image) = monitor.capture_image()
         {
-            let raw = image.as_raw();
             let force_encode = last_encode_time.elapsed() >= Duration::from_secs(2);
 
-            if force_encode || raw != &last_raw
+            //memcmp EARLY-EXITS ON THE FIRST DIFFERING BYTE, SO THIS IS CHEAP WHEN THE SCREEN MOVED
+            let changed = last_image.as_ref().is_none_or(|previous| previous.as_raw() != image.as_raw());
+
+            if force_encode || changed
             {
-                if let Some(compressed) = encode_rgba(&mut encoder, image.width(), image.height(), raw)?
+                if let Some(compressed) = encoder.encode(image.width(), image.height(), image.as_raw())?
                 {
-                    frame_tx.try_send(compressed).ok();
+                    encoder.dispatch(&frame_tx, compressed);
                 }
 
-                last_raw.clear();
-                last_raw.extend_from_slice(raw);
+                last_image = Some(image);
                 last_encode_time = Instant::now();
             }
         }
@@ -215,21 +296,25 @@ fn capture_loop_wayshot
 
     let mut target_output = select_output(&wayshot)?;
 
-    let mut encoder = create_encoder(fps as f32)?;
+    let mut encoder = FrameEncoder::new(fps as f32)?;
 
-    //GET INITIAL DIMENSIONS FOR ENCODER
+    //PROBE ONCE UP FRONT SO AN UNSUPPORTED COMPOSITOR REPORTS A USEFUL ERROR RATHER THAN A BLANK SHARE
     let first_image = wayshot.screenshot_single_output(&target_output, true)
         .map_err(|e| format!("capturing {} failed ({e}) - your compositor must support \
             ext-image-copy-capture-v1 or wlr-screencopy-v1", target_output.name))?
         .into_rgba8();
 
     //ENCODE AND SEND FIRST FRAME
-    if let Some(compressed) = encode_rgba(&mut encoder, first_image.width(), first_image.height(), first_image.as_raw())?
+    if let Some(compressed) = encoder.encode(first_image.width(), first_image.height(), first_image.as_raw())?
     {
-        frame_tx.try_send(compressed).ok();
+        encoder.dispatch(&frame_tx, compressed);
     }
 
-    let mut frame_count = 0;
+    //PREVIOUS FRAME, KEPT BY MOVE (SEE capture_loop_xcap) - THIS PATH USED TO ENCODE EVERY TICK UNCONDITIONALLY
+    let mut last_image = Some(first_image);
+    let mut last_encode_time = Instant::now();
+
+    let mut failures = 0u32;
     let mut next_tick = Instant::now() + target_interval;
 
     while running.load(Ordering::Relaxed)
@@ -241,29 +326,52 @@ fn capture_loop_wayshot
             return Ok(());
         }
 
-        if frame_count > (consts::TARGET_FPS * 10)
+        match wayshot.screenshot_single_output(&target_output, true)
         {
-            if let Ok(w) = libwayshot::WayshotConnection::new()
+            Ok(image) =>
             {
-                let o_opt = w.get_all_outputs().iter().find(|o| o.name == target_output.name).cloned();
-                if let Some(o) = o_opt
+                failures = 0;
+
+                let image = image.into_rgba8();
+                let force_encode = last_encode_time.elapsed() >= Duration::from_secs(2);
+                let changed = last_image.as_ref().is_none_or(|previous| previous.as_raw() != image.as_raw());
+
+                if force_encode || changed
                 {
-                    wayshot = w;
-                    target_output = o;
+                    if let Some(compressed) = encoder.encode(image.width(), image.height(), image.as_raw())?
+                    {
+                        encoder.dispatch(&frame_tx, compressed);
+                    }
+
+                    last_image = Some(image);
+                    last_encode_time = Instant::now();
                 }
-            }
-            frame_count = 0;
-        }
-        frame_count += 1;
+            },
 
-        if let Ok(image) = wayshot.screenshot_single_output(&target_output, true)
-        {
-            let image = image.into_rgba8();
-
-            if let Some(compressed) = encode_rgba(&mut encoder, image.width(), image.height(), image.as_raw())?
+            //RECONNECT ONLY WHEN CAPTURE ACTUALLY BREAKS (E.G. THE OUTPUT WAS HOTPLUGGED)
+            Err(_) =>
             {
-                frame_tx.try_send(compressed).ok();
-            }
+                failures += 1;
+
+                if failures >= consts::WAYLAND_RECONNECT_FAILURES
+                {
+                    if let Ok(connection) = libwayshot::WayshotConnection::new()
+                    {
+                        let output = connection.get_all_outputs().iter().find(|o| o.name == target_output.name).cloned();
+                        if let Some(output) = output
+                        {
+                            wayshot = connection;
+                            target_output = output;
+
+                            //FORCE A KEYFRAME - THE VIEWER HAS MISSED FRAMES WHILE WE WERE DOWN
+                            encoder.force_intra_frame();
+                            last_image = None;
+                        }
+                    }
+
+                    failures = 0;
+                }
+            },
         }
 
         sleep_until_next_tick(&mut next_tick, target_interval);

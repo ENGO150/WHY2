@@ -18,19 +18,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::time::Duration;
 
-pub const H264_BITRATE: u32              = 4_000_000;                                       //H.264 ENCODER TARGET BITRATE (4 Mbps)
+pub const H264_BITRATE: u32               = 4_000_000;                                       //H.264 ENCODER TARGET BITRATE (4 Mbps)
 
-pub const BUFFER_SIZE: u32               = 960;                                             //CPAL BUFFER SIZE
-pub const MAX_PACKET_SIZE: usize         = 4000;                                            //MAX OPUS PACKET SIZE
+pub const BUFFER_SIZE: u32                = 960;                                             //CPAL BUFFER SIZE
+pub const MAX_PACKET_SIZE: usize          = 4000;                                            //MAX OPUS PACKET SIZE
 
-pub const FRAME_SAMPLES: usize           = 1920;                                            //OPUS FRAME SAMPLES
+pub const FRAME_SAMPLES: usize            = 1920;                                            //OPUS FRAME SAMPLES
 
-pub const TARGET_FPS: u32                = 30;                                              //TARGET FPS
-pub const FRAME_POLL_INTERVAL: Duration  = Duration::from_millis(1000 / TARGET_FPS as u64); //~30 FPS POLL
+pub const TARGET_FPS: u32                 = 30;                                              //TARGET FPS
+pub const FRAME_POLL_INTERVAL: Duration   = Duration::from_millis(1000 / TARGET_FPS as u64); //~30 FPS POLL
 
-pub const WINIT_SIZE: (u32, u32)         = (1920, 1080);                                    //DEFAULT WINIT WINDOW SIZE
+pub const WINIT_SIZE: (u32, u32)          = (1920, 1080);                                    //DEFAULT WINIT WINDOW SIZE
+pub const WAYLAND_RECONNECT_FAILURES: u32 = 3;                                               //CONSECUTIVE CAPTURE FAILURES BEFORE RECONNECTING
 
-pub const MULTIPLEX_CHANNEL_BOUND: usize = 2;                                               //NETWORK BUFFER (VIDEO/AUDIO HANDOFF)
-pub const CAPTURE_CHANNEL_BOUND: usize   = MULTIPLEX_CHANNEL_BOUND * 4;                     //CAPTURE BUFFER (~160ms)
-pub const PLAYBACK_CHANNEL_BOUND: usize  = MULTIPLEX_CHANNEL_BOUND + 1;                     //PLAYBACK BUFFER (~60ms)
-pub const NETWORK_CHANNEL_BOUND: usize   = MULTIPLEX_CHANNEL_BOUND * 8;                     //NETWORK RECEIVE BUFFER (~320ms)
+pub const MULTIPLEX_CHANNEL_BOUND: usize  = 2;                                               //NETWORK BUFFER (VIDEO/AUDIO HANDOFF)
+pub const CAPTURE_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 4;                     //CAPTURE BUFFER (~160ms)
+pub const PLAYBACK_CHANNEL_BOUND: usize   = MULTIPLEX_CHANNEL_BOUND + 1;                     //PLAYBACK BUFFER (~60ms)
+pub const NETWORK_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 8;                     //NETWORK RECEIVE BUFFER (~320ms)
