@@ -413,6 +413,8 @@ impl App
             //CHANNELS EXIST - A CHANNEL LIVES EXACTLY AS LONG AS SOMEBODY SITS IN IT.
             ClientEvent::ChannelChanged(channel) =>
             {
+                self.clear_messages();
+
                 if let Some(name) = channel.clone() { self.channels.insert(name); }
 
                 //KEEP OUR OWN ROW HONEST UNTIL THE NEXT LIST REFRESHES EVERYBODY ELSE'S

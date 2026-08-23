@@ -146,6 +146,18 @@ impl App
         self.push(Line::from(Span::styled(text.into(), style)));
     }
 
+    //CLEARS THE MESSAGE HISTORY (E.G. ON CHANNEL SWITCH)
+    pub fn clear_messages(&mut self)
+    {
+        self.messages.clear();
+        self.wrapped = None;
+        self.scroll = None;
+        self.unread = 0;
+
+        self.generation += 1;
+        self.dirty = true;
+    }
+
     //DRAINS NEWLY PUSHED LINES AS PLAIN TEXT (USED BY THE PRE-TUI PHASE, WHICH HAS NO FRAME TO DRAW)
     pub fn drain_plain(&mut self) -> Vec<String>
     {
