@@ -157,7 +157,7 @@ impl Palette
 
 //FUNCTIONS
 //PRIVATE
-//WHICH PARAMETER THE CARET IS SITTING ON; None ONCE EVERY PARAMETER HAS BEEN GIVEN
+//WHICH PARAMETER THE CARET IS SITTING ON
 fn active_arg(info: &CommandInfo, tail: &str) -> Option<usize>
 {
     let given = tail.split_whitespace().count();
@@ -165,14 +165,9 @@ fn active_arg(info: &CommandInfo, tail: &str) -> Option<usize>
     //A TRAILING SPACE MEANS THE USER MOVED ON TO THE NEXT PARAMETER
     let index = if tail.ends_with(char::is_whitespace) { given } else { given.saturating_sub(1) };
 
-    //THE LAST PARAMETER SWALLOWS THE REST OF THE LINE (E.G. A PRIVATE MESSAGE)
-    if index >= info.args.len()
-    {
-        if tail.ends_with(char::is_whitespace) { None } else { Some(info.args.len() - 1) }
-    } else
-    {
-        Some(index)
-    }
+    //THE LAST PARAMETER SWALLOWS THE REST OF THE LINE (E.G. A PRIVATE MESSAGE), SO THERE IS
+    //NEVER A PARAMETER BEYOND IT TO ADVANCE TO - KEEP IT ACTIVE NO MATTER HOW MUCH MORE IS TYPED
+    Some(index.min(info.args.len() - 1))
 }
 
 //PUBLIC

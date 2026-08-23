@@ -399,14 +399,17 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
     {
         let mut spans = vec![Span::styled(if Some(row) == selected { "▌" } else { " " }, theme::ACCENT)];
 
+        //THE ACTIVE PARAMETER'S OWN DESCRIPTION TAKES OVER THE COLUMN WHILE IT'S BEING TYPED
+        let description = active.and_then(|i| info.args.get(i)).map_or(info.description, |arg| arg.description);
+
         spans.extend(palette::signature_spans(info, *active));
         spans.push(Span::raw(" ".repeat(signature_width - palette::signature_width(info) + 2)));
-        spans.push(Span::styled(info.description.to_string(), theme::DIM));
+        spans.push(Span::styled(description.to_string(), theme::DIM));
 
         //SHORTCUTS HUG THE RIGHT EDGE, IN THEIR OWN COLUMN
         if shortcut_width > 0
         {
-            let used = 1 + signature_width + 2 + info.description.width();
+            let used = 1 + signature_width + 2 + description.width();
             let shortcut = palette::format_shortcut(info);
 
             spans.push(Span::raw(" ".repeat((inner.width as usize).saturating_sub(used + shortcut_width + 1))));
