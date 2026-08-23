@@ -31,6 +31,9 @@ cargo build --bin why2 --release        # explicit client binary
 cargo build --bin why2-server --no-default-features --features server --release
 ```
 
+The client TUI is built on `ratatui` (feature `crossterm_0_29`, so it reuses the crossterm 0.29
+already in the tree instead of pulling a second backend). The server build has no UI dependencies.
+
 `chat`'s `build.rs` enforces that `client_base`/`client_voice`/`client_screen`/`client` and
 `server` are never enabled together, and that the internal `chat` feature is never enabled
 directly (only via `client*` or `server`) — it will `panic!` with an explanatory message if you
@@ -144,25 +147,56 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   server user store (`server_users.toml`) and server keypair storage
   (`server_keys/{private,public,private_pq,public_pq}`), all under `WHY2_CONFIG_DIR` (defaults to
   `~/.config/WHY2`, baked in by `build.rs` unless overridden at build time).
-- **`bin/client/`** — the TUI client entrypoint (`mod.rs`), terminal UI (`ui.rs`, `crossterm`
-  based), and color handling (`colors.rs`). The input loop is async over `crossterm::EventStream`;
-  a separate task drains the `ClientEvent` channel into `ui::draw_event`.
+- **`bin/client/`** — the client entrypoint (`mod.rs`), the full-screen TUI (`tui/`, ratatui over
+  the crossterm backend), and color handling (`colors.rs`).
 
-  **The prompt-redraw protocol is stateful — read this before touching anything that prints.**
-  The screen invariant is: the last output block, then one blank line, then the `>>> ` prompt.
-  Because raw mode echoes no newline on Enter, output handlers erase the prompt line before
-  drawing: `clear_lines(2)` (the prompt line *and* the blank above it) is the normal case, so
-  consecutive messages pack together without gaps.
-  `options::get/set_extra_space()` is the exception flag. Block-style output (`/list`, `/files`,
-  `/screens`, `/help`, `/info`) ends with a deliberate trailing blank line that must survive, so it
-  sets the flag; the *next* thing that prints must first emit one extra newline so its
-  `clear_lines(2)` eats [that newline + the prompt] instead of [the prompt + the blank], then reset
-  the flag. `network::client::listen_server` does this at the top of its loop for server-driven
-  output, and `run_client` does it locally for commands it handles itself.
-  Two rules follow: a packet arm that prints nothing and `continue`s (`Version`, `Upload`,
-  `Download`) must be excluded from the extra-space emission — see the `silent` check — because it
-  never reaches the reset at the bottom of the loop and would leak the flag onto the next packet;
-  and any locally handled command must consume the flag before calling `clear_lines`.
+  **The client renders through one event loop — there is no printing anywhere else.**
+  `tui::run` (`tui/mod.rs`) is a single `tokio::select!` over three sources: the
+  `crossterm::EventStream` (keys, resize, mouse wheel), the `mpsc::Receiver<ClientEvent>`, and a
+  33 ms redraw tick. `ClientEvent` handling (`App::apply`, `tui/event.rs`) is **pure state
+  mutation** — it appends `Line`s to `App::messages`, updates the sidebar/voice roster or sets
+  `should_quit`, and never touches the terminal. The tick sets nothing and draws only when
+  `App::dirty` is set, which is what keeps `VoiceActivity` (one event per voice packet) from
+  repainting hundreds of times a second. Consequences for new code:
+  - Never `println!`/`print!` after the TUI is entered. Anything with something to say sends a
+    `ClientEvent` (from the network layer) or calls `App::push*` (from a locally handled command in
+    `mod.rs::submit`). The one pre-TUI phase — version check, IP prompt, connection failure — runs
+    on the normal screen before `TerminalGuard::enter`, and uses `flush_plain`.
+  - C libraries that write to fd 2 (cpal/ALSA, openh264/xcap) corrupt the frame; the existing
+    `gag::Gag::stderr()` wrappers in `network/voice/client` must stay.
+  - `tui::install_panic_hook` is called first thing in `main` and is **not optional**: the release
+    profile sets `panic = "abort"`, so `TerminalGuard::drop` never runs on a panic and the hook is
+    the only path that leaves the alternate screen.
+  - Fatal events (`TofuError`, `Quit`) do not `process::exit` from the draw path. They call
+    `App::quit(code, message)`; the loop breaks, the guard restores the terminal, and `run_client`
+    prints the message on the normal screen.
+  - The message pane is wrapped by `state::wrap_line` (cached per width + history generation) rather
+    than by `Paragraph`, so the scroll offset is exact. `App::scroll == None` means stuck to the
+    bottom.
+  - `config::read_config` re-parses the TOML on every call — read config-driven styling through
+    `App::theme` (`tui/theme.rs`), and call `Theme::reload` after a `config::client_write`.
+  - `tui/input.rs`'s `InputBuffer` is the single source of truth for the input line (there is no
+    global partial-input state), and `tui/palette.rs` drives the slash-command popup straight off
+    `command::COMMAND_LIST` — never duplicate the trigger table. The popup has two modes
+    (`PaletteMode`): a filtered command menu while the command word is still being typed, and a
+    single-row signature hint highlighting the parameter the caret is on once it is finished.
+  - The sidebar is fed by events, never by polling. `App::refresh_online` (a `PacketCode::List`
+    request drained on the redraw tick) is only set for things that genuinely change the roster —
+    `Authenticated`, `Join`, `Leave`. **A channel switch must not trigger one**: it would land
+    inside the server's `min_message_delay` window right behind the `/channel` packet and earn a
+    `SpamWarning` (three of those disconnect). The channel list is maintained from the globally
+    broadcast `ChannelCreated`/`ChannelDestroyed` packets plus whatever the last `List` showed —
+    a channel exists exactly as long as somebody is in it, so the lobby is not one and is not
+    listed.
+  - Block-command output (`/list`, `/files`, `/screens`, `/help`, `/info`) is a tree, not a table:
+    every row opens with `tui::branch` (`├─`/`╰─`, `│` continuing the trunk past a non-last owner's
+    files in `/files`) in `theme::BORDER`, then a right-aligned dim id column, then the name. Keep
+    new block output to that shape — boxed tables were tried and rejected, and anything wider than
+    the message pane is re-wrapped by it and comes out as rubble.
+  - Transient prompts belong in the chrome, not the history. The username/password prompts render
+    as the input box's title (plus `App::login_hint`) and vanish once answered; nothing pushes them
+    into `App::messages`. Block commands (`/help`, `/list`, `/files`, …) end without a trailing
+    blank line — the styled headings already separate them.
 - **`bin/server.rs`** — headless server entrypoint (`tokio::main`), wires together `network::server`,
   `network::file::server`, `network::screen::server`, `network::voice::server`.
 - **`command.rs` / `options.rs`** — in-chat slash commands (`/pm`, `/channel`, `/voice`, etc.) and
