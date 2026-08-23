@@ -59,9 +59,6 @@ static KEYS: RwLock<Option<SharedKeys>> = RwLock::new(None); //SHARED SYMMETRIC 
 static ASKING_PASSWORD: AtomicBool = AtomicBool::new(false); //CLIENT IS SENDING PASSWORD (DISABLE ECHO)
 
 #[cfg(feature = "client_base")]
-static EXTRA_SPACE: AtomicBool = AtomicBool::new(false); //CLIENT DISPLAYED SOME MENU (/help ETC.), ADD EXTRA SPACE ON NEXT MESSAGE
-
-#[cfg(feature = "client_base")]
 static LOGIN_STATE: RwLock<LoginState> = RwLock::new(LoginState::None);
 
 #[cfg(feature = "client_base")]
@@ -141,19 +138,6 @@ pub fn set_asking_password(value: bool) //SET ASKING_PASSWORD
 pub fn get_asking_password() -> bool //GET ASKING_PASSWORD
 {
     ASKING_PASSWORD.load(Ordering::Relaxed)
-}
-
-//ADD EXTRA SPACE
-#[cfg(feature = "client_base")]
-pub fn set_extra_space(value: bool) //SET EXTRA_SPACE
-{
-    EXTRA_SPACE.store(value, Ordering::Relaxed);
-}
-
-#[cfg(feature = "client_base")]
-pub fn get_extra_space() -> bool //GET EXTRA_SPACE
-{
-    EXTRA_SPACE.load(Ordering::Relaxed)
 }
 
 //LOGIN STATE

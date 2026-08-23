@@ -71,7 +71,6 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
 
     //LOG
     tx.send(ClientEvent::Upload(filename.clone())).await.unwrap();
-    tx.send(ClientEvent::Prompt).await.unwrap();
 
     //LOCAL SEQ COUNTER
     let mut seq = 0usize;
@@ -137,7 +136,6 @@ pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
 
     //LOG
     tx.send(ClientEvent::Download(filename.clone())).await.unwrap();
-    tx.send(ClientEvent::Prompt).await.unwrap();
 
     //INIT COUNTERS
     let mut current_size = 0u64;
@@ -180,7 +178,6 @@ pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
                     ClientEvent::DownloadFailed(filename)
                 }).await.unwrap();
 
-                tx.send(ClientEvent::Prompt).await.unwrap();
                 return;
             }
         }

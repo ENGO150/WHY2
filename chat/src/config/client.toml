@@ -35,5 +35,8 @@ disable_colors = false # Disable message colors
 username_color = "none" # Color of username (change via command)
 message_color = "none" # Color of message (change via command)
 
+# Interface
+mouse_capture = true # Capture the mouse for wheel scrolling (disables the terminal's own drag-select)
+
 # Other
 show_id = false # Show client IDs in chat

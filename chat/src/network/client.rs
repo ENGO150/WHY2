@@ -105,7 +105,6 @@ pub enum ClientEvent
     Authenticated,                                 //LOGIN SUCCESSFUL
     Connected(String),                             //SUCCESSFUL CONNECTION MESSAGE
     Message(String, String, usize, MessageColors), //RECEIVED MESSAGE
-    Prompt,                                        //">>>" PROMPT
     PrivateMessageSent(String, usize, String),     //SENT PM
     PrivateMessageRecv(String, usize, String),     //RECEIVED PM
     TofuError(TofuCode),                           //TOFU VERIFICATION FAILED
@@ -113,9 +112,9 @@ pub enum ClientEvent
     VoiceActivity(Vec<VoiceUser>),                 //VOICE OVERLAY
     Join(String),                                  //CLIENT CONNECTED
     Leave(String),                                 //CLIENT DISCONNECTED
+    ChannelChanged(Option<String>),                //WE SWITCHED CHANNEL
     ChannelCreated(String),                        //CHANNEL CREATED
     ChannelDestroyed(String),                      //CHANNEL ABANDONED
-    Clear(usize),                                  //CLEAR n LINES
     InvalidUsage,                                  //INVALID COMMAND USAGE
     VersionFailed,                                 //FETCHING VERSIONS FAILED
     VersionMismatch(String, String),               //MISMATCH GIT HASH
@@ -136,7 +135,6 @@ pub enum ClientEvent
     ScreenFailed(String),                          //SCREEN CAPTURE FAILED
     Attach(String),                                //ATTACHED SCREENSHARE
     Deattach(String),                              //DEATTACHED SCREENSHARE
-    ExtraSpace,                                    //JUST RANDOM NEWLINE
     IncompatibleVersion(String, String),           //INCOMPATIBLE SERVER VERSION
     UsernameRejected,                              //USERNAME REJECTED BY SERVER
     PasswordRejected(u64),                         //PASSWORD REJECTED BY SERVER
@@ -260,9 +258,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
     let mut disabled_registration = false; //PRINT "Registration disabled!"
 
-    //FORMATTING SHIT
+    //FIRST Join PACKET CARRIES OUR OWN USERNAME
+    #[cfg(feature = "client_voice")]
     let mut first_message = true;
-    let mut extra_space: bool;
 
     //CONNECTION PROPERTIES
     #[cfg(feature = "client_voice")]
@@ -293,20 +291,6 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             network::send(&mut *streams.1.lock().await, PacketCode::KeepAlive, options::get_keys().as_ref()).await;
             continue;
         }
-
-        //CODES WHICH PRINT NOTHING (THEY MUST NEITHER CONSUME THE EXTRA SPACE NOR REDRAW THE PROMPT)
-        let silent = matches!
-        (
-            read,
-            PacketCode::Version { .. } |
-            PacketCode::Upload { .. } |
-            PacketCode::Download { .. }
-        );
-
-        extra_space = false; //RESET EXTRA SPACE
-
-        //EXTRA SPACE
-        if !silent && options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).await.unwrap(); }
 
         //CODES
         match read
@@ -367,8 +351,6 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //PICK_USERNAME CODE - guess what
             PacketCode::Username { .. } =>
             {
-                tx.send(ClientEvent::Clear(2)).await.unwrap();
-
                 //INVALID UNAME
                 if invalid_username
                 {
@@ -386,7 +368,6 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //REGISTER
             PacketCode::PasswordR { .. } =>
             {
-                tx.send(ClientEvent::Clear(3)).await.unwrap();
                 options::set_asking_password(true);
 
                 //INVALID PASS
@@ -415,11 +396,14 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 tx.send(ClientEvent::Authenticated).await.unwrap();
 
-                //SET SERVER-SIDE ID
+                //SET SERVER-SIDE ID (ONLY VOICE CARES WHO WE ARE)
                 #[cfg(feature = "client_voice")]
                 {
                     id = sid;
                 }
+
+                #[cfg(not(feature = "client_voice"))]
+                let _ = sid;
 
                 //ALLOW MESSAGE HISTORY & COMMANDS
                 options::set_sending_messages(true);
@@ -429,17 +413,11 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //JOIN MESSAGE (CLIENT CONNECTED)
             PacketCode::Join { username: user } =>
             {
-                tx.send(ClientEvent::Clear(2)).await.unwrap();
-
+                #[cfg(feature = "client_voice")]
                 if first_message
                 {
-                    tx.send(ClientEvent::ExtraSpace).await.unwrap();
                     first_message = false;
-
-                    #[cfg(feature = "client_voice")]
-                    {
-                        username = Some(user.clone());
-                    }
+                    username = Some(user.clone());
                 }
 
                 tx.send(ClientEvent::Join(user)).await.unwrap();
@@ -452,6 +430,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                 #[cfg(feature = "client_voice")]
                 voice_client::remove_consumer(&id);
+
+                #[cfg(not(feature = "client_voice"))]
+                let _ = id;
             },
 
             //CHANNEL CHANGE
@@ -461,9 +442,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 #[cfg(feature = "client_voice")]
                 voice_client::remove_all_consumers();
 
-                options::set_channel(channel.unwrap_or_else(|| String::new()));
+                options::set_channel(channel.clone().unwrap_or_default());
 
-                tx.send(ClientEvent::Clear(1)).await.unwrap();
+                tx.send(ClientEvent::ChannelChanged(channel)).await.unwrap();
             },
 
             //CHANNEL CREATED
@@ -533,10 +514,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //LIST OF ONLINE USERS
             PacketCode::List { users } =>
             {
-                if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).await.unwrap(); }
                 tx.send(ClientEvent::List(users.unwrap())).await.unwrap();
-                extra_space = true;
-                options::set_extra_space(true);
             },
 
             //UPLOAD APPROVAL
@@ -568,14 +546,6 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 if let Some(users) = users
                 {
-                    //PARSE JSON
-                    if !users.is_empty()
-                    {
-                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).await.unwrap(); }
-                        extra_space = true;
-                        options::set_extra_space(true);
-                    }
-
                     tx.send(ClientEvent::Files(users)).await.unwrap();
                 }
             },
@@ -585,13 +555,6 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 if let Some(users) = users
                 {
-                    if !users.is_empty()
-                    {
-                        if !options::get_extra_space() { tx.send(ClientEvent::ExtraSpace).await.unwrap(); }
-                        extra_space = true;
-                        options::set_extra_space(true);
-                    }
-
                     tx.send(ClientEvent::Screens(users)).await.unwrap();
                 }
             },
@@ -690,9 +653,5 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
             _ => continue //EITHER INVALID CODE OR A KEY EXCHANGE CODE
         }
-
-        //PRINT INPUT PROMPT
-        tx.send(ClientEvent::Prompt).await.unwrap();
-        if !extra_space { options::set_extra_space(false); } //DISABLE EXTRA SPACE
     }
 }
