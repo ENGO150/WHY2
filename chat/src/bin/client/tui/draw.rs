@@ -73,6 +73,9 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     let area = frame.area();
     let masked = options::get_asking_password();
 
+    //PAINT THE BASE FOREGROUND FIRST
+    frame.buffer_mut().set_style(area, theme::TEXT);
+
     //MEASURE THE INPUT FIRST - THE MAIN AREA GETS WHATEVER IS LEFT
     let input_width = area.width.saturating_sub(4).max(1); //BORDERS + "> "
     let (input_lines, cursor) = app.input.render(input_width, masked);
@@ -376,7 +379,9 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
         height,
     };
 
-    frame.render_widget(Clear, popup);
+    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS, SO THE BASE FOREGROUND GOES BACK ON
+
+    frame.buffer_mut().set_style(popup, theme::TEXT);
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)

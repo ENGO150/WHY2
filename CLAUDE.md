@@ -175,6 +175,15 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     bottom.
   - `config::read_config` re-parses the TOML on every call — read config-driven styling through
     `App::theme` (`tui/theme.rs`), and call `Theme::reload` after a `config::client_write`.
+  - Every chrome color in `tui/theme.rs` is a `Color::Rgb` — never a named ANSI color, and never a
+    `Color::Indexed` either. Both of those are slots the user's terminal scheme fills in, so
+    `Color::Cyan` renders sky blue in one theme and swamp green in the next, and schemes routinely
+    redefine the upper greys of the 256-color cube as well; the constants are the reference palette
+    so every truecolor terminal draws the client identically. `draw::draw` also paints `theme::TEXT`
+    over the whole frame first (and over the palette popup again, since `Clear` resets those cells)
+    so unstyled spans do not inherit the terminal's default foreground. Scheme-relative colors
+    survive in exactly one place: `colors.rs`, where they are the user's own `/color`/`/ucolor`
+    choice.
   - `tui/input.rs`'s `InputBuffer` is the single source of truth for the input line (there is no
     global partial-input state), and `tui/palette.rs` drives the slash-command popup straight off
     `command::COMMAND_LIST` — never duplicate the trigger table. The popup has two modes

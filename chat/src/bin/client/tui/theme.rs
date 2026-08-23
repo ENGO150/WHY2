@@ -65,19 +65,21 @@ impl Theme
 }
 
 //CONSTS
-pub const BORDER: Style = Style::new().fg(Color::DarkGray);
-pub const BORDER_ACTIVE: Style = Style::new().fg(Color::Cyan);
-pub const TITLE: Style = Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD);
-pub const DIM: Style = Style::new().fg(Color::DarkGray);
-pub const ACCENT: Style = Style::new().fg(Color::Cyan);
-pub const NOTICE: Style = Style::new().fg(Color::Yellow);
-pub const ERROR: Style = Style::new().fg(Color::Red);
-pub const OK: Style = Style::new().fg(Color::Green);
-pub const SPEAKING: Style = Style::new().fg(Color::Green).add_modifier(Modifier::BOLD);
-pub const SELECTED: Style = Style::new().bg(Color::Indexed(23)); //DEEP TEAL
+pub const TEXT: Style = Style::new().fg(Color::Rgb(0xEE, 0xD1, 0xD6));          //WARM OFF-WHITE - THE BASE FOREGROUND
+pub const BORDER: Style = Style::new().fg(Color::Rgb(0xCA, 0xB4, 0xB7));        //MUTED ROSE GREY
+pub const BORDER_ACTIVE: Style = Style::new().fg(Color::Rgb(0x9D, 0xCE, 0xFF)); //SKY BLUE
+pub const TITLE: Style = Style::new().fg(Color::Rgb(0x9D, 0xCE, 0xFF)).add_modifier(Modifier::BOLD);
+pub const DIM: Style = Style::new().fg(Color::Rgb(0xCA, 0xB4, 0xB7));
+pub const ACCENT: Style = Style::new().fg(Color::Rgb(0x9D, 0xCE, 0xFF));
+pub const NOTICE: Style = Style::new().fg(Color::Rgb(0xFF, 0xDD, 0xE2));        //PALE PINK
+pub const ERROR: Style = Style::new().fg(Color::Rgb(0xF6, 0x46, 0xC6));         //HOT MAGENTA
+pub const OK: Style = Style::new().fg(Color::Rgb(0xFF, 0xBB, 0xBA));            //SALMON
+pub const SPEAKING: Style = Style::new().fg(Color::Rgb(0xFF, 0xBB, 0xBA)).add_modifier(Modifier::BOLD);
 
-pub const ARG_REQUIRED: Style = Style::new().fg(Color::Indexed(180)); //SOFT SAND
-pub const ARG_OPTIONAL: Style = Style::new().fg(Color::Indexed(244)); //MID GREY
-pub const ARG_ACTIVE: Style = Style::new().fg(Color::Indexed(215))    //WARM AMBER - THE PARAMETER BEING TYPED
+pub const SELECTED: Style = Style::new().bg(Color::Rgb(0x00, 0x5F, 0x5F));
+
+pub const ARG_REQUIRED: Style = Style::new().fg(Color::Rgb(0xD7, 0xAF, 0x87));  //SOFT SAND
+pub const ARG_OPTIONAL: Style = Style::new().fg(Color::Rgb(0xFF, 0xB4, 0xAB));  //FADED CORAL
+pub const ARG_ACTIVE: Style = Style::new().fg(Color::Rgb(0xFF, 0xAF, 0x5F))     //WARM AMBER - THE PARAMETER BEING TYPED
     .add_modifier(Modifier::BOLD)
     .add_modifier(Modifier::UNDERLINED);
