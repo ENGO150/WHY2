@@ -67,6 +67,7 @@ pub enum Command
 pub struct CommandArg //COMMAND PARAMETER
 {
     pub name: &'static str,
+    pub description: &'static str,
     pub required: bool,
 }
 
@@ -95,7 +96,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Info,
         triggers: &[ "INFO", "COMMAND", "MAN" ],
         shortcut: None,
-        args: &[CommandArg { name: "COMMAND", required: true }],
+        args:
+        &[
+            CommandArg
+            {
+                name: "COMMAND",
+                description: "Target command",
+                required: true,
+            },
+        ],
         description: "Shows command info",
     },
 
@@ -115,7 +124,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Mute,
         triggers: &[ "MUTE", "UNMUTE", "SILENCE", "STFU" ],
         shortcut: Some('s'),
-        args: &[CommandArg { name: "ID", required: false }],
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "ID of target user",
+                required: false,
+            },
+        ],
         description: "Toggle-mutes user/yourself",
     },
 
@@ -124,7 +141,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Channel,
         triggers: &[ "CHANNEL", "SWITCH", "CHECKOUT", "AREA" ],
         shortcut: None,
-        args: &[CommandArg { name: "NAME", required: false }],
+        args:
+        &[
+            CommandArg
+            {
+                name: "NAME",
+                description: "Name of channel",
+                required: false,
+            },
+        ],
         description: "Switches to channel/lobby if NAME is omitted",
     },
 
@@ -133,7 +158,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Upload,
         triggers: &[ "UPLOAD", "FILEUP", "PUSH", "UP" ],
         shortcut: None,
-        args: &[CommandArg { name: "PATH", required: true }],
+        args:
+        &[
+            CommandArg
+            {
+                name: "PATH",
+                description: "Path of target file",
+                required: true,
+            },
+        ],
         description: "Uploads file to server",
     },
 
@@ -144,8 +177,18 @@ pub const COMMAND_LIST: &[CommandInfo] =
         shortcut: None,
         args:
         &[
-            CommandArg { name: "USER ID", required: true },
-            CommandArg { name: "FILE ID", required: true },
+            CommandArg
+            {
+                name: "USER ID",
+                description: "ID of uploader",
+                required: true,
+            },
+            CommandArg
+            {
+                name: "FILE ID",
+                description: "ID of target file",
+                required: true,
+            },
         ],
         description: "Downloads file from server",
     },
@@ -166,7 +209,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Attach,
         triggers: &[ "ATTACH", "WATCH", "DISPLAY", "JOIN" ],
         shortcut: None,
-        args: &[CommandArg { name: "ID", required: true }],
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "ID of screensharing user",
+                required: true,
+            },
+        ],
         description: "Attaches client screenshare.",
     },
 
@@ -215,8 +266,18 @@ pub const COMMAND_LIST: &[CommandInfo] =
         shortcut: None,
         args:
         &[
-            CommandArg { name: "ID", required: true },
-            CommandArg { name: "MESSAGE", required: true },
+            CommandArg
+            {
+                name: "ID",
+                description: "ID of target user",
+                required: true,
+            },
+            CommandArg
+            {
+                name: "MESSAGE",
+                description: "Message content",
+                required: true,
+            },
         ],
         description: "Sends private message",
     },
@@ -226,7 +287,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::UsernameColor,
         triggers: &[ "UCOLOR", "USERNAME" ],
         shortcut: None,
-        args: &[CommandArg { name: "COLOR", required: true }],
+        args:
+        &[
+            CommandArg
+            {
+                name: "COLOR",
+                description: "Target color",
+                required: true,
+            },
+        ],
         description: "Sets color of username",
     },
 
@@ -235,7 +304,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::MessageColor,
         triggers: &[ "COLOR", "MESSAGE" ],
         shortcut: None,
-        args: &[CommandArg { name: "COLOR", required: true }],
+        args:
+        &[
+            CommandArg
+            {
+                name: "COLOR",
+                description: "Target color",
+                required: true,
+            },
+        ],
         description: "Sets color of message",
     },
 
