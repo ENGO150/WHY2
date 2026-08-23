@@ -47,9 +47,9 @@ use crate::
 
 use super::
 {
-    palette,
-    state::App,
     theme,
+    state::App,
+    palette::{ self, PaletteMode },
 };
 
 //CONSTS
@@ -347,9 +347,9 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
     //(COMMAND, PARAMETER TO HIGHLIGHT) PER ROW, PLUS WHICH ROW IS SELECTED
     let (entries, selected, title) = match &app.palette.mode
     {
-        palette::PaletteMode::Hidden => return,
+        PaletteMode::Hidden => return,
 
-        palette::PaletteMode::Menu(matches, selected) =>
+        PaletteMode::Menu(matches, selected) =>
         {
             //KEEP THE SELECTION IN VIEW
             let first = selected.saturating_sub(palette::MAX_ROWS.saturating_sub(1));
@@ -363,7 +363,7 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
             (entries, Some(selected - first), " Commands ")
         },
 
-        palette::PaletteMode::Signature(info, active) => (vec![(*info, *active)], None, " Parameters "),
+        PaletteMode::Signature(info, active) => (vec![(*info, *active)], None, " Parameters "),
     };
 
     let height = entries.len() as u16 + 2;
