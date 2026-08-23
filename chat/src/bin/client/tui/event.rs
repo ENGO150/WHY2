@@ -27,7 +27,11 @@ use crate::
     network::client::ClientEvent,
 };
 
-use super::{ branch, state::App, theme };
+use super::
+{
+    theme,
+    state::App,
+};
 
 //IMPLEMENTATIONS
 impl App
@@ -213,7 +217,7 @@ impl App
 
                     let rows = self.online.iter().enumerate().map(|(index, user)|
                     {
-                        let mut spans = vec![Span::styled(branch(index == last), theme::BORDER)];
+                        let mut spans = vec![Span::styled(super::branch(index == last), theme::BORDER)];
 
                         spans.extend(id_column(user.id, width));
                         spans.push(Span::raw(user.username.clone()));
@@ -279,7 +283,7 @@ impl App
 
                     for (index, user) in users.into_iter().enumerate()
                     {
-                        let mut spans = vec![Span::styled(branch(index == last), theme::BORDER)];
+                        let mut spans = vec![Span::styled(super::branch(index == last), theme::BORDER)];
 
                         spans.extend(id_column(user.id, width));
                         spans.push(Span::raw(user.username.clone()));
@@ -293,7 +297,7 @@ impl App
 
                         for (file, (filename, file_id)) in user.upload.into_iter().enumerate()
                         {
-                            let mut spans = vec![Span::styled(format!("{trunk}{}", branch(file == last_file)), theme::BORDER)];
+                            let mut spans = vec![Span::styled(format!("{trunk}{}", super::branch(file == last_file)), theme::BORDER)];
 
                             spans.extend(id_column(file_id, file_width));
                             spans.push(Span::raw(filename));
@@ -321,7 +325,7 @@ impl App
 
                     for (index, user) in users.into_iter().enumerate()
                     {
-                        let mut spans = vec![Span::styled(branch(index == last), theme::BORDER)];
+                        let mut spans = vec![Span::styled(super::branch(index == last), theme::BORDER)];
 
                         spans.extend(id_column(user.id, width));
                         spans.push(Span::raw(user.username));

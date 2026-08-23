@@ -21,7 +21,7 @@ use ratatui::text::{ Line, Span };
 use unicode_width::UnicodeWidthChar;
 
 //STRUCTS
-pub struct InputBuffer //MULTI-LINE INPUT BUFFER (SINGLE SOURCE OF TRUTH, REPLACES THE OLD INPUT_READ GLOBAL)
+pub struct InputBuffer //MULTI-LINE INPUT BUFFER
 {
     chars: Vec<char>,
     cursor: usize,

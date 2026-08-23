@@ -26,9 +26,14 @@ pub mod theme;
 
 use std::
 {
-    io::{ self, Stdout, Write },
     sync::Arc,
     time::Duration,
+    io::
+    {
+        self,
+        Stdout,
+        Write,
+    },
 };
 
 use crossterm::
@@ -57,13 +62,23 @@ use ratatui::{ Terminal, backend::CrosstermBackend };
 use tokio::
 {
     net::tcp::OwnedWriteHalf,
-    sync::{ Mutex as MutexAsync, mpsc::Receiver },
-    time::{ MissedTickBehavior, interval },
+    time::{ self, MissedTickBehavior },
+    sync::
+    {
+        mpsc::Receiver,
+        Mutex as MutexAsync,
+    },
 };
 
 use tokio_stream::StreamExt;
 
-use crate::{ command, config, options, network::client::ClientEvent };
+use crate::
+{
+    command,
+    config,
+    options,
+    network::client::ClientEvent,
+};
 
 pub use state::App;
 
@@ -166,7 +181,7 @@ pub async fn run
 )
 {
     let mut reader = EventStream::new();
-    let mut tick = interval(REDRAW_INTERVAL);
+    let mut tick = time::interval(REDRAW_INTERVAL);
     tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
     let mut events_open = true;

@@ -30,9 +30,9 @@ pub const MAX_ROWS: usize = 8; //VISIBLE POPUP ROWS
 //ENUMS
 pub enum PaletteMode
 {
-    Hidden,                                                       //NOTHING TO SHOW
-    Menu(Vec<&'static CommandInfo>, usize),                       //MATCHING COMMANDS + SELECTION
-    Signature(&'static CommandInfo, Option<usize>),               //ONE COMMAND + THE PARAMETER BEING TYPED
+    Hidden,                                         //NOTHING TO SHOW
+    Menu(Vec<&'static CommandInfo>, usize),         //MATCHING COMMANDS + SELECTION
+    Signature(&'static CommandInfo, Option<usize>), //ONE COMMAND + THE PARAMETER BEING TYPED
 }
 
 //STRUCTS

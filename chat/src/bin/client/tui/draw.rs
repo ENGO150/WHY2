@@ -19,7 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use ratatui::
 {
     Frame,
-    layout::{ Constraint, Layout, Position, Rect },
     style::Style,
     text::{ Line, Span },
     widgets::
@@ -29,11 +28,22 @@ use ratatui::
         Clear,
         Paragraph,
     },
+    layout::
+    {
+        Constraint,
+        Layout,
+        Position,
+        Rect,
+    },
 };
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::{ command, options };
+use crate::
+{
+    command,
+    options::{ self, LoginState },
+};
 
 use super::
 {
@@ -43,11 +53,11 @@ use super::
 };
 
 //CONSTS
-const SIDEBAR_WIDTH: u16 = 24;
+const SIDEBAR_WIDTH: u16          = 24;
 const SIDEBAR_MIN_TERM_WIDTH: u16 = 70; //BELOW THIS THE SIDEBAR IS DROPPED AND MESSAGES GO FULL-WIDTH
-const INPUT_MIN_HEIGHT: u16 = 3;
-const INPUT_MAX_HEIGHT: u16 = 8;
-const CHANNELS_MIN_HEIGHT: u16 = 12; //SIDEBAR ROWS NEEDED BEFORE THE CHANNEL LIST IS WORTH SHOWING
+const INPUT_MIN_HEIGHT: u16       = 3;
+const INPUT_MAX_HEIGHT: u16       = 8;
+const CHANNELS_MIN_HEIGHT: u16    = 12; //SIDEBAR ROWS NEEDED BEFORE THE CHANNEL LIST IS WORTH SHOWING
 
 //ENUMS
 enum Panel //SIDEBAR SECTIONS, IN THE ORDER THEY ARE STACKED
@@ -97,7 +107,7 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 //PRIVATE
 fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 {
-    //WHY2 ── <SERVER NAME> ── <ADDRESS AS TYPED> ── SOCKS5, SKIPPING WHATEVER WE DON'T KNOW YET
+    //WHY2 ── <SERVER NAME> ── <ADDRESS AS TYPED> ── SOCKS5
     let mut parts = vec![String::from("WHY2")];
 
     if !app.server_name.is_empty() { parts.push(app.server_name.clone()); }
@@ -146,7 +156,6 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect)
 
     let limit = area.height.saturating_sub(3).max(3);
 
-    //THE LOBBY IS NOT A CHANNEL, SO WITH NOBODY IN A NAMED ONE THERE IS NOTHING TO LIST
     if area.height >= CHANNELS_MIN_HEIGHT && !app.channels.is_empty()
     {
         constraints.push(Constraint::Length((app.channels.len() as u16 + 2).clamp(3, limit)));
@@ -274,10 +283,10 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
     //THE LOGIN PROMPT LIVES HERE, NOT IN THE HISTORY - IT DISAPPEARS THE MOMENT IT IS ANSWERED
     let prompt = match options::get_login_state()
     {
-        options::LoginState::Username => "Username",
-        options::LoginState::PasswordLogin => "Password (login)",
-        options::LoginState::PasswordRegister => "Password (register)",
-        options::LoginState::None => "",
+        LoginState::Username => "Username",
+        LoginState::PasswordLogin => "Password (login)",
+        LoginState::PasswordRegister => "Password (register)",
+        LoginState::None => "",
     };
 
     let title = match (prompt, app.login_hint.as_deref())

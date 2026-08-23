@@ -18,15 +18,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use ratatui::
 {
-    style::{ Color, Modifier, Style },
     text::Span,
     backend::FromCrossterm,
+    style::
+    {
+        Color,
+        Modifier,
+        Style,
+    },
 };
 
 use crate::{ colors, config };
 
 //STRUCTS
-pub struct Theme //CACHED CONFIG-DRIVEN STYLING (config::read_config RE-PARSES THE TOML, NEVER CALL IT PER FRAME)
+pub struct Theme //CACHED CONFIG-DRIVEN STYLING
 {
     pub disable_colors: bool,
     pub show_id: bool,
@@ -69,13 +74,8 @@ pub const NOTICE: Style = Style::new().fg(Color::Yellow);
 pub const ERROR: Style = Style::new().fg(Color::Red);
 pub const OK: Style = Style::new().fg(Color::Green);
 pub const SPEAKING: Style = Style::new().fg(Color::Green).add_modifier(Modifier::BOLD);
-//BACKGROUND ONLY, SO THE ROW KEEPS ITS OWN COLORS. A GREY WASH READS AS A BLACK BAR ON A DARK
-//TERMINAL, SO THE SELECTION IS TINTED TOWARDS THE CYAN ACCENT INSTEAD - A HUE DIFFERENCE, NOT A
-//BRIGHTNESS ONE, WHICH STAYS SUBTLE WHATEVER THE BACKGROUND IS.
 pub const SELECTED: Style = Style::new().bg(Color::Indexed(23)); //DEEP TEAL
 
-//THE PALETTE USES 256-COLOR INDICES RATHER THAN THE SIXTEEN NAMED ANSI COLORS: THOSE ARE REMAPPED BY
-//THE TERMINAL'S OWN SCHEME (MAGENTA COMES OUT A VIVID RED IN PLENTY OF THEM), THESE DO NOT MOVE.
 pub const ARG_REQUIRED: Style = Style::new().fg(Color::Indexed(180)); //SOFT SAND
 pub const ARG_OPTIONAL: Style = Style::new().fg(Color::Indexed(244)); //MID GREY
 pub const ARG_ACTIVE: Style = Style::new().fg(Color::Indexed(215))    //WARM AMBER - THE PARAMETER BEING TYPED
