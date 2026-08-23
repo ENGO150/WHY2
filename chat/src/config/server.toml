@@ -19,12 +19,12 @@ server_ip = "0.0.0.0" # Server address
 server_port = 1204 # Server port
 
 # Voice Chat
-enable_voice_chat = true # Enable VoIP (changing requires restart)
+enable_voice_chat = true # Enable VoIP
 enable_screenshare = true # Enable screensharing
 
 # Appearance
 server_name = "WHY2 Server" # Name of the server
-server_username = "server" # Username server will use (changing requires restart)
+server_username = "server" # Username server will use
 
 # Cleanup
 communication_time = 300 # Seconds waiting for client message before stopping communication (+- 5 seconds)
