@@ -88,6 +88,9 @@ impl App
             //REFUSING (OR FAILING) THE CHECK JUST ENDS THE SESSION - THE PROMPT ALREADY SAID WHY
             ClientEvent::TofuError => self.quit(1, None),
 
+            //THE SERVER WENT AWAY BETWEEN THE TWO CONNECTIONS - THE SESSION IS OVER, SILENTLY
+            ClientEvent::ReconnectFailed => self.quit(1, None),
+
             ClientEvent::TofuSkip(hash) =>
             {
                 self.push_styled("SECURITY WARNING: UNKNOWN SERVER IDENTITY", theme::ERROR);

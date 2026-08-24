@@ -111,6 +111,13 @@ pub struct VoiceUser
 }
 
 //ENUMS
+enum Handshake
+{
+    Ready,     //KEYS AGREED - THE SESSION CAN START
+    Reconnect, //THE USER JUST PINNED THIS KEY - START OVER SO THE SESSION IS ONE THE PIN WAS CHECKED AGAINST
+    Failed,    //REFUSED - THE CLIENT IS DONE
+}
+
 pub enum ClientEvent
 {
     Register,                                      //REGISTER PROMPT
@@ -123,6 +130,7 @@ pub enum ClientEvent
     TofuError,                                     //TOFU VERIFICATION REJECTED BY THE USER
     TofuPrompt(TofuRequest),                       //TOFU DECISION ASKED OF THE USER
     TofuSkip(String),                              //TOFU VERIFICATION SKIPPED
+    ReconnectFailed,                               //RECONNECTING AFTER PINNING THE KEY FAILED
     VoiceActivity(Vec<VoiceUser>),                 //VOICE OVERLAY
     Join(String),                                  //CLIENT CONNECTED
     Leave(String),                                 //CLIENT DISCONNECTED
@@ -170,7 +178,7 @@ async fn key_exchange
     keys: &mut SharedKeys,
     tx: &Sender<ClientEvent>,
     exchange_keys: Option<&SharedKeys>,
-) -> bool //KEY EXCHANGE FOR CLIENT-SIDE
+) -> Handshake //KEY EXCHANGE FOR CLIENT-SIDE
 {
     //WAIT FOR KeyExchange
     let (ecc, pq) = loop
@@ -244,13 +252,35 @@ async fn key_exchange
                 tx.send(ClientEvent::TofuError).await.unwrap();
 
                 //EXIT
-                return false;
+                return Handshake::Failed;
             }
 
             //PIN THE KEY - THE NEXT CONNECTION TO host VERIFIES AGAINST IT
             config::server_keys_save(&host, &hash);
+
+            if exchange_keys.is_none()
+            {
+                //GRACEFULLY DISCONNECT FROM SERVER
+                network::send(&mut *streams.1.lock().await, PacketCode::Disconnect, Some(keys)).await;
+
+                return Handshake::Reconnect;
+            }
         },
     }
+
+    Handshake::Ready
+}
+
+async fn reconnect(streams: &mut Streams<'_>) -> bool
+{
+    let Ok((read_half, write_half)) = connect(options::get_server_address()).await else { return false };
+
+    *streams.0 = read_half;
+    *streams.1.lock().await = write_half;
+
+    //A NEW CONNECTION COUNTS FROM ZERO ON BOTH SIDES
+    options::set_seq(0);
+    options::set_server_seq(0);
 
     true
 }
@@ -278,15 +308,31 @@ pub async fn connect(connecting_addr: String) -> Result<(OwnedReadHalf, OwnedWri
 
 pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
-    //SEND HEADER
-    let mut header = [0u8; 32];
-    SysRng.try_fill_bytes(&mut header).unwrap(); //GENERATE RANDOM HEADER
-    options::set_obfuscation_key(&header);
-    streams.1.lock().await.write_all(&header).await.unwrap();
-
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    if !key_exchange(streams, &mut keys, &tx, None).await { return; }
+
+    //ACCEPTING A SERVER KEY PINS IT AND RECONNECTS, SO THE HANDSHAKE IS RUN AGAIN ON THE NEW SOCKET
+    loop
+    {
+        //SEND HEADER
+        let mut header = [0u8; 32];
+        SysRng.try_fill_bytes(&mut header).unwrap(); //GENERATE RANDOM HEADER
+        options::set_obfuscation_key(&header);
+        streams.1.lock().await.write_all(&header).await.unwrap();
+
+        match key_exchange(streams, &mut keys, &tx, None).await
+        {
+            Handshake::Ready => break,
+            Handshake::Failed => return,
+
+            //THE SERVER WENT AWAY BETWEEN THE TWO CONNECTIONS - NOTHING LEFT TO TALK TO
+            Handshake::Reconnect => if !reconnect(streams).await
+            {
+                tx.send(ClientEvent::ReconnectFailed).await.unwrap();
+                return;
+            },
+        }
+    }
 
     //SERVER INFO VARIABLES
     let mut min_pass: Option<u64> = None;

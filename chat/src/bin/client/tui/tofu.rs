@@ -198,7 +198,8 @@ fn answer(app: &mut App, accept: bool)
 
     if accept
     {
-        app.push_styled(format!("Server identity for {} accepted and saved.", prompt.host), theme::OK);
+        app.push_styled(format!("Server identity for {} accepted and saved. Reconnecting...", prompt.host),
+            theme::OK);
     }
 
     app.dirty = true;
