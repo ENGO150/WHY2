@@ -27,7 +27,7 @@ use std::
     sync::{ LazyLock, Mutex }
 };
 
-use toml_edit::{ DocumentMut, Value };
+use toml_edit::{ DocumentMut, Item, Value };
 
 use crate::{ consts, misc };
 
@@ -145,7 +145,7 @@ where
     config_read(filename, key)
 }
 
-fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
+fn config_write_value(filename: &str, key: &str, value: Value) //WRITE TYPED VALUE TO CONFIG
 {
     //WRITE
     with_cached_mut(&config_path(filename), |doc|
@@ -153,12 +153,23 @@ fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
         let table = doc.as_table_mut();
         if let Some(item) = table.get_mut(key)
         {
-            *item.as_value_mut().expect("Updating config failed") = value.into();
+            //KEEP THE TRAILING COMMENT THE DEFAULT CONFIG SHIPPED WITH
+            let decor = item.as_value().map(|old| old.decor().clone());
+            let mut value = value;
+
+            if let Some(decor) = decor { *value.decor_mut() = decor; }
+
+            *item.as_value_mut().expect("Updating config failed") = value;
         } else
         {
-            table.insert(key, value.into());
+            table.insert(key, Item::Value(value));
         }
     });
+}
+
+fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
+{
+    config_write_value(filename, key, value.into());
 }
 
 //PUBLIC
@@ -235,6 +246,18 @@ pub fn server_users_config(key: &str) -> String //RETURN key FROM server_users.t
 pub fn client_write(key: &str, value: &str) //WRITE TO client.toml
 {
     config_write(consts::CLIENT_CONFIG, key, value);
+}
+
+#[cfg(feature = "client_base")]
+pub fn client_write_bool(key: &str, value: bool) //WRITE BOOLEAN TO client.toml
+{
+    config_write_value(consts::CLIENT_CONFIG, key, value.into());
+}
+
+#[cfg(feature = "client_base")]
+pub fn client_write_int(key: &str, value: i64) //WRITE INTEGER TO client.toml
+{
+    config_write_value(consts::CLIENT_CONFIG, key, value.into());
 }
 
 #[cfg(feature = "server")]
