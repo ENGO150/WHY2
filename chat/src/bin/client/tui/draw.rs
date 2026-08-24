@@ -624,14 +624,14 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
         ]).centered());
     }
 
-    let height = lines.len() as u16 + 2;
+    let height = (lines.len() as u16 + 2).min(area.height);
 
     let popup = Rect
     {
         x: area.x + (area.width.saturating_sub(width)) / 2,
         y: area.y + (area.height.saturating_sub(height)) / 2,
         width,
-        height: height.min(area.height),
+        height,
     };
 
     frame.render_widget(Clear, popup); //Clear RESETS THE CELLS, SO THE BASE FOREGROUND GOES BACK ON
@@ -683,30 +683,36 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
 
     lines.push(Line::default());
 
-    //ONE STATUS ROW, ALWAYS IN THE SAME PLACE: WHAT IS HAPPENING, WHAT WENT WRONG, OR THE SERVER'S RULES
-    lines.push(match (login.busy, login.error.as_deref(), login.hint.as_deref())
+    //THE STATUS ROW, ALWAYS IN THE SAME PLACE: WHAT IS HAPPENING, WHAT WENT WRONG, OR THE SERVER'S RULES.
+    //IT IS WRAPPED, NOT TRUNCATED - AN OS ERROR IS AS LONG AS IT IS, AND THE BOX GROWS A ROW INSTEAD OF
+    //SPILLING PAST ITS OWN BORDER.
+    let status = match (login.busy, login.error.as_deref(), login.hint.as_deref())
     {
         (true, ..) => Line::from(Span::styled(login.waiting(), theme::ACCENT)),
         (false, Some(error), _) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
         (false, None, Some(hint)) => Line::from(Span::styled(hint.to_string(), theme::DIM)),
         (false, None, None) => Line::default(),
-    });
+    };
+
+    lines.extend(state::wrap_line(&status, inner_width));
 
     //THE PROXY IS THE ADDRESS STEP'S BUSINESS - BY THE TIME WE ARE LOGGING IN IT HAS ALREADY DONE ITS JOB
     if login.stage == LoginStage::Address && options::socks5_enabled()
     {
-        lines.push(Line::from(Span::styled(format!("Through SOCKS5 {}",
-            config::read_config::<String>("socks5_addr")), theme::DIM)));
+        let proxy = Line::from(Span::styled(format!("Through SOCKS5 {}",
+            config::read_config::<String>("socks5_addr")), theme::DIM));
+
+        lines.extend(state::wrap_line(&proxy, inner_width));
     }
 
-    let height = lines.len() as u16 + 2;
+    let height = (lines.len() as u16 + 2).min(area.height);
 
     let popup = Rect
     {
         x: area.x + (area.width.saturating_sub(width)) / 2,
         y: area.y + (area.height.saturating_sub(height)) / 2,
         width,
-        height: height.min(area.height),
+        height,
     };
 
     frame.render_widget(Clear, popup); //Clear RESETS THE CELLS, SO THE BASE FOREGROUND GOES BACK ON
