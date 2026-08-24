@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod draw;
 pub mod event;
 pub mod input;
+pub mod login;
 pub mod palette;
 pub mod settings;
 pub mod state;
@@ -35,6 +36,7 @@ use std::
         self,
         Stdout,
         Write,
+        Result,
     },
 };
 
@@ -72,11 +74,11 @@ use ratatui::
 
 use tokio::
 {
-    net::tcp::OwnedWriteHalf,
+    net::tcp::{ OwnedReadHalf, OwnedWriteHalf },
     time::{ self, MissedTickBehavior },
     sync::
     {
-        mpsc::Receiver,
+        mpsc::{ self, Receiver, Sender },
         Mutex as MutexAsync,
     },
 };
@@ -87,7 +89,7 @@ use crate::
 {
     config,
     options,
-    network::client::ClientEvent,
+    network::client::{ self, ClientEvent },
     command::
     {
         self,
@@ -95,6 +97,8 @@ use crate::
         CommandInfo,
     },
 };
+
+use login::ConnectResult;
 
 pub use state::App;
 
@@ -115,7 +119,7 @@ pub struct TerminalGuard //RESTORES THE TERMINAL ON DROP
 //IMPLEMENTATIONS
 impl TerminalGuard
 {
-    pub fn enter() -> io::Result<Self>
+    pub fn enter() -> Result<Self>
     {
         let mouse = config::read_config::<bool>("mouse_capture");
 
@@ -180,20 +184,21 @@ pub fn restore_terminal() //BEST-EFFORT, IDEMPOTENT
     let _ = stdout.flush();
 }
 
-pub fn init() -> io::Result<Tui>
+pub fn init() -> Result<Tui>
 {
     //NO Terminal::clear() HERE - IT QUERIES THE CURSOR POSITION (WHICH SOME TERMINALS NEVER ANSWER)
     //AND THE ALTERNATE SCREEN STARTS BLANK ANYWAY
     Terminal::new(CrosstermBackend::new(io::stdout()))
 }
 
-//THE SINGLE EVENT LOOP. EVERY TERMINAL WRITE IN THE CLIENT HAPPENS HERE.
+//THE SINGLE EVENT LOOP. EVERY TERMINAL WRITE IN THE CLIENT HAPPENS HERE - INCLUDING THE CONNECT PROMPT,
+//WHICH IS WHY THE SOCKET IS OPENED HERE AND NOT BEFORE THE ALTERNATE SCREEN IS ENTERED.
 pub async fn run
 (
     terminal: &mut Tui,
     app: &mut App,
     rx: &mut Receiver<ClientEvent>,
-    write_stream: &Arc<MutexAsync<OwnedWriteHalf>>,
+    tx: &Sender<ClientEvent>,
 )
 {
     let mut reader = EventStream::new();
@@ -202,10 +207,23 @@ pub async fn run
 
     let mut events_open = true;
 
+    //NONE UNTIL THE CONNECT PROMPT HAS PRODUCED A SOCKET; WHILE IT IS NONE, THE PROMPT OWNS THE KEYBOARD
+    let mut write_stream: Option<Arc<MutexAsync<OwnedWriteHalf>>> = None;
+
+    let (connect_tx, mut connect_rx) = mpsc::channel::<ConnectResult>(1);
+
+    //auto_connect DIALS WITHOUT WAITING FOR A KEYSTROKE, AND STILL DOES IT FROM INSIDE THE TUI
+    if app.login.as_ref().is_some_and(|prompt| prompt.connecting) { login::connect(app, &connect_tx); }
+
     loop
     {
         tokio::select!
         {
+            result = connect_rx.recv() =>
+            {
+                if let Some((attempt, result)) = result { connected(app, tx, &mut write_stream, attempt, result); }
+            },
+
             event = rx.recv(), if events_open =>
             {
                 match event
@@ -219,7 +237,7 @@ pub async fn run
             {
                 match event
                 {
-                    Some(Ok(event)) => handle_terminal_event(app, event, write_stream, terminal).await,
+                    Some(Ok(event)) => handle_terminal_event(app, event, write_stream.as_ref(), &connect_tx, terminal).await,
                     Some(Err(_)) => app.quit(1, Some(String::from("Reading terminal input failed."))),
                     None => app.quit(0, None),
                 }
@@ -228,7 +246,7 @@ pub async fn run
             _ = tick.tick() =>
             {
                 //SILENT ROSTER REFRESH (/list IS REQUEST/RESPONSE, THE SIDEBAR NEEDS FEEDING)
-                if app.refresh_online
+                if app.refresh_online && let Some(write_stream) = write_stream.as_ref()
                 {
                     app.refresh_online = false;
 
@@ -249,11 +267,53 @@ pub async fn run
 }
 
 //PRIVATE
+fn connected
+(
+    app: &mut App,
+    tx: &Sender<ClientEvent>,
+    write_stream: &mut Option<Arc<MutexAsync<OwnedWriteHalf>>>,
+    attempt: u64,
+    result: Result<(OwnedReadHalf, OwnedWriteHalf)>,
+)
+{
+    if !app.login.as_ref().is_some_and(|prompt| prompt.accepts(attempt)) { return; }
+
+    app.dirty = true;
+
+    let (mut read_half, write_half) = match result
+    {
+        Ok(halves) => halves,
+
+        //THE ADDRESS STAYS ON SCREEN WITH THE REASON UNDER IT, SO THE NEXT TRY IS ONE EDIT AWAY
+        Err(error) =>
+        {
+            if let Some(prompt) = app.login.as_mut() { prompt.failed(&error); }
+
+            return;
+        },
+    };
+
+    let stream = Arc::new(MutexAsync::new(write_half));
+
+    //THE HANDSHAKE (AND THE TOFU PROMPT INSIDE IT) RUNS FROM HERE ON, WITH THE TUI ALREADY UP
+    let listen_stream = stream.clone();
+    let listen_tx = tx.clone();
+
+    tokio::spawn(async move
+    {
+        client::listen_server(&mut (&mut read_half, listen_stream), listen_tx).await;
+    });
+
+    *write_stream = Some(stream);
+    app.login = None; //THE INPUT BOX TAKES OVER FROM HERE - USERNAME, PASSWORD, THEN MESSAGES
+}
+
 async fn handle_terminal_event
 (
     app: &mut App,
     event: Event,
-    write_stream: &Arc<MutexAsync<OwnedWriteHalf>>,
+    write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>,
+    connect_tx: &Sender<ConnectResult>,
     terminal: &Tui,
 )
 {
@@ -263,7 +323,7 @@ async fn handle_terminal_event
         {
             if key.kind == KeyEventKind::Release { return; }
 
-            handle_key(app, key, write_stream, message_viewport(terminal)).await;
+            handle_key(app, key, write_stream, connect_tx, message_viewport(terminal)).await;
         },
 
         Event::Mouse(mouse) =>
@@ -287,8 +347,16 @@ async fn handle_terminal_event
         Event::Resize(..) | Event::FocusGained | Event::FocusLost => app.dirty = true,
         Event::Paste(text) =>
         {
-            app.input.insert_str(&text);
-            app.palette.update(&app.input.text());
+            //A PASTED ADDRESS BELONGS TO THE CONNECT PROMPT, NOT TO THE CHAT LINE BEHIND IT
+            if app.login.is_some()
+            {
+                login::insert_str(app, &text);
+            } else
+            {
+                app.input.insert_str(&text);
+                app.palette.update(&app.input.text());
+            }
+
             app.dirty = true;
         },
     }
@@ -298,7 +366,8 @@ async fn handle_key
 (
     app: &mut App,
     key: KeyEvent,
-    write_stream: &Arc<MutexAsync<OwnedWriteHalf>>,
+    write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>,
+    connect_tx: &Sender<ConnectResult>,
     viewport: u16,
 )
 {
@@ -307,6 +376,19 @@ async fn handle_key
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
 
     app.dirty = true;
+
+    //THE CONNECT PROMPT COMES FIRST: UNTIL IT HAS PRODUCED A SOCKET THERE IS NOWHERE FOR A KEYSTROKE TO GO
+    if app.login.is_some()
+    {
+        match login::handle_key(app, key)
+        {
+            login::Action::Connect => login::connect(app, connect_tx),
+            login::Action::Quit => app.quit(0, None),
+            login::Action::None => {},
+        }
+
+        return;
+    }
 
     //THE IDENTITY PROMPT OUTRANKS EVERYTHING: THE NETWORK TASK IS PARKED ON ITS ANSWER, AND NOTHING MAY
     //REACH A SERVER THE USER HAS NOT ACCEPTED YET
@@ -330,6 +412,10 @@ async fn handle_key
 
         return;
     }
+
+    //EVERYTHING BELOW EITHER SENDS SOMETHING OR EDITS THE LINE THAT WILL, SO IT NEEDS THE SOCKET THE
+    //CONNECT PROMPT OPENED (WHICH IS GONE BY NOW, SO THIS ONLY GUARDS THE UNREACHABLE CASE)
+    let Some(write_stream) = write_stream else { return };
 
     //NEWLINE (Alt+Enter EVERYWHERE, Shift+Enter WHERE THE TERMINAL REPORTS IT)
     if key.code == KeyCode::Enter && (alt || shift)

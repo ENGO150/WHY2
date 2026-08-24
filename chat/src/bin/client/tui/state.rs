@@ -39,6 +39,7 @@ use crate::network::
 use super::
 {
     input::InputBuffer,
+    login::Login,
     palette::Palette,
     settings::Settings,
     tofu::Prompt,
@@ -87,6 +88,7 @@ pub struct App
     pub input: InputBuffer,
     pub palette: Palette,
     pub settings: Settings, //SETTINGS OVERLAY (CLOSED UNLESS THE USER OPENED IT)
+    pub login: Option<Login>, //CONNECT PROMPT - UP FROM THE FIRST FRAME UNTIL THERE IS A SOCKET
     pub tofu: Option<Prompt>, //SERVER IDENTITY PROMPT - OUTRANKS EVERY OTHER OVERLAY WHILE IT IS UP
     pub theme: Theme,
 
@@ -133,6 +135,7 @@ impl App
             input: InputBuffer::new(),
             palette: Palette::new(),
             settings: Settings::new(),
+            login: Some(Login::new()),
             tofu: None,
             theme: Theme::load(),
             list_requested: false,
@@ -205,17 +208,6 @@ impl App
         self.dirty = true;
     }
 
-    //DRAINS NEWLY PUSHED LINES AS PLAIN TEXT (USED BY THE PRE-TUI PHASE, WHICH HAS NO FRAME TO DRAW)
-    pub fn drain_plain(&mut self) -> Vec<String>
-    {
-        let out = self.messages.iter().map(|entry| plain(&self.theme.render(entry))).collect();
-
-        self.messages.clear();
-        self.wrapped = None;
-
-        out
-    }
-
     //SCROLLING
     pub fn scroll_up(&mut self, amount: u16, viewport: u16)
     {
@@ -276,11 +268,6 @@ impl App
 }
 
 //FUNCTIONS
-pub fn plain(line: &Line<'_>) -> String //STRIP STYLING (PRE-TUI OUTPUT)
-{
-    line.spans.iter().map(|s| s.content.as_ref()).collect()
-}
-
 pub fn wrap_line(line: &Line<'static>, width: u16) -> Vec<Line<'static>> //WORD-WRAP ONE LOGICAL LINE, KEEPING SPAN STYLES
 {
     let width = width.max(1) as usize;

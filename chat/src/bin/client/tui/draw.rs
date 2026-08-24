@@ -41,6 +41,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::
 {
+    config,
     command::CommandInfo,
     options::{ self, LoginState },
 };
@@ -51,6 +52,7 @@ use crate::network::voice::client::options as voice_options;
 use super::
 {
     theme,
+    login::Login,
     state::{ self, App },
     palette::{ self, PaletteMode },
     tofu::
@@ -77,6 +79,8 @@ const INPUT_MAX_HEIGHT: u16       = 8;
 const CHANNELS_MIN_HEIGHT: u16    = 12; //SIDEBAR ROWS NEEDED BEFORE THE CHANNEL LIST IS WORTH SHOWING
 const SETTINGS_WIDTH: u16         = 62; //SETTINGS OVERLAY, CAPPED TO THE TERMINAL
 const TOFU_WIDTH: u16             = 64; //SERVER IDENTITY OVERLAY, CAPPED TO THE TERMINAL
+const LOGIN_WIDTH: u16            = 52; //CONNECT PROMPT, CAPPED TO THE TERMINAL
+const FIELD_ROW: u16              = 1;  //THE ADDRESS FIELD SITS ONE ROW UNDER ITS OWN LABEL
 const SETTINGS_VALUE_WIDTH: u16   = 20; //NARROWEST THE VALUE COLUMN MAY GET (BAR + PERCENTAGE)
 
 #[cfg(feature = "client_voice")]
@@ -134,6 +138,9 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 
     //...AND THE IDENTITY PROMPT COVERS THE SETTINGS OVERLAY, BECAUSE IT IS THE ONLY THING THE USER MAY ANSWER
     if let Some(prompt) = &app.tofu { draw_tofu(frame, prompt, area); }
+
+    //THE CONNECT PROMPT IS THE FIRST THING THE CLIENT EVER DRAWS, AND NOTHING ELSE IS UP WHILE IT IS
+    if let Some(login) = &app.login { draw_login(frame, login, area); }
 }
 
 //PRIVATE
@@ -364,8 +371,8 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
     let offset = cursor.1.saturating_sub(text_area.height.saturating_sub(1));
     frame.render_widget(Paragraph::new(lines).scroll((offset, 0)), text_area);
 
-    //NO CARET WHILE AN OVERLAY OWNS THE KEYBOARD
-    if app.settings.open || app.tofu.is_some() { return; }
+    //NO CARET WHILE AN OVERLAY OWNS THE KEYBOARD (THE CONNECT PROMPT DRAWS ITS OWN)
+    if app.settings.open || app.tofu.is_some() || app.login.is_some() { return; }
 
     frame.set_cursor_position(Position::new
     (
@@ -662,6 +669,89 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
     ]).areas(inner);
 
     frame.render_widget(Paragraph::new(lines), text_area);
+}
+
+fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
+{
+    let width = LOGIN_WIDTH.min(area.width.saturating_sub(2)).max(1);
+    let inner_width = width.saturating_sub(4); //BORDERS PLUS A COLUMN OF AIR EACH SIDE
+    let field_width = inner_width.saturating_sub(2); //"> " GUTTER
+
+    if area.height < 8 || field_width < 8 { return; }
+
+    let (field, cursor) = login.input.render(field_width, false);
+
+    let mut lines = vec![Line::from(Span::styled("Server address", theme::DIM))];
+
+    for (index, line) in field.into_iter().enumerate()
+    {
+        let mut spans = vec![Span::styled(if index == 0 { "> " } else { "  " }, theme::ACCENT)];
+        spans.extend(line.spans);
+
+        lines.push(Line::from(spans));
+    }
+
+    lines.push(Line::default());
+
+    //ONE STATUS ROW, ALWAYS IN THE SAME PLACE: WHAT IS HAPPENING, OR WHAT WENT WRONG
+    lines.push(match (login.connecting, login.error.as_deref())
+    {
+        (true, _) => Line::from(Span::styled("Connecting…", theme::ACCENT)),
+        (false, Some(error)) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
+        (false, None) => Line::default(),
+    });
+
+    if options::socks5_enabled()
+    {
+        lines.push(Line::from(Span::styled(format!("Through SOCKS5 {}",
+            config::read_config::<String>("socks5_addr")), theme::DIM)));
+    }
+
+    let height = lines.len() as u16 + 2;
+
+    let popup = Rect
+    {
+        x: area.x + (area.width.saturating_sub(width)) / 2,
+        y: area.y + (area.height.saturating_sub(height)) / 2,
+        width,
+        height: height.min(area.height),
+    };
+
+    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS, SO THE BASE FOREGROUND GOES BACK ON
+
+    frame.buffer_mut().set_style(popup, theme::TEXT);
+
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(theme::BORDER_ACTIVE)
+        .title(Span::styled(" Connect ", theme::TITLE))
+        .title_bottom(Line::from(Span::styled(if login.connecting
+        {
+            " Esc cancel "
+        } else { " ⏎ connect │ Esc quit " }, theme::DIM)).centered());
+
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    //ONE COLUMN OF AIR EACH SIDE, MATCHING WHAT inner_width WAS MEASURED AGAINST
+    let [_, text_area, _] = Layout::horizontal
+    ([
+        Constraint::Length(1),
+        Constraint::Min(0),
+        Constraint::Length(1),
+    ]).areas(inner);
+
+    frame.render_widget(Paragraph::new(lines), text_area);
+
+    //THE ADDRESS FIELD IS THE ONLY THING BEING TYPED INTO WHILE THIS IS UP, SO IT KEEPS THE CARET
+    if !login.connecting
+    {
+        frame.set_cursor_position(Position::new
+        (
+            text_area.x + 2 + cursor.0.min(field_width.saturating_sub(1)),
+            text_area.y + FIELD_ROW + cursor.1,
+        ));
+    }
 }
 
 fn button(label: &'static str, selected: bool, style: Style) -> Span<'static>

@@ -28,12 +28,7 @@ use std::
     fs::File,
     path::Path,
     sync::Arc,
-    io::
-    {
-        self,
-        Read,
-        Write,
-    },
+    io::Read,
 };
 
 use tokio::
@@ -169,16 +164,6 @@ fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
     }
 }
 
-async fn read_line() -> String //READ ONE LINE FROM STDIN (BEFORE RAW MODE IS ENABLED)
-{
-    task::spawn_blocking(||
-    {
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
-        input
-    }).await.expect("Reading stdin failed")
-}
-
 //EVERY DEVICE THE VOICE CLIENT COULD OPEN. THE LIST COMES FROM THE VOICE CLIENT ITSELF, SO IT IS ENUMERATED
 //IN THE SAME cpal HOST THAT LATER OPENS THE CHOSEN DEVICE (BLOCKING, HENCE spawn_blocking).
 async fn audio_devices() -> Devices
@@ -216,18 +201,14 @@ async fn main()
     tui::install_panic_hook();
 
     //CREATE CHANNEL
-    let (tx, mut rx) = mpsc::channel::<ClientEvent>(consts::EVENT_CHANNEL_BOUND);
+    let (tx, rx) = mpsc::channel::<ClientEvent>(consts::EVENT_CHANNEL_BOUND);
 
     //CONFIGURATION
-    misc::check_version(&tx).await; //CHECK WHY2 VERSION
     config::init_config(); //CREATE client.toml CONFIGURATION
 
-    //DRAIN WHATEVER check_version REPORTED - STILL ON THE NORMAL SCREEN
-    let mut pre_tui = App::new();
-    while let Ok(event) = rx.try_recv() { pre_tui.apply(event); }
-    flush_plain(&mut pre_tui);
-
-    println!("Welcome.\n");
+    //CHECK WHY2 VERSION - IT REPORTS THROUGH tx LIKE ANYTHING ELSE, SO IT MUST NOT HOLD UP THE FIRST FRAME
+    let version_tx = tx.clone();
+    tokio::spawn(async move { misc::check_version(&version_tx).await; });
 
     //RUN REST OF CLIENT IN NEW TASK
     #[cfg(feature = "client_screen")]
@@ -248,85 +229,21 @@ async fn main()
     }
 }
 
-fn flush_plain(app: &mut App) //PRINT PENDING OUTPUT WITHOUT A FRAME (PRE-TUI PHASE)
-{
-    for line in app.drain_plain() { println!("{line}"); }
-
-    io::stdout().flush().unwrap();
-}
-
 async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>)
 {
-    //GET CONNECTING ADDRESS
-    let mut connecting_addr = if config::read_config::<bool>("auto_connect") //USER ENABLED AUTOMATIC CONNECTION
-    {
-        let addr = config::read_config("auto_connect_addr"); //USE CONFIG ADDR
-
-        //PRINT OUT IP
-        println!(">>> {addr}");
-        io::stdout().flush().unwrap();
-
-        addr
-    } else //NO AUTO CONNECT
-    {
-        print!("Enter IP Address:\n>>> ");
-        io::stdout().flush().unwrap();
-
-        //GET IP FROM USER INPUT
-        read_line().await.trim().to_owned()
-    };
-
-    //REMEMBER WHAT THE USER ACTUALLY TYPED - THE TITLE ONLY SHOWS A PORT WHEN ONE WAS ASKED FOR
-    let display_addr = connecting_addr.trim().to_owned();
-
-    //ADD PORT TO IP IF MISSING
-    if !connecting_addr.contains(':')
-    {
-        //APPEND DEFAULT PORT TO connecting_ip
-        connecting_addr.push_str(&format!(":{}", config::read_config::<u16>("default_port")));
-    }
-
-    //SET GLOBAL SERVER ADDR
-    options::set_server_address(&connecting_addr);
-
-    //CHECK IF SOCKS5 IS ENABLED
+    //CHECK IF SOCKS5 IS ENABLED (EVERY DIAL THE CONNECT PROMPT MAKES GOES THROUGH IT)
     if config::read_config("socks5_enabled")
     {
         options::enable_socks5();
     }
 
-    //CONNECT TO SERVER (STILL ON THE NORMAL SCREEN, SO A FAILURE STAYS READABLE)
-    let (mut read_stream, write_half) = match client::connect(connecting_addr).await
-    {
-        Ok(s) => s,
-        Err(e) =>
-        {
-            eprintln!("\nConnecting failed: {e}");
-            process::exit(1);
-        }
-    };
-
-    //CREATE STREAM LOCK
-    let write_stream = Arc::new(MutexAsync::new(write_half));
-
-    //CLONE SOCKET FOR CLIENT INPUT
-    let write_stream_listen = write_stream.clone();
-
-    //LISTEN TO SERVER
-    let client_tx = tx.clone();
-    tokio::spawn(async move
-    {
-        client::listen_server(&mut (&mut read_stream, write_stream_listen), client_tx).await;
-    });
-
-    //ENTER THE TUI - EVERY TERMINAL WRITE FROM HERE ON GOES THROUGH tui::run
+    //ENTER THE TUI RIGHT AWAY - THE ADDRESS IS ASKED FOR INSIDE IT, AND SO IS EVERYTHING AFTER IT
     let mut app = App::new();
-    app.address = display_addr;
 
     let guard = TerminalGuard::enter().expect("Entering the alternate screen failed");
     let mut terminal = tui::init().expect("Creating the terminal backend failed");
 
-    tui::run(&mut terminal, &mut app, &mut rx, &write_stream).await;
+    tui::run(&mut terminal, &mut app, &mut rx, &tx).await;
 
     //LEAVE THE ALTERNATE SCREEN BEFORE SAYING ANYTHING ELSE
     drop(guard);
