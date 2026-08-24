@@ -151,17 +151,43 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   the crossterm backend), and color handling (`colors.rs`).
 
   **The client renders through one event loop — there is no printing anywhere else.**
-  `tui::run` (`tui/mod.rs`) is a single `tokio::select!` over three sources: the
-  `crossterm::EventStream` (keys, resize, mouse wheel), the `mpsc::Receiver<ClientEvent>`, and a
-  33 ms redraw tick. `ClientEvent` handling (`App::apply`, `tui/event.rs`) is **pure state
+  `tui::run` (`tui/mod.rs`) is a single `tokio::select!` over four sources: the
+  `crossterm::EventStream` (keys, resize, mouse wheel), the `mpsc::Receiver<ClientEvent>`, the
+  finished dial attempts of the connect prompt (`login::ConnectResult`), and a 33 ms redraw tick.
+  `ClientEvent` handling (`App::apply`, `tui/event.rs`) is **pure state
   mutation** — it appends `Line`s to `App::messages`, updates the sidebar/voice roster or sets
   `should_quit`, and never touches the terminal. The tick sets nothing and draws only when
   `App::dirty` is set, which is what keeps `VoiceActivity` (one event per voice packet) from
   repainting hundreds of times a second. Consequences for new code:
   - Never `println!`/`print!` after the TUI is entered. Anything with something to say sends a
     `ClientEvent` (from the network layer) or calls `App::push*` (from a locally handled command in
-    `mod.rs::submit`). The one pre-TUI phase — version check, IP prompt, connection failure — runs
-    on the normal screen before `TerminalGuard::enter`, and uses `flush_plain`.
+    `mod.rs::submit`). There is no pre-TUI phase left: `run_client` enters the alternate screen
+    before anything else happens, and the only write left to the normal screen is `App::quit_message`,
+    printed after the guard is dropped. The version check reports through `ClientEvent` like everything
+    else, and runs in a task so it cannot hold up the first frame.
+  - **Getting in happens inside the TUI** (`tui/login.rs`, `draw::draw_login`). `App::login` is `Some`
+    from the first frame until the server accepts us, and it is one box asking three times
+    (`login::Stage`: `Address`, `Username`, `Password { register }`) — the address, the username and
+    the password are the same field, relabelled. While it is up it owns the keyboard (behind only the
+    TOFU prompt, which is the one thing that may still be answered over it), and **the input bar and
+    the sidebar are not drawn at all** — there is nothing to type into or list yet, so `draw::draw`
+    gives the input row zero height.
+    Only the address step is client-driven: `login::connect` dials in a task of its own (the frame keeps
+    being drawn while a dead address times out) and reports back over the connect channel;
+    `tui::mod::connected` spawns `client::listen_server` and marks the box `connected`, which is what
+    turns `Esc` from "cancel the dial" into "quit". A refused connection stays in the box as an error
+    instead of ending the process, and the attempt counter is what makes a cancelled dial's socket get
+    dropped rather than land on the user. `auto_connect` prefills the field and dials without a
+    keystroke — it is not a separate code path.
+    **The server drives the other two steps.** `ClientEvent::Username`/`Register`/`Login` call
+    `Login::ask`, which relabels the field, clears it and stores the server's rules as the hint;
+    `UsernameRejected`/`PasswordRejected` set `Login::error` (which `ask` deliberately does *not* clear —
+    the rejection arrives immediately before the re-prompt and still has to be read); `Authenticated`
+    drops `App::login` and hands the keyboard to the input bar. **Those arms have to set `App::dirty`
+    themselves** — unlike the rest of `App::apply` they push nothing into the history, so without it the
+    box silently stops repainting. An answered step is not sent from the prompt: `login::Action::Submit`
+    hands the text to `mod.rs::submit` like any other line, and `options::get_login_state()` turns it
+    into the right packet.
   - C libraries that write to fd 2 (cpal/ALSA, openh264/xcap) corrupt the frame; the existing
     `gag::Gag::stderr()` wrappers in `network/voice/client` must stay.
   - `tui::install_panic_hook` is called first thing in `main` and is **not optional**: the release
@@ -233,9 +259,8 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `disable_colors` change repaints the messages already in the pane. Anything that rewrites
     config-driven styling must call `App::reload_theme` (which bumps the wrap-cache generation), never
     `Theme::reload` on its own.
-  - Transient prompts belong in the chrome, not the history. The username/password prompts render
-    as the input box's title (plus `App::login_hint`) and vanish once answered; nothing pushes them
-    into `App::messages`. Block commands (`/help`, `/list`, `/files`, …) end without a trailing
+  - Transient prompts belong in the chrome, not the history. The username/password steps live in the
+    connect box and vanish once answered; nothing pushes them into `App::messages`. Block commands (`/help`, `/list`, `/files`, …) end without a trailing
     blank line — the styled headings already separate them.
 - **`bin/server.rs`** — headless server entrypoint (`tokio::main`), wires together `network::server`,
   `network::file::server`, `network::screen::server`, `network::voice::server`.
