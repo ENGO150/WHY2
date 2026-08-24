@@ -26,9 +26,15 @@ auto_connect_addr = "0.0.0.0" # See 'auto_connect'
 # Downloads
 download_directory = "{HOME}/Downloads/WHY2"
 
-# Voice chat devices (set via --audio-setup or leave blank for default)
+# Voice chat devices (set via /settings, --audio-setup or leave blank for default)
 input_device = ""
 output_device = ""
+
+# Voice chat audio (set via /settings)
+input_volume = 100 # Microphone volume in percent (0-200)
+output_volume = 100 # Playback volume in percent (0-200)
+noise_suppression = true # Remove background noise from the microphone
+automatic_gain = true # Normalize the microphone level automatically
 
 # Colors
 disable_colors = false # Disable message colors

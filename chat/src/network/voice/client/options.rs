@@ -16,12 +16,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::sync::atomic::
+use std::sync::
 {
-    AtomicBool,
-    AtomicUsize,
-    Ordering,
+    LazyLock,
+    atomic::
+    {
+        AtomicBool,
+        AtomicUsize,
+        Ordering,
+    },
 };
+
+use crate::config;
+
+//CONSTS
+pub const VOLUME_MAX: u32 = 200; //LOUDEST SETTING (PERCENT)
 
 //OPTIONS
 static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT -> SERVER)
@@ -29,6 +38,12 @@ static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT 
 static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (SERVER -> CLIENT)
 
 static USE_VOICE: AtomicBool = AtomicBool::new(false);
+
+//AUDIO PREFERENCES - SEEDED FROM client.toml, LIVE-EDITED BY /settings
+static INPUT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(clamp_volume(config::read_config::<u32>("input_volume")) as usize));
+static OUTPUT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(clamp_volume(config::read_config::<u32>("output_volume")) as usize));
+static NOISE_SUPPRESSION: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(config::read_config::<bool>("noise_suppression")));
+static AUTOMATIC_GAIN: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(config::read_config::<bool>("automatic_gain")));
 
 //SEQ
 pub fn get_seq() -> usize //GET SEQUENCE NUMBER
@@ -62,3 +77,68 @@ pub fn swap_use_voice() -> bool //SET USE VOICE
 {
     !USE_VOICE.fetch_xor(true, Ordering::Relaxed)
 }
+
+//AUDIO PREFERENCES
+pub fn clamp_volume(percent: u32) -> u32 //KEEP A VOLUME INSIDE THE SUPPORTED RANGE
+{
+    percent.min(VOLUME_MAX)
+}
+
+pub fn init_audio() //TOUCH EVERY PREFERENCE SO NO AUDIO CALLBACK EVER PAYS FOR THE CONFIG READ
+{
+    get_input_volume();
+    get_output_volume();
+    noise_suppression();
+    automatic_gain();
+}
+
+pub fn get_input_volume() -> u32 //MICROPHONE VOLUME (PERCENT)
+{
+    INPUT_VOLUME.load(Ordering::Relaxed) as u32
+}
+
+pub fn set_input_volume(percent: u32)
+{
+    INPUT_VOLUME.store(clamp_volume(percent) as usize, Ordering::Relaxed);
+}
+
+pub fn get_output_volume() -> u32 //PLAYBACK VOLUME (PERCENT)
+{
+    OUTPUT_VOLUME.load(Ordering::Relaxed) as u32
+}
+
+pub fn set_output_volume(percent: u32)
+{
+    OUTPUT_VOLUME.store(clamp_volume(percent) as usize, Ordering::Relaxed);
+}
+
+pub fn get_input_gain() -> f32 //MICROPHONE VOLUME AS A MULTIPLIER
+{
+    get_input_volume() as f32 / 100.
+}
+
+pub fn get_output_gain() -> f32 //PLAYBACK VOLUME AS A MULTIPLIER
+{
+    get_output_volume() as f32 / 100.
+}
+
+pub fn noise_suppression() -> bool //RUN THE DENOISER ON CAPTURED FRAMES
+{
+    NOISE_SUPPRESSION.load(Ordering::Relaxed)
+}
+
+pub fn set_noise_suppression(value: bool)
+{
+    NOISE_SUPPRESSION.store(value, Ordering::Relaxed);
+}
+
+pub fn automatic_gain() -> bool //NORMALIZE CAPTURED FRAMES (AGC + LIMITER)
+{
+    AUTOMATIC_GAIN.load(Ordering::Relaxed)
+}
+
+pub fn set_automatic_gain(value: bool)
+{
+    AUTOMATIC_GAIN.store(value, Ordering::Relaxed);
+}
+

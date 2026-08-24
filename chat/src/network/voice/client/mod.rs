@@ -221,8 +221,18 @@ pub fn configure_device(device: &cpal::Device, supported_configs: impl Iterator<
     config
 }
 
-fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], tx: &Sender<Vec<u8>>)
+fn transmit_audio(encoder: &Encoder, frame: &mut [f32], buffer: &mut [u8], tx: &Sender<Vec<u8>>)
 {
+    //MICROPHONE VOLUME (/settings) - APPLIED AFTER THE AGC, SO IT STAYS THE USER'S LAST WORD ON THE LEVEL
+    let gain = options::get_input_gain();
+    if gain != 1.
+    {
+        for sample in frame.iter_mut()
+        {
+            *sample = (*sample * gain).clamp(-1., 1.);
+        }
+    }
+
     //ENCODE (IGNORE ERRORS)
     if let Ok(len) = encoder.encode_float(&frame, buffer)
     {
@@ -234,6 +244,8 @@ fn transmit_audio(encoder: &Encoder, frame: &[f32], buffer: &mut [u8], tx: &Send
 //NORMALIZE ONE FRAME IN PLACE, MUST BE CALLED ON EVERY TRANSMITTED FRAME IN ORDER (THE GAIN IS STATEFUL)
 fn apply_agc(frame: &mut [f32], rms: f32, is_speech: bool, envelope: &mut f32, gain: &mut f32)
 {
+    if !options::automatic_gain() { return; } //TURNED OFF IN /settings - THE RAW LEVEL GOES OUT AS CAPTURED
+
     //TRACK THE SPEECH LEVEL ONLY WHILE SOMEBODY IS ACTUALLY TALKING
     if is_speech
     {
@@ -277,6 +289,9 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     //RESET SEQs
     options::set_seq(0);
     options::set_server_seq(0);
+
+    //LOAD THE AUDIO PREFERENCES WHILE WE ARE STILL ALLOWED TO TOUCH THE FILESYSTEM
+    options::init_audio();
 
     //DUPLICATE STREAM GUARDS
     let current_generation = AUDIO_GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
@@ -386,8 +401,8 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     let agc_gain_cb = agc_gain.clone();
     let input_stream = input_device.build_input_stream(input_config, move |data: &[f32], _: &_|
     {
-        //CHECK FOR MUTING
-        if chat_options::is_muted(None)
+        //CHECK FOR MUTING (A MICROPHONE TURNED DOWN TO 0% IS OFF, VOICE ACTIVITY INCLUDED)
+        if chat_options::is_muted(None) || options::get_input_volume() == 0
         {
             LOCAL_DISPLAY_HOLD.store(0, Ordering::Relaxed); //CLEAR VAD WINDOW
             input_accum.clear(); //REMOVE BLOB REMAINING IN BUFFER
@@ -455,10 +470,10 @@ pub async fn listen_server_voice //SERVER -> CLIENT
         {
             let mut frame: Vec<f32> = input_accum.drain(0..consts::FRAME_SIZE).collect();
 
-            //NOISE REDUCTION
+            //NOISE REDUCTION (SKIPPED WHEN TURNED OFF IN /settings)
             for chunk in frame.chunks_mut(consts::SAMPLE_RATE as usize / 100)
             {
-                if chunk.len() == consts::SAMPLE_RATE as usize / 100
+                if options::noise_suppression() && chunk.len() == consts::SAMPLE_RATE as usize / 100
                 {
                     //SCALE UP
                     for sample in chunk.iter_mut()
@@ -506,7 +521,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
                 for mut old_frame in preroll.drain(..)
                 {
                     apply_agc(&mut old_frame, rms, false, &mut envelope, &mut gain);
-                    transmit_audio(&opus_encoder, &old_frame, &mut encoded_buffer, &packet_tx);
+                    transmit_audio(&opus_encoder, &mut old_frame, &mut encoded_buffer, &packet_tx);
                 }
 
                 *hold_frames = consts::HOLD_FRAMES;
@@ -541,7 +556,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
 
                 //ONLY FRAMES CARRYING REAL SPEECH ENERGY FEED THE ENVELOPE, HOLD-TAIL FRAMES DO NOT
                 apply_agc(&mut frame, rms, rms >= treshold_close, &mut envelope, &mut gain);
-                transmit_audio(&opus_encoder, &frame, &mut encoded_buffer, &packet_tx);
+                transmit_audio(&opus_encoder, &mut frame, &mut encoded_buffer, &packet_tx);
             }
         }
     }, |_| {}, None).unwrap();
@@ -563,6 +578,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
         //CLEAR OUTPUT BUFFER
         data.fill(0.);
 
+        let output_gain = options::get_output_gain(); //ONCE PER CALLBACK, NOT PER SAMPLE
         let frames_to_write = data.len() / output_channels;
         let mut consumers_guard = CONSUMERS.lock().unwrap();
 
@@ -615,6 +631,9 @@ pub async fn listen_server_voice //SERVER -> CLIENT
 
             //MIX EFFECTS
             sfx::play_effects(&mut mixed_sample);
+
+            //PLAYBACK VOLUME (/settings)
+            mixed_sample *= output_gain;
 
             //SOFT CLIPPING (HYPERBOLIC TANGENT)
             mixed_sample = mixed_sample.tanh();
