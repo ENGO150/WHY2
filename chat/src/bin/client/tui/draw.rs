@@ -110,8 +110,8 @@ pub fn draw(frame: &mut Frame, app: &mut App)
         Constraint::Length(input_height),
     ]).areas(area);
 
-    //MESSAGES + SIDEBAR
-    let (messages_area, sidebar_area) = if area.width >= SIDEBAR_MIN_TERM_WIDTH
+    //MESSAGES + SIDEBAR (THE SIDEBAR IS EMPTY UNTIL WE ARE AUTHENTICATED - DO NOT SPEND THE WIDTH ON IT)
+    let (messages_area, sidebar_area) = if area.width >= SIDEBAR_MIN_TERM_WIDTH && options::get_sending_messages()
     {
         let [m, s] = Layout::horizontal([Constraint::Min(0), Constraint::Length(SIDEBAR_WIDTH)]).areas(main_area);
         (m, Some(s))

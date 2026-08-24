@@ -20,7 +20,10 @@ use ratatui::text::Span;
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::command::{ self, CommandInfo };
+use crate::{
+    command::{ self, CommandInfo },
+    options,
+};
 
 use super::theme;
 
@@ -63,6 +66,13 @@ impl Palette
     //RECOMPUTE FROM THE CURRENT INPUT
     pub fn update(&mut self, input: &str)
     {
+        //THE INPUT LINE BELONGS TO THE LOGIN PROMPT UNTIL AUTH IS DONE - COMMANDS ARE NOT DISPATCHED YET EITHER
+        if !options::get_sending_messages()
+        {
+            self.dismiss();
+            return;
+        }
+
         let Some(rest) = input.strip_prefix(command::COMMAND_PREFIX) else
         {
             self.dismiss();
