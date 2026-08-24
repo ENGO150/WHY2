@@ -43,6 +43,7 @@ pub const SERVER_PQ_SKEY: &str       = "/private_pq";                           
 pub const SERVER_PQ_PKEY: &str       = "/public_pq";                                //SERVER POST-QUANTUM PUBLIC KEY FILE
 
 pub const FETCH_TIMEOUT: u64         = 5000;                                        //TIMOUT FOR FETCHING DATA (MS)
+pub const CONNECT_TIMEOUT: u64       = 3000;                                        //TIMEOUT FOR DIALING A SERVER (MS)
 
 pub const REKEY_INTERVAL: u64        = 600;                                         //INTERVAL FOR RE-REKEYING (SECS)
 

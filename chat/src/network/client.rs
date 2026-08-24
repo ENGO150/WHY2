@@ -18,7 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    io::Error,
+    io::{ Error, ErrorKind },
+    time::Duration,
     sync::Mutex,
     path::PathBuf,
     collections::BTreeMap,
@@ -26,6 +27,7 @@ use std::
 
 use tokio::
 {
+    time,
     io::AsyncWriteExt,
     sync::
     {
@@ -59,6 +61,7 @@ use crate::
     options::{ self, LoginState },
     consts::
     {
+        self,
         Streams,
         SharedKeys,
     },
@@ -288,22 +291,29 @@ async fn reconnect(streams: &mut Streams<'_>) -> bool
 //PUBLIC
 pub async fn connect(connecting_addr: String) -> Result<(OwnedReadHalf, OwnedWriteHalf), Error> //CONNECT TO SERVER
 {
-    if !options::socks5_enabled() //NO SOCKS5
+    let dial = async
     {
-        TcpStream::connect(connecting_addr).await
-    } else //USE PROXY
-    {
-        let proxy_addr = config::read_config::<String>("socks5_addr");
+        if !options::socks5_enabled() //NO SOCKS5
+        {
+            TcpStream::connect(connecting_addr).await
+        } else //USE PROXY
+        {
+            let proxy_addr = config::read_config::<String>("socks5_addr");
 
-        Socks5Stream::connect(proxy_addr.as_str(), connecting_addr.as_str()).await
-            .map(|s| s.into_inner())
-            .map_err(Error::other)
-    }.and_then(|s|
-    {
-        //SET TCP_NODELAY
-        s.set_nodelay(true)?;
-        Ok(s.into_split())
-    })
+            Socks5Stream::connect(proxy_addr.as_str(), connecting_addr.as_str()).await
+                .map(|s| s.into_inner())
+                .map_err(Error::other)
+        }
+    };
+
+    time::timeout(Duration::from_millis(consts::CONNECT_TIMEOUT), dial).await
+        .unwrap_or_else(|_| Err(Error::new(ErrorKind::TimedOut, "Connection timed out.")))
+        .and_then(|s|
+        {
+            //SET TCP_NODELAY
+            s.set_nodelay(true)?;
+            Ok(s.into_split())
+        })
 }
 
 pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
