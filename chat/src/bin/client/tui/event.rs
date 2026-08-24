@@ -16,14 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::env;
-
 use ratatui::text::{ Line, Span };
 
 use crate::
 {
     options,
-    config::TofuCode,
     network::client::ClientEvent,
 };
 
@@ -31,6 +28,7 @@ use super::
 {
     theme,
     state::App,
+    tofu::Prompt,
 };
 
 //IMPLEMENTATIONS
@@ -81,37 +79,14 @@ impl App
                 ]));
             },
 
-            ClientEvent::TofuError(status) => //FATAL - REPORTED ON THE NORMAL SCREEN AFTER TEARDOWN
+            ClientEvent::TofuPrompt(request) =>
             {
-                let text = match status
-                {
-                    TofuCode::Mismatch => String::from
-                    (
-                        "\nSECURITY WARNING: SERVER IDENTITY MISMATCH\n\n\
-                        The server's identity key is different from the\n\
-                        key stored in local configuration. This could\n\
-                        mean that someone is intercepting your connection\n\
-                        (Man-in-the-Middle attack) or that the server\n\
-                        key has been changed.\n\n\
-                        Connection aborted to protect your privacy."
-                    ),
-
-                    TofuCode::Unknown(hash, ip) => format!
-                    (
-                        "\nSECURITY WARNING: UNKNOWN SERVER IDENTITY\n\n\
-                        The server's identity key is not stored in local\n\
-                        configuration. If you are sure that the key below\n\
-                        is valid, enter following command and connect again.\n\n\
-                        {} --verify {ip} {hash}",
-
-                        env::args().next().unwrap_or_else(|| String::from("why2"))
-                    ),
-
-                    _ => String::from("\nSECURITY WARNING: SERVER IDENTITY COULD NOT BE VERIFIED."),
-                };
-
-                self.quit(1, Some(text));
+                self.tofu = Some(Prompt::new(request));
+                self.dirty = true;
             },
+
+            //REFUSING (OR FAILING) THE CHECK JUST ENDS THE SESSION - THE PROMPT ALREADY SAID WHY
+            ClientEvent::TofuError => self.quit(1, None),
 
             ClientEvent::TofuSkip(hash) =>
             {

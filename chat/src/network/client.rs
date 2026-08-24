@@ -27,7 +27,11 @@ use std::
 use tokio::
 {
     io::AsyncWriteExt,
-    sync::mpsc::Sender,
+    sync::
+    {
+        oneshot,
+        mpsc::Sender,
+    },
     net::
     {
         TcpStream,
@@ -88,6 +92,15 @@ use crate::network::screen::client::
 };
 
 //STRUCTS
+pub struct TofuRequest
+{
+    pub host: String,           //WHAT THE KEY IS PINNED AGAINST
+    pub hash: String,           //SHA256 OF THE SERVER'S PUBLIC KEYS
+    pub mismatch: bool,         //A KEY IS ALREADY PINNED FOR host AND DIFFERS (NOT A FIRST CONTACT)
+    pub pinned: Option<String>, //THE FINGERPRINT ON RECORD, SHOWN BESIDE THE NEW ONE ON A MISMATCH
+    pub reply: oneshot::Sender<bool>,
+}
+
 pub struct VoiceUser
 {
     pub id: usize,          //ID OF USER
@@ -107,7 +120,8 @@ pub enum ClientEvent
     Message(String, String, usize, MessageColors), //RECEIVED MESSAGE
     PrivateMessageSent(String, usize, String),     //SENT PM
     PrivateMessageRecv(String, usize, String),     //RECEIVED PM
-    TofuError(TofuCode),                           //TOFU VERIFICATION FAILED
+    TofuError,                                     //TOFU VERIFICATION REJECTED BY THE USER
+    TofuPrompt(TofuRequest),                       //TOFU DECISION ASKED OF THE USER
     TofuSkip(String),                              //TOFU VERIFICATION SKIPPED
     VoiceActivity(Vec<VoiceUser>),                 //VOICE OVERLAY
     Join(String),                                  //CLIENT CONNECTED
@@ -171,28 +185,11 @@ async fn key_exchange
     let pks = ecc.clone() + &pq;
 
     //VERIFY PUBKEY VALIDITY (TOFU)
-    if env!("WHY2_SKIP_TOFU") == "false"
+    let host = streams.0.peer_addr().unwrap().ip().to_string();
+    let verdict = if env!("WHY2_SKIP_TOFU") == "false"
     {
-        match config::server_keys_check(&streams.0.peer_addr().unwrap().ip().to_string(), &pks)
-        {
-            TofuCode::Valid => {},
-
-            status @ (TofuCode::Mismatch | TofuCode::Unknown(_, _)) =>
-            {
-                //GRACEFULLY DISCONNECT FROM SERVER
-                network::send(&mut *streams.1.lock().await, PacketCode::Disconnect, None).await;
-
-                //PRINT SECURITY MESSAGE
-                tx.send(ClientEvent::TofuError(status)).await.unwrap();
-
-                //EXIT
-                return false;
-            },
-        }
-    } else
-    {
-        tx.send(ClientEvent::TofuSkip(config::server_keys_hash(&pks))).await.unwrap();
-    }
+        Some(config::server_keys_check(&host, &pks))
+    } else { None };
 
     //GENERATE EPHEMERAL ECC KEYS
     let (sk, pk) = kex::generate_ephemeral_keys();
@@ -212,6 +209,48 @@ async fn key_exchange
 
     //SET GLOBAL VARIABLES
     options::set_keys(keys.clone());
+
+    //ACT ON THE TOFU VERDICT NOW THAT THE SERVER HAS ITS ANSWER
+    let hash = config::server_keys_hash(&pks);
+
+    match verdict
+    {
+        //VERIFICATION DISABLED AT BUILD TIME
+        None => tx.send(ClientEvent::TofuSkip(hash)).await.unwrap(),
+
+        Some(TofuCode::Valid) => {},
+
+        Some(status) =>
+        {
+            //ASK THE USER IN THE TUI INSTEAD OF DROPPING THEM BACK TO THE SHELL
+            let (reply, answer) = oneshot::channel();
+
+            tx.send(ClientEvent::TofuPrompt(TofuRequest
+            {
+                host: host.clone(),
+                hash: hash.clone(),
+                mismatch: matches!(status, TofuCode::Mismatch),
+                pinned: config::server_keys_pinned(&host),
+                reply,
+            })).await.unwrap();
+
+            //A DROPPED SENDER (THE CLIENT IS QUITTING) COUNTS AS A REFUSAL
+            if !answer.await.unwrap_or(false)
+            {
+                //GRACEFULLY DISCONNECT FROM SERVER
+                network::send(&mut *streams.1.lock().await, PacketCode::Disconnect, Some(keys)).await;
+
+                //END THE SESSION
+                tx.send(ClientEvent::TofuError).await.unwrap();
+
+                //EXIT
+                return false;
+            }
+
+            //PIN THE KEY - THE NEXT CONNECTION TO host VERIFIES AGAINST IT
+            config::server_keys_save(&host, &hash);
+        },
+    }
 
     true
 }

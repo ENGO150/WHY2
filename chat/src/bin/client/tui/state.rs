@@ -16,7 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::collections::{ BTreeSet, VecDeque };
+use std::
+{
+    mem,
+    collections::{ BTreeSet, VecDeque },
+};
 
 use ratatui::
 {
@@ -37,6 +41,7 @@ use super::
     input::InputBuffer,
     palette::Palette,
     settings::Settings,
+    tofu::Prompt,
     theme::Theme,
 };
 
@@ -82,6 +87,7 @@ pub struct App
     pub input: InputBuffer,
     pub palette: Palette,
     pub settings: Settings, //SETTINGS OVERLAY (CLOSED UNLESS THE USER OPENED IT)
+    pub tofu: Option<Prompt>, //SERVER IDENTITY PROMPT - OUTRANKS EVERY OTHER OVERLAY WHILE IT IS UP
     pub theme: Theme,
 
     //REQUEST BOOKKEEPING (A LIST/SCREENS RESPONSE IS ONLY ECHOED WHEN THE USER ASKED FOR IT)
@@ -127,6 +133,7 @@ impl App
             input: InputBuffer::new(),
             palette: Palette::new(),
             settings: Settings::new(),
+            tofu: None,
             theme: Theme::load(),
             list_requested: false,
             #[cfg(feature = "client_screen")]
@@ -293,7 +300,7 @@ pub fn wrap_line(line: &Line<'static>, width: u16) -> Vec<Line<'static>> //WORD-
             //BREAK BEFORE A WORD THAT NO LONGER FITS
             if column + word_width > width && column > 0
             {
-                out.push(Line::from(std::mem::take(&mut current)));
+                out.push(Line::from(mem::take(&mut current)));
                 column = 0;
 
                 if word.chars().all(char::is_whitespace) { continue; } //DROP THE SPACE THAT CAUSED THE BREAK
@@ -309,8 +316,8 @@ pub fn wrap_line(line: &Line<'static>, width: u16) -> Vec<Line<'static>> //WORD-
 
                     if column + w > width && column > 0
                     {
-                        current.push(Span::styled(std::mem::take(&mut chunk), style));
-                        out.push(Line::from(std::mem::take(&mut current)));
+                        current.push(Span::styled(mem::take(&mut chunk), style));
+                        out.push(Line::from(mem::take(&mut current)));
                         column = 0;
                     }
 

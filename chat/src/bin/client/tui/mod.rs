@@ -24,6 +24,7 @@ pub mod palette;
 pub mod settings;
 pub mod state;
 pub mod theme;
+pub mod tofu;
 
 use std::
 {
@@ -39,14 +40,19 @@ use std::
 
 use crossterm::
 {
-    execute,
-    terminal,
     cursor::Show,
+    terminal::
+    {
+        self,
+        EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
     event::
     {
         Event,
         EventStream,
         KeyCode,
+        KeyEvent,
         KeyEventKind,
         KeyModifiers,
         KeyboardEnhancementFlags,
@@ -58,7 +64,11 @@ use crossterm::
     },
 };
 
-use ratatui::{ Terminal, backend::CrosstermBackend };
+use ratatui::
+{
+    Terminal,
+    backend::CrosstermBackend,
+};
 
 use tokio::
 {
@@ -75,10 +85,15 @@ use tokio_stream::StreamExt;
 
 use crate::
 {
-    command,
     config,
     options,
     network::client::ClientEvent,
+    command::
+    {
+        self,
+        Command,
+        CommandInfo,
+    },
 };
 
 pub use state::App;
@@ -105,15 +120,15 @@ impl TerminalGuard
         let mouse = config::read_config::<bool>("mouse_capture");
 
         terminal::enable_raw_mode()?;
-        execute!(io::stdout(), terminal::EnterAlternateScreen)?;
+        crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
 
-        if mouse { execute!(io::stdout(), EnableMouseCapture)?; }
+        if mouse { crossterm::execute!(io::stdout(), EnableMouseCapture)?; }
 
         //Shift+Enter IS ONLY DISTINGUISHABLE WITH THE KITTY PROTOCOL; Alt+Enter IS THE UNIVERSAL FALLBACK
         let enhanced = terminal::supports_keyboard_enhancement().unwrap_or(false);
         if enhanced
         {
-            execute!(io::stdout(), PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES))?;
+            crossterm::execute!(io::stdout(), PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES))?;
         }
 
         Ok(Self { mouse, enhanced })
@@ -126,10 +141,10 @@ impl Drop for TerminalGuard
     {
         let mut stdout = io::stdout();
 
-        if self.enhanced { let _ = execute!(stdout, PopKeyboardEnhancementFlags); }
-        if self.mouse { let _ = execute!(stdout, DisableMouseCapture); }
+        if self.enhanced { let _ = crossterm::execute!(stdout, PopKeyboardEnhancementFlags); }
+        if self.mouse { let _ = crossterm::execute!(stdout, DisableMouseCapture); }
 
-        let _ = execute!(stdout, terminal::LeaveAlternateScreen, Show);
+        let _ = crossterm::execute!(stdout, LeaveAlternateScreen, Show);
         let _ = terminal::disable_raw_mode();
         let _ = stdout.flush();
     }
@@ -158,9 +173,9 @@ pub fn restore_terminal() //BEST-EFFORT, IDEMPOTENT
 {
     let mut stdout = io::stdout();
 
-    let _ = execute!(stdout, PopKeyboardEnhancementFlags);
-    let _ = execute!(stdout, DisableMouseCapture);
-    let _ = execute!(stdout, terminal::LeaveAlternateScreen, Show);
+    let _ = crossterm::execute!(stdout, PopKeyboardEnhancementFlags);
+    let _ = crossterm::execute!(stdout, DisableMouseCapture);
+    let _ = crossterm::execute!(stdout, LeaveAlternateScreen, Show);
     let _ = terminal::disable_raw_mode();
     let _ = stdout.flush();
 }
@@ -282,7 +297,7 @@ async fn handle_terminal_event
 async fn handle_key
 (
     app: &mut App,
-    key: crossterm::event::KeyEvent,
+    key: KeyEvent,
     write_stream: &Arc<MutexAsync<OwnedWriteHalf>>,
     viewport: u16,
 )
@@ -292,6 +307,15 @@ async fn handle_key
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
 
     app.dirty = true;
+
+    //THE IDENTITY PROMPT OUTRANKS EVERYTHING: THE NETWORK TASK IS PARKED ON ITS ANSWER, AND NOTHING MAY
+    //REACH A SERVER THE USER HAS NOT ACCEPTED YET
+    if app.tofu.is_some()
+    {
+        tofu::handle_key(app, key);
+
+        return;
+    }
 
     //THE SETTINGS OVERLAY OWNS THE KEYBOARD WHILE IT IS UP - EXCEPT FOR ITS OWN SHORTCUT, WHICH CLOSES IT
     if app.settings.open
@@ -410,7 +434,7 @@ async fn handle_key
     }
 }
 
-fn complete(app: &mut App, info: &'static command::CommandInfo)
+fn complete(app: &mut App, info: &'static CommandInfo)
 {
     app.input.clear();
     app.input.insert_str(&format!("{}{}", command::COMMAND_PREFIX, info.triggers[0].to_lowercase()));
@@ -426,7 +450,7 @@ fn settings_shortcut(code: KeyCode) -> bool //Ctrl+<SHORTCUT OF /settings>
     let KeyCode::Char(c) = code else { return false };
 
     command::COMMAND_LIST.iter()
-        .find(|info| info.command == command::Command::Settings)
+        .find(|info| info.command == Command::Settings)
         .is_some_and(|info| info.shortcut == Some(c))
 }
 

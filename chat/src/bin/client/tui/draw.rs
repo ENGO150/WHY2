@@ -41,7 +41,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::
 {
-    command,
+    command::CommandInfo,
     options::{ self, LoginState },
 };
 
@@ -51,9 +51,22 @@ use crate::network::voice::client::options as voice_options;
 use super::
 {
     theme,
-    state::App,
+    state::{ self, App },
     palette::{ self, PaletteMode },
-    settings::{ self, DeviceEntry, Row, Settings, Value },
+    tofu::
+    {
+        self,
+        Prompt,
+        Stage,
+    },
+    settings::
+    {
+        self,
+        Row,
+        Value,
+        Settings,
+        DeviceEntry,
+    },
 };
 
 //CONSTS
@@ -63,6 +76,7 @@ const INPUT_MIN_HEIGHT: u16       = 3;
 const INPUT_MAX_HEIGHT: u16       = 8;
 const CHANNELS_MIN_HEIGHT: u16    = 12; //SIDEBAR ROWS NEEDED BEFORE THE CHANNEL LIST IS WORTH SHOWING
 const SETTINGS_WIDTH: u16         = 62; //SETTINGS OVERLAY, CAPPED TO THE TERMINAL
+const TOFU_WIDTH: u16             = 64; //SERVER IDENTITY OVERLAY, CAPPED TO THE TERMINAL
 const SETTINGS_VALUE_WIDTH: u16   = 20; //NARROWEST THE VALUE COLUMN MAY GET (BAR + PERCENTAGE)
 
 #[cfg(feature = "client_voice")]
@@ -117,6 +131,9 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 
     //THE SETTINGS OVERLAY COVERS EVERYTHING ELSE (THE INPUT CURSOR IS SUPPRESSED IN draw_input)
     if app.settings.open { draw_settings(frame, &app.settings, area); }
+
+    //...AND THE IDENTITY PROMPT COVERS THE SETTINGS OVERLAY, BECAUSE IT IS THE ONLY THING THE USER MAY ANSWER
+    if let Some(prompt) = &app.tofu { draw_tofu(frame, prompt, area); }
 }
 
 //PRIVATE
@@ -347,8 +364,8 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
     let offset = cursor.1.saturating_sub(text_area.height.saturating_sub(1));
     frame.render_widget(Paragraph::new(lines).scroll((offset, 0)), text_area);
 
-    //NO CARET WHILE THE SETTINGS OVERLAY OWNS THE KEYBOARD
-    if app.settings.open { return; }
+    //NO CARET WHILE AN OVERLAY OWNS THE KEYBOARD
+    if app.settings.open || app.tofu.is_some() { return; }
 
     frame.set_cursor_position(Position::new
     (
@@ -373,7 +390,7 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
                 .skip(first)
                 .take(palette::MAX_ROWS)
                 .map(|info| (info, None))
-                .collect::<Vec<(&'static command::CommandInfo, Option<usize>)>>();
+                .collect::<Vec<(&'static CommandInfo, Option<usize>)>>();
 
             (entries, Some(selected - first), " Commands ")
         },
@@ -518,6 +535,138 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
     frame.render_widget(block, popup);
 
     frame.render_widget(Paragraph::new(lines), inner);
+}
+
+//THE SERVER IDENTITY PROMPT. THE WHOLE POINT IS THAT THE FINGERPRINT IS READABLE AND THE SAFE ANSWER IS
+//THE ONE ALREADY SELECTED - TRUSTING TAKES A DELIBERATE MOVE PLUS ⏎. A MISMATCH GOES ONE STEP FURTHER AND
+//ASKS A SECOND TIME (tofu::Stage::Confirm), WHERE THE ANSWER HAS TO BE TYPED OUT.
+fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
+{
+    let width = TOFU_WIDTH.min(area.width.saturating_sub(2)).max(1);
+    let inner_width = width.saturating_sub(4); //BORDERS PLUS A COLUMN OF AIR EACH SIDE
+
+    if area.height < 9 || inner_width < 20 { return; }
+
+    let confirming = prompt.stage == Stage::Confirm;
+
+    let warning = match (confirming, prompt.mismatch)
+    {
+        (true, _) => "Replacing a pinned key throws away the only thing that would \
+            catch an interception. Do it only after checking the fingerprint with \
+            the operator over a channel this server cannot touch.",
+
+        (false, true) => "The server is presenting a different identity key than the one \
+            pinned for this address. Either the operator replaced the server's \
+            keys, or somebody is sitting between you and it.",
+
+        (false, false) => "This address has no pinned identity key yet. Accept it only if the \
+            fingerprint below matches the one the server's operator published.",
+    };
+
+    //THE BODY IS WRAPPED WITH THE SAME WRAPPER THE MESSAGE PANE USES, SO A NARROW TERMINAL STAYS READABLE
+    let mut lines = state::wrap_line(&Line::from(Span::styled(warning, theme::NOTICE)), inner_width);
+
+    lines.push(Line::default());
+    lines.push(Line::from(vec!
+    [
+        Span::styled("Server   ", theme::DIM),
+        Span::raw(prompt.host.clone()),
+    ]));
+
+    //ON A MISMATCH BOTH FINGERPRINTS ARE ON SCREEN AT ONCE - THE DECISION IS A COMPARISON, NOT A GUESS
+    for (index, row) in prompt.pinned_fingerprint().into_iter().enumerate()
+    {
+        lines.push(Line::from(vec!
+        [
+            Span::styled(if index == 0 { "Pinned   " } else { "         " }, theme::DIM),
+            Span::styled(row, theme::DIM),
+        ]));
+    }
+
+    let label = if prompt.mismatch { "New key  " } else { "Key      " };
+
+    for (index, row) in prompt.fingerprint().into_iter().enumerate()
+    {
+        lines.push(Line::from(vec!
+        [
+            Span::styled(if index == 0 { label } else { "         " }, theme::DIM),
+            Span::styled(row, theme::ACCENT),
+        ]));
+    }
+
+    lines.push(Line::default());
+
+    if confirming
+    {
+        let typed = prompt.typed.chars().count();
+
+        lines.append(&mut state::wrap_line(&Line::from(Span::styled(format!
+        (
+            "Type '{}' to replace the pinned key with this one:",
+            tofu::CHALLENGE,
+        ), theme::TEXT)), inner_width));
+
+        lines.push(Line::from(vec!
+        [
+            Span::styled(prompt.typed.clone(), theme::ACCENT),
+            Span::styled("_".repeat(tofu::CHALLENGE.chars().count().saturating_sub(typed)), theme::DIM),
+        ]).centered());
+
+        if prompt.wrong
+        {
+            lines.push(Line::from(Span::styled(format!("Type '{}' to go through with it.", tofu::CHALLENGE),
+                theme::ERROR)).centered());
+        }
+    } else
+    {
+        lines.push(Line::from(vec!
+        [
+            button(" Reject ", !prompt.accept, theme::ERROR),
+            Span::raw("  "),
+            button(if prompt.mismatch { " Replace pinned key " } else { " Trust & save " }, prompt.accept, theme::OK),
+        ]).centered());
+    }
+
+    let height = lines.len() as u16 + 2;
+
+    let popup = Rect
+    {
+        x: area.x + (area.width.saturating_sub(width)) / 2,
+        y: area.y + (area.height.saturating_sub(height)) / 2,
+        width,
+        height: height.min(area.height),
+    };
+
+    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS, SO THE BASE FOREGROUND GOES BACK ON
+
+    frame.buffer_mut().set_style(popup, theme::TEXT);
+
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(theme::ERROR)
+        .title(Span::styled(prompt.title(), theme::ERROR))
+        .title_bottom(Line::from(Span::styled(if confirming
+        {
+            " type the word │ ⏎ confirm │ ← back │ Esc reject "
+        } else { " ←→ choose │ ⏎ confirm │ Esc reject " }, theme::DIM)).centered());
+
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    //ONE COLUMN OF AIR EACH SIDE, MATCHING WHAT inner_width WAS MEASURED AGAINST
+    let [_, text_area, _] = Layout::horizontal
+    ([
+        Constraint::Length(1),
+        Constraint::Min(0),
+        Constraint::Length(1),
+    ]).areas(inner);
+
+    frame.render_widget(Paragraph::new(lines), text_area);
+}
+
+fn button(label: &'static str, selected: bool, style: Style) -> Span<'static>
+{
+    if selected { Span::styled(label, style.patch(theme::SELECTED)) } else { Span::styled(label, theme::DIM) }
 }
 
 fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usize, width: usize) -> Line<'static>

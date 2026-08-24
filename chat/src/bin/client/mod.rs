@@ -24,7 +24,6 @@ pub mod tui;
 
 use std::
 {
-    env,
     process,
     fs::File,
     path::Path,
@@ -56,7 +55,14 @@ use unicode_width::UnicodeWidthStr;
 
 use ratatui::text::{ Line, Span };
 
-use tui::{ App, theme, settings::Devices };
+use tui::
+{
+    theme,
+    palette,
+    App,
+    TerminalGuard,
+    settings::Devices,
+};
 
 #[cfg(feature = "client_voice")]
 use tui::settings::DeviceEntry;
@@ -221,31 +227,6 @@ async fn main()
     while let Ok(event) = rx.try_recv() { pre_tui.apply(event); }
     flush_plain(&mut pre_tui);
 
-    //CHECK FOR PARAMETERS
-    if let Some(arg) = env::args().nth(1)
-    {
-        if arg == "--verify" && env::args().len() == 4 //SAVE SERVER PUBKEY
-        {
-            config::server_keys_save(&env::args().nth(2).unwrap(), &env::args().nth(3).unwrap());
-            println!("Key saved.");
-        } else if arg == "--help" && env::args().len() == 2
-        {
-            println!
-            (
-                "WHY2 Chat Client\n\
-                ================\n\n\
-                Usage: why2 [options]\n\n\
-                --verify (HOST) (PUBKEY HASH) - Whitelist server keys\n\
-                --help                        - Display this"
-            );
-        } else //INVALID CMD
-        {
-            println!("Invalid usage! Use 'why2 --help'.");
-        }
-
-        return;
-    }
-
     println!("Welcome.\n");
 
     //RUN REST OF CLIENT IN NEW TASK
@@ -342,7 +323,7 @@ async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>
     let mut app = App::new();
     app.address = display_addr;
 
-    let guard = tui::TerminalGuard::enter().expect("Entering the alternate screen failed");
+    let guard = TerminalGuard::enter().expect("Entering the alternate screen failed");
     let mut terminal = tui::init().expect("Creating the terminal backend failed");
 
     tui::run(&mut terminal, &mut app, &mut rx, &write_stream).await;
@@ -401,7 +382,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         {
                             //COLUMN WIDTHS ARE MEASURED, NOT GUESSED - LONG SIGNATURES MUST NOT PUSH THE REST OUT OF LINE
                             let signature_width = command::COMMAND_LIST.iter()
-                                .map(tui::palette::signature_width).max().unwrap_or(0);
+                                .map(palette::signature_width).max().unwrap_or(0);
 
                             //ONLY SHORTCUT-CARRYING ROWS NEED A PADDED DESCRIPTION, AND PADDING TO THE
                             //LONGEST DESCRIPTION OF ALL WOULD PUSH THEM OFF THE PANE
@@ -415,12 +396,12 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
                             for (index, info) in command::COMMAND_LIST.iter().enumerate() //ITERATE OVER ALL COMMANDS
                             {
-                                let shortcut = tui::palette::format_shortcut(info);
-                                let padding = signature_width - tui::palette::signature_width(info);
+                                let shortcut = palette::format_shortcut(info);
+                                let padding = signature_width - palette::signature_width(info);
 
                                 let mut spans = vec![Span::styled(tui::branch(index == last), theme::BORDER)];
 
-                                spans.extend(tui::palette::signature_spans(info, None));
+                                spans.extend(palette::signature_spans(info, None));
                                 spans.push(Span::raw(" ".repeat(padding + 2)));
 
                                 spans.push(Span::styled(format!
@@ -447,9 +428,9 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                 if let Some(info) = command::COMMAND_LIST.iter()
                                     .find(|c| c.triggers.iter().any(|t| t.eq_ignore_ascii_case(&parameters)))
                                 {
-                                    let shortcut = tui::palette::format_shortcut(info);
+                                    let shortcut = palette::format_shortcut(info);
 
-                                    app.push(Line::from(tui::palette::signature_spans(info, None)));
+                                    app.push(Line::from(palette::signature_spans(info, None)));
 
                                     let fields =
                                     [

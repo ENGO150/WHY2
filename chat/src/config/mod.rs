@@ -310,6 +310,14 @@ pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VA
 }
 
 #[cfg(feature = "client_base")]
+pub fn server_keys_pinned(host: &str) -> Option<String> //THE FINGERPRINT CURRENTLY PINNED FOR host, IF ANY
+{
+    if get_data(&config_path(consts::SERVER_KEYS_CONFIG)).get(host).is_none() { return None; }
+
+    Some(config_read::<String>(consts::SERVER_KEYS_CONFIG, host))
+}
+
+#[cfg(feature = "client_base")]
 pub fn server_keys_save(host: &str, pubkey_hash: &str) //SAVE KEY
 {
     //WRITE
