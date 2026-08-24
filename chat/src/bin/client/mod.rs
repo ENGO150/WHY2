@@ -221,37 +221,6 @@ where
     devices
 }
 
-#[cfg(feature = "client_voice")]
-fn list_devices(devices: &[String])
-{
-    for (i, device) in devices.iter().enumerate()
-    {
-        println!("[{}]: {device}", i + 1);
-    }
-}
-
-#[cfg(feature = "client_voice")]
-fn setup_devices() //SELECT AUDIO DEVICES AND STORE IN CLIENT CONFIG
-{
-    let host = cpal::default_host();
-
-    //COLLECT INPUT DEVICES
-    println!("Available input devices\n=======================");
-    let input_devices = load_devices(host.input_devices().unwrap());
-
-    //GET INPUT DEVICE
-    list_devices(&input_devices); //LIST
-    prompt_selection(&input_devices, "input_device"); //PROMPT
-
-    //COLLECT OUTPUT DEVICES
-    println!("\nAvailable output devices\n========================");
-    let output_devices = load_devices(host.output_devices().unwrap());
-
-    //GET OUTPUT DEVICE
-    list_devices(&output_devices); //LIST
-    prompt_selection(&output_devices, "output_device"); //PROMPT
-}
-
 //EVERY INPUT/OUTPUT DEVICE cpal KNOWS ABOUT (BLOCKING, AND ALSA SPEAKS TO fd 2 - HENCE THE GAG)
 async fn audio_devices() -> Devices
 {
@@ -301,10 +270,6 @@ async fn main()
         {
             config::server_keys_save(&env::args().nth(2).unwrap(), &env::args().nth(3).unwrap());
             println!("Key saved.");
-        } else if arg == "--audio-setup" && env::args().len() == 2
-        {
-            #[cfg(feature = "client_voice")]
-            setup_devices();
         } else if arg == "--help" && env::args().len() == 2
         {
             println!
@@ -313,7 +278,6 @@ async fn main()
                 ================\n\n\
                 Usage: why2 [options]\n\n\
                 --verify (HOST) (PUBKEY HASH) - Whitelist server keys\n\
-                --audio-setup                 - Select audio devices for voice chat\n\
                 --help                        - Display this"
             );
         } else //INVALID CMD
