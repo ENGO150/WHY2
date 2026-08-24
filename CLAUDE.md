@@ -210,12 +210,24 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     A row whose config key is phrased as a negative (`disable_colors`) carries `invert`, and the
     inversion happens in exactly one place per direction (`settings::toggle_value` on read,
     `settings::toggle` on write) — inverting on only one side silently makes the row a no-op.
-    Device lists come from one `spawn_blocking` cpal enumeration when the command is typed
-    (`mod.rs::audio_devices`, gagged stderr), never from the draw path. Picking a device bumps
-    `voice_options::mark_devices_changed`, and the voice session's VAD task rebuilds both cpal streams
-    (`voice::client::replace_streams`) within its 100 ms tick: the UDP socket, `CONSUMERS` and the
-    jitter buffers survive, so the call does not drop. A device that will not open keeps the old pair
-    and reports `ClientEvent::VoiceDeviceFailed`.
+    Device lists come from one `spawn_blocking` call to `voice::client::list_devices` when the command
+    is typed (`mod.rs::audio_devices`, gagged stderr), never from the draw path. **That list has to come
+    from the voice client itself**: it enumerates `voice::client::audio_hosts` — the ALSA host that
+    `audio_host()` pins for latency, then the sound server's own host — and the client later opens the
+    chosen device out of the same hosts. Listing anywhere else (`cpal::default_host()` in the client
+    binary, as it used to be) hands the picker names from PulseAudio while the opener looks them up in
+    ALSA, and every switch fails. `client.toml` stores the **cpal device id** (`alsa:plughw:CARD=1,DEV=0`,
+    `pulseaudio:alsa_input…`), which carries its host and is unique; the description is display only
+    (`Settings::device_label`) because ALSA hands the same one to a dozen PCMs. `is_usable` drops the
+    ALSA PCMs that are noise (`null`, `hw:`, `surround*`, `iec958`) and, once a sound server is running,
+    the raw cards too — the server holds those and ALSA can only report them busy.
+    Picking a device bumps `voice_options::mark_devices_changed`, and the voice session's VAD task
+    rebuilds both cpal streams (`voice::client::replace_streams`) within its 100 ms tick: the UDP socket,
+    `CONSUMERS` and the jitter buffers survive, so the call does not drop. The old pair is dropped
+    **before** the new one is built — a PCM is exclusive, so the device that is kept across the switch
+    (usually one of the two) would refuse a second open. A device that will not open puts the previous
+    pair back, points `input_device`/`output_device` at it again and reports
+    `ClientEvent::VoiceDeviceFailed`, which re-reads those two rows (`Settings::refresh_devices`).
   - Chat messages live in `App::messages` as `state::Entry::Message` (username/id/text/colors), not as
     rendered `Line`s — `Theme::render` turns an entry into a line on every wrap, so a `show_id` or
     `disable_colors` change repaints the messages already in the pane. Anything that rewrites

@@ -43,8 +43,9 @@ pub enum Value
     #[cfg(feature = "client_voice")]
     Volume(u32), //PERCENT
 
+    //THE cpal DEVICE ID, WHICH IS WHAT client.toml HOLDS - THE LABEL IS LOOKED UP FOR DISPLAY ONLY
     #[cfg(feature = "client_voice")]
-    Device { name: String, input: bool }, //EMPTY NAME = SYSTEM DEFAULT
+    Device { id: String, input: bool }, //EMPTY ID = SYSTEM DEFAULT
 }
 
 pub enum Row
@@ -61,10 +62,19 @@ pub struct Item
     pub value: Value,
 }
 
+//ONE DEVICE AS THE PICKER SHOWS IT. THE id IS WHAT client.toml HOLDS AND WHAT THE VOICE CLIENT OPENS -
+//THE label IS DISPLAY ONLY, AND IS NOT UNIQUE (ALSA HANDS OUT THE SAME DESCRIPTION TO SEVERAL PCMs).
+#[derive(Clone, Default)]
+pub struct DeviceEntry
+{
+    pub id: String,
+    pub label: String,
+}
+
 pub struct Picker //DEVICE LIST OPENED ON TOP OF THE SETTINGS ROWS
 {
     pub title: &'static str,
-    pub entries: Vec<String>, //ENTRY 0 IS ALWAYS THE SYSTEM DEFAULT
+    pub entries: Vec<DeviceEntry>, //ENTRY 0 IS ALWAYS THE SYSTEM DEFAULT
     pub selected: usize,
     pub row: usize, //THE SETTINGS ROW THAT OPENED IT
 }
@@ -73,10 +83,10 @@ pub struct Picker //DEVICE LIST OPENED ON TOP OF THE SETTINGS ROWS
 pub struct Devices //WHAT cpal REPORTED, ENUMERATED ONCE WHEN /settings IS TYPED
 {
     #[cfg(feature = "client_voice")]
-    pub input: Vec<String>,
+    pub input: Vec<DeviceEntry>,
 
     #[cfg(feature = "client_voice")]
-    pub output: Vec<String>,
+    pub output: Vec<DeviceEntry>,
 }
 
 pub struct Settings //THE /settings OVERLAY
@@ -125,14 +135,14 @@ impl Settings
             {
                 label: "Input device",
                 key: "input_device",
-                value: Value::Device { name: config::read_config::<String>("input_device"), input: true },
+                value: Value::Device { id: config::read_config::<String>("input_device"), input: true },
             }));
 
             rows.push(Row::Item(Item
             {
                 label: "Output device",
                 key: "output_device",
-                value: Value::Device { name: config::read_config::<String>("output_device"), input: false },
+                value: Value::Device { id: config::read_config::<String>("output_device"), input: false },
             }));
 
             rows.push(Row::Item(Item
@@ -224,6 +234,32 @@ impl Settings
             }
         }
     }
+
+    //WHAT A STORED DEVICE ID IS CALLED - A DEVICE THAT IS NOT IN THE LIST ANY MORE FALLS BACK TO ITS RAW ID
+    #[cfg(feature = "client_voice")]
+    pub fn device_label(&self, id: &str, input: bool) -> String
+    {
+        if id.is_empty() { return String::from(DEFAULT_DEVICE); }
+
+        let devices = if input { &self.devices.input } else { &self.devices.output };
+
+        devices.iter().find(|device| device.id == id).map(|device| device.label.clone()).unwrap_or_else(|| String::from(id))
+    }
+
+    //RE-READ THE DEVICE ROWS OUT OF THE CONFIG - THE VOICE CLIENT PUTS THE OLD PAIR BACK WHEN A SWITCH FAILS
+    #[cfg(feature = "client_voice")]
+    pub fn refresh_devices(&mut self)
+    {
+        for row in self.rows.iter_mut()
+        {
+            let Row::Item(item) = row else { continue };
+
+            if let Value::Device { input, .. } = item.value
+            {
+                item.value = Value::Device { id: config::read_config::<String>(item.key), input };
+            }
+        }
+    }
 }
 
 //READ A BOOLEAN SETTING AS THE ROW SHOWS IT - invert IS FOR KEYS PHRASED AS A NEGATIVE (disable_colors)
@@ -294,7 +330,7 @@ fn handle_picker_key(app: &mut App, key: KeyEvent)
             let Some(picker) = app.settings.picker.take() else { return };
 
             //ENTRY 0 IS THE SYSTEM DEFAULT, WHICH IS AN EMPTY CONFIG VALUE
-            let chosen = if picker.selected == 0 { String::new() } else { picker.entries[picker.selected].clone() };
+            let chosen = picker.entries.get(picker.selected).map(|entry| entry.id.clone()).unwrap_or_default();
 
             set_device(app, picker.row, chosen);
             return;
@@ -341,7 +377,7 @@ fn selected(app: &App) -> Option<Selected>
         Value::Volume(percent) => Selected::Volume(item.key, *percent),
 
         #[cfg(feature = "client_voice")]
-        Value::Device { name, input } => Selected::Device(name.clone(), *input),
+        Value::Device { id, input } => Selected::Device(id.clone(), *input),
     })
 }
 
@@ -375,13 +411,13 @@ fn adjust(app: &mut App, direction: i32)
         },
 
         #[cfg(feature = "client_voice")]
-        Some(Selected::Device(name, input)) =>
+        Some(Selected::Device(id, input)) =>
         {
             let entries = device_entries(app, input);
-            let current = entries.iter().position(|entry| *entry == name).unwrap_or(0);
+            let current = entries.iter().position(|entry| entry.id == id).unwrap_or(0);
 
             let next = (current as isize + direction as isize).rem_euclid(entries.len() as isize) as usize;
-            let chosen = entries[next].clone();
+            let chosen = entries[next].id.clone();
 
             set_device(app, _row, chosen);
         },
@@ -403,14 +439,14 @@ fn activate(app: &mut App)
         Some(Selected::Volume(..)) => adjust(app, 1),
 
         #[cfg(feature = "client_voice")]
-        Some(Selected::Device(name, input)) =>
+        Some(Selected::Device(id, input)) =>
         {
             let entries = device_entries(app, input);
 
             app.settings.picker = Some(Picker
             {
                 title: if input { " Input device " } else { " Output device " },
-                selected: entries.iter().position(|entry| *entry == name).unwrap_or(0),
+                selected: entries.iter().position(|entry| entry.id == id).unwrap_or(0),
                 entries,
                 row: _row,
             });
@@ -463,12 +499,12 @@ fn set_device(app: &mut App, row: usize, chosen: String)
 {
     let Some(Row::Item(item)) = app.settings.rows.get_mut(row) else { return };
 
-    let Value::Device { name, input } = &item.value else { return };
+    let Value::Device { id, input } = &item.value else { return };
 
-    if *name == chosen { return; }
+    if *id == chosen { return; }
 
     let (key, input) = (item.key, *input);
-    item.value = Value::Device { name: chosen.clone(), input };
+    item.value = Value::Device { id: chosen.clone(), input };
 
     config::client_write(key, &chosen);
 
@@ -481,16 +517,19 @@ fn set_device(_app: &mut App, _row: usize, _chosen: String) {}
 
 //THE SYSTEM DEFAULT PLUS EVERY DEVICE cpal REPORTED, WITH THE CONFIGURED ONE GUARANTEED TO BE IN THE LIST
 #[cfg(feature = "client_voice")]
-fn device_entries(app: &App, input: bool) -> Vec<String>
+fn device_entries(app: &App, input: bool) -> Vec<DeviceEntry>
 {
     let devices = if input { &app.settings.devices.input } else { &app.settings.devices.output };
 
-    let mut entries = vec![String::new()];
+    let mut entries = vec![DeviceEntry { id: String::new(), label: String::from(DEFAULT_DEVICE) }];
     entries.extend(devices.iter().cloned());
 
     //A DEVICE THAT IS CONFIGURED BUT CURRENTLY UNPLUGGED STILL DESERVES A ROW
     let configured = config::read_config::<String>(if input { "input_device" } else { "output_device" });
-    if !configured.is_empty() && !entries.contains(&configured) { entries.push(configured); }
+    if !configured.is_empty() && !entries.iter().any(|entry| entry.id == configured)
+    {
+        entries.push(DeviceEntry { label: configured.clone(), id: configured });
+    }
 
     entries
 }

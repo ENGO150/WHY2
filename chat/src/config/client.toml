@@ -26,7 +26,7 @@ auto_connect_addr = "0.0.0.0" # See 'auto_connect'
 # Downloads
 download_directory = "{HOME}/Downloads/WHY2"
 
-# Voice chat devices (set via /settings, --audio-setup or leave blank for default)
+# Voice chat devices (cpal device IDs - set via /settings, or leave blank for the system default)
 input_device = ""
 output_device = ""
 

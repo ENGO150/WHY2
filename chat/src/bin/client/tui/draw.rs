@@ -53,7 +53,7 @@ use super::
     theme,
     state::App,
     palette::{ self, PaletteMode },
-    settings::{ self, Row, Settings, Value },
+    settings::{ self, DeviceEntry, Row, Settings, Value },
 };
 
 //CONSTS
@@ -484,7 +484,7 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
         None => state.rows.iter().enumerate()
             .skip(first)
             .take(visible)
-            .map(|(index, row)| settings_line(row, index == state.selected, label_width, inner_width))
+            .map(|(index, row)| settings_line(state, row, index == state.selected, label_width, inner_width))
             .collect::<Vec<Line>>(),
     };
 
@@ -520,7 +520,7 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
-fn settings_line(row: &Row, selected: bool, label_width: usize, width: usize) -> Line<'static>
+fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usize, width: usize) -> Line<'static>
 {
     let item = match row
     {
@@ -544,14 +544,14 @@ fn settings_line(row: &Row, selected: bool, label_width: usize, width: usize) ->
         ),
     ];
 
-    spans.extend(value_spans(&item.value, width.saturating_sub(label_width + 3)));
+    spans.extend(value_spans(_state, &item.value, width.saturating_sub(label_width + 3)));
 
     let line = Line::from(spans);
 
     if selected { line.style(theme::SELECTED) } else { line }
 }
 
-fn value_spans(value: &Value, _width: usize) -> Vec<Span<'static>>
+fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'static>>
 {
     match value
     {
@@ -573,29 +573,29 @@ fn value_spans(value: &Value, _width: usize) -> Vec<Span<'static>>
         },
 
         #[cfg(feature = "client_voice")]
-        Value::Device { name, .. } =>
+        Value::Device { id, input } =>
         {
-            if name.is_empty()
+            if id.is_empty()
             {
                 vec![Span::styled(settings::DEFAULT_DEVICE, theme::DIM)]
             } else
             {
-                vec![Span::styled(truncate(name, _width), theme::ACCENT)]
+                vec![Span::styled(truncate(&_state.device_label(id, *input), _width), theme::ACCENT)]
             }
         },
     }
 }
 
 #[cfg(feature = "client_voice")]
-fn picker_line(entry: &str, selected: bool, width: usize) -> Line<'static>
+fn picker_line(entry: &DeviceEntry, selected: bool, width: usize) -> Line<'static>
 {
     //ENTRY 0 IS THE EMPTY CONFIG VALUE, WHICH MEANS "WHATEVER THE SYSTEM PICKS"
-    let (text, style) = if entry.is_empty()
+    let (text, style) = if entry.id.is_empty()
     {
         (String::from(settings::DEFAULT_DEVICE), theme::DIM)
     } else
     {
-        (truncate(entry, width.saturating_sub(3)), theme::TEXT)
+        (truncate(&entry.label, width.saturating_sub(3)), theme::TEXT)
     };
 
     let line = Line::from(vec!
@@ -608,7 +608,7 @@ fn picker_line(entry: &str, selected: bool, width: usize) -> Line<'static>
 }
 
 #[cfg(not(feature = "client_voice"))]
-fn picker_line(_entry: &str, _selected: bool, _width: usize) -> Line<'static> { Line::default() }
+fn picker_line(_entry: &DeviceEntry, _selected: bool, _width: usize) -> Line<'static> { Line::default() }
 
 fn truncate(text: &str, width: usize) -> String //FIT text INTO width CELLS, ELLIPSIS AND ALL
 {

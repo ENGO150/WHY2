@@ -129,7 +129,8 @@ cargo build --bin why2-server --no-default-features --features server --release
      - Display options (`show_id`, `disable_colors`)
      - Voice chat audio (`input_device`, `output_device`, `input_volume`, `output_volume`,
        `noise_suppression`, `automatic_gain`) - all editable in-app with `/settings`, and applied
-       immediately, including to a voice call that is already running
+       immediately, including to a voice call that is already running. The two device keys hold a
+       cpal device ID, so pick them in `/settings` rather than by hand
 
 ### Important Commands
 

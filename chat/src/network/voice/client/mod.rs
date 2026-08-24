@@ -117,6 +117,19 @@ struct LocalStream
 {
     _input: Stream,
     _output: Stream,
+
+    //THE PAIR THIS WAS BUILT FROM (EMPTY = SYSTEM DEFAULT), SO A FAILED SWITCH CAN GO BACK TO IT
+    input_id: String,
+    output_id: String,
+}
+
+//ONE DEVICE AS THE SETTINGS OVERLAY SHOWS IT. THE id IS WHAT client.toml STORES AND WHAT find_devices
+//MATCHES ON - THE label IS ONLY EVER DISPLAYED, AND IS NOT UNIQUE ON ALSA.
+#[derive(Clone)]
+pub struct AudioDevice
+{
+    pub id: String,
+    pub label: String,
 }
 
 struct StreamGuard
@@ -167,25 +180,123 @@ impl Drop for StreamGuard
 }
 
 //PRIVATE
-fn find_devices(host: &Host) -> Option<(Device, Device)> //FIND CONFIGURED/DEFAULT DEVICE
+fn device_id(device: &Device) -> String //THE HOST-QUALIFIED cpal ID, E.G. "alsa:plughw:CARD=1,DEV=0"
 {
-    //GET DEVICES FROM CONFIG
-    let input_device = config::read_config::<String>("input_device");
-    let output_device = config::read_config::<String>("output_device");
+    device.id().map(|id| id.to_string()).unwrap_or_default()
+}
 
-    //GET INPUT DEVICE (OR DEFAULT IF EMPTY)
-    let input_device = if !input_device.is_empty()
+//WHETHER A DEVICE IS WORTH OFFERING IN /settings. ALSA ENUMERATES EVERY PCM PLUGIN, MOST OF WHICH SHARE
+//THE SAME DESCRIPTION AND EITHER CANNOT BE OPENED AT ALL (hw:, surround*, iec958 ON A STEREO CARD) OR
+//DUPLICATE ONE THAT CAN - plughw: DOES THE FORMAT CONVERSION FOR US, SO IT IS THE ONE WE KEEP. cards IS
+//CLEARED ONCE A SOUND SERVER IS IN THE PICTURE: IT HOLDS THE CARDS ITSELF AND ALSA ONLY REPORTS THEM BUSY,
+//SO THE SERVER'S OWN HOST IS WHERE A NAMED DEVICE COMES FROM.
+fn is_usable(id: &str, cards: bool) -> bool
+{
+    #[cfg(target_os = "linux")]
     {
-        host.input_devices().ok()?.find(|d| d.description().is_ok_and(|desc| desc.to_string() == input_device))
-    } else { host.default_input_device() };
+        let Some(pcm) = id.strip_prefix("alsa:") else { return true };
 
-    //GET OUTPUT DEVICE (OR DEFAULT IF EMPTY)
-    let output_device = if !output_device.is_empty()
+        if pcm == "null" { return false; }
+
+        //A PLUGIN WITHOUT A CARD (default, sysdefault, pipewire, pulse, ...) IS THE SOUND SERVER ITSELF
+        if !pcm.contains("CARD=") { return true; }
+
+        cards && pcm.starts_with("plughw:")
+    }
+
+    #[cfg(not(target_os = "linux"))]
     {
-        host.output_devices().ok()?.find(|d| d.description().is_ok_and(|desc| desc.to_string() == output_device))
-    } else { host.default_output_device() };
+        let (_, _) = (id, cards);
+        true
+    }
+}
 
-    Some((input_device?, output_device?))
+//EVERY HOST THE VOICE CLIENT IS WILLING TO OPEN A DEVICE IN, LOWEST LATENCY FIRST. audio_host() IS WHERE
+//THE SYSTEM DEFAULT COMES FROM; THE SOUND SERVER'S OWN HOST FOLLOWS IT, BECAUSE PIPEWIRE/PULSEAUDIO HOLD
+//THE RAW CARDS AND ALSA CAN ONLY REPORT THEM AS BUSY - PICKING A NAMED DEVICE HAS TO GO THROUGH THE SERVER.
+fn audio_hosts() -> Vec<Host>
+{
+    let primary = audio_host();
+    let mut hosts = vec![primary];
+
+    let fallback = cpal::default_host();
+    if fallback.id() != hosts[0].id() { hosts.push(fallback); }
+
+    hosts
+}
+
+//EVERY DEVICE THE VOICE CLIENT COULD OPEN, ENUMERATED IN THE SAME HOSTS THAT LATER OPEN THEM - THE LIST
+//THAT /settings SHOWS AND THE ID IT WRITES HAVE TO COME FROM THE SAME PLACE, OR THE SAVED DEVICE MATCHES
+//NOTHING WHEN THE TIME COMES TO OPEN IT.
+//BLOCKING, AND ALSA SPEAKS TO fd 2 - HENCE THE GAG.
+pub fn list_devices() -> (Vec<AudioDevice>, Vec<AudioDevice>) //(INPUT, OUTPUT)
+{
+    let _stderr_gag = Gag::stderr().ok();
+    let hosts = audio_hosts();
+
+    //WITH A SOUND SERVER RUNNING, THE RAW ALSA CARDS BELONG TO IT AND ARE NOT OURS TO OPEN
+    let cards = hosts.len() == 1;
+
+    let collect = |input: bool|
+    {
+        let mut out: Vec<AudioDevice> = Vec::new();
+
+        for host in hosts.iter() { collect_devices(host, input, cards, &mut out); }
+
+        out
+    };
+
+    (collect(true), collect(false))
+}
+
+fn collect_devices(host: &Host, input: bool, cards: bool, out: &mut Vec<AudioDevice>)
+{
+    let Ok(devices) = (if input { host.input_devices() } else { host.output_devices() }) else { return };
+
+    let start = out.len();
+
+    for device in devices
+    {
+        let id = device_id(&device);
+
+        if id.is_empty() || !is_usable(&id, cards) || out.iter().any(|entry| entry.id == id) { continue; }
+
+        let Ok(label) = device.description().map(|d| d.to_string()) else { continue };
+
+        out.push(AudioDevice { id, label });
+    }
+
+    //EACH HOST IS SORTED WITHIN ITSELF, SO THE ORDER OF THE HOSTS THEMSELVES SURVIVES
+    out[start..].sort_by(|a, b| a.label.cmp(&b.label).then_with(|| a.id.cmp(&b.id)));
+}
+
+//THE DEVICE wanted POINTS AT, OR THE SYSTEM DEFAULT WHEN IT IS EMPTY. THE ID CARRIES ITS HOST, SO A DEVICE
+//IS LOOKED FOR IN EVERY HOST AND CAN ONLY EVER MATCH THE ONE IT CAME FROM.
+fn pick_device(wanted: &str, input: bool) -> Option<Device>
+{
+    let hosts = audio_hosts();
+
+    if wanted.is_empty()
+    {
+        let host = hosts.first()?;
+
+        return if input { host.default_input_device() } else { host.default_output_device() };
+    }
+
+    let devices: Vec<Device> = hosts.iter()
+        .filter_map(|host| if input { host.input_devices().ok() } else { host.output_devices().ok() })
+        .flatten()
+        .collect();
+
+    devices.iter().find(|device| device_id(device) == wanted)
+        //A CONFIG WRITTEN BEFORE DEVICES WERE STORED BY ID STILL HOLDS A DESCRIPTION
+        .or_else(|| devices.iter().find(|device| device.description().is_ok_and(|desc| desc.to_string() == wanted)))
+        .cloned()
+}
+
+fn configured_ids() -> (String, String) //THE PAIR client.toml CURRENTLY POINTS AT
+{
+    (config::read_config::<String>("input_device"), config::read_config::<String>("output_device"))
 }
 
 pub fn configure_device(device: &cpal::Device, supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig, is_input_stream: bool) -> StreamConfig
@@ -582,16 +693,17 @@ fn build_output_stream(device: &Device, config: StreamConfig, current_generation
     }, |_| {}, None).ok()
 }
 
-//BOTH STREAMS FOR WHATEVER THE CONFIG CURRENTLY POINTS AT, ALREADY PLAYING
-fn build_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> Option<LocalStream>
+//BOTH STREAMS, ALREADY PLAYING. wanted OVERRIDES THE CONFIGURED PAIR (USED TO GO BACK TO A DEVICE THAT WORKED).
+fn build_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>, wanted: Option<(String, String)>) -> Option<LocalStream>
 {
-    let host = audio_host();
+    let (wanted_input, wanted_output) = wanted.unwrap_or_else(configured_ids);
 
     //FIND INPUT/OUTPUT DEVICE (SUPPRESS STDERR TO AVOID ALSA ERRORS)
     let (input_device, output_device) =
     {
         let _stderr_gag = Gag::stderr().ok();
-        find_devices(&host)?
+
+        (pick_device(&wanted_input, true)?, pick_device(&wanted_output, false)?)
     };
 
     //CONFIGURE CPAL INPUT
@@ -613,20 +725,42 @@ fn build_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> Opti
     {
         _input: input_stream,
         _output: output_stream,
+        input_id: wanted_input,
+        output_id: wanted_output,
     })
 }
 
 //SWAPS IN A FRESHLY BUILT PAIR AFTER A /settings DEVICE CHANGE. THE UDP SESSION, THE PEERS AND THE JITTER
-//BUFFERS ARE UNTOUCHED - ONLY THE TWO CPAL STREAMS ARE REPLACED. A DEVICE THAT CANNOT BE OPENED KEEPS THE OLD PAIR.
+//BUFFERS ARE UNTOUCHED - ONLY THE TWO CPAL STREAMS ARE REPLACED.
 fn replace_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> bool
 {
-    let Some(streams) = build_streams(current_generation, packet_tx) else { return false };
-
-    //THE OLD PAIR STOPS WHEN IT IS DROPPED, WHICH HAPPENS OUTSIDE THE LOCK
-    let previous = LOCAL_STREAMS.lock().unwrap().replace(streams);
+    //THE OLD PAIR HAS TO STOP BEFORE THE NEW ONE OPENS - AN ALSA PCM IS EXCLUSIVE, SO THE DEVICE THAT IS
+    //KEPT ACROSS THE SWITCH (ONLY ONE OF THE TWO USUALLY CHANGES) WOULD REFUSE THE SECOND OPEN
+    let previous = LOCAL_STREAMS.lock().unwrap().take();
+    let restore = previous.as_ref().map(|streams| (streams.input_id.clone(), streams.output_id.clone()));
     drop(previous);
 
-    true
+    if let Some(streams) = build_streams(current_generation, packet_tx, None)
+    {
+        *LOCAL_STREAMS.lock().unwrap() = Some(streams);
+
+        return true;
+    }
+
+    //THE NEW DEVICE WILL NOT OPEN - PUT THE CALL BACK ON THE PAIR THAT WAS PLAYING, AND POINT THE CONFIG
+    //AT IT AGAIN, SO THE SETTINGS ROW AND THE NEXT JOIN BOTH AGREE WITH WHAT IS ACTUALLY RUNNING
+    if let Some((input_id, output_id)) = restore
+    {
+        config::client_write("input_device", &input_id);
+        config::client_write("output_device", &output_id);
+
+        if let Some(streams) = build_streams(current_generation, packet_tx, Some((input_id, output_id)))
+        {
+            *LOCAL_STREAMS.lock().unwrap() = Some(streams);
+        }
+    }
+
+    false
 }
 
 //PUBLIC
@@ -677,7 +811,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     });
 
     //BUILD AND START THE CPAL STREAMS
-    let streams = match build_streams(current_generation, &packet_tx)
+    let streams = match build_streams(current_generation, &packet_tx, None)
     {
         Some(streams) => streams,
         None => //NO USABLE DEVICE

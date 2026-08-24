@@ -58,6 +58,9 @@ use ratatui::text::{ Line, Span };
 
 use tui::{ App, theme, settings::Devices };
 
+#[cfg(feature = "client_voice")]
+use tui::settings::DeviceEntry;
+
 use why2_chat::
 {
     config,
@@ -74,11 +77,7 @@ use why2_chat::
 };
 
 #[cfg(feature = "client_voice")]
-use cpal::
-{
-    Device,
-    traits::{ DeviceTrait, HostTrait },
-};
+use why2_chat::network::voice::client as voice;
 
 #[cfg(feature = "client_screen")]
 use winit::event_loop::EventLoop;
@@ -174,54 +173,8 @@ async fn read_line() -> String //READ ONE LINE FROM STDIN (BEFORE RAW MODE IS EN
     }).await.expect("Reading stdin failed")
 }
 
-#[cfg(feature = "client_voice")]
-fn prompt_selection(devices: &[String], config: &str) -> usize
-{
-    //PROMPT
-    let mut input: String;
-    loop
-    {
-        print!("\nSelect device: ");
-        io::stdout().flush().unwrap();
-        input = String::new(); //CLEAR BUFFER
-        io::stdin().read_line(&mut input).unwrap(); //READ INPUT
-
-        if let Ok(idx) = input.trim().parse::<usize>() && idx != 0
-        {
-            if let Some(device) = devices.get(idx - 1)
-            {
-                config::client_write(config, device);
-                println!("Set to: {}", device);
-                return idx - 1;
-            }
-        }
-
-        println!("Invalid selection!");
-    }
-}
-
-#[cfg(feature = "client_voice")]
-fn load_devices<T>(all_devices: T) -> Vec<String>
-where
-    T: Iterator<Item = Device>
-{
-    //COLLECT
-    let mut devices = Vec::new();
-    for device in all_devices
-    {
-        //DO NOT PUSH DUPLICATES
-        if let Ok(name) = device.description().map(|d| d.to_string()) && !devices.contains(&name)
-        {
-            devices.push(name);
-        }
-    }
-
-    //SORT & RETURN
-    devices.sort();
-    devices
-}
-
-//EVERY INPUT/OUTPUT DEVICE cpal KNOWS ABOUT (BLOCKING, AND ALSA SPEAKS TO fd 2 - HENCE THE GAG)
+//EVERY DEVICE THE VOICE CLIENT COULD OPEN. THE LIST COMES FROM THE VOICE CLIENT ITSELF, SO IT IS ENUMERATED
+//IN THE SAME cpal HOST THAT LATER OPENS THE CHOSEN DEVICE (BLOCKING, HENCE spawn_blocking).
 async fn audio_devices() -> Devices
 {
     #[cfg(not(feature = "client_voice"))]
@@ -233,16 +186,21 @@ async fn audio_devices() -> Devices
     {
         task::spawn_blocking(||
         {
-            let _stderr_gag = gag::Gag::stderr().ok();
-            let host = cpal::default_host();
+            let (input, output) = voice::list_devices();
 
             Devices
             {
-                input: host.input_devices().map(load_devices).unwrap_or_default(),
-                output: host.output_devices().map(load_devices).unwrap_or_default(),
+                input: input.into_iter().map(device_entry).collect(),
+                output: output.into_iter().map(device_entry).collect(),
             }
         }).await.unwrap_or_default()
     }
+}
+
+#[cfg(feature = "client_voice")]
+fn device_entry(device: voice::AudioDevice) -> DeviceEntry
+{
+    DeviceEntry { id: device.id, label: device.label }
 }
 
 #[tokio::main]

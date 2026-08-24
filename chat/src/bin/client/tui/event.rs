@@ -180,6 +180,10 @@ impl App
             ClientEvent::VoiceDeviceFailed =>
             {
                 self.push_styled("Switching the audio device failed - the previous one is still in use.", theme::ERROR);
+
+                //THE VOICE CLIENT POINTED THE CONFIG BACK AT THE DEVICE THAT IS ACTUALLY PLAYING
+                #[cfg(feature = "client_voice")]
+                self.settings.refresh_devices();
             },
 
             ClientEvent::VoiceDisabled =>
