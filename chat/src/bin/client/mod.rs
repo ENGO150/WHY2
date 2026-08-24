@@ -146,7 +146,7 @@ fn color_handler(app: &mut App, config_key: &str, parameters: Option<String>) //
     {
         //SAVE COLOR TO CONFIG
         config::client_write(config_key, &formatted_name);
-        app.theme.reload();
+        app.reload_theme();
 
         app.push_styled("Color set successfully.", theme::OK);
     } else

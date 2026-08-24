@@ -28,7 +28,7 @@ use unicode_width::UnicodeWidthChar;
 
 use crate::network::
 {
-    codes::OnlineUser,
+    codes::{ MessageColors, OnlineUser },
     client::VoiceUser,
 };
 
@@ -42,11 +42,26 @@ use super::
 //CONSTS
 pub const HISTORY_LIMIT: usize = 5000; //CAP THE MESSAGE PANE SO RE-WRAPPING EACH FRAME STAYS CHEAP
 
+//ENUMS
+pub enum Entry //ONE ROW OF HISTORY
+{
+    Line(Line<'static>), //ALREADY STYLED - CLIENT OUTPUT, NOTICES, BLOCK COMMANDS
+
+    //A CHAT MESSAGE KEEPS ITS PARTS, SO show_id/disable_colors CAN BE APPLIED TO IT AGAIN LATER
+    Message
+    {
+        username: String,
+        id: usize,
+        text: String,
+        colors: MessageColors,
+    },
+}
+
 //STRUCTS
 pub struct App
 {
     //MESSAGE PANE
-    pub messages: VecDeque<Line<'static>>,
+    pub messages: VecDeque<Entry>,
     pub scroll: Option<u16>, //None = STUCK TO THE BOTTOM
     pub unread: usize,       //MESSAGES ARRIVED WHILE SCROLLED AWAY
 
@@ -126,7 +141,18 @@ impl App
     //OUTPUT
     pub fn push(&mut self, line: Line<'static>)
     {
-        self.messages.push_back(line);
+        self.push_entry(Entry::Line(line));
+    }
+
+    //A CHAT MESSAGE IS STORED UNRENDERED - draw RE-APPLIES THE THEME TO IT ON EVERY WRAP
+    pub fn push_message(&mut self, username: String, id: usize, text: String, colors: MessageColors)
+    {
+        self.push_entry(Entry::Message { username, id, text, colors });
+    }
+
+    fn push_entry(&mut self, entry: Entry)
+    {
+        self.messages.push_back(entry);
 
         while self.messages.len() > HISTORY_LIMIT { self.messages.pop_front(); }
 
@@ -158,10 +184,21 @@ impl App
         self.dirty = true;
     }
 
+    //RE-READS THE CONFIG-DRIVEN STYLING AND REPAINTS THE WHOLE HISTORY WITH IT
+    pub fn reload_theme(&mut self)
+    {
+        self.theme.reload();
+
+        //THE WRAP CACHE HOLDS RENDERED LINES, SO IT HAS TO GO WITH IT
+        self.generation += 1;
+        self.wrapped = None;
+        self.dirty = true;
+    }
+
     //DRAINS NEWLY PUSHED LINES AS PLAIN TEXT (USED BY THE PRE-TUI PHASE, WHICH HAS NO FRAME TO DRAW)
     pub fn drain_plain(&mut self) -> Vec<String>
     {
-        let out = self.messages.iter().map(plain).collect();
+        let out = self.messages.iter().map(|entry| plain(&self.theme.render(entry))).collect();
 
         self.messages.clear();
         self.wrapped = None;
@@ -213,7 +250,9 @@ impl App
 
         if stale
         {
-            let lines = self.messages.iter().flat_map(|l| wrap_line(l, width)).collect();
+            let theme = &self.theme;
+            let lines = self.messages.iter().flat_map(|entry| wrap_line(&theme.render(entry), width)).collect();
+
             self.wrapped = Some((width, self.generation, lines));
         }
 

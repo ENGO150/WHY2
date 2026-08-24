@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use ratatui::
 {
-    text::Span,
+    text::{ Line, Span },
     backend::FromCrossterm,
     style::
     {
@@ -29,6 +29,8 @@ use ratatui::
 };
 
 use crate::{ colors, config };
+
+use super::state::Entry;
 
 //STRUCTS
 pub struct Theme //CACHED CONFIG-DRIVEN STYLING
@@ -52,6 +54,29 @@ impl Theme
     pub fn reload(&mut self) //RE-READ AFTER A config::client_write
     {
         *self = Self::load();
+    }
+
+    //ONE HISTORY ENTRY, STYLED WITH THE CURRENT CONFIG - CHAT MESSAGES ARE RENDERED HERE, NOT WHERE THEY ARRIVE,
+    //SO A show_id/disable_colors CHANGE REACHES THE MESSAGES THAT ARE ALREADY IN THE PANE
+    pub fn render(&self, entry: &Entry) -> Line<'static>
+    {
+        match entry
+        {
+            Entry::Line(line) => line.clone(),
+
+            Entry::Message { username, id, text, colors } =>
+            {
+                let id = if self.show_id { format!(" ({id})") } else { String::new() };
+
+                Line::from(vec!
+                [
+                    self.colorize(username.clone(), colors.username_color),
+                    Span::styled(id, DIM),
+                    Span::raw(": "),
+                    self.colorize(text.clone(), colors.message_color),
+                ])
+            },
+        }
     }
 
     pub fn colorize(&self, text: String, color: Option<u8>) -> Span<'static> //COLORIZE text IF PASSED COLOR

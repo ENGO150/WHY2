@@ -60,21 +60,8 @@ impl App
                 self.server_name = server_name;
             },
 
-            ClientEvent::Message(message, username, id, colors) =>
-            {
-                let id = if self.theme.show_id { format!(" ({id})") } else { String::new() };
-
-                let username = self.theme.colorize(username, colors.username_color);
-                let message = self.theme.colorize(message, colors.message_color);
-
-                self.push(Line::from(vec!
-                [
-                    username,
-                    Span::styled(id, theme::DIM),
-                    Span::raw(": "),
-                    message,
-                ]));
-            },
+            //STORED UNRENDERED - App::theme TURNS IT INTO A LINE, AGAIN AFTER EVERY THEME CHANGE
+            ClientEvent::Message(message, username, id, colors) => self.push_message(username, id, message, colors),
 
             ClientEvent::PrivateMessageSent(to, id, msg) =>
             {

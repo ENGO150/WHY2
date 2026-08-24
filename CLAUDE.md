@@ -202,6 +202,11 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     files in `/files`) in `theme::BORDER`, then a right-aligned dim id column, then the name. Keep
     new block output to that shape — boxed tables were tried and rejected, and anything wider than
     the message pane is re-wrapped by it and comes out as rubble.
+  - Chat messages live in `App::messages` as `state::Entry::Message` (username/id/text/colors), not as
+    rendered `Line`s — `Theme::render` turns an entry into a line on every wrap, so a `show_id` or
+    `disable_colors` change repaints the messages already in the pane. Anything that rewrites
+    config-driven styling must call `App::reload_theme` (which bumps the wrap-cache generation), never
+    `Theme::reload` on its own.
   - Transient prompts belong in the chrome, not the history. The username/password prompts render
     as the input box's title (plus `App::login_hint`) and vanish once answered; nothing pushes them
     into `App::messages`. Block commands (`/help`, `/list`, `/files`, …) end without a trailing
