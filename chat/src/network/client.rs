@@ -121,6 +121,7 @@ pub enum ClientEvent
     UnsafeVersion(usize, Version, String),         //OLD VERSION
     Username(bool, u64, u64),                      //USERNAME PROMPT
     VoiceEnabled,                                  //VOICE CHAT ENABLED
+    VoiceDeviceFailed,                             //REBUILDING THE AUDIO STREAMS FAILED
     VoiceDisabled,                                 //VOICE CHAT DISABLED
     List(Vec<OnlineUser>),                         //LIST OF USERS
     Upload(String),                                //UPLOADING FILE

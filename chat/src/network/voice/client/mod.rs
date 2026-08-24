@@ -277,91 +277,22 @@ fn apply_agc(frame: &mut [f32], rms: f32, is_speech: bool, envelope: &mut f32, g
     }
 }
 
-//PUBLIC
-pub async fn listen_server_voice //SERVER -> CLIENT
-(
-    id: usize,
-    username: String,
-    tx: Sender<ClientEvent>,
-    write_stream: Arc<MutexAsync<OwnedWriteHalf>>
-)
+fn audio_host() -> Host //THE HOST THE VOICE CLIENT TALKS TO
 {
-    //RESET SEQs
-    options::set_seq(0);
-    options::set_server_seq(0);
-
-    //LOAD THE AUDIO PREFERENCES WHILE WE ARE STILL ALLOWED TO TOUCH THE FILESYSTEM
-    options::init_audio();
-
-    //DUPLICATE STREAM GUARDS
-    let current_generation = AUDIO_GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
-    let _guard = StreamGuard { generation: current_generation };
-
-    //CONNECT
-    let socket = Arc::new(UdpSocket::bind("0.0.0.0:0").await.expect("Binding UDP failed"));
-    socket.connect(chat_options::get_server_address()).await.expect("Connecting to server UDP failed");
-
-    //INIT AUDIO HOST
-    let host =
+    #[cfg(target_os = "linux")]
     {
-        #[cfg(target_os = "linux")]
-        {
-            cpal::host_from_id(HostId::Alsa).unwrap_or_else(|_| cpal::default_host())
-        }
+        cpal::host_from_id(HostId::Alsa).unwrap_or_else(|_| cpal::default_host())
+    }
 
-        #[cfg(not(target_os = "linux"))]
-        {
-            cpal::default_host()
-        }
-    };
-
-    //FIND INPUT/OUTPUT DEVICE (SUPPRESS STDERR TO AVOID ALSA ERRORS)
-    let devices =
+    #[cfg(not(target_os = "linux"))]
     {
-        let _stderr_gag = Gag::stderr().unwrap();
-        find_devices(&host)
-    };
+        cpal::default_host()
+    }
+}
 
-    let (input_device, output_device) = match devices
-    {
-        Some((input, output)) => (input, output), //FOUND
-        _ => //NOT FOUND
-        {
-            //LEAVE VOICE
-            command::send_command_code(&mut *write_stream.lock().await, &Command::Voice, &None).await;
-            return;
-        }
-    };
-
-    //SEND HELLO PACKET
-    voice::send(&socket, id, VoicePacketCode::Hello, &chat_options::get_keys().unwrap()).await.ok();
-
-    //AUDIO CALLBACK -> NETWORK TASK BRIDGE
-    let (packet_tx, mut packet_rx) = mpsc::channel::<Vec<u8>>(consts::SEND_CHANNEL_BOUND);
-
-    //SPAWN TRANSMIT TASK
-    let send_socket = socket.clone();
-    tokio::spawn(async move
-    {
-        while let Some(data) = packet_rx.recv().await
-        {
-            //CHECK GENERATION
-            if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
-
-            voice::send(&send_socket, id, VoicePacketCode::Audio
-            {
-                data,
-                username: None,
-            }, &chat_options::get_keys().unwrap()).await.ok();
-        }
-    });
-
-    //CONFIGURE CPAL INPUT
-    let input_config = configure_device(&input_device, input_device.supported_input_configs().unwrap(), input_device.default_input_config().unwrap(), true);
-
-    //CONFIGURE CPAL OUTPUT
-    let output_config = configure_device(&output_device, output_device.supported_output_configs().unwrap(), output_device.default_output_config().unwrap(), false);
-
+//CAPTURE SIDE. EVERY PIECE OF STATE (VAD, AGC, RESAMPLER) IS BUILT HERE, SO A REBUILD STARTS FROM A CLEAN SLATE.
+fn build_input_stream(device: &Device, config: StreamConfig, current_generation: usize, packet_tx: Sender<Vec<u8>>) -> Option<Stream>
+{
     //PREPARE OPUS ENCODER
     let opus_encoder = Encoder::new
     (
@@ -375,8 +306,8 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     let mut encoded_buffer = [0u8; 1500]; //ALLOCATE BUFFER TO STANDARD MTU
 
     //INPUT RESAMPLING
-    let input_channels = input_config.channels as usize;
-    let input_source_rate = input_config.sample_rate as f32;
+    let input_channels = config.channels as usize;
+    let input_source_rate = config.sample_rate as f32;
     let input_target_rate = consts::SAMPLE_RATE as f32;
 
     //INPUT INTERPOLATION
@@ -399,7 +330,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     let noise_floor_cb = noise_floor.clone();
     let agc_envelope_cb = agc_envelope.clone();
     let agc_gain_cb = agc_gain.clone();
-    let input_stream = input_device.build_input_stream(input_config, move |data: &[f32], _: &_|
+    device.build_input_stream(config, move |data: &[f32], _: &_|
     {
         //CHECK FOR MUTING (A MICROPHONE TURNED DOWN TO 0% IS OFF, VOICE ACTIVITY INCLUDED)
         if chat_options::is_muted(None) || options::get_input_volume() == 0
@@ -559,18 +490,22 @@ pub async fn listen_server_voice //SERVER -> CLIENT
                 transmit_audio(&opus_encoder, &mut frame, &mut encoded_buffer, &packet_tx);
             }
         }
-    }, |_| {}, None).unwrap();
+    }, |_| {}, None).ok()
+}
 
+//PLAYBACK SIDE. THE PEERS THEMSELVES LIVE IN CONSUMERS, WHICH A REBUILD LEAVES ALONE.
+fn build_output_stream(device: &Device, config: StreamConfig, current_generation: usize) -> Option<Stream>
+{
     //OUTPUT RESAMPLING
-    let output_channels = output_config.channels as usize;
+    let output_channels = config.channels as usize;
     let output_source_rate = consts::SAMPLE_RATE as f32;
-    let output_target_rate = output_config.sample_rate as f32;
+    let output_target_rate = config.sample_rate as f32;
 
     //OUTPUT INTERPOLATION
     let output_resample_step = output_source_rate / output_target_rate;
 
     //CONFIGURE OUTPUT STREAM
-    let output_stream = output_device.build_output_stream(output_config, move |data: &mut [f32], _: &_|
+    device.build_output_stream(config, move |data: &mut [f32], _: &_|
     {
         //CHECK GENERATION
         if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
@@ -644,36 +579,152 @@ pub async fn listen_server_voice //SERVER -> CLIENT
                 data[i * output_channels + channel] = mixed_sample;
             }
         }
-    }, |_| {}, None).unwrap();
+    }, |_| {}, None).ok()
+}
+
+//BOTH STREAMS FOR WHATEVER THE CONFIG CURRENTLY POINTS AT, ALREADY PLAYING
+fn build_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> Option<LocalStream>
+{
+    let host = audio_host();
+
+    //FIND INPUT/OUTPUT DEVICE (SUPPRESS STDERR TO AVOID ALSA ERRORS)
+    let (input_device, output_device) =
+    {
+        let _stderr_gag = Gag::stderr().ok();
+        find_devices(&host)?
+    };
+
+    //CONFIGURE CPAL INPUT
+    let input_config = configure_device(&input_device, input_device.supported_input_configs().ok()?,
+        input_device.default_input_config().ok()?, true);
+
+    //CONFIGURE CPAL OUTPUT
+    let output_config = configure_device(&output_device, output_device.supported_output_configs().ok()?,
+        output_device.default_output_config().ok()?, false);
+
+    let input_stream = build_input_stream(&input_device, input_config, current_generation, packet_tx.clone())?;
+    let output_stream = build_output_stream(&output_device, output_config, current_generation)?;
 
     //RUN STREAMS
-    input_stream.play().unwrap();  //INPUT
-    output_stream.play().unwrap(); //OUTPUT
+    input_stream.play().ok()?;  //INPUT
+    output_stream.play().ok()?; //OUTPUT
 
-    //MOVE STREAMS TO GLOBAL STORAGE
-    *LOCAL_STREAMS.lock().unwrap() = Some(LocalStream
+    Some(LocalStream
     {
         _input: input_stream,
         _output: output_stream,
+    })
+}
+
+//SWAPS IN A FRESHLY BUILT PAIR AFTER A /settings DEVICE CHANGE. THE UDP SESSION, THE PEERS AND THE JITTER
+//BUFFERS ARE UNTOUCHED - ONLY THE TWO CPAL STREAMS ARE REPLACED. A DEVICE THAT CANNOT BE OPENED KEEPS THE OLD PAIR.
+fn replace_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> bool
+{
+    let Some(streams) = build_streams(current_generation, packet_tx) else { return false };
+
+    //THE OLD PAIR STOPS WHEN IT IS DROPPED, WHICH HAPPENS OUTSIDE THE LOCK
+    let previous = LOCAL_STREAMS.lock().unwrap().replace(streams);
+    drop(previous);
+
+    true
+}
+
+//PUBLIC
+pub async fn listen_server_voice //SERVER -> CLIENT
+(
+    id: usize,
+    username: String,
+    tx: Sender<ClientEvent>,
+    write_stream: Arc<MutexAsync<OwnedWriteHalf>>
+)
+{
+    //RESET SEQs
+    options::set_seq(0);
+    options::set_server_seq(0);
+
+    //LOAD THE AUDIO PREFERENCES WHILE WE ARE STILL ALLOWED TO TOUCH THE FILESYSTEM
+    options::init_audio();
+
+    //DUPLICATE STREAM GUARDS
+    let current_generation = AUDIO_GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
+    let _guard = StreamGuard { generation: current_generation };
+
+    //CONNECT
+    let socket = Arc::new(UdpSocket::bind("0.0.0.0:0").await.expect("Binding UDP failed"));
+    socket.connect(chat_options::get_server_address()).await.expect("Connecting to server UDP failed");
+
+    //SEND HELLO PACKET
+    voice::send(&socket, id, VoicePacketCode::Hello, &chat_options::get_keys().unwrap()).await.ok();
+
+    //AUDIO CALLBACK -> NETWORK TASK BRIDGE
+    let (packet_tx, mut packet_rx) = mpsc::channel::<Vec<u8>>(consts::SEND_CHANNEL_BOUND);
+
+    //SPAWN TRANSMIT TASK
+    let send_socket = socket.clone();
+    tokio::spawn(async move
+    {
+        while let Some(data) = packet_rx.recv().await
+        {
+            //CHECK GENERATION
+            if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
+
+            voice::send(&send_socket, id, VoicePacketCode::Audio
+            {
+                data,
+                username: None,
+            }, &chat_options::get_keys().unwrap()).await.ok();
+        }
     });
+
+    //BUILD AND START THE CPAL STREAMS
+    let streams = match build_streams(current_generation, &packet_tx)
+    {
+        Some(streams) => streams,
+        None => //NO USABLE DEVICE
+        {
+            //LEAVE VOICE
+            command::send_command_code(&mut *write_stream.lock().await, &Command::Voice, &None).await;
+            return;
+        }
+    };
+
+    //MOVE STREAMS TO GLOBAL STORAGE
+    *LOCAL_STREAMS.lock().unwrap() = Some(streams);
 
     //PLAY JOIN SOUND
     sfx::clear_effects();
     sfx::queue_effect(SoundEffect::Join);
 
-    //START VOICE ACTIVITY DISPLAY & PING TASK
+    //START VOICE ACTIVITY DISPLAY & PING TASK (ALSO THE ONE PLACE THAT NOTICES A /settings DEVICE CHANGE)
     let vad_socket = socket.clone();
     tokio::spawn(async move
     {
         let mut iteration_counter = 0u8;
+        let mut devices = options::device_generation();
 
         loop
         {
+            //A LEFTOVER TASK FROM AN EARLIER SESSION MUST NOT TOUCH THIS ONE'S STREAMS
+            if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
+
             //QUIT ON /leave
             if !options::get_use_voice()
             {
                 tx.send(ClientEvent::VoiceActivity(Vec::new())).await.unwrap(); //CLEAR WINDOW
                 return;
+            }
+
+            //THE USER PICKED A DIFFERENT DEVICE - REBUILD BOTH STREAMS, KEEP THE CALL
+            let generation = options::device_generation();
+            if generation != devices
+            {
+                devices = generation;
+
+                //A DEVICE THAT WILL NOT OPEN IS WORTH SAYING OUT LOUD - THE OLD ONE KEEPS RUNNING
+                if !replace_streams(current_generation, &packet_tx)
+                {
+                    tx.send(ClientEvent::VoiceDeviceFailed).await.unwrap();
+                }
             }
 
             iteration_counter += 1; //INCREMENT

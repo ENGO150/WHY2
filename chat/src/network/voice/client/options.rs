@@ -45,6 +45,8 @@ static OUTPUT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(
 static NOISE_SUPPRESSION: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(config::read_config::<bool>("noise_suppression")));
 static AUTOMATIC_GAIN: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(config::read_config::<bool>("automatic_gain")));
 
+static DEVICE_GENERATION: AtomicUsize = AtomicUsize::new(0); //BUMPED WHENEVER THE CONFIGURED DEVICES CHANGE
+
 //SEQ
 pub fn get_seq() -> usize //GET SEQUENCE NUMBER
 {
@@ -142,3 +144,13 @@ pub fn set_automatic_gain(value: bool)
     AUTOMATIC_GAIN.store(value, Ordering::Relaxed);
 }
 
+//DEVICE GENERATION
+pub fn device_generation() -> usize //A RUNNING VOICE SESSION REBUILDS ITS STREAMS WHEN THIS MOVES
+{
+    DEVICE_GENERATION.load(Ordering::Relaxed)
+}
+
+pub fn mark_devices_changed() //input_device/output_device WAS REWRITTEN
+{
+    DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed);
+}

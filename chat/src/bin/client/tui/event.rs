@@ -190,6 +190,11 @@ impl App
                 self.push_styled("Voice enabled.", theme::OK);
             },
 
+            ClientEvent::VoiceDeviceFailed =>
+            {
+                self.push_styled("Switching the audio device failed - the previous one is still in use.", theme::ERROR);
+            },
+
             ClientEvent::VoiceDisabled =>
             {
                 self.voice_enabled = false;
