@@ -43,7 +43,7 @@ use crate::
 {
     config,
     command::CommandInfo,
-    options::{ self, LoginState },
+    options,
 };
 
 #[cfg(feature = "client_voice")]
@@ -52,7 +52,6 @@ use crate::network::voice::client::options as voice_options;
 use super::
 {
     theme,
-    login::Login,
     state::{ self, App },
     palette::{ self, PaletteMode },
     tofu::
@@ -68,6 +67,11 @@ use super::
         Value,
         Settings,
         DeviceEntry,
+    },
+    login::
+    {
+        Login,
+        Stage as LoginStage,
     },
 };
 
@@ -98,15 +102,19 @@ enum Panel //SIDEBAR SECTIONS, IN THE ORDER THEY ARE STACKED
 pub fn draw(frame: &mut Frame, app: &mut App)
 {
     let area = frame.area();
-    let masked = options::get_asking_password();
+
+    //THE CONNECT BOX ASKS FOR EVERYTHING UNTIL WE ARE IN - THE INPUT BAR HAS NOTHING TO SAY YET, THE SAME
+    //WAY THE SIDEBAR HAS NOBODY TO LIST
+    let connecting = app.login.is_some();
 
     //PAINT THE BASE FOREGROUND FIRST
     frame.buffer_mut().set_style(area, theme::TEXT);
 
     //MEASURE THE INPUT FIRST - THE MAIN AREA GETS WHATEVER IS LEFT
     let input_width = area.width.saturating_sub(4).max(1); //BORDERS + "> "
-    let (input_lines, cursor) = app.input.render(input_width, masked);
-    let input_height = (input_lines.len() as u16 + 2).clamp(INPUT_MIN_HEIGHT, INPUT_MAX_HEIGHT);
+    let (input_lines, cursor) = app.input.render(input_width, false);
+    let input_height = if connecting { 0 }
+        else { (input_lines.len() as u16 + 2).clamp(INPUT_MIN_HEIGHT, INPUT_MAX_HEIGHT) };
 
     let [main_area, input_area] = Layout::vertical
     ([
@@ -128,7 +136,7 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 
     if let Some(sidebar_area) = sidebar_area { draw_sidebar(frame, app, sidebar_area); }
 
-    draw_input(frame, app, input_area, input_lines, cursor, masked);
+    if !connecting { draw_input(frame, app, input_area, input_lines, cursor); }
 
     //THE PALETTE FLOATS OVER THE BOTTOM OF THE MESSAGE PANE
     if app.palette.is_visible() { draw_palette(frame, app, messages_area); }
@@ -136,11 +144,11 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     //THE SETTINGS OVERLAY COVERS EVERYTHING ELSE (THE INPUT CURSOR IS SUPPRESSED IN draw_input)
     if app.settings.open { draw_settings(frame, &app.settings, area); }
 
-    //...AND THE IDENTITY PROMPT COVERS THE SETTINGS OVERLAY, BECAUSE IT IS THE ONLY THING THE USER MAY ANSWER
-    if let Some(prompt) = &app.tofu { draw_tofu(frame, prompt, area); }
-
-    //THE CONNECT PROMPT IS THE FIRST THING THE CLIENT EVER DRAWS, AND NOTHING ELSE IS UP WHILE IT IS
+    //THE CONNECT BOX IS THE FIRST THING THE CLIENT EVER DRAWS, AND IT KEEPS ASKING UNTIL WE ARE LOGGED IN
     if let Some(login) = &app.login { draw_login(frame, login, area); }
+
+    //...AND THE SERVER-KEY PROMPT COVERS EVEN THAT, BECAUSE IT IS THE ONLY THING THE USER MAY ANSWER
+    if let Some(prompt) = &app.tofu { draw_tofu(frame, prompt, area); }
 }
 
 //PRIVATE
@@ -317,24 +325,8 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
-fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>>, cursor: (u16, u16), masked: bool)
+fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>>, cursor: (u16, u16))
 {
-    //THE LOGIN PROMPT LIVES HERE, NOT IN THE HISTORY - IT DISAPPEARS THE MOMENT IT IS ANSWERED
-    let prompt = match options::get_login_state()
-    {
-        LoginState::Username => "Username",
-        LoginState::PasswordLogin => "Password (login)",
-        LoginState::PasswordRegister => "Password (register)",
-        LoginState::None => "",
-    };
-
-    let title = match (prompt, app.login_hint.as_deref())
-    {
-        ("", _) => String::new(),
-        (prompt, Some(hint)) => format!(" {prompt} ── {hint} "),
-        (prompt, None) => format!(" {prompt} "),
-    };
-
     //STATUS LINE - THE INPUT BLOCK'S BOTTOM BORDER
     let channel = match options::get_channel()
     {
@@ -350,13 +342,11 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
         (c, u) => format!(" {c} │ {u} "),
     };
 
-    let mut block = Block::bordered()
+    let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(if masked { theme::NOTICE } else { theme::BORDER_ACTIVE })
+        .border_style(theme::BORDER_ACTIVE)
         .title_bottom(Line::from(Span::styled(left, theme::DIM)))
         .title_bottom(Line::from(Span::styled(right_status(app), theme::DIM)).right_aligned());
-
-    if !title.is_empty() { block = block.title(Span::styled(title, theme::TITLE)); }
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -679,9 +669,9 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
 
     if area.height < 8 || field_width < 8 { return; }
 
-    let (field, cursor) = login.input.render(field_width, false);
+    let (field, cursor) = login.input.render(field_width, login.masked());
 
-    let mut lines = vec![Line::from(Span::styled("Server address", theme::DIM))];
+    let mut lines = vec![Line::from(Span::styled(login.label(), theme::DIM))];
 
     for (index, line) in field.into_iter().enumerate()
     {
@@ -693,15 +683,17 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
 
     lines.push(Line::default());
 
-    //ONE STATUS ROW, ALWAYS IN THE SAME PLACE: WHAT IS HAPPENING, OR WHAT WENT WRONG
-    lines.push(match (login.connecting, login.error.as_deref())
+    //ONE STATUS ROW, ALWAYS IN THE SAME PLACE: WHAT IS HAPPENING, WHAT WENT WRONG, OR THE SERVER'S RULES
+    lines.push(match (login.busy, login.error.as_deref(), login.hint.as_deref())
     {
-        (true, _) => Line::from(Span::styled("Connecting…", theme::ACCENT)),
-        (false, Some(error)) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
-        (false, None) => Line::default(),
+        (true, ..) => Line::from(Span::styled(login.waiting(), theme::ACCENT)),
+        (false, Some(error), _) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
+        (false, None, Some(hint)) => Line::from(Span::styled(hint.to_string(), theme::DIM)),
+        (false, None, None) => Line::default(),
     });
 
-    if options::socks5_enabled()
+    //THE PROXY IS THE ADDRESS STEP'S BUSINESS - BY THE TIME WE ARE LOGGING IN IT HAS ALREADY DONE ITS JOB
+    if login.stage == LoginStage::Address && options::socks5_enabled()
     {
         lines.push(Line::from(Span::styled(format!("Through SOCKS5 {}",
             config::read_config::<String>("socks5_addr")), theme::DIM)));
@@ -724,11 +716,14 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::BORDER_ACTIVE)
-        .title(Span::styled(" Connect ", theme::TITLE))
-        .title_bottom(Line::from(Span::styled(if login.connecting
+        .title(Span::styled(login.title(), theme::TITLE))
+        .title_bottom(Line::from(Span::styled(match (login.stage, login.busy, login.cancellable())
         {
-            " Esc cancel "
-        } else { " ⏎ connect │ Esc quit " }, theme::DIM)).centered());
+            (_, true, true) => " Esc cancel ",
+            (_, true, false) => " Esc quit ",
+            (LoginStage::Address, false, _) => " ⏎ connect │ Esc quit ",
+            (_, false, _) => " ⏎ continue │ Esc quit ",
+        }, theme::DIM)).centered());
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -743,8 +738,8 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
 
     frame.render_widget(Paragraph::new(lines), text_area);
 
-    //THE ADDRESS FIELD IS THE ONLY THING BEING TYPED INTO WHILE THIS IS UP, SO IT KEEPS THE CARET
-    if !login.connecting
+    //THIS BOX IS THE ONLY THING BEING TYPED INTO WHILE IT IS UP, SO IT KEEPS THE CARET
+    if !login.busy
     {
         frame.set_cursor_position(Position::new
         (

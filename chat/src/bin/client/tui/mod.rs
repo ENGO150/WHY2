@@ -98,7 +98,7 @@ use crate::
     },
 };
 
-use login::ConnectResult;
+use login::{ Action, ConnectResult };
 
 pub use state::App;
 
@@ -213,7 +213,7 @@ pub async fn run
     let (connect_tx, mut connect_rx) = mpsc::channel::<ConnectResult>(1);
 
     //auto_connect DIALS WITHOUT WAITING FOR A KEYSTROKE, AND STILL DOES IT FROM INSIDE THE TUI
-    if app.login.as_ref().is_some_and(|prompt| prompt.connecting) { login::connect(app, &connect_tx); }
+    if app.login.as_ref().is_some_and(|prompt| prompt.busy) { login::connect(app, &connect_tx); }
 
     loop
     {
@@ -305,7 +305,11 @@ fn connected
     });
 
     *write_stream = Some(stream);
-    app.login = None; //THE INPUT BOX TAKES OVER FROM HERE - USERNAME, PASSWORD, THEN MESSAGES
+
+    if let Some(prompt) = app.login.as_mut() { prompt.connected = true; }
+
+    //THE BOX STAYS UP, STILL BUSY: THE HANDSHAKE IS RUNNING, AND THE USERNAME PROMPT THAT FOLLOWS IT IS
+    //THE SAME FIELD ASKING AGAIN. ClientEvent::Authenticated IS WHAT FINALLY CLOSES IT.
 }
 
 async fn handle_terminal_event
@@ -347,7 +351,7 @@ async fn handle_terminal_event
         Event::Resize(..) | Event::FocusGained | Event::FocusLost => app.dirty = true,
         Event::Paste(text) =>
         {
-            //A PASTED ADDRESS BELONGS TO THE CONNECT PROMPT, NOT TO THE CHAT LINE BEHIND IT
+            //A PASTE BELONGS TO THE CONNECT BOX WHILE IT IS UP, NOT TO THE CHAT LINE BEHIND IT
             if app.login.is_some()
             {
                 login::insert_str(app, &text);
@@ -377,24 +381,36 @@ async fn handle_key
 
     app.dirty = true;
 
-    //THE CONNECT PROMPT COMES FIRST: UNTIL IT HAS PRODUCED A SOCKET THERE IS NOWHERE FOR A KEYSTROKE TO GO
-    if app.login.is_some()
+    //THE SERVER-KEY PROMPT OUTRANKS EVERYTHING, THE CONNECT BOX INCLUDED: THE NETWORK TASK IS PARKED ON
+    //ITS ANSWER, AND NOTHING MAY REACH A SERVER THE USER HAS NOT ACCEPTED YET
+    if app.tofu.is_some()
     {
-        match login::handle_key(app, key)
-        {
-            login::Action::Connect => login::connect(app, connect_tx),
-            login::Action::Quit => app.quit(0, None),
-            login::Action::None => {},
-        }
+        tofu::handle_key(app, key);
 
         return;
     }
 
-    //THE IDENTITY PROMPT OUTRANKS EVERYTHING: THE NETWORK TASK IS PARKED ON ITS ANSWER, AND NOTHING MAY
-    //REACH A SERVER THE USER HAS NOT ACCEPTED YET
-    if app.tofu.is_some()
+    //THEN THE CONNECT BOX, WHICH OWNS THE KEYBOARD ALL THE WAY THROUGH ADDRESS, USERNAME AND PASSWORD
+    if app.login.is_some()
     {
-        tofu::handle_key(app, key);
+        match login::handle_key(app, key)
+        {
+            Action::Connect => login::connect(app, connect_tx),
+
+            //AN ANSWERED IDENTITY STEP IS AN ORDINARY SUBMITTED LINE - submit() TURNS IT INTO ITS PACKET
+            Action::Submit =>
+            {
+                if let Some(write_stream) = write_stream
+                {
+                    let answer = login::take_input(app);
+
+                    crate::submit(app, write_stream, answer).await;
+                }
+            },
+
+            Action::Quit => app.quit(0, None),
+            Action::None => {},
+        }
 
         return;
     }

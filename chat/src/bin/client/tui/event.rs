@@ -29,6 +29,7 @@ use super::
     theme,
     state::App,
     tofu::Prompt,
+    login::Stage,
 };
 
 //IMPLEMENTATIONS
@@ -39,15 +40,25 @@ impl App
     {
         match event
         {
-            //THE PROMPTS THEMSELVES LIVE IN THE INPUT BOX TITLE - NOTHING GOES INTO THE HISTORY
-            ClientEvent::Register | ClientEvent::Login =>
+            //THE PROMPTS THEMSELVES LIVE IN THE CONNECT BOX - NOTHING GOES INTO THE HISTORY
+            //NOTHING IS PUSHED HERE, SO THE REDRAW HAS TO BE ASKED FOR - THE TICK ONLY DRAWS WHEN DIRTY
+            ClientEvent::Register =>
             {
-                self.login_hint = None;
+                if let Some(login) = self.login.as_mut() { login.ask(Stage::Password { register: true }, None); }
+
+                self.dirty = true;
+            },
+
+            ClientEvent::Login =>
+            {
+                if let Some(login) = self.login.as_mut() { login.ask(Stage::Password { register: false }, None); }
+
+                self.dirty = true;
             },
 
             ClientEvent::Authenticated =>
             {
-                self.login_hint = None;
+                self.login = None; //THE BOX HAS ASKED FOR EVERYTHING IT WAS GOING TO ASK FOR
                 self.push_styled("Login successful. Press Ctrl+H for help.", theme::OK);
                 self.refresh_online = true;
             },
@@ -140,13 +151,17 @@ impl App
 
             ClientEvent::Username(disabled_registration, min_uname, max_uname) =>
             {
-                self.login_hint = Some(if disabled_registration
+                let hint = if disabled_registration
                 {
-                    String::from("registration disabled")
+                    String::from("Registration is disabled.")
                 } else
                 {
                     format!("a-Z, 0-9; {min_uname}-{max_uname} characters")
-                });
+                };
+
+                if let Some(login) = self.login.as_mut() { login.ask(Stage::Username, Some(hint)); }
+
+                self.dirty = true;
             },
 
             ClientEvent::VoiceEnabled =>
@@ -345,14 +360,29 @@ impl App
                     ({client_version}/{server_version})"), theme::NOTICE);
             },
 
+            //A REJECTION IS ALWAYS FOLLOWED BY THE RE-PROMPT, AND Login::ask KEEPS THE ERROR ON SCREEN
             ClientEvent::UsernameRejected =>
             {
-                self.push_styled("Username rejected!", theme::ERROR);
+                match self.login.as_mut()
+                {
+                    Some(login) => login.error = Some(String::from("Username rejected!")),
+                    None => self.push_styled("Username rejected!", theme::ERROR),
+                }
+
+                self.dirty = true;
             },
 
             ClientEvent::PasswordRejected(min_pass) =>
             {
-                self.push_styled(format!("Password rejected! Enter at least {min_pass} characters."), theme::ERROR);
+                let message = format!("Password rejected! Enter at least {min_pass} characters.");
+
+                match self.login.as_mut()
+                {
+                    Some(login) => login.error = Some(message),
+                    None => self.push_styled(message, theme::ERROR),
+                }
+
+                self.dirty = true;
             },
 
             ClientEvent::SpamWarning =>

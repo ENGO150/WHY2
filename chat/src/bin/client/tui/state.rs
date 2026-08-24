@@ -82,13 +82,12 @@ pub struct App
     //CONNECTION (SHOWN IN THE MESSAGE PANE TITLE)
     pub address: String,     //AS THE USER TYPED IT - NO IMPLICIT PORT
     pub server_name: String, //THE SERVER'S OWN NAME, ONCE IT HAS INTRODUCED ITSELF
-    pub login_hint: Option<String>, //USERNAME/PASSWORD RULES, SHOWN IN THE INPUT TITLE INSTEAD OF THE PANE
 
     //INPUT
     pub input: InputBuffer,
     pub palette: Palette,
     pub settings: Settings, //SETTINGS OVERLAY (CLOSED UNLESS THE USER OPENED IT)
-    pub login: Option<Login>, //CONNECT PROMPT - UP FROM THE FIRST FRAME UNTIL THERE IS A SOCKET
+    pub login: Option<Login>, //CONNECT BOX - UP FROM THE FIRST FRAME UNTIL THE SERVER ACCEPTS US
     pub tofu: Option<Prompt>, //SERVER IDENTITY PROMPT - OUTRANKS EVERY OTHER OVERLAY WHILE IT IS UP
     pub theme: Theme,
 
@@ -131,7 +130,6 @@ impl App
             voice_enabled: false,
             address: String::new(),
             server_name: String::new(),
-            login_hint: None,
             input: InputBuffer::new(),
             palette: Palette::new(),
             settings: Settings::new(),
