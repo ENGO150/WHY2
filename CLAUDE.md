@@ -166,7 +166,8 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     printed after the guard is dropped. The version check reports through `ClientEvent` like everything
     else, and runs in a task so it cannot hold up the first frame.
   - **Getting in happens inside the TUI** (`tui/login.rs`, `draw::draw_login`). `App::login` is `Some`
-    from the first frame until the server accepts us, and it is one box asking three times
+    from the first frame until the server accepts us (and again the moment a session is lost), and it
+    is one box asking three times
     (`login::Stage`: `Address`, `Username`, `Password { register }`) — the address, the username and
     the password are the same field, relabelled. While it is up it owns the keyboard (behind only the
     TOFU prompt, which is the one thing that may still be answered over it), and **the input bar and
@@ -188,12 +189,22 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     box silently stops repainting. An answered step is not sent from the prompt: `login::Action::Submit`
     hands the text to `mod.rs::submit` like any other line, and `options::get_login_state()` turns it
     into the right packet.
+  - **A lost session comes back to the box instead of ending the client.** `ClientEvent::Quit` (which
+    `listen_server` also sends when the socket simply dies) and `ReconnectFailed` call
+    `App::disconnected(reason)`: it rebuilds `App::login` with `Login::again` at the `Address` stage —
+    address prefilled, reason as the error, **attempt counter carried over** so a dial cancelled before
+    the drop cannot land on the new prompt — clears the history/sidebar/voice/overlays, and resets the
+    session state that lives outside `App` (`state::reset_session`: sequence numbers, login state,
+    channel, `ACTIVE_UPLOADS`, the voice/screen flags whose tasks watch them). The dead write half
+    belongs to the event loop, so the reset only sets `App::drop_stream` and `tui::run` drops it.
+    The one disconnect that still ends the process is the one the user asked for: `submit` sets
+    `App::leaving` on `Command::Exit`, and the `Quit` arm honours it.
   - C libraries that write to fd 2 (cpal/ALSA, openh264/xcap) corrupt the frame; the existing
     `gag::Gag::stderr()` wrappers in `network/voice/client` must stay.
   - `tui::install_panic_hook` is called first thing in `main` and is **not optional**: the release
     profile sets `panic = "abort"`, so `TerminalGuard::drop` never runs on a panic and the hook is
     the only path that leaves the alternate screen.
-  - Fatal events (`TofuError`, `Quit`) do not `process::exit` from the draw path. They call
+  - Fatal events (`TofuError`, a user-asked-for `Quit`) do not `process::exit` from the draw path. They call
     `App::quit(code, message)`; the loop breaks, the guard restores the terminal, and `run_client`
     prints the message on the normal screen.
   - The message pane is wrapped by `state::wrap_line` (cached per width + history generation) rather

@@ -97,7 +97,20 @@ impl Login
         Self { input, stage: Stage::Address, busy: auto, connected: false, error: None, hint: None, attempt: 0 }
     }
 
+    //THE SERVER DROPPED US MID-SESSION: THE BOX COMES BACK AT THE ADDRESS STEP WITH THE ADDRESS STILL IN IT
+    //AND THE REASON UNDER IT. THE ATTEMPT COUNTER IS CARRIED OVER, SO A DIAL THAT WAS CANCELLED BEFORE THE
+    //DROP CANNOT LAND ON THE NEW PROMPT EITHER.
+    pub fn again(address: &str, attempt: u64, error: String) -> Self
+    {
+        let mut input = InputBuffer::new();
+        input.insert_str(address);
+
+        Self { input, stage: Stage::Address, busy: false, connected: false, error: Some(error), hint: None, attempt }
+    }
+
     pub fn address(&self) -> String { self.input.text().trim().to_owned() }
+
+    pub fn attempt(&self) -> u64 { self.attempt }
 
     //THE ATTEMPT A RESULT HAS TO BELONG TO IN ORDER TO COUNT
     pub fn accepts(&self, attempt: u64) -> bool { self.busy && attempt == self.attempt }
@@ -278,6 +291,10 @@ pub fn connect(app: &mut App, results: &Sender<ConnectResult>)
 
     //THE RECONNECT AFTER PINNING A SERVER KEY DIALS THIS, SO IT HAS TO BE THE RESOLVED ADDRESS
     options::set_server_address(&address);
+
+    //A NEW CONNECTION COUNTS FROM ZERO ON BOTH SIDES - THE PREVIOUS SESSION LEFT ITS OWN NUMBERS BEHIND
+    options::set_seq(0);
+    options::set_server_seq(0);
 
     let results = results.clone();
 

@@ -99,8 +99,8 @@ impl App
             //REFUSING (OR FAILING) THE CHECK JUST ENDS THE SESSION - THE PROMPT ALREADY SAID WHY
             ClientEvent::TofuError => self.quit(1, None),
 
-            //THE SERVER WENT AWAY BETWEEN THE TWO CONNECTIONS - THE SESSION IS OVER, SILENTLY
-            ClientEvent::ReconnectFailed => self.quit(1, None),
+            //THE SERVER WENT AWAY BETWEEN THE TWO CONNECTIONS - BACK TO THE ADDRESS, THE KEY IS PINNED NOW
+            ClientEvent::ReconnectFailed => self.disconnected("Reconnecting to the server failed."),
 
             ClientEvent::TofuSkip(hash) =>
             {
@@ -405,9 +405,14 @@ impl App
                 self.push_styled("Fetching versions failed, this release could be unsafe!", theme::NOTICE);
             },
 
+            //THE SOCKET IS GONE, BUT THE CLIENT IS NOT: THE CONNECT BOX COMES BACK SO ANOTHER SERVER (OR THE
+            //SAME ONE AGAIN) IS ONE ENTER AWAY. ONLY A DISCONNECT THE USER ASKED FOR ENDS THE PROCESS.
             ClientEvent::Quit =>
             {
-                self.quit(0, Some(String::from("Server quit communication.")));
+                if self.leaving
+                {
+                    self.quit(0, Some(String::from("Disconnected from the server.")));
+                } else { self.disconnected("Server quit communication."); }
             },
 
             //SIDEBAR-ONLY - THE CHANNEL LIST TRACKS THESE, THE HISTORY DOES NOT.

@@ -30,11 +30,21 @@ use ratatui::
 
 use unicode_width::UnicodeWidthChar;
 
-use crate::network::
+use crate::
 {
-    codes::{ MessageColors, OnlineUser },
-    client::VoiceUser,
+    options::{ self, LoginState },
+    network::
+    {
+        codes::{ MessageColors, OnlineUser },
+        client::{ self, VoiceUser },
+    },
 };
+
+#[cfg(feature = "client_voice")]
+use crate::network::voice::client::options as voice_options;
+
+#[cfg(feature = "client_screen")]
+use crate::network::screen::client::options as screen_options;
 
 use super::
 {
@@ -98,6 +108,8 @@ pub struct App
     pub refresh_online: bool, //THE LOOP SHOULD SEND A SILENT PacketCode::List
 
     //LIFECYCLE
+    pub leaving: bool,      //THE USER ASKED TO LEAVE, SO THE DISCONNECT THAT FOLLOWS ENDS THE CLIENT
+    pub drop_stream: bool,  //THE LOOP OWNS THE WRITE HALF - IT HAS TO CLOSE IT AFTER A LOST SESSION
     pub should_quit: bool,
     pub exit_code: i32,
     pub quit_message: Option<String>, //PRINTED ON THE NORMAL SCREEN AFTER TEARDOWN
@@ -140,6 +152,8 @@ impl App
             #[cfg(feature = "client_screen")]
             screens_requested: false,
             refresh_online: false,
+            leaving: false,
+            drop_stream: false,
             should_quit: false,
             exit_code: 0,
             quit_message: None,
@@ -203,6 +217,42 @@ impl App
         //THE WRAP CACHE HOLDS RENDERED LINES, SO IT HAS TO GO WITH IT
         self.generation += 1;
         self.wrapped = None;
+        self.dirty = true;
+    }
+
+    //THE SERVER CLOSED THE SOCKET ON US. THE SESSION IS OVER, THE CLIENT IS NOT: EVERYTHING THE SESSION
+    //BUILT UP IS THROWN AWAY AND THE CONNECT BOX COMES BACK AT THE ADDRESS STEP, PREFILLED WITH THE ADDRESS
+    //AND CARRYING THE REASON, SO THE NEXT TRY (HERE OR ELSEWHERE) IS ONE KEYSTROKE AWAY.
+    pub fn disconnected(&mut self, reason: impl Into<String>)
+    {
+        //A DIAL CANCELLED BEFORE THIS SESSION MUST NOT LAND ON THE NEW PROMPT EITHER, SO THE COUNTER LIVES ON
+        let attempt = self.login.as_ref().map_or(0, Login::attempt);
+
+        self.login = Some(Login::again(&self.address, attempt, reason.into()));
+        self.drop_stream = true; //THE WRITE HALF BELONGS TO THE EVENT LOOP - IT CLOSES IT ON THE NEXT PASS
+
+        //A NEW SESSION STARTS BLANK, THE WAY A CHANNEL SWITCH DOES
+        self.clear_messages();
+
+        self.input = InputBuffer::new();
+        self.palette.dismiss();
+        self.settings.close();
+        self.tofu = None;
+
+        self.username.clear();
+        self.server_name.clear();
+        self.online.clear();
+        self.channels.clear();
+        self.voice.clear();
+        self.voice_enabled = false;
+
+        self.list_requested = false;
+        #[cfg(feature = "client_screen")]
+        { self.screens_requested = false; }
+        self.refresh_online = false;
+
+        reset_session();
+
         self.dirty = true;
     }
 
@@ -355,4 +405,29 @@ fn split_words(text: &str) -> Vec<&str> //SPLIT INTO ALTERNATING RUNS OF WHITESP
 fn text_width(text: &str) -> usize
 {
     text.chars().map(|c| c.width().unwrap_or(0)).sum()
+}
+
+//EVERY PIECE OF SESSION STATE THAT LIVES OUTSIDE App - THE NEXT HANDSHAKE HAS TO START FROM THE SAME
+//PLACE THE FIRST ONE DID, AND ANY TASK STILL WATCHING THESE (THE VOICE SESSION, A SCREEN SHARE) HAS TO STOP
+fn reset_session()
+{
+    options::set_seq(0);
+    options::set_server_seq(0);
+    options::set_login_state(LoginState::None);
+    options::set_sending_messages(false);
+    options::set_asking_password(false);
+    options::set_channel(String::new());
+    options::set_server_username("");
+
+    //A HALF-FINISHED UPLOAD BELONGS TO THE SOCKET THAT IS GONE
+    client::ACTIVE_UPLOADS.lock().unwrap().clear();
+
+    #[cfg(feature = "client_voice")]
+    voice_options::set_use_voice(false);
+
+    #[cfg(feature = "client_screen")]
+    {
+        screen_options::set_use_screen(false);
+        screen_options::set_attach_screen(false);
+    }
 }

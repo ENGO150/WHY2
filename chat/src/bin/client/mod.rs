@@ -278,6 +278,10 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                     Command::List => app.list_requested = true,
                     #[cfg(feature = "client_screen")]
                     Command::Screens => app.screens_requested = true,
+
+                    //THE DISCONNECT THAT COMES BACK IS ONE THE USER ASKED FOR, SO IT ENDS THE CLIENT
+                    //INSTEAD OF DROPPING BACK INTO THE CONNECT BOX
+                    Command::Exit => app.leaving = true,
                     _ => {},
                 }
             }

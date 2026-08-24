@@ -231,6 +231,14 @@ pub async fn run
                     Some(event) => app.apply(event),
                     None => events_open = false,
                 }
+
+                //A LOST SESSION LEAVES A DEAD WRITE HALF BEHIND - DROPPING IT SHUTS THE WRITE SIDE DOWN AND
+                //TAKES THE KEYBOARD BACK TO THE CONNECT BOX, WHICH IS THE ONLY THING ON SCREEN NOW ANYWAY
+                if app.drop_stream
+                {
+                    app.drop_stream = false;
+                    write_stream = None;
+                }
             },
 
             event = reader.next() =>
