@@ -287,7 +287,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     {
         command: Command::Settings,
         triggers: &[ "SETTINGS", "SETUP", "CONFIG", "PREFERENCES", "AUDIO" ],
-        shortcut: Some('g'),
+        shortcut: Some(','),
         args: &[],
         description: "Opens audio and interface settings",
     },

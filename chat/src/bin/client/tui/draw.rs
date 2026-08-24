@@ -644,7 +644,7 @@ fn right_status(_app: &App) -> String
         parts.push(String::from(if off { "mic off" } else { "mic on" }));
     }
 
-    parts.push(String::from("Ctrl+H help"));
+    parts.push(String::from("Ctrl+, settings"));
 
     format!(" {} ", parts.join(" │ "))
 }
