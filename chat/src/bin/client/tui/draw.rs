@@ -45,11 +45,15 @@ use crate::
     options::{ self, LoginState },
 };
 
+#[cfg(feature = "client_voice")]
+use crate::network::voice::client::options as voice_options;
+
 use super::
 {
     theme,
     state::App,
     palette::{ self, PaletteMode },
+    settings::{ self, Row, Settings, Value },
 };
 
 //CONSTS
@@ -58,6 +62,11 @@ const SIDEBAR_MIN_TERM_WIDTH: u16 = 70; //BELOW THIS THE SIDEBAR IS DROPPED AND 
 const INPUT_MIN_HEIGHT: u16       = 3;
 const INPUT_MAX_HEIGHT: u16       = 8;
 const CHANNELS_MIN_HEIGHT: u16    = 12; //SIDEBAR ROWS NEEDED BEFORE THE CHANNEL LIST IS WORTH SHOWING
+const SETTINGS_WIDTH: u16         = 62; //SETTINGS OVERLAY, CAPPED TO THE TERMINAL
+const SETTINGS_VALUE_WIDTH: u16   = 20; //NARROWEST THE VALUE COLUMN MAY GET (BAR + PERCENTAGE)
+
+#[cfg(feature = "client_voice")]
+const SLIDER_WIDTH: usize         = 14; //CELLS OF VOLUME BAR
 
 //ENUMS
 enum Panel //SIDEBAR SECTIONS, IN THE ORDER THEY ARE STACKED
@@ -105,6 +114,9 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 
     //THE PALETTE FLOATS OVER THE BOTTOM OF THE MESSAGE PANE
     if app.palette.is_visible() { draw_palette(frame, app, messages_area); }
+
+    //THE SETTINGS OVERLAY COVERS EVERYTHING ELSE (THE INPUT CURSOR IS SUPPRESSED IN draw_input)
+    if app.settings.open { draw_settings(frame, &app.settings, area); }
 }
 
 //PRIVATE
@@ -335,6 +347,9 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
     let offset = cursor.1.saturating_sub(text_area.height.saturating_sub(1));
     frame.render_widget(Paragraph::new(lines).scroll((offset, 0)), text_area);
 
+    //NO CARET WHILE THE SETTINGS OVERLAY OWNS THE KEYBOARD
+    if app.settings.open { return; }
+
     frame.set_cursor_position(Position::new
     (
         text_area.x + cursor.0.min(text_area.width.saturating_sub(1)),
@@ -424,6 +439,198 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
+//THE /settings OVERLAY - ONE CENTERED BOX, EITHER THE SETTING ROWS OR THE DEVICE PICKER ON TOP OF THEM
+fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
+{
+    let width = SETTINGS_WIDTH.min(area.width.saturating_sub(2)).max(1);
+    let inner_width = width.saturating_sub(2) as usize;
+
+    if area.height < 5 || inner_width < 12 { return; }
+
+    //THE PICKER BORROWS THE SAME BOX, SO BOTH MODES ARE MEASURED THE SAME WAY
+    let (title, total, selected) = match &state.picker
+    {
+        Some(picker) => (picker.title, picker.entries.len(), picker.selected),
+        None => (" Settings ", state.rows.len(), state.selected),
+    };
+
+    let room = area.height.saturating_sub(4) as usize; //BORDERS PLUS A LINE OF AIR TOP AND BOTTOM
+    let visible = match &state.picker
+    {
+        Some(_) => total.min(settings::MAX_PICKER_ROWS).min(room),
+        None => total.min(room),
+    }.max(1);
+
+    //KEEP THE SELECTION IN VIEW
+    let first = selected.saturating_sub(visible.saturating_sub(1)).min(total.saturating_sub(visible));
+
+    //THE VALUE COLUMN STARTS RIGHT BEHIND THE LONGEST LABEL, NOT AT SOME GUESSED OFFSET
+    let label_width = state.rows.iter().filter_map(|row| match row
+    {
+        Row::Item(item) => Some(item.label.width()),
+        Row::Header(_) => None,
+    }).max().unwrap_or(0).min(inner_width.saturating_sub(SETTINGS_VALUE_WIDTH as usize + 3));
+
+    //ON A NARROW TERMINAL THE LABELS GIVE WAY FIRST - THE VALUES ARE WHAT THE USER IS HERE FOR
+
+    let lines = match &state.picker
+    {
+        Some(picker) => picker.entries.iter().enumerate()
+            .skip(first)
+            .take(visible)
+            .map(|(index, entry)| picker_line(entry, index == picker.selected, inner_width))
+            .collect::<Vec<Line>>(),
+
+        None => state.rows.iter().enumerate()
+            .skip(first)
+            .take(visible)
+            .map(|(index, row)| settings_line(row, index == state.selected, label_width, inner_width))
+            .collect::<Vec<Line>>(),
+    };
+
+    let height = lines.len() as u16 + 2;
+
+    let popup = Rect
+    {
+        x: area.x + (area.width.saturating_sub(width)) / 2,
+        y: area.y + (area.height.saturating_sub(height)) / 2,
+        width,
+        height,
+    };
+
+    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS, SO THE BASE FOREGROUND GOES BACK ON
+
+    frame.buffer_mut().set_style(popup, theme::TEXT);
+
+    let hint = match &state.picker
+    {
+        Some(_) => " ↑↓ select │ ⏎ apply │ Esc back ",
+        None => " ↑↓ move │ ←→ change │ ⏎ select │ Esc close ",
+    };
+
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(theme::BORDER_ACTIVE)
+        .title(Span::styled(title, theme::TITLE))
+        .title_bottom(Line::from(Span::styled(hint, theme::DIM)).centered());
+
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn settings_line(row: &Row, selected: bool, label_width: usize, width: usize) -> Line<'static>
+{
+    let item = match row
+    {
+        //A SECTION HEADING CARRIES A RULE OUT TO THE EDGE, WHICH IS WHAT SEPARATES THE GROUPS
+        Row::Header(label) => return Line::from(vec!
+        [
+            Span::styled(format!(" {label} "), theme::TITLE),
+            Span::styled("─".repeat(width.saturating_sub(label.width() + 2)), theme::BORDER),
+        ]),
+
+        Row::Item(item) => item,
+    };
+
+    let mut spans = vec!
+    [
+        Span::styled(if selected { "▌" } else { " " }, theme::ACCENT),
+        Span::styled
+        (
+            format!(" {:<label_width$}  ", truncate(item.label, label_width)),
+            if selected { theme::ACCENT } else { theme::TEXT },
+        ),
+    ];
+
+    spans.extend(value_spans(&item.value, width.saturating_sub(label_width + 3)));
+
+    let line = Line::from(spans);
+
+    if selected { line.style(theme::SELECTED) } else { line }
+}
+
+fn value_spans(value: &Value, _width: usize) -> Vec<Span<'static>>
+{
+    match value
+    {
+        Value::Toggle { on: true, .. } => vec![Span::styled("● on", theme::OK)],
+        Value::Toggle { on: false, .. } => vec![Span::styled("○ off", theme::DIM)],
+
+        #[cfg(feature = "client_voice")]
+        Value::Volume(percent) =>
+        {
+            //THE BAR IS THE WHOLE SUPPORTED RANGE, SO 100% SITS EXACTLY IN THE MIDDLE
+            let filled = (*percent as usize * SLIDER_WIDTH).div_ceil(voice_options::VOLUME_MAX as usize);
+
+            vec!
+            [
+                Span::styled("█".repeat(filled), theme::ACCENT),
+                Span::styled("░".repeat(SLIDER_WIDTH.saturating_sub(filled)), theme::BORDER),
+                Span::styled(format!(" {percent:>3}%"), if *percent == 0 { theme::DIM } else { theme::TEXT }),
+            ]
+        },
+
+        #[cfg(feature = "client_voice")]
+        Value::Device { name, .. } =>
+        {
+            if name.is_empty()
+            {
+                vec![Span::styled(settings::DEFAULT_DEVICE, theme::DIM)]
+            } else
+            {
+                vec![Span::styled(truncate(name, _width), theme::ACCENT)]
+            }
+        },
+    }
+}
+
+#[cfg(feature = "client_voice")]
+fn picker_line(entry: &str, selected: bool, width: usize) -> Line<'static>
+{
+    //ENTRY 0 IS THE EMPTY CONFIG VALUE, WHICH MEANS "WHATEVER THE SYSTEM PICKS"
+    let (text, style) = if entry.is_empty()
+    {
+        (String::from(settings::DEFAULT_DEVICE), theme::DIM)
+    } else
+    {
+        (truncate(entry, width.saturating_sub(3)), theme::TEXT)
+    };
+
+    let line = Line::from(vec!
+    [
+        Span::styled(if selected { "▌" } else { " " }, theme::ACCENT),
+        Span::styled(format!(" {text}"), style),
+    ]);
+
+    if selected { line.style(theme::SELECTED) } else { line }
+}
+
+#[cfg(not(feature = "client_voice"))]
+fn picker_line(_entry: &str, _selected: bool, _width: usize) -> Line<'static> { Line::default() }
+
+fn truncate(text: &str, width: usize) -> String //FIT text INTO width CELLS, ELLIPSIS AND ALL
+{
+    if text.width() <= width { return text.to_string(); }
+
+    let mut out = String::new();
+    let mut used = 0;
+
+    for c in text.chars()
+    {
+        let next = used + c.to_string().width();
+
+        if next > width.saturating_sub(1) { break; }
+
+        out.push(c);
+        used = next;
+    }
+
+    out.push('…');
+    out
+}
+
 fn right_status(_app: &App) -> String
 {
     let mut parts: Vec<String> = Vec::new();
@@ -431,7 +638,10 @@ fn right_status(_app: &App) -> String
     #[cfg(feature = "client_voice")]
     if _app.voice_enabled
     {
-        parts.push(String::from(if options::is_muted(None) { "mic off" } else { "mic on" }));
+        //THE CAPTURE CALLBACK TREATS 0% AS OFF, SO THE STATUS LINE HAD BETTER AGREE
+        let off = options::is_muted(None) || voice_options::get_input_volume() == 0;
+
+        parts.push(String::from(if off { "mic off" } else { "mic on" }));
     }
 
     parts.push(String::from("Ctrl+H help"));
@@ -443,3 +653,5 @@ fn voice_visible(app: &App) -> bool
 {
     app.voice_enabled && !app.voice.is_empty()
 }
+
+

@@ -127,6 +127,9 @@ cargo build --bin why2-server --no-default-features --features server --release
      - `auto_connect_addr`: Default server address
      - `default_port`: Default server port
      - Display options (`show_id`, `disable_colors`)
+     - Voice chat audio (`input_device`, `output_device`, `input_volume`, `output_volume`,
+       `noise_suppression`, `automatic_gain`) - all editable in-app with `/settings`, and applied
+       immediately, including to a voice call that is already running
 
 ### Important Commands
 
@@ -137,6 +140,7 @@ cargo build --bin why2-server --no-default-features --features server --release
 | `/pm <user> <message>` | Send private message |
 | `/channel <name>` | Switch to channel |
 | `/voice` | Join voice channel |
+| `/settings` | Open audio and interface settings |
 | `/exit` | Disconnect and quit |
 
 ---

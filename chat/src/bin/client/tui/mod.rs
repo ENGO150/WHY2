@@ -21,6 +21,7 @@ pub mod draw;
 pub mod event;
 pub mod input;
 pub mod palette;
+pub mod settings;
 pub mod state;
 pub mod theme;
 
@@ -256,10 +257,16 @@ async fn handle_terminal_event
 
             match mouse.kind
             {
+                //THE WHEEL DRIVES THE SETTINGS SELECTION WHILE THE OVERLAY IS UP
+                MouseEventKind::ScrollUp if app.settings.open => settings::scroll(app, -1),
+                MouseEventKind::ScrollDown if app.settings.open => settings::scroll(app, 1),
+
                 MouseEventKind::ScrollUp => app.scroll_up(SCROLL_STEP, viewport),
                 MouseEventKind::ScrollDown => app.scroll_down(SCROLL_STEP, viewport),
                 _ => {},
             }
+
+            app.dirty = true;
         },
 
         Event::Resize(..) | Event::FocusGained | Event::FocusLost => app.dirty = true,
@@ -285,6 +292,20 @@ async fn handle_key
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
 
     app.dirty = true;
+
+    //THE SETTINGS OVERLAY OWNS THE KEYBOARD WHILE IT IS UP - EXCEPT FOR ITS OWN SHORTCUT, WHICH CLOSES IT
+    if app.settings.open
+    {
+        if control && settings_shortcut(key.code)
+        {
+            app.settings.close();
+        } else
+        {
+            settings::handle_key(app, key);
+        }
+
+        return;
+    }
 
     //NEWLINE (Alt+Enter EVERYWHERE, Shift+Enter WHERE THE TERMINAL REPORTS IT)
     if key.code == KeyCode::Enter && (alt || shift)
@@ -398,6 +419,15 @@ fn complete(app: &mut App, info: &'static command::CommandInfo)
     if !info.args.is_empty() { app.input.insert(' '); }
 
     app.palette.update(&app.input.text());
+}
+
+fn settings_shortcut(code: KeyCode) -> bool //Ctrl+<SHORTCUT OF /settings>
+{
+    let KeyCode::Char(c) = code else { return false };
+
+    command::COMMAND_LIST.iter()
+        .find(|info| info.command == command::Command::Settings)
+        .is_some_and(|info| info.shortcut == Some(c))
 }
 
 fn message_viewport(terminal: &Tui) -> u16 //ROWS OF ACTUAL MESSAGE TEXT, FOR SCROLL CLAMPING

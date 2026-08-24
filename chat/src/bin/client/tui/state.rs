@@ -36,6 +36,7 @@ use super::
 {
     input::InputBuffer,
     palette::Palette,
+    settings::Settings,
     theme::Theme,
 };
 
@@ -80,6 +81,7 @@ pub struct App
     //INPUT
     pub input: InputBuffer,
     pub palette: Palette,
+    pub settings: Settings, //SETTINGS OVERLAY (CLOSED UNLESS THE USER OPENED IT)
     pub theme: Theme,
 
     //REQUEST BOOKKEEPING (A LIST/SCREENS RESPONSE IS ONLY ECHOED WHEN THE USER ASKED FOR IT)
@@ -124,6 +126,7 @@ impl App
             login_hint: None,
             input: InputBuffer::new(),
             palette: Palette::new(),
+            settings: Settings::new(),
             theme: Theme::load(),
             list_requested: false,
             #[cfg(feature = "client_screen")]

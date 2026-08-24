@@ -202,6 +202,20 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     files in `/files`) in `theme::BORDER`, then a right-aligned dim id column, then the name. Keep
     new block output to that shape — boxed tables were tried and rejected, and anything wider than
     the message pane is re-wrapped by it and comes out as rubble.
+  - `/settings` (`tui/settings.rs`) is a modal overlay, not a block command: while `App::settings.open`
+    is set it swallows the keyboard in `tui::mod::handle_key` and suppresses the input caret in
+    `draw::draw_input`. Every row writes straight through to `client.toml` (typed, via
+    `config::client_write_bool`/`client_write_int`) and into the atomics in
+    `network/voice/client/options.rs` that the running cpal callbacks read — there is no save step.
+    A row whose config key is phrased as a negative (`disable_colors`) carries `invert`, and the
+    inversion happens in exactly one place per direction (`settings::toggle_value` on read,
+    `settings::toggle` on write) — inverting on only one side silently makes the row a no-op.
+    Device lists come from one `spawn_blocking` cpal enumeration when the command is typed
+    (`mod.rs::audio_devices`, gagged stderr), never from the draw path. Picking a device bumps
+    `voice_options::mark_devices_changed`, and the voice session's VAD task rebuilds both cpal streams
+    (`voice::client::replace_streams`) within its 100 ms tick: the UDP socket, `CONSUMERS` and the
+    jitter buffers survive, so the call does not drop. A device that will not open keeps the old pair
+    and reports `ClientEvent::VoiceDeviceFailed`.
   - Chat messages live in `App::messages` as `state::Entry::Message` (username/id/text/colors), not as
     rendered `Line`s — `Theme::render` turns an entry into a line on every wrap, so a `show_id` or
     `disable_colors` change repaints the messages already in the pane. Anything that rewrites

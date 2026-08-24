@@ -56,7 +56,7 @@ use unicode_width::UnicodeWidthStr;
 
 use ratatui::text::{ Line, Span };
 
-use tui::{ App, theme };
+use tui::{ App, theme, settings::Devices };
 
 use why2_chat::
 {
@@ -250,6 +250,30 @@ fn setup_devices() //SELECT AUDIO DEVICES AND STORE IN CLIENT CONFIG
     //GET OUTPUT DEVICE
     list_devices(&output_devices); //LIST
     prompt_selection(&output_devices, "output_device"); //PROMPT
+}
+
+//EVERY INPUT/OUTPUT DEVICE cpal KNOWS ABOUT (BLOCKING, AND ALSA SPEAKS TO fd 2 - HENCE THE GAG)
+async fn audio_devices() -> Devices
+{
+    #[cfg(not(feature = "client_voice"))]
+    {
+        Devices::default()
+    }
+
+    #[cfg(feature = "client_voice")]
+    {
+        task::spawn_blocking(||
+        {
+            let _stderr_gag = gag::Gag::stderr().ok();
+            let host = cpal::default_host();
+
+            Devices
+            {
+                input: host.input_devices().map(load_devices).unwrap_or_default(),
+                output: host.output_devices().map(load_devices).unwrap_or_default(),
+            }
+        }).await.unwrap_or_default()
+    }
 }
 
 #[tokio::main]
@@ -588,6 +612,9 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                 }
                             } else { invalid_usage(app, None); }
                         },
+
+                        //THE DEVICE LIST IS ENUMERATED HERE, ONCE, SO THE DRAW PATH NEVER TALKS TO cpal
+                        Command::Settings => app.settings.open(audio_devices().await),
 
                         Command::UsernameColor => color_handler(app, "username_color", parameters),
                         Command::MessageColor => color_handler(app, "message_color", parameters),

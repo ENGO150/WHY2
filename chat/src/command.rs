@@ -58,6 +58,7 @@ pub enum Command
     #[cfg(feature = "client_screen")] Attach,   //ATTACH SCREEN SHARE
     #[cfg(feature = "client_screen")] Deattach, //DEATTACH SCREEN SHARE
     PrivateMessage,                             //ONE TO ONE MESSAGE
+    Settings,                                   //OPEN THE SETTINGS OVERLAY
     UsernameColor,                              //SET COLOR OF USERNAME
     MessageColor,                               //SET COLOR OF MESSAGE
     Invalid,                                    //INVALID COMMAND
@@ -280,6 +281,15 @@ pub const COMMAND_LIST: &[CommandInfo] =
             },
         ],
         description: "Sends private message",
+    },
+
+    CommandInfo
+    {
+        command: Command::Settings,
+        triggers: &[ "SETTINGS", "SETUP", "CONFIG", "PREFERENCES", "AUDIO" ],
+        shortcut: Some('g'),
+        args: &[],
+        description: "Opens audio and interface settings",
     },
 
     CommandInfo
