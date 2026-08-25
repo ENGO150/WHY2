@@ -26,6 +26,7 @@ use std::
     collections::{ BTreeMap, VecDeque },
     time::
     {
+        Instant,
         SystemTime,
         Duration,
         UNIX_EPOCH,
@@ -34,7 +35,7 @@ use std::
     {
         Arc,
         Mutex,
-        atomic::{ AtomicUsize, Ordering },
+        atomic::{ AtomicBool, AtomicUsize, Ordering },
     },
 };
 
@@ -789,7 +790,8 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     id: usize,
     username: String,
     tx: Sender<ClientEvent>,
-    write_stream: Arc<MutexAsync<OwnedWriteHalf>>
+    write_stream: Arc<MutexAsync<OwnedWriteHalf>>,
+    token: [u8; 32]
 )
 {
     //RESET SEQs
@@ -807,20 +809,24 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     let socket = Arc::new(UdpSocket::bind("0.0.0.0:0").await.expect("Binding UDP failed"));
     socket.connect(chat_options::get_server_address()).await.expect("Connecting to server UDP failed");
 
-    //SEND HELLO PACKET
-    voice::send(&socket, id, VoicePacketCode::Hello, &chat_options::get_keys().unwrap()).await.ok();
+    //CLAIM THE VOICE SLOT THE SERVER OPENED
+    let handshake = Arc::new(AtomicBool::new(false));
 
     //AUDIO CALLBACK -> NETWORK TASK BRIDGE
     let (packet_tx, mut packet_rx) = mpsc::channel::<Vec<u8>>(consts::SEND_CHANNEL_BOUND);
 
     //SPAWN TRANSMIT TASK
     let send_socket = socket.clone();
+    let send_handshake = handshake.clone();
     tokio::spawn(async move
     {
         while let Some(data) = packet_rx.recv().await
         {
             //CHECK GENERATION
             if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
+
+            //THE SLOT IS NOT OURS YET - THE SERVER WOULD ONLY DROP THIS
+            if !send_handshake.load(Ordering::Relaxed) { continue; }
 
             voice::send(&send_socket, id, VoicePacketCode::Audio
             {
@@ -844,6 +850,43 @@ pub async fn listen_server_voice //SERVER -> CLIENT
 
     //MOVE STREAMS TO GLOBAL STORAGE
     *LOCAL_STREAMS.lock().unwrap() = Some(streams);
+
+    {
+        let socket = socket.clone();
+        let handshake = handshake.clone();
+        let tx = tx.clone();
+        let write_stream = write_stream.clone();
+
+        tokio::spawn(async move
+        {
+            let deadline = Instant::now() + Duration::from_millis(consts::HELLO_TIMEOUT);
+
+            while !handshake.load(Ordering::Relaxed)
+            {
+                //THE SESSION WENT AWAY UNDER US
+                if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation || !options::get_use_voice() { return; }
+
+                //NOTHING CAME BACK - LEAVE THE CALL THE WAY A DEAD DEVICE DOES, RATHER THAN SIT IN A
+                //CALL NOBODY CAN HEAR
+                if Instant::now() >= deadline
+                {
+                    tx.send(ClientEvent::VoiceHandshakeFailed).await.ok();
+                    command::send_command_code(&mut *write_stream.lock().await, &Command::Voice, &None).await;
+
+                    return;
+                }
+
+                let keys = match chat_options::get_keys()
+                {
+                    Some(keys) => keys,
+                    None => return //SESSION LOST
+                };
+
+                voice::send(&socket, id, VoicePacketCode::Hello { token }, &keys).await.ok();
+                time::sleep(Duration::from_millis(consts::HELLO_INTERVAL)).await;
+            }
+        });
+    }
 
     //PLAY JOIN SOUND
     sfx::clear_effects();
@@ -935,6 +978,13 @@ pub async fn listen_server_voice //SERVER -> CLIENT
         //VERIFY SERVER SEQ
         if network_buffer.seq <= options::get_server_seq() { continue; } //INGORE INVALID SEQs
         options::set_server_seq(network_buffer.seq); //SET SERVER SEQ
+
+        //HANDSHAKE ANSWERED - THE SLOT IS OURS, STOP REPEATING Hello AND START SENDING
+        if let VoicePacketCode::HelloAck = network_buffer.code
+        {
+            handshake.store(true, Ordering::Relaxed);
+            continue;
+        }
 
         //PING HAS TO BE ANSWERED OUTSIDE OF THE CONSUMERS LOCK
         let mut pong: Option<u128> = None;

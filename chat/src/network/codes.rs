@@ -121,6 +121,7 @@ pub enum PacketCode //CONTROL CODES
     Screens { users: Option<Vec<UserScreen>> },     //CLIENT <> SERVER | LIST SCREENSHARES
     Deattach { username: Option<String> },          //CLIENT <> SERVER | DEATTACH CLIENT SCREENSHARE
     Screen { token: Option<[u8; 32]> },             //CLIENT <> SERVER | TOGGLE SCREENSHARE
+    Voice { token: Option<[u8; 32]> },              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
     KeyExchange { ecc: String, pq: String },        //SERVER <> CLIENT | KEY EXCHANGE
     Accept { id: usize },                           //SERVER -> CLIENT | START CHATTING
     Join { username: String },                      //SERVER -> CLIENT | CLIENT JOIN MESSAGE
@@ -130,7 +131,6 @@ pub enum PacketCode //CONTROL CODES
     Disconnect,       //SERVER <> CLIENT | QUIT COMMUNICATION
     SpamWarning,      //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN
     RegisterDisabled, //SERVER -> CLIENT | REGISTRATION IS DISABLED
-    Voice,            //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
     UploadLimit,      //SERVER -> CLIENT | MAX CONCURRENT UPLOADS REACHED
     InvalidUsage,     //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
     InvalidFeature,   //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE

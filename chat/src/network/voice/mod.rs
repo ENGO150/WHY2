@@ -53,8 +53,14 @@ use crate::options as chat_options;
 #[derive(SchemaRead, SchemaWrite)]
 pub enum VoicePacketCode
 {
-    //INIT PACKET
-    Hello,
+    //INIT PACKET - CLAIMS THE VOICE SLOT THE TCP SESSION OPENED
+    Hello
+    {
+        token: [u8; 32], //TOKEN HANDED OUT OVER THE AUTHENTICATED TCP CHANNEL
+    },
+
+    //Hello ACCEPTED - UDP IS LOSSY, SO THE CLIENT REPEATS Hello UNTIL THIS COMES BACK
+    HelloAck,
 
     //AUDIO TRANSMIT
     Audio
@@ -183,6 +189,10 @@ pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //
 
         let buffer_offset: usize;
 
+        //ID THE KEYS WERE PICKED BY (SERVER ONLY)
+        #[cfg(feature = "server")]
+        let sender_id: usize;
+
         //GET ID ON SERVER
         let keys =
         {
@@ -198,6 +208,7 @@ pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //
 
                 //REMOVE ID FROM BUFFER
                 buffer_offset = 8;
+                sender_id = id;
 
                 match server::find_key(&id)
                 {
@@ -222,10 +233,15 @@ pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //
         };
 
         //PACKET ARRIVED, DESERIALIZE
-        return match wincode::deserialize::<VoicePacket>(&decrypted_bytes)
+        let packet = match wincode::deserialize::<VoicePacket>(&decrypted_bytes)
         {
-            Ok(packet) => Some((packet, addr)),
+            Ok(packet) => packet,
             Err(_) => continue
-        }
+        };
+
+        #[cfg(feature = "server")]
+        if packet.id != sender_id { continue; }
+
+        return Some((packet, addr))
     }
 }

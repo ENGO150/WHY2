@@ -25,6 +25,12 @@ use std::
 
 use tokio::net::UdpSocket;
 
+use rand::
+{
+    TryRng,
+    rngs::SysRng,
+};
+
 use dashmap::DashMap;
 
 use crate::
@@ -53,7 +59,8 @@ pub struct Connection
 }
 
 //LISTS
-pub static CONNECTIONS: LazyLock<DashMap<usize, (Option<Connection>, String)>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
+//CONNECTION (NONE UNTIL THE Hello ARRIVES), USERNAME, TOKEN THAT CLAIMS THE SLOT
+pub static CONNECTIONS: LazyLock<DashMap<usize, (Option<Connection>, String, [u8; 32])>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //IMPLEMENTATIONS
 impl Connection
@@ -129,7 +136,24 @@ fn validate_opus_packet(packet: &[u8]) -> bool
     }
 }
 
+fn tokens_match(a: &[u8; 32], b: &[u8; 32]) -> bool //COMPARE WITHOUT LEAKING WHERE THEY DIVERGE
+{
+    a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
 //PUBLIC
+pub fn open_connection(id: usize, username: String) -> [u8; 32] //OPEN A VOICE SLOT AND HAND OUT ITS TOKEN
+{
+    //GENERATE RANDOM TOKEN
+    let mut token = [0u8; 32];
+    SysRng.try_fill_bytes(&mut token).unwrap();
+
+    //THE SLOT STAYS UNBOUND UNTIL A Hello CARRYING THIS TOKEN ARRIVES OVER UDP
+    CONNECTIONS.insert(id, (None, username, token));
+
+    token
+}
+
 pub fn find_key(id: &usize) -> Option<SharedKeys>
 {
     server::CONNECTIONS.iter()
@@ -146,7 +170,7 @@ pub fn find_channel(id: &usize) -> Option<Option<String>>
 
 pub fn remove_connection(id: &usize) //REMOVE CONNECTION
 {
-    if let Some((_, (conn, _))) = CONNECTIONS.remove(id) &&
+    if let Some((_, (conn, _, _))) = CONNECTIONS.remove(id) &&
         let Some(conn) = conn
     {
         log::info!("Close voice connection: {}", conn.peer_addr());
@@ -175,15 +199,23 @@ pub async fn listen_client_voice(socket: UdpSocket)
         let username: String;
 
         //CHECK IF ID IS IN CONNECTIONS
-        if let Some(mut conn) = CONNECTIONS.get_mut(&received.id)
+        if let Some(mut entry) = CONNECTIONS.get_mut(&received.id)
         {
-            //FOUND, CHECK ADDRESS
-            if let Some(conn) = conn.0.as_mut()
+            //A Hello IS THE ONLY PACKET THAT MAY CLAIM OR MOVE A SLOT, AND ONLY WITH THE RIGHT TOKEN
+            let valid_hello = match received.code
             {
-                //NAT PORT SHIFTING
+                VoicePacketCode::Hello { ref token } => tokens_match(token, &entry.2),
+                _ => false
+            };
+
+            //FOUND, CHECK ADDRESS
+            if let Some(conn) = entry.0.as_mut()
+            {
                 if conn.addr != addr
                 {
-                    if conn.addr.ip() == addr.ip()
+                    //A Hello CARRYING THE TOKEN MAY MOVE THE SESSION ANYWHERE; ANYTHING ELSE ONLY FOLLOWS
+                    //A NAT PORT SHIFT, WHICH KEEPS THE ADDRESS THE SESSION IS ALREADY ON
+                    if valid_hello || conn.addr.ip() == addr.ip()
                     {
                         conn.addr = addr;
                     } else { continue; } //IGNORE NON-MATCHING ADDRESS (SPOOFING)
@@ -200,13 +232,17 @@ pub async fn listen_client_voice(socket: UdpSocket)
                     conn.packet_accumulator = 0; //RESET ACCUM
                     reset_last_activity(&received.id); //RESET ACTIVITY TIMER
                 }
-            } else //NOT FOUND, ADD ADDRESS
+            } else //NOT BOUND YET, ADD ADDRESS
             {
-                conn.0 = Some(Connection
+                //WITHOUT THE TOKEN THERE IS NOTHING TO BIND TO: THE SLOT WAITS FOR THE CLIENT THAT WAS
+                //HANDED IT OVER TCP, NOT FOR WHOEVER SPEAKS FIRST
+                if !valid_hello { continue; }
+
+                entry.0 = Some(Connection
                 {
                     addr: addr,
                     id: received.id,
-                    seq: 0,
+                    seq: received.seq,
                     server_seq: 0,
                     packet_accumulator: 0,
                 });
@@ -215,12 +251,23 @@ pub async fn listen_client_voice(socket: UdpSocket)
             }
 
             //SET USERNAME
-            username = conn.1.clone();
+            username = entry.1.clone();
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
         //CODES
         match received.code
         {
+            //HANDSHAKE - ANSWER EVERY Hello, INCLUDING THE REPEATS THAT CROSSED AN ACK ON THE WIRE
+            VoicePacketCode::Hello { .. } =>
+            {
+                if let Some(ref keys) = find_key(&received.id)
+                {
+                    voice::send(&socket, received.id, VoicePacketCode::HelloAck, &addr, &received.id, keys).await.ok();
+                }
+
+                continue;
+            },
+
             //AUDIO
             VoicePacketCode::Audio { data, .. } =>
             {
@@ -234,7 +281,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
                 let mut addresses: Vec<(SocketAddr, SharedKeys, usize)> = Vec::new();
                 for connection in CONNECTIONS.iter()
                 {
-                    if let (Some(conn), _) = connection.value()
+                    if let (Some(conn), _, _) = connection.value()
                     {
                         //DO NOT SEND BACK TO SENDER (LOOPBACK)
                         if conn.addr != addr
@@ -272,7 +319,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
                 let mut addresses: Vec<(SocketAddr, SharedKeys, usize)> = Vec::new();
                 for connection in CONNECTIONS.iter()
                 {
-                    if let (Some(conn), _) = connection.value()
+                    if let (Some(conn), _, _) = connection.value()
                     {
                         //DO NOT SEND BACK TO SENDER (LOOPBACK)
                         if conn.addr != addr

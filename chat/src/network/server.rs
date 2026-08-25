@@ -1295,41 +1295,33 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //VOICE CALL
-            PacketCode::Voice =>
+            PacketCode::Voice { .. } =>
             {
                 //CHECK DISABLED FEATURE
                 if !options::voice_chat_enabled()
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidFeature, Some(&keys)).await;
-                } else
+                } else if !voice_server::CONNECTIONS.contains_key(&id) //IS NOT USING VOICE
                 {
-                    //ACKNOWLEDGE
-                    network::send(&mut *streams.1.lock().await, PacketCode::Voice, Some(&keys)).await;
+                    //OPEN THE VOICE SLOT AND ACKNOWLEDGE WITH THE TOKEN THAT CLAIMS IT OVER UDP
+                    let token = voice_server::open_connection(id, username.clone());
+                    network::send(&mut *streams.1.lock().await, PacketCode::Voice { token: Some(token) }, Some(&keys)).await;
 
-                    if !voice_server::CONNECTIONS.contains_key(&id) //IS NOT USING VOICE
-                    {
-                        //ADD CLIENT ID TO VOICE CONNECTIONS MAP
-                        voice_server::CONNECTIONS.insert(id, (None, username.clone()));
+                    //SEND CODE TO CHANNEL
+                    send_to_all(PacketCode::ChannelJoin { username: username.clone(), id }, true, channel.as_deref());
 
-                        //SEND CODE TO CHANNEL
-                        if options::voice_chat_enabled()
-                        {
-                            send_to_all(PacketCode::ChannelJoin { username: username.clone(), id }, true, channel.as_deref());
-                        }
+                    //SEND CONNECTED CLIENTS
+                    send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
+                } else //IS USING VOICE
+                {
+                    //ACKNOWLEDGE THE LEAVE
+                    network::send(&mut *streams.1.lock().await, PacketCode::Voice { token: None }, Some(&keys)).await;
 
-                        //SEND CONNECTED CLIENTS
-                        send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
-                    } else //IS USING VOICE
-                    {
-                        //SEND CODE TO LAST CHANNEL
-                        if options::voice_chat_enabled()
-                        {
-                            send_to_all(PacketCode::ChannelLeave { id }, true, channel.as_deref());
-                        }
+                    //SEND CODE TO LAST CHANNEL
+                    send_to_all(PacketCode::ChannelLeave { id }, true, channel.as_deref());
 
-                        //REMOVE FROM VOICE
-                        voice_server::remove_connection(&id);
-                    }
+                    //REMOVE FROM VOICE
+                    voice_server::remove_connection(&id);
                 }
             },
 

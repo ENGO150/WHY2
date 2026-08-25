@@ -394,7 +394,7 @@ impl Command
             #[cfg(feature = "client_screen")] Command::Screens => Some(Ok(PacketCode::Screens { users: None })),
 
             Command::Exit => Some(Ok(PacketCode::Disconnect)),
-            #[cfg(feature = "client_voice")] Command::Voice => Some(Ok(PacketCode::Voice)),
+            #[cfg(feature = "client_voice")] Command::Voice => Some(Ok(PacketCode::Voice { token: None })),
 
             _ => None,
         }

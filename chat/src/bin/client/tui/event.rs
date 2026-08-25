@@ -179,6 +179,11 @@ impl App
                 self.settings.refresh_devices();
             },
 
+            ClientEvent::VoiceHandshakeFailed =>
+            {
+                self.push_styled("The server never answered the voice handshake - is UDP getting through?", theme::ERROR);
+            },
+
             ClientEvent::VoiceDisabled =>
             {
                 self.voice_enabled = false;

@@ -75,11 +75,6 @@ pub fn get_use_voice() -> bool //GET USE VOICE
     USE_VOICE.load(Ordering::Relaxed)
 }
 
-pub fn swap_use_voice() -> bool //SET USE VOICE
-{
-    !USE_VOICE.fetch_xor(true, Ordering::Relaxed)
-}
-
 pub fn set_use_voice(value: bool) //FORCE USE VOICE (A LOST SESSION TAKES THE CALL WITH IT)
 {
     USE_VOICE.store(value, Ordering::Relaxed)

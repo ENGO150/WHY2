@@ -147,6 +147,7 @@ pub enum ClientEvent
     Username(bool, u64, u64),                      //USERNAME PROMPT
     VoiceEnabled,                                  //VOICE CHAT ENABLED
     VoiceDeviceFailed,                             //REBUILDING THE AUDIO STREAMS FAILED
+    VoiceHandshakeFailed,                          //THE SERVER NEVER ANSWERED THE UDP HANDSHAKE
     VoiceDisabled,                                 //VOICE CHAT DISABLED
     List(Vec<OnlineUser>),                         //LIST OF USERS
     Upload(String),                                //UPLOADING FILE
@@ -557,7 +558,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
             //SERVER ALLOWED VOICE
             #[cfg(feature = "client_voice")]
-            PacketCode::Voice =>
+            PacketCode::Voice { token } =>
             {
                 if options::socks5_enabled()
                 {
@@ -565,17 +566,22 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     continue;
                 }
 
+                //FOLLOW THE SERVER INSTEAD OF TOGGLING, SO BOTH SIDES CANNOT DRIFT APART
+                voice_options::set_use_voice(token.is_some());
+
                 //TOGGLE VOICE (& PRINT STATUS)
-                tx.send(if voice_options::swap_use_voice()
+                tx.send(match token
                 {
-                    let username = username.clone();
-                    let voice_tx = tx.clone();
-                    let stream = streams.1.clone();
-                    tokio::spawn(voice_client::listen_server_voice(id, username.unwrap(), voice_tx, stream));
-                    ClientEvent::VoiceEnabled
-                } else
-                {
-                    ClientEvent::VoiceDisabled
+                    Some(token) =>
+                    {
+                        let username = username.clone();
+                        let voice_tx = tx.clone();
+                        let stream = streams.1.clone();
+                        tokio::spawn(voice_client::listen_server_voice(id, username.unwrap(), voice_tx, stream, token));
+                        ClientEvent::VoiceEnabled
+                    },
+
+                    None => ClientEvent::VoiceDisabled,
                 }).await.unwrap();
             },
 
