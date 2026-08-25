@@ -101,6 +101,10 @@ pub const ERROR: Style = Style::new().fg(Color::Rgb(0xF6, 0x46, 0xC6));         
 pub const OK: Style = Style::new().fg(Color::Rgb(0xFF, 0xBB, 0xBA));            //SALMON
 pub const SPEAKING: Style = Style::new().fg(Color::Rgb(0xFF, 0xBB, 0xBA)).add_modifier(Modifier::BOLD);
 
+pub const LOGO_COLOR: Color = Color::Rgb(0x5C, 0x46, 0x4B);                     //DEEP ROSE - THE WATERMARK BEHIND EVERYTHING
+pub const LOGO: Style = Style::new().fg(LOGO_COLOR);                            //ON A FREE CELL THE GLYPH ITSELF IS DRAWN...
+pub const LOGO_UNDER: Style = Style::new().bg(LOGO_COLOR);                      //...UNDER TEXT ONLY THE BACKGROUND IS, SO THE SHAPE RUNS ON BEHIND IT
+
 pub const SELECTED: Style = Style::new().bg(Color::Rgb(0x00, 0x5F, 0x5F));
 
 pub const ARG_REQUIRED: Style = Style::new().fg(Color::Rgb(0xD7, 0xAF, 0x87));  //SOFT SAND

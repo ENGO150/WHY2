@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use ratatui::
 {
     Frame,
-    style::Style,
+    style::{ Color, Style },
     text::{ Line, Span },
     widgets::
     {
@@ -87,6 +87,9 @@ const LOGIN_WIDTH: u16            = 52; //CONNECT PROMPT, CAPPED TO THE TERMINAL
 const FIELD_ROW: u16              = 1;  //THE ADDRESS FIELD SITS ONE ROW UNDER ITS OWN LABEL
 const SETTINGS_VALUE_WIDTH: u16   = 20; //NARROWEST THE VALUE COLUMN MAY GET (BAR + PERCENTAGE)
 
+//THE PROJECT LOGO, PAINTED IN THE MIDDLE OF THE MESSAGE PANE AS A WATERMARK
+const LOGO: &str = include_str!("./assets/rexlogo");
+
 #[cfg(feature = "client_voice")]
 const SLIDER_WIDTH: usize         = 14; //CELLS OF VOLUME BAR
 
@@ -137,6 +140,10 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     if let Some(sidebar_area) = sidebar_area { draw_sidebar(frame, app, sidebar_area); }
 
     if !connecting { draw_input(frame, app, input_area, input_lines, cursor); }
+
+    //THE LOGO GOES BEHIND ALL OF IT, IN THE MIDDLE OF THE SCREEN - THE OVERLAYS BELOW Clear THEIR OWN RECT, SO IT
+    //NEVER REACHES THEM
+    draw_logo(frame, area);
 
     //THE PALETTE FLOATS OVER THE BOTTOM OF THE MESSAGE PANE
     if app.palette.is_visible() { draw_palette(frame, app, messages_area); }
@@ -193,6 +200,41 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         .collect::<Vec<Line<'static>>>();
 
     frame.render_widget(Paragraph::new(visible), inner);
+}
+
+//THE LOGO GOES IN LAST AND CLAIMS NO CELL THAT IS ALREADY SPOKEN FOR: ON A FREE CELL IT DRAWS ITS OWN GLYPH, AND
+//UNDER A CHARACTER SOMEBODY ELSE PUT THERE IT ONLY TAKES THE BACKGROUND - SO MESSAGES READ OVER THE LOGO INSTEAD
+//OF PUNCHING HOLES IN IT, AND THE SHAPE STAYS WHOLE EITHER WAY
+fn draw_logo(frame: &mut Frame, area: Rect)
+{
+    let rows = LOGO.lines().collect::<Vec<&str>>();
+    let height = rows.len() as u16;
+    let width = rows.iter().map(|row| row.chars().count()).max().unwrap_or(0) as u16;
+
+    if width == 0 || area.width < width || area.height < height { return; } //TOO CRAMPED TO READ - LEAVE IT OUT
+
+    let x = area.x + (area.width - width) / 2;
+    let y = area.y + (area.height - height) / 2;
+    let buffer = frame.buffer_mut();
+
+    for (row_index, row) in rows.iter().enumerate()
+    {
+        for (column, symbol) in row.chars().enumerate()
+        {
+            if symbol == ' ' { continue; }
+
+            let Some(cell) = buffer.cell_mut((x + column as u16, y + row_index as u16)) else { continue; };
+
+            if cell.symbol().trim().is_empty() //FREE CELL - THE LOGO OWNS IT OUTRIGHT
+            {
+                cell.set_char(symbol);
+                cell.set_style(theme::LOGO);
+            } else if cell.bg == Color::Reset //TAKEN, BUT NOTHING IS PAINTED BEHIND IT YET
+            {
+                cell.set_style(theme::LOGO_UNDER);
+            }
+        }
+    }
 }
 
 fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect)
