@@ -87,6 +87,16 @@ That test **passes trivially on a machine with no GPU** — `GpuConverter::new()
 the case the CPU fallback exists for, so it returns rather than failing. Do not "fix" it into a
 hard failure.
 
+The screen share's echo canceller is the other exception, and needs no hardware at all — it drives
+a synthetic loopback (a known delay and gain) past the canceller and measures what came out:
+
+```bash
+cargo test -p why2-chat --lib --release aec:: -- --nocapture
+```
+
+Run it with `--release`: the search correlates a few hundred milliseconds of audio at every lag and
+is far too slow to sit through in a debug build.
+
 There is deliberately **no standing benchmark for the capture pipeline** — the per-stage
 instrumentation and the headless comparator that produced the GPU-conversion numbers were
 development scaffolding and were removed once the work landed. Anything measuring capture cost
@@ -222,6 +232,43 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     did not match the window.
   - `YuvRenderer` knows nothing about windows, so the conversion is rendered offscreen and checked
     without a display — that is how the colour tests run headless in CI.
+- **`network/voice/client/aec.rs`** — keeps WHY2's own playback out of the shared screen audio. The
+  share captures the output sink's monitor (or the WASAPI loopback), which is the *finished* mix, so
+  the voice channel is in it and a viewer who is also in that channel hears themselves come back a
+  second later. Nothing in PulseAudio or cpal can leave one application out of a monitor, so the
+  client subtracts itself instead.
+  - **This is not acoustic echo cancellation, and the difference is what makes it tractable.** There
+    is no microphone and no room: the monitor is the digital mix, so our contribution appears in it
+    as literally the samples we wrote, offset by the sink's buffer and scaled by the per-stream
+    volume — a fixed delay plus a scalar. The voice output callback is the only producer
+    (`push_reference`, tapped *after* the output gain and the soft clip, so it is exactly what the
+    sink received) and the screen capture owns the only consumer, in `screen/client/audio.rs`, which
+    cancels each chunk before Opus. The tap is installed by `start` and costs one atomic load per
+    callback while nobody is sharing.
+  - **The delay search must not demand a strong correlation.** Whatever is being shared is in the
+    capture too and is routinely the louder half — a video playing over a quiet voice channel drags
+    the correlation at the *correct* lag down to 0.1 or below, so any fixed floor either rejects the
+    right answer or accepts every wrong one. What separates them is not the peak's height but how
+    far it stands above the other lags, which are uncorrelated and scatter around zero with a known
+    spread; the search accepts a peak only at `AEC_PEAK_SIGMA` above that. An earlier two-pass
+    version correlated block-energy envelopes first and refined the best few — it was cheaper, but
+    the envelope of a loud share swamps the echo's, and it failed exactly when it was needed.
+  - **The NLMS step is deliberately tiny** (`AEC_STEP`). The search hands the filter a least-squares
+    gain at the right lag, so it only has to track drift, while the shared audio sits in the error
+    signal as a loud disturbance that a large step turns into weight jitter. Raising it makes things
+    worse, and measurably: against a share twice as loud as the echo, 0.002 removes 21 dB,
+    0.0005 removes 30 dB and 0.0001 removes 34 dB. Cancellation degrades gracefully from there as
+    the share gets louder relative to the voice — 40 dB at parity down to 16 dB at eighteen times
+    it — while the damage done to the shared audio stays flat at about -44 dB throughout.
+  - **Every failure degrades instead of breaking.** No voice session means an empty ring, which
+    reads as silence and subtracts nothing; a voice output device that is not the monitored sink
+    leaves our audio out of the capture entirely and the filter converges to zero on its own; and
+    while the delay is unknown, or the running ERLE check finds the filter adding energy rather than
+    removing it, the capture is passed through untouched rather than damaged. `WHY2_SHARE_AEC=off`
+    disables it.
+  - **Known gap:** the reference is the voice output stream only. `screen::client::audio`'s own
+    playback — what you hear while attached to somebody else's share — is a separate cpal stream and
+    is not in it, so sharing while attached still leaks that share's audio into yours.
 - **`crypto/kex.rs`** — hybrid key exchange: classical ECC (`p521`) + post-quantum ML-KEM,
   combined via HKDF (`crypto/mod.rs::get_correct_key`, `derive_stream_nonce`) to derive the actual
   `why2` grid key/nonce and HMAC key (`SharedKeys = (why2 key, HMAC key)`) from the raw shared

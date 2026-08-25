@@ -235,8 +235,9 @@ impl Canceller
         estimate
     }
 
-    //NLMS. THE STEP IS DIVIDED BY THE ENERGY IN THE TAP WINDOW, SO THE FILTER CONVERGES AT THE SAME PACE
-    //WHETHER THE CHANNEL IS LOUD OR QUIET, AND DOES NOT MOVE AT ALL WHILE IT IS SILENT.
+    //NLMS. THE STEP IS DIVIDED BY THE ENERGY IN THE TAP WINDOW (SUMMED BY `estimate`, WHICH HAS ALREADY
+    //WALKED IT), SO THE FILTER MOVES AT THE SAME PACE WHETHER THE CHANNEL IS LOUD OR QUIET, AND NOT AT ALL
+    //WHILE IT IS SILENT. THE STEP ITSELF IS TINY ON PURPOSE - SEE consts::AEC_STEP.
     fn adapt(&mut self, error: f32)
     {
         let newest = self.reference.len() - 1;
@@ -272,9 +273,14 @@ impl Canceller
         }
     }
 
-    //FINDS HOW FAR BEHIND THE CAPTURE OUR OWN PLAYBACK IS. A FULL SAMPLE-BY-SAMPLE SEARCH OVER A SECOND OF
-    //AUDIO IS FAR TOO EXPENSIVE, SO THIS IS TWO PASSES: A CORRELATION OF THE BLOCK ENERGY ENVELOPES, WHICH
-    //IS CHEAP AND LANDS WITHIN ONE BLOCK, THEN A SAMPLE-ACCURATE ONE OVER THAT BLOCK ALONE.
+    //FINDS HOW FAR BEHIND THE CAPTURE OUR OWN PLAYBACK IS, BY CORRELATING THE TWO AT EVERY LAG IN RANGE.
+    //
+    //WHAT IT MUST NOT DO IS DEMAND A STRONG CORRELATION. WHATEVER IS BEING SHARED IS IN THE CAPTURE TOO,
+    //AND IT IS OFTEN THE LOUDER HALF BY FAR - A VIDEO PLAYING OVER A QUIET VOICE CHANNEL DRAGS THE
+    //CORRELATION AT THE *CORRECT* LAG DOWN TO 0.1 OR BELOW, SO ANY FIXED FLOOR EITHER REJECTS THE RIGHT
+    //ANSWER OR ACCEPTS EVERY WRONG ONE. WHAT SEPARATES THEM IS NOT THE PEAK'S HEIGHT BUT HOW FAR IT STANDS
+    //ABOVE THE OTHER LAGS: THOSE ARE UNCORRELATED, SO THEY SCATTER AROUND ZERO WITH A KNOWN SPREAD, AND A
+    //REAL ECHO CLEARS IT BY SIGMAS EVEN WHEN IT IS BURIED UNDER THE SHARE.
     fn search(&mut self)
     {
         self.countdown = consts::AEC_SEARCH_INTERVAL;
@@ -282,27 +288,74 @@ impl Canceller
         let reference: Vec<f32> = self.reference.iter().copied().collect();
         let capture: Vec<f32> = self.capture.iter().copied().collect();
 
+        let window = consts::AEC_WINDOW;
+        let captured = &capture[capture.len() - window..];
+        let capture_norm = energy(captured).sqrt();
+
         //NOTHING IS PLAYING - THERE IS NOTHING TO LINE UP AGAINST YET
-        if energy(&reference[reference.len() - consts::AEC_FINE_WINDOW..]) < consts::AEC_MIN_ENERGY
+        if capture_norm <= 0. || energy(&reference[reference.len() - window..]) < consts::AEC_MIN_ENERGY
         {
             return;
         }
 
-        //THE LOUDEST ENVELOPE PEAK IS NOT ALWAYS THE RIGHT ONE - ANYTHING RHYTHMIC IN WHAT IS BEING SHARED
-        //CAN OUTSCORE US AT THE WRONG LAG, AND ONLY THE SAMPLE-ACCURATE PASS CAN TELL THEM APART
-        let mut best: Option<(usize, f32, f32)> = None;
+        let mut best = (0usize, f32::NEG_INFINITY);
+        let mut total = 0.;
+        let mut total_squared = 0.;
 
-        for coarse in self.search_envelope(&reference, &capture)
+        //THE REFERENCE WINDOW SLIDES ONE SAMPLE PER LAG, SO ITS ENERGY IS CARRIED ACROSS INSTEAD OF RESUMMED
+        let mut first = reference.len() - window;
+        let mut reference_energy = energy(&reference[first..]);
+
+        for delay in 0..=consts::AEC_SEARCH_RANGE
         {
-            let Some(found) = self.search_samples(&reference, &capture, coarse) else { continue };
-
-            if best.is_none_or(|(_, _, score)| found.2 > score)
+            if delay > 0
             {
-                best = Some(found);
+                first -= 1;
+                reference_energy += reference[first] * reference[first]
+                    - reference[first + window] * reference[first + window];
             }
+
+            if reference_energy <= 0. { continue; }
+
+            let mut correlation = 0.;
+
+            for index in 0..window
+            {
+                correlation += captured[index] * reference[first + index];
+            }
+
+            let score = correlation / (reference_energy.sqrt() * capture_norm);
+
+            total += score;
+            total_squared += score * score;
+
+            if score > best.1 { best = (delay, score); }
         }
 
-        let Some((delay, gain, _)) = best else { return };
+        //HOW FAR THE PEAK STANDS ABOVE THE LAGS THAT ARE ONLY COINCIDENCE
+        let lags = (consts::AEC_SEARCH_RANGE + 1) as f32;
+        let mean = total / lags;
+        let deviation = (total_squared / lags - mean * mean).max(0.).sqrt();
+
+        if best.1 < mean + consts::AEC_PEAK_SIGMA * deviation { return; }
+
+        let delay = best.0;
+        let start = reference.len() - window - delay;
+        let found = &reference[start..start + window];
+
+        let mut correlation = 0.;
+
+        for index in 0..window
+        {
+            correlation += captured[index] * found[index];
+        }
+
+        //LEAST SQUARES FIT OF THE REFERENCE ONTO THE CAPTURE - WHERE THE FILTER STARTS FROM, RATHER THAN
+        //FROM NOTHING. A GAIN THIS FAR FROM UNITY IS NOT OUR OWN AUDIO COMING BACK BUT A COINCIDENCE IN
+        //SOMEBODY ELSE'S, AND SUBTRACTING IT WOULD EAT WHAT WE ARE MEANT TO BE SHARING.
+        let gain = correlation / energy(found);
+
+        if !(consts::AEC_MIN_GAIN..=consts::AEC_MAX_GAIN).contains(&gain) { return; }
 
         //STRADDLE THE ESTIMATE, SO THE FILTER CAN CORRECT IN EITHER DIRECTION
         self.offset = delay.saturating_sub(consts::AEC_LEAD_TAPS);
@@ -319,109 +372,6 @@ impl Canceller
         self.residual_energy = 0.;
         self.state = State::Locked;
     }
-
-    //PASS ONE: WHICH BLOCK. THE ENVELOPES ARE MEAN-CENTRED SO THIS IS A REAL CORRELATION COEFFICIENT AND
-    //NOT JUST "WHICHEVER LAG HAS THE MOST ENERGY".
-    fn search_envelope(&self, reference: &[f32], capture: &[f32]) -> Vec<usize>
-    {
-        let blocks = self.history / consts::AEC_BLOCK;
-        let window = consts::AEC_WINDOW_BLOCKS;
-
-        let reference_envelope = envelope(reference, blocks);
-        let capture_envelope = envelope(capture, blocks);
-
-        let capture_window = &capture_envelope[blocks - window..];
-        let (capture_centred, capture_norm) = centre(capture_window);
-
-        if capture_norm <= 0. { return Vec::new(); }
-
-        let mut scored = Vec::new();
-
-        for lag in 0..=consts::AEC_SEARCH_BLOCKS
-        {
-            let start = blocks - window - lag;
-            let (reference_centred, reference_norm) = centre(&reference_envelope[start..start + window]);
-
-            if reference_norm <= 0. { continue; }
-
-            let mut score = 0.;
-
-            for index in 0..window
-            {
-                score += capture_centred[index] * reference_centred[index];
-            }
-
-            score /= capture_norm * reference_norm;
-
-            if score > consts::AEC_ENVELOPE_MIN
-            {
-                scored.push((lag, score));
-            }
-        }
-
-        scored.sort_by(|left, right| right.1.total_cmp(&left.1));
-
-        //THE FINE PASS SWEEPS A BLOCK EITHER SIDE, SO NEIGHBOURING PEAKS ARE THE SAME CANDIDATE TWICE
-        let mut candidates: Vec<usize> = Vec::with_capacity(consts::AEC_CANDIDATES);
-
-        for (lag, _) in scored
-        {
-            if candidates.len() == consts::AEC_CANDIDATES { break; }
-
-            if candidates.iter().all(|taken| taken.abs_diff(lag * consts::AEC_BLOCK) > consts::AEC_BLOCK)
-            {
-                candidates.push(lag * consts::AEC_BLOCK);
-            }
-        }
-
-        candidates
-    }
-
-    //PASS TWO: WHICH SAMPLE, AND HOW LOUD. THE GAIN IS THE LEAST-SQUARES FIT OF THE REFERENCE ONTO THE
-    //CAPTURE AT THAT LAG, WHICH IS WHERE THE FILTER STARTS FROM INSTEAD OF FROM NOTHING.
-    fn search_samples(&self, reference: &[f32], capture: &[f32], coarse: usize) -> Option<(usize, f32, f32)>
-    {
-        let window = consts::AEC_FINE_WINDOW;
-        let capture_window = &capture[capture.len() - window..];
-        let capture_norm = energy(capture_window).sqrt();
-
-        if capture_norm <= 0. { return None; }
-
-        let first = coarse.saturating_sub(consts::AEC_BLOCK);
-        let last = (coarse + consts::AEC_BLOCK).min(reference.len() - window);
-
-        let mut best = None;
-        let mut best_score = consts::AEC_FINE_MIN;
-
-        for delay in first..=last
-        {
-            let start = reference.len() - window - delay;
-            let reference_window = &reference[start..start + window];
-
-            let mut correlation = 0.;
-            let mut reference_energy = 0.;
-
-            for index in 0..window
-            {
-                correlation += capture_window[index] * reference_window[index];
-                reference_energy += reference_window[index] * reference_window[index];
-            }
-
-            if reference_energy <= 0. { continue; }
-
-            let score = correlation / (reference_energy.sqrt() * capture_norm);
-
-            if score > best_score
-            {
-                best_score = score;
-                best = Some((delay, correlation / reference_energy, score));
-            }
-        }
-
-        //A GAIN THAT FAR FROM UNITY IS NOT OUR OWN AUDIO COMING BACK, IT IS A COINCIDENCE IN SOMEBODY
-        //ELSE'S - LOCKING ONTO IT WOULD SUBTRACT PART OF WHAT WE ARE MEANT TO BE SHARING
-        best.filter(|(_, gain, _)| (consts::AEC_MIN_GAIN..=consts::AEC_MAX_GAIN).contains(gain))
-    }
 }
 
 //FUNCTIONS
@@ -430,21 +380,6 @@ fn energy(samples: &[f32]) -> f32
     samples.iter().map(|sample| sample * sample).sum()
 }
 
-//BLOCK ENERGIES, OLDEST FIRST
-fn envelope(samples: &[f32], blocks: usize) -> Vec<f32>
-{
-    (0..blocks).map(|block| energy(&samples[block * consts::AEC_BLOCK..(block + 1) * consts::AEC_BLOCK])).collect()
-}
-
-//MEAN-CENTRED COPY AND ITS LENGTH
-fn centre(values: &[f32]) -> (Vec<f32>, f32)
-{
-    let mean = values.iter().sum::<f32>() / values.len() as f32;
-    let centred: Vec<f32> = values.iter().map(|value| value - mean).collect();
-    let length = energy(&centred).sqrt();
-
-    (centred, length)
-}
 
 //PUBLIC
 //IS THE CANCELLER WANTED AT ALL?
@@ -465,7 +400,7 @@ pub fn start() -> Option<Canceller>
     DESYNC.store(true, Ordering::Relaxed);
     ACTIVE.store(true, Ordering::Relaxed);
 
-    let history = (consts::AEC_SEARCH_BLOCKS + consts::AEC_WINDOW_BLOCKS) * consts::AEC_BLOCK;
+    let history = consts::AEC_SEARCH_RANGE + consts::AEC_WINDOW;
 
     Some(Canceller
     {
@@ -529,6 +464,7 @@ pub fn push_reference(samples: &[f32])
 }
 
 #[cfg(test)]
+#[cfg(test)]
 mod test
 {
     use super::*;
@@ -536,8 +472,8 @@ mod test
     //THE TAP IS A GLOBAL - TWO TESTS RUNNING AT ONCE WOULD BE ONE TEST WATCHING THE OTHER'S REFERENCE
     static SERIAL: Mutex<()> = Mutex::new(());
 
-    const DELAY: usize = 3000;  //HOW FAR THE SINK IS BEHIND US (~62ms)
-    const GAIN: f32 = 0.7;      //WHAT THE PER-STREAM VOLUME DID TO IT ON THE WAY
+    const DELAY: usize = 3000; //HOW FAR THE SINK IS BEHIND US (~62ms)
+    const GAIN: f32 = 0.7;     //WHAT THE PER-STREAM VOLUME DID TO IT ON THE WAY
     const SECONDS: usize = 8;
     const CHUNK: usize = 960;
 
@@ -553,8 +489,8 @@ mod test
         }
     }
 
-    //SPEECH-SHAPED: BURSTS WITH GAPS AND CHANGING LOUDNESS. A FLAT SIGNAL WOULD HAVE NO ENVELOPE FOR THE
-    //COARSE PASS TO LINE UP, AND NOTHING IN A VOICE CHANNEL LOOKS LIKE THAT.
+    //SPEECH-SHAPED: BURSTS WITH GAPS AND CHANGING LOUDNESS. A FLAT SIGNAL WOULD HAVE NO ENVELOPE AND
+    //NOTHING IN A VOICE CHANNEL LOOKS LIKE THAT.
     fn talking(seed: u32, samples: usize) -> Vec<f32>
     {
         let mut noise = Noise(seed);
@@ -564,8 +500,8 @@ mod test
 
         for index in 0..samples
         {
-            //A NEW BURST EVERY ~250ms, LOUD OR SILENT ON ITS OWN COIN - TWO PEOPLE TALKING DO NOT SHARE
-            //AN ENVELOPE, AND A TEST WHERE THEY DID WOULD BE TESTING THE WRONG THING
+            //A NEW BURST EVERY ~250ms, LOUD OR SILENT ON ITS OWN COIN - TWO PEOPLE TALKING DO NOT SHARE AN
+            //ENVELOPE, AND A TEST WHERE THEY DID WOULD BE TESTING THE WRONG THING
             if index % (consts::SAMPLE_RATE as usize / 4) == 0
             {
                 let coin = pattern.next();
@@ -579,22 +515,21 @@ mod test
         signal
     }
 
-    fn energy_of(samples: &[f32]) -> f32
+    //THE SHARED AUDIO ITSELF. UNLIKE SPEECH IT DOES NOT STOP, WHICH IS PRECISELY WHAT MAKES IT HARD - IT
+    //SITS ON TOP OF THE ECHO THE WHOLE TIME INSTEAD OF LEAVING GAPS TO FIND IT IN.
+    fn playing(seed: u32, samples: usize, level: f32) -> Vec<f32>
     {
-        samples.iter().map(|sample| sample * sample).sum()
+        let mut noise = Noise(seed);
+
+        (0..samples).map(|_| noise.next() * level).collect()
     }
 
-    //THE WHOLE POINT: WHAT WE PLAY OUT COMES BACK IN THE MONITOR, AND HAS TO LEAVE AGAIN BEFORE THE SHARE
-    //IS ENCODED - WITHOUT TAKING THE AUDIO WE ARE ACTUALLY SHARING WITH IT
-    #[test]
-    fn our_own_playback_is_taken_back_out_of_the_capture()
+    //RUNS A WHOLE SHARE PAST THE CANCELLER AND REPORTS HOW MUCH OF OUR OWN PLAYBACK IT TOOK BACK OUT (dB),
+    //ALONGSIDE HOW MUCH OF THE SHARED AUDIO IT DAMAGED DOING SO
+    fn share(content: &[f32]) -> (f32, f32)
     {
-        let _serial = SERIAL.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-
         let samples = consts::SAMPLE_RATE as usize * SECONDS;
-
-        let reference = talking(1, samples);          //THE VOICE CHANNEL, AS THE SINK RECEIVED IT
-        let content = talking(7, samples);            //WHAT THE USER MEANT TO SHARE
+        let reference = talking(1, samples);                       //THE VOICE CHANNEL, AS THE SINK GOT IT
         let measured = samples - consts::SAMPLE_RATE as usize * 3; //FIRST SAMPLE THAT COUNTS (PAST THE SEARCH)
 
         set_rate(consts::SAMPLE_RATE);
@@ -603,7 +538,9 @@ mod test
 
         let mut echo_before = 0.;
         let mut echo_after = 0.;
-        let mut damage = 0.;
+        let mut content_energy = 0.;
+
+        let echo_at = |index: usize| if index >= DELAY { reference[index - DELAY] * GAIN } else { 0. };
 
         for start in (0..samples).step_by(CHUNK)
         {
@@ -616,10 +553,8 @@ mod test
 
             for index in start..end
             {
-                let echo = if index >= DELAY { reference[index - DELAY] * GAIN } else { 0. };
-
-                chunk.push(content[index] + echo);
-                chunk.push(content[index] + echo);
+                chunk.push(content[index] + echo_at(index));
+                chunk.push(content[index] + echo_at(index));
             }
 
             canceller.process(&mut chunk);
@@ -630,24 +565,50 @@ mod test
 
                 if index < measured { continue; }
 
-                let echo = if index >= DELAY { reference[index - DELAY] * GAIN } else { 0. };
+                //BOTH CHANNELS CARRY THE SAME ESTIMATE, SO THE SUBTRACTION CANNOT PULL THE IMAGE APART
+                assert_eq!(frame[0], frame[1]);
+
                 let residual = frame[0] - content[index];
 
-                echo_before += echo * echo;
+                echo_before += echo_at(index) * echo_at(index);
                 echo_after += residual * residual;
-                damage += (frame[0] - frame[1]) * (frame[0] - frame[1]);
+                content_energy += content[index] * content[index];
             }
         }
 
-        let erle = 10. * (echo_before / echo_after.max(f32::MIN_POSITIVE)).log10();
+        let removed = 10. * (echo_before / echo_after.max(f32::MIN_POSITIVE)).log10();
+        let damage = 10. * (echo_after / content_energy.max(f32::MIN_POSITIVE)).log10();
 
-        assert!(erle > 20., "only {erle:.1} dB of our own playback was removed");
+        (removed, damage)
+    }
 
-        //BOTH CHANNELS CARRY THE SAME ESTIMATE, SO THE SUBTRACTION CANNOT PULL THE STEREO IMAGE APART
-        assert_eq!(damage, 0.);
+    //THE WHOLE POINT: WHAT WE PLAY OUT COMES BACK IN THE MONITOR, AND HAS TO LEAVE AGAIN BEFORE THE SHARE
+    //IS ENCODED - WITHOUT TAKING THE AUDIO WE ARE ACTUALLY SHARING WITH IT
+    #[test]
+    fn our_own_playback_is_taken_back_out_of_the_capture()
+    {
+        let _serial = SERIAL.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
-        //AND THE SHARED AUDIO ITSELF SURVIVED IT
-        assert!(echo_after < energy_of(&content[measured..]) * 0.1, "the shared audio was damaged");
+        let content = talking(7, consts::SAMPLE_RATE as usize * SECONDS);
+        let (removed, damage) = share(&content);
+
+        assert!(removed > 25., "only {removed:.1} dB of our own playback was removed");
+        assert!(damage < -30., "the shared audio was damaged ({damage:.1} dB of it is residual)");
+    }
+
+    //A VIDEO PLAYING WHILE WE SHARE. THIS IS THE CASE A FIXED CORRELATION FLOOR GETS WRONG: THE SHARE IS
+    //FOUR TIMES THE ECHO AND NEVER PAUSES, SO THE CORRELATION AT THE CORRECT LAG IS WEAK IN ABSOLUTE TERMS
+    //AND THE DELAY IS ONLY FINDABLE BY HOW FAR IT STANDS OUT FROM THE LAGS AROUND IT.
+    #[test]
+    fn a_loud_share_does_not_hide_the_echo()
+    {
+        let _serial = SERIAL.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let content = playing(7, consts::SAMPLE_RATE as usize * SECONDS, 0.4);
+        let (removed, damage) = share(&content);
+
+        assert!(removed > 25., "only {removed:.1} dB of our own playback was removed");
+        assert!(damage < -30., "the shared audio was damaged ({damage:.1} dB of it is residual)");
     }
 
     //NOBODY IS IN A VOICE CHANNEL: THERE IS NOTHING OF OURS IN THE MONITOR, SO THE CAPTURE IS NOT TOUCHED
