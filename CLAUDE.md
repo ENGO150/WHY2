@@ -354,6 +354,16 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `command::COMMAND_LIST` — never duplicate the trigger table. The popup has two modes
     (`PaletteMode`): a filtered command menu while the command word is still being typed, and a
     single-row signature hint highlighting the parameter the caret is on once it is finished.
+  - **Anything that scrolls says so**, via `draw::draw_scrollbar` — the message pane, the slash-command
+    popup (commands *and* value lists) and the `/settings` box in both its modes. It overwrites cells of
+    the box's own right border between the corners rather than claiming a column, so no list gets
+    narrower for having one, and it is skipped entirely while everything fits: a visible bar always means
+    there is more off-screen. The thumb is placed by hand instead of by ratatui's `Scrollbar`, which
+    never quite lands on either end of the track — being *at the bottom* is the one thing the bar has to
+    state unambiguously. The scrollbar is drawn after the block, and the caller passes the box rect (not
+    `block.inner`) plus the same `first`/`visible` the rows were built from — in the palette that `first`
+    is computed once in `draw_palette` and handed to `entry_lines`/`value_lines` precisely so the two
+    cannot disagree.
   - The sidebar is fed by events, never by polling. `App::refresh_online` (a `PacketCode::List`
     request drained on the redraw tick) is only set for things that genuinely change the roster —
     `Authenticated`, `Join`, `Leave`. **A channel switch must not trigger one**: it would land

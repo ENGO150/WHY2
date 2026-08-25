@@ -206,6 +206,48 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         .collect::<Vec<Line<'static>>>();
 
     frame.render_widget(Paragraph::new(visible), inner);
+
+    //THE BACKLOG IS THE ONE THING THE MESSAGE PANE CANNOT SHOW BY ITSELF
+    draw_scrollbar(frame, area, total as usize, viewport as usize, offset as usize);
+}
+
+//A SCROLLBAR DOWN THE RIGHT-HAND BORDER OF A BOX WHOSE LIST DOES NOT FIT. IT REPLACES BORDER CELLS RATHER THAN
+//CLAIMING A COLUMN OF ITS OWN, SO NOTHING GETS NARROWER FOR HAVING ONE, AND IT IS DRAWN ONLY WHILE THERE IS
+//SOMETHING OFF-SCREEN - A VISIBLE BAR ALWAYS MEANS "THERE IS MORE", NEVER JUST "THIS IS A LIST".
+//THE THUMB IS SIZED AND PLACED HERE INSTEAD OF BY ratatui's Scrollbar BECAUSE THAT ONE NEVER QUITE LANDS ON EITHER
+//END OF THE TRACK, AND THE ONE THING THE BAR HAS TO SAY UNAMBIGUOUSLY IS WHEN THE USER IS AT THE BOTTOM
+fn draw_scrollbar(frame: &mut Frame, area: Rect, total: usize, visible: usize, first: usize)
+{
+    if total <= visible || visible == 0 || area.width == 0 || area.height < 3 { return; }
+
+    let track = area.height as usize - 2; //THE CORNERS STAY CORNERS
+
+    if track == 0 { return; }
+
+    let max_first = total - visible;
+
+    //ROUNDED, SO A LONG LIST STILL GETS A THUMB AND A SHORT SCROLL STILL MOVES IT
+    let thumb = ((visible * track + total / 2) / total).clamp(1, track);
+    let room = track - thumb;
+    let start = if max_first == 0 { 0 } else { (first.min(max_first) * room + max_first / 2) / max_first };
+
+    let x = area.x + area.width - 1;
+    let buffer = frame.buffer_mut();
+
+    for row in 0..track
+    {
+        let Some(cell) = buffer.cell_mut((x, area.y + 1 + row as u16)) else { continue; };
+
+        if row >= start && row < start + thumb
+        {
+            cell.set_symbol("\u{2588}");
+            cell.set_style(theme::ACCENT);
+        } else
+        {
+            cell.set_symbol("\u{2502}");
+            cell.set_style(theme::BORDER);
+        }
+    }
 }
 
 //THE LOGO GOES IN LAST AND CLAIMS NO CELL THAT IS ALREADY SPOKEN FOR: ON A FREE CELL IT DRAWS ITS OWN GLYPH, AND
@@ -421,19 +463,25 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
 
 fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
 {
-    //HOW MANY ROWS AND WHAT THEY ARE CALLED - THE BOX IS MEASURED FROM THAT, AND ONLY THEN IS THERE A WIDTH TO FILL
-    let (rows, title) = match &app.palette.mode
+    //HOW MANY ROWS THERE ARE, HOW MANY FIT AND WHAT THEY ARE CALLED - THE BOX IS MEASURED FROM THAT, AND ONLY THEN
+    //IS THERE A WIDTH TO FILL
+    let (total, selected, title) = match &app.palette.mode
     {
         PaletteMode::Hidden => return,
 
-        PaletteMode::Menu(matches, _) => (matches.len().min(palette::MAX_ROWS), String::from(" Commands ")),
+        PaletteMode::Menu(matches, selected) => (matches.len(), *selected, String::from(" Commands ")),
 
         //THE PARAMETER NAMES ITSELF - THE LIST IS ITS VOCABULARY, NOT THE COMMAND'S
         PaletteMode::Values(values) =>
-            (values.matches.len().min(palette::MAX_ROWS), format!(" {} ", capitalize(values.arg.name))),
+            (values.matches.len(), values.selected, format!(" {} ", capitalize(values.arg.name))),
 
-        PaletteMode::Signature(..) => (1, String::from(" Parameters ")),
+        PaletteMode::Signature(..) => (1, 0, String::from(" Parameters ")),
     };
+
+    let rows = total.min(palette::MAX_ROWS);
+
+    //KEEP THE SELECTION IN VIEW - ONE PLACE, SO THE ROWS AND THE SCROLLBAR CANNOT DISAGREE ABOUT WHICH ONES THEY ARE
+    let first = selected.saturating_sub(rows.saturating_sub(1));
 
     let height = rows as u16 + 2;
 
@@ -462,19 +510,18 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
 
     let lines = match &app.palette.mode
     {
-        PaletteMode::Values(values) => value_lines(values, rows),
-        _ => entry_lines(app, rows, inner.width as usize),
+        PaletteMode::Values(values) => value_lines(values, rows, first),
+        _ => entry_lines(app, rows, first, inner.width as usize),
     };
 
     frame.render_widget(Paragraph::new(lines), inner);
+
+    draw_scrollbar(frame, popup, total, rows, first);
 }
 
 //ONE ROW PER ANSWER THE PARAMETER ACCEPTS, EACH SHOWING ITS OWN COLOR - A NAME ALONE WOULD STILL BE A GUESS
-fn value_lines(values: &Values, rows: usize) -> Vec<Line<'static>>
+fn value_lines(values: &Values, rows: usize, first: usize) -> Vec<Line<'static>>
 {
-    //KEEP THE SELECTION IN VIEW
-    let first = values.selected.saturating_sub(rows.saturating_sub(1));
-
     values.matches.iter().skip(first).take(rows).enumerate().map(|(row, value)|
     {
         let selected = first + row == values.selected;
@@ -497,16 +544,13 @@ fn value_lines(values: &Values, rows: usize) -> Vec<Line<'static>>
 }
 
 //ONE ROW PER COMMAND (OR THE SINGLE PARAMETER HINT), IN ALIGNED COLUMNS
-fn entry_lines(app: &App, rows: usize, width: usize) -> Vec<Line<'static>>
+fn entry_lines(app: &App, rows: usize, first: usize, width: usize) -> Vec<Line<'static>>
 {
     //(COMMAND, PARAMETER TO HIGHLIGHT) PER ROW, PLUS WHICH ROW IS SELECTED
     let (entries, selected) = match &app.palette.mode
     {
         PaletteMode::Menu(matches, selected) =>
         {
-            //KEEP THE SELECTION IN VIEW
-            let first = selected.saturating_sub(rows.saturating_sub(1));
-
             let entries = matches.iter().copied()
                 .skip(first)
                 .take(rows)
@@ -643,6 +687,9 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
     frame.render_widget(block, popup);
 
     frame.render_widget(Paragraph::new(lines), inner);
+
+    //BOTH MODES SCROLL - THE DEVICE PICKER ALWAYS, THE SETTING ROWS ON A SHORT TERMINAL
+    draw_scrollbar(frame, popup, total, visible, first);
 }
 
 //THE SERVER IDENTITY PROMPT. THE WHOLE POINT IS THAT THE FINGERPRINT IS READABLE AND THE SAFE ANSWER IS
