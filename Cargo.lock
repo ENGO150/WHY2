@@ -3368,7 +3368,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6b2b561d2103303e233779545da757ecd35bad82188d619a6d8901f3007e1ff"
 dependencies = [
  "openh264-sys2",
- "wide 1.5.0",
+ "wide",
 ]
 
 [[package]]
@@ -3710,20 +3710,6 @@ dependencies = [
  "bindgen",
  "libspa-sys",
  "system-deps",
-]
-
-[[package]]
-name = "pixels"
-version = "0.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7ddc5048a90da4dab8f3f81fb280f44c9e1d76b68fb2f62dce78b22d55546b1"
-dependencies = [
- "bytemuck",
- "pollster",
- "raw-window-handle",
- "thiserror 2.0.18",
- "ultraviolet",
- "wgpu",
 ]
 
 [[package]]
@@ -4404,15 +4390,6 @@ name = "ryu"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
-
-[[package]]
-name = "safe_arch"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96b02de82ddbe1b636e6170c21be622223aea188ef2e139be0a5b219ec215323"
-dependencies = [
- "bytemuck",
-]
 
 [[package]]
 name = "safe_arch"
@@ -5283,15 +5260,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ultraviolet"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea519dad475ee0446b8172793c3c327e4fc81dafdaf05aaac510e630000b6296"
-dependencies = [
- "wide 0.7.33",
-]
-
-[[package]]
 name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5781,7 +5749,6 @@ dependencies = [
  "thiserror 2.0.18",
  "wgpu-core-deps-apple",
  "wgpu-core-deps-emscripten",
- "wgpu-core-deps-wasm",
  "wgpu-core-deps-windows-linux-android",
  "wgpu-hal",
  "wgpu-naga-bridge",
@@ -5802,15 +5769,6 @@ name = "wgpu-core-deps-emscripten"
 version = "29.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01e09be551dc939498bdd5f6b2c66e55ab275dad25825267a08605a80fc9f0af"
-dependencies = [
- "wgpu-hal",
-]
-
-[[package]]
-name = "wgpu-core-deps-wasm"
-version = "29.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af1fb1798be2a912497d4c224f72d39bb0cb34af50e8bcc29865bc339c943059"
 dependencies = [
  "wgpu-hal",
 ]
@@ -5913,7 +5871,7 @@ dependencies = [
  "rayon",
  "sha2 0.11.0",
  "subtle",
- "wide 1.5.0",
+ "wide",
  "zeroize",
 ]
 
@@ -5936,7 +5894,7 @@ dependencies = [
  "nnnoiseless",
  "openh264",
  "p521",
- "pixels",
+ "pollster",
  "rand 0.10.2",
  "ratatui",
  "ringbuf",
@@ -5950,6 +5908,7 @@ dependencies = [
  "toml_edit",
  "unicode-width",
  "ureq",
+ "wgpu",
  "why2",
  "wincode",
  "winit",
@@ -5959,22 +5918,12 @@ dependencies = [
 
 [[package]]
 name = "wide"
-version = "0.7.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce5da8ecb62bcd8ec8b7ea19f69a51275e91299be594ea5cc6ef7819e16cd03"
-dependencies = [
- "bytemuck",
- "safe_arch 0.7.4",
-]
-
-[[package]]
-name = "wide"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfdfe6a32973f2d1b268b8895845a8a96cac2f0191e72c27cc929036060dbf89"
 dependencies = [
  "bytemuck",
- "safe_arch 1.0.0",
+ "safe_arch",
 ]
 
 [[package]]
