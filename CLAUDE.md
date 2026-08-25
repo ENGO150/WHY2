@@ -326,9 +326,12 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `App::leaving` on `Command::Exit`, and the `Quit` arm honours it.
   - C libraries that write to fd 2 (cpal/ALSA, openh264/xcap) corrupt the frame; the existing
     `gag::Gag::stderr()` wrappers in `network/voice/client` must stay.
-  - `tui::install_panic_hook` is called first thing in `main` and is **not optional**: the release
-    profile sets `panic = "abort"`, so `TerminalGuard::drop` never runs on a panic and the hook is
-    the only path that leaves the alternate screen.
+  - `tui::install_panic_hook` is called first thing in `main` and is **not optional**. The release
+    profile now unwinds (`panic = "unwind"`, set workspace-wide because the server must survive a
+    panicking connection task and Cargo cannot scope `panic` per-binary), so `TerminalGuard::drop`
+    does run — but only for a panic on the main thread while the guard is alive. A panic in a
+    spawned task or before the guard exists still leaves the alternate screen up, and the hook is
+    the only path out of it.
   - Fatal events (`TofuError`, a user-asked-for `Quit`) do not `process::exit` from the draw path. They call
     `App::quit(code, message)`; the loop breaks, the guard restores the terminal, and `run_client`
     prints the message on the normal screen.
