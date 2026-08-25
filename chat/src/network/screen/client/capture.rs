@@ -53,13 +53,10 @@ use openh264::
 use crate::network::screen::
 {
     consts,
-    client::options,
+    client::{ gpu::GpuConverter, options },
 };
 
-#[cfg(target_os = "linux")]
-use std::env;
-
-pub fn get_primary_monitor() -> Result<Monitor, String>
+fn get_primary_monitor() -> Result<Monitor, String>
 {
     let monitors = Monitor::all().map_err(|e| format!("failed to enumerate monitors ({e})"))?;
 
@@ -199,10 +196,37 @@ impl YuvScratch
     }
 }
 
+enum Converter //RGBA -> I420, ON THE GPU WHERE THAT IS POSSIBLE
+{
+    Gpu(Box<GpuConverter>),
+    Cpu(YuvScratch),
+}
+
+impl Converter
+{
+    fn select() -> Self
+    {
+        //AN EXPLICIT "cpu" PINS THE OLD PATH; ANYTHING ELSE MERELY *PREFERS* THE GPU, WHICH STILL
+        //HAS TO INITIALISE SUCCESSFULLY BEFORE IT IS USED
+        if env::var(consts::CONVERTER_OVERRIDE_VAR).unwrap_or_default().eq_ignore_ascii_case("cpu")
+        {
+            return Converter::Cpu(YuvScratch::new());
+        }
+
+        match GpuConverter::new()
+        {
+            Ok(converter) => Converter::Gpu(Box::new(converter)),
+
+            //NO ADAPTER, NO DRIVER, A HEADLESS BOX - THE CPU PATH IS ALWAYS THERE
+            Err(_) => Converter::Cpu(YuvScratch::new()),
+        }
+    }
+}
+
 struct FrameEncoder
 {
     encoder: Encoder,
-    scratch: YuvScratch,
+    converter: Converter,
     fps: f32,
     dimensions: Option<(u32, u32)>,
 }
@@ -211,7 +235,7 @@ impl FrameEncoder
 {
     fn new(fps: f32) -> Result<Self, String>
     {
-        Ok(Self { encoder: create_encoder(fps)?, scratch: YuvScratch::new(), fps, dimensions: None })
+        Ok(Self { encoder: create_encoder(fps)?, converter: Converter::select(), fps, dimensions: None })
     }
 
     fn force_intra_frame(&mut self)
@@ -236,14 +260,68 @@ impl FrameEncoder
 
         self.dimensions = Some((width, height));
 
-        let scratch = &mut self.scratch;
-        let yuv = scratch.fill(width, height, rgba);
+        //A GPU THAT FAILS MID-SESSION (DEVICE LOST, A RESOLUTION THE PACKING CANNOT EXPRESS) DROPS
+        //BACK TO THE CPU FOR GOOD RATHER THAN RETRYING EVERY FRAME
+        if let Converter::Gpu(_) = &self.converter
+            && !GpuConverter::supports(width, height)
+        {
+            self.converter = Converter::Cpu(YuvScratch::new());
+        }
 
-        let encoder = &mut self.encoder;
-        let bitstream = encoder.encode(yuv)
-            .map_err(|e| format!("H.264 encode failed ({e})"))?;
+        let mut fallback = None;
 
-        let data = bitstream.to_vec();
+        let bitstream = match &mut self.converter
+        {
+            Converter::Gpu(converter) => match converter.convert(width, height, rgba)
+            {
+                Ok(frame) =>
+                {
+                    let bitstream = self.encoder.encode(frame)
+                        .map_err(|e| format!("H.264 encode failed ({e})"))?;
+
+                    Some(bitstream.to_vec())
+                },
+
+                Err(reason) =>
+                {
+                    fallback = Some(reason);
+                    None
+                },
+            },
+
+            Converter::Cpu(scratch) =>
+            {
+                let yuv = scratch.fill(width, height, rgba);
+
+                let bitstream = self.encoder.encode(yuv)
+                    .map_err(|e| format!("H.264 encode failed ({e})"))?;
+
+                Some(bitstream.to_vec())
+            },
+        };
+
+        //THE GPU REFUSED THIS FRAME - SWITCH PERMANENTLY AND REDO IT ON THE CPU, SO THE VIEWER
+        //NEVER SEES A GAP IN THE PREDICTED STREAM
+        let data = match bitstream
+        {
+            Some(result) => result,
+
+            None =>
+            {
+                debug_assert!(fallback.is_some(), "the GPU path only yields None after refusing a frame");
+
+                self.converter = Converter::Cpu(YuvScratch::new());
+
+                let Converter::Cpu(scratch) = &mut self.converter else { unreachable!() };
+
+                let yuv = scratch.fill(width, height, rgba);
+
+                let bitstream = self.encoder.encode(yuv)
+                    .map_err(|e| format!("H.264 encode failed ({e})"))?;
+
+                bitstream.to_vec()
+            },
+        };
 
         //SKIP EMPTY FRAMES (ENCODER MAY DECIDE NO DATA IS NEEDED)
         if data.is_empty()
