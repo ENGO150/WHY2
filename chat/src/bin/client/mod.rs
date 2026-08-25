@@ -301,21 +301,25 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         //HELP
                         Command::Help =>
                         {
+                            //WHAT OUR ROLE MAY RUN - THE WIDTHS AND THE TRUNK ARE MEASURED OVER THIS, NOT OVER THE WHOLE LIST
+                            let commands = command::COMMAND_LIST.iter()
+                                .filter(|info| info.available(app.role)).collect::<Vec<_>>();
+
                             //COLUMN WIDTHS ARE MEASURED, NOT GUESSED - LONG SIGNATURES MUST NOT PUSH THE REST OUT OF LINE
-                            let signature_width = command::COMMAND_LIST.iter()
+                            let signature_width = commands.iter().copied()
                                 .map(palette::signature_width).max().unwrap_or(0);
 
                             //ONLY SHORTCUT-CARRYING ROWS NEED A PADDED DESCRIPTION, AND PADDING TO THE
                             //LONGEST DESCRIPTION OF ALL WOULD PUSH THEM OFF THE PANE
-                            let description_width = command::COMMAND_LIST.iter()
+                            let description_width = commands.iter()
                                 .filter(|info| info.shortcut.is_some())
                                 .map(|info| info.description.width()).max().unwrap_or(0);
 
-                            let last = command::COMMAND_LIST.len() - 1;
+                            let last = commands.len().saturating_sub(1);
 
                             app.push_styled("Commands:", theme::TITLE);
 
-                            for (index, info) in command::COMMAND_LIST.iter().enumerate() //ITERATE OVER ALL COMMANDS
+                            for (index, info) in commands.into_iter().enumerate() //ITERATE OVER ALL COMMANDS WE MAY RUN
                             {
                                 let shortcut = palette::format_shortcut(info);
                                 let padding = signature_width - palette::signature_width(info);
@@ -347,7 +351,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             {
                                 //CHECK IF COMMAND/ALIAS EXISTS
                                 if let Some(info) = command::COMMAND_LIST.iter()
-                                    .find(|c| c.triggers.iter().any(|t| t.eq_ignore_ascii_case(&parameters)))
+                                    .find(|c| c.available(app.role) && c.triggers.iter().any(|t| t.eq_ignore_ascii_case(&parameters)))
                                 {
                                     let shortcut = palette::format_shortcut(info);
 

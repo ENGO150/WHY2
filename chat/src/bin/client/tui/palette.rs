@@ -63,8 +63,8 @@ impl Palette
     //ANYTHING AT ALL IS ON SCREEN (MENU OR PARAMETER HINT)
     pub fn is_visible(&self) -> bool { !matches!(self.mode, PaletteMode::Hidden) }
 
-    //RECOMPUTE FROM THE CURRENT INPUT
-    pub fn update(&mut self, input: &str)
+    //RECOMPUTE FROM THE CURRENT INPUT (role HIDES WHAT WE ARE NOT ALLOWED TO RUN)
+    pub fn update(&mut self, input: &str, role: usize)
     {
         //THE INPUT LINE BELONGS TO THE LOGIN PROMPT UNTIL AUTH IS DONE - COMMANDS ARE NOT DISPATCHED YET EITHER
         if !options::get_sending_messages()
@@ -87,7 +87,7 @@ impl Palette
                 let candidate = rest.to_lowercase();
 
                 let matches = command::COMMAND_LIST.iter()
-                    .filter(|info| info.triggers.iter().any(|t| t.to_lowercase().starts_with(&candidate)))
+                    .filter(|info| info.available(role) && info.triggers.iter().any(|t| t.to_lowercase().starts_with(&candidate)))
                     .collect::<Vec<&'static CommandInfo>>();
 
                 if matches.is_empty()
@@ -117,7 +117,7 @@ impl Palette
                 let (word, tail) = rest.split_at(split);
 
                 let Some(info) = command::COMMAND_LIST.iter()
-                    .find(|info| info.triggers.iter().any(|t| t.eq_ignore_ascii_case(word))) else
+                    .find(|info| info.available(role) && info.triggers.iter().any(|t| t.eq_ignore_ascii_case(word))) else
                 {
                     self.dismiss();
                     return;

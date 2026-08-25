@@ -366,7 +366,7 @@ async fn handle_terminal_event
             } else
             {
                 app.input.insert_str(&text);
-                app.palette.update(&app.input.text());
+                app.palette.update(&app.input.text(), app.role);
             }
 
             app.dirty = true;
@@ -478,7 +478,7 @@ async fn handle_key
             _ => {},
         }
 
-        app.palette.update(&app.input.text());
+        app.palette.update(&app.input.text(), app.role);
 
         return;
     }
@@ -488,19 +488,19 @@ async fn handle_key
         KeyCode::Char(c) =>
         {
             app.input.insert(c);
-            app.palette.update(&app.input.text());
+            app.palette.update(&app.input.text(), app.role);
         },
 
         KeyCode::Backspace =>
         {
             app.input.backspace();
-            app.palette.update(&app.input.text());
+            app.palette.update(&app.input.text(), app.role);
         },
 
         KeyCode::Delete =>
         {
             app.input.delete();
-            app.palette.update(&app.input.text());
+            app.palette.update(&app.input.text(), app.role);
         },
 
         KeyCode::Left => if alt { app.input.word_left() } else { app.input.left() },
@@ -552,7 +552,7 @@ fn complete(app: &mut App, info: &'static CommandInfo)
     //LEAVE ROOM FOR ARGUMENTS RIGHT AWAY
     if !info.args.is_empty() { app.input.insert(' '); }
 
-    app.palette.update(&app.input.text());
+    app.palette.update(&app.input.text(), app.role);
 }
 
 fn settings_shortcut(code: KeyCode) -> bool //Ctrl+<SHORTCUT OF /settings>

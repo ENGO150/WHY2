@@ -359,6 +359,12 @@ pub const COMMAND_LIST: &[CommandInfo] =
 pub const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 
 //IMPLEMENTATIONS
+impl CommandInfo
+{
+    //THE COMMAND IS OFFERED TO role - HIDING IT IS COSMETIC, THE SERVER STILL CHECKS EVERY PRIVILEGED PACKET ITSELF
+    pub fn available(&self, role: usize) -> bool { role >= self.minimal_role }
+}
+
 impl Command
 {
     //GET CODE MATCHING TO COMMAND
