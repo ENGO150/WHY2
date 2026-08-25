@@ -29,6 +29,9 @@ use std::
 
 use toml_edit::{ DocumentMut, Item, Value };
 
+#[cfg(feature = "server")]
+use toml_edit::Table;
+
 use crate::{ consts, misc };
 
 #[cfg(feature = "client_base")]
@@ -145,6 +148,7 @@ where
     config_read(filename, key)
 }
 
+#[cfg(feature = "client_base")]
 fn config_write_value(filename: &str, key: &str, value: Value) //WRITE TYPED VALUE TO CONFIG
 {
     //WRITE
@@ -167,9 +171,32 @@ fn config_write_value(filename: &str, key: &str, value: Value) //WRITE TYPED VAL
     });
 }
 
+#[cfg(feature = "client_base")]
 fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
 {
     config_write_value(filename, key, value.into());
+}
+
+#[cfg(feature = "server")]
+fn user_entry(hash: &str) -> Item //BUILD A USER ENTRY SUBTABLE
+{
+    let mut table = Table::new();
+    table.insert("password", Item::Value(hash.into()));
+
+    Item::Table(table)
+}
+
+#[cfg(feature = "server")]
+fn user_password(item: &Item) -> Option<String> //READ PASSWORD HASH OUT OF A USER ENTRY (EITHER SHAPE)
+{
+    //LEGACY FLAT ENTRY (username = "<hash>")
+    if let Item::Value(Value::String(hash)) = item
+    {
+        return Some(hash.value().to_string());
+    }
+
+    //CURRENT SUBTABLE ENTRY
+    item.as_table_like()?.get("password")?.as_str().map(str::to_string)
 }
 
 //PUBLIC
@@ -219,6 +246,10 @@ pub fn init_config() //INITIALIZE CONFIG FILES
     {
         fs::write(&runtime_path, "#*#**#*###**#***###*#").expect("Writing to config failed");
     }
+
+    //BRING ANY PRE-SUBTABLE USER STORE UP TO DATE
+    #[cfg(feature = "server")]
+    server_users_migrate();
 }
 
 pub fn read_config<T: FromStr>(key: &str) -> T //RETURN key FROM TOML CONFIG
@@ -237,9 +268,9 @@ where
 }
 
 #[cfg(feature = "server")]
-pub fn server_users_config(key: &str) -> String //RETURN key FROM server_users.toml
+pub fn server_users_password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF username FROM server_users.toml
 {
-    config_read(consts::SERVER_USERS_CONFIG, key)
+    user_password(get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(username)?)
 }
 
 #[cfg(feature = "client_base")]
@@ -261,9 +292,48 @@ pub fn client_write_int(key: &str, value: i64) //WRITE INTEGER TO client.toml
 }
 
 #[cfg(feature = "server")]
-pub fn server_users_write(key: &str, value: &str) //WRITE TO server_users.toml
+pub fn server_users_write(username: &str, hash: &str) //WRITE PASSWORD HASH OF username TO server_users.toml
 {
-    config_write(consts::SERVER_USERS_CONFIG, key, value);
+    with_cached_mut(&config_path(consts::SERVER_USERS_CONFIG), |doc|
+    {
+        let table = doc.as_table_mut();
+
+        //KEEP WHATEVER ELSE THE ENTRY ALREADY CARRIES
+        if let Some(entry) = table.get_mut(username).and_then(Item::as_table_like_mut)
+        {
+            entry.insert("password", Item::Value(hash.into()));
+            return;
+        }
+
+        table.insert(username, user_entry(hash));
+    });
+}
+
+#[cfg(feature = "server")]
+pub fn server_users_migrate() //CONVERT FLAT username = "<hash>" ENTRIES INTO SUBTABLES
+{
+    let path = config_path(consts::SERVER_USERS_CONFIG);
+
+    //COLLECT LEGACY ENTRIES
+    let legacy: Vec<(String, String)> = get_data(&path).as_table().iter()
+        .filter_map(|(username, item)| match item
+        {
+            Item::Value(Value::String(hash)) => Some((username.to_string(), hash.value().to_string())),
+
+            _ => None
+        }).collect();
+
+    //NOTHING TO MIGRATE
+    if legacy.is_empty() { return; }
+
+    //REWRITE
+    with_cached_mut(&path, |doc|
+    {
+        for (username, hash) in &legacy
+        {
+            doc.as_table_mut().insert(username, user_entry(hash));
+        }
+    });
 }
 
 #[cfg(feature = "server")]

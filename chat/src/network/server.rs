@@ -1220,14 +1220,16 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         };
 
         //VERIFY PASSWORD (ARGON2 IS CPU HEAVY, KEEP IT OFF THE RUNTIME)
-        let valid = if !user_exists || password.is_empty()
+        let valid = if password.is_empty()
         {
             false
-        } else
+        } else if let Some(hashed) = config::server_users_password(&username)
         {
-            let hashed = config::server_users_config(&username);
             task::spawn_blocking(move || password::compare_password_hash(&hashed, &password))
                 .await.expect("Comparing password failed")
+        } else //UNKNOWN USER (OR FAKE LOGIN)
+        {
+            false
         };
 
         //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
