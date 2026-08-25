@@ -452,7 +452,7 @@ fn vocabulary(values: ArgValues) -> Vec<&'static str>
 {
     match values
     {
-        ArgValues::Colors => colors::COLORS.iter().map(|(name, _)| *name).collect(),
+        ArgValues::Colors => colors::offered(),
         ArgValues::Free => Vec::new(),
     }
 }
