@@ -1252,7 +1252,11 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     authenticate_client(&peer_addr, &username, id);
 
     //TELL CLIENT TO START CHATTING
-    network::send(&mut *streams.1.lock().await, PacketCode::Accept { id }, Some(&keys)).await;
+    network::send(&mut *streams.1.lock().await, PacketCode::Accept
+    {
+        id,
+        role: config::server_users_role(&username).unwrap(),
+    }, Some(&keys)).await;
 
     //SEND JOIN MESSAGE
     send_to_all(PacketCode::Join { username: username.clone() }, false, None);

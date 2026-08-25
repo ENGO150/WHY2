@@ -42,6 +42,13 @@ pub enum PacketCode //CONTROL CODES
         git_hash: String,
     },
 
+    //SERVER -> CLIENT | START CHATTING
+    Accept
+    {
+        id: usize,
+        role: usize,
+    },
+
     //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
     Leave
     {
@@ -123,7 +130,6 @@ pub enum PacketCode //CONTROL CODES
     Screen { token: Option<[u8; 32]> },             //CLIENT <> SERVER | TOGGLE SCREENSHARE
     Voice { token: Option<[u8; 32]> },              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
     KeyExchange { ecc: String, pq: String },        //SERVER <> CLIENT | KEY EXCHANGE
-    Accept { id: usize },                           //SERVER -> CLIENT | START CHATTING
     Join { username: String },                      //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     List { users: Option<Vec<OnlineUser>> },        //CLIENT <> SERVER | PRINT CONNECTED USERS
 

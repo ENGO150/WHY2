@@ -197,19 +197,6 @@ fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD O
 }
 
 #[cfg(feature = "server")]
-fn user_password(item: &Item) -> Option<String> //READ PASSWORD HASH OUT OF A USER ENTRY (EITHER SHAPE)
-{
-    //LEGACY FLAT ENTRY (username = "<hash>")
-    if let Item::Value(Value::String(hash)) = item
-    {
-        return Some(hash.value().to_string());
-    }
-
-    //CURRENT SUBTABLE ENTRY
-    item.as_table_like()?.get("password")?.as_str().map(str::to_string)
-}
-
-#[cfg(feature = "server")]
 pub fn server_users_len() -> usize //COUNT USERS
 {
     get_data(&config_path(consts::SERVER_USERS_CONFIG)).len()
@@ -286,8 +273,15 @@ where
 #[cfg(feature = "server")]
 pub fn server_users_password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF username
 {
-    //THE ONLY FIELD WITH A LEGACY FLAT SHAPE, HENCE THE SEPARATE READER
-    user_password(get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(username)?)
+    get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(username)?
+        .as_table_like()?.get("password")?.as_str().map(str::to_string)
+}
+
+#[cfg(feature = "server")]
+pub fn server_users_role(username: &str) -> Option<usize> //RETURN PASSWORD HASH OF username
+{
+    get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(username)?
+        .as_table_like()?.get("role")?.as_integer().map(|i| i as usize)
 }
 
 #[cfg(feature = "server")]

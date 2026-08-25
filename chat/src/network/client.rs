@@ -126,7 +126,7 @@ pub enum ClientEvent
     Register,                                      //REGISTER PROMPT
     Login,                                         //LOGIN PROMPT
     FirstUser,                                     //FIRST USER
-    Authenticated,                                 //LOGIN SUCCESSFUL
+    Authenticated(usize),                          //LOGIN SUCCESSFUL, ROLE
     Connected(String),                             //SUCCESSFUL CONNECTION MESSAGE
     Message(String, String, usize, MessageColors), //RECEIVED MESSAGE
     PrivateMessageSent(String, usize, String),     //SENT PM
@@ -496,9 +496,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //START CHATTING
-            PacketCode::Accept { id: sid } =>
+            PacketCode::Accept { id: sid, role } =>
             {
-                tx.send(ClientEvent::Authenticated).await.unwrap();
+                tx.send(ClientEvent::Authenticated(role)).await.unwrap();
 
                 //SET SERVER-SIDE ID (ONLY VOICE CARES WHO WE ARE)
                 #[cfg(feature = "client_voice")]

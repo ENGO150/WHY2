@@ -61,9 +61,10 @@ impl App
                 self.push_styled("You are the first user to register, owner role has been granted to you.", theme::NOTICE);
             },
 
-            ClientEvent::Authenticated =>
+            ClientEvent::Authenticated(role) =>
             {
                 self.login = None; //THE BOX HAS ASKED FOR EVERYTHING IT WAS GOING TO ASK FOR
+                self.role = role;
                 self.push_styled("Login successful. Press Ctrl+H for help.", theme::OK);
                 self.refresh_online = true;
             },
