@@ -54,6 +54,9 @@ pub const EVENT_CHANNEL_BOUND: usize   = 1024;                                  
 pub const MEGABYTE: usize              = 1_000_000;                                   //MEGABYTE DEFINITION
 pub const UPLOAD_CHUNK_SIZE: usize     = MEGABYTE;                                    //FILE UPLOAD CHUNK (1MB)
 
+pub const MAX_AUXILIARY_PACKET_SIZE: usize = UPLOAD_CHUNK_SIZE * 2;                   //FILE/SCREEN SIDE CHANNELS (2MB)
+pub const MAX_PACKET_CEILING: usize        = 16 * MEGABYTE;                           //ABSOLUTE CEILING WHEN SPAM PROTECTION IS OFF (16MB)
+
 //TYPES
 pub type SharedKeys  = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);           //WHY2 KEY, HMAC
 pub type Streams<'a> = (&'a mut OwnedReadHalf, Arc<Mutex<OwnedWriteHalf>>); //READ STREAM, WRITE STREAM

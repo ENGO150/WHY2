@@ -59,6 +59,7 @@ use crate::
     network::codes::PacketCode,
     consts::
     {
+        self as chat_consts,
         Streams,
         SharedKeys,
     },
@@ -274,15 +275,23 @@ pub async fn read_tcp
             .map(|conn| conn.is_authenticated())
             .unwrap_or(false);
 
-        //ALLOW BIG MESSAGES WHEN SPAM PROTECTION IS OFF AND CLIENT IS AUTHENTICATED OR WHEN STREAM IS AUXILIARY
-        max_packet_size = if (!spam_protection && authenticated) || auxiliary
+        max_packet_size = if auxiliary
         {
-            usize::MAX
+            //SIDE CHANNELS ONLY EVER CARRY UPLOAD CHUNKS AND ENCODED FRAMES
+            chat_consts::MAX_AUXILIARY_PACKET_SIZE
+        } else if !spam_protection && authenticated
+        {
+            //SPAM PROTECTION OFF MEANS "ALLOW BIG MESSAGES", NOT "ALLOW ANY ALLOCATION AT ALL"
+            chat_consts::MAX_PACKET_CEILING
         } else //SET MAX PACKET SIZE IF SPAM PROTECTION IS ENABLED
         {
             config::read_config("max_packet_size")
         };
     }
+
+    //USE SERVER'S ABSOLUTE MAX PACKET SIZE FOR CLIENT
+    #[cfg(feature = "client_base")]
+    let max_packet_size = chat_consts::MAX_PACKET_CEILING;
 
     //READ MESSAGE LENGTH
     let mut len_buf = [0u8; 4];
@@ -301,6 +310,9 @@ pub async fn read_tcp
         server::remove_connection(&peer_addr, true, Some("length")).await;
         return None;
     }
+
+    #[cfg(feature = "client_base")]
+    if len > max_packet_size { return None; } //DISCONNECT
 
     //READ REST OF PACKET
     let mut decoded_packet = Zeroizing::new(vec![0u8; len]);
