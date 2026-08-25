@@ -340,6 +340,7 @@ pub fn server_users_migrate() //CONVERT FLAT username = "<hash>" ENTRIES INTO SU
         for (username, hash) in &legacy
         {
             set_user_field(doc.as_table_mut(), username, "password", hash.into());
+            set_user_field(doc.as_table_mut(), username, "role", 0.into());
         }
     });
 }
