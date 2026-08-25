@@ -178,7 +178,7 @@ fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
 }
 
 #[cfg(feature = "server")]
-fn set_user_password(users: &mut Table, username: &str, hash: &str) //SET username'S PASSWORD, KEEPING ANY OTHER FIELDS
+fn set_user_field(users: &mut Table, username: &str, key: &str, value: &str) //SET ONE FIELD OF username, KEEPING THE REST OF THE ENTRY
 {
     //A MISSING OR LEGACY FLAT ENTRY BECOMES AN EMPTY SUBTABLE FIRST
     if users.get(username).and_then(Item::as_table_like).is_none()
@@ -187,7 +187,13 @@ fn set_user_password(users: &mut Table, username: &str, hash: &str) //SET userna
     }
 
     users.get_mut(username).and_then(Item::as_table_like_mut)
-        .expect("User entry is not a table").insert("password", Item::Value(hash.into()));
+        .expect("User entry is not a table").insert(key, Item::Value(value.into()));
+}
+
+#[cfg(feature = "server")]
+fn write_user_field(username: &str, key: &str, value: &str) //WRITE ONE FIELD OF username TO server_users.toml
+{
+    with_cached_mut(&config_path(consts::SERVER_USERS_CONFIG), |doc| set_user_field(doc.as_table_mut(), username, key, value));
 }
 
 #[cfg(feature = "server")]
@@ -272,9 +278,16 @@ where
 }
 
 #[cfg(feature = "server")]
-pub fn server_users_password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF username FROM server_users.toml
+pub fn server_users_password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF username
 {
+    //THE ONLY FIELD WITH A LEGACY FLAT SHAPE, HENCE THE SEPARATE READER
     user_password(get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(username)?)
+}
+
+#[cfg(feature = "server")]
+pub fn server_users_add(username: &str, hash: &str) //CREATE NEW USER
+{
+    write_user_field(username, "password", hash);
 }
 
 #[cfg(feature = "client_base")]
@@ -293,12 +306,6 @@ pub fn client_write_bool(key: &str, value: bool) //WRITE BOOLEAN TO client.toml
 pub fn client_write_int(key: &str, value: i64) //WRITE INTEGER TO client.toml
 {
     config_write_value(consts::CLIENT_CONFIG, key, value.into());
-}
-
-#[cfg(feature = "server")]
-pub fn server_users_write(username: &str, hash: &str) //WRITE PASSWORD HASH OF username TO server_users.toml
-{
-    with_cached_mut(&config_path(consts::SERVER_USERS_CONFIG), |doc| set_user_password(doc.as_table_mut(), username, hash));
 }
 
 #[cfg(feature = "server")]
@@ -323,7 +330,7 @@ pub fn server_users_migrate() //CONVERT FLAT username = "<hash>" ENTRIES INTO SU
     {
         for (username, hash) in &legacy
         {
-            set_user_password(doc.as_table_mut(), username, hash);
+            set_user_field(doc.as_table_mut(), username, "password", hash);
         }
     });
 }

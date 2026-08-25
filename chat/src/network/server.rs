@@ -1202,7 +1202,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             .await.expect("Hashing password failed");
 
         //SAVE PASSWORD
-        config::server_users_write(&username, &hash);
+        config::server_users_add(&username, &hash);
     } else //LOGIN
     {
         //SEND LOGIN CODE
