@@ -25,9 +25,12 @@ use std::
     {
         Arc,
         atomic::{ AtomicBool, Ordering },
-        mpsc::{ self, Receiver, RecvTimeoutError },
+        mpsc::{ self, Receiver },
     },
 };
+
+#[cfg(not(target_os = "macos"))]
+use std::sync::mpsc::RecvTimeoutError;
 
 use tokio::sync::mpsc::Sender;
 
@@ -109,43 +112,53 @@ pub fn capture_loop //CAPTURE LOOP
         _ => {},
     }
 
-    UPGRADING.store(false, Ordering::Relaxed);
-
-    let (probe_tx, probe_rx) = mpsc::channel();
-
-    thread::spawn(move ||
+    //SOME OBJECTIVE-C BULLSHIT ON MAC
+    #[cfg(target_os = "macos")]
+    return match open_recorder()
     {
-        let session = open_recorder();
-
-        //THE FLAG GOES UP BEFORE THE SEND: IT IS WHAT MAKES THE POLLING LOOP STAND DOWN, AND ONLY
-        //ONCE IT HAS STOOD DOWN IS ANYBODY WAITING ON THE CHANNEL
-        if session.is_ok() { UPGRADING.store(true, Ordering::Relaxed); }
-
-        probe_tx.send(session).ok();
-    });
-
-    let outcome = legacy_capture_loop(frame_tx.clone(), running.clone(), fps);
-
-    //ENDED ON ITS OWN TERMS - STOPPED, OR THE SCREEN OPTION WENT OFF
-    if !upgrading() && (outcome.is_ok() || !running.load(Ordering::Relaxed)) { return outcome; }
-
-    let probed = if upgrading()
-    {
-        probe_rx.recv().ok()
-    }
-    else
-    {
-        //THE POLLING PATH COULD NOT RUN AT ALL
-        probe_rx.recv_timeout(probe_timeout()).ok()
+        Ok(session) => run_recorder(session, frame_tx, running, fps),
+        Err(_) => legacy_capture_loop(frame_tx, running, fps),
     };
 
-    UPGRADING.store(false, Ordering::Relaxed);
-
-    match probed
+    #[cfg(not(target_os = "macos"))]
     {
-        //A PROVEN RECORDER IS WORTH TAKING EVEN IF THE POLLING PATH ERRORED ON ITS WAY OUT
-        Some(Ok(session)) if running.load(Ordering::Relaxed) => run_recorder(session, frame_tx, running, fps),
-        _ => outcome,
+        UPGRADING.store(false, Ordering::Relaxed);
+
+        let (probe_tx, probe_rx) = mpsc::channel();
+
+        thread::spawn(move ||
+        {
+            let session = open_recorder();
+
+            //THE FLAG GOES UP BEFORE THE SEND: IT IS WHAT MAKES THE POLLING LOOP STAND DOWN, AND ONLY
+            //ONCE IT HAS STOOD DOWN IS ANYBODY WAITING ON THE CHANNEL
+            if session.is_ok() { UPGRADING.store(true, Ordering::Relaxed); }
+
+            probe_tx.send(session).ok();
+        });
+
+        let outcome = legacy_capture_loop(frame_tx.clone(), running.clone(), fps);
+
+        //ENDED ON ITS OWN TERMS - STOPPED, OR THE SCREEN OPTION WENT OFF
+        if !upgrading() && (outcome.is_ok() || !running.load(Ordering::Relaxed)) { return outcome; }
+
+        let probed = if upgrading()
+        {
+            probe_rx.recv().ok()
+        } else
+        {
+            //THE POLLING PATH COULD NOT RUN AT ALL
+            probe_rx.recv_timeout(probe_timeout()).ok()
+        };
+
+        UPGRADING.store(false, Ordering::Relaxed);
+
+        match probed
+        {
+            //A PROVEN RECORDER IS WORTH TAKING EVEN IF THE POLLING PATH ERRORED ON ITS WAY OUT
+            Some(Ok(session)) if running.load(Ordering::Relaxed) => run_recorder(session, frame_tx, running, fps),
+            _ => outcome,
+        }
     }
 }
 
@@ -588,6 +601,7 @@ fn open_recorder() -> Result<RecorderSession, String> //THE BLOCKING HALF OF THE
     Ok(RecorderSession { recorder, frames, first })
 }
 
+#[cfg(not(target_os = "macos"))]
 fn probe_timeout() -> Duration
 {
     env::var(consts::PROBE_TIMEOUT_VAR).ok()
@@ -596,6 +610,15 @@ fn probe_timeout() -> Duration
         .unwrap_or(consts::RECORDER_PROBE_TIMEOUT)
 }
 
+//SEE `capture_loop`: A macOS SESSION CANNOT CROSS A THREAD, AND HAS NO PORTAL TO WAIT ON EITHER,
+//SO THE BOUND IT WOULD BUY IS THE ONE `open_recorder` ALREADY IMPOSES ON THE FIRST FRAME
+#[cfg(target_os = "macos")]
+fn start_recorder() -> Result<RecorderSession, String>
+{
+    open_recorder()
+}
+
+#[cfg(not(target_os = "macos"))]
 fn start_recorder() -> Result<RecorderSession, String> //PROBE THE OS-NATIVE RECORDER, BOUNDED
 {
     //THE PROBE RUNS ON A THREAD OF ITS OWN BECAUSE IT CAN BLOCK FOR AN UNBOUNDED TIME: ON WAYLAND
