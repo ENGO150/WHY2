@@ -52,3 +52,23 @@ pub const GRID_HEIGHT: usize        = 4;                                        
 
 pub const RECV_TIMEOUT: u64         = 200;                                      //UDP RECEIVE POLL TIMEOUT (MS)
 pub const SEND_CHANNEL_BOUND: usize = 8;                                        //AUDIO CALLBACK -> NETWORK TASK BUFFER
+
+pub const AEC_OVERRIDE_VAR: &str          = "WHY2_SHARE_AEC";                   //"off" LEAVES OUR OWN PLAYBACK IN THE SHARED AUDIO
+pub const AEC_REFERENCE_CAPACITY: usize   = (SAMPLE_RATE * 2) as usize;         //REFERENCE RING (~2s, DRAINED IN LOCKSTEP SO IT SITS NEAR EMPTY)
+pub const AEC_BLOCK: usize                = (SAMPLE_RATE / 100) as usize;       //ENVELOPE BLOCK (~10ms)
+pub const AEC_SEARCH_BLOCKS: usize        = 100;                                //FURTHEST THE PLAYBACK MAY LAG THE CAPTURE (~1s)
+pub const AEC_WINDOW_BLOCKS: usize        = 100;                                //HOW MUCH OF IT THE ENVELOPES ARE COMPARED OVER (~1s)
+pub const AEC_CANDIDATES: usize           = 4;                                  //HOW MANY OF THE COARSE PASS'S PEAKS THE FINE PASS GETS TO CHECK
+pub const AEC_FINE_WINDOW: usize          = 4096;                               //SAMPLES USED BY THE SAMPLE-ACCURATE PASS (~85ms)
+pub const AEC_SEARCH_INTERVAL: usize      = (SAMPLE_RATE / 2) as usize;         //MINIMUM GAP BETWEEN TWO SEARCHES (~500ms)
+pub const AEC_ENVELOPE_MIN: f32           = 0.3;                                //WEAKEST ENVELOPE CORRELATION WORTH REFINING
+pub const AEC_FINE_MIN: f32               = 0.2;                                //WEAKEST SAMPLE CORRELATION WORTH LOCKING ONTO
+pub const AEC_MIN_ENERGY: f32             = 0.05;                               //REFERENCE ENERGY BELOW THIS IS SILENCE, NOT A SIGNAL
+pub const AEC_MIN_GAIN: f32               = 0.05;                               //QUIETEST PLAUSIBLE ECHO (-26dB)
+pub const AEC_MAX_GAIN: f32               = 2.0;                                //LOUDEST PLAUSIBLE ECHO (+6dB)
+pub const AEC_TAPS: usize                 = 256;                                //FILTER LENGTH (~5ms AROUND THE ESTIMATE)
+pub const AEC_LEAD_TAPS: usize            = 64;                                 //HOW MUCH OF IT SITS AHEAD OF THE ESTIMATE (~1ms)
+pub const AEC_STEP: f32                   = 0.002;                               //NLMS STEP SIZE (SMALL - THE SEARCH ALREADY LANDS CLOSE, AND THE SHARED AUDIO IS A LOUD DISTURBANCE IN THE ERROR)
+pub const AEC_EPSILON: f32                = 1e-6;                               //NLMS REGULARIZATION (NEVER DIVIDE BY A SILENT WINDOW)
+pub const AEC_SCORE_WINDOW: usize         = SAMPLE_RATE as usize;               //HOW OFTEN THE FILTER HAS TO JUSTIFY ITSELF (~1s)
+pub const AEC_SCORE_FLOOR: f32            = 0.05;                               //TOO LITTLE WENT THROUGH THAT WINDOW TO JUDGE IT

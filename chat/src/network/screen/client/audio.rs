@@ -71,6 +71,7 @@ use crate::network::
     {
         consts,
         client as voice,
+        client::aec,
     },
 };
 
@@ -196,6 +197,10 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
 
     stream.play().unwrap();
 
+    //TAKE OUR OWN VOICE PLAYBACK BACK OUT OF THE LOOPBACK, SO A VIEWER IN THE SAME CHANNEL DOES NOT HEAR
+    //THEMSELVES. DROPPING THIS UNINSTALLS THE TAP, INCLUDING ON EVERY EARLY RETURN BELOW.
+    let mut canceller = aec::start();
+
     let mut out = vec![0u8; screen_consts::MAX_PACKET_SIZE];
 
     while running.load(Ordering::Relaxed)
@@ -209,7 +214,13 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
 
         match time::timeout(Duration::from_millis(100), chunk_rx.recv()).await
         {
-            Ok(Some(chunk)) => input_accum.extend_from_slice(&chunk),
+            Ok(Some(mut chunk)) =>
+            {
+                if let Some(canceller) = canceller.as_mut() { canceller.process(&mut chunk); }
+
+                input_accum.extend_from_slice(&chunk);
+            },
+
             _ =>
             {
                 if !running.load(Ordering::Relaxed) { return; }
@@ -218,8 +229,10 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
         }
 
         //DRAIN ANY QUEUED CHUNKS
-        while let Ok(chunk) = chunk_rx.try_recv()
+        while let Ok(mut chunk) = chunk_rx.try_recv()
         {
+            if let Some(canceller) = canceller.as_mut() { canceller.process(&mut chunk); }
+
             input_accum.extend_from_slice(&chunk);
         }
 

@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //MODULES
 pub mod sfx;
+pub mod aec;
 pub mod options;
 
 use std::
@@ -175,6 +176,9 @@ impl Drop for StreamGuard
             {
                 *streams = None;
             }
+
+            //NOTHING OF OURS REACHES THE SINK ANY MORE, SO A RUNNING SHARE MUST STOP SUBTRACTING
+            aec::set_rate(0);
         }
     }
 }
@@ -615,6 +619,12 @@ fn build_output_stream(device: &Device, config: StreamConfig, current_generation
     //OUTPUT INTERPOLATION
     let output_resample_step = output_source_rate / output_target_rate;
 
+    //THE SCREEN SHARE SUBTRACTS THIS STREAM BACK OUT OF THE SINK MONITOR (SEE aec.rs), AND NEEDS THE RATE
+    //IT IS PRODUCED AT. IT IS ALSO HOW A REBUILT STREAM TELLS THE CANCELLER TO FIND THE DELAY AGAIN.
+    aec::set_rate(config.sample_rate);
+
+    let mut reference = Vec::with_capacity(consts::FRAME_SIZE);
+
     //CONFIGURE OUTPUT STREAM
     device.build_output_stream(config, move |data: &mut [f32], _: &_|
     {
@@ -627,6 +637,8 @@ fn build_output_stream(device: &Device, config: StreamConfig, current_generation
         let output_gain = options::get_output_gain(); //ONCE PER CALLBACK, NOT PER SAMPLE
         let frames_to_write = data.len() / output_channels;
         let mut consumers_guard = CONSUMERS.lock().unwrap();
+
+        reference.clear();
 
         for i in 0..frames_to_write
         {
@@ -684,12 +696,20 @@ fn build_output_stream(device: &Device, config: StreamConfig, current_generation
             //SOFT CLIPPING (HYPERBOLIC TANGENT)
             mixed_sample = mixed_sample.tanh();
 
+            //THE REFERENCE IS TAPPED HERE, PAST EVERY STAGE THAT SHAPES IT - WHAT THE SINK RECEIVES IS
+            //WHAT THE SHARE HAS TO TAKE BACK OUT, AND A SILENT FRAME COUNTS AS MUCH AS A LOUD ONE
+            reference.push(mixed_sample);
+
             //WRITE SAMPLE TO ALL CHANNELS
             for channel in 0..output_channels
             {
                 data[i * output_channels + channel] = mixed_sample;
             }
         }
+
+        drop(consumers_guard);
+
+        aec::push_reference(&reference);
     }, |_| {}, None).ok()
 }
 
