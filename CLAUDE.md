@@ -170,6 +170,17 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     rescue, since nothing would have failed. `RECORDER_PROBE_TIMEOUT` now only applies where the
     polling path could not start at all and the recorder is the last backend left rather than an
     upgrade — that is the one case worth blocking for.
+  - **The wayshot path recycles its Wayland connection on a memory budget**, and this is not
+    optional tidiness. `libwayshot` binds a fresh `wl_shm` per capture and never releases it, so
+    the compositor holds one full-screen buffer for every frame taken — measured against Hyprland
+    at ~5.5 MB a frame, which is ~10 GB a minute at 30 fps and takes the whole machine down with
+    it inside about a minute. The share does not leak it back: all of it is returned the moment
+    the *client disconnects*, and `WayshotConnection::new()` costs 0.4 ms, so
+    `capture_loop_wayshot` counts the bytes it has stranded and reconnects once they pass
+    `WAYLAND_LEAK_BUDGET`. Sizing by bytes rather than by a frame count is deliberate — a 4K share
+    strands memory four times faster than a 1080p one and has to recycle four times as often.
+    Unlike the failure-driven reconnect beside it, this one forces no keyframe and clears no
+    `last_image`: nothing was missed and the picture has not moved.
   - `WHY2_CAPTURE_BACKEND` (`recorder` / `legacy`) pins a backend; `WHY2_CAPTURE_PROBE_TIMEOUT`
     overrides the probe deadline in seconds. Both exist so a machine where the heuristic picks
     wrong is one env var away from the old behaviour.

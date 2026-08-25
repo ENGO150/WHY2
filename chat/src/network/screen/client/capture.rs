@@ -429,6 +429,17 @@ fn select_output(wayshot: &libwayshot::WayshotConnection) -> Result<libwayshot::
         .clone())
 }
 
+//A FRESH CONNECTION ONTO THE SAME OUTPUT. USED BOTH WHEN CAPTURE BREAKS AND, ROUTINELY, TO HAND THE
+//COMPOSITOR BACK THE MEMORY EVERY CAPTURE STRANDS (SEE THE LEAK NOTE IN capture_loop_wayshot).
+#[cfg(target_os = "linux")]
+fn reconnect_wayshot(name: &str) -> Option<(libwayshot::WayshotConnection, libwayshot::output::OutputInfo)>
+{
+    let connection = libwayshot::WayshotConnection::new().ok()?;
+    let output = connection.get_all_outputs().iter().find(|output| output.name == name).cloned()?;
+
+    Some((connection, output))
+}
+
 #[cfg(target_os = "linux")]
 fn capture_loop_wayshot
 (
@@ -466,6 +477,12 @@ fn capture_loop_wayshot
     let mut failures = 0u32;
     let mut next_tick = Instant::now() + target_interval;
 
+    //libwayshot BINDS A FRESH wl_shm PER CAPTURE AND NEVER RELEASES IT, SO THE COMPOSITOR HOLDS ON TO ONE
+    //FULL-SCREEN BUFFER FOR EVERY FRAME WE TAKE - MEASURED AT ~5.5 MB A FRAME, WHICH IS ~10 GB A MINUTE AT
+    //30 FPS AND TAKES THE WHOLE MACHINE DOWN WITH IT. IT IS ALL HANDED BACK WHEN THE CLIENT DISCONNECTS,
+    //AND RECONNECTING COSTS 0.4 ms, SO THE SHARE SIMPLY RECYCLES ITS CONNECTION BEFORE THE BILL GETS BIG.
+    let mut stranded = 0u64;
+
     while running.load(Ordering::Relaxed) && !upgrading()
     {
         //EXIT ON DISABLED SCREEN
@@ -483,6 +500,8 @@ fn capture_loop_wayshot
 
                 let image = image.into_rgba8();
 
+                stranded += image.as_raw().len() as u64;
+
                 let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
 
                 let changed = last_image.as_ref().is_none_or(|previous| previous.as_raw() != image.as_raw());
@@ -497,6 +516,19 @@ fn capture_loop_wayshot
                     last_image = Some(image);
                     last_encode_time = Instant::now();
                 }
+
+                //NOTHING WAS MISSED AND THE PICTURE HAS NOT MOVED, SO THIS COSTS NEITHER A KEYFRAME NOR THE
+                //CHANGE DETECTION - ONLY THE RECONNECT ITSELF
+                if stranded >= consts::WAYLAND_LEAK_BUDGET
+                {
+                    if let Some((connection, output)) = reconnect_wayshot(&target_output.name)
+                    {
+                        wayshot = connection;
+                        target_output = output;
+                    }
+
+                    stranded = 0;
+                }
             },
 
             //RECONNECT ONLY WHEN CAPTURE ACTUALLY BREAKS (E.G. THE OUTPUT WAS HOTPLUGGED)
@@ -506,20 +538,17 @@ fn capture_loop_wayshot
 
                 if failures >= consts::WAYLAND_RECONNECT_FAILURES
                 {
-                    if let Ok(connection) = libwayshot::WayshotConnection::new()
+                    if let Some((connection, output)) = reconnect_wayshot(&target_output.name)
                     {
-                        let output = connection.get_all_outputs().iter().find(|o| o.name == target_output.name).cloned();
-                        if let Some(output) = output
-                        {
-                            wayshot = connection;
-                            target_output = output;
+                        wayshot = connection;
+                        target_output = output;
 
-                            //FORCE A KEYFRAME - THE VIEWER HAS MISSED FRAMES WHILE WE WERE DOWN
-                            encoder.force_intra_frame();
-                            last_image = None;
-                        }
+                        //FORCE A KEYFRAME - THE VIEWER HAS MISSED FRAMES WHILE WE WERE DOWN
+                        encoder.force_intra_frame();
+                        last_image = None;
                     }
 
+                    stranded = 0;
                     failures = 0;
                 }
             },
