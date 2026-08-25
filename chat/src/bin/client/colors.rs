@@ -18,50 +18,41 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crossterm::style::Color;
 
+//CONSTS
+//THE WHOLE VOCABULARY OF /color AND /ucolor, IN CODE ORDER - THE NAMES ARE THE ONES crossterm ITSELF PARSES,
+//SO WHAT THE PALETTE OFFERS IS EXACTLY WHAT to_color ACCEPTS AND WHAT LANDS IN client.toml
+pub const COLORS: [(&str, Color); 16] =
+[
+    ("black",        Color::Black),
+    ("dark_red",     Color::DarkRed),
+    ("dark_green",   Color::DarkGreen),
+    ("dark_yellow",  Color::DarkYellow),
+    ("dark_blue",    Color::DarkBlue),
+    ("dark_magenta", Color::DarkMagenta),
+    ("dark_cyan",    Color::DarkCyan),
+    ("grey",         Color::Grey),
+    ("dark_grey",    Color::DarkGrey),
+    ("red",          Color::Red),
+    ("green",        Color::Green),
+    ("yellow",       Color::Yellow),
+    ("blue",         Color::Blue),
+    ("magenta",      Color::Magenta),
+    ("cyan",         Color::Cyan),
+    ("white",        Color::White),
+];
+
+//FUNCTIONS
 pub fn color_to_u8(color: &Color) -> u8 //MAP COLOR TO COLOR CODE
 {
-    match color
-    {
-        Color::Black => 0,
-        Color::DarkRed => 1,
-        Color::DarkGreen => 2,
-        Color::DarkYellow => 3,
-        Color::DarkBlue => 4,
-        Color::DarkMagenta => 5,
-        Color::DarkCyan => 6,
-        Color::Grey => 7,
-        Color::DarkGrey => 8,
-        Color::Red => 9,
-        Color::Green => 10,
-        Color::Yellow => 11,
-        Color::Blue => 12,
-        Color::Magenta => 13,
-        Color::Cyan => 14,
-        Color::White => 15,
-        _ => 255, //UNKNOWN
-    }
+    COLORS.iter().position(|(_, c)| c == color).map_or(255, |i| i as u8) //255 - UNKNOWN
 }
 
 pub fn u8_to_color(val: u8) -> Option<Color> //COLOR CODE TO COLOR
 {
-    match val
-    {
-        0 => Some(Color::Black),
-        1 => Some(Color::DarkRed),
-        2 => Some(Color::DarkGreen),
-        3 => Some(Color::DarkYellow),
-        4 => Some(Color::DarkBlue),
-        5 => Some(Color::DarkMagenta),
-        6 => Some(Color::DarkCyan),
-        7 => Some(Color::Grey),
-        8 => Some(Color::DarkGrey),
-        9 => Some(Color::Red),
-        10 => Some(Color::Green),
-        11 => Some(Color::Yellow),
-        12 => Some(Color::Blue),
-        13 => Some(Color::Magenta),
-        14 => Some(Color::Cyan),
-        15 => Some(Color::White),
-        _ => None,
-    }
+    COLORS.get(val as usize).map(|(_, color)| *color)
+}
+
+pub fn by_name(name: &str) -> Option<Color> //NAME AS THE PALETTE OFFERS IT BACK TO ITS COLOR
+{
+    COLORS.iter().find(|(n, _)| n.eq_ignore_ascii_case(name)).map(|(_, color)| *color)
 }

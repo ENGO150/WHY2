@@ -181,9 +181,14 @@ fn to_color(color: &str) -> Result<(u8, String), ()> //CONVERT STRING TO COLOR C
         formatted_color = formatted_color.replacen("dark", "dark_", 1);
     }
 
-    Color::try_from(formatted_color.as_str())
-        .map(|c| (colors::color_to_u8(&c), formatted_color))
-        .map_err(|_| ())
+    //A COLOR THAT PARSES IS NOT NECESSARILY ONE WE CAN SEND: THE WIRE CARRIES A CODE, SO ansi_(n) AND rgb_(r,g,b)
+    //HAVE NOWHERE TO GO AND USED TO BE ACCEPTED, WRITTEN TO THE CONFIG AND THEN SILENTLY IGNORED ON EVERY MESSAGE
+    let color = Color::try_from(formatted_color.as_str()).map_err(|_| ())?;
+    let code = colors::color_to_u8(&color);
+
+    if code == 255 { return Err(()); }
+
+    Ok((code, formatted_color))
 }
 
 fn color_handler(app: &mut App, config_key: &str, parameters: Option<String>) //HANDLE COLOR CHANGE
@@ -201,7 +206,7 @@ fn color_handler(app: &mut App, config_key: &str, parameters: Option<String>) //
         app.push_styled("Color set successfully.", theme::OK);
     } else
     {
-        app.push_styled("Invalid color! See https://docs.rs/crossterm/latest/crossterm/style/enum.Color.html for help.", theme::ERROR);
+        app.push_styled("Invalid color! Type the command again and pick one of the offered colors.", theme::ERROR);
     }
 }
 

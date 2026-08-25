@@ -74,12 +74,22 @@ pub enum Subcommand
     Settings, //SERVER CONFIGURATION
 }
 
+//A PARAMETER WITH A CLOSED SET OF ANSWERS - THE PALETTE OFFERS THEM INSTEAD OF LEAVING THE USER GUESSING.
+//THE VARIANT ONLY NAMES THE SET; THE VALUES THEMSELVES LIVE WHERE THEY ARE ALREADY DEFINED (colors::COLORS)
+#[derive(Clone, Copy, PartialEq)]
+pub enum ArgValues
+{
+    Free,   //ANYTHING - A NAME, A MESSAGE, AN ID
+    Colors, //A crossterm COLOR NAME
+}
+
 //STRUCTS
 pub struct CommandArg //COMMAND PARAMETER
 {
     pub name: &'static str,
     pub description: &'static str,
     pub required: bool,
+    pub values: ArgValues, //WHAT MAY BE TYPED HERE, WHEN THAT IS A KNOWN, SHORT LIST
 }
 
 pub struct SubcommandInfo //SUBCOMMAND INFO - CARRIES ITS OWN ROLE, SO ONE COMMAND CAN HOLD ACTIONS OF DIFFERENT RANKS
@@ -116,6 +126,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
                 name: "ID",
                 description: "Target user",
                 required: true,
+                values: ArgValues::Free,
             },
         ],
         description: "Mutes a user server-side",
@@ -133,6 +144,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
                 name: "ID",
                 description: "Target user",
                 required: true,
+                values: ArgValues::Free,
             },
         ],
         description: "Disconnects a user from the server",
@@ -175,6 +187,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "COMMAND",
                 description: "Target command",
                 required: true,
+                values: ArgValues::Free,
             },
         ],
         description: "Shows command info",
@@ -207,6 +220,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "ID",
                 description: "ID of target user",
                 required: false,
+                values: ArgValues::Free,
             },
         ],
         description: "Toggle-mutes user/yourself",
@@ -226,6 +240,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "NAME",
                 description: "Name of channel",
                 required: false,
+                values: ArgValues::Free,
             },
         ],
         description: "Switches to channel/lobby if NAME is omitted",
@@ -245,6 +260,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "PATH",
                 description: "Path of target file",
                 required: true,
+                values: ArgValues::Free,
             },
         ],
         description: "Uploads file to server",
@@ -264,12 +280,14 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "USER ID",
                 description: "ID of uploader",
                 required: true,
+                values: ArgValues::Free,
             },
             CommandArg
             {
                 name: "FILE ID",
                 description: "ID of target file",
                 required: true,
+                values: ArgValues::Free,
             },
         ],
         description: "Downloads file from server",
@@ -302,6 +320,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "ID",
                 description: "ID of screensharing user",
                 required: true,
+                values: ArgValues::Free,
             },
         ],
         description: "Attaches client screenshare.",
@@ -367,12 +386,14 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "ID",
                 description: "ID of target user",
                 required: true,
+                values: ArgValues::Free,
             },
             CommandArg
             {
                 name: "MESSAGE",
                 description: "Message content",
                 required: true,
+                values: ArgValues::Free,
             },
         ],
         description: "Sends private message",
@@ -403,6 +424,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "COLOR",
                 description: "Target color",
                 required: true,
+                values: ArgValues::Colors,
             },
         ],
         description: "Sets color of username",
@@ -422,6 +444,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "COLOR",
                 description: "Target color",
                 required: true,
+                values: ArgValues::Colors,
             },
         ],
         description: "Sets color of message",
@@ -441,6 +464,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "ACTION",
                 description: "Moderation action",
                 required: true,
+                values: ArgValues::Free,
             },
         ],
         description: "Moderation actions",

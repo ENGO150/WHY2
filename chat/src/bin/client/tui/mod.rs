@@ -515,22 +515,12 @@ async fn handle_key
 
         KeyCode::Esc => app.palette.dismiss(),
 
-        KeyCode::Tab =>
-        {
-            if let Some(entry) = app.palette.selection()
-            {
-                complete(app, entry);
-            }
-        },
+        KeyCode::Tab => { complete_selection(app, true); },
 
         KeyCode::Enter =>
         {
             //A HIGHLIGHTED PALETTE ENTRY THE USER HASN'T FULLY TYPED COMPLETES FIRST
-            if let Some(entry) = app.palette.selection() && !entry.typed(&app.input.text())
-            {
-                complete(app, entry);
-                return;
-            }
+            if complete_selection(app, false) { return; }
 
             app.palette.dismiss();
 
@@ -540,6 +530,34 @@ async fn handle_key
 
         _ => {},
     }
+}
+
+//WRITE THE HIGHLIGHTED ROW ONTO THE LINE, WHETHER IT IS A COMMAND OR ONE ANSWER OF A PARAMETER.
+//force IS Tab, WHICH COMPLETES WHATEVER IS HIGHLIGHTED; Enter ONLY COMPLETES WHAT IS NOT SPELLED OUT ALREADY,
+//SO A FINISHED LINE IS SENT INSTEAD OF BEING REWRITTEN. RETURNS WHETHER THE LINE WAS TOUCHED
+fn complete_selection(app: &mut App, force: bool) -> bool
+{
+    if let Some(values) = app.palette.values()
+    {
+        let input = app.input.text();
+
+        let Some(value) = values.selection().filter(|_| force || !values.typed(&input)) else { return false };
+
+        //EVERYTHING UP TO THE HALF-TYPED VALUE STAYS - THE PARAMETERS BEFORE IT WERE ANSWERED ALREADY
+        let kept = input.chars().take(values.start).collect::<String>();
+
+        app.input.clear();
+        app.input.insert_str(&format!("{kept}{value}"));
+        app.palette.update(&app.input.text(), app.role);
+
+        return true;
+    }
+
+    let Some(entry) = app.palette.selection().filter(|entry| force || !entry.typed(&app.input.text())) else { return false };
+
+    complete(app, entry);
+
+    true
 }
 
 fn complete(app: &mut App, entry: palette::Entry)

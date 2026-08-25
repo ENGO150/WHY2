@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use ratatui::
 {
     Frame,
+    backend::FromCrossterm,
     style::{ Color, Style },
     text::{ Line, Span },
     widgets::
@@ -55,8 +56,9 @@ use super::
     palette::
     {
         self,
-        PaletteMode,
         Entry,
+        Values,
+        PaletteMode,
     },
     tofu::
     {
@@ -419,29 +421,21 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
 
 fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
 {
-    //(COMMAND, PARAMETER TO HIGHLIGHT) PER ROW, PLUS WHICH ROW IS SELECTED
-    let (entries, selected, title) = match &app.palette.mode
+    //HOW MANY ROWS AND WHAT THEY ARE CALLED - THE BOX IS MEASURED FROM THAT, AND ONLY THEN IS THERE A WIDTH TO FILL
+    let (rows, title) = match &app.palette.mode
     {
         PaletteMode::Hidden => return,
 
-        PaletteMode::Menu(matches, selected) =>
-        {
-            //KEEP THE SELECTION IN VIEW
-            let first = selected.saturating_sub(palette::MAX_ROWS.saturating_sub(1));
+        PaletteMode::Menu(matches, _) => (matches.len().min(palette::MAX_ROWS), String::from(" Commands ")),
 
-            let entries = matches.iter().copied()
-                .skip(first)
-                .take(palette::MAX_ROWS)
-                .map(|entry| (entry, None))
-                .collect::<Vec<(Entry, Option<usize>)>>();
+        //THE PARAMETER NAMES ITSELF - THE LIST IS ITS VOCABULARY, NOT THE COMMAND'S
+        PaletteMode::Values(values) =>
+            (values.matches.len().min(palette::MAX_ROWS), format!(" {} ", capitalize(values.arg.name))),
 
-            (entries, Some(selected - first), " Commands ")
-        },
-
-        PaletteMode::Signature(entry, active) => (vec![(*entry, *active)], None, " Parameters "),
+        PaletteMode::Signature(..) => (1, String::from(" Parameters ")),
     };
 
-    let height = entries.len() as u16 + 2;
+    let height = rows as u16 + 2;
 
     if area.height < height || area.width < 10 { return; }
 
@@ -466,11 +460,72 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
+    let lines = match &app.palette.mode
+    {
+        PaletteMode::Values(values) => value_lines(values, rows),
+        _ => entry_lines(app, rows, inner.width as usize),
+    };
+
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+//ONE ROW PER ANSWER THE PARAMETER ACCEPTS, EACH SHOWING ITS OWN COLOR - A NAME ALONE WOULD STILL BE A GUESS
+fn value_lines(values: &Values, rows: usize) -> Vec<Line<'static>>
+{
+    //KEEP THE SELECTION IN VIEW
+    let first = values.selected.saturating_sub(rows.saturating_sub(1));
+
+    values.matches.iter().skip(first).take(rows).enumerate().map(|(row, value)|
+    {
+        let selected = first + row == values.selected;
+
+        let mut spans = vec![Span::styled(if selected { "▌" } else { " " }, theme::ACCENT)];
+
+        //THE SWATCH IS PAINTED AS A BACKGROUND, SO EVEN black AND dark_grey ARE SOMETHING TO LOOK AT
+        if let Some(color) = values.swatch(value)
+        {
+            spans.push(Span::styled("    ", Style::new().bg(Color::from_crossterm(color))));
+            spans.push(Span::raw(" "));
+        }
+
+        spans.push(Span::raw((*value).to_string()));
+
+        let line = Line::from(spans);
+
+        if selected { line.style(theme::SELECTED) } else { line }
+    }).collect()
+}
+
+//ONE ROW PER COMMAND (OR THE SINGLE PARAMETER HINT), IN ALIGNED COLUMNS
+fn entry_lines(app: &App, rows: usize, width: usize) -> Vec<Line<'static>>
+{
+    //(COMMAND, PARAMETER TO HIGHLIGHT) PER ROW, PLUS WHICH ROW IS SELECTED
+    let (entries, selected) = match &app.palette.mode
+    {
+        PaletteMode::Menu(matches, selected) =>
+        {
+            //KEEP THE SELECTION IN VIEW
+            let first = selected.saturating_sub(rows.saturating_sub(1));
+
+            let entries = matches.iter().copied()
+                .skip(first)
+                .take(rows)
+                .map(|entry| (entry, None))
+                .collect::<Vec<(Entry, Option<usize>)>>();
+
+            (entries, Some(selected - first))
+        },
+
+        PaletteMode::Signature(entry, active) => (vec![(*entry, *active)], None),
+
+        _ => return Vec::new(),
+    };
+
     //COLUMNS ARE MEASURED ACROSS THE VISIBLE ROWS SO DESCRIPTIONS AND SHORTCUTS LINE UP
     let signature_width = entries.iter().map(|(entry, _)| entry.width()).max().unwrap_or(0);
     let shortcut_width = entries.iter().map(|(entry, _)| entry.shortcut().width()).max().unwrap_or(0);
 
-    let lines = entries.iter().enumerate().map(|(row, (entry, active))|
+    entries.iter().enumerate().map(|(row, (entry, active))|
     {
         let mut spans = vec![Span::styled(if Some(row) == selected { "▌" } else { " " }, theme::ACCENT)];
 
@@ -487,16 +542,26 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
             let used = 1 + signature_width + 2 + description.width();
             let shortcut = entry.shortcut();
 
-            spans.push(Span::raw(" ".repeat((inner.width as usize).saturating_sub(used + shortcut_width + 1))));
+            spans.push(Span::raw(" ".repeat(width.saturating_sub(used + shortcut_width + 1))));
             spans.push(Span::styled(format!("{shortcut:>shortcut_width$} "), theme::ACCENT));
         }
 
         let line = Line::from(spans);
 
         if Some(row) == selected { line.style(theme::SELECTED) } else { line }
-    }).collect::<Vec<Line>>();
+    }).collect()
+}
 
-    frame.render_widget(Paragraph::new(lines), inner);
+//"COLOR" -> "Color" - PARAMETER NAMES ARE STORED SHOUTED, TITLES ARE NOT
+fn capitalize(name: &str) -> String
+{
+    let mut chars = name.chars();
+
+    match chars.next()
+    {
+        Some(first) => first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
+        None => String::new(),
+    }
 }
 
 //THE /settings OVERLAY - ONE CENTERED BOX, EITHER THE SETTING ROWS OR THE DEVICE PICKER ON TOP OF THEM

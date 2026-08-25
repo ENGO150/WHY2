@@ -18,14 +18,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use ratatui::text::Span;
 
+use crossterm::style::Color;
+
 use unicode_width::UnicodeWidthStr;
 
 use crate::
 {
+    colors,
     options,
     command::
     {
         self,
+        ArgValues,
         CommandArg,
         CommandInfo,
         SubcommandInfo,
@@ -40,9 +44,10 @@ pub const MAX_ROWS: usize = 8; //VISIBLE POPUP ROWS
 //ENUMS
 pub enum PaletteMode
 {
-    Hidden,                         //NOTHING TO SHOW
-    Menu(Vec<Entry>, usize),        //MATCHING ENTRIES + SELECTION
-    Signature(Entry, Option<usize>) //ONE ENTRY + THE PARAMETER BEING TYPED
+    Hidden,                          //NOTHING TO SHOW
+    Menu(Vec<Entry>, usize),         //MATCHING ENTRIES + SELECTION
+    Values(Values),                  //THE ANSWERS A PARAMETER ACCEPTS, WHERE THERE IS A KNOWN LIST OF THEM
+    Signature(Entry, Option<usize>), //ONE ENTRY + THE PARAMETER BEING TYPED
 }
 
 //STRUCTS
@@ -53,6 +58,16 @@ pub struct Entry
 {
     pub info: &'static CommandInfo,
     pub sub: Option<&'static SubcommandInfo>,
+}
+
+//WHAT MAY GO IN THE PARAMETER THE CARET IS ON. THE COLOR COMMANDS ARE THE REASON THIS EXISTS: THE VOCABULARY IS
+//crossterm'S OWN AND IS NOWHERE ON THE SCREEN, SO WITHOUT IT THE ONLY WAY TO LEARN A NAME IS TO GUESS ONE AND BE TOLD NO
+pub struct Values
+{
+    pub arg: &'static CommandArg,
+    pub matches: Vec<&'static str>,
+    pub selected: usize,
+    pub start: usize, //CHAR INDEX WHERE THE HALF-TYPED VALUE BEGINS - COMPLETING REPLACES EVERYTHING FROM HERE ON
 }
 
 pub struct Palette //SLASH-COMMAND AUTOCOMPLETE
@@ -154,6 +169,29 @@ impl Entry
     }
 }
 
+impl Values
+{
+    pub fn selection(&self) -> Option<&'static str> { self.matches.get(self.selected).copied() }
+
+    //THE HIGHLIGHTED VALUE IS ALREADY SPELLED OUT ON THE LINE, SO Enter SENDS IT INSTEAD OF COMPLETING IT
+    pub fn typed(&self, input: &str) -> bool
+    {
+        let typed = input.chars().skip(self.start).collect::<String>();
+
+        self.selection().is_some_and(|value| value.eq_ignore_ascii_case(typed.trim()))
+    }
+
+    //THE STYLE OF THE SWATCH DRAWN BESIDE A ROW - A NAME IS NOT WORTH MUCH IF IT DOES NOT SHOW ITS OWN COLOR
+    pub fn swatch(&self, value: &str) -> Option<Color>
+    {
+        match self.arg.values
+        {
+            ArgValues::Colors => colors::by_name(value),
+            ArgValues::Free => None,
+        }
+    }
+}
+
 impl Default for Palette
 {
     fn default() -> Self { Self::new() }
@@ -166,8 +204,17 @@ impl Palette
         Self { mode: PaletteMode::Hidden }
     }
 
-    //THE COMMAND MENU IS OPEN (NAVIGABLE + COMPLETABLE)
-    pub fn is_active(&self) -> bool { matches!(self.mode, PaletteMode::Menu(..)) }
+    //A MENU IS OPEN (NAVIGABLE + COMPLETABLE) - EITHER OF COMMANDS OR OF WHAT ONE PARAMETER ACCEPTS
+    pub fn is_active(&self) -> bool { matches!(self.mode, PaletteMode::Menu(..) | PaletteMode::Values(..)) }
+
+    pub fn values(&self) -> Option<&Values>
+    {
+        match &self.mode
+        {
+            PaletteMode::Values(values) => Some(values),
+            _ => None,
+        }
+    }
 
     //ANYTHING AT ALL IS ON SCREEN (MENU OR PARAMETER HINT)
     pub fn is_visible(&self) -> bool { !matches!(self.mode, PaletteMode::Hidden) }
@@ -217,7 +264,7 @@ impl Palette
                 //A COMMAND THAT TAKES AN ACTION HAS NOTHING OF ITS OWN TO HINT - THE ACTION OWNS EVERYTHING PAST IT
                 if !info.subcommands.is_empty()
                 {
-                    self.action(info, tail.trim_start(), role);
+                    self.action(info, tail.trim_start(), role, input);
                     return;
                 }
 
@@ -227,13 +274,13 @@ impl Palette
                     return;
                 }
 
-                self.mode = PaletteMode::Signature(Entry::command(info), active_arg(info.args, tail));
+                self.hint(Entry::command(info), tail, input);
             },
         }
     }
 
     //THE ACTION WORD OF /command <action> ... - A MENU WHILE IT IS BEING TYPED, ITS PARAMETERS ONCE IT IS DONE
-    fn action(&mut self, info: &'static CommandInfo, tail: &str, role: usize)
+    fn action(&mut self, info: &'static CommandInfo, tail: &str, role: usize, input: &str)
     {
         match tail.find(char::is_whitespace)
         {
@@ -266,9 +313,50 @@ impl Palette
                     return;
                 }
 
-                self.mode = PaletteMode::Signature(Entry::action(info, sub), active_arg(sub.args, tail));
+                self.hint(Entry::action(info, sub), tail, input);
             },
         }
+    }
+
+    //THE PARAMETER THE CARET IS ON: ITS OWN ANSWERS WHERE IT HAS A CLOSED SET OF THEM, OTHERWISE THE PLAIN SIGNATURE HINT
+    fn hint(&mut self, entry: Entry, tail: &str, input: &str)
+    {
+        let args = entry.args();
+        let active = active_arg(args, tail);
+
+        if let Some(arg) = active.and_then(|i| args.get(i)) && arg.values != ArgValues::Free
+        {
+            let typed = partial(tail).to_lowercase();
+
+            let matches = vocabulary(arg.values).into_iter()
+                .filter(|value| value.starts_with(&typed)).collect::<Vec<&'static str>>();
+
+            //A TYPO IS NOT A REASON TO GO BLANK - THE SIGNATURE HINT BELOW STILL SAYS WHAT THE PARAMETER IS
+            if !matches.is_empty()
+            {
+                //A FULLY TYPED VALUE WINS THE SELECTION, OTHERWISE KEEP IT WHERE IT WAS (SAME RULE AS THE COMMAND MENU)
+                let exact = matches.iter().position(|value| value.eq_ignore_ascii_case(&typed));
+
+                let selected = match (exact, &self.mode)
+                {
+                    (Some(exact), _) => exact,
+                    (None, PaletteMode::Values(values)) => values.selected.min(matches.len() - 1),
+                    (None, _) => 0,
+                };
+
+                self.mode = PaletteMode::Values(Values
+                {
+                    arg,
+                    matches,
+                    selected,
+                    start: input.chars().count() - typed.chars().count(),
+                });
+
+                return;
+            }
+        }
+
+        self.mode = PaletteMode::Signature(entry, active);
     }
 
     //SHOW matches, KEEPING THE SELECTION WHERE IT WAS UNLESS typed SPELLS ONE OF THEM OUT IN FULL
@@ -305,17 +393,26 @@ impl Palette
 
     pub fn next(&mut self)
     {
-        if let PaletteMode::Menu(matches, selected) = &mut self.mode
+        match &mut self.mode
         {
-            *selected = (*selected + 1) % matches.len();
+            PaletteMode::Menu(matches, selected) => *selected = (*selected + 1) % matches.len(),
+            PaletteMode::Values(values) => values.selected = (values.selected + 1) % values.matches.len(),
+
+            _ => {},
         }
     }
 
     pub fn previous(&mut self)
     {
-        if let PaletteMode::Menu(matches, selected) = &mut self.mode
+        match &mut self.mode
         {
-            *selected = if *selected == 0 { matches.len() - 1 } else { *selected - 1 };
+            PaletteMode::Menu(matches, selected) =>
+                *selected = if *selected == 0 { matches.len() - 1 } else { *selected - 1 },
+
+            PaletteMode::Values(values) =>
+                values.selected = if values.selected == 0 { values.matches.len() - 1 } else { values.selected - 1 },
+
+            _ => {},
         }
     }
 
@@ -342,6 +439,22 @@ fn active_arg(args: &'static [CommandArg], tail: &str) -> Option<usize>
     //THE LAST PARAMETER SWALLOWS THE REST OF THE LINE (E.G. A PRIVATE MESSAGE), SO THERE IS
     //NEVER A PARAMETER BEYOND IT TO ADVANCE TO - KEEP IT ACTIVE NO MATTER HOW MUCH MORE IS TYPED
     Some(index.min(args.len() - 1))
+}
+
+//THE HALF-TYPED VALUE THE CARET IS ON - EMPTY ONCE THE USER HAS MOVED ON TO THE NEXT PARAMETER
+fn partial(tail: &str) -> &str
+{
+    if tail.ends_with(char::is_whitespace) { "" } else { tail.split_whitespace().next_back().unwrap_or("") }
+}
+
+//THE ANSWERS THEMSELVES, READ WHERE THEY ARE ALREADY DEFINED RATHER THAN SPELLED OUT A SECOND TIME
+fn vocabulary(values: ArgValues) -> Vec<&'static str>
+{
+    match values
+    {
+        ArgValues::Colors => colors::COLORS.iter().map(|(name, _)| *name).collect(),
+        ArgValues::Free => Vec::new(),
+    }
 }
 
 //PUBLIC
