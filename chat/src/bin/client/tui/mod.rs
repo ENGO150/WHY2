@@ -94,7 +94,6 @@ use crate::
     {
         self,
         Command,
-        CommandInfo,
     },
 };
 
@@ -518,19 +517,18 @@ async fn handle_key
 
         KeyCode::Tab =>
         {
-            if let Some(info) = app.palette.selection()
+            if let Some(entry) = app.palette.selection()
             {
-                complete(app, info);
+                complete(app, entry);
             }
         },
 
         KeyCode::Enter =>
         {
             //A HIGHLIGHTED PALETTE ENTRY THE USER HASN'T FULLY TYPED COMPLETES FIRST
-            if let Some(info) = app.palette.selection()
-                && !info.triggers.iter().any(|t| t.eq_ignore_ascii_case(app.input.text().trim_start_matches(command::COMMAND_PREFIX)))
+            if let Some(entry) = app.palette.selection() && !entry.typed(&app.input.text())
             {
-                complete(app, info);
+                complete(app, entry);
                 return;
             }
 
@@ -544,13 +542,13 @@ async fn handle_key
     }
 }
 
-fn complete(app: &mut App, info: &'static CommandInfo)
+fn complete(app: &mut App, entry: palette::Entry)
 {
     app.input.clear();
-    app.input.insert_str(&format!("{}{}", command::COMMAND_PREFIX, info.triggers[0].to_lowercase()));
+    app.input.insert_str(&entry.name());
 
-    //LEAVE ROOM FOR ARGUMENTS RIGHT AWAY
-    if !info.args.is_empty() { app.input.insert(' '); }
+    //LEAVE ROOM FOR ARGUMENTS RIGHT AWAY - AN ACTION WORD COUNTS AS ONE, SO /server OPENS ITS OWN MENU
+    if !entry.args().is_empty() { app.input.insert(' '); }
 
     app.palette.update(&app.input.text(), app.role);
 }

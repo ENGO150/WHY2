@@ -20,9 +20,16 @@ use ratatui::text::Span;
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::{
-    command::{ self, CommandInfo },
+use crate::
+{
     options,
+    command::
+    {
+        self,
+        CommandArg,
+        CommandInfo,
+        SubcommandInfo,
+    },
 };
 
 use super::theme;
@@ -33,18 +40,120 @@ pub const MAX_ROWS: usize = 8; //VISIBLE POPUP ROWS
 //ENUMS
 pub enum PaletteMode
 {
-    Hidden,                                         //NOTHING TO SHOW
-    Menu(Vec<&'static CommandInfo>, usize),         //MATCHING COMMANDS + SELECTION
-    Signature(&'static CommandInfo, Option<usize>), //ONE COMMAND + THE PARAMETER BEING TYPED
+    Hidden,                         //NOTHING TO SHOW
+    Menu(Vec<Entry>, usize),        //MATCHING ENTRIES + SELECTION
+    Signature(Entry, Option<usize>) //ONE ENTRY + THE PARAMETER BEING TYPED
 }
 
 //STRUCTS
+//ONE POPUP LINE - A COMMAND, OR ONE ACTION OF A COMMAND THAT TAKES ONE (/server mute).
+//AN ACTION SPEAKS FOR ITSELF FROM HERE ON: ITS OWN ARGUMENTS, ITS OWN DESCRIPTION, ITS OWN ROLE
+#[derive(Clone, Copy)]
+pub struct Entry
+{
+    pub info: &'static CommandInfo,
+    pub sub: Option<&'static SubcommandInfo>,
+}
+
 pub struct Palette //SLASH-COMMAND AUTOCOMPLETE
 {
     pub mode: PaletteMode,
 }
 
 //IMPLEMENTATIONS
+impl Entry
+{
+    pub fn command(info: &'static CommandInfo) -> Self { Self { info, sub: None } }
+
+    pub fn action(info: &'static CommandInfo, sub: &'static SubcommandInfo) -> Self { Self { info, sub: Some(sub) } }
+
+    pub fn args(&self) -> &'static [CommandArg]
+    {
+        self.sub.map_or(self.info.args, |sub| sub.args)
+    }
+
+    pub fn description(&self) -> &'static str
+    {
+        self.sub.map_or(self.info.description, |sub| sub.description)
+    }
+
+    //ONLY WHOLE COMMANDS CARRY A SHORTCUT - A KEY THAT LANDED ON HALF OF ONE WOULD HAVE NOTHING TO RUN
+    pub fn shortcut(&self) -> String
+    {
+        match self.sub
+        {
+            Some(_) => String::new(),
+            None => self.info.shortcut.map(|s| format!("Ctrl+{}", s.to_ascii_uppercase())).unwrap_or_default(),
+        }
+    }
+
+    //WHAT THE USER TYPES TO GET HERE, WITHOUT THE PARAMETERS (/server mute)
+    pub fn name(&self) -> String
+    {
+        let mut name = format!("{}{}", command::COMMAND_PREFIX, self.info.triggers[0].to_lowercase());
+
+        if let Some(sub) = self.sub { name.push_str(&format!(" {}", sub.triggers[0].to_lowercase())); }
+
+        name
+    }
+
+    //FULL SIGNATURE AS PLAIN TEXT - USE THIS TO MEASURE THE COLUMN
+    pub fn signature(&self) -> String
+    {
+        let args = self.args().iter().map(format_arg).collect::<Vec<String>>().join(" ");
+        let separator = if args.is_empty() { "" } else { " " };
+
+        format!("{}{separator}{args}", self.name())
+    }
+
+    pub fn width(&self) -> usize { self.signature().width() }
+
+    //SAME SIGNATURE, STYLED: REQUIRED PARAMETERS STAND OUT, THE ACTIVE ONE MORE SO
+    pub fn spans(&self, active: Option<usize>) -> Vec<Span<'static>>
+    {
+        let mut spans = vec![Span::styled(self.name(), theme::TITLE)];
+
+        for (i, arg) in self.args().iter().enumerate()
+        {
+            let style = if active == Some(i)
+            {
+                theme::ARG_ACTIVE
+            } else if arg.required
+            {
+                theme::ARG_REQUIRED
+            } else
+            {
+                theme::ARG_OPTIONAL
+            };
+
+            spans.push(Span::raw(" "));
+            spans.push(Span::styled(format_arg(arg), style));
+        }
+
+        spans
+    }
+
+    //THE ENTRY IS ALREADY SPELLED OUT ON THE LINE, SO Enter SENDS IT INSTEAD OF COMPLETING IT
+    pub fn typed(&self, input: &str) -> bool
+    {
+        let Some(rest) = input.trim().strip_prefix(command::COMMAND_PREFIX) else { return false };
+
+        match self.sub
+        {
+            None => self.info.triggers.iter().any(|t| t.eq_ignore_ascii_case(rest)),
+
+            //BOTH WORDS HAVE TO BE THERE - THE COMMAND WORD ALONE IS NOT THIS ENTRY
+            Some(sub) => match rest.split_once(char::is_whitespace)
+            {
+                Some((word, action)) => self.info.triggers.iter().any(|t| t.eq_ignore_ascii_case(word)) &&
+                    sub.triggers.iter().any(|t| t.eq_ignore_ascii_case(action.trim())),
+
+                None => false,
+            },
+        }
+    }
+}
+
 impl Default for Palette
 {
     fn default() -> Self { Self::new() }
@@ -88,30 +197,12 @@ impl Palette
 
                 let matches = command::COMMAND_LIST.iter()
                     .filter(|info| info.available(role) && info.triggers.iter().any(|t| t.to_lowercase().starts_with(&candidate)))
-                    .collect::<Vec<&'static CommandInfo>>();
+                    .map(Entry::command).collect::<Vec<Entry>>();
 
-                if matches.is_empty()
-                {
-                    self.dismiss();
-                    return;
-                }
-
-                //A FULLY TYPED COMMAND WINS THE SELECTION, OTHERWISE KEEP IT WHERE IT WAS.
-                //WITHOUT THIS, "/screens" HIGHLIGHTS "/screen" AND Enter RUNS THE WRONG COMMAND.
-                let exact = matches.iter()
-                    .position(|info| info.triggers.iter().any(|t| t.eq_ignore_ascii_case(rest)));
-
-                let selected = match (exact, &self.mode)
-                {
-                    (Some(exact), _) => exact,
-                    (None, PaletteMode::Menu(_, selected)) => (*selected).min(matches.len() - 1),
-                    (None, _) => 0,
-                };
-
-                self.mode = PaletteMode::Menu(matches, selected);
+                self.menu(matches, rest);
             },
 
-            //COMMAND WORD IS FINISHED - HINT THE PARAMETER THE USER IS ON
+            //COMMAND WORD IS FINISHED - HAND THE REST OF THE LINE TO ITS ACTIONS, OR HINT THE PARAMETER THE USER IS ON
             Some(split) =>
             {
                 let (word, tail) = rest.split_at(split);
@@ -123,15 +214,88 @@ impl Palette
                     return;
                 };
 
+                //A COMMAND THAT TAKES AN ACTION HAS NOTHING OF ITS OWN TO HINT - THE ACTION OWNS EVERYTHING PAST IT
+                if !info.subcommands.is_empty()
+                {
+                    self.action(info, tail.trim_start(), role);
+                    return;
+                }
+
                 if info.args.is_empty()
                 {
                     self.dismiss();
                     return;
                 }
 
-                self.mode = PaletteMode::Signature(info, active_arg(info, tail));
+                self.mode = PaletteMode::Signature(Entry::command(info), active_arg(info.args, tail));
             },
         }
+    }
+
+    //THE ACTION WORD OF /command <action> ... - A MENU WHILE IT IS BEING TYPED, ITS PARAMETERS ONCE IT IS DONE
+    fn action(&mut self, info: &'static CommandInfo, tail: &str, role: usize)
+    {
+        match tail.find(char::is_whitespace)
+        {
+            //STILL TYPING THE ACTION - FILTER WHAT OUR ROLE MAY RUN
+            None =>
+            {
+                let candidate = tail.to_lowercase();
+
+                let matches = info.actions(role)
+                    .filter(|sub| sub.triggers.iter().any(|t| t.to_lowercase().starts_with(&candidate)))
+                    .map(|sub| Entry::action(info, sub)).collect::<Vec<Entry>>();
+
+                self.menu(matches, tail);
+            },
+
+            Some(split) =>
+            {
+                let (action, tail) = tail.split_at(split);
+
+                //AN ACTION OUT OF OUR REACH IS NOT HINTED EITHER - IT IS NOT SUPPOSED TO BE THERE AT ALL
+                let Some(sub) = info.action(action).filter(|sub| sub.available(role)) else
+                {
+                    self.dismiss();
+                    return;
+                };
+
+                if sub.args.is_empty()
+                {
+                    self.dismiss();
+                    return;
+                }
+
+                self.mode = PaletteMode::Signature(Entry::action(info, sub), active_arg(sub.args, tail));
+            },
+        }
+    }
+
+    //SHOW matches, KEEPING THE SELECTION WHERE IT WAS UNLESS typed SPELLS ONE OF THEM OUT IN FULL
+    fn menu(&mut self, matches: Vec<Entry>, typed: &str)
+    {
+        if matches.is_empty()
+        {
+            self.dismiss();
+            return;
+        }
+
+        //A FULLY TYPED WORD WINS THE SELECTION, OTHERWISE KEEP IT WHERE IT WAS.
+        //WITHOUT THIS, "/screens" HIGHLIGHTS "/screen" AND Enter RUNS THE WRONG COMMAND.
+        let exact = matches.iter().position(|entry| match entry.sub
+        {
+            Some(sub) => sub.triggers.iter().any(|t| t.eq_ignore_ascii_case(typed)),
+            None => entry.info.triggers.iter().any(|t| t.eq_ignore_ascii_case(typed)),
+        });
+
+        let selected = match (exact, &self.mode)
+        {
+            (Some(exact), _) => exact,
+            (None, PaletteMode::Menu(_, selected)) => (*selected).min(matches.len() - 1),
+            (None, _) => 0,
+        };
+
+        self.mode = PaletteMode::Menu(matches, selected);
     }
 
     pub fn dismiss(&mut self)
@@ -155,7 +319,7 @@ impl Palette
         }
     }
 
-    pub fn selection(&self) -> Option<&'static CommandInfo>
+    pub fn selection(&self) -> Option<Entry>
     {
         match &self.mode
         {
@@ -168,7 +332,7 @@ impl Palette
 //FUNCTIONS
 //PRIVATE
 //WHICH PARAMETER THE CARET IS SITTING ON
-fn active_arg(info: &CommandInfo, tail: &str) -> Option<usize>
+fn active_arg(args: &'static [CommandArg], tail: &str) -> Option<usize>
 {
     let given = tail.split_whitespace().count();
 
@@ -177,7 +341,7 @@ fn active_arg(info: &CommandInfo, tail: &str) -> Option<usize>
 
     //THE LAST PARAMETER SWALLOWS THE REST OF THE LINE (E.G. A PRIVATE MESSAGE), SO THERE IS
     //NEVER A PARAMETER BEYOND IT TO ADVANCE TO - KEEP IT ACTIVE NO MATTER HOW MUCH MORE IS TYPED
-    Some(index.min(info.args.len() - 1))
+    Some(index.min(args.len() - 1))
 }
 
 //PUBLIC
@@ -192,51 +356,3 @@ pub fn format_arg(arg: &command::CommandArg) -> String //<REQUIRED> / [OPTIONAL]
     }
 }
 
-pub fn format_args(info: &CommandInfo) -> String
-{
-    info.args.iter().map(format_arg).collect::<Vec<String>>().join(" ")
-}
-
-//FULL COMMAND SIGNATURE AS PLAIN TEXT - USE THIS TO MEASURE THE COLUMN
-pub fn signature(info: &CommandInfo) -> String
-{
-    let args = format_args(info);
-    let separator = if args.is_empty() { "" } else { " " };
-
-    format!("{}{}{separator}{args}", command::COMMAND_PREFIX, info.triggers[0].to_lowercase())
-}
-
-pub fn signature_width(info: &CommandInfo) -> usize
-{
-    signature(info).width()
-}
-
-//SAME SIGNATURE, STYLED: REQUIRED PARAMETERS STAND OUT, THE ACTIVE ONE MORE SO
-pub fn signature_spans(info: &CommandInfo, active: Option<usize>) -> Vec<Span<'static>>
-{
-    let mut spans = vec![Span::styled(format!("{}{}", command::COMMAND_PREFIX, info.triggers[0].to_lowercase()), theme::TITLE)];
-
-    for (i, arg) in info.args.iter().enumerate()
-    {
-        let style = if active == Some(i)
-        {
-            theme::ARG_ACTIVE
-        } else if arg.required
-        {
-            theme::ARG_REQUIRED
-        } else
-        {
-            theme::ARG_OPTIONAL
-        };
-
-        spans.push(Span::raw(" "));
-        spans.push(Span::styled(format_arg(arg), style));
-    }
-
-    spans
-}
-
-pub fn format_shortcut(info: &CommandInfo) -> String
-{
-    info.shortcut.map(|s| format!("Ctrl+{}", s.to_ascii_uppercase())).unwrap_or_default()
-}

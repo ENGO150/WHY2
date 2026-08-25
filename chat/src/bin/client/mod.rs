@@ -24,6 +24,7 @@ pub mod tui;
 
 use std::
 {
+    iter,
     process,
     fs::File,
     path::Path,
@@ -67,8 +68,13 @@ use why2_chat::
     config,
     consts,
     misc,
-    command::{ self, Command },
     options::{ self, LoginState },
+    command::
+    {
+        self,
+        Command,
+        Subcommand,
+    },
     network::
     {
         self,
@@ -95,6 +101,50 @@ use why2_chat::network::screen::client::
 fn invalid_usage(app: &mut App, subject: Option<&str>) //PUSH 'INVALID' MESSAGE
 {
     app.push_styled(format!("Invalid {}! Press Ctrl+H for help.", subject.unwrap_or("usage")), theme::ERROR);
+}
+
+//MODERATION ACTIONS - /server <action> [id]
+fn server_command(app: &mut App, parameters: Option<String>)
+{
+    let Some(info) = command::COMMAND_LIST.iter().find(|info| info.command == Command::Server) else { return };
+
+    //HIDING THE COMMAND DOES NOT STOP ANYBODY TYPING IT OUT, AND REFUSING IT WOULD CONFIRM IT EXISTS -
+    //TO A ROLE THAT MAY NOT RUN IT, IT IS SIMPLY NOT A COMMAND
+    if !info.available(app.role) { return invalid_usage(app, Some("command")); }
+
+    let Some(parameters) = parameters else { return invalid_usage(app, None) };
+
+    //THE ACTION IS THE FIRST WORD, WHATEVER IT TAKES FOLLOWS IT
+    let (action, tail) = match parameters.split_once(char::is_whitespace)
+    {
+        Some((action, tail)) => (action, tail.trim()),
+        None => (parameters.as_str(), ""),
+    };
+
+    let Some(sub) = info.action(action) else { return invalid_usage(app, Some("action")) };
+
+    //AN ACTION ABOVE OUR ROLE IS UNKNOWN FOR THE SAME REASON THE COMMAND IS
+    if !sub.available(app.role) { return invalid_usage(app, Some("action")); }
+
+    //EVERY ACTION THAT TAKES A PARAMETER TAKES ONE TARGET ID
+    let _id = match sub.args.is_empty()
+    {
+        true => None,
+
+        false => match tail.parse::<usize>()
+        {
+            Ok(id) => Some(id),
+            Err(_) => return invalid_usage(app, None),
+        },
+    };
+
+    //TODO: NOTHING OF THIS EXISTS SERVER-SIDE YET - THE PACKETS GO HERE, ONE PER ACTION
+    match sub.subcommand
+    {
+        Subcommand::Mute => app.push_styled("Muting users is not implemented yet.", theme::NOTICE),
+        Subcommand::Kick => app.push_styled("Kicking users is not implemented yet.", theme::NOTICE),
+        Subcommand::Settings => app.push_styled("Server settings are not implemented yet.", theme::NOTICE),
+    }
 }
 
 #[cfg(feature = "client_voice")]
@@ -301,38 +351,47 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         //HELP
                         Command::Help =>
                         {
-                            //WHAT OUR ROLE MAY RUN - THE WIDTHS AND THE TRUNK ARE MEASURED OVER THIS, NOT OVER THE WHOLE LIST
+                            //WHAT OUR ROLE MAY RUN - THE WIDTHS AND THE TRUNK ARE MEASURED OVER THIS, NOT OVER THE WHOLE LIST.
+                            //A COMMAND THAT TAKES AN ACTION IS LISTED AS ITS ACTIONS: /server ALONE RUNS NOTHING,
+                            //AND ITS ACTIONS ARE NOT ALL OF THE SAME RANK
                             let commands = command::COMMAND_LIST.iter()
-                                .filter(|info| info.available(app.role)).collect::<Vec<_>>();
+                                .filter(|info| info.available(app.role))
+                                .flat_map(|info| -> Box<dyn Iterator<Item = palette::Entry>>
+                                {
+                                    match info.subcommands.is_empty()
+                                    {
+                                        true => Box::new(iter::once(palette::Entry::command(info))),
+                                        false => Box::new(info.actions(app.role).map(|sub| palette::Entry::action(info, sub))),
+                                    }
+                                }).collect::<Vec<palette::Entry>>();
 
                             //COLUMN WIDTHS ARE MEASURED, NOT GUESSED - LONG SIGNATURES MUST NOT PUSH THE REST OUT OF LINE
-                            let signature_width = commands.iter().copied()
-                                .map(palette::signature_width).max().unwrap_or(0);
+                            let signature_width = commands.iter().map(palette::Entry::width).max().unwrap_or(0);
 
                             //ONLY SHORTCUT-CARRYING ROWS NEED A PADDED DESCRIPTION, AND PADDING TO THE
                             //LONGEST DESCRIPTION OF ALL WOULD PUSH THEM OFF THE PANE
                             let description_width = commands.iter()
-                                .filter(|info| info.shortcut.is_some())
-                                .map(|info| info.description.width()).max().unwrap_or(0);
+                                .filter(|entry| !entry.shortcut().is_empty())
+                                .map(|entry| entry.description().width()).max().unwrap_or(0);
 
                             let last = commands.len().saturating_sub(1);
 
                             app.push_styled("Commands:", theme::TITLE);
 
-                            for (index, info) in commands.into_iter().enumerate() //ITERATE OVER ALL COMMANDS WE MAY RUN
+                            for (index, entry) in commands.into_iter().enumerate() //ITERATE OVER ALL COMMANDS WE MAY RUN
                             {
-                                let shortcut = palette::format_shortcut(info);
-                                let padding = signature_width - palette::signature_width(info);
+                                let shortcut = entry.shortcut();
+                                let padding = signature_width - entry.width();
 
                                 let mut spans = vec![Span::styled(tui::branch(index == last), theme::BORDER)];
 
-                                spans.extend(palette::signature_spans(info, None));
+                                spans.extend(entry.spans(None));
                                 spans.push(Span::raw(" ".repeat(padding + 2)));
 
                                 spans.push(Span::styled(format!
                                 (
                                     "{description:<width$}",
-                                    description = info.description,
+                                    description = entry.description(),
                                     width = if shortcut.is_empty() { 0 } else { description_width },
                                 ), theme::DIM));
 
@@ -350,18 +409,34 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             if let Some(parameters) = parameters
                             {
                                 //CHECK IF COMMAND/ALIAS EXISTS
-                                if let Some(info) = command::COMMAND_LIST.iter()
-                                    .find(|c| c.available(app.role) && c.triggers.iter().any(|t| t.eq_ignore_ascii_case(&parameters)))
+                                //AN ACTION IS ASKED ABOUT THE WAY IT IS RUN: /info server mute
+                                let (word, action) = match parameters.split_once(char::is_whitespace)
                                 {
-                                    let shortcut = palette::format_shortcut(info);
+                                    Some((word, action)) => (word, Some(action.trim())),
+                                    None => (parameters.as_str(), None),
+                                };
 
-                                    app.push(Line::from(palette::signature_spans(info, None)));
+                                if let Some(info) = command::COMMAND_LIST.iter()
+                                    .find(|c| c.available(app.role) && c.triggers.iter().any(|t| t.eq_ignore_ascii_case(word)))
+                                    //AN ACTION THAT WAS NAMED HAS TO EXIST AND BE OURS TO RUN, OTHERWISE THIS IS NOT A COMMAND WE KNOW
+                                    && let Some(entry) = match action
+                                    {
+                                        Some(action) => info.action(action).filter(|sub| sub.available(app.role))
+                                            .map(|sub| palette::Entry::action(info, sub)),
+
+                                        None => Some(palette::Entry::command(info)),
+                                    }
+                                {
+                                    let shortcut = entry.shortcut();
+                                    let triggers = entry.sub.map_or(info.triggers, |sub| sub.triggers);
+
+                                    app.push(Line::from(entry.spans(None)));
 
                                     let fields =
                                     [
-                                        ("Aliases", if info.triggers.len() > 1 { info.triggers[1..].join(", ") } else { String::from("None") }),
+                                        ("Aliases", if triggers.len() > 1 { triggers[1..].join(", ") } else { String::from("None") }),
                                         ("Shortcut", if shortcut.is_empty() { String::from("None") } else { shortcut }),
-                                        ("Description", info.description.to_string()),
+                                        ("Description", entry.description().to_string()),
                                     ];
 
                                     let last = fields.len() - 1;
@@ -443,6 +518,8 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
                         //THE DEVICE LIST IS ENUMERATED HERE, ONCE, SO THE DRAW PATH NEVER TALKS TO cpal
                         Command::Settings => app.settings.open(audio_devices().await),
+
+                        Command::Server => server_command(app, parameters),
 
                         Command::UsernameColor => color_handler(app, "username_color", parameters),
                         Command::MessageColor => color_handler(app, "message_color", parameters),

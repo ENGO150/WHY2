@@ -59,9 +59,19 @@ pub enum Command
     #[cfg(feature = "client_screen")] Deattach, //DEATTACH SCREEN SHARE
     PrivateMessage,                             //ONE TO ONE MESSAGE
     Settings,                                   //OPEN THE SETTINGS OVERLAY
+    Server,                                     //MODERATION ACTIONS (TAKES A SUBCOMMAND)
     UsernameColor,                              //SET COLOR OF USERNAME
     MessageColor,                               //SET COLOR OF MESSAGE
     Invalid,                                    //INVALID COMMAND
+}
+
+//ONE ACTION OF A COMMAND THAT TAKES ONE - THE COMMAND WORD ALONE DOES NOTHING (/server mute <id>)
+#[derive(Clone, PartialEq)]
+pub enum Subcommand
+{
+    Mute,     //MUTE A USER SERVER-SIDE
+    Kick,     //DISCONNECT A USER
+    Settings, //SERVER CONFIGURATION
 }
 
 //STRUCTS
@@ -72,15 +82,71 @@ pub struct CommandArg //COMMAND PARAMETER
     pub required: bool,
 }
 
+pub struct SubcommandInfo //SUBCOMMAND INFO - CARRIES ITS OWN ROLE, SO ONE COMMAND CAN HOLD ACTIONS OF DIFFERENT RANKS
+{
+    pub subcommand: Subcommand,
+    pub triggers: &'static [&'static str],
+    pub minimal_role: usize,
+    pub args: &'static [CommandArg],
+    pub description: &'static str,
+}
+
 pub struct CommandInfo //COMMAND INFO
 {
     pub command: Command,
     pub triggers: &'static [&'static str],
     pub shortcut: Option<char>,
     pub minimal_role: usize,
+    pub subcommands: &'static [SubcommandInfo], //EMPTY UNLESS THE COMMAND IS A DOORWAY TO ACTIONS
     pub args: &'static [CommandArg],
     pub description: &'static str,
 }
+
+pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
+&[
+    SubcommandInfo
+    {
+        subcommand: Subcommand::Mute,
+        triggers: &[ "MUTE", "SILENCE", "STFU" ],
+        minimal_role: 1,
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "Target user",
+                required: true,
+            },
+        ],
+        description: "Mutes a user server-side",
+    },
+
+    SubcommandInfo
+    {
+        subcommand: Subcommand::Kick,
+        triggers: &[ "KICK", "BOOT", "REMOVE" ],
+        minimal_role: 1,
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "Target user",
+                required: true,
+            },
+        ],
+        description: "Disconnects a user from the server",
+    },
+
+    SubcommandInfo
+    {
+        subcommand: Subcommand::Settings,
+        triggers: &[ "SETTINGS", "CONFIG", "SETUP" ],
+        minimal_role: 2,
+        args: &[],
+        description: "Opens the server configuration",
+    },
+];
 
 pub const COMMAND_LIST: &[CommandInfo] =
 &[
@@ -90,6 +156,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "HELP", "H", "COMMANDS", "USAGE", "GUIDE" ],
         shortcut: Some('h'),
         minimal_role: 0,
+        subcommands: &[],
         args: &[],
         description: "Prints all available commands",
     },
@@ -100,6 +167,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "INFO", "COMMAND", "MAN" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args:
         &[
             CommandArg
@@ -119,6 +187,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "VOICE", "VOIP", "CALL" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args: &[],
         description: "Toggles voice chat",
     },
@@ -130,6 +199,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "MUTE", "UNMUTE", "SILENCE", "STFU" ],
         shortcut: Some('s'),
         minimal_role: 0,
+        subcommands: &[],
         args:
         &[
             CommandArg
@@ -148,6 +218,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "CHANNEL", "SWITCH", "CHECKOUT", "AREA" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args:
         &[
             CommandArg
@@ -166,6 +237,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "UPLOAD", "FILEUP", "PUSH", "UP" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args:
         &[
             CommandArg
@@ -184,6 +256,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "DOWNLOAD", "FILEDOWN", "PULL", "DOWN", "FETCH" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args:
         &[
             CommandArg
@@ -209,6 +282,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "SCREEN", "SCREENSHARE", "PRESENTATION", "SHARE" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args: &[],
         description: "Toggles screensharing",
     },
@@ -220,6 +294,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "ATTACH", "WATCH", "DISPLAY", "JOIN" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args:
         &[
             CommandArg
@@ -239,6 +314,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "DEATTACH", "STOP", "CLOSE" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args: &[],
         description: "Dettaches client screenshare.",
     },
@@ -249,6 +325,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "LIST", "USERS", "CLIENTS", "CHANNELS", "IDS", "ID" ],
         shortcut: Some('l'),
         minimal_role: 0,
+        subcommands: &[],
         args: &[],
         description: "Shows connected users and their IDs",
     },
@@ -259,6 +336,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "FILES", "LISTFILES", "UPLOADS", "DOWNLOADS" ],
         shortcut: Some('u'),
         minimal_role: 0,
+        subcommands: &[],
         args: &[],
         description: "Shows available files and their IDs",
     },
@@ -270,6 +348,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "SCREENS", "LISTSCREENS", "SCREENSHARES", "SHARES" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args: &[],
         description: "Shows all screensharing clients.",
     },
@@ -280,6 +359,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "PM", "DM", "MSG", "TELL" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args:
         &[
             CommandArg
@@ -304,6 +384,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "SETTINGS", "SETUP", "CONFIG", "PREFERENCES", "AUDIO" ],
         shortcut: Some(','),
         minimal_role: 0,
+        subcommands: &[],
         args: &[],
         description: "Opens audio and interface settings",
     },
@@ -314,6 +395,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "UCOLOR", "USERNAME" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args:
         &[
             CommandArg
@@ -332,6 +414,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         triggers: &[ "COLOR", "MESSAGE" ],
         shortcut: None,
         minimal_role: 0,
+        subcommands: &[],
         args:
         &[
             CommandArg
@@ -346,10 +429,30 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Server,
+        triggers: &[ "SERVER", "ADMIN", "MOD" ],
+        shortcut: None,
+        minimal_role: 1,
+        subcommands: SERVER_SUBCOMMANDS,
+        args:
+        &[
+            CommandArg
+            {
+                name: "ACTION",
+                description: "Moderation action",
+                required: true,
+            },
+        ],
+        description: "Moderation actions",
+    },
+
+    CommandInfo
+    {
         command: Command::Exit,
         triggers: &[ "EXIT", "LEAVE", "QUIT", "DISCONNECT" ],
         shortcut: Some('c'),
         minimal_role: 0,
+        subcommands: &[],
         args: &[],
         description: "Disconnects from the server",
     },
@@ -362,6 +465,25 @@ pub const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 impl CommandInfo
 {
     //THE COMMAND IS OFFERED TO role - HIDING IT IS COSMETIC, THE SERVER STILL CHECKS EVERY PRIVILEGED PACKET ITSELF
+    pub fn available(&self, role: usize) -> bool
+    {
+        //A COMMAND THAT IS NOTHING BUT A DOORWAY TO ITS ACTIONS IS WORTH SHOWING ONLY WHILE ONE OF THEM IS LEFT
+        role >= self.minimal_role && (self.subcommands.is_empty() || self.actions(role).next().is_some())
+    }
+
+    pub fn actions(&self, role: usize) -> impl Iterator<Item = &'static SubcommandInfo> //ACTIONS role MAY RUN
+    {
+        self.subcommands.iter().filter(move |sub| sub.available(role))
+    }
+
+    pub fn action(&self, word: &str) -> Option<&'static SubcommandInfo> //ACTION BY TRIGGER (ROLE IS NOT CHECKED HERE)
+    {
+        self.subcommands.iter().find(|sub| sub.triggers.iter().any(|t| t.eq_ignore_ascii_case(word)))
+    }
+}
+
+impl SubcommandInfo
+{
     pub fn available(&self, role: usize) -> bool { role >= self.minimal_role }
 }
 

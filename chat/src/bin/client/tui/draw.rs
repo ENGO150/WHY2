@@ -42,7 +42,6 @@ use unicode_width::UnicodeWidthStr;
 use crate::
 {
     config,
-    command::CommandInfo,
     options,
 };
 
@@ -53,7 +52,12 @@ use super::
 {
     theme,
     state::{ self, App },
-    palette::{ self, PaletteMode },
+    palette::
+    {
+        self,
+        PaletteMode,
+        Entry,
+    },
     tofu::
     {
         self,
@@ -428,13 +432,13 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
             let entries = matches.iter().copied()
                 .skip(first)
                 .take(palette::MAX_ROWS)
-                .map(|info| (info, None))
-                .collect::<Vec<(&'static CommandInfo, Option<usize>)>>();
+                .map(|entry| (entry, None))
+                .collect::<Vec<(Entry, Option<usize>)>>();
 
             (entries, Some(selected - first), " Commands ")
         },
 
-        PaletteMode::Signature(info, active) => (vec![(*info, *active)], None, " Parameters "),
+        PaletteMode::Signature(entry, active) => (vec![(*entry, *active)], None, " Parameters "),
     };
 
     let height = entries.len() as u16 + 2;
@@ -463,25 +467,25 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
     frame.render_widget(block, popup);
 
     //COLUMNS ARE MEASURED ACROSS THE VISIBLE ROWS SO DESCRIPTIONS AND SHORTCUTS LINE UP
-    let signature_width = entries.iter().map(|(info, _)| palette::signature_width(info)).max().unwrap_or(0);
-    let shortcut_width = entries.iter().map(|(info, _)| palette::format_shortcut(info).width()).max().unwrap_or(0);
+    let signature_width = entries.iter().map(|(entry, _)| entry.width()).max().unwrap_or(0);
+    let shortcut_width = entries.iter().map(|(entry, _)| entry.shortcut().width()).max().unwrap_or(0);
 
-    let lines = entries.iter().enumerate().map(|(row, (info, active))|
+    let lines = entries.iter().enumerate().map(|(row, (entry, active))|
     {
         let mut spans = vec![Span::styled(if Some(row) == selected { "▌" } else { " " }, theme::ACCENT)];
 
         //THE ACTIVE PARAMETER'S OWN DESCRIPTION TAKES OVER THE COLUMN WHILE IT'S BEING TYPED
-        let description = active.and_then(|i| info.args.get(i)).map_or(info.description, |arg| arg.description);
+        let description = active.and_then(|i| entry.args().get(i)).map_or(entry.description(), |arg| arg.description);
 
-        spans.extend(palette::signature_spans(info, *active));
-        spans.push(Span::raw(" ".repeat(signature_width - palette::signature_width(info) + 2)));
+        spans.extend(entry.spans(*active));
+        spans.push(Span::raw(" ".repeat(signature_width - entry.width() + 2)));
         spans.push(Span::styled(description.to_string(), theme::DIM));
 
         //SHORTCUTS HUG THE RIGHT EDGE, IN THEIR OWN COLUMN
         if shortcut_width > 0
         {
             let used = 1 + signature_width + 2 + description.width();
-            let shortcut = palette::format_shortcut(info);
+            let shortcut = entry.shortcut();
 
             spans.push(Span::raw(" ".repeat((inner.width as usize).saturating_sub(used + shortcut_width + 1))));
             spans.push(Span::styled(format!("{shortcut:>shortcut_width$} "), theme::ACCENT));
