@@ -25,11 +25,13 @@ use std::
     {
         Arc,
         atomic::{ AtomicBool, Ordering },
-        mpsc::{ self, Receiver },
+        mpsc::Receiver,
     },
 };
 
 #[cfg(not(target_os = "macos"))]
+use std::sync::mpsc;
+
 use std::sync::mpsc::RecvTimeoutError;
 
 use tokio::sync::mpsc::Sender;
