@@ -178,7 +178,7 @@ fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
 }
 
 #[cfg(feature = "server")]
-fn set_user_field(users: &mut Table, username: &str, key: &str, value: &str) //SET ONE FIELD OF username, KEEPING THE REST OF THE ENTRY
+fn set_user_field(users: &mut Table, username: &str, key: &str, value: Value) //SET ONE FIELD OF username, KEEPING THE REST OF THE ENTRY
 {
     //A MISSING OR LEGACY FLAT ENTRY BECOMES AN EMPTY SUBTABLE FIRST
     if users.get(username).and_then(Item::as_table_like).is_none()
@@ -187,11 +187,11 @@ fn set_user_field(users: &mut Table, username: &str, key: &str, value: &str) //S
     }
 
     users.get_mut(username).and_then(Item::as_table_like_mut)
-        .expect("User entry is not a table").insert(key, Item::Value(value.into()));
+        .expect("User entry is not a table").insert(key, Item::Value(value));
 }
 
 #[cfg(feature = "server")]
-fn write_user_field(username: &str, key: &str, value: &str) //WRITE ONE FIELD OF username TO server_users.toml
+fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD OF username TO server_users.toml
 {
     with_cached_mut(&config_path(consts::SERVER_USERS_CONFIG), |doc| set_user_field(doc.as_table_mut(), username, key, value));
 }
@@ -287,7 +287,7 @@ pub fn server_users_password(username: &str) -> Option<String> //RETURN PASSWORD
 #[cfg(feature = "server")]
 pub fn server_users_add(username: &str, hash: &str) //CREATE NEW USER
 {
-    write_user_field(username, "password", hash);
+    write_user_field(username, "password", hash.into());
 }
 
 #[cfg(feature = "client_base")]
@@ -330,7 +330,7 @@ pub fn server_users_migrate() //CONVERT FLAT username = "<hash>" ENTRIES INTO SU
     {
         for (username, hash) in &legacy
         {
-            set_user_field(doc.as_table_mut(), username, "password", hash);
+            set_user_field(doc.as_table_mut(), username, "password", hash.into());
         }
     });
 }
