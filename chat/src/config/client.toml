@@ -43,6 +43,7 @@ message_color = "none" # Color of message (change via command)
 
 # Interface
 mouse_capture = true # Capture the mouse for wheel scrolling (disables the terminal's own drag-select)
+disable_logo = false # Hide the logo drawn behind the chat
 
 # Other
 show_id = false # Show client IDs in chat

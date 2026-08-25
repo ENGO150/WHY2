@@ -143,7 +143,7 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 
     //THE LOGO GOES BEHIND ALL OF IT, IN THE MIDDLE OF THE SCREEN - THE OVERLAYS BELOW Clear THEIR OWN RECT, SO IT
     //NEVER REACHES THEM
-    draw_logo(frame, area);
+    if !app.theme.disable_logo { draw_logo(frame, area); }
 
     //THE PALETTE FLOATS OVER THE BOTTOM OF THE MESSAGE PANE
     if app.palette.is_visible() { draw_palette(frame, app, messages_area); }

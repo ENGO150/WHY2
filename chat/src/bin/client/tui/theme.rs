@@ -36,6 +36,7 @@ use super::state::Entry;
 pub struct Theme //CACHED CONFIG-DRIVEN STYLING
 {
     pub disable_colors: bool,
+    pub disable_logo: bool,
     pub show_id: bool,
 }
 
@@ -47,6 +48,7 @@ impl Theme
         Self
         {
             disable_colors: config::read_config::<bool>("disable_colors"),
+            disable_logo: config::read_config::<bool>("disable_logo"),
             show_id: config::read_config::<bool>("show_id"),
         }
     }

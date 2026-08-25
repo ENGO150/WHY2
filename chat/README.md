@@ -126,7 +126,7 @@ cargo build --bin why2-server --no-default-features --features server --release
    - Important Settings:
      - `auto_connect_addr`: Default server address
      - `default_port`: Default server port
-     - Display options (`show_id`, `disable_colors`)
+     - Display options (`show_id`, `disable_colors`, `disable_logo`)
      - Voice chat audio (`input_device`, `output_device`, `input_volume`, `output_volume`,
        `noise_suppression`, `automatic_gain`) - all editable in-app with `/settings`, and applied
        immediately, including to a voice call that is already running. The two device keys hold a

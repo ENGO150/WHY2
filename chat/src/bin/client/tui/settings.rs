@@ -185,6 +185,13 @@ impl Settings
 
         rows.push(Row::Item(Item
         {
+            label: "Background logo",
+            key: "disable_logo",
+            value: toggle_value("disable_logo", true),
+        }));
+
+        rows.push(Row::Item(Item
+        {
             label: "Show client IDs",
             key: "show_id",
             value: toggle_value("show_id", false),
@@ -482,7 +489,7 @@ fn toggle(app: &mut App)
 
     config::client_write_bool(key, if invert { !next } else { next });
 
-    //disable_colors AND show_id ARE READ THROUGH App::theme, AND APPLY TO THE WHOLE PANE AT ONCE
+    //THE INTERFACE ROWS ARE READ THROUGH App::theme, AND APPLY TO THE WHOLE PANE AT ONCE
     app.reload_theme();
 
     #[cfg(feature = "client_voice")]
