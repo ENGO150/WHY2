@@ -35,3 +35,11 @@ pub const MULTIPLEX_CHANNEL_BOUND: usize  = 2;                                  
 pub const CAPTURE_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 4;                     //CAPTURE BUFFER (~160ms)
 pub const PLAYBACK_CHANNEL_BOUND: usize   = MULTIPLEX_CHANNEL_BOUND + 1;                     //PLAYBACK BUFFER (~60ms)
 pub const NETWORK_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 8;                     //NETWORK RECEIVE BUFFER (~320ms)
+
+pub const FORCED_INTRA_INTERVAL: Duration  = Duration::from_secs(2);      //MAX GAP BETWEEN ENCODED FRAMES (KEEPS A LATE VIEWER SYNCED)
+pub const RECORDER_POLL_INTERVAL: Duration = Duration::from_millis(100);  //HOW OFTEN THE RECORDER LOOP RECHECKS `running` WHILE IDLE
+pub const BACKEND_OVERRIDE_VAR: &str       = "WHY2_CAPTURE_BACKEND";      //PINS A CAPTURE BACKEND ("recorder" / "legacy")
+pub const PROBE_TIMEOUT_VAR: &str          = "WHY2_CAPTURE_PROBE_TIMEOUT"; //OVERRIDES THE PROBE TIMEOUT, IN SECONDS
+pub const RECORDER_PROBE_TIMEOUT: Duration = Duration::from_secs(30);     //HOW LONG THE RECORDER PROBE MAY BLOCK BEFORE WE FALL BACK
+pub const CONVERTER_OVERRIDE_VAR: &str     = "WHY2_CAPTURE_CONVERTER"; //PINS THE RGBA -> I420 PATH ("gpu" / "cpu")
+pub const RECORDER_FIRST_FRAME: Duration  = Duration::from_secs(5);   //A RECORDER THAT DELIVERS NOTHING IN THIS LONG IS TREATED AS BROKEN

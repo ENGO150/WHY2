@@ -18,18 +18,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    env,
     thread,
     time::{ Duration, Instant },
     sync::
     {
         Arc,
         atomic::{ AtomicBool, Ordering },
+        mpsc::{ self, Receiver, RecvTimeoutError },
     },
 };
 
 use tokio::sync::mpsc::Sender;
 
-use xcap::Monitor;
+use xcap::{ Frame, Monitor, VideoRecorder };
 
 use openh264::
 {
@@ -68,7 +70,17 @@ pub fn get_primary_monitor() -> Result<Monitor, String>
         .ok_or_else(|| "no monitors found".to_owned())
 }
 
-pub fn capture_loop //CAPTURE LOOP
+//SET BY THE BACKGROUND PROBE THE MOMENT THE OS-NATIVE RECORDER HAS PROVEN ITSELF, AND OBSERVED BY
+//THE POLLING LOOPS SO THEY STAND DOWN. IT IS DELIBERATELY *NOT* `running`: standing the legacy path
+//down is not ending the share, and clearing `running` would end it.
+static UPGRADING: AtomicBool = AtomicBool::new(false);
+
+fn upgrading() -> bool
+{
+    UPGRADING.load(Ordering::Relaxed)
+}
+
+fn legacy_capture_loop //THE PRE-RECORDER POLLING PATH, KEPT AS THE LAST FALLBACK
 (
     frame_tx: Sender<Vec<u8>>,
     running: Arc<AtomicBool>,
@@ -82,6 +94,62 @@ pub fn capture_loop //CAPTURE LOOP
     }
 
     capture_loop_xcap(get_primary_monitor()?, frame_tx, running, fps)
+}
+
+pub fn capture_loop //CAPTURE LOOP
+(
+    frame_tx: Sender<Vec<u8>>,
+    running: Arc<AtomicBool>,
+    fps: u32,
+) -> Result<(), String>
+{
+    //AN EXPLICIT OVERRIDE SKIPS THE PROBE ENTIRELY - THIS IS WHAT PINS A BACKEND ON HARDWARE
+    //WHERE THE PREFERRED ONE MISBEHAVES
+    match env::var(consts::BACKEND_OVERRIDE_VAR).unwrap_or_default().to_lowercase().as_str()
+    {
+        "recorder" => return capture_loop_recorder(frame_tx, running, fps),
+        "legacy" | "xcap" | "wayshot" => return legacy_capture_loop(frame_tx, running, fps),
+        _ => {},
+    }
+
+    UPGRADING.store(false, Ordering::Relaxed);
+
+    let (probe_tx, probe_rx) = mpsc::channel();
+
+    thread::spawn(move ||
+    {
+        let session = open_recorder();
+
+        //THE FLAG GOES UP BEFORE THE SEND: IT IS WHAT MAKES THE POLLING LOOP STAND DOWN, AND ONLY
+        //ONCE IT HAS STOOD DOWN IS ANYBODY WAITING ON THE CHANNEL
+        if session.is_ok() { UPGRADING.store(true, Ordering::Relaxed); }
+
+        probe_tx.send(session).ok();
+    });
+
+    let outcome = legacy_capture_loop(frame_tx.clone(), running.clone(), fps);
+
+    //ENDED ON ITS OWN TERMS - STOPPED, OR THE SCREEN OPTION WENT OFF
+    if !upgrading() && (outcome.is_ok() || !running.load(Ordering::Relaxed)) { return outcome; }
+
+    let probed = if upgrading()
+    {
+        probe_rx.recv().ok()
+    }
+    else
+    {
+        //THE POLLING PATH COULD NOT RUN AT ALL
+        probe_rx.recv_timeout(probe_timeout()).ok()
+    };
+
+    UPGRADING.store(false, Ordering::Relaxed);
+
+    match probed
+    {
+        //A PROVEN RECORDER IS WORTH TAKING EVEN IF THE POLLING PATH ERRORED ON ITS WAY OUT
+        Some(Ok(session)) if running.load(Ordering::Relaxed) => run_recorder(session, frame_tx, running, fps),
+        _ => outcome,
+    }
 }
 
 fn create_encoder(fps: f32) -> Result<Encoder, String>
@@ -188,6 +256,8 @@ impl FrameEncoder
 
     fn dispatch(&mut self, frame_tx: &Sender<Vec<u8>>, frame: Vec<u8>) //HAND A FRAME TO THE NETWORK TASK
     {
+        //A FULL CHANNEL MEANS THE NETWORK FELL BEHIND AND THIS FRAME IS GONE, SO THE NEXT ONE
+        //CANNOT BE A PREDICTED ONE
         if frame_tx.try_send(frame).is_err()
         {
             self.force_intra_frame();
@@ -226,7 +296,7 @@ fn capture_loop_xcap
     let mut last_image: Option<xcap::image::RgbaImage> = None;
     let mut last_encode_time = Instant::now();
 
-    while running.load(Ordering::Relaxed)
+    while running.load(Ordering::Relaxed) && !upgrading()
     {
         //EXIT ON DISABLED SCREEN
         if !options::get_use_screen()
@@ -237,7 +307,7 @@ fn capture_loop_xcap
 
         if let Ok(image) = monitor.capture_image()
         {
-            let force_encode = last_encode_time.elapsed() >= Duration::from_secs(2);
+            let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
 
             //memcmp EARLY-EXITS ON THE FIRST DIFFERING BYTE, SO THIS IS CHEAP WHEN THE SCREEN MOVED
             let changed = last_image.as_ref().is_none_or(|previous| previous.as_raw() != image.as_raw());
@@ -312,12 +382,13 @@ fn capture_loop_wayshot
 
     //PREVIOUS FRAME, KEPT BY MOVE (SEE capture_loop_xcap) - THIS PATH USED TO ENCODE EVERY TICK UNCONDITIONALLY
     let mut last_image = Some(first_image);
+
     let mut last_encode_time = Instant::now();
 
     let mut failures = 0u32;
     let mut next_tick = Instant::now() + target_interval;
 
-    while running.load(Ordering::Relaxed)
+    while running.load(Ordering::Relaxed) && !upgrading()
     {
         //EXIT ON DISABLED SCREEN
         if !options::get_use_screen()
@@ -333,7 +404,9 @@ fn capture_loop_wayshot
                 failures = 0;
 
                 let image = image.into_rgba8();
-                let force_encode = last_encode_time.elapsed() >= Duration::from_secs(2);
+
+                let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
+
                 let changed = last_image.as_ref().is_none_or(|previous| previous.as_raw() != image.as_raw());
 
                 if force_encode || changed
@@ -378,4 +451,160 @@ fn capture_loop_wayshot
     }
 
     Ok(())
+}
+
+//STRUCTS
+struct RecorderSession //A STARTED OS-NATIVE RECORDER, ITS FRAME CHANNEL, AND ITS PROVEN FIRST FRAME
+{
+    recorder: VideoRecorder,
+    frames: Receiver<Frame>,
+    first: Frame,
+}
+
+fn open_recorder() -> Result<RecorderSession, String> //THE BLOCKING HALF OF THE PROBE
+{
+    let monitor = get_primary_monitor()?;
+
+    let (recorder, frames) = monitor.video_recorder()
+        .map_err(|e| format!("the OS screen recorder is unavailable ({e})"))?;
+
+    recorder.start()
+        .map_err(|e| format!("starting the OS screen recorder failed ({e})"))?;
+
+    //A RECORDER THAT STARTS IS NOT A RECORDER THAT WORKS. xcap's X11 RECORDER, FOR ONE, REPORTS
+    //SUCCESS AND THEN NEVER DELIVERS A SINGLE FRAME - ACCEPTING IT ON THE STRENGTH OF `start()`
+    //WOULD HAND THE VIEWER A PERMANENTLY BLANK SHARE THAT NO FALLBACK COULD EVER RESCUE, BECAUSE
+    //NOTHING WOULD HAVE FAILED. SO THE PROBE IS ONLY SATISFIED BY AN ACTUAL FRAME.
+    let first = frames.recv_timeout(consts::RECORDER_FIRST_FRAME)
+        .map_err(|_| "the OS screen recorder started but delivered no frames".to_owned())?;
+
+    Ok(RecorderSession { recorder, frames, first })
+}
+
+fn probe_timeout() -> Duration
+{
+    env::var(consts::PROBE_TIMEOUT_VAR).ok()
+        .and_then(|value| value.parse().ok())
+        .map(Duration::from_secs)
+        .unwrap_or(consts::RECORDER_PROBE_TIMEOUT)
+}
+
+fn start_recorder() -> Result<RecorderSession, String> //PROBE THE OS-NATIVE RECORDER, BOUNDED
+{
+    //THE PROBE RUNS ON A THREAD OF ITS OWN BECAUSE IT CAN BLOCK FOR AN UNBOUNDED TIME: ON WAYLAND
+    //IT IS AN xdg-desktop-portal SCREENCAST REQUEST, WHICH SITS THERE UNTIL SOMEBODY ANSWERS THE
+    //PICKER - AND NEVER RETURNS AT ALL IF NO PORTAL IMPLEMENTATION IS LISTENING. RUNNING IT INLINE
+    //WOULD WEDGE THE WHOLE CAPTURE THREAD WITH NO WAY BACK TO THE FALLBACK PATH.
+    let (probe_tx, probe_rx) = mpsc::channel();
+
+    thread::spawn(move ||
+    {
+        //A LATE ANSWER FINDS THE RECEIVER GONE; THE SESSION IS THEN DROPPED HERE, WHICH STOPS THE
+        //RECORDER AND RELEASES THE PORTAL SESSION RATHER THAN LEAKING IT
+        probe_tx.send(open_recorder()).ok();
+    });
+
+    match probe_rx.recv_timeout(probe_timeout())
+    {
+        Ok(result) => result,
+        Err(RecvTimeoutError::Timeout) => Err("the OS screen recorder did not answer in time".to_owned()),
+        Err(RecvTimeoutError::Disconnected) => Err("the OS screen recorder probe died".to_owned()),
+    }
+}
+
+fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
+(
+    session: RecorderSession,
+    frame_tx: Sender<Vec<u8>>,
+    running: Arc<AtomicBool>,
+    fps: u32,
+) -> Result<(), String>
+{
+    let RecorderSession { recorder, frames, first } = session;
+
+    let mut encoder = FrameEncoder::new(fps as f32)?;
+
+    let min_interval = Duration::from_secs_f64(1.0 / fps as f64);
+
+    let mut last_encode_time = Instant::now();
+
+    //SET BACK BY ONE INTERVAL SO THE VERY FIRST FRAME IS NOT HELD FOR THE FPS BUDGET
+    let mut last_dispatch = Instant::now() - min_interval;
+
+    //THE PREVIOUS FRAME'S BYTES. UNLIKE THE POLLING PATHS THIS BACKEND ONLY SPEAKS WHEN THE SCREEN
+    //CHANGED ON MOST PLATFORMS, SO THE COMPARISON USUALLY EARLY-EXITS ON THE FIRST BYTE
+    let mut last_raw: Option<Vec<u8>> = None;
+
+    //THE FRAME THE PROBE ALREADY PAID FOR GOES OUT RATHER THAN BEING THROWN AWAY
+    let mut pending = Some(first);
+
+    let outcome = loop
+    {
+        if !running.load(Ordering::Relaxed) { break Ok(()); }
+
+        //EXIT ON DISABLED SCREEN
+        if !options::get_use_screen()
+        {
+            running.store(false, Ordering::Relaxed);
+            break Ok(());
+        }
+
+        //THE TIMEOUT IS ONLY THERE SO `running` IS STILL OBSERVED ON A PERFECTLY IDLE SCREEN -
+        //AN IDLE DESKTOP COSTS US NOTHING BUT THIS WAKEUP, WHERE THE POLLING PATHS GRABBED A FULL FRAME
+        let mut frame = match pending.take()
+        {
+            Some(frame) => frame,
+
+            None => match frames.recv_timeout(consts::RECORDER_POLL_INTERVAL)
+            {
+                Ok(frame) => frame,
+                Err(RecvTimeoutError::Timeout) => continue,
+                Err(RecvTimeoutError::Disconnected) => break Err("the OS screen recorder stopped delivering frames".to_owned()),
+            },
+        };
+
+        //A COMPOSITOR MAY DELIVER FASTER THAN WE ENCODE; KEEP THE NEWEST FRAME AND DROP THE REST
+        while let Ok(newer) = frames.try_recv()
+        {
+            frame = newer;
+        }
+
+        let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
+
+        //FPS BUDGET
+        if !force_encode && last_dispatch.elapsed() < min_interval
+        {
+            continue;
+        }
+
+        let changed = last_raw.as_ref().is_none_or(|previous| previous != &frame.raw);
+
+        if !(force_encode || changed)
+        {
+            continue;
+        }
+
+        if let Some(compressed) = encoder.encode(frame.width, frame.height, &frame.raw)?
+        {
+            encoder.dispatch(&frame_tx, compressed);
+        }
+
+        last_dispatch = Instant::now();
+        last_encode_time = last_dispatch;
+        last_raw = Some(frame.raw);
+    };
+
+    recorder.stop().ok();
+
+    outcome
+}
+
+fn capture_loop_recorder //OS-NATIVE STREAMING CAPTURE, WITHOUT THE FALLBACK CHAIN
+(
+    frame_tx: Sender<Vec<u8>>,
+    running: Arc<AtomicBool>,
+    fps: u32,
+) -> Result<(), String>
+{
+    run_recorder(start_recorder()?, frame_tx, running, fps)
 }
