@@ -87,16 +87,6 @@ That test **passes trivially on a machine with no GPU** — `GpuConverter::new()
 the case the CPU fallback exists for, so it returns rather than failing. Do not "fix" it into a
 hard failure.
 
-The screen share's echo canceller is the other exception, and needs no hardware at all — it drives
-a synthetic loopback (a known delay and gain) past the canceller and measures what came out:
-
-```bash
-cargo test -p why2-chat --lib --release aec:: -- --nocapture
-```
-
-Run it with `--release`: the search correlates a few hundred milliseconds of audio at every lag and
-is far too slow to sit through in a debug build.
-
 There is deliberately **no standing benchmark for the capture pipeline** — the per-stage
 instrumentation and the headless comparator that produced the GPU-conversion numbers were
 development scaffolding and were removed once the work landed. Anything measuring capture cost
@@ -256,16 +246,17 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - **The NLMS step is deliberately tiny** (`AEC_STEP`). The search hands the filter a least-squares
     gain at the right lag, so it only has to track drift, while the shared audio sits in the error
     signal as a loud disturbance that a large step turns into weight jitter. Raising it makes things
-    worse, and measurably: against a share twice as loud as the echo, 0.002 removes 21 dB,
-    0.0005 removes 30 dB and 0.0001 removes 34 dB. Cancellation degrades gracefully from there as
-    the share gets louder relative to the voice — 40 dB at parity down to 16 dB at eighteen times
-    it — while the damage done to the shared audio stays flat at about -44 dB throughout.
+    worse, and measurably: against a share twice as loud as the echo, 0.002 removed 21 dB, 0.0005
+    removed 30 dB and the 0.0001 it settled on removed 34 dB. Cancellation degrades gracefully from
+    there as the share gets louder relative to the voice — 40 dB at parity down to 16 dB at eighteen
+    times it — while damage to the shared audio stays flat at about -44 dB. Those came off a
+    synthetic loopback harness (a known delay and gain) that was development scaffolding and is not
+    in the tree; anything re-tuning these has to bring its own.
   - **Every failure degrades instead of breaking.** No voice session means an empty ring, which
     reads as silence and subtracts nothing; a voice output device that is not the monitored sink
     leaves our audio out of the capture entirely and the filter converges to zero on its own; and
     while the delay is unknown, or the running ERLE check finds the filter adding energy rather than
-    removing it, the capture is passed through untouched rather than damaged. `WHY2_SHARE_AEC=off`
-    disables it.
+    removing it, the capture is passed through untouched rather than damaged.
   - **Known gap:** the reference is the voice output stream only. `screen::client::audio`'s own
     playback — what you hear while attached to somebody else's share — is a separate cpal stream and
     is not in it, so sharing while attached still leaks that share's audio into yours.

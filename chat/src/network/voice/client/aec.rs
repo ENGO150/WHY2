@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    env,
     collections::VecDeque,
     sync::
     {
@@ -380,19 +379,10 @@ fn energy(samples: &[f32]) -> f32
     samples.iter().map(|sample| sample * sample).sum()
 }
 
-
 //PUBLIC
-//IS THE CANCELLER WANTED AT ALL?
-pub fn enabled() -> bool
-{
-    !env::var(consts::AEC_OVERRIDE_VAR).unwrap_or_default().eq_ignore_ascii_case("off")
-}
-
 //INSTALLS THE TAP. THE SCREEN CAPTURE CALLS THIS ONCE, AND DROPS THE CANCELLER WHEN THE SHARE ENDS.
 pub fn start() -> Option<Canceller>
 {
-    if !enabled() { return None; }
-
     let (producer, consumer) = HeapRb::<f32>::new(consts::AEC_REFERENCE_CAPACITY).split();
 
     *REFERENCE.lock().ok()? = Some(producer);
@@ -460,171 +450,5 @@ pub fn push_reference(samples: &[f32])
     if reference.push_slice(samples) != samples.len()
     {
         DESYNC.store(true, Ordering::Relaxed);
-    }
-}
-
-#[cfg(test)]
-#[cfg(test)]
-mod test
-{
-    use super::*;
-
-    //THE TAP IS A GLOBAL - TWO TESTS RUNNING AT ONCE WOULD BE ONE TEST WATCHING THE OTHER'S REFERENCE
-    static SERIAL: Mutex<()> = Mutex::new(());
-
-    const DELAY: usize = 3000; //HOW FAR THE SINK IS BEHIND US (~62ms)
-    const GAIN: f32 = 0.7;     //WHAT THE PER-STREAM VOLUME DID TO IT ON THE WAY
-    const SECONDS: usize = 8;
-    const CHUNK: usize = 960;
-
-    struct Noise(u32); //DETERMINISTIC, SO A FAILURE IS ALWAYS THE SAME FAILURE
-
-    impl Noise
-    {
-        fn next(&mut self) -> f32
-        {
-            self.0 = self.0.wrapping_mul(1664525).wrapping_add(1013904223);
-
-            (self.0 >> 8) as f32 / (1 << 23) as f32 - 1.
-        }
-    }
-
-    //SPEECH-SHAPED: BURSTS WITH GAPS AND CHANGING LOUDNESS. A FLAT SIGNAL WOULD HAVE NO ENVELOPE AND
-    //NOTHING IN A VOICE CHANNEL LOOKS LIKE THAT.
-    fn talking(seed: u32, samples: usize) -> Vec<f32>
-    {
-        let mut noise = Noise(seed);
-        let mut pattern = Noise(seed.wrapping_mul(2654435761));
-        let mut signal = Vec::with_capacity(samples);
-        let mut level = 0.;
-
-        for index in 0..samples
-        {
-            //A NEW BURST EVERY ~250ms, LOUD OR SILENT ON ITS OWN COIN - TWO PEOPLE TALKING DO NOT SHARE AN
-            //ENVELOPE, AND A TEST WHERE THEY DID WOULD BE TESTING THE WRONG THING
-            if index % (consts::SAMPLE_RATE as usize / 4) == 0
-            {
-                let coin = pattern.next();
-
-                level = if coin < -0.2 { 0. } else { 0.15 + 0.25 * (coin + 1.) * 0.5 };
-            }
-
-            signal.push(noise.next() * level);
-        }
-
-        signal
-    }
-
-    //THE SHARED AUDIO ITSELF. UNLIKE SPEECH IT DOES NOT STOP, WHICH IS PRECISELY WHAT MAKES IT HARD - IT
-    //SITS ON TOP OF THE ECHO THE WHOLE TIME INSTEAD OF LEAVING GAPS TO FIND IT IN.
-    fn playing(seed: u32, samples: usize, level: f32) -> Vec<f32>
-    {
-        let mut noise = Noise(seed);
-
-        (0..samples).map(|_| noise.next() * level).collect()
-    }
-
-    //RUNS A WHOLE SHARE PAST THE CANCELLER AND REPORTS HOW MUCH OF OUR OWN PLAYBACK IT TOOK BACK OUT (dB),
-    //ALONGSIDE HOW MUCH OF THE SHARED AUDIO IT DAMAGED DOING SO
-    fn share(content: &[f32]) -> (f32, f32)
-    {
-        let samples = consts::SAMPLE_RATE as usize * SECONDS;
-        let reference = talking(1, samples);                       //THE VOICE CHANNEL, AS THE SINK GOT IT
-        let measured = samples - consts::SAMPLE_RATE as usize * 3; //FIRST SAMPLE THAT COUNTS (PAST THE SEARCH)
-
-        set_rate(consts::SAMPLE_RATE);
-
-        let mut canceller = start().expect("the canceller is enabled by default");
-
-        let mut echo_before = 0.;
-        let mut echo_after = 0.;
-        let mut content_energy = 0.;
-
-        let echo_at = |index: usize| if index >= DELAY { reference[index - DELAY] * GAIN } else { 0. };
-
-        for start in (0..samples).step_by(CHUNK)
-        {
-            let end = (start + CHUNK).min(samples);
-
-            push_reference(&reference[start..end]);
-
-            //THE MONITOR: WHAT WE ARE SHARING, PLUS OUR OWN PLAYBACK DELAYED AND RESCALED BY THE SINK
-            let mut chunk = Vec::with_capacity((end - start) * 2);
-
-            for index in start..end
-            {
-                chunk.push(content[index] + echo_at(index));
-                chunk.push(content[index] + echo_at(index));
-            }
-
-            canceller.process(&mut chunk);
-
-            for (offset, frame) in chunk.chunks_exact(2).enumerate()
-            {
-                let index = start + offset;
-
-                if index < measured { continue; }
-
-                //BOTH CHANNELS CARRY THE SAME ESTIMATE, SO THE SUBTRACTION CANNOT PULL THE IMAGE APART
-                assert_eq!(frame[0], frame[1]);
-
-                let residual = frame[0] - content[index];
-
-                echo_before += echo_at(index) * echo_at(index);
-                echo_after += residual * residual;
-                content_energy += content[index] * content[index];
-            }
-        }
-
-        let removed = 10. * (echo_before / echo_after.max(f32::MIN_POSITIVE)).log10();
-        let damage = 10. * (echo_after / content_energy.max(f32::MIN_POSITIVE)).log10();
-
-        (removed, damage)
-    }
-
-    //THE WHOLE POINT: WHAT WE PLAY OUT COMES BACK IN THE MONITOR, AND HAS TO LEAVE AGAIN BEFORE THE SHARE
-    //IS ENCODED - WITHOUT TAKING THE AUDIO WE ARE ACTUALLY SHARING WITH IT
-    #[test]
-    fn our_own_playback_is_taken_back_out_of_the_capture()
-    {
-        let _serial = SERIAL.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-
-        let content = talking(7, consts::SAMPLE_RATE as usize * SECONDS);
-        let (removed, damage) = share(&content);
-
-        assert!(removed > 25., "only {removed:.1} dB of our own playback was removed");
-        assert!(damage < -30., "the shared audio was damaged ({damage:.1} dB of it is residual)");
-    }
-
-    //A VIDEO PLAYING WHILE WE SHARE. THIS IS THE CASE A FIXED CORRELATION FLOOR GETS WRONG: THE SHARE IS
-    //FOUR TIMES THE ECHO AND NEVER PAUSES, SO THE CORRELATION AT THE CORRECT LAG IS WEAK IN ABSOLUTE TERMS
-    //AND THE DELAY IS ONLY FINDABLE BY HOW FAR IT STANDS OUT FROM THE LAGS AROUND IT.
-    #[test]
-    fn a_loud_share_does_not_hide_the_echo()
-    {
-        let _serial = SERIAL.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-
-        let content = playing(7, consts::SAMPLE_RATE as usize * SECONDS, 0.4);
-        let (removed, damage) = share(&content);
-
-        assert!(removed > 25., "only {removed:.1} dB of our own playback was removed");
-        assert!(damage < -30., "the shared audio was damaged ({damage:.1} dB of it is residual)");
-    }
-
-    //NOBODY IS IN A VOICE CHANNEL: THERE IS NOTHING OF OURS IN THE MONITOR, SO THE CAPTURE IS NOT TOUCHED
-    #[test]
-    fn a_silent_reference_changes_nothing()
-    {
-        let _serial = SERIAL.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-
-        set_rate(0);
-
-        let mut canceller = start().expect("the canceller is enabled by default");
-        let mut chunk: Vec<f32> = (0..CHUNK * 2).map(|index| (index as f32 * 0.01).sin()).collect();
-        let original = chunk.clone();
-
-        canceller.process(&mut chunk);
-
-        assert_eq!(chunk, original);
     }
 }

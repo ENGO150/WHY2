@@ -53,7 +53,6 @@ pub const GRID_HEIGHT: usize        = 4;                                        
 pub const RECV_TIMEOUT: u64         = 200;                                      //UDP RECEIVE POLL TIMEOUT (MS)
 pub const SEND_CHANNEL_BOUND: usize = 8;                                        //AUDIO CALLBACK -> NETWORK TASK BUFFER
 
-pub const AEC_OVERRIDE_VAR: &str          = "WHY2_SHARE_AEC";                   //"off" LEAVES OUR OWN PLAYBACK IN THE SHARED AUDIO
 pub const AEC_REFERENCE_CAPACITY: usize   = (SAMPLE_RATE * 2) as usize;         //REFERENCE RING (~2s, DRAINED IN LOCKSTEP SO IT SITS NEAR EMPTY)
 pub const AEC_SEARCH_RANGE: usize         = (SAMPLE_RATE * 3 / 10) as usize;    //FURTHEST THE PLAYBACK MAY LAG THE CAPTURE (~300ms, PAST ANY SINK BUFFER)
 pub const AEC_WINDOW: usize               = 4096;                               //SAMPLES EACH LAG IS SCORED OVER (~85ms)
