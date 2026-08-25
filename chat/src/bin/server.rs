@@ -152,92 +152,110 @@ async fn main()
         {
             Ok((mut stream, peer_addr)) =>
             {
-                //READ TOKEN (WITH TIMEOUT FOR ZOMBIE CONNECTIONS)
-                let mut token = [0u8; 32];
-                if let Ok(Ok(_)) = time::timeout(Duration::from_millis(2000), stream.read_exact(&mut token)).await
+                //TAKE A HANDSHAKE SLOT - AN UNIDENTIFIED SOCKET COUNTS AGAINST NO OTHER LIMIT
+                let slot = match server::HandshakeSlot::reserve(peer_addr.ip())
                 {
-                    //SET TCP_NODELAY
-                    match stream.set_nodelay(true)
+                    Some(s) => s,
+                    None =>
                     {
-                        Ok(_) => {},
-                        Err(_) => continue
-                    }
-
-                    if let Some((_, (id, conn_type, _))) = server::PENDING_TOKENS.remove(&token)
-                    {
-                        match conn_type
-                        {
-                            ConnectionType::FileUpload { uid } =>
-                            {
-                                server::spawn_with_abort(move |task| async move
-                                {
-                                    let (mut read_stream, write_stream) = stream.into_split();
-                                    file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task).await;
-                                });
-                                continue;
-                            },
-
-                            ConnectionType::FileDownload { uid, file: file_data } =>
-                            {
-                                server::spawn_with_abort(move |task| async move
-                                {
-                                    let (_read_stream, write_stream) = stream.into_split();
-                                    file::upload(token, id, write_stream, file_data, uid, task).await;
-                                });
-                                continue;
-                            },
-
-                            ConnectionType::Screen =>
-                            {
-                                server::spawn_with_abort(move |task| async move
-                                {
-                                    let (mut read_stream, write_stream) = stream.into_split();
-                                    screen::screen(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), task).await;
-                                });
-                                continue;
-                            },
-
-                            ConnectionType::Attach { id: sharer_id } =>
-                            {
-                                //ONLY THE WRITE HALF IS EVER USED FOR AN ATTACHED VIEWER
-                                let (_read_stream, write_stream) = stream.into_split();
-
-                                if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
-                                {
-                                    conn.attach_screen(sharer_id, Arc::new(Mutex::new(write_stream)), token);
-                                }
-
-                                continue;
-                            },
-                        }
-                    } else
-                    {
-                        //COUNT SLOTS
-                        let auth_clients = server::CONNECTIONS.iter().filter(|c| c.is_authenticated()).count();
-                        let unauth_clients = server::CONNECTIONS.len() - auth_clients;
-
-                        //COUNT CONNECTIONS FROM SAME IP
-                        let ip_clients = server::CONNECTIONS.iter().filter(|c| c.peer_addr().ip() == peer_addr.ip()).count();
-
-                        //CHECK FOR MAXIMAL CONNECTIONS
-                        if auth_clients >= config::read_config::<usize>("max_clients") ||
-                            unauth_clients >= config::read_config::<usize>("max_unauth_clients") ||
-                            ip_clients >= config::read_config::<usize>("max_ip_clients")
-                        {
-                            log::error!("Connection rejected (limit): {peer_addr}");
-                            continue;
-                        }
-
-                        server::spawn_with_abort(move |task| async move
-                        {
-                            let (mut read_stream, write_stream) = stream.into_split();
-                            server::listen_client(&mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), peer_addr, token, task).await;
-                        });
+                        log::error!("Connection rejected (handshake limit): {peer_addr}");
                         continue;
                     }
-                }
+                };
 
-                log::error!("Connection rejected (header): {peer_addr}");
+                //READ THE HEADER IN THE CONNECTION'S OWN TASK, NEVER HERE: A PEER THAT CONNECTS AND SAYS
+                //NOTHING WOULD OTHERWISE HOLD THE ACCEPT LOOP FOR THE WHOLE TIMEOUT, ONE SOCKET AT A TIME
+                tokio::spawn(async move
+                {
+                    let _slot = slot; //RELEASED HOWEVER THE HANDSHAKE ENDS
+
+                    //READ TOKEN (WITH TIMEOUT FOR ZOMBIE CONNECTIONS)
+                    let mut token = [0u8; 32];
+                    if let Ok(Ok(_)) = time::timeout(Duration::from_millis(2000), stream.read_exact(&mut token)).await
+                    {
+                        //SET TCP_NODELAY
+                        match stream.set_nodelay(true)
+                        {
+                            Ok(_) => {},
+                            Err(_) => return
+                        }
+
+                        if let Some((_, (id, conn_type, _))) = server::PENDING_TOKENS.remove(&token)
+                        {
+                            match conn_type
+                            {
+                                ConnectionType::FileUpload { uid } =>
+                                {
+                                    server::spawn_with_abort(move |task| async move
+                                    {
+                                        let (mut read_stream, write_stream) = stream.into_split();
+                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task).await;
+                                    });
+                                    return;
+                                },
+
+                                ConnectionType::FileDownload { uid, file: file_data } =>
+                                {
+                                    server::spawn_with_abort(move |task| async move
+                                    {
+                                        let (_read_stream, write_stream) = stream.into_split();
+                                        file::upload(token, id, write_stream, file_data, uid, task).await;
+                                    });
+                                    return;
+                                },
+
+                                ConnectionType::Screen =>
+                                {
+                                    server::spawn_with_abort(move |task| async move
+                                    {
+                                        let (mut read_stream, write_stream) = stream.into_split();
+                                        screen::screen(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), task).await;
+                                    });
+                                    return;
+                                },
+
+                                ConnectionType::Attach { id: sharer_id } =>
+                                {
+                                    //ONLY THE WRITE HALF IS EVER USED FOR AN ATTACHED VIEWER
+                                    let (_read_stream, write_stream) = stream.into_split();
+
+                                    if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
+                                    {
+                                        conn.attach_screen(sharer_id, Arc::new(Mutex::new(write_stream)), token);
+                                    }
+
+                                    return;
+                                },
+                            }
+                        } else
+                        {
+                            //COUNT SLOTS
+                            let auth_clients = server::CONNECTIONS.iter().filter(|c| c.is_authenticated()).count();
+                            let unauth_clients = server::CONNECTIONS.len() - auth_clients;
+
+                            //COUNT CONNECTIONS FROM SAME IP
+                            let ip_clients = server::CONNECTIONS.iter().filter(|c| c.peer_addr().ip() == peer_addr.ip()).count();
+
+                            //CHECK FOR MAXIMAL CONNECTIONS
+                            if auth_clients >= config::read_config::<usize>("max_clients") ||
+                                unauth_clients >= config::read_config::<usize>("max_unauth_clients") ||
+                                ip_clients >= config::read_config::<usize>("max_ip_clients")
+                            {
+                                log::error!("Connection rejected (limit): {peer_addr}");
+                                return;
+                            }
+
+                            server::spawn_with_abort(move |task| async move
+                            {
+                                let (mut read_stream, write_stream) = stream.into_split();
+                                server::listen_client(&mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), peer_addr, token, task).await;
+                            });
+                            return;
+                        }
+                    }
+
+                    log::error!("Connection rejected (header): {peer_addr}");
+                });
             },
 
             Err(e) =>

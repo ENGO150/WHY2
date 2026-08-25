@@ -20,7 +20,7 @@ use std::
 {
     path::PathBuf,
     future::Future,
-    net::SocketAddr,
+    net::{ IpAddr, SocketAddr },
     time::{ Instant, Duration },
     collections::{ HashSet, HashMap },
     sync::
@@ -28,6 +28,7 @@ use std::
         Arc,
         LazyLock,
         Mutex as MutexSync,
+        atomic::{ AtomicUsize, Ordering },
     },
 };
 
@@ -94,6 +95,11 @@ pub struct Attach //SCREEN ATTACHMENT
     pub stream: Arc<Mutex<OwnedWriteHalf>>, //RECEIVE STREAM
     pub target_id: usize,                   //ID OF SCREENSHARER
     pub token: [u8; 32],                    //TOKEN FOR REXSTREAM
+}
+
+pub struct HandshakeSlot //RESERVATION HELD BY A SOCKET THAT HAS NOT IDENTIFIED ITSELF YET (SEE HANDSHAKE BUDGET)
+{
+    ip: IpAddr, //PEER THE SLOT WAS TAKEN FOR
 }
 
 //ENUMS
@@ -503,10 +509,57 @@ impl Connection
     }
 }
 
+impl HandshakeSlot
+{
+    //TAKE A SLOT FOR A FRESHLY ACCEPTED SOCKET, None IF THE BUDGET IS FULL
+    pub fn reserve(ip: IpAddr) -> Option<Self>
+    {
+        if HANDSHAKES.load(Ordering::Relaxed) >= *MAX_HANDSHAKES { return None; }
+
+        //PER-IP SO ONE PEER CANNOT TAKE THE WHOLE BUDGET
+        {
+            let mut slots = HANDSHAKES_PER_IP.entry(ip).or_insert(0);
+            if *slots >= consts::MAX_HANDSHAKES_PER_IP { return None; }
+
+            *slots += 1;
+        }
+
+        HANDSHAKES.fetch_add(1, Ordering::Relaxed);
+
+        Some(Self { ip })
+    }
+}
+
+impl Drop for HandshakeSlot
+{
+    //RELEASE THE SLOT, WHICHEVER WAY THE HANDSHAKE ENDED
+    fn drop(&mut self)
+    {
+        HANDSHAKES.fetch_sub(1, Ordering::Relaxed);
+
+        //DROP THE GUARD BEFORE REMOVING - BOTH TOUCH THE SAME SHARD
+        let empty = if let Some(mut slots) = HANDSHAKES_PER_IP.get_mut(&self.ip)
+        {
+            *slots = slots.saturating_sub(1);
+            *slots == 0
+        } else { false };
+
+        if empty { HANDSHAKES_PER_IP.remove_if(&self.ip, |_, slots| *slots == 0); }
+    }
+}
+
 //LISTS
 pub static PENDING_TOKENS: LazyLock<DashMap<[u8; 32], (usize, ConnectionType, Instant)>> = LazyLock::new(|| DashMap::new());
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
 pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
+
+//HANDSHAKE BUDGET
+static MAX_HANDSHAKES: LazyLock<usize> = LazyLock::new(||
+{
+    (config::read_config::<usize>("max_clients") + config::read_config::<usize>("max_unauth_clients")) * consts::MAX_HANDSHAKES_PER_IP
+});
+static HANDSHAKES: AtomicUsize = AtomicUsize::new(0);
+static HANDSHAKES_PER_IP: LazyLock<DashMap<IpAddr, usize>> = LazyLock::new(|| DashMap::new());
 
 //PRIVATE
 async fn untrusted_read<F>(streams: &mut Streams<'_>, is_match: F, keys: Option<&SharedKeys>) -> Option<PacketCode>
