@@ -76,7 +76,22 @@ cargo bench --bench comprehensive
 ```
 
 There is currently no automated test suite for the `chat` crate; CI only builds it
-(`cargo build --release` + the server feature combo above).
+(`cargo build --release` + the server feature combo above). The one exception is the screen
+capture colour conversion, which is checked against openh264's own CPU conversion:
+
+```bash
+cargo test -p why2-chat --features client_screen --lib gpu:: --release
+```
+
+That test **passes trivially on a machine with no GPU** — `GpuConverter::new()` returning `Err` is
+the case the CPU fallback exists for, so it returns rather than failing. Do not "fix" it into a
+hard failure.
+
+There is deliberately **no standing benchmark for the capture pipeline** — the per-stage
+instrumentation and the headless comparator that produced the GPU-conversion numbers were
+development scaffolding and were removed once the work landed. Anything measuring capture cost
+again has to bring its own harness, and should compare whole-process CPU rather than per-stage
+wall time: a push backend moves acquisition onto its own thread, so stage timings alone flatter it.
 
 ## Core architecture (`core/src`)
 
@@ -135,6 +150,67 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   extensions with their own client/server submodules for file transfer, screen sharing (feature
   `client_screen`/`server`), and voice chat (`client_voice`/`server`) respectively — voice runs
   over UDP while text runs over TCP, on the same port.
+- **`network/screen/client/capture.rs`** — the capture pipeline, and the only blocking CPU loop in
+  the client (`spawn_blocking`). It is **backend-selected at runtime, never assumed**:
+  - `capture_loop` prefers the OS-native streaming recorder (`xcap::Monitor::video_recorder()` —
+    DXGI Desktop Duplication on Windows, `AVCaptureScreenInput` on macOS, xdg-desktop-portal +
+    PipeWire on Wayland, a polling thread on X11) over the legacy polling path
+    (`capture_loop_xcap` / `capture_loop_wayshot`), but it does not *wait* for it.
+  - **The probe never gates the share.** The polling path starts immediately and the probe runs
+    beside it on its own thread; the recorder takes over only once it has proven itself, via the
+    `UPGRADING` flag that the polling loops watch in their `while` condition. Probing first was
+    tried and is exactly wrong: on Wayland the probe is an xdg-desktop-portal request that blocks
+    until somebody notices the picker, so a viewer attaching in that window sat in front of a
+    black rectangle for tens of seconds while a working backend went unused. Handing over costs
+    one keyframe mid-share; gating cost the entire opening of it. `UPGRADING` is deliberately not
+    `running` — standing the polling path down is not ending the share.
+  - **The probe still demands an actual frame**, because a recorder that *starts* is not a
+    recorder that *works*: xcap's X11 recorder reports success and then delivers nothing, which
+    without `RECORDER_FIRST_FRAME` would be a permanently blank share that no fallback could
+    rescue, since nothing would have failed. `RECORDER_PROBE_TIMEOUT` now only applies where the
+    polling path could not start at all and the recorder is the last backend left rather than an
+    upgrade — that is the one case worth blocking for.
+  - `WHY2_CAPTURE_BACKEND` (`recorder` / `legacy`) pins a backend; `WHY2_CAPTURE_PROBE_TIMEOUT`
+    overrides the probe deadline in seconds. Both exist so a machine where the heuristic picks
+    wrong is one env var away from the old behaviour.
+- **`network/screen/client/gpu.rs` + `rgba_to_i420.wgsl`** — RGBA → I420 on the GPU via a `wgpu`
+  compute shader. This is not decoration: measured on the capture pipeline, the colour conversion
+  was **the single most expensive stage, larger than acquisition and the H.264 encode together**
+  (~17 ms/frame at 1600x900), because openh264 implements `RGB8Source` only for packed 24-bit RGB
+  — an RGBA screen grab falls into the per-pixel scalar `write_yuv_by_pixel`. The shader cuts that
+  to ~1.4 ms and roughly halves whole-process CPU.
+  - The shader reproduces openh264's **own** BT.601 limited-range integer coefficients so the
+    stream's colours do not shift with the backend. The two agree to within 1 LSB of luma and 2 of
+    chroma (the CPU path is float and averages chroma without rounding) — hence the test asserts a
+    tolerance, not equality.
+  - It packs four samples per `u32` in both planes, so it requires `width % 8 == 0 && height % 2
+    == 0`; `GpuConverter::supports` guards that and anything else uses the CPU path.
+  - **Every failure degrades rather than breaks**: no adapter, a rejected shader, an unsupported
+    resolution or a mid-session device loss all switch `Converter` to the CPU permanently and keep
+    the share alive. `WHY2_CAPTURE_CONVERTER=cpu` pins the CPU path.
+- **`network/screen/client/video.rs` + `yuv_to_rgba.wgsl`** — the viewer half, a `wgpu` surface
+  that replaced `pixels` (which is no longer a dependency). The decoder's Y/U/V planes are uploaded
+  as three `R8Unorm` textures — **1.5 bytes per pixel instead of the 4 the old RGBA path pushed**,
+  with no CPU `write_rgba8` pass at all — and the fragment shader does the BT.601 conversion, the
+  chroma upscale and the scale-to-window in one draw.
+  - Planes are allocated at the decoder's **stride**, not its width, and the shader trims the
+    padding. The span therefore reaches the *centre* of the last real texel: mapping `u = 1` to
+    `width / stride` lands on the texel boundary, where a linear sampler mixes in half a texel of
+    padding — a visible smear down the right-hand column. `row_padding_never_reaches_the_picture`
+    is a regression test for exactly that, and it caught it once already.
+  - **The picture is never written through an sRGB view.** The fragment shader emits
+    display-referred sRGB already — BT.601 output is gamma-encoded video, not linear light — so an
+    sRGB surface format encodes it a *second* time on write. That is not a subtle shift: mid grey
+    lands on 188 instead of 128 and dark grey on 124 instead of 51, lifting every shadow while the
+    primaries stay put, which reads as a washed-out grey picture. `present_format` strips the
+    suffix and `render` creates the swapchain view with it (declared in `view_formats` when the
+    surface itself is sRGB). The headless colour tests cannot catch this — they render to
+    `Rgba8Unorm`, non-sRGB by construction, so they passed while a real window was visibly wrong;
+    `the_picture_is_never_written_through_an_srgb_view` is the check that does.
+  - The viewer letterboxes; the old `ScalingMode::Fill` silently distorted any share whose aspect
+    did not match the window.
+  - `YuvRenderer` knows nothing about windows, so the conversion is rendered offscreen and checked
+    without a display — that is how the colour tests run headless in CI.
 - **`crypto/kex.rs`** — hybrid key exchange: classical ECC (`p521`) + post-quantum ML-KEM,
   combined via HKDF (`crypto/mod.rs::get_correct_key`, `derive_stream_nonce`) to derive the actual
   `why2` grid key/nonce and HMAC key (`SharedKeys = (why2 key, HMAC key)`) from the raw shared
