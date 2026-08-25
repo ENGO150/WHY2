@@ -209,6 +209,12 @@ fn user_password(item: &Item) -> Option<String> //READ PASSWORD HASH OUT OF A US
     item.as_table_like()?.get("password")?.as_str().map(str::to_string)
 }
 
+#[cfg(feature = "server")]
+pub fn server_users_len() -> usize //COUNT USERS
+{
+    get_data(&config_path(consts::SERVER_USERS_CONFIG)).len()
+}
+
 //PUBLIC
 pub fn init_config() //INITIALIZE CONFIG FILES
 {
@@ -287,7 +293,10 @@ pub fn server_users_password(username: &str) -> Option<String> //RETURN PASSWORD
 #[cfg(feature = "server")]
 pub fn server_users_add(username: &str, hash: &str) //CREATE NEW USER
 {
-    write_user_field(username, "password", hash.into());
+    let users = server_users_len();
+
+    write_user_field(username, "password", hash.into()); //PASSWORD
+    write_user_field(username, "role", if users == 0 { 2 } else { 0 }.into()); //ROLE (OWNER IF THIS IS THE FIRST USER)
 }
 
 #[cfg(feature = "client_base")]
