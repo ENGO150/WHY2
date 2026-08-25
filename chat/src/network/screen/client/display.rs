@@ -29,13 +29,6 @@ use std::
 
 use tokio::sync::mpsc::{ Receiver, UnboundedSender };
 
-use pixels::
-{
-    Pixels,
-    SurfaceTexture,
-    ScalingMode,
-};
-
 use winit::
 {
     application::ApplicationHandler,
@@ -50,16 +43,12 @@ use winit::
     },
 };
 
-use openh264::
-{
-    decoder::Decoder,
-    formats::YUVSource,
-};
+use openh264::decoder::Decoder;
 
 use crate::network::screen::
 {
     consts,
-    client::{ ScreenShareRequest, UserEvent },
+    client::{ ScreenShareRequest, UserEvent, video::VideoSurface },
 };
 
 //PRIVATE
@@ -67,11 +56,9 @@ use crate::network::screen::
 struct Session
 {
     window: Arc<Window>,
-    pixels: Pixels<'static>,
+    surface: VideoSurface,
     frame_rx: Receiver<Vec<u8>>,
     decoder: Decoder,
-    last_width: u32,
-    last_height: u32,
     frame_dirty: bool,
     running: Arc<AtomicBool>,
     deattach: UnboundedSender<()>,
@@ -101,30 +88,12 @@ impl Session
             //AND SKIPPING ONE WOULD BREAK PREDICTION FOR THE FRAMES THAT FOLLOW
             let Ok(Some(yuv)) = self.decoder.decode(compressed) else { continue; };
 
-            //ONLY THE NEWEST FRAME IS EVER SEEN, SO THE OLDER ONES SKIP THE YUV -> RGBA PASS AND THE UPLOAD
+            //ONLY THE NEWEST FRAME IS EVER SEEN, SO THE OLDER ONES SKIP THE UPLOAD ENTIRELY
             if index != newest { continue; }
 
-            let dim = yuv.dimensions();
-            let w = dim.0 as u32;
-            let h = dim.1 as u32;
-
-            if self.last_width != w || self.last_height != h
-            {
-                self.last_width = w;
-                self.last_height = h;
-
-                //RESIZE PIXEL BUFFER TO MATCH DECODED DIMENSIONS
-                self.pixels.resize_buffer(w, h).ok();
-            }
-
-            let frame_data = self.pixels.frame_mut();
-
-            //WRITE RGBA DIRECTLY INTO THE PIXEL BUFFER
-            let wanted = dim.0 * dim.1 * 4;
-            if frame_data.len() == wanted
-            {
-                yuv.write_rgba8(frame_data);
-            }
+            //THE PLANES GO STRAIGHT UP AS THEY ARE - NO CPU I420 -> RGBA PASS, AND 1.5 BYTES PER
+            //PIXEL ON THE BUS INSTEAD OF 4. THE FRAGMENT SHADER DOES THE CONVERSION.
+            self.surface.upload(&yuv);
 
             self.frame_dirty = true;
         }
@@ -135,9 +104,9 @@ impl Session
     fn redraw(&mut self)
     {
         let size = self.window.inner_size();
-        self.pixels.resize_surface(size.width, size.height).ok();
 
-        self.pixels.render().ok();
+        self.surface.resize(size.width, size.height);
+        self.surface.render();
     }
 }
 
@@ -171,8 +140,6 @@ impl ScreenShareApp
             session.running = request.running;
             session.deattach = request.deattach;
             session.decoder = Decoder::new().expect("Failed to create H.264 decoder");
-            session.last_width = 0;
-            session.last_height = 0;
             session.frame_dirty = false;
             session.frame_count = 0;
             session.last_fps_time = Instant::now();
@@ -192,9 +159,9 @@ impl ScreenShareApp
         let window = Arc::new(window);
 
         let size = window.inner_size();
-        let surface_texture = SurfaceTexture::new(size.width, size.height, window.clone());
-        let Ok(mut pixels) = Pixels::new(consts::WINIT_SIZE.0, consts::WINIT_SIZE.1, surface_texture) else { return; };
-        pixels.set_scaling_mode(ScalingMode::Fill);
+
+        //A VIEWER WE CANNOT PAINT IS NOT A VIEWER; THE WINDOW IS DROPPED RATHER THAN LEFT BLANK
+        let Ok(surface) = VideoSurface::new(window.clone(), size.width, size.height) else { return; };
 
         let window_id = window.id();
         window.request_redraw();
@@ -202,11 +169,9 @@ impl ScreenShareApp
         self.sessions.insert(window_id, Session
         {
             window,
-            pixels,
+            surface,
             frame_rx: request.rx,
             decoder: Decoder::new().expect("Failed to create H.264 decoder"),
-            last_width: 0,
-            last_height: 0,
             frame_dirty: false,
             running: request.running,
             deattach: request.deattach,
@@ -252,7 +217,7 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
             {
                 if let Some(session) = self.sessions.get_mut(&window_id)
                 {
-                    session.pixels.resize_surface(size.width, size.height).ok();
+                    session.surface.resize(size.width, size.height);
                     session.window.request_redraw();
                 }
             },

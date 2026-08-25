@@ -22,6 +22,7 @@ pub mod capture;
 pub mod display;
 pub mod gpu;
 pub mod options;
+pub mod video;
 
 use std::
 {
