@@ -125,6 +125,7 @@ pub enum ClientEvent
 {
     Register,                                      //REGISTER PROMPT
     Login,                                         //LOGIN PROMPT
+    FirstUser,                                     //FIRST USER
     Authenticated,                                 //LOGIN SUCCESSFUL
     Connected(String),                             //SUCCESSFUL CONNECTION MESSAGE
     Message(String, String, usize, MessageColors), //RECEIVED MESSAGE
@@ -486,6 +487,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 options::set_asking_password(true);
                 options::set_login_state(LoginState::PasswordLogin);
                 tx.send(ClientEvent::Login).await.unwrap();
+            },
+
+            //FIRST USER
+            PacketCode::FirstUser =>
+            {
+                tx.send(ClientEvent::FirstUser).await.unwrap();
             },
 
             //START CHATTING

@@ -56,6 +56,11 @@ impl App
                 self.dirty = true;
             },
 
+            ClientEvent::FirstUser =>
+            {
+                self.push_styled("You are the first user to register, owner role has been granted to you.", theme::NOTICE);
+            },
+
             ClientEvent::Authenticated =>
             {
                 self.login = None; //THE BOX HAS ASKED FOR EVERYTHING IT WAS GOING TO ASK FOR

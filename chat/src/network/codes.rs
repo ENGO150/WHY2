@@ -127,6 +127,7 @@ pub enum PacketCode //CONTROL CODES
     Join { username: String },                      //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     List { users: Option<Vec<OnlineUser>> },        //CLIENT <> SERVER | PRINT CONNECTED USERS
 
+    FirstUser,        //SERVER -> CLIENT | FIRST ONE TO REGISTER, OWNER ROLE ADDED
     Rekey,            //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)
     Disconnect,       //SERVER <> CLIENT | QUIT COMMUNICATION
     SpamWarning,      //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN

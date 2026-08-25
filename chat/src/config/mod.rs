@@ -291,12 +291,14 @@ pub fn server_users_password(username: &str) -> Option<String> //RETURN PASSWORD
 }
 
 #[cfg(feature = "server")]
-pub fn server_users_add(username: &str, hash: &str) //CREATE NEW USER
+pub fn server_users_add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON FIRST USER
 {
-    let users = server_users_len();
+    let first_user = server_users_len() == 0; //SELF-EXPLANATORY, INNIT?
 
     write_user_field(username, "password", hash.into()); //PASSWORD
-    write_user_field(username, "role", if users == 0 { 2 } else { 0 }.into()); //ROLE (OWNER IF THIS IS THE FIRST USER)
+    write_user_field(username, "role", if first_user { 2 } else { 0 }.into()); //ROLE (OWNER IF THIS IS THE FIRST USER)
+
+    first_user
 }
 
 #[cfg(feature = "client_base")]
