@@ -178,12 +178,16 @@ fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
 }
 
 #[cfg(feature = "server")]
-fn user_entry(hash: &str) -> Item //BUILD A USER ENTRY SUBTABLE
+fn set_user_password(users: &mut Table, username: &str, hash: &str) //SET username'S PASSWORD, KEEPING ANY OTHER FIELDS
 {
-    let mut table = Table::new();
-    table.insert("password", Item::Value(hash.into()));
+    //A MISSING OR LEGACY FLAT ENTRY BECOMES AN EMPTY SUBTABLE FIRST
+    if users.get(username).and_then(Item::as_table_like).is_none()
+    {
+        users.insert(username, Item::Table(Table::new()));
+    }
 
-    Item::Table(table)
+    users.get_mut(username).and_then(Item::as_table_like_mut)
+        .expect("User entry is not a table").insert("password", Item::Value(hash.into()));
 }
 
 #[cfg(feature = "server")]
@@ -294,19 +298,7 @@ pub fn client_write_int(key: &str, value: i64) //WRITE INTEGER TO client.toml
 #[cfg(feature = "server")]
 pub fn server_users_write(username: &str, hash: &str) //WRITE PASSWORD HASH OF username TO server_users.toml
 {
-    with_cached_mut(&config_path(consts::SERVER_USERS_CONFIG), |doc|
-    {
-        let table = doc.as_table_mut();
-
-        //KEEP WHATEVER ELSE THE ENTRY ALREADY CARRIES
-        if let Some(entry) = table.get_mut(username).and_then(Item::as_table_like_mut)
-        {
-            entry.insert("password", Item::Value(hash.into()));
-            return;
-        }
-
-        table.insert(username, user_entry(hash));
-    });
+    with_cached_mut(&config_path(consts::SERVER_USERS_CONFIG), |doc| set_user_password(doc.as_table_mut(), username, hash));
 }
 
 #[cfg(feature = "server")]
@@ -331,7 +323,7 @@ pub fn server_users_migrate() //CONVERT FLAT username = "<hash>" ENTRIES INTO SU
     {
         for (username, hash) in &legacy
         {
-            doc.as_table_mut().insert(username, user_entry(hash));
+            set_user_password(doc.as_table_mut(), username, hash);
         }
     });
 }
