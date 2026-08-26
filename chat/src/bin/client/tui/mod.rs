@@ -92,6 +92,7 @@ use crate::
     network::
     {
         self,
+        codes::PacketCode,
         client::{ self, ClientEvent },
     },
     command::
@@ -262,7 +263,7 @@ pub async fn run
                     app.refresh_online = false;
 
                     network::send(&mut *write_stream.lock().await,
-                        network::codes::PacketCode::List { users: None }, options::get_keys().as_ref()).await;
+                        PacketCode::List { users: None }, options::get_keys().as_ref()).await;
                 }
 
                 if app.dirty
@@ -446,7 +447,7 @@ async fn handle_key
                 Some(write_stream) =>
                 {
                     network::send(&mut *write_stream.lock().await,
-                        network::codes::PacketCode::ServerSettings { settings: Some(settings), save: true },
+                        PacketCode::ServerSettings { settings: Some(settings), save: true },
                         options::get_keys().as_ref()).await;
 
                     //STORED IS NOT THE SAME AS IN USE FOR THESE - SAY SO ONCE, WHERE THE USER READS THINGS
@@ -463,6 +464,16 @@ async fn handle_key
                     app.settings.restart_note = None;
                 },
             }
+        }
+
+        //AND SO DOES A CONFIRMED Restart. IT IS THE LAST THING THIS SOCKET CARRIES: THE SERVER ANSWERS BY
+        //DISCONNECTING EVERYBODY AND GOING DOWN, WHICH LANDS US BACK IN THE CONNECT BOX LIKE ANY OTHER DROP
+        if app.settings.take_restart() && let Some(write_stream) = write_stream
+        {
+            network::send(&mut *write_stream.lock().await,
+                PacketCode::ServerRestart, options::get_keys().as_ref()).await;
+
+            app.push_styled(String::from("Restarting the server..."), theme::NOTICE);
         }
 
         return;

@@ -437,6 +437,20 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     it to that const; the handshake budget used to be one of those (a `LazyLock` over `max_clients` +
     `max_unauth_clients`) and was turned into `server::max_handshakes()` rather than listed, because the
     connection limit beside it was already live and having half of one pair need a restart is a trap.
+  - **And the overlay can do the restart those keys are waiting for.** A second button under `[ Save ]`
+    sends `PacketCode::ServerRestart` (owner only, checked server-side like every other server-settings
+    packet); the server disconnects everybody gracefully and then **re-execs itself** —
+    `misc::restart()`, `exec` on unix so the pid and whatever supervises it survive, spawn-and-exit
+    everywhere else. Re-reading the config in place was the alternative and is not the same thing: the
+    startup-only keys are startup-only precisely because their effect is bound at startup (a listener, a
+    spawned UDP task, a latched username), so the only honest way to apply them is to start up again.
+    The restart is deliberately *awkward*: it is refused while any row is unsaved (the restart would throw
+    those edits away unread — the description under the button says to save first), and one press only
+    arms it while the next fires it, since it ends the session for every client on the server. Nothing
+    comes back on the socket — the client's own connection dies with the server and lands in the connect
+    box like any other drop. `bin/server.rs` binds with a short retry (`BIND_ATTEMPTS`) rather than
+    exiting on the first `EADDRINUSE`, because the non-`exec` path starts the replacement beside a
+    process that may still be holding the port.
   - Chat messages live in `App::messages` as `state::Entry::Message` (username/id/text/colors), not as
     rendered `Line`s — `Theme::render` turns an entry into a line on every wrap, so a `show_id` or
     `disable_colors` change repaints the messages already in the pane. Anything that rewrites

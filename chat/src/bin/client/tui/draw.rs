@@ -70,7 +70,6 @@ use super::
     {
         self,
         Row,
-        Item,
         Value,
         Settings,
         DeviceEntry,
@@ -629,8 +628,8 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
     //FULL WIDTH AND OVER AS MANY LINES AS IT NEEDS
     let hint_lines = match state.picker.is_none().then(|| state.rows.get(state.selected)).flatten()
     {
-        Some(Row::Item(item)) => description_lines(item, inner_width as u16),
-        _ => Vec::new(),
+        Some(row) => description_lines(state, row, inner_width as u16),
+        None => Vec::new(),
     };
 
     //THE FOOT IS SIZED FOR THE LONGEST COMMENT IN THE BOX, NOT FOR THE ONE UNDER THE CURSOR - OTHERWISE THE
@@ -638,11 +637,9 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
     let hint_height = match state.picker.is_some()
     {
         true => 0,
-        false => state.rows.iter().filter_map(|row| match row
-        {
-            Row::Item(item) => Some(description_lines(item, inner_width as u16).len()),
-            Row::Header(_) | Row::Action(_) => None,
-        }).max().unwrap_or(0),
+        false => state.rows.iter()
+            .map(|row| description_lines(state, row, inner_width as u16).len())
+            .max().unwrap_or(0),
     };
 
     let room = area.height.saturating_sub(4) as usize; //BORDERS PLUS A LINE OF AIR TOP AND BOTTOM
@@ -965,18 +962,37 @@ fn button(label: &'static str, selected: bool, style: Style) -> Span<'static>
 
 //THE SELECTED ROW'S EXPLANATION, WRAPPED RATHER THAN CUT: server.toml's COMMENTS ARE FULL SENTENCES AND
 //THE ONLY THING SAYING WHAT A KEY DOES, SO LOSING THE END OF ONE LOSES THE POINT OF IT
-fn description_lines(item: &Item, width: u16) -> Vec<Line<'static>>
+fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'static>>
 {
     let mut spans = Vec::new();
 
-    if !item.hint.is_empty() { spans.push(Span::styled(item.hint.clone(), theme::DIM)); }
-
-    //A KEY THE SERVER ONLY READS AT STARTUP IS SAID SO HERE - IT IS STORED EITHER WAY, JUST NOT USED YET
-    if item.restart
+    match row
     {
-        let note = match spans.is_empty() { true => "restart required", false => " \u{b7} restart required" };
+        Row::Header(_) => return Vec::new(),
 
-        spans.push(Span::styled(note, theme::NOTICE));
+        //A BUTTON SAYS WHAT PRESSING IT DOES - AND, WHEN IT WILL NOT DO IT YET, WHY NOT
+        Row::Action(label) if **label == *settings::RESTART_LABEL =>
+        {
+            spans.push(Span::styled("Restart the server \u{2014} every client is disconnected and the whole config is read again.", theme::DIM));
+
+            if state.unsaved() { spans.push(Span::styled(" \u{b7} save your changes first", theme::NOTICE)); }
+            else if state.confirm { spans.push(Span::styled(" \u{b7} press again to confirm", theme::ERROR)); }
+        },
+
+        Row::Action(_) => spans.push(Span::styled("Send the edited rows to the server.", theme::DIM)),
+
+        Row::Item(item) =>
+        {
+            if !item.hint.is_empty() { spans.push(Span::styled(item.hint.clone(), theme::DIM)); }
+
+            //A KEY THE SERVER ONLY READS AT STARTUP IS SAID SO HERE - IT IS STORED EITHER WAY, JUST NOT USED YET
+            if item.restart
+            {
+                let note = match spans.is_empty() { true => "restart required", false => " \u{b7} restart required" };
+
+                spans.push(Span::styled(note, theme::NOTICE));
+            }
+        },
     }
 
     if spans.is_empty() { return Vec::new(); }
@@ -998,16 +1014,24 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
         //A BUTTON IS THE WHOLE ROW - IT HAS NO VALUE COLUMN TO LINE UP WITH
         Row::Action(label) =>
         {
-            let unsaved = _state.unsaved();
+            //A BUTTON IS LIVE WHEN IT HAS SOMETHING TO DO: Save WITH EDITED ROWS IN THE BOX, Restart WITH NONE
+            let restart = **label == *settings::RESTART_LABEL;
+            let live = if restart { !_state.unsaved() } else { _state.unsaved() };
+            let armed = restart && _state.confirm;
 
-            let style = match (selected, unsaved)
+            let style = match (armed, selected, live)
             {
-                (true, _) => theme::ACCENT,
-                (false, true) => theme::TEXT,
-                (false, false) => theme::DIM,
+                (true, _, _) => theme::ERROR,
+                (_, true, _) => theme::ACCENT,
+                (_, false, true) => theme::TEXT,
+                (_, false, false) => theme::DIM,
             };
 
-            let text = format!("[ {label} ]");
+            let text = match armed
+            {
+                true => format!("[ {label} \u{b7} press again ]"),
+                false => format!("[ {label} ]"),
+            };
             let padding = width.saturating_sub(text.width() + 1) / 2;
 
             let line = Line::from(vec!

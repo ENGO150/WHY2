@@ -37,7 +37,8 @@ use super::state::App;
 //CONSTS
 pub const MAX_PICKER_ROWS: usize = 8; //VISIBLE DEVICE ROWS BEFORE THE PICKER SCROLLS
 
-pub const SAVE_LABEL: &str = "Save"; //THE BUTTON THE SERVER ROWS ARE SENT BACK WITH
+pub const SAVE_LABEL: &str = "Save";              //THE BUTTON THE SERVER ROWS ARE SENT BACK WITH
+pub const RESTART_LABEL: &str = "Restart server"; //AND THE ONE THAT PUTS THE STARTUP-ONLY ONES IN USE
 
 #[cfg(feature = "client_voice")]
 pub const DEFAULT_DEVICE: &str = "System default"; //SHOWN FOR AN EMPTY input_device/output_device
@@ -125,6 +126,10 @@ pub struct Settings //THE /settings OVERLAY, IN EITHER OF ITS TWO MODES
     //THE STARTUP-ONLY KEYS IN THAT SAVE, SO THE EVENT LOOP CAN SAY THEY ARE STORED BUT NOT IN USE YET
     pub restart_note: Option<String>,
 
+    //THE RESTART BUTTON ENDS EVERY SESSION ON THE SERVER, SO IT IS ARMED BY ONE PRESS AND FIRED BY THE NEXT
+    pub confirm: bool,
+    restart: bool, //ARMED, CONFIRMED, AND STILL WAITING FOR THE EVENT LOOP TO PUT IT ON THE WIRE
+
     #[cfg(feature = "client_voice")]
     devices: Devices,
 }
@@ -158,6 +163,8 @@ impl Settings
             saving: false,
             save: None,
             restart_note: None,
+            confirm: false,
+            restart: false,
 
             #[cfg(feature = "client_voice")]
             devices: Devices::default(),
@@ -250,6 +257,7 @@ impl Settings
         }
 
         rows.push(Row::Action(SAVE_LABEL)); //NOTHING LEAVES THIS BOX UNTIL THIS IS PRESSED
+        rows.push(Row::Action(RESTART_LABEL));
 
         self.rows = rows;
         self.picker = None;
@@ -257,6 +265,7 @@ impl Settings
         self.server = true;
         self.edit = None;
         self.saving = false;
+        self.confirm = false;
         self.selected = 0;
 
         self.step(1);
@@ -269,6 +278,7 @@ impl Settings
         self.edit = None;
         self.server = false;
         self.saving = false;
+        self.confirm = false;
         self.rows = Vec::new();
     }
 
@@ -288,6 +298,9 @@ impl Settings
 
     //THE ROWS THE EVENT LOOP STILL HAS TO SEND - IT OWNS THE SOCKET, THIS OVERLAY DOES NOT
     pub fn take_save(&mut self) -> Option<Vec<ServerSetting>> { self.save.take() }
+
+    //AND SO IS A CONFIRMED RESTART - THE OVERLAY NEVER TOUCHES THE SOCKET ITSELF
+    pub fn take_restart(&mut self) -> bool { std::mem::take(&mut self.restart) }
 
     //WHAT THE SERVER ANSWERED A SAVE WITH: THE CONFIG AS IT ACTUALLY STANDS NOW, SO A ROW IT REFUSED
     //SNAPS BACK INSTEAD OF SITTING THERE LOOKING APPLIED. THE SELECTION IS KEPT WHERE THE USER LEFT IT
@@ -378,6 +391,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
         handle_edit_key(app, key);
         return;
     }
+
+    //AN ARMED RESTART SURVIVES ONLY THE KEY THAT CONFIRMS IT - ANYTHING ELSE PUTS THE BUTTON BACK
+    if !matches!(key.code, KeyCode::Enter | KeyCode::Char(' ')) { app.settings.confirm = false; }
 
     //Ctrl+S SAVES FROM WHEREVER THE SELECTION IS - THE BUTTON IS AT THE BOTTOM OF A LONG LIST
     if app.settings.server && key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('s')
@@ -523,7 +539,7 @@ enum Selected
     Toggle(bool),
     Number(i64),
     Text(String),
-    Action,
+    Action(&'static str), //WHICH BUTTON - THE SERVER ROWS HAVE TWO OF THEM
 
     #[cfg(feature = "client_voice")]
     Volume(String, u32),
@@ -537,7 +553,7 @@ fn selected(app: &App) -> Option<Selected>
     match app.settings.rows.get(app.settings.selected)?
     {
         Row::Header(_) => None,
-        Row::Action(_) => Some(Selected::Action),
+        Row::Action(label) => Some(Selected::Action(label)),
 
         Row::Item(item) => Some(match &item.value
         {
@@ -576,7 +592,7 @@ fn adjust(app: &mut App, direction: i32)
         },
 
         //A FREE-FORM STRING HAS NO NEXT VALUE TO STEP TO - IT IS TYPED
-        Some(Selected::Text(_)) | Some(Selected::Action) => {},
+        Some(Selected::Text(_)) | Some(Selected::Action(_)) => {},
 
         #[cfg(feature = "client_voice")]
         Some(Selected::Volume(key, percent)) =>
@@ -625,7 +641,8 @@ fn activate(app: &mut App)
         Some(Selected::Number(number)) => app.settings.edit = Some(number.to_string()),
         Some(Selected::Text(text)) => app.settings.edit = Some(text),
 
-        Some(Selected::Action) => save(app),
+        Some(Selected::Action(RESTART_LABEL)) => restart(app),
+        Some(Selected::Action(_)) => save(app),
 
         #[cfg(feature = "client_voice")]
         Some(Selected::Volume(..)) => adjust(app, 1),
@@ -646,6 +663,25 @@ fn activate(app: &mut App)
 
         None => {},
     }
+}
+
+//THE ONE BUTTON THAT ENDS THE SESSION FOR EVERYBODY ON THE SERVER, SO IT IS ASKED TWICE - AND NEVER WHILE
+//THERE ARE EDITED ROWS IN THE BOX, WHICH THE RESTART WOULD THROW AWAY UNREAD
+fn restart(app: &mut App)
+{
+    if !app.settings.server || app.settings.saving || app.settings.unsaved() { return; }
+
+    //THE FIRST PRESS ONLY ARMS IT - THE BUTTON AND THE LINE UNDER IT BOTH SAY SO UNTIL SOMETHING CLEARS IT
+    if !app.settings.confirm
+    {
+        app.settings.confirm = true;
+        return;
+    }
+
+    app.settings.restart = true;
+
+    //THE SERVER GOES DOWN WITH THIS, SO THERE IS NOTHING LEFT FOR THE BOX TO SHOW OR TO SAVE
+    app.settings.close();
 }
 
 //HAND THE EDITED ROWS TO THE EVENT LOOP, WHICH IS WHERE THE SOCKET IS. THE ROWS STAY MARKED UNTIL THE

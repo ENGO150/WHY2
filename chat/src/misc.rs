@@ -157,3 +157,42 @@ pub fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOA
 {
     env::temp_dir().join(consts::UPLOADS_DIR).join(username)
 }
+
+#[cfg(feature = "server")]
+pub fn restart() -> !
+{
+    let executable = match env::current_exe()
+    {
+        Ok(path) => path,
+        Err(error) =>
+        {
+            log::error!("Restart failed (executable not found): {error}");
+            std::process::exit(1);
+        }
+    };
+
+    let arguments: Vec<String> = env::args().skip(1).collect();
+
+    //ON UNIX THE PROCESS IMAGE IS REPLACED, KEEPING THE PID - WHATEVER SUPERVISES THE SERVER (systemd,
+    //docker) NEVER SEES IT GO AWAY, AND THE LISTENING SOCKET IS CLOSED BY THE exec ITSELF (CLOSE-ON-EXEC)
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+
+        //ONLY EVER RETURNS ON FAILURE
+        let error = std::process::Command::new(&executable).args(&arguments).exec();
+
+        log::error!("Restart failed: {error}");
+    }
+
+    //EVERYWHERE ELSE THERE IS NO exec, SO THE REPLACEMENT IS STARTED BESIDE US AND WE STAND DOWN - IT CAN
+    //REACH ITS bind BEFORE WE ARE GONE, WHICH IS WHAT THE BINARY'S RETRY IS FOR
+    #[cfg(not(unix))]
+    match std::process::Command::new(&executable).args(&arguments).spawn()
+    {
+        Ok(_) => std::process::exit(0),
+        Err(error) => log::error!("Restart failed: {error}"),
+    }
+
+    std::process::exit(1);
+}

@@ -27,6 +27,7 @@ use std::
 
 use tokio::
 {
+    io::Result,
     time,
     signal,
     sync::Mutex,
@@ -51,6 +52,36 @@ use why2_chat::
         server::{ self, ConnectionType },
     },
 };
+
+//CONSTS
+const BIND_ATTEMPTS: usize = 15;   //~3 SECONDS OF THEM
+const BIND_RETRY_DELAY: u64 = 200; //MS BETWEEN THEM
+
+//FUNCTIONS
+//THE PORT IS WAITED FOR RATHER THAN GIVEN UP ON AT THE FIRST TRY: A RESTART ON A PLATFORM WITHOUT exec
+//STARTS THE REPLACEMENT BESIDE THE OLD PROCESS, WHICH MAY STILL BE HOLDING IT FOR A MOMENT
+async fn bind<T>(what: &str, address: &str, bind: impl AsyncFn() -> Result<T>) -> T
+{
+    let mut last = None;
+
+    for attempt in 0..BIND_ATTEMPTS
+    {
+        match bind().await
+        {
+            Ok(bound) => return bound,
+
+            Err(error) =>
+            {
+                last = Some(error);
+
+                if attempt + 1 < BIND_ATTEMPTS { time::sleep(Duration::from_millis(BIND_RETRY_DELAY)).await; }
+            }
+        }
+    }
+
+    log::error!("Binding {what} on {address} failed: {}", last.unwrap());
+    process::exit(1);
+}
 
 async fn quit() //DISCONNECT ALL USERS
 {
@@ -87,21 +118,14 @@ async fn main()
     let address = format!("{}:{}", config::read_config::<String>("server_ip"), config::read_config::<u16>("server_port")); //GET ADDRESS
 
     //BIND TCP (TEXT)
-    let listener = match TcpListener::bind(&address).await
-    {
-        Ok(l) => l,
-        Err(_) =>
-        {
-            log::error!("Binding on {address} failed!");
-            process::exit(1);
-        }
-    };
+    let listener = bind("TCP", &address, async || TcpListener::bind(&address).await).await;
 
     //BIND UDP (VOICE)
-    let udp_socket = if options::voice_chat_enabled() //VOICE ENABLED
+    let udp_socket = match options::voice_chat_enabled()
     {
-        Some(UdpSocket::bind(&address).await.expect("Binding UDP failed"))
-    } else { None }; //VOICE DISABLED
+        true => Some(bind("UDP", &address, async || UdpSocket::bind(&address).await).await), //VOICE ENABLED
+        false => None,                                                                       //VOICE DISABLED
+    };
 
     log::info!("Listening on {address}"); //PRINT INFO
 

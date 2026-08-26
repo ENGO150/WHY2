@@ -1675,6 +1675,28 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 }, Some(&keys)).await;
             },
 
+            //SERVER RESTART
+            PacketCode::ServerRestart =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_OWNER_ROLE
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                log::info!("Restart requested by {username}");
+
+                //IN A TASK OF ITS OWN, BECAUSE disconnect_all ABORTS THIS ONE
+                tokio::spawn(async
+                {
+                    //EVERYONE IS SENT OFF FIRST, SO A CLIENT READS A DISCONNECT RATHER THAN A DEAD SOCKET
+                    disconnect_all().await;
+
+                    misc::restart();
+                });
+            },
+
             //KEEPALIVE
             PacketCode::KeepAlive =>
             {
