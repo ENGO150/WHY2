@@ -127,7 +127,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
     if !sub.available(app.role) { return invalid_usage(app, Some("action")); }
 
     //EVERY ACTION THAT TAKES A PARAMETER TAKES ONE TARGET ID
-    let _id = match sub.args.is_empty()
+    let id = match sub.args.is_empty()
     {
         true => None,
 
@@ -138,16 +138,26 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
         },
     };
 
-    //TODO: MUTE AND KICK DO NOT EXIST SERVER-SIDE YET - THEIR PACKETS GO HERE, ONE PER ACTION
     match sub.subcommand
     {
         Subcommand::Mute => app.push_styled("Muting users is not implemented yet.", theme::NOTICE),
-        Subcommand::Kick => app.push_styled("Kicking users is not implemented yet.", theme::NOTICE),
 
-        //THE SERVER OWNS server.toml, SO THE OVERLAY IS OPENED BY ITS ANSWER (ClientEvent::ServerSettings),
-        //NOT HERE - THE ROLE IS CHECKED AGAIN AT THE OTHER END BEFORE ANY OF IT COMES BACK
-        Subcommand::Settings => network::send(&mut *write_stream.lock().await,
-            PacketCode::ServerSettings { settings: None, save: false }, options::get_keys().as_ref()).await,
+        Subcommand::Kick =>
+        {
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerKick
+            {
+                id: id.unwrap(),
+            }, options::get_keys().as_ref()).await;
+        },
+
+        Subcommand::Settings =>
+        {
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerSettings
+            {
+                settings: None,
+                save: false,
+            }, options::get_keys().as_ref()).await;
+        },
     }
 }
 

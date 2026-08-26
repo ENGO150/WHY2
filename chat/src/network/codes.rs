@@ -142,6 +142,7 @@ pub enum PacketCode //CONTROL CODES
     KeyExchange { ecc: String, pq: String },        //SERVER <> CLIENT | KEY EXCHANGE
     Join { username: String },                      //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     List { users: Option<Vec<OnlineUser>> },        //CLIENT <> SERVER | PRINT CONNECTED USERS
+    ServerKick { id: usize },                       //CLIENT -> SERVER | KICK USER
 
     FirstUser,        //SERVER -> CLIENT | FIRST ONE TO REGISTER, OWNER ROLE ADDED
     Rekey,            //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)

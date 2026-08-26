@@ -1652,6 +1652,31 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 }
             },
 
+            //KICK USER
+            PacketCode::ServerKick { id } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_MODERATOR_ROLE
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                //FIND TARGET USER
+                let target = CONNECTIONS.iter()
+                    .find(|entry| entry.value().id() == Some(&id))
+                    .map(|entry| *entry.key());
+
+                if let Some(addr) = target
+                {
+                    //KICK
+                    remove_connection(&addr, true, Some("kick")).await;
+                } else //USER NOT FOUND
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                }
+            },
+
             //SERVER CONFIGURATION
             PacketCode::ServerSettings { settings, save } =>
             {
