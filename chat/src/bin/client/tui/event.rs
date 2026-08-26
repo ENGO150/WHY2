@@ -442,6 +442,9 @@ impl App
                 if self.leaving
                 {
                     self.quit(0, Some(String::from("Disconnected from the server.")));
+                } else if self.logging_out
+                {
+                    self.disconnected("Logged out.");
                 } else { self.disconnected("Server quit communication."); }
             },
 

@@ -110,6 +110,7 @@ pub struct App
 
     //LIFECYCLE
     pub leaving: bool,      //THE USER ASKED TO LEAVE, SO THE DISCONNECT THAT FOLLOWS ENDS THE CLIENT
+    pub logging_out: bool,  //THE USER ASKED TO LOG OUT, SO THAT DISCONNECT IS NOT AN ERROR - IT IS THE POINT
     pub drop_stream: bool,  //THE LOOP OWNS THE WRITE HALF - IT HAS TO CLOSE IT AFTER A LOST SESSION
     pub should_quit: bool,
     pub exit_code: i32,
@@ -155,6 +156,7 @@ impl App
             screens_requested: false,
             refresh_online: false,
             leaving: false,
+            logging_out: false,
             drop_stream: false,
             should_quit: false,
             exit_code: 0,
@@ -253,6 +255,7 @@ impl App
         #[cfg(feature = "client_screen")]
         { self.screens_requested = false; }
         self.refresh_online = false;
+        self.logging_out = false; //THE NEXT DROP IS THE NEXT SESSION'S TO EXPLAIN
 
         reset_session();
 

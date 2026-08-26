@@ -45,6 +45,7 @@ use crate::
 pub enum Command
 {
     Exit,                                       //DISCONNECT FROM SERVER
+    Logout,                                     //DISCONNECT FROM SERVER, BACK TO THE CONNECT BOX
     #[cfg(feature = "client_voice")] Voice,     //ENABLE VOICE CHAT
     #[cfg(feature = "client_voice")] Mute,      //TOGGLE-MUTE USER/YOURSELF
     Channel,                                    //SWITCH CHANNEL
@@ -473,6 +474,17 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Logout,
+        triggers: &[ "LOGOUT", "SIGNOUT", "SWITCH" ],
+        shortcut: Some('o'),
+        minimal_role: consts::SERVER_USER_ROLE,
+        subcommands: &[],
+        args: &[],
+        description: "Disconnects from the server and returns to the login screen",
+    },
+
+    CommandInfo
+    {
         command: Command::Exit,
         triggers: &[ "EXIT", "LEAVE", "QUIT", "DISCONNECT" ],
         shortcut: Some('c'),
@@ -565,7 +577,9 @@ impl Command
             #[cfg(feature = "client_screen")] Command::Deattach => Some(Ok(PacketCode::Deattach { username: None } )),
             #[cfg(feature = "client_screen")] Command::Screens => Some(Ok(PacketCode::Screens { users: None })),
 
-            Command::Exit => Some(Ok(PacketCode::Disconnect)),
+            //THE SAME PACKET AS /exit - THE TWO DIFFER ONLY IN WHAT THE CLIENT DOES WITH THE DISCONNECT
+            //THAT COMES BACK: ONE ENDS THE PROCESS, THE OTHER LANDS IN THE CONNECT BOX
+            Command::Exit | Command::Logout => Some(Ok(PacketCode::Disconnect)),
             #[cfg(feature = "client_voice")] Command::Voice => Some(Ok(PacketCode::Voice { token: None })),
 
             _ => None,

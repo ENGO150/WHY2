@@ -341,6 +341,9 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                     //THE DISCONNECT THAT COMES BACK IS ONE THE USER ASKED FOR, SO IT ENDS THE CLIENT
                     //INSTEAD OF DROPPING BACK INTO THE CONNECT BOX
                     Command::Exit => app.leaving = true,
+
+                    //AND THE ONE /logout ASKED FOR IS NOT AN ERROR EITHER - IT GOES BACK TO THE CONNECT BOX
+                    Command::Logout => app.logging_out = true,
                     _ => {},
                 }
             }
