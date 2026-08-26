@@ -132,6 +132,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         screen_stream: Option<AbortHandle>,                      //SCREEN UPLOAD TASK
         peer_addr: SocketAddr,                                   //ADDRESS & PORT
         username: String,                                        //USERNAME
+        role: usize,                                             //ROLE
         id: usize,                                               //ID OF USER
         keys: SharedKeys,                                        //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
         attached_screen: Option<Attach>,                         //SCREEN DOWNLOAD STREAM & TARGET ID
@@ -219,6 +220,16 @@ impl Connection
         {
             Self::Authenticated { .. } => panic!("Do not use username_mut() on Authenticated client"),
             Self::NonAuthenticated { username, .. } => username,
+        }
+    }
+
+    //GET ROLE
+    pub fn role(&self) -> Option<&usize>
+    {
+        match self
+        {
+            Self::Authenticated { role, .. } => Some(role),
+            Self::NonAuthenticated { .. } => None,
         }
     }
 
@@ -863,7 +874,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                 }
             },
 
-            Connection::Authenticated { write_stream, task, file_streams, screen_stream, username,
+            Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, role,
                 id, attached_screen, last_activity, channel, seq, server_seq, peer_addr, alive, muted, .. } =>
             {
                 Connection::Authenticated
@@ -874,6 +885,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     screen_stream,
                     peer_addr,
                     username,
+                    role,
                     id,
                     keys: keys.to_owned(),
                     attached_screen,
@@ -891,7 +903,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
     });
 }
 
-fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
+fn authenticate_client(peer_addr: &SocketAddr, username: &str, role: usize, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
     //UPDATE CONNECTION
     CONNECTIONS.alter(&peer_addr, |_, old_connection|
@@ -904,7 +916,8 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
             screen_stream: None,
             peer_addr: *old_connection.peer_addr(),
             username: username.to_string(),
-            id: id,
+            role,
+            id,
             keys: old_connection.keys().unwrap().to_owned(),
             attached_screen: None,
             last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
@@ -942,6 +955,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             screen_stream: old_connection.screen_stream().clone(),
             peer_addr: *old_connection.peer_addr(),
             username: old_connection.username().unwrap().clone(),
+            role: *old_connection.role().unwrap(),
             id: *old_connection.id().unwrap(),
             keys: old_connection.keys().unwrap().to_owned(),
             attached_screen: old_connection.attached_screen().clone(),
@@ -1266,15 +1280,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         }
     }
 
-    //GENERATE ID FOR CLIENT
-    let id = get_latest_id();
+    let id = get_latest_id(); //GENERATE ID FOR CLIENT
+    let role = config::server_users_role(&username).unwrap(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
 
     let mut channel: Option<String> = None; //CURRENT CLIENT CHANNEL
 
     //AUTHENTICATE CLIENT
-    authenticate_client(&peer_addr, &username, id);
-
-    let role = config::server_users_role(&username).unwrap(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
+    authenticate_client(&peer_addr, &username, role, id);
 
     //TELL CLIENT TO START CHATTING
     network::send(&mut *streams.1.lock().await, PacketCode::Accept { id, role }, Some(&keys)).await;
@@ -1708,7 +1720,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 //FIND TARGET USER
                 if let Some(mut conn) = CONNECTIONS.iter_mut()
-                    .find(|entry| entry.value().id() == Some(&id))
+                    .find(|entry| entry.value().id() == Some(&id)) && conn.role() < Some(&role)
                 {
                     //TOGGLE MUTE
                     conn.toggle_mute();
@@ -1731,9 +1743,9 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //FIND TARGET USER
                 let target = CONNECTIONS.iter()
                     .find(|entry| entry.value().id() == Some(&id))
-                    .map(|entry| *entry.key());
+                    .map(|entry| (*entry.key(), entry.role().cloned()));
 
-                if let Some(addr) = target
+                if let Some((addr, Some(trole))) = target && trole < role
                 {
                     //KICK
                     remove_connection(&addr, true, Some("kick")).await;
