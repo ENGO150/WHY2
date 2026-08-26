@@ -133,7 +133,7 @@ impl App
                 self.refresh_online = true;
             },
 
-            ClientEvent::Leave(uname) =>
+            ClientEvent::Leave(uname, id) =>
             {
                 self.push(Line::from(vec!
                 [
@@ -141,7 +141,12 @@ impl App
                     Span::styled(format!("{uname} disconnected."), theme::DIM),
                 ]));
 
-                self.refresh_online = true;
+                //NO PacketCode::List HERE: A KICK WOULD PUT ONE RIGHT BEHIND THE ServerKick PACKET AND
+                //EARN A SpamWarning. THE Leave PACKET NAMES THE USER, SO THE ROSTER CAN DROP THEM ITSELF
+                self.online.retain(|user| user.id != id);
+
+                //SAME RULE AS ClientEvent::List - A CHANNEL EXISTS EXACTLY AS LONG AS SOMEBODY IS IN IT
+                self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
             },
 
             ClientEvent::InvalidUsage =>

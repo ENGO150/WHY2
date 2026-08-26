@@ -366,12 +366,18 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     cannot disagree.
   - The sidebar is fed by events, never by polling. `App::refresh_online` (a `PacketCode::List`
     request drained on the redraw tick) is only set for things that genuinely change the roster —
-    `Authenticated`, `Join`, `Leave`. **A channel switch must not trigger one**: it would land
+    `Authenticated` and `Join` — `Join` carries only a username, so the roster has to be asked.
+    **A channel switch must not trigger one**: it would land
     inside the server's `min_message_delay` window right behind the `/channel` packet and earn a
-    `SpamWarning` (three of those disconnect). The channel list is maintained from the globally
+    `SpamWarning` (three of those disconnect). **`Leave` must not either, for the same reason**: it
+    is broadcast to the kicker as well, so a `/kick` would put the `List` request directly behind
+    its own `ServerKick` packet and warn the moderator for spam. It does not need one — `Leave`
+    names the id, so the arm drops that user from `App::online` itself and re-derives the channels
+    from what is left. The channel list is maintained from the globally
     broadcast `ChannelCreated`/`ChannelDestroyed` packets plus whatever the last `List` showed —
     a channel exists exactly as long as somebody is in it, so the lobby is not one and is not
-    listed.
+    listed. (`ChannelDestroyed` is only sent on a `/channel` switch, never on a disconnect, so
+    re-deriving in the `Leave` arm is also what retires a channel whose last member dropped.)
   - Block-command output (`/list`, `/files`, `/screens`, `/help`, `/info`) is a tree, not a table:
     every row opens with `tui::branch` (`├─`/`╰─`, `│` continuing the trunk past a non-last owner's
     files in `/files`) in `theme::BORDER`, then a right-aligned dim id column, then the name. Keep

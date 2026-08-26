@@ -138,7 +138,7 @@ pub enum ClientEvent
     ReconnectFailed,                               //RECONNECTING AFTER PINNING THE KEY FAILED
     VoiceActivity(Vec<VoiceUser>),                 //VOICE OVERLAY
     Join(String),                                  //CLIENT CONNECTED
-    Leave(String),                                 //CLIENT DISCONNECTED
+    Leave(String, usize),                          //CLIENT DISCONNECTED
     ChannelChanged(Option<String>),                //WE SWITCHED CHANNEL
     ChannelCreated(String),                        //CHANNEL CREATED
     ChannelDestroyed(String),                      //CHANNEL ABANDONED
@@ -532,13 +532,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //LEAVE MESSAGE (CLIENT DISCONNECTED)
             PacketCode::Leave { username, id } =>
             {
-                tx.send(ClientEvent::Leave(username)).await.unwrap();
+                tx.send(ClientEvent::Leave(username, id)).await.unwrap();
 
                 #[cfg(feature = "client_voice")]
                 voice_client::remove_consumer(&id);
-
-                #[cfg(not(feature = "client_voice"))]
-                let _ = id;
             },
 
             //CHANNEL CHANGE
