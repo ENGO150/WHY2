@@ -70,6 +70,7 @@ use super::
     {
         self,
         Row,
+        Item,
         Value,
         Settings,
         DeviceEntry,
@@ -623,11 +624,39 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
         None => (state.title(), state.rows.len(), state.selected),
     };
 
+    //THE SERVER'S COMMENT ON A KEY IS A WHOLE SENTENCE AND HAS NO BUSINESS IN A TITLE BAR, WHERE IT SHARES
+    //THE WIDTH WITH THE TITLE AND IS CUT OFF. IT IS WRAPPED INTO THE FOOT OF THE BOX INSTEAD, ACROSS THE
+    //FULL WIDTH AND OVER AS MANY LINES AS IT NEEDS
+    let hint_lines = match state.picker.is_none().then(|| state.rows.get(state.selected)).flatten()
+    {
+        Some(Row::Item(item)) => description_lines(item, inner_width as u16),
+        _ => Vec::new(),
+    };
+
+    //THE FOOT IS SIZED FOR THE LONGEST COMMENT IN THE BOX, NOT FOR THE ONE UNDER THE CURSOR - OTHERWISE THE
+    //WHOLE BOX GROWS AND SHRINKS AS THE SELECTION MOVES, WHICH IS UNREADABLE TO SCROLL THROUGH
+    let hint_height = match state.picker.is_some()
+    {
+        true => 0,
+        false => state.rows.iter().filter_map(|row| match row
+        {
+            Row::Item(item) => Some(description_lines(item, inner_width as u16).len()),
+            Row::Header(_) | Row::Action(_) => None,
+        }).max().unwrap_or(0),
+    };
+
     let room = area.height.saturating_sub(4) as usize; //BORDERS PLUS A LINE OF AIR TOP AND BOTTOM
+
+    //THE RULE ABOVE IT COUNTS TOO - AND ON A TERMINAL WITH NO ROOM FOR BOTH, THE ROWS WIN
+    let footer = match hint_height { 0 => 0, height => height + 1 };
+    let footer = if room > footer { footer } else { 0 };
+
+    let rows_room = room - footer;
+
     let visible = match &state.picker
     {
-        Some(_) => total.min(settings::MAX_PICKER_ROWS).min(room),
-        None => total.min(room),
+        Some(_) => total.min(settings::MAX_PICKER_ROWS).min(rows_room),
+        None => total.min(rows_room),
     }.max(1);
 
     //KEEP THE SELECTION IN VIEW
@@ -642,7 +671,7 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
 
     //ON A NARROW TERMINAL THE LABELS GIVE WAY FIRST - THE VALUES ARE WHAT THE USER IS HERE FOR
 
-    let lines = match &state.picker
+    let mut lines = match &state.picker
     {
         Some(picker) => picker.entries.iter().enumerate()
             .skip(first)
@@ -656,6 +685,19 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
             .map(|(index, row)| settings_line(state, row, index == state.selected, label_width, inner_width))
             .collect::<Vec<Line>>(),
     };
+
+    let rows_height = lines.len() as u16 + 2; //WHAT THE SCROLLBAR IS ALLOWED TO RUN DOWN
+
+    //THE DESCRIPTION SITS UNDER A RULE, SO IT READS AS AN EXPLANATION OF THE SELECTED ROW AND NOT AS A ROW
+    if footer > 0
+    {
+        lines.push(Line::from(Span::styled("\u{2500}".repeat(inner_width), theme::BORDER)));
+
+        let blanks = hint_height - hint_lines.len(); //A SHORT COMMENT LEAVES THE REST OF THE FOOT EMPTY
+
+        lines.extend(hint_lines);
+        lines.extend(std::iter::repeat_n(Line::default(), blanks));
+    }
 
     let height = lines.len() as u16 + 2;
 
@@ -679,38 +721,20 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
         (None, false, false) => " ↑↓ move │ ←→ change │ ⏎ select │ Esc close ",
     };
 
-    let mut block = Block::bordered()
+    let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::BORDER_ACTIVE)
-        .title(Span::styled(title.clone(), theme::TITLE))
+        .title(Span::styled(title, theme::TITLE))
         .title_bottom(Line::from(Span::styled(hint, theme::DIM)).centered());
-
-    //THE SERVER SENDS ITS OWN COMMENT ON EVERY KEY ALONG, WHICH IS THE ONLY EXPLANATION OF WHAT THE ROW DOES
-    if state.picker.is_none()
-        && let Some(Row::Item(item)) = state.rows.get(state.selected)
-        && !item.hint.is_empty()
-    {
-        //A KEY THE SERVER ONLY READS AT STARTUP IS SAID SO HERE - IT IS STORED EITHER WAY, JUST NOT USED YET
-        let note = if item.restart { " · restart required" } else { "" };
-        let room = inner_width.saturating_sub(title.width() + note.width() + 2);
-
-        if room > 8
-        {
-            block = block.title_top(Line::from(vec!
-            [
-                Span::styled(truncate(&item.hint, room), theme::DIM),
-                Span::styled(note, theme::NOTICE),
-            ]).right_aligned());
-        }
-    }
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
     frame.render_widget(Paragraph::new(lines), inner);
 
-    //BOTH MODES SCROLL - THE DEVICE PICKER ALWAYS, THE SETTING ROWS ON A SHORT TERMINAL
-    draw_scrollbar(frame, popup, total, visible, first);
+    //BOTH MODES SCROLL - THE DEVICE PICKER ALWAYS, THE SETTING ROWS ON A SHORT TERMINAL. THE TRACK IS THE
+    //ROWS' OWN HEIGHT, NOT THE BOX'S: THE DESCRIPTION UNDER THEM IS NOT SOMETHING THE BAR IS MEASURING
+    draw_scrollbar(frame, Rect { height: rows_height, ..popup }, total, visible, first);
 }
 
 //THE SERVER IDENTITY PROMPT. THE WHOLE POINT IS THAT THE FINGERPRINT IS READABLE AND THE SAFE ANSWER IS
@@ -937,6 +961,27 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
 fn button(label: &'static str, selected: bool, style: Style) -> Span<'static>
 {
     if selected { Span::styled(label, style.patch(theme::SELECTED)) } else { Span::styled(label, theme::DIM) }
+}
+
+//THE SELECTED ROW'S EXPLANATION, WRAPPED RATHER THAN CUT: server.toml's COMMENTS ARE FULL SENTENCES AND
+//THE ONLY THING SAYING WHAT A KEY DOES, SO LOSING THE END OF ONE LOSES THE POINT OF IT
+fn description_lines(item: &Item, width: u16) -> Vec<Line<'static>>
+{
+    let mut spans = Vec::new();
+
+    if !item.hint.is_empty() { spans.push(Span::styled(item.hint.clone(), theme::DIM)); }
+
+    //A KEY THE SERVER ONLY READS AT STARTUP IS SAID SO HERE - IT IS STORED EITHER WAY, JUST NOT USED YET
+    if item.restart
+    {
+        let note = match spans.is_empty() { true => "restart required", false => " \u{b7} restart required" };
+
+        spans.push(Span::styled(note, theme::NOTICE));
+    }
+
+    if spans.is_empty() { return Vec::new(); }
+
+    state::wrap_line(&Line::from(spans), width)
 }
 
 fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usize, width: usize) -> Line<'static>

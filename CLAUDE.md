@@ -416,14 +416,23 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     have — the client does not get to invent keys or retype them. This mode is the one place the overlay does
     **not** write through: server rows are held (`Item::changed`, marked `●`) until `[ Save ]`/Ctrl+S, which
     only hands the changed rows to `tui::run`'s key path — the overlay never touches the socket itself.
+  - **The selected row's description is wrapped in the foot of the settings box, not put in the title bar.**
+    `server.toml`'s comments are whole sentences and are the only thing saying what a key does, so a title
+    bar — which shares its width with the title and can only truncate — loses the half that mattered;
+    `draw::description_lines` wraps it with `state::wrap_line` across the full inner width instead, under a
+    rule. The foot is sized for the **longest** comment in the box rather than the selected one, so the box
+    does not grow and shrink as the selection moves, and it is dropped entirely when the terminal has no
+    room for both it and the rows. Client rows carry no comment, so `/settings` proper is unchanged. The
+    scrollbar is handed the rows' own height (not `popup`), because the description is not part of what it
+    is measuring.
   - **A saved server key is live the moment it is stored — except the four the server only reads while
     starting up.** Every other key is read at its point of use through `config::read_config` (which is
     cached, so a write is visible to the next read), so a limit or a length raised in the overlay applies
     to the next packet. `consts::SERVER_RESTART_SETTINGS` names the ones that do not: `server_ip` and
     `server_port` (the listener is already bound), `enable_voice_chat` (the UDP server is spawned once in
     `bin/server.rs`) and `server_username` (latched into `options::set_server_username`). `server_settings`
-    stamps `ServerSetting::restart` from that list, and the client marks those rows `↻` with a
-    `· restart required` note and says so in the history when such a row is saved — the save itself is
+    stamps `ServerSetting::restart` from that list, and the client marks those rows `↻`, adds
+    `· restart required` to the description under them and says so in the history when such a row is saved — the save itself is
     never refused, the value is stored either way. Adding a key that is only read at startup means adding
     it to that const; the handshake budget used to be one of those (a `LazyLock` over `max_clients` +
     `max_unauth_clients`) and was turned into `server::max_handshakes()` rather than listed, because the
