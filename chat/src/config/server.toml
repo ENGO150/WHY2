@@ -18,7 +18,7 @@
 server_ip = "0.0.0.0" # Server address
 server_port = 1204 # Server port
 
-# Voice Chat
+# Features
 enable_voice_chat = true # Enable VoIP
 enable_screenshare = true # Enable screensharing
 
