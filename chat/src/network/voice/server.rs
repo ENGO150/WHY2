@@ -271,6 +271,9 @@ pub async fn listen_client_voice(socket: UdpSocket)
             //AUDIO
             VoicePacketCode::Audio { data, .. } =>
             {
+                //SILENCE MUTED USERS
+                if *server::CONNECTIONS.iter().find(|c| c.id() == Some(&received.id)).unwrap().muted() { continue; }
+
                 //VALIDATE PACKET IF IT CONTAINS AUDIO
                 if !validate_opus_packet(&data) { continue; }
 

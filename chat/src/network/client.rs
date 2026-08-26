@@ -142,6 +142,7 @@ pub enum ClientEvent
     ChannelChanged(Option<String>),                //WE SWITCHED CHANNEL
     ChannelCreated(String),                        //CHANNEL CREATED
     ChannelDestroyed(String),                      //CHANNEL ABANDONED
+    Muted,                                         //HAHA
     InvalidUsage,                                  //INVALID COMMAND USAGE
     VersionFailed,                                 //FETCHING VERSIONS FAILED
     VersionMismatch(String, String),               //MISMATCH GIT HASH
@@ -745,6 +746,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 disabled_registration = true;
             },
+
+            //HAHA, YOU'RE MUTED
+            PacketCode::Muted =>
+            {
+                tx.send(ClientEvent::Muted).await.unwrap();
+            }
 
             //CLIENT MESSED SOME COMMAND UP
             PacketCode::InvalidUsage =>

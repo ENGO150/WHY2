@@ -140,7 +140,13 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
 
     match sub.subcommand
     {
-        Subcommand::Mute => app.push_styled("Muting users is not implemented yet.", theme::NOTICE),
+        Subcommand::Mute =>
+        {
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerMute
+            {
+                id: id.unwrap(),
+            }, options::get_keys().as_ref()).await;
+        },
 
         Subcommand::Kick =>
         {

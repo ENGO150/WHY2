@@ -143,6 +143,7 @@ pub enum PacketCode //CONTROL CODES
     Join { username: String },                      //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     List { users: Option<Vec<OnlineUser>> },        //CLIENT <> SERVER | PRINT CONNECTED USERS
     ServerKick { id: usize },                       //CLIENT -> SERVER | KICK USER
+    ServerMute { id: usize },                       //CLIENT -> SERVER | MUTE USER
 
     FirstUser,        //SERVER -> CLIENT | FIRST ONE TO REGISTER, OWNER ROLE ADDED
     Rekey,            //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)
@@ -150,6 +151,7 @@ pub enum PacketCode //CONTROL CODES
     SpamWarning,      //SERVER -> CLIENT | TELL CLIENT TO CALM TF DOWN
     RegisterDisabled, //SERVER -> CLIENT | REGISTRATION IS DISABLED
     UploadLimit,      //SERVER -> CLIENT | MAX CONCURRENT UPLOADS REACHED
+    Muted,            //SERVER -> CLIENT | TELL CLIENT TO STFU
     InvalidUsage,     //SERVER -> CLIENT | INVALID PARAMETERS TO A COMMAND
     InvalidFeature,   //SERVER -> CLIENT | CLIENT REQUESTED DISABLED FEATURE
     KeepAlive,        //SERVER <> CLIENT | A BIT LESS STUPID KEEP-ALIVE

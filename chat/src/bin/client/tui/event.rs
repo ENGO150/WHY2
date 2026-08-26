@@ -149,6 +149,11 @@ impl App
                 self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
             },
 
+            ClientEvent::Muted =>
+            {
+                self.push_styled("You have been muted by moderator.", theme::NOTICE);
+            },
+
             ClientEvent::InvalidUsage =>
             {
                 self.push_styled("Invalid usage! Press Ctrl+H for help.", theme::ERROR);

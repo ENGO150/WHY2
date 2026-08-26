@@ -144,6 +144,9 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             None => break
         };
 
+        //SILENCE MUTED USERS
+        if *server::CONNECTIONS.iter().find(|c| c.id() == Some(&id)).unwrap().muted() { continue; }
+
         //COLLECT ALL ATTACHED CLIENT STREAMS
         let entries: Vec<(usize, Arc<Mutex<OwnedWriteHalf>>)> = server::CONNECTIONS.iter().filter_map(|entry|
         {

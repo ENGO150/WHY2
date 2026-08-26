@@ -126,22 +126,23 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 {
     Authenticated
     {
-        write_stream: Arc<Mutex<OwnedWriteHalf>>,                    //STREAM
-        task: AbortHandle,                                           //HANDLER TASK (USED TO FORCE-CLOSE THE CONNECTION)
-        file_streams: Arc<MutexSync<HashMap<u64, AbortHandle>>>,     //ACTIVE FILE TRANSFER TASKS
-        screen_stream: Option<AbortHandle>,                          //SCREEN UPLOAD TASK
-        peer_addr: SocketAddr,                                       //ADDRESS & PORT
-        username: String,                                            //USERNAME
-        id: usize,                                                   //ID OF USER
-        keys: SharedKeys,                                            //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
-        attached_screen: Option<Attach>,                             //SCREEN DOWNLOAD STREAM & TARGET ID
-        last_activity: Instant,                                      //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
-        last_key_exchange: Instant,                                  //TIME OF LAST REKEY
-        spam_violations: usize,                                      //SPAM VIOLATIONS (unexpected, huh?)
-        channel: Option<String>,                                     //CHANNEL
-        seq: usize,                                                  //SEQUENCE NUMBER (CLIENT -> SERVER)
-        server_seq: usize,                                           //SEQUENCE NUMBER (SERVER -> CLIENT)
-        alive: bool,                                                 //RESPONDED TO KEEPALIVE
+        write_stream: Arc<Mutex<OwnedWriteHalf>>,                //STREAM
+        task: AbortHandle,                                       //HANDLER TASK (USED TO FORCE-CLOSE THE CONNECTION)
+        file_streams: Arc<MutexSync<HashMap<u64, AbortHandle>>>, //ACTIVE FILE TRANSFER TASKS
+        screen_stream: Option<AbortHandle>,                      //SCREEN UPLOAD TASK
+        peer_addr: SocketAddr,                                   //ADDRESS & PORT
+        username: String,                                        //USERNAME
+        id: usize,                                               //ID OF USER
+        keys: SharedKeys,                                        //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
+        attached_screen: Option<Attach>,                         //SCREEN DOWNLOAD STREAM & TARGET ID
+        last_activity: Instant,                                  //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
+        last_key_exchange: Instant,                              //TIME OF LAST REKEY
+        spam_violations: usize,                                  //SPAM VIOLATIONS (unexpected, huh?)
+        channel: Option<String>,                                 //CHANNEL
+        seq: usize,                                              //SEQUENCE NUMBER (CLIENT -> SERVER)
+        server_seq: usize,                                       //SEQUENCE NUMBER (SERVER -> CLIENT)
+        alive: bool,                                             //RESPONDED TO KEEPALIVE
+        muted: bool,                                             //USER HAS SAID TOO MUCH, GIVING HIM A REST
     },
 
     NonAuthenticated
@@ -507,6 +508,25 @@ impl Connection
             id
         })
     }
+
+    //MUTE
+    pub fn toggle_mute(&mut self)
+    {
+        if let Self::Authenticated { muted, .. } = self
+        {
+            *muted = !*muted;
+        }
+    }
+
+    //MUTED
+    pub fn muted(&self) -> &bool
+    {
+        match self
+        {
+            Self::Authenticated { muted, .. } => muted,
+            Self::NonAuthenticated { .. } => &false,
+        }
+    }
 }
 
 impl HandshakeSlot
@@ -843,8 +863,8 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                 }
             },
 
-            Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, id, attached_screen, last_activity, channel,
-                seq, server_seq, peer_addr, alive, .. } =>
+            Connection::Authenticated { write_stream, task, file_streams, screen_stream, username,
+                id, attached_screen, last_activity, channel, seq, server_seq, peer_addr, alive, muted, .. } =>
             {
                 Connection::Authenticated
                 {
@@ -864,6 +884,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     seq,
                     server_seq,
                     alive,
+                    muted,
                 }
             }
         }
@@ -893,6 +914,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, id: usize) //MOVE
             seq: *old_connection.seq(),
             server_seq: 0,
             alive: true,
+            muted: false,
         }
     });
 
@@ -930,6 +952,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             seq: *old_connection.seq(),
             server_seq: *old_connection.server_seq().unwrap(),
             alive: true,
+            muted: *old_connection.muted(),
         }
     });
 
@@ -1285,6 +1308,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             //MESSAGE
             PacketCode::Message { text, colors, .. } =>
             {
+                //SILENCE MUTED USERS
+                if *CONNECTIONS.get(&peer_addr).unwrap().muted()
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
+                    continue;
+                }
+
                 //SEND MESSAGE TO ALL USERS
                 send_to_all(PacketCode::Message
                 {
@@ -1391,6 +1421,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             //NEW FILE UPLOAD
             PacketCode::Upload { hash, .. } =>
             {
+                //SILENCE MUTED USERS
+                if *CONNECTIONS.get(&peer_addr).unwrap().muted()
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
+                    continue;
+                }
+
                 //PREVENT TOKEN SPAM
                 let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count();
                 if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
@@ -1606,6 +1643,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             //PRIVATE MESSAGE
             PacketCode::PrivateMessage { text, id: recipient_id, .. } =>
             {
+                //SILENCE MUTED USERS
+                if *CONNECTIONS.get(&peer_addr).unwrap().muted()
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
+                    continue;
+                }
+
                 //FIND RECIPIENT BY ID
                 let recipient_addr = CONNECTIONS.iter()
                     .find(|entry| entry.value().id() == Some(&recipient_id))
@@ -1648,6 +1692,28 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 } else
                 {
                     //INVALID PM FORMAT
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                }
+            },
+
+            //MUTE USER
+            PacketCode::ServerMute { id } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_MODERATOR_ROLE
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                //FIND TARGET USER
+                if let Some(mut conn) = CONNECTIONS.iter_mut()
+                    .find(|entry| entry.value().id() == Some(&id))
+                {
+                    //TOGGLE MUTE
+                    conn.toggle_mute();
+                } else //USER NOT FOUND
+                {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
