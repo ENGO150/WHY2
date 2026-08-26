@@ -514,7 +514,7 @@ impl HandshakeSlot
     //TAKE A SLOT FOR A FRESHLY ACCEPTED SOCKET, None IF THE BUDGET IS FULL
     pub fn reserve(ip: IpAddr) -> Option<Self>
     {
-        if HANDSHAKES.load(Ordering::Relaxed) >= *MAX_HANDSHAKES { return None; }
+        if HANDSHAKES.load(Ordering::Relaxed) >= max_handshakes() { return None; }
 
         //PER-IP SO ONE PEER CANNOT TAKE THE WHOLE BUDGET
         {
@@ -554,10 +554,10 @@ pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::ne
 pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //HANDSHAKE BUDGET
-static MAX_HANDSHAKES: LazyLock<usize> = LazyLock::new(||
+fn max_handshakes() -> usize
 {
     (config::read_config::<usize>("max_clients") + config::read_config::<usize>("max_unauth_clients")) * consts::MAX_HANDSHAKES_PER_IP
-});
+}
 static HANDSHAKES: AtomicUsize = AtomicUsize::new(0);
 static HANDSHAKES_PER_IP: LazyLock<DashMap<IpAddr, usize>> = LazyLock::new(|| DashMap::new());
 

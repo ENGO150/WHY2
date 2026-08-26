@@ -78,6 +78,7 @@ pub struct Item
     pub value: Value,
     pub hint: String,   //THE COMMENT THE SERVER SENT ALONG (EMPTY ON A CLIENT ROW)
     pub changed: bool,  //EDITED AND NOT SAVED YET - ONLY A SERVER ROW IS EVER LEFT UNSAVED
+    pub restart: bool,  //SAVING IT STORES IT, BUT THE RUNNING SERVER KEEPS USING WHAT IT READ AT STARTUP
 }
 
 //ONE DEVICE AS THE PICKER SHOWS IT. THE id IS WHAT client.toml HOLDS AND WHAT THE VOICE CLIENT OPENS -
@@ -121,6 +122,9 @@ pub struct Settings //THE /settings OVERLAY, IN EITHER OF ITS TWO MODES
 
     save: Option<Vec<ServerSetting>>, //ROWS THE EVENT LOOP STILL HAS TO PUT ON THE WIRE
 
+    //THE STARTUP-ONLY KEYS IN THAT SAVE, SO THE EVENT LOOP CAN SAY THEY ARE STORED BUT NOT IN USE YET
+    pub restart_note: Option<String>,
+
     #[cfg(feature = "client_voice")]
     devices: Devices,
 }
@@ -135,7 +139,7 @@ impl Item
 {
     fn client(label: &str, key: &str, value: Value) -> Self //A ROW BACKED BY client.toml
     {
-        Self { label: label.to_string(), key: key.to_string(), value, hint: String::new(), changed: false }
+        Self { label: label.to_string(), key: key.to_string(), value, hint: String::new(), changed: false, restart: false }
     }
 }
 
@@ -153,6 +157,7 @@ impl Settings
             edit: None,
             saving: false,
             save: None,
+            restart_note: None,
 
             #[cfg(feature = "client_voice")]
             devices: Devices::default(),
@@ -240,6 +245,7 @@ impl Settings
                 },
                 hint: setting.description,
                 changed: false,
+                restart: setting.restart, //THE SERVER SAYS WHICH OF ITS OWN KEYS IT ONLY READS AT STARTUP
             }));
         }
 
@@ -670,10 +676,20 @@ fn save(app: &mut App)
             //THE SERVER IS THE ONE WHO KNOWS THESE - SENDING THEM BACK WOULD ONLY BE US QUOTING IT
             section: String::new(),
             description: String::new(),
+            restart: false,
         })
     }).collect();
 
     if changed.is_empty() { return; }
+
+    //A KEY THE SERVER ONLY READS AT STARTUP IS STORED LIKE ANY OTHER - IT JUST WILL NOT DO ANYTHING YET
+    let restart: Vec<&str> = app.settings.rows.iter().filter_map(|row| match row
+    {
+        Row::Item(item) if item.changed && item.restart => Some(item.key.as_str()),
+        _ => None,
+    }).collect();
+
+    app.settings.restart_note = (!restart.is_empty()).then(|| restart.join(", "));
 
     app.settings.saving = true;
     app.settings.save = Some(changed);

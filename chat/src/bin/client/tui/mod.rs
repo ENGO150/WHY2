@@ -443,12 +443,25 @@ async fn handle_key
         {
             match write_stream
             {
-                Some(write_stream) => network::send(&mut *write_stream.lock().await,
-                    network::codes::PacketCode::ServerSettings { settings: Some(settings), save: true },
-                    options::get_keys().as_ref()).await,
+                Some(write_stream) =>
+                {
+                    network::send(&mut *write_stream.lock().await,
+                        network::codes::PacketCode::ServerSettings { settings: Some(settings), save: true },
+                        options::get_keys().as_ref()).await;
+
+                    //STORED IS NOT THE SAME AS IN USE FOR THESE - SAY SO ONCE, WHERE THE USER READS THINGS
+                    if let Some(keys) = app.settings.restart_note.take()
+                    {
+                        app.push_styled(format!("{keys} takes effect when the server is restarted."), theme::NOTICE);
+                    }
+                },
 
                 //NOTHING WENT OUT, SO NOTHING IS COMING BACK - THE ROWS STAY EDITABLE INSTEAD OF WAITING FOREVER
-                None => app.settings.saving = false,
+                None =>
+                {
+                    app.settings.saving = false;
+                    app.settings.restart_note = None;
+                },
             }
         }
 

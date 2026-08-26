@@ -690,11 +690,17 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
         && let Some(Row::Item(item)) = state.rows.get(state.selected)
         && !item.hint.is_empty()
     {
-        let room = inner_width.saturating_sub(title.width() + 2);
+        //A KEY THE SERVER ONLY READS AT STARTUP IS SAID SO HERE - IT IS STORED EITHER WAY, JUST NOT USED YET
+        let note = if item.restart { " · restart required" } else { "" };
+        let room = inner_width.saturating_sub(title.width() + note.width() + 2);
 
         if room > 8
         {
-            block = block.title_top(Line::from(Span::styled(truncate(&item.hint, room), theme::DIM)).right_aligned());
+            block = block.title_top(Line::from(vec!
+            [
+                Span::styled(truncate(&item.hint, room), theme::DIM),
+                Span::styled(note, theme::NOTICE),
+            ]).right_aligned());
         }
     }
 
@@ -993,6 +999,9 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
 
     //AN EDITED ROW IS MARKED UNTIL THE SERVER HAS SAID WHAT IT STORED
     if item.changed { spans.push(Span::styled(" ●", theme::NOTICE)); }
+
+    //AND ONE THE SERVER WILL NOT PICK UP UNTIL IT IS RESTARTED CARRIES THAT ON THE ROW, SAVED OR NOT
+    if item.restart { spans.push(Span::styled(" ↻", theme::DIM)); }
 
     let line = Line::from(spans);
 

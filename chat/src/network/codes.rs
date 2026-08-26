@@ -164,6 +164,7 @@ pub struct ServerSetting
     pub value: SettingValue,
     pub section: String,     //THE '# Network' HEADING THE KEY SITS UNDER
     pub description: String, //THE TRAILING COMMENT ON THE KEY'S OWN LINE
+    pub restart: bool,       //THE SERVER READS THIS ONE ONLY WHILE STARTING UP (consts::SERVER_RESTART_SETTINGS)
 }
 
 //THE THREE DATATYPES config_read UNDERSTANDS - A VALUE THAT COMES BACK AS A DIFFERENT ONE IS REFUSED

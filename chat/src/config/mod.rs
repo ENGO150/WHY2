@@ -363,6 +363,9 @@ pub fn server_settings() -> Vec<ServerSetting>
             },
             section: section.clone(),
             description,
+
+            //SAVING ONE OF THESE STORES IT, AND THE RUNNING SERVER GOES ON USING WHAT IT READ AT STARTUP
+            restart: consts::SERVER_RESTART_SETTINGS.contains(&key),
         });
     }
 
