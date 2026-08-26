@@ -313,6 +313,13 @@ pub fn server_users_role(username: &str) -> Option<usize> //RETURN PASSWORD HASH
 }
 
 #[cfg(feature = "server")]
+pub fn server_users_banned(username: &str) -> Option<bool>
+{
+    get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(username)?
+        .as_table_like()?.get("banned")?.as_bool()
+}
+
+#[cfg(feature = "server")]
 pub fn server_users_ban(username: &str)
 {
     write_user_field(username, "banned", true.into());

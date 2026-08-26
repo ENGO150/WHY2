@@ -1261,7 +1261,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         };
 
         //VERIFY PASSWORD (ARGON2 IS CPU HEAVY, KEEP IT OFF THE RUNTIME)
-        let valid = if password.is_empty()
+        let valid = if password.is_empty() || config::server_users_banned(&username).unwrap()
         {
             false
         } else if let Some(hashed) = config::server_users_password(&username)
