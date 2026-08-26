@@ -96,7 +96,8 @@ pub struct Picker //DEVICE LIST OPENED ON TOP OF THE SETTINGS ROWS
     pub title: &'static str,
     pub entries: Vec<DeviceEntry>, //ENTRY 0 IS ALWAYS THE SYSTEM DEFAULT
     pub selected: usize,
-    pub row: usize, //THE SETTINGS ROW THAT OPENED IT
+    pub row: usize,    //THE SETTINGS ROW THAT OPENED IT
+    pub offset: usize, //FIRST VISIBLE ENTRY - THE DRAW PATH KEEPS IT, THE SAME WAY IT KEEPS Settings::offset
 }
 
 #[derive(Default)]
@@ -115,6 +116,12 @@ pub struct Settings //THE /settings OVERLAY, IN EITHER OF ITS TWO MODES
     pub rows: Vec<Row>,
     pub selected: usize,
     pub picker: Option<Picker>,
+
+    //WHERE THE VIEW STANDS, KEPT BETWEEN FRAMES SO IT ONLY MOVES WHEN THE SELECTION RUNS INTO THE GAP AT
+    //EITHER EDGE - DERIVING IT FROM THE SELECTION ALONE PINS THE SELECTION TO AN EDGE AND SCROLLS ON EVERY
+    //KEY. BOTH ARE WRITTEN BY THE DRAW PATH, WHICH IS THE ONLY PLACE THAT KNOWS HOW MANY ROWS FIT
+    pub offset: usize,
+    pub page: usize, //ROWS THE LAST FRAME FIT, SO PageUp/PageDown MOVE BY WHAT IS ACTUALLY ON SCREEN
 
     //THE ROWS BELONG TO server.toml, WHICH IS NOT OURS TO WRITE - IT IS EDITED HERE AND SAVED IN ONE GO
     pub server: bool,
@@ -158,6 +165,8 @@ impl Settings
             rows: Vec::new(),
             selected: 0,
             picker: None,
+            offset: 0,
+            page: 0,
             server: false,
             edit: None,
             saving: false,
@@ -212,6 +221,7 @@ impl Settings
         self.edit = None;
         self.saving = false;
         self.selected = 0;
+        self.offset = 0;
 
         #[cfg(feature = "client_voice")]
         {
@@ -267,6 +277,7 @@ impl Settings
         self.saving = false;
         self.confirm = false;
         self.selected = 0;
+        self.offset = 0;
 
         self.step(1);
     }
@@ -280,6 +291,8 @@ impl Settings
         self.saving = false;
         self.confirm = false;
         self.rows = Vec::new();
+        self.offset = 0;
+        self.page = 0;
     }
 
     pub fn title(&self) -> String //WHAT THE BOX CALLS ITSELF - AN UNSAVED SERVER ROW IS SAID SO IN THE TITLE
@@ -307,9 +320,11 @@ impl Settings
     pub fn stored(&mut self, settings: Vec<ServerSetting>)
     {
         let selected = self.selected;
+        let offset = self.offset; //THE VIEW STAYS WHERE IT WAS TOO - THE ROWS ARE THE SAME ONES
 
         self.open_server(settings);
         self.selected = selected.min(self.rows.len().saturating_sub(1));
+        self.offset = offset;
 
         //THE ROW THE SELECTION LANDED ON MAY BE A HEADING NOW
         if matches!(self.rows.get(self.selected), Some(Row::Header(_))) { self.step(1); }
@@ -335,6 +350,51 @@ impl Settings
                 return;
             }
         }
+    }
+
+    //PageUp/PageDown TURN THE PAGE: THE VIEW MOVES BY WHAT THE LAST FRAME FIT AND THE SELECTION GOES WITH IT,
+    //RATHER THAN THE SELECTION DRAGGING THE VIEW ALONG A ROW AT A TIME
+    fn page_move(&mut self, direction: isize)
+    {
+        if self.rows.is_empty() { return; }
+
+        let page = self.page.max(1) as isize;
+
+        self.offset = (self.offset as isize + direction * page).max(0) as usize;
+
+        let target = (self.selected as isize + direction * page).clamp(0, self.rows.len() as isize - 1);
+
+        self.land(target as usize, direction);
+    }
+
+    //LAND ON index, OR ON THE NEAREST ROW THAT IS NOT A HEADING - HEADINGS ARE NOT SELECTABLE ANYWHERE ELSE
+    //EITHER, AND ONE AT THE VERY END IS WHY THE OTHER DIRECTION IS TRIED AS WELL
+    fn land(&mut self, index: usize, direction: isize)
+    {
+        if self.rows.is_empty() { return; }
+
+        self.selected = index.min(self.rows.len() - 1);
+
+        if !matches!(self.rows[self.selected], Row::Header(_)) { return; }
+
+        let before = self.selected;
+
+        self.step(direction);
+
+        if self.selected == before { self.step(-direction); }
+    }
+
+    //Home/End GO TO THE ENDS OF THE LIST, AND TAKE THE VIEW WITH THEM (THE DRAW PATH CLAMPS THE OFFSET)
+    fn first_row(&mut self)
+    {
+        self.offset = 0;
+        self.land(0, 1);
+    }
+
+    fn last_row(&mut self)
+    {
+        self.offset = self.rows.len();
+        self.land(self.rows.len().saturating_sub(1), -1);
     }
 
     //WHAT A STORED DEVICE ID IS CALLED - A DEVICE THAT IS NOT IN THE LIST ANY MORE FALLS BACK TO ITS RAW ID
@@ -409,6 +469,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
         KeyCode::Up => app.settings.step(-1),
         KeyCode::Down => app.settings.step(1),
 
+        KeyCode::PageUp => app.settings.page_move(-1),
+        KeyCode::PageDown => app.settings.page_move(1),
+
+        KeyCode::Home => app.settings.first_row(),
+        KeyCode::End => app.settings.last_row(),
+
         KeyCode::Left => adjust(app, -1),
         KeyCode::Right => adjust(app, 1),
 
@@ -461,6 +527,8 @@ fn handle_picker_key(app: &mut App, key: KeyEvent)
         _ => {},
     }
 
+    let page = app.settings.page.max(1) as isize; //READ BEFORE THE BORROW BELOW TAKES app.settings
+
     let Some(picker) = app.settings.picker.as_mut() else { return };
 
     match key.code
@@ -468,8 +536,19 @@ fn handle_picker_key(app: &mut App, key: KeyEvent)
         KeyCode::Up => picker.selected = if picker.selected == 0 { picker.entries.len() - 1 } else { picker.selected - 1 },
         KeyCode::Down => picker.selected = (picker.selected + 1) % picker.entries.len(),
 
-        KeyCode::Home => picker.selected = 0,
-        KeyCode::End => picker.selected = picker.entries.len() - 1,
+        //THE PICKER HAS NO HEADINGS, SO A PAGE IS JUST A CLAMPED JUMP - THE VIEW FOLLOWS THE SAME WAY
+        KeyCode::PageUp | KeyCode::PageDown =>
+        {
+            let direction: isize = if key.code == KeyCode::PageUp { -1 } else { 1 };
+
+            picker.offset = (picker.offset as isize + direction * page).max(0) as usize;
+
+            picker.selected = (picker.selected as isize + direction * page)
+                .clamp(0, picker.entries.len() as isize - 1) as usize;
+        },
+
+        KeyCode::Home => { picker.selected = 0; picker.offset = 0; },
+        KeyCode::End => { picker.selected = picker.entries.len() - 1; picker.offset = picker.entries.len(); },
 
         _ => {},
     }
@@ -658,6 +737,7 @@ fn activate(app: &mut App)
                 selected: entries.iter().position(|entry| entry.id == id).unwrap_or(0),
                 entries,
                 row: _row,
+                offset: 0,
             });
         },
 

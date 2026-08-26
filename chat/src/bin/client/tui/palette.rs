@@ -73,6 +73,10 @@ pub struct Values
 pub struct Palette //SLASH-COMMAND AUTOCOMPLETE
 {
     pub mode: PaletteMode,
+
+    //FIRST VISIBLE ROW, WRITTEN BY THE DRAW PATH (THE ONLY PLACE THAT KNOWS HOW MANY FIT) AND KEPT BETWEEN
+    //FRAMES, SO THE LIST SCROLLS A GAP SHORT OF EITHER EDGE INSTEAD OF PINNING THE SELECTION TO ONE
+    pub offset: usize,
 }
 
 //IMPLEMENTATIONS
@@ -201,7 +205,7 @@ impl Palette
 {
     pub fn new() -> Self
     {
-        Self { mode: PaletteMode::Hidden }
+        Self { mode: PaletteMode::Hidden, offset: 0 }
     }
 
     //A MENU IS OPEN (NAVIGABLE + COMPLETABLE) - EITHER OF COMMANDS OR OF WHAT ONE PARAMETER ACCEPTS
@@ -389,6 +393,7 @@ impl Palette
     pub fn dismiss(&mut self)
     {
         self.mode = PaletteMode::Hidden;
+        self.offset = 0;
     }
 
     pub fn next(&mut self)

@@ -99,6 +99,10 @@ const LOGO: &str = include_str!("./assets/rexlogo");
 #[cfg(feature = "client_voice")]
 const SLIDER_WIDTH: usize         = 14; //CELLS OF VOLUME BAR
 
+//ROWS KEPT BETWEEN THE SELECTION AND EITHER EDGE OF A SCROLLING LIST, SO THERE IS ALWAYS VISIBLE PROOF THAT
+//THE LIST GOES ON BEFORE IT STARTS MOVING
+const SCROLL_GAP: usize           = 4;
+
 //ENUMS
 enum Panel //SIDEBAR SECTIONS, IN THE ORDER THEY ARE STACKED
 {
@@ -155,7 +159,7 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     if app.palette.is_visible() { draw_palette(frame, app, messages_area); }
 
     //THE SETTINGS OVERLAY COVERS EVERYTHING ELSE (THE INPUT CURSOR IS SUPPRESSED IN draw_input)
-    if app.settings.open { draw_settings(frame, &app.settings, area); }
+    if app.settings.open { draw_settings(frame, &mut app.settings, area); }
 
     //THE CONNECT BOX IS THE FIRST THING THE CLIENT EVER DRAWS, AND IT KEEPS ASKING UNTIL WE ARE LOGGED IN
     if let Some(login) = &app.login { draw_login(frame, login, area); }
@@ -216,6 +220,25 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 //SOMETHING OFF-SCREEN - A VISIBLE BAR ALWAYS MEANS "THERE IS MORE", NEVER JUST "THIS IS A LIST".
 //THE THUMB IS SIZED AND PLACED HERE INSTEAD OF BY ratatui's Scrollbar BECAUSE THAT ONE NEVER QUITE LANDS ON EITHER
 //END OF THE TRACK, AND THE ONE THING THE BAR HAS TO SAY UNAMBIGUOUSLY IS WHEN THE USER IS AT THE BOTTOM
+//WHERE A SCROLLING LIST STARTS DRAWING. THE OFFSET IS KEPT BY THE LIST BETWEEN FRAMES AND ONLY MOVES WHEN THE
+//SELECTION RUNS INTO THE GAP AT EITHER EDGE - DERIVING IT FROM THE SELECTION ALONE PINS THE SELECTION TO AN EDGE,
+//WHICH BOTH HIDES THAT THERE IS MORE BELOW AND SCROLLS ON EVERY SINGLE KEY ON THE WAY BACK UP
+fn window(offset: usize, selected: usize, total: usize, visible: usize) -> usize
+{
+    let max = total.saturating_sub(visible);
+
+    //A LIST TOO SHORT TO HOLD TWO GAPS AND A SELECTION KEEPS WHATEVER IT CAN
+    let gap = SCROLL_GAP.min(visible.saturating_sub(1) / 2);
+
+    let mut first = offset.min(max);
+
+    if selected < first + gap { first = selected.saturating_sub(gap); }
+
+    if selected + gap >= first + visible { first = (selected + gap + 1).saturating_sub(visible); }
+
+    first.min(max)
+}
+
 fn draw_scrollbar(frame: &mut Frame, area: Rect, total: usize, visible: usize, first: usize)
 {
     if total <= visible || visible == 0 || area.width == 0 || area.height < 3 { return; }
@@ -461,7 +484,7 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
     ));
 }
 
-fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
+fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect)
 {
     //HOW MANY ROWS THERE ARE, HOW MANY FIT AND WHAT THEY ARE CALLED - THE BOX IS MEASURED FROM THAT, AND ONLY THEN
     //IS THERE A WIDTH TO FILL
@@ -480,8 +503,11 @@ fn draw_palette(frame: &mut Frame, app: &App, area: Rect)
 
     let rows = total.min(palette::MAX_ROWS);
 
-    //KEEP THE SELECTION IN VIEW - ONE PLACE, SO THE ROWS AND THE SCROLLBAR CANNOT DISAGREE ABOUT WHICH ONES THEY ARE
-    let first = selected.saturating_sub(rows.saturating_sub(1));
+    //KEEP THE SELECTION IN VIEW, A GAP SHORT OF EITHER EDGE - ONE PLACE, SO THE ROWS AND THE SCROLLBAR CANNOT
+    //DISAGREE ABOUT WHICH ONES THEY ARE
+    let first = window(app.palette.offset, selected, total, rows);
+
+    app.palette.offset = first;
 
     let height = rows as u16 + 2;
 
@@ -609,7 +635,7 @@ fn capitalize(name: &str) -> String
 }
 
 //THE /settings OVERLAY - ONE CENTERED BOX, EITHER THE SETTING ROWS OR THE DEVICE PICKER ON TOP OF THEM
-fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
+fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 {
     let width = SETTINGS_WIDTH.min(area.width.saturating_sub(2)).max(1);
     let inner_width = width.saturating_sub(2) as usize;
@@ -656,8 +682,23 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
         None => total.min(rows_room),
     }.max(1);
 
-    //KEEP THE SELECTION IN VIEW
-    let first = selected.saturating_sub(visible.saturating_sub(1)).min(total.saturating_sub(visible));
+    //KEEP THE SELECTION IN VIEW, A GAP SHORT OF EITHER EDGE - AND HAND THE LIST BACK BOTH WHERE THE VIEW ENDED
+    //UP AND HOW MANY ROWS FIT, WHICH IS WHAT PageUp/PageDown MOVE BY
+    let offset = match &state.picker
+    {
+        Some(picker) => picker.offset,
+        None => state.offset,
+    };
+
+    let first = window(offset, selected, total, visible);
+
+    state.page = visible;
+
+    match state.picker.as_mut()
+    {
+        Some(picker) => picker.offset = first,
+        None => state.offset = first,
+    }
 
     //THE VALUE COLUMN STARTS RIGHT BEHIND THE LONGEST LABEL, NOT AT SOME GUESSED OFFSET
     let label_width = state.rows.iter().filter_map(|row| match row
