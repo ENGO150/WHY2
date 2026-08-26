@@ -1656,7 +1656,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerSettings { settings, save } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_SETTINGS_ROLE
+                if role < consts::SERVER_OWNER_ROLE
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;

@@ -50,7 +50,9 @@ pub const REKEY_INTERVAL: u64          = 600;                                   
 
 pub const EVENT_CHANNEL_BOUND: usize   = 1024;                                        //CLIENT UI EVENT BUFFER
 
-pub const SERVER_SETTINGS_ROLE: usize  = 2;                                           //OWNER
+pub const SERVER_OWNER_ROLE: usize     = 2;                                           //OWNER
+pub const SERVER_MODERATOR_ROLE: usize = 1;                                           //MODERATOR
+pub const SERVER_USER_ROLE: usize      = 0;                                           //USER
 
 //DO NOT CHANGE CONSTS BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const MEGABYTE: usize              = 1_000_000;                                   //MEGABYTE DEFINITION

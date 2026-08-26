@@ -318,7 +318,8 @@ pub fn server_users_add(username: &str, hash: &str) -> bool //CREATE NEW USER, R
     let first_user = server_users_len() == 0; //SELF-EXPLANATORY, INNIT?
 
     write_user_field(username, "password", hash.into()); //PASSWORD
-    write_user_field(username, "role", if first_user { 2 } else { 0 }.into()); //ROLE (OWNER IF THIS IS THE FIRST USER)
+    write_user_field(username, "role", (if first_user
+        { consts::SERVER_OWNER_ROLE } else { consts::SERVER_USER_ROLE } as i64).into()); //ROLE (OWNER IF THIS IS THE FIRST USER)
 
     first_user
 }
@@ -441,7 +442,7 @@ pub fn server_users_migrate() //CONVERT FLAT username = "<hash>" ENTRIES INTO SU
         for (username, hash) in &legacy
         {
             set_user_field(doc.as_table_mut(), username, "password", hash.into());
-            set_user_field(doc.as_table_mut(), username, "role", 0.into());
+            set_user_field(doc.as_table_mut(), username, "role", (consts::SERVER_USER_ROLE as i64).into());
         }
     });
 }

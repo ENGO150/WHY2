@@ -119,7 +119,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Mute,
         triggers: &[ "MUTE", "SILENCE", "STFU" ],
-        minimal_role: 1,
+        minimal_role: consts::SERVER_MODERATOR_ROLE,
         args:
         &[
             CommandArg
@@ -137,7 +137,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Kick,
         triggers: &[ "KICK", "BOOT", "REMOVE" ],
-        minimal_role: 1,
+        minimal_role: consts::SERVER_MODERATOR_ROLE,
         args:
         &[
             CommandArg
@@ -155,7 +155,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Settings,
         triggers: &[ "SETTINGS", "CONFIG", "SETUP" ],
-        minimal_role: consts::SERVER_SETTINGS_ROLE,
+        minimal_role: consts::SERVER_OWNER_ROLE,
         args: &[],
         description: "Opens the server configuration",
     },
@@ -168,7 +168,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Help,
         triggers: &[ "HELP", "H", "COMMANDS", "USAGE", "GUIDE" ],
         shortcut: Some('h'),
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args: &[],
         description: "Prints all available commands",
@@ -179,7 +179,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Info,
         triggers: &[ "INFO", "COMMAND", "MAN" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args:
         &[
@@ -200,7 +200,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Voice,
         triggers: &[ "VOICE", "VOIP", "CALL" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args: &[],
         description: "Toggles voice chat",
@@ -212,7 +212,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Mute,
         triggers: &[ "MUTE", "UNMUTE", "SILENCE", "STFU" ],
         shortcut: Some('s'),
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args:
         &[
@@ -232,7 +232,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Channel,
         triggers: &[ "CHANNEL", "SWITCH", "CHECKOUT", "AREA" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args:
         &[
@@ -252,7 +252,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Upload,
         triggers: &[ "UPLOAD", "FILEUP", "PUSH", "UP" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args:
         &[
@@ -272,7 +272,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Download,
         triggers: &[ "DOWNLOAD", "FILEDOWN", "PULL", "DOWN", "FETCH" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args:
         &[
@@ -300,7 +300,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Screen,
         triggers: &[ "SCREEN", "SCREENSHARE", "PRESENTATION", "SHARE" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args: &[],
         description: "Toggles screensharing",
@@ -312,7 +312,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Attach,
         triggers: &[ "ATTACH", "WATCH", "DISPLAY", "JOIN" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args:
         &[
@@ -333,7 +333,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Deattach,
         triggers: &[ "DEATTACH", "STOP", "CLOSE" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args: &[],
         description: "Dettaches client screenshare.",
@@ -344,7 +344,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::List,
         triggers: &[ "LIST", "USERS", "CLIENTS", "CHANNELS", "IDS", "ID" ],
         shortcut: Some('l'),
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args: &[],
         description: "Shows connected users and their IDs",
@@ -355,7 +355,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Files,
         triggers: &[ "FILES", "LISTFILES", "UPLOADS", "DOWNLOADS" ],
         shortcut: Some('u'),
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args: &[],
         description: "Shows available files and their IDs",
@@ -367,7 +367,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Screens,
         triggers: &[ "SCREENS", "LISTSCREENS", "SCREENSHARES", "SHARES" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args: &[],
         description: "Shows all screensharing clients.",
@@ -378,7 +378,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::PrivateMessage,
         triggers: &[ "PM", "DM", "MSG", "TELL" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args:
         &[
@@ -405,7 +405,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Settings,
         triggers: &[ "SETTINGS", "SETUP", "CONFIG", "PREFERENCES", "AUDIO" ],
         shortcut: Some(','),
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args: &[],
         description: "Opens audio and interface settings",
@@ -416,7 +416,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::UsernameColor,
         triggers: &[ "UCOLOR", "USERNAME" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args:
         &[
@@ -436,7 +436,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::MessageColor,
         triggers: &[ "COLOR", "MESSAGE" ],
         shortcut: None,
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args:
         &[
@@ -456,7 +456,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Server,
         triggers: &[ "SERVER", "ADMIN", "MOD" ],
         shortcut: None,
-        minimal_role: 1,
+        minimal_role: consts::SERVER_MODERATOR_ROLE,
         subcommands: SERVER_SUBCOMMANDS,
         args:
         &[
@@ -476,7 +476,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Exit,
         triggers: &[ "EXIT", "LEAVE", "QUIT", "DISCONNECT" ],
         shortcut: Some('c'),
-        minimal_role: 0,
+        minimal_role: consts::SERVER_USER_ROLE,
         subcommands: &[],
         args: &[],
         description: "Disconnects from the server",
