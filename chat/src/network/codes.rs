@@ -116,6 +116,16 @@ pub enum PacketCode //CONTROL CODES
         token: Option<[u8; 32]>,
     },
 
+    //CLIENT <> SERVER | READ AND WRITE server.toml
+    ServerSettings
+    {
+        //REQUEST: None | SERVER ANSWER: THE WHOLE CONFIG | SAVE: THE ROWS THAT CHANGED
+        settings: Option<Vec<ServerSetting>>,
+
+        //FALSE = READ, TRUE = WRITE - AND THE SERVER ACKNOWLEDGES A WRITE WITH THE STORED CONFIG BACK
+        save: bool,
+    },
+
     Version { version: Option<String> },            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
     Username { username: Option<String> },          //SERVER <> CLIENT | PICK USERNAME
     PasswordL { password: Option<String> },         //SERVER -> CLIENT | LOGIN
@@ -145,6 +155,26 @@ pub enum PacketCode //CONTROL CODES
 }
 
 //STRUCTS
+//ONE server.toml KEY AS THE CLIENT EDITS IT. THE SERVER IS THE ONLY PLACE THAT KNOWS WHICH KEYS EXIST,
+//SO IT SENDS THE HEADING AND THE TRAILING COMMENT ALONG - THE CLIENT RENDERS WHATEVER IT IS GIVEN
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub struct ServerSetting
+{
+    pub key: String,
+    pub value: SettingValue,
+    pub section: String,     //THE '# Network' HEADING THE KEY SITS UNDER
+    pub description: String, //THE TRAILING COMMENT ON THE KEY'S OWN LINE
+}
+
+//THE THREE DATATYPES config_read UNDERSTANDS - A VALUE THAT COMES BACK AS A DIFFERENT ONE IS REFUSED
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub enum SettingValue
+{
+    Toggle(bool),
+    Number(i64),
+    Text(String),
+}
+
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
 pub struct MessageColors //COLORS OF MESSAGE
 {

@@ -31,6 +31,7 @@ use tokio::net::tcp::OwnedWriteHalf;
 
 use crate::
 {
+    consts,
     options,
     network::
     {
@@ -154,7 +155,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Settings,
         triggers: &[ "SETTINGS", "CONFIG", "SETUP" ],
-        minimal_role: 2,
+        minimal_role: consts::SERVER_SETTINGS_ROLE,
         args: &[],
         description: "Opens the server configuration",
     },

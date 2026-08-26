@@ -403,6 +403,19 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     (usually one of the two) would refuse a second open. A device that will not open puts the previous
     pair back, points `input_device`/`output_device` at it again and reports
     `ClientEvent::VoiceDeviceFailed`, which re-reads those two rows (`Settings::refresh_devices`).
+  - **The same overlay is also the server's config**, in a second mode (`Settings::server`). `/server settings`
+    sends `PacketCode::ServerSettings { settings: None, save: false }` and opens nothing — the box is opened
+    by the answer (`ClientEvent::ServerSettings`), because the client is not the one who decides whether it
+    may see it: the server checks `role >= consts::SERVER_SETTINGS_ROLE` and answers `InvalidUsage` otherwise.
+    One packet code carries all four messages (request, the whole config, a save, the ack), and the ack is the
+    **whole config again** rather than an "ok", so a key the server refused snaps back in the rows instead of
+    sitting there looking applied. Nothing in the client names a server key: `config::server_settings` walks
+    `server.toml` itself and sends each key with its `# section` heading and trailing comment, so a key added
+    to the default config appears in the overlay with no client change. In the other direction
+    `config::server_settings_write` accepts only keys the file already has, with the datatype they already
+    have — the client does not get to invent keys or retype them. This mode is the one place the overlay does
+    **not** write through: server rows are held (`Item::changed`, marked `●`) until `[ Save ]`/Ctrl+S, which
+    only hands the changed rows to `tui::run`'s key path — the overlay never touches the socket itself.
   - Chat messages live in `App::messages` as `state::Entry::Message` (username/id/text/colors), not as
     rendered `Line`s — `Theme::render` turns an entry into a line on every wrap, so a `show_id` or
     `disable_colors` change repaints the messages already in the pane. Anything that rewrites

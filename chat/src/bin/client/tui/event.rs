@@ -197,6 +197,25 @@ impl App
                 self.push_styled("Voice disabled.", theme::DIM);
             },
 
+            //server.toml CAME BACK - EITHER THE COPY WE ASKED FOR, OR THE ONE THE SERVER JUST STORED
+            ClientEvent::ServerSettings(settings, saved) =>
+            {
+                match saved
+                {
+                    //THE ANSWER TO A SAVE IS THE CONFIG AS IT ACTUALLY STANDS, SO A REFUSED ROW SNAPS BACK
+                    true =>
+                    {
+                        if self.settings.open && self.settings.server { self.settings.stored(settings); }
+
+                        self.push_styled("Server settings saved.", theme::OK);
+                    },
+
+                    false => self.settings.open_server(settings),
+                }
+
+                self.dirty = true;
+            },
+
             ClientEvent::List(users) =>
             {
                 //ALWAYS REFRESH THE SIDEBAR; ONLY ECHO A BLOCK WHEN THE USER ASKED FOR ONE

@@ -27,10 +27,19 @@ use std::
     sync::{ LazyLock, Mutex }
 };
 
-use toml_edit::{ DocumentMut, Item, Value };
+use toml_edit::
+{
+    DocumentMut,
+    Item,
+    Table,
+    Value,
+};
 
 #[cfg(feature = "server")]
-use toml_edit::Table;
+use toml_edit::RawString;
+
+#[cfg(feature = "server")]
+use crate::network::codes::{ ServerSetting, SettingValue };
 
 use crate::{ consts, misc };
 
@@ -148,33 +157,52 @@ where
     config_read(filename, key)
 }
 
+fn set_value(table: &mut Table, key: &str, value: Value) //ASSIGN ONE KEY, KEEPING THE COMMENTS AROUND IT
+{
+    if let Some(item) = table.get_mut(key)
+    {
+        //KEEP THE TRAILING COMMENT THE DEFAULT CONFIG SHIPPED WITH
+        let decor = item.as_value().map(|old| old.decor().clone());
+        let mut value = value;
+
+        if let Some(decor) = decor { *value.decor_mut() = decor; }
+
+        *item.as_value_mut().expect("Updating config failed") = value;
+    } else
+    {
+        table.insert(key, Item::Value(value));
+    }
+}
+
 #[cfg(feature = "client_base")]
 fn config_write_value(filename: &str, key: &str, value: Value) //WRITE TYPED VALUE TO CONFIG
 {
     //WRITE
-    with_cached_mut(&config_path(filename), |doc|
-    {
-        let table = doc.as_table_mut();
-        if let Some(item) = table.get_mut(key)
-        {
-            //KEEP THE TRAILING COMMENT THE DEFAULT CONFIG SHIPPED WITH
-            let decor = item.as_value().map(|old| old.decor().clone());
-            let mut value = value;
-
-            if let Some(decor) = decor { *value.decor_mut() = decor; }
-
-            *item.as_value_mut().expect("Updating config failed") = value;
-        } else
-        {
-            table.insert(key, Item::Value(value));
-        }
-    });
+    with_cached_mut(&config_path(filename), |doc| set_value(doc.as_table_mut(), key, value));
 }
 
 #[cfg(feature = "client_base")]
 fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
 {
     config_write_value(filename, key, value.into());
+}
+
+//THE HEADING A KEY SITS UNDER - THE LAST COMMENT BLOCK ABOVE IT. THE LICENSE BLOCK AT THE TOP OF THE FILE
+//IS NOT ONE: IT IS SEPARATED FROM THE FIRST KEY BY A BLANK LINE, WHICH IS WHAT STARTS THE BLOCK OVER
+#[cfg(feature = "server")]
+fn heading(prefix: &str) -> Option<String>
+{
+    let mut heading = None;
+
+    for line in prefix.lines()
+    {
+        let line = line.trim();
+
+        if line.is_empty() { heading = None; }
+        else if let Some(comment) = line.strip_prefix('#') { heading = Some(comment.trim().to_string()); }
+    }
+
+    heading
 }
 
 #[cfg(feature = "server")]
@@ -293,6 +321,83 @@ pub fn server_users_add(username: &str, hash: &str) -> bool //CREATE NEW USER, R
     write_user_field(username, "role", if first_user { 2 } else { 0 }.into()); //ROLE (OWNER IF THIS IS THE FIRST USER)
 
     first_user
+}
+
+//EVERY KEY OF server.toml AS THE CLIENT EDITS IT. THE FILE ITSELF IS THE LIST - NOTHING HERE NAMES A KEY,
+//SO A KEY ADDED TO THE DEFAULT CONFIG SHOWS UP IN THE OVERLAY WITHOUT ANY FURTHER WORK
+#[cfg(feature = "server")]
+pub fn server_settings() -> Vec<ServerSetting>
+{
+    let data = get_data(&config_path(consts::SERVER_CONFIG));
+    let table = data.as_table();
+
+    let mut settings = Vec::new();
+    let mut section = String::new();
+
+    for (key, item) in table.iter()
+    {
+        //A KEY OF A DATATYPE THE CONFIG READER DOES NOT UNDERSTAND HAS NO ROW TO BE EDITED IN
+        let Some(value) = item.as_value() else { continue };
+
+        //THE HEADING CARRIES DOWN THE FILE UNTIL THE NEXT ONE
+        if let Some(prefix) = table.key(key).and_then(|key| key.leaf_decor().prefix()).and_then(RawString::as_str)
+            && let Some(found) = heading(prefix)
+        {
+            section = found;
+        }
+
+        let description = value.decor().suffix().and_then(RawString::as_str)
+            .map(|comment| comment.trim().trim_start_matches('#').trim().to_string()).unwrap_or_default();
+
+        settings.push(ServerSetting
+        {
+            key: key.to_string(),
+            value: match value
+            {
+                Value::Boolean(on) => SettingValue::Toggle(*on.value()),
+                Value::Integer(number) => SettingValue::Number(*number.value()),
+                Value::String(text) => SettingValue::Text(text.value().clone()),
+
+                _ => continue,
+            },
+            section: section.clone(),
+            description,
+        });
+    }
+
+    settings
+}
+
+//STORE WHAT THE CLIENT SENT BACK, RETURNING HOW MANY ROWS WERE ACCEPTED. A KEY THE CONFIG DOES NOT ALREADY
+//HAVE, OR ONE THAT COMES BACK AS A DIFFERENT DATATYPE, IS DROPPED - THE CLIENT DOES NOT GET TO INVENT KEYS
+#[cfg(feature = "server")]
+pub fn server_settings_write(settings: &[ServerSetting]) -> usize
+{
+    let data = get_data(&config_path(consts::SERVER_CONFIG));
+
+    let accepted: Vec<(&str, Value)> = settings.iter().filter_map(|setting|
+    {
+        let current = data.get(&setting.key).and_then(Item::as_value)?;
+
+        let value: Value = match (&setting.value, current)
+        {
+            (SettingValue::Toggle(on), Value::Boolean(_)) => (*on).into(),
+            (SettingValue::Number(number), Value::Integer(_)) => (*number).into(),
+            (SettingValue::Text(text), Value::String(_)) => text.as_str().into(),
+
+            _ => return None,
+        };
+
+        Some((setting.key.as_str(), value))
+    }).collect();
+
+    //ONE PASS OVER THE DOCUMENT, SO THE FILE IS REWRITTEN ONCE NO MATTER HOW MANY ROWS CHANGED
+    with_cached_mut(&config_path(consts::SERVER_CONFIG), |doc|
+    {
+        for (key, value) in &accepted { set_value(doc.as_table_mut(), key, value.clone()); }
+    });
+
+    accepted.len()
 }
 
 #[cfg(feature = "client_base")]

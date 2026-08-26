@@ -50,6 +50,8 @@ pub const REKEY_INTERVAL: u64          = 600;                                   
 
 pub const EVENT_CHANNEL_BOUND: usize   = 1024;                                        //CLIENT UI EVENT BUFFER
 
+pub const SERVER_SETTINGS_ROLE: usize  = 2;                                           //OWNER
+
 //DO NOT CHANGE CONSTS BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const MEGABYTE: usize              = 1_000_000;                                   //MEGABYTE DEFINITION
 pub const UPLOAD_CHUNK_SIZE: usize     = MEGABYTE;                                    //FILE UPLOAD CHUNK (1MB)

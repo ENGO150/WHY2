@@ -76,6 +76,7 @@ use crate::
             UserFile,
             OnlineUser,
             UserScreen,
+            ServerSetting,
         },
     },
 };
@@ -151,6 +152,7 @@ pub enum ClientEvent
     VoiceHandshakeFailed,                          //THE SERVER NEVER ANSWERED THE UDP HANDSHAKE
     VoiceDisabled,                                 //VOICE CHAT DISABLED
     List(Vec<OnlineUser>),                         //LIST OF USERS
+    ServerSettings(Vec<ServerSetting>, bool),      //server.toml AS THE SERVER HOLDS IT (TRUE = IT HAS JUST BEEN SAVED)
     Upload(String),                                //UPLOADING FILE
     Uploaded(String, String),                      //USER UPLOADED FILE
     Download(String),                              //DOWNLOADING FILE
@@ -618,6 +620,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::ChannelLeave { id } =>
             {
                 voice_client::remove_consumer(&id);
+            },
+
+            //server.toml, EITHER BECAUSE WE ASKED FOR IT OR BECAUSE THE SERVER JUST STORED WHAT WE SENT
+            PacketCode::ServerSettings { settings, save } =>
+            {
+                tx.send(ClientEvent::ServerSettings(settings.unwrap_or_default(), save)).await.unwrap();
             },
 
             //LIST OF ONLINE USERS

@@ -619,8 +619,8 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
     //THE PICKER BORROWS THE SAME BOX, SO BOTH MODES ARE MEASURED THE SAME WAY
     let (title, total, selected) = match &state.picker
     {
-        Some(picker) => (picker.title, picker.entries.len(), picker.selected),
-        None => (" Settings ", state.rows.len(), state.selected),
+        Some(picker) => (picker.title.to_string(), picker.entries.len(), picker.selected),
+        None => (state.title(), state.rows.len(), state.selected),
     };
 
     let room = area.height.saturating_sub(4) as usize; //BORDERS PLUS A LINE OF AIR TOP AND BOTTOM
@@ -637,7 +637,7 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
     let label_width = state.rows.iter().filter_map(|row| match row
     {
         Row::Item(item) => Some(item.label.width()),
-        Row::Header(_) => None,
+        Row::Header(_) | Row::Action(_) => None,
     }).max().unwrap_or(0).min(inner_width.saturating_sub(SETTINGS_VALUE_WIDTH as usize + 3));
 
     //ON A NARROW TERMINAL THE LABELS GIVE WAY FIRST - THE VALUES ARE WHAT THE USER IS HERE FOR
@@ -671,17 +671,32 @@ fn draw_settings(frame: &mut Frame, state: &Settings, area: Rect)
 
     frame.buffer_mut().set_style(popup, theme::TEXT);
 
-    let hint = match &state.picker
+    let hint = match (&state.picker, state.edit.is_some(), state.server)
     {
-        Some(_) => " ↑↓ select │ ⏎ apply │ Esc back ",
-        None => " ↑↓ move │ ←→ change │ ⏎ select │ Esc close ",
+        (Some(_), ..) => " ↑↓ select │ ⏎ apply │ Esc back ",
+        (None, true, _) => " type a value │ ⏎ keep │ Esc cancel ",
+        (None, false, true) => " ↑↓ move │ ←→ change │ ⏎ edit │ ^S save │ Esc close ",
+        (None, false, false) => " ↑↓ move │ ←→ change │ ⏎ select │ Esc close ",
     };
 
-    let block = Block::bordered()
+    let mut block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::BORDER_ACTIVE)
-        .title(Span::styled(title, theme::TITLE))
+        .title(Span::styled(title.clone(), theme::TITLE))
         .title_bottom(Line::from(Span::styled(hint, theme::DIM)).centered());
+
+    //THE SERVER SENDS ITS OWN COMMENT ON EVERY KEY ALONG, WHICH IS THE ONLY EXPLANATION OF WHAT THE ROW DOES
+    if state.picker.is_none()
+        && let Some(Row::Item(item)) = state.rows.get(state.selected)
+        && !item.hint.is_empty()
+    {
+        let room = inner_width.saturating_sub(title.width() + 2);
+
+        if room > 8
+        {
+            block = block.title_top(Line::from(Span::styled(truncate(&item.hint, room), theme::DIM)).right_aligned());
+        }
+    }
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -929,6 +944,31 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
             Span::styled("─".repeat(width.saturating_sub(label.width() + 2)), theme::BORDER),
         ]),
 
+        //A BUTTON IS THE WHOLE ROW - IT HAS NO VALUE COLUMN TO LINE UP WITH
+        Row::Action(label) =>
+        {
+            let unsaved = _state.unsaved();
+
+            let style = match (selected, unsaved)
+            {
+                (true, _) => theme::ACCENT,
+                (false, true) => theme::TEXT,
+                (false, false) => theme::DIM,
+            };
+
+            let text = format!("[ {label} ]");
+            let padding = width.saturating_sub(text.width() + 1) / 2;
+
+            let line = Line::from(vec!
+            [
+                Span::styled(if selected { "▌" } else { " " }, theme::ACCENT),
+                Span::raw(" ".repeat(padding)),
+                Span::styled(text, style),
+            ]);
+
+            return if selected { line.style(theme::SELECTED) } else { line };
+        },
+
         Row::Item(item) => item,
     };
 
@@ -937,12 +977,22 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
         Span::styled(if selected { "▌" } else { " " }, theme::ACCENT),
         Span::styled
         (
-            format!(" {:<label_width$}  ", truncate(item.label, label_width)),
+            format!(" {:<label_width$}  ", truncate(&item.label, label_width)),
             if selected { theme::ACCENT } else { theme::TEXT },
         ),
     ];
 
-    spans.extend(value_spans(_state, &item.value, width.saturating_sub(label_width + 3)));
+    let value_width = width.saturating_sub(label_width + 3);
+
+    //THE ROW BEING TYPED INTO SHOWS THE TEXT AS IT STANDS, CARET AND ALL - THE STORED VALUE IS BEHIND IT
+    match _state.edit.as_ref().filter(|_| selected)
+    {
+        Some(edit) => spans.push(Span::styled(format!("{}▏", truncate(edit, value_width.saturating_sub(1))), theme::ACCENT)),
+        None => spans.extend(value_spans(_state, &item.value, value_width)),
+    }
+
+    //AN EDITED ROW IS MARKED UNTIL THE SERVER HAS SAID WHAT IT STORED
+    if item.changed { spans.push(Span::styled(" ●", theme::NOTICE)); }
 
     let line = Line::from(spans);
 
@@ -955,6 +1005,11 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
     {
         Value::Toggle { on: true, .. } => vec![Span::styled("● on", theme::OK)],
         Value::Toggle { on: false, .. } => vec![Span::styled("○ off", theme::DIM)],
+
+        Value::Number(number) => vec![Span::styled(number.to_string(), theme::TEXT)],
+
+        Value::Text(text) if text.is_empty() => vec![Span::styled("(empty)", theme::DIM)],
+        Value::Text(text) => vec![Span::styled(truncate(text, _width), theme::TEXT)],
 
         #[cfg(feature = "client_voice")]
         Value::Volume(percent) =>

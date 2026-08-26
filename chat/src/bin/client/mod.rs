@@ -104,7 +104,7 @@ fn invalid_usage(app: &mut App, subject: Option<&str>) //PUSH 'INVALID' MESSAGE
 }
 
 //MODERATION ACTIONS - /server <action> [id]
-fn server_command(app: &mut App, parameters: Option<String>)
+async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, parameters: Option<String>)
 {
     let Some(info) = command::COMMAND_LIST.iter().find(|info| info.command == Command::Server) else { return };
 
@@ -138,12 +138,16 @@ fn server_command(app: &mut App, parameters: Option<String>)
         },
     };
 
-    //TODO: NOTHING OF THIS EXISTS SERVER-SIDE YET - THE PACKETS GO HERE, ONE PER ACTION
+    //TODO: MUTE AND KICK DO NOT EXIST SERVER-SIDE YET - THEIR PACKETS GO HERE, ONE PER ACTION
     match sub.subcommand
     {
         Subcommand::Mute => app.push_styled("Muting users is not implemented yet.", theme::NOTICE),
         Subcommand::Kick => app.push_styled("Kicking users is not implemented yet.", theme::NOTICE),
-        Subcommand::Settings => app.push_styled("Server settings are not implemented yet.", theme::NOTICE),
+
+        //THE SERVER OWNS server.toml, SO THE OVERLAY IS OPENED BY ITS ANSWER (ClientEvent::ServerSettings),
+        //NOT HERE - THE ROLE IS CHECKED AGAIN AT THE OTHER END BEFORE ANY OF IT COMES BACK
+        Subcommand::Settings => network::send(&mut *write_stream.lock().await,
+            PacketCode::ServerSettings { settings: None, save: false }, options::get_keys().as_ref()).await,
     }
 }
 
@@ -524,7 +528,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         //THE DEVICE LIST IS ENUMERATED HERE, ONCE, SO THE DRAW PATH NEVER TALKS TO cpal
                         Command::Settings => app.settings.open(audio_devices().await),
 
-                        Command::Server => server_command(app, parameters),
+                        Command::Server => server_command(app, write_stream, parameters).await,
 
                         Command::UsernameColor => color_handler(app, "username_color", parameters),
                         Command::MessageColor => color_handler(app, "message_color", parameters),

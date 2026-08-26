@@ -89,7 +89,11 @@ use crate::
 {
     config,
     options,
-    network::client::{ self, ClientEvent },
+    network::
+    {
+        self,
+        client::{ self, ClientEvent },
+    },
     command::
     {
         self,
@@ -257,8 +261,8 @@ pub async fn run
                 {
                     app.refresh_online = false;
 
-                    crate::network::send(&mut *write_stream.lock().await,
-                        crate::network::codes::PacketCode::List { users: None }, options::get_keys().as_ref()).await;
+                    network::send(&mut *write_stream.lock().await,
+                        network::codes::PacketCode::List { users: None }, options::get_keys().as_ref()).await;
                 }
 
                 if app.dirty
@@ -425,12 +429,27 @@ async fn handle_key
     //THE SETTINGS OVERLAY OWNS THE KEYBOARD WHILE IT IS UP - EXCEPT FOR ITS OWN SHORTCUT, WHICH CLOSES IT
     if app.settings.open
     {
-        if control && settings_shortcut(key.code)
+        //Ctrl+S BELONGS TO THE SERVER ROWS, SO THE OVERLAY IS ASKED FIRST AND ONLY THEN THE SHORTCUT
+        if control && settings_shortcut(key.code) && !(app.settings.server && key.code == KeyCode::Char('s'))
         {
             app.settings.close();
         } else
         {
             settings::handle_key(app, key);
+        }
+
+        //THE OVERLAY EDITS server.toml BUT DOES NOT OWN THE SOCKET - A PRESSED Save LANDS HERE
+        if let Some(settings) = app.settings.take_save()
+        {
+            match write_stream
+            {
+                Some(write_stream) => network::send(&mut *write_stream.lock().await,
+                    network::codes::PacketCode::ServerSettings { settings: Some(settings), save: true },
+                    options::get_keys().as_ref()).await,
+
+                //NOTHING WENT OUT, SO NOTHING IS COMING BACK - THE ROWS STAY EDITABLE INSTEAD OF WAITING FOREVER
+                None => app.settings.saving = false,
+            }
         }
 
         return;

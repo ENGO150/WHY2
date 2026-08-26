@@ -1251,12 +1251,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //AUTHENTICATE CLIENT
     authenticate_client(&peer_addr, &username, id);
 
+    let role = config::server_users_role(&username).unwrap(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
+
     //TELL CLIENT TO START CHATTING
-    network::send(&mut *streams.1.lock().await, PacketCode::Accept
-    {
-        id,
-        role: config::server_users_role(&username).unwrap(),
-    }, Some(&keys)).await;
+    network::send(&mut *streams.1.lock().await, PacketCode::Accept { id, role }, Some(&keys)).await;
 
     //SEND JOIN MESSAGE
     send_to_all(PacketCode::Join { username: username.clone() }, false, None);
@@ -1652,6 +1650,29 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //INVALID PM FORMAT
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
+            },
+
+            //SERVER CONFIGURATION
+            PacketCode::ServerSettings { settings, save } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_SETTINGS_ROLE
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                //A SAVE WITHOUT ROWS IS NOT A SAVE, AND A READ IGNORES WHATEVER IT WAS SENT WITH
+                if save && let Some(settings) = &settings
+                {
+                    config::server_settings_write(settings);
+                }
+
+                network::send(&mut *streams.1.lock().await, PacketCode::ServerSettings
+                {
+                    settings: Some(config::server_settings()),
+                    save,
+                }, Some(&keys)).await;
             },
 
             //KEEPALIVE
