@@ -18,8 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    sync::Arc,
+    time::Instant,
     collections::HashMap,
+    sync::{ Arc, LazyLock },
 };
 
 use tokio::
@@ -45,6 +46,17 @@ use crate::
 };
 
 //PRIVATE
+//STATICS
+//WHAT A MUTED SHARER'S VIEWERS GET INSTEAD OF THEIR SCREEN, AS ANNEX-B H.264. IT IS COMMITTED
+//PRE-ENCODED (FROM `assets/muted.gif`) BECAUSE THE SERVER HAS NO ENCODER AND MUST NOT GROW ONE -
+//`openh264` IS A CLIENT-ONLY DEPENDENCY. EVERY FRAME IS AN IDR CARRYING ITS OWN SPS/PPS, SO ANY
+//ONE OF THEM CAN BE HANDED TO A VIEWER THAT ATTACHED HALF A LOOP AGO AND STILL DECODE:
+//
+//  ffmpeg -i assets/muted.gif -an -vf "pad=220:216:0:0:color=black,format=yuv420p" \
+//      -c:v libx264 -profile:v baseline -preset veryslow -crf 20 \
+//      -x264-params keyint=1:min-keyint=1:scenecut=0:repeat-headers=1 -f h264 assets/muted.h264
+static MUTED_ANIMATION: LazyLock<Vec<Vec<u8>>> = LazyLock::new(|| split_access_units(include_bytes!("./assets/muted.h264")));
+
 //STRUCTS
 struct ScreenTransferGuard
 {
@@ -65,6 +77,51 @@ impl Drop for ScreenTransferGuard
 }
 
 //FUNCTIONS
+fn split_access_units(bitstream: &[u8]) -> Vec<Vec<u8>> //CUT AN ANNEX-B STREAM INTO ONE BUFFER PER FRAME
+{
+    let mut units = Vec::new();
+    let mut start = None;
+
+    let mut index = 0;
+    while index + 3 < bitstream.len()
+    {
+        //NOT A START CODE
+        if bitstream[index..index + 3] != [0, 0, 1] { index += 1; continue; }
+
+        //AN SPS OPENS A FRAME (EVERY FRAME REPEATS ITS HEADERS), SO THE PREVIOUS ONE ENDS HERE
+        if bitstream[index + 3] & 0x1f == 7
+        {
+            //BACK UP OVER THE LEADING ZERO OF A FOUR-BYTE START CODE
+            let mut boundary = index;
+            while boundary > 0 && bitstream[boundary - 1] == 0 { boundary -= 1; }
+
+            if let Some(start) = start.replace(boundary)
+            {
+                units.push(bitstream[start..boundary].to_vec());
+            }
+        }
+
+        index += 3;
+    }
+
+    //THE LAST FRAME RUNS TO THE END
+    if let Some(start) = start { units.push(bitstream[start..].to_vec()); }
+
+    units
+}
+
+fn muted_frame(started: &Instant) -> Option<usize> //INDEX OF THE PLACEHOLDER FRAME DUE RIGHT NOW
+{
+    //THE ANIMATION IS PLAYED OFF THE WALL CLOCK RATHER THAN OFF ARRIVING FRAMES: THE SHARER'S
+    //FRAME RATE IS WHATEVER THEIR DESKTOP IS DOING, AND ADVANCING PER ARRIVAL WOULD PLAY THE LOOP
+    //AT THAT SPEED. THE FLIP SIDE IS THAT A *STILL* DESKTOP ONLY SENDS ONE FRAME EVERY
+    //`FORCED_INTRA_INTERVAL`, WHICH IS ALL THE PLACEHOLDER GETS TO ADVANCE ON
+    let frames = MUTED_ANIMATION.len();
+    if frames == 0 { return None; }
+
+    Some((started.elapsed().as_millis() / screen::consts::MUTED_FRAME_INTERVAL.as_millis()) as usize % frames)
+}
+
 async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
 {
     //TAKE THE SHARE STATE (WITHOUT ABORTING - WE *ARE* THE SHARE TASK)
@@ -134,6 +191,10 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
     //INIT REX STREAM
     let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
 
+    //PLACEHOLDER PLAYBACK STATE
+    let started = Instant::now();
+    let mut sent_muted_frame = None;
+
     //LOOP READING
     loop
     {
@@ -144,8 +205,38 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             None => break
         };
 
-        //SILENCE MUTED USERS
-        if *server::CONNECTIONS.iter().find(|c| c.id() == Some(&id)).unwrap().muted() { continue; }
+        //IS THE SHARER MUTED? (COLLECT AND DROP THE GUARD - IT MUST NOT BE HELD ACROSS THE SENDS BELOW)
+        let muted = server::CONNECTIONS.iter()
+            .find(|c| c.id() == Some(&id))
+            .map(|c| *c.muted())
+            .unwrap_or(false);
+
+        //SILENCE MUTED USERS - THEIR SCREEN NEVER LEAVES THE SERVER, THE PLACEHOLDER GOES OUT IN ITS PLACE
+        let read = match (muted, read)
+        {
+            //NOT MUTED, FORWARD WHATEVER CAME IN
+            (false, read) =>
+            {
+                sent_muted_frame = None;
+
+                read
+            },
+
+            //MUTED AUDIO IS SIMPLY DROPPED - THERE IS NOTHING TO PUT IN ITS PLACE
+            (true, ScreenPacketCode::Audio { .. }) => continue,
+
+            (true, ScreenPacketCode::Video { .. }) =>
+            {
+                let Some(frame) = muted_frame(&started) else { continue; };
+
+                //THE SHARER SENDS FAR FASTER THAN THE PLACEHOLDER ADVANCES - RESENDING THE SAME
+                //FRAME WOULD ONLY COST EVERY VIEWER AN IDR TO REDRAW THE PICTURE THEY ALREADY HAVE
+                if sent_muted_frame == Some(frame) { continue; }
+                sent_muted_frame = Some(frame);
+
+                ScreenPacketCode::Video { data: MUTED_ANIMATION[frame].clone() }
+            },
+        };
 
         //COLLECT ALL ATTACHED CLIENT STREAMS
         let entries: Vec<(usize, Arc<Mutex<OwnedWriteHalf>>)> = server::CONNECTIONS.iter().filter_map(|entry|
