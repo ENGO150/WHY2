@@ -1755,6 +1755,31 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 }
             },
 
+            //BAN USER
+            PacketCode::ServerBan { id: uid } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_OWNER_ROLE || id == uid
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                //FIND TARGET USER
+                let target = CONNECTIONS.iter()
+                    .find(|entry| entry.value().id() == Some(&uid))
+                    .map(|entry| (*entry.key(), entry.username().cloned()));
+
+                if let Some((addr, Some(username))) = target
+                {
+                    config::server_users_ban(&username);
+                    remove_connection(&addr, true, Some("ban")).await;
+                } else //USER NOT FOUND
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                }
+            },
+
             //SERVER CONFIGURATION
             PacketCode::ServerSettings { settings, save } =>
             {

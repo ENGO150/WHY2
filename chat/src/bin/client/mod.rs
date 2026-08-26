@@ -158,7 +158,10 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
 
         Subcommand::Ban =>
         {
-            app.push_styled("Banning is not implemented yet.", theme::ERROR);
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerBan
+            {
+                id: id.unwrap(),
+            }, options::get_keys().as_ref()).await;
         },
 
         Subcommand::Settings =>

@@ -313,6 +313,12 @@ pub fn server_users_role(username: &str) -> Option<usize> //RETURN PASSWORD HASH
 }
 
 #[cfg(feature = "server")]
+pub fn server_users_ban(username: &str)
+{
+    write_user_field(username, "banned", true.into());
+}
+
+#[cfg(feature = "server")]
 pub fn server_users_add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON FIRST USER
 {
     let first_user = server_users_len() == 0; //SELF-EXPLANATORY, INNIT?
