@@ -224,6 +224,31 @@ fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD O
     with_cached_mut(&config_path(consts::SERVER_USERS_CONFIG), |doc| set_user_field(doc.as_table_mut(), username, key, value));
 }
 
+//SET ONE ENTRY OF server_bans.toml. USERNAMES AND ADDRESSES LIVE IN SUBTABLES OF THEIR OWN SO A USERNAME
+//THAT LOOKS LIKE AN ADDRESS - OR THE OTHER WAY AROUND - CANNOT BAN THE WRONG SUBJECT
+#[cfg(feature = "server")]
+fn set_ban(doc: &mut DocumentMut, section: &str, key: &str, banned: bool)
+{
+    //A MISSING SECTION BECOMES AN EMPTY SUBTABLE FIRST
+    if doc.get(section).and_then(Item::as_table_like).is_none()
+    {
+        doc.insert(section, Item::Table(Table::new()));
+    }
+
+    doc.get_mut(section).and_then(Item::as_table_like_mut)
+        .expect("Ban section is not a table").insert(key, Item::Value(banned.into()));
+}
+
+#[cfg(feature = "server")]
+fn banned(section: &str, key: &str) -> bool //READ ONE ENTRY OF server_bans.toml
+{
+    get_data(&config_path(consts::SERVER_BANS_CONFIG)).get(section)
+        .and_then(Item::as_table_like)
+        .and_then(|section| section.get(key))
+        .and_then(Item::as_bool)
+        .unwrap_or(false) //NO ENTRY IS NO BAN
+}
+
 #[cfg(feature = "server")]
 pub fn server_users_len() -> usize //COUNT USERS
 {
@@ -259,23 +284,26 @@ pub fn init_config() //INITIALIZE CONFIG FILES
         }
     }
 
-    let runtime_path =
+    let runtime_paths =
     {
         #[cfg(feature = "client_base")]
         {
-            config_path(consts::SERVER_KEYS_CONFIG)
+            vec![config_path(consts::SERVER_KEYS_CONFIG)]
         }
 
         #[cfg(feature = "server")]
         {
-            config_path(consts::SERVER_USERS_CONFIG)
+            vec![config_path(consts::SERVER_USERS_CONFIG), config_path(consts::SERVER_BANS_CONFIG)]
         }
     };
 
-    //CREATE RUNTIME CONFIG
-    if !Path::new(&runtime_path).is_file()
+    //CREATE RUNTIME CONFIGS
+    for runtime_path in &runtime_paths
     {
-        fs::write(&runtime_path, "#*#**#*###**#***###*#").expect("Writing to config failed");
+        if !Path::new(runtime_path).is_file()
+        {
+            fs::write(runtime_path, "#*#**#*###**#***###*#").expect("Writing to config failed");
+        }
     }
 
     //BRING ANY PRE-SUBTABLE USER STORE UP TO DATE
@@ -313,16 +341,15 @@ pub fn server_users_role(username: &str) -> Option<usize> //RETURN PASSWORD HASH
 }
 
 #[cfg(feature = "server")]
-pub fn server_users_banned(username: &str) -> Option<bool>
+pub fn server_bans_banned(username: &str) -> bool //IS username BANNED?
 {
-    get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(username)?
-        .as_table_like()?.get("banned")?.as_bool()
+    banned("user", username)
 }
 
 #[cfg(feature = "server")]
-pub fn server_users_ban(username: &str)
+pub fn server_bans_ban(username: &str) //BAN username
 {
-    write_user_field(username, "banned", true.into());
+    with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| set_ban(doc, "user", username, true));
 }
 
 #[cfg(feature = "server")]
@@ -333,7 +360,6 @@ pub fn server_users_add(username: &str, hash: &str) -> bool //CREATE NEW USER, R
     write_user_field(username, "password", hash.into()); //PASSWORD
     write_user_field(username, "role", (if first_user
         { consts::SERVER_OWNER_ROLE } else { consts::SERVER_USER_ROLE } as i64).into()); //ROLE (OWNER IF THIS IS THE FIRST USER)
-    write_user_field(username, "banned", false.into()); //BANNED
 
     first_user
 }
@@ -460,7 +486,6 @@ pub fn server_users_migrate() //CONVERT FLAT username = "<hash>" ENTRIES INTO SU
         {
             set_user_field(doc.as_table_mut(), username, "password", hash.into());
             set_user_field(doc.as_table_mut(), username, "role", (consts::SERVER_USER_ROLE as i64).into());
-            set_user_field(doc.as_table_mut(), username, "banned", false.into());
         }
     });
 }

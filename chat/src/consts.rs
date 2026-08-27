@@ -34,6 +34,7 @@ pub const UPLOADS_DIR: &str            = "WHY2-Uploads";                        
 pub const SERVER_CONFIG: &str          = "/server.toml";                              //SERVER CONFIG FILE
 pub const CLIENT_CONFIG: &str          = "/client.toml";                              //CLIENT CONFIG FILE
 pub const SERVER_USERS_CONFIG: &str    = "/server_users.toml";                        //SERVER USERS CONFIG FILE
+pub const SERVER_BANS_CONFIG: &str     = "/server_bans.toml";                         //SERVER BANS CONFIG FILE
 
 pub const SERVER_KEYS_CONFIG: &str     = "/server_keys.toml";                         //SERVER PUBKEY CONFIG FILE
 pub const SERVER_KEYS_DIR: &str        = "/server_keys";                              //SERVER KEYS DIRECTORY
