@@ -690,6 +690,18 @@ async fn send_welcome_packet(write_stream: &mut OwnedWriteHalf, keys: &SharedKey
     }, Some(keys)).await;
 }
 
+async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTIONS BY IP
+{
+    let addrs: Vec<SocketAddr> = CONNECTIONS.iter()
+        .filter(|conn| conn.key().ip() == *addr)
+        .map(|conn| *conn.key()).collect();
+
+    for addr in addrs
+    {
+        remove_connection(&addr, grace, info).await;
+    }
+}
+
 //PUBLIC
 pub fn spawn_with_abort<F, Fut>(f: F) -> AbortHandle //SPAWN TASK WHICH KNOWS ITS OWN AbortHandle
 where
@@ -1774,6 +1786,31 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 {
                     config::server_bans_ban(&username);
                     remove_connection(&addr, true, Some("ban")).await;
+                } else //USER NOT FOUND
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                }
+            },
+
+            //BAN USER'S IP
+            PacketCode::ServerBanIp { id: uid } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_OWNER_ROLE || id == uid
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                //FIND TARGET USER
+                let target = CONNECTIONS.iter()
+                    .find(|entry| entry.value().id() == Some(&uid))
+                    .map(|entry| *entry.key());
+
+                if let Some(addr) = target
+                {
+                    config::server_bans_banip(&addr.ip());
+                    remove_connections(&addr.ip(), true, Some("ip ban")).await;
                 } else //USER NOT FOUND
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;

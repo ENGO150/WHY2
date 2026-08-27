@@ -49,7 +49,12 @@ use why2_chat::
         file::server as file,
         screen::server as screen,
         voice::server as voice_server,
-        server::{ self, ConnectionType },
+        server::
+        {
+            self,
+            HandshakeSlot,
+            ConnectionType,
+        },
     },
 };
 
@@ -176,8 +181,15 @@ async fn main()
         {
             Ok((mut stream, peer_addr)) =>
             {
+                //CHECK FOR IP BAN
+                if config::server_bans_bannedip(&peer_addr.ip())
+                {
+                    log::error!("Connection rejected (ip banned): {peer_addr}");
+                    continue;
+                }
+
                 //TAKE A HANDSHAKE SLOT - AN UNIDENTIFIED SOCKET COUNTS AGAINST NO OTHER LIMIT
-                let slot = match server::HandshakeSlot::reserve(peer_addr.ip())
+                let slot = match HandshakeSlot::reserve(peer_addr.ip())
                 {
                     Some(s) => s,
                     None =>

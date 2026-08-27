@@ -164,6 +164,14 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
             }, options::get_keys().as_ref()).await;
         },
 
+        Subcommand::BanIp =>
+        {
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerBanIp
+            {
+                id: id.unwrap(),
+            }, options::get_keys().as_ref()).await;
+        },
+
         Subcommand::Settings =>
         {
             network::send(&mut *write_stream.lock().await, PacketCode::ServerSettings

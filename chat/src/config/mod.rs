@@ -35,13 +35,16 @@ use toml_edit::
     Value,
 };
 
+use crate::{ consts, misc };
+
+#[cfg(feature = "server")]
+use std::net::IpAddr;
+
 #[cfg(feature = "server")]
 use toml_edit::{ Array, RawString };
 
 #[cfg(feature = "server")]
 use crate::network::codes::{ ServerSetting, SettingValue };
-
-use crate::{ consts, misc };
 
 #[cfg(feature = "client_base")]
 use std::fmt::Write;
@@ -347,9 +350,21 @@ pub fn server_bans_banned(username: &str) -> bool //IS username BANNED?
 }
 
 #[cfg(feature = "server")]
+pub fn server_bans_bannedip(ip: &IpAddr) -> bool //IS ip BANNED?
+{
+    banned("ip", &ip.to_string())
+}
+
+#[cfg(feature = "server")]
 pub fn server_bans_ban(username: &str) //BAN username
 {
     with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| set_ban(doc, "user", username));
+}
+
+#[cfg(feature = "server")]
+pub fn server_bans_banip(ip: &IpAddr) //BAN ip
+{
+    with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| set_ban(doc, "ip", &ip.to_string()));
 }
 
 #[cfg(feature = "server")]

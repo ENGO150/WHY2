@@ -81,6 +81,7 @@ pub enum Subcommand
     Mute,     //MUTE A USER SERVER-SIDE
     Kick,     //DISCONNECT A USER
     Ban,      //BAN A USER
+    BanIp,    //IP BAN A USER
     Settings, //SERVER CONFIGURATION
 }
 
@@ -177,6 +178,24 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
             },
         ],
         description: "Bans a user from the server",
+    },
+
+    SubcommandInfo
+    {
+        subcommand: Subcommand::BanIp,
+        triggers: &[ "BANIP", "DISABLEIP", "BLOCKIP" ],
+        minimal_role: consts::SERVER_OWNER_ROLE,
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "Target user",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Bans a user's IP from the server",
     },
 
     SubcommandInfo
