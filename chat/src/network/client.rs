@@ -57,8 +57,12 @@ use crate::
 {
     misc,
     crypto::kex,
-    config::{ self, TofuCode },
     options::{ self, LoginState },
+    config::
+    {
+        self,
+        keys::TofuCode,
+    },
     consts::
     {
         self,
@@ -207,7 +211,7 @@ async fn key_exchange
     let host = streams.0.peer_addr().unwrap().ip().to_string();
     let verdict = if env!("WHY2_SKIP_TOFU") == "false"
     {
-        Some(config::server_keys_check(&host, &pks))
+        Some(config::keys::check(&host, &pks))
     } else { None };
 
     //GENERATE EPHEMERAL ECC KEYS
@@ -230,7 +234,7 @@ async fn key_exchange
     options::set_keys(keys.clone());
 
     //ACT ON THE TOFU VERDICT NOW THAT THE SERVER HAS ITS ANSWER
-    let hash = config::server_keys_hash(&pks);
+    let hash = config::keys::hash(&pks);
 
     match verdict
     {
@@ -249,7 +253,7 @@ async fn key_exchange
                 host: host.clone(),
                 hash: hash.clone(),
                 mismatch: matches!(status, TofuCode::Mismatch),
-                pinned: config::server_keys_pinned(&host),
+                pinned: config::keys::pinned(&host),
                 reply,
             })).await.unwrap();
 
@@ -267,7 +271,7 @@ async fn key_exchange
             }
 
             //PIN THE KEY - THE NEXT CONNECTION TO host VERIFIES AGAINST IT
-            config::server_keys_save(&host, &hash);
+            config::keys::save(&host, &hash);
 
             if exchange_keys.is_none()
             {

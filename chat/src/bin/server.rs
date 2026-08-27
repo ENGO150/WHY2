@@ -52,8 +52,8 @@ use why2_chat::
         server::
         {
             self,
-            HandshakeSlot,
-            ConnectionType,
+            connection::ConnectionType,
+            handshake::HandshakeSlot,
         },
     },
 };
@@ -182,7 +182,7 @@ async fn main()
             Ok((mut stream, peer_addr)) =>
             {
                 //CHECK FOR IP BAN
-                if config::server_bans_bannedip(&peer_addr.ip())
+                if config::bans::banned_ip(&peer_addr.ip())
                 {
                     log::error!("Connection rejected (ip banned): {peer_addr}");
                     continue;

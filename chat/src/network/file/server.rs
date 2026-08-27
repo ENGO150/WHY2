@@ -61,7 +61,11 @@ use crate::
         self,
         EncryptionMode,
         codes::PacketCode,
-        server::{ self, AvailableFile },
+        server::
+        {
+            self,
+            connection::AvailableFile,
+        },
         file::
         {
             self,

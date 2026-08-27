@@ -16,9 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//MODULES
+pub mod connection;
+pub mod handshake;
+
 use std::
 {
-    path::PathBuf,
     future::Future,
     net::{ IpAddr, SocketAddr },
     time::{ Instant, Duration },
@@ -28,7 +31,6 @@ use std::
         Arc,
         LazyLock,
         Mutex as MutexSync,
-        atomic::{ AtomicUsize, Ordering },
     },
 };
 
@@ -50,12 +52,19 @@ use zeroize::Zeroizing;
 
 use dashmap::DashMap;
 
+use connection::
+{
+    AvailableFile,
+    ConnectionType,
+    Connection,
+};
+
 use crate::
 {
     config,
     options,
     misc,
-    crypto::{ kex, password },
+    crypto::password,
     consts::
     {
         self,
@@ -77,627 +86,20 @@ use crate::
     },
 };
 
-//STRUCTS
-#[derive(Clone)]
-pub struct AvailableFile //UPLOADED FILE
-{
-    pub hash: [u8; 32],   //FILE HASH
-    pub path: PathBuf,    //PATH
-    pub filename: String, //FILENAME
-    pub size: u64,        //FILE SIZE
-    pub key: Zeroizing<Vec<i64>>,
-    pub nonce: Vec<i64>,
-}
-
-#[derive(Clone)]
-pub struct Attach //SCREEN ATTACHMENT
-{
-    pub stream: Arc<Mutex<OwnedWriteHalf>>, //RECEIVE STREAM
-    pub target_id: usize,                   //ID OF SCREENSHARER
-    pub token: [u8; 32],                    //TOKEN FOR REXSTREAM
-}
-
-pub struct HandshakeSlot //RESERVATION HELD BY A SOCKET THAT HAS NOT IDENTIFIED ITSELF YET (SEE HANDSHAKE BUDGET)
-{
-    ip: IpAddr, //PEER THE SLOT WAS TAKEN FOR
-}
-
-//ENUMS
-pub enum ConnectionType //TYPES OF TCP CHANNEL
-{
-    FileUpload
-    {
-        uid: u64,
-    },
-    FileDownload
-    {
-        uid: u64,
-        file: AvailableFile,
-    },
-    Screen,
-    Attach
-    {
-        id: usize,
-    },
-}
-
-#[derive(Clone)]
-pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
-{
-    Authenticated
-    {
-        write_stream: Arc<Mutex<OwnedWriteHalf>>,                //STREAM
-        task: AbortHandle,                                       //HANDLER TASK (USED TO FORCE-CLOSE THE CONNECTION)
-        file_streams: Arc<MutexSync<HashMap<u64, AbortHandle>>>, //ACTIVE FILE TRANSFER TASKS
-        screen_stream: Option<AbortHandle>,                      //SCREEN UPLOAD TASK
-        peer_addr: SocketAddr,                                   //ADDRESS & PORT
-        username: String,                                        //USERNAME
-        role: usize,                                             //ROLE
-        id: usize,                                               //ID OF USER
-        keys: SharedKeys,                                        //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
-        attached_screen: Option<Attach>,                         //SCREEN DOWNLOAD STREAM & TARGET ID
-        last_activity: Instant,                                  //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
-        last_key_exchange: Instant,                              //TIME OF LAST REKEY
-        spam_violations: usize,                                  //SPAM VIOLATIONS (unexpected, huh?)
-        channel: Option<String>,                                 //CHANNEL
-        seq: usize,                                              //SEQUENCE NUMBER (CLIENT -> SERVER)
-        server_seq: usize,                                       //SEQUENCE NUMBER (SERVER -> CLIENT)
-        alive: bool,                                             //RESPONDED TO KEEPALIVE
-        muted: bool,                                             //USER HAS SAID TOO MUCH, GIVING HIM A REST
-    },
-
-    NonAuthenticated
-    {
-        write_stream: Arc<Mutex<OwnedWriteHalf>>, //STREAM
-        task: AbortHandle,                        //HANDLER TASK
-        peer_addr: SocketAddr,                    //ADDRESS & PORT
-        username: Option<String>,                 //CHOSEN USERNAME
-        keys: Option<SharedKeys>,                 //SHARED KEYS
-        obfuscation_key: [u8; 32],                //OBFUSCATION KEY FROM PLAIN PACKETS
-        last_activity: Instant,                   //TIME OF LAST MESSAGE
-        seq: usize,                               //SEQUENCE NUMBER
-        connect: Instant,                         //TIME OF CONNECTION
-    },
-}
-
-//IMPLEMENTATIONS
-impl Connection
-{
-    //GET STREAM FROM Connection
-    pub fn write_stream(&self) -> &Arc<Mutex<OwnedWriteHalf>>
-    {
-        match self
-        {
-            Self::Authenticated { write_stream, .. } => write_stream,
-            Self::NonAuthenticated { write_stream, .. } => write_stream,
-        }
-    }
-
-    //GET HANDLER TASK FROM Connection
-    pub fn task(&self) -> &AbortHandle
-    {
-        match self
-        {
-            Self::Authenticated { task, .. } => task,
-            Self::NonAuthenticated { task, .. } => task,
-        }
-    }
-
-    //GET ALL ACTIVE FILE STREAMS
-    pub fn file_streams(&self) -> Option<&Arc<MutexSync<HashMap<u64, AbortHandle>>>>
-    {
-        match self
-        {
-            Self::Authenticated { file_streams, .. } => Some(file_streams),
-            Self::NonAuthenticated { .. } => None,
-        }
-    }
-
-    //GET PEER ADDR FROM Connection#stream
-    pub fn peer_addr(&self) -> &SocketAddr
-    {
-        match self
-        {
-            Self::Authenticated { peer_addr, .. } => peer_addr,
-            Self::NonAuthenticated { peer_addr, .. } => peer_addr,
-        }
-    }
-
-    //GET USERNAME FROM Connection
-    pub fn username(&self) -> Option<&String>
-    {
-        match self
-        {
-            Self::Authenticated { username, .. } => Some(username),
-            Self::NonAuthenticated { username, .. } => username.as_ref(),
-        }
-    }
-
-    //GET USERNAME FROM Connection AS MUTABLE
-    fn username_mut(&mut self) -> &mut Option<String>
-    {
-        match self
-        {
-            Self::Authenticated { .. } => panic!("Do not use username_mut() on Authenticated client"),
-            Self::NonAuthenticated { username, .. } => username,
-        }
-    }
-
-    //GET ROLE
-    pub fn role(&self) -> Option<&usize>
-    {
-        match self
-        {
-            Self::Authenticated { role, .. } => Some(role),
-            Self::NonAuthenticated { .. } => None,
-        }
-    }
-
-    //GET ID FROM Connection
-    pub fn id(&self) -> Option<&usize>
-    {
-        match self
-        {
-            Self::Authenticated { id, .. } => Some(id),
-            Self::NonAuthenticated { .. } => None,
-        }
-    }
-
-    //GET SHARED KEYS FROM Connection
-    pub fn keys(&self) -> Option<&SharedKeys>
-    {
-        match self
-        {
-            Self::Authenticated { keys, .. } => Some(keys),
-            Self::NonAuthenticated { keys, .. } => keys.as_ref(),
-        }
-    }
-
-    //GET OBFUSCATION KEY
-    pub fn obfuscation_key(&self) -> Option<&[u8; 32]>
-    {
-        match self
-        {
-            Self::Authenticated { .. } => None,
-            Self::NonAuthenticated { obfuscation_key, .. } => Some(obfuscation_key),
-        }
-    }
-
-    //GET LAST ACTIVITY FROM Connection
-    pub fn last_activity(&self) -> &Instant
-    {
-        match self
-        {
-            Self::Authenticated { last_activity, .. } => last_activity,
-            Self::NonAuthenticated { last_activity, .. } => last_activity,
-        }
-    }
-
-    //GET LAST ACTIVITY FROM Connection AS MUTABLE
-    pub fn last_activity_mut(&mut self) -> &mut Instant
-    {
-        match self
-        {
-            Self::Authenticated { last_activity, .. } => last_activity,
-            Self::NonAuthenticated { last_activity, .. } => last_activity,
-        }
-    }
-
-    //GET LAST KEY EXCHANGE FROM Connection
-    pub fn last_key_exchange(&self) -> Option<&Instant>
-    {
-        match self
-        {
-            Self::Authenticated { last_key_exchange, .. } => Some(last_key_exchange),
-            Self::NonAuthenticated { .. } => None,
-        }
-    }
-
-    //GET SPAM VIOLATIONS FROM Connection
-    pub fn spam_violations(&self) -> Option<&usize>
-    {
-        match self
-        {
-            Self::Authenticated { spam_violations, .. } => Some(spam_violations),
-            Self::NonAuthenticated { .. } => None,
-        }
-    }
-
-    //GET SPAM VIOLATIONS FROM Connection AS MUTABLE
-    pub fn spam_violations_mut(&mut self) -> Option<&mut usize>
-    {
-        match self
-        {
-            Self::Authenticated { spam_violations, .. } => Some(spam_violations),
-            Self::NonAuthenticated { .. } => None,
-        }
-    }
-
-    //GET CHANNEL
-    pub fn channel(&self) -> &Option<String>
-    {
-        match self
-        {
-            Self::Authenticated { channel, .. } => channel,
-            Self::NonAuthenticated { .. }  => &None,
-        }
-    }
-
-    //GET LAST SEQUENCE NUMBER
-    pub fn seq(&self) -> &usize
-    {
-        match self
-        {
-            Self::Authenticated { seq, .. } => seq,
-            Self::NonAuthenticated { seq, .. } => seq,
-        }
-    }
-
-    //GET LAST SEQUENCE NUMBER AS MUTABLE
-    pub fn seq_mut(&mut self) -> &mut usize
-    {
-        match self
-        {
-            Self::Authenticated { seq, .. } => seq,
-            Self::NonAuthenticated { seq, .. } => seq,
-        }
-    }
-
-    //GET LAST SERVER SEQUENCE NUMBER
-    pub fn server_seq(&self) -> Option<&usize>
-    {
-        match self
-        {
-            Self::Authenticated { server_seq, .. } => Some(server_seq),
-            Self::NonAuthenticated { .. } => None,
-        }
-    }
-
-    //GET LAST SERVER SEQUENCE NUMBER AS MUTABLE
-    pub fn server_seq_mut(&mut self) -> Option<&mut usize>
-    {
-        match self
-        {
-            Self::Authenticated { server_seq, .. } => Some(server_seq),
-            Self::NonAuthenticated { .. } => None,
-        }
-    }
-
-    //CHECK IF CONNECTION IS INACTIVE
-    fn is_inactive(&self, now: Option<Instant>) -> bool
-    {
-        match self
-        {
-            Self::Authenticated { last_activity, .. } =>
-            {
-                now.unwrap_or_else(Instant::now).duration_since(*last_activity) >
-                    Duration::from_secs(config::read_config::<u64>("communication_time"))
-            },
-
-            Self::NonAuthenticated { connect, .. } =>
-            {
-                now.unwrap_or_else(Instant::now).duration_since(*connect) >
-                    Duration::from_secs(config::read_config::<u64>("max_auth_time"))
-            },
-        }
-    }
-
-    //IS AUTHENTICATED
-    pub fn is_authenticated(&self) -> bool
-    {
-        match self
-        {
-            Self::Authenticated { .. } => true,
-            Self::NonAuthenticated { .. } => false,
-        }
-    }
-
-    //SET CONNECTION TO ALIVE
-    pub fn set_alive(&mut self, val: bool)
-    {
-        match self
-        {
-            Self::Authenticated { alive, .. } => *alive = val,
-            _ => {}
-        }
-    }
-
-    //CHECK IF CONNECTION IS ALIVE
-    pub fn is_alive(&self) -> &bool
-    {
-        match self
-        {
-            Self::Authenticated { alive, .. } => alive,
-            Self::NonAuthenticated { .. } => &false,
-        }
-    }
-
-    //ADD FILE STREAM
-    pub fn add_file_stream(&self, uid: u64, task: AbortHandle)
-    {
-        if let Self::Authenticated { file_streams, .. } = self
-        {
-            file_streams.lock().unwrap().insert(uid, task);
-        }
-    }
-
-    //REMOVE FILE STREAM
-    pub fn remove_file_stream(&self, uid: u64)
-    {
-        if let Self::Authenticated { file_streams, .. } = self
-        {
-            if let Some(task) = file_streams.lock().unwrap().remove(&uid)
-            {
-                task.abort(); //DROPS THE STREAM HALVES, CLOSING THE SOCKET
-            }
-        }
-    }
-
-    //GET SCREEN UPLOAD STREAM
-    pub fn screen_stream(&self) -> &Option<AbortHandle>
-    {
-        match self
-        {
-            Self::Authenticated { screen_stream, .. } => screen_stream,
-            Self::NonAuthenticated { .. } => &None,
-        }
-    }
-
-    //GET ATTACHED SCREENSHARE
-    pub fn attached_screen(&self) -> &Option<Attach>
-    {
-        match self
-        {
-            Self::Authenticated { attached_screen, .. } => attached_screen,
-            Self::NonAuthenticated { .. } => &None,
-        }
-    }
-
-    //SET ATTACHED SCREENSHARE
-    pub fn attach_screen(&mut self, target_id: usize, stream: Arc<Mutex<OwnedWriteHalf>>, token: [u8; 32])
-    {
-        match self
-        {
-            Self::Authenticated { attached_screen, .. } => *attached_screen = Some(Attach
-            {
-                target_id,
-                stream,
-                token,
-            }),
-            _ => {},
-        }
-    }
-
-    //UNSET ATTACHED SCREENSHARE
-    pub fn deattach_screen(&mut self)
-    {
-        match self
-        {
-            Self::Authenticated { attached_screen, .. } =>
-            {
-                *attached_screen = None;
-                log::info!("Stop screen attach: {}", self.peer_addr());
-            },
-            _ => {},
-        }
-    }
-
-    //ADD SCREEN UPLOAD STREAM
-    pub fn set_screen_stream(&mut self, task: AbortHandle)
-    {
-        //CLEAN OLD STREAM
-        self.remove_screen_stream();
-
-        if let Self::Authenticated { screen_stream, .. } = self
-        {
-            *screen_stream = Some(task);
-        }
-    }
-
-    //TAKE SCREEN UPLOAD STREAM WITHOUT ABORTING IT (FOR THE SHARE TASK TEARING ITSELF DOWN)
-    pub fn take_screen_stream(&mut self) -> Option<(usize, AbortHandle)>
-    {
-        if let Self::Authenticated { screen_stream, peer_addr, id, .. } = self
-        {
-            if let Some(old_task) = screen_stream.take()
-            {
-                log::info!("Stop screenshare: {}", peer_addr);
-
-                return Some((*id, old_task));
-            }
-        }
-
-        None
-    }
-
-    //REMOVE SCREEN UPLOAD STREAM
-    pub fn remove_screen_stream(&mut self) -> Option<usize>
-    {
-        self.take_screen_stream().map(|(id, old_task)|
-        {
-            old_task.abort();
-            id
-        })
-    }
-
-    //MUTE
-    pub fn toggle_mute(&mut self)
-    {
-        if let Self::Authenticated { muted, .. } = self
-        {
-            *muted = !*muted;
-        }
-    }
-
-    //MUTED
-    pub fn muted(&self) -> &bool
-    {
-        match self
-        {
-            Self::Authenticated { muted, .. } => muted,
-            Self::NonAuthenticated { .. } => &false,
-        }
-    }
-}
-
-impl HandshakeSlot
-{
-    //TAKE A SLOT FOR A FRESHLY ACCEPTED SOCKET, None IF THE BUDGET IS FULL
-    pub fn reserve(ip: IpAddr) -> Option<Self>
-    {
-        if HANDSHAKES.load(Ordering::Relaxed) >= max_handshakes() { return None; }
-
-        //PER-IP SO ONE PEER CANNOT TAKE THE WHOLE BUDGET
-        {
-            let mut slots = HANDSHAKES_PER_IP.entry(ip).or_insert(0);
-            if *slots >= consts::MAX_HANDSHAKES_PER_IP { return None; }
-
-            *slots += 1;
-        }
-
-        HANDSHAKES.fetch_add(1, Ordering::Relaxed);
-
-        Some(Self { ip })
-    }
-}
-
-impl Drop for HandshakeSlot
-{
-    //RELEASE THE SLOT, WHICHEVER WAY THE HANDSHAKE ENDED
-    fn drop(&mut self)
-    {
-        HANDSHAKES.fetch_sub(1, Ordering::Relaxed);
-
-        //DROP THE GUARD BEFORE REMOVING - BOTH TOUCH THE SAME SHARD
-        let empty = if let Some(mut slots) = HANDSHAKES_PER_IP.get_mut(&self.ip)
-        {
-            *slots = slots.saturating_sub(1);
-            *slots == 0
-        } else { false };
-
-        if empty { HANDSHAKES_PER_IP.remove_if(&self.ip, |_, slots| *slots == 0); }
-    }
-}
-
 //LISTS
 pub static PENDING_TOKENS: LazyLock<DashMap<[u8; 32], (usize, ConnectionType, Instant)>> = LazyLock::new(|| DashMap::new());
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
 pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
-//HANDSHAKE BUDGET
-fn max_handshakes() -> usize
-{
-    (config::read_config::<usize>("max_clients") + config::read_config::<usize>("max_unauth_clients")) * consts::MAX_HANDSHAKES_PER_IP
-}
-static HANDSHAKES: AtomicUsize = AtomicUsize::new(0);
-static HANDSHAKES_PER_IP: LazyLock<DashMap<IpAddr, usize>> = LazyLock::new(|| DashMap::new());
-
 //PRIVATE
-async fn untrusted_read<F>(streams: &mut Streams<'_>, is_match: F, keys: Option<&SharedKeys>) -> Option<PacketCode>
-where
-    F: Fn(&PacketCode) -> bool
-{
-    let mut invalid_packets = 0; //INVALID KEY EXCHANGE PACKETS COUNTER
-
-    //WAIT FOR KeyExchange
-    let message = loop
-    {
-        //READ MESSAGE (WITH TIMEOUT FOR ZOMBIE CONNECTIONS)
-        let received = match tokio::time::timeout(Duration::from_millis(2000), network::receive(streams, keys, None)).await
-        {
-            Ok(Some(r)) => r,
-            _ => return None
-        };
-
-        if is_match(&received) { break received; }
-
-        //CHECK INVALID PACKETS COUNTER
-        if invalid_packets == 3 { return None; }
-        invalid_packets += 1; //INCREMENT
-    };
-
-    Some(message)
-}
-
-async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
-(
-    streams: &mut Streams<'_>,
-    peer_addr: &SocketAddr,
-    keys: &mut SharedKeys,
-    rekey_trigger: Option<&SharedKeys>,
-)
-{
-    //LOAD KEYS
-    let (sk, pk) = kex::get_server_keys();          //ECC
-    let (pq_sk, pq_pk) = kex::get_server_pq_keys(); //PQ (ML-KEM)
-
-    //ATOMIC SEND
-    {
-        let mut write = streams.1.lock().await;
-
-        //TRIGGER REKEY
-        let keys = if let Some(current_keys) = rekey_trigger
-        {
-            network::send(&mut write, PacketCode::Rekey, Some(current_keys)).await;
-
-            //ENCRYPT PUBKEYS
-            Some(current_keys)
-        } else { None }; //OBFUSCATE PUBKEYS
-
-        //SEND ENCRYPTED PUBKEYS TO CLIENT
-        network::send(&mut write, PacketCode::KeyExchange { ecc: pk, pq: pq_pk }, keys).await;
-    }
-
-    //READ FROM UNTRUSTED CLIENT
-    let message = match untrusted_read(streams, |code| matches!(code, PacketCode::KeyExchange { .. }), rekey_trigger).await
-    {
-        Some(r) => r,
-        None => return
-    };
-
-    //DERIVE SHARED KEYS
-    let new_keys = (||
-    {
-        if let PacketCode::KeyExchange { ecc, pq } = message
-        {
-            //DECAPSULATE PQ
-            let pq_secret = kex::decapsulate_pq(&pq_sk, &pq)?;
-
-            //DERIVE KEYS
-            kex::derive_shared_secret(sk, ecc, pq_secret)
-        } else { unreachable!("what"); }
-    })();
-
-    //UPDATE CLIENT KEYS
-    if let Some(new_keys) = new_keys
-    {
-        update_client_keys(peer_addr, &new_keys);
-        *keys = new_keys;
-    }
-}
-
-async fn send_welcome_packet(write_stream: &mut OwnedWriteHalf, keys: &SharedKeys) //send welcome packet you idiot
-{
-    //SEND
-    network::send(write_stream, PacketCode::Welcome
-    {
-        min_pass: config::read_config::<u64>("min_password_length"),
-        max_uname: config::read_config::<u64>("max_username_length"),
-        min_uname: config::read_config::<u64>("min_username_length"),
-        server_name: config::read_config::<String>("server_name"),
-        server_uname: options::get_server_username(),
-        git_hash: env!("WHY2_GIT_HASH").to_owned(),
-    }, Some(keys)).await;
-}
-
 //SEND THE WHOLE BAN LIST. IT IS BOTH THE ANSWER TO /server bans AND THE ACKNOWLEDGEMENT OF A PARDON,
 //BECAUSE LIFTING ONE BAN RENUMBERS THE ONES BELOW IT
 async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys)
 {
     network::send(&mut *write_stream.lock().await, PacketCode::ServerBans
     {
-        users: Some(config::server_bans_users()),
-        ips: Some(config::server_bans_ips()),
+        users: Some(config::bans::users()),
+        ips: Some(config::bans::ips()),
     }, Some(keys)).await;
 }
 
@@ -1023,21 +425,6 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
     }
 }
 
-async fn ask_version(streams: &mut Streams<'_>, keys: &SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
-{
-    //ASK FOR VERSION
-    network::send(&mut *streams.1.lock().await,
-        PacketCode::Version { version: Some(misc::get_version().to_string()) }, Some(keys)).await;
-
-    //READ FROM UNTRUSTED CLIENT
-    let read = untrusted_read(streams, |code| matches!(code, PacketCode::Version { .. }), Some(keys)).await?;
-
-    if let PacketCode::Version { version } = read
-    {
-        return version;
-    } { unreachable!("what"); }
-}
-
 async fn send_voice_clients(stream: &mut OwnedWriteHalf, keys: &SharedKeys, id: usize)
 {
     //FIND CHANNEL
@@ -1136,7 +523,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
     //GET ENCRYPTION & MAC KEYS
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    key_exchange(streams, &peer_addr, &mut keys, None).await;
+    handshake::key_exchange(streams, &peer_addr, &mut keys, None).await;
 
     //CHECK FOR VALID KEYS
     if keys.0.is_empty() || keys.1.is_empty()
@@ -1147,7 +534,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //ASK CLIENT FOR THEIR PACKAGE VERSION
     if config::read_config("check_client_version")
     {
-        let version = ask_version(streams, &keys).await;
+        let version = handshake::ask_version(streams, &keys).await;
         if version.is_none() || version != Some(misc::get_version().to_string())
         {
             return remove_connection(&peer_addr, true, Some("version")).await;
@@ -1155,7 +542,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     }
 
     //SEND PACKET WITH REQUIRED SERVER INFO
-    send_welcome_packet(&mut *streams.1.lock().await, &keys).await;
+    handshake::send_welcome_packet(&mut *streams.1.lock().await, &keys).await;
 
     //GET USERNAME FROM USER
     let mut username: Option<String> = None; //USER ENTERED USERNAME
@@ -1217,7 +604,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         }
     }
 
-    let user_exists = config::server_users_contains(&username);
+    let user_exists = config::users::contains(&username);
 
     //ASK FOR PASSWORD
     if !user_exists && !disabled_registration //REGISTRATION (OR "FAKE" LOGIN ON DISABLED REGISTER)
@@ -1262,7 +649,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             .await.expect("Hashing password failed");
 
         //SAVE PASSWORD
-        if config::server_users_add(&username, &hash)
+        if config::users::add(&username, &hash)
         {
             //FIRST USER, NOTIFY ABOUT OWNER ROLE
             network::send(&mut *streams.1.lock().await, PacketCode::FirstUser, Some(&keys)).await;
@@ -1284,10 +671,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         };
 
         //VERIFY PASSWORD (ARGON2 IS CPU HEAVY, KEEP IT OFF THE RUNTIME)
-        let valid = if password.is_empty() || config::server_bans_banned(&username)
+        let valid = if password.is_empty() || config::bans::banned(&username)
         {
             false
-        } else if let Some(hashed) = config::server_users_password(&username)
+        } else if let Some(hashed) = config::users::password(&username)
         {
             task::spawn_blocking(move || password::compare_password_hash(&hashed, &password))
                 .await.expect("Comparing password failed")
@@ -1304,7 +691,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     }
 
     let id = get_latest_id(); //GENERATE ID FOR CLIENT
-    let role = config::server_users_role(&username).unwrap(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
+    let role = config::users::role(&username).unwrap(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
 
     let mut channel: Option<String> = None; //CURRENT CLIENT CHANNEL
 
@@ -1334,7 +721,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         {
             //INFORM CLIENT ABOUT REKEYING
             let current_keys = keys.clone();
-            key_exchange(streams, &peer_addr, &mut keys, Some(&current_keys)).await; //INIT REKEY
+            handshake::key_exchange(streams, &peer_addr, &mut keys, Some(&current_keys)).await; //INIT REKEY
         }
 
         //CLIENT CODES
@@ -1795,7 +1182,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 if let Some((addr, Some(username))) = target
                 {
-                    config::server_bans_ban(&username);
+                    config::bans::ban(&username);
                     remove_connection(&addr, true, Some("ban")).await;
                 } else //USER NOT FOUND
                 {
@@ -1820,7 +1207,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 if let Some(addr) = target
                 {
-                    config::server_bans_banip(&addr.ip());
+                    config::bans::ban_ip(&addr.ip());
                     remove_connections(&addr.ip(), true, Some("ip ban")).await;
                 } else //USER NOT FOUND
                 {
@@ -1851,7 +1238,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
-                if config::server_bans_pardon(ban)
+                if config::bans::pardon(ban)
                 {
                     send_bans(&streams.1, &keys).await;
                 } else
@@ -1870,7 +1257,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
-                if config::server_bans_pardonip(ban)
+                if config::bans::pardon_ip(ban)
                 {
                     send_bans(&streams.1, &keys).await;
                 } else
@@ -1906,12 +1293,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //A SAVE WITHOUT ROWS IS NOT A SAVE, AND A READ IGNORES WHATEVER IT WAS SENT WITH
                 if save && let Some(settings) = &settings
                 {
-                    config::server_settings_write(settings);
+                    config::settings::write(settings);
                 }
 
                 network::send(&mut *streams.1.lock().await, PacketCode::ServerSettings
                 {
-                    settings: Some(config::server_settings()),
+                    settings: Some(config::settings::all()),
                     save,
                 }, Some(&keys)).await;
             },

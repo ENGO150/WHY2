@@ -16,6 +16,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//MODULES
+#[cfg(feature = "server")]
+pub mod users;
+
+#[cfg(feature = "server")]
+pub mod bans;
+
+#[cfg(feature = "server")]
+pub mod settings;
+
+#[cfg(feature = "client_base")]
+pub mod keys;
+
 use std::
 {
     fmt::Debug,
@@ -36,35 +49,6 @@ use toml_edit::
 };
 
 use crate::{ consts, misc };
-
-#[cfg(feature = "server")]
-use std::net::IpAddr;
-
-#[cfg(feature = "server")]
-use toml_edit::{ Array, RawString };
-
-#[cfg(feature = "server")]
-use crate::network::codes::
-{
-    BanEntry,
-    ServerSetting,
-    SettingValue,
-};
-
-#[cfg(feature = "client_base")]
-use std::fmt::Write;
-
-#[cfg(feature = "client_base")]
-use crate::crypto;
-
-//ENUMS
-#[cfg(feature = "client_base")]
-pub enum TofuCode //POSSIBLE KEY VERIFICATION RESULTS
-{
-    Valid, //KEY MATCHES LOCAL CONFIG
-    Unknown(String, String), //KEY NOT FOUND IN CONFIG
-    Mismatch, //KEY DIFFERS
-}
 
 //PRIVATE
 //GLOBAL VARIABLES
@@ -195,95 +179,6 @@ fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
     config_write_value(filename, key, value.into());
 }
 
-//THE HEADING A KEY SITS UNDER - THE LAST COMMENT BLOCK ABOVE IT. THE LICENSE BLOCK AT THE TOP OF THE FILE
-//IS NOT ONE: IT IS SEPARATED FROM THE FIRST KEY BY A BLANK LINE, WHICH IS WHAT STARTS THE BLOCK OVER
-#[cfg(feature = "server")]
-fn heading(prefix: &str) -> Option<String>
-{
-    let mut heading = None;
-
-    for line in prefix.lines()
-    {
-        let line = line.trim();
-
-        if line.is_empty() { heading = None; }
-        else if let Some(comment) = line.strip_prefix('#') { heading = Some(comment.trim().to_string()); }
-    }
-
-    heading
-}
-
-#[cfg(feature = "server")]
-fn set_user_field(users: &mut Table, username: &str, key: &str, value: Value) //SET ONE FIELD OF username, KEEPING THE REST OF THE ENTRY
-{
-    //A MISSING OR LEGACY FLAT ENTRY BECOMES AN EMPTY SUBTABLE FIRST
-    if users.get(username).and_then(Item::as_table_like).is_none()
-    {
-        users.insert(username, Item::Table(Table::new()));
-    }
-
-    users.get_mut(username).and_then(Item::as_table_like_mut)
-        .expect("User entry is not a table").insert(key, Item::Value(value));
-}
-
-#[cfg(feature = "server")]
-fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD OF username TO server_users.toml
-{
-    with_cached_mut(&config_path(consts::SERVER_USERS_CONFIG), |doc| set_user_field(doc.as_table_mut(), username, key, value));
-}
-
-//ADD ONE SUBJECT TO A LIST OF server_bans.toml. USERNAMES AND ADDRESSES GET A LIST OF THEIR OWN SO A
-//USERNAME THAT LOOKS LIKE AN ADDRESS - OR THE OTHER WAY AROUND - CANNOT BAN THE WRONG SUBJECT
-#[cfg(feature = "server")]
-fn set_ban(doc: &mut DocumentMut, section: &str, key: &str)
-{
-    //A MISSING LIST BECOMES AN EMPTY ONE FIRST
-    if doc.get(section).and_then(Item::as_array).is_none()
-    {
-        doc.insert(section, Item::Value(Value::Array(Array::new())));
-    }
-
-    let bans = doc.get_mut(section).and_then(Item::as_array_mut).expect("Ban list is not an array");
-
-    //BEING ON THE LIST IS THE WHOLE BAN, SO BANNING TWICE MUST NOT LIST THE SUBJECT TWICE
-    if !bans.iter().any(|ban| ban.as_str() == Some(key)) { bans.push(key); }
-}
-
-#[cfg(feature = "server")]
-fn unset_ban(doc: &mut DocumentMut, section: &str, id: usize) -> bool //REMOVES BAN
-{
-    let Some(bans) = doc.get_mut(section).and_then(Item::as_array_mut) else { return false };
-    if id >= bans.len() { return false; }
-
-    bans.remove(id);
-    true
-}
-
-#[cfg(feature = "server")]
-fn ban_list(section: &str) -> Vec<BanEntry> //EVERY SUBJECT ON A LIST OF server_bans.toml, NUMBERED
-{
-    get_data(&config_path(consts::SERVER_BANS_CONFIG)).get(section)
-        .and_then(Item::as_array)
-        .map(|bans| bans.iter().enumerate()
-            .filter_map(|(id, ban)| Some(BanEntry { id, subject: ban.as_str()?.to_string() }))
-            .collect())
-        .unwrap_or_default()
-}
-
-#[cfg(feature = "server")]
-fn banned(section: &str, key: &str) -> bool //IS key ON A LIST OF server_bans.toml?
-{
-    get_data(&config_path(consts::SERVER_BANS_CONFIG)).get(section)
-        .and_then(Item::as_array)
-        .is_some_and(|bans| bans.iter().any(|ban| ban.as_str() == Some(key)))
-}
-
-#[cfg(feature = "server")]
-pub fn server_users_len() -> usize //COUNT USERS
-{
-    get_data(&config_path(consts::SERVER_USERS_CONFIG)).len()
-}
-
 //PUBLIC
 pub fn init_config() //INITIALIZE CONFIG FILES
 {
@@ -337,7 +232,7 @@ pub fn init_config() //INITIALIZE CONFIG FILES
 
     //BRING ANY PRE-SUBTABLE USER STORE UP TO DATE
     #[cfg(feature = "server")]
-    server_users_migrate();
+    users::migrate();
 }
 
 pub fn read_config<T: FromStr>(key: &str) -> T //RETURN key FROM TOML CONFIG
@@ -353,166 +248,6 @@ where
     {
         config_read(consts::SERVER_CONFIG, key)
     }
-}
-
-#[cfg(feature = "server")]
-pub fn server_users_password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF username
-{
-    get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(username)?
-        .as_table_like()?.get("password")?.as_str().map(str::to_string)
-}
-
-#[cfg(feature = "server")]
-pub fn server_users_role(username: &str) -> Option<usize> //RETURN PASSWORD HASH OF username
-{
-    get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(username)?
-        .as_table_like()?.get("role")?.as_integer().map(|i| i as usize)
-}
-
-#[cfg(feature = "server")]
-pub fn server_bans_banned(username: &str) -> bool //IS username BANNED?
-{
-    banned("user", username)
-}
-
-#[cfg(feature = "server")]
-pub fn server_bans_bannedip(ip: &IpAddr) -> bool //IS ip BANNED?
-{
-    banned("ip", &ip.to_string())
-}
-
-#[cfg(feature = "server")]
-pub fn server_bans_ban(username: &str) //BAN username
-{
-    with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| set_ban(doc, "user", username));
-}
-
-#[cfg(feature = "server")]
-pub fn server_bans_banip(ip: &IpAddr) //BAN ip
-{
-    with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| set_ban(doc, "ip", &ip.to_string()));
-}
-
-#[cfg(feature = "server")]
-pub fn server_bans_users() -> Vec<BanEntry> //EVERY BANNED USERNAME
-{
-    ban_list("user")
-}
-
-#[cfg(feature = "server")]
-pub fn server_bans_ips() -> Vec<BanEntry> //EVERY BANNED ADDRESS
-{
-    ban_list("ip")
-}
-
-#[cfg(feature = "server")]
-pub fn server_bans_pardon(id: usize) -> bool //LIFT THE USERNAME BAN NUMBERED id
-{
-    let mut pardoned = false;
-    with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| pardoned = unset_ban(doc, "user", id));
-
-    pardoned
-}
-
-#[cfg(feature = "server")]
-pub fn server_bans_pardonip(id: usize) -> bool //LIFT THE ADDRESS BAN NUMBERED id
-{
-    let mut pardoned = false;
-    with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| pardoned = unset_ban(doc, "ip", id));
-
-    pardoned
-}
-
-#[cfg(feature = "server")]
-pub fn server_users_add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON FIRST USER
-{
-    let first_user = server_users_len() == 0; //SELF-EXPLANATORY, INNIT?
-
-    write_user_field(username, "password", hash.into()); //PASSWORD
-    write_user_field(username, "role", (if first_user
-        { consts::SERVER_OWNER_ROLE } else { consts::SERVER_USER_ROLE } as i64).into()); //ROLE (OWNER IF THIS IS THE FIRST USER)
-
-    first_user
-}
-
-//EVERY KEY OF server.toml AS THE CLIENT EDITS IT. THE FILE ITSELF IS THE LIST - NOTHING HERE NAMES A KEY,
-//SO A KEY ADDED TO THE DEFAULT CONFIG SHOWS UP IN THE OVERLAY WITHOUT ANY FURTHER WORK
-#[cfg(feature = "server")]
-pub fn server_settings() -> Vec<ServerSetting>
-{
-    let data = get_data(&config_path(consts::SERVER_CONFIG));
-    let table = data.as_table();
-
-    let mut settings = Vec::new();
-    let mut section = String::new();
-
-    for (key, item) in table.iter()
-    {
-        //A KEY OF A DATATYPE THE CONFIG READER DOES NOT UNDERSTAND HAS NO ROW TO BE EDITED IN
-        let Some(value) = item.as_value() else { continue };
-
-        //THE HEADING CARRIES DOWN THE FILE UNTIL THE NEXT ONE
-        if let Some(prefix) = table.key(key).and_then(|key| key.leaf_decor().prefix()).and_then(RawString::as_str)
-            && let Some(found) = heading(prefix)
-        {
-            section = found;
-        }
-
-        let description = value.decor().suffix().and_then(RawString::as_str)
-            .map(|comment| comment.trim().trim_start_matches('#').trim().to_string()).unwrap_or_default();
-
-        settings.push(ServerSetting
-        {
-            key: key.to_string(),
-            value: match value
-            {
-                Value::Boolean(on) => SettingValue::Toggle(*on.value()),
-                Value::Integer(number) => SettingValue::Number(*number.value()),
-                Value::String(text) => SettingValue::Text(text.value().clone()),
-
-                _ => continue,
-            },
-            section: section.clone(),
-            description,
-
-            //SAVING ONE OF THESE STORES IT, AND THE RUNNING SERVER GOES ON USING WHAT IT READ AT STARTUP
-            restart: consts::SERVER_RESTART_SETTINGS.contains(&key),
-        });
-    }
-
-    settings
-}
-
-//STORE WHAT THE CLIENT SENT BACK, RETURNING HOW MANY ROWS WERE ACCEPTED. A KEY THE CONFIG DOES NOT ALREADY
-//HAVE, OR ONE THAT COMES BACK AS A DIFFERENT DATATYPE, IS DROPPED - THE CLIENT DOES NOT GET TO INVENT KEYS
-#[cfg(feature = "server")]
-pub fn server_settings_write(settings: &[ServerSetting]) -> usize
-{
-    let data = get_data(&config_path(consts::SERVER_CONFIG));
-
-    let accepted: Vec<(&str, Value)> = settings.iter().filter_map(|setting|
-    {
-        let current = data.get(&setting.key).and_then(Item::as_value)?;
-
-        let value: Value = match (&setting.value, current)
-        {
-            (SettingValue::Toggle(on), Value::Boolean(_)) => (*on).into(),
-            (SettingValue::Number(number), Value::Integer(_)) => (*number).into(),
-            (SettingValue::Text(text), Value::String(_)) => text.as_str().into(),
-
-            _ => return None,
-        };
-
-        Some((setting.key.as_str(), value))
-    }).collect();
-
-    //ONE PASS OVER THE DOCUMENT, SO THE FILE IS REWRITTEN ONCE NO MATTER HOW MANY ROWS CHANGED
-    with_cached_mut(&config_path(consts::SERVER_CONFIG), |doc|
-    {
-        for (key, value) in &accepted { set_value(doc.as_table_mut(), key, value.clone()); }
-    });
-
-    accepted.len()
 }
 
 #[cfg(feature = "client_base")]
@@ -531,90 +266,4 @@ pub fn client_write_bool(key: &str, value: bool) //WRITE BOOLEAN TO client.toml
 pub fn client_write_int(key: &str, value: i64) //WRITE INTEGER TO client.toml
 {
     config_write_value(consts::CLIENT_CONFIG, key, value.into());
-}
-
-#[cfg(feature = "server")]
-pub fn server_users_migrate() //CONVERT FLAT username = "<hash>" ENTRIES INTO SUBTABLES
-{
-    let path = config_path(consts::SERVER_USERS_CONFIG);
-
-    //COLLECT LEGACY ENTRIES
-    let legacy: Vec<(String, String)> = get_data(&path).as_table().iter()
-        .filter_map(|(username, item)| match item
-        {
-            Item::Value(Value::String(hash)) => Some((username.to_string(), hash.value().to_string())),
-
-            _ => None
-        }).collect();
-
-    //NOTHING TO MIGRATE
-    if legacy.is_empty() { return; }
-
-    //REWRITE
-    with_cached_mut(&path, |doc|
-    {
-        for (username, hash) in &legacy
-        {
-            set_user_field(doc.as_table_mut(), username, "password", hash.into());
-            set_user_field(doc.as_table_mut(), username, "role", (consts::SERVER_USER_ROLE as i64).into());
-        }
-    });
-}
-
-#[cfg(feature = "server")]
-pub fn server_users_contains(key: &str) -> bool //CHECK IF server_users.toml contains
-{
-    get_data(&config_path(consts::SERVER_USERS_CONFIG)).get(key).is_some()
-}
-
-#[cfg(feature = "client_base")]
-pub fn server_keys_hash(pubkey: &str) -> String //HASH SERVER KEYS
-{
-    //HASH PUBKEY
-    let pubkey_hash = crypto::sha256(pubkey);
-    let mut pubkey_string = String::with_capacity(64);
-
-    //SERIALIZE
-    for byte in pubkey_hash
-    {
-        write!(pubkey_string, "{:02x}", byte).unwrap();
-    }
-
-    pubkey_string
-}
-
-#[cfg(feature = "client_base")]
-pub fn server_keys_check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VALIDITY (TOFU)
-{
-    let pubkey_string = server_keys_hash(pubkey);
-
-    //PEER PUBKEY STORED, CHECK VALIDITY
-    if get_data(&config_path(consts::SERVER_KEYS_CONFIG)).get(host).is_some()
-    {
-        //COMPARE
-        return if config_read::<String>(consts::SERVER_KEYS_CONFIG, host) == pubkey_string
-        {
-            TofuCode::Valid
-        } else
-        {
-            TofuCode::Mismatch
-        }
-    }
-
-    TofuCode::Unknown(pubkey_string, host.to_string())
-}
-
-#[cfg(feature = "client_base")]
-pub fn server_keys_pinned(host: &str) -> Option<String> //THE FINGERPRINT CURRENTLY PINNED FOR host, IF ANY
-{
-    if get_data(&config_path(consts::SERVER_KEYS_CONFIG)).get(host).is_none() { return None; }
-
-    Some(config_read::<String>(consts::SERVER_KEYS_CONFIG, host))
-}
-
-#[cfg(feature = "client_base")]
-pub fn server_keys_save(host: &str, pubkey_hash: &str) //SAVE KEY
-{
-    //WRITE
-    config_write(consts::SERVER_KEYS_CONFIG, host, pubkey_hash);
 }

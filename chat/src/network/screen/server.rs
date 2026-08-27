@@ -40,7 +40,11 @@ use crate::
         self,
         Streams,
         codes::PacketCode,
-        server::{ self, Connection },
+        server::
+        {
+            self,
+            connection::Connection,
+        },
         screen::{ self, ScreenPacketCode },
     },
 };
