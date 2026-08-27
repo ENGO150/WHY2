@@ -82,6 +82,9 @@ pub enum Subcommand
     Kick,     //DISCONNECT A USER
     Ban,      //BAN A USER
     BanIp,    //IP BAN A USER
+    Bans,     //LIST EVERY BAN
+    Pardon,   //LIFT A USERNAME BAN
+    PardonIp, //LIFT AN IP BAN
     Settings, //SERVER CONFIGURATION
 }
 
@@ -196,6 +199,51 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
             },
         ],
         description: "Bans a user's IP from the server",
+    },
+
+    SubcommandInfo
+    {
+        subcommand: Subcommand::Bans,
+        triggers: &[ "BANLIST", "BANS", "BANNED", "DISABLED", "BLOCKED" ],
+        minimal_role: consts::SERVER_OWNER_ROLE,
+        args: &[],
+        description: "Lists every ban",
+    },
+
+    SubcommandInfo
+    {
+        subcommand: Subcommand::Pardon,
+        triggers: &[ "PARDON", "UNBAN", "FORGIVE", "UNBLOCK" ],
+        minimal_role: consts::SERVER_OWNER_ROLE,
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "Banned user ID",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Removes a user ban",
+    },
+
+    SubcommandInfo
+    {
+        subcommand: Subcommand::PardonIp,
+        triggers: &[ "PARDONIP", "UNBANIP", "FORGIVEIP", "UNBLOCKIP" ],
+        minimal_role: consts::SERVER_OWNER_ROLE,
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "Banned address ID",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Removes an IP ban",
     },
 
     SubcommandInfo

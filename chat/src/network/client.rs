@@ -77,6 +77,7 @@ use crate::
             OnlineUser,
             UserScreen,
             ServerSetting,
+            BanEntry,
         },
     },
 };
@@ -154,6 +155,7 @@ pub enum ClientEvent
     VoiceDisabled,                                 //VOICE CHAT DISABLED
     List(Vec<OnlineUser>),                         //LIST OF USERS
     ServerSettings(Vec<ServerSetting>, bool),      //server.toml AS THE SERVER HOLDS IT (TRUE = IT HAS JUST BEEN SAVED)
+    ServerBans(Vec<BanEntry>, Vec<BanEntry>),      //server_bans.toml AS THE SERVER HOLDS IT (USERNAMES, ADDRESSES)
     Upload(String),                                //UPLOADING FILE
     Uploaded(String, String),                      //USER UPLOADED FILE
     Download(String),                              //DOWNLOADING FILE
@@ -624,6 +626,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::ServerSettings { settings, save } =>
             {
                 tx.send(ClientEvent::ServerSettings(settings.unwrap_or_default(), save)).await.unwrap();
+            },
+
+            //THE BAN LIST, EITHER BECAUSE WE ASKED FOR IT OR BECAUSE THE SERVER JUST LIFTED ONE
+            PacketCode::ServerBans { users, ips } =>
+            {
+                tx.send(ClientEvent::ServerBans(users.unwrap_or_default(), ips.unwrap_or_default())).await.unwrap();
             },
 
             //LIST OF ONLINE USERS

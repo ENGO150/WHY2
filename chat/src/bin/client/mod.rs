@@ -172,6 +172,31 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
             }, options::get_keys().as_ref()).await;
         },
 
+        Subcommand::Bans =>
+        {
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerBans
+            {
+                users: None,
+                ips: None,
+            }, options::get_keys().as_ref()).await;
+        },
+
+        Subcommand::Pardon =>
+        {
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerPardon
+            {
+                id: id.unwrap(),
+            }, options::get_keys().as_ref()).await;
+        },
+
+        Subcommand::PardonIp =>
+        {
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerPardonIp
+            {
+                id: id.unwrap(),
+            }, options::get_keys().as_ref()).await;
+        },
+
         Subcommand::Settings =>
         {
             network::send(&mut *write_stream.lock().await, PacketCode::ServerSettings

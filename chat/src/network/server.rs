@@ -690,6 +690,17 @@ async fn send_welcome_packet(write_stream: &mut OwnedWriteHalf, keys: &SharedKey
     }, Some(keys)).await;
 }
 
+//SEND THE WHOLE BAN LIST. IT IS BOTH THE ANSWER TO /server bans AND THE ACKNOWLEDGEMENT OF A PARDON,
+//BECAUSE LIFTING ONE BAN RENUMBERS THE ONES BELOW IT
+async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys)
+{
+    network::send(&mut *write_stream.lock().await, PacketCode::ServerBans
+    {
+        users: Some(config::server_bans_users()),
+        ips: Some(config::server_bans_ips()),
+    }, Some(keys)).await;
+}
+
 async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTIONS BY IP
 {
     let addrs: Vec<SocketAddr> = CONNECTIONS.iter()
@@ -1812,6 +1823,57 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     config::server_bans_banip(&addr.ip());
                     remove_connections(&addr.ip(), true, Some("ip ban")).await;
                 } else //USER NOT FOUND
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                }
+            },
+
+            //BAN LIST
+            PacketCode::ServerBans { .. } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_OWNER_ROLE
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                send_bans(&streams.1, &keys).await;
+            },
+
+            //LIFT A USERNAME BAN
+            PacketCode::ServerPardon { id: ban } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_OWNER_ROLE
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                if config::server_bans_pardon(ban)
+                {
+                    send_bans(&streams.1, &keys).await;
+                } else
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                }
+            },
+
+            //LIFT AN IP BAN
+            PacketCode::ServerPardonIp { id: ban } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_OWNER_ROLE
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                if config::server_bans_pardonip(ban)
+                {
+                    send_bans(&streams.1, &keys).await;
+                } else
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }

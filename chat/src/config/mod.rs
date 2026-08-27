@@ -44,7 +44,12 @@ use std::net::IpAddr;
 use toml_edit::{ Array, RawString };
 
 #[cfg(feature = "server")]
-use crate::network::codes::{ ServerSetting, SettingValue };
+use crate::network::codes::
+{
+    BanEntry,
+    ServerSetting,
+    SettingValue,
+};
 
 #[cfg(feature = "client_base")]
 use std::fmt::Write;
@@ -245,6 +250,27 @@ fn set_ban(doc: &mut DocumentMut, section: &str, key: &str)
 }
 
 #[cfg(feature = "server")]
+fn unset_ban(doc: &mut DocumentMut, section: &str, id: usize) -> bool //REMOVES BAN
+{
+    let Some(bans) = doc.get_mut(section).and_then(Item::as_array_mut) else { return false };
+    if id >= bans.len() { return false; }
+
+    bans.remove(id);
+    true
+}
+
+#[cfg(feature = "server")]
+fn ban_list(section: &str) -> Vec<BanEntry> //EVERY SUBJECT ON A LIST OF server_bans.toml, NUMBERED
+{
+    get_data(&config_path(consts::SERVER_BANS_CONFIG)).get(section)
+        .and_then(Item::as_array)
+        .map(|bans| bans.iter().enumerate()
+            .filter_map(|(id, ban)| Some(BanEntry { id, subject: ban.as_str()?.to_string() }))
+            .collect())
+        .unwrap_or_default()
+}
+
+#[cfg(feature = "server")]
 fn banned(section: &str, key: &str) -> bool //IS key ON A LIST OF server_bans.toml?
 {
     get_data(&config_path(consts::SERVER_BANS_CONFIG)).get(section)
@@ -365,6 +391,36 @@ pub fn server_bans_ban(username: &str) //BAN username
 pub fn server_bans_banip(ip: &IpAddr) //BAN ip
 {
     with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| set_ban(doc, "ip", &ip.to_string()));
+}
+
+#[cfg(feature = "server")]
+pub fn server_bans_users() -> Vec<BanEntry> //EVERY BANNED USERNAME
+{
+    ban_list("user")
+}
+
+#[cfg(feature = "server")]
+pub fn server_bans_ips() -> Vec<BanEntry> //EVERY BANNED ADDRESS
+{
+    ban_list("ip")
+}
+
+#[cfg(feature = "server")]
+pub fn server_bans_pardon(id: usize) -> bool //LIFT THE USERNAME BAN NUMBERED id
+{
+    let mut pardoned = false;
+    with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| pardoned = unset_ban(doc, "user", id));
+
+    pardoned
+}
+
+#[cfg(feature = "server")]
+pub fn server_bans_pardonip(id: usize) -> bool //LIFT THE ADDRESS BAN NUMBERED id
+{
+    let mut pardoned = false;
+    with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| pardoned = unset_ban(doc, "ip", id));
+
+    pardoned
 }
 
 #[cfg(feature = "server")]

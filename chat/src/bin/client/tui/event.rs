@@ -226,6 +226,53 @@ impl App
                 self.dirty = true;
             },
 
+            //ASKED FOR BY /server bans, AND SENT AGAIN AFTER EVERY PARDON - THE IDS RENUMBER WHEN ONE
+            //IS LIFTED, SO THE ANSWER TO A PARDON IS THE NEW LIST RATHER THAN AN 'OK' OVER A STALE ONE
+            ClientEvent::ServerBans(users, ips) =>
+            {
+                if users.is_empty() && ips.is_empty()
+                {
+                    self.push_styled("No bans.", theme::DIM);
+                } else
+                {
+                    self.push_styled(format!("Bans ({}):", users.len() + ips.len()), theme::TITLE);
+
+                    //TWO SECTIONS, EACH NUMBERED FROM ITS OWN ZERO - THE HEADING NAMES THE ACTION THAT LIFTS IT
+                    let sections = [("users", users), ("addresses", ips)];
+                    let last_section = sections.iter().filter(|(_, bans)| !bans.is_empty()).count().saturating_sub(1);
+
+                    let mut section_index = 0;
+                    for (name, bans) in sections
+                    {
+                        if bans.is_empty() { continue; }
+
+                        let last = section_index == last_section;
+                        section_index += 1;
+
+                        self.push(Line::from(vec!
+                        [
+                            Span::styled(super::branch(last), theme::BORDER),
+                            Span::raw(name),
+                        ]));
+
+                        //THE TRUNK KEEPS RUNNING PAST THE SUBJECTS UNLESS THIS IS THE LAST SECTION
+                        let trunk = format!("{}  ", if last { " " } else { "│" });
+                        let width = id_width(bans.iter().map(|ban| ban.id));
+                        let last_ban = bans.len() - 1;
+
+                        for (index, ban) in bans.into_iter().enumerate()
+                        {
+                            let mut spans = vec![Span::styled(format!("{trunk}{}", super::branch(index == last_ban)), theme::BORDER)];
+
+                            spans.extend(id_column(ban.id, width));
+                            spans.push(Span::raw(ban.subject));
+
+                            self.push(Line::from(spans));
+                        }
+                    }
+                }
+            },
+
             ClientEvent::List(users) =>
             {
                 //ALWAYS REFRESH THE SIDEBAR; ONLY ECHO A BLOCK WHEN THE USER ASKED FOR ONE
