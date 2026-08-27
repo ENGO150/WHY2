@@ -66,6 +66,7 @@ use wgpu::
     ShaderSource,
     StoreOp,
     Surface,
+    SurfaceColorSpace,
     SurfaceConfiguration,
     TexelCopyBufferLayout,
     TexelCopyTextureInfo,
@@ -249,6 +250,7 @@ impl YuvRenderer
             power_preference: PowerPreference::HighPerformance,
             force_fallback_adapter: false,
             compatible_surface: None,
+            apply_limit_buckets: false,
         })).map_err(|e| format!("no usable GPU adapter ({e})"))?;
 
         let (device, queue) = pollster::block_on(adapter.request_device(&DeviceDescriptor
@@ -403,6 +405,7 @@ impl VideoSurface
             power_preference: PowerPreference::HighPerformance,
             force_fallback_adapter: false,
             compatible_surface: Some(&surface),
+            apply_limit_buckets: false,
         })).map_err(|e| format!("no usable GPU adapter ({e})"))?;
 
         let (device, queue) = pollster::block_on(adapter.request_device(&DeviceDescriptor
@@ -437,6 +440,9 @@ impl VideoSurface
                 .find(|mode| *mode == PresentMode::Mailbox)
                 .unwrap_or(PresentMode::Fifo),
             alpha_mode: capabilities.alpha_modes[0],
+            //Auto IS THE ONE THAT KEEPS THE BACKEND OUT OF OUR ENCODING: ANYTHING WIDE-GAMUT OR HDR
+            //WOULD CHANGE WHAT THE FRAGMENT SHADER IS EXPECTED TO EMIT, AND IT ALREADY EMITS sRGB
+            color_space: SurfaceColorSpace::Auto,
             view_formats,
             desired_maximum_frame_latency: 2,
         };
@@ -491,6 +497,6 @@ impl VideoSurface
 
         self.renderer.draw(&view, (self.configuration.width, self.configuration.height));
 
-        frame.present();
+        self.renderer.queue.present(frame);
     }
 }

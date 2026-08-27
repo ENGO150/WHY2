@@ -137,6 +137,7 @@ impl GpuConverter
             power_preference: PowerPreference::HighPerformance,
             force_fallback_adapter: false,
             compatible_surface: None,
+            apply_limit_buckets: false,
         })).map_err(|e| format!("no usable GPU adapter ({e})"))?;
 
         let name = adapter.get_info().name;
@@ -337,7 +338,13 @@ impl GpuConverter
             Err(_) => return Err("the GPU never reported the readback".to_owned()),
         }
 
-        self.frame.data.copy_from_slice(&slice.get_mapped_range());
+        {
+            let mapped = slice.get_mapped_range()
+                .map_err(|e| format!("reading back the converted frame failed ({e})"))?;
+
+            self.frame.data.copy_from_slice(&mapped);
+        }
+
         resources.staging.unmap();
 
         Ok(&self.frame)

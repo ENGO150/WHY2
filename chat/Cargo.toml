@@ -50,14 +50,14 @@ why2 = { workspace = true }
 sha2 = { workspace = true }
 zeroize = { workspace = true }
 tokio = { version = "1.53.1", features = ["full"], optional = true }
-serde_json = { version = "1.0.150", optional = true }
-wincode = { version = "0.5.5", features = ["derive"], optional = true }
+serde_json = { version = "1.0.151", optional = true }
+wincode = { version = "0.6.1", features = ["derive"], optional = true }
 dirs = { version = "6.0.0", optional = true }
 p521 = { version = "0.14.0", features = ["ecdh", "pkcs8", "getrandom"], optional = true }
 ml-kem = { version = "0.3.2", features = ["getrandom"], optional = true }
-ureq = { version = "3.3.0", optional = true }
+ureq = { version = "3.4.0", optional = true }
 semver = { version = "1.0.28", optional = true }
-toml_edit = { version = "0.25.12", optional = true }
+toml_edit = { version = "0.25.13", optional = true }
 hkdf = { version = "0.13.0", optional = true }
 tokio-socks = { version = "0.5.3", optional = true }
 dashmap = { version = "6.2.1", optional = true }
@@ -65,13 +65,13 @@ rand = { version = "0.10.2", optional = true }
 
 # CHAT (CLIENT SPECIFIC)
 crossterm = { version = "0.29.0", optional = true, features = ["event-stream"] }
-tokio-stream = { version = "0.1.18", optional = true }
+tokio-stream = { version = "0.1.19", optional = true }
 ratatui = { version = "0.30.2", optional = true, default-features = false, features = ["crossterm_0_29", "std", "layout-cache", "underline-color", "all-widgets"] }
 unicode-width = { version = "0.2.2", optional = true }
 
 # VOICE CHAT (CLIENT)
-cpal = { version = "0.18.1", optional = true, features = ["pulseaudio"] }
-ringbuf = { version = "0.5.0", optional = true }
+cpal = { version = "0.18.2", optional = true, features = ["pulseaudio"] }
+ringbuf = { version = "0.5.1", optional = true }
 audiopus = { version = "0.2.0", optional = true }
 gag = { version = "1.0.0", optional = true }
 nnnoiseless = { version = "0.5.2", default-features = false, optional = true }
@@ -79,14 +79,14 @@ lewton = { version = "0.10.2", optional = true }
 
 # SCREEN SHARE (CLIENT SPECIFIC)
 winit = { version = "0.30.13", optional = true }
-xcap = { version = "0.9.6", default-features = false, optional = true }
-wgpu = { version = "29.0.4", optional = true }
-pollster = { version = "0.4.0", optional = true }
-openh264 = { version = "0.9.7", optional = true }
+xcap = { version = "0.9.8", default-features = false, optional = true }
+wgpu = { version = "30.0.1", optional = true }
+pollster = { version = "1.0.1", optional = true }
+openh264 = { version = "0.9.8", optional = true }
 
 # CHAT (SERVER SPECIFIC)
-argon2 = { version = "0.5.3", optional = true }
-log = { version = "0.4.33", optional = true }
+argon2 = { version = "0.6.0", optional = true }
+log = { version = "0.4.34", optional = true }
 simple_logger = { version = "5.2.0", optional = true }
 
 [features]
@@ -149,4 +149,4 @@ server = [
 ]
 
 [target.'cfg(target_os = "linux")'.dependencies]
-libwayshot = { version = "0.8.0", default-features = false, optional = true }
+libwayshot = { version = "0.9.0", default-features = false, optional = true }
