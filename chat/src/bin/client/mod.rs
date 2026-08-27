@@ -563,6 +563,15 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         #[cfg(feature = "client_voice")]
                         Command::Mute => mute(app, parameters),
 
+                        //NOTHING WENT TO THE SERVER BECAUSE NOTHING HAD TO: THE SHARE IS ALREADY UP AND
+                        //ONLY THE MONITOR UNDER IT CHANGED, WHICH THE RUNNING CAPTURE PICKS UP ON ITS OWN
+                        #[cfg(feature = "client_screen")]
+                        Command::Screen => app.push_styled(match screen::capture::current_monitor()
+                        {
+                            Some(monitor) => format!("Sharing {monitor} now."),
+                            None => String::from("Swapped the shared monitor."),
+                        }, theme::OK),
+
                         //INVALID COMMAND
                         Command::Invalid => invalid_usage(app, Some("command")),
 

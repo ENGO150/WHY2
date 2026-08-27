@@ -65,7 +65,10 @@ pub struct Entry
 pub struct Values
 {
     pub arg: &'static CommandArg,
-    pub matches: Vec<&'static str>,
+
+    //NOT &'static str: THE MONITORS OF THIS MACHINE ARE ONLY KNOWN AT RUNTIME, AND ARE READ AFRESH
+    //RATHER THAN LEAKED ONCE - ONE PLUGGED IN MID-SESSION IS STILL SUPPOSED TO SHOW UP HERE
+    pub matches: Vec<String>,
     pub selected: usize,
     pub start: usize, //CHAR INDEX WHERE THE HALF-TYPED VALUE BEGINS - COMPLETING REPLACES EVERYTHING FROM HERE ON
 }
@@ -175,7 +178,7 @@ impl Entry
 
 impl Values
 {
-    pub fn selection(&self) -> Option<&'static str> { self.matches.get(self.selected).copied() }
+    pub fn selection(&self) -> Option<&str> { self.matches.get(self.selected).map(String::as_str) }
 
     //THE HIGHLIGHTED VALUE IS ALREADY SPELLED OUT ON THE LINE, SO Enter SENDS IT INSTEAD OF COMPLETING IT
     pub fn typed(&self, input: &str) -> bool
@@ -191,7 +194,7 @@ impl Values
         match self.arg.values
         {
             ArgValues::Colors => colors::by_name(value),
-            ArgValues::Free => None,
+            ArgValues::Free | ArgValues::Monitors => None,
         }
     }
 }
@@ -333,7 +336,7 @@ impl Palette
             let typed = partial(tail).to_lowercase();
 
             let matches = vocabulary(arg.values).into_iter()
-                .filter(|value| value.starts_with(&typed)).collect::<Vec<&'static str>>();
+                .filter(|value| value.to_lowercase().starts_with(&typed)).collect::<Vec<String>>();
 
             //A TYPO IS NOT A REASON TO GO BLANK - THE SIGNATURE HINT BELOW STILL SAYS WHAT THE PARAMETER IS
             if !matches.is_empty()
@@ -453,11 +456,20 @@ fn partial(tail: &str) -> &str
 }
 
 //THE ANSWERS THEMSELVES, READ WHERE THEY ARE ALREADY DEFINED RATHER THAN SPELLED OUT A SECOND TIME
-fn vocabulary(values: ArgValues) -> Vec<&'static str>
+fn vocabulary(values: ArgValues) -> Vec<String>
 {
     match values
     {
-        ArgValues::Colors => colors::offered(),
+        ArgValues::Colors => colors::offered().into_iter().map(str::to_string).collect(),
+
+        //THE MONITORS ARE THE REASON A LIST MAY BE RUNTIME-BUILT AT ALL: NOTHING ON THE SCREEN NAMES
+        //THEM EITHER, AND A DISPLAY-SERVER NAME (DP-3, \\.\DISPLAY2) IS NOT SOMETHING TO GUESS AT
+        #[cfg(feature = "client_screen")]
+        ArgValues::Monitors => crate::screen::capture::monitor_names(),
+
+        #[cfg(not(feature = "client_screen"))]
+        ArgValues::Monitors => Vec::new(),
+
         ArgValues::Free => Vec::new(),
     }
 }

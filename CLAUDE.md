@@ -181,6 +181,31 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     strands memory four times faster than a 1080p one and has to recycle four times as often.
     Unlike the failure-driven reconnect beside it, this one forces no keyframe and clears no
     `last_image`: nothing was missed and the picture has not moved.
+  - **Which monitor is shared is a client-local choice**, not part of the protocol: `/screen [MONITOR]`
+    (a 1-based index or a monitor name) stores it in `screen::client::options::set_monitor` and
+    `capture::get_target_monitor` resolves it; the `Screen` packet still only toggles the share, and the
+    palette offers the monitor names (`ArgValues::Monitors` → `capture::monitor_names`, cached for
+    `MONITOR_LIST_TTL` because the popup asks on every keystroke). `command.rs` resolves the parameter
+    to a monitor *name* through `capture::resolve_monitor` before storing it, so an unknown monitor is
+    invalid usage on the spot rather than a share that starts and dies, and so `/screen 2` and
+    `/screen DP-2` are recognised as the same monitor. **The pick lasts exactly as long as the share
+    does** — it lives only in that atomic-style global, and every path that ends a share puts it back to
+    `None` (the `Screen { token: None }` arm in `network/client.rs`, `state::reset_session` for a lost
+    session), so a bare `/screen` always starts on the default monitor.
+  - **`/screen MONITOR` while a share is running swaps the capture over instead of ending it.** The
+    server only ever knows *that* we are sharing, so nothing is sent: `set_monitor` bumps
+    `MONITOR_GENERATION`, every capture loop watches it (`capture::switched`) and stands down, and
+    `capture_loop` — a restart loop around `capture_backend` — opens the new monitor while `running`,
+    the socket, the token and the audio capture all survive. The viewer pays one keyframe (the encoder
+    is new) and nothing else. Naming the monitor already being captured, or passing none, is still the
+    plain toggle: asking for what is already on the wire is the one case where a swap would mean nothing —
+    and that path deliberately leaves the pick alone, since swapping to the monitor we are about to stop
+    capturing would only restart the capture on its way out.
+    `build_message` returns `None` for a swap, which is why `mod.rs::submit` needs a `Command::Screen`
+    arm — its default arm panics on a command it does not know how to handle locally.
+  - On Wayland a picked monitor also **pins the polling path**: the recorder there is an
+    xdg-desktop-portal request whose picker chooses the output itself, so upgrading to it would throw
+    the selection away and ask again.
   - `WHY2_CAPTURE_BACKEND` (`recorder` / `legacy`) pins a backend; `WHY2_CAPTURE_PROBE_TIMEOUT`
     overrides the probe deadline in seconds. Both exist so a machine where the heuristic picks
     wrong is one env var away from the old behaviour.

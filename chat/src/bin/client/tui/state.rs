@@ -435,5 +435,6 @@ fn reset_session()
     {
         screen_options::set_use_screen(false);
         screen_options::set_attach_screen(false);
+        screen_options::set_monitor(None);
     }
 }

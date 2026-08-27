@@ -24,6 +24,7 @@ use std::
     sync::
     {
         Arc,
+        RwLock,
         atomic::{ AtomicBool, Ordering },
         mpsc::Receiver,
     },
@@ -61,15 +62,86 @@ use crate::network::screen::
     client::{ gpu::GpuConverter, options },
 };
 
-fn get_primary_monitor() -> Result<Monitor, String>
+fn monitor_name(monitor: &Monitor) -> String
+{
+    monitor.name().unwrap_or_else(|_| "unknown".to_owned())
+}
+
+fn monitor_list(monitors: &[Monitor]) -> String //THE MONITORS AS THE USER MAY NAME THEM, FOR THE ERROR THAT LISTS THEM
+{
+    monitors.iter().enumerate()
+        .map(|(index, monitor)| format!("{} ({})", index + 1, monitor_name(monitor)))
+        .collect::<Vec<String>>()
+        .join(", ")
+}
+
+//THE MONITOR THE USER ASKED FOR, BY 1-BASED INDEX OR BY NAME. AN UNKNOWN ONE IS AN ERROR RATHER THAN
+//A SILENT FALL BACK TO THE PRIMARY: SHARING A SCREEN THE USER DID NOT PICK IS THE WORSE OUTCOME.
+fn select_monitor(monitors: Vec<Monitor>, selection: &str) -> Result<Monitor, String>
+{
+    if let Ok(index) = selection.parse::<usize>()
+        && let Some(monitor) = index.checked_sub(1).and_then(|index| monitors.get(index))
+    {
+        return Ok(monitor.clone());
+    }
+
+    monitors.iter()
+        .find(|monitor| monitor_name(monitor).eq_ignore_ascii_case(selection))
+        .cloned()
+        .ok_or_else(|| format!("no monitor called '{selection}' - available: {}", monitor_list(&monitors)))
+}
+
+fn get_target_monitor() -> Result<Monitor, String> //THE MONITOR TO SHARE: THE PICKED ONE, OTHERWISE THE PRIMARY
 {
     let monitors = Monitor::all().map_err(|e| format!("failed to enumerate monitors ({e})"))?;
 
-    monitors.iter()
-        .find(|m| m.is_primary().unwrap_or(false))
-        .cloned()
-        .or_else(|| monitors.into_iter().next())
-        .ok_or_else(|| "no monitors found".to_owned())
+    if monitors.is_empty() { return Err("no monitors found".to_owned()); }
+
+    match options::get_monitor()
+    {
+        Some(selection) => select_monitor(monitors, &selection),
+
+        None => Ok(monitors.iter()
+            .find(|m| m.is_primary().unwrap_or(false))
+            .cloned()
+            .unwrap_or_else(|| monitors.into_iter().next().unwrap())),
+    }
+}
+
+//THE NAME OF THE MONITOR `selection` ASKS FOR. THE COMMAND RESOLVES BEFORE IT STORES ANYTHING, SO A
+//MONITOR THAT DOES NOT EXIST IS REFUSED WHILE THE USER IS STILL LOOKING AT WHAT THEY TYPED - AND SO
+//WHAT IS STORED IS THE MONITOR ITSELF RATHER THAN ONE OF THE WAYS OF SPELLING IT
+pub fn resolve_monitor(selection: &str) -> Result<String, String>
+{
+    let monitors = Monitor::all().map_err(|e| format!("failed to enumerate monitors ({e})"))?;
+
+    select_monitor(monitors, selection).map(|monitor| monitor_name(&monitor))
+}
+
+pub fn current_monitor() -> Option<String> //WHAT A SHARE WOULD CAPTURE RIGHT NOW, BY NAME
+{
+    get_target_monitor().ok().map(|monitor| monitor_name(&monitor))
+}
+
+//THE NAMES THE PALETTE OFFERS. IT ASKS ON EVERY KEYSTROKE OF THE PARAMETER, AND ENUMERATING MONITORS
+//IS A ROUND TRIP TO THE DISPLAY SERVER, SO THE ANSWER IS HELD FOR A MOMENT - LONG ENOUGH TO COVER
+//TYPING, SHORT ENOUGH THAT A MONITOR PLUGGED IN MID-SESSION SHOWS UP WITHOUT A RESTART
+pub fn monitor_names() -> Vec<String>
+{
+    static CACHE: RwLock<Option<(Instant, Vec<String>)>> = RwLock::new(None);
+
+    if let Some((taken, names)) = CACHE.read().unwrap().as_ref()
+        && taken.elapsed() < consts::MONITOR_LIST_TTL
+    {
+        return names.clone();
+    }
+
+    let names = Monitor::all().map(|monitors| monitors.iter().map(monitor_name).collect::<Vec<String>>())
+        .unwrap_or_default();
+
+    *CACHE.write().unwrap() = Some((Instant::now(), names.clone()));
+
+    names
 }
 
 //SET BY THE BACKGROUND PROBE THE MOMENT THE OS-NATIVE RECORDER HAS PROVEN ITSELF, AND OBSERVED BY
@@ -82,6 +154,12 @@ fn upgrading() -> bool
     UPGRADING.load(Ordering::Relaxed)
 }
 
+#[cfg(target_os = "linux")]
+fn wayland() -> bool
+{
+    env::var("WAYLAND_DISPLAY").is_ok() || env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland"
+}
+
 fn legacy_capture_loop //THE PRE-RECORDER POLLING PATH, KEPT AS THE LAST FALLBACK
 (
     frame_tx: Sender<Vec<u8>>,
@@ -90,15 +168,43 @@ fn legacy_capture_loop //THE PRE-RECORDER POLLING PATH, KEPT AS THE LAST FALLBAC
 ) -> Result<(), String>
 {
     #[cfg(target_os = "linux")]
-    if env::var("WAYLAND_DISPLAY").is_ok() || env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland"
+    if wayland()
     {
         return capture_loop_wayshot(frame_tx, running, fps);
     }
 
-    capture_loop_xcap(get_primary_monitor()?, frame_tx, running, fps)
+    capture_loop_xcap(get_target_monitor()?, frame_tx, running, fps)
 }
 
 pub fn capture_loop //CAPTURE LOOP
+(
+    frame_tx: Sender<Vec<u8>>,
+    running: Arc<AtomicBool>,
+    fps: u32,
+) -> Result<(), String>
+{
+    loop
+    {
+        let generation = options::monitor_generation();
+
+        let outcome = capture_backend(frame_tx.clone(), running.clone(), fps);
+
+        //THE BACKEND STOOD DOWN BECAUSE THE MONITOR CHANGED UNDER IT, NOT BECAUSE THE SHARE ENDED:
+        //START OVER ON THE NEW ONE. THE VIEWER PAYS ONE KEYFRAME FOR IT (THE ENCODER IS NEW) AND
+        //NOTHING ELSE - THE SOCKET, THE TOKEN AND THE SERVER'S IDEA OF WHO IS SHARING ALL SURVIVE
+        if !switched(generation) || !running.load(Ordering::Relaxed) || !options::get_use_screen()
+        {
+            return outcome;
+        }
+    }
+}
+
+fn switched(generation: usize) -> bool //THE MONITOR WAS PICKED AGAIN WHILE WE WERE CAPTURING
+{
+    options::monitor_generation() != generation
+}
+
+fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
 (
     frame_tx: Sender<Vec<u8>>,
     running: Arc<AtomicBool>,
@@ -112,6 +218,15 @@ pub fn capture_loop //CAPTURE LOOP
         "recorder" => return capture_loop_recorder(frame_tx, running, fps),
         "legacy" | "xcap" | "wayshot" => return legacy_capture_loop(frame_tx, running, fps),
         _ => {},
+    }
+
+    //A PICKED MONITOR IS THE ONE THING THE PORTAL RECORDER CANNOT BE TOLD: ON WAYLAND IT IS THE USER'S
+    //OWN PICKER THAT CHOOSES THE OUTPUT, SO UPGRADING TO IT WOULD QUIETLY THROW THE SELECTION AWAY -
+    //AND ASK AGAIN ON TOP OF IT. THE POLLING PATH HONOURS THE CHOICE, SO IT KEEPS THE SHARE.
+    #[cfg(target_os = "linux")]
+    if wayland() && options::get_monitor().is_some()
+    {
+        return legacy_capture_loop(frame_tx, running, fps);
     }
 
     //SOME OBJECTIVE-C BULLSHIT ON MAC
@@ -383,13 +498,15 @@ fn capture_loop_xcap
     let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
     let mut next_tick = Instant::now() + target_interval;
 
+    let generation = options::monitor_generation();
+
     let mut encoder = FrameEncoder::new(fps as f32)?;
 
     //PREVIOUS FRAME, KEPT BY MOVE - COPYING ITS BYTES OUT WOULD COST A FULL-FRAME memcpy EVERY TICK
     let mut last_image: Option<xcap::image::RgbaImage> = None;
     let mut last_encode_time = Instant::now();
 
-    while running.load(Ordering::Relaxed) && !upgrading()
+    while running.load(Ordering::Relaxed) && !upgrading() && !switched(generation)
     {
         //EXIT ON DISABLED SCREEN
         if !options::get_use_screen()
@@ -430,11 +547,22 @@ fn select_output(wayshot: &libwayshot::WayshotConnection) -> Result<libwayshot::
 
     if outputs.is_empty() { return Err("compositor reported no outputs".to_owned()); }
 
-    //PREFERRED: THE MONITOR xcap CALLS PRIMARY
-    if let Ok(name) = get_primary_monitor().and_then(|m| m.name().map_err(|e| e.to_string()))
-        && let Some(output) = outputs.iter().find(|o| o.name == name)
+    //A PICKED MONITOR IS RESOLVED HERE TOO, AND IS THE ONE CASE THAT MAY FAIL: THE COMPOSITOR AND xcap
+    //NUMBER THEIR OUTPUTS INDEPENDENTLY, SO THE SELECTION IS TURNED INTO A NAME FIRST AND THE NAME IS
+    //WHAT THE OUTPUT IS FOUND BY. FALLING BACK TO ANOTHER SCREEN HERE WOULD SHARE ONE NOBODY ASKED FOR.
+    let picked = options::get_monitor().is_some();
+
+    match get_target_monitor().and_then(|m| m.name().map_err(|e| e.to_string()))
     {
-        return Ok(output.clone());
+        Ok(name) => match outputs.iter().find(|o| o.name == name)
+        {
+            Some(output) => return Ok(output.clone()),
+            None if picked => return Err(format!("the compositor knows no output called '{name}'")),
+            None => {},
+        },
+
+        Err(reason) if picked => return Err(reason),
+        Err(_) => {},
     }
 
     //FALLBACK: THE OUTPUT AT THE ORIGIN OF THE LAYOUT, OTHERWISE THE FIRST ONE
@@ -464,6 +592,8 @@ fn capture_loop_wayshot
 ) -> Result<(), String>
 {
     let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
+
+    let generation = options::monitor_generation();
 
     let mut wayshot = libwayshot::WayshotConnection::new()
         .map_err(|e| format!("wayland screen capture is unavailable ({e})"))?;
@@ -498,7 +628,7 @@ fn capture_loop_wayshot
     //AND RECONNECTING COSTS 0.4 ms, SO THE SHARE SIMPLY RECYCLES ITS CONNECTION BEFORE THE BILL GETS BIG.
     let mut stranded = 0u64;
 
-    while running.load(Ordering::Relaxed) && !upgrading()
+    while running.load(Ordering::Relaxed) && !upgrading() && !switched(generation)
     {
         //EXIT ON DISABLED SCREEN
         if !options::get_use_screen()
@@ -585,7 +715,7 @@ struct RecorderSession //A STARTED OS-NATIVE RECORDER, ITS FRAME CHANNEL, AND IT
 
 fn open_recorder() -> Result<RecorderSession, String> //THE BLOCKING HALF OF THE PROBE
 {
-    let monitor = get_primary_monitor()?;
+    let monitor = get_target_monitor()?;
 
     let (recorder, frames) = monitor.video_recorder()
         .map_err(|e| format!("the OS screen recorder is unavailable ({e})"))?;
@@ -670,9 +800,14 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
     //THE FRAME THE PROBE ALREADY PAID FOR GOES OUT RATHER THAN BEING THROWN AWAY
     let mut pending = Some(first);
 
+    let generation = options::monitor_generation();
+
     let outcome = loop
     {
         if !running.load(Ordering::Relaxed) { break Ok(()); }
+
+        //THE MONITOR WAS PICKED AGAIN - HAND THE RECORDER BACK SO capture_loop CAN OPEN THE NEW ONE
+        if switched(generation) { break Ok(()); }
 
         //EXIT ON DISABLED SCREEN
         if !options::get_use_screen()

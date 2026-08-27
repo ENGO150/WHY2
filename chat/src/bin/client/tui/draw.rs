@@ -561,7 +561,7 @@ fn value_lines(values: &Values, rows: usize, first: usize) -> Vec<Line<'static>>
             spans.push(Span::raw(" "));
         }
 
-        spans.push(Span::raw((*value).to_string()));
+        spans.push(Span::raw(value.clone()));
 
         let line = Line::from(spans);
 

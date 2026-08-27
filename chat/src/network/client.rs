@@ -687,6 +687,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 //FOLLOW THE SERVER INSTEAD OF TOGGLING, SO BOTH SIDES CANNOT DRIFT APART
                 screen_options::set_use_screen(token.is_some());
 
+                //THE MONITOR WAS THIS SHARE'S, NOT THIS SESSION'S - THE NEXT BARE /screen STARTS ON THE DEFAULT ONE
+                if token.is_none() { screen_options::set_monitor(None); }
+
                 tx.send(match token
                 {
                     Some(token) =>
