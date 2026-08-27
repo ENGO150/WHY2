@@ -36,7 +36,7 @@ use toml_edit::
 };
 
 #[cfg(feature = "server")]
-use toml_edit::RawString;
+use toml_edit::{ Array, RawString };
 
 #[cfg(feature = "server")]
 use crate::network::codes::{ ServerSetting, SettingValue };
@@ -224,29 +224,29 @@ fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD O
     with_cached_mut(&config_path(consts::SERVER_USERS_CONFIG), |doc| set_user_field(doc.as_table_mut(), username, key, value));
 }
 
-//SET ONE ENTRY OF server_bans.toml. USERNAMES AND ADDRESSES LIVE IN SUBTABLES OF THEIR OWN SO A USERNAME
-//THAT LOOKS LIKE AN ADDRESS - OR THE OTHER WAY AROUND - CANNOT BAN THE WRONG SUBJECT
+//ADD ONE SUBJECT TO A LIST OF server_bans.toml. USERNAMES AND ADDRESSES GET A LIST OF THEIR OWN SO A
+//USERNAME THAT LOOKS LIKE AN ADDRESS - OR THE OTHER WAY AROUND - CANNOT BAN THE WRONG SUBJECT
 #[cfg(feature = "server")]
-fn set_ban(doc: &mut DocumentMut, section: &str, key: &str, banned: bool)
+fn set_ban(doc: &mut DocumentMut, section: &str, key: &str)
 {
-    //A MISSING SECTION BECOMES AN EMPTY SUBTABLE FIRST
-    if doc.get(section).and_then(Item::as_table_like).is_none()
+    //A MISSING LIST BECOMES AN EMPTY ONE FIRST
+    if doc.get(section).and_then(Item::as_array).is_none()
     {
-        doc.insert(section, Item::Table(Table::new()));
+        doc.insert(section, Item::Value(Value::Array(Array::new())));
     }
 
-    doc.get_mut(section).and_then(Item::as_table_like_mut)
-        .expect("Ban section is not a table").insert(key, Item::Value(banned.into()));
+    let bans = doc.get_mut(section).and_then(Item::as_array_mut).expect("Ban list is not an array");
+
+    //BEING ON THE LIST IS THE WHOLE BAN, SO BANNING TWICE MUST NOT LIST THE SUBJECT TWICE
+    if !bans.iter().any(|ban| ban.as_str() == Some(key)) { bans.push(key); }
 }
 
 #[cfg(feature = "server")]
-fn banned(section: &str, key: &str) -> bool //READ ONE ENTRY OF server_bans.toml
+fn banned(section: &str, key: &str) -> bool //IS key ON A LIST OF server_bans.toml?
 {
     get_data(&config_path(consts::SERVER_BANS_CONFIG)).get(section)
-        .and_then(Item::as_table_like)
-        .and_then(|section| section.get(key))
-        .and_then(Item::as_bool)
-        .unwrap_or(false) //NO ENTRY IS NO BAN
+        .and_then(Item::as_array)
+        .is_some_and(|bans| bans.iter().any(|ban| ban.as_str() == Some(key)))
 }
 
 #[cfg(feature = "server")]
@@ -349,7 +349,7 @@ pub fn server_bans_banned(username: &str) -> bool //IS username BANNED?
 #[cfg(feature = "server")]
 pub fn server_bans_ban(username: &str) //BAN username
 {
-    with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| set_ban(doc, "user", username, true));
+    with_cached_mut(&config_path(consts::SERVER_BANS_CONFIG), |doc| set_ban(doc, "user", username));
 }
 
 #[cfg(feature = "server")]
