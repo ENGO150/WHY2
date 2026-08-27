@@ -1879,6 +1879,20 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 }
             },
 
+            //SAY AS SERVER
+            PacketCode::ServerSay { message } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_OWNER_ROLE
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                //SEND BACK TO ALL CLIENTS ACROSS ALL CHANNELS
+                send_to_all(PacketCode::ServerSay { message }, false, None);
+            },
+
             //SERVER CONFIGURATION
             PacketCode::ServerSettings { settings, save } =>
             {

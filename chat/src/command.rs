@@ -85,6 +85,7 @@ pub enum Subcommand
     Bans,     //LIST EVERY BAN
     Pardon,   //LIFT A USERNAME BAN
     PardonIp, //LIFT AN IP BAN
+    Say,      //SAY AS SERVER
     Settings, //SERVER CONFIGURATION
 }
 
@@ -244,6 +245,24 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
             },
         ],
         description: "Removes an IP ban",
+    },
+
+    SubcommandInfo
+    {
+        subcommand: Subcommand::Say,
+        triggers: &[ "SAY", "ECHO", "BROADCAST", "NOTICE", "MESSAGE" ],
+        minimal_role: consts::SERVER_OWNER_ROLE,
+        args:
+        &[
+            CommandArg
+            {
+                name: "MESSAGE",
+                description: "Message to broadcast",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Broadcasts message as server",
     },
 
     SubcommandInfo
@@ -625,6 +644,17 @@ impl CommandInfo
 impl SubcommandInfo
 {
     pub fn available(&self, role: usize) -> bool { role >= self.minimal_role }
+
+    //WHETHER THE PARAMETER IS A TARGET ID - EVERY ACTION AIMED AT A USER TAKES ONE, THE REST TAKE THEIR PARAMETER AS TEXT
+    pub fn takes_id(&self) -> bool
+    {
+        matches!(self.subcommand, Subcommand::Mute
+            | Subcommand::Kick
+            | Subcommand::Ban
+            | Subcommand::BanIp
+            | Subcommand::Pardon
+            | Subcommand::PardonIp)
+    }
 }
 
 impl Command

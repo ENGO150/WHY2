@@ -140,6 +140,7 @@ pub enum ClientEvent
     VoiceActivity(Vec<VoiceUser>),                 //VOICE OVERLAY
     Join(String),                                  //CLIENT CONNECTED
     Leave(String, usize),                          //CLIENT DISCONNECTED
+    ServerSay(String),                             //SERVER MESSAGE
     ChannelChanged(Option<String>),                //WE SWITCHED CHANNEL
     ChannelCreated(String),                        //CHANNEL CREATED
     ChannelDestroyed(String),                      //CHANNEL ABANDONED
@@ -621,6 +622,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 voice_client::remove_consumer(&id);
             },
+
+            //SERVER MESSAGE
+            PacketCode::ServerSay { message } =>
+            {
+                tx.send(ClientEvent::ServerSay(message)).await.unwrap();
+            }
 
             //server.toml, EITHER BECAUSE WE ASKED FOR IT OR BECAUSE THE SERVER JUST STORED WHAT WE SENT
             PacketCode::ServerSettings { settings, save } =>

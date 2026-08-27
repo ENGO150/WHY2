@@ -207,6 +207,16 @@ impl App
                 self.push_styled("Voice disabled.", theme::DIM);
             },
 
+            //SERVER MESSAGE
+            ClientEvent::ServerSay(message) =>
+            {
+                self.push(Line::from(vec!
+                [
+                    Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
+                    Span::styled(message, theme::NOTICE),
+                ]));
+            },
+
             //server.toml CAME BACK - EITHER THE COPY WE ASKED FOR, OR THE ONE THE SERVER JUST STORED
             ClientEvent::ServerSettings(settings, saved) =>
             {

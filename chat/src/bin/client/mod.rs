@@ -126,16 +126,19 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
     //AN ACTION ABOVE OUR ROLE IS UNKNOWN FOR THE SAME REASON THE COMMAND IS
     if !sub.available(app.role) { return invalid_usage(app, Some("action")); }
 
-    //EVERY ACTION THAT TAKES A PARAMETER TAKES ONE TARGET ID
-    let id = match sub.args.is_empty()
-    {
-        true => None,
+    //AN ACTION THAT TAKES A PARAMETER NEEDS ONE, WHATEVER IT IS
+    if !sub.args.is_empty() && tail.is_empty() { return invalid_usage(app, None); }
 
-        false => match tail.parse::<usize>()
+    //MOST ACTIONS ARE AIMED AT A USER AND TAKE AN ID - THE REST READ `tail` AS TEXT
+    let id = match sub.takes_id()
+    {
+        true => match tail.parse::<usize>()
         {
             Ok(id) => Some(id),
             Err(_) => return invalid_usage(app, None),
         },
+
+        false => None,
     };
 
     match sub.subcommand
@@ -194,6 +197,14 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
             network::send(&mut *write_stream.lock().await, PacketCode::ServerPardonIp
             {
                 id: id.unwrap(),
+            }, options::get_keys().as_ref()).await;
+        },
+
+        Subcommand::Say =>
+        {
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerSay
+            {
+                message: tail.to_owned(),
             }, options::get_keys().as_ref()).await;
         },
 

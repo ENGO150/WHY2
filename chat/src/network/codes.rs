@@ -156,6 +156,7 @@ pub enum PacketCode //CONTROL CODES
     ServerBanIp { id: usize },                      //CLIENT -> SERVER | BAN USER'S IP
     ServerPardon { id: usize },                     //CLIENT -> SERVER | LIFT A USERNAME BAN
     ServerPardonIp { id: usize },                   //CLIENT -> SERVER | LIFT AN IP BAN
+    ServerSay { message: String },                  //CLIENT <> SERVER | SAY AS SERVER
 
     FirstUser,        //SERVER -> CLIENT | FIRST ONE TO REGISTER, OWNER ROLE ADDED
     Rekey,            //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)
