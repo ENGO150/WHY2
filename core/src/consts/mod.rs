@@ -73,3 +73,10 @@ pub const DEFAULT_GRID_WIDTH: usize = 8;
 ///
 /// This constant defines the number of rows in the standard grid configuration.
 pub const DEFAULT_GRID_HEIGHT: usize = 8;
+
+/// Number of blocks below which the keystream is generated on the calling thread.
+///
+/// Handing a one-block slice to `rayon` costs more in pool dispatch than the block costs to
+/// encrypt, which is the common case for the streaming API: a chat packet is frequently a
+/// single grid. Above this the work is worth spreading.
+pub const PARALLEL_THRESHOLD: usize = 4;

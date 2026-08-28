@@ -239,28 +239,76 @@ pub fn apply_ctr<const W: usize, const H: usize>
         .map(|k| k.precalculate_shifts())
         .collect();
 
+    apply_ctr_with_shifts(grids, nonce, round_keys, &round_shifts, counter_offset);
+}
+
+/// [`apply_ctr`] with the row shifts supplied by the caller.
+///
+/// The shifts depend only on the round keys, so a long-lived stream can derive them once at
+/// construction instead of on every chunk. [`apply_ctr`] is the entry point that derives them
+/// itself, for callers holding nothing but a key.
+pub(crate) fn apply_ctr_with_shifts<const W: usize, const H: usize>
+(
+    grids: &mut [Grid<W, H>],
+    nonce: &Grid<W, H>,
+    round_keys: &[Grid<W, H>],
+    round_shifts: &[[usize; H]],
+    counter_offset: Option<u64>,
+)
+{
+    let offset = counter_offset.unwrap_or(0);
+
+    //SMALL BATCHES ARE CHEAPER TO RUN HERE THAN TO HAND TO THE POOL
+    if grids.len() < consts::PARALLEL_THRESHOLD
+    {
+        for (i, grid) in grids.iter_mut().enumerate()
+        {
+            keystream_block(grid, nonce, round_keys, round_shifts, offset.wrapping_add(i as u64));
+        }
+
+        return;
+    }
+
     //APPLY ENCRYPTION TO EACH GRID (PARALLEL)
     grids.par_iter_mut().enumerate().for_each(|(i, grid)|
     {
-        //CREATE KEYSTREAM BLOCK
-        let mut keystream_block = nonce.clone();
-
-        //BLOCK INDEX
-        keystream_block.increment(counter_offset.unwrap_or(0) + i as u64);
-
-        //INITIAL XOR
-        keystream_block ^= &round_keys[0];
-
-        //ROUND OPERATIONS
-        for (i, round_key) in round_keys[1..].iter().enumerate()
-        {
-            keystream_block ^= round_key;                 //XOR
-            keystream_block.subcell(i);                   //SUBCELL (ARX)
-            keystream_block.shift_rows(&round_shifts[i]); //SHIFT ROWS
-            keystream_block.mix_columns();                //MIX COLUMNS (MDS)
-        }
-
-        //XOR KEYSTREAM AND DATA
-        *grid ^= &keystream_block;
+        keystream_block(grid, nonce, round_keys, round_shifts, offset.wrapping_add(i as u64));
     });
+}
+
+/// Derives the keystream block for `counter` and XORs it into `grid`.
+///
+/// This is the WHY2 block cipher itself: whitening with $K_0$, then a round of key addition,
+/// [`subcell`](Grid::subcell), [`shift_rows`](Grid::shift_rows) and
+/// [`mix_columns`](Grid::mix_columns) for every remaining round key.
+#[inline]
+fn keystream_block<const W: usize, const H: usize>
+(
+    grid: &mut Grid<W, H>,
+    nonce: &Grid<W, H>,
+    round_keys: &[Grid<W, H>],
+    round_shifts: &[[usize; H]],
+    counter: u64,
+)
+{
+    //CREATE KEYSTREAM BLOCK
+    let mut keystream_block = nonce.clone();
+
+    //BLOCK INDEX
+    keystream_block.increment(counter);
+
+    //INITIAL XOR
+    keystream_block ^= &round_keys[0];
+
+    //ROUND OPERATIONS
+    for (i, round_key) in round_keys[1..].iter().enumerate()
+    {
+        keystream_block ^= round_key;                 //XOR
+        keystream_block.subcell(i);                   //SUBCELL (ARX)
+        keystream_block.shift_rows(&round_shifts[i]); //SHIFT ROWS
+        keystream_block.mix_columns();                //MIX COLUMNS (MDS)
+    }
+
+    //XOR KEYSTREAM AND DATA
+    *grid ^= &keystream_block;
 }

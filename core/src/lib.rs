@@ -37,7 +37,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! - **Configurable Block Sizes**: From 4×4 to 16×16 grids (1024-16384 bits per block)
 //! - **Cache-Timing Resistant**: ARX-based design eliminates table lookups
-//! - **SIMD-Optimized**: Vectorized operations for modern CPUs (AVX2, NEON)
+//! - **SIMD-Optimized**: Vectorized operations selected at run time (AVX2, VPCLMULQDQ,
+//!   PCLMULQDQ, NEON/PMULL), so a portable build still uses them
 //! - **Constant-Time**: All cryptographic operations avoid timing side-channels
 //! - **Memory-Safe**: Pure Rust implementation prevents buffer overflows
 //! - **Parallel Encryption**: CTR mode enables multi-core processing
@@ -60,7 +61,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! - Grid-based encryption with customizable dimensions
 //! - ARX-style nonlinear mixing (cache-timing resistant)
-//! - SIMD-accelerated operations (4× i64 vector processing)
+//! - SIMD-accelerated operations (4× i64 vector processing), dispatched at run time
 //! - Round-key expansion via ChaCha20 CSPRNG
 //! - Optional authenticated encryption (HMAC-SHA256)
 //! - Constant-time implementation (via `subtle` crate)

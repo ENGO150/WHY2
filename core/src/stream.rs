@@ -86,6 +86,7 @@ pub struct RexStream
 >
 {
     round_keys: Zeroizing<Vec<Grid<W, H>>>,
+    round_shifts: Vec<[usize; H]>,
     nonce: Grid<W, H>,
     block_counter: u64,
     buffer: Zeroizing<Vec<i64>>,
@@ -111,9 +112,15 @@ impl<const W: usize, const H: usize> RexStream<W, H>
     {
         let round_keys = crypto::generate_round_keys(key_grid)?;
 
+        //THE ROW SHIFTS DEPEND ONLY ON THE ROUND KEYS, SO THEY ARE DERIVED ONCE PER STREAM
+        //RATHER THAN ONCE PER CHUNK. A STREAM DRIVEN A PACKET AT A TIME SPENDS MOST OF ITS
+        //TIME IN PER-CALL SETUP OTHERWISE.
+        let round_shifts = round_keys.iter().map(|k| k.precalculate_shifts()).collect();
+
         Ok(Self
         {
             round_keys,
+            round_shifts,
             nonce,
             block_counter: 0,
             buffer: Zeroizing::new(Vec::with_capacity(W * H)),
@@ -164,7 +171,7 @@ impl<const W: usize, const H: usize> RexStream<W, H>
                 let mut grid = Grid::from_flat(&self.buffer)?;
 
                 //ENCRYPT
-                crypto::apply_ctr(slice::from_mut(&mut grid), &self.nonce, &self.round_keys, Some(self.block_counter));
+                crypto::apply_ctr_with_shifts(slice::from_mut(&mut grid), &self.nonce, &self.round_keys, &self.round_shifts, Some(self.block_counter));
                 self.block_counter += 1; //INCREMENT COUNTER
 
                 //APPEND TO OUTPUT
@@ -184,7 +191,7 @@ impl<const W: usize, const H: usize> RexStream<W, H>
                 .map(Grid::from_flat).collect::<Result<Vec<_>, _>>()?;
 
             //ENCRYPT GRIDS
-            crypto::apply_ctr(&mut grids, &self.nonce, &self.round_keys, Some(self.block_counter));
+            crypto::apply_ctr_with_shifts(&mut grids, &self.nonce, &self.round_keys, &self.round_shifts, Some(self.block_counter));
             self.block_counter += full_grids_count as u64; //INCREMENT COUNTER
 
             //APPEND TO OUTPUT
@@ -216,11 +223,12 @@ impl<const W: usize, const H: usize> RexStream<W, H>
         let mut grid = Zeroizing::new(Grid::from_flat(&self.buffer)?);
 
         //ENCRYPT
-        crypto::apply_ctr
+        crypto::apply_ctr_with_shifts
         (
             slice::from_mut(&mut *grid),
             &self.nonce,
             &self.round_keys,
+            &self.round_shifts,
             Some(self.block_counter)
         );
 

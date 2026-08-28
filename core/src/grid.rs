@@ -77,7 +77,6 @@ use subtle::
 {
     Choice,
     ConstantTimeEq,
-    ConditionallySelectable,
 };
 
 //TYPES
@@ -188,6 +187,141 @@ macro_rules! subcell //SUBCELL CORE LOGIC
         $v1 = ($v1 ^ $round_tweak) & $mask;
     }
 }
+
+//HADAMARD DIFFUSION
+/// Checks at compile time that an MDS matrix satisfies $M_{i,j} = M_{0,\, i \oplus j}$.
+///
+/// [`mix_columns`](Grid::mix_columns) evaluates the matrix product as an XOR-convolution and
+/// solves it by Karatsuba, using $3^{\log_2 H}$ field products instead of $H^2$. That is only
+/// equal to the plain product for matrices of this (Hadamard) shape.
+///
+/// Every matrix in [`consts`] happens to have it. They are Cauchy matrices over the disjoint
+/// sets $x = \lbrace 0 \dots H-1 \rbrace$ and $y = \lbrace H \dots 2H-1 \rbrace$, and because
+/// $H$ is a power of two, $H + j = H \oplus j$; hence
+/// $M_{i,j} = (x_i \oplus y_j)^{-1} = (i \oplus j \oplus H)^{-1}$, which depends on $i$ and
+/// $j$ only through $i \oplus j$. The assertions below fail the build if a future matrix
+/// stops satisfying it, rather than letting `mix_columns` quietly compute the wrong thing.
+const fn is_hadamard<const N: usize>(m: &[[u64; N]; N]) -> bool
+{
+    let mut i = 0;
+    while i < N
+    {
+        let mut j = 0;
+        while j < N
+        {
+            if m[i][j] != m[0][i ^ j] { return false; }
+            j += 1;
+        }
+
+        i += 1;
+    }
+
+    true
+}
+
+const _: () = assert!(is_hadamard(&consts::MDS_4), "MDS_4 is not Hadamard; mix_columns cannot use Karatsuba");
+const _: () = assert!(is_hadamard(&consts::MDS_8), "MDS_8 is not Hadamard; mix_columns cannot use Karatsuba");
+const _: () = assert!(is_hadamard(&consts::MDS_16), "MDS_16 is not Hadamard; mix_columns cannot use Karatsuba");
+
+/// ARX transform of one cell, used for the tail that the vector loops cannot cover.
+///
+/// Arithmetic is done in `u64` with wrapping adds so the 32-bit halves behave exactly as the
+/// masked vector lanes do. The previous tail used `u32` with a plain `+`, which would panic on
+/// overflow in a debug build.
+#[inline(always)]
+fn subcell_cell(cell: i64, round: usize) -> i64
+{
+    const MASK: u64 = 0xFFFF_FFFF;
+
+    let x = cell as u64;
+    let mut v0 = x & MASK;
+    let mut v1 = (x >> 32) & MASK;
+    let mut sum: u64 = 0;
+
+    //XOR TWEAK -> MAKE ROUNDS DIFFERENT
+    v0 = (v0 ^ round as u64) & MASK;
+
+    //ARX-LIKE ROUNDS (INSPIRED BY XTEA/TEA)
+    for _ in 0..consts::SUBCELL_ROUNDS
+    {
+        sum = sum.wrapping_add(consts::DELTA_32 as u64);
+
+        v0 = v0.wrapping_add((((v1 << 4) ^ (v1 >> 5)).wrapping_add(v1)) ^ sum) & MASK; //MIX V1 INTO V0
+        v1 = v1.wrapping_add((((v0 << 4) ^ (v0 >> 5)).wrapping_add(v0)) ^ sum) & MASK; //MIX V0 INTO V1
+    }
+
+    //XOR TWEAK
+    v1 = (v1 ^ round as u64) & MASK;
+
+    ((v1 << 32) | v0) as i64
+}
+
+/// Base case of the XOR-convolution: a single field product per column.
+///
+/// # Safety
+/// `B` must name a backend whose CPU features the caller has enabled.
+#[inline(always)]
+unsafe fn hadamard_1<const B: u8>(m: &[u64; 1], x: &[[u64; gf::LANE]; 1], out: &mut [[u64; gf::RAW]; 1])
+{
+    out[0] = unsafe { gf::scale_raw::<B>(&x[0], m[0]) };
+}
+
+macro_rules! hadamard_level //ONE KARATSUBA SPLIT OF THE XOR-CONVOLUTION
+{
+    ($name:ident, $child:ident, $n:literal, $h:literal) =>
+    {
+        /// One Karatsuba split: three half-size convolutions instead of four.
+        ///
+        /// With $M_{i,j} = m_{i \oplus j}$ the top half of the index space acts on the bottom
+        /// half exactly as the bottom acts on the top, so writing
+        /// $P = m_{lo} \otimes x_{lo}$, $Q = m_{hi} \otimes x_{hi}$ and
+        /// $S = (m_{lo} \oplus m_{hi}) \otimes (x_{lo} \oplus x_{hi})$ gives
+        /// $\text{out}_{lo} = P \oplus Q$ and $\text{out}_{hi} = S \oplus \text{out}_{lo}$.
+        ///
+        /// # Safety
+        /// `B` must name a backend whose CPU features the caller has enabled.
+        #[inline(always)]
+        unsafe fn $name<const B: u8>(m: &[u64; $n], x: &[[u64; gf::LANE]; $n], out: &mut [[u64; gf::RAW]; $n])
+        {
+            //SPLIT THE COEFFICIENTS AND THE STATE
+            let ml: [u64; $h] = std::array::from_fn(|i| m[i]);
+            let mr: [u64; $h] = std::array::from_fn(|i| m[$h + i]);
+            let ms: [u64; $h] = std::array::from_fn(|i| ml[i] ^ mr[i]);
+
+            let xl: [[u64; gf::LANE]; $h] = std::array::from_fn(|i| x[i]);
+            let xr: [[u64; gf::LANE]; $h] = std::array::from_fn(|i| x[$h + i]);
+            let xs: [[u64; gf::LANE]; $h] = std::array::from_fn(|i| std::array::from_fn(|c| xl[i][c] ^ xr[i][c]));
+
+            let mut p = [[0u64; gf::RAW]; $h];
+            let mut q = [[0u64; gf::RAW]; $h];
+            let mut s = [[0u64; gf::RAW]; $h];
+
+            //THREE HALF-SIZE PRODUCTS
+            unsafe
+            {
+                $child::<B>(&ml, &xl, &mut p);
+                $child::<B>(&mr, &xr, &mut q);
+                $child::<B>(&ms, &xs, &mut s);
+            }
+
+            //RECOMBINE
+            for i in 0..$h
+            {
+                for c in 0..gf::RAW
+                {
+                    out[i][c] = p[i][c] ^ q[i][c];
+                    out[$h + i][c] = s[i][c] ^ out[i][c];
+                }
+            }
+        }
+    }
+}
+
+hadamard_level!(hadamard_2, hadamard_1, 2, 1);
+hadamard_level!(hadamard_4, hadamard_2, 4, 2);
+hadamard_level!(hadamard_8, hadamard_4, 8, 4);
+hadamard_level!(hadamard_16, hadamard_8, 16, 8);
+
 
 //IMPLEMENTATIONS
 /// Implementation of core Grid operations for fixed-size grids.
@@ -486,16 +620,104 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// $$ \text{sum} \leftarrow \text{sum} + \delta_{32} $$
     ///
     /// # Implementation
-    /// The function uses SIMD acceleration via 256-bit AVX2 (or 2×128-bit NEON) vector operations
-    /// to process 4 cells simultaneously. Remaining cells are handled with a scalar fallback.
+    /// Four cells are transformed at a time in a 256-bit vector. The implementation is chosen at
+    /// **run time**: on x86-64 with AVX2 an intrinsics path is used, and everything else falls
+    /// back to a portable path. This matters because `wide`'s
+    /// `i64x4` selects its backend from the *compile-time* target features, so a stock
+    /// `cargo build --release` — which targets baseline `x86-64` — silently produced scalar
+    /// code. Dispatching at run time is what makes a portable binary actually vectorised.
     ///
     /// # Notes
     /// - This method mutates the [`Grid`] in-place.
     /// - It is inspired by TEA/XTEA but adapted for WHY2's [`Grid`] architecture.
     /// - The transformation is deterministic for a given round and [`Grid`] state.
-    /// - SIMD implementation provides 2.5-4× speedup on modern CPUs compared to scalar code.
     #[inline(always)]
     pub fn subcell(&mut self, round: usize)
+    {
+        //DISPATCH ONCE PER CALL; THE VECTOR BODY NEEDS THE FEATURE ENABLED AT COMPILE TIME
+        #[cfg(target_arch = "x86_64")]
+        if gf::has_avx2()
+        {
+            unsafe { self.subcell_avx2(round) };
+            return;
+        }
+
+        self.subcell_portable(round);
+    }
+
+    /// AVX2 implementation of [`subcell`](Self::subcell).
+    ///
+    /// Identical arithmetic to [`subcell_portable`](Self::subcell_portable), written against the
+    /// intrinsics directly. `wide`'s `i64x4` picks its backend from the *compile-time* target
+    /// features, so on a stock `cargo build --release` (baseline `x86-64`) it degrades to scalar
+    /// code and the vectorisation the docs promise never happens. Selecting the implementation
+    /// at run time is what makes it real on a portable binary.
+    ///
+    /// # Safety
+    /// Requires `avx2`; reached only through [`gf::has_avx2`].
+    #[cfg(target_arch = "x86_64")]
+    #[target_feature(enable = "avx2")]
+    unsafe fn subcell_avx2(&mut self, round: usize)
+    {
+        use std::arch::x86_64::*;
+
+        let data: &mut [i64] = unsafe
+        {
+            slice::from_raw_parts_mut(self.0.as_mut_ptr() as *mut i64, W * H)
+        };
+
+        let mask = _mm256_set1_epi64x(0xFFFF_FFFF);
+        let delta = _mm256_set1_epi64x(consts::DELTA_32 as i64);
+        let tweak = _mm256_set1_epi64x(round as i64);
+
+        let mut chunks_iter = data.chunks_exact_mut(4);
+
+        for chunk in &mut chunks_iter
+        {
+            unsafe
+            {
+                let x = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
+
+                //SPLIT CELL TO HIGH32 AND LOW32
+                let mut v0 = _mm256_and_si256(x, mask);
+                let mut v1 = _mm256_and_si256(_mm256_srli_epi64(x, 32), mask);
+                let mut sum = _mm256_setzero_si256();
+
+                //XOR TWEAK
+                v0 = _mm256_and_si256(_mm256_xor_si256(v0, tweak), mask);
+
+                //ARX-LIKE ROUNDS (INSPIRED BY XTEA/TEA)
+                for _ in 0..consts::SUBCELL_ROUNDS
+                {
+                    sum = _mm256_add_epi64(sum, delta);
+
+                    //MIX V1 INTO V0
+                    let a = _mm256_xor_si256(_mm256_slli_epi64(v1, 4), _mm256_srli_epi64(v1, 5));
+                    let a = _mm256_xor_si256(_mm256_add_epi64(a, v1), sum);
+                    v0 = _mm256_and_si256(_mm256_add_epi64(v0, a), mask);
+
+                    //MIX V0 INTO V1
+                    let b = _mm256_xor_si256(_mm256_slli_epi64(v0, 4), _mm256_srli_epi64(v0, 5));
+                    let b = _mm256_xor_si256(_mm256_add_epi64(b, v0), sum);
+                    v1 = _mm256_and_si256(_mm256_add_epi64(v1, b), mask);
+                }
+
+                //XOR TWEAK
+                v1 = _mm256_and_si256(_mm256_xor_si256(v1, tweak), mask);
+
+                //RECONSTRUCT AND STORE
+                let res = _mm256_or_si256(_mm256_slli_epi64(v1, 32), v0);
+                _mm256_storeu_si256(chunk.as_mut_ptr() as *mut __m256i, res);
+            }
+        }
+
+        //TAIL (UNREACHABLE FOR THE SUPPORTED HEIGHTS, WHICH ALL MAKE W * H A MULTIPLE OF 4)
+        for cell in chunks_iter.into_remainder() { *cell = subcell_cell(*cell, round); }
+    }
+
+    /// Portable implementation of [`subcell`](Self::subcell), used when no vector backend applies.
+    #[inline(always)]
+    fn subcell_portable(&mut self, round: usize)
     {
         //CONVERT DATA TO i64 SLICE
         let data: &mut [i64] = unsafe
@@ -537,30 +759,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
 
         //SCALAR FALLBACK (WHEN (W * H) % 4 != 0)
-        let mask_scalar = 0xFFFF_FFFF;
-        for cell in chunks_iter.into_remainder()
-        {
-            //SPLIT CELL TO HIGH32 AND LOW32
-            let x = *cell as u64;
-            let mut v0 = (x & mask_scalar) as u32;
-            let mut v1 = ((x >> 32) & mask_scalar) as u32;
-
-            let mut sum = 0u32;
-
-            //MIX
-            subcell!
-            (
-                v0,
-                v1,
-                sum,
-                consts::DELTA_32,
-                round as u32,
-                mask_scalar as u32
-            );
-
-            //RECONSTRUCT AND STORE
-            *cell = (((v1 as u64) << 32) | (v0 as u64)) as i64;
-        }
+        for cell in chunks_iter.into_remainder() { *cell = subcell_cell(*cell, round); }
     }
 
     /// Precomputes row shift amounts from the current Grid state.
@@ -664,18 +863,32 @@ impl<const W: usize, const H: usize> Grid<W, H>
                 //BARREL-SHIFTER
                 while stride < W
                 {
-                    let do_rotate = Choice::from(((shift >> bit) & 1) as u8);
+                    //ALL-ONES WHEN THIS STAGE ROTATES, ALL-ZEROES WHEN IT DOES NOT.
+                    //`Choice::unwrap_u8` CARRIES subtle'S OPTIMISATION BARRIER, SO THE SELECT
+                    //BELOW CANNOT BE TURNED BACK INTO A BRANCH. ONE BARRIER PER STAGE IS
+                    //ENOUGH; THE PREVIOUS CODE PAID FOR ONE PER CELL AND BUILT A SECOND
+                    //SCRATCH ROW TO SELECT FROM.
+                    let mask = 0i64.wrapping_sub(Choice::from(((shift >> bit) & 1) as u8).unwrap_u8() as i64);
+
+                    //THE ROTATION SOURCE IS TWO CONTIGUOUS RUNS, NOT A GATHER: FOR
+                    //j < W - stride IT IS tmp[j + stride], AND FOR THE TAIL IT WRAPS TO
+                    //tmp[j + stride - W]. WRITTEN AS ONE `% W` THE COMPILER CANNOT VECTORISE
+                    //THE SELECT; SPLIT LIKE THIS IT CAN. BOTH BOUNDS COME FROM THE PUBLIC
+                    //LOOP COUNTERS, SO NOTHING SECRET REACHES AN INDEX.
                     let mut rotated = [0i64; W];
+                    let split = W - stride;
 
-                    for j in 0..W
+                    for j in 0..split
                     {
-                        rotated[j] = tmp[(j + stride) % W];
+                        rotated[j] = tmp[j] ^ ((tmp[j] ^ tmp[j + stride]) & mask);
                     }
 
-                    for j in 0..W
+                    for j in split..W
                     {
-                        tmp[j].conditional_assign(&rotated[j], do_rotate);
+                        rotated[j] = tmp[j] ^ ((tmp[j] ^ tmp[j - split]) & mask);
                     }
+
+                    tmp = rotated;
 
                     bit += 1;
                     stride <<= 1;
@@ -721,10 +934,19 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///   demonstrating no hidden weaknesses.
     ///
     /// # Implementation
-    /// Uses hardware-accelerated carry-less multiplication:
-    /// - **x86_64**: `PCLMULQDQ` instruction, processing 2 multiplications per instruction.
-    /// - **AArch64**: `PMULL`/`PMULL2` instructions, processing 2 multiplications per instruction.
-    /// - **Fallback**: Software implementation for other architectures.
+    /// Three things make this cheaper than the $H^2$ field multiplications the definition asks
+    /// for, none of which change the result:
+    ///
+    /// 1. **The matrix is Hadamard.** $M_{i,j}$ depends only on $i \oplus j$ (see
+    ///    a compile-time assertion enforces it), so the product is an XOR-convolution and splits
+    ///    by Karatsuba into
+    ///    $3^{\log_2 H}$ products instead of $H^2$ — 27 rather than 64 at the default height.
+    /// 2. **Reduction is deferred.** Folding modulo $p(x)$ is $\mathbb{F}_2$-linear, so the
+    ///    128-bit products are accumulated raw and reduced once per output row rather than once
+    ///    per product.
+    /// 3. **The multiply backend is chosen once**, per process, instead of being probed
+    ///    per product: `VPCLMULQDQ` (four products per instruction pair), `PCLMULQDQ` or
+    ///    `PMULL`/`PMULL2` (two), or a portable branchless fallback.
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
@@ -732,64 +954,127 @@ impl<const W: usize, const H: usize> Grid<W, H>
     #[inline(always)]
     pub fn mix_columns(&mut self)
     {
-        let mut out = [[0u64; W]; H];
-
-        for k in 0..H
+        //DISPATCH ONCE PER CALL, NOT ONCE PER PRODUCT
+        match gf::backend()
         {
-            for r in 0..H
-            {
-                //PICK CORRECT MATRIX (AND ITS COEFFICIENT)
-                let coeff = match H
-                {
-                    4  => consts::MDS_4[r][k],
-                    8  => consts::MDS_8[r][k],
-                    16 => consts::MDS_16[r][k],
-                    _  => unreachable!("tf")
-                };
+            #[cfg(target_arch = "x86_64")]
+            gf::Backend::Vclmul => unsafe { self.mix_columns_dispatch_vclmul() },
 
-                let acc = &mut out[r];
-                let src = &self.0[k]; // ROW-MAJOR READ, SEQUENTIAL
-                let mut c = 0usize;
+            #[cfg(target_arch = "x86_64")]
+            gf::Backend::Clmul => unsafe { self.mix_columns_dispatch_clmul() },
 
-                //PROCESS 4 COLUMNS AT ONCE
-                while c + 3 < W
-                {
-                    let (p0, p1) = gf::mul_const2(src[c] as u64, src[c + 1] as u64, coeff);
-                    let (p2, p3) = gf::mul_const2(src[c + 2] as u64, src[c + 3] as u64, coeff);
+            #[cfg(target_arch = "aarch64")]
+            gf::Backend::Pmull => unsafe { self.mix_columns_dispatch_pmull() },
 
-                    acc[c]     ^= p0;
-                    acc[c + 1] ^= p1;
-                    acc[c + 2] ^= p2;
-                    acc[c + 3] ^= p3;
-
-                    c += 4;
-                }
-
-                while c + 1 < W
-                {
-                    let (p0, p1) = gf::mul_const2(src[c] as u64, src[c + 1] as u64, coeff);
-
-                    acc[c]     ^= p0;
-                    acc[c + 1] ^= p1;
-
-                    c += 2;
-                }
-
-                //REMAINDER
-                if c < W
-                {
-                    acc[c] ^= gf::mul(src[c] as u64, coeff);
-                }
-            }
+            gf::Backend::Soft => unsafe { self.mix_columns_inner::<{ gf::B_SOFT }>() },
         }
+    }
 
-        //SAVE RESULT
-        for r in 0..H
+    /// `VPCLMULQDQ` entry point for [`mix_columns`](Self::mix_columns).
+    ///
+    /// # Safety
+    /// Only reachable when [`gf::backend`] reports [`gf::Backend::Vclmul`].
+    #[cfg(target_arch = "x86_64")]
+    #[target_feature(enable = "avx2,vpclmulqdq")]
+    unsafe fn mix_columns_dispatch_vclmul(&mut self)
+    {
+        unsafe { self.mix_columns_inner::<{ gf::B_VCLMUL }>() }
+    }
+
+    /// `PCLMULQDQ` entry point for [`mix_columns`](Self::mix_columns).
+    ///
+    /// # Safety
+    /// Only reachable when [`gf::backend`] reports [`gf::Backend::Clmul`].
+    #[cfg(target_arch = "x86_64")]
+    #[target_feature(enable = "pclmulqdq")]
+    unsafe fn mix_columns_dispatch_clmul(&mut self)
+    {
+        unsafe { self.mix_columns_inner::<{ gf::B_CLMUL }>() }
+    }
+
+    /// `PMULL` entry point for [`mix_columns`](Self::mix_columns).
+    ///
+    /// # Safety
+    /// Only reachable when [`gf::backend`] reports [`gf::Backend::Pmull`].
+    #[cfg(target_arch = "aarch64")]
+    #[target_feature(enable = "aes,neon")]
+    unsafe fn mix_columns_dispatch_pmull(&mut self)
+    {
+        unsafe { self.mix_columns_inner::<{ gf::B_PMULL }>() }
+    }
+
+    /// Body of [`mix_columns`](Self::mix_columns), generic over the field backend.
+    ///
+    /// Columns are handled [`gf::LANE`] at a time so the scratch used by the recursion is
+    /// bounded by the grid *height* alone and does not grow with `W`.
+    ///
+    /// # Safety
+    /// `B` must name a backend whose CPU features the caller has enabled.
+    #[inline(always)]
+    unsafe fn mix_columns_inner<const B: u8>(&mut self)
+    {
+        //HADAMARD VECTOR: THE WHOLE MATRIX IS M[i][j] = m[i ^ j], SO ROW 0 IS ALL OF IT
+        let m: &[u64] = match H
         {
-            for c in 0..W
+            4  => &consts::MDS_4[0],
+            8  => &consts::MDS_8[0],
+            16 => &consts::MDS_16[0],
+            _  => unreachable!("tf")
+        };
+
+        let mut col = 0;
+        while col < W
+        {
+            let take = if W - col < gf::LANE { W - col } else { gf::LANE };
+
+            //GATHER A LANE OF COLUMNS (THE TAIL IS ZERO-PADDED, WHICH SCALES TO ZERO)
+            let mut x = [[0u64; gf::LANE]; 16];
+            for k in 0..H
             {
-                self[r][c] = out[r][c] as i64;
+                for c in 0..take { x[k][c] = self.0[k][col + c] as u64; }
             }
+
+            let mut out = [[0u64; gf::RAW]; 16];
+
+            //XOR-CONVOLUTION BY KARATSUBA: 3^log2(H) products instead of H^2
+            match H
+            {
+                4 => unsafe
+                {
+                    hadamard_4::<B>
+                    (
+                        m.try_into().unwrap(),
+                        (&x[..4]).try_into().unwrap(),
+                        (&mut out[..4]).try_into().unwrap(),
+                    )
+                },
+
+                8 => unsafe
+                {
+                    hadamard_8::<B>
+                    (
+                        m.try_into().unwrap(),
+                        (&x[..8]).try_into().unwrap(),
+                        (&mut out[..8]).try_into().unwrap(),
+                    )
+                },
+
+                16 => unsafe
+                {
+                    hadamard_16::<B>(m.try_into().unwrap(), &x, &mut out)
+                },
+
+                _ => unreachable!("tf")
+            }
+
+            //FOLD EACH ACCUMULATED ROW BACK INTO THE FIELD, THEN SCATTER
+            for k in 0..H
+            {
+                let row = unsafe { gf::reduce_lane::<B>(&out[k]) };
+                for c in 0..take { self.0[k][col + c] = row[c] as i64; }
+            }
+
+            col += take;
         }
     }
 
