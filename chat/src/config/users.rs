@@ -23,7 +23,11 @@ use toml_edit::
     Value,
 };
 
-use crate::consts;
+use crate::
+{
+    consts,
+    role::Role,
+};
 
 fn set_user_field(users: &mut Table, username: &str, key: &str, value: Value) //SET ONE FIELD OF username, KEEPING THE REST OF THE ENTRY
 {
@@ -53,15 +57,15 @@ pub fn password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF user
         .as_table_like()?.get("password")?.as_str().map(str::to_string)
 }
 
-pub fn role(username: &str) -> Option<usize> //RETURN PASSWORD HASH OF username
+pub fn role(username: &str) -> Option<Role> //RETURN ROLE OF username
 {
     super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).get(username)?
-        .as_table_like()?.get("role")?.as_integer().map(|i| i as usize)
+        .as_table_like()?.get("role")?.as_str()?.parse().ok()
 }
 
-pub fn set_role(username: &str, role: usize) //STORE A NEW ROLE FOR username
+pub fn set_role(username: &str, role: Role) //STORE A NEW ROLE FOR username
 {
-    write_user_field(username, "role", (role as i64).into());
+    write_user_field(username, "role", role.name().into());
 }
 
 pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON FIRST USER
@@ -69,8 +73,7 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
     let first_user = len() == 0; //SELF-EXPLANATORY, INNIT?
 
     write_user_field(username, "password", hash.into()); //PASSWORD
-    write_user_field(username, "role", (if first_user
-        { consts::SERVER_OWNER_ROLE } else { consts::SERVER_USER_ROLE } as i64).into()); //ROLE (OWNER IF THIS IS THE FIRST USER)
+    set_role(username, if first_user { Role::Owner } else { Role::User }); //ROLE (OWNER IF THIS IS THE FIRST USER)
 
     first_user
 }
@@ -97,7 +100,7 @@ pub fn migrate() //CONVERT FLAT username = "<hash>" ENTRIES INTO SUBTABLES
         for (username, hash) in &legacy
         {
             set_user_field(doc.as_table_mut(), username, "password", hash.into());
-            set_user_field(doc.as_table_mut(), username, "role", (consts::SERVER_USER_ROLE as i64).into());
+            set_user_field(doc.as_table_mut(), username, "role", Role::User.name().into());
         }
     });
 }

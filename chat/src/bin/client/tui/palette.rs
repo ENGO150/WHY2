@@ -25,8 +25,8 @@ use unicode_width::UnicodeWidthStr;
 use crate::
 {
     colors,
-    consts,
     options,
+    role::Role,
     command::
     {
         self,
@@ -228,7 +228,7 @@ impl Palette
     pub fn is_visible(&self) -> bool { !matches!(self.mode, PaletteMode::Hidden) }
 
     //RECOMPUTE FROM THE CURRENT INPUT (role HIDES WHAT WE ARE NOT ALLOWED TO RUN)
-    pub fn update(&mut self, input: &str, role: usize)
+    pub fn update(&mut self, input: &str, role: Role)
     {
         //THE INPUT LINE BELONGS TO THE LOGIN PROMPT UNTIL AUTH IS DONE - COMMANDS ARE NOT DISPATCHED YET EITHER
         if !options::get_sending_messages()
@@ -288,7 +288,7 @@ impl Palette
     }
 
     //THE ACTION WORD OF /command <action> ... - A MENU WHILE IT IS BEING TYPED, ITS PARAMETERS ONCE IT IS DONE
-    fn action(&mut self, info: &'static CommandInfo, tail: &str, role: usize, input: &str)
+    fn action(&mut self, info: &'static CommandInfo, tail: &str, role: Role, input: &str)
     {
         match tail.find(char::is_whitespace)
         {
@@ -473,7 +473,7 @@ fn vocabulary(values: ArgValues) -> Vec<String>
 
         //THE ROLES ARE THE ONE VOCABULARY THAT IS ALSO A PROTOCOL VALUE - THE SERVER STORES THE NUMBER
         //THE POSITION IN THIS LIST IS, SO OFFERING THE NAMES IS THE ONLY WAY THE TWO CANNOT DRIFT
-        ArgValues::Roles => consts::SERVER_ROLES.iter().map(|role| role.to_string()).collect(),
+        ArgValues::Roles => Role::ALL.iter().map(Role::to_string).collect(),
 
         ArgValues::Free => Vec::new(),
     }

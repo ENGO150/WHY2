@@ -56,6 +56,7 @@ use semver::Version;
 use crate::
 {
     misc,
+    role::Role,
     crypto::kex,
     options::{ self, LoginState },
     config::
@@ -133,7 +134,7 @@ pub enum ClientEvent
     Register,                                      //REGISTER PROMPT
     Login,                                         //LOGIN PROMPT
     FirstUser,                                     //FIRST USER
-    Authenticated(usize),                          //LOGIN SUCCESSFUL, ROLE
+    Authenticated(Role),                           //LOGIN SUCCESSFUL, ROLE
     Connected(String),                             //SUCCESSFUL CONNECTION MESSAGE
     Message(String, String, usize, MessageColors), //RECEIVED MESSAGE
     PrivateMessageSent(String, usize, String),     //SENT PM
@@ -146,7 +147,7 @@ pub enum ClientEvent
     Join(String),                                  //CLIENT CONNECTED
     Leave(String, usize),                          //CLIENT DISCONNECTED
     ServerSay(String),                             //SERVER MESSAGE
-    Role(usize, Option<String>),                   //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
+    Role(Role, Option<String>),                    //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
     History(Vec<StoredMessage>),                   //THE LOBBY'S STORED MESSAGES, SENT ONCE AT LOGIN
     ChannelChanged(Option<String>),                //WE SWITCHED CHANNEL
     ChannelCreated(String),                        //CHANNEL CREATED

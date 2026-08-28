@@ -63,6 +63,7 @@ use crate::
 {
     misc,
     options,
+    role::Role,
     crypto::password,
     config::{ self, users },
     consts::
@@ -336,7 +337,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
     });
 }
 
-fn authenticate_client(peer_addr: &SocketAddr, username: &str, role: usize, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
+fn authenticate_client(peer_addr: &SocketAddr, username: &str, role: Role, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
     //UPDATE CONNECTION
     CONNECTIONS.alter(&peer_addr, |_, old_connection|
@@ -1145,7 +1146,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerMute { id } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_MODERATOR_ROLE
+                if role < Role::Moderator
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -1167,7 +1168,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerKick { id } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_MODERATOR_ROLE
+                if role < Role::Moderator
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -1192,7 +1193,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerBan { id: uid } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_OWNER_ROLE || id == uid
+                if role < Role::Owner || id == uid
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -1217,7 +1218,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerBanIp { id: uid } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_OWNER_ROLE || id == uid
+                if role < Role::Owner || id == uid
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -1242,7 +1243,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerBans { .. } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_OWNER_ROLE
+                if role < Role::Owner
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -1255,7 +1256,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerPardon { id: ban } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_OWNER_ROLE
+                if role < Role::Owner
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -1274,7 +1275,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerPardonIp { id: ban } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_OWNER_ROLE
+                if role < Role::Owner
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -1293,7 +1294,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerSay { message } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_OWNER_ROLE
+                if role < Role::Owner
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -1307,7 +1308,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerRole { id: uid, role: new_role, .. } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_OWNER_ROLE || id == uid || new_role > role || new_role >= consts::SERVER_ROLES.len()
+                if role < Role::Owner || id == uid || new_role > role
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -1375,7 +1376,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerSettings { settings, save } =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_OWNER_ROLE
+                if role < Role::Owner
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -1398,7 +1399,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::ServerRestart =>
             {
                 //VERIFY PERMISSIONS
-                if role < consts::SERVER_OWNER_ROLE
+                if role < Role::Owner
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;

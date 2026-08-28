@@ -31,8 +31,8 @@ use tokio::net::tcp::OwnedWriteHalf;
 
 use crate::
 {
-    consts,
     options,
+    role::Role,
     network::
     {
         self,
@@ -98,7 +98,7 @@ pub enum ArgValues
     Free,     //ANYTHING - A NAME, A MESSAGE, AN ID
     Colors,   //A crossterm COLOR NAME
     Monitors, //A MONITOR OF THIS MACHINE, AS THE DISPLAY SERVER NAMES IT
-    Roles,    //A SERVER ROLE, BY THE NAME BOTH SIDES KNOW IT BY (consts::SERVER_ROLES)
+    Roles,    //A SERVER ROLE, BY THE NAME BOTH SIDES KNOW IT BY (role::Role)
 }
 
 //STRUCTS
@@ -114,7 +114,7 @@ pub struct SubcommandInfo //SUBCOMMAND INFO - CARRIES ITS OWN ROLE, SO ONE COMMA
 {
     pub subcommand: Subcommand,
     pub triggers: &'static [&'static str],
-    pub minimal_role: usize,
+    pub minimal_role: Role,
     pub args: &'static [CommandArg],
     pub description: &'static str,
 }
@@ -124,7 +124,7 @@ pub struct CommandInfo //COMMAND INFO
     pub command: Command,
     pub triggers: &'static [&'static str],
     pub shortcut: Option<char>,
-    pub minimal_role: usize,
+    pub minimal_role: Role,
     pub subcommands: &'static [SubcommandInfo], //EMPTY UNLESS THE COMMAND IS A DOORWAY TO ACTIONS
     pub args: &'static [CommandArg],
     pub description: &'static str,
@@ -136,7 +136,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Mute,
         triggers: &[ "MUTE", "SILENCE", "STFU" ],
-        minimal_role: consts::SERVER_MODERATOR_ROLE,
+        minimal_role: Role::Moderator,
         args:
         &[
             CommandArg
@@ -154,7 +154,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Kick,
         triggers: &[ "KICK", "BOOT", "REMOVE" ],
-        minimal_role: consts::SERVER_MODERATOR_ROLE,
+        minimal_role: Role::Moderator,
         args:
         &[
             CommandArg
@@ -172,7 +172,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Ban,
         triggers: &[ "BAN", "DISABLE", "KILL" ],
-        minimal_role: consts::SERVER_OWNER_ROLE,
+        minimal_role: Role::Owner,
         args:
         &[
             CommandArg
@@ -190,7 +190,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::BanIp,
         triggers: &[ "BANIP", "DISABLEIP", "BLOCKIP" ],
-        minimal_role: consts::SERVER_OWNER_ROLE,
+        minimal_role: Role::Owner,
         args:
         &[
             CommandArg
@@ -208,7 +208,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Bans,
         triggers: &[ "BANLIST", "BANS", "BANNED", "DISABLED", "BLOCKED" ],
-        minimal_role: consts::SERVER_OWNER_ROLE,
+        minimal_role: Role::Owner,
         args: &[],
         description: "Lists every ban",
     },
@@ -217,7 +217,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Pardon,
         triggers: &[ "PARDON", "UNBAN", "FORGIVE", "UNBLOCK" ],
-        minimal_role: consts::SERVER_OWNER_ROLE,
+        minimal_role: Role::Owner,
         args:
         &[
             CommandArg
@@ -235,7 +235,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::PardonIp,
         triggers: &[ "PARDONIP", "UNBANIP", "FORGIVEIP", "UNBLOCKIP" ],
-        minimal_role: consts::SERVER_OWNER_ROLE,
+        minimal_role: Role::Owner,
         args:
         &[
             CommandArg
@@ -253,7 +253,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Say,
         triggers: &[ "SAY", "ECHO", "BROADCAST", "NOTICE", "MESSAGE" ],
-        minimal_role: consts::SERVER_OWNER_ROLE,
+        minimal_role: Role::Owner,
         args:
         &[
             CommandArg
@@ -271,7 +271,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Role,
         triggers: &[ "ROLE", "RANK", "PROMOTE", "DEMOTE" ],
-        minimal_role: consts::SERVER_OWNER_ROLE,
+        minimal_role: Role::Owner,
         args:
         &[
             CommandArg
@@ -297,7 +297,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     {
         subcommand: Subcommand::Settings,
         triggers: &[ "SETTINGS", "CONFIG", "SETUP" ],
-        minimal_role: consts::SERVER_OWNER_ROLE,
+        minimal_role: Role::Owner,
         args: &[],
         description: "Opens the server configuration",
     },
@@ -310,7 +310,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Help,
         triggers: &[ "HELP", "H", "COMMANDS", "USAGE", "GUIDE" ],
         shortcut: Some('h'),
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args: &[],
         description: "Prints all available commands",
@@ -321,7 +321,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Info,
         triggers: &[ "INFO", "COMMAND", "MAN" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args:
         &[
@@ -342,7 +342,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Voice,
         triggers: &[ "VOICE", "VOIP", "CALL" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args: &[],
         description: "Toggles voice chat",
@@ -354,7 +354,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Mute,
         triggers: &[ "MUTE", "UNMUTE", "SILENCE", "STFU" ],
         shortcut: Some('s'),
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args:
         &[
@@ -374,7 +374,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Channel,
         triggers: &[ "CHANNEL", "SWITCH", "CHECKOUT", "AREA" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args:
         &[
@@ -394,7 +394,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Upload,
         triggers: &[ "UPLOAD", "FILEUP", "PUSH", "UP" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args:
         &[
@@ -414,7 +414,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Download,
         triggers: &[ "DOWNLOAD", "FILEDOWN", "PULL", "DOWN", "FETCH" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args:
         &[
@@ -442,7 +442,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Screen,
         triggers: &[ "SCREEN", "SCREENSHARE", "PRESENTATION", "SHARE" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args:
         &[
@@ -463,7 +463,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Attach,
         triggers: &[ "ATTACH", "WATCH", "DISPLAY", "JOIN" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args:
         &[
@@ -484,7 +484,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Deattach,
         triggers: &[ "DEATTACH", "STOP", "CLOSE" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args: &[],
         description: "Dettaches client screenshare.",
@@ -495,7 +495,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::List,
         triggers: &[ "LIST", "USERS", "CLIENTS", "CHANNELS", "IDS", "ID" ],
         shortcut: Some('l'),
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args: &[],
         description: "Shows connected users and their IDs",
@@ -506,7 +506,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Files,
         triggers: &[ "FILES", "LISTFILES", "UPLOADS", "DOWNLOADS" ],
         shortcut: Some('u'),
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args: &[],
         description: "Shows available files and their IDs",
@@ -518,7 +518,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Screens,
         triggers: &[ "SCREENS", "LISTSCREENS", "SCREENSHARES", "SHARES" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args: &[],
         description: "Shows all screensharing clients.",
@@ -529,7 +529,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::PrivateMessage,
         triggers: &[ "PM", "DM", "MSG", "TELL" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args:
         &[
@@ -556,7 +556,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Settings,
         triggers: &[ "SETTINGS", "SETUP", "CONFIG", "PREFERENCES", "AUDIO" ],
         shortcut: Some(','),
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args: &[],
         description: "Opens audio and interface settings",
@@ -567,7 +567,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::UsernameColor,
         triggers: &[ "UCOLOR", "USERNAME" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args:
         &[
@@ -587,7 +587,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::MessageColor,
         triggers: &[ "COLOR", "MESSAGE" ],
         shortcut: None,
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args:
         &[
@@ -607,7 +607,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Server,
         triggers: &[ "SERVER", "ADMIN", "MOD" ],
         shortcut: None,
-        minimal_role: consts::SERVER_MODERATOR_ROLE,
+        minimal_role: Role::Moderator,
         subcommands: SERVER_SUBCOMMANDS,
         args:
         &[
@@ -627,7 +627,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Logout,
         triggers: &[ "LOGOUT", "SIGNOUT", "SWITCH" ],
         shortcut: Some('o'),
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args: &[],
         description: "Disconnects from the server and returns to the login screen",
@@ -638,7 +638,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         command: Command::Exit,
         triggers: &[ "EXIT", "LEAVE", "QUIT", "DISCONNECT" ],
         shortcut: Some('c'),
-        minimal_role: consts::SERVER_USER_ROLE,
+        minimal_role: Role::User,
         subcommands: &[],
         args: &[],
         description: "Disconnects from the server",
@@ -652,13 +652,13 @@ pub const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 impl CommandInfo
 {
     //THE COMMAND IS OFFERED TO role - HIDING IT IS COSMETIC, THE SERVER STILL CHECKS EVERY PRIVILEGED PACKET ITSELF
-    pub fn available(&self, role: usize) -> bool
+    pub fn available(&self, role: Role) -> bool
     {
         //A COMMAND THAT IS NOTHING BUT A DOORWAY TO ITS ACTIONS IS WORTH SHOWING ONLY WHILE ONE OF THEM IS LEFT
         role >= self.minimal_role && (self.subcommands.is_empty() || self.actions(role).next().is_some())
     }
 
-    pub fn actions(&self, role: usize) -> impl Iterator<Item = &'static SubcommandInfo> //ACTIONS role MAY RUN
+    pub fn actions(&self, role: Role) -> impl Iterator<Item = &'static SubcommandInfo> //ACTIONS role MAY RUN
     {
         self.subcommands.iter().filter(move |sub| sub.available(role))
     }
@@ -671,7 +671,7 @@ impl CommandInfo
 
 impl SubcommandInfo
 {
-    pub fn available(&self, role: usize) -> bool { role >= self.minimal_role }
+    pub fn available(&self, role: Role) -> bool { role >= self.minimal_role }
 
     //WHETHER THE WHOLE PARAMETER IS A TARGET ID - THE REST TAKE THEIR PARAMETER AS TEXT, AND AN ACTION
     //THAT TAKES AN ID *AND* SOMETHING ELSE (Role) SPLITS IT ITSELF

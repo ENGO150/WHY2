@@ -58,21 +58,6 @@ pub fn get_identifier() -> String //GET IDENTIFIER OF PACKAGE VERSION [WHY2/VERS
     format!("WHY2/{}", get_version())
 }
 
-pub fn role_name(role: usize) -> &'static str //THE NAME OF A ROLE
-{
-    consts::SERVER_ROLES.get(role).copied().unwrap_or("unknown")
-}
-
-pub fn role_by_name(name: &str) -> Option<usize>
-{
-    if let Ok(role) = name.parse::<usize>()
-    {
-        return (role < consts::SERVER_ROLES.len()).then_some(role);
-    }
-
-    consts::SERVER_ROLES.iter().position(|role| role.eq_ignore_ascii_case(name))
-}
-
 pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
 {
     //CREATE CUSTOM CLIENT (WITH TIMEOUT)

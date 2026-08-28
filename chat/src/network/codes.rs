@@ -18,6 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use wincode::{ SchemaWrite, SchemaRead };
 
+use crate::role::Role;
+
 //ENUMS
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
 pub enum PacketCode //CONTROL CODES
@@ -46,7 +48,7 @@ pub enum PacketCode //CONTROL CODES
     Accept
     {
         id: usize,
-        role: usize,
+        role: Role,
     },
 
     //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
@@ -128,7 +130,7 @@ pub enum PacketCode //CONTROL CODES
     ServerRole
     {
         id: usize,                //TARGET USER
-        role: usize,              //THE ROLE THEY ARE BEING GIVEN
+        role: Role,               //THE ROLE THEY ARE BEING GIVEN
         username: Option<String>, //REQUEST: None | SERVER ANSWER: THE TARGET, SO THE ISSUER SEES WHO IT LANDED ON
     },
 

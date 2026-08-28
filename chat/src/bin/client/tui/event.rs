@@ -20,7 +20,6 @@ use ratatui::text::{ Line, Span };
 
 use crate::
 {
-    misc,
     options,
     network::client::ClientEvent,
 };
@@ -222,16 +221,14 @@ impl App
             //IS OURS - AND THAT ONE HAS TO LAND IN App::role, WHICH IS WHAT THE PALETTE AND /help READ
             ClientEvent::Role(role, username) =>
             {
-                let name = misc::role_name(role);
-
                 match username
                 {
-                    Some(username) => self.push_styled(format!("{username} is now {name}."), theme::NOTICE),
+                    Some(username) => self.push_styled(format!("{username} is now {role}."), theme::NOTICE),
 
                     None =>
                     {
                         self.role = role;
-                        self.push_styled(format!("You are now {name}."), theme::NOTICE);
+                        self.push_styled(format!("You are now {role}."), theme::NOTICE);
                     },
                 }
             },

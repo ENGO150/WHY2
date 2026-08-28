@@ -37,6 +37,7 @@ use zeroize::Zeroizing;
 use crate::
 {
     config,
+    role::Role,
     consts::SharedKeys,
 };
 
@@ -90,7 +91,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         screen_stream: Option<AbortHandle>,                      //SCREEN UPLOAD TASK
         peer_addr: SocketAddr,                                   //ADDRESS & PORT
         username: String,                                        //USERNAME
-        role: usize,                                             //ROLE
+        role: Role,                                              //ROLE
         id: usize,                                               //ID OF USER
         keys: SharedKeys,                                        //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
         attached_screen: Option<Attach>,                         //SCREEN DOWNLOAD STREAM & TARGET ID
@@ -182,7 +183,7 @@ impl Connection
     }
 
     //GET ROLE
-    pub fn role(&self) -> Option<&usize>
+    pub fn role(&self) -> Option<&Role>
     {
         match self
         {
@@ -488,7 +489,7 @@ impl Connection
     }
 
     //SET ROLE
-    pub fn set_role(&mut self, new_role: usize)
+    pub fn set_role(&mut self, new_role: Role)
     {
         if let Self::Authenticated { role, .. } = self
         {

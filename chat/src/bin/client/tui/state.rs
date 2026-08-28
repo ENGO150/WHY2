@@ -32,6 +32,7 @@ use unicode_width::UnicodeWidthChar;
 
 use crate::
 {
+    role::Role,
     options::{ self, LoginState },
     network::
     {
@@ -93,7 +94,7 @@ pub struct App
 
     //SIDEBAR
     pub username: String, //OUR OWN USERNAME (options::get_server_username IS THE SERVER'S NAME)
-    pub role: usize,      //OUR OWN ROLE
+    pub role: Role,       //OUR OWN ROLE
     pub online: Vec<OnlineUser>,
     pub channels: BTreeSet<String>, //NAMED CHANNELS THE SERVER CURRENTLY HOLDS
     pub voice: Vec<VoiceUser>,
@@ -147,7 +148,7 @@ impl App
             scroll: None,
             unread: 0,
             username: String::new(),
-            role: 0,
+            role: Role::default(),
             online: Vec::new(),
             channels: BTreeSet::new(),
             voice: Vec::new(),
@@ -259,7 +260,7 @@ impl App
         self.tofu = None;
 
         self.username.clear();
-        self.role = 0; //THE NEXT SERVER GRANTS ITS OWN
+        self.role = Role::default(); //THE NEXT SERVER GRANTS ITS OWN
         self.server_name.clear();
         self.online.clear();
         self.channels.clear();

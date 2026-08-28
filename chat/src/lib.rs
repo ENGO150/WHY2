@@ -22,6 +22,7 @@ pub mod crypto;
 pub mod misc;
 pub mod network;
 pub mod options;
+pub mod role;
 
 #[cfg(feature = "client_base")]
 pub mod command;

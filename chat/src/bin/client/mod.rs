@@ -68,6 +68,7 @@ use why2_chat::
     config,
     consts,
     misc,
+    role::{ self, Role },
     options::{ self, LoginState },
     command::
     {
@@ -215,7 +216,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
             let Some((target, role)) = tail.split_once(char::is_whitespace) else { return invalid_usage(app, None) };
 
             let Ok(target) = target.parse::<usize>() else { return invalid_usage(app, None) };
-            let Some(role) = misc::role_by_name(role.trim()) else { return invalid_usage(app, Some("role")) };
+            let Ok(role) = role.trim().parse::<Role>() else { return invalid_usage(app, Some("role")) };
 
             network::send(&mut *write_stream.lock().await, PacketCode::ServerRole
             {
