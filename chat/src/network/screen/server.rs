@@ -30,7 +30,7 @@ use tokio::
     net::tcp::OwnedWriteHalf,
 };
 
-use why2::stream::RexStream;
+use crate::crypto::RexPacketStream;
 
 use crate::
 {
@@ -190,7 +190,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
 
     //VIEWER MAPS
     let mut viewer_seqs = HashMap::<usize, usize>::new();
-    let mut viewer_streams = HashMap::<usize, ([u8; 32], RexStream)>::new();
+    let mut viewer_streams = HashMap::<usize, ([u8; 32], RexPacketStream)>::new();
 
     //INIT REX STREAM
     let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();

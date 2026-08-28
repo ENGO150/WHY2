@@ -34,11 +34,13 @@ use tokio::
 
 use wincode::{ SchemaRead, SchemaWrite };
 
+#[cfg(feature = "server")]
 use why2::stream::RexStream;
 
 use crate::
 {
     consts::{ self, Streams },
+    crypto::RexPacketStream,
     network::
     {
         self,
@@ -92,7 +94,7 @@ pub async fn send_file //CHUNK FILE AND SEND TO STREAM
     path: PathBuf,
     mut write_stream: OwnedWriteHalf,
     uid: u64,
-    rex_stream: &mut RexStream,
+    rex_stream: &mut RexPacketStream,
     mut seq: Option<&mut usize>,
     #[cfg(feature = "server")] disk_stream: &mut RexStream,
 )
@@ -143,7 +145,7 @@ pub async fn send_file //CHUNK FILE AND SEND TO STREAM
 pub async fn receive_file
 (
     streams: &mut Streams<'_>,
-    rex_stream: &mut RexStream,
+    rex_stream: &mut RexPacketStream,
     seq: &mut usize
 ) -> Option<(u64, FilePacketCode)>
 {

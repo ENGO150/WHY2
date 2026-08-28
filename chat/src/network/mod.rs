@@ -47,16 +47,12 @@ use wincode::
 
 use zeroize::Zeroizing;
 
-use why2::
-{
-    consts,
-    stream::RexStream,
-};
+use why2::consts;
 
 use crate::
 {
-    crypto,
     network::codes::PacketCode,
+    crypto::{ self, RexPacketStream },
     consts::
     {
         self as chat_consts,
@@ -89,7 +85,7 @@ pub trait SequencedPacket: SchemaWrite<DefaultConfig, Src = Self>
 pub enum EncryptionMode<'a> //MODE OF ENCRYPTION
 {
     OneShot(Option<&'a SharedKeys>), //ONE-SHOT ENCRYPTION
-    Stream(&'a mut RexStream),       //STREAM ENCRYPTION
+    Stream(&'a mut RexPacketStream), //STREAM ENCRYPTION (AUTHENTICATED)
 }
 
 //STRUCTS
@@ -214,25 +210,10 @@ pub async fn send_tcp //SEND packet TO stream
             obfuscate_data(&packet_bytes, key) //NO ENCRYPTION, OBFUSCATE
         },
 
-        //STREAMED ENCRYPTION
+        //STREAMED ENCRYPTION (ENCRYPT-THEN-MAC)
         EncryptionMode::Stream(rex_stream) =>
         {
-            //CONVERT PACKET BYTES TO i64
-            let input_i64 = Zeroizing::new(crypto::bytes_to_i64(&packet_bytes));
-
-            //ENCRYPT
-            let mut encrypted_i64 = Zeroizing::new(rex_stream.update(&input_i64).expect("Stream encryption failed"));
-
-            //FLUSH
-            encrypted_i64.extend(rex_stream.finalize().expect("Stream finalize failed"));
-
-            //CONVERT ENCRYPTED BYTES BACK TO u8
-            let mut final_bytes = crypto::i64_to_bytes(&encrypted_i64);
-
-            //TRUNCATE PADDING
-            final_bytes.truncate(packet_bytes.len());
-
-            final_bytes
+            rex_stream.seal(&packet_bytes)
         },
     };
 
@@ -364,27 +345,21 @@ pub async fn read_tcp
             Zeroizing::new(obfuscate_data(&decoded_packet, key)) //NO ENCRYPTION, REMOVE OBFUSCATION
         },
 
-        //STREAMED ENCRYPTION
+        //STREAMED ENCRYPTION (VERIFY-THEN-DECRYPT)
         EncryptionMode::Stream(rex_stream) =>
         {
-            let original_len = decoded_packet.len();
+            match rex_stream.open(&decoded_packet)
+            {
+                Some(d) => d,
+                None => //INVALID MAC
+                {
+                    //LOG IF ON SERVER
+                    #[cfg(feature = "server")]
+                    log::warn!("Stream HMAC verification failed: {}", peer_addr);
 
-            //CONVERT u8 TO i64
-            let input_i64 = Zeroizing::new(crypto::bytes_to_i64(&decoded_packet));
-
-            //DECRYPTION
-            let mut decrypted_i64 = Zeroizing::new(rex_stream.update(&input_i64).expect("Stream decryption failed"));
-
-            //FLUSH
-            decrypted_i64.extend(rex_stream.finalize().expect("Stream finalize failed"));
-
-            //CONVERT BACK TO u8
-            let mut output_bytes = Zeroizing::new(crypto::i64_to_bytes(&decrypted_i64));
-
-            //TRUNCATE PADDING
-            output_bytes.truncate(original_len);
-
-            output_bytes
+                    return None;
+                }
+            }
         }
     };
 

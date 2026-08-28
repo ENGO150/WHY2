@@ -35,6 +35,13 @@ use zeroize::Zeroizing;
 use hkdf::Hkdf;
 use sha2::{ Sha256, Digest };
 
+use hmac::
+{
+    Mac,
+    Hmac,
+    KeyInit,
+};
+
 use why2::
 {
     consts,
@@ -43,6 +50,89 @@ use why2::
 
 use crate::consts::SharedKeys;
 
+//STRUCTS
+pub struct RexPacketStream //AUTHENTICATED STREAM CIPHER (ENCRYPT-THEN-MAC OVER A RexStream)
+{
+    stream: RexStream,             //CTR MODE STREAM
+    mac_key: Zeroizing<[u8; 32]>,  //HMAC KEY (STREAM SPECIFIC)
+    counter: u64,                  //PACKET COUNTER (BOUND INTO EVERY TAG)
+}
+
+//IMPLEMENTATIONS
+impl RexPacketStream
+{
+    //PRIVATE
+    fn mac(&self, ciphertext: &[u8]) -> Hmac<Sha256> //PRIME MAC OVER counter || len || ciphertext
+    {
+        let mut mac = <Hmac<Sha256>>::new_from_slice(self.mac_key.as_ref()).expect("Invalid MAC key");
+
+        mac.update(&self.counter.to_be_bytes());
+        mac.update(&(ciphertext.len() as u64).to_be_bytes());
+        mac.update(ciphertext);
+
+        mac
+    }
+
+    //PUBLIC
+    pub fn seal(&mut self, plaintext: &[u8]) -> Vec<u8> //ENCRYPT AND AUTHENTICATE ([TAG][CIPHERTEXT])
+    {
+        //CONVERT PLAINTEXT TO i64
+        let input_i64 = Zeroizing::new(bytes_to_i64(plaintext));
+
+        //ENCRYPT
+        let mut encrypted_i64 = Zeroizing::new(self.stream.update(&input_i64).expect("Stream encryption failed"));
+
+        //FLUSH
+        encrypted_i64.extend(self.stream.finalize().expect("Stream finalize failed"));
+
+        //CONVERT ENCRYPTED BYTES BACK TO u8
+        let mut ciphertext = i64_to_bytes(&encrypted_i64);
+
+        //TRUNCATE PADDING
+        ciphertext.truncate(plaintext.len());
+
+        //AUTHENTICATE
+        let tag = self.mac(&ciphertext).finalize().into_bytes();
+        self.counter += 1;
+
+        //[TAG][CIPHERTEXT]
+        let mut output = Vec::with_capacity(tag.len() + ciphertext.len());
+        output.extend_from_slice(&tag);
+        output.append(&mut ciphertext);
+
+        output
+    }
+
+    pub fn open(&mut self, data: &[u8]) -> Option<Zeroizing<Vec<u8>>> //VERIFY AND DECRYPT
+    {
+        //SPLIT OFF THE TAG
+        if data.len() < 32 { return None; }
+        let (tag, ciphertext) = data.split_at(32);
+
+        //VERIFY BEFORE DECRYPTING (CONSTANT TIME); STREAM STAYS UNTOUCHED ON FAILURE
+        self.mac(ciphertext).verify_slice(tag).ok()?;
+        self.counter += 1;
+
+        //CONVERT u8 TO i64
+        let input_i64 = Zeroizing::new(bytes_to_i64(ciphertext));
+
+        //DECRYPT
+        let mut decrypted_i64 = Zeroizing::new(self.stream.update(&input_i64).ok()?);
+
+        //FLUSH
+        decrypted_i64.extend(self.stream.finalize().ok()?);
+
+        //CONVERT BACK TO u8
+        let mut output = Zeroizing::new(i64_to_bytes(&decrypted_i64));
+
+        //TRUNCATE PADDING
+        output.truncate(ciphertext.len());
+
+        Some(output)
+    }
+}
+
+//FUNCTIONS
 //PRIVATE
 fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) -> Zeroizing<Vec<i64>> //DERIVE VALID KEYDIM USING HKDF
 {
@@ -83,6 +173,16 @@ fn derive_stream_nonce(context: &[u8]) -> Zeroizing<Vec<i64>>
     hkdf.expand(b"WHY2-STREAM-NONCE", &mut okm).expect("HKDF expand failed");
 
     Zeroizing::new(okm.chunks_exact(8).map(|c| i64::from_be_bytes(c.try_into().unwrap())).collect())
+}
+
+fn derive_stream_mac_key(hmac_key: &[u8], context: &[u8]) -> Zeroizing<[u8; 32]> //STREAM SPECIFIC MAC KEY
+{
+    let hkdf = Hkdf::<Sha256>::new(Some(context), hmac_key);
+
+    let mut okm = Zeroizing::new([0u8; 32]);
+    hkdf.expand(b"WHY2-STREAM-MAC", okm.as_mut()).expect("HKDF expand failed");
+
+    okm
 }
 
 //CRATE PUBLIC
@@ -165,7 +265,7 @@ pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, k
     Some(Zeroizing::new(i64_to_bytes(&decrypted_packet.output)))
 }
 
-pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexStream>
+pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketStream>
 {
     let key_grid = Grid::from_key(&keys.0).ok()?;
 
@@ -175,5 +275,10 @@ pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexStream>
     let nonce_grid = Grid::from_flat(&derived).ok()?;
 
     //INIT & RETURN
-    RexStream::new(&key_grid, nonce_grid).ok()
+    Some(RexPacketStream
+    {
+        stream: RexStream::new(&key_grid, nonce_grid).ok()?,
+        mac_key: derive_stream_mac_key(&keys.1, token),
+        counter: 0,
+    })
 }

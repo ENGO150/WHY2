@@ -29,11 +29,10 @@ use tokio::net::tcp::OwnedWriteHalf;
 
 use wincode::{ SchemaRead, SchemaWrite };
 
-use why2::stream::RexStream;
-
 use crate::
 {
     consts::Streams,
+    crypto::RexPacketStream,
     network::
     {
         self,
@@ -71,7 +70,7 @@ pub async fn send_frame //SEND frame TO stream
 (
     write_stream: &mut OwnedWriteHalf,
     code: ScreenPacketCode,
-    rex_stream: &mut RexStream,
+    rex_stream: &mut RexPacketStream,
     seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
 )
 {
@@ -91,7 +90,7 @@ pub async fn send_frame //SEND frame TO stream
 pub async fn receive_frame
 (
     streams: &mut Streams<'_>,
-    rex_stream: &mut RexStream,
+    rex_stream: &mut RexPacketStream,
     seq: &mut usize //LOCAL/GLOBAL SEQ
 ) -> Option<ScreenPacketCode>
 {
