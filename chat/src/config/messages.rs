@@ -22,9 +22,12 @@ use std::
     sync::{ LazyLock, Mutex },
 };
 
+use why2::consts as why2_consts;
+
 use crate::
 {
-    consts,
+    crypto,
+    consts::{ self, SharedKeys },
     network::codes::
     {
         MessageColors,
@@ -34,6 +37,7 @@ use crate::
 
 //GLOBAL VARIABLES
 static HISTORY: LazyLock<Mutex<Vec<StoredMessage>>> = LazyLock::new(|| Mutex::new(load())); //MESSAGE HISTORY
+static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                    //AT-REST KEYS
 
 //FUNCTIONS
 //PRIVATE
@@ -47,7 +51,11 @@ fn load() -> Vec<StoredMessage> //READ THE HISTORY OFF DISK
     //NO FILE IS AN EMPTY HISTORY
     let Ok(bytes) = fs::read(path()) else { return Vec::new() };
 
-    wincode::deserialize::<Vec<StoredMessage>>(&bytes).unwrap_or_default()
+    let Some(plaintext) = crypto::decrypt_packet::
+        <{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(bytes, &KEYS)
+    else { return Vec::new() };
+
+    wincode::deserialize::<Vec<StoredMessage>>(&plaintext).unwrap_or_default()
 }
 
 //PUBLIC
@@ -70,8 +78,11 @@ pub fn store(username: &str, text: &str, colors: &MessageColors) //APPEND MESSAG
     let over = history.len().saturating_sub(limit);
     history.drain(..over);
 
+    //ENCRYPT-THEN-MAC THE WHOLE HISTORY
     let bytes = wincode::serialize(&*history).expect("Encoding message history failed");
-    fs::write(path(), bytes).expect("Saving message history failed");
+    let sealed = crypto::encrypt_packet::<{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(&bytes, &KEYS);
+
+    fs::write(path(), sealed).expect("Saving message history failed");
 }
 
 pub fn all() -> Vec<StoredMessage> //EVERY STORED LOBBY MESSAGE, OLDEST FIRST

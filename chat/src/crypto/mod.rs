@@ -282,3 +282,33 @@ pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketS
         counter: 0,
     })
 }
+
+#[cfg(feature = "server")]
+pub fn history_keys() -> SharedKeys //AT-REST KEYS FOR THE MESSAGE HISTORY
+{
+    //THE SERVER'S OWN PRIVATE KEYS ARE THE ONLY SECRET ON DISK WITH THE RIGHT LIFETIME: WRITTEN ONCE BY
+    //kex::init, NEVER ROTATED, AND ALREADY FATAL TO LOSE - SO A KEY DERIVED FROM THEM COSTS THE OPERATOR
+    //NOTHING AND SURVIVES EVERY RESTART AND UPGRADE. BOTH HALVES GO IN, SO NEITHER ALONE IS ENOUGH
+    let (sk, _) = kex::get_server_keys();
+    let (pq_sk, _) = kex::get_server_pq_keys();
+
+    let mut ikm = Zeroizing::new(Vec::with_capacity(sk.len() + pq_sk.len()));
+    ikm.extend_from_slice(sk.as_bytes());
+    ikm.extend_from_slice(pq_sk.as_bytes());
+
+    let hkdf = Hkdf::<Sha256>::new(None, &ikm);
+
+    //GRID KEY, AT THE FULL KEYDIM SO encrypt_packet DOES NOT RE-DERIVE IT
+    const KEY_LEN: usize = consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT * 2;
+
+    let mut key_bytes = Zeroizing::new(vec![0u8; KEY_LEN * 8]);
+    hkdf.expand(b"WHY2-HISTORY-KEY", &mut key_bytes).expect("HKDF expand failed");
+
+    let key = key_bytes.chunks_exact(8).map(|c| i64::from_be_bytes(c.try_into().unwrap())).collect();
+
+    //MAC KEY, EXPANDED SEPARATELY SO THE TAG NEVER SHARES MATERIAL WITH THE CIPHER
+    let mut mac_key = Zeroizing::new(vec![0u8; 32]);
+    hkdf.expand(b"WHY2-HISTORY-MAC", &mut mac_key).expect("HKDF expand failed");
+
+    (Zeroizing::new(key), mac_key)
+}
