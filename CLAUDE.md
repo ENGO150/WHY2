@@ -139,7 +139,21 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   reachable in both client and server binaries.
 - **`network/mod.rs`** — shared packet-level plumbing used by both client and server: `Packet`
   struct (control code + sequence number), `SequencedPacket` trait, `EncryptionMode` (either
-  one-shot `SharedKeys`-based or a stateful `RexStream`), and `send_tcp`/`read_tcp` helpers.
+  one-shot `SharedKeys`-based or a stateful `crypto::RexPacketStream`), and `send_tcp`/`read_tcp`
+  helpers.
+  **Both encryption modes are authenticated, and neither one does it here** — `send_tcp`/`read_tcp`
+  hand the packet to `crypto` and never touch a cipher themselves. One-shot goes through
+  `crypto::encrypt_packet`/`decrypt_packet` (`why2`'s `AuthenticatedData`); stream mode goes through
+  `RexPacketStream::seal`/`open`, which is encrypt-then-MAC around a `why2` `RexStream`: the tag is
+  HMAC-SHA256 over `counter || len || ciphertext` with a stream-specific key derived from the session
+  HMAC key and the transfer token (`derive_stream_mac_key`), and the wire framing is
+  `[len][32-byte tag][ciphertext]`. The **counter in the tag is what makes it a stream** rather than a
+  bag of individually-valid packets: the ciphertext MAC alone would accept a replayed or reordered
+  frame (the key is static), and a CTR-mode receiver whose counter has moved on would decrypt it to
+  garbage rather than reject it. `open` verifies **before** advancing the `RexStream`, so a forged
+  packet costs the transfer nothing; a failure means the peer is not who it was and the caller ends
+  the transfer. The bare `RexStream` survives in exactly one place, `file/server.rs`'s `disk_stream`
+  — that is at-rest encryption of an upload, not a packet.
   **Everything here is async (tokio) — there is no sync path.** `send_tcp`/`send` take a
   `&mut OwnedWriteHalf`; `read_tcp`/`receive` take `&mut Streams<'_>`, the
   `(&mut OwnedReadHalf, Arc<tokio::sync::Mutex<OwnedWriteHalf>>)` alias in `consts.rs`.
