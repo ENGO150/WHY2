@@ -307,6 +307,19 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   single session key.
   TOFU (trust-on-first-use) server key pinning is expected; `WHY2_SKIP_TOFU` env var (baked in at
   build time via `build.rs`) disables that check for local/dev testing only.
+- **`role.rs`** — `Role`, the server rank (`User`/`Moderator`/`Owner`). **The ordering is the permission
+  check**: every gate is `role >= Role::Something`, so the variants are declared lowest-first and derive
+  `Ord` from that order. The variants, the names they are typed/stored/shown by and the list the palette
+  offers are generated together by the `roles!` macro at the top of the file — a new rank is one line in
+  that list and nothing else, and the three cannot drift apart. It crosses the wire as itself
+  (`Accept`, `ServerRole`), so a role that does not exist is not a value the protocol can carry.
+  A rank is its name everywhere it is read or written — typed into `/server role`, and stored in
+  `server_users.toml` — so there is one spelling of it and nothing to convert between.
+  Ranks are handed out with `/server role <id> <role>` (owner only; the server refuses granting above
+  your own rank, retitling yourself, or touching a peer or superior). A granted role applies to the
+  session it lands in — the server updates the live `Connection` and tells that client, whose
+  `App::role` is what the palette and `/help` read — so the per-connection role is re-read on every
+  packet rather than latched at login.
 - **`config/mod.rs`** — TOML config for client (`client.toml`) and server (`server.toml`), plus
   server user store (`server_users.toml`), server ban list (`server_bans.toml`) and server keypair
   storage (`server_keys/{private,public,private_pq,public_pq}`), all under `WHY2_CONFIG_DIR`
