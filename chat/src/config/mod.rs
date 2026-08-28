@@ -26,6 +26,9 @@ pub mod bans;
 #[cfg(feature = "server")]
 pub mod settings;
 
+#[cfg(feature = "server")]
+pub mod messages;
+
 #[cfg(feature = "client_base")]
 pub mod keys;
 

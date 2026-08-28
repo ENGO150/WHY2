@@ -101,6 +101,16 @@ async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys)
     }, Some(keys)).await;
 }
 
+async fn send_history(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys) //SEND THE STORED LOBBY MESSAGES
+{
+    if !config::read_config::<bool>("persistent_messages") { return; }
+
+    let messages = config::messages::all();
+    if messages.is_empty() { return; }
+
+    network::send(&mut *write_stream.lock().await, PacketCode::History { messages }, Some(keys)).await;
+}
+
 async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTIONS BY IP
 {
     let addrs: Vec<SocketAddr> = CONNECTIONS.iter()
@@ -699,6 +709,9 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //TELL CLIENT TO START CHATTING
     network::send(&mut *streams.1.lock().await, PacketCode::Accept { id, role }, Some(&keys)).await;
 
+    //SEND WHAT WAS SAID IN THE LOBBY BEFORE THIS CLIENT ARRIVED
+    send_history(&streams.1, &keys).await;
+
     //SEND JOIN MESSAGE
     send_to_all(PacketCode::Join { username: username.clone() }, false, None);
 
@@ -735,10 +748,18 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
+                let text = text.trim().to_owned();
+
+                //KEEP IT - ONLY THE LOBBY HAS A HISTORY, A CHANNEL IS AS TEMPORARY AS THE CLIENTS IN IT
+                if channel.is_none() && config::read_config::<bool>("persistent_messages")
+                {
+                    config::messages::store(&username, &text, &colors);
+                }
+
                 //SEND MESSAGE TO ALL USERS
                 send_to_all(PacketCode::Message
                 {
-                    text: text.trim().to_owned(),
+                    text,
                     username: Some(username.clone()),
                     id: Some(id),
                     colors,

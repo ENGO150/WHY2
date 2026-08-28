@@ -54,3 +54,7 @@ max_message_delay_violations = 3 # Maximal 'spam' messages that can be sent with
 
 # Channel
 max_channel_length = 20 # Maximal length of channel name
+
+# History
+persistent_messages = false # Keep lobby messages on disk and send them to every client on login
+max_persistent_messages = 100000 # Number of lobby messages kept (the oldest go as new ones arrive)
