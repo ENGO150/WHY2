@@ -138,6 +138,7 @@ pub enum PacketCode //CONTROL CODES
     Username { username: Option<String> },          //SERVER <> CLIENT | PICK USERNAME
     PasswordL { password: Option<String> },         //SERVER -> CLIENT | LOGIN
     PasswordR { password: Option<String> },         //SERVER -> CLIENT | REGISTER
+    History { messages: Vec<StoredMessage> },       //SERVER -> CLIENT | THE LOBBY'S STORED MESSAGES
     Channel { channel: Option<String> },            //SERVER <> CLIENT | CHANNEL CHANGE
     ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
     ChannelDestroyed { name: String },              //SERVER -> CLIENT | CHANNEL ABANDONED
@@ -191,6 +192,16 @@ pub enum SettingValue
     Toggle(bool),
     Number(i64),
     Text(String),
+}
+
+//ONE MESSAGE AS server_messages.bin KEEPS IT. THE HISTORY OUTLIVES THE SESSION THAT SAID IT, SO THE
+//SENDER'S ID IS NOT KEPT - THEIR COLORS ARE, BECAUSE THEY ARE PART OF WHAT THE MESSAGE LOOKED LIKE
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub struct StoredMessage
+{
+    pub username: String,
+    pub text: String,
+    pub colors: MessageColors,
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
