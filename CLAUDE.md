@@ -315,11 +315,27 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   (`persistent_messages`), kept as the last `max_persistent_messages` messages. **It is the one
   thing under the config dir that is not TOML**: `server_messages.bin` is a `wincode`-encoded
   `Vec<StoredMessage>`, the same encoding the packets use, so a message is stored the way it is sent
-  — colors and all — instead of being flattened into text. It is **not encrypted**, deliberately for
-  now.
+  — colors and all — instead of being flattened into text.
+  - **It is encrypted at rest, authenticated, under a key nobody has to manage.**
+    `crypto::history_keys` HKDFs the `why2` grid key and the HMAC key out of the server's *own*
+    private keys (ECC and ML-KEM concatenated, so neither half alone is enough), and `store`/`load`
+    go through `crypto::encrypt_packet`/`decrypt_packet` — the same `AuthenticatedData`
+    encrypt-then-MAC the one-shot packets use. Those keys are the only secret on disk with the right
+    lifetime: written once by `kex::generate_server_keys`, never rotated, and already fatal to lose.
+    Baking a key in at build time was the alternative and is wrong twice over — it ships inside the
+    binary, so every operator running the same artifact shares one key, and it changes on rebuild, so
+    an upgrade silently drops the history.
+    Be honest about what this buys: the key sits next to the ciphertext, so it protects a *leaked
+    copy* of the file (a backup, a snapshot, a support bundle) and nothing that already has the
+    config dir. Authentication is not optional decoration either — the history is replayed straight
+    into every client's chat pane, so bare CTR would put attacker-flippable bytes on that path.
+    The nonce is fresh on **every** write, which `encrypt_packet` gives for free: the file is
+    replaced rather than appended to, so one nonce reused across rewrites of a growing buffer is
+    textbook keystream reuse.
   - **The in-memory `HISTORY` is the working set**, and the file is the copy of it that survives a
-    restart: it is read once, on first touch, and only ever written after that. A missing, truncated
-    or older-format file loads as an empty history rather than refusing to start.
+    restart: it is read once, on first touch, and only ever written after that. A missing, truncated,
+    tampered, older-format file, or one written under another server's keys, all load as an empty
+    history rather than refusing to start.
   - **Only the lobby has one.** A channel exists exactly as long as somebody is in it, so there is
     nothing to keep it against; `server::listen_client`'s `Message` arm stores only while
     `channel.is_none()`.
