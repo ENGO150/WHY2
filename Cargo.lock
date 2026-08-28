@@ -5815,6 +5815,7 @@ dependencies = [
  "dirs",
  "gag",
  "hkdf",
+ "hmac",
  "lewton",
  "libwayshot",
  "log",
