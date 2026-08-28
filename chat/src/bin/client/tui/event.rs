@@ -217,6 +217,17 @@ impl App
                 ]));
             },
 
+            //THE LOBBY'S STORED MESSAGES
+            ClientEvent::History(messages) =>
+            {
+                self.push_styled(format!("Message history ({}):", messages.len()), theme::TITLE);
+
+                for message in messages
+                {
+                    self.push_history(message.username, message.text, message.colors);
+                }
+            },
+
             //server.toml CAME BACK - EITHER THE COPY WE ASKED FOR, OR THE ONE THE SERVER JUST STORED
             ClientEvent::ServerSettings(settings, saved) =>
             {

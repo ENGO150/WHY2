@@ -77,6 +77,7 @@ use crate::
         {
             PacketCode,
             MessageColors,
+            StoredMessage,
             UserFile,
             OnlineUser,
             UserScreen,
@@ -145,6 +146,7 @@ pub enum ClientEvent
     Join(String),                                  //CLIENT CONNECTED
     Leave(String, usize),                          //CLIENT DISCONNECTED
     ServerSay(String),                             //SERVER MESSAGE
+    History(Vec<StoredMessage>),                   //THE LOBBY'S STORED MESSAGES, SENT ONCE AT LOGIN
     ChannelChanged(Option<String>),                //WE SWITCHED CHANNEL
     ChannelCreated(String),                        //CHANNEL CREATED
     ChannelDestroyed(String),                      //CHANNEL ABANDONED
@@ -407,6 +409,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::Message { text, username, id, colors } =>
             {
                 tx.send(ClientEvent::Message(text, username.unwrap(), id.unwrap(), colors)).await.unwrap();
+            }
+
+            //THE LOBBY'S STORED MESSAGES - EVERYTHING SAID BEFORE WE GOT HERE
+            PacketCode::History { messages } =>
+            {
+                tx.send(ClientEvent::History(messages)).await.unwrap();
             }
 
             //VERSION CHECK

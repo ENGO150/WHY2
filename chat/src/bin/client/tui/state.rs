@@ -72,6 +72,15 @@ pub enum Entry //ONE ROW OF HISTORY
         text: String,
         colors: MessageColors,
     },
+
+    //A REPLAYED MESSAGE FROM THE SERVER'S HISTORY - THE SAME THING WITHOUT AN ID, SINCE THE SESSION
+    //THAT SAID IT IS GONE AND WHOEVER HOLDS THAT ID NOW IS SOMEBODY ELSE
+    History
+    {
+        username: String,
+        text: String,
+        colors: MessageColors,
+    },
 }
 
 //STRUCTS
@@ -177,6 +186,12 @@ impl App
     pub fn push_message(&mut self, username: String, id: usize, text: String, colors: MessageColors)
     {
         self.push_entry(Entry::Message { username, id, text, colors });
+    }
+
+    //A REPLAYED MESSAGE IS STORED UNRENDERED FOR THE SAME REASON A LIVE ONE IS
+    pub fn push_history(&mut self, username: String, text: String, colors: MessageColors)
+    {
+        self.push_entry(Entry::History { username, text, colors });
     }
 
     fn push_entry(&mut self, entry: Entry)

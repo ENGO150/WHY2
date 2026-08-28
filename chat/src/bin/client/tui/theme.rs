@@ -78,6 +78,15 @@ impl Theme
                     self.colorize(text.clone(), colors.message_color),
                 ])
             },
+
+            //THE SAME LINE WITHOUT THE ID COLUMN - THE HISTORY KEEPS NO IDS, AND show_id MUST NOT
+            //INVENT ONE FOR IT
+            Entry::History { username, text, colors } => Line::from(vec!
+            [
+                self.colorize(username.clone(), colors.username_color),
+                Span::raw(": "),
+                self.colorize(text.clone(), colors.message_color),
+            ]),
         }
     }
 
