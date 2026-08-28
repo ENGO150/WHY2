@@ -61,10 +61,10 @@ use connection::
 
 use crate::
 {
-    config,
-    options,
     misc,
+    options,
     crypto::password,
+    config::{ self, users },
     consts::
     {
         self,
@@ -735,6 +735,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             handshake::key_exchange(streams, &peer_addr, &mut keys, Some(&current_keys)).await; //INIT REKEY
         }
 
+        //THE ROLE IS RE-READ RATHER THAN LATCHED AT LOGIN: /server role APPLIES TO THE SESSION IT LANDS
+        //ON, SO A DEMOTION HAS TO REACH THESE CHECKS BEFORE THE NEXT PRIVILEGED PACKET DOES
+        let role = CONNECTIONS.get(&peer_addr).and_then(|entry| entry.role().copied()).unwrap_or(role);
+
         //CLIENT CODES
         match read
         {
@@ -1297,6 +1301,74 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 //SEND BACK TO ALL CLIENTS ACROSS ALL CHANNELS
                 send_to_all(PacketCode::ServerSay { message }, false, None);
+            },
+
+            //SET A USER'S ROLE
+            PacketCode::ServerRole { id: uid, role: new_role, .. } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < consts::SERVER_OWNER_ROLE || id == uid || new_role > role || new_role >= consts::SERVER_ROLES.len()
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                //FIND TARGET USER
+                let target = CONNECTIONS.iter()
+                    .find(|entry| entry.value().id() == Some(&uid))
+                    .map(|entry| (entry.username().cloned(), entry.role().copied()));
+
+                //CHECK FOR VALID TARGET
+                let Some((Some(target_username), Some(target_role))) = target else
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                };
+
+                //A PEER OR A SUPERIOR CANNOT BE AFFECTED
+                if target_role >= role || target_role == new_role
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                //STORE
+                users::set_role(&target_username, new_role);
+
+                //APPLY TO WHATEVER SESSIONS USER HAS OPENED
+                let sessions: Vec<(usize, Arc<Mutex<OwnedWriteHalf>>, SharedKeys)> =
+                {
+                    let mut sessions = Vec::new();
+
+                    for mut entry in CONNECTIONS.iter_mut()
+                        .filter(|entry| entry.username() == Some(&target_username) && entry.role().is_some())
+                    {
+                        entry.set_role(new_role);
+
+                        sessions.push((entry.id().copied().unwrap(), entry.write_stream().clone(), entry.keys().cloned().unwrap()));
+                    }
+
+                    sessions
+                };
+
+                //TELL THE TARGET
+                for (sid, write_stream, target_keys) in sessions
+                {
+                    network::send(&mut *write_stream.lock().await, PacketCode::ServerRole
+                    {
+                        id: sid,
+                        role: new_role,
+                        username: None,
+                    }, Some(&target_keys)).await;
+                }
+
+                //TELL THE ISSUER
+                network::send(&mut *streams.1.lock().await, PacketCode::ServerRole
+                {
+                    id: uid,
+                    role: new_role,
+                    username: Some(target_username),
+                }, Some(&keys)).await;
             },
 
             //SERVER CONFIGURATION

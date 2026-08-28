@@ -487,6 +487,15 @@ impl Connection
         }
     }
 
+    //SET ROLE
+    pub fn set_role(&mut self, new_role: usize)
+    {
+        if let Self::Authenticated { role, .. } = self
+        {
+            *role = new_role;
+        }
+    }
+
     //MUTED
     pub fn muted(&self) -> &bool
     {

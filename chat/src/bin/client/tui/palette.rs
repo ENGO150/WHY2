@@ -25,6 +25,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::
 {
     colors,
+    consts,
     options,
     command::
     {
@@ -194,7 +195,7 @@ impl Values
         match self.arg.values
         {
             ArgValues::Colors => colors::by_name(value),
-            ArgValues::Free | ArgValues::Monitors => None,
+            ArgValues::Free | ArgValues::Monitors | ArgValues::Roles => None,
         }
     }
 }
@@ -469,6 +470,10 @@ fn vocabulary(values: ArgValues) -> Vec<String>
 
         #[cfg(not(feature = "client_screen"))]
         ArgValues::Monitors => Vec::new(),
+
+        //THE ROLES ARE THE ONE VOCABULARY THAT IS ALSO A PROTOCOL VALUE - THE SERVER STORES THE NUMBER
+        //THE POSITION IN THIS LIST IS, SO OFFERING THE NAMES IS THE ONLY WAY THE TWO CANNOT DRIFT
+        ArgValues::Roles => consts::SERVER_ROLES.iter().map(|role| role.to_string()).collect(),
 
         ArgValues::Free => Vec::new(),
     }

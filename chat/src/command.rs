@@ -86,6 +86,7 @@ pub enum Subcommand
     Pardon,   //LIFT A USERNAME BAN
     PardonIp, //LIFT AN IP BAN
     Say,      //SAY AS SERVER
+    Role,     //SET A USER'S ROLE
     Settings, //SERVER CONFIGURATION
 }
 
@@ -97,6 +98,7 @@ pub enum ArgValues
     Free,     //ANYTHING - A NAME, A MESSAGE, AN ID
     Colors,   //A crossterm COLOR NAME
     Monitors, //A MONITOR OF THIS MACHINE, AS THE DISPLAY SERVER NAMES IT
+    Roles,    //A SERVER ROLE, BY THE NAME BOTH SIDES KNOW IT BY (consts::SERVER_ROLES)
 }
 
 //STRUCTS
@@ -263,6 +265,32 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
             },
         ],
         description: "Broadcasts message as server",
+    },
+
+    SubcommandInfo
+    {
+        subcommand: Subcommand::Role,
+        triggers: &[ "ROLE", "RANK", "PROMOTE", "DEMOTE" ],
+        minimal_role: consts::SERVER_OWNER_ROLE,
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "Target user",
+                required: true,
+                values: ArgValues::Free,
+            },
+
+            CommandArg
+            {
+                name: "ROLE",
+                description: "Role to grant",
+                required: true,
+                values: ArgValues::Roles,
+            },
+        ],
+        description: "Sets a user's role on the server",
     },
 
     SubcommandInfo
@@ -645,7 +673,8 @@ impl SubcommandInfo
 {
     pub fn available(&self, role: usize) -> bool { role >= self.minimal_role }
 
-    //WHETHER THE PARAMETER IS A TARGET ID - EVERY ACTION AIMED AT A USER TAKES ONE, THE REST TAKE THEIR PARAMETER AS TEXT
+    //WHETHER THE WHOLE PARAMETER IS A TARGET ID - THE REST TAKE THEIR PARAMETER AS TEXT, AND AN ACTION
+    //THAT TAKES AN ID *AND* SOMETHING ELSE (Role) SPLITS IT ITSELF
     pub fn takes_id(&self) -> bool
     {
         matches!(self.subcommand, Subcommand::Mute

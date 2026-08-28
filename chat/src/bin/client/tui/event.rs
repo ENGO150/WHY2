@@ -20,6 +20,7 @@ use ratatui::text::{ Line, Span };
 
 use crate::
 {
+    misc,
     options,
     network::client::ClientEvent,
 };
@@ -215,6 +216,24 @@ impl App
                     Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
                     Span::styled(message, theme::NOTICE),
                 ]));
+            },
+
+            //A ROLE WAS SET. THE SERVER NAMES THE USER WHEN IT IS SOMEBODY ELSE, SO THE ONE WITHOUT A NAME
+            //IS OURS - AND THAT ONE HAS TO LAND IN App::role, WHICH IS WHAT THE PALETTE AND /help READ
+            ClientEvent::Role(role, username) =>
+            {
+                let name = misc::role_name(role);
+
+                match username
+                {
+                    Some(username) => self.push_styled(format!("{username} is now {name}."), theme::NOTICE),
+
+                    None =>
+                    {
+                        self.role = role;
+                        self.push_styled(format!("You are now {name}."), theme::NOTICE);
+                    },
+                }
             },
 
             //THE LOBBY'S STORED MESSAGES

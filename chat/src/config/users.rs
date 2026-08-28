@@ -59,6 +59,11 @@ pub fn role(username: &str) -> Option<usize> //RETURN PASSWORD HASH OF username
         .as_table_like()?.get("role")?.as_integer().map(|i| i as usize)
 }
 
+pub fn set_role(username: &str, role: usize) //STORE A NEW ROLE FOR username
+{
+    write_user_field(username, "role", (role as i64).into());
+}
+
 pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON FIRST USER
 {
     let first_user = len() == 0; //SELF-EXPLANATORY, INNIT?

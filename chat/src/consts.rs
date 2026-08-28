@@ -55,8 +55,10 @@ pub const EVENT_CHANNEL_BOUND: usize   = 1024;                                  
 pub const SERVER_OWNER_ROLE: usize     = 2;                                           //OWNER
 pub const SERVER_MODERATOR_ROLE: usize = 1;                                           //MODERATOR
 pub const SERVER_USER_ROLE: usize      = 0;                                           //USER
+pub const SERVER_ROLES: &[&str] =                                                     //ROLE NAMES, INDEXED BY THE
+    &["user", "moderator", "owner"];                                                  //ROLE ITSELF
 pub const SERVER_RESTART_SETTINGS: &[&str] =                                          //SERVER SETTINGS THAT REQUIRE
-    &["server_ip", "server_port", "enable_voice_chat", "server_username"];            //  RESTART TO BE APPLIED
+    &["server_ip", "server_port", "enable_voice_chat", "server_username"];            //RESTART TO BE APPLIED
 
 //DO NOT CHANGE CONSTS BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const MEGABYTE: usize              = 1_000_000;                                   //MEGABYTE DEFINITION

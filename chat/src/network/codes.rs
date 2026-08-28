@@ -124,6 +124,14 @@ pub enum PacketCode //CONTROL CODES
         ips: Option<Vec<BanEntry>>,
     },
 
+    //CLIENT <> SERVER | SET A USER'S ROLE
+    ServerRole
+    {
+        id: usize,                //TARGET USER
+        role: usize,              //THE ROLE THEY ARE BEING GIVEN
+        username: Option<String>, //REQUEST: None | SERVER ANSWER: THE TARGET, SO THE ISSUER SEES WHO IT LANDED ON
+    },
+
     //CLIENT <> SERVER | READ AND WRITE server.toml
     ServerSettings
     {

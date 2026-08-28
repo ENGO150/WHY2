@@ -208,6 +208,23 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
             }, options::get_keys().as_ref()).await;
         },
 
+        //THE ONE ACTION THAT AIMS AT A USER AND STILL TAKES SOMETHING ELSE - THE ROLE IS RESOLVED HERE,
+        //SO A NAME NOBODY KNOWS IS INVALID USAGE ON THE SPOT RATHER THAN A PACKET THE SERVER REFUSES
+        Subcommand::Role =>
+        {
+            let Some((target, role)) = tail.split_once(char::is_whitespace) else { return invalid_usage(app, None) };
+
+            let Ok(target) = target.parse::<usize>() else { return invalid_usage(app, None) };
+            let Some(role) = misc::role_by_name(role.trim()) else { return invalid_usage(app, Some("role")) };
+
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerRole
+            {
+                id: target,
+                role,
+                username: None,
+            }, options::get_keys().as_ref()).await;
+        },
+
         Subcommand::Settings =>
         {
             network::send(&mut *write_stream.lock().await, PacketCode::ServerSettings

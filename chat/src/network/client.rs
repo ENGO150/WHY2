@@ -146,6 +146,7 @@ pub enum ClientEvent
     Join(String),                                  //CLIENT CONNECTED
     Leave(String, usize),                          //CLIENT DISCONNECTED
     ServerSay(String),                             //SERVER MESSAGE
+    Role(usize, Option<String>),                   //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
     History(Vec<StoredMessage>),                   //THE LOBBY'S STORED MESSAGES, SENT ONCE AT LOGIN
     ChannelChanged(Option<String>),                //WE SWITCHED CHANNEL
     ChannelCreated(String),                        //CHANNEL CREATED
@@ -640,6 +641,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 tx.send(ClientEvent::ServerSay(message)).await.unwrap();
             }
+
+            //A ROLE WAS SET - EITHER ON SOMEBODY ELSE (WE ASKED FOR IT) OR ON US (SOMEBODY ELSE DID)
+            PacketCode::ServerRole { role, username, .. } =>
+            {
+                tx.send(ClientEvent::Role(role, username)).await.unwrap();
+            },
 
             //server.toml, EITHER BECAUSE WE ASKED FOR IT OR BECAUSE THE SERVER JUST STORED WHAT WE SENT
             PacketCode::ServerSettings { settings, save } =>
