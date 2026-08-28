@@ -308,9 +308,30 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   TOFU (trust-on-first-use) server key pinning is expected; `WHY2_SKIP_TOFU` env var (baked in at
   build time via `build.rs`) disables that check for local/dev testing only.
 - **`config/mod.rs`** — TOML config for client (`client.toml`) and server (`server.toml`), plus
-  server user store (`server_users.toml`) and server keypair storage
-  (`server_keys/{private,public,private_pq,public_pq}`), all under `WHY2_CONFIG_DIR` (defaults to
-  `~/.config/WHY2`, baked in by `build.rs` unless overridden at build time).
+  server user store (`server_users.toml`), server ban list (`server_bans.toml`) and server keypair
+  storage (`server_keys/{private,public,private_pq,public_pq}`), all under `WHY2_CONFIG_DIR`
+  (defaults to `~/.config/WHY2`, baked in by `build.rs` unless overridden at build time).
+- **`config/messages.rs`** (feature `server`) — the lobby's message history, off by default
+  (`persistent_messages`), kept as the last `max_persistent_messages` messages. **It is the one
+  thing under the config dir that is not TOML**: `server_messages.bin` is a `wincode`-encoded
+  `Vec<StoredMessage>`, the same encoding the packets use, so a message is stored the way it is sent
+  — colors and all — instead of being flattened into text. It is **not encrypted**, deliberately for
+  now.
+  - **The in-memory `HISTORY` is the working set**, and the file is the copy of it that survives a
+    restart: it is read once, on first touch, and only ever written after that. A missing, truncated
+    or older-format file loads as an empty history rather than refusing to start.
+  - **Only the lobby has one.** A channel exists exactly as long as somebody is in it, so there is
+    nothing to keep it against; `server::listen_client`'s `Message` arm stores only while
+    `channel.is_none()`.
+  - The append-trim-write runs under the one `HISTORY` lock, so two clients talking at once cannot
+    drop each other's message or leave a half-written file behind.
+  - The history is sent once, as `PacketCode::History`, immediately after `Accept` (`send_history`)
+    — every client starts in the lobby, so a channel switch has nothing to replay and asks for
+    nothing. `StoredMessage` keeps the username, the text and the colors, but **no id**: the session
+    that said it is gone and whoever holds that id now is somebody else. The client replays it as
+    `state::Entry::History` — an ordinary chat line rendered through `Theme::render` (so
+    `disable_colors` reaches it like any other message) minus the id column, under a
+    `Message history (n):` heading that is what separates it from what is being said now.
 - **`bin/client/`** — the client entrypoint (`mod.rs`), the full-screen TUI (`tui/`, ratatui over
   the crossterm backend), and color handling (`colors.rs`).
 
