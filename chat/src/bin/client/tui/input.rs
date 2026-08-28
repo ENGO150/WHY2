@@ -28,6 +28,7 @@ pub struct InputBuffer //MULTI-LINE INPUT BUFFER
     history: Vec<String>,
     history_pos: usize,
     stash: Option<String>, //IN-PROGRESS LINE PARKED WHILE PAGING HISTORY
+    prefix: Option<String>, //PREFIX THE SEARCH IS LOCKED TO (NEVER A COMMAND)
 }
 
 //IMPLEMENTATIONS
@@ -40,7 +41,7 @@ impl InputBuffer
 {
     pub fn new() -> Self
     {
-        Self { chars: Vec::new(), cursor: 0, history: Vec::new(), history_pos: 0, stash: None }
+        Self { chars: Vec::new(), cursor: 0, history: Vec::new(), history_pos: 0, stash: None, prefix: None }
     }
 
     //QUERIES
@@ -118,25 +119,45 @@ impl InputBuffer
     {
         if self.history.is_empty() || self.history_pos == 0 { return; }
 
-        //PARK THE LINE THE USER WAS TYPING
-        if self.history_pos == self.history.len() { self.stash = Some(self.text()); }
+        //PARK THE LINE THE USER WAS TYPING; A HALF-WRITTEN MESSAGE ALSO LOCKS THE SEARCH TO ITSELF
+        if self.history_pos == self.history.len()
+        {
+            let typed = self.text();
 
-        self.history_pos -= 1;
-        self.set(&self.history[self.history_pos].clone());
+            self.prefix = (!typed.is_empty() && !typed.starts_with('/')).then(|| typed.clone());
+            self.stash = Some(typed);
+        }
+
+        let Some(found) = self.history[..self.history_pos].iter().rposition(|e| self.matches(e))
+        else { return; };
+
+        self.history_pos = found;
+        self.set(&self.history[found].clone());
     }
 
     pub fn history_down(&mut self)
     {
         if self.history_pos >= self.history.len() { return; }
 
-        self.history_pos += 1;
+        let next = self.history.iter().enumerate().skip(self.history_pos + 1)
+            .find(|(_, e)| self.matches(e)).map(|(i, _)| i);
 
-        let new = if self.history_pos < self.history.len()
+        let new = match next
         {
-            self.history[self.history_pos].clone()
-        } else
-        {
-            self.stash.take().unwrap_or_default()
+            Some(i) =>
+            {
+                self.history_pos = i;
+
+                self.history[i].clone()
+            },
+
+            None => //BACK TO THE LINE THAT STARTED THE SEARCH
+            {
+                self.history_pos = self.history.len();
+                self.prefix = None;
+
+                self.stash.take().unwrap_or_default()
+            }
         };
 
         self.set(&new);
@@ -151,12 +172,14 @@ impl InputBuffer
 
         self.history_pos = self.history.len();
         self.stash = None;
+        self.prefix = None;
     }
 
     pub fn reset_history_position(&mut self)
     {
         self.history_pos = self.history.len();
         self.stash = None;
+        self.prefix = None;
     }
 
     //LIFECYCLE
@@ -222,6 +245,11 @@ impl InputBuffer
     }
 
     //PRIVATE
+    fn matches(&self, entry: &str) -> bool //IS THIS ENTRY A CANDIDATE FOR THE RUNNING SEARCH?
+    {
+        self.prefix.as_ref().is_none_or(|p| entry.starts_with(p.as_str()))
+    }
+
     fn set(&mut self, text: &str)
     {
         self.chars = text.chars().collect();
