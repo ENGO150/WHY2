@@ -92,9 +92,7 @@ pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::ne
 pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
-//SEND THE WHOLE BAN LIST. IT IS BOTH THE ANSWER TO /server bans AND THE ACKNOWLEDGEMENT OF A PARDON,
-//BECAUSE LIFTING ONE BAN RENUMBERS THE ONES BELOW IT
-async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys)
+async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys) //SEND THE WHOLE BAN LIST
 {
     network::send(&mut *write_stream.lock().await, PacketCode::ServerBans
     {
