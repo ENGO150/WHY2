@@ -772,12 +772,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// For each row $i$, the shift amount $S_i$ is computed as:
     ///
     /// $$ H_i = \bigoplus_{j=0}^{W-1} G_{i,j} $$
-    ///
-    /// **Constant-time variant:**
     /// $$ S_i = \left\lfloor \frac{H_i \cdot W}{2^{64}} \right\rfloor $$
-    ///
-    /// **Non-constant-time variant:**
-    /// $$ S_i = H_i \bmod W $$
     ///
     /// where $G_{i,j}$ represents the cell at row $i$, column $j$.
     ///
@@ -785,7 +780,10 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// An array of length $H$ containing shift amounts in the range $[0, W)$ for each row.
     ///
     /// # Security Notes
-    /// - The constant-time variant uses Barrett reduction to prevent timing attacks.
+    /// - The fixed-point scaling above is the *only* mapping this function has, in every
+    ///   feature configuration.
+    /// - The multiply-high is inherently constant time: it is a single instruction on
+    ///   every target the crate supports, with no data-dependent path.
     /// - The XOR-fold ensures each row's shift is influenced by all cells in that row.
     /// - Output shifts are deterministic for a given Grid state.
     ///
@@ -801,18 +799,11 @@ impl<const W: usize, const H: usize> Grid<W, H>
         //SHIFT EACH ROW
         for (i, row) in self.iter().enumerate()
         {
+            //XOR-FOLD THE ROW, THEN SCALE THE FOLD INTO [0, W) BY TAKING THE HIGH HALF OF
+            //THE WIDENING PRODUCT
             let hash_chunk = row.iter().fold(0i64, |acc, &x| acc ^ x);
 
-            #[cfg(feature = "constant-time")]
-            {
-                shifts[i] = ((hash_chunk as u64 as u128 * W as u128) >> 64) as usize;
-            }
-
-            #[cfg(not(feature = "constant-time"))]
-            {
-                //SPLIT key_grid TO 8 PARTS & XOR EACH VALUE TO GET SHIFT
-                shifts[i] = hash_chunk.rem_euclid(W as i64) as usize;
-            }
+            shifts[i] = ((hash_chunk as u64 as u128 * W as u128) >> 64) as usize;
         }
 
         shifts
