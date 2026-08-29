@@ -41,8 +41,7 @@ pub const SERVER_KEYS_CONFIG: &str     = "/server_keys.toml";                   
 pub const SERVER_KEYS_DIR: &str        = "/server_keys";                              //SERVER KEYS DIRECTORY
 pub const SERVER_SKEY: &str            = "/private";                                  //SERVER PRIVATE KEY FILE
 pub const SERVER_PKEY: &str            = "/public";                                   //SERVER PUBLIC KEY FILE
-pub const SERVER_PQ_SKEY: &str         = "/private_pq";                               //SERVER POST-QUANTUM PRIVATE KEY FILE
-pub const SERVER_PQ_PKEY: &str         = "/public_pq";                                //SERVER POST-QUANTUM PUBLIC KEY FILE
+pub const SERVER_HISTORY_KEY: &str     = "/history_key";                              //MESSAGE HISTORY AT-REST KEY FILE
 
 pub const ECC_PUBKEY_SIZE: usize       = 133;                                         //SEC1 UNCOMPRESSED NIST P-521 POINT
 pub const ECC_SIGNATURE_SIZE: usize    = 132;                                         //FIXED-SIZE ECDSA/P-521 SIGNATURE (r || s)

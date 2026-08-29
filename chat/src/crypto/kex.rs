@@ -58,6 +58,13 @@ use crate::
 };
 
 #[cfg(feature = "server")]
+use rand::
+{
+    TryRng,
+    rngs::SysRng,
+};
+
+#[cfg(feature = "server")]
 use crate::network::schema;
 
 #[cfg(feature = "server")]
@@ -73,11 +80,6 @@ use p521::
         EncodePrivateKey,
         DecodePrivateKey,
         EncodePublicKey,
-        der::pem::
-        {
-            self,
-            LineEnding,
-        },
     },
 };
 
@@ -200,17 +202,22 @@ fn generate_pem_keys() -> (Zeroizing<String>, String) //CREATE ECC KEYS IN THE O
 }
 
 #[cfg(feature = "server")]
-pub fn generate_server_pq_keys() -> (Zeroizing<String>, String) //GENERATE POST-QUANTUM KEYS
+fn write_secure_key(path: String, data: &[u8]) //WRITE A SECRET TO DISK, READABLE BY NOBODY ELSE
 {
-    //GENERATE KEYS
-    let (dk, ek) = MlKem768::generate_keypair();
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
 
-    let dk_pem = pem::encode_string("PQ PRIVATE KEY", LineEnding::LF, dk.to_bytes().as_slice())
-        .expect("Encoding EQ key to PEM failed");
-    let ek_pem = pem::encode_string("PQ PUBLIC KEY", LineEnding::LF, ek.to_bytes().as_slice())
-        .expect("Encoding EQ pkey to PEM failed");
+    //SET FILE PERMS ON UNIX-LIKE OS
+    #[cfg(unix)]
+    {
+        options.mode(0o600);
+    }
 
-    (Zeroizing::new(dk_pem), ek_pem)
+    let mut file = options.open(&path)
+        .unwrap_or_else(|_| panic!("Failed to open {} for writing", path));
+
+    file.write_all(data)
+        .unwrap_or_else(|_| panic!("Failed to write key to {}", path));
 }
 
 #[cfg(feature = "server")]
@@ -232,35 +239,11 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
         builder.create(&server_keys_dir).expect("Failed to create WHY2 server-keys directory");
 
         //GENERATE KEYS
-        let (sk, pk) = generate_pem_keys();       //ECC
-        let (dk, ek) = generate_server_pq_keys(); //ML-KEM
-
-        //WRITE CLOSURE
-        let write_secure_key = |path: String, data: &[u8]|
-        {
-            let mut options = OpenOptions::new();
-            options.write(true).create(true).truncate(true);
-
-            //SET FILE PERMS ON UNIX-LIKE OS
-            #[cfg(unix)]
-            {
-                options.mode(0o600);
-            }
-
-            let mut file = options.open(&path)
-                .unwrap_or_else(|_| panic!("Failed to open {} for writing", path));
-
-            file.write_all(data)
-                .unwrap_or_else(|_| panic!("Failed to write key to {}", path));
-        };
+        let (sk, pk) = generate_pem_keys();
 
         //SAVE ECC KEYS
         write_secure_key(server_keys_dir.clone() + consts_chat::SERVER_SKEY, sk.as_bytes());
-        write_secure_key(server_keys_dir.clone() + consts_chat::SERVER_PKEY, pk.as_bytes());
-
-        //SAVE PQ KEYS
-        write_secure_key(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY, dk.as_bytes());
-        write_secure_key(server_keys_dir + consts_chat::SERVER_PQ_PKEY, ek.as_bytes());
+        write_secure_key(server_keys_dir + consts_chat::SERVER_PKEY, pk.as_bytes());
     } else
     {
         //ENFORCE STRICT FILE PERMISSIONS
@@ -289,8 +272,7 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
             //ENFORCE 600 PERMS ON FILES
             enforce_file_perms(consts_chat::SERVER_SKEY);
             enforce_file_perms(consts_chat::SERVER_PKEY);
-            enforce_file_perms(consts_chat::SERVER_PQ_SKEY);
-            enforce_file_perms(consts_chat::SERVER_PQ_PKEY);
+            enforce_file_perms(consts_chat::SERVER_HISTORY_KEY);
         }
     }
 }
@@ -307,14 +289,24 @@ pub fn get_server_keys() -> (Zeroizing<String>, String) //GET SERVER ECC KEYS (O
 }
 
 #[cfg(feature = "server")]
-pub fn get_server_pq_keys() -> (Zeroizing<String>, String) //GET SERVER ML-KEM KEYS
+pub fn history_key() -> Zeroizing<[u8; 32]> //THE MESSAGE HISTORY'S AT-REST KEY, CREATED ON FIRST USE
 {
-    let server_keys_dir = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR;
+    let path = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR + consts_chat::SERVER_HISTORY_KEY;
 
-    let dk = fs::read_to_string(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY).expect("Reading server PQ secret key failed");
-    let ek = fs::read_to_string(server_keys_dir + consts_chat::SERVER_PQ_PKEY).expect("Reading server PQ pubkey failed");
+    //LOAD KEY
+    if let Ok(bytes) = fs::read(&path)
+        && let Ok(key) = <[u8; 32]>::try_from(bytes.as_slice())
+    {
+        return Zeroizing::new(key);
+    }
 
-    (Zeroizing::new(dk), ek)
+    //NO KEY, OR A TRUNCATED ONE - THE HISTORY UNDER IT IS UNREADABLE EITHER WAY, SO START A NEW ONE
+    let mut key = Zeroizing::new([0u8; 32]);
+    SysRng.try_fill_bytes(key.as_mut()).expect("Failed to generate history key");
+
+    write_secure_key(path, key.as_ref());
+
+    key
 }
 
 #[cfg(feature = "server")]

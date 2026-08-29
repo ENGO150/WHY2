@@ -286,17 +286,7 @@ pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketS
 #[cfg(feature = "server")]
 pub fn history_keys() -> SharedKeys //AT-REST KEYS FOR THE MESSAGE HISTORY
 {
-    //THE SERVER'S OWN PRIVATE KEYS ARE THE ONLY SECRET ON DISK WITH THE RIGHT LIFETIME: WRITTEN ONCE BY
-    //kex::init, NEVER ROTATED, AND ALREADY FATAL TO LOSE - SO A KEY DERIVED FROM THEM COSTS THE OPERATOR
-    //NOTHING AND SURVIVES EVERY RESTART AND UPGRADE. BOTH HALVES GO IN, SO NEITHER ALONE IS ENOUGH
-    let (sk, _) = kex::get_server_keys();
-    let (pq_sk, _) = kex::get_server_pq_keys();
-
-    let mut ikm = Zeroizing::new(Vec::with_capacity(sk.len() + pq_sk.len()));
-    ikm.extend_from_slice(sk.as_bytes());
-    ikm.extend_from_slice(pq_sk.as_bytes());
-
-    let hkdf = Hkdf::<Sha256>::new(None, &ikm);
+    let hkdf = Hkdf::<Sha256>::new(None, kex::history_key().as_ref());
 
     //GRID KEY, AT THE FULL KEYDIM SO encrypt_packet DOES NOT RE-DERIVE IT
     const KEY_LEN: usize = consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT * 2;

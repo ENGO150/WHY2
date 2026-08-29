@@ -322,7 +322,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   packet rather than latched at login.
 - **`config/mod.rs`** — TOML config for client (`client.toml`) and server (`server.toml`), plus
   server user store (`server_users.toml`), server ban list (`server_bans.toml`) and server keypair
-  storage (`server_keys/{private,public,private_pq,public_pq}`), all under `WHY2_CONFIG_DIR`
+  storage (`server_keys/{private,public}`, plus `server_keys/history_key`), all under `WHY2_CONFIG_DIR`
   (defaults to `~/.config/WHY2`, baked in by `build.rs` unless overridden at build time).
 - **`config/messages.rs`** (feature `server`) — the lobby's message history, off by default
   (`persistent_messages`), kept as the last `max_persistent_messages` messages. **It is the one
@@ -330,14 +330,19 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   `Vec<StoredMessage>`, the same encoding the packets use, so a message is stored the way it is sent
   — colors and all — instead of being flattened into text.
   - **It is encrypted at rest, authenticated, under a key nobody has to manage.**
-    `crypto::history_keys` HKDFs the `why2` grid key and the HMAC key out of the server's *own*
-    private keys (ECC and ML-KEM concatenated, so neither half alone is enough), and `store`/`load`
-    go through `crypto::encrypt_packet`/`decrypt_packet` — the same `AuthenticatedData`
-    encrypt-then-MAC the one-shot packets use. Those keys are the only secret on disk with the right
-    lifetime: written once by `kex::generate_server_keys`, never rotated, and already fatal to lose.
-    Baking a key in at build time was the alternative and is wrong twice over — it ships inside the
-    binary, so every operator running the same artifact shares one key, and it changes on rebuild, so
-    an upgrade silently drops the history.
+    `crypto::history_keys` HKDFs the `why2` grid key and the HMAC key out of `kex::history_key` — 32
+    random bytes in `server_keys/history_key`, written the first time the history is touched — and
+    `store`/`load` go through `crypto::encrypt_packet`/`decrypt_packet`, the same `AuthenticatedData`
+    encrypt-then-MAC the one-shot packets use.
+    **The key is the history's own and is deliberately not derived from the server identity.** It was
+    once HKDF'd from the ECC and ML-KEM private keys, which bought no strength — everything lives in
+    the same directory either way — and cost two things: the history could not outlive a rotation of
+    the identity, and a static ML-KEM pair had to stay on disk for it alone after the handshake moved
+    to ephemeral keys. A key of its own is also the way to *discard* the history: delete the file and
+    the ciphertext beside it is scrap, which is what `history_key` does when it finds no key or a
+    truncated one. Baking a key in at build time was the other alternative and is wrong twice over —
+    it ships inside the binary, so every operator running the same artifact shares one key, and it
+    changes on rebuild, so an upgrade silently drops the history.
     Be honest about what this buys: the key sits next to the ciphertext, so it protects a *leaked
     copy* of the file (a backup, a snapshot, a support bundle) and nothing that already has the
     config dir. Authentication is not optional decoration either — the history is replayed straight
