@@ -133,8 +133,9 @@ pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 
 /// Derives a sequence of round keys from a master Grid using a deterministic CSPRNG stream.
 ///
-/// This function generates [`consts::ROUND_KEYS`] round keys by expanding the master key
-/// using a CSPRNG stream.
+/// This function generates the full [`consts::ROUND_KEYS`]-key schedule by expanding the master
+/// key using a CSPRNG stream. $K_0$ and $K_N$ are the input and output whitening keys; the keys
+/// between them drive one round each.
 ///
 /// $$ S = \text{Hash}(\text{MasterKey}) $$
 /// $$ K_0, \dots, K_N \leftarrow \text{CSPRNG}(S) $$
@@ -162,7 +163,7 @@ pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, 
     let mut rng = ChaCha20Rng::from_seed(*seed); //DERIVE SEED FROM MASTER KEY HASH
 
     //GENERATE KEYS
-    for _ in 0..(consts::ROUND_KEYS)
+    for _ in 0..consts::ROUND_KEYS
     {
         //USE SEED OF LAST KEY TO GENERATE NEW KEY
         let key = generate_key_deterministic::<W, H>(&mut rng);
@@ -214,11 +215,17 @@ pub fn generate_nonce<const W: usize, const H: usize>() -> Result<Grid<W, H>, Gr
 ///
 /// 1. **Counter Initialization**: $B = \text{Nonce} + \text{offset} + i$
 /// 2. **Initial Whitening**: $B \leftarrow B \oplus K_0$
-/// 3. **Round Operations**: For each round $r$ and key $K_r$ (from 1 to $N$):
+/// 3. **Round Operations**: For each round $r$ and key $K_r$ (from 1 to $N - 1$):
 ///    * **Key Addition**: $B \leftarrow B \oplus K_r$
 ///    * **Nonlinear Mixing**: $B \leftarrow \text{Subcell}(B, r)$
 ///    * **Row Permutation**: $B \leftarrow \text{ShiftRows}(B, K_r)$
 ///    * **Column Diffusion**: $B \leftarrow \text{MixColumns}(B, K_r)$
+/// 4. **Final Whitening**: $B \leftarrow B \oplus K_N$
+///
+/// # Panics
+/// Panics if `round_keys` holds fewer than two keys: the schedule must carry at least the two
+/// whitening keys. A schedule of exactly two runs no rounds and is not a cipher — the length
+/// that callers want is [`consts::ROUND_KEYS`], which [`generate_round_keys`] produces.
 ///
 /// # Parameters
 /// - `grids`: A mutable slice of [`Grid`]s representing the plaintext or ciphertext.
@@ -256,6 +263,12 @@ pub(crate) fn apply_ctr_with_shifts<const W: usize, const H: usize>
     counter_offset: Option<u64>,
 )
 {
+    //THE SCHEDULE MUST CARRY BOTH WHITENING KEYS AND A SHIFT FOR EVERY ROUND BETWEEN THEM.
+    //CHECKED ONCE HERE RATHER THAN PER BLOCK, SO THE HOT PATH INDEXES WITHOUT A GUARD AND A
+    //CALLER THAT GETS IT WRONG READS WHY INSTEAD OF A SLICE RANGE PANIC.
+    assert!(round_keys.len() >= 2, "round key schedule must hold at least the two whitening keys");
+    assert!(round_shifts.len() >= round_keys.len() - 2, "one row shift is required per keyed round");
+
     let offset = counter_offset.unwrap_or(0);
 
     //SMALL BATCHES ARE CHEAPER TO RUN HERE THAN TO HAND TO THE POOL
@@ -278,9 +291,14 @@ pub(crate) fn apply_ctr_with_shifts<const W: usize, const H: usize>
 
 /// Derives the keystream block for `counter` and XORs it into `grid`.
 ///
-/// This is the WHY2 block cipher itself: whitening with $K_0$, then a round of key addition,
-/// [`subcell`](Grid::subcell), [`shift_rows`](Grid::shift_rows) and
-/// [`mix_columns`](Grid::mix_columns) for every remaining round key.
+/// This is the WHY2 block cipher itself: whitening with the first key, then a round of key
+/// addition, [`subcell`](Grid::subcell), [`shift_rows`](Grid::shift_rows) and
+/// [`mix_columns`](Grid::mix_columns) for every key up to the last, then whitening with that
+/// last key.
+///
+/// The schedule length is read from `round_keys` rather than from [`consts::ROUND_KEYS`]. The
+/// two cannot then drift apart, and a caller that brings its own schedule gets the rounds it
+/// paid for instead of an out-of-bounds index.
 #[inline]
 fn keystream_block<const W: usize, const H: usize>
 (
@@ -301,13 +319,17 @@ fn keystream_block<const W: usize, const H: usize>
     keystream_block ^= &round_keys[0];
 
     //ROUND OPERATIONS
-    for (i, round_key) in round_keys[1..].iter().enumerate()
+    for (i, round_key) in round_keys[1..round_keys.len() - 1].iter().enumerate()
     {
         keystream_block ^= round_key;                 //XOR
         keystream_block.subcell(i);                   //SUBCELL (ARX)
         keystream_block.shift_rows(&round_shifts[i]); //SHIFT ROWS
         keystream_block.mix_columns();                //MIX COLUMNS (MDS)
     }
+
+    //FINAL KEY WHITENING - WITHOUT THIS THE PERMUTATION WOULD END ON mix_columns, WHICH IS
+    //PUBLIC AND INVERTIBLE, SO THE LAST ROUND'S DIFFUSION WOULD COST AN ATTACKER NOTHING
+    keystream_block ^= &round_keys[round_keys.len() - 1];
 
     //XOR KEYSTREAM AND DATA
     *grid ^= &keystream_block;

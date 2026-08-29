@@ -31,13 +31,22 @@ pub(crate) use mds::
     MDS_16,
 };
 
-/// Number of round keys used in the WHY2 cipher.
+/// Length of the round key schedule used by the WHY2 cipher.
 ///
-/// Each round key introduces nonlinear and linear mixing. This value controls the depth
-/// of encryption and decryption. Increasing it strengthens diffusion but adds computational cost.
+/// The schedule is consumed as *whitening key, rounds, whitening key*: the first key is XORed
+/// into the counter block before any round runs, the last is XORed into the result after every
+/// round has run, and each key between them drives one round of nonlinear and linear mixing.
+/// The number of keyed rounds is therefore `ROUND_KEYS - 2`, currently 15.
 ///
-/// Do not modify unless you're fully aware of the cryptographic implications.
-pub const ROUND_KEYS: usize = 16;
+/// The two whitening keys are not optional padding. Without the trailing one the permutation
+/// would end on [`mix_columns`](crate::grid::Grid::mix_columns) — a public, unkeyed, invertible
+/// map — and CTR mode hands an attacker the permutation's input in the clear, so they could
+/// strip that last linear layer for free and attack a cipher one round shorter than this one.
+///
+/// Raising this value strengthens diffusion but adds computational cost, and changes the
+/// keystream: ciphertexts do not survive a change to it. Do not modify unless you're fully
+/// aware of the cryptographic implications.
+pub const ROUND_KEYS: usize = 17;
 
 /// Number of ARX mixing iterations per cell in the [`subcell`](crate::grid::Grid::subcell) transformation.
 ///
