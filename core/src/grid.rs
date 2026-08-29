@@ -40,6 +40,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    array,
     result,
     error::Error,
     iter::Flatten,
@@ -191,16 +192,9 @@ macro_rules! subcell //SUBCELL CORE LOGIC
 //HADAMARD DIFFUSION
 /// Checks at compile time that an MDS matrix satisfies $M_{i,j} = M_{0,\, i \oplus j}$.
 ///
-/// [`mix_columns`](Grid::mix_columns) evaluates the matrix product as an XOR-convolution and
-/// solves it by Karatsuba, using $3^{\log_2 H}$ field products instead of $H^2$. That is only
-/// equal to the plain product for matrices of this (Hadamard) shape.
-///
-/// Every matrix in [`consts`] happens to have it. They are Cauchy matrices over the disjoint
-/// sets $x = \lbrace 0 \dots H-1 \rbrace$ and $y = \lbrace H \dots 2H-1 \rbrace$, and because
-/// $H$ is a power of two, $H + j = H \oplus j$; hence
-/// $M_{i,j} = (x_i \oplus y_j)^{-1} = (i \oplus j \oplus H)^{-1}$, which depends on $i$ and
-/// $j$ only through $i \oplus j$. The assertions below fail the build if a future matrix
-/// stops satisfying it, rather than letting `mix_columns` quietly compute the wrong thing.
+/// [`mix_columns`](Grid::mix_columns) reads only row 0 of the matrix and indexes it by
+/// $i \oplus j$, so a matrix that lost this shape would be silently multiplied by a different
+/// matrix than the one written down. The assertions below fail the build instead.
 const fn is_hadamard<const N: usize>(m: &[[u64; N]; N]) -> bool
 {
     let mut i = 0;
@@ -219,9 +213,36 @@ const fn is_hadamard<const N: usize>(m: &[[u64; N]; N]) -> bool
     true
 }
 
-const _: () = assert!(is_hadamard(&consts::MDS_4), "MDS_4 is not Hadamard; mix_columns cannot use Karatsuba");
-const _: () = assert!(is_hadamard(&consts::MDS_8), "MDS_8 is not Hadamard; mix_columns cannot use Karatsuba");
-const _: () = assert!(is_hadamard(&consts::MDS_16), "MDS_16 is not Hadamard; mix_columns cannot use Karatsuba");
+/// Checks at compile time that an MDS matrix is its own inverse.
+///
+/// For a Hadamard matrix $(M^2)_{i,j} = \sum_k m_{i \oplus k} \, m_{k \oplus j}$. Off the
+/// diagonal every term pairs with the one at $k \oplus i \oplus j$ and the two cancel; on it
+/// the sum is $\sum_k m_k^2 = \left( \bigoplus_k m_k \right)^2$, because squaring is
+/// $\mathbb{F}_2$-linear in characteristic two. So $M^2 = \left( \bigoplus_k m_k \right)^2 I$
+/// and the matrix is involutory exactly when its row XORs to one — which takes no field
+/// arithmetic to check, and is why undoing [`mix_columns`](Grid::mix_columns) needs no second
+/// matrix and no second code path: applying it twice is the identity.
+const fn is_involutory<const N: usize>(m: &[[u64; N]; N]) -> bool
+{
+    let mut x = 0u64;
+    let mut i = 0;
+
+    while i < N
+    {
+        x ^= m[0][i];
+        i += 1;
+    }
+
+    x == 1
+}
+
+const _: () = assert!(is_hadamard(&consts::MDS_4), "MDS_4 is not Hadamard; mix_columns reads it as if it were");
+const _: () = assert!(is_hadamard(&consts::MDS_8), "MDS_8 is not Hadamard; mix_columns reads it as if it were");
+const _: () = assert!(is_hadamard(&consts::MDS_16), "MDS_16 is not Hadamard; mix_columns reads it as if it were");
+
+const _: () = assert!(is_involutory(&consts::MDS_4), "MDS_4 is not involutory; mix_columns would no longer undo itself");
+const _: () = assert!(is_involutory(&consts::MDS_8), "MDS_8 is not involutory; mix_columns would no longer undo itself");
+const _: () = assert!(is_involutory(&consts::MDS_16), "MDS_16 is not involutory; mix_columns would no longer undo itself");
 
 /// ARX transform of one cell, used for the tail that the vector loops cannot cover.
 ///
@@ -256,71 +277,106 @@ fn subcell_cell(cell: i64, round: usize) -> i64
     ((v1 << 32) | v0) as i64
 }
 
-/// Base case of the XOR-convolution: a single field product per column.
-///
-/// # Safety
-/// `B` must name a backend whose CPU features the caller has enabled.
+/// XOR of two lanes, written by value rather than through indices: a compiler will fold this
+/// into one vector instruction, where the equivalent loop over a `&mut` array often does not
+/// leave the scalar registers.
 #[inline(always)]
-unsafe fn hadamard_1<const B: u8>(m: &[u64; 1], x: &[[u64; gf::LANE]; 1], out: &mut [[u64; gf::RAW]; 1])
+fn xor_lane(a: [u64; gf::LANE], b: [u64; gf::LANE]) -> [u64; gf::LANE]
 {
-    out[0] = unsafe { gf::scale_raw::<B>(&x[0], m[0]) };
+    array::from_fn(|i| a[i] ^ b[i])
 }
 
-macro_rules! hadamard_level //ONE KARATSUBA SPLIT OF THE XOR-CONVOLUTION
+/// [`gf::xtime`] across a lane. See [`xor_lane`] for why it takes and returns by value.
+#[inline(always)]
+fn xtime_lane(v: [u64; gf::LANE]) -> [u64; gf::LANE]
 {
-    ($name:ident, $child:ident, $n:literal, $h:literal) =>
-    {
-        /// One Karatsuba split: three half-size convolutions instead of four.
-        ///
-        /// With $M_{i,j} = m_{i \oplus j}$ the top half of the index space acts on the bottom
-        /// half exactly as the bottom acts on the top, so writing
-        /// $P = m_{lo} \otimes x_{lo}$, $Q = m_{hi} \otimes x_{hi}$ and
-        /// $S = (m_{lo} \oplus m_{hi}) \otimes (x_{lo} \oplus x_{hi})$ gives
-        /// $\text{out}_{lo} = P \oplus Q$ and $\text{out}_{hi} = S \oplus \text{out}_{lo}$.
-        ///
-        /// # Safety
-        /// `B` must name a backend whose CPU features the caller has enabled.
-        #[inline(always)]
-        unsafe fn $name<const B: u8>(m: &[u64; $n], x: &[[u64; gf::LANE]; $n], out: &mut [[u64; gf::RAW]; $n])
+    array::from_fn(|i| gf::xtime(v[i]))
+}
+
+macro_rules! mix_terms //ONE INPUT ROW'S CONTRIBUTION TO EVERY OUTPUT ROW
+{
+    ($m:expr, $exp:expr, $x:expr, $out:expr, $k:literal, [$($i:literal),*]) =>
+    {{
+        //RUNNING VALUE: x^e TIMES INPUT ROW $k, ONE LANE WIDE
+        let mut s = $x[$k];
+
+        for e in 0..$exp
         {
-            //SPLIT THE COEFFICIENTS AND THE STATE
-            let ml: [u64; $h] = std::array::from_fn(|i| m[i]);
-            let mr: [u64; $h] = std::array::from_fn(|i| m[$h + i]);
-            let ms: [u64; $h] = std::array::from_fn(|i| ml[i] ^ mr[i]);
+            if e > 0 { s = xtime_lane(s); }
 
-            let xl: [[u64; gf::LANE]; $h] = std::array::from_fn(|i| x[i]);
-            let xr: [[u64; gf::LANE]; $h] = std::array::from_fn(|i| x[$h + i]);
-            let xs: [[u64; gf::LANE]; $h] = std::array::from_fn(|i| std::array::from_fn(|c| xl[i][c] ^ xr[i][c]));
+            //ONE STRAIGHT-LINE TEST PER OUTPUT ROW, EACH ON A CONSTANT COEFFICIENT
+            $( if $m[$i ^ $k] >> e & 1 == 1 { $out[$i] = xor_lane($out[$i], s); } )*
+        }
+    }}
+}
 
-            let mut p = [[0u64; gf::RAW]; $h];
-            let mut q = [[0u64; gf::RAW]; $h];
-            let mut s = [[0u64; gf::RAW]; $h];
+macro_rules! mix_hadamard //ONE MONOMORPHISED DIFFUSION LAYER
+{
+    ($name:ident, $n:literal, $row:expr, $is:tt, [$($k:literal),*]) =>
+    {
+        /// Multiplies a lane of columns by the order-`$n` MDS matrix.
+        ///
+        /// The matrix is Hadamard, so $M_{i,j} = m_{i \oplus j}$ and its first row is all of
+        /// it. Every $m_d$ is a sum of powers of $x$ with small exponents, which is what makes
+        /// the product this cheap: walk the input rows, keep multiplying the running value by
+        /// $x$ with `xtime`, and XOR it into each output row whose coefficient uses that power.
+        /// No general field multiply is performed anywhere in here.
+        ///
+        /// **Both index loops are unrolled by the macro**, which is the whole point of writing
+        /// it this way: with $i$ and $k$ literal, every `M[i ^ k]` is a constant the compiler
+        /// folds the coefficient test against, leaving a fixed straight-line sequence of shifts
+        /// and XORs over [`gf::LANE`]-wide values. Left as ordinary loops the same code is
+        /// **twice as slow**: the coefficients stay in memory and each term costs a load, a bit
+        /// test and a branch.
+        #[inline(always)]
+        fn $name(x: &[[u64; gf::LANE]; $n]) -> [[u64; gf::LANE]; $n]
+        {
+            const M: [u64; $n] = $row;
 
-            //THREE HALF-SIZE PRODUCTS
-            unsafe
+            //HIGHEST POWER OF x ANY COEFFICIENT USES
+            const EXP: u32 =
             {
-                $child::<B>(&ml, &xl, &mut p);
-                $child::<B>(&mr, &xr, &mut q);
-                $child::<B>(&ms, &xs, &mut s);
-            }
+                let mut bits = 0u64;
+                let mut i = 0;
 
-            //RECOMBINE
-            for i in 0..$h
-            {
-                for c in 0..gf::RAW
+                while i < $n
                 {
-                    out[i][c] = p[i][c] ^ q[i][c];
-                    out[$h + i][c] = s[i][c] ^ out[i][c];
+                    bits |= M[i];
+                    i += 1;
                 }
-            }
+
+                64 - bits.leading_zeros()
+            };
+
+            let mut out = [[0u64; gf::LANE]; $n];
+
+            $( mix_terms!(M, EXP, x, out, $k, $is); )*
+
+            out
         }
     }
 }
 
-hadamard_level!(hadamard_2, hadamard_1, 2, 1);
-hadamard_level!(hadamard_4, hadamard_2, 4, 2);
-hadamard_level!(hadamard_8, hadamard_4, 8, 4);
-hadamard_level!(hadamard_16, hadamard_8, 16, 8);
+mix_hadamard!
+(
+    mix_4, 4, consts::MDS_4[0],
+    [0, 1, 2, 3],
+    [0, 1, 2, 3]
+);
+
+mix_hadamard!
+(
+    mix_8, 8, consts::MDS_8[0],
+    [0, 1, 2, 3, 4, 5, 6, 7],
+    [0, 1, 2, 3, 4, 5, 6, 7]
+);
+
+mix_hadamard!
+(
+    mix_16, 16, consts::MDS_16[0],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+);
 
 
 //IMPLEMENTATIONS
@@ -895,49 +951,47 @@ impl<const W: usize, const H: usize> Grid<W, H>
         }
     }
 
-    /// Applies column-wise mixing using a fixed Cauchy MDS matrix over $\mathbb{F}_{2^{64}}$.
+    /// Applies column-wise mixing using a fixed involutory MDS matrix over
+    /// $\mathbb{F}_{2^{64}}$.
     ///
     /// This transformation provides vertical diffusion by treating each column as a vector
-    /// of elements in $\mathbb{F}_{2^{64}}$ and multiplying it by a precomputed Cauchy MDS matrix.
-    /// Unlike the previous implementation, the matrix is **fixed and independent of the round key**,
-    /// enabling formal cryptographic analysis.
+    /// of elements in $\mathbb{F}_{2^{64}}$ and multiplying it by a fixed MDS matrix.
+    /// The matrix is **independent of the round key**, which is what makes the layer formally
+    /// analyzable.
     ///
     /// # Algorithm
     /// For each column $c$, the output vector is computed as:
     ///
     /// $$ \text{out}\[r\] = \sum_{k=0}^{H-1} M\[r\]\[k\] \cdot \text{col}\[k\] $$
     ///
-    /// Multiplication uses carry-less multiplication modulo the irreducible polynomial
-    /// $p(x) = x^{64} + x^4 + x^3 + x + 1$ in $\mathbb{F}_{2^{64}}$.
-    /// Addition corresponds to XOR.
-    ///
-    /// The matrix $M$ is a Cauchy MDS matrix constructed from disjoint sets
-    /// $x = \{0, \ldots, H-1\}$ and $y = \{H, \ldots, 2H-1\}$ over $\mathbb{F}_{2^{64}}$:
-    ///
-    /// $$ M_{ij} = (x_i \oplus y_j)^{-1} $$
+    /// Multiplication is modulo the irreducible polynomial
+    /// $p(x) = x^{64} + x^4 + x^3 + x + 1$ in $\mathbb{F}_{2^{64}}$; addition is XOR.
     ///
     /// # Security Properties
     /// - **True MDS**: Branch number is provably $H + 1$ — the theoretical maximum.
     ///   Any nonzero input with $k$ nonzero elements produces an output with at least $H+1-k$
-    ///   nonzero elements.
+    ///   nonzero elements. Verified exhaustively: every square submatrix of every matrix in
+    ///   [`consts`] is non-singular.
     /// - **Formally analyzable**: Fixed matrix enables standard differential/linear cryptanalysis bounds.
-    /// - **Nothing-up-my-sleeve**: Matrix derived from smallest possible disjoint sets,
-    ///   demonstrating no hidden weaknesses.
+    /// - **Involutory**: $M^2 = I$, so this function is its own inverse — applying it twice is
+    ///   the identity, and undoing the layer costs exactly what applying it does. Enforced at
+    ///   compile time. CTR mode never needs it: the keystream is generated the same way in both
+    ///   directions, so the cipher only ever runs the permutation forwards.
+    /// - **Nothing-up-my-sleeve**: each matrix is the lexicographically smallest one meeting
+    ///   those conditions at minimal weight, not a value picked out of a large set of equals.
     ///
     /// # Implementation
-    /// Three things make this cheaper than the $H^2$ field multiplications the definition asks
-    /// for, none of which change the result:
+    /// Two things make this far cheaper than the $H^2$ field multiplications the definition
+    /// asks for, neither of which changes the result:
     ///
-    /// 1. **The matrix is Hadamard.** $M_{i,j}$ depends only on $i \oplus j$ (see
-    ///    a compile-time assertion enforces it), so the product is an XOR-convolution and splits
-    ///    by Karatsuba into
-    ///    $3^{\log_2 H}$ products instead of $H^2$ — 27 rather than 64 at the default height.
-    /// 2. **Reduction is deferred.** Folding modulo $p(x)$ is $\mathbb{F}_2$-linear, so the
-    ///    128-bit products are accumulated raw and reduced once per output row rather than once
-    ///    per product.
-    /// 3. **The multiply backend is chosen once**, per process, instead of being probed
-    ///    per product: `VPCLMULQDQ` (four products per instruction pair), `PCLMULQDQ` or
-    ///    `PMULL`/`PMULL2` (two), or a portable branchless fallback.
+    /// 1. **The matrix is Hadamard.** $M_{i,j}$ depends only on $i \oplus j$ (a compile-time
+    ///    assertion enforces it), so one row is the entire matrix and the product is an
+    ///    XOR-convolution.
+    /// 2. **The coefficients are sums of small powers of $x$.** A product is therefore a short
+    ///    chain of `xtime` steps — shift up, fold the carry — and an XOR, not a carry-less
+    ///    multiply and a reduction. The whole layer is shifts and XORs, so it runs at the same
+    ///    speed on every machine rather than falling off a cliff on one without `PCLMULQDQ`,
+    ///    and the only thing left to dispatch on is register width.
     ///
     /// # Notes
     /// - This method mutates the grid in-place.
@@ -945,124 +999,63 @@ impl<const W: usize, const H: usize> Grid<W, H>
     #[inline(always)]
     pub fn mix_columns(&mut self)
     {
-        //DISPATCH ONCE PER CALL, NOT ONCE PER PRODUCT
-        match gf::backend()
+        #[cfg(target_arch = "x86_64")]
+        if gf::has_avx2()
         {
-            #[cfg(target_arch = "x86_64")]
-            gf::Backend::Vclmul => unsafe { self.mix_columns_dispatch_vclmul() },
-
-            #[cfg(target_arch = "x86_64")]
-            gf::Backend::Clmul => unsafe { self.mix_columns_dispatch_clmul() },
-
-            #[cfg(target_arch = "aarch64")]
-            gf::Backend::Pmull => unsafe { self.mix_columns_dispatch_pmull() },
-
-            gf::Backend::Soft => unsafe { self.mix_columns_inner::<{ gf::B_SOFT }>() },
+            unsafe { self.mix_columns_avx2() };
+            return;
         }
+
+        self.mix_columns_inner();
     }
 
-    /// `VPCLMULQDQ` entry point for [`mix_columns`](Self::mix_columns).
+    /// AVX2 entry point for [`mix_columns`](Self::mix_columns).
+    ///
+    /// The body is nothing but 64-bit shifts and XORs over [`gf::LANE`]-wide arrays; all this
+    /// adds is the register width to fold them into.
     ///
     /// # Safety
-    /// Only reachable when [`gf::backend`] reports [`gf::Backend::Vclmul`].
+    /// Only reachable when [`gf::has_avx2`] reports true.
     #[cfg(target_arch = "x86_64")]
-    #[target_feature(enable = "avx2,vpclmulqdq")]
-    unsafe fn mix_columns_dispatch_vclmul(&mut self)
+    #[target_feature(enable = "avx2")]
+    unsafe fn mix_columns_avx2(&mut self)
     {
-        unsafe { self.mix_columns_inner::<{ gf::B_VCLMUL }>() }
+        self.mix_columns_inner();
     }
 
-    /// `PCLMULQDQ` entry point for [`mix_columns`](Self::mix_columns).
+    /// Body of [`mix_columns`](Self::mix_columns).
     ///
-    /// # Safety
-    /// Only reachable when [`gf::backend`] reports [`gf::Backend::Clmul`].
-    #[cfg(target_arch = "x86_64")]
-    #[target_feature(enable = "pclmulqdq")]
-    unsafe fn mix_columns_dispatch_clmul(&mut self)
-    {
-        unsafe { self.mix_columns_inner::<{ gf::B_CLMUL }>() }
-    }
-
-    /// `PMULL` entry point for [`mix_columns`](Self::mix_columns).
-    ///
-    /// # Safety
-    /// Only reachable when [`gf::backend`] reports [`gf::Backend::Pmull`].
-    #[cfg(target_arch = "aarch64")]
-    #[target_feature(enable = "aes,neon")]
-    unsafe fn mix_columns_dispatch_pmull(&mut self)
-    {
-        unsafe { self.mix_columns_inner::<{ gf::B_PMULL }>() }
-    }
-
-    /// Body of [`mix_columns`](Self::mix_columns), generic over the field backend.
-    ///
-    /// Columns are handled [`gf::LANE`] at a time so the scratch used by the recursion is
-    /// bounded by the grid *height* alone and does not grow with `W`.
-    ///
-    /// # Safety
-    /// `B` must name a backend whose CPU features the caller has enabled.
+    /// Columns are handled [`gf::LANE`] at a time, so the scratch space is bounded by the grid
+    /// *height* alone and does not grow with `W`.
     #[inline(always)]
-    unsafe fn mix_columns_inner<const B: u8>(&mut self)
+    fn mix_columns_inner(&mut self)
     {
-        //HADAMARD VECTOR: THE WHOLE MATRIX IS M[i][j] = m[i ^ j], SO ROW 0 IS ALL OF IT
-        let m: &[u64] = match H
-        {
-            4  => &consts::MDS_4[0],
-            8  => &consts::MDS_8[0],
-            16 => &consts::MDS_16[0],
-            _  => unreachable!("tf")
-        };
-
         let mut col = 0;
         while col < W
         {
             let take = if W - col < gf::LANE { W - col } else { gf::LANE };
 
-            //GATHER A LANE OF COLUMNS (THE TAIL IS ZERO-PADDED, WHICH SCALES TO ZERO)
+            //GATHER A LANE OF COLUMNS (THE TAIL IS ZERO-PADDED, WHICH MIXES TO ZERO)
             let mut x = [[0u64; gf::LANE]; 16];
             for k in 0..H
             {
                 for c in 0..take { x[k][c] = self.0[k][col + c] as u64; }
             }
 
-            let mut out = [[0u64; gf::RAW]; 16];
+            let mut out = [[0u64; gf::LANE]; 16];
 
-            //XOR-CONVOLUTION BY KARATSUBA: 3^log2(H) products instead of H^2
             match H
             {
-                4 => unsafe
-                {
-                    hadamard_4::<B>
-                    (
-                        m.try_into().unwrap(),
-                        (&x[..4]).try_into().unwrap(),
-                        (&mut out[..4]).try_into().unwrap(),
-                    )
-                },
-
-                8 => unsafe
-                {
-                    hadamard_8::<B>
-                    (
-                        m.try_into().unwrap(),
-                        (&x[..8]).try_into().unwrap(),
-                        (&mut out[..8]).try_into().unwrap(),
-                    )
-                },
-
-                16 => unsafe
-                {
-                    hadamard_16::<B>(m.try_into().unwrap(), &x, &mut out)
-                },
-
-                _ => unreachable!("tf")
+                4  => out[..4].copy_from_slice(&mix_4((&x[..4]).try_into().unwrap())),
+                8  => out[..8].copy_from_slice(&mix_8((&x[..8]).try_into().unwrap())),
+                16 => out = mix_16(&x),
+                _  => unreachable!("tf")
             }
 
-            //FOLD EACH ACCUMULATED ROW BACK INTO THE FIELD, THEN SCATTER
+            //SCATTER BACK
             for k in 0..H
             {
-                let row = unsafe { gf::reduce_lane::<B>(&out[k]) };
-                for c in 0..take { self.0[k][col + c] = row[c] as i64; }
+                for c in 0..take { self.0[k][col + c] = out[k][c] as i64; }
             }
 
             col += take;

@@ -37,8 +37,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! - **Configurable Block Sizes**: From 4×4 to 16×16 grids (1024-16384 bits per block)
 //! - **Cache-Timing Resistant**: ARX-based design eliminates table lookups
-//! - **SIMD-Optimized**: Vectorized operations selected at run time (AVX2, VPCLMULQDQ,
-//!   PCLMULQDQ, NEON/PMULL), so a portable build still uses them
+//! - **SIMD-Optimized**: Vectorized operations selected at run time (AVX2), so a portable
+//!   build still uses them
 //! - **Constant-Time**: All cryptographic operations avoid timing side-channels
 //! - **Memory-Safe**: Pure Rust implementation prevents buffer overflows
 //! - **Parallel Encryption**: CTR mode enables multi-core processing
@@ -50,8 +50,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! - **SPN Architecture**: Proven approach used by standardized ciphers
 //! - **ARX Operations**: Memory-hard-free construction (inspired by TEA/XTEA/Salsa20)
-//! - **True MDS Diffusion**: Cauchy MDS matrix over $\mathbb{F}_{2^{64}}$ provides
-//!   provably optimal branch number, enabling formal security bounds.
+//! - **True MDS Diffusion**: an involutory MDS matrix over $\mathbb{F}_{2^{64}}$ provides
+//!   provably optimal branch number, enabling formal security bounds — built from coefficients
+//!   light enough that the layer is shifts and XORs rather than field multiplications.
 //! - **Native 64-bit Operations**: Optimized for contemporary processor architectures
 //!
 //! For detailed security architecture and implementation specifics, see the
