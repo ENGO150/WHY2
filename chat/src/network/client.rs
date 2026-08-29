@@ -123,6 +123,7 @@ pub struct VoiceUser
 }
 
 //ENUMS
+#[derive(PartialEq)]
 enum Handshake
 {
     Ready,     //KEYS AGREED - THE SESSION CAN START
@@ -475,7 +476,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 //WAIT FOR SERVER TO INIT KEY EXCHANGE
                 let current_keys = keys.clone();
-                key_exchange(streams, &mut keys, &tx, Some(&current_keys)).await;
+
+                //A REKEY THAT DOES NOT VERIFY ENDS THE SESSION. CARRYING ON UNDER THE OLD KEYS WOULD MEAN
+                //SHRUGGING OFF A PEER THAT JUST FAILED TO PROVE IT IS STILL THE ONE WE PINNED
+                if key_exchange(streams, &mut keys, &tx, Some(&current_keys)).await != Handshake::Ready { return; }
             }
 
             //PICK_USERNAME CODE - guess what
