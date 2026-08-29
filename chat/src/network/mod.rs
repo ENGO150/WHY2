@@ -432,8 +432,8 @@ pub async fn receive
                     let mut grace = true;
 
                     //SPAM
-                    if packet.code != PacketCode::KeepAlive &&
-                        !matches!(packet.code, PacketCode::KeyExchange { .. })
+                    if !matches!(packet.code, PacketCode::KeepAlive) &&
+                        !matches!(packet.code, PacketCode::KeyExchangeOffer { .. } | PacketCode::KeyExchangeReply { .. })
                     {
                         //MESSAGE SIZE (ONLY FOR AUTHENTICATED)
                         if let PacketCode::Message { ref text, .. } = packet.code
@@ -496,7 +496,7 @@ pub async fn receive
                     None => options::get_server_seq(),
                 };
 
-                if packet.seq > used_seq || used_seq == 0 || packet.code == PacketCode::Disconnect //VALID
+                if packet.seq > used_seq || used_seq == 0 || matches!(packet.code, PacketCode::Disconnect) //VALID
                 {
                     //SET SEQ
                     if let Some(seq) = seq

@@ -18,10 +18,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use wincode::{ SchemaWrite, SchemaRead };
 
-use crate::role::Role;
+use crate::
+{
+    role::Role,
+    network::schema::
+    {
+        Offer,
+        BoxedOffer,
+        Reply,
+        BoxedReply,
+    },
+};
 
 //ENUMS
-#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+#[derive(SchemaWrite, SchemaRead, Clone)]
 pub enum PacketCode //CONTROL CODES
 {
     //CLIENT <> SERVER | TEXT MESSAGE
@@ -31,6 +41,20 @@ pub enum PacketCode //CONTROL CODES
         username: Option<String>,
         id: Option<usize>,
         colors: MessageColors,
+    },
+
+    //SERVER -> CLIENT | KEY EXCHANGE OFFER
+    KeyExchangeOffer
+    {
+        #[wincode(with = "BoxedOffer")]
+        offer: Box<Offer>,
+    },
+
+    //CLIENT -> SERVER | KEY EXCHANGE REPLY
+    KeyExchangeReply
+    {
+        #[wincode(with = "BoxedReply")]
+        reply: Box<Reply>,
     },
 
     //SERVER -> CLIENT | INFORMATIONS
@@ -158,7 +182,6 @@ pub enum PacketCode //CONTROL CODES
     Deattach { username: Option<String> },          //CLIENT <> SERVER | DEATTACH CLIENT SCREENSHARE
     Screen { token: Option<[u8; 32]> },             //CLIENT <> SERVER | TOGGLE SCREENSHARE
     Voice { token: Option<[u8; 32]> },              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
-    KeyExchange { ecc: String, pq: String },        //SERVER <> CLIENT | KEY EXCHANGE
     Join { username: String },                      //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     List { users: Option<Vec<OnlineUser>> },        //CLIENT <> SERVER | PRINT CONNECTED USERS
     ServerKick { id: usize },                       //CLIENT -> SERVER | KICK USER

@@ -62,7 +62,7 @@ use crate::
     config::
     {
         self,
-        keys::TofuCode,
+        keys::{ self, TofuCode },
     },
     consts::
     {
@@ -73,6 +73,7 @@ use crate::
     network::
     {
         self,
+        schema,
         file::client as file,
         codes::
         {
@@ -143,6 +144,7 @@ pub enum ClientEvent
     TofuPrompt(TofuRequest),                       //TOFU DECISION ASKED OF THE USER
     TofuSkip(String),                              //TOFU VERIFICATION SKIPPED
     ReconnectFailed,                               //RECONNECTING AFTER PINNING THE KEY FAILED
+    HandshakeFailed(String),                       //THE KEY EXCHANGE DID NOT ADD UP
     VoiceActivity(Vec<VoiceUser>),                 //VOICE OVERLAY
     Join(String),                                  //CLIENT CONNECTED
     Leave(String, usize),                          //CLIENT DISCONNECTED
@@ -199,46 +201,56 @@ async fn key_exchange
     exchange_keys: Option<&SharedKeys>,
 ) -> Handshake //KEY EXCHANGE FOR CLIENT-SIDE
 {
-    //WAIT FOR KeyExchange
-    let (ecc, pq) = loop
+    //WAIT FOR KeyExchangeOffer
+    let offer = loop
     {
         //READ MESSAGE
-        let received = network::receive(streams, exchange_keys, None).await.unwrap();
+        let Some(received) = network::receive(streams, exchange_keys, None).await else
+        {
+            //THE SERVER WENT AWAY MID-HANDSHAKE - NOTHING TO VERIFY AND NOTHING TO ASK THE USER
+            tx.send(ClientEvent::Quit).await.ok();
 
-        if let PacketCode::KeyExchange { ecc, pq } = received { break (ecc, pq); }
+            return Handshake::Failed;
+        };
+
+        if let PacketCode::KeyExchangeOffer { offer } = received { break offer; }
     };
 
-    //CONCAT PUBLIC KEYS
-    let pks = ecc.clone() + &pq;
-
-    //VERIFY PUBKEY VALIDITY (TOFU)
+    //VERIFY PUBKEY VALIDITY (TOFU) - ONLY THE STATIC IDENTITY IS PINNED, THE OTHER TWO KEYS ARE EPHEMERAL
     let host = streams.0.peer_addr().unwrap().ip().to_string();
     let verdict = if env!("WHY2_SKIP_TOFU") == "false"
     {
-        Some(config::keys::check(&host, &pks))
+        Some(keys::check(&host, &kex::public_bytes(&offer.static_ecc)))
     } else { None };
+
+    //THE STATIC KEY SIGNS THE EPHEMERAL ONES AND DOES NOTHING ELSE
+    if !kex::verify_offer(&options::get_obfuscation_key(), &offer.static_ecc, &offer.eph_ecc, &offer.pq, &offer.sig)
+    {
+        tx.send(ClientEvent::HandshakeFailed(String::from("Server identity did not sign its exchange keys."))).await.ok();
+
+        return Handshake::Failed;
+    }
 
     //GENERATE EPHEMERAL ECC KEYS
     let (sk, pk) = kex::generate_ephemeral_keys();
 
     //ENCAPSULATE PQ
-    let (pq_ciphertext, pq_secret) = kex::encapsulate_pq(&pq);
+    let (pq_ciphertext, pq_secret) = kex::encapsulate_pq(&offer.pq);
 
     //SEND PUBKEYS TO SERVER
-    network::send(&mut *streams.1.lock().await, PacketCode::KeyExchange
+    network::send(&mut *streams.1.lock().await, PacketCode::KeyExchangeReply
     {
-        ecc: pk,
-        pq: pq_ciphertext,
+        reply: Box::new(schema::Reply { eph_ecc: pk, pq: pq_ciphertext }),
     }, exchange_keys).await;
 
-    //CALCULATE SHARED SECRET (HYBRID)
-    *keys = kex::derive_shared_secret(sk, ecc.to_string(), pq_secret).expect("Shared secret derivation failed");
+    //CALCULATE SHARED SECRET (HYBRID) - AGAINST THE SERVER'S EPHEMERAL KEY, NOT ITS IDENTITY
+    *keys = kex::derive_shared_secret(sk, &offer.eph_ecc, pq_secret);
 
     //SET GLOBAL VARIABLES
     options::set_keys(keys.clone());
 
     //ACT ON THE TOFU VERDICT NOW THAT THE SERVER HAS ITS ANSWER
-    let hash = config::keys::hash(&pks);
+    let hash = keys::hash(&kex::public_bytes(&offer.static_ecc));
 
     match verdict
     {
@@ -257,7 +269,7 @@ async fn key_exchange
                 host: host.clone(),
                 hash: hash.clone(),
                 mismatch: matches!(status, TofuCode::Mismatch),
-                pinned: config::keys::pinned(&host),
+                pinned: keys::pinned(&host),
                 reply,
             })).await.unwrap();
 
@@ -275,7 +287,7 @@ async fn key_exchange
             }
 
             //PIN THE KEY - THE NEXT CONNECTION TO host VERIFIES AGAINST IT
-            config::keys::save(&host, &hash);
+            keys::save(&host, &hash);
 
             if exchange_keys.is_none()
             {
@@ -397,7 +409,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
         }
 
         //KEEPALIVE
-        if read == PacketCode::KeepAlive
+        if matches!(read, PacketCode::KeepAlive)
         {
             //ECHO
             network::send(&mut *streams.1.lock().await, PacketCode::KeepAlive, options::get_keys().as_ref()).await;

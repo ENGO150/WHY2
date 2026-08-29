@@ -32,7 +32,7 @@ pub enum TofuCode //POSSIBLE KEY VERIFICATION RESULTS
     Mismatch, //KEY DIFFERS
 }
 
-pub fn hash(pubkey: &str) -> String //HASH SERVER KEYS
+pub fn hash(pubkey: &[u8]) -> String //HASH SERVER IDENTITY KEY
 {
     //HASH PUBKEY
     let pubkey_hash = crypto::sha256(pubkey);
@@ -47,7 +47,7 @@ pub fn hash(pubkey: &str) -> String //HASH SERVER KEYS
     pubkey_string
 }
 
-pub fn check(host: &str, pubkey: &str) -> TofuCode //CHECK PUBKEY VALIDITY (TOFU)
+pub fn check(host: &str, pubkey: &[u8]) -> TofuCode //CHECK PUBKEY VALIDITY (TOFU)
 {
     let pubkey_string = hash(pubkey);
 

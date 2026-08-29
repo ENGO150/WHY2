@@ -532,7 +532,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
     //GET ENCRYPTION & MAC KEYS
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
-    handshake::key_exchange(streams, &peer_addr, &mut keys, None).await;
+    handshake::key_exchange(streams, &peer_addr, &obfuscation_key, &mut keys, None).await;
 
     //CHECK FOR VALID KEYS
     if keys.0.is_empty() || keys.1.is_empty()
@@ -733,7 +733,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         {
             //INFORM CLIENT ABOUT REKEYING
             let current_keys = keys.clone();
-            handshake::key_exchange(streams, &peer_addr, &mut keys, Some(&current_keys)).await; //INIT REKEY
+            handshake::key_exchange(streams, &peer_addr, &obfuscation_key, &mut keys, Some(&current_keys)).await; //INIT REKEY
         }
 
         //THE ROLE IS RE-READ RATHER THAN LATCHED AT LOGIN: /server role APPLIES TO THE SESSION IT LANDS

@@ -135,13 +135,13 @@ pub(super) async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
 (
     streams: &mut Streams<'_>,
     peer_addr: &SocketAddr,
+    nonce: &[u8; 32],
     keys: &mut SharedKeys,
     rekey_trigger: Option<&SharedKeys>,
 )
 {
-    //LOAD KEYS
-    let (sk, pk) = kex::get_server_keys();          //ECC
-    let (pq_sk, pq_pk) = kex::get_server_pq_keys(); //PQ (ML-KEM)
+    //SIGN A FRESH EPHEMERAL PAIR WITH THE STATIC IDENTITY
+    let (ephemeral, offer) = kex::create_offer(nonce);
 
     //ATOMIC SEND
     {
@@ -156,36 +156,29 @@ pub(super) async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
             Some(current_keys)
         } else { None }; //OBFUSCATE PUBKEYS
 
-        //SEND ENCRYPTED PUBKEYS TO CLIENT
-        network::send(&mut write, PacketCode::KeyExchange { ecc: pk, pq: pq_pk }, keys).await;
+        //SEND SIGNED OFFER TO CLIENT
+        network::send(&mut write, PacketCode::KeyExchangeOffer { offer }, keys).await;
     }
 
     //READ FROM UNTRUSTED CLIENT
-    let message = match untrusted_read(streams, |code| matches!(code, PacketCode::KeyExchange { .. }), rekey_trigger).await
+    let message = match untrusted_read(streams, |code| matches!(code, PacketCode::KeyExchangeReply { .. }), rekey_trigger).await
     {
         Some(r) => r,
         None => return
     };
 
-    //DERIVE SHARED KEYS
-    let new_keys = (||
-    {
-        if let PacketCode::KeyExchange { ecc, pq } = message
-        {
-            //DECAPSULATE PQ
-            let pq_secret = kex::decapsulate_pq(&pq_sk, &pq)?;
+    //DERIVE SHARED KEYS - THE PACKET SCHEMA ALREADY PROVED BOTH HALVES ARE KEYS, SO NOTHING CAN FAIL HERE
+    let PacketCode::KeyExchangeReply { reply } = message else { unreachable!("what"); };
 
-            //DERIVE KEYS
-            kex::derive_shared_secret(sk, ecc, pq_secret)
-        } else { unreachable!("what"); }
-    })();
+    //DECAPSULATE PQ
+    let pq_secret = kex::decapsulate_pq(&ephemeral, &reply.pq);
+
+    //DERIVE KEYS - THIS CONSUMES THE EPHEMERAL SECRET
+    let new_keys = kex::derive_shared_secret(ephemeral.into_ecc(), &reply.eph_ecc, pq_secret);
 
     //UPDATE CLIENT KEYS
-    if let Some(new_keys) = new_keys
-    {
-        super::update_client_keys(peer_addr, &new_keys);
-        *keys = new_keys;
-    }
+    super::update_client_keys(peer_addr, &new_keys);
+    *keys = new_keys;
 }
 
 pub(super) async fn send_welcome_packet(write_stream: &mut OwnedWriteHalf, keys: &SharedKeys) //send welcome packet you idiot

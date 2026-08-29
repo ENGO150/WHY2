@@ -16,23 +16,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+
 use p521::
 {
     ecdh,
     PublicKey,
     SecretKey,
-    elliptic_curve::Generate,
-    pkcs8::
+    elliptic_curve::
     {
-        EncodePrivateKey,
-        DecodePrivateKey,
-        EncodePublicKey,
-        DecodePublicKey,
-        der::pem::
-        {
-            self,
-            LineEnding,
-        },
+        Generate,
+        sec1::ToSec1Point,
+    },
+    ecdsa::
+    {
+        Signature,
+        VerifyingKey,
+        signature::Verifier,
     },
 };
 
@@ -40,11 +39,9 @@ use ml_kem::
 {
     MlKem768,
     Ciphertext,
-    DecapsulationKey768,
     EncapsulationKey768,
-    KeyInit,
-    TryKeyInit,
-    kem::{ Encapsulate, Decapsulate },
+    KeyExport,
+    kem::Encapsulate,
 };
 
 use sha2::Sha256;
@@ -58,6 +55,30 @@ use crate::
 {
     misc,
     consts as consts_chat,
+};
+
+#[cfg(feature = "server")]
+use crate::network::schema;
+
+#[cfg(feature = "server")]
+use p521::
+{
+    ecdsa::
+    {
+        SigningKey,
+        signature::Signer,
+    },
+    pkcs8::
+    {
+        EncodePrivateKey,
+        DecodePrivateKey,
+        EncodePublicKey,
+        der::pem::
+        {
+            self,
+            LineEnding,
+        },
+    },
 };
 
 #[cfg(feature = "server")]
@@ -85,15 +106,49 @@ use std::os::unix::fs::
 #[cfg(feature = "server")]
 use ml_kem::
 {
-    KeyExport,
-    kem::Kem,
+    DecapsulationKey768,
+    kem::
+    {
+        Kem,
+        Decapsulate,
+    },
 };
+
+//STRUCTS
+#[cfg(feature = "server")] //THE SERVER'S HALF OF ONE EXCHANGE
+pub struct Ephemeral
+{
+    ecc: SecretKey,
+    pq: DecapsulationKey768,
+}
+
+#[cfg(feature = "server")]
+pub struct Offer
+{
+    pub static_ecc: PublicKey,
+    pub eph_ecc: PublicKey,
+    pub pq: EncapsulationKey768,
+    pub sig: Signature,
+}
 
 //FUNCTIONS
 //PRIVATE
-fn decode_raw_pem(pem: &str) -> Option<Vec<u8>>
+fn transcript(nonce: &[u8; 32], eph_ecc: &PublicKey, pq: &EncapsulationKey768) -> Vec<u8> //WHAT THE STATIC KEY SIGNS
 {
-    pem::decode_vec(pem.as_bytes()).ok().map(|p| p.1.to_vec())
+    let eph_bytes = public_bytes(eph_ecc);
+    let pq_bytes = pq.to_bytes();
+
+    let mut message = Vec::with_capacity
+    (
+        consts_chat::KEX_CONTEXT.len() + nonce.len() + eph_bytes.len() + pq_bytes.len()
+    );
+
+    message.extend_from_slice(consts_chat::KEX_CONTEXT);
+    message.extend_from_slice(nonce);
+    message.extend_from_slice(&eph_bytes);
+    message.extend_from_slice(&pq_bytes);
+
+    message
 }
 
 fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::SharedKeys //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
@@ -118,7 +173,21 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::Shar
 }
 
 //PUBLIC
-pub fn generate_ephemeral_keys() -> (Zeroizing<String>, String) //CREATE ECC KEYS
+pub fn public_bytes(key: &PublicKey) -> [u8; consts_chat::ECC_PUBKEY_SIZE]
+{
+    key.to_sec1_point(false).as_bytes().try_into().expect("Unexpected SEC1 point length")
+}
+
+pub fn generate_ephemeral_keys() -> (SecretKey, PublicKey) //CREATE EPHEMERAL ECC KEYS
+{
+    let private = SecretKey::generate();
+    let public = private.public_key();
+
+    (private, public)
+}
+
+#[cfg(feature = "server")]
+fn generate_pem_keys() -> (Zeroizing<String>, String) //CREATE ECC KEYS IN THE ON-DISK PEM FORMAT
 {
     //GENERATE PRIVATE KEY
     let private = SecretKey::generate();
@@ -127,7 +196,6 @@ pub fn generate_ephemeral_keys() -> (Zeroizing<String>, String) //CREATE ECC KEY
     let private_pem = private.to_pkcs8_pem(Default::default()).expect("Encoding key to PEM failed");
     let public_pem = private.public_key().to_public_key_pem(Default::default()).expect("Encoding pkey to PEM failed");
 
-    //RETURN TUPLE OF PRIVATE AND PUBLIC KEYS
     (private_pem, public_pem.to_string())
 }
 
@@ -164,7 +232,7 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
         builder.create(&server_keys_dir).expect("Failed to create WHY2 server-keys directory");
 
         //GENERATE KEYS
-        let (sk, pk) = generate_ephemeral_keys(); //ECC
+        let (sk, pk) = generate_pem_keys();       //ECC
         let (dk, ek) = generate_server_pq_keys(); //ML-KEM
 
         //WRITE CLOSURE
@@ -228,7 +296,7 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
 }
 
 #[cfg(feature = "server")]
-pub fn get_server_keys() -> (Zeroizing<String>, String) //GET SERVER ECC KEYS
+pub fn get_server_keys() -> (Zeroizing<String>, String) //GET SERVER ECC KEYS (ON-DISK PEM)
 {
     let server_keys_dir = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR;
 
@@ -244,24 +312,55 @@ pub fn get_server_pq_keys() -> (Zeroizing<String>, String) //GET SERVER ML-KEM K
     let server_keys_dir = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR;
 
     let dk = fs::read_to_string(server_keys_dir.clone() + consts_chat::SERVER_PQ_SKEY).expect("Reading server PQ secret key failed");
-    let ek = fs::read_to_string(server_keys_dir + consts_chat::SERVER_PQ_PKEY).expect("Reading server PQ public key failed");
+    let ek = fs::read_to_string(server_keys_dir + consts_chat::SERVER_PQ_PKEY).expect("Reading server PQ pubkey failed");
 
     (Zeroizing::new(dk), ek)
 }
 
+#[cfg(feature = "server")]
+pub fn create_offer(nonce: &[u8; 32]) -> (Ephemeral, Box<schema::Offer>) //SIGN A FRESH EPHEMERAL PAIR WITH THE STATIC IDENTITY
+{
+    //LOAD THE STATIC IDENTITY - IT ONLY EVER SIGNS
+    let (static_sk_pem, _) = get_server_keys();
+    let static_sk = SecretKey::from_pkcs8_pem(&static_sk_pem).expect("Invalid server secret key");
+    let signing = SigningKey::from(&static_sk);
+
+    //GENERATE BOTH EPHEMERALS
+    let (eph_sk, eph_ecc) = generate_ephemeral_keys();
+    let (pq_dk, pq) = MlKem768::generate_keypair();
+
+    //SIGN THE TRANSCRIPT
+    let sig: Signature = signing.sign(&transcript(nonce, &eph_ecc, &pq));
+
+    (
+        Ephemeral { ecc: eph_sk, pq: pq_dk },
+        Box::new(schema::Offer { static_ecc: static_sk.public_key(), eph_ecc, pq, sig }),
+    )
+}
+
+pub fn verify_offer //VERIFY AN OFFER AGAINST THE PINNED IDENTITY
+(
+    nonce: &[u8; 32],
+    static_ecc: &PublicKey,
+    eph_ecc: &PublicKey,
+    pq: &EncapsulationKey768,
+    sig: &Signature,
+) -> bool
+{
+    let Ok(verifying) = VerifyingKey::from_sec1_bytes(&public_bytes(static_ecc)) else { return false };
+
+    verifying.verify(&transcript(nonce, eph_ecc, pq), sig).is_ok()
+}
+
 pub fn derive_shared_secret //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
 (
-    local_key: Zeroizing<String>,
-    peer_pkey: String,
+    local_key: SecretKey,
+    peer_pkey: &PublicKey,
     pq_secret: Zeroizing<Vec<u8>>,
-) -> Option<consts_chat::SharedKeys>
+) -> consts_chat::SharedKeys
 {
-    //PARSE KEYS
-    let local_private = SecretKey::from_pkcs8_pem(&local_key).expect("Invalid key");
-    let remote_public = PublicKey::from_public_key_pem(&peer_pkey).ok()?;
-
     //COMPUTE EDCH
-    let shared = ecdh::diffie_hellman(local_private.to_nonzero_scalar(), remote_public.as_affine());
+    let shared = ecdh::diffie_hellman(local_key.to_nonzero_scalar(), peer_pkey.as_affine());
 
     //COMBINE SECRETS
     let hkdf = Hkdf::<Sha256>::new(None, &[]);
@@ -273,35 +372,26 @@ pub fn derive_shared_secret //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPT
     ).unwrap();
 
     //USE HKDF TO DERIVE SEPARATE ENCRYPTION AND MAC KEY
-    Some(derive_encryption_keys(&combined, misc::get_version()))
+    derive_encryption_keys(&combined, misc::get_version())
 }
 
-pub fn encapsulate_pq(peer_pk_bytes: &str) -> (String, Zeroizing<Vec<u8>>)
+pub fn encapsulate_pq(peer_ek: &EncapsulationKey768) -> (Ciphertext<MlKem768>, Zeroizing<Vec<u8>>)
 {
-    //DECODE PEM
-    let pk_bytes = decode_raw_pem(peer_pk_bytes).expect("Decoding PEM failed");
-
-    //DESERIALIZE KEY
-    let ek = EncapsulationKey768::new_from_slice(&pk_bytes).expect("Invalid encapsulation key");
-
     //ENCAPSULATE
-    let (ct, ss) = ek.encapsulate();
+    let (ct, ss) = peer_ek.encapsulate();
 
-    //ENCODE CIPHERTEXT TO PEM
-    let ct_pem = pem::encode_string("PQ CIPHERTEXT", LineEnding::LF, &ct).unwrap();
-
-    (ct_pem, Zeroizing::new(ss.as_slice().to_vec()))
+    (ct, Zeroizing::new(ss.as_slice().to_vec()))
 }
 
-pub fn decapsulate_pq(local_sk_pem: &str, ciphertext_pem: &str) -> Option<Zeroizing<Vec<u8>>>
+#[cfg(feature = "server")]
+pub fn decapsulate_pq(ephemeral: &Ephemeral, ciphertext: &Ciphertext<MlKem768>) -> Zeroizing<Vec<u8>>
 {
-    //DECODE PEM
-    let sk_bytes = Zeroizing::new(decode_raw_pem(local_sk_pem)?);
-    let ct_bytes = decode_raw_pem(ciphertext_pem)?;
+    Zeroizing::new(ephemeral.pq.decapsulate(ciphertext).as_slice().to_vec())
+}
 
-    //DESERIALIZE
-    let dk = DecapsulationKey768::new_from_slice(&sk_bytes).ok()?;
-    let ct = Ciphertext::<MlKem768>::try_from(ct_bytes.as_slice()).ok()?;
-
-    Some(Zeroizing::new(dk.decapsulate(&ct).as_slice().to_vec()))
+#[cfg(feature = "server")]
+impl Ephemeral
+{
+    //THE ECC HALF IS CONSUMED BY THE AGREEMENT, WHICH IS ALSO WHAT ENDS ITS LIFE
+    pub fn into_ecc(self) -> SecretKey { self.ecc }
 }

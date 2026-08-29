@@ -108,6 +108,9 @@ impl App
             //THE SERVER WENT AWAY BETWEEN THE TWO CONNECTIONS - BACK TO THE ADDRESS, THE KEY IS PINNED NOW
             ClientEvent::ReconnectFailed => self.disconnected("Reconnecting to the server failed."),
 
+            //UNLIKE TofuError THERE WAS NO PROMPT TO EXPLAIN ITSELF, SO THE REASON GOES BACK WITH THE BOX
+            ClientEvent::HandshakeFailed(reason) => self.disconnected(reason),
+
             ClientEvent::TofuSkip(hash) =>
             {
                 self.push_styled("SECURITY WARNING: UNKNOWN SERVER IDENTITY", theme::ERROR);

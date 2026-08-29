@@ -202,11 +202,11 @@ pub(crate) fn i64_to_bytes(vals: &[i64]) -> Vec<u8>
 }
 
 //PUBLIC
-pub fn sha256(seed_str: &str) -> [u8; 32] //GET HASH SEED; USED FOR PADDING
+pub fn sha256(data: &[u8]) -> [u8; 32] //SHA-256 OF A BYTE STRING
 {
     //SHA256
     let mut hasher = Sha256::new();
-    hasher.update(seed_str.as_bytes());
+    hasher.update(data);
 
     //FINALIZE
     hasher.finalize().into()

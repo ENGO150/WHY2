@@ -48,6 +48,7 @@ pub const ECC_PUBKEY_SIZE: usize       = 133;                                   
 pub const ECC_SIGNATURE_SIZE: usize    = 132;                                         //FIXED-SIZE ECDSA/P-521 SIGNATURE (r || s)
 pub const PQ_PUBKEY_SIZE: usize        = 1184;                                        //ML-KEM-768 ENCAPSULATION KEY
 pub const PQ_CIPHERTEXT_SIZE: usize    = 1088;                                        //ML-KEM-768 CIPHERTEXT
+pub const KEX_CONTEXT: &[u8]           = b"WHY2-KEX-V1";                              //DOMAIN SEPARATION FOR THE SIGNED HANDSHAKE TRANSCRIPT
 
 pub const FETCH_TIMEOUT: u64           = 5000;                                        //TIMOUT FOR FETCHING DATA (MS)
 pub const CONNECT_TIMEOUT: u64         = 3000;                                        //TIMEOUT FOR DIALING A SERVER (MS)
