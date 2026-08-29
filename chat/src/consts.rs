@@ -44,6 +44,11 @@ pub const SERVER_PKEY: &str            = "/public";                             
 pub const SERVER_PQ_SKEY: &str         = "/private_pq";                               //SERVER POST-QUANTUM PRIVATE KEY FILE
 pub const SERVER_PQ_PKEY: &str         = "/public_pq";                                //SERVER POST-QUANTUM PUBLIC KEY FILE
 
+pub const ECC_PUBKEY_SIZE: usize       = 133;                                         //SEC1 UNCOMPRESSED NIST P-521 POINT
+pub const ECC_SIGNATURE_SIZE: usize    = 132;                                         //FIXED-SIZE ECDSA/P-521 SIGNATURE (r || s)
+pub const PQ_PUBKEY_SIZE: usize        = 1184;                                        //ML-KEM-768 ENCAPSULATION KEY
+pub const PQ_CIPHERTEXT_SIZE: usize    = 1088;                                        //ML-KEM-768 CIPHERTEXT
+
 pub const FETCH_TIMEOUT: u64           = 5000;                                        //TIMOUT FOR FETCHING DATA (MS)
 pub const CONNECT_TIMEOUT: u64         = 3000;                                        //TIMEOUT FOR DIALING A SERVER (MS)
 

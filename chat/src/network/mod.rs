@@ -25,6 +25,7 @@ pub mod client;
 
 pub mod file;
 pub mod codes;
+pub mod schema;
 
 #[cfg(any(feature = "server", feature = "client_screen"))]
 pub mod screen;
