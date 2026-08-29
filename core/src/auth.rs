@@ -233,23 +233,29 @@ impl<const W: usize, const H: usize> TryFrom<&[u8]> for AuthenticatedData<W, H>
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error>
     {
-        if bytes.len() < 32
+        let grid_size = W * H * 8;
+
+        //THE SHORTEST WELL-FORMED PACKET IS A TAG PLUS THE NONCE GRID
+        if bytes.len() < 32 + grid_size
         {
-            return Err(GridError::InvalidByteLength { expected_mod: 0, actual_len: bytes.len() });
+            return Err(GridError::InvalidByteLength { expected_mod: grid_size, actual_len: bytes.len() });
         }
 
         //SEPARATE MAC
         let (mac_slice, content) = bytes.split_at(32);
 
-        //LOAD GRIDS
+        //LOAD GRIDS (REJECTS ANY LENGTH THAT IS NOT A WHOLE NUMBER OF GRIDS)
         let mut grids = Grid::<W, H>::from_bytes(content)?;
 
         //REMOVE NONCE
         let nonce = grids.remove(0);
 
+        let mut mac = [0u8; 32];
+        mac.copy_from_slice(mac_slice);
+
         Ok(Self
         {
-            mac: mac_slice.try_into().unwrap(),
+            mac,
             encrypted_data: EncryptedData
             {
                 output: grids,
