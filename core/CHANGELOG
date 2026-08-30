@@ -1,6 +1,16 @@
 WHY2 (Core) Changelog
 =====================
 
+v1.5.2:
+- ffc8b2a6: implement lightweight MDS matrices
+- 275e7edb: increase SUBCELL_ROUNDS to 5
+- 7bb44966: implement final key whitening in keystream_block
+- 4552067e: unite precalculate_shifts outputs on CT and non-CT builds
+- 533ee52f: fix possible AuthenticatedData::try_from panic
+- a5d754d0: optimize the rex module
+- f2b55a6b: update dependencies
+- 8d1f4124: change panic strategy to unwind
+
 v1.5.1:
 - 96f92062: add default RexStream dimensions
 - 678f3384: implement Zeroizing radically
