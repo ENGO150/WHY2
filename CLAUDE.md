@@ -280,8 +280,25 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     right answer or accepts every wrong one. What separates them is not the peak's height but how
     far it stands above the other lags, which are uncorrelated and scatter around zero with a known
     spread; the search accepts a peak only at `AEC_PEAK_SIGMA` above that. An earlier two-pass
-    version correlated block-energy envelopes first and refined the best few — it was cheaper, but
-    the envelope of a loud share swamps the echo's, and it failed exactly when it was needed.
+    version correlated block-energy *envelopes* first and refined the best few — it was cheaper, but
+    the envelope of a loud share swamps the echo's, and it failed exactly when it was needed. (The
+    decimation below is not that: it correlates the waveform throughout, only at a coarser rate.)
+  - **The search is coarse-to-fine because its cost lands on the capture task**, and that is what a
+    share's opening used to leak. At full rate it is `search_range` × `window` multiply-adds — 59
+    million at the shipped settings, measured at 30 ms — run inline between socket awaits, while the
+    capture callback drops a chunk whenever `chunk_tx` (~160 ms) is full. So every attempt punched a
+    hole in the very audio the next attempt would correlate, and the interval between attempts had to
+    be half a second to afford it: a share could spend seconds unlocked, passing raw echo through for
+    all of it, which is what a viewer attaching heard. A peak is only being *located*, though, and a
+    delay does not need sample resolution to be located: `decimate` box-filters both sides down by
+    `AEC_SEARCH_DECIMATION`, which costs its square and lands within one decimated sample, and a
+    full-rate pass across that one sample resolves the lag exactly — so what the filter is handed is
+    unchanged. Measured against the full search over speech-like noise under an interfering share,
+    the two pick the same lag and the peak's sigma agrees to within 4%, for 2 ms instead of 30.
+    Decimating by 8 is cheaper still and was rejected: sigma is 10% down there, and sigma *is* the
+    decision — that would buy the speed by refusing marginal locks. The cheap search is also what
+    pays for `AEC_SEARCH_INTERVAL` dropping to 100 ms, which is the rest of the opening: the gap
+    between attempts is the worst case a lock can be late by once somebody speaks.
   - **The filter only learns from audio our own echo is actually a part of** (`AEC_ADAPT_RATIO`), and
     this is what makes it survive anything else being played. Whatever is being shared is in the capture
     and is in the reference not at all, so it reaches the adaptation as a disturbance in the error that

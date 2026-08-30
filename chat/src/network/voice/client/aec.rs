@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    ops::RangeInclusive,
     collections::VecDeque,
     sync::
     {
@@ -249,6 +250,7 @@ impl Canceller
         self.capture_energy = 0.;
         self.residual_energy = 0.;
         self.phantoms = 0;
+
     }
 
     //ONE REFERENCE SAMPLE AT OUR RATE. AN EMPTY RING READS AS SILENCE, WHICH IS EXACTLY RIGHT - THERE IS
@@ -368,56 +370,36 @@ impl Canceller
 
         let window = consts::AEC_WINDOW;
         let captured = &capture[capture.len() - window..];
-        let capture_norm = energy(captured).sqrt();
 
         //NOTHING IS PLAYING - THERE IS NOTHING TO LINE UP AGAINST YET
-        if capture_norm <= 0. || energy(&reference[reference.len() - window..]) < consts::AEC_MIN_ENERGY
+        if energy(captured) <= 0. || energy(&reference[reference.len() - window..]) < consts::AEC_MIN_ENERGY
         {
             return;
         }
 
-        let mut best = (0usize, f32::NEG_INFINITY);
-        let mut total = 0.;
-        let mut total_squared = 0.;
+        //COARSE PASS: WHICH LAG, TO WITHIN ONE DECIMATED SAMPLE, AND WHETHER IT IS A PEAK AT ALL
+        let factor = consts::AEC_SEARCH_DECIMATION;
 
-        //THE REFERENCE WINDOW SLIDES ONE SAMPLE PER LAG, SO ITS ENERGY IS CARRIED ACROSS INSTEAD OF RESUMMED
-        let mut first = reference.len() - window;
-        let mut reference_energy = energy(&reference[first..]);
+        let coarse_reference = decimate(&reference, factor);
+        let coarse_captured = decimate(captured, factor);
 
-        for delay in 0..=consts::AEC_SEARCH_RANGE
-        {
-            if delay > 0
-            {
-                first -= 1;
-                reference_energy += reference[first] * reference[first]
-                    - reference[first + window] * reference[first + window];
-            }
+        let coarse_range = (coarse_reference.len().saturating_sub(coarse_captured.len()))
+            .min(consts::AEC_SEARCH_RANGE / factor);
 
-            if reference_energy <= 0. { continue; }
-
-            let mut correlation = 0.;
-
-            for index in 0..window
-            {
-                correlation += captured[index] * reference[first + index];
-            }
-
-            let score = correlation / (reference_energy.sqrt() * capture_norm);
-
-            total += score;
-            total_squared += score * score;
-
-            if score > best.1 { best = (delay, score); }
-        }
+        let Some((coarse, _, sigma)) = correlate(&coarse_reference, &coarse_captured, 0..=coarse_range)
+        else { return };
 
         //HOW FAR THE PEAK STANDS ABOVE THE LAGS THAT ARE ONLY COINCIDENCE
-        let lags = (consts::AEC_SEARCH_RANGE + 1) as f32;
-        let mean = total / lags;
-        let deviation = (total_squared / lags - mean * mean).max(0.).sqrt();
+        if sigma < consts::AEC_PEAK_SIGMA { return; }
 
-        if best.1 < mean + consts::AEC_PEAK_SIGMA * deviation { return; }
+        //FINE PASS: THE SAME PEAK AT FULL RATE, ACROSS THE ONE DECIMATED SAMPLE THE COARSE ONE COULD NOT
+        //SEE INSIDE. IT SPANS BOTH WAYS BECAUSE THE BOX FILTER CENTRES NOTHING - THE TRUE LAG SITS
+        //ANYWHERE IN THE SAMPLE THAT WON, OR JUST OVER EITHER EDGE OF IT.
+        let centre = coarse * factor;
+        let lags = centre.saturating_sub(factor)..=(centre + factor).min(consts::AEC_SEARCH_RANGE);
 
-        let delay = best.0;
+        let Some((delay, _, _)) = correlate(&reference, captured, lags) else { return };
+
         let start = reference.len() - window - delay;
         let found = &reference[start..start + window];
 
@@ -463,6 +445,72 @@ impl Canceller
 fn energy(samples: &[f32]) -> f32
 {
     samples.iter().map(|sample| sample * sample).sum()
+}
+
+fn decimate(samples: &[f32], factor: usize) -> Vec<f32>
+{
+    samples[samples.len() % factor..]
+        .chunks_exact(factor)
+        .map(|chunk| chunk.iter().sum::<f32>() / factor as f32)
+        .collect()
+}
+
+fn correlate(reference: &[f32], captured: &[f32], lags: RangeInclusive<usize>) -> Option<(usize, f32, f32)>
+{
+    let window = captured.len();
+    let capture_norm = energy(captured).sqrt();
+
+    let (first_lag, last_lag) = (*lags.start(), *lags.end());
+
+    if capture_norm <= 0. || reference.len() < window + last_lag { return None; }
+
+    let mut best = (0usize, f32::NEG_INFINITY);
+    let mut total = 0.;
+    let mut total_squared = 0.;
+    let mut scored = 0.;
+
+    //THE REFERENCE WINDOW SLIDES ONE SAMPLE PER LAG, SO ITS ENERGY IS CARRIED ACROSS INSTEAD OF RESUMMED
+    let mut first = reference.len() - window - first_lag;
+    let mut reference_energy = energy(&reference[first..first + window]);
+
+    for delay in first_lag..=last_lag
+    {
+        if delay > first_lag
+        {
+            first -= 1;
+            reference_energy += reference[first] * reference[first]
+                - reference[first + window] * reference[first + window];
+        }
+
+        if reference_energy <= 0. { continue; }
+
+        let mut correlation = 0.;
+
+        for index in 0..window
+        {
+            correlation += captured[index] * reference[first + index];
+        }
+
+        let score = correlation / (reference_energy.sqrt() * capture_norm);
+
+        total += score;
+        total_squared += score * score;
+        scored += 1.;
+
+        if score > best.1 { best = (delay, score); }
+    }
+
+    if scored <= 0. { return None; }
+
+    let mean = total / scored;
+    let deviation = (total_squared / scored - mean * mean).max(0.).sqrt();
+
+    //A SINGLE LAG, OR A POPULATION WITH NO SPREAD AT ALL, IS NO EVIDENCE AGAINST THE ONLY ANSWER THERE IS
+    Some(match deviation > 0.
+    {
+        true => (best.0, best.1, (best.1 - mean) / deviation),
+        false => (best.0, best.1, f32::INFINITY),
+    })
 }
 
 //PUBLIC
