@@ -70,4 +70,7 @@ pub const AEC_LEAD_TAPS: usize            = 64;                                 
 pub const AEC_STEP: f32                   = 0.0001;                              //NLMS STEP SIZE (SMALL - THE SEARCH ALREADY LANDS CLOSE, AND THE SHARED AUDIO IS A LOUD DISTURBANCE IN THE ERROR)
 pub const AEC_EPSILON: f32                = 1e-6;                               //NLMS REGULARIZATION (NEVER DIVIDE BY A SILENT WINDOW)
 pub const AEC_SCORE_WINDOW: usize         = SAMPLE_RATE as usize;               //HOW OFTEN THE FILTER HAS TO JUSTIFY ITSELF (~1s)
+pub const AEC_ROLLBACK_MARGIN: f32        = 3.0;                                //dB WORSE THAN THE BEST THIS LOCK MANAGED BEFORE THE FILTER IS PUT BACK
+pub const AEC_ROLLBACK_DECAY: f32         = 1.0;                                //dB THE STANDARD TO BEAT FORGETS EACH WINDOW, SO IT TRACKS WHAT THE CHANNEL CURRENTLY ALLOWS
+pub const AEC_ROLLBACK_LIMIT: usize       = 3;                                  //ROLLBACKS IN A ROW THAT DO NOT RESCUE IT - THE DELAY IS WRONG, NOT THE FILTER
 pub const AEC_SCORE_FLOOR: f32            = 0.05;                               //TOO LITTLE WENT THROUGH THAT WINDOW TO JUDGE IT

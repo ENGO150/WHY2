@@ -68,6 +68,9 @@ pub struct Canceller
 
     //FILTER
     weights: Vec<f32>,
+    best: Vec<f32>,   //THE BEST FILTER THIS LOCK HAS MANAGED, TO GO BACK TO WHEN ADAPTATION MAKES THINGS WORSE
+    best_erle: f32,   //WHAT IT SCORED
+    failures: usize,  //SCORING WINDOWS PUTTING IT BACK HAS NOT RESCUED
     offset: usize,      //HOW FAR BACK THE FIRST TAP SITS
     norm: f32,          //ENERGY OF THE TAP WINDOW
     norm_taps: usize,   //HOW MANY TAPS THAT WAS SUMMED OVER - FEWER THAN THE FILTER UNTIL THE LINE FILLS
@@ -232,6 +235,10 @@ impl Canceller
 
         self.weights.fill(0.);
 
+        self.best.fill(0.);
+        self.best_erle = f32::NEG_INFINITY;
+        self.failures = 0;
+
         self.offset = 0;
         self.norm = 0.;
         self.norm_taps = 0;
@@ -321,14 +328,35 @@ impl Canceller
 
         let lost = self.capture_energy > consts::AEC_SCORE_FLOOR && self.residual_energy > self.capture_energy;
 
+        //WHAT THE FILTER IS ACTUALLY REMOVING, WHICH IS THE ONE NUMBER WORTH LOOKING AT WHILE TUNING IT
+        let erle = match self.residual_energy > 0. && self.capture_energy > 0.
+        {
+            true => 10. * (self.capture_energy / self.residual_energy).log10(),
+            false => 0.,
+        };
+
         self.scored = 0;
         self.capture_energy = 0.;
         self.residual_energy = 0.;
 
-        if lost
+        if self.best_erle.is_finite() { self.best_erle -= consts::AEC_ROLLBACK_DECAY; }
+
+        if !lost && erle > self.best_erle
         {
-            self.reset();
+            self.best.copy_from_slice(&self.weights);
+            self.best_erle = erle;
+        } else if lost || erle < self.best_erle - consts::AEC_ROLLBACK_MARGIN
+        {
+            self.weights.copy_from_slice(&self.best);
         }
+
+        match lost
+        {
+            true => self.failures += 1,
+            false => self.failures = 0,
+        }
+
+        if self.failures >= consts::AEC_ROLLBACK_LIMIT { self.reset(); }
     }
 
     fn search(&mut self)
@@ -413,6 +441,11 @@ impl Canceller
         self.weights.fill(0.);
         self.weights[delay - self.offset] = gain;
 
+        //THE LEAST SQUARES FIT IS THE FILTER TO BEAT, AND THE ONE TO FALL BACK ON UNTIL SOMETHING BEATS IT
+        self.best.copy_from_slice(&self.weights);
+        self.best_erle = f32::NEG_INFINITY;
+        self.failures = 0;
+
         self.capture.clear();
         self.capture.shrink_to_fit();
 
@@ -459,6 +492,9 @@ pub fn start() -> Option<Canceller>
         capture: VecDeque::with_capacity(HISTORY + 1),
 
         weights: vec![0.; consts::AEC_TAPS],
+        best: vec![0.; consts::AEC_TAPS],
+        best_erle: f32::NEG_INFINITY,
+        failures: 0,
         offset: 0,
         norm: 0.,
         norm_taps: 0,

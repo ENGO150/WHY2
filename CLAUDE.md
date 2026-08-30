@@ -305,6 +305,23 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     means anything. Measured across a loud share, perfect cancellation and no cancellation at all both
     come out at 0 dB — the echo is a rounding error in the total either way — so two windows are not
     comparable unless there was something of ours to remove in both.
+  - **A filter that scores badly is put back, not thrown away** (`best`, `AEC_ROLLBACK_MARGIN`). A reset
+    is far more expensive than it looks: it passes the capture through untouched — raw echo — for as
+    long as the search needs, and comes back with the single tap the search seeds, which is where the
+    filter started. While a share is playing it cannot climb back out of that, so the lock churn *was*
+    the residual echo: a little of it for as long as the video ran, then gone once the filter could
+    converge again. So each scoring window is compared against the best that lock has managed, the
+    weights behind that best are kept, and a window `AEC_ROLLBACK_MARGIN` dB worse (or one that is
+    adding energy outright) restores them instead of giving up the delay.
+    **Only a filter that is adding energy counts as a failure**, though, and this is the whole
+    difference between the rollback helping and it making things worse. ERLE swings with what is being
+    said as much as with the filter, so scoring under an earlier peak is ordinary; counting those
+    towards a reset made the lock *more* fragile than the plain check it replaced — three unremarkable
+    windows below one good one and the share went back to raw echo while the search ran, which showed
+    up as the echo returning on a **quiet** channel rather than only under a video. The standard also
+    forgets `AEC_ROLLBACK_DECAY` dB every window, so a best taken under conditions that no longer hold
+    cannot sit there rejecting perfectly good filters. Only `AEC_ROLLBACK_LIMIT` energy-adding windows
+    in a row mean the delay itself is wrong rather than the filter, and only then is there a reset.
   - **The NLMS step is deliberately tiny** (`AEC_STEP`). The search hands the filter a least-squares
     gain at the right lag, so it only has to track drift, while the shared audio sits in the error
     signal as a loud disturbance that a large step turns into weight jitter. Raising it makes things
