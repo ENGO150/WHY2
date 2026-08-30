@@ -1,6 +1,152 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.0.0:
+- fcc12634: add screenshare audio volume control to client settings
+- 64b99556: spawn one forward task for each attached client
+- b4fc409c: shed the viewer's audio backlog instead of playing through it
+- 5a95d041: cap the screen share's socket buffers
+- 70e0653d: search for the echo delay coarse-to-fine
+- 60cf5733: put the best filter back instead of giving up the echo lock
+- 573c8e29: scale the echo canceller's step by how much of the capture is its own echo
+- 5f6751dd: keep the echo canceller aligned through dropped chunks and drift
+- 08b1ad65: use random history key instead of Sha256(ECC || ML-KEM)
+- 561d801b: end the session when a rekey fails to verify
+- 66effe7a: sign ephemeral exchange keys with the static server identity
+- 2158f101: add wire adapters for the key exchange key types
+- 3cb63a82: replace role constants with a role enum
+- 777eb785: implement chaning user roles
+- ec37cc0d: add prefix-based history on client
+- b1e74f55: encrypt message history on disk
+- 59d6f259: replay message history on login
+- 42eeb857: store lobby messages on server
+- 957e3e70: add History packet code
+- 86df54d8: shorten send_bans comment
+- 8935c897: authorize streamed packets
+- 7f75195a: add hmac dependency to chat
+- 766d2176: split config & server into multiple files
+- a4aaf5ee: add ServerSay command
+- bf268293: implement pardoning
+- 755eab0a: implement IP banning
+- f2b55a6b: update dependencies
+- 637730fe: store banned users as an array
+- bcbae5ca: move server bans to separate config file
+- 3056ae02: paint the viewer letterbox black
+- a9be63e6: implement monitor picker on Screen command
+- f99cad5f: fail password verification on banned users
+- c35f5249: implement banning
+- 765ef2da: prepare ban command
+- 80894e42: add banned field to server_users
+- 24ab4ddb: disallow muting/kicking same or higher roles
+- f86ca460: display very serious message on screenshare when server-muted
+- c339c57c: implement ServerMute command
+- 7a17b437: fix spam warning on ServerKick
+- ec31c149: implement ServerKick command
+- 11b0516a: fix chat default feature
+- 1ca30b49: add Logout command
+- 6d5ee7ed: improve settings scrolling
+- 05405f6b: implement ServerRestart
+- 9c1d0bbb: move server config entry description to separate block
+- c4900ad0: add restart required note to server settings
+- 007d1b5f: rename server config voice chat category to features
+- 9b388ef3: move role definitions to consts module
+- 533e1bee: implement server settings command
+- 84094783: add scrollbar to TUI windows
+- 50c22482: sort color menu alphabetically
+- 2758ea26: implement color helper on color & ucolor command
+- 8cb08ae2: prepare admin mute, kick & settings commands
+- a7925a77: hide unprivileged commands on client
+- a54fa295: add minimal_role requirement to commands
+- 0ab272ac: add role field to Accept code
+- 30c1bac0: notice first user they have been granted owner role
+- 60e956d1: set role to 0 on migration
+- 0c1efbdb: add role field to new users
+- 96d40462: change set_user_field value parameter type to Value
+- 952a1480: prepare server_users for roles
+- 25753992: simplify user storing
+- 96d112ce: store users as sub-tables
+- f0938ca5: yet another macOS compilation fix
+- 636b79f8: fix macOS screenshare compilation
+- 8d1f4124: change panic strategy to unwind
+- eb7c945c: implement stricter packet size ceiling
+- 32f29b6f: remove redundant screenshare test code
+- 63f7c510: fix possible voice connection hijacking
+- 9d765b0a: fix possible server DoS
+- fbcd8a2c: remove share aec test code
+- 0c15f5eb: find the echo delay under a loud share
+- 8c23c936: recycle the wayland capture connection
+- 242ceea7: implement screen sharing AEC
+- 10d0e0ab: render the screen share viewer on the gpu
+- b6242d55: convert rgba to i420 on the gpu
+- 30c2fbfc: prefer the os-native screen recorder
+- 36ca63f0: replace pixels with wgpu
+- 7c18e0ef: add disable logo option to settings
+- 1368fef7: display rexlogo in the center of chat window
+- 0a581235: add text rexlogo
+- 35f6773b: implement 3s server dial timeout
+- cd5f62e0: return to login screen on server-side disconnect
+- 297ffa00: dynamicaly grow address input box on errors
+- d2f13fd6: move auth into login box
+- 4613f618: move server address prompt to TUI
+- 7e0b09df: hide command palette & user list during auth
+- d2e7c0ef: reconnect on ToFU match
+- 472d4c53: move ToFU verification to TUI
+- d223ec19: fix non-default audio device crash
+- 550a0c7f: remove audio-setup client flag
+- 9c472491: bind settings to C-,
+- 80005717: add settings overlay behind /settings
+- 0c45153a: render chat messages through the theme
+- 3a813864: rebuild voice streams on device change
+- e9066154: add audio preferences to voice chat
+- e9bb3f92: add typed config writers
+- 462abbb5: implement CommandArg description on TUI command palette
+- 1e9830f1: add description field to CommandArg
+- 89cb93a6: remove restart note from configuration files
+- c6606567: clear message history on channel switch
+- 5134659a: simplify tui::draw imports
+- 95cbd65c: fix TUI color palette
+- 306c2ed5: reformat TUI code
+- 551b276b: replace the client ui with a full-screen tui
+- 03532240: add ratatui to the client
+- bc122def: optimize screenshare cpu overhead
+- b8f5f5aa: fix audio normalization bugs
+- 673ba7ad: notify client on screenshare fail
+- 964bb58e: fix fileshare download key mismatch
+- fb402225: fix extra space leaking into the next printed output
+- 77121fae: run both binaries on a tokio runtime
+- fe86b30d: port file, screen and voice subsystems to async
+- 4c5795f3: port client networking to tokio
+- b8c5c300: port server to tokio tasks and abort handles
+- 59e71625: drop sync TCP handlers in favour of async
+- fa54272a: implement async client listen_server
+- 12d1fc76: add client::connect_async fn
+- cc9e0f9d: fix server compilation errors in async net handlers
+- 6ac48101: create async cousins of TCP handlers
+- 72174433: add async version on Streams type
+- 0bab88e9: implement tokio runtime for chat binaries
+- c64d3733: add tokio dependency
+- 7bc2d3f5: cache chat configs
+- 7866dae2: implement agc voice normalization
+- 80292794: implement dynamic voice gating
+- eef8bb92: implement VoicePacketCode on voice connections
+- 38dcf8fb: implement ScreenPacketCode on screen connections
+- a825494d: implement FilePacketCode on file connections
+- 0ad86285: fix attach code server deadlock
+- 17fb0fe7: fix lobby channel broadcast bug
+- 1f5c31e1: run client file upload preparation on separate thread
+- 9927fdac: implement LoginState on client
+- f99f0058: implement PacketCode on server-side
+- 80da1a4c: add missing PacketCode parameters
+- 166f6174: fix Attach command parameters
+- 5303e0a5: implement PacketCode on client-side chat
+- f102cf5a: implement PacketCode in network module
+- 9a214f66: recreate MessageCodes as codes::PacketCodes
+- 7b4d99e6: add network::codes module
+- e6eeb9a7: enforce strict server key-file permissions
+- 0e3819f2: add ChannelCreated & ChannelDestroyed ClientEvents
+- a6078ab5: send ChannelCreated & ChannelDestroyed codes on client channel switch
+- b842c2e2: add filter_channel bool to send_to_all fn
+
 v1.6.0:
 - 9b4b4ea6: remove PQ keys migration
 - 63b19a8b: fix p521 breaking changes
