@@ -37,6 +37,8 @@ pub const CAPTURE_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 4;        
 pub const PLAYBACK_CHANNEL_BOUND: usize   = MULTIPLEX_CHANNEL_BOUND + 1;                     //PLAYBACK BUFFER (~60ms)
 pub const NETWORK_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 8;                     //NETWORK RECEIVE BUFFER (~320ms)
 
+pub const SOCKET_BUFFER: usize            = 128 * 1024;                                      //KERNEL QUEUE A SCREEN SHARE SOCKET MAY HOLD (SEE cap_socket_buffers)
+
 pub const FORCED_INTRA_INTERVAL: Duration  = Duration::from_secs(2);      //MAX GAP BETWEEN ENCODED FRAMES (KEEPS A LATE VIEWER SYNCED)
 pub const RECORDER_POLL_INTERVAL: Duration = Duration::from_millis(100);  //HOW OFTEN THE RECORDER LOOP RECHECKS `running` WHILE IDLE
 pub const BACKEND_OVERRIDE_VAR: &str       = "WHY2_CAPTURE_BACKEND";      //PINS A CAPTURE BACKEND ("recorder" / "legacy")

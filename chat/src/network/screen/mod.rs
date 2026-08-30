@@ -25,7 +25,11 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
-use tokio::net::tcp::OwnedWriteHalf;
+use tokio::net::
+{
+    TcpStream,
+    tcp::OwnedWriteHalf,
+};
 
 use wincode::{ SchemaRead, SchemaWrite };
 
@@ -66,6 +70,26 @@ impl SequencedPacket for ScreenPacket
 
 //FUNCTIONS
 //UTILS
+pub fn cap_socket_buffers(stream: &TcpStream) //BOUND THE KERNEL QUEUE THIS SOCKET MAY HIDE
+{
+    //THE PIPELINE ALREADY KNOWS HOW TO SHED A BACKLOG - `FrameEncoder::dispatch` DROPS A FRAME THE
+    //NETWORK CHANNEL CANNOT HOLD AND FORCES AN IDR SO THE NEXT ONE STANDS ALONE. IT ONLY EVER GETS
+    //TO DO THAT ONCE A SEND ACTUALLY BLOCKS, THOUGH, AND WITH AUTOTUNED BUFFERS (4 MB OF SEND
+    //QUEUE ON LINUX BY DEFAULT) IT NEVER DOES: THE KERNEL SWALLOWS MEGABYTES AT `H264_BITRATE`
+    //BEFORE `write_all` STALLS, AND EVERY ONE OF THOSE BYTES IS LATENCY THE VIEWER PAYS - SECONDS
+    //OF IT ON A LINK THAT CANNOT CARRY THE SHARE. CAPPING THE BUFFER IS WHAT TURNS "THE LINK IS
+    //FULL" BACK INTO SOMETHING THE ENCODER CAN FEEL WHILE THE BACKLOG IS STILL ONE FRAME OLD.
+    //
+    //`SOCKET_BUFFER` IS THE TRADE: THE STANDING QUEUE COSTS ROUGHLY ONE BUFFER PER HOP AT THE
+    //SHARE'S BITRATE (~250 ms EACH AT 4 Mbps), WHILE A RECEIVE BUFFER ALSO PINS THE WINDOW, SO
+    //SIZING IT MUCH SMALLER WOULD CAP THROUGHPUT ON A HIGH-LATENCY PATH INSTEAD.
+    let socket = socket2::SockRef::from(stream);
+
+    //BEST EFFORT - A PLATFORM THAT REFUSES EITHER ONE IS BUFFERBLOATED, NOT BROKEN
+    socket.set_send_buffer_size(consts::SOCKET_BUFFER).ok();
+    socket.set_recv_buffer_size(consts::SOCKET_BUFFER).ok();
+}
+
 pub async fn send_frame //SEND frame TO stream
 (
     write_stream: &mut OwnedWriteHalf,

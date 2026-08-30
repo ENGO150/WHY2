@@ -47,7 +47,7 @@ use why2_chat::
     network::
     {
         file::server as file,
-        screen::server as screen,
+        screen::{ self, server as screen_server },
         voice::server as voice_server,
         server::
         {
@@ -242,16 +242,22 @@ async fn main()
 
                                 ConnectionType::Screen =>
                                 {
+                                    //A SHARE'S BACKLOG IS LATENCY, NOT CAPACITY
+                                    screen::cap_socket_buffers(&stream);
+
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (mut read_stream, write_stream) = stream.into_split();
-                                        screen::screen(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), task).await;
+                                        screen_server::screen(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), task).await;
                                     });
                                     return;
                                 },
 
                                 ConnectionType::Attach { id: sharer_id } =>
                                 {
+                                    //A SHARE'S BACKLOG IS LATENCY, NOT CAPACITY
+                                    screen::cap_socket_buffers(&stream);
+
                                     //ONLY THE WRITE HALF IS EVER USED FOR AN ATTACHED VIEWER
                                     let (_read_stream, write_stream) = stream.into_split();
 

@@ -5831,6 +5831,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "simple_logger",
+ "socket2",
  "tokio",
  "tokio-socks",
  "tokio-stream",

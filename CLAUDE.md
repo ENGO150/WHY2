@@ -223,6 +223,31 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - `WHY2_CAPTURE_BACKEND` (`recorder` / `legacy`) pins a backend; `WHY2_CAPTURE_PROBE_TIMEOUT`
     overrides the probe deadline in seconds. Both exist so a machine where the heuristic picks
     wrong is one env var away from the old behaviour.
+- **The share's latency is bounded by shedding, not by buffering, and every queue on the path has to
+  agree with that.** The pipeline already drops rather than waits where it matters —
+  `FrameEncoder::dispatch` tail-drops a frame the network channel cannot hold and forces an IDR so
+  the next one stands alone — but that only fires once a send actually blocks, and what a full-motion
+  share (a video, not a desktop) turned into seconds of delay is every queue that took the backlog
+  instead of letting it get that far:
+  - **The kernel send queue hid the backlog.** Linux autotunes `tcp_wmem` to 4 MB, so at
+    `H264_BITRATE` the socket swallows megabytes before `write_all` ever stalls, and every one of
+    those bytes is standing latency — about two seconds of it on a link that cannot carry the share.
+    Nothing downstream can shed it either: it is bytes in a stream, not frames in a queue.
+    `screen::cap_socket_buffers` caps `SO_SNDBUF`/`SO_RCVBUF` at `SOCKET_BUFFER` on all four ends of
+    a share (the sharer's upload, the server's two, the viewer's download), which is what turns "the
+    link is full" back into something the encoder can feel while the backlog is still one frame old.
+    The size is the trade: the standing queue costs roughly one buffer per hop at the share's
+    bitrate, while a receive buffer also pins the window, so sizing it much smaller would cap
+    throughput on a high-latency path instead of the latency.
+  - **Known gap: the bitrate does not adapt.** A chronically saturated link now sheds frames instead
+    of queueing them, which is right, but the honest fix is for the encoder to lower its rate rather
+    than for `dispatch` to drop and force an IDR — an IDR is several times a P-frame, so a link that
+    is only just too slow pays for the drop twice. That needs a feedback signal the protocol does not
+    carry yet.
+  - **Known gap: one slow viewer sets the rate for all of them.** `screen::server`'s loop forwards
+    each frame to every viewer inline, so a viewer that cannot keep up now backpressures the sharer
+    (it used to disappear into the socket buffers instead). Everyone stays live, at the slowest
+    viewer's rate; per-viewer queues with their own drop policy are what would fix it.
 - **`network/screen/client/gpu.rs` + `rgba_to_i420.wgsl`** — RGBA → I420 on the GPU via a `wgpu`
   compute shader. This is not decoration: measured on the capture pipeline, the colour conversion
   was **the single most expensive stage, larger than acquisition and the H.264 encode together**

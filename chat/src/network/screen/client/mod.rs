@@ -97,6 +97,9 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
     let (_read_stream, mut write_stream) = client::connect(chat_options::get_server_address()).await
         .expect("Screen upload connection failed");
 
+    //KEEP THE UPLOAD'S BACKLOG WHERE THE ENCODER CAN SEE IT
+    screen::cap_socket_buffers(write_stream.as_ref());
+
     //SEND TOKEN
     write_stream.write_all(&token).await.unwrap();
 
@@ -175,6 +178,9 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
     //INIT FILE CONNECTION
     let (mut read_stream, mut write_stream) = client::connect(chat_options::get_server_address()).await
         .expect("Screen download connection failed");
+
+    //KEEP THE DOWNLOAD'S BACKLOG WHERE IT CAN STILL BE SHED
+    screen::cap_socket_buffers(read_stream.as_ref());
 
     //SEND TOKEN (HAHA, SLEEP TOKEN)
     write_stream.write_all(&token).await.unwrap();
