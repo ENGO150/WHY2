@@ -247,7 +247,10 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
 
                 ScreenPacketCode::Audio { data } =>
                 {
-                    audio_tx.send(AudioFrame { data }).await.ok();
+                    //VIDEO AND AUDIO SHARE ONE TCP STREAM, SO WAITING HERE STOPS THE PICTURE TOO -
+                    //A PLAYBACK PATH THAT HAS FALLEN BEHIND WOULD HOLD THE READER, CLOSE THE
+                    //RECEIVE WINDOW AND BACK THE WHOLE SHARE UP. 20 ms OF SOUND IS THE CHEAPER LOSS
+                    audio_tx.try_send(AudioFrame { data }).ok();
                 },
             }
         }

@@ -226,9 +226,8 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
 - **The share's latency is bounded by shedding, not by buffering, and every queue on the path has to
   agree with that.** The pipeline already drops rather than waits where it matters —
   `FrameEncoder::dispatch` tail-drops a frame the network channel cannot hold and forces an IDR so
-  the next one stands alone — but that only fires once a send actually blocks, and what a full-motion
-  share (a video, not a desktop) turned into seconds of delay is every queue that took the backlog
-  instead of letting it get that far:
+  the next one stands alone — but that only fires once a send actually blocks, and the two places it
+  could not fire were what a full-motion share (a video, not a desktop) turned into seconds of delay:
   - **The kernel send queue hid the backlog.** Linux autotunes `tcp_wmem` to 4 MB, so at
     `H264_BITRATE` the socket swallows megabytes before `write_all` ever stalls, and every one of
     those bytes is standing latency — about two seconds of it on a link that cannot carry the share.
@@ -239,6 +238,15 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     The size is the trade: the standing queue costs roughly one buffer per hop at the share's
     bitrate, while a receive buffer also pins the window, so sizing it much smaller would cap
     throughput on a high-latency path instead of the latency.
+  - **The viewer's audio queue ratcheted and never came back.** Its consumer is a sound card and its
+    producer is the sharer's, so the two run at the same rate forever: whatever depth one bad moment
+    on the link pushed in stayed in. And because video and audio share one TCP stream, that depth was
+    latency on the *picture* too — `spawn_audio_playback` blocking on a full channel held the reader,
+    closed the receive window and backed the whole share up. So the reader `try_send`s (20 ms of
+    sound is the cheaper loss) and the playback task throws the backlog away rather than playing
+    through it, decoding only the newest frame. `AUDIO_BACKLOG_TARGET` is deliberately not zero: the
+    queue is also the jitter buffer, and draining it flat would trade the latency for a gap on every
+    late packet — the channel's own bound is the ceiling this replaces, not the depth it should sit at.
   - **Known gap: the bitrate does not adapt.** A chronically saturated link now sheds frames instead
     of queueing them, which is right, but the honest fix is for the encoder to lower its rate rather
     than for `dispatch` to drop and force an IDR — an IDR is several times a P-frame, so a link that

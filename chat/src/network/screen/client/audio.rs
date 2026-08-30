@@ -362,8 +362,27 @@ pub async fn spawn_audio_playback(mut rx: Receiver<AudioFrame>, running: Arc<Ato
 
         match time::timeout(Duration::from_millis(50), rx.recv()).await
         {
-            Ok(Some(frame)) =>
+            Ok(Some(mut frame)) =>
             {
+                //A QUEUE THAT HAS GROWN NEVER SHRINKS ON ITS OWN. THE CONSUMER IS A SOUND CARD AND
+                //THE PRODUCER IS THE SHARER'S, SO THE TWO RUN AT THE SAME RATE FOREVER: WHATEVER
+                //DEPTH ONE BAD MOMENT ON THE LINK PUSHES IN STAYS IN, AS PERMANENT LATENCY ON THE
+                //AUDIO *AND* ON THE VIDEO BEHIND IT IN THE SAME TCP STREAM. SO THE BACKLOG IS
+                //THROWN AWAY RATHER THAN PLAYED THROUGH - IT COSTS A CLICK, ONCE, AND BUYS THE
+                //DIFFERENCE BACK. ONLY THE NEWEST FRAME IS DECODED; THE OLDER ONES ARE NOT
+                //CONCEALED, BECAUSE NOBODY IS GOING TO HEAR THEM EITHER WAY.
+                //`AUDIO_BACKLOG_TARGET` IS NOT ZERO ON PURPOSE: THE QUEUE IS ALSO THE JITTER BUFFER,
+                //AND DRAINING IT FLAT WOULD TRADE THE LATENCY FOR A GAP IN EVERY LATE PACKET. THE
+                //CHANNEL'S OWN BOUND IS THE CEILING THIS REPLACES, NOT THE DEPTH IT SHOULD SIT AT
+                while rx.len() > screen_consts::AUDIO_BACKLOG_TARGET
+                {
+                    match rx.try_recv()
+                    {
+                        Ok(newer) => frame = newer,
+                        Err(_) => break,
+                    }
+                }
+
                 match decoder.decode_float(Some(&frame.data[..]), &mut out, false)
                 {
                     Ok(len) =>
