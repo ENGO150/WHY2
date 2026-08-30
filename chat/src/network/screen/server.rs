@@ -25,16 +25,19 @@ use std::
 
 use tokio::
 {
-    sync::Mutex,
     task::AbortHandle,
     net::tcp::OwnedWriteHalf,
+    sync::
+    {
+        Mutex,
+        mpsc::{ self, Sender },
+    },
 };
-
-use crate::crypto::RexPacketStream;
 
 use crate::
 {
     crypto,
+    consts::SharedKeys,
     network::
     {
         self,
@@ -67,6 +70,14 @@ struct ScreenTransferGuard
     id: usize,
 }
 
+struct Viewer //ONE ATTACHED CLIENT, AND THE TASK THAT WRITES TO IT
+{
+    token: [u8; 32],              //THE ATTACHMENT THIS TASK WAS BUILT FOR
+    tx: Sender<ScreenPacketCode>, //HANDOFF TO THAT TASK
+    task: AbortHandle,            //THE TASK ITSELF
+    needs_key: bool,              //SOMETHING WAS SHED - NOTHING IS DECODABLE UNTIL THE NEXT IDR
+}
+
 //IMPLEMENTATIONS
 impl Drop for ScreenTransferGuard
 {
@@ -77,6 +88,16 @@ impl Drop for ScreenTransferGuard
             //REMOVE SCREEN STREAM
             conn.remove_screen_stream();
         }
+    }
+}
+
+impl Drop for Viewer
+{
+    fn drop(&mut self)
+    {
+        //THE TASK MAY BE PARKED IN `write_all` ON A SOCKET THAT WILL NEVER DRAIN, SO CLOSING THE
+        //CHANNEL IS NOT ENOUGH TO END IT - IT WOULD NEVER REACH THE NEXT `recv`
+        self.task.abort();
     }
 }
 
@@ -112,6 +133,47 @@ fn split_access_units(bitstream: &[u8]) -> Vec<Vec<u8>> //CUT AN ANNEX-B STREAM 
     if let Some(start) = start { units.push(bitstream[start..].to_vec()); }
 
     units
+}
+
+fn is_keyframe(bitstream: &[u8]) -> bool //DOES THIS ACCESS UNIT STAND ON ITS OWN?
+{
+    //ONLY AN IDR (NAL TYPE 5), OR THE SPS (7) THE ENCODER REPEATS IN FRONT OF ONE, CAN BE DECODED
+    //WITHOUT THE FRAMES BEFORE IT - WHICH IS THE ONLY THING A VIEWER THAT HAS BEEN SHED CAN USE
+    let mut index = 0;
+    while index + 3 < bitstream.len()
+    {
+        if bitstream[index..index + 3] != [0, 0, 1] { index += 1; continue; }
+
+        if matches!(bitstream[index + 3] & 0x1f, 5 | 7) { return true; }
+
+        index += 3;
+    }
+
+    false
+}
+
+fn spawn_viewer //ONE TASK PER VIEWER, SO A SLOW ONE BLOCKS ONLY ITSELF
+(
+    stream: Arc<Mutex<OwnedWriteHalf>>,
+    keys: &SharedKeys,
+    token: [u8; 32],
+) -> Option<Viewer>
+{
+    //THE REX STREAM AND THE SEQUENCE NUMBER ARE PER VIEWER, SO THEY MOVE INTO THE TASK WITH IT
+    let mut rex_stream = crypto::init_rex_stream(keys, &token)?;
+    let (tx, mut rx) = mpsc::channel(screen::consts::VIEWER_CHANNEL_BOUND);
+
+    let task = tokio::spawn(async move
+    {
+        let mut seq = 0usize;
+
+        while let Some(code) = rx.recv().await
+        {
+            screen::send_frame(&mut *stream.lock().await, code, &mut rex_stream, Some(&mut seq)).await;
+        }
+    }).abort_handle();
+
+    Some(Viewer { token, tx, task, needs_key: false })
 }
 
 fn muted_frame(started: &Instant) -> Option<usize> //INDEX OF THE PLACEHOLDER FRAME DUE RIGHT NOW
@@ -188,9 +250,8 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
     //LOCAL SEQ
     let mut seq = 0usize;
 
-    //VIEWER MAPS
-    let mut viewer_seqs = HashMap::<usize, usize>::new();
-    let mut viewer_streams = HashMap::<usize, ([u8; 32], RexPacketStream)>::new();
+    //ONE ENTRY PER ATTACHED VIEWER, EACH WITH ITS OWN WRITER TASK
+    let mut viewers = HashMap::<usize, Viewer>::new();
 
     //INIT REX STREAM
     let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
@@ -242,8 +303,8 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             },
         };
 
-        //COLLECT ALL ATTACHED CLIENT STREAMS
-        let entries: Vec<(usize, Arc<Mutex<OwnedWriteHalf>>)> = server::CONNECTIONS.iter().filter_map(|entry|
+        //COLLECT ALL ATTACHED CLIENT STREAMS (THE KEYS COME ALONG ONLY WHEN A TASK STILL HAS TO BE BUILT)
+        let entries: Vec<(usize, Arc<Mutex<OwnedWriteHalf>>, [u8; 32], Option<SharedKeys>)> = server::CONNECTIONS.iter().filter_map(|entry|
         {
             match entry.value()
             {
@@ -252,36 +313,55 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
                     //FILTER ATTACHED CLIENTS
                     if let Some(attached_screen) = attached_screen && attached_screen.target_id == id
                     {
-                        //CHECK FOR EXISTING REX STREAM
-                        if viewer_streams.get(client_id).map(|(t, _)| t != &attached_screen.token).unwrap_or(true)
-                        {
-                            //INIT REX STREAM
-                            let rex_stream = crypto::init_rex_stream(&keys, &attached_screen.token).unwrap();
-
-                            viewer_streams.insert(*client_id, (attached_screen.token, rex_stream));
-                        }
-
-                        //PREVENT FEEDBACK
-                        if *client_id == id && matches!(read, ScreenPacketCode::Audio { .. })
-                        {
-                            return None;
-                        }
+                        //A VIEWER WE ARE ALREADY SERVING KEEPS ITS TASK, AND WITH IT ITS REX STREAM
+                        let known = viewers.get(client_id).is_some_and(|v| v.token == attached_screen.token);
 
                         //FOUND, COLLECT
-                        Some((*client_id, attached_screen.stream.clone()))
+                        Some((*client_id, attached_screen.stream.clone(), attached_screen.token,
+                            if known { None } else { Some(keys.clone()) }))
                     } else { None }
                 },
                 _ => None,
             }
         }).collect();
 
-        //FORWARD PACKET
-        for (client_id, stream) in entries
-        {
-            let viewer_seq = viewer_seqs.entry(client_id).or_insert(0);
-            let viewer_stream = viewer_streams.get_mut(&client_id).unwrap();
+        //RETIRE WHOEVER LEFT - DROPPING A `Viewer` ABORTS ITS TASK AND CLOSES ITS SOCKET
+        viewers.retain(|client_id, _| entries.iter().any(|(e, ..)| e == client_id));
 
-            screen::send_frame(&mut *stream.lock().await, read.clone(), &mut viewer_stream.1, Some(viewer_seq)).await;
+        //FORWARD PACKET
+        let keyframe = matches!(&read, ScreenPacketCode::Video { data } if is_keyframe(data));
+
+        for (client_id, stream, token, keys) in entries
+        {
+            //A NEW ATTACHMENT (OR A RE-ATTACHMENT UNDER A NEW TOKEN) NEEDS A TASK OF ITS OWN
+            if let Some(keys) = keys
+            {
+                let Some(viewer) = spawn_viewer(stream, &keys, token) else { continue; };
+
+                viewers.insert(client_id, viewer);
+            }
+
+            let Some(viewer) = viewers.get_mut(&client_id) else { continue; };
+
+            //PREVENT FEEDBACK
+            if client_id == id && matches!(read, ScreenPacketCode::Audio { .. }) { continue; }
+
+            //A VIEWER THAT MISSED A FRAME CANNOT DECODE A PREDICTED ONE - IT HOLDS ITS LAST PICTURE
+            //UNTIL AN IDR COMES ROUND (AT MOST `FORCED_INTRA_INTERVAL`) RATHER THAN BE HANDED RUBBISH
+            if viewer.needs_key && matches!(read, ScreenPacketCode::Video { .. })
+            {
+                if !keyframe { continue; }
+
+                viewer.needs_key = false;
+            }
+
+            //A FULL QUEUE MEANS *THIS* VIEWER'S LINK CANNOT CARRY THE SHARE. SHEDDING THE FRAME IS
+            //THE WHOLE POINT: THE SHARE RUNS AT THE SHARER'S RATE AND A SLOW VIEWER PAYS ALONE,
+            //WHERE FORWARDING INLINE MADE EVERYBODY WAIT FOR THE WORST LINK ON THE SERVER
+            if viewer.tx.try_send(read.clone()).is_err() && matches!(read, ScreenPacketCode::Video { .. })
+            {
+                viewer.needs_key = true;
+            }
         }
     }
 

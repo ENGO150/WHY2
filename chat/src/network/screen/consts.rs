@@ -37,6 +37,7 @@ pub const CAPTURE_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 4;        
 pub const PLAYBACK_CHANNEL_BOUND: usize   = MULTIPLEX_CHANNEL_BOUND + 1;                     //PLAYBACK BUFFER (~60ms)
 pub const NETWORK_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 8;                     //NETWORK RECEIVE BUFFER (~320ms)
 pub const AUDIO_BACKLOG_TARGET: usize     = MULTIPLEX_CHANNEL_BOUND * 2 + 1;                 //AUDIO FRAMES THE RECEIVE QUEUE IS SHED BACK DOWN TO (~100ms OF JITTER TOLERANCE, SEE spawn_audio_playback)
+pub const VIEWER_CHANNEL_BOUND: usize     = MULTIPLEX_CHANNEL_BOUND * 4;                     //SERVER-SIDE FORWARD QUEUE, PER VIEWER (~270ms BEFORE THAT VIEWER ALONE IS SHED)
 
 pub const SOCKET_BUFFER: usize            = 128 * 1024;                                      //KERNEL QUEUE A SCREEN SHARE SOCKET MAY HOLD (SEE cap_socket_buffers)
 
