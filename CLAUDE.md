@@ -616,6 +616,12 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     A row whose config key is phrased as a negative (`disable_colors`) carries `invert`, and the
     inversion happens in exactly one place per direction (`settings::toggle_value` on read,
     `settings::toggle` on write) — inverting on only one side silently makes the row a no-op.
+    `Screen share volume` (`screen_volume`, `client_screen` only) is the same kind of row pointed at a
+    different atomic: `screen::client::options::get_screen_gain`, read once per output callback in
+    `screen::client::audio::spawn_audio_playback` and soft-clipped like the voice mix. It is **playback
+    only** — an attached viewer turning a share down changes nothing for the sharer or for anybody else,
+    and it is deliberately separate from `output_volume` so a loud share can be ducked without also
+    ducking the voices being talked over.
     Device lists come from one `spawn_blocking` call to `voice::client::list_devices` when the command
     is typed (`mod.rs::audio_devices`, gagged stderr), never from the draw path. **That list has to come
     from the voice client itself**: it enumerates `voice::client::audio_hosts` — the ALSA host that
