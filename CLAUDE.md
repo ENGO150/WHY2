@@ -252,10 +252,31 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     than for `dispatch` to drop and force an IDR — an IDR is several times a P-frame, so a link that
     is only just too slow pays for the drop twice. That needs a feedback signal the protocol does not
     carry yet.
-  - **Known gap: one slow viewer sets the rate for all of them.** `screen::server`'s loop forwards
-    each frame to every viewer inline, so a viewer that cannot keep up now backpressures the sharer
-    (it used to disappear into the socket buffers instead). Everyone stays live, at the slowest
-    viewer's rate; per-viewer queues with their own drop policy are what would fix it.
+  - **A slow viewer is shed on its own socket, not paid for by everybody else.** `screen::server`'s
+    loop used to `send_frame` to each viewer inline, so the share ran at the slowest link on the
+    server: one viewer stalling in `write_all` held the read of the sharer's *next* frame, and every
+    other viewer waited behind it. Each attachment now owns a task and a `VIEWER_CHANNEL_BOUND`
+    queue (`spawn_viewer`), and the `Viewer` entry carries the `RexPacketStream` and sequence
+    counter into it — those are per viewer already, so nothing is shared across the split. The share
+    loop `try_send`s and never awaits a viewer, so the rate is the sharer's.
+    - **A shed viewer waits for an IDR rather than being handed a broken chain.** The server has no
+      encoder and no way to ask the sharer for a keyframe, so a dropped frame cannot be made good —
+      it can only be *not compounded*: `needs_key` holds that viewer's last picture and skips video
+      until `is_keyframe` sees a NAL the decoder can stand up on its own (type 5, or the SPS the
+      encoder repeats in front of one), which the encoder's `intra_frame_period` guarantees within
+      `FORCED_INTRA_INTERVAL`. Forwarding the P-frames instead would put frames on the wire whose
+      references that viewer never received, and its decoder drops those anyway (`display.rs`) —
+      the freeze is the same picture without the bandwidth.
+      Audio is shed by itself and needs none of this: a 20 ms frame is self-contained, so the queue
+      being full costs exactly that frame.
+    - Dropping a `Viewer` **aborts** its task rather than closing the channel: the task it is
+      standing down is by definition one that may be parked in `write_all` on a socket that will
+      never drain, and it would not reach the next `recv` to notice. That socket is being discarded
+      either way — the viewer detached, or re-attached under a new token, which is a new stream.
+    - **Known gap: the sharer is no longer told when a viewer cannot keep up.** Forwarding inline at
+      least backpressured them; now nothing does, so a share sized for a link nobody has is simply
+      shed at the server, per viewer, forever. This is the same missing feedback signal the bitrate
+      gap above needs.
 - **`network/screen/client/gpu.rs` + `rgba_to_i420.wgsl`** — RGBA → I420 on the GPU via a `wgpu`
   compute shader. This is not decoration: measured on the capture pipeline, the colour conversion
   was **the single most expensive stage, larger than acquisition and the H.264 encode together**
