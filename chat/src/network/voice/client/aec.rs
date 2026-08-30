@@ -22,7 +22,7 @@ use std::
     sync::
     {
         Mutex,
-        atomic::{ AtomicBool, AtomicU32, Ordering },
+        atomic::{ AtomicBool, AtomicU32, AtomicUsize, Ordering },
     },
 };
 
@@ -34,7 +34,6 @@ use ringbuf::
     traits::
     {
         Split,
-        Observer,
         Producer,
         Consumer,
     },
@@ -66,25 +65,31 @@ pub struct Canceller
     //HISTORY, NEWEST AT THE BACK. `reference` IS ALSO THE FILTER'S DELAY LINE ONCE WE ARE LOCKED.
     reference: VecDeque<f32>,
     capture: VecDeque<f32>,
-    history: usize,
 
     //FILTER
     weights: Vec<f32>,
     offset: usize, //HOW FAR BACK THE FIRST TAP SITS
-    norm: f32,     //RUNNING ENERGY OF THE TAP WINDOW
+    norm: f32,     //ENERGY OF THE TAP WINDOW
 
     //GUARDS
     countdown: usize,     //SAMPLES LEFT BEFORE THE NEXT SEARCH IS WORTH ATTEMPTING
     scored: usize,        //SAMPLES IN THE CURRENT ERLE WINDOW
     capture_energy: f32,  //ENERGY THAT WENT INTO IT
     residual_energy: f32, //ENERGY THAT CAME OUT
+
+    //REFERENCE SAMPLES THE RING COULD NOT SUPPLY, WHICH WENT INTO THE DELAY LINE AS SILENCE ANYWAY
+    phantoms: usize,
 }
+
+//HOW MUCH OF EACH SIDE THE SEARCH HAS TO HAVE IN HAND BEFORE IT CAN RUN: A FULL WINDOW AT EVERY LAG IN RANGE
+const HISTORY: usize = consts::AEC_SEARCH_RANGE + consts::AEC_WINDOW;
 
 //GLOBAL VARIABLES
 static REFERENCE: Mutex<Option<HeapProd<f32>>> = Mutex::new(None); //THE VOICE OUTPUT CALLBACK'S END OF THE TAP
 static ACTIVE: AtomicBool = AtomicBool::new(false);                //IS ANYBODY SHARING?
 static DESYNC: AtomicBool = AtomicBool::new(false);                //THE REFERENCE LOST SAMPLES - ALIGNMENT IS GONE
 static RATE: AtomicU32 = AtomicU32::new(0);                        //SAMPLE RATE OF THE VOICE OUTPUT STREAM
+static SKIPPED: AtomicUsize = AtomicUsize::new(0);                 //CAPTURED FRAMES THAT NEVER REACHED US
 
 //IMPLEMENTATIONS
 impl Drop for Canceller
@@ -102,21 +107,21 @@ impl Canceller
     {
         self.follow_output_stream();
 
+        //CAPTURED FRAMES THE CHANNEL COULD NOT HOLD, WHICH THEREFORE NEVER REACHED US
+        let skipped = SKIPPED.swap(0, Ordering::Relaxed);
+
         //NO VOICE OUTPUT STREAM MEANS NOTHING OF OURS IS IN THE CAPTURE
         if self.rate == 0
         {
             return;
         }
 
-        //A REFERENCE THAT BACKED UP IS A REFERENCE THAT NO LONGER LINES UP
-        if self.consumer.occupied_len() > self.consumer.capacity().get() / 2
-        {
-            DESYNC.store(true, Ordering::Relaxed);
-        }
-
         if DESYNC.swap(false, Ordering::Relaxed)
         {
-            self.reset();
+            self.reset(); //A RESET STARTS FROM NOTHING ANYWAY, SO THE SKIP HAS NOTHING LEFT TO CORRECT
+        } else
+        {
+            for _ in 0..skipped { self.next_reference(); }
         }
 
         for frame in chunk.chunks_exact_mut(2)
@@ -130,14 +135,15 @@ impl Canceller
             {
                 State::Searching =>
                 {
+                    self.phantoms = 0; //NOTHING IS ALIGNED TO ANYTHING YET
                     self.capture.push_back(captured);
 
-                    while self.reference.len() > self.history { self.reference.pop_front(); }
-                    while self.capture.len() > self.history { self.capture.pop_front(); }
+                    while self.reference.len() > HISTORY { self.reference.pop_front(); }
+                    while self.capture.len() > HISTORY { self.capture.pop_front(); }
 
                     self.countdown = self.countdown.saturating_sub(1);
 
-                    if self.countdown == 0 && self.capture.len() == self.history
+                    if self.countdown == 0 && self.capture.len() == HISTORY
                     {
                         self.search();
                     }
@@ -145,7 +151,25 @@ impl Canceller
 
                 State::Locked =>
                 {
-                    while self.reference.len() > self.offset + consts::AEC_TAPS { self.reference.pop_front(); }
+                    if self.phantoms > 0
+                    {
+                        match self.offset.checked_sub(self.phantoms)
+                        {
+                            //RUN OUT OF LEAD AND THERE IS NOTHING LEFT TO SLIDE INTO - THE MATCHING
+                            //REFERENCE WOULD BE NEWER THAN ANYTHING WE HAVE CONSUMED
+                            None =>
+                            {
+                                self.reset();
+                                continue;
+                            },
+
+                            Some(offset) => self.offset = offset,
+                        }
+
+                        self.phantoms = 0;
+                    }
+
+                    while self.reference.len() > self.offset + self.weights.len() { self.reference.pop_front(); }
 
                     //OUR CONTRIBUTION IS THE SAME IN BOTH CHANNELS (THE VOICE MIX IS MONO ACROSS THEM), SO
                     //ONE ESTIMATE IS SUBTRACTED FROM BOTH AND THE MONO ERROR DRIVES THE ADAPTATION
@@ -172,14 +196,16 @@ impl Canceller
         self.rate = rate;
         self.step = if rate == 0 { 0. } else { rate as f32 / consts::SAMPLE_RATE as f32 };
 
+        //A CHANGE OF RATE IS THE ONE THING THAT MAKES THE SAMPLES ALREADY IN THE RING WRONG RATHER THAN
+        //MERELY UNALIGNED - THEY WERE WRITTEN BY A STREAM THAT NO LONGER EXISTS, AT ANOTHER DEVICE'S RATE
+        while self.consumer.try_pop().is_some() {}
+
         self.reset();
     }
 
     //BACK TO KNOWING NOTHING: THE CAPTURE GOES OUT UNTOUCHED UNTIL THE DELAY IS FOUND AGAIN
     fn reset(&mut self)
     {
-        while self.consumer.try_pop().is_some() {}
-
         self.state = State::Searching;
         self.position = 0.;
         self.current = 0.;
@@ -189,12 +215,15 @@ impl Canceller
         self.capture.clear();
 
         self.weights.fill(0.);
+
+        self.offset = 0;
         self.norm = 0.;
 
         self.countdown = consts::AEC_SEARCH_INTERVAL;
         self.scored = 0;
         self.capture_energy = 0.;
         self.residual_energy = 0.;
+        self.phantoms = 0;
     }
 
     //ONE REFERENCE SAMPLE AT OUR RATE. AN EMPTY RING READS AS SILENCE, WHICH IS EXACTLY RIGHT - THERE IS
@@ -204,7 +233,19 @@ impl Canceller
         while self.position >= 1.
         {
             self.current = self.next;
-            self.next = self.consumer.try_pop().unwrap_or(0.);
+
+            self.next = match self.consumer.try_pop()
+            {
+                Some(sample) => sample,
+
+                None =>
+                {
+                    self.phantoms += 1;
+
+                    0.
+                },
+            };
+
             self.position -= 1.;
         }
 
@@ -222,7 +263,7 @@ impl Canceller
 
         self.norm = 0.;
 
-        for tap in 0..consts::AEC_TAPS
+        for tap in 0..self.weights.len()
         {
             let Some(index) = newest.checked_sub(self.offset + tap) else { break };
             let sample = self.reference[index];
@@ -242,7 +283,7 @@ impl Canceller
         let newest = self.reference.len() - 1;
         let scale = consts::AEC_STEP * error / (self.norm + consts::AEC_EPSILON);
 
-        for tap in 0..consts::AEC_TAPS
+        for tap in 0..self.weights.len()
         {
             let Some(index) = newest.checked_sub(self.offset + tap) else { break };
 
@@ -250,8 +291,6 @@ impl Canceller
         }
     }
 
-    //A FILTER THAT IS ADDING ENERGY INSTEAD OF REMOVING IT HAS LOST THE ALIGNMENT (THE USER MOVED THE
-    //VOLUME SLIDER, THE TWO DEVICES DRIFTED APART) - GIVE UP THE LOCK RATHER THAN KEEP DAMAGING THE SHARE
     fn score(&mut self, captured: f32, error: f32)
     {
         self.capture_energy += captured * captured;
@@ -272,14 +311,6 @@ impl Canceller
         }
     }
 
-    //FINDS HOW FAR BEHIND THE CAPTURE OUR OWN PLAYBACK IS, BY CORRELATING THE TWO AT EVERY LAG IN RANGE.
-    //
-    //WHAT IT MUST NOT DO IS DEMAND A STRONG CORRELATION. WHATEVER IS BEING SHARED IS IN THE CAPTURE TOO,
-    //AND IT IS OFTEN THE LOUDER HALF BY FAR - A VIDEO PLAYING OVER A QUIET VOICE CHANNEL DRAGS THE
-    //CORRELATION AT THE *CORRECT* LAG DOWN TO 0.1 OR BELOW, SO ANY FIXED FLOOR EITHER REJECTS THE RIGHT
-    //ANSWER OR ACCEPTS EVERY WRONG ONE. WHAT SEPARATES THEM IS NOT THE PEAK'S HEIGHT BUT HOW FAR IT STANDS
-    //ABOVE THE OTHER LAGS: THOSE ARE UNCORRELATED, SO THEY SCATTER AROUND ZERO WITH A KNOWN SPREAD, AND A
-    //REAL ECHO CLEARS IT BY SIGMAS EVEN WHEN IT IS BURIED UNDER THE SHARE.
     fn search(&mut self)
     {
         self.countdown = consts::AEC_SEARCH_INTERVAL;
@@ -388,9 +419,8 @@ pub fn start() -> Option<Canceller>
     *REFERENCE.lock().ok()? = Some(producer);
 
     DESYNC.store(true, Ordering::Relaxed);
+    SKIPPED.store(0, Ordering::Relaxed);
     ACTIVE.store(true, Ordering::Relaxed);
-
-    let history = consts::AEC_SEARCH_RANGE + consts::AEC_WINDOW;
 
     Some(Canceller
     {
@@ -403,9 +433,8 @@ pub fn start() -> Option<Canceller>
         current: 0.,
         next: 0.,
 
-        reference: VecDeque::with_capacity(history + 1),
-        capture: VecDeque::with_capacity(history + 1),
-        history,
+        reference: VecDeque::with_capacity(HISTORY + 1),
+        capture: VecDeque::with_capacity(HISTORY + 1),
 
         weights: vec![0.; consts::AEC_TAPS],
         offset: 0,
@@ -415,7 +444,17 @@ pub fn start() -> Option<Canceller>
         scored: 0,
         capture_energy: 0.,
         residual_energy: 0.,
+
+        phantoms: 0,
     })
+}
+
+//CALLED FROM THE SCREEN CAPTURE CALLBACK WHEN A CHUNK IS DROPPED ON THE FLOOR - SEE process()
+pub fn skip_reference(frames: usize)
+{
+    if !ACTIVE.load(Ordering::Relaxed) { return; }
+
+    SKIPPED.fetch_add(frames, Ordering::Relaxed);
 }
 
 //UNINSTALLS THE TAP. THE VOICE OUTPUT CALLBACK IS BACK TO A SINGLE ATOMIC LOAD PER CALLBACK.

@@ -191,7 +191,14 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
 
         if !chunk.is_empty()
         {
-            chunk_tx.try_send(chunk).ok();
+            //A CHUNK THE CHANNEL COULD NOT HOLD IS DROPPED - THE CAPTURE TASK IS BLOCKED ON THE NETWORK,
+            //AND A REALTIME CALLBACK CANNOT WAIT FOR IT. THE CANCELLER LINES THE REFERENCE UP AGAINST THE
+            //CAPTURE BY COUNT, THOUGH, SO IT HAS TO BE TOLD: FRAMES THAT VANISH HERE AND NOWHERE ELSE
+            //SHIFT ITS ALIGNMENT BY EXACTLY THIS MANY, WHICH IS WHY THE ECHO COMES BACK ON A BAD LINK.
+            if let Err(error) = chunk_tx.try_send(chunk)
+            {
+                aec::skip_reference(error.into_inner().len() / 2);
+            }
         }
     }, |_| {}, None).unwrap();
 

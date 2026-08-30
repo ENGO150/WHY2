@@ -291,6 +291,26 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     times it — while damage to the shared audio stays flat at about -44 dB. Those came off a
     synthetic loopback harness (a known delay and gain) that was development scaffolding and is not
     in the tree; anything re-tuning these has to bring its own.
+  - **Reference and capture are aligned by count — one reference sample per captured frame — so a gap in
+    only one of them shifts every later sample.** The capture callback drops a chunk whenever
+    `chunk_tx` is full, which is routine: the capture task blocks on `tx.send().await` to the network,
+    so chunks are dropped exactly when the link is struggling — which is exactly when the echo is worst.
+    `aec::skip_reference` is how the callback reports it, and `process` drops the same number of frames
+    out of the reference so the lock survives instead of being re-found a second later. A dropped chunk
+    is not a `DESYNC`; a *lost reference sample* (a full ring in `push_reference`) still is, because
+    there is no way to know where in the stream it went missing.
+  - **The reference ring running dry is drift, not silence, and it is tracked rather than reset on.** The
+    voice output callback pushes every frame it writes, silent ones included, so an empty ring means our
+    consumer has run past their producer — the two devices' clocks differ. The zero still goes into the
+    delay line (there is nothing else to put there), but `next_reference` counts it, and the `Locked` arm
+    slides `offset` back by the same amount: every real sample behind a phantom sits one place closer to
+    the newest end, so the whole tap window follows it and every weight stays on the sample it was fitted
+    to. Without this, an undetected trickle of one-sample shifts walks the filter off its own echo and the
+    cancellation comes and goes on no schedule at all — which is exactly what it did. Running out of lead
+    to slide into is the one case that still resets.
+  - **A reset does not drain the reference ring.** The alignment is what it throws away, and the search
+    derives that again from wherever the two sides sit — the audio itself is still perfectly good. Only a
+    **rate change** drains it, the one event that makes those samples wrong rather than merely unaligned.
   - **Every failure degrades instead of breaking.** No voice session means an empty ring, which
     reads as silence and subtracts nothing; a voice output device that is not the monitored sink
     leaves our audio out of the capture entirely and the filter converges to zero on its own; and
