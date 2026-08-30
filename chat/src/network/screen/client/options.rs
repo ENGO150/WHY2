@@ -18,8 +18,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::sync::
 {
+    LazyLock,
     RwLock,
-    atomic::{ AtomicBool, AtomicUsize, Ordering },
+    atomic::
+    {
+        AtomicBool,
+        AtomicUsize,
+        Ordering,
+    },
+};
+
+use crate::
+{
+    config,
+    network::voice::client::options as voice_options,
 };
 
 //OPTIONS
@@ -34,6 +46,11 @@ static MONITOR: RwLock<Option<String>> = RwLock::new(None);
 //BUMPED WHENEVER THE PICK ACTUALLY CHANGES. A RUNNING CAPTURE WATCHES IT AND STARTS OVER ON THE NEW
 //MONITOR, WHICH IS WHAT MAKES `/screen OTHER` A SWAP RATHER THAN THE END OF THE SHARE.
 static MONITOR_GENERATION: AtomicUsize = AtomicUsize::new(0);
+
+//HOW LOUD AN ATTACHED SHARE'S AUDIO IS PLAYED, IN PERCENT. READ ONCE PER OUTPUT CALLBACK, SO
+///settings CHANGES IT UNDER A RUNNING ATTACH. IT IS A PLAYBACK GAIN ONLY - THE SHARER SENDS WHAT
+//THEY SEND, AND NOBODY ELSE HEARS THIS.
+static SCREEN_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(voice_options::clamp_volume(config::read_config::<u32>("screen_volume")) as usize));
 
 //USE SCREEN
 pub fn get_use_screen() -> bool
@@ -77,4 +94,20 @@ pub fn set_monitor(monitor: Option<String>)
 pub fn monitor_generation() -> usize
 {
     MONITOR_GENERATION.load(Ordering::Relaxed)
+}
+
+//SCREEN VOLUME
+pub fn get_screen_volume() -> u32 //ATTACHED SHARE PLAYBACK VOLUME (PERCENT)
+{
+    SCREEN_VOLUME.load(Ordering::Relaxed) as u32
+}
+
+pub fn set_screen_volume(percent: u32)
+{
+    SCREEN_VOLUME.store(voice_options::clamp_volume(percent) as usize, Ordering::Relaxed);
+}
+
+pub fn get_screen_gain() -> f32 //THE SAME, AS A MULTIPLIER
+{
+    get_screen_volume() as f32 / 100.
 }

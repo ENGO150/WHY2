@@ -289,6 +289,7 @@ pub async fn spawn_audio_playback(mut rx: Receiver<AudioFrame>, running: Arc<Ato
 
     let stream = device.build_output_stream(config.clone(), move |data: &mut [f32], _: &OutputCallbackInfo|
     {
+        let gain = options::get_screen_gain(); //ONCE PER CALLBACK, NOT PER SAMPLE
         let frames_to_write = data.len() / output_channels;
         for i in 0..frames_to_write
         {
@@ -328,9 +329,17 @@ pub async fn spawn_audio_playback(mut rx: Receiver<AudioFrame>, running: Arc<Ato
                 resample_pos -= 1.;
             }
 
-            let interpolated_l = current_frame.0 + (next_frame.0 - current_frame.0) * resample_pos;
-            let interpolated_r = current_frame.1 + (next_frame.1 - current_frame.1) * resample_pos;
+            let mut interpolated_l = current_frame.0 + (next_frame.0 - current_frame.0) * resample_pos;
+            let mut interpolated_r = current_frame.1 + (next_frame.1 - current_frame.1) * resample_pos;
             resample_pos += output_resample_step;
+
+            //ATTACHED SHARE VOLUME (/settings), SOFT CLIPPED LIKE THE VOICE MIX SO ANYTHING PAST
+            //100% BENDS INSTEAD OF WRAPPING
+            if gain != 1.
+            {
+                interpolated_l = (interpolated_l * gain).tanh();
+                interpolated_r = (interpolated_r * gain).tanh();
+            }
 
             if output_channels >= 2
             {

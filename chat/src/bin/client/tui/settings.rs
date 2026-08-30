@@ -32,6 +32,9 @@ use why2_chat::
 #[cfg(feature = "client_voice")]
 use why2_chat::network::voice::client::options as voice_options;
 
+#[cfg(feature = "client_screen")]
+use why2_chat::network::screen::client::options as screen_options;
+
 use super::state::App;
 
 //CONSTS
@@ -200,6 +203,10 @@ impl Settings
 
             rows.push(Row::Item(Item::client("Output volume", "output_volume",
                 Value::Volume(voice_options::clamp_volume(config::read_config::<u32>("output_volume"))))));
+
+            #[cfg(feature = "client_screen")]
+            rows.push(Row::Item(Item::client("Screen share volume", "screen_volume",
+                Value::Volume(voice_options::clamp_volume(config::read_config::<u32>("screen_volume"))))));
 
             rows.push(Row::Item(Item::client("Noise suppression", "noise_suppression",
                 toggle_value("noise_suppression", false))));
@@ -902,6 +909,9 @@ fn apply_volume(key: &str, percent: u32) //LIVE-UPDATE THE RUNNING AUDIO STREAMS
     {
         "input_volume" => voice_options::set_input_volume(percent),
         "output_volume" => voice_options::set_output_volume(percent),
+
+        #[cfg(feature = "client_screen")]
+        "screen_volume" => screen_options::set_screen_volume(percent),
         _ => {},
     }
 }

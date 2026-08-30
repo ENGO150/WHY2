@@ -35,6 +35,7 @@ input_volume = 100 # Microphone volume in percent (0-200)
 output_volume = 100 # Playback volume in percent (0-200)
 noise_suppression = true # Remove background noise from the microphone
 automatic_gain = true # Normalize the microphone level automatically
+screen_volume = 100 # Volume of an attached screen share's audio in percent (0-200)
 
 # Colors
 disable_colors = false # Disable message colors
