@@ -68,8 +68,10 @@ pub struct Canceller
 
     //FILTER
     weights: Vec<f32>,
-    offset: usize, //HOW FAR BACK THE FIRST TAP SITS
-    norm: f32,     //ENERGY OF THE TAP WINDOW
+    offset: usize,      //HOW FAR BACK THE FIRST TAP SITS
+    norm: f32,          //ENERGY OF THE TAP WINDOW
+    norm_taps: usize,   //HOW MANY TAPS THAT WAS SUMMED OVER - FEWER THAN THE FILTER UNTIL THE LINE FILLS
+    capture_power: f32, //MEAN SQUARE OF THE CAPTURE, OVER THE SPAN THE TAP WINDOW COVERS
 
     //GUARDS
     countdown: usize,     //SAMPLES LEFT BEFORE THE NEXT SEARCH IS WORTH ATTEMPTING
@@ -79,6 +81,9 @@ pub struct Canceller
 
     //REFERENCE SAMPLES THE RING COULD NOT SUPPLY, WHICH WENT INTO THE DELAY LINE AS SILENCE ANYWAY
     phantoms: usize,
+
+    //WHAT THE SEARCH FOUND, WHICH THE ECHO ESTIMATE STILL NEEDS
+    gain: f32,
 }
 
 //HOW MUCH OF EACH SIDE THE SEARCH HAS TO HAVE IN HAND BEFORE IT CAN RUN: A FULL WINDOW AT EVERY LAG IN RANGE
@@ -179,8 +184,19 @@ impl Canceller
                     frame[0] -= estimate;
                     frame[1] -= estimate;
 
-                    self.adapt(error);
-                    self.score(captured, error);
+                    let echo = self.gain * self.gain * self.norm / self.norm_taps.max(1) as f32;
+
+                    self.capture_power += (captured * captured - self.capture_power) / self.weights.len() as f32;
+
+                    let confidence = match self.capture_power > 0.
+                    {
+                        true => (echo / self.capture_power).min(1.),
+                        false => 0.,
+                    };
+
+                    self.adapt(error, confidence);
+
+                    if confidence >= consts::AEC_ADAPT_RATIO { self.score(captured, error); }
                 },
             }
         }
@@ -218,6 +234,8 @@ impl Canceller
 
         self.offset = 0;
         self.norm = 0.;
+        self.norm_taps = 0;
+        self.capture_power = 0.;
 
         self.countdown = consts::AEC_SEARCH_INTERVAL;
         self.scored = 0;
@@ -262,6 +280,7 @@ impl Canceller
         let mut estimate = 0.;
 
         self.norm = 0.;
+        self.norm_taps = 0;
 
         for tap in 0..self.weights.len()
         {
@@ -270,6 +289,7 @@ impl Canceller
 
             estimate += self.weights[tap] * sample;
             self.norm += sample * sample;
+            self.norm_taps += 1;
         }
 
         estimate
@@ -278,10 +298,10 @@ impl Canceller
     //NLMS. THE STEP IS DIVIDED BY THE ENERGY IN THE TAP WINDOW (SUMMED BY `estimate`, WHICH HAS ALREADY
     //WALKED IT), SO THE FILTER MOVES AT THE SAME PACE WHETHER THE CHANNEL IS LOUD OR QUIET, AND NOT AT ALL
     //WHILE IT IS SILENT. THE STEP ITSELF IS TINY ON PURPOSE - SEE consts::AEC_STEP.
-    fn adapt(&mut self, error: f32)
+    fn adapt(&mut self, error: f32, confidence: f32)
     {
         let newest = self.reference.len() - 1;
-        let scale = consts::AEC_STEP * error / (self.norm + consts::AEC_EPSILON);
+        let scale = consts::AEC_STEP * confidence * error / (self.norm + consts::AEC_EPSILON);
 
         for tap in 0..self.weights.len()
         {
@@ -401,6 +421,8 @@ impl Canceller
         self.capture_energy = 0.;
         self.residual_energy = 0.;
         self.state = State::Locked;
+
+        self.gain = gain;
     }
 }
 
@@ -439,6 +461,8 @@ pub fn start() -> Option<Canceller>
         weights: vec![0.; consts::AEC_TAPS],
         offset: 0,
         norm: 0.,
+        norm_taps: 0,
+        capture_power: 0.,
 
         countdown: consts::AEC_SEARCH_INTERVAL,
         scored: 0,
@@ -446,6 +470,8 @@ pub fn start() -> Option<Canceller>
         residual_energy: 0.,
 
         phantoms: 0,
+
+        gain: 0.,
     })
 }
 

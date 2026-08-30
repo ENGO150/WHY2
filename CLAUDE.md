@@ -282,6 +282,29 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     spread; the search accepts a peak only at `AEC_PEAK_SIGMA` above that. An earlier two-pass
     version correlated block-energy envelopes first and refined the best few — it was cheaper, but
     the envelope of a loud share swamps the echo's, and it failed exactly when it was needed.
+  - **The filter only learns from audio our own echo is actually a part of** (`AEC_ADAPT_RATIO`), and
+    this is what makes it survive anything else being played. Whatever is being shared is in the capture
+    and is in the reference not at all, so it reaches the adaptation as a disturbance in the error that
+    no step size averages away — and NLMS divides the update by the *reference's* energy, so a quiet
+    voice channel under a loud video scales pure noise **up** and walks the weights off the echo. The
+    ERLE check then reset them, the search re-locked, and it went round again: the cancellation coming
+    and going with nothing to show for it, working on a quiet channel and failing the moment a video
+    started, was that loop and not a tuning problem. There is nothing to track while the evidence is
+    bad, though — this echo path is a fixed delay and a scalar, not a room — so `process` compares the
+    echo it expects (`gain²` × the tap window's mean square) against the capture's, and **scales the
+    NLMS step by that fraction**. The prediction deliberately comes from the *search's* gain rather than
+    from the estimate the filter just produced: a diverging filter emits more, so judging it by its own
+    output would open the gate wider the worse it got.
+    A hard gate on the same fraction was the first cut and it works — it is what turned "they hear
+    themselves whenever a video plays" into "a little, sometimes" — but it is backwards in both
+    directions: it throws away every sample below the line and spends the full step on every sample
+    above it. Misadjustment goes as the step times the disturbance-to-echo ratio, so scaling by it
+    instead holds the damage *constant* at any share loudness, and lets the filter keep creeping
+    forward under a video rather than stopping dead and waiting for silence.
+  - **The ERLE check is what `AEC_ADAPT_RATIO` still gates**, because it is the only way that number
+    means anything. Measured across a loud share, perfect cancellation and no cancellation at all both
+    come out at 0 dB — the echo is a rounding error in the total either way — so two windows are not
+    comparable unless there was something of ours to remove in both.
   - **The NLMS step is deliberately tiny** (`AEC_STEP`). The search hands the filter a least-squares
     gain at the right lag, so it only has to track drift, while the shared audio sits in the error
     signal as a loud disturbance that a large step turns into weight jitter. Raising it makes things

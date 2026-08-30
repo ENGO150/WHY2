@@ -62,6 +62,7 @@ pub const AEC_WINDOW: usize               = 4096;                               
 pub const AEC_SEARCH_INTERVAL: usize      = (SAMPLE_RATE / 2) as usize;         //MINIMUM GAP BETWEEN TWO SEARCHES (~500ms)
 pub const AEC_PEAK_SIGMA: f32             = 6.0;                                //HOW FAR THE PEAK MUST STAND ABOVE THE OTHER LAGS TO BE BELIEVED
 pub const AEC_MIN_ENERGY: f32             = 0.05;                               //REFERENCE ENERGY BELOW THIS IS SILENCE, NOT A SIGNAL
+pub const AEC_ADAPT_RATIO: f32            = 0.5;                                //HOW MUCH OF THE CAPTURE MUST BE OUR OWN ECHO BEFORE THE FILTER IS ALLOWED TO LEARN FROM IT
 pub const AEC_MIN_GAIN: f32               = 0.05;                               //QUIETEST PLAUSIBLE ECHO (-26dB)
 pub const AEC_MAX_GAIN: f32               = 2.0;                                //LOUDEST PLAUSIBLE ECHO (+6dB)
 pub const AEC_TAPS: usize                 = 256;                                //FILTER LENGTH (~5ms AROUND THE ESTIMATE)
