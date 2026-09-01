@@ -707,11 +707,11 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //AUTHENTICATE CLIENT
     authenticate_client(&peer_addr, &username, role, id);
 
-    //TELL CLIENT TO START CHATTING
-    network::send(&mut *streams.1.lock().await, PacketCode::Accept { id, role }, Some(&keys)).await;
-
     //SEND WHAT WAS SAID IN THE LOBBY BEFORE THIS CLIENT ARRIVED
     send_history(&streams.1, &keys).await;
+
+    //TELL CLIENT TO START CHATTING
+    network::send(&mut *streams.1.lock().await, PacketCode::Accept { id, role }, Some(&keys)).await;
 
     //SEND JOIN MESSAGE
     send_to_all(PacketCode::Join { username: username.clone() }, false, None);
