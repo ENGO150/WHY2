@@ -91,6 +91,11 @@ pub enum UserEvent //CUSTOM WINIT EVENTS
 //GLOBAL VARIABLES
 pub static SCREEN_SHARE_PROXY: RwLock<Option<EventLoopProxy<UserEvent>>> = RwLock::new(None);
 
+//WHERE AN ATTACHED SHARE'S PICTURE GOES WHEN THE CLIENT HAS A SURFACE OF ITS OWN. A CLIENT THAT SETS THIS
+//IS HANDED THE H.264 ACCESS UNITS AS THEY ARRIVE AND DRAWS THEM ITSELF, AND NO WINDOW IS OPENED FOR IT -
+//WHICH IS THE ONLY WAY TO WATCH A SHARE IN A PROCESS WHOSE MAIN THREAD IS ALREADY SOMEBODY ELSE'S
+pub static SCREEN_FRAME_SINK: RwLock<Option<UnboundedSender<Vec<u8>>>> = RwLock::new(None);
+
 pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
@@ -238,10 +243,22 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
             {
                 ScreenPacketCode::Video { data } =>
                 {
-                    tx.send(data).await.ok();
-                    if let Some(proxy) = SCREEN_SHARE_PROXY.read().unwrap().as_ref()
+                    //CLONED OUT OF THE LOCK RATHER THAN HELD ACROSS THE HANDOVER, SINCE THE SINK MAY BE
+                    //REPLACED WHILE A SHARE IS RUNNING
+                    let sink = SCREEN_FRAME_SINK.read().unwrap().clone();
+
+                    match sink
                     {
-                        proxy.send_event(UserEvent::NewFrame).ok();
+                        Some(sink) => { sink.send(data).ok(); },
+
+                        None =>
+                        {
+                            tx.send(data).await.ok();
+                            if let Some(proxy) = SCREEN_SHARE_PROXY.read().unwrap().as_ref()
+                            {
+                                proxy.send_event(UserEvent::NewFrame).ok();
+                            }
+                        },
                     }
                 },
 
@@ -255,6 +272,9 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
             }
         }
     });
+
+    //A CLIENT DRAWING THE FRAMES ITSELF GETS NO WINDOW - THE SINK IS THE WHOLE OF THE DISPLAY THEN
+    if SCREEN_FRAME_SINK.read().unwrap().is_some() { return }
 
     if let Some(proxy) = SCREEN_SHARE_PROXY.read().unwrap().as_ref()
     {
