@@ -75,7 +75,7 @@ cargo build --release
 #### Server
 ```bash
 # Build server binary (no client features)
-cargo build --bin why2-server --no-default-features --features server --release
+cargo build --bin why2-server --no-default-features --features server,windows_resources --release
 
 # Binary location: ./target/release/why2-server
 ```

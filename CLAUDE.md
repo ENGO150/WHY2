@@ -28,7 +28,7 @@ cargo build --release
 cargo build --bin why2 --release        # explicit client binary
 
 # Build chat server (mutually exclusive with client features)
-cargo build --bin why2-server --no-default-features --features server --release
+cargo build --bin why2-server --no-default-features --features server,windows_resources --release
 ```
 
 The client TUI is built on `ratatui` (feature `crossterm_0_29`, so it reuses the crossterm 0.29
@@ -39,6 +39,28 @@ already in the tree instead of pulling a second backend). The server build has n
 directly (only via `client*` or `server`) — it will `panic!` with an explanatory message if you
 get this wrong. Set `WHY2_DEV_BYPASS=1` to skip that check when experimenting with unusual feature
 combinations (never use it for real builds).
+
+`build.rs` also embeds the Windows resources (`winresource`, the maintained fork of `winres`):
+`chat/assets/why2.ico` — generated from the repo-root `icon.png` — plus a VERSIONINFO block and an
+application manifest. This is skipped unless `CARGO_CFG_TARGET_OS == "windows"`, and a failure is a
+`cargo:warning` rather than a build error, so a host without a resource compiler still builds. The
+metadata is not cosmetic: an unsigned, metadata-less binary that opens sockets and captures the
+screen is exactly the shape SmartScreen/Defender heuristics flag, and the manifest is where
+`asInvoker` (no UAC prompt), per-monitor DPI awareness, the UTF-8 active code page and long-path
+support are declared. `FILEVERSION`/`PRODUCTVERSION` come from `CARGO_PKG_VERSION` automatically;
+`InternalName`/`OriginalFilename` follow the feature set, since one build script serves both
+binaries. Real code signing is still the only thing that removes the warning outright.
+
+**The `windows_resources` feature is why every server build command names it explicitly.** A build
+script's `cargo:rustc-link-lib=static:+whole-archive` propagates to the final link of whatever
+binary depends on the crate — verified with `cargo rustc -- --print=link-args` — so with the
+resources unconditional, any downstream crate using `why2-chat` *as a library* on Windows would get
+WHY2's icon, `CompanyName` and manifest force-linked into **its** exe, and a collision on resource
+id 1 if it embeds its own. Cargo gives a build script no way to tell it is being built as a
+dependency (`CARGO_PRIMARY_PACKAGE` is not passed to build scripts), so the switch is a feature: it
+lives in `default` and in nothing else, which is what makes `default-features = false` a working
+opt-out for a library consumer. A new binary build command has to add it; a new *library* consumer
+must not.
 
 Building the full client (default features, includes voice + screen share) requires system
 packages: on Debian/Ubuntu, `pkg-config libasound2-dev libopus-dev libpipewire-0.3-dev
