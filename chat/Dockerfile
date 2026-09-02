@@ -22,7 +22,7 @@ WORKDIR /app
 COPY . .
 
 ENV WHY2_CONFIG_DIR="/data"
-RUN cargo build --bin why2-server --no-default-features --features server --release
+RUN cargo build --bin why2-server --no-default-features --features server,windows_resources --release
 
 FROM alpine AS runtime
 
