@@ -22,8 +22,78 @@ use std::
     process::Command,
 };
 
+use winresource::WindowsResource;
+
+//APPLICATION MANIFEST (DPI AWARENESS, LONG PATHS, NO UAC PROMPT)
+const WINDOWS_MANIFEST: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+    <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+        <security>
+            <requestedPrivileges>
+                <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+            </requestedPrivileges>
+        </security>
+    </trustInfo>
+    <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+        <application>
+            <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+            <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}" />
+            <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}" />
+        </application>
+    </compatibility>
+    <application xmlns="urn:schemas-microsoft-com:asm.v3">
+        <windowsSettings>
+            <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+            <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">permonitorv2</dpiAwareness>
+            <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+            <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+        </windowsSettings>
+    </application>
+</assembly>
+"#;
+
+//EMBED ICON + VERSION INFO INTO THE WINDOWS BINARIES
+fn windows_resources()
+{
+    println!("cargo:rerun-if-changed=assets/why2.ico");
+
+    if env::var("CARGO_FEATURE_WINDOWS_RESOURCES").is_err() { return; }
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") { return; }
+
+    let server = env::var("CARGO_FEATURE_SERVER").is_ok();
+
+    let (binary, description) = if server
+    {
+        ("why2-server.exe", "WHY2 chat server")
+    } else
+    {
+        ("why2.exe", "WHY2 chat client")
+    };
+
+    let mut resource = WindowsResource::new();
+
+    resource.set_icon("assets/why2.ico");
+    resource.set_manifest(WINDOWS_MANIFEST);
+
+    resource.set("ProductName", "WHY2");
+    resource.set("FileDescription", description);
+    resource.set("InternalName", binary);
+    resource.set("OriginalFilename", binary);
+    resource.set("CompanyName", "Václav Šmejkal");
+    resource.set("LegalCopyright", "Copyright (C) 2022-2026 Václav Šmejkal - GPL-3.0-only");
+    resource.set("Comments", "https://why2.satan.red");
+
+    //NON-FATAL: A MISSING RESOURCE COMPILER MUST NOT BREAK THE BUILD
+    if let Err(error) = resource.compile()
+    {
+        println!("cargo:warning=failed to embed windows resources: {error}");
+    }
+}
+
 fn main()
 {
+    windows_resources();
+
     //DO NOT USE WHY2_DEV_BYPASS IN PRODUCTION!!!
     if env::var("WHY2_DEV_BYPASS").is_ok() { return; }
 
@@ -46,7 +116,7 @@ fn main()
             "Error: You are trying to enable both `client` and `server` features at the same time.\n\
              By default, the 'client' feature is enabled.\n\n\
              To install the SERVER, use:\n\
-             cargo install why2-chat --no-default-features --features server"
+             cargo install why2-chat --no-default-features --features server,windows_resources"
         );
     }
 
