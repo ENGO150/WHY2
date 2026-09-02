@@ -92,7 +92,10 @@ log = { version = "0.4.34", optional = true }
 simple_logger = { version = "5.2.0", optional = true }
 
 [features]
-default = ["client"]
+default = ["client", "windows_resources"]
+
+# EMBEDS THE WINDOWS ICON/VERSION INFO/MANIFEST; BINARY BUILDS ONLY (SEE build.rs)
+windows_resources = []
 
 chat = [
     "dep:tokio",
@@ -151,6 +154,9 @@ server = [
     "dep:log",
     "dep:simple_logger",
 ]
+
+[build-dependencies]
+winresource = "0.1.31"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libwayshot = { version = "0.9.0", default-features = false, optional = true }
