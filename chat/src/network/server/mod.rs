@@ -217,6 +217,15 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
     //AUTHENTICATED ACTIONS
     if connection.is_authenticated()
     {
+        //TELL THE SHARER WE STOPPED WATCHING
+        if let Some(target_id) = connection.attached_screen().as_ref().map(|a| a.target_id)
+        {
+            notify(target_id, PacketCode::Deattached
+            {
+                username: connection.username().unwrap().to_owned(),
+            }).await;
+        }
+
         //DISCONNECT FROM VOICE CHAT
         if options::voice_chat_enabled()
         {
@@ -488,6 +497,18 @@ fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW T
 }
 
 //PUBLIC
+pub async fn notify(id: usize, code: PacketCode) //SEND PACKET TO THE CLIENT WITH id (NOTHING HAPPENS IF IT IS GONE)
+{
+    //COLLECT INTO LOCALS FIRST - THE GUARD MUST NOT LIVE ACROSS THE await
+    let target = CONNECTIONS.iter().find(|conn| conn.id() == Some(&id))
+        .map(|conn| (conn.write_stream().clone(), conn.keys().cloned()));
+
+    if let Some((write_stream, keys)) = target
+    {
+        network::send(&mut *write_stream.lock().await, code, keys.as_ref()).await;
+    }
+}
+
 pub async fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLIENTS
 {
     let mut to_notify = Vec::new();
@@ -992,6 +1013,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         token: Some(token),
                     }, Some(&keys)).await;
 
+                    //TELL THE SHARER WHO IS WATCHING
+                    notify(sharer_id, PacketCode::Attached
+                    {
+                        username: username.clone(),
+                    }).await;
+
                     //LOG START
                     log::info!("Screen attach: {peer_addr}");
                 } else
@@ -1021,6 +1048,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                     //SEND ACCEPT
                     network::send(&mut *streams.1.lock().await, PacketCode::Deattach { username: sharer_uname }, Some(&keys)).await;
+
+                    //TELL THE SHARER WHO STOPPED WATCHING
+                    notify(sharer_id, PacketCode::Deattached
+                    {
+                        username: username.clone(),
+                    }).await;
                 } else
                 {
                     //NOT ATTACHED

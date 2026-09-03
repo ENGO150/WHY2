@@ -476,6 +476,16 @@ impl App
                 self.push_text(format!("Deattached {username}'s screen sharing."));
             },
 
+            ClientEvent::Attached(username) =>
+            {
+                self.push_text(format!("{username} attached your screen sharing."));
+            },
+
+            ClientEvent::Deattached(username) =>
+            {
+                self.push_text(format!("{username} deattached your screen sharing."));
+            },
+
             ClientEvent::IncompatibleVersion(version, server_version) =>
             {
                 self.push_styled(format!("Incompatible version! ({version}/{server_version})"), theme::ERROR);

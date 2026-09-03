@@ -180,6 +180,8 @@ pub enum ClientEvent
     ScreenFailed(String),                          //SCREEN CAPTURE FAILED
     Attach(String),                                //ATTACHED SCREENSHARE
     Deattach(String),                              //DEATTACHED SCREENSHARE
+    Attached(String),                              //SOMEBODY ATTACHED OUR SCREENSHARE
+    Deattached(String),                            //SOMEBODY DEATTACHED OUR SCREENSHARE
     IncompatibleVersion(String, String),           //INCOMPATIBLE SERVER VERSION
     UsernameRejected,                              //USERNAME REJECTED BY SERVER
     PasswordRejected(u64),                         //PASSWORD REJECTED BY SERVER
@@ -775,6 +777,20 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 screen_options::set_attach_screen(false);
 
                 tx.send(ClientEvent::Deattach(username.unwrap())).await.unwrap();
+            },
+
+            //SOMEBODY ATTACHED OUR SCREENSHARE
+            #[cfg(feature = "client_screen")]
+            PacketCode::Attached { username } =>
+            {
+                tx.send(ClientEvent::Attached(username)).await.unwrap();
+            },
+
+            //SOMEBODY DEATTACHED OUR SCREENSHARE
+            #[cfg(feature = "client_screen")]
+            PacketCode::Deattached { username } =>
+            {
+                tx.send(ClientEvent::Deattached(username)).await.unwrap();
             },
 
             //PRIVATE MESSAGE INCOMING
