@@ -974,7 +974,9 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         .and_then(|conn| conn.username().map(|u| (sid, u.to_owned())))
                 });
 
-                if let Some((sharer_id, sharer_username)) = sharer_info
+                if let Some((sharer_id, sharer_username)) = sharer_info &&
+                    CONNECTIONS.get(&peer_addr).is_some_and(|c| c.attached_screen().as_ref()
+                        .is_none_or(|s| s.target_id != sharer_id)) //PROHIBIT ATTACHING THE SAME SCREEN TWICE
                 { //VALID SHARER FOUND
                     //OPEN NEW CONNECTION
                     let token = open_connection(id, ConnectionType::Attach
