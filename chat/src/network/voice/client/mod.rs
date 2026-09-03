@@ -1124,7 +1124,7 @@ async fn display_active_speakers(local_username: &str, tx: &Sender<ClientEvent>)
     });
 
     //COLLECT OTHER USERS
-    if let Ok(consumers) = CONSUMERS.try_lock()
+    if let Ok(consumers) = CONSUMERS.lock()
     {
         for (id, (stream, _)) in consumers.iter()
         {
