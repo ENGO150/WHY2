@@ -965,6 +965,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                     //SEND SCREEN DISABLE NOTIFICATION
                     network::send(&mut *streams.1.lock().await, PacketCode::Screen { token: None }, Some(&keys)).await;
+
+                    //NOTIFY USERS ABOUT SCREEN
+                    send_to_all(PacketCode::ScreenshareEnd { username: username.clone() }, false, None);
+
                     continue;
                 }
 
@@ -976,6 +980,9 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     {
                         token: Some(open_connection(id, ConnectionType::Screen))
                     }, Some(&keys)).await;
+
+                    //NOTIFY USERS ABOUT SCREEN
+                    send_to_all(PacketCode::Screenshare { username: username.clone() }, false, None);
 
                     //LOG START
                     log::info!("Screen share: {peer_addr}");

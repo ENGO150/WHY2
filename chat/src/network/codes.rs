@@ -183,6 +183,8 @@ pub enum PacketCode //CONTROL CODES
     Attached { username: String },                  //SERVER -> CLIENT | CLIENT ATTACHED LOCAL CLIENT SHARE
     Deattached { username: String },                //SERVER -> CLIENT | CLIENT DEATTACHED LOCAL CLIENT SHARE
     Screen { token: Option<[u8; 32]> },             //CLIENT <> SERVER | TOGGLE SCREENSHARE
+    Screenshare { username: String },               //SERVER -> CLIENT | CLIENT STARTED SCREENSHARING
+    ScreenshareEnd { username: String },            //SERVER -> CLIENT | CLIENT STOPPED SCREENSHARING
     Voice { token: Option<[u8; 32]> },              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
     Join { username: String },                      //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     List { users: Option<Vec<OnlineUser>> },        //CLIENT <> SERVER | PRINT CONNECTED USERS

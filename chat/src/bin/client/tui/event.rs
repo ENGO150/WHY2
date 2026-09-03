@@ -476,6 +476,27 @@ impl App
                 self.push_text(format!("Deattached {username}'s screen sharing."));
             },
 
+            //BROADCAST TO EVERYBODY, US INCLUDED - ClientEvent::Screen ALREADY SAID IT ON THIS END
+            ClientEvent::Screenshare(username) if username != self.username =>
+            {
+                self.push(Line::from(vec!
+                [
+                    Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
+                    Span::styled(format!("{username} started screen sharing."), theme::NOTICE),
+                ]));
+            },
+
+            ClientEvent::ScreenshareEnd(username) if username != self.username =>
+            {
+                self.push(Line::from(vec!
+                [
+                    Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
+                    Span::styled(format!("{username} stopped screen sharing."), theme::DIM),
+                ]));
+            },
+
+            ClientEvent::Screenshare(_) | ClientEvent::ScreenshareEnd(_) => {},
+
             ClientEvent::Attached(username) =>
             {
                 self.push_text(format!("{username} attached your screen sharing."));
