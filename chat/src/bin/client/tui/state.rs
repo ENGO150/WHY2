@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     mem,
-    collections::{ BTreeSet, VecDeque },
+    collections::{ BTreeMap, BTreeSet, VecDeque },
 };
 
 use ratatui::
@@ -97,7 +97,9 @@ pub struct App
     pub role: Role,       //OUR OWN ROLE
     pub online: Vec<OnlineUser>,
     pub channels: BTreeSet<String>, //NAMED CHANNELS THE SERVER CURRENTLY HOLDS
-    pub voice: Vec<VoiceUser>,
+    pub voice: Vec<VoiceUser>, //WHAT THE VOICE PANEL DRAWS - rebuild_voice MAKES IT OUT OF THE TWO BELOW
+    pub voice_roster: BTreeMap<usize, String>, //WHO THE SERVER SAYS IS IN VOICE IN OUR CHANNEL (US EXCLUDED)
+    pub voice_activity: Vec<VoiceUser>, //WHO WE ARE ACTUALLY HEARING - EMPTY WHILE WE ARE NOT IN VOICE
     pub voice_enabled: bool,
 
     //CONNECTION (SHOWN IN THE MESSAGE PANE TITLE)
@@ -152,6 +154,8 @@ impl App
             online: Vec::new(),
             channels: BTreeSet::new(),
             voice: Vec::new(),
+            voice_roster: BTreeMap::new(),
+            voice_activity: Vec::new(),
             voice_enabled: false,
             address: String::new(),
             server_name: String::new(),
@@ -175,6 +179,51 @@ impl App
             generation: 0,
             wrapped: None,
         }
+    }
+
+    //THE PANEL IS THE SERVER'S ROSTER, DRESSED WITH WHATEVER THE LOCAL VOICE SESSION KNOWS ABOUT IT.
+    //THE TWO ARE SEPARATE BECAUSE ONLY ONE OF THEM ARRIVES WHILE WE ARE NOT IN VOICE OURSELVES
+    pub fn rebuild_voice(&mut self)
+    {
+        let mut users: Vec<VoiceUser> = Vec::with_capacity(self.voice_roster.len() + 1);
+
+        //US - THE ROSTER NEVER NAMES US, AND ONLY THE LOCAL SESSION KNOWS WE ARE SPEAKING
+        if self.voice_enabled
+        {
+            users.push(match self.voice_activity.iter().find(|user| user.is_local)
+            {
+                Some(local) => VoiceUser { username: self.username.clone(), ..*local },
+
+                //THE FIRST activity TICK IS UP TO 100 ms AWAY - DO NOT BLINK OUT OF OUR OWN PANEL UNTIL THEN
+                None => VoiceUser
+                {
+                    id: 0,
+                    username: self.username.clone(),
+                    is_speaking: false,
+                    latency: None,
+                    is_local: true,
+                },
+            });
+        }
+
+        //EVERYBODY ELSE, IN ID ORDER (BTreeMap). A ROSTER ENTRY WE HAVE NO STREAM FOR IS STILL IN VOICE -
+        //IT IS US WHO CANNOT HEAR THEM, SO IT IS DRAWN WITHOUT A LATENCY RATHER THAN LEFT OUT
+        for (id, username) in self.voice_roster.iter()
+        {
+            let heard = self.voice_activity.iter().find(|user| !user.is_local && user.id == *id);
+
+            users.push(VoiceUser
+            {
+                id: *id,
+                username: username.clone(),
+                is_speaking: heard.is_some_and(|user| user.is_speaking),
+                latency: heard.and_then(|user| user.latency),
+                is_local: false,
+            });
+        }
+
+        self.voice = users;
+        self.dirty = true;
     }
 
     //OUTPUT
@@ -265,6 +314,8 @@ impl App
         self.online.clear();
         self.channels.clear();
         self.voice.clear();
+        self.voice_roster.clear();
+        self.voice_activity.clear();
         self.voice_enabled = false;
 
         self.list_requested = false;

@@ -737,6 +737,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //SEND JOIN MESSAGE
     send_to_all(PacketCode::Join { username: username.clone() }, false, None);
 
+    //TELL THE CLIENT WHO IS ALREADY IN VOICE - THE ROSTER IS SHOWN WHETHER OR NOT THEY JOIN IT
+    if options::voice_chat_enabled()
+    {
+        send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
+    }
+
     //LOOP READING
     loop
     {
@@ -813,7 +819,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     network::send(&mut *streams.1.lock().await, PacketCode::Voice { token: Some(token) }, Some(&keys)).await;
 
                     //SEND CODE TO CHANNEL
-                    send_to_all(PacketCode::ChannelJoin { username: username.clone(), id }, true, channel.as_deref());
+                    send_to_all(PacketCode::VoiceJoin { username: username.clone(), id }, true, channel.as_deref());
 
                     //SEND CONNECTED CLIENTS
                     send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
@@ -823,7 +829,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     network::send(&mut *streams.1.lock().await, PacketCode::Voice { token: None }, Some(&keys)).await;
 
                     //SEND CODE TO LAST CHANNEL
-                    send_to_all(PacketCode::ChannelLeave { id }, true, channel.as_deref());
+                    send_to_all(PacketCode::VoiceLeave { id }, true, channel.as_deref());
 
                     //REMOVE FROM VOICE
                     voice_server::remove_connection(&id);
@@ -836,10 +842,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //CHECK PARAMETER VALIDITY
                 if tchannel.iter().all(|s| !s.is_empty() && s.len() <= config::read_config("max_channel_length") && s.chars().all(|c| c.is_ascii_alphanumeric() && c != ' '))
                 {
-                    //SEND ChannelLeave CODE TO OLD CHANNEL
-                    if options::voice_chat_enabled()
+                    //SEND VoiceLeave CODE TO OLD CHANNEL (ONLY IF THERE WAS ANYTHING TO LEAVE)
+                    if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
                     {
-                        send_to_all(PacketCode::ChannelLeave { id }, true, channel.as_deref());
+                        send_to_all(PacketCode::VoiceLeave { id }, true, channel.as_deref());
                     }
 
                     //UPDATE CHANNEL
@@ -850,7 +856,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //SEND CODE TO CHANNEL
                     if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
                     {
-                        send_to_all(PacketCode::ChannelJoin { username: username.clone(), id }, true, channel.as_deref());
+                        send_to_all(PacketCode::VoiceJoin { username: username.clone(), id }, true, channel.as_deref());
                     }
 
                     //SEND CONNECTED CLIENTS

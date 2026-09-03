@@ -115,11 +115,11 @@ pub struct TofuRequest
 
 pub struct VoiceUser
 {
-    pub id: usize,          //ID OF USER
-    pub username: String,   //USERNAME TO DISPLAY
-    pub is_speaking: bool,  //TAKE A WILD GUESS
-    pub latency: u128,      //USER'S PING
-    pub is_local: bool,     //AM I THE USER?
+    pub id: usize,             //ID OF USER
+    pub username: String,      //USERNAME TO DISPLAY
+    pub is_speaking: bool,     //TAKE A WILD GUESS
+    pub latency: Option<u128>, //USER'S PING - None WHILE WE ARE NOT RECEIVING THEM (WE ARE NOT IN VOICE)
+    pub is_local: bool,        //AM I THE USER?
 }
 
 //ENUMS
@@ -147,6 +147,9 @@ pub enum ClientEvent
     ReconnectFailed,                               //RECONNECTING AFTER PINNING THE KEY FAILED
     HandshakeFailed(String),                       //THE KEY EXCHANGE DID NOT ADD UP
     VoiceActivity(Vec<VoiceUser>),                 //VOICE OVERLAY
+    VoiceRoster(Vec<(usize, String)>),             //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
+    VoiceJoin(usize, String),                      //SOMEBODY JOINED VOICE IN OUR CHANNEL
+    VoiceLeave(usize),                             //SOMEBODY LEFT VOICE IN OUR CHANNEL
     Join(String),                                  //CLIENT CONNECTED
     Leave(String, usize),                          //CLIENT DISCONNECTED
     ServerSay(String),                             //SERVER MESSAGE
@@ -392,8 +395,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
     let mut first_message = true;
 
     //CONNECTION PROPERTIES
-    #[cfg(feature = "client_voice")]
-    let mut id = 0usize; //ID SET BY SERVER
+    let mut id = 0usize; //ID SET BY SERVER - THE VOICE ROSTER IS EVERYBODY BUT US, SO EVERY BUILD NEEDS IT
     #[cfg(feature = "client_voice")]
     let mut username: Option<String> = None;
 
@@ -540,14 +542,8 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 tx.send(ClientEvent::Authenticated(role)).await.unwrap();
 
-                //SET SERVER-SIDE ID (ONLY VOICE CARES WHO WE ARE)
-                #[cfg(feature = "client_voice")]
-                {
-                    id = sid;
-                }
-
-                #[cfg(not(feature = "client_voice"))]
-                let _ = sid;
+                //SET SERVER-SIDE ID
+                id = sid;
 
                 //ALLOW MESSAGE HISTORY & COMMANDS
                 options::set_sending_messages(true);
@@ -629,32 +625,45 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 }).await.unwrap();
             },
 
-            //VOICE CLIENTS
-            #[cfg(feature = "client_voice")]
+            //THE WHOLE VOICE ROSTER - SENT ON LOGIN, ON A CHANNEL SWITCH AND WHEN WE JOIN VOICE, SO IT
+            //ARRIVES WHETHER OR NOT WE ARE IN VOICE OURSELVES. IT IS THE TRUTH, NOT AN ADDITION
             PacketCode::VoiceClients { clients } =>
             {
-                //ADD CLIENTS
-                for (id, username) in clients
+                //ADD CLIENTS WE CAN ACTUALLY HEAR (THE CONSUMERS WERE CLEARED BY WHATEVER ASKED FOR THIS)
+                #[cfg(feature = "client_voice")]
+                if voice_options::get_use_voice()
                 {
-                    voice_client::add_consumer(id, username);
+                    for (id, username) in clients.iter()
+                    {
+                        voice_client::add_consumer(*id, username.clone());
+                    }
                 }
+
+                tx.send(ClientEvent::VoiceRoster(clients)).await.unwrap();
             }
 
-            //CLIENT JOINED VOICE CHANNEL
-            #[cfg(feature = "client_voice")]
-            PacketCode::ChannelJoin { username, id: sid } =>
+            //CLIENT JOINED VOICE
+            PacketCode::VoiceJoin { username, id: sid } =>
             {
-                if voice_options::get_use_voice() && id != sid
+                //OUR OWN JOIN COMES BACK TO US TOO - THE ROSTER IS EVERYBODY ELSE
+                if id == sid { continue; }
+
+                #[cfg(feature = "client_voice")]
+                if voice_options::get_use_voice()
                 {
-                    voice_client::add_consumer(sid, username);
+                    voice_client::add_consumer(sid, username.clone());
                 }
+
+                tx.send(ClientEvent::VoiceJoin(sid, username)).await.unwrap();
             },
 
-            //CLIENT LEFT VOICE CHANNEL
-            #[cfg(feature = "client_voice")]
-            PacketCode::ChannelLeave { id } =>
+            //CLIENT LEFT VOICE
+            PacketCode::VoiceLeave { id } =>
             {
+                #[cfg(feature = "client_voice")]
                 voice_client::remove_consumer(&id);
+
+                tx.send(ClientEvent::VoiceLeave(id)).await.unwrap();
             },
 
             //SERVER MESSAGE

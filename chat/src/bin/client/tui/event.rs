@@ -121,8 +121,27 @@ impl App
 
             ClientEvent::VoiceActivity(users) =>
             {
-                self.voice = users;
-                self.dirty = true;
+                self.voice_activity = users;
+                self.rebuild_voice();
+            },
+
+            //THE WHOLE ROSTER - IT REPLACES WHAT WE HELD, IT DOES NOT ADD TO IT
+            ClientEvent::VoiceRoster(clients) =>
+            {
+                self.voice_roster = clients.into_iter().collect();
+                self.rebuild_voice();
+            },
+
+            ClientEvent::VoiceJoin(id, username) =>
+            {
+                self.voice_roster.insert(id, username);
+                self.rebuild_voice();
+            },
+
+            ClientEvent::VoiceLeave(id) =>
+            {
+                self.voice_roster.remove(&id);
+                self.rebuild_voice();
             },
 
             ClientEvent::Join(uname) =>
@@ -147,6 +166,9 @@ impl App
                 //NO PacketCode::List HERE: A KICK WOULD PUT ONE RIGHT BEHIND THE ServerKick PACKET AND
                 //EARN A SpamWarning. THE Leave PACKET NAMES THE USER, SO THE ROSTER CAN DROP THEM ITSELF
                 self.online.retain(|user| user.id != id);
+
+                //A DISCONNECT IS BROADCAST TO EVERY CHANNEL AND CARRIES NO VoiceLeave OF ITS OWN
+                if self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
 
                 //SAME RULE AS ClientEvent::List - A CHANNEL EXISTS EXACTLY AS LONG AS SOMEBODY IS IN IT
                 self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
@@ -186,6 +208,7 @@ impl App
             ClientEvent::VoiceEnabled =>
             {
                 self.voice_enabled = true;
+                self.rebuild_voice();
                 self.push_styled("Voice enabled.", theme::OK);
             },
 
@@ -205,8 +228,10 @@ impl App
 
             ClientEvent::VoiceDisabled =>
             {
+                //ONLY OUR OWN HALF OF THE PANEL GOES - THE OTHERS ARE STILL IN VOICE, WE JUST STOPPED HEARING THEM
                 self.voice_enabled = false;
-                self.voice.clear();
+                self.voice_activity.clear();
+                self.rebuild_voice();
                 self.push_styled("Voice disabled.", theme::DIM);
             },
 
@@ -595,7 +620,10 @@ impl App
                     user.channel = channel;
                 }
 
-                self.dirty = true;
+                //THE VOICE ROSTER IS PER CHANNEL - THE NEW ONE'S ARRIVES RIGHT BEHIND THIS PACKET
+                self.voice_roster.clear();
+                self.voice_activity.clear();
+                self.rebuild_voice();
             },
 
             ClientEvent::ChannelCreated(name) =>

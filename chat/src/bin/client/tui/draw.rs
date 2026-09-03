@@ -408,8 +408,9 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
 
     let lines = app.voice.iter().map(|user|
     {
+        //A MUTE ONLY MEANS ANYTHING WHILE WE ARE THE ONE LISTENING
         #[cfg(feature = "client_voice")]
-        let muted = options::is_muted(if user.is_local { None } else { Some(user.id) });
+        let muted = app.voice_enabled && options::is_muted(if user.is_local { None } else { Some(user.id) });
 
         #[cfg(not(feature = "client_voice"))]
         let muted = false;
@@ -426,7 +427,12 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
             theme::DIM
         };
 
-        let latency = if user.is_local { String::new() } else { format!(" {}ms", user.latency) };
+        //NO PING FOR SOMEBODY WE ARE NOT RECEIVING - THE ROSTER SAYS THEY ARE IN VOICE, NOTHING MORE
+        let latency = match user.latency
+        {
+            Some(latency) => format!(" {latency}ms"),
+            None => String::new(),
+        };
 
         Line::from(vec!
         [
@@ -1221,9 +1227,10 @@ fn right_status(_app: &App) -> String
     format!(" {} ", parts.join(" │ "))
 }
 
+//THE PANEL IS THE CHANNEL'S VOICE ROSTER, NOT OUR OWN SESSION - IT IS SHOWN WHETHER OR NOT WE ARE IN IT
 fn voice_visible(app: &App) -> bool
 {
-    app.voice_enabled && !app.voice.is_empty()
+    !app.voice.is_empty()
 }
 
 

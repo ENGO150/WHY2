@@ -98,15 +98,15 @@ pub enum PacketCode //CONTROL CODES
         id: usize,
     },
 
-    //SERVER -> CLIENT | CLIENT JOINED VOICE CHANNEL
-    ChannelJoin
+    //SERVER -> CLIENT | CLIENT JOINED VOICE (SENT TO THE WHOLE CHANNEL, NOT ONLY TO ITS VOICE USERS)
+    VoiceJoin
     {
         username: String,
         id: usize,
     },
 
-    //SERVER -> CLIENT | CLIENT LEFT VOICE CHANNEL
-    ChannelLeave
+    //SERVER -> CLIENT | CLIENT LEFT VOICE (SENT TO THE WHOLE CHANNEL, NOT ONLY TO ITS VOICE USERS)
+    VoiceLeave
     {
         id: usize,
     },
@@ -176,7 +176,7 @@ pub enum PacketCode //CONTROL CODES
     Channel { channel: Option<String> },            //SERVER <> CLIENT | CHANNEL CHANGE
     ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
     ChannelDestroyed { name: String },              //SERVER -> CLIENT | CHANNEL ABANDONED
-    VoiceClients { clients: Vec<(usize, String)> }, //SERVER -> CLIENT | TELL CLIENT ALL CONNECTED VOICE CLIENTS
+    VoiceClients { clients: Vec<(usize, String)> }, //SERVER -> CLIENT | THE CHANNEL'S WHOLE VOICE ROSTER (SELF EXCLUDED)
     Files { users: Option<Vec<UserFile>> },         //CLIENT <> SERVER | LIST UPLOADED FILES
     Screens { users: Option<Vec<UserScreen>> },     //CLIENT <> SERVER | LIST SCREENSHARES
     Deattach { username: Option<String> },          //CLIENT <> SERVER | DEATTACH CLIENT SCREENSHARE

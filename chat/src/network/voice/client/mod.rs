@@ -1119,7 +1119,7 @@ async fn display_active_speakers(local_username: &str, tx: &Sender<ClientEvent>)
         id: 0,
         username: local_username.to_string(),
         is_speaking: local_speaking,
-        latency: 0,
+        latency: None,
         is_local: true,
     });
 
@@ -1133,7 +1133,7 @@ async fn display_active_speakers(local_username: &str, tx: &Sender<ClientEvent>)
                 id: *id,
                 username: stream.username.clone(),
                 is_speaking: stream.display_hold > 0, //SPEAKING
-                latency: stream.avg_latency,
+                latency: Some(stream.avg_latency),
                 is_local: false,
             });
         }
