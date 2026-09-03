@@ -625,6 +625,30 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     a channel exists exactly as long as somebody is in it, so the lobby is not one and is not
     listed. (`ChannelDestroyed` is only sent on a `/channel` switch, never on a disconnect, so
     re-deriving in the `Leave` arm is also what retires a channel whose last member dropped.)
+  - **The voice panel is the channel's roster, not our own voice session**, so somebody who never
+    types `/voice` still sees who is in it. `PacketCode::VoiceJoin`/`VoiceLeave` (named
+    `ChannelJoin`/`ChannelLeave` before — they were always the *voice* pair, while
+    `ChannelCreated`/`ChannelDestroyed` are the text-channel one) already went to the whole channel;
+    what made them invisible was the client, which handled them only under `client_voice` and only
+    to add and drop audio consumers. Both arms now also raise a `ClientEvent`, and
+    `PacketCode::VoiceClients` — the whole roster, self excluded — is sent on login as well as on a
+    channel switch and on joining voice, so a client that never joins still learns who was already
+    talking when it arrived. Nothing new crosses the wire for this.
+    - **The two sources are kept apart and merged on the way to the panel.** `App::voice_roster` is
+      the server's truth (who is in voice in our channel) and `App::voice_activity` is the last
+      `VoiceActivity` tick from the local voice session (who is *speaking*, and their ping); only
+      the first arrives while we are not in voice, and only the second knows anything about sound.
+      `App::rebuild_voice` builds `App::voice` out of both, which is why nothing writes `App::voice`
+      directly any more — a `VoiceActivity` that replaced it wholesale, as it used to, would drop
+      every roster entry we have no stream for. Our own row comes from the activity (the roster
+      never names us) and is added only while `voice_enabled`.
+    - `VoiceUser::latency` is an `Option` for the same reason: a roster entry we are not receiving
+      is in voice, we simply have no ping for them, and `0ms` would be a lie rather than a blank.
+      A per-user mute is likewise only drawn while we are the one listening.
+    - The roster is dropped on a channel switch (it is per channel, and the server sends the new
+      one unasked, straight behind the `Channel` packet) and on a lost session. A disconnect
+      needs no `VoiceLeave`: `Leave` is broadcast to every channel and names the id, so the arm
+      drops them itself — the same reason it maintains `App::online` by hand.
   - Block-command output (`/list`, `/files`, `/screens`, `/help`, `/info`) is a tree, not a table:
     every row opens with `tui::branch` (`├─`/`╰─`, `│` continuing the trunk past a non-last owner's
     files in `/files`) in `theme::BORDER`, then a right-aligned dim id column, then the name. Keep
