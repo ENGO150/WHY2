@@ -18,7 +18,7 @@ name: Build WHY2
 
 on:
   push:
-    branches: [ development ]
+    branches: [ development, stable, release ]
 
 permissions:
   contents: read
@@ -31,8 +31,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: development
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -52,8 +50,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: development
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
@@ -86,3 +82,54 @@ jobs:
           path: |
             ./target/release/why2${{ runner.os == 'Windows' && '.exe' || '' }}
             ./target/release/why2-server${{ runner.os == 'Windows' && '.exe' || '' }}
+
+  publish:
+    needs: build-why2-chat
+    runs-on: ubuntu-latest
+    # Skips silently in a fork, or before the endpoint is configured.
+    if: vars.DL_ENDPOINT != ''
+
+    permissions:
+      contents: read
+      id-token: write        # lets the run mint its own OIDC token
+
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish
+        env:
+          ENDPOINT: ${{ vars.DL_ENDPOINT }}
+          AUDIENCE: why2-dl
+        run: |
+          set -euo pipefail
+
+          # ACTIONS_ID_TOKEN_REQUEST_{URL,TOKEN} are injected by `id-token: write`.
+          # A fresh token per file: the endpoint accepts each `jti` exactly once.
+          mint() {
+            curl -sS \
+              -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}" | jq -r .value
+          }
+
+          publish() {
+            local file="$1" variant="$2" sum token
+            sum="$(sha256sum "$file" | cut -d' ' -f1)"
+            token="$(mint)"
+            echo "::add-mask::$token"
+            curl -fsS --retry 3 --retry-connrefused \
+              -X PUT "$ENDPOINT/$variant" \
+              -H "Authorization: Bearer $token" \
+              -H "X-Content-SHA256: $sum" \
+              --data-binary "@$file"
+            echo "published $variant ($sum)"
+          }
+
+          publish dist/why2-chat-ubuntu-latest/why2              client-linux
+          publish dist/why2-chat-ubuntu-latest/why2-server       server-linux
+          publish dist/why2-chat-macos-latest/why2               client-macos
+          publish dist/why2-chat-macos-latest/why2-server        server-macos
+          publish dist/why2-chat-windows-latest/why2.exe         client-windows.exe
+          publish dist/why2-chat-windows-latest/why2-server.exe  server-windows.exe
