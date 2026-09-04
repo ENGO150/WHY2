@@ -611,6 +611,17 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `block.inner`) plus the same `first`/`visible` the rows were built from — in the palette that `first`
     is computed once in `draw_palette` and handed to `entry_lines`/`value_lines` precisely so the two
     cannot disagree.
+  - **A channel switch parks the pane it is leaving instead of clearing it** (`App::switch_channel`,
+    matching WHY2-Desktop's `paneByChannel`). `App::messages` is the channel being read and
+    `App::panes` holds the others' scrollback keyed by name (`""` is the lobby), so stepping out of the
+    lobby and back shows what was said in it rather than an empty pane; the scroll position and the
+    unread count are the *view's*, and reset on every switch. Nothing is replayed from the server for
+    this — a channel switch asks for nothing, so the scrollback only exists client-side.
+    What keeps that bounded is the same rule the sidebar runs on: a channel exists exactly as long as
+    somebody is in it, so `App::prune_panes` drops the parked pane of a channel that no longer has
+    anybody in it (after every roster re-derivation, and in the `ChannelDestroyed` arm). The lobby is
+    never pruned, and the pane being read is not in the map to prune. A lost session throws the whole
+    map away in `App::disconnected` — unlike a switch, nothing there is coming back to.
   - The sidebar is fed by events, never by polling. `App::refresh_online` (a `PacketCode::List`
     request drained on the redraw tick) is only set for things that genuinely change the roster —
     `Authenticated` and `Join` — `Join` carries only a username, so the roster has to be asked.
