@@ -172,6 +172,7 @@ impl App
 
                 //SAME RULE AS ClientEvent::List - A CHANNEL EXISTS EXACTLY AS LONG AS SOMEBODY IS IN IT
                 self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
+                self.prune_panes();
             },
 
             ClientEvent::Muted =>
@@ -345,6 +346,7 @@ impl App
 
                 //AUTHORITATIVE: A CHANNEL EXISTS EXACTLY AS LONG AS SOMEBODY IS IN IT
                 self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
+                self.prune_panes();
 
                 if self.list_requested
                 {
@@ -608,7 +610,7 @@ impl App
             //CHANNELS EXIST - A CHANNEL LIVES EXACTLY AS LONG AS SOMEBODY SITS IN IT.
             ClientEvent::ChannelChanged(channel) =>
             {
-                self.clear_messages();
+                self.switch_channel(channel.clone().unwrap_or_default());
 
                 if let Some(name) = channel.clone() { self.channels.insert(name); }
 
@@ -635,6 +637,7 @@ impl App
             ClientEvent::ChannelDestroyed(name) =>
             {
                 self.channels.remove(&name);
+                self.panes.remove(&name);
                 self.dirty = true;
             },
         }

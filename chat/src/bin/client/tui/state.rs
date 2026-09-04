@@ -19,7 +19,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     mem,
-    collections::{ BTreeMap, BTreeSet, VecDeque },
+    collections::
+    {
+        BTreeMap,
+        BTreeSet,
+        HashMap,
+        VecDeque,
+    },
 };
 
 use ratatui::
@@ -88,7 +94,9 @@ pub enum Entry //ONE ROW OF HISTORY
 pub struct App
 {
     //MESSAGE PANE
-    pub messages: VecDeque<Entry>,
+    pub messages: VecDeque<Entry>, //THE PANE BEING LOOKED AT - THE CHANNEL WE ARE STANDING IN
+    pub channel: String,           //WHICH CHANNEL THAT IS ("" = THE LOBBY)
+    pub panes: HashMap<String, VecDeque<Entry>>, //THE OTHER CHANNELS' SCROLLBACK, PARKED WHILE WE ARE AWAY
     pub scroll: Option<u16>, //None = STUCK TO THE BOTTOM
     pub unread: usize,       //MESSAGES ARRIVED WHILE SCROLLED AWAY
 
@@ -147,6 +155,8 @@ impl App
         Self
         {
             messages: VecDeque::new(),
+            channel: String::new(),
+            panes: HashMap::new(),
             scroll: None,
             unread: 0,
             username: String::new(),
@@ -266,7 +276,7 @@ impl App
         self.push(Line::from(Span::styled(text.into(), style)));
     }
 
-    //CLEARS THE MESSAGE HISTORY (E.G. ON CHANNEL SWITCH)
+    //CLEARS THE PANE BEING LOOKED AT (A CHANNEL SWITCH PARKS IT INSTEAD - SEE switch_channel)
     pub fn clear_messages(&mut self)
     {
         self.messages.clear();
@@ -276,6 +286,35 @@ impl App
 
         self.generation += 1;
         self.dirty = true;
+    }
+
+    //A CHANNEL SWITCH PARKS THE PANE WE ARE LEAVING INSTEAD OF THROWING IT AWAY, AND PUTS BACK THE ONE
+    //WE ARE ENTERING - STEPPING OUT OF THE LOBBY AND BACK NO LONGER COSTS WHAT WAS SAID IN IT
+    pub fn switch_channel(&mut self, channel: String)
+    {
+        if channel == self.channel { return; }
+
+        let parked = mem::take(&mut self.messages);
+
+        if !parked.is_empty() { self.panes.insert(mem::take(&mut self.channel), parked); }
+
+        self.messages = self.panes.remove(&channel).unwrap_or_default();
+        self.channel = channel;
+
+        self.wrapped = None;
+        self.scroll = None;
+        self.unread = 0;
+
+        self.generation += 1;
+        self.dirty = true;
+    }
+
+    //A CHANNEL EXISTS EXACTLY AS LONG AS SOMEBODY SITS IN IT, SO THE SCROLLBACK OF ONE NOBODY IS IN ANY
+    //MORE IS NOT WORTH KEEPING. THE LOBBY IS NOT IN THE LIST AND ALWAYS EXISTS; THE PANE WE ARE READING
+    //IS NOT IN THE MAP AT ALL
+    pub fn prune_panes(&mut self)
+    {
+        self.panes.retain(|channel, _| channel.is_empty() || self.channels.contains(channel));
     }
 
     //RE-READS THE CONFIG-DRIVEN STYLING AND REPAINTS THE WHOLE HISTORY WITH IT
@@ -300,8 +339,10 @@ impl App
         self.login = Some(Login::again(&self.address, attempt, reason.into()));
         self.drop_stream = true; //THE WRITE HALF BELONGS TO THE EVENT LOOP - IT CLOSES IT ON THE NEXT PASS
 
-        //A NEW SESSION STARTS BLANK, THE WAY A CHANNEL SWITCH DOES
+        //A NEW SESSION STARTS BLANK - AND UNLIKE A CHANNEL SWITCH, NOTHING IS PARKED FOR LATER
         self.clear_messages();
+        self.panes.clear();
+        self.channel.clear();
 
         self.input = InputBuffer::new();
         self.palette.dismiss();
