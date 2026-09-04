@@ -31,16 +31,40 @@ jobs:
     - uses: rust-lang/crates-io-auth-action@v1
       id: auth
 
-    - run: cargo publish -p why2
+    # A release usually bumps only one of the two crates; publishing a version
+    # that is already on crates.io is a hard error, so ask the registry first.
+    - name: Check which crates need publishing
+      id: check
+      run: |
+        set -euo pipefail
+        meta=$(cargo metadata --format-version 1 --no-deps)
+        for crate in why2 why2-chat; do
+          version=$(jq -r --arg c "$crate" '.packages[] | select(.name == $c) | .version' <<<"$meta")
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H 'User-Agent: why2-release-ci (gitlab@satan.red)' \
+            "https://crates.io/api/v1/crates/$crate/$version")
+          case "$code" in
+            200) publish=false; echo "$crate $version is already published, skipping" ;;
+            404) publish=true;  echo "$crate $version is new, will publish" ;;
+            *) echo "unexpected HTTP $code from crates.io for $crate $version" >&2; exit 1 ;;
+          esac
+          echo "${crate//-/_}=$publish" >> "$GITHUB_OUTPUT"
+        done
+
+    - if: steps.check.outputs.why2 == 'true'
+      run: cargo publish -p why2
       env:
         CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
     - name: Install dependencies
+      if: steps.check.outputs.why2_chat == 'true'
       run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev libopus-dev libpipewire-0.3-dev libegl-dev clang libclang-dev libgbm-dev nasm
 
     - name: Wait for index update
+      if: steps.check.outputs.why2 == 'true' && steps.check.outputs.why2_chat == 'true'
       run: sleep 30
 
-    - run: cargo publish -p why2-chat
+    - if: steps.check.outputs.why2_chat == 'true'
+      run: cargo publish -p why2-chat
       env:
         CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
