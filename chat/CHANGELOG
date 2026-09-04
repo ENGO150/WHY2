@@ -1,6 +1,21 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.0.1:
+- a415718f: preserve lobby messages when switching channels
+- 1e57d9a0: make voice users visible to all clients
+- 938cf211: add screenshare start/end global notification
+- da683844: notify client on peer client attach
+- 0cc4f3c4: prohibit attaching same screenshare twice
+- 8873f605: fix active_speakers blinking
+- b79250c9: mention windows_resources in prose files
+- 881aa033: use windows_resources feature in pipeline server builds
+- c146de6a: embed windows executable info to chat binaries
+- 369631a3: add WHY2 chat binary icon
+- 602d6ef2: add winresource chat build dependency
+- 98388e6e: send History packet before Accept
+- 159018c3: implement custom SCREEN_FRAME_SINK
+
 v2.0.0:
 - fcc12634: add screenshare audio volume control to client settings
 - 64b99556: spawn one forward task for each attached client
