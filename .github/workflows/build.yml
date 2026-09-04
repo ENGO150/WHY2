@@ -114,17 +114,37 @@ jobs:
               "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}" | jq -r .value
           }
 
+          # Retried by hand rather than with --retry: the endpoint spends a
+          # token's `jti` the first time it sees it, so curl's own retry would
+          # resend a spent one and report the resulting 401 instead of the real
+          # error. Each attempt mints its own.
           publish() {
-            local file="$1" variant="$2" sum token
+            local file="$1" variant="$2" sum token attempt=1
             sum="$(sha256sum "$file" | cut -d' ' -f1)"
-            token="$(mint)"
-            echo "::add-mask::$token"
-            curl -fsS --retry 3 --retry-connrefused \
-              -X PUT "$ENDPOINT/$variant" \
-              -H "Authorization: Bearer $token" \
-              -H "X-Content-SHA256: $sum" \
-              --data-binary "@$file"
-            echo "published $variant ($sum)"
+
+            while true; do
+              token="$(mint)"
+              echo "::add-mask::$token"
+
+              # --fail-with-body, not -f: the endpoint's rejection reason is in
+              # the body, and -f discards it.
+              if curl -sS --fail-with-body \
+                   -X PUT "$ENDPOINT/$variant" \
+                   -H "Authorization: Bearer $token" \
+                   -H "X-Content-SHA256: $sum" \
+                   --data-binary "@$file"; then
+                echo "published $variant ($sum)"
+                return 0
+              fi
+
+              if [ "$attempt" -ge 3 ]; then
+                echo "giving up on $variant after $attempt attempts" >&2
+                return 1
+              fi
+
+              attempt=$((attempt + 1))
+              sleep 5
+            done
           }
 
           publish dist/why2-chat-ubuntu-latest/why2              client-linux
