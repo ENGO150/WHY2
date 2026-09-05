@@ -704,11 +704,19 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //UPLOAD APPROVAL
-            PacketCode::Upload { hash, token, uid } | PacketCode::Image { hash, token, uid } =>
+            PacketCode::Upload { hash, token, uid } | PacketCode::Image { hash, token, uid, .. } =>
             {
+                //NO TOKEN IS THE SERVER SAYING IT ALREADY HAS THIS PICTURE. IT IS ON THE CHANNEL ALREADY
+                //(ImageDisplay IS ON ITS WAY), SO THE UPLOAD IS SIMPLY DROPPED WHERE IT WAS PARKED
+                let (Some(token), Some(uid)) = (token, uid) else
+                {
+                    ACTIVE_UPLOADS.lock().unwrap().remove(&hash);
+                    continue;
+                };
+
                 //SPAWN UPLOAD TASK
                 let file_tx = tx.clone(); //CLONE TX
-                tokio::spawn(file::upload(token.unwrap(), uid.unwrap(), hash,
+                tokio::spawn(file::upload(token, uid, hash,
                     file_tx, matches!(read, PacketCode::Image { .. })));
                 continue;
             },

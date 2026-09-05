@@ -22,6 +22,7 @@ pub mod handshake;
 
 use std::
 {
+    path::Path,
     future::Future,
     net::{ IpAddr, SocketAddr },
     time::{ Instant, Duration },
@@ -922,6 +923,54 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
+                let image = matches!(read, PacketCode::Image { .. });
+
+                //CHECK IF IMAGE WAS ALREADY UPLOADED
+                let stored = match image && config::messages::has_image(&hash)
+                {
+                    true => file::read_image(&hash).await,
+                    false => None,
+                };
+
+                if let Some(data) = stored
+                {
+                    let filename = match &read
+                    {
+                        PacketCode::Image { filename, .. } => Path::new(filename)
+                            .file_name()
+                            .and_then(|f| f.to_str())
+                            .unwrap_or("unnamed_file")
+                            .to_string(),
+
+                        _ => String::from("unnamed_file"),
+                    };
+
+                    //KEEP IT, ON THE SAME TERMS AS AN UPLOAD OF IT WOULD HAVE BEEN
+                    if channel.is_none() && config::read_config::<bool>("persistent_messages")
+                    {
+                        config::messages::store_image(&username, &filename, &hash);
+                    }
+
+                    send_to_all(PacketCode::ImageDisplay
+                    {
+                        username: username.clone(),
+                        filename: filename.clone(),
+                        data,
+                    }, true, channel.as_deref());
+
+                    //TELL THE UPLOADER THERE IS NOTHING TO SEND
+                    network::send(&mut *streams.1.lock().await, PacketCode::Image
+                    {
+                        hash,
+                        filename,
+                        token: None,
+                        uid: None,
+                    }, Some(&keys)).await;
+
+                    log::info!("Image already stored, upload skipped: {peer_addr}");
+                    continue;
+                }
+
                 //PREVENT TOKEN SPAM
                 let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count();
                 if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
@@ -932,7 +981,6 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 //GENERATE RANDOM UID
                 let uid = rand::random::<u64>();
-                let image = matches!(read, PacketCode::Image { .. });
                 let token = open_connection(id, if image
                 {
                     ConnectionType::Image { uid }
@@ -949,6 +997,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     PacketCode::Image
                     {
                         hash,
+                        filename: String::new(), //THE UPLOAD'S OWN METADATA CARRIES IT FROM HERE
                         token: Some(token),
                         uid: Some(uid),
                     }

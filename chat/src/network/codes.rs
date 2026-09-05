@@ -131,6 +131,7 @@ pub enum PacketCode //CONTROL CODES
     Image
     {
         hash: [u8; 32],
+        filename: String, //WHAT THE PICTURE IS CALLED, NEEDED BEFORE THE UPLOAD IN CASE THERE IS NONE
         token: Option<[u8; 32]>,
         uid: Option<u64>,
     },
