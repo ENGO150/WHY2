@@ -102,13 +102,15 @@ pub enum Entry //ONE ROW OF HISTORY
     },
 
     //A PICTURE SOMEBODY UPLOADED. THE LINE IS ONLY ITS CAPTION - THE PICTURE IS DRAWN OVER THE ROWS
-    //RESERVED UNDER IT, AND THE PROTOCOL IS ITS ENCODED FORM, RE-ENCODED ONLY WHEN THE PANE RESIZES
+    //RESERVED UNDER IT, AND THE PROTOCOL IS ITS ENCODED FORM, REBUILT ONLY WHEN THE PANE RESIZES
     Image
     {
         username: String,
         filename: String,
-        pixels: (u32, u32),
-        protocol: StatefulProtocol,
+        source: DynamicImage,               //THE PICTURE ITSELF, KEPT TO FIT AGAIN AT A NEW PANE WIDTH
+        rows: u16,                          //ROWS IT RESERVES AT THAT WIDTH
+        fitted: u16,                        //THE WIDTH `protocol` WAS FITTED TO
+        protocol: Option<StatefulProtocol>, //None UNTIL THE FIRST WRAP KNOWS HOW WIDE THE PANE IS
     },
 }
 
@@ -301,10 +303,8 @@ impl App
             false => image,
         };
 
-        let pixels = (image.width(), image.height());
-        let protocol = self.picker.new_resize_protocol(image);
-
-        self.push_entry(Entry::Image { username, filename, pixels, protocol });
+        self.push_entry(Entry::Image { username, filename, source: image, rows: 1, fitted: 0,
+            protocol: None });
     }
 
     //THE QUERY WANTS STDIO TO ITSELF: AFTER THE ALTERNATE SCREEN IS UP, BEFORE ANYTHING READS EVENTS.
@@ -489,24 +489,32 @@ impl App
 
         if !stale { return; }
 
-        let theme = &self.theme;
         let font = self.picker.font_size();
 
         let mut lines: Vec<Line<'static>> = Vec::new();
         let mut placements: Vec<Placement> = Vec::new();
 
-        for (entry, message) in self.messages.iter().enumerate()
+        for entry in 0..self.messages.len()
         {
-            lines.extend(wrap_line(&theme.render(message), width));
+            lines.extend(wrap_line(&self.theme.render(&self.messages[entry]), width));
 
             //AN IMAGE RESERVES ITS ROWS AS BLANK LINES, SO THE SCROLL OFFSET STAYS EXACT AND THE PANE
             //STAYS A LIST OF LINES - THE PICTURE IS PAINTED OVER THEM AFTERWARDS
-            if let Entry::Image { pixels, .. } = message
+            if let Entry::Image { source, rows, fitted, protocol, .. } = &mut self.messages[entry]
             {
-                let height = image_rows(*pixels, width, font);
+                //THE FIT HAPPENS HERE AND NOWHERE ELSE, SO THE PROTOCOL ALWAYS HOLDS THE PICTURE AT THE
+                //SIZE IT IS DRAWN AT - WHICH IS WHAT LETS draw CROP IT INSTEAD OF SHRINKING IT
+                if *fitted != width || protocol.is_none()
+                {
+                    let image = fit_image(source, width, font);
 
-                placements.push(Placement { entry, row: lines.len() as u16, height });
-                lines.extend(iter::repeat_n(Line::default(), height as usize));
+                    *rows = (image.height().div_ceil(font.height as u32) as u16).clamp(1, IMAGE_ROWS);
+                    *protocol = Some(self.picker.new_resize_protocol(image));
+                    *fitted = width;
+                }
+
+                placements.push(Placement { entry, row: lines.len() as u16, height: *rows });
+                lines.extend(iter::repeat_n(Line::default(), *rows as usize));
             }
         }
 
@@ -520,22 +528,18 @@ impl App
 }
 
 //FUNCTIONS
-//HOW MANY ROWS A PICTURE RESERVES. Resize::Fit SHRINKS INTO THE BOX AND NEVER GROWS INTO IT, SO A SMALL
-//PICTURE KEEPS ITS OWN SIZE - THIS HAS TO AGREE WITH WHAT draw HANDS THE PROTOCOL, OR THE ROWS LIE
-pub fn image_rows((width_px, height_px): (u32, u32), width: u16, font: FontSize) -> u16
+//A PICTURE SHRUNK INTO THE PANE - NEVER GROWN INTO IT, SO A SMALL ONE KEEPS ITS OWN SIZE. WHAT COMES BACK
+//IS EXACTLY WHAT THE TERMINAL DRAWS, SO THE ROWS IT RESERVES CANNOT DISAGREE WITH THE PICTURE IN THEM
+fn fit_image(image: &DynamicImage, width: u16, font: FontSize) -> DynamicImage
 {
-    if width_px == 0 || height_px == 0 { return 1; }
+    let available_width = width.max(1) as u32 * font.width as u32;
+    let available_height = IMAGE_ROWS as u32 * font.height as u32;
 
-    let available_width = (width.max(1) as u32 * font.width as u32) as f64;
-    let available_height = (IMAGE_ROWS as u32 * font.height as u32) as f64;
-
-    let scale = (available_width / width_px as f64)
-        .min(available_height / height_px as f64)
-        .min(1.0);
-
-    let rows = (height_px as f64 * scale / font.height as f64).ceil() as u16;
-
-    rows.clamp(1, IMAGE_ROWS)
+    match image.width() > available_width || image.height() > available_height
+    {
+        true => image.resize(available_width, available_height, FilterType::Triangle),
+        false => image.clone(),
+    }
 }
 
 pub fn wrap_line(line: &Line<'static>, width: u16) -> Vec<Line<'static>> //WORD-WRAP ONE LOGICAL LINE, KEEPING SPAN STYLES

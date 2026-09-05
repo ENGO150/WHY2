@@ -40,7 +40,7 @@ use ratatui::
 
 use unicode_width::UnicodeWidthStr;
 
-use ratatui_image::{ Resize, ResizeEncodeRender };
+use ratatui_image::{ CropOptions, Resize, ResizeEncodeRender };
 
 use crate::
 {
@@ -213,27 +213,37 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 
     frame.render_widget(Paragraph::new(visible), inner);
 
-    //THE PICTURES GO OVER THE ROWS THE WRAP RESERVED FOR THEM. resize_encode_render ONLY RE-ENCODES WHEN
-    //THE AREA IT IS HANDED CHANGED, SO A RESIZE COSTS ONE ENCODE PER PICTURE AND AN ORDINARY FRAME NONE
+    //THE PICTURES GO OVER THE ROWS THE WRAP RESERVED FOR THEM. THE PROTOCOL IS ALREADY FITTED TO THE PANE
+    //(state::rewrap), SO WHAT IS ASKED FOR HERE IS A CROP: ONE HANGING OFF THE TOP OR THE BOTTOM OF THE
+    //PANE LOSES THOSE ROWS RATHER THAN BEING SQUEEZED INTO THE ONES LEFT, WHICH IS WHY SCROLLING PAST A
+    //PICTURE NO LONGER RESIZES IT. resize_encode_render RE-ENCODES ONLY WHEN THE CROP ITSELF CHANGED
     for placement in app.placements(inner.width)
     {
-        //ONLY ONCE ITS TOP ROW IS ON SCREEN - NONE OF THE PROTOCOLS CAN CROP A PICTURE FROM ABOVE, SO
-        //SCROLLING PAST ONE LEAVES ITS ROWS EMPTY RATHER THAN DRAWING IT SOMEWHERE IT DOES NOT BELONG
-        if placement.row < offset || placement.row >= offset + viewport { continue; }
+        let bottom = placement.row + placement.height;
 
-        let top = placement.row - offset;
+        let first = placement.row.max(offset);
+        let last = bottom.min(offset + viewport);
+
+        if last <= first { continue; }
+
+        //THE CROP COMES OFF WHICHEVER END IS OFF SCREEN, AND CAN ONLY COME OFF ONE OF THEM - SO A PANE
+        //TOO SHORT TO HOLD THE WHOLE PICTURE CUTS THE END THAT IS FURTHER OUT
+        let clip_top = offset.saturating_sub(placement.row) > bottom.saturating_sub(offset + viewport);
 
         let area = Rect
         {
             x: inner.x,
-            y: inner.y + top,
+            y: inner.y + (first - offset),
             width: inner.width,
-            height: placement.height.min(viewport - top),
+            height: last - first,
         };
 
-        if let Some(state::Entry::Image { protocol, .. }) = app.messages.get_mut(placement.entry)
+        if let Some(state::Entry::Image { protocol: Some(protocol), .. }) =
+            app.messages.get_mut(placement.entry)
         {
-            protocol.resize_encode_render(&Resize::Fit(None), area, frame.buffer_mut());
+            let resize = Resize::Crop(Some(CropOptions { clip_top, clip_left: false }));
+
+            protocol.resize_encode_render(&resize, area, frame.buffer_mut());
         }
     }
 
