@@ -892,7 +892,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //NEW FILE UPLOAD
-            PacketCode::Upload { hash, .. } =>
+            PacketCode::Upload { hash, .. } | PacketCode::Image { hash, .. } =>
             {
                 //SILENCE MUTED USERS
                 if *CONNECTIONS.get(&peer_addr).unwrap().muted()
@@ -911,18 +911,38 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 //GENERATE RANDOM UID
                 let uid = rand::random::<u64>();
-                let token = open_connection(id, ConnectionType::FileUpload { uid });
+                let image = matches!(read, PacketCode::Image { .. });
+                let token = open_connection(id, if image
+                {
+                    ConnectionType::Image { uid }
+                } else
+                {
+                    ConnectionType::FileUpload { uid }
+                });
 
                 //LOG FILE UPLOAD
                 log::info!("Upload request: {peer_addr}");
 
-                //SEND APPROVAL TO CLIENT
-                network::send(&mut *streams.1.lock().await, PacketCode::Upload
+                let packet = if image
                 {
-                    hash,
-                    token: Some(token),
-                    uid: Some(uid),
-                }, Some(&keys)).await;
+                    PacketCode::Image
+                    {
+                        hash,
+                        token: Some(token),
+                        uid: Some(uid),
+                    }
+                } else
+                {
+                    PacketCode::Upload
+                    {
+                        hash,
+                        token: Some(token),
+                        uid: Some(uid),
+                    }
+                };
+
+                //SEND APPROVAL TO CLIENT
+                network::send(&mut *streams.1.lock().await, packet, Some(&keys)).await;
             },
 
             //DOWNLOAD

@@ -220,12 +220,12 @@ async fn main()
                         {
                             match conn_type
                             {
-                                ConnectionType::FileUpload { uid } =>
+                                ConnectionType::FileUpload { uid } | ConnectionType::Image { uid } =>
                                 {
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (mut read_stream, write_stream) = stream.into_split();
-                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task).await;
+                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task, matches!(conn_type, ConnectionType::Image { .. })).await;
                                     });
                                     return;
                                 },

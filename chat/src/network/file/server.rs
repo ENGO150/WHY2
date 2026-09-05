@@ -121,7 +121,7 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
 //LISTS
 pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new()); //LIST FOR ACTIVE FILE UPLOADS
 
-pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid: u64, task: AbortHandle)
+pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid: u64, task: AbortHandle, persistent: bool)
 {
     //GET CLIENT INFO
     let (keys, username, peer_addr) =
