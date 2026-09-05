@@ -181,6 +181,28 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   `(&mut OwnedReadHalf, Arc<tokio::sync::Mutex<OwnedWriteHalf>>)` alias in `consts.rs`.
   Sequence numbers are used to prevent replay/reordering; obfuscation (`obfuscate_data`, a simple
   XOR) is a distinct, non-cryptographic layer applied on top of the real encryption.
+- **The two costs an image puts on somebody else are bounded explicitly, because neither is bounded
+  by the 8MB `MAX_IMAGE_SIZE` the server accepts.**
+  - **Decoding is limited on the client** (`network/client.rs::decode_image`). `MAX_IMAGE_SIZE`
+    bounds the bytes on the wire and says nothing about what they unpack to: a 292KB PNG decodes to
+    400MB, and `ImageDisplay` is **pushed rather than asked for**, so every client in the channel
+    decodes whatever was posted, one unbounded `tokio::spawn` per packet. `image`'s own default
+    (`Limits::default()`, which `load_from_memory` uses) caps a single decode at 512MB and does not
+    bound the dimensions at all — that is a limit on one picture, not on a flood. Every decode
+    therefore goes through `ImageReader` with `MAX_IMAGE_DIMENSION` and `MAX_IMAGE_ALLOC` set, and
+    never through `load_from_memory`. The residual is `MAX_IMAGE_ALLOC` × however many images a
+    sender can post, which is what the ordinary spam window bounds — `PacketCode::Image` is
+    deliberately *not* in `receive`'s exemption list.
+  - **Fetching is spaced on the server** (`listen_client`'s `PacketCode::ImageData` arm). The
+    request is a hash and the answer is a disk read, a whole `RexStream` decrypt and up to
+    `MAX_IMAGE_SIZE` back on the wire, so it is the one packet where a client's cost and everybody
+    else's are wildly different. It stays out of the spam window — a burst of clicked captions is
+    not spam, and warning on it would disconnect ordinary users — and is held to one per
+    `IMAGE_REQUEST_DELAY` by `Connection::last_image` instead. It is **served late rather than
+    refused**: the client never retries, so a dropped request leaves its caption on `[ loading... ]`
+    for the rest of the session. The wait sits on that connection's own read loop, which is the
+    backpressure and costs nobody else. `last_image` is carried across a rekey and a channel switch
+    — a client that could reset it by switching channels would not be limited at all.
 - **`network/client.rs` / `network/server.rs`** — connection-level logic (handshake, auth, message
   dispatch) for each side. `network/file`, `network/screen`, `network/voice` are protocol
   extensions with their own client/server submodules for file transfer, screen sharing (feature
