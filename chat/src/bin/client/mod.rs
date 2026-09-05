@@ -556,7 +556,10 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             if !valid { invalid_usage(app, None); }
                         },
 
-                        Command::Upload =>
+                        //ONE REQUEST, TWO CODES: A PERSISTENT IMAGE IS ASKED FOR EXACTLY THE WAY A
+                        //FILESHARE IS - THE PATH IS CHECKED AND THE FILE HASHED IDENTICALLY, AND ONLY THE
+                        //CODE THE SERVER IS ASKED WITH DECIDES WHICH OF THE TWO IT BECOMES
+                        Command::Upload | Command::Image =>
                         {
                             //CHECK PATH
                             if let Some(parameters) = parameters
@@ -571,6 +574,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                     let mut file = file;
                                     let write_stream = write_stream.clone();
                                     let keys = options::get_keys();
+                                    let image = command == Command::Image;
 
                                     tokio::spawn(async move
                                     {
@@ -603,8 +607,13 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                                 .insert(hash, path.canonicalize().unwrap());
 
                                             //SEND UPLOAD REQUEST
-                                            network::send(&mut *write_stream.lock().await,
-                                                PacketCode::Upload { hash, token: None, uid: None }, keys.as_ref()).await;
+                                            let request = match image
+                                            {
+                                                true => PacketCode::Image { hash, token: None, uid: None },
+                                                false => PacketCode::Upload { hash, token: None, uid: None },
+                                            };
+
+                                            network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
                                         }
                                     });
                                 } else //NON-EXISTING FILE

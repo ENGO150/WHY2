@@ -127,6 +127,14 @@ pub enum PacketCode //CONTROL CODES
         token: Option<[u8; 32]>,
     },
 
+    //CLIENT <> SERVER | REQUEST IMAGE UPLOAD
+    Image
+    {
+        hash: [u8; 32],
+        token: Option<[u8; 32]>,
+        uid: Option<u64>,
+    },
+
     //SERVER -> CLIENT | ANNOUNCE NEW UPLOADED FILE
     Uploaded
     {

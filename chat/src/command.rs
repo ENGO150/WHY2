@@ -63,6 +63,7 @@ pub enum Command
     #[cfg(feature = "client_screen")] Screens,  //LIST SCREENSHARES
     Upload,                                     //UPLOAD FILE TO SERVER
     Download,                                   //DOWNLOAD FILE FROM SERVER
+    Image,                                      //PERSISTENT IMAGE UPLOAD
     #[cfg(feature = "client_screen")] Screen,   //TOGGLE SCREEN SHARING
     #[cfg(feature = "client_screen")] Attach,   //ATTACH SCREEN SHARE
     #[cfg(feature = "client_screen")] Deattach, //DEATTACH SCREEN SHARE
@@ -434,6 +435,26 @@ pub const COMMAND_LIST: &[CommandInfo] =
             },
         ],
         description: "Downloads file from server",
+    },
+
+    CommandInfo
+    {
+        command: Command::Image,
+        triggers: &[ "IMAGE", "PICTURE", "PIC" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args:
+        &[
+            CommandArg
+            {
+                name: "PATH",
+                description: "Path of target image",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Uploads a persistent image",
     },
 
     #[cfg(feature = "client_screen")]
