@@ -61,6 +61,23 @@ C) Authenticated Encryption
    - Verification: Constant-time comparison via `Mac::verify_slice`
    - Key Separation: Encryption and MAC keys MUST be independently derived
 
+D) Reference Application (why2-chat)
+   The chat crate in this repository is a demonstration of the algorithm in a protocol,
+   and is held to the same practices:
+   - Handshake: ephemeral ECDH (NIST P-521) + ML-KEM-768, combined via HKDF. The offer is
+     signed by the server's static identity over a domain-separated transcript, and that
+     identity is pinned on first use (TOFU).
+   - Forward Secrecy: the ephemerals are fresh per handshake, and the session rekeys every
+     10 minutes.
+   - Transport: every packet is authenticated. One-shot packets use WHY2's AuthenticatedData;
+     streamed ones (file transfer, screen share) are encrypt-then-MAC over
+     counter || len || ciphertext, verified before the stream cipher advances, so a forged
+     frame cannot desynchronize the receiver.
+   - Passwords: Argon2 on the server. At-rest lobby history, when enabled, is encrypted and
+     authenticated under a key of its own.
+   - This is client-to-server transport encryption, NOT end-to-end encryption: the server
+     necessarily sees plaintext messages.
+
 3. SECURITY LIMITATIONS & RISK ASSESSMENT
 -----------------------------------------
 Users must be aware of the following limitations. WHY2 is experimental software.
