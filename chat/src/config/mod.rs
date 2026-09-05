@@ -232,10 +232,6 @@ pub fn init_config() //INITIALIZE CONFIG FILES
             fs::write(runtime_path, "#*#**#*###**#***###*#").expect("Writing to config failed");
         }
     }
-
-    //BRING ANY PRE-SUBTABLE USER STORE UP TO DATE
-    #[cfg(feature = "server")]
-    users::migrate();
 }
 
 pub fn read_config<T: FromStr>(key: &str) -> T //RETURN key FROM TOML CONFIG

@@ -29,21 +29,21 @@ use crate::
     role::Role,
 };
 
-fn set_user_field(users: &mut Table, username: &str, key: &str, value: Value) //SET ONE FIELD OF username, KEEPING THE REST OF THE ENTRY
-{
-    //A MISSING OR LEGACY FLAT ENTRY BECOMES AN EMPTY SUBTABLE FIRST
-    if users.get(username).and_then(Item::as_table_like).is_none()
-    {
-        users.insert(username, Item::Table(Table::new()));
-    }
-
-    users.get_mut(username).and_then(Item::as_table_like_mut)
-        .expect("User entry is not a table").insert(key, Item::Value(value));
-}
-
 fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD OF username TO server_users.toml
 {
-    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc| set_user_field(doc.as_table_mut(), username, key, value));
+    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
+    {
+        let users = doc.as_table_mut();
+
+        //A MISSING OR LEGACY FLAT ENTRY BECOMES AN EMPTY SUBTABLE FIRST
+        if users.get(username).and_then(Item::as_table_like).is_none()
+        {
+            users.insert(username, Item::Table(Table::new()));
+        }
+
+        users.get_mut(username).and_then(Item::as_table_like_mut)
+            .expect("User entry is not a table").insert(key, Item::Value(value));
+    });
 }
 
 pub fn len() -> usize //COUNT USERS
@@ -76,33 +76,6 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
     set_role(username, if first_user { Role::Owner } else { Role::User }); //ROLE (OWNER IF THIS IS THE FIRST USER)
 
     first_user
-}
-
-pub fn migrate() //CONVERT FLAT username = "<hash>" ENTRIES INTO SUBTABLES
-{
-    let path = super::config_path(consts::SERVER_USERS_CONFIG);
-
-    //COLLECT LEGACY ENTRIES
-    let legacy: Vec<(String, String)> = super::get_data(&path).as_table().iter()
-        .filter_map(|(username, item)| match item
-        {
-            Item::Value(Value::String(hash)) => Some((username.to_string(), hash.value().to_string())),
-
-            _ => None
-        }).collect();
-
-    //NOTHING TO MIGRATE
-    if legacy.is_empty() { return; }
-
-    //REWRITE
-    super::with_cached_mut(&path, |doc|
-    {
-        for (username, hash) in &legacy
-        {
-            set_user_field(doc.as_table_mut(), username, "password", hash.into());
-            set_user_field(doc.as_table_mut(), username, "role", Role::User.name().into());
-        }
-    });
 }
 
 pub fn contains(key: &str) -> bool //CHECK IF server_users.toml contains
