@@ -41,6 +41,19 @@ fn main()
 }
 ```
 
+## Cargo Features
+
+- **`constant-time`** (default) — constant-time conditional operations via `subtle`. Disabling it
+  is faster, and opens timing side-channels.
+- **`auth`** (default) — authenticated encryption (encrypt-then-MAC with HMAC-SHA256) via
+  `AuthenticatedData`.
+
+## Beyond One-Shot Encryption
+
+`why2::stream::RexStream` runs the same CTR-mode cipher incrementally, for data that arrives in
+chunks (sockets, large files) and should not be buffered whole. `why2-chat`, the reference chat
+application in this repository, is built on both APIs — see the [chat README](https://git.satan.red/ENGO150/WHY2/-/blob/stable/chat/README.md).
+
 ## Links
 
 - [API Documentation](https://docs.rs/why2)
