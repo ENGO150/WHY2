@@ -1,6 +1,27 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.1.0:
+- 0b00801a: add limits to image sharing
+- 740ed677: cache image uploads
+- bfdb4b38: add drag selection to the message pane
+- 63e7e2ac: prevent orphan images on non-lobby upload
+- 42062b8c: add images to message history
+- 6671dc02: crop image instead of resizing
+- 60c3a92a: display images in TUI after upload
+- c09c9942: use custom wincode config to allow large packets
+- 5f3615ad: add client image dependencies
+- c31d5344: check for valid image on Image upload
+- 29047c2e: display ClientEvent::Image on image upload
+- 2e608428: handle image uploads on server
+- cbb99c8c: generate server image_key file
+- f08b33ee: implement client image upload
+- 36ce6b2c: open file connection on server on Image code
+- 72a841a5: add client image command
+- d43c264b: move history_key body into helper fn
+- 134d45b2: remove server_users migration code
+- 0834912b: update outdated chat README
+
 v2.0.1:
 - a415718f: preserve lobby messages when switching channels
 - 1e57d9a0: make voice users visible to all clients
