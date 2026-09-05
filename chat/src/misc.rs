@@ -39,7 +39,11 @@ use tokio::sync::mpsc::Sender;
 use crate::network::client::ClientEvent;
 
 #[cfg(feature = "server")]
-use std::path::PathBuf;
+use std::
+{
+    fmt::Write,
+    path::PathBuf,
+};
 
 //PRIVATE
 fn get_dir(dir: &str) -> String
@@ -156,6 +160,27 @@ pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
 pub fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOAD
 {
     env::temp_dir().join(consts::UPLOADS_DIR).join(username)
+}
+
+//AN IMAGE IS KEPT, SO IT LIVES UNDER THE CONFIG DIR RATHER THAN IN TEMP - NOTHING ELSE SEPARATES
+//THE TWO, AND A TEMP DIR IS EXACTLY THE THING THE HOST IS FREE TO SWEEP BETWEEN RESTARTS
+#[cfg(feature = "server")]
+pub fn get_image_dir() -> PathBuf //DIRECTORY FOR PERSISTENT IMAGES
+{
+    PathBuf::from(get_why2_dir() + consts::SERVER_IMAGES_DIR)
+}
+
+#[cfg(feature = "server")]
+pub fn hex(bytes: &[u8]) -> String //BYTES AS LOWERCASE HEX
+{
+    let mut string = String::with_capacity(bytes.len() * 2);
+
+    for byte in bytes
+    {
+        write!(string, "{byte:02x}").expect("Hex encoding failed");
+    }
+
+    string
 }
 
 #[cfg(feature = "server")]

@@ -20,7 +20,11 @@ use std::
 {
     sync::Arc,
     ffi::OsStr,
-    path::Path,
+    path::
+    {
+        Path,
+        PathBuf,
+    },
     sync::LazyLock,
 };
 
@@ -93,12 +97,10 @@ impl Drop for FileTransferGuard
             //REMOVE FILE STREAM
             conn.remove_file_stream(self.uid);
 
-            //REMOVE JUNK FILE
-            if ACTIVE_FILESHARES.remove(&self.uid).is_some() && let Some(uname) = conn.username()
+            //REMOVE JUNK FILE - THE UPLOAD CARRIES ITS OWN PATH, SINCE AN IMAGE IS NOT BUILT IN THE TEMP DIR
+            if let Some((_, active)) = ACTIVE_FILESHARES.remove(&self.uid)
             {
-                let temp_dir = misc::get_upload_dir(uname);
-                let junk_file = temp_dir.join(self.uid.to_string());
-                let _ = std::fs::remove_file(&junk_file);
+                let _ = std::fs::remove_file(&active.path);
                 log::error!("Upload failed: {}", conn.peer_addr());
             }
         }
@@ -115,6 +117,7 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
     pub hasher: Sha256,         //HASHER
     pub filename: String,       //FILENAME
     pub client_id: usize,       //ID OF SENDER
+    pub path: PathBuf,          //WHERE THE UPLOAD IS BEING BUILT
     pub stream: RexStream,
 }
 
@@ -186,26 +189,44 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         return;
     }
 
-    //CREATE KEY & NONCE FOR FILE ENCRYPTION ON DISK
-    let disk_key = core_crypto::generate_key::
-            <{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>();
-    let disk_nonce = core_crypto::generate_nonce::
-            <{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>().unwrap();
+    //CREATE KEY & NONCE FOR FILE ENCRYPTION ON DISK. A FILESHARE KEEPS ITS RANDOM PAIR IN
+    //AVAILABLE_FILES AND DIES WITH THE PROCESS; AN IMAGE IS NOT IN THAT LIST AND OUTLIVES IT, SO ITS
+    //PAIR IS DERIVED FROM THE SERVER'S IMAGE KEY AND THE HASH THE FILE IS NAMED AFTER INSTEAD
+    let (disk_key, disk_nonce) = match persistent
+    {
+        true => crypto::image_keys(&hash),
+
+        false =>
+        (
+            core_crypto::generate_key::
+                <{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>(),
+            core_crypto::generate_nonce::
+                <{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>().unwrap().to_flat(),
+        ),
+    };
+
+    //WHERE THE UPLOAD IS BUILT, AND WHERE IT STAYS
+    let target_dir = match persistent
+    {
+        true => misc::get_image_dir(),
+        false => misc::get_upload_dir(&username),
+    };
 
     if !valid && size / consts::MEGABYTE as u64 <= config::read_config::<u64>("max_upload_size")
     {
-        //CREATE TEMP UPLOAD DIRECTORY
-        let temp_dir = misc::get_upload_dir(&username);
-        fs::create_dir_all(&temp_dir).await.expect("Creating upload temp directory failed");
+        //CREATE UPLOAD DIRECTORY
+        fs::create_dir_all(&target_dir).await.expect("Creating upload directory failed");
 
         //CREATE REXSTREAM FOR FILE ENCRYPTION ON DISK
-        let disk_stream = RexStream::new(&Grid::from_key(&disk_key).unwrap(), disk_nonce.clone()).unwrap();
+        let disk_stream = RexStream::new(&Grid::from_key(&disk_key).unwrap(),
+            Grid::from_flat(&disk_nonce).unwrap()).unwrap();
 
-        //CREATE THE FILE
+        //CREATE THE FILE - IT IS BUILT UNDER THE UID AND ONLY NAMED ONCE IT IS WHOLE AND VERIFIED
+        let upload_path = target_dir.join(uid.to_string());
         let upload_file = OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(temp_dir.join(uid.to_string()))
+            .open(&upload_path)
             .await.expect("Creating upload file failed");
 
         //ADD ACTIVE UPLOAD
@@ -218,6 +239,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
             hasher: Sha256::new(),
             filename,
             client_id: id,
+            path: upload_path,
             stream: disk_stream,
         });
 
@@ -314,15 +336,20 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         if expected_hash != final_hash { return; }
 
         //GET FILE PATHS
-        let temp_dir = misc::get_upload_dir(&username);
-        let current_path = temp_dir.join(uid.to_string());
+        let current_path = target_dir.join(uid.to_string());
 
         //GET NEW FILE PATH
         let filename = Path::new(&upload_filename) //PREVENT FROM PATH TRAVERSAL
             .file_name()
             .unwrap_or(OsStr::new("unnamed_file"))
             .to_os_string();
-        let new_path = temp_dir.join(&filename);
+
+        //AN IMAGE IS NAMED AFTER ITS CONTENT INSTEAD
+        let new_path = match persistent
+        {
+            true => target_dir.join(misc::hex(&final_hash)),
+            false => target_dir.join(&filename),
+        };
 
         //RENAME FILE
         let insert = !fs::try_exists(&new_path).await.unwrap_or(false);
@@ -333,25 +360,29 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
 
         let filename = filename.into_string().unwrap_or("unnamed_file".to_string());
 
-        //ANNOUNCE FILE UPLOAD
-        server::send_to_all(PacketCode::Uploaded
+        //DO NOT ANNOUNCE PERSISTENT FILES
+        if !persistent
         {
-            username: username.clone(),
-            filename: filename.clone(),
-        }, false, None);
-
-        if insert
-        {
-            //ADD FILE TO AVAILABLE FILES
-            server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
+            //ANNOUNCE FILE UPLOAD
+            server::send_to_all(PacketCode::Uploaded
             {
-                hash: final_hash,
-                path: new_path,
-                filename,
-                size: final_size,
-                key: disk_key.clone(),
-                nonce: disk_nonce.to_flat(),
-            });
+                username: username.clone(),
+                filename: filename.clone(),
+            }, false, None);
+
+            if insert
+            {
+                //ADD FILE TO AVAILABLE FILES
+                server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
+                {
+                    hash: final_hash,
+                    path: new_path,
+                    filename,
+                    size: final_size,
+                    key: disk_key.clone(),
+                    nonce: disk_nonce.clone(),
+                });
+            }
         }
 
         //REMOVE ACTIVE UPLOAD
