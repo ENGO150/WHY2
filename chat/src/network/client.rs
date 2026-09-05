@@ -697,7 +697,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //UPLOAD APPROVAL
-            PacketCode::Upload { hash, token, uid } =>
+            PacketCode::Upload { hash, token, uid } | PacketCode::Image { hash, token, uid } =>
             {
                 //SPAWN UPLOAD TASK
                 let file_tx = tx.clone(); //CLONE TX
