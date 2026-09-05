@@ -585,6 +585,27 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - The message pane is wrapped by `state::wrap_line` (cached per width + history generation) rather
     than by `Paragraph`, so the scroll offset is exact. `App::scroll == None` means stuck to the
     bottom.
+  - **Capturing the mouse takes the terminal's own drag-select away, so the client provides one**
+    (`App::selection`, `mouse_capture = true`). A press in the message pane anchors it, a drag extends
+    it and the release copies — but a press is **not** a selection until a drag arrives (`dragged`),
+    which is what keeps a click on an image caption a click. Both ends are stored as **wrapped-view
+    rows, not terminal rows**, so scrolling during or after a drag moves the highlight with the text
+    instead of leaving it on the cells the pointer happened to cross; a drag past either edge scrolls
+    the pane rather than stopping at it. What is copied is sliced out of the same wrapped lines that
+    are highlighted (`state::slice_cells`, cells rather than characters, so a wide glyph is taken
+    whole), so the copy cannot disagree with what is on screen.
+    The copy is **OSC 52** (`tui::copy_to_clipboard`) rather than a clipboard library: it needs no
+    X11/Wayland system dependency, and over SSH a local clipboard would be the wrong machine's. The
+    terminal either takes it or ignores it — there is no answer to read, so a terminal that refuses
+    OSC 52 writes copies nothing and the client cannot tell. `theme::SELECTION` is the chrome's sky blue
+    taken down to a background, and a background **only** — every glyph keeps its own colour, so a
+    username stays the colour it is being copied as. The accent at full strength would have to repaint
+    the text dark to stay readable on it, which is exactly what a selection must not do.
+  - **A copy says so in the pane's bottom border, not in the history** (`App::notify`/`App::notice`,
+    `draw_messages`' second `title_bottom`). The pane is the conversation, so something the user *did*
+    does not belong in it as a line — and a toast that expires takes no row away from what was said.
+    Nothing pushes it out again, so `tui::run`'s redraw tick calls `App::expire_notice`, which costs a
+    frame only on the pass it actually expires on.
   - `config::read_config` re-parses the TOML on every call — read config-driven styling through
     `App::theme` (`tui/theme.rs`), and call `Theme::reload` after a `config::client_write`.
   - Every chrome color in `tui/theme.rs` is a `Color::Rgb` — never a named ANSI color, and never a

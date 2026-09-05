@@ -193,6 +193,13 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         block = block.title_bottom(Line::from(Span::styled(format!(" ↓ {} new ", app.unread), theme::NOTICE)).right_aligned());
     }
 
+    //AND THE TOAST, ON THE OTHER END OF THE SAME BORDER - IT IS NOT PART OF THE CONVERSATION, SO IT NEVER
+    //ENTERS THE HISTORY AND TAKES NO ROW AWAY FROM IT
+    if let Some(notice) = app.notice()
+    {
+        block = block.title_bottom(Span::styled(format!(" {notice} "), theme::OK));
+    }
+
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -216,6 +223,17 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         .collect::<Vec<Line<'static>>>();
 
     frame.render_widget(Paragraph::new(visible), inner);
+
+    //THE DRAG-SELECTED RUN, PAINTED OVER THE ROWS THAT WERE JUST DRAWN
+    for y in inner.y..inner.y + viewport
+    {
+        let Some((first, last)) = app.selection_columns(offset + (y - inner.y)) else { continue };
+
+        for x in first..=last.min(inner.width.saturating_sub(1))
+        {
+            if let Some(cell) = frame.buffer_mut().cell_mut((inner.x + x, y)) { cell.set_style(theme::SELECTION); }
+        }
+    }
 
     //THE PICTURES GO OVER THE ROWS THE WRAP RESERVED FOR THEM. THE PROTOCOL IS ALREADY FITTED TO THE PANE
     //(state::rewrap), SO WHAT IS ASKED FOR HERE IS A CROP: ONE HANGING OFF THE TOP OR THE BOTTOM OF THE

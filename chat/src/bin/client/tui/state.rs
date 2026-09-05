@@ -20,6 +20,7 @@ use std::
 {
     mem,
     iter,
+    time::{ Duration, Instant },
     collections::
     {
         BTreeMap,
@@ -78,6 +79,7 @@ use super::
 //CONSTS
 pub const HISTORY_LIMIT: usize = 5000; //CAP THE MESSAGE PANE SO RE-WRAPPING EACH FRAME STAYS CHEAP
 pub const IMAGE_ROWS: u16 = 20;        //TALLEST AN IMAGE MAY BE DRAWN - THE PANE IS A CHAT, NOT A VIEWER
+pub const NOTICE_DURATION: Duration = Duration::from_secs(2); //HOW LONG THE PANE'S TOAST STAYS UP
 
 //ENUMS
 pub enum Entry //ONE ROW OF HISTORY
@@ -141,6 +143,16 @@ pub struct Placement //WHERE ONE IMAGE SITS IN THE WRAPPED VIEW
     pub height: u16,   //RESERVED ROWS - 0 WHILE THERE IS NO PICTURE
 }
 
+//A DRAG IN THE MESSAGE PANE. BOTH ENDS ARE ROWS OF THE WRAPPED VIEW RATHER THAN TERMINAL ROWS, SO
+//SCROLLING DURING (OR AFTER) A DRAG MOVES THE HIGHLIGHT WITH THE TEXT INSTEAD OF LEAVING IT BEHIND
+#[derive(Clone, Copy)]
+pub struct Selection
+{
+    pub anchor: (u16, u16), //(ROW IN THE WRAPPED VIEW, COLUMN INSIDE THE PANE)
+    pub cursor: (u16, u16),
+    pub dragged: bool,      //A DRAG EVER ARRIVED - UNTIL THEN THE PRESS IS STILL A PLAIN CLICK
+}
+
 //STRUCTS
 pub struct App
 {
@@ -177,6 +189,10 @@ pub struct App
     //WHERE THE MESSAGE PANE WAS LAST DRAWN, WHICH IS THE ONLY WAY A CLICK CAN BE TURNED INTO A LINE
     pub pane: Rect,
     pub pane_offset: u16,
+    pub selection: Option<Selection>, //A DRAG-SELECTED RUN OF THE PANE, KEPT UNTIL THE NEXT PRESS
+
+    //SOMETHING THAT HAPPENED RATHER THAN SOMETHING THAT WAS SAID, SO IT GOES IN THE CHROME AND EXPIRES
+    pub notice: Option<(String, Instant)>,
 
     //REQUEST BOOKKEEPING (A LIST/SCREENS RESPONSE IS ONLY ECHOED WHEN THE USER ASKED FOR IT)
     pub list_requested: bool,
@@ -199,6 +215,14 @@ pub struct App
 }
 
 //IMPLEMENTATIONS
+impl Selection
+{
+    pub fn ordered(&self) -> ((u16, u16), (u16, u16)) //THE TWO ENDS IN READING ORDER
+    {
+        if self.cursor < self.anchor { (self.cursor, self.anchor) } else { (self.anchor, self.cursor) }
+    }
+}
+
 impl Default for App
 {
     fn default() -> Self { Self::new() }
@@ -234,6 +258,8 @@ impl App
             picker: Picker::halfblocks(), //UNTIL init_picker HAS ASKED THE TERMINAL FOR SOMETHING BETTER
             pane: Rect::ZERO,
             pane_offset: 0,
+            selection: None,
+            notice: None,
             list_requested: false,
             #[cfg(feature = "client_screen")]
             screens_requested: false,
@@ -414,6 +440,7 @@ impl App
     {
         self.messages.clear();
         self.wrapped = None;
+        self.selection = None;
         self.scroll = None;
         self.unread = 0;
 
@@ -435,6 +462,7 @@ impl App
         self.channel = channel;
 
         self.wrapped = None;
+        self.selection = None;
         self.scroll = None;
         self.unread = 0;
 
@@ -561,6 +589,160 @@ impl App
             .map(|placement| placement.entry)
     }
 
+    //SELECTION
+    //A PRESS INSIDE THE PANE STARTS ONE. IT IS NOT A SELECTION YET - UNTIL A DRAG ARRIVES IT IS A CLICK,
+    //WHICH IS WHAT KEEPS AN IMAGE CAPTION CLICKABLE
+    pub fn selection_start(&mut self, column: u16, row: u16) -> bool
+    {
+        let pane = self.pane;
+
+        if column < pane.x || column >= pane.x + pane.width { return false; }
+        if row < pane.y || row >= pane.y + pane.height { return false; }
+
+        let cell = self.pane_cell(column, row);
+
+        self.selection = Some(Selection { anchor: cell, cursor: cell, dragged: false });
+        self.dirty = true;
+
+        true
+    }
+
+    //A DRAG PAST EITHER EDGE SCROLLS THE PANE INSTEAD OF STOPPING AT IT - THE ANCHOR IS A WRAPPED-VIEW
+    //ROW, SO WHAT WAS ALREADY SELECTED STAYS SELECTED WHILE THE VIEW MOVES UNDER IT
+    pub fn selection_extend(&mut self, column: u16, row: u16)
+    {
+        let pane = self.pane;
+
+        if self.selection.is_none() || pane.height == 0 { return; }
+
+        //THE ROW THE SCROLL IS ABOUT TO REVEAL IS THE ONE BEING DRAGGED ONTO, AND pane_offset ONLY
+        //CATCHES UP AT THE NEXT DRAW - SO IT IS NAMED HERE RATHER THAN READ BACK A FRAME LATE
+        let cell = match row
+        {
+            _ if row < pane.y =>
+            {
+                self.scroll_up(1, pane.height);
+
+                (self.pane_offset.saturating_sub(1), self.pane_cell(column, row).1)
+            },
+
+            _ if row >= pane.y + pane.height =>
+            {
+                self.scroll_down(1, pane.height);
+
+                (self.pane_offset + pane.height, self.pane_cell(column, row).1)
+            },
+
+            _ => self.pane_cell(column, row),
+        };
+
+        if let Some(selection) = self.selection.as_mut()
+        {
+            selection.cursor = cell;
+            selection.dragged = true;
+        }
+
+        self.dirty = true;
+    }
+
+    //TOAST
+    //A LINE IN THE PANE'S BOTTOM BORDER FOR THINGS THE USER DID, NOT THINGS ANYBODY SAID - THE HISTORY IS
+    //THE CONVERSATION AND NOTHING ELSE BELONGS IN IT
+    pub fn notify(&mut self, text: impl Into<String>)
+    {
+        self.notice = Some((text.into(), Instant::now()));
+        self.dirty = true;
+    }
+
+    pub fn notice(&self) -> Option<&str>
+    {
+        self.notice.as_ref()
+            .filter(|(_, shown)| shown.elapsed() < NOTICE_DURATION)
+            .map(|(text, _)| text.as_str())
+    }
+
+    //THE TOAST GOES AWAY ON ITS OWN, SO SOMETHING HAS TO NOTICE THAT NOTHING HAPPENED - THE REDRAW TICK
+    //ASKS EVERY PASS, AND ONLY THE PASS IT EXPIRES ON COSTS A FRAME
+    pub fn expire_notice(&mut self)
+    {
+        if self.notice.is_some() && self.notice().is_none()
+        {
+            self.notice = None;
+            self.dirty = true;
+        }
+    }
+
+    pub fn clear_selection(&mut self)
+    {
+        if self.selection.take().is_some() { self.dirty = true; }
+    }
+
+    //WHICH COLUMNS OF ONE WRAPPED ROW ARE SELECTED (INCLUSIVE), IF ANY - THIS IS WHAT draw PAINTS
+    pub fn selection_columns(&self, row: u16) -> Option<(u16, u16)>
+    {
+        let selection = self.selection?;
+
+        if !selection.dragged { return None; }
+
+        let (start, end) = selection.ordered();
+
+        if row < start.0 || row > end.0 { return None; }
+
+        let last = self.pane.width.saturating_sub(1);
+
+        let first = if row == start.0 { start.1 } else { 0 };
+        let final_column = if row == end.0 { end.1 } else { last };
+
+        (first <= final_column).then_some((first, final_column))
+    }
+
+    //THE SELECTED TEXT, ROW BY ROW. THE ROWS ARE THE WRAPPED ONES RATHER THAN THE MESSAGES BEHIND THEM,
+    //SO WHAT IS COPIED IS EXACTLY WHAT IS HIGHLIGHTED
+    pub fn selection_text(&mut self) -> Option<String>
+    {
+        let selection = self.selection?;
+
+        if !selection.dragged { return None; }
+
+        let width = self.pane.width;
+        let (start, end) = selection.ordered();
+
+        self.rewrap(width);
+
+        let lines = &self.wrapped.as_ref().unwrap().2;
+        let last = width.saturating_sub(1);
+
+        let mut out: Vec<String> = Vec::new();
+
+        for row in start.0..=end.0
+        {
+            let Some(line) = lines.get(row as usize) else { break };
+
+            let first = if row == start.0 { start.1 } else { 0 };
+            let final_column = if row == end.0 { end.1 } else { last };
+
+            if first > final_column { continue; }
+
+            out.push(slice_cells(line, first as usize, final_column as usize).trim_end().to_owned());
+        }
+
+        let text = out.join("\n");
+
+        (!text.trim().is_empty()).then_some(text)
+    }
+
+    //A TERMINAL CELL AS A PLACE IN THE WRAPPED VIEW. OUT-OF-PANE COORDINATES ARE CLAMPED RATHER THAN
+    //REFUSED - A DRAG ROUTINELY LEAVES THE PANE AND STILL MEANS SOMETHING
+    fn pane_cell(&self, column: u16, row: u16) -> (u16, u16)
+    {
+        let pane = self.pane;
+
+        let column = column.clamp(pane.x, pane.x + pane.width.saturating_sub(1)) - pane.x;
+        let row = row.clamp(pane.y, pane.y + pane.height.saturating_sub(1)) - pane.y;
+
+        (self.pane_offset + row, column)
+    }
+
     pub fn placements(&mut self, width: u16) -> Vec<Placement>
     {
         self.rewrap(width);
@@ -645,6 +827,30 @@ fn fit_image(image: &DynamicImage, width: u16, font: FontSize) -> DynamicImage
         true => image.resize(available_width, available_height, FilterType::Triangle),
         false => image.clone(),
     }
+}
+
+//THE TEXT OF ONE WRAPPED LINE BETWEEN TWO CELL COLUMNS, BOTH INCLUSIVE. COLUMNS ARE CELLS AND NOT
+//CHARACTERS, SO A WIDE GLYPH IS TAKEN WHOLE THE MOMENT THE SELECTION TOUCHES EITHER HALF OF IT
+fn slice_cells(line: &Line<'static>, from: usize, to: usize) -> String
+{
+    let mut out = String::new();
+    let mut column = 0usize;
+
+    for span in &line.spans
+    {
+        for c in span.content.chars()
+        {
+            let w = c.width().unwrap_or(0).max(1);
+
+            if column + w > from && column <= to { out.push(c); }
+
+            column += w;
+
+            if column > to { return out; }
+        }
+    }
+
+    out
 }
 
 pub fn wrap_line(line: &Line<'static>, width: u16) -> Vec<Line<'static>> //WORD-WRAP ONE LOGICAL LINE, KEEPING SPAN STYLES

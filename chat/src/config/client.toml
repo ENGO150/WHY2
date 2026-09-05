@@ -43,7 +43,7 @@ username_color = "none" # Color of username (change via command)
 message_color = "none" # Color of message (change via command)
 
 # Interface
-mouse_capture = true # Capture the mouse for wheel scrolling (disables the terminal's own drag-select)
+mouse_capture = true # Capture the mouse for wheel scrolling and drag-select (replaces the terminal's own)
 disable_logo = false # Hide the logo drawn behind the chat
 
 # Other

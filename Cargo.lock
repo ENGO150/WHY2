@@ -6116,6 +6116,7 @@ version = "2.0.1"
 dependencies = [
  "argon2",
  "audiopus",
+ "base64 0.23.1",
  "cpal",
  "crossterm",
  "dashmap",

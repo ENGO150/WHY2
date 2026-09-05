@@ -40,6 +40,8 @@ use std::
     },
 };
 
+use base64::prelude::{ Engine, BASE64_STANDARD };
+
 use crossterm::
 {
     cursor::Show,
@@ -189,6 +191,24 @@ pub fn restore_terminal() //BEST-EFFORT, IDEMPOTENT
     let _ = stdout.flush();
 }
 
+//A SELECTION (AND THE CLICK IT MAY TURN OUT TO BE) BELONGS TO THE MESSAGE PANE, SO NOTHING DRAGS WHILE
+//AN OVERLAY OWNS THE SCREEN IN FRONT OF IT
+fn selectable(app: &App) -> bool
+{
+    app.tofu.is_none() && app.login.is_none() && !app.settings.open
+}
+
+//HAND THE SELECTION TO THE TERMINAL WITH OSC 52. THERE IS NO ANSWER TO THIS AND NO CLIPBOARD LIBRARY
+//BEHIND IT - THE TERMINAL EITHER TAKES IT OR IGNORES IT, AND EITHER WAY IT COSTS NO SYSTEM DEPENDENCY
+//AND WORKS THROUGH AN SSH SESSION, WHERE A LOCAL CLIPBOARD WOULD BE THE WRONG MACHINE'S
+fn copy_to_clipboard(text: &str)
+{
+    let mut stdout = io::stdout();
+
+    let _ = write!(stdout, "\x1b]52;c;{}\x07", BASE64_STANDARD.encode(text));
+    let _ = stdout.flush();
+}
+
 pub fn init() -> Result<Tui>
 {
     //NO Terminal::clear() HERE - IT QUERIES THE CURSOR POSITION (WHICH SOME TERMINALS NEVER ANSWER)
@@ -266,6 +286,8 @@ pub async fn run
                     network::send(&mut *write_stream.lock().await,
                         PacketCode::List { users: None }, options::get_keys().as_ref()).await;
                 }
+
+                app.expire_notice();
 
                 if app.dirty
                 {
@@ -356,18 +378,49 @@ async fn handle_terminal_event
                 MouseEventKind::ScrollUp => app.scroll_up(SCROLL_STEP, viewport),
                 MouseEventKind::ScrollDown => app.scroll_down(SCROLL_STEP, viewport),
 
-                //A CLICK ON AN IMAGE CAPTION FETCHES THE PICTURE. THE HISTORY REPLAYS HASHES RATHER THAN
-                //BYTES, SO THIS IS THE ONLY THING THAT EVER PUTS A STORED PICTURE ON THE WIRE
-                MouseEventKind::Down(MouseButton::Left) if app.tofu.is_none() && app.login.is_none() && !app.settings.open =>
+                //A PRESS IN THE PANE ANCHORS A SELECTION. IT IS NOT ONE YET - WITHOUT A DRAG BEHIND IT
+                //THE RELEASE IS AN ORDINARY CLICK, WHICH IS WHAT KEEPS THE IMAGE CAPTIONS CLICKABLE
+                MouseEventKind::Down(MouseButton::Left) if selectable(app) =>
                 {
-                    if let Some(write_stream) = write_stream
-                        && let Some(entry) = app.image_at(mouse.column, mouse.row)
-                        && let Some(hash) = app.request_image(entry)
+                    if !app.selection_start(mouse.column, mouse.row) { app.clear_selection(); }
+                },
+
+                MouseEventKind::Drag(MouseButton::Left) if selectable(app) =>
+                {
+                    app.selection_extend(mouse.column, mouse.row);
+                },
+
+                MouseEventKind::Up(MouseButton::Left) if selectable(app) =>
+                {
+                    //WHETHER THIS WAS A SELECTION IS THE DRAG'S ANSWER AND NOT THE TEXT'S - A DRAG THAT
+                    //PICKED UP NOTHING BUT BLANKS IS STILL A DRAG, AND MUST NOT FETCH A PICTURE
+                    if app.selection.is_some_and(|selection| selection.dragged)
                     {
-                        network::send(&mut *write_stream.lock().await,
-                            PacketCode::ImageData { hash, data: None }, options::get_keys().as_ref()).await;
+                        //THE TERMINAL'S OWN DRAG-SELECT IS GONE WHILE THE MOUSE IS CAPTURED, SO THE COPY IS
+                        //OURS TO MAKE: OSC 52 HANDS IT TO THE TERMINAL, WHICH ALSO WORKS OVER SSH
+                        if let Some(text) = app.selection_text()
+                        {
+                            let lines = text.lines().count();
+
+                            copy_to_clipboard(&text);
+                            app.notify(format!("Copied {lines} line{} to the clipboard", if lines == 1 { "" } else { "s" }));
+                        }
+                    } else
+                    {
+                        app.clear_selection();
+
+                        //A CLICK ON AN IMAGE CAPTION FETCHES THE PICTURE. THE HISTORY REPLAYS HASHES RATHER
+                        //THAN BYTES, SO THIS IS THE ONLY THING THAT EVER PUTS A STORED PICTURE ON THE WIRE
+                        if let Some(write_stream) = write_stream
+                            && let Some(entry) = app.image_at(mouse.column, mouse.row)
+                            && let Some(hash) = app.request_image(entry)
+                        {
+                            network::send(&mut *write_stream.lock().await,
+                                PacketCode::ImageData { hash, data: None }, options::get_keys().as_ref()).await;
+                        }
                     }
                 },
+
                 _ => {},
             }
 
@@ -570,7 +623,11 @@ async fn handle_key
         KeyCode::PageUp => app.scroll_up(viewport.saturating_sub(1).max(1), viewport),
         KeyCode::PageDown => app.scroll_down(viewport.saturating_sub(1).max(1), viewport),
 
-        KeyCode::Esc => app.palette.dismiss(),
+        KeyCode::Esc =>
+        {
+            app.palette.dismiss();
+            app.clear_selection();
+        },
 
         KeyCode::Tab => { complete_selection(app, true); },
 

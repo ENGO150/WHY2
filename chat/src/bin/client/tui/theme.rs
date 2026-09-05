@@ -139,6 +139,12 @@ pub const LOGO_UNDER: Style = Style::new().bg(LOGO_COLOR);                      
 
 pub const SELECTED: Style = Style::new().bg(Color::Rgb(0x00, 0x5F, 0x5F));
 
+//THE DRAG-SELECTED RUN OF THE MESSAGE PANE - THE CHROME'S SKY BLUE TAKEN DOWN TO A BACKGROUND, AND A
+//BACKGROUND ONLY: EVERY GLYPH KEEPS ITS OWN COLOUR, SO A USERNAME STAYS THE COLOUR IT IS BEING COPIED AS.
+//THE FULL ACCENT WOULD MEAN REPAINTING THE TEXT DARK TO STAY READABLE ON IT, WHICH IS THE ONE THING A
+//SELECTION MUST NOT DO
+pub const SELECTION: Style = Style::new().bg(Color::Rgb(0x30, 0x45, 0x63));
+
 pub const ARG_REQUIRED: Style = Style::new().fg(Color::Rgb(0xD7, 0xAF, 0x87));  //SOFT SAND
 pub const ARG_OPTIONAL: Style = Style::new().fg(Color::Rgb(0xFF, 0xB4, 0xAB));  //FADED CORAL
 pub const ARG_ACTIVE: Style = Style::new().fg(Color::Rgb(0xFF, 0xAF, 0x5F))     //WARM AMBER - THE PARAMETER BEING TYPED
