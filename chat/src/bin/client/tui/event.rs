@@ -386,6 +386,11 @@ impl App
                 self.push_text(format!("Uploading file \"{filename}\"..."));
             },
 
+            ClientEvent::Image(filename) =>
+            {
+                self.push_text(format!("Uploading image \"{filename}\"..."));
+            },
+
             ClientEvent::Uploaded(username, filename) =>
             {
                 self.push(Line::from(vec!

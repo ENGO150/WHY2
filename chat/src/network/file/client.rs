@@ -54,7 +54,7 @@ use crate::
     },
 };
 
-pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientEvent>)
+pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientEvent>, persistent: bool)
 {
     //INIT FILE CONNECTION
     let (_read_stream, mut write_stream) = client::connect(options::get_server_address()).await.expect("File connection failed");
@@ -70,7 +70,13 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
     let size = fs::metadata(&path).await.unwrap().len();
 
     //LOG
-    tx.send(ClientEvent::Upload(filename.clone())).await.unwrap();
+    tx.send(if persistent
+    {
+        ClientEvent::Image(filename.clone())
+    } else
+    {
+        ClientEvent::Upload(filename.clone())
+    }).await.unwrap();
 
     //LOCAL SEQ COUNTER
     let mut seq = 0usize;

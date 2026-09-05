@@ -172,6 +172,7 @@ pub enum ClientEvent
     ServerSettings(Vec<ServerSetting>, bool),      //server.toml AS THE SERVER HOLDS IT (TRUE = IT HAS JUST BEEN SAVED)
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),      //server_bans.toml AS THE SERVER HOLDS IT (USERNAMES, ADDRESSES)
     Upload(String),                                //UPLOADING FILE
+    Image(String),                                 //UPLOADING IMAGE
     Uploaded(String, String),                      //USER UPLOADED FILE
     Download(String),                              //DOWNLOADING FILE
     Downloaded(String),                            //DOWNLOADED FILE
@@ -701,7 +702,8 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 //SPAWN UPLOAD TASK
                 let file_tx = tx.clone(); //CLONE TX
-                tokio::spawn(file::upload(token.unwrap(), uid.unwrap(), hash, file_tx));
+                tokio::spawn(file::upload(token.unwrap(), uid.unwrap(), hash,
+                    file_tx, matches!(read, PacketCode::Image { .. })));
                 continue;
             },
 
