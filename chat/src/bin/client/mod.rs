@@ -388,6 +388,10 @@ async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>
     let guard = TerminalGuard::enter().expect("Entering the alternate screen failed");
     let mut terminal = tui::init().expect("Creating the terminal backend failed");
 
+    //ASK THE TERMINAL WHAT IT CAN DRAW AND HOW BIG ITS CELLS ARE - THE QUERY WRITES AND READS STDIO, SO
+    //IT GOES HERE: THE ALTERNATE SCREEN IS UP AND NOTHING IS READING EVENTS YET
+    app.init_picker();
+
     tui::run(&mut terminal, &mut app, &mut rx, &tx).await;
 
     //LEAVE THE ALTERNATE SCREEN BEFORE SAYING ANYTHING ELSE
@@ -590,7 +594,14 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                         file.rewind().ok();
                                     }
 
-                                    if image && !misc::is_image(&header)
+                                    //THE SERVER TURNS AN OVERSIZED IMAGE DOWN AS INVALID USAGE, WHICH SAYS
+                                    //NOTHING ABOUT WHY - THE SIZE IS KNOWN HERE, SO IT IS SAID HERE
+                                    if image && path.metadata().map(|m| m.len()).unwrap_or(0) >
+                                        consts::MAX_IMAGE_SIZE as u64
+                                    {
+                                        app.push_styled(format!("Image is too large! (limit is {}MB)",
+                                            consts::MAX_IMAGE_SIZE / consts::MEGABYTE), theme::ERROR);
+                                    } else if image && !misc::is_image(&header)
                                     {
                                         app.push_styled("Not an image!", theme::ERROR);
                                     } else

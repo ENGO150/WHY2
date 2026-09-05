@@ -118,6 +118,7 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
     pub filename: String,       //FILENAME
     pub client_id: usize,       //ID OF SENDER
     pub path: PathBuf,          //WHERE THE UPLOAD IS BEING BUILT
+    pub image: Option<Vec<u8>>, //THE PLAINTEXT, KEPT ONLY FOR AN IMAGE - IT IS SENT ON WHEN IT IS WHOLE
     pub stream: RexStream,
 }
 
@@ -189,6 +190,14 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         return;
     }
 
+    //AN IMAGE IS NOT ONLY STORED, IT IS PUSHED TO EVERY CLIENT IN THE CHANNEL AS ONE PACKET
+    if persistent && size > consts::MAX_IMAGE_SIZE as u64
+    {
+        log::info!("Image rejected (too large): {peer_addr}");
+        server::notify(id, PacketCode::InvalidUsage).await;
+        return;
+    }
+
     //CREATE KEY & NONCE FOR FILE ENCRYPTION ON DISK. A FILESHARE KEEPS ITS RANDOM PAIR IN
     //AVAILABLE_FILES AND DIES WITH THE PROCESS; AN IMAGE IS NOT IN THAT LIST AND OUTLIVES IT, SO ITS
     //PAIR IS DERIVED FROM THE SERVER'S IMAGE KEY AND THE HASH THE FILE IS NAMED AFTER INSTEAD
@@ -240,6 +249,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
             filename,
             client_id: id,
             path: upload_path,
+            image: persistent.then(|| Vec::with_capacity(size as usize)),
             stream: disk_stream,
         });
 
@@ -326,6 +336,10 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
             //UPDATE HASHER
             active.hasher.update(&data);
 
+            //KEEP THE PLAINTEXT OF AN IMAGE - WHAT GOES TO DISK IS ENCRYPTED, AND WHAT GOES TO THE
+            //CHANNEL IS THIS. READING IT BACK OFF THE DISK WOULD MEAN DECRYPTING WHAT WE JUST HELD
+            if let Some(buffer) = active.image.as_mut() { buffer.extend_from_slice(&data); }
+
             //CHECK SIZE
             active.current_size == active.size
         };
@@ -333,16 +347,16 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         if !done { continue; } //UPLOAD STILL RUNNING
 
         //UPLOAD DONE, COLLECT FINAL STATE
-        let (final_hash, expected_hash, upload_filename, final_size) =
+        let (final_hash, expected_hash, upload_filename, final_size, image) =
         {
-            let active = match ACTIVE_FILESHARES.get(&uid)
+            let mut active = match ACTIVE_FILESHARES.get_mut(&uid)
             {
                 Some(a) => a,
                 None => return
             };
 
             let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
-            (final_hash, active.hash, active.filename.clone(), active.current_size)
+            (final_hash, active.hash, active.filename.clone(), active.current_size, active.image.take())
         };
 
         //FLUSH TO DISK BEFORE RENAMING
@@ -376,8 +390,23 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
 
         let filename = filename.into_string().unwrap_or("unnamed_file".to_string());
 
-        //DO NOT ANNOUNCE PERSISTENT FILES
-        if !persistent
+        //AN IMAGE IS SHOWN, NOT ANNOUNCED
+        if persistent
+        {
+            if let Some(data) = image
+            {
+                let channel = server::CONNECTIONS.iter()
+                    .find(|conn| conn.id() == Some(&id))
+                    .and_then(|conn| conn.channel().clone());
+
+                server::send_to_all(PacketCode::ImageDisplay
+                {
+                    username: username.clone(),
+                    filename,
+                    data,
+                }, true, channel.as_deref());
+            }
+        } else
         {
             //ANNOUNCE FILE UPLOAD
             server::send_to_all(PacketCode::Uploaded

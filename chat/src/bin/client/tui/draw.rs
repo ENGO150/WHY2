@@ -40,6 +40,8 @@ use ratatui::
 
 use unicode_width::UnicodeWidthStr;
 
+use ratatui_image::{ Resize, ResizeEncodeRender };
+
 use crate::
 {
     config,
@@ -210,6 +212,30 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         .collect::<Vec<Line<'static>>>();
 
     frame.render_widget(Paragraph::new(visible), inner);
+
+    //THE PICTURES GO OVER THE ROWS THE WRAP RESERVED FOR THEM. resize_encode_render ONLY RE-ENCODES WHEN
+    //THE AREA IT IS HANDED CHANGED, SO A RESIZE COSTS ONE ENCODE PER PICTURE AND AN ORDINARY FRAME NONE
+    for placement in app.placements(inner.width)
+    {
+        //ONLY ONCE ITS TOP ROW IS ON SCREEN - NONE OF THE PROTOCOLS CAN CROP A PICTURE FROM ABOVE, SO
+        //SCROLLING PAST ONE LEAVES ITS ROWS EMPTY RATHER THAN DRAWING IT SOMEWHERE IT DOES NOT BELONG
+        if placement.row < offset || placement.row >= offset + viewport { continue; }
+
+        let top = placement.row - offset;
+
+        let area = Rect
+        {
+            x: inner.x,
+            y: inner.y + top,
+            width: inner.width,
+            height: placement.height.min(viewport - top),
+        };
+
+        if let Some(state::Entry::Image { protocol, .. }) = app.messages.get_mut(placement.entry)
+        {
+            protocol.resize_encode_render(&Resize::Fit(None), area, frame.buffer_mut());
+        }
+    }
 
     //THE BACKLOG IS THE ONE THING THE MESSAGE PANE CANNOT SHOW BY ITSELF
     draw_scrollbar(frame, area, total as usize, viewport as usize, offset as usize);

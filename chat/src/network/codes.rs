@@ -135,6 +135,14 @@ pub enum PacketCode //CONTROL CODES
         uid: Option<u64>,
     },
 
+    //SERVER -> CLIENT | A STORED IMAGE, AS IT WAS UPLOADED
+    ImageDisplay
+    {
+        username: String,
+        filename: String,
+        data: Vec<u8>,
+    },
+
     //SERVER -> CLIENT | ANNOUNCE NEW UPLOADED FILE
     Uploaded
     {

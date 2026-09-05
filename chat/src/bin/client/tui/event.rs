@@ -78,6 +78,13 @@ impl App
             //STORED UNRENDERED - App::theme TURNS IT INTO A LINE, AGAIN AFTER EVERY THEME CHANGE
             ClientEvent::Message(message, username, id, colors) => self.push_message(username, id, message, colors),
 
+            //A PICTURE IS AN ENTRY OF ITS OWN - THE PANE RESERVES ROWS FOR IT AND draw PAINTS THEM
+            ClientEvent::ImageDisplay(username, filename, image) => self.push_image(username, filename, *image),
+
+            //IT PASSED THE SERVER'S HEADER CHECK AND STILL WOULD NOT DECODE, SO SAY SO WHERE IT WOULD HAVE BEEN
+            ClientEvent::ImageFailed(username, filename) => self.push_styled(
+                format!("{username} sent an image that could not be displayed ({filename})."), theme::ERROR),
+
             ClientEvent::PrivateMessageSent(to, id, msg) =>
             {
                 self.push(Line::from(vec!

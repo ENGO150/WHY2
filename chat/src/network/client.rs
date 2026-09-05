@@ -28,6 +28,7 @@ use std::
 use tokio::
 {
     time,
+    task,
     io::AsyncWriteExt,
     sync::
     {
@@ -48,6 +49,8 @@ use rand::
 };
 
 use tokio_socks::tcp::Socks5Stream;
+
+use image::DynamicImage;
 
 use zeroize::Zeroizing;
 
@@ -133,68 +136,70 @@ enum Handshake
 
 pub enum ClientEvent
 {
-    Register,                                      //REGISTER PROMPT
-    Login,                                         //LOGIN PROMPT
-    FirstUser,                                     //FIRST USER
-    Authenticated(Role),                           //LOGIN SUCCESSFUL, ROLE
-    Connected(String),                             //SUCCESSFUL CONNECTION MESSAGE
-    Message(String, String, usize, MessageColors), //RECEIVED MESSAGE
-    PrivateMessageSent(String, usize, String),     //SENT PM
-    PrivateMessageRecv(String, usize, String),     //RECEIVED PM
-    TofuError,                                     //TOFU VERIFICATION REJECTED BY THE USER
-    TofuPrompt(TofuRequest),                       //TOFU DECISION ASKED OF THE USER
-    TofuSkip(String),                              //TOFU VERIFICATION SKIPPED
-    ReconnectFailed,                               //RECONNECTING AFTER PINNING THE KEY FAILED
-    HandshakeFailed(String),                       //THE KEY EXCHANGE DID NOT ADD UP
-    VoiceActivity(Vec<VoiceUser>),                 //VOICE OVERLAY
-    VoiceRoster(Vec<(usize, String)>),             //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
-    VoiceJoin(usize, String),                      //SOMEBODY JOINED VOICE IN OUR CHANNEL
-    VoiceLeave(usize),                             //SOMEBODY LEFT VOICE IN OUR CHANNEL
-    Join(String),                                  //CLIENT CONNECTED
-    Leave(String, usize),                          //CLIENT DISCONNECTED
-    ServerSay(String),                             //SERVER MESSAGE
-    Role(Role, Option<String>),                    //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
-    History(Vec<StoredMessage>),                   //THE LOBBY'S STORED MESSAGES, SENT ONCE AT LOGIN
-    ChannelChanged(Option<String>),                //WE SWITCHED CHANNEL
-    ChannelCreated(String),                        //CHANNEL CREATED
-    ChannelDestroyed(String),                      //CHANNEL ABANDONED
-    Muted,                                         //HAHA
-    InvalidUsage,                                  //INVALID COMMAND USAGE
-    VersionFailed,                                 //FETCHING VERSIONS FAILED
-    VersionMismatch(String, String),               //MISMATCH GIT HASH
-    UnsafeVersion(usize, Version, String),         //OLD VERSION
-    Username(bool, u64, u64),                      //USERNAME PROMPT
-    VoiceEnabled,                                  //VOICE CHAT ENABLED
-    VoiceDeviceFailed,                             //REBUILDING THE AUDIO STREAMS FAILED
-    VoiceHandshakeFailed,                          //THE SERVER NEVER ANSWERED THE UDP HANDSHAKE
-    VoiceDisabled,                                 //VOICE CHAT DISABLED
-    List(Vec<OnlineUser>),                         //LIST OF USERS
-    ServerSettings(Vec<ServerSetting>, bool),      //server.toml AS THE SERVER HOLDS IT (TRUE = IT HAS JUST BEEN SAVED)
-    ServerBans(Vec<BanEntry>, Vec<BanEntry>),      //server_bans.toml AS THE SERVER HOLDS IT (USERNAMES, ADDRESSES)
-    Upload(String),                                //UPLOADING FILE
-    Image(String),                                 //UPLOADING IMAGE
-    Uploaded(String, String),                      //USER UPLOADED FILE
-    Download(String),                              //DOWNLOADING FILE
-    Downloaded(String),                            //DOWNLOADED FILE
-    DownloadFailed(String),                        //DOWNLOADING FAILED
-    Files(Vec<UserFile>),                          //FILE LIST
-    Screens(Vec<UserScreen>),                      //SCREENSHARE LIST
-    UploadLimit,                                   //MAX CONCURRENT UPLOADS REACHED
-    Screen(bool),                                  //TOGGLED SCREENSHARE
-    ScreenFailed(String),                          //SCREEN CAPTURE FAILED
-    Attach(String),                                //ATTACHED SCREENSHARE
-    Deattach(String),                              //DEATTACHED SCREENSHARE
-    Attached(String),                              //SOMEBODY ATTACHED OUR SCREENSHARE
-    Deattached(String),                            //SOMEBODY DEATTACHED OUR SCREENSHARE
-    Screenshare(String),                           //SOMEBODY STARTED SCREENSHARING
-    ScreenshareEnd(String),                        //SOMEBODY STOPPED SCREENSHARING
-    IncompatibleVersion(String, String),           //INCOMPATIBLE SERVER VERSION
-    UsernameRejected,                              //USERNAME REJECTED BY SERVER
-    PasswordRejected(u64),                         //PASSWORD REJECTED BY SERVER
-    SpamWarning,                                   //SPAM WARNING
-    Socks5Voice,                                   //DISABLED VOICE ON SOCKS5
-    DisabledFeature,                               //DISABLED FEATURE
-    Quit,                                          //SERVER QUIT COMMUNICATION
+    Register,                                        //REGISTER PROMPT
+    Login,                                           //LOGIN PROMPT
+    FirstUser,                                       //FIRST USER
+    Authenticated(Role),                             //LOGIN SUCCESSFUL, ROLE
+    Connected(String),                               //SUCCESSFUL CONNECTION MESSAGE
+    Message(String, String, usize, MessageColors),   //RECEIVED MESSAGE
+    PrivateMessageSent(String, usize, String),       //SENT PM
+    PrivateMessageRecv(String, usize, String),       //RECEIVED PM
+    TofuError,                                       //TOFU VERIFICATION REJECTED BY THE USER
+    TofuPrompt(TofuRequest),                         //TOFU DECISION ASKED OF THE USER
+    TofuSkip(String),                                //TOFU VERIFICATION SKIPPED
+    ReconnectFailed,                                 //RECONNECTING AFTER PINNING THE KEY FAILED
+    HandshakeFailed(String),                         //THE KEY EXCHANGE DID NOT ADD UP
+    VoiceActivity(Vec<VoiceUser>),                   //VOICE OVERLAY
+    VoiceRoster(Vec<(usize, String)>),               //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
+    VoiceJoin(usize, String),                        //SOMEBODY JOINED VOICE IN OUR CHANNEL
+    VoiceLeave(usize),                               //SOMEBODY LEFT VOICE IN OUR CHANNEL
+    Join(String),                                    //CLIENT CONNECTED
+    Leave(String, usize),                            //CLIENT DISCONNECTED
+    ServerSay(String),                               //SERVER MESSAGE
+    Role(Role, Option<String>),                      //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
+    History(Vec<StoredMessage>),                     //THE LOBBY'S STORED MESSAGES, SENT ONCE AT LOGIN
+    ChannelChanged(Option<String>),                  //WE SWITCHED CHANNEL
+    ChannelCreated(String),                          //CHANNEL CREATED
+    ChannelDestroyed(String),                        //CHANNEL ABANDONED
+    Muted,                                           //HAHA
+    InvalidUsage,                                    //INVALID COMMAND USAGE
+    VersionFailed,                                   //FETCHING VERSIONS FAILED
+    VersionMismatch(String, String),                 //MISMATCH GIT HASH
+    UnsafeVersion(usize, Version, String),           //OLD VERSION
+    Username(bool, u64, u64),                        //USERNAME PROMPT
+    VoiceEnabled,                                    //VOICE CHAT ENABLED
+    VoiceDeviceFailed,                               //REBUILDING THE AUDIO STREAMS FAILED
+    VoiceHandshakeFailed,                            //THE SERVER NEVER ANSWERED THE UDP HANDSHAKE
+    VoiceDisabled,                                   //VOICE CHAT DISABLED
+    List(Vec<OnlineUser>),                           //LIST OF USERS
+    ServerSettings(Vec<ServerSetting>, bool),        //server.toml AS THE SERVER HOLDS IT (TRUE = IT HAS JUST BEEN SAVED)
+    ServerBans(Vec<BanEntry>, Vec<BanEntry>),        //server_bans.toml AS THE SERVER HOLDS IT (USERNAMES, ADDRESSES)
+    Upload(String),                                  //UPLOADING FILE
+    Image(String),                                   //UPLOADING IMAGE
+    ImageDisplay(String, String, Box<DynamicImage>), //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
+    ImageFailed(String, String),                     //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
+    Uploaded(String, String),                        //USER UPLOADED FILE
+    Download(String),                                //DOWNLOADING FILE
+    Downloaded(String),                              //DOWNLOADED FILE
+    DownloadFailed(String),                          //DOWNLOADING FAILED
+    Files(Vec<UserFile>),                            //FILE LIST
+    Screens(Vec<UserScreen>),                        //SCREENSHARE LIST
+    UploadLimit,                                     //MAX CONCURRENT UPLOADS REACHED
+    Screen(bool),                                    //TOGGLED SCREENSHARE
+    ScreenFailed(String),                            //SCREEN CAPTURE FAILED
+    Attach(String),                                  //ATTACHED SCREENSHARE
+    Deattach(String),                                //DEATTACHED SCREENSHARE
+    Attached(String),                                //SOMEBODY ATTACHED OUR SCREENSHARE
+    Deattached(String),                              //SOMEBODY DEATTACHED OUR SCREENSHARE
+    Screenshare(String),                             //SOMEBODY STARTED SCREENSHARING
+    ScreenshareEnd(String),                          //SOMEBODY STOPPED SCREENSHARING
+    IncompatibleVersion(String, String),             //INCOMPATIBLE SERVER VERSION
+    UsernameRejected,                                //USERNAME REJECTED BY SERVER
+    PasswordRejected(u64),                           //PASSWORD REJECTED BY SERVER
+    SpamWarning,                                     //SPAM WARNING
+    Socks5Voice,                                     //DISABLED VOICE ON SOCKS5
+    DisabledFeature,                                 //DISABLED FEATURE
+    Quit,                                            //SERVER QUIT COMMUNICATION
 }
 
 //LISTS
@@ -713,6 +718,26 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 //SPAWN DOWNLOAD TASK
                 let file_tx = tx.clone(); //CLONE TX
                 tokio::spawn(file::download(token.unwrap(), file_tx));
+                continue;
+            },
+
+            //SOMEBODY'S IMAGE
+            PacketCode::ImageDisplay { username, filename, data } =>
+            {
+                let image_tx = tx.clone();
+
+                tokio::spawn(async move
+                {
+                    let image = task::spawn_blocking(move || image::load_from_memory(&data).ok())
+                        .await.expect("Decoding image panicked");
+
+                    image_tx.send(match image
+                    {
+                        Some(image) => ClientEvent::ImageDisplay(username, filename, Box::new(image)),
+                        None => ClientEvent::ImageFailed(username, filename),
+                    }).await.unwrap();
+                });
+
                 continue;
             },
 

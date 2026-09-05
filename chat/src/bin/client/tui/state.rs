@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     mem,
+    iter,
     collections::
     {
         BTreeMap,
@@ -35,6 +36,16 @@ use ratatui::
 };
 
 use unicode_width::UnicodeWidthChar;
+
+use image::DynamicImage;
+
+use ratatui_image::
+{
+    FontSize,
+    FilterType,
+    picker::Picker,
+    protocol::StatefulProtocol,
+};
 
 use crate::
 {
@@ -65,6 +76,7 @@ use super::
 
 //CONSTS
 pub const HISTORY_LIMIT: usize = 5000; //CAP THE MESSAGE PANE SO RE-WRAPPING EACH FRAME STAYS CHEAP
+pub const IMAGE_ROWS: u16 = 20;        //TALLEST AN IMAGE MAY BE DRAWN - THE PANE IS A CHAT, NOT A VIEWER
 
 //ENUMS
 pub enum Entry //ONE ROW OF HISTORY
@@ -88,6 +100,25 @@ pub enum Entry //ONE ROW OF HISTORY
         text: String,
         colors: MessageColors,
     },
+
+    //A PICTURE SOMEBODY UPLOADED. THE LINE IS ONLY ITS CAPTION - THE PICTURE IS DRAWN OVER THE ROWS
+    //RESERVED UNDER IT, AND THE PROTOCOL IS ITS ENCODED FORM, RE-ENCODED ONLY WHEN THE PANE RESIZES
+    Image
+    {
+        username: String,
+        filename: String,
+        pixels: (u32, u32),
+        protocol: StatefulProtocol,
+    },
+}
+
+//STRUCTS
+#[derive(Clone, Copy)]
+pub struct Placement //WHERE ONE IMAGE'S RESERVED ROWS SIT IN THE WRAPPED VIEW
+{
+    pub entry: usize, //WHICH App::messages ENTRY IT BELONGS TO
+    pub row: u16,     //FIRST RESERVED ROW
+    pub height: u16,
 }
 
 //STRUCTS
@@ -121,6 +152,7 @@ pub struct App
     pub login: Option<Login>, //CONNECT BOX - UP FROM THE FIRST FRAME UNTIL THE SERVER ACCEPTS US
     pub tofu: Option<Prompt>, //SERVER IDENTITY PROMPT - OUTRANKS EVERY OTHER OVERLAY WHILE IT IS UP
     pub theme: Theme,
+    pub picker: Picker, //WHAT THE TERMINAL CAN DRAW, AND HOW BIG ITS CELLS ARE
 
     //REQUEST BOOKKEEPING (A LIST/SCREENS RESPONSE IS ONLY ECHOED WHEN THE USER ASKED FOR IT)
     pub list_requested: bool,
@@ -139,7 +171,7 @@ pub struct App
 
     //WRAP CACHE
     generation: u64,
-    wrapped: Option<(u16, u64, Vec<Line<'static>>)>,
+    wrapped: Option<(u16, u64, Vec<Line<'static>>, Vec<Placement>)>,
 }
 
 //IMPLEMENTATIONS
@@ -175,6 +207,7 @@ impl App
             login: Some(Login::new()),
             tofu: None,
             theme: Theme::load(),
+            picker: Picker::halfblocks(), //UNTIL init_picker HAS ASKED THE TERMINAL FOR SOMETHING BETTER
             list_requested: false,
             #[cfg(feature = "client_screen")]
             screens_requested: false,
@@ -252,6 +285,33 @@ impl App
     pub fn push_history(&mut self, username: String, text: String, colors: MessageColors)
     {
         self.push_entry(Entry::History { username, text, colors });
+    }
+
+    //A PICTURE IS ENCODED FOR THE TERMINAL ONCE, HERE - THE DECODE ITSELF ALREADY HAPPENED OFF THE LOOP
+    pub fn push_image(&mut self, username: String, filename: String, image: DynamicImage)
+    {
+        //IT IS NEVER DRAWN TALLER THAN IMAGE_ROWS, SO NOTHING ABOVE THAT IS WORTH KEEPING - AND THE
+        //PROTOCOL HOLDS ON TO WHAT IT IS GIVEN, WHICH FOR A PHONE PHOTO IS TENS OF MEGABYTES DECODED
+        let font = self.picker.font_size();
+        let limit = IMAGE_ROWS as u32 * font.height as u32;
+
+        let image = match image.height() > limit
+        {
+            true => image.resize(image.width(), limit, FilterType::Triangle),
+            false => image,
+        };
+
+        let pixels = (image.width(), image.height());
+        let protocol = self.picker.new_resize_protocol(image);
+
+        self.push_entry(Entry::Image { username, filename, pixels, protocol });
+    }
+
+    //THE QUERY WANTS STDIO TO ITSELF: AFTER THE ALTERNATE SCREEN IS UP, BEFORE ANYTHING READS EVENTS.
+    //A TERMINAL THAT DOES NOT ANSWER STILL GETS PICTURES - HALFBLOCKS ARE A FALLBACK, NOT A FAILURE
+    pub fn init_picker(&mut self)
+    {
+        if let Ok(picker) = Picker::from_query_stdio() { self.picker = picker; }
     }
 
     fn push_entry(&mut self, entry: Entry)
@@ -406,30 +466,78 @@ impl App
     //WRAPPED VIEW (CACHED PER WIDTH + HISTORY GENERATION)
     pub fn wrapped_lines(&mut self, width: u16) -> &[Line<'static>]
     {
-        let stale = match &self.wrapped
-        {
-            Some((w, g, _)) => *w != width || *g != self.generation,
-            None => true,
-        };
-
-        if stale
-        {
-            let theme = &self.theme;
-            let lines = self.messages.iter().flat_map(|entry| wrap_line(&theme.render(entry), width)).collect();
-
-            self.wrapped = Some((width, self.generation, lines));
-        }
+        self.rewrap(width);
 
         &self.wrapped.as_ref().unwrap().2
     }
 
+    //WHERE THE PICTURES SIT IN THAT VIEW - draw NEEDS THE ROWS AND THE ENTRY BEHIND EACH OF THEM
+    pub fn placements(&mut self, width: u16) -> Vec<Placement>
+    {
+        self.rewrap(width);
+
+        self.wrapped.as_ref().unwrap().3.clone()
+    }
+
+    fn rewrap(&mut self, width: u16)
+    {
+        let stale = match &self.wrapped
+        {
+            Some((w, g, _, _)) => *w != width || *g != self.generation,
+            None => true,
+        };
+
+        if !stale { return; }
+
+        let theme = &self.theme;
+        let font = self.picker.font_size();
+
+        let mut lines: Vec<Line<'static>> = Vec::new();
+        let mut placements: Vec<Placement> = Vec::new();
+
+        for (entry, message) in self.messages.iter().enumerate()
+        {
+            lines.extend(wrap_line(&theme.render(message), width));
+
+            //AN IMAGE RESERVES ITS ROWS AS BLANK LINES, SO THE SCROLL OFFSET STAYS EXACT AND THE PANE
+            //STAYS A LIST OF LINES - THE PICTURE IS PAINTED OVER THEM AFTERWARDS
+            if let Entry::Image { pixels, .. } = message
+            {
+                let height = image_rows(*pixels, width, font);
+
+                placements.push(Placement { entry, row: lines.len() as u16, height });
+                lines.extend(iter::repeat_n(Line::default(), height as usize));
+            }
+        }
+
+        self.wrapped = Some((width, self.generation, lines, placements));
+    }
+
     fn wrapped_len(&self) -> u16
     {
-        self.wrapped.as_ref().map(|(_, _, l)| l.len() as u16).unwrap_or(0)
+        self.wrapped.as_ref().map(|(_, _, lines, _)| lines.len() as u16).unwrap_or(0)
     }
 }
 
 //FUNCTIONS
+//HOW MANY ROWS A PICTURE RESERVES. Resize::Fit SHRINKS INTO THE BOX AND NEVER GROWS INTO IT, SO A SMALL
+//PICTURE KEEPS ITS OWN SIZE - THIS HAS TO AGREE WITH WHAT draw HANDS THE PROTOCOL, OR THE ROWS LIE
+pub fn image_rows((width_px, height_px): (u32, u32), width: u16, font: FontSize) -> u16
+{
+    if width_px == 0 || height_px == 0 { return 1; }
+
+    let available_width = (width.max(1) as u32 * font.width as u32) as f64;
+    let available_height = (IMAGE_ROWS as u32 * font.height as u32) as f64;
+
+    let scale = (available_width / width_px as f64)
+        .min(available_height / height_px as f64)
+        .min(1.0);
+
+    let rows = (height_px as f64 * scale / font.height as f64).ceil() as u16;
+
+    rows.clamp(1, IMAGE_ROWS)
+}
+
 pub fn wrap_line(line: &Line<'static>, width: u16) -> Vec<Line<'static>> //WORD-WRAP ONE LOGICAL LINE, KEEPING SPAN STYLES
 {
     let width = width.max(1) as usize;

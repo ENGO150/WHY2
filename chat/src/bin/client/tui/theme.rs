@@ -87,6 +87,13 @@ impl Theme
                 Span::raw(": "),
                 self.colorize(text.clone(), colors.message_color),
             ]),
+
+            //ONLY THE CAPTION - THE PICTURE IS DRAWN OVER THE ROWS THE WRAP RESERVES UNDER IT
+            Entry::Image { username, filename, .. } => Line::from(vec!
+            [
+                Span::styled(username.clone(), ACCENT),
+                Span::styled(format!(" sent an image ({filename})"), DIM),
+            ]),
         }
     }
 
