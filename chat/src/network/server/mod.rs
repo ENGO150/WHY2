@@ -38,6 +38,7 @@ use std::
 use tokio::
 {
     fs,
+    time,
     sync::{ Mutex, oneshot },
     net::tcp::OwnedWriteHalf,
     task::{ self, AbortHandle },
@@ -340,7 +341,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
             },
 
             Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, role,
-                id, attached_screen, last_activity, channel, seq, server_seq, peer_addr, alive, muted, .. } =>
+                id, attached_screen, last_activity, last_image, channel, seq, server_seq, peer_addr, alive, muted, .. } =>
             {
                 Connection::Authenticated
                 {
@@ -356,6 +357,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     attached_screen,
                     last_activity,
                     last_key_exchange: Instant::now(),
+                    last_image,
                     spam_violations: 0,
                     channel,
                     seq,
@@ -387,6 +389,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, role: Role, id: u
             attached_screen: None,
             last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
             last_key_exchange: old_connection.last_key_exchange().copied().unwrap_or_else(Instant::now),
+            last_image: Instant::now() - consts::IMAGE_REQUEST_DELAY,
             spam_violations: 0,
             channel: None,
             seq: *old_connection.seq(),
@@ -426,6 +429,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             attached_screen: old_connection.attached_screen().clone(),
             last_activity: Instant::now(),
             last_key_exchange: *old_connection.last_key_exchange().unwrap(),
+            last_image: *old_connection.last_image().unwrap(),
             spam_violations: *old_connection.spam_violations().unwrap(),
             channel: channel.clone(),
             seq: *old_connection.seq(),
@@ -1204,6 +1208,18 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             //IS THE GUARD: A HASH IT DOES NOT NAME IS NOT SERVED, SO NOTHING ELSE IN images/ IS REACHABLE
             PacketCode::ImageData { hash, .. } =>
             {
+                //CHEAP TO ASK FOR, EXPENSIVE TO ANSWER - SO ONE CLIENT IS HELD TO ONE PER
+                //IMAGE_REQUEST_DELAY, SERVED LATE RATHER THAN REFUSED (THE CLIENT NEVER RETRIES)
+                let wait = CONNECTIONS.get(&peer_addr)
+                    .and_then(|conn| conn.last_image().map(|last| consts::IMAGE_REQUEST_DELAY
+                        .saturating_sub(last.elapsed())))
+                    .unwrap_or_default(); //GUARD DROPPED HERE - NEVER HELD ACROSS THE SLEEP
+
+                if !wait.is_zero() { time::sleep(wait).await; }
+
+                if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
+                    && let Some(last) = conn.last_image_mut() { *last = Instant::now(); }
+
                 let image = match config::messages::has_image(&hash)
                 {
                     true => file::read_image(&hash).await,

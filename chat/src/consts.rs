@@ -16,7 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::sync::Arc;
+use std::
+{
+    sync::Arc,
+    time::Duration,
+};
 
 use tokio::
 {
@@ -70,6 +74,10 @@ pub const UPLOAD_CHUNK_SIZE: usize     = MEGABYTE;                              
 pub const IMAGE_HEADER_SIZE: usize     = 16;                                          //BYTES AN IMAGE IS RECOGNISED BY
 pub const MAX_IMAGE_SIZE: usize        = 8 * MEGABYTE;                                //BIGGEST IMAGE THE SERVER PASSES ON (8MB)
 pub const MAX_HISTORY_SIZE: usize      = 12 * MEGABYTE;                               //BIGGEST HISTORY THE SERVER REPLAYS (12MB)
+pub const MAX_IMAGE_DIMENSION: u32     = 16_384;                                      //WIDEST/TALLEST PICTURE A CLIENT DECODES
+pub const MAX_IMAGE_ALLOC: u64         = 256 * MEGABYTE as u64;                       //MOST MEMORY ONE DECODE MAY TAKE (256MB)
+
+pub const IMAGE_REQUEST_DELAY: Duration    = Duration::from_millis(500);              //SPACING OF ONE CLIENT'S IMAGE FETCHES
 
 pub const MAX_AUXILIARY_PACKET_SIZE: usize = UPLOAD_CHUNK_SIZE * 2;                   //FILE/SCREEN SIDE CHANNELS (2MB)
 pub const MAX_PACKET_CEILING: usize        = 16 * MEGABYTE;                           //ABSOLUTE CEILING WHEN SPAM PROTECTION IS OFF (16MB)

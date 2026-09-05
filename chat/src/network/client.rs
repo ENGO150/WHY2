@@ -18,11 +18,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    io::{ Error, ErrorKind },
     time::Duration,
     sync::Mutex,
     path::PathBuf,
     collections::BTreeMap,
+    io::
+    {
+        Cursor,
+        Error,
+        ErrorKind,
+    },
 };
 
 use tokio::
@@ -50,7 +55,12 @@ use rand::
 
 use tokio_socks::tcp::Socks5Stream;
 
-use image::DynamicImage;
+use image::
+{
+    Limits,
+    ImageReader,
+    DynamicImage,
+};
 
 use zeroize::Zeroizing;
 
@@ -357,6 +367,22 @@ pub async fn connect(connecting_addr: String) -> Result<(OwnedReadHalf, OwnedWri
             s.set_nodelay(true)?;
             Ok(s.into_split())
         })
+}
+
+//DECODE UNDER EXPLICIT LIMITS - MAX_IMAGE_SIZE BOUNDS THE BYTES ON THE WIRE AND NOT WHAT THEY UNPACK TO
+fn decode_image(data: &[u8]) -> Option<DynamicImage>
+{
+    let mut reader = ImageReader::new(Cursor::new(data)).with_guessed_format().ok()?;
+
+    let mut limits = Limits::default();
+
+    limits.max_image_width = Some(consts::MAX_IMAGE_DIMENSION);
+    limits.max_image_height = Some(consts::MAX_IMAGE_DIMENSION);
+    limits.max_alloc = Some(consts::MAX_IMAGE_ALLOC);
+
+    reader.limits(limits);
+
+    reader.decode().ok()
 }
 
 pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
@@ -740,7 +766,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 {
                     let image = match data
                     {
-                        Some(data) => task::spawn_blocking(move || image::load_from_memory(&data).ok())
+                        Some(data) => task::spawn_blocking(move || decode_image(&data))
                             .await.expect("Decoding image panicked"),
 
                         None => None,
@@ -758,7 +784,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                 tokio::spawn(async move
                 {
-                    let image = task::spawn_blocking(move || image::load_from_memory(&data).ok())
+                    let image = task::spawn_blocking(move || decode_image(&data))
                         .await.expect("Decoding image panicked");
 
                     image_tx.send(match image

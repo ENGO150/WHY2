@@ -101,6 +101,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         attached_screen: Option<Attach>,                         //SCREEN DOWNLOAD STREAM & TARGET ID
         last_activity: Instant,                                  //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
         last_key_exchange: Instant,                              //TIME OF LAST REKEY
+        last_image: Instant,                                     //TIME OF LAST SERVED IMAGE FETCH
         spam_violations: usize,                                  //SPAM VIOLATIONS (unexpected, huh?)
         channel: Option<String>,                                 //CHANNEL
         seq: usize,                                              //SEQUENCE NUMBER (CLIENT -> SERVER)
@@ -243,6 +244,26 @@ impl Connection
         {
             Self::Authenticated { last_activity, .. } => last_activity,
             Self::NonAuthenticated { last_activity, .. } => last_activity,
+        }
+    }
+
+    //GET LAST SERVED IMAGE FETCH FROM Connection
+    pub fn last_image(&self) -> Option<&Instant>
+    {
+        match self
+        {
+            Self::Authenticated { last_image, .. } => Some(last_image),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //GET LAST SERVED IMAGE FETCH FROM Connection AS MUTABLE
+    pub fn last_image_mut(&mut self) -> Option<&mut Instant>
+    {
+        match self
+        {
+            Self::Authenticated { last_image, .. } => Some(last_image),
+            Self::NonAuthenticated { .. } => None,
         }
     }
 
