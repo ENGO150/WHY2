@@ -25,15 +25,22 @@ A) Core Algorithm Design
    - Block Structure: 2D matrix of 64-bit signed integers (i64)
    - Default Size: 8×8 grid (4096-bit blocks), customizable to 2×2 through 16×16+
 
+   Round Structure: whitening key, 15 keyed rounds, whitening key (ROUND_KEYS = 17)
+   - The trailing whitening key matters: without it the permutation would end on the
+     public, unkeyed MixColumns, which CTR mode would let an attacker strip for free.
+
    Nonlinear Layer (SubCell):
    - ARX (Add-Rotate-XOR) construction inspired by TEA/XTEA
    - Operates on 32-bit halves via Feistel-like network
-   - 4 rounds per cell with golden ratio constant (DELTA_32)
+   - 5 rounds per cell with golden ratio constant (DELTA_32)
    - Security Benefit: No lookup tables => immune to cache-timing attacks
 
    Diffusion Layers:
    - ShiftRows: Key-dependent row rotations (not fixed like in AES)
-   - MixColumns: True MDS matrix multiplication
+   - MixColumns: True MDS matrix multiplication over GF(2^64). The matrix is Hadamard
+     and involutory, with coefficients chosen exhaustively as the cheapest vector that is
+     both MDS (branch number H + 1) and its own inverse - so the layer needs no general
+     field multiply, and no carry-less multiply instruction, without giving up diffusion.
    - Key mixing: XOR with ChaCha20-expanded round keys
 
    Mode: Counter (CTR) with grid-based nonce + block index
