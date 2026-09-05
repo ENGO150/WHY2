@@ -174,6 +174,27 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::Shar
     }).collect()), mac)
 }
 
+#[cfg(feature = "server")]
+fn media_key(filename: &str) -> Zeroizing<[u8; 32]>
+{
+    let path = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR + filename;
+
+    //LOAD KEY
+    if let Ok(bytes) = fs::read(&path)
+        && let Ok(key) = <[u8; 32]>::try_from(bytes.as_slice())
+    {
+        return Zeroizing::new(key);
+    }
+
+    //NO KEY, OR A TRUNCATED ONE - THE HISTORY UNDER IT IS UNREADABLE EITHER WAY, SO START A NEW ONE
+    let mut key = Zeroizing::new([0u8; 32]);
+    SysRng.try_fill_bytes(key.as_mut()).expect("Failed to generate history key");
+
+    write_secure_key(path, key.as_ref());
+
+    key
+}
+
 //PUBLIC
 pub fn public_bytes(key: &PublicKey) -> [u8; consts_chat::ECC_PUBKEY_SIZE]
 {
@@ -291,22 +312,7 @@ pub fn get_server_keys() -> (Zeroizing<String>, String) //GET SERVER ECC KEYS (O
 #[cfg(feature = "server")]
 pub fn history_key() -> Zeroizing<[u8; 32]> //THE MESSAGE HISTORY'S AT-REST KEY, CREATED ON FIRST USE
 {
-    let path = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR + consts_chat::SERVER_HISTORY_KEY;
-
-    //LOAD KEY
-    if let Ok(bytes) = fs::read(&path)
-        && let Ok(key) = <[u8; 32]>::try_from(bytes.as_slice())
-    {
-        return Zeroizing::new(key);
-    }
-
-    //NO KEY, OR A TRUNCATED ONE - THE HISTORY UNDER IT IS UNREADABLE EITHER WAY, SO START A NEW ONE
-    let mut key = Zeroizing::new([0u8; 32]);
-    SysRng.try_fill_bytes(key.as_mut()).expect("Failed to generate history key");
-
-    write_secure_key(path, key.as_ref());
-
-    key
+    media_key(consts_chat::SERVER_HISTORY_KEY)
 }
 
 #[cfg(feature = "server")]
