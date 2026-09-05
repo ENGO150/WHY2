@@ -143,6 +143,13 @@ pub enum PacketCode //CONTROL CODES
         data: Vec<u8>,
     },
 
+    //CLIENT <> SERVER | ASK FOR ONE OF THE HISTORY'S PICTURES, ANSWERED WITH data (None = IT IS GONE).
+    ImageData
+    {
+        hash: [u8; 32],
+        data: Option<Vec<u8>>,
+    },
+
     //SERVER -> CLIENT | ANNOUNCE NEW UPLOADED FILE
     Uploaded
     {
@@ -247,14 +254,14 @@ pub enum SettingValue
     Text(String),
 }
 
-//ONE MESSAGE AS server_messages.bin KEEPS IT. THE HISTORY OUTLIVES THE SESSION THAT SAID IT, SO THE
-//SENDER'S ID IS NOT KEPT - THEIR COLORS ARE, BECAUSE THEY ARE PART OF WHAT THE MESSAGE LOOKED LIKE
+//ONE MESSAGE AS server_messages.bin KEEPS IT
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
 pub struct StoredMessage
 {
     pub username: String,
-    pub text: String,
+    pub text: String,            //THE MESSAGE - OR THE FILENAME, WHEN THIS LINE IS AN IMAGE
     pub colors: MessageColors,
+    pub image: Option<[u8; 32]>, //CONTENT HASH OF THE PICTURE, WHICH IS WHAT MAKES THIS LINE ONE
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]

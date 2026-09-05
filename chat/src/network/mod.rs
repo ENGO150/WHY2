@@ -432,7 +432,7 @@ pub async fn receive
                     let mut grace = true;
 
                     //SPAM
-                    if !matches!(packet.code, PacketCode::KeepAlive) &&
+                    if !matches!(packet.code, PacketCode::KeepAlive | PacketCode::ImageData { .. }) &&
                         !matches!(packet.code, PacketCode::KeyExchangeOffer { .. } | PacketCode::KeyExchangeReply { .. })
                     {
                         //MESSAGE SIZE (ONLY FOR AUTHENTICATED)

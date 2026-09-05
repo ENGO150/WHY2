@@ -204,6 +204,10 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
     let max_offset = total.saturating_sub(viewport);
     let offset = app.scroll.map(|o| o.min(max_offset)).unwrap_or(max_offset);
 
+    //A CLICK ARRIVES AS A TERMINAL CELL AND NOTHING ELSE KNOWS WHERE THE PANE IS OR WHAT IT IS SHOWING
+    app.pane = inner;
+    app.pane_offset = offset;
+
     let visible = app.wrapped_lines(inner.width)
         .iter()
         .skip(offset as usize)
@@ -238,8 +242,8 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
             height: last - first,
         };
 
-        if let Some(state::Entry::Image { protocol: Some(protocol), .. }) =
-            app.messages.get_mut(placement.entry)
+        if let Some(state::Entry::Image { picture: state::Picture::Ready(ready), .. }) =
+            app.messages.get_mut(placement.entry) && let Some(protocol) = ready.protocol.as_mut()
         {
             let resize = Resize::Crop(Some(CropOptions { clip_top, clip_left: false }));
 

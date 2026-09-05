@@ -399,6 +399,12 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
                     .find(|conn| conn.id() == Some(&id))
                     .and_then(|conn| conn.channel().clone());
 
+                //KEEP IT, ON THE SAME TERMS AS A MESSAGE
+                if channel.is_none() && config::read_config::<bool>("persistent_messages")
+                {
+                    config::messages::store_image(&username, &filename, &final_hash);
+                }
+
                 server::send_to_all(PacketCode::ImageDisplay
                 {
                     username: username.clone(),
@@ -499,4 +505,23 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
 
     //LOG END
     log::info!("Download done: {peer_addr}");
+}
+
+//READ ONE STORED IMAGE BACK OFF DISK. THE PAIR IT WAS SEALED WITH IS DERIVED FROM THE HASH THE FILE IS
+//NAMED AFTER, SO NOTHING ABOUT IT HAS TO BE KEPT ANYWHERE - THE NAME IS THE KEY
+pub async fn read_image(hash: &[u8; 32]) -> Option<Vec<u8>>
+{
+    let sealed = fs::read(misc::get_image_dir().join(misc::hex(hash))).await.ok()?;
+
+    let (key, nonce) = crypto::image_keys(hash);
+
+    let mut disk_stream: RexStream = RexStream::new(&Grid::from_key(&key).ok()?, Grid::from_flat(&nonce).ok()?).ok()?;
+
+    let mut decrypted = disk_stream.update(&crypto::bytes_to_i64(&sealed)).ok()?;
+    decrypted.extend(disk_stream.finalize().ok()?);
+
+    let mut image = crypto::i64_to_bytes(&decrypted);
+    image.truncate(sealed.len());
+
+    Some(image)
 }

@@ -58,6 +58,7 @@ use crossterm::
         KeyEventKind,
         KeyModifiers,
         KeyboardEnhancementFlags,
+        MouseButton,
         MouseEventKind,
         DisableMouseCapture,
         EnableMouseCapture,
@@ -354,6 +355,19 @@ async fn handle_terminal_event
 
                 MouseEventKind::ScrollUp => app.scroll_up(SCROLL_STEP, viewport),
                 MouseEventKind::ScrollDown => app.scroll_down(SCROLL_STEP, viewport),
+
+                //A CLICK ON AN IMAGE CAPTION FETCHES THE PICTURE. THE HISTORY REPLAYS HASHES RATHER THAN
+                //BYTES, SO THIS IS THE ONLY THING THAT EVER PUTS A STORED PICTURE ON THE WIRE
+                MouseEventKind::Down(MouseButton::Left) if app.tofu.is_none() && app.login.is_none() && !app.settings.open =>
+                {
+                    if let Some(write_stream) = write_stream
+                        && let Some(entry) = app.image_at(mouse.column, mouse.row)
+                        && let Some(hash) = app.request_image(entry)
+                    {
+                        network::send(&mut *write_stream.lock().await,
+                            PacketCode::ImageData { hash, data: None }, options::get_keys().as_ref()).await;
+                    }
+                },
                 _ => {},
             }
 

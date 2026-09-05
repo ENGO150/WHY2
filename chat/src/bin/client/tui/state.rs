@@ -31,6 +31,7 @@ use std::
 
 use ratatui::
 {
+    layout::Rect,
     style::Style,
     text::{ Line, Span },
 };
@@ -101,26 +102,43 @@ pub enum Entry //ONE ROW OF HISTORY
         colors: MessageColors,
     },
 
-    //A PICTURE SOMEBODY UPLOADED. THE LINE IS ONLY ITS CAPTION - THE PICTURE IS DRAWN OVER THE ROWS
-    //RESERVED UNDER IT, AND THE PROTOCOL IS ITS ENCODED FORM, REBUILT ONLY WHEN THE PANE RESIZES
+    //A PICTURE SOMEBODY SENT. THE LINE IS ITS CAPTION - THE PICTURE IS DRAWN OVER THE ROWS RESERVED UNDER
+    //IT, ONCE THERE IS ONE TO DRAW: A REPLAYED IMAGE ARRIVES AS A HASH AND IS ONLY FETCHED IF IT IS ASKED
+    //FOR, WHICH IS WHAT KEEPS A LOGIN FROM PULLING EVERY PICTURE EVER POSTED
     Image
     {
         username: String,
         filename: String,
-        source: DynamicImage,               //THE PICTURE ITSELF, KEPT TO FIT AGAIN AT A NEW PANE WIDTH
-        rows: u16,                          //ROWS IT RESERVES AT THAT WIDTH
-        fitted: u16,                        //THE WIDTH `protocol` WAS FITTED TO
-        protocol: Option<StatefulProtocol>, //None UNTIL THE FIRST WRAP KNOWS HOW WIDE THE PANE IS
+        hash: Option<[u8; 32]>, //WHAT TO ASK THE SERVER FOR - None WHEN IT ARRIVED WITH ITS PICTURE
+        picture: Picture,
     },
 }
 
-//STRUCTS
-#[derive(Clone, Copy)]
-pub struct Placement //WHERE ONE IMAGE'S RESERVED ROWS SIT IN THE WRAPPED VIEW
+//WHAT THERE IS TO DRAW UNDER A CAPTION - AND, WHILE THERE IS NOTHING, WHAT THE CAPTION OFFERS INSTEAD
+pub enum Picture
 {
-    pub entry: usize, //WHICH App::messages ENTRY IT BELONGS TO
-    pub row: u16,     //FIRST RESERVED ROW
-    pub height: u16,
+    Absent,            //NOT ASKED FOR YET
+    Waiting,           //ASKED FOR, NOT HERE YET
+    Gone,              //THE SERVER DOES NOT HAVE IT ANY MORE
+    Ready(Box<Fitted>),
+}
+
+//STRUCTS
+pub struct Fitted //A PICTURE AT THE SIZE THE PANE DRAWS IT AT
+{
+    pub source: DynamicImage,               //THE PICTURE ITSELF, KEPT TO FIT AGAIN AT A NEW PANE WIDTH
+    pub rows: u16,                          //ROWS IT RESERVES AT THAT WIDTH
+    pub fitted: u16,                        //THE WIDTH `protocol` WAS FITTED TO
+    pub protocol: Option<StatefulProtocol>, //None UNTIL THE FIRST WRAP KNOWS HOW WIDE THE PANE IS
+}
+
+#[derive(Clone, Copy)]
+pub struct Placement //WHERE ONE IMAGE SITS IN THE WRAPPED VIEW
+{
+    pub entry: usize,  //WHICH App::messages ENTRY IT BELONGS TO
+    pub caption: u16,  //FIRST ROW OF THE CAPTION, WHICH IS ALSO WHAT IS CLICKED TO FETCH THE PICTURE
+    pub row: u16,      //FIRST RESERVED ROW (WHERE THE CAPTION ENDS)
+    pub height: u16,   //RESERVED ROWS - 0 WHILE THERE IS NO PICTURE
 }
 
 //STRUCTS
@@ -155,6 +173,10 @@ pub struct App
     pub tofu: Option<Prompt>, //SERVER IDENTITY PROMPT - OUTRANKS EVERY OTHER OVERLAY WHILE IT IS UP
     pub theme: Theme,
     pub picker: Picker, //WHAT THE TERMINAL CAN DRAW, AND HOW BIG ITS CELLS ARE
+
+    //WHERE THE MESSAGE PANE WAS LAST DRAWN, WHICH IS THE ONLY WAY A CLICK CAN BE TURNED INTO A LINE
+    pub pane: Rect,
+    pub pane_offset: u16,
 
     //REQUEST BOOKKEEPING (A LIST/SCREENS RESPONSE IS ONLY ECHOED WHEN THE USER ASKED FOR IT)
     pub list_requested: bool,
@@ -210,6 +232,8 @@ impl App
             tofu: None,
             theme: Theme::load(),
             picker: Picker::halfblocks(), //UNTIL init_picker HAS ASKED THE TERMINAL FOR SOMETHING BETTER
+            pane: Rect::ZERO,
+            pane_offset: 0,
             list_requested: false,
             #[cfg(feature = "client_screen")]
             screens_requested: false,
@@ -289,22 +313,71 @@ impl App
         self.push_entry(Entry::History { username, text, colors });
     }
 
-    //A PICTURE IS ENCODED FOR THE TERMINAL ONCE, HERE - THE DECODE ITSELF ALREADY HAPPENED OFF THE LOOP
+    //A PICTURE THAT ARRIVED WITH ITS OWN BYTES - A LIVE ONE, OR A REPLAYED ONE THAT WAS ASKED FOR
     pub fn push_image(&mut self, username: String, filename: String, image: DynamicImage)
     {
-        //IT IS NEVER DRAWN TALLER THAN IMAGE_ROWS, SO NOTHING ABOVE THAT IS WORTH KEEPING - AND THE
-        //PROTOCOL HOLDS ON TO WHAT IT IS GIVEN, WHICH FOR A PHONE PHOTO IS TENS OF MEGABYTES DECODED
+        let picture = self.fit(image);
+
+        self.push_entry(Entry::Image { username, filename, hash: None, picture });
+    }
+
+    //AND ONE THE HISTORY ONLY NAMED. NOTHING IS FETCHED UNTIL THE CAPTION IS CLICKED
+    pub fn push_caption(&mut self, username: String, filename: String, hash: [u8; 32])
+    {
+        self.push_entry(Entry::Image { username, filename, hash: Some(hash), picture: Picture::Absent });
+    }
+
+    //A CLICKED CAPTION. THE HASH IT COMES BACK WITH IS WHAT THE CALLER ASKS THE SERVER FOR - None MEANS
+    //THERE IS NOTHING TO ASK FOR (THE PICTURE IS ALREADY HERE, OR ALREADY ON ITS WAY)
+    pub fn request_image(&mut self, entry: usize) -> Option<[u8; 32]>
+    {
+        let Some(Entry::Image { hash, picture, .. }) = self.messages.get_mut(entry) else { return None };
+
+        if !matches!(picture, Picture::Absent | Picture::Gone) { return None; }
+
+        *picture = Picture::Waiting;
+
+        self.generation += 1;
+        self.dirty = true;
+
+        *hash
+    }
+
+    //THE ANSWER TO ONE OF THOSE. THE SAME PICTURE CAN BE IN THE PANE TWICE, SO IT FILLS THE OLDEST LINE
+    //STILL WAITING FOR IT - THE SECOND ONE ASKED FOR ITSELF AND IS ANSWERED BY ITS OWN PACKET
+    pub fn deliver_image(&mut self, hash: [u8; 32], image: Option<DynamicImage>)
+    {
+        let picture = match image
+        {
+            Some(image) => self.fit(image),
+            None => Picture::Gone,
+        };
+
+        let waiting = self.messages.iter().position(|entry| matches!(entry,
+            Entry::Image { hash: Some(h), picture: Picture::Waiting, .. } if *h == hash));
+
+        let Some(entry) = waiting else { return };
+
+        if let Some(Entry::Image { picture: slot, .. }) = self.messages.get_mut(entry) { *slot = picture; }
+
+        self.generation += 1;
+        self.dirty = true;
+    }
+
+    //IT IS NEVER DRAWN TALLER THAN IMAGE_ROWS, SO NOTHING ABOVE THAT IS WORTH KEEPING - AND THE PROTOCOL
+    //HOLDS ON TO WHAT IT IS GIVEN, WHICH FOR A PHONE PHOTO IS TENS OF MEGABYTES DECODED
+    fn fit(&self, image: DynamicImage) -> Picture
+    {
         let font = self.picker.font_size();
         let limit = IMAGE_ROWS as u32 * font.height as u32;
 
-        let image = match image.height() > limit
+        let source = match image.height() > limit
         {
             true => image.resize(image.width(), limit, FilterType::Triangle),
             false => image,
         };
 
-        self.push_entry(Entry::Image { username, filename, source: image, rows: 1, fitted: 0,
-            protocol: None });
+        Picture::Ready(Box::new(Fitted { source, rows: 1, fitted: 0, protocol: None }))
     }
 
     //THE QUERY WANTS STDIO TO ITSELF: AFTER THE ALTERNATE SCREEN IS UP, BEFORE ANYTHING READS EVENTS.
@@ -472,6 +545,22 @@ impl App
     }
 
     //WHERE THE PICTURES SIT IN THAT VIEW - draw NEEDS THE ROWS AND THE ENTRY BEHIND EACH OF THEM
+    //WHICH IMAGE'S CAPTION IS UNDER THE POINTER. THE WHOLE CAPTION IS THE TARGET RATHER THAN THE PROMPT
+    //IN IT - IT IS ONE LINE OF A CHAT PANE, AND MISSING IT BY A COLUMN WOULD BE THE COMMON CASE
+    pub fn image_at(&mut self, column: u16, row: u16) -> Option<usize>
+    {
+        let pane = self.pane;
+
+        if column < pane.x || column >= pane.x + pane.width { return None; }
+        if row < pane.y || row >= pane.y + pane.height { return None; }
+
+        let row = self.pane_offset + (row - pane.y);
+
+        self.placements(pane.width).into_iter()
+            .find(|placement| row >= placement.caption && row < placement.row)
+            .map(|placement| placement.entry)
+    }
+
     pub fn placements(&mut self, width: u16) -> Vec<Placement>
     {
         self.rewrap(width);
@@ -496,25 +585,41 @@ impl App
 
         for entry in 0..self.messages.len()
         {
+            let row = lines.len() as u16;
+
             lines.extend(wrap_line(&self.theme.render(&self.messages[entry]), width));
 
             //AN IMAGE RESERVES ITS ROWS AS BLANK LINES, SO THE SCROLL OFFSET STAYS EXACT AND THE PANE
             //STAYS A LIST OF LINES - THE PICTURE IS PAINTED OVER THEM AFTERWARDS
-            if let Entry::Image { source, rows, fitted, protocol, .. } = &mut self.messages[entry]
+            if let Entry::Image { picture, .. } = &mut self.messages[entry]
             {
+                let caption = row;
+                let row = lines.len() as u16;
+
                 //THE FIT HAPPENS HERE AND NOWHERE ELSE, SO THE PROTOCOL ALWAYS HOLDS THE PICTURE AT THE
                 //SIZE IT IS DRAWN AT - WHICH IS WHAT LETS draw CROP IT INSTEAD OF SHRINKING IT
-                if *fitted != width || protocol.is_none()
+                let height = match picture
                 {
-                    let image = fit_image(source, width, font);
+                    Picture::Ready(ready) =>
+                    {
+                        if ready.fitted != width || ready.protocol.is_none()
+                        {
+                            let image = fit_image(&ready.source, width, font);
 
-                    *rows = (image.height().div_ceil(font.height as u32) as u16).clamp(1, IMAGE_ROWS);
-                    *protocol = Some(self.picker.new_resize_protocol(image));
-                    *fitted = width;
-                }
+                            ready.rows = (image.height().div_ceil(font.height as u32) as u16).clamp(1, IMAGE_ROWS);
+                            ready.protocol = Some(self.picker.new_resize_protocol(image));
+                            ready.fitted = width;
+                        }
 
-                placements.push(Placement { entry, row: lines.len() as u16, height: *rows });
-                lines.extend(iter::repeat_n(Line::default(), *rows as usize));
+                        ready.rows
+                    },
+
+                    //A CAPTION WITHOUT A PICTURE RESERVES NOTHING - IT IS ONE LINE OFFERING TO FETCH ONE
+                    _ => 0,
+                };
+
+                placements.push(Placement { entry, caption, row, height });
+                lines.extend(iter::repeat_n(Line::default(), height as usize));
             }
         }
 

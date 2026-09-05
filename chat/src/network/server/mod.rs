@@ -81,6 +81,7 @@ use crate::
         {
             PacketCode,
             OnlineUser,
+            StoredMessage,
             UserFile,
             UserScreen,
         },
@@ -106,8 +107,28 @@ async fn send_history(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKe
 {
     if !config::read_config::<bool>("persistent_messages") { return; }
 
-    let messages = config::messages::all();
+    let stored = config::messages::all();
+    if stored.is_empty() { return; }
+
+    //THE REPLAY IS ONE PACKET, SO IT IS THE NEWEST PART OF THE HISTORY THAT FITS IN ONE: A PACKET OVER THE
+    //CLIENT'S CEILING IS NOT TRIMMED THERE, IT IS REFUSED AND THE SOCKET DROPPED. THE PICTURES ARE NOT IN
+    //IT - AN IMAGE IS ITS HASH HERE, AND THE CLIENT ASKS FOR THE ONES IT WANTS TO SEE (PacketCode::ImageData)
+    let mut messages: Vec<StoredMessage> = Vec::new();
+    let mut budget = consts::MAX_HISTORY_SIZE;
+
+    for message in stored.into_iter().rev()
+    {
+        let size = message.username.len() + message.text.len();
+        if size > budget { break; }
+
+        budget -= size;
+
+        messages.push(message);
+    }
+
     if messages.is_empty() { return; }
+
+    messages.reverse(); //OLDEST FIRST AGAIN - THE BUDGET IS SPENT FROM THE NEWEST END, THE PANE READS FROM THE OTHER
 
     network::send(&mut *write_stream.lock().await, PacketCode::History { messages }, Some(keys)).await;
 }
@@ -1128,6 +1149,19 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 //SEND LIST BACK TO CLIENT
                 network::send(&mut *streams.1.lock().await, PacketCode::Files { users: Some(users) }, Some(&keys)).await;
+            },
+
+            //ONE OF THE HISTORY'S PICTURES, ASKED FOR BY A CLIENT THAT WAS SHOWN ITS CAPTION. THE HISTORY
+            //IS THE GUARD: A HASH IT DOES NOT NAME IS NOT SERVED, SO NOTHING ELSE IN images/ IS REACHABLE
+            PacketCode::ImageData { hash, .. } =>
+            {
+                let image = match config::messages::has_image(&hash)
+                {
+                    true => file::read_image(&hash).await,
+                    false => None,
+                };
+
+                network::send(&mut *streams.1.lock().await, PacketCode::ImageData { hash, data: image }, Some(&keys)).await;
             },
 
             //LIST SCREENSHARES

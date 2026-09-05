@@ -30,7 +30,7 @@ use ratatui::
 
 use crate::{ colors, config };
 
-use super::state::Entry;
+use super::state::{ Entry, Picture };
 
 //STRUCTS
 pub struct Theme //CACHED CONFIG-DRIVEN STYLING
@@ -88,12 +88,26 @@ impl Theme
                 self.colorize(text.clone(), colors.message_color),
             ]),
 
-            //ONLY THE CAPTION - THE PICTURE IS DRAWN OVER THE ROWS THE WRAP RESERVES UNDER IT
-            Entry::Image { username, filename, .. } => Line::from(vec!
-            [
-                Span::styled(username.clone(), ACCENT),
-                Span::styled(format!(" sent an image ({filename})"), DIM),
-            ]),
+            //ONLY THE CAPTION - THE PICTURE IS DRAWN OVER THE ROWS THE WRAP RESERVES UNDER IT. WHILE THERE
+            //ARE NONE THE CAPTION SAYS WHY, AND OFFERS THE CLICK THAT FETCHES THE PICTURE
+            Entry::Image { username, filename, picture, .. } =>
+            {
+                let mut spans = vec!
+                [
+                    Span::styled(username.clone(), ACCENT),
+                    Span::styled(format!(" sent an image ({filename})"), DIM),
+                ];
+
+                match picture
+                {
+                    Picture::Absent => spans.push(Span::styled(" [ show ]", ACCENT)),
+                    Picture::Waiting => spans.push(Span::styled(" [ loading... ]", DIM)),
+                    Picture::Gone => spans.push(Span::styled(" [ unavailable ]", ERROR)),
+                    Picture::Ready(..) => {},
+                }
+
+                Line::from(spans)
+            },
         }
     }
 

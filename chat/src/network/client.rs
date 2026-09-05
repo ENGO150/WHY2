@@ -177,6 +177,7 @@ pub enum ClientEvent
     Upload(String),                                  //UPLOADING FILE
     Image(String),                                   //UPLOADING IMAGE
     ImageDisplay(String, String, Box<DynamicImage>), //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
+    ImageData([u8; 32], Option<Box<DynamicImage>>),   //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
     ImageFailed(String, String),                     //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
     Uploaded(String, String),                        //USER UPLOADED FILE
     Download(String),                                //DOWNLOADING FILE
@@ -722,6 +723,27 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //SOMEBODY'S IMAGE
+            //ONE OF THOSE, ASKED FOR AND ANSWERED. IT IS DECODED OFF THE LOOP LIKE ANY OTHER PICTURE
+            PacketCode::ImageData { hash, data } =>
+            {
+                let image_tx = tx.clone();
+
+                tokio::spawn(async move
+                {
+                    let image = match data
+                    {
+                        Some(data) => task::spawn_blocking(move || image::load_from_memory(&data).ok())
+                            .await.expect("Decoding image panicked"),
+
+                        None => None,
+                    };
+
+                    image_tx.send(ClientEvent::ImageData(hash, image.map(Box::new))).await.unwrap();
+                });
+
+                continue;
+            },
+
             PacketCode::ImageDisplay { username, filename, data } =>
             {
                 let image_tx = tx.clone();

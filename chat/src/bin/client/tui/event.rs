@@ -269,16 +269,24 @@ impl App
                 }
             },
 
-            //THE LOBBY'S STORED MESSAGES
+            //THE LOBBY'S STORED MESSAGES. AN IMAGE IN IT IS A CAPTION OFFERING TO FETCH THE PICTURE -
+            //REPLAYING THE PICTURES THEMSELVES WOULD MAKE EVERY LOGIN CARRY EVERY IMAGE EVER POSTED
             ClientEvent::History(messages) =>
             {
                 self.push_styled(format!("Message history ({}):", messages.len()), theme::TITLE);
 
                 for message in messages
                 {
-                    self.push_history(message.username, message.text, message.colors);
+                    match message.image
+                    {
+                        Some(hash) => self.push_caption(message.username, message.text, hash),
+                        None => self.push_history(message.username, message.text, message.colors),
+                    }
                 }
             },
+
+            //THE ANSWER TO A CLICKED CAPTION - OR THE LACK OF ONE, WHICH THE CAPTION THEN SAYS
+            ClientEvent::ImageData(hash, image) => self.deliver_image(hash, image.map(|image| *image)),
 
             //server.toml CAME BACK - EITHER THE COPY WE ASKED FOR, OR THE ONE THE SERVER JUST STORED
             ClientEvent::ServerSettings(settings, saved) =>

@@ -61,18 +61,35 @@ fn load() -> Vec<StoredMessage> //READ THE HISTORY OFF DISK
 //PUBLIC
 pub fn store(username: &str, text: &str, colors: &MessageColors) //APPEND MESSAGE
 {
+    push(StoredMessage
+    {
+        username: username.to_string(),
+        text: text.to_string(),
+        colors: colors.clone(),
+        image: None,
+    });
+}
+
+pub fn store_image(username: &str, filename: &str, hash: &[u8; 32])
+{
+    push(StoredMessage
+    {
+        username: username.to_string(),
+        text: filename.to_string(),
+        colors: MessageColors { username_color: None, message_color: None },
+        image: Some(*hash),
+    });
+}
+
+fn push(message: StoredMessage) //APPEND ONE ENTRY AND REWRITE THE FILE
+{
     //A HISTORY OF NOTHING IS NOT A HISTORY - DO NOT TOUCH THE FILE AT ALL
     let limit: usize = super::read_config("max_persistent_messages");
     if limit == 0 { return; }
 
     let mut history = HISTORY.lock().unwrap();
 
-    history.push(StoredMessage
-    {
-        username: username.to_string(),
-        text: text.to_string(),
-        colors: colors.clone(),
-    });
+    history.push(message);
 
     //THE HISTORY IS A WINDOW OVER THE LAST limit MESSAGES, SO THE OLDEST GO AS THE NEW ONES ARRIVE
     let over = history.len().saturating_sub(limit);
@@ -83,6 +100,11 @@ pub fn store(username: &str, text: &str, colors: &MessageColors) //APPEND MESSAG
     let sealed = crypto::encrypt_packet::<{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(&bytes, &KEYS);
 
     fs::write(path(), sealed).expect("Saving message history failed");
+}
+
+pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
+{
+    HISTORY.lock().unwrap().iter().any(|message| message.image.as_ref() == Some(hash))
 }
 
 pub fn all() -> Vec<StoredMessage> //EVERY STORED LOBBY MESSAGE, OLDEST FIRST
