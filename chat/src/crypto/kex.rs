@@ -316,6 +316,12 @@ pub fn history_key() -> Zeroizing<[u8; 32]> //THE MESSAGE HISTORY'S AT-REST KEY,
 }
 
 #[cfg(feature = "server")]
+pub fn image_key() -> Zeroizing<[u8; 32]> //PERSISTENT IMAGE KEY FILE
+{
+    media_key(consts_chat::SERVER_IMAGE_KEY)
+}
+
+#[cfg(feature = "server")]
 pub fn create_offer(nonce: &[u8; 32]) -> (Ephemeral, Box<schema::Offer>) //SIGN A FRESH EPHEMERAL PAIR WITH THE STATIC IDENTITY
 {
     //LOAD THE STATIC IDENTITY - IT ONLY EVER SIGNS

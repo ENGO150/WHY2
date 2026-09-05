@@ -284,6 +284,29 @@ pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketS
 }
 
 #[cfg(feature = "server")]
+pub fn image_keys(hash: &[u8; 32]) -> (Zeroizing<Vec<i64>>, Vec<i64>) //AT-REST KEY & NONCE FOR ONE IMAGE
+{
+    let hkdf = Hkdf::<Sha256>::new(Some(hash), kex::image_key().as_ref());
+
+    const KEY_LEN: usize = consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT * 2;
+    const NONCE_LEN: usize = consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT;
+
+    //GRID KEY, AT THE FULL KEYDIM SO Grid::from_key DOES NOT RE-DERIVE IT
+    let mut key_bytes = Zeroizing::new(vec![0u8; KEY_LEN * 8]);
+    hkdf.expand(b"WHY2-IMAGE-KEY", &mut key_bytes).expect("HKDF expand failed");
+
+    //NONCE, EXPANDED SEPARATELY SO IT SHARES NO MATERIAL WITH THE KEY
+    let mut nonce_bytes = Zeroizing::new(vec![0u8; NONCE_LEN * 8]);
+    hkdf.expand(b"WHY2-IMAGE-NONCE", &mut nonce_bytes).expect("HKDF expand failed");
+
+    let to_i64 = |bytes: &[u8]| bytes.chunks_exact(8)
+        .map(|c| i64::from_be_bytes(c.try_into().unwrap()))
+        .collect::<Vec<i64>>();
+
+    (Zeroizing::new(to_i64(&key_bytes)), to_i64(&nonce_bytes))
+}
+
+#[cfg(feature = "server")]
 pub fn history_keys() -> SharedKeys //AT-REST KEYS FOR THE MESSAGE HISTORY
 {
     let hkdf = Hkdf::<Sha256>::new(None, kex::history_key().as_ref());

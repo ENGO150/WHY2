@@ -42,6 +42,7 @@ pub const SERVER_KEYS_DIR: &str        = "/server_keys";                        
 pub const SERVER_SKEY: &str            = "/private";                                  //SERVER PRIVATE KEY FILE
 pub const SERVER_PKEY: &str            = "/public";                                   //SERVER PUBLIC KEY FILE
 pub const SERVER_HISTORY_KEY: &str     = "/history_key";                              //MESSAGE HISTORY AT-REST KEY FILE
+pub const SERVER_IMAGE_KEY: &str       = "/image_key";                                //PERSISTENT IMAGE KEY FILE
 
 pub const ECC_PUBKEY_SIZE: usize       = 133;                                         //SEC1 UNCOMPRESSED NIST P-521 POINT
 pub const ECC_SIGNATURE_SIZE: usize    = 132;                                         //FIXED-SIZE ECDSA/P-521 SIGNATURE (r || s)
