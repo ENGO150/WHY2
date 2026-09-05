@@ -29,7 +29,7 @@ use std::
     fs::File,
     path::Path,
     sync::Arc,
-    io::Read,
+    io::{ Read, Seek },
 };
 
 use tokio::
@@ -576,46 +576,66 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                     let keys = options::get_keys();
                                     let image = command == Command::Image;
 
-                                    tokio::spawn(async move
+                                    //THE HEADER IS READ BEFORE THE SERVER IS ASKED FOR ANYTHING, SO A FILE
+                                    //THAT IS NOT AN IMAGE COSTS NO CONNECTION AND NO HASH. THE SERVER STILL
+                                    //CHECKS THE BYTES IT RECEIVES - NOTHING MAKES A CLIENT RUN THIS
+                                    let mut header = Vec::new();
+
+                                    if image
                                     {
-                                        //GET SHA256 FILE HASH (BLOCKING I/O + CPU, KEEP IT OFF THE RUNTIME)
-                                        let hash: Option<[u8; 32]> = task::spawn_blocking(move ||
-                                        {
-                                            let mut hasher = Sha256::new();
-                                            let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+                                        file.by_ref().take(consts::IMAGE_HEADER_SIZE as u64)
+                                            .read_to_end(&mut header).ok();
 
-                                            //LOOP READING
-                                            let success = loop
+                                        //THE HASH IS TAKEN FROM THE SAME HANDLE, SO GIVE BACK WHAT WAS READ
+                                        file.rewind().ok();
+                                    }
+
+                                    if image && !misc::is_image(&header)
+                                    {
+                                        app.push_styled("Not an image!", theme::ERROR);
+                                    } else
+                                    {
+                                        tokio::spawn(async move
+                                        {
+                                            //GET SHA256 FILE HASH (BLOCKING I/O + CPU, KEEP IT OFF THE RUNTIME)
+                                            let hash: Option<[u8; 32]> = task::spawn_blocking(move ||
                                             {
-                                                match file.read(&mut buffer)
+                                                let mut hasher = Sha256::new();
+                                                let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+
+                                                //LOOP READING
+                                                let success = loop
                                                 {
-                                                    Ok(0) => break true,
-                                                    Ok(bytes) => hasher.update(&buffer[..bytes]),
-                                                    Err(_) => break false,
-                                                }
-                                            };
+                                                    match file.read(&mut buffer)
+                                                    {
+                                                        Ok(0) => break true,
+                                                        Ok(bytes) => hasher.update(&buffer[..bytes]),
+                                                        Err(_) => break false,
+                                                    }
+                                                };
 
-                                            //FINALIZE HASH
-                                            if success { Some(hasher.finalize().into()) } else { None }
-                                        }).await.expect("Hashing file failed");
+                                                //FINALIZE HASH
+                                                if success { Some(hasher.finalize().into()) } else { None }
+                                            }).await.expect("Hashing file failed");
 
-                                        //REQUEST FILE UPLOAD
-                                        if let Some(hash) = hash
-                                        {
-                                            //STORE UPLOAD IN ACTIVE UPLOADS LIST
-                                            client::ACTIVE_UPLOADS.lock().unwrap()
-                                                .insert(hash, path.canonicalize().unwrap());
-
-                                            //SEND UPLOAD REQUEST
-                                            let request = match image
+                                            //REQUEST FILE UPLOAD
+                                            if let Some(hash) = hash
                                             {
-                                                true => PacketCode::Image { hash, token: None, uid: None },
-                                                false => PacketCode::Upload { hash, token: None, uid: None },
-                                            };
+                                                //STORE UPLOAD IN ACTIVE UPLOADS LIST
+                                                client::ACTIVE_UPLOADS.lock().unwrap()
+                                                    .insert(hash, path.canonicalize().unwrap());
 
-                                            network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
-                                        }
-                                    });
+                                                //SEND UPLOAD REQUEST
+                                                let request = match image
+                                                {
+                                                    true => PacketCode::Image { hash, token: None, uid: None },
+                                                    false => PacketCode::Upload { hash, token: None, uid: None },
+                                                };
+
+                                                network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
+                                            }
+                                        });
+                                    }
                                 } else //NON-EXISTING FILE
                                 {
                                     app.push_styled("File not found!", theme::ERROR);

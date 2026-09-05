@@ -156,6 +156,34 @@ pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
     }
 }
 
+pub fn is_image(header: &[u8]) -> bool //CHECK FOR SUPPORTED IMAGE
+{
+    const MAGIC: [&[u8]; 13] =
+    [
+        b"\x89PNG\r\n\x1a\n", //PNG
+        b"\xff\xd8\xff",      //JPEG
+        b"GIF87a",            //GIF (87)
+        b"GIF89a",            //GIF (89)
+        b"BM",                //BMP
+        b"\x00\x00\x01\x00",  //ICO
+        b"II*\x00",           //TIFF (LITTLE ENDIAN)
+        b"MM\x00*",           //TIFF (BIG ENDIAN)
+        b"qoif",              //QOI
+        b"#?",                //RADIANCE HDR
+        b"farbfeld",          //FARBFELD
+        b"DDS ",              //DDS
+        b"v/1\x01",           //OPENEXR
+    ];
+
+    if MAGIC.iter().any(|magic| header.starts_with(magic)) { return true; }
+
+    //THE OTHER TWO ARE NOT PLAIN PREFIXES: WEBP CARRIES ITS TAG BEHIND THE RIFF LENGTH, AND A NETPBM
+    //MAGIC IS ONLY TWO BYTES, SO THE WHITESPACE THE FORMAT DEMANDS AFTER IT IS PART OF THE CHECK
+    (header.len() >= 12 && header.starts_with(b"RIFF") && &header[8..12] == b"WEBP") ||
+    (header.len() >= 3 && header[0] == b'P' && (b'1'..=b'7').contains(&header[1]) &&
+        header[2].is_ascii_whitespace())
+}
+
 #[cfg(feature = "server")]
 pub fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOAD
 {

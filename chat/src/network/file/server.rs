@@ -253,6 +253,9 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         return;
     }
 
+    //A FILESHARE IS WHATEVER THE UPLOADER SAYS IT IS; AN IMAGE IS NOT
+    let mut checked = !persistent;
+
     //LOOP READING CHUNKS
     loop
     {
@@ -262,6 +265,19 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
             Some((uid, FilePacketCode::Data { data })) => (uid, data),
             _ => return
         };
+
+        //CHECK FOR VALID IMAGE ON PERSISTENT UPLOADS
+        if !checked
+        {
+            checked = true;
+
+            if !misc::is_image(&data)
+            {
+                log::info!("Image rejected (not an image): {peer_addr}");
+                server::notify(id, PacketCode::InvalidUsage).await;
+                return;
+            }
+        }
 
         //ENCRYPT CHUNK (NEVER HOLD THE UPLOAD ENTRY ACROSS AN AWAIT)
         let prepared =

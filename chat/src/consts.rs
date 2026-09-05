@@ -65,6 +65,7 @@ pub const SERVER_RESTART_SETTINGS: &[&str] =                                    
 //DO NOT CHANGE CONSTS BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const MEGABYTE: usize              = 1_000_000;                                   //MEGABYTE DEFINITION
 pub const UPLOAD_CHUNK_SIZE: usize     = MEGABYTE;                                    //FILE UPLOAD CHUNK (1MB)
+pub const IMAGE_HEADER_SIZE: usize     = 16;                                          //BYTES AN IMAGE IS RECOGNISED BY
 
 pub const MAX_AUXILIARY_PACKET_SIZE: usize = UPLOAD_CHUNK_SIZE * 2;                   //FILE/SCREEN SIDE CHANNELS (2MB)
 pub const MAX_PACKET_CEILING: usize        = 16 * MEGABYTE;                           //ABSOLUTE CEILING WHEN SPAM PROTECTION IS OFF (16MB)
