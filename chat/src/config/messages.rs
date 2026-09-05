@@ -55,7 +55,7 @@ fn load() -> Vec<StoredMessage> //READ THE HISTORY OFF DISK
         <{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(bytes, &KEYS)
     else { return Vec::new() };
 
-    wincode::deserialize::<Vec<StoredMessage>>(&plaintext).unwrap_or_default()
+    wincode::config::deserialize::<Vec<StoredMessage>, _>(&plaintext, consts::PACKET_CONFIG).unwrap_or_default()
 }
 
 //PUBLIC
@@ -79,7 +79,7 @@ pub fn store(username: &str, text: &str, colors: &MessageColors) //APPEND MESSAG
     history.drain(..over);
 
     //ENCRYPT-THEN-MAC THE WHOLE HISTORY
-    let bytes = wincode::serialize(&*history).expect("Encoding message history failed");
+    let bytes = wincode::config::serialize(&*history, consts::PACKET_CONFIG).expect("Encoding message history failed");
     let sealed = crypto::encrypt_packet::<{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(&bytes, &KEYS);
 
     fs::write(path(), sealed).expect("Saving message history failed");

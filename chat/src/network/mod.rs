@@ -41,7 +41,6 @@ use tokio::
 
 use wincode::
 {
-    config::DefaultConfig,
     SchemaWrite,
     SchemaRead,
 };
@@ -57,6 +56,7 @@ use crate::
     consts::
     {
         self as chat_consts,
+        PacketConfig,
         Streams,
         SharedKeys,
     },
@@ -76,7 +76,7 @@ use std::
 use crate::config;
 
 //TRAITS
-pub trait SequencedPacket: SchemaWrite<DefaultConfig, Src = Self>
+pub trait SequencedPacket: SchemaWrite<PacketConfig, Src = Self>
 {
     fn seq(&self) -> usize;
     fn set_seq(&mut self, seq: usize);
@@ -179,7 +179,7 @@ pub async fn send_tcp //SEND packet TO stream
     }
 
     //ENCODE THE PACKET STRUCT TO Vec<u8>
-    let packet_bytes = Zeroizing::new(wincode::serialize(&packet).expect("Encoding packet failed"));
+    let packet_bytes = Zeroizing::new(wincode::config::serialize(&packet, chat_consts::PACKET_CONFIG).expect("Encoding packet failed"));
 
     let mut final_bytes = match encryption_mode
     {
@@ -408,7 +408,7 @@ pub async fn receive
     ).await?;
 
     //DESERIALIZE AND RETURN
-    match wincode::deserialize::<Packet>(&read.data)
+    match wincode::config::deserialize::<Packet, _>(&read.data, chat_consts::PACKET_CONFIG)
     {
         Ok(packet) =>
         {

@@ -41,7 +41,7 @@ use std::time::Duration;
 use crate::
 {
     crypto,
-    consts::SharedKeys,
+    consts::{ self as chat_consts, SharedKeys },
 };
 
 #[cfg(feature = "client_base")]
@@ -128,7 +128,7 @@ pub async fn send //SEND DATA TO UDP
     }
 
     //SERIALIZE PACKET
-    let packet_bytes = wincode::serialize(&packet).expect("Encoding packet failed");
+    let packet_bytes = wincode::config::serialize(&packet, chat_consts::PACKET_CONFIG).expect("Encoding packet failed");
 
     //ENCRYPT PACKET
     #[cfg(feature = "server")]
@@ -233,7 +233,7 @@ pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //
         };
 
         //PACKET ARRIVED, DESERIALIZE
-        let packet = match wincode::deserialize::<VoicePacket>(&decrypted_bytes)
+        let packet = match wincode::config::deserialize::<VoicePacket, _>(&decrypted_bytes, chat_consts::PACKET_CONFIG)
         {
             Ok(packet) => packet,
             Err(_) => continue

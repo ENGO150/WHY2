@@ -35,7 +35,7 @@ use wincode::{ SchemaRead, SchemaWrite };
 
 use crate::
 {
-    consts::Streams,
+    consts::{ self as chat_consts, Streams },
     crypto::RexPacketStream,
     network::
     {
@@ -126,7 +126,7 @@ pub async fn receive_frame
     ).await?;
 
     //DESERIALIZE AND RETURN
-    match wincode::deserialize::<ScreenPacket>(&read.data)
+    match wincode::config::deserialize::<ScreenPacket, _>(&read.data, chat_consts::PACKET_CONFIG)
     {
         Ok(packet) =>
         {

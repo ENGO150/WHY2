@@ -157,7 +157,7 @@ pub async fn receive_file
     ).await?;
 
     //DESERIALIZE AND RETURN
-    match wincode::deserialize::<FilePacket>(&read.data)
+    match wincode::config::deserialize::<FilePacket, _>(&read.data, consts::PACKET_CONFIG)
     {
         Ok(packet) =>
         {
