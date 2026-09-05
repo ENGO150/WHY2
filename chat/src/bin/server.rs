@@ -109,6 +109,7 @@ async fn main()
     misc::check_version().await; //CHECK WHY2 VERSION
     config::init_config(); //CREATE server.toml CONFIGURATION
     kex::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
+    config::messages::sweep_images(); //DROP THE PICTURES NOTHING NAMES ANY MORE
 
     //CHECK IF VOICE IS ENABLED
     if config::read_config("enable_voice_chat")

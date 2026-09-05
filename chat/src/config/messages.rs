@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     fs,
+    collections::HashSet,
     sync::{ LazyLock, Mutex },
 };
 
@@ -26,6 +27,7 @@ use why2::consts as why2_consts;
 
 use crate::
 {
+    misc,
     crypto,
     consts::{ self, SharedKeys },
     network::codes::
@@ -93,18 +95,55 @@ fn push(message: StoredMessage) //APPEND ONE ENTRY AND REWRITE THE FILE
 
     //THE HISTORY IS A WINDOW OVER THE LAST limit MESSAGES, SO THE OLDEST GO AS THE NEW ONES ARRIVE
     let over = history.len().saturating_sub(limit);
-    history.drain(..over);
+    let dropped: Vec<[u8; 32]> = history.drain(..over).filter_map(|message| message.image).collect();
+
+    //AND A PICTURE IS KEPT BY THE HISTORY AND BY NOTHING ELSE, SO AN ENTRY LEAVING THE WINDOW IS THE END
+    //OF IT. THE SAME PICTURE POSTED TWICE IS ONE FILE (IT IS NAMED AFTER ITS CONTENT), SO WHAT IS LEFT
+    //HAS TO BE ASKED FIRST - THE OLDER LINE GOING DOES NOT TAKE THE NEWER ONE'S PICTURE WITH IT
+    let orphans: Vec<[u8; 32]> = dropped.into_iter()
+        .filter(|hash| !history.iter().any(|message| message.image.as_ref() == Some(hash)))
+        .collect();
 
     //ENCRYPT-THEN-MAC THE WHOLE HISTORY
     let bytes = wincode::config::serialize(&*history, consts::PACKET_CONFIG).expect("Encoding message history failed");
     let sealed = crypto::encrypt_packet::<{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(&bytes, &KEYS);
 
     fs::write(path(), sealed).expect("Saving message history failed");
+
+    drop(history); //THE FILES ARE NOT THE HISTORY'S BUSINESS - THE LOCK IS DONE WITH
+
+    for hash in orphans { let _ = fs::remove_file(misc::get_image_dir().join(misc::hex(&hash))); }
 }
 
 pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
 {
     HISTORY.lock().unwrap().iter().any(|message| message.image.as_ref() == Some(hash))
+}
+
+//EVERY PICTURE THE HISTORY DOES NOT NAME IS SCRAP: NOTHING ELSE EVER POINTS AT images/, SO A FILE THAT
+//OUTLIVED ITS ENTRY CAN ONLY SIT THERE - AN UPLOAD ABANDONED HALFWAY, A CRASH BETWEEN THE RENAME AND THE
+//ENTRY, A HISTORY DISCARDED WHOLE BY DROPPING ITS KEY. THIS IS A STARTUP JOB AND HAS TO STAY ONE: AN
+//UPLOAD IN FLIGHT IS BUILT IN THAT SAME DIRECTORY UNDER ITS UID, AND A SWEEP WOULD TAKE IT
+pub fn sweep_images()
+{
+    let Ok(directory) = fs::read_dir(misc::get_image_dir()) else { return }; //NO DIRECTORY, NOTHING TO SWEEP
+
+    let files: Vec<_> = directory.flatten().map(|entry| entry.path()).collect();
+
+    //AN EMPTY DIRECTORY IS NOT WORTH TOUCHING THE HISTORY OVER - THE FIRST READ OF IT MINTS ITS AT-REST KEY
+    if files.is_empty() { return; }
+
+    let kept: HashSet<String> = HISTORY.lock().unwrap().iter()
+        .filter_map(|message| message.image.as_ref().map(|hash| misc::hex(hash)))
+        .collect();
+
+    for file in files
+    {
+        let named = file.file_name().and_then(|name| name.to_str())
+            .map(|name| kept.contains(name)).unwrap_or(false);
+
+        if !named { let _ = fs::remove_file(&file); }
+    }
 }
 
 pub fn all() -> Vec<StoredMessage> //EVERY STORED LOBBY MESSAGE, OLDEST FIRST
