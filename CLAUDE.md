@@ -203,6 +203,25 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     for the rest of the session. The wait sits on that connection's own read loop, which is the
     backpressure and costs nobody else. `last_image` is carried across a rekey and a channel switch
     — a client that could reset it by switching channels would not be limited at all.
+  - **`server_images/` is sealed encrypt-then-MAC, and it is read back in the chunks it was written
+    in.** `crypto::image_keys` HKDFs a key, nonce and MAC key per picture out of `server_image_key`
+    salted with the hash the file is named after, so nothing about the pair is kept anywhere and two
+    pictures never share a keystream. The tag is required for the same reason the history's is: a
+    stored picture is decrypted and pushed to every client in the channel, so bare CTR would put
+    attacker-flippable bytes into every one of their decoders. `file/server.rs` MACs an upload
+    **as it arrives** — `ActiveFileshare::mac` is fed whatever the disk actually took, and
+    `crypto::disk_tag` binds the length and appends the tag once the last chunk is in, which is why
+    the tag is at the end rather than in front of the ciphertext. A fileshare gets none of this: its
+    key is random and dies with the process, so there is no leaked copy of one to authenticate, and
+    it is streamed back out chunk by chunk, which a trailing tag could not be checked ahead of anyway.
+  - **`read_image` chunks by `UPLOAD_CHUNK_SIZE` because the write did, and this is not optional.** A
+    `RexStream` that is `finalize()`d mid-file processes whatever part-grid is buffered as a block of
+    its own and moves the counter on, so a reader only stays on the keystream if it breaks the file
+    exactly where the upload did. `UPLOAD_CHUNK_SIZE` is a round 1,000,000 and `MEGABYTE` is 10^6, not
+    2^20 — so a chunk is 1953.125 grids, not a whole number of them, and a single pass over the file
+    decrypts everything past the first boundary to rubbish. This is why every stored image over 1MB
+    used to come back undecodable. Either mirror the chunking or make the chunk a multiple of the
+    512-byte grid; do not assume one `update` over the whole file is equivalent.
 - **`cache.rs`** (feature `client_base`) — the client keeps every picture it has seen, which is what
   makes a replayed image appear at all without asking anybody, and what lets the server stop pushing
   the ones everybody already holds.
@@ -226,12 +245,22 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     bytes are an `Arc` so the cache keeps them without a second copy. A fetch answer whose digest is
     not the hash we asked for is displayed but not filed — otherwise a truncated transfer would be
     cached under a good name forever.
-  - **It is encrypted at rest** the same way the server's own `server_images/` is —
-    `crypto::cache_keys` HKDFs a per-picture key and nonce out of the one `client_cache_key`, salted
-    with `fingerprint || hash`, so two servers' copies of the same picture
-    share no keystream and one file discards the lot. Be honest about what this buys: the key sits
-    beside the ciphertext, so it protects a leaked copy (a backup, a snapshot) and nothing that
-    already has the config dir.
+  - **It is encrypted and authenticated at rest** the same way the server's own `server_images/` is —
+    `crypto::cache_keys` HKDFs a per-picture key, nonce and MAC key out of the one `client_cache_key`,
+    salted with `fingerprint || hash`, so two servers' copies of the same picture
+    share no keystream and one file discards the lot. Be honest about what the *encryption* buys: the
+    key sits beside the ciphertext, so it protects a leaked copy (a backup, a snapshot) and nothing
+    that already has the config dir.
+    The **tag is not decoration**, and it is what the encryption alone could not do. A cached picture
+    is decoded without being re-hashed — that is the whole point of the `fresh` split in the
+    `ImageDisplay` arm — so bare CTR would put whatever is in that file straight into an image decoder,
+    and `store` refuses to overwrite (the name is the content), so one bad file would poison that hash
+    forever. Because the keys come from `fingerprint || hash`, the tag says three things at once: that
+    we wrote it, that it is whole, and that it is the picture its name promises — a file copied out of
+    another server's scope, or renamed to another hash, fails to verify rather than decrypting to
+    somebody else's picture. `cache::load` **deletes a file that does not verify** so the next fetch
+    refills it, which is also what makes a half-written file (a crash, a full disk) recoverable rather
+    than permanent.
   - **Its only bound is `MAX_IMAGE_CACHE`.** The server's `server_images/` is owned by the history
     and a picture dies with its entry; a client cache is owned by nothing, so a write that takes it
     over the cap drops the oldest files by mtime, and every hit touches the file it read so what goes

@@ -46,6 +46,12 @@ use dashmap::DashMap;
 
 use sha2::{ Sha256, Digest };
 
+use hmac::
+{
+    Mac,
+    Hmac,
+};
+
 use why2::
 {
     grid::Grid,
@@ -120,6 +126,11 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
     pub path: PathBuf,          //WHERE THE UPLOAD IS BEING BUILT
     pub image: Option<Vec<u8>>, //THE PLAINTEXT, KEPT ONLY FOR AN IMAGE - IT IS SENT ON WHEN IT IS WHOLE
     pub stream: RexStream,
+
+    //THE TAG BEING BUILT OVER WHAT GOES TO DISK, FOR AN IMAGE ONLY. A FILESHARE'S KEY IS RANDOM AND DIES
+    //WITH THE PROCESS, SO THERE IS NO LEAKED COPY OF ONE TO AUTHENTICATE - AND IT IS STREAMED BACK OUT
+    //CHUNK BY CHUNK, WHICH A TRAILING TAG COULD NOT BE CHECKED AHEAD OF ANYWAY
+    pub mac: Option<Hmac<Sha256>>,
 }
 
 //LISTS
@@ -201,9 +212,14 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
     //CREATE KEY & NONCE FOR FILE ENCRYPTION ON DISK. A FILESHARE KEEPS ITS RANDOM PAIR IN
     //AVAILABLE_FILES AND DIES WITH THE PROCESS; AN IMAGE IS NOT IN THAT LIST AND OUTLIVES IT, SO ITS
     //PAIR IS DERIVED FROM THE SERVER'S IMAGE KEY AND THE HASH THE FILE IS NAMED AFTER INSTEAD
-    let (disk_key, disk_nonce) = match persistent
+    let (disk_key, disk_nonce, disk_mac) = match persistent
     {
-        true => crypto::image_keys(&hash),
+        true =>
+        {
+            let (key, nonce, mac_key) = crypto::image_keys(&hash);
+
+            (key, nonce, Some(crypto::disk_mac(&mac_key)))
+        },
 
         false =>
         (
@@ -211,6 +227,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
                 <{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>(),
             core_crypto::generate_nonce::
                 <{ core_consts::DEFAULT_GRID_WIDTH }, { core_consts::DEFAULT_GRID_HEIGHT }>().unwrap().to_flat(),
+            None,
         ),
     };
 
@@ -251,6 +268,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
             path: upload_path,
             image: persistent.then(|| Vec::with_capacity(size as usize)),
             stream: disk_stream,
+            mac: disk_mac,
         });
 
         valid = true;
@@ -336,6 +354,9 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
             //UPDATE HASHER
             active.hasher.update(&data);
 
+            //AND THE TAG, OVER WHAT THE DISK ACTUALLY TOOK RATHER THAN WHAT WE PREPARED FOR IT
+            if let Some(mac) = active.mac.as_mut() { mac.update(&encrypted_bytes); }
+
             //KEEP THE PLAINTEXT OF AN IMAGE - WHAT GOES TO DISK IS ENCRYPTED, AND WHAT GOES TO THE
             //CHANNEL IS THIS. READING IT BACK OFF THE DISK WOULD MEAN DECRYPTING WHAT WE JUST HELD
             if let Some(buffer) = active.image.as_mut() { buffer.extend_from_slice(&data); }
@@ -347,7 +368,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         if !done { continue; } //UPLOAD STILL RUNNING
 
         //UPLOAD DONE, COLLECT FINAL STATE
-        let (final_hash, expected_hash, upload_filename, final_size, image) =
+        let (final_hash, expected_hash, upload_filename, final_size, image, mac) =
         {
             let mut active = match ACTIVE_FILESHARES.get_mut(&uid)
             {
@@ -356,8 +377,17 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
             };
 
             let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
-            (final_hash, active.hash, active.filename.clone(), active.current_size, active.image.take())
+            (final_hash, active.hash, active.filename.clone(), active.current_size, active.image.take(),
+                active.mac.take())
         };
+
+        //THE TAG GOES ON THE END, WHICH IS THE ONLY PLACE AN UPLOAD BEING WRITTEN AS IT ARRIVES CAN PUT IT
+        if let Some(mac) = mac
+        {
+            let tag = crypto::disk_tag(mac, final_size);
+
+            if upload_file.lock().await.write_all(&tag).await.is_err() { return; }
+        }
 
         //FLUSH TO DISK BEFORE RENAMING
         upload_file.lock().await.flush().await.ok();
@@ -514,21 +544,30 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
     log::info!("Download done: {peer_addr}");
 }
 
-//READ ONE STORED IMAGE BACK OFF DISK. THE PAIR IT WAS SEALED WITH IS DERIVED FROM THE HASH THE FILE IS
-//NAMED AFTER, SO NOTHING ABOUT IT HAS TO BE KEPT ANYWHERE - THE NAME IS THE KEY
+//READ ONE STORED IMAGE BACK OFF DISK
 pub async fn read_image(hash: &[u8; 32]) -> Option<Vec<u8>>
 {
     let sealed = fs::read(misc::get_image_dir().join(misc::hex(hash))).await.ok()?;
 
-    let (key, nonce) = crypto::image_keys(hash);
+    let (key, nonce, mac_key) = crypto::image_keys(hash);
+
+    let ciphertext = crypto::disk_open(&mac_key, &sealed)?;
 
     let mut disk_stream: RexStream = RexStream::new(&Grid::from_key(&key).ok()?, Grid::from_flat(&nonce).ok()?).ok()?;
 
-    let mut decrypted = disk_stream.update(&crypto::bytes_to_i64(&sealed)).ok()?;
-    decrypted.extend(disk_stream.finalize().ok()?);
+    //THE READ HAS TO MIRROR THE WRITE CHUNK FOR CHUNK
+    let mut image = Vec::with_capacity(ciphertext.len());
 
-    let mut image = crypto::i64_to_bytes(&decrypted);
-    image.truncate(sealed.len());
+    for chunk in ciphertext.chunks(consts::UPLOAD_CHUNK_SIZE)
+    {
+        let mut decrypted = disk_stream.update(&crypto::bytes_to_i64(chunk)).ok()?;
+        decrypted.extend(disk_stream.finalize().ok()?);
+
+        let mut bytes = crypto::i64_to_bytes(&decrypted);
+        bytes.truncate(chunk.len());
+
+        image.extend_from_slice(&bytes);
+    }
 
     Some(image)
 }

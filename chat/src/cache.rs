@@ -84,10 +84,10 @@ async fn evict(directory: &PathBuf)
     }
 }
 
-//SEAL ONE PICTURE FOR DISK, THE SAME WAY THE SERVER SEALS ITS OWN
+//SEAL ONE PICTURE FOR DISK, THE SAME WAY THE SERVER SEALS ITS OWN: ENCRYPT-THEN-MAC, TAG LAST
 fn seal(fingerprint: &str, hash: &[u8; 32], data: &[u8]) -> Option<Vec<u8>>
 {
-    let (key, nonce) = crypto::cache_keys(fingerprint, hash);
+    let (key, nonce, mac_key) = crypto::cache_keys(fingerprint, hash);
 
     let mut disk_stream: RexStream = RexStream::new(&Grid::from_key(&key).ok()?, Grid::from_flat(&nonce).ok()?).ok()?;
 
@@ -96,6 +96,10 @@ fn seal(fingerprint: &str, hash: &[u8; 32], data: &[u8]) -> Option<Vec<u8>>
 
     let mut bytes = crypto::i64_to_bytes(&sealed);
     bytes.truncate(data.len());
+
+    //AUTHENTICATE
+    let tag = crypto::disk_seal(&mac_key, &bytes);
+    bytes.extend_from_slice(&tag);
 
     Some(bytes)
 }
@@ -110,24 +114,34 @@ pub async fn has(hash: &[u8; 32]) -> bool
     fs::try_exists(&path).await.unwrap_or(false)
 }
 
-//READ ONE CACHED PICTURE BACK. THE PAIR IT WAS SEALED WITH COMES FROM THE FINGERPRINT AND THE HASH THE
-//FILE IS NAMED AFTER, SO A FILE THAT DECRYPTS TO NOTHING USEFUL SIMPLY MISSES - THE DECODER IS THE ONLY
-//THING THAT EVER JUDGES THE BYTES, AND IT IS THE SAME DECODER THE WIRE GOES THROUGH
+//READ ONE CACHED PICTURE BACK. THE KEYS IT WAS SEALED WITH COME FROM THE FINGERPRINT AND THE HASH THE
+//FILE IS NAMED AFTER, SO THE TAG SAYS THREE THINGS AT ONCE: THAT WE WROTE IT, THAT IT IS WHOLE, AND THAT
+//IT IS THE PICTURE THIS NAME PROMISES. NOTHING IS DECRYPTED UNTIL IT VERIFIES
 pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
 {
     let (fingerprint, path) = scope(hash)?;
 
     let sealed = fs::read(&path).await.ok()?;
 
-    let (key, nonce) = crypto::cache_keys(&fingerprint, hash);
+    let (key, nonce, mac_key) = crypto::cache_keys(&fingerprint, hash);
+
+    //A FILE THAT DOES NOT VERIFY IS NOT A PICTURE WE CAN EVER USE, AND store WILL NOT OVERWRITE IT
+    //BECAUSE THE NAME IS THE CONTENT - SO IT GOES, AND THE NEXT FETCH REFILLS IT. A HALF-WRITTEN FILE
+    //LEFT BY A CRASH OR A FULL DISK IS EXACTLY THIS CASE
+    let Some(ciphertext) = crypto::disk_open(&mac_key, &sealed) else
+    {
+        let _ = fs::remove_file(&path).await;
+
+        return None;
+    };
 
     let mut disk_stream: RexStream = RexStream::new(&Grid::from_key(&key).ok()?, Grid::from_flat(&nonce).ok()?).ok()?;
 
-    let mut decrypted = disk_stream.update(&crypto::bytes_to_i64(&sealed)).ok()?;
+    let mut decrypted = disk_stream.update(&crypto::bytes_to_i64(ciphertext)).ok()?;
     decrypted.extend(disk_stream.finalize().ok()?);
 
     let mut image = crypto::i64_to_bytes(&decrypted);
-    image.truncate(sealed.len());
+    image.truncate(ciphertext.len());
 
     //A HIT IS A USE, AND THE EVICTION ORDER IS THE ONLY THING THAT CARES. ONE utimensat IS NOT WORTH A
     //TASK OF ITS OWN, AND A FAILURE ONLY COSTS THIS PICTURE ITS PLACE IN THE QUEUE

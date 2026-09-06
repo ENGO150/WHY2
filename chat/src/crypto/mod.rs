@@ -48,7 +48,12 @@ use why2::
     stream::RexStream,
 };
 
-use crate::consts::SharedKeys;
+use crate::consts::
+{
+    self as consts_chat,
+    DiskKeys,
+    SharedKeys,
+};
 
 //STRUCTS
 pub struct RexPacketStream //AUTHENTICATED STREAM CIPHER (ENCRYPT-THEN-MAC OVER A RexStream)
@@ -283,10 +288,9 @@ pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketS
     })
 }
 
-//AT-REST KEY & NONCE FOR ONE FILE, DERIVED FROM WHAT THE FILE IS NAMED AFTER - SO NOTHING ABOUT THE PAIR
-//HAS TO BE KEPT ANYWHERE, AND TWO FILES NEVER SHARE A KEYSTREAM
+//AT-REST KEYS FOR ONE FILE
 #[cfg(feature = "chat")]
-fn disk_keys(salt: &[u8], ikm: &[u8]) -> (Zeroizing<Vec<i64>>, Vec<i64>)
+fn disk_keys(salt: &[u8], ikm: &[u8]) -> DiskKeys
 {
     let hkdf = Hkdf::<Sha256>::new(Some(salt), ikm);
 
@@ -301,21 +305,24 @@ fn disk_keys(salt: &[u8], ikm: &[u8]) -> (Zeroizing<Vec<i64>>, Vec<i64>)
     let mut nonce_bytes = Zeroizing::new(vec![0u8; NONCE_LEN * 8]);
     hkdf.expand(b"WHY2-IMAGE-NONCE", &mut nonce_bytes).expect("HKDF expand failed");
 
+    let mut mac_bytes = Zeroizing::new([0u8; 32]);
+    hkdf.expand(b"WHY2-DISK-MAC", mac_bytes.as_mut()).expect("HKDF expand failed");
+
     let to_i64 = |bytes: &[u8]| bytes.chunks_exact(8)
         .map(|c| i64::from_be_bytes(c.try_into().unwrap()))
         .collect::<Vec<i64>>();
 
-    (Zeroizing::new(to_i64(&key_bytes)), to_i64(&nonce_bytes))
+    (Zeroizing::new(to_i64(&key_bytes)), to_i64(&nonce_bytes), mac_bytes)
 }
 
 #[cfg(feature = "server")]
-pub fn image_keys(hash: &[u8; 32]) -> (Zeroizing<Vec<i64>>, Vec<i64>) //AT-REST KEY & NONCE FOR ONE IMAGE
+pub fn image_keys(hash: &[u8; 32]) -> DiskKeys //AT-REST KEYS FOR ONE IMAGE
 {
     disk_keys(hash, kex::image_key().as_ref())
 }
 
 #[cfg(feature = "client_base")]
-pub fn cache_keys(fingerprint: &str, hash: &[u8; 32]) -> (Zeroizing<Vec<i64>>, Vec<i64>)
+pub fn cache_keys(fingerprint: &str, hash: &[u8; 32]) -> DiskKeys
 {
     let mut salt = Vec::with_capacity(fingerprint.len() + hash.len());
 
@@ -323,6 +330,45 @@ pub fn cache_keys(fingerprint: &str, hash: &[u8; 32]) -> (Zeroizing<Vec<i64>>, V
     salt.extend_from_slice(hash);
 
     disk_keys(&salt, kex::cache_key().as_ref())
+}
+
+#[cfg(feature = "chat")]
+pub fn disk_mac(mac_key: &[u8; 32]) -> Hmac<Sha256> //OPEN A MAC OVER A FILE'S CIPHERTEXT
+{
+    <Hmac<Sha256>>::new_from_slice(mac_key).expect("Invalid MAC key")
+}
+
+#[cfg(feature = "chat")]
+pub fn disk_tag(mut mac: Hmac<Sha256>, length: u64) -> [u8; 32] //BIND THE LENGTH AND FINISH IT
+{
+    mac.update(&length.to_be_bytes());
+
+    mac.finalize().into_bytes().into()
+}
+
+#[cfg(feature = "chat")]
+pub fn disk_seal(mac_key: &[u8; 32], ciphertext: &[u8]) -> [u8; 32]
+{
+    let mut mac = disk_mac(mac_key);
+    mac.update(ciphertext);
+
+    disk_tag(mac, ciphertext.len() as u64)
+}
+
+#[cfg(feature = "chat")]
+pub fn disk_open<'a>(mac_key: &[u8; 32], sealed: &'a [u8]) -> Option<&'a [u8]>
+{
+    let (ciphertext, tag) = sealed.split_at_checked(
+        sealed.len().checked_sub(consts_chat::DISK_TAG_SIZE)?)?;
+
+    let mut mac = disk_mac(mac_key);
+
+    mac.update(ciphertext);
+    mac.update(&(ciphertext.len() as u64).to_be_bytes());
+
+    mac.verify_slice(tag).ok()?;
+
+    Some(ciphertext)
 }
 
 #[cfg(feature = "server")]

@@ -82,6 +82,8 @@ pub const MAX_IMAGE_SIZE: usize        = 8 * MEGABYTE;                          
 pub const MAX_HISTORY_SIZE: usize      = 12 * MEGABYTE;                               //BIGGEST HISTORY THE SERVER REPLAYS (12MB)
 pub const MAX_IMAGE_DIMENSION: u32     = 16_384;                                      //WIDEST/TALLEST PICTURE A CLIENT DECODES
 
+pub const DISK_TAG_SIZE: usize         = 32;                                          //HMAC-SHA256 TAG ON AN ENCRYPTED FILE
+
 //THE SERVER'S server_images/ IS OWNED BY THE HISTORY AND DIES WITH IT; A CLIENT CACHE IS OWNED BY NOTHING,
 //SO ITS ONLY BOUND IS THIS ONE - THE OLDEST FILES GO WHEN A WRITE TAKES IT OVER
 pub const MAX_IMAGE_CACHE: u64         = 512 * MEGABYTE as u64;                       //MOST DISK THE IMAGE CACHE MAY TAKE
@@ -99,4 +101,5 @@ pub const PACKET_CONFIG: PacketConfig =
 
 //TYPES
 pub type SharedKeys  = (Zeroizing<Vec<i64>>, Zeroizing<Vec<u8>>);           //WHY2 KEY, HMAC
+pub type DiskKeys    = (Zeroizing<Vec<i64>>, Vec<i64>, Zeroizing<[u8; 32]>); //WHY2 KEY, NONCE, HMAC
 pub type Streams<'a> = (&'a mut OwnedReadHalf, Arc<Mutex<OwnedWriteHalf>>); //READ STREAM, WRITE STREAM
