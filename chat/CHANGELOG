@@ -1,6 +1,19 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.1.1:
+- 0cf08812: make the server's log level configurable
+- 82d4972e: say when the message history is discarded
+- 45181b1d: log auxiliary connections as their main connection
+- 503cf552: log every step of a connection's life
+- 80850da8: give PacketCode a name that carries none of its fields
+- 4660be22: mention auto_show_images in prose files
+- 55f2270d: add client config entry to disable auto image loading
+- dd5d3fa2: authenticate cached images
+- 85d64f8a: offer stored images instead of pushing them
+- 56a56451: cache images on the client
+- 5e07e535: move at-rest keys to the config root
+
 v2.1.0:
 - 0b00801a: add limits to image sharing
 - 740ed677: cache image uploads
