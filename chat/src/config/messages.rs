@@ -51,13 +51,36 @@ fn path() -> String //WHERE THE HISTORY IS KEPT
 fn load() -> Vec<StoredMessage> //READ THE HISTORY OFF DISK
 {
     //NO FILE IS AN EMPTY HISTORY
-    let Ok(bytes) = fs::read(path()) else { return Vec::new() };
+    let Ok(bytes) = fs::read(path()) else
+    {
+        log::info!("No message history on disk, starting empty");
+        return Vec::new();
+    };
 
+    //A HISTORY THAT WILL NOT VERIFY IS DROPPED RATHER THAN REFUSED, WHICH IS WORTH SAYING OUT LOUD: IT IS
+    //ALSO WHAT A FILE WRITTEN UNDER ANOTHER SERVER'S KEY, OR A TAMPERED ONE, LOOKS LIKE FROM HERE
     let Some(plaintext) = crypto::decrypt_packet::
         <{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(bytes, &KEYS)
-    else { return Vec::new() };
+    else
+    {
+        log::error!("Message history failed verification, it is being ignored");
+        return Vec::new();
+    };
 
-    wincode::config::deserialize::<Vec<StoredMessage>, _>(&plaintext, consts::PACKET_CONFIG).unwrap_or_default()
+    match wincode::config::deserialize::<Vec<StoredMessage>, _>(&plaintext, consts::PACKET_CONFIG)
+    {
+        Ok(history) =>
+        {
+            log::info!("Loaded {} stored messages", history.len());
+            history
+        },
+
+        Err(_) =>
+        {
+            log::error!("Message history is of an older format, it is being ignored");
+            Vec::new()
+        }
+    }
 }
 
 //PUBLIC
@@ -112,6 +135,8 @@ fn push(message: StoredMessage) //APPEND ONE ENTRY AND REWRITE THE FILE
 
     drop(history); //THE FILES ARE NOT THE HISTORY'S BUSINESS - THE LOCK IS DONE WITH
 
+    if !orphans.is_empty() { log::info!("Dropping {} stored images with no history entry left", orphans.len()); }
+
     for hash in orphans { let _ = fs::remove_file(misc::get_image_dir().join(misc::hex(&hash))); }
 }
 
@@ -137,13 +162,17 @@ pub fn sweep_images()
         .filter_map(|message| message.image.as_ref().map(|hash| misc::hex(hash)))
         .collect();
 
+    let mut swept = 0;
+
     for file in files
     {
         let named = file.file_name().and_then(|name| name.to_str())
             .map(|name| kept.contains(name)).unwrap_or(false);
 
-        if !named { let _ = fs::remove_file(&file); }
+        if !named && fs::remove_file(&file).is_ok() { swept += 1; }
     }
+
+    if swept > 0 { log::info!("Swept {swept} stored images nothing names any more"); }
 }
 
 pub fn all() -> Vec<StoredMessage> //EVERY STORED LOBBY MESSAGE, OLDEST FIRST
