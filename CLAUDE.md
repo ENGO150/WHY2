@@ -899,6 +899,44 @@ When adding a new packet type or handler, changes typically need to touch: `netw
 (`PacketCode` enum) and both `network/client.rs` and `network/server.rs` (or the relevant
 file/screen/voice submodule).
 
+## Server logging
+
+The server logs through `log` + `simple_logger` (both `server`-only dependencies — the client has no
+logger and prints nothing outside the TUI, see above). Two rules decide every line, and new code has
+to keep to them.
+
+- **A line identifies a client by its address and by nothing else.** No username, no message or
+  private-message text, no channel or file name, no password, key, token or hash ever reaches the
+  log — those are the users' and a server operator's log is not where they belong. What is logged
+  beside the address is the server's own vocabulary and the shape of what happened: the packet's
+  control code (`PacketCode::name`, which exists for this and returns the variant name *only* —
+  `PacketCode` deliberately does not derive `Debug`, which would print the fields with it), a byte
+  or character count, a limit that was hit, a role, a count of connections. `Role` crosses into the
+  log as itself for the same reason it crosses the wire as itself.
+- **An auxiliary connection is logged as the main connection that asked for it.** An upload, a
+  download, a screen share, a viewer attachment and a voice session are each a socket of their own on
+  an ephemeral port that nothing else in the log ever names, so keying a line on it would produce
+  lines nobody can tie to anything. `server::log_addr(&id)` resolves a client id to its main
+  connection's address and is what those paths log — `file/server.rs` collects the address up front
+  when it collects the keys, `screen/server.rs` takes it once per share, `bin/server.rs` takes it in
+  the accept loop the moment a token is matched, and `voice/server.rs` takes it per event (its own
+  address is the UDP one). **`log_addr` walks `CONNECTIONS`, so it must never be called while a guard
+  on that map is held** — the established pattern of collecting into locals and dropping the guard
+  applies to it like to any other read.
+
+`log_level` (`server.toml`, default `info`) is the verbosity, parsed as a `LevelFilter` and falling
+back to `info` on anything unrecognised. `info` is the operator's view — a connection's life
+(accepted, key exchange, authenticated, closed with the reason), every transfer, every share, every
+moderation action and every settings save. `debug` adds the per-packet line (one per received
+packet, its code only), the handshake's steps, rekeys and the shedding decisions. The key is read
+once, when the logger is built, so it is in `consts::SERVER_RESTART_SETTINGS` — and because the
+logger has to exist before anything has something to say, `bin/server.rs` calls `config::init_config`
+*before* it, ahead of the version check that was first.
+
+Levels are not decoration: `warn` is a client being refused something (a limit, a bad password, an
+undecodable packet, a spam violation, a viewer shed) — routine, and not the operator's problem;
+`error` is the server's own (a bind that failed, a stored image or history that will not verify).
+
 ## Concurrency rules (`chat`)
 
 The crate is async top to bottom — both binaries are `#[tokio::main]` and there are no manually
