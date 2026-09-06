@@ -237,6 +237,78 @@ pub enum PacketCode //CONTROL CODES
 //STRUCTS
 //ONE server.toml KEY AS THE CLIENT EDITS IT. THE SERVER IS THE ONLY PLACE THAT KNOWS WHICH KEYS EXIST,
 //SO IT SENDS THE HEADING AND THE TRAILING COMMENT ALONG - THE CLIENT RENDERS WHATEVER IT IS GIVEN
+//IMPLEMENTATIONS
+impl PacketCode
+{
+    //THE VARIANT'S NAME, AND NOTHING THAT CAME WITH IT. THIS IS WHAT THE SERVER LOG NAMES A PACKET BY: A
+    //CONTROL CODE IS THE PROTOCOL'S OWN VOCABULARY, WHILE EVERY FIELD BESIDE IT (THE TEXT, THE FILENAMES,
+    //THE USERNAMES, THE PASSWORDS, THE TOKENS) IS THE USERS' AND IS NEVER WRITTEN DOWN
+    pub fn name(&self) -> &'static str
+    {
+        match self
+        {
+            Self::Message { .. } => "Message",
+            Self::KeyExchangeOffer { .. } => "KeyExchangeOffer",
+            Self::KeyExchangeReply { .. } => "KeyExchangeReply",
+            Self::Welcome { .. } => "Welcome",
+            Self::Accept { .. } => "Accept",
+            Self::Leave { .. } => "Leave",
+            Self::PrivateMessage { .. } => "PrivateMessage",
+            Self::PrivateMessageBack { .. } => "PrivateMessageBack",
+            Self::VoiceJoin { .. } => "VoiceJoin",
+            Self::VoiceLeave { .. } => "VoiceLeave",
+            Self::Upload { .. } => "Upload",
+            Self::Download { .. } => "Download",
+            Self::Image { .. } => "Image",
+            Self::ImageDisplay { .. } => "ImageDisplay",
+            Self::ImageData { .. } => "ImageData",
+            Self::Uploaded { .. } => "Uploaded",
+            Self::Attach { .. } => "Attach",
+            Self::ServerBans { .. } => "ServerBans",
+            Self::ServerRole { .. } => "ServerRole",
+            Self::ServerSettings { .. } => "ServerSettings",
+            Self::Version { .. } => "Version",
+            Self::Username { .. } => "Username",
+            Self::PasswordL { .. } => "PasswordL",
+            Self::PasswordR { .. } => "PasswordR",
+            Self::History { .. } => "History",
+            Self::Channel { .. } => "Channel",
+            Self::ChannelCreated { .. } => "ChannelCreated",
+            Self::ChannelDestroyed { .. } => "ChannelDestroyed",
+            Self::VoiceClients { .. } => "VoiceClients",
+            Self::Files { .. } => "Files",
+            Self::Screens { .. } => "Screens",
+            Self::Deattach { .. } => "Deattach",
+            Self::Attached { .. } => "Attached",
+            Self::Deattached { .. } => "Deattached",
+            Self::Screen { .. } => "Screen",
+            Self::Screenshare { .. } => "Screenshare",
+            Self::ScreenshareEnd { .. } => "ScreenshareEnd",
+            Self::Voice { .. } => "Voice",
+            Self::Join { .. } => "Join",
+            Self::List { .. } => "List",
+            Self::ServerKick { .. } => "ServerKick",
+            Self::ServerMute { .. } => "ServerMute",
+            Self::ServerBan { .. } => "ServerBan",
+            Self::ServerBanIp { .. } => "ServerBanIp",
+            Self::ServerPardon { .. } => "ServerPardon",
+            Self::ServerPardonIp { .. } => "ServerPardonIp",
+            Self::ServerSay { .. } => "ServerSay",
+            Self::FirstUser { .. } => "FirstUser",
+            Self::Rekey { .. } => "Rekey",
+            Self::Disconnect { .. } => "Disconnect",
+            Self::SpamWarning { .. } => "SpamWarning",
+            Self::RegisterDisabled { .. } => "RegisterDisabled",
+            Self::UploadLimit { .. } => "UploadLimit",
+            Self::Muted { .. } => "Muted",
+            Self::InvalidUsage { .. } => "InvalidUsage",
+            Self::InvalidFeature { .. } => "InvalidFeature",
+            Self::KeepAlive { .. } => "KeepAlive",
+            Self::ServerRestart { .. } => "ServerRestart",
+        }
+    }
+}
+
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
 pub struct ServerSetting
 {
