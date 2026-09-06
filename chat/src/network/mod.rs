@@ -280,7 +280,11 @@ pub async fn read_tcp
     if streams.0.read_exact(&mut len_buf).await.is_err() //READ LENGTH
     {
         #[cfg(feature = "server")]
-        server::remove_connection(&peer_addr, false, Some("length")).await;
+        {
+            log::debug!("Socket closed while reading length: {peer_addr}");
+            server::remove_connection(&peer_addr, false, Some("length")).await;
+        }
+
         return None;
     }
     let len = u32::from_be_bytes(len_buf) as usize;
@@ -289,6 +293,8 @@ pub async fn read_tcp
     #[cfg(feature = "server")]
     if len > max_packet_size
     {
+        log::warn!("Packet over the limit ({len} > {max_packet_size}): {peer_addr}");
+
         server::remove_connection(&peer_addr, true, Some("length")).await;
         return None;
     }
@@ -301,7 +307,11 @@ pub async fn read_tcp
     if streams.0.read_exact(&mut decoded_packet).await.is_err() //READ
     {
         #[cfg(feature = "server")]
-        server::remove_connection(&peer_addr, false, Some("length")).await;
+        {
+            log::debug!("Socket closed mid-packet ({len} bytes expected): {peer_addr}");
+            server::remove_connection(&peer_addr, false, Some("length")).await;
+        }
+
         return None;
     }
 
@@ -475,12 +485,17 @@ pub async fn receive
                     //SEND WARNING CODE
                     if spam_warning
                     {
+                        log::warn!("Spam warning: {}", read.peer_addr);
+
                         send(&mut *streams.1.lock().await, PacketCode::SpamWarning, shared_key.as_ref()).await;
                     }
 
                     //TOO MANY VIOLATIONS, BYE
                     if disconnect
                     {
+                        log::warn!("Disconnecting ({}): {}", if !grace { "invalid sequence number" } else { "spam" },
+                            read.peer_addr);
+
                         server::remove_connection(&read.peer_addr, grace, Some(if !grace { "SEQ" } else { "SPAM" })).await;
                         return None;
                     }
@@ -519,7 +534,10 @@ pub async fn receive
         {
             //FORCEFULLY DISCONNECT CLIENT ON INVALID PACKET
             #[cfg(feature = "server")]
-            server::remove_connection(&read.peer_addr, false, Some("packet")).await;
+            {
+                log::warn!("Undecodable packet ({} bytes): {}", read.data.len(), read.peer_addr);
+                server::remove_connection(&read.peer_addr, false, Some("packet")).await;
+            }
 
             return None;
         }

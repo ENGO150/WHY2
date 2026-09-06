@@ -132,6 +132,8 @@ async fn send_history(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKe
 
     messages.reverse(); //OLDEST FIRST AGAIN - THE BUDGET IS SPENT FROM THE NEWEST END, THE PANE READS FROM THE OTHER
 
+    log::debug!("Replaying history ({} messages)", messages.len());
+
     network::send(&mut *write_stream.lock().await, PacketCode::History { messages }, Some(keys)).await;
 }
 
@@ -148,6 +150,17 @@ async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //RE
 }
 
 //PUBLIC
+//THE ADDRESS EVERY LINE ABOUT A CLIENT IS KEYED BY. AN AUXILIARY SOCKET (AN UPLOAD, A DOWNLOAD, A SHARE, A
+//VIEWER, A VOICE SESSION) IS A CONNECTION OF ITS OWN ON AN EPHEMERAL PORT THAT NOTHING ELSE IN THE LOG EVER
+//NAMES, SO IT IS LOGGED AS THE MAIN CONNECTION THAT ASKED FOR IT AND THE TWO CAN BE READ TOGETHER.
+//NEVER CALL THIS WHILE HOLDING A CONNECTIONS GUARD - IT WALKS THE SAME MAP
+pub fn log_addr(id: &usize) -> String
+{
+    CONNECTIONS.iter().find(|conn| conn.id() == Some(id))
+        .map(|conn| conn.peer_addr().to_string())
+        .unwrap_or_else(|| String::from("<gone>"))
+}
+
 pub fn spawn_with_abort<F, Fut>(f: F) -> AbortHandle //SPAWN TASK WHICH KNOWS ITS OWN AbortHandle
 where
     F: FnOnce(AbortHandle) -> Fut + Send + 'static,
@@ -271,12 +284,15 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
 
     log::info!
     (
-        "Close connection{}: {peer_addr}",
+        "Close connection{}: {peer_addr} ({}, {} left)",
 
         if let Some(info) = info
         {
             format!(" ({info})")
-        } else { String::new() }
+        } else { String::new() },
+
+        if connection.is_authenticated() { "authenticated" } else { "unauthenticated" },
+        CONNECTIONS.len(),
     );
 
     //SHUT DOWN THE HANDLER TASK (MUST BE LAST - THIS MAY BE THE CALLING TASK ITSELF)
@@ -402,7 +418,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, role: Role, id: u
     //CREATE AVAILABLE FILES ENTRY
     AVAILABLE_FILES.insert(username.to_string(), Vec::new());
 
-    log::info!("Authenticate connection: {}", peer_addr);
+    log::info!("Authenticate connection: {peer_addr} (id {id}, role {role})");
 }
 
 fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOVE CLIENT TO CHANNEL
@@ -442,12 +458,18 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
     //RETURN IF CLIENT SWITCHED TO SAME CHANNEL
     if old_channel == *channel { return; }
 
+    log::info!("Channel switch: {peer_addr} ({} -> {})",
+        if old_channel.is_some() { "channel" } else { "lobby" },
+        if channel.is_some() { "channel" } else { "lobby" });
+
     //CHECK IF CHANNEL WAS ABANDONED
     if let Some(old_channel) = old_channel
     {
         if !CONNECTIONS.iter().any(|c| c.channel().as_ref() == Some(&old_channel))
         {
             //NO CLIENT IS IN OLD CHANNEL
+            log::info!("Channel destroyed (last client left): {peer_addr}");
+
             send_to_all(PacketCode::ChannelDestroyed
             {
                 name: old_channel,
@@ -461,6 +483,8 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
         if CONNECTIONS.iter().filter(|c| c.channel().as_ref() == Some(channel)).count() == 1
         {
             //CLIENT IS FIRST IN CHANNEL
+            log::info!("Channel created: {peer_addr}");
+
             send_to_all(PacketCode::ChannelCreated
             {
                 name: channel.clone(),
@@ -584,8 +608,11 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //CHECK FOR VALID KEYS
     if keys.0.is_empty() || keys.1.is_empty()
     {
+        log::warn!("Key exchange failed: {peer_addr}");
         return remove_connection(&peer_addr, false, None).await
     }
+
+    log::debug!("Key exchange done: {peer_addr}");
 
     //ASK CLIENT FOR THEIR PACKAGE VERSION
     if config::read_config("check_client_version")
@@ -593,6 +620,9 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         let version = handshake::ask_version(streams, &keys).await;
         if version.is_none() || version != Some(misc::get_version().to_string())
         {
+            log::warn!("Version mismatch: {peer_addr} (client {}, server {})",
+                version.as_deref().unwrap_or("none"), misc::get_version());
+
             return remove_connection(&peer_addr, true, Some("version")).await;
         }
     }
@@ -616,8 +646,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     }
 
     //ASK n TIMES
-    for _ in 0..max_tries
+    for attempt in 0..max_tries
     {
+        log::debug!("Asking for username: {peer_addr} (try {}/{max_tries})", attempt + 1);
+
         //SEND PICK_USERNAME CODE
         network::send(&mut *streams.1.lock().await, PacketCode::Username { username: None }, Some(&keys)).await;
 
@@ -635,6 +667,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         username = Some(uname);
                         break;
                     }
+
+                    log::debug!("Username refused: {peer_addr}");
                 }
             },
 
@@ -700,6 +734,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             return remove_connection(&peer_addr, true, Some("register")).await;
         }
 
+        log::info!("Registering new user: {peer_addr}");
+
         //HASH PASSWORD (ARGON2 IS CPU HEAVY, KEEP IT OFF THE RUNTIME)
         let hash = task::spawn_blocking(move || password::hash_password(password.as_ref().unwrap().as_str()))
             .await.expect("Hashing password failed");
@@ -708,6 +744,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         if config::users::add(&username, &hash)
         {
             //FIRST USER, NOTIFY ABOUT OWNER ROLE
+            log::info!("First user registered, granting {}: {peer_addr}", Role::Owner);
+
             network::send(&mut *streams.1.lock().await, PacketCode::FirstUser, Some(&keys)).await;
         }
     } else //LOGIN
@@ -742,8 +780,11 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
         if !valid
         {
+            log::warn!("Login refused: {peer_addr}");
             return remove_connection(&peer_addr, true, Some("login")).await;
         }
+
+        log::debug!("Login accepted: {peer_addr}");
     }
 
     let id = get_latest_id(); //GENERATE ID FOR CLIENT
@@ -785,6 +826,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             !file::ACTIVE_FILESHARES.iter().any(|entry| entry.client_id == id) //DO NOT REKEY ON FILE UPLOAD
         {
             //INFORM CLIENT ABOUT REKEYING
+            log::debug!("Rekeying: {peer_addr}");
+
             let current_keys = keys.clone();
             handshake::key_exchange(streams, &peer_addr, &obfuscation_key, &mut keys, Some(&current_keys)).await; //INIT REKEY
         }
@@ -792,6 +835,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         //THE ROLE IS RE-READ RATHER THAN LATCHED AT LOGIN: /server role APPLIES TO THE SESSION IT LANDS
         //ON, SO A DEMOTION HAS TO REACH THESE CHECKS BEFORE THE NEXT PRIVILEGED PACKET DOES
         let role = CONNECTIONS.get(&peer_addr).and_then(|entry| entry.role().copied()).unwrap_or(role);
+
+        //WHAT ARRIVED, NEVER WHAT WAS IN IT: A CONTROL CODE IS THE SERVER'S OWN VOCABULARY, WHILE THE TEXT,
+        //THE FILENAMES AND THE CHANNEL NAMES BESIDE IT ARE WHAT THE USERS TYPED AND ARE NOT LOGGED ANYWHERE
+        log::debug!("Packet {}: {peer_addr}", read.name());
 
         //CLIENT CODES
         match read
@@ -802,11 +849,16 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //SILENCE MUTED USERS
                 if *CONNECTIONS.get(&peer_addr).unwrap().muted()
                 {
+                    log::debug!("Message dropped (muted): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
                     continue;
                 }
 
                 let text = text.trim().to_owned();
+
+                log::info!("Message ({} chars) in {}: {peer_addr}", text.chars().count(),
+                    if channel.is_some() { "channel" } else { "lobby" });
 
                 //KEEP IT - ONLY THE LOBBY HAS A HISTORY, A CHANNEL IS AS TEMPORARY AS THE CLIENTS IN IT
                 if channel.is_none() && config::read_config::<bool>("persistent_messages")
@@ -837,9 +889,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //CHECK DISABLED FEATURE
                 if !options::voice_chat_enabled()
                 {
+                    log::warn!("Voice refused (disabled): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidFeature, Some(&keys)).await;
                 } else if !voice_server::CONNECTIONS.contains_key(&id) //IS NOT USING VOICE
                 {
+                    log::info!("Voice slot opened: {peer_addr}");
+
                     //OPEN THE VOICE SLOT AND ACKNOWLEDGE WITH THE TOKEN THAT CLAIMS IT OVER UDP
                     let token = voice_server::open_connection(id, username.clone());
                     network::send(&mut *streams.1.lock().await, PacketCode::Voice { token: Some(token) }, Some(&keys)).await;
@@ -851,6 +907,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
                 } else //IS USING VOICE
                 {
+                    log::info!("Voice leave: {peer_addr}");
+
                     //ACKNOWLEDGE THE LEAVE
                     network::send(&mut *streams.1.lock().await, PacketCode::Voice { token: None }, Some(&keys)).await;
 
@@ -889,6 +947,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
                 } else //INVALID CHANNEL
                 {
+                    log::warn!("Channel refused (invalid name): {peer_addr}");
+
                     //SEND InvalidUsage CODE
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
@@ -912,6 +972,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         });
                     }
                 }
+
+                log::debug!("Sending online list ({} users): {peer_addr}", users.len());
 
                 //SEND LIST BACK TO CLIENT
                 network::send(&mut *streams.1.lock().await, PacketCode::List { users: Some(users) }, Some(&keys)).await;
@@ -974,6 +1036,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count();
                 if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
                 {
+                    log::warn!("Upload refused ({active_count} already running): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::UploadLimit, Some(&keys)).await;
                     continue;
                 }
@@ -989,7 +1053,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 });
 
                 //LOG FILE UPLOAD
-                log::info!("Upload request: {peer_addr}");
+                log::info!("Upload request ({}): {peer_addr}", if image { "image" } else { "file" });
 
                 let packet = if image
                 {
@@ -1030,6 +1094,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //GENERATE RANDOM SHARE UID
                     let uid = rand::random::<u64>();
 
+                    let file_size = file.size;
+
                     //OPEN NEW CONNECTION
                     let token = open_connection(id, ConnectionType::FileDownload { uid, file });
 
@@ -1041,9 +1107,11 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     }, Some(&keys)).await;
 
                     //LOG START
-                    log::info!("Download request: {peer_addr}");
+                    log::info!("Download request ({} bytes): {peer_addr}", file_size);
                 } else
                 {
+                    log::warn!("Download refused (unknown file): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
@@ -1057,6 +1125,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 {
                     //DEATTACH ALL CLIENTS
                     deattach(removed_id, &username).await;
+
+                    log::info!("Screen share stopped: {peer_addr}");
 
                     //SEND SCREEN DISABLE NOTIFICATION
                     network::send(&mut *streams.1.lock().await, PacketCode::Screen { token: None }, Some(&keys)).await;
@@ -1083,6 +1153,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     log::info!("Screen share: {peer_addr}");
                 } else
                 {
+                    log::warn!("Screen share refused (disabled): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidFeature, Some(&keys)).await;
                 }
             },
@@ -1122,9 +1194,11 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     }).await;
 
                     //LOG START
-                    log::info!("Screen attach: {peer_addr}");
+                    log::info!("Screen attach: {peer_addr} watching {}", log_addr(&sharer_id));
                 } else
                 {
+                    log::warn!("Screen attach refused (no such share): {peer_addr}");
+
                     //INVALID ARGS
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
@@ -1158,6 +1232,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     }).await;
                 } else
                 {
+                    log::warn!("Deattach refused (not attached): {peer_addr}");
+
                     //NOT ATTACHED
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
@@ -1195,6 +1271,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     }
                 }
 
+                log::debug!("Sending file list ({} users): {peer_addr}", users.len());
+
                 //SEND LIST BACK TO CLIENT
                 network::send(&mut *streams.1.lock().await, PacketCode::Files { users: Some(users) }, Some(&keys)).await;
             },
@@ -1210,7 +1288,11 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         .saturating_sub(last.elapsed())))
                     .unwrap_or_default(); //GUARD DROPPED HERE - NEVER HELD ACROSS THE SLEEP
 
-                if !wait.is_zero() { time::sleep(wait).await; }
+                if !wait.is_zero()
+                {
+                    log::debug!("Image fetch held for {}ms: {peer_addr}", wait.as_millis());
+                    time::sleep(wait).await;
+                }
 
                 if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
                     && let Some(last) = conn.last_image_mut() { *last = Instant::now(); }
@@ -1220,6 +1302,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     true => file::read_image(&hash).await,
                     false => None,
                 };
+
+                match image.as_ref()
+                {
+                    Some(data) => log::info!("Image fetch served ({} bytes): {peer_addr}", data.len()),
+                    None => log::warn!("Image fetch refused (not in history): {peer_addr}"),
+                }
 
                 network::send(&mut *streams.1.lock().await, PacketCode::ImageData { hash, data: image }, Some(&keys)).await;
             },
@@ -1244,6 +1332,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     }
                 }
 
+                log::debug!("Sending screenshare list ({} users): {peer_addr}", users.len());
+
                 //SEND LIST BACK TO CLIENT
                 network::send(&mut *streams.1.lock().await, PacketCode::Screens { users: Some(users) }, Some(&keys)).await;
             },
@@ -1265,6 +1355,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 if let Some(recipient_addr) = recipient_addr
                 {
+                    log::info!("Private message ({} chars): {peer_addr} -> {recipient_addr}", text.chars().count());
+
                     //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
                     if recipient_id != id
                     {
@@ -1299,6 +1391,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     }, Some(&keys)).await;
                 } else
                 {
+                    log::warn!("Private message refused (no such recipient): {peer_addr}");
+
                     //INVALID PM FORMAT
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
@@ -1310,19 +1404,34 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Moderator
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
 
                 //FIND TARGET USER
-                if let Some(mut conn) = CONNECTIONS.iter_mut()
+                let muted = if let Some(mut conn) = CONNECTIONS.iter_mut()
                     .find(|entry| entry.value().id() == Some(&id)) && conn.role() < Some(&role)
                 {
                     //TOGGLE MUTE
                     conn.toggle_mute();
-                } else //USER NOT FOUND
+
+                    Some((*conn.peer_addr(), *conn.muted()))
+                } else { None }; //USER NOT FOUND
+
+                match muted
                 {
-                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    //THE GUARD IS DROPPED BEFORE THE SEND BELOW, AND BEFORE THIS LINE
+                    Some((target, muted)) => log::info!("{} by {peer_addr}: {target}",
+                        if muted { "Mute" } else { "Unmute" }),
+
+                    None =>
+                    {
+                        log::warn!("Mute refused (no such user, or a peer): {peer_addr}");
+
+                        network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    }
                 }
             },
 
@@ -1332,6 +1441,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Moderator
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
@@ -1343,10 +1454,14 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 if let Some((addr, Some(trole))) = target && trole < role
                 {
+                    log::info!("Kick by {peer_addr}: {addr}");
+
                     //KICK
                     remove_connection(&addr, true, Some("kick")).await;
                 } else //USER NOT FOUND
                 {
+                    log::warn!("Kick refused (no such user, or a peer): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
@@ -1357,6 +1472,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Owner || id == uid
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
@@ -1368,10 +1485,14 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 if let Some((addr, Some(username))) = target
                 {
+                    log::info!("Ban by {peer_addr}: {addr}");
+
                     config::bans::ban(&username);
                     remove_connection(&addr, true, Some("ban")).await;
                 } else //USER NOT FOUND
                 {
+                    log::warn!("Ban refused (no such user): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
@@ -1382,6 +1503,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Owner || id == uid
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
@@ -1393,10 +1516,14 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 if let Some(addr) = target
                 {
+                    log::info!("IP ban by {peer_addr}: {}", addr.ip());
+
                     config::bans::ban_ip(&addr.ip());
                     remove_connections(&addr.ip(), true, Some("ip ban")).await;
                 } else //USER NOT FOUND
                 {
+                    log::warn!("IP ban refused (no such user): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
@@ -1407,6 +1534,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Owner
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
@@ -1420,15 +1549,21 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Owner
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
 
                 if config::bans::pardon(ban)
                 {
+                    log::info!("Pardon by {peer_addr}");
+
                     send_bans(&streams.1, &keys).await;
                 } else
                 {
+                    log::warn!("Pardon refused (no such ban): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
@@ -1439,15 +1574,21 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Owner
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
 
                 if config::bans::pardon_ip(ban)
                 {
+                    log::info!("IP pardon by {peer_addr}");
+
                     send_bans(&streams.1, &keys).await;
                 } else
                 {
+                    log::warn!("IP pardon refused (no such ban): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
             },
@@ -1458,9 +1599,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Owner
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
+
+                log::info!("Server announcement ({} chars) by {peer_addr}", message.chars().count());
 
                 //SEND BACK TO ALL CLIENTS ACROSS ALL CHANNELS
                 send_to_all(PacketCode::ServerSay { message }, false, None);
@@ -1472,6 +1617,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Owner || id == uid || new_role > role
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
@@ -1494,6 +1641,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
+
+                log::info!("Role change by {peer_addr}: {} is now {new_role} (was {target_role})", log_addr(&uid));
 
                 //STORE
                 users::set_role(&target_username, new_role);
@@ -1540,6 +1689,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Owner
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
@@ -1547,7 +1698,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //A SAVE WITHOUT ROWS IS NOT A SAVE, AND A READ IGNORES WHATEVER IT WAS SENT WITH
                 if save && let Some(settings) = &settings
                 {
-                    config::settings::write(settings);
+                    let accepted = config::settings::write(settings);
+
+                    log::info!("Server settings saved by {peer_addr}: {accepted}/{} rows accepted", settings.len());
+                } else if !save
+                {
+                    log::info!("Server settings read by {peer_addr}");
                 }
 
                 network::send(&mut *streams.1.lock().await, PacketCode::ServerSettings
@@ -1563,11 +1719,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //VERIFY PERMISSIONS
                 if role < Role::Owner
                 {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
 
-                log::info!("Restart requested by {username}");
+                log::info!("Restart requested by {peer_addr}");
 
                 //IN A TASK OF ITS OWN, BECAUSE disconnect_all ABORTS THIS ONE
                 tokio::spawn(async
@@ -1598,6 +1756,8 @@ pub async fn disconnect_all() //DISCONNECT ALL CLIENTS
 {
     //ITERATE OVER ALL ADDRESSES, REMOVE CONNECTIONS
     let addrs: Vec<SocketAddr> = CONNECTIONS.iter().map(|conn| *conn.peer_addr()).collect();
+
+    log::info!("Disconnecting {} connections", addrs.len());
     for addr in &addrs
     {
         remove_connection(addr, true, None).await; //REMOVE GRACEFULLY
@@ -1613,6 +1773,8 @@ pub async fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
         .filter(|conn| conn.is_inactive(Some(now)))
         .map(|conn| *conn.peer_addr())
         .collect();
+
+    if !inactive_addrs.is_empty() { log::debug!("Disconnecting {} inactive connections", inactive_addrs.len()); }
 
     //DISCONNECT INACTIVE CLIENTS
     for addr in &inactive_addrs
@@ -1665,6 +1827,8 @@ pub async fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
     for dead in dead_clients
     {
         //HAIL SATAN, AVE CLIENT
+        log::warn!("Missed keepalive: {dead}");
+
         remove_connection(&dead, false, Some("dead")).await;
     }
 }

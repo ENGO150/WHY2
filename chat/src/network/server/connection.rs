@@ -459,8 +459,10 @@ impl Connection
         {
             Self::Authenticated { attached_screen, .. } =>
             {
-                *attached_screen = None;
-                log::info!("Stop screen attach: {}", self.peer_addr());
+                let target = attached_screen.take().map(|attached| attached.target_id);
+
+                log::info!("Stop screen attach: {} (was watching id {})", self.peer_addr(),
+                    target.map(|id| id.to_string()).unwrap_or_else(|| String::from("nobody")));
             },
             _ => {},
         }

@@ -70,12 +70,21 @@ impl HandshakeSlot
     //TAKE A SLOT FOR A FRESHLY ACCEPTED SOCKET, None IF THE BUDGET IS FULL
     pub fn reserve(ip: IpAddr) -> Option<Self>
     {
-        if HANDSHAKES.load(Ordering::Relaxed) >= max_handshakes() { return None; }
+        let budget = max_handshakes();
+        if HANDSHAKES.load(Ordering::Relaxed) >= budget
+        {
+            log::warn!("Handshake budget full ({budget}): {ip}");
+            return None;
+        }
 
         //PER-IP SO ONE PEER CANNOT TAKE THE WHOLE BUDGET
         {
             let mut slots = HANDSHAKES_PER_IP.entry(ip).or_insert(0);
-            if *slots >= consts::MAX_HANDSHAKES_PER_IP { return None; }
+            if *slots >= consts::MAX_HANDSHAKES_PER_IP
+            {
+                log::warn!("Handshake budget full for this IP ({}): {ip}", consts::MAX_HANDSHAKES_PER_IP);
+                return None;
+            }
 
             *slots += 1;
         }
@@ -123,6 +132,8 @@ where
 
         if is_match(&received) { break received; }
 
+        log::debug!("Unexpected packet during handshake: {}", received.name());
+
         //CHECK INVALID PACKETS COUNTER
         if invalid_packets == 3 { return None; }
         invalid_packets += 1; //INCREMENT
@@ -140,6 +151,8 @@ pub(super) async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
     rekey_trigger: Option<&SharedKeys>,
 )
 {
+    log::debug!("{}: {peer_addr}", if rekey_trigger.is_some() { "Rekey" } else { "Key exchange" });
+
     //SIGN A FRESH EPHEMERAL PAIR WITH THE STATIC IDENTITY
     let (ephemeral, offer) = kex::create_offer(nonce);
 
@@ -164,7 +177,11 @@ pub(super) async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
     let message = match untrusted_read(streams, |code| matches!(code, PacketCode::KeyExchangeReply { .. }), rekey_trigger).await
     {
         Some(r) => r,
-        None => return
+        None =>
+        {
+            log::warn!("No key exchange reply: {peer_addr}");
+            return;
+        }
     };
 
     //DERIVE SHARED KEYS - THE PACKET SCHEMA ALREADY PROVED BOTH HALVES ARE KEYS, SO NOTHING CAN FAIL HERE
@@ -197,6 +214,8 @@ pub(super) async fn send_welcome_packet(write_stream: &mut OwnedWriteHalf, keys:
 
 pub(super) async fn ask_version(streams: &mut Streams<'_>, keys: &SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
 {
+    log::debug!("Asking for client version");
+
     //ASK FOR VERSION
     network::send(&mut *streams.1.lock().await,
         PacketCode::Version { version: Some(misc::get_version().to_string()) }, Some(keys)).await;
