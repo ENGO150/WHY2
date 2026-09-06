@@ -270,7 +270,7 @@ pub async fn run
             {
                 match event
                 {
-                    Some(Ok(event)) => handle_terminal_event(app, event, write_stream.as_ref(), &connect_tx, terminal).await,
+                    Some(Ok(event)) => handle_terminal_event(app, event, write_stream.as_ref(), tx, &connect_tx, terminal).await,
                     Some(Err(_)) => app.quit(1, Some(String::from("Reading terminal input failed."))),
                     None => app.quit(0, None),
                 }
@@ -365,6 +365,7 @@ async fn handle_terminal_event
     app: &mut App,
     event: Event,
     write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>,
+    tx: &Sender<ClientEvent>,
     connect_tx: &Sender<ConnectResult>,
     terminal: &Tui,
 )
@@ -422,14 +423,15 @@ async fn handle_terminal_event
                     {
                         app.clear_selection();
 
-                        //A CLICK ON AN IMAGE CAPTION FETCHES THE PICTURE. THE HISTORY REPLAYS HASHES RATHER
-                        //THAN BYTES, SO THIS IS THE ONLY THING THAT EVER PUTS A STORED PICTURE ON THE WIRE
-                        if let Some(write_stream) = write_stream
+                        //A CLICK ON AN IMAGE CAPTION FETCHES THE PICTURE - OUT OF THE CACHE IF IT IS
+                        //THERE, AND OFF THE SERVER OTHERWISE (ClientEvent::ImageRequest, WHICH THE TICK
+                        //BELOW SENDS). THE HISTORY REPLAYS HASHES RATHER THAN BYTES, SO THAT REQUEST IS
+                        //THE ONLY THING THAT EVER PUTS A STORED PICTURE ON THE WIRE
+                        if write_stream.is_some()
                             && let Some(entry) = app.image_at(mouse.column, mouse.row)
                             && let Some(hash) = app.request_image(entry)
                         {
-                            network::send(&mut *write_stream.lock().await,
-                                PacketCode::ImageData { hash, data: None }, options::get_keys().as_ref()).await;
+                            client::fetch_image(hash, tx.clone());
                         }
                     }
                 },

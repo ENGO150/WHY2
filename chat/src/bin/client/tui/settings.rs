@@ -219,6 +219,9 @@ impl Settings
 
         rows.push(Row::Item(Item::client("Message colors", "disable_colors", toggle_value("disable_colors", true))));
         rows.push(Row::Item(Item::client("Background logo", "disable_logo", toggle_value("disable_logo", true))));
+        rows.push(Row::Item(Item::client("Show images automatically", "auto_show_images",
+            toggle_value("auto_show_images", false))));
+
         rows.push(Row::Item(Item::client("Show client IDs", "show_id", toggle_value("show_id", false))));
 
         self.rows = rows;

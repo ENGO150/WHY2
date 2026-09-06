@@ -90,6 +90,13 @@ impl App
                 self.image_requests.push(hash);
             },
 
+            //THE SAME LINE WITH THE BUTTON STILL ON IT: auto_show_images IS OFF, SO NOBODY ASKED FOR
+            //THIS PICTURE AND NOTHING IS COMING UNTIL SOMEBODY CLICKS
+            ClientEvent::ImageOffer(username, filename, hash) => self.push_caption(username, filename, hash, false),
+
+            //A CLICK THE CACHE COULD NOT ANSWER, SO THE SERVER IS ASKED AFTER ALL
+            ClientEvent::ImageRequest(hash) => self.image_requests.push(hash),
+
             ClientEvent::ImageFailed(username, filename) => self.push_styled(
                 format!("{username} sent an image that could not be displayed ({filename})."), theme::ERROR),
 

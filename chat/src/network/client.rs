@@ -190,6 +190,8 @@ pub enum ClientEvent
     ImageDisplay(String, String, Box<DynamicImage>), //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
     ImageData([u8; 32], Option<Box<DynamicImage>>),   //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
     ImagePending(String, String, [u8; 32]),          //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
+    ImageOffer(String, String, [u8; 32]),            //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
+    ImageRequest([u8; 32]),                          //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
     ImageFailed(String, String),                     //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
     Uploaded(String, String),                        //USER UPLOADED FILE
     Download(String),                                //DOWNLOADING FILE
@@ -375,6 +377,12 @@ pub async fn connect(connecting_addr: String) -> Result<(OwnedReadHalf, OwnedWri
 }
 
 //DECODE UNDER EXPLICIT LIMITS - MAX_IMAGE_SIZE BOUNDS THE BYTES ON THE WIRE AND NOT WHAT THEY UNPACK TO
+//WHETHER A PICTURE IS DRAWN AS IT ARRIVES, OR WAITS TO BE CLICKED THE WAY A REPLAYED ONE DOES
+fn auto_show_images() -> bool
+{
+    config::read_config::<bool>("auto_show_images")
+}
+
 fn decode_image(data: &[u8]) -> Option<DynamicImage>
 {
     let mut reader = ImageReader::new(Cursor::new(data)).with_guessed_format().ok()?;
@@ -394,6 +402,26 @@ async fn digest_and_decode(data: Arc<Vec<u8>>) -> ([u8; 32], Option<DynamicImage
 {
     task::spawn_blocking(move || (crypto::sha256(&data), decode_image(&data)))
         .await.expect("Decoding image panicked")
+}
+
+pub fn fetch_image(hash: [u8; 32], tx: Sender<ClientEvent>)
+{
+    tokio::spawn(async move
+    {
+        let cached = match cache::load(&hash).await
+        {
+            Some(data) => task::spawn_blocking(move || decode_image(&data))
+                .await.expect("Decoding image panicked"),
+
+            None => None,
+        };
+
+        tx.send(match cached
+        {
+            Some(image) => ClientEvent::ImageData(hash, Some(Box::new(image))),
+            None => ClientEvent::ImageRequest(hash),
+        }).await.unwrap();
+    });
 }
 
 pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
@@ -482,15 +510,22 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 let hashes: Vec<[u8; 32]> = messages.iter().filter_map(|message| message.image).collect();
 
                 //WHICH OF THEM WE ALREADY HOLD, BEFORE THE CAPTIONS GO UP: ONE THAT IS ABOUT TO FILL
-                //ITSELF MUST NOT OFFER A BUTTON THAT ASKS FOR WHAT IS ALREADY ON ITS WAY
+                //ITSELF MUST NOT OFFER A BUTTON THAT ASKS FOR WHAT IS ALREADY ON ITS WAY.
+                //WITH auto_show_images OFF NOTHING IS ABOUT TO FILL ITSELF, SO EVERY CAPTION IS A BUTTON
+                let auto_show = auto_show_images();
                 let mut cached: Vec<[u8; 32]> = Vec::new();
 
-                for hash in &hashes
+                if auto_show
                 {
-                    if cache::has(hash).await { cached.push(*hash); }
+                    for hash in &hashes
+                    {
+                        if cache::has(hash).await { cached.push(*hash); }
+                    }
                 }
 
                 tx.send(ClientEvent::History(messages, cached)).await.unwrap();
+
+                if !auto_show { continue; }
 
                 let image_tx = tx.clone();
 
@@ -831,6 +866,29 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::ImageDisplay { username, filename, hash, data } =>
             {
                 let image_tx = tx.clone();
+
+                //NOTHING IS UNPACKED WITHOUT A CLICK WHILE auto_show_images IS OFF
+                if !auto_show_images()
+                {
+                    tokio::spawn(async move
+                    {
+                        if let Some(data) = data
+                        {
+                            let data = Arc::new(data);
+                            let digest = task::spawn_blocking
+                            ({
+                                let data = data.clone();
+                                move || crypto::sha256(&data)
+                            }).await.expect("Hashing image panicked");
+
+                            cache::store(&digest, &data).await;
+                        }
+
+                        image_tx.send(ClientEvent::ImageOffer(username, filename, hash)).await.unwrap();
+                    });
+
+                    continue;
+                }
 
                 tokio::spawn(async move
                 {
