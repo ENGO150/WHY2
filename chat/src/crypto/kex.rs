@@ -57,7 +57,7 @@ use crate::
     consts as consts_chat,
 };
 
-#[cfg(feature = "server")]
+#[cfg(feature = "chat")]
 use rand::
 {
     TryRng,
@@ -83,7 +83,7 @@ use p521::
     },
 };
 
-#[cfg(feature = "server")]
+#[cfg(feature = "chat")]
 use std::
 {
     io::Write,
@@ -101,7 +101,7 @@ use std::
     fs::DirBuilder,
 };
 
-#[cfg(all(feature = "server", unix))]
+#[cfg(all(feature = "chat", unix))]
 use std::os::unix::fs::OpenOptionsExt;
 
 #[cfg(all(feature = "server", unix))]
@@ -180,7 +180,7 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::Shar
     }).collect()), mac)
 }
 
-#[cfg(feature = "server")]
+#[cfg(feature = "chat")]
 fn media_key(filename: &str) -> Zeroizing<[u8; 32]>
 {
     let path = misc::get_why2_dir() + filename;
@@ -230,7 +230,7 @@ fn generate_pem_keys() -> (Zeroizing<String>, String) //CREATE ECC KEYS IN THE O
 
 //THE FILE IS 0600 WHEREVER IT LANDS, WHICH IS WHAT PROTECTS THE BYTES - THE CONFIG ROOT IS NOT 0700 LIKE
 //server_keys/ IS, SO THE NAME IS VISIBLE TO OTHER LOCAL USERS AND THE CONTENT IS NOT
-#[cfg(feature = "server")]
+#[cfg(feature = "chat")]
 fn write_secure_key(path: String, data: &[u8]) //WRITE A SECRET TO DISK, READABLE BY NOBODY ELSE
 {
     let mut options = OpenOptions::new();
@@ -327,6 +327,12 @@ pub fn history_key() -> Zeroizing<[u8; 32]> //THE MESSAGE HISTORY'S AT-REST KEY,
 pub fn image_key() -> Zeroizing<[u8; 32]> //PERSISTENT IMAGE KEY FILE
 {
     media_key(consts_chat::SERVER_IMAGE_KEY)
+}
+
+#[cfg(feature = "client_base")]
+pub fn cache_key() -> Zeroizing<[u8; 32]> //CACHED IMAGE AT-REST KEY FILE
+{
+    media_key(consts_chat::CLIENT_CACHE_KEY)
 }
 
 #[cfg(feature = "server")]

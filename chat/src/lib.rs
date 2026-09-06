@@ -25,4 +25,7 @@ pub mod options;
 pub mod role;
 
 #[cfg(feature = "client_base")]
+pub mod cache;
+
+#[cfg(feature = "client_base")]
 pub mod command;

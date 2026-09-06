@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     time::Duration,
-    sync::Mutex,
+    sync::{ Arc, Mutex },
     path::PathBuf,
     collections::BTreeMap,
     io::
@@ -69,8 +69,9 @@ use semver::Version;
 use crate::
 {
     misc,
+    cache,
     role::Role,
-    crypto::kex,
+    crypto::{ self, kex },
     options::{ self, LoginState },
     config::
     {
@@ -167,7 +168,7 @@ pub enum ClientEvent
     Leave(String, usize),                            //CLIENT DISCONNECTED
     ServerSay(String),                               //SERVER MESSAGE
     Role(Role, Option<String>),                      //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
-    History(Vec<StoredMessage>),                     //THE LOBBY'S STORED MESSAGES, SENT ONCE AT LOGIN
+    History(Vec<StoredMessage>, Vec<[u8; 32]>),      //STORED MESSAGES, AND WHICH OF THEIR PICTURES WE HOLD
     ChannelChanged(Option<String>),                  //WE SWITCHED CHANNEL
     ChannelCreated(String),                          //CHANNEL CREATED
     ChannelDestroyed(String),                        //CHANNEL ABANDONED
@@ -277,6 +278,9 @@ async fn key_exchange
     //ACT ON THE TOFU VERDICT NOW THAT THE SERVER HAS ITS ANSWER
     let hash = keys::hash(&kex::public_bytes(&offer.static_ecc));
 
+    //SET SERVER FINGERPRINT
+    options::set_fingerprint(&hash);
+
     match verdict
     {
         //VERIFICATION DISABLED AT BUILD TIME
@@ -385,6 +389,12 @@ fn decode_image(data: &[u8]) -> Option<DynamicImage>
     reader.decode().ok()
 }
 
+async fn digest_and_decode(data: Arc<Vec<u8>>) -> ([u8; 32], Option<DynamicImage>)
+{
+    task::spawn_blocking(move || (crypto::sha256(&data), decode_image(&data)))
+        .await.expect("Decoding image panicked")
+}
+
 pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
@@ -468,7 +478,38 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //THE LOBBY'S STORED MESSAGES - EVERYTHING SAID BEFORE WE GOT HERE
             PacketCode::History { messages } =>
             {
-                tx.send(ClientEvent::History(messages)).await.unwrap();
+                let hashes: Vec<[u8; 32]> = messages.iter().filter_map(|message| message.image).collect();
+
+                //WHICH OF THEM WE ALREADY HOLD, BEFORE THE CAPTIONS GO UP: ONE THAT IS ABOUT TO FILL
+                //ITSELF MUST NOT OFFER A BUTTON THAT ASKS FOR WHAT IS ALREADY ON ITS WAY
+                let mut cached: Vec<[u8; 32]> = Vec::new();
+
+                for hash in &hashes
+                {
+                    if cache::has(hash).await { cached.push(*hash); }
+                }
+
+                tx.send(ClientEvent::History(messages, cached)).await.unwrap();
+
+                let image_tx = tx.clone();
+
+                tokio::spawn(async move
+                {
+                    for hash in hashes
+                    {
+                        let Some(data) = cache::load(&hash).await else { continue };
+
+                        let image = task::spawn_blocking(move || decode_image(&data))
+                            .await.expect("Decoding image panicked");
+
+                        if let Some(image) = image
+                        {
+                            image_tx.send(ClientEvent::ImageData(hash, Some(Box::new(image)))).await.unwrap();
+                        }
+                    }
+                });
+
+                continue;
             }
 
             //VERSION CHECK
@@ -766,8 +807,15 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 {
                     let image = match data
                     {
-                        Some(data) => task::spawn_blocking(move || decode_image(&data))
-                            .await.expect("Decoding image panicked"),
+                        Some(data) =>
+                        {
+                            let data = Arc::new(data);
+                            let (digest, image) = digest_and_decode(data.clone()).await;
+
+                            if digest == hash { cache::store(&hash, &data).await; }
+
+                            image
+                        },
 
                         None => None,
                     };

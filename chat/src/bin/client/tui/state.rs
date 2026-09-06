@@ -347,10 +347,18 @@ impl App
         self.push_entry(Entry::Image { username, filename, hash: None, picture });
     }
 
-    //AND ONE THE HISTORY ONLY NAMED. NOTHING IS FETCHED UNTIL THE CAPTION IS CLICKED
-    pub fn push_caption(&mut self, username: String, filename: String, hash: [u8; 32])
+    //AND ONE WITHOUT ITS PICTURE. A REPLAYED LINE WAITS TO BE CLICKED (Absent); A LIVE ONE THE SERVER
+    //ONLY OFFERED HAS ALREADY BEEN ASKED FOR BY THE TIME IT GETS HERE (Waiting), SINCE NOBODY CHOOSES
+    //TO SEE A PICTURE THAT IS BEING SENT TO THEM ANYWAY
+    pub fn push_caption(&mut self, username: String, filename: String, hash: [u8; 32], pending: bool)
     {
-        self.push_entry(Entry::Image { username, filename, hash: Some(hash), picture: Picture::Absent });
+        let picture = match pending
+        {
+            true => Picture::Waiting,
+            false => Picture::Absent,
+        };
+
+        self.push_entry(Entry::Image { username, filename, hash: Some(hash), picture });
     }
 
     //A CLICKED CAPTION. THE HASH IT COMES BACK WITH IS WHAT THE CALLER ASKS THE SERVER FOR - None MEANS
@@ -370,17 +378,27 @@ impl App
     }
 
     //THE ANSWER TO ONE OF THOSE. THE SAME PICTURE CAN BE IN THE PANE TWICE, SO IT FILLS THE OLDEST LINE
-    //STILL WAITING FOR IT - THE SECOND ONE ASKED FOR ITSELF AND IS ANSWERED BY ITS OWN PACKET
+    //STILL WITHOUT IT - THE SECOND ONE ASKED FOR ITSELF AND IS ANSWERED BY ITS OWN PACKET.
+    //Absent COUNTS AS WELL AS Waiting: A PICTURE FOUND IN THE CACHE ANSWERS A CAPTION NOBODY CLICKED,
+    //WHICH IS THE WHOLE POINT OF HAVING KEPT IT. A REFUSAL ONLY MARKS A LINE THAT DID ASK
     pub fn deliver_image(&mut self, hash: [u8; 32], image: Option<DynamicImage>)
     {
-        let picture = match image
+        let (picture, asked) = match image
         {
-            Some(image) => self.fit(image),
-            None => Picture::Gone,
+            Some(image) => (self.fit(image), false),
+            None => (Picture::Gone, true),
         };
 
-        let waiting = self.messages.iter().position(|entry| matches!(entry,
-            Entry::Image { hash: Some(h), picture: Picture::Waiting, .. } if *h == hash));
+        let waiting = self.messages.iter().position(|entry| match entry
+        {
+            Entry::Image { hash: Some(h), picture: slot, .. } if *h == hash => match asked
+            {
+                true => matches!(slot, Picture::Waiting),
+                false => matches!(slot, Picture::Absent | Picture::Waiting),
+            },
+
+            _ => false,
+        });
 
         let Some(entry) = waiting else { return };
 

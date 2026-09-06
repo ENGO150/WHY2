@@ -38,7 +38,7 @@ use tokio::sync::mpsc::Sender;
 #[cfg(feature = "client_base")]
 use crate::network::client::ClientEvent;
 
-#[cfg(feature = "server")]
+#[cfg(feature = "chat")]
 use std::
 {
     fmt::Write,
@@ -198,7 +198,7 @@ pub fn get_image_dir() -> PathBuf //DIRECTORY FOR PERSISTENT IMAGES
     PathBuf::from(get_why2_dir() + consts::SERVER_IMAGES_DIR)
 }
 
-#[cfg(feature = "server")]
+#[cfg(feature = "chat")]
 pub fn hex(bytes: &[u8]) -> String //BYTES AS LOWERCASE HEX
 {
     let mut string = String::with_capacity(bytes.len() * 2);
@@ -209,6 +209,12 @@ pub fn hex(bytes: &[u8]) -> String //BYTES AS LOWERCASE HEX
     }
 
     string
+}
+
+#[cfg(feature = "client_base")]
+pub fn get_image_cache_dir(fingerprint: &str) -> PathBuf //DIRECTORY FOR ONE SERVER'S CACHED IMAGES
+{
+    PathBuf::from(get_why2_dir() + consts::CLIENT_IMAGES_DIR).join(fingerprint)
 }
 
 #[cfg(feature = "server")]

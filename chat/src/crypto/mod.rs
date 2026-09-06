@@ -283,10 +283,12 @@ pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketS
     })
 }
 
-#[cfg(feature = "server")]
-pub fn image_keys(hash: &[u8; 32]) -> (Zeroizing<Vec<i64>>, Vec<i64>) //AT-REST KEY & NONCE FOR ONE IMAGE
+//AT-REST KEY & NONCE FOR ONE FILE, DERIVED FROM WHAT THE FILE IS NAMED AFTER - SO NOTHING ABOUT THE PAIR
+//HAS TO BE KEPT ANYWHERE, AND TWO FILES NEVER SHARE A KEYSTREAM
+#[cfg(feature = "chat")]
+fn disk_keys(salt: &[u8], ikm: &[u8]) -> (Zeroizing<Vec<i64>>, Vec<i64>)
 {
-    let hkdf = Hkdf::<Sha256>::new(Some(hash), kex::image_key().as_ref());
+    let hkdf = Hkdf::<Sha256>::new(Some(salt), ikm);
 
     const KEY_LEN: usize = consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT * 2;
     const NONCE_LEN: usize = consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT;
@@ -304,6 +306,23 @@ pub fn image_keys(hash: &[u8; 32]) -> (Zeroizing<Vec<i64>>, Vec<i64>) //AT-REST 
         .collect::<Vec<i64>>();
 
     (Zeroizing::new(to_i64(&key_bytes)), to_i64(&nonce_bytes))
+}
+
+#[cfg(feature = "server")]
+pub fn image_keys(hash: &[u8; 32]) -> (Zeroizing<Vec<i64>>, Vec<i64>) //AT-REST KEY & NONCE FOR ONE IMAGE
+{
+    disk_keys(hash, kex::image_key().as_ref())
+}
+
+#[cfg(feature = "client_base")]
+pub fn cache_keys(fingerprint: &str, hash: &[u8; 32]) -> (Zeroizing<Vec<i64>>, Vec<i64>)
+{
+    let mut salt = Vec::with_capacity(fingerprint.len() + hash.len());
+
+    salt.extend_from_slice(fingerprint.as_bytes());
+    salt.extend_from_slice(hash);
+
+    disk_keys(&salt, kex::cache_key().as_ref())
 }
 
 #[cfg(feature = "server")]

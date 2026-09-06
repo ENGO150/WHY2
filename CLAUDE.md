@@ -203,6 +203,40 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     for the rest of the session. The wait sits on that connection's own read loop, which is the
     backpressure and costs nobody else. `last_image` is carried across a rekey and a channel switch
     — a client that could reset it by switching channels would not be limited at all.
+- **`cache.rs`** (feature `client_base`) — the client keeps every picture it has seen, so a
+  replayed image appears without asking the server for it again.
+  - **The cache is keyed by content and scoped by the server's fingerprint**
+    (`misc::get_image_cache_dir`, `options::get_fingerprint`, set at the handshake whether or not
+    TOFU pinned it). Scoping is not tidiness: over one shared cache a server could name any hash in a
+    caption and watch whether we fetch it, which is an oracle over every picture we have seen
+    anywhere. Keying on the identity hash rather than the host also means a server that moves address
+    keeps its pictures.
+  - **The hash is re-taken over the bytes, never trusted from the packet.** `digest_and_decode` runs
+    the SHA-256 and the decode in one `spawn_blocking` (both are CPU over the whole picture) and the
+    bytes are an `Arc` so the cache keeps them without a second copy. A fetch answer whose digest is
+    not the hash we asked for is displayed but not filed — otherwise a truncated transfer would be
+    cached under a good name forever.
+  - **It is encrypted at rest** the same way the server's own `server_images/` is —
+    `crypto::cache_keys` HKDFs a per-picture key and nonce out of the one `client_cache_key`, salted
+    with `fingerprint || hash`, so two servers' copies of the same picture
+    share no keystream and one file discards the lot. Be honest about what this buys: the key sits
+    beside the ciphertext, so it protects a leaked copy (a backup, a snapshot) and nothing that
+    already has the config dir.
+  - **Its only bound is `MAX_IMAGE_CACHE`.** The server's `server_images/` is owned by the history
+    and a picture dies with its entry; a client cache is owned by nothing, so a write that takes it
+    over the cap drops the oldest files by mtime, and every hit touches the file it read so what goes
+    is what has not been looked at.
+  - **A replay fills from the cache without a packet.** `App::apply` is pure state mutation and
+    cannot do disk I/O, so the `History` arm in `network/client.rs` does it: first `cache::has` (one
+    `stat` per picture, no key and no decrypt) to say which hashes we hold, so a caption that is about
+    to fill itself comes up as `Picture::Waiting` (`[ loading... ]`) rather than `Absent`
+    (`[ show ]`) — offering a button for a picture already on its way is the one thing it must not do,
+    and `request_image` would refuse the click anyway. Then it sends the captions and
+    walks the hashes in one task, decoding hits **one at a time** — a login is the one place dozens of
+    pictures arrive at once, and a task each would be exactly the unbounded fan-out `MAX_IMAGE_ALLOC`
+    exists to bound. Each hit arrives as an ordinary `ClientEvent::ImageData`, which is why
+    `deliver_image` fills `Picture::Absent` as well as `Waiting`: an answer nobody clicked for is what
+    a cache hit *is*. A refusal (`None`) still only marks a line that actually asked.
 - **`network/client.rs` / `network/server.rs`** — connection-level logic (handshake, auth, message
   dispatch) for each side. `network/file`, `network/screen`, `network/voice` are protocol
   extensions with their own client/server submodules for file transfer, screen sharing (feature
@@ -500,9 +534,10 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   storage (`server_keys/{private,public}`), all under `WHY2_CONFIG_DIR`
   (defaults to `~/.config/WHY2`, baked in by `build.rs` unless overridden at build time).
   **The at-rest keys live in the config root, not in `server_keys/`** (`server_history_key`,
-  `server_image_key`, created on first use by `kex::media_key`). That directory is the server's
-  *identity*, and neither key is derived from it — that is the point of them. The root is where the
-  binaries' files already sit side by side, distinguished by an owner prefix. The file is 0600
+  `server_image_key`, `client_cache_key`, created on first use by `kex::media_key`). That directory is the server's
+  *identity*, and none of them are derived from it — that is the point of them — while a client has no
+  identity there at all and never creates the directory. The root is where both binaries' files
+  already sit side by side, distinguished by an owner prefix. The file is 0600
   wherever it lands, which is what protects the bytes; the root is not 0700 like `server_keys/` is,
   so the name is visible to other local users and the content is not.
 - **`config/messages.rs`** (feature `server`) — the lobby's message history, off by default

@@ -271,7 +271,7 @@ impl App
 
             //THE LOBBY'S STORED MESSAGES. AN IMAGE IN IT IS A CAPTION OFFERING TO FETCH THE PICTURE -
             //REPLAYING THE PICTURES THEMSELVES WOULD MAKE EVERY LOGIN CARRY EVERY IMAGE EVER POSTED
-            ClientEvent::History(messages) =>
+            ClientEvent::History(messages, cached) =>
             {
                 self.push_styled(format!("Message history ({}):", messages.len()), theme::TITLE);
 
@@ -279,7 +279,10 @@ impl App
                 {
                     match message.image
                     {
-                        Some(hash) => self.push_caption(message.username, message.text, hash),
+                        //A PICTURE WE HOLD IS ALREADY ON ITS WAY INTO THE PANE, SO IT SAYS SO INSTEAD OF
+                        //OFFERING A BUTTON THAT WOULD ASK FOR IT AGAIN
+                        Some(hash) => self.push_caption(message.username, message.text, hash,
+                            cached.contains(&hash)),
                         None => self.push_history(message.username, message.text, message.colors),
                     }
                 }

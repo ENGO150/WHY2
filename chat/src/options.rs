@@ -77,6 +77,9 @@ static SERVER_ADDRESS: RwLock<String> = RwLock::new(String::new());
 static OBFUSCATION_KEY: RwLock<[u8; 32]> = RwLock::new([0; 32]);
 
 #[cfg(feature = "client_base")]
+static SERVER_FINGERPRINT: RwLock<String> = RwLock::new(String::new()); //WHAT THE IMAGE CACHE IS SCOPED BY
+
+#[cfg(feature = "client_base")]
 static CHANNEL: RwLock<String> = RwLock::new(String::new()); //ACTIVE CHANNEL
 
 #[cfg(feature = "client_voice")]
@@ -214,6 +217,19 @@ pub fn get_obfuscation_key() -> [u8; 32] //GET OBFUSCATION KEY
 pub fn set_obfuscation_key(key: &[u8; 32]) //SET OBFUSCATION KEY
 {
     *OBFUSCATION_KEY.write().unwrap() = *key;
+}
+
+//SERVER FINGERPRINT
+#[cfg(feature = "client_base")]
+pub fn get_fingerprint() -> String //GET SERVER FINGERPRINT
+{
+    SERVER_FINGERPRINT.read().unwrap().clone()
+}
+
+#[cfg(feature = "client_base")]
+pub fn set_fingerprint(fingerprint: &str) //SET SERVER FINGERPRINT
+{
+    *SERVER_FINGERPRINT.write().unwrap() = fingerprint.to_owned();
 }
 
 //CHANNEL

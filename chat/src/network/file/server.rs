@@ -405,7 +405,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
                 if kept { config::messages::store_image(&username, &filename, &final_hash); }
 
                 //AND WHAT IS NOT KEPT IS NOT LEFT BEHIND: NOTHING BUT THE HISTORY EVER NAMES A FILE IN
-                //images/, SO A PICTURE POSTED IN A CHANNEL (OR WITH THE HISTORY OFF) IS AS TEMPORARY AS
+                //server_images/, SO A PICTURE POSTED IN A CHANNEL (OR WITH THE HISTORY OFF) IS AS TEMPORARY AS
                 //THE LINE IT CAME ON. insert IS THE GUARD - THE NAME IS THE CONTENT, SO A HASH THAT WAS
                 //ALREADY THERE IS SOMEBODY ELSE'S ENTRY AND NOT OURS TO DELETE
                 if !kept && insert { let _ = fs::remove_file(&new_path).await; }
