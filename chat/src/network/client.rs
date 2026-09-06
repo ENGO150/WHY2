@@ -189,6 +189,7 @@ pub enum ClientEvent
     Image(String),                                   //UPLOADING IMAGE
     ImageDisplay(String, String, Box<DynamicImage>), //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
     ImageData([u8; 32], Option<Box<DynamicImage>>),   //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
+    ImagePending(String, String, [u8; 32]),          //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
     ImageFailed(String, String),                     //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
     Uploaded(String, String),                        //USER UPLOADED FILE
     Download(String),                                //DOWNLOADING FILE
@@ -826,14 +827,48 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 continue;
             },
 
-            PacketCode::ImageDisplay { username, filename, data } =>
+            //EITHER THE PICTURE OR THE OFFER OF IT
+            PacketCode::ImageDisplay { username, filename, hash, data } =>
             {
                 let image_tx = tx.clone();
 
                 tokio::spawn(async move
                 {
-                    let image = task::spawn_blocking(move || decode_image(&data))
-                        .await.expect("Decoding image panicked");
+                    //AN OFFER IS ANSWERED OUT OF THE CACHE, AND ONLY ASKED FOR WHEN IT IS NOT THERE
+                    let (data, fresh) = match data
+                    {
+                        Some(data) => (Some(Arc::new(data)), true),
+                        None => (cache::load(&hash).await.map(Arc::new), false),
+                    };
+
+                    let Some(data) = data else
+                    {
+                        //A LIVE PICTURE IS NOT A CLICK-TO-LOAD ONE, SO IT IS ASKED FOR WITHOUT A CLICK -
+                        //BUT BY THE EVENT LOOP, WHICH OWNS THE WRITE HALF AND THE SEQUENCE COUNTER
+                        image_tx.send(ClientEvent::ImagePending(username, filename, hash)).await.unwrap();
+
+                        return;
+                    };
+
+                    let image = match fresh
+                    {
+                        //OFF THE WIRE: THE NAME IS THE CONTENT, SO IT IS FILED UNDER WHAT IT HASHES TO
+                        //AND NOT UNDER WHAT THE PACKET CALLED IT
+                        true =>
+                        {
+                            let (digest, image) = digest_and_decode(data.clone()).await;
+
+                            cache::store(&digest, &data).await;
+
+                            image
+                        },
+
+                        //OUT OF THE CACHE, WHERE IT IS ALREADY FILED UNDER THIS HASH - THERE IS NOTHING
+                        //TO CHECK AND NOTHING TO WRITE, AND HASHING IT AGAIN WOULD BE A WHOLE PASS OVER
+                        //THE PICTURE ON THE ONE PATH THE CACHE EXISTS TO MAKE CHEAP
+                        false => task::spawn_blocking(move || decode_image(&data))
+                            .await.expect("Decoding image panicked"),
+                    };
 
                     image_tx.send(match image
                     {

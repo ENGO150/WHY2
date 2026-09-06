@@ -287,6 +287,19 @@ pub async fn run
                         PacketCode::List { users: None }, options::get_keys().as_ref()).await;
                 }
 
+                //AND THE PICTURES SOMEBODY OFFERED THAT WE DID NOT ALREADY HOLD
+                if !app.image_requests.is_empty() && let Some(write_stream) = write_stream.as_ref()
+                {
+                    let keys = options::get_keys();
+                    let mut stream = write_stream.lock().await;
+
+                    for hash in app.image_requests.drain(..)
+                    {
+                        network::send(&mut *stream,
+                            PacketCode::ImageData { hash, data: None }, keys.as_ref()).await;
+                    }
+                }
+
                 app.expire_notice();
 
                 if app.dirty

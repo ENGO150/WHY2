@@ -200,6 +200,10 @@ pub struct App
     pub screens_requested: bool,
     pub refresh_online: bool, //THE LOOP SHOULD SEND A SILENT PacketCode::List
 
+    //OFFERED PICTURES WE DID NOT HOLD. THE LOOP OWNS THE WRITE HALF AND THE SEQUENCE COUNTER, SO IT DOES
+    //THE ASKING - A TASK OF ITS OWN WOULD RACE BOTH
+    pub image_requests: Vec<[u8; 32]>,
+
     //LIFECYCLE
     pub leaving: bool,      //THE USER ASKED TO LEAVE, SO THE DISCONNECT THAT FOLLOWS ENDS THE CLIENT
     pub logging_out: bool,  //THE USER ASKED TO LOG OUT, SO THAT DISCONNECT IS NOT AN ERROR - IT IS THE POINT
@@ -264,6 +268,7 @@ impl App
             #[cfg(feature = "client_screen")]
             screens_requested: false,
             refresh_online: false,
+            image_requests: Vec::new(),
             leaving: false,
             logging_out: false,
             drop_stream: false,
@@ -542,6 +547,7 @@ impl App
         #[cfg(feature = "client_screen")]
         { self.screens_requested = false; }
         self.refresh_online = false;
+        self.image_requests.clear();
         self.logging_out = false; //THE NEXT DROP IS THE NEXT SESSION'S TO EXPLAIN
 
         reset_session();

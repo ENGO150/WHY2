@@ -82,6 +82,14 @@ impl App
             ClientEvent::ImageDisplay(username, filename, image) => self.push_image(username, filename, *image),
 
             //IT PASSED THE SERVER'S HEADER CHECK AND STILL WOULD NOT DECODE, SO SAY SO WHERE IT WOULD HAVE BEEN
+            //AN OFFER WE DID NOT HOLD. THE CAPTION GOES UP NOW, THE LOOP ASKS FOR THE PICTURE, AND IT
+            //FILLS THE CAPTION WHEN IT ARRIVES
+            ClientEvent::ImagePending(username, filename, hash) =>
+            {
+                self.push_caption(username, filename, hash, true);
+                self.image_requests.push(hash);
+            },
+
             ClientEvent::ImageFailed(username, filename) => self.push_styled(
                 format!("{username} sent an image that could not be displayed ({filename})."), theme::ERROR),
 

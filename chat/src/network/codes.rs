@@ -141,7 +141,8 @@ pub enum PacketCode //CONTROL CODES
     {
         username: String,
         filename: String,
-        data: Vec<u8>,
+        hash: [u8; 32],
+        data: Option<Vec<u8>>,
     },
 
     //CLIENT <> SERVER | ASK FOR ONE OF THE HISTORY'S PICTURES, ANSWERED WITH data (None = IT IS GONE).

@@ -410,11 +410,13 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
                 //ALREADY THERE IS SOMEBODY ELSE'S ENTRY AND NOT OURS TO DELETE
                 if !kept && insert { let _ = fs::remove_file(&new_path).await; }
 
+                //A PICTURE THAT HAS JUST BEEN UPLOADED IS ONE NOBODY CAN HOLD YET, SO IT GOES OUT WHOLE
                 server::send_to_all(PacketCode::ImageDisplay
                 {
                     username: username.clone(),
                     filename,
-                    data,
+                    hash: final_hash,
+                    data: Some(data),
                 }, true, channel.as_deref());
             }
         } else

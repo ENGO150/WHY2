@@ -930,13 +930,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 let image = matches!(read, PacketCode::Image { .. });
 
                 //CHECK IF IMAGE WAS ALREADY UPLOADED
-                let stored = match image && config::messages::has_image(&hash)
-                {
-                    true => file::read_image(&hash).await,
-                    false => None,
-                };
-
-                if let Some(data) = stored
+                if image && config::messages::has_image(&hash)
                 {
                     let filename = match &read
                     {
@@ -959,7 +953,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     {
                         username: username.clone(),
                         filename: filename.clone(),
-                        data,
+                        hash,
+                        data: None,
                     }, true, channel.as_deref());
 
                     //TELL THE UPLOADER THERE IS NOTHING TO SEND

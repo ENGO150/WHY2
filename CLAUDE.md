@@ -203,8 +203,18 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     for the rest of the session. The wait sits on that connection's own read loop, which is the
     backpressure and costs nobody else. `last_image` is carried across a rekey and a channel switch
     — a client that could reset it by switching channels would not be limited at all.
-- **`cache.rs`** (feature `client_base`) — the client keeps every picture it has seen, so a
-  replayed image appears without asking the server for it again.
+- **`cache.rs`** (feature `client_base`) — the client keeps every picture it has seen, which is what
+  makes a replayed image appear at all without asking anybody, and what lets the server stop pushing
+  the ones everybody already holds.
+  - **`ImageDisplay` carries a hash and an optional payload.** `send_to_all` clones the whole
+    `PacketCode` per recipient and every connection has its own keys, so an 8MB picture in a
+    20-client channel is 20 clones and 20 independent REX encryptions — there is no shared ciphertext
+    to reuse, so the only saving is not sending the bytes N times. The branch is the one the upload
+    arm already computes: a picture `config::messages::has_image` does not know is one nobody can
+    hold, and goes out whole (`file/server.rs`); one it does know has been posted here before, so it
+    goes out as `data: None` and the repost costs the server neither the disk read nor the
+    `RexStream` decrypt that used to feed the broadcast. A client that misses falls through to the
+    existing `ImageData` fetch and pays what a history caption pays.
   - **The cache is keyed by content and scoped by the server's fingerprint**
     (`misc::get_image_cache_dir`, `options::get_fingerprint`, set at the handshake whether or not
     TOFU pinned it). Scoping is not tidiness: over one shared cache a server could name any hash in a
