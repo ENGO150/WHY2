@@ -177,6 +177,8 @@ link time.
      - `socks5_enabled` / `socks5_addr`: route the connection through a SOCKS5 proxy
      - `download_directory`: where downloads land
      - Display options (`show_id`, `disable_colors`, `disable_logo`, `mouse_capture`)
+     - `auto_show_images`: off, a posted picture goes up as a caption with a `[ show ]` button (the
+       way a replayed one does) instead of being decoded and drawn as it arrives
      - Audio (`input_device`, `output_device`, `input_volume`, `output_volume`,
        `screen_volume`, `noise_suppression`, `automatic_gain`) — all editable in-app with
        `/settings`, and applied immediately, including to a voice call that is already running. The

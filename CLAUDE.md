@@ -276,6 +276,20 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     exists to bound. Each hit arrives as an ordinary `ClientEvent::ImageData`, which is why
     `deliver_image` fills `Picture::Absent` as well as `Waiting`: an answer nobody clicked for is what
     a cache hit *is*. A refusal (`None`) still only marks a line that actually asked.
+  - **`auto_show_images` (client.toml, default on) makes a live picture behave like a replayed one.**
+    With it off, `network/client.rs`'s `ImageDisplay` arm decodes nothing: the line goes up as a
+    caption with a `[ show ]` button (`ClientEvent::ImageOffer` → `push_caption(.., pending: false)`)
+    and the history's cache prefetch is skipped, so every replayed caption is a button too. The two
+    costs it declines are the ones the pushed path pays without being asked — the decode
+    (`MAX_IMAGE_ALLOC` per picture, one per packet, for pictures nobody looked at) and the `ImageData`
+    fetch that answers an offer. Bytes that arrived **anyway** are still hashed and cached: they are
+    paid for, and dropping them would only mean fetching them back on the click.
+    That is also why the click goes through the cache first (`client::fetch_image`, replacing the
+    unconditional `ImageData` request in `tui/mod.rs`'s mouse-up arm) — with this setting off, the
+    picture a click asks for is usually already on disk, and asking the server for it would cost a
+    disk read, a whole `RexStream` decrypt and `MAX_IMAGE_SIZE` back on the wire for nothing. A miss
+    comes back as `ClientEvent::ImageRequest` and joins `App::image_requests`, which the redraw tick
+    sends — the event loop owns the write half and the sequence counter, so the fetch task cannot.
 - **`network/client.rs` / `network/server.rs`** — connection-level logic (handshake, auth, message
   dispatch) for each side. `network/file`, `network/screen`, `network/voice` are protocol
   extensions with their own client/server submodules for file transfer, screen sharing (feature
