@@ -86,22 +86,28 @@ use p521::
 #[cfg(feature = "server")]
 use std::
 {
-    path::Path,
     io::Write,
     fs::
     {
         self,
-        DirBuilder,
         OpenOptions,
     },
 };
 
+#[cfg(feature = "server")]
+use std::
+{
+    path::Path,
+    fs::DirBuilder,
+};
+
+#[cfg(all(feature = "server", unix))]
+use std::os::unix::fs::OpenOptionsExt;
 
 #[cfg(all(feature = "server", unix))]
 use std::os::unix::fs::
 {
     DirBuilderExt,
-    OpenOptionsExt,
     PermissionsExt,
 };
 
@@ -177,7 +183,7 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::Shar
 #[cfg(feature = "server")]
 fn media_key(filename: &str) -> Zeroizing<[u8; 32]>
 {
-    let path = misc::get_why2_dir() + consts_chat::SERVER_KEYS_DIR + filename;
+    let path = misc::get_why2_dir() + filename;
 
     //LOAD KEY
     if let Ok(bytes) = fs::read(&path)
@@ -222,6 +228,8 @@ fn generate_pem_keys() -> (Zeroizing<String>, String) //CREATE ECC KEYS IN THE O
     (private_pem, public_pem.to_string())
 }
 
+//THE FILE IS 0600 WHEREVER IT LANDS, WHICH IS WHAT PROTECTS THE BYTES - THE CONFIG ROOT IS NOT 0700 LIKE
+//server_keys/ IS, SO THE NAME IS VISIBLE TO OTHER LOCAL USERS AND THE CONTENT IS NOT
 #[cfg(feature = "server")]
 fn write_secure_key(path: String, data: &[u8]) //WRITE A SECRET TO DISK, READABLE BY NOBODY ELSE
 {

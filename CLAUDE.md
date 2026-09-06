@@ -497,8 +497,14 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   packet rather than latched at login.
 - **`config/mod.rs`** — TOML config for client (`client.toml`) and server (`server.toml`), plus
   server user store (`server_users.toml`), server ban list (`server_bans.toml`) and server keypair
-  storage (`server_keys/{private,public}`, plus `server_keys/history_key`), all under `WHY2_CONFIG_DIR`
+  storage (`server_keys/{private,public}`), all under `WHY2_CONFIG_DIR`
   (defaults to `~/.config/WHY2`, baked in by `build.rs` unless overridden at build time).
+  **The at-rest keys live in the config root, not in `server_keys/`** (`server_history_key`,
+  `server_image_key`, created on first use by `kex::media_key`). That directory is the server's
+  *identity*, and neither key is derived from it — that is the point of them. The root is where the
+  binaries' files already sit side by side, distinguished by an owner prefix. The file is 0600
+  wherever it lands, which is what protects the bytes; the root is not 0700 like `server_keys/` is,
+  so the name is visible to other local users and the content is not.
 - **`config/messages.rs`** (feature `server`) — the lobby's message history, off by default
   (`persistent_messages`), kept as the last `max_persistent_messages` messages. **It is the one
   thing under the config dir that is not TOML**: `server_messages.bin` is a `wincode`-encoded

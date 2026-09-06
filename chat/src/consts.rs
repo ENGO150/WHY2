@@ -46,10 +46,13 @@ pub const SERVER_IMAGES_DIR: &str      = "/images";                             
 
 pub const SERVER_KEYS_CONFIG: &str     = "/server_keys.toml";                         //SERVER PUBKEY CONFIG FILE
 pub const SERVER_KEYS_DIR: &str        = "/server_keys";                              //SERVER KEYS DIRECTORY
+
+//AT-REST KEYS SIT IN THE CONFIG ROOT RATHER THAN IN server_keys/: THAT DIRECTORY IS THE SERVER'S
+//IDENTITY, AND NONE OF THESE ARE DERIVED FROM IT (THAT IS THE POINT OF THEM)
+pub const SERVER_HISTORY_KEY: &str     = "/server_history_key";                       //MESSAGE HISTORY AT-REST KEY FILE
+pub const SERVER_IMAGE_KEY: &str       = "/server_image_key";                         //PERSISTENT IMAGE KEY FILE
 pub const SERVER_SKEY: &str            = "/private";                                  //SERVER PRIVATE KEY FILE
 pub const SERVER_PKEY: &str            = "/public";                                   //SERVER PUBLIC KEY FILE
-pub const SERVER_HISTORY_KEY: &str     = "/history_key";                              //MESSAGE HISTORY AT-REST KEY FILE
-pub const SERVER_IMAGE_KEY: &str       = "/image_key";                                //PERSISTENT IMAGE KEY FILE
 
 pub const ECC_PUBKEY_SIZE: usize       = 133;                                         //SEC1 UNCOMPRESSED NIST P-521 POINT
 pub const ECC_SIGNATURE_SIZE: usize    = 132;                                         //FIXED-SIZE ECDSA/P-521 SIGNATURE (r || s)
