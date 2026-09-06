@@ -72,7 +72,8 @@ pub const REKEY_INTERVAL: u64          = 600;                                   
 pub const EVENT_CHANNEL_BOUND: usize   = 1024;                                        //CLIENT UI EVENT BUFFER
 
 pub const SERVER_RESTART_SETTINGS: &[&str] =                                          //SERVER SETTINGS THAT REQUIRE
-    &["server_ip", "server_port", "enable_voice_chat", "server_username"];            //RESTART TO BE APPLIED
+    &["server_ip", "server_port", "enable_voice_chat", "server_username",             //RESTART TO BE APPLIED
+      "log_level"];
 
 //DO NOT CHANGE CONSTS BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 pub const MEGABYTE: usize              = 1_000_000;                                   //MEGABYTE DEFINITION

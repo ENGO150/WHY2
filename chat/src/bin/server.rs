@@ -22,6 +22,7 @@ use std::
 {
     process,
     sync::Arc,
+    str::FromStr,
     time::Duration,
 };
 
@@ -90,24 +91,30 @@ async fn bind<T>(what: &str, address: &str, bind: impl AsyncFn() -> Result<T>) -
 
 async fn quit() //DISCONNECT ALL USERS
 {
-    log::info!("Exiting...");
+    log::info!("Exiting ({} connections open)...", server::CONNECTIONS.len());
     server::disconnect_all().await; //DISCONNECT ALL USERS
 }
 
 #[tokio::main]
 async fn main()
 {
+    //THE CONFIG COMES FIRST - THE LOG LEVEL IS IN IT, AND NOTHING BEFORE THE LOGGER HAS ANYTHING TO SAY
+    config::init_config(); //CREATE server.toml CONFIGURATION
+
     //INIT LOGGER
+    let level = LevelFilter::from_str(&config::read_config::<String>("log_level")).unwrap_or(LevelFilter::Info);
+
     SimpleLogger::new()
-        .with_level(LevelFilter::Info)
+        .with_level(level)
         .with_module_level("ureq", LevelFilter::Warn) //DISABLE UREQ INFO LOGS
         .with_module_level("rustls", LevelFilter::Warn) //DISABLE RUSTLS INFO LOGS
         .init()
         .unwrap();
 
+    log::info!("WHY2 server {} ({}), log level {level}", misc::get_version(), env!("WHY2_GIT_HASH"));
+
     //CONFIGURATION
     misc::check_version().await; //CHECK WHY2 VERSION
-    config::init_config(); //CREATE server.toml CONFIGURATION
     kex::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
     config::messages::sweep_images(); //DROP THE PICTURES NOTHING NAMES ANY MORE
 
@@ -134,6 +141,28 @@ async fn main()
     };
 
     log::info!("Listening on {address}"); //PRINT INFO
+
+    //WHAT THIS SERVER WILL AND WILL NOT DO, ONCE, RATHER THAN GUESSED AT FROM THE PACKETS THAT GET REFUSED
+    log::info!
+    (
+        "Voice: {}, screenshare: {}, registration: {}, version check: {}, history: {}, spam protection: {}",
+        options::voice_chat_enabled(),
+        config::read_config::<bool>("enable_screenshare"),
+        config::read_config::<bool>("allow_register"),
+        config::read_config::<bool>("check_client_version"),
+        config::read_config::<bool>("persistent_messages"),
+        config::read_config::<bool>("spam_protection"),
+    );
+
+    log::info!
+    (
+        "Limits: {} clients ({} unauthenticated, {} per IP), {}MB uploads, {} parallel per client",
+        config::read_config::<usize>("max_clients"),
+        config::read_config::<usize>("max_unauth_clients"),
+        config::read_config::<usize>("max_ip_clients"),
+        config::read_config::<u64>("max_upload_size"),
+        config::read_config::<usize>("max_client_parallel_uploads"),
+    );
 
     //CREATE KEEPALIVE & INACTIVITY WATCHDOG TASK
     tokio::spawn(async move
@@ -182,10 +211,12 @@ async fn main()
         {
             Ok((mut stream, peer_addr)) =>
             {
+                log::debug!("Accepted socket: {peer_addr}");
+
                 //CHECK FOR IP BAN
                 if config::bans::banned_ip(&peer_addr.ip())
                 {
-                    log::error!("Connection rejected (ip banned): {peer_addr}");
+                    log::warn!("Connection rejected (ip banned): {peer_addr}");
                     continue;
                 }
 
@@ -195,7 +226,7 @@ async fn main()
                     Some(s) => s,
                     None =>
                     {
-                        log::error!("Connection rejected (handshake limit): {peer_addr}");
+                        log::warn!("Connection rejected (handshake limit): {peer_addr}");
                         continue;
                     }
                 };
@@ -219,10 +250,17 @@ async fn main()
 
                         if let Some((_, (id, conn_type, _))) = server::PENDING_TOKENS.remove(&token)
                         {
+                            //AN AUXILIARY SOCKET IS LOGGED AS THE CONNECTION THAT ASKED FOR IT - ITS OWN
+                            //ADDRESS IS AN EPHEMERAL PORT NOTHING ELSE IN THE LOG EVER NAMES
+                            let owner = server::log_addr(&id);
+
                             match conn_type
                             {
                                 ConnectionType::FileUpload { uid } | ConnectionType::Image { uid } =>
                                 {
+                                    log::info!("Auxiliary connection ({}): {owner}",
+                                        if matches!(conn_type, ConnectionType::Image { .. }) { "image upload" } else { "file upload" });
+
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (mut read_stream, write_stream) = stream.into_split();
@@ -233,6 +271,8 @@ async fn main()
 
                                 ConnectionType::FileDownload { uid, file: file_data } =>
                                 {
+                                    log::info!("Auxiliary connection (file download): {owner}");
+
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (_read_stream, write_stream) = stream.into_split();
@@ -243,6 +283,8 @@ async fn main()
 
                                 ConnectionType::Screen =>
                                 {
+                                    log::info!("Auxiliary connection (screen share): {owner}");
+
                                     //A SHARE'S BACKLOG IS LATENCY, NOT CAPACITY
                                     screen::cap_socket_buffers(&stream);
 
@@ -262,9 +304,19 @@ async fn main()
                                     //ONLY THE WRITE HALF IS EVER USED FOR AN ATTACHED VIEWER
                                     let (_read_stream, write_stream) = stream.into_split();
 
-                                    if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
+                                    let attached = if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
                                     {
                                         conn.attach_screen(sharer_id, Arc::new(Mutex::new(write_stream)), token);
+                                        true
+                                    } else { false };
+
+                                    //THE GUARD IS GONE BY HERE - log_addr WALKS THE SAME MAP
+                                    match attached
+                                    {
+                                        true => log::info!("Auxiliary connection (screen viewer): {owner} watching {}",
+                                            server::log_addr(&sharer_id)),
+
+                                        false => log::warn!("Screen viewer dropped (connection gone): {owner}"),
                                     }
 
                                     return;
@@ -284,7 +336,8 @@ async fn main()
                                 unauth_clients >= config::read_config::<usize>("max_unauth_clients") ||
                                 ip_clients >= config::read_config::<usize>("max_ip_clients")
                             {
-                                log::error!("Connection rejected (limit): {peer_addr}");
+                                log::warn!("Connection rejected (limit): {peer_addr} ({auth_clients} authenticated, \
+                                    {unauth_clients} unauthenticated, {ip_clients} from this IP)");
                                 return;
                             }
 
@@ -297,7 +350,7 @@ async fn main()
                         }
                     }
 
-                    log::error!("Connection rejected (header): {peer_addr}");
+                    log::warn!("Connection rejected (header): {peer_addr}");
                 });
             },
 
