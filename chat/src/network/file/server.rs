@@ -107,7 +107,8 @@ impl Drop for FileTransferGuard
             if let Some((_, active)) = ACTIVE_FILESHARES.remove(&self.uid)
             {
                 let _ = std::fs::remove_file(&active.path);
-                log::error!("Upload failed: {}", conn.peer_addr());
+
+                log::warn!("Upload failed at {}/{} bytes: {}", active.current_size, active.size, conn.peer_addr());
             }
         }
     }
@@ -190,6 +191,8 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         _ => return
     };
 
+    log::info!("Upload started ({size} bytes, {}): {peer_addr}", if persistent { "image" } else { "file" });
+
     let mut valid = false;
 
     //CHECK FOR CONCURRENT UPLOADS
@@ -204,7 +207,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
     //AN IMAGE IS NOT ONLY STORED, IT IS PUSHED TO EVERY CLIENT IN THE CHANNEL AS ONE PACKET
     if persistent && size > consts::MAX_IMAGE_SIZE as u64
     {
-        log::info!("Image rejected (too large): {peer_addr}");
+        log::warn!("Image rejected ({size} bytes over the {} ceiling): {peer_addr}", consts::MAX_IMAGE_SIZE);
         server::notify(id, PacketCode::InvalidUsage).await;
         return;
     }
@@ -277,7 +280,8 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
     if !valid
     {
         //LOG FILE REJECT
-        log::info!("Upload rejected: {peer_addr}");
+        log::warn!("Upload rejected ({size} bytes over the {}MB limit): {peer_addr}",
+            config::read_config::<u64>("max_upload_size"));
         return;
     }
 
@@ -301,7 +305,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
 
             if !misc::is_image(&data)
             {
-                log::info!("Image rejected (not an image): {peer_addr}");
+                log::warn!("Image rejected (not an image): {peer_addr}");
                 server::notify(id, PacketCode::InvalidUsage).await;
                 return;
             }
@@ -393,7 +397,11 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         upload_file.lock().await.flush().await.ok();
 
         //CHECK HASHES
-        if expected_hash != final_hash { return; }
+        if expected_hash != final_hash
+        {
+            log::warn!("Upload rejected (hash mismatch): {peer_addr}");
+            return;
+        }
 
         //GET FILE PATHS
         let current_path = target_dir.join(uid.to_string());
@@ -416,7 +424,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
         if fs::rename(&current_path, &new_path).await.is_err() { return; }
 
         //LOG FILE UPLOAD
-        log::info!("Upload done: {peer_addr}");
+        log::info!("Upload done ({final_size} bytes, {}): {peer_addr}", if persistent { "image" } else { "file" });
 
         let filename = filename.into_string().unwrap_or("unnamed_file".to_string());
 
@@ -537,6 +545,8 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
     //INIT DISK REX STREAM
     let mut disk_stream = RexStream::new(&Grid::from_key(&file.key).unwrap(), Grid::from_flat(&file.nonce).unwrap()).unwrap();
 
+    log::info!("Download started ({} bytes): {peer_addr}", file.size);
+
     //START UPLOAD
     file::send_file(file.path, write_stream, uid, &mut rex_stream, Some(&mut seq), &mut disk_stream).await;
 
@@ -547,11 +557,23 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
 //READ ONE STORED IMAGE BACK OFF DISK
 pub async fn read_image(hash: &[u8; 32]) -> Option<Vec<u8>>
 {
-    let sealed = fs::read(misc::get_image_dir().join(misc::hex(hash))).await.ok()?;
+    let sealed = match fs::read(misc::get_image_dir().join(misc::hex(hash))).await
+    {
+        Ok(bytes) => bytes,
+        Err(error) =>
+        {
+            log::warn!("Stored image unreadable: {error}");
+            return None;
+        }
+    };
 
     let (key, nonce, mac_key) = crypto::image_keys(hash);
 
-    let ciphertext = crypto::disk_open(&mac_key, &sealed)?;
+    let Some(ciphertext) = crypto::disk_open(&mac_key, &sealed) else
+    {
+        log::error!("Stored image failed verification, it is not the picture it is named after");
+        return None;
+    };
 
     let mut disk_stream: RexStream = RexStream::new(&Grid::from_key(&key).ok()?, Grid::from_flat(&nonce).ok()?).ok()?;
 

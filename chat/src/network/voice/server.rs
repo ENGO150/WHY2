@@ -170,10 +170,12 @@ pub fn find_channel(id: &usize) -> Option<Option<String>>
 
 pub fn remove_connection(id: &usize) //REMOVE CONNECTION
 {
-    if let Some((_, (conn, _, _))) = CONNECTIONS.remove(id) &&
-        let Some(conn) = conn
+    //THE UDP ADDRESS IS THE CLIENT'S VOICE SOCKET AND NOTHING ELSE IN THE LOG NAMES IT, SO THE LINE IS
+    //KEYED BY THE TCP CONNECTION THAT ASKED FOR THE SLOT
+    if let Some((_, (conn, _, _))) = CONNECTIONS.remove(id)
     {
-        log::info!("Close voice connection: {}", conn.peer_addr());
+        log::info!("Close voice connection ({}): {}",
+            if conn.is_some() { "bound" } else { "never bound" }, server::log_addr(id));
     }
 }
 
@@ -217,8 +219,18 @@ pub async fn listen_client_voice(socket: UdpSocket)
                     //A NAT PORT SHIFT, WHICH KEEPS THE ADDRESS THE SESSION IS ALREADY ON
                     if valid_hello || conn.addr.ip() == addr.ip()
                     {
+                        log::debug!("Voice session moved ({}): main connection {}",
+                            if valid_hello { "hello" } else { "NAT port shift" }, server::log_addr(&received.id));
+
                         conn.addr = addr;
-                    } else { continue; } //IGNORE NON-MATCHING ADDRESS (SPOOFING)
+                    } else
+                    {
+                        //IGNORE NON-MATCHING ADDRESS (SPOOFING)
+                        log::warn!("Voice packet from an unexpected address ignored: main connection {}",
+                            server::log_addr(&received.id));
+
+                        continue;
+                    }
                 }
 
                 //VERIFY SEQ
@@ -247,7 +259,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
                     packet_accumulator: 0,
                 });
 
-                log::info!("New voice connection: {}", addr);
+                log::info!("New voice connection: {}", server::log_addr(&received.id));
             }
 
             //SET USERNAME
@@ -275,7 +287,11 @@ pub async fn listen_client_voice(socket: UdpSocket)
                 if *server::CONNECTIONS.iter().find(|c| c.id() == Some(&received.id)).unwrap().muted() { continue; }
 
                 //VALIDATE PACKET IF IT CONTAINS AUDIO
-                if !validate_opus_packet(&data) { continue; }
+                if !validate_opus_packet(&data)
+                {
+                    log::debug!("Malformed opus packet dropped: main connection {}", server::log_addr(&received.id));
+                    continue;
+                }
 
                 //FIND SENDER'S CHANNEL
                 let sender_channel = find_channel(&received.id);

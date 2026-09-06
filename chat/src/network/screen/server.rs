@@ -205,6 +205,8 @@ async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
         (conn.write_stream().clone(), conn.keys().cloned(), conn.username().cloned())
     };
 
+    log::info!("Screen share ended (upload socket closed): {}", server::log_addr(&id));
+
     //DEATTACH EVERY VIEWER
     if let Some(username) = username
     {
@@ -243,6 +245,11 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             None => return
         }
     };
+
+    //THE SHARE'S OWN SOCKET IS AUXILIARY - EVERY LINE ABOUT IT IS KEYED BY THE MAIN CONNECTION
+    let owner = server::log_addr(&id);
+
+    log::info!("Screen share started: {owner}");
 
     //DISCONNECT GUARD
     let _guard = ScreenTransferGuard { id };
@@ -336,7 +343,13 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             //A NEW ATTACHMENT (OR A RE-ATTACHMENT UNDER A NEW TOKEN) NEEDS A TASK OF ITS OWN
             if let Some(keys) = keys
             {
-                let Some(viewer) = spawn_viewer(stream, &keys, token) else { continue; };
+                let Some(viewer) = spawn_viewer(stream, &keys, token) else
+                {
+                    log::warn!("Screen viewer refused (stream setup failed): share of {owner}");
+                    continue;
+                };
+
+                log::info!("Screen viewer serving ({} attached): share of {owner}", viewers.len() + 1);
 
                 viewers.insert(client_id, viewer);
             }
@@ -352,15 +365,24 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             {
                 if !keyframe { continue; }
 
+                log::debug!("Screen viewer recovered on a keyframe: share of {owner}");
+
                 viewer.needs_key = false;
             }
 
             //A FULL QUEUE MEANS *THIS* VIEWER'S LINK CANNOT CARRY THE SHARE. SHEDDING THE FRAME IS
             //THE WHOLE POINT: THE SHARE RUNS AT THE SHARER'S RATE AND A SLOW VIEWER PAYS ALONE,
             //WHERE FORWARDING INLINE MADE EVERYBODY WAIT FOR THE WORST LINK ON THE SERVER
-            if viewer.tx.try_send(read.clone()).is_err() && matches!(read, ScreenPacketCode::Video { .. })
+            if viewer.tx.try_send(read.clone()).is_err()
             {
-                viewer.needs_key = true;
+                //A LINE PER SHED FRAME WOULD BE ONE PER FRAME ON A LINK THAT CANNOT CARRY THE SHARE AT ALL,
+                //SO ONLY THE FIRST OF A RUN IS WORTH SAYING: THE REST ARE THE SAME VIEWER STILL BEHIND
+                if matches!(read, ScreenPacketCode::Video { .. })
+                {
+                    if !viewer.needs_key { log::warn!("Screen viewer shed (link too slow): share of {owner}"); }
+
+                    viewer.needs_key = true;
+                }
             }
         }
     }
