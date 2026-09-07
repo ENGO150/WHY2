@@ -111,7 +111,8 @@ pub enum Entry //ONE ROW OF HISTORY
     {
         username: String,
         filename: String,
-        hash: Option<[u8; 32]>, //WHAT TO ASK THE SERVER FOR - None WHEN IT ARRIVED WITH ITS PICTURE
+        username_color: Option<u8>, //THE SENDER'S, LIKE A MESSAGE'S - THE CAPTION NAMES THEM THE SAME WAY
+        hash: Option<[u8; 32]>,     //WHAT TO ASK THE SERVER FOR - None WHEN IT ARRIVED WITH ITS PICTURE
         picture: Picture,
     },
 }
@@ -345,17 +346,19 @@ impl App
     }
 
     //A PICTURE THAT ARRIVED WITH ITS OWN BYTES - A LIVE ONE, OR A REPLAYED ONE THAT WAS ASKED FOR
-    pub fn push_image(&mut self, username: String, filename: String, image: DynamicImage)
+    pub fn push_image(&mut self, username: String, filename: String, image: DynamicImage,
+        username_color: Option<u8>)
     {
         let picture = self.fit(image);
 
-        self.push_entry(Entry::Image { username, filename, hash: None, picture });
+        self.push_entry(Entry::Image { username, filename, username_color, hash: None, picture });
     }
 
     //AND ONE WITHOUT ITS PICTURE. A REPLAYED LINE WAITS TO BE CLICKED (Absent); A LIVE ONE THE SERVER
     //ONLY OFFERED HAS ALREADY BEEN ASKED FOR BY THE TIME IT GETS HERE (Waiting), SINCE NOBODY CHOOSES
     //TO SEE A PICTURE THAT IS BEING SENT TO THEM ANYWAY
-    pub fn push_caption(&mut self, username: String, filename: String, hash: [u8; 32], pending: bool)
+    pub fn push_caption(&mut self, username: String, filename: String, hash: [u8; 32], pending: bool,
+        username_color: Option<u8>)
     {
         let picture = match pending
         {
@@ -363,7 +366,7 @@ impl App
             false => Picture::Absent,
         };
 
-        self.push_entry(Entry::Image { username, filename, hash: Some(hash), picture });
+        self.push_entry(Entry::Image { username, filename, username_color, hash: Some(hash), picture });
     }
 
     //A CLICKED CAPTION. THE HASH IT COMES BACK WITH IS WHAT THE CALLER ASKS THE SERVER FOR - None MEANS

@@ -635,6 +635,23 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `state::Entry::History` — an ordinary chat line rendered through `Theme::render` (so
     `disable_colors` reaches it like any other message) minus the id column, under a
     `Message history (n):` heading that is what separates it from what is being said now.
+  - **An image line carries the sender's username color, the way a message does.** It is the username
+    color *only*: an image line's text is the filename, which is the client's own wording and not
+    something the sender typed, so there is no message color to keep and `StoredMessage`'s stays
+    `None`. The server has no standing notion of a client's colors — they arrive with each
+    `PacketCode::Message` — so the upload request carries it (`PacketCode::Image`), the token it mints
+    holds it until the upload socket attaches (`ConnectionType::Image`), and `PacketCode::ImageDisplay`
+    hands it to the clients watching live so a picture looks the same before and after a restart. A
+    fileshare puts up no line and has none, which is why `download`'s `username_color` is the image
+    path's alone while `persistent` stays what says an upload is one.
+    It reaches a consumer of the crate through the events, not only through the packet: a library user
+    only ever sees `ClientEvent`, so every one of the four a live picture can put a line up with carries
+    it — `ImageDisplay`, `ImagePending` (the caption a cache miss puts up before the fetch),
+    `ImageOffer` (the same line with the button, `auto_show_images` off) and `ImageFailed`. `ImageData`
+    deliberately does not: it is keyed by hash and only fills a caption one of those already created.
+    The TUI reads it too — `Entry::Image` keeps it and `Theme::render` names the sender in their own
+    color, falling back to the chrome's accent when they have none, so a caption and the messages
+    around it agree on who is talking.
 - **`bin/client/`** — the client entrypoint (`mod.rs`), the full-screen TUI (`tui/`, ratatui over
   the crossterm backend), and color handling (`colors.rs`).
 

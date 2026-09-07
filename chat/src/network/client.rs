@@ -147,74 +147,74 @@ enum Handshake
 
 pub enum ClientEvent
 {
-    Register,                                        //REGISTER PROMPT
-    Login,                                           //LOGIN PROMPT
-    FirstUser,                                       //FIRST USER
-    Authenticated(Role),                             //LOGIN SUCCESSFUL, ROLE
-    Connected(String),                               //SUCCESSFUL CONNECTION MESSAGE
-    Message(String, String, usize, MessageColors),   //RECEIVED MESSAGE
-    PrivateMessageSent(String, usize, String),       //SENT PM
-    PrivateMessageRecv(String, usize, String),       //RECEIVED PM
-    TofuError,                                       //TOFU VERIFICATION REJECTED BY THE USER
-    TofuPrompt(TofuRequest),                         //TOFU DECISION ASKED OF THE USER
-    TofuSkip(String),                                //TOFU VERIFICATION SKIPPED
-    ReconnectFailed,                                 //RECONNECTING AFTER PINNING THE KEY FAILED
-    HandshakeFailed(String),                         //THE KEY EXCHANGE DID NOT ADD UP
-    VoiceActivity(Vec<VoiceUser>),                   //VOICE OVERLAY
-    VoiceRoster(Vec<(usize, String)>),               //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
-    VoiceJoin(usize, String),                        //SOMEBODY JOINED VOICE IN OUR CHANNEL
-    VoiceLeave(usize),                               //SOMEBODY LEFT VOICE IN OUR CHANNEL
-    Join(String),                                    //CLIENT CONNECTED
-    Leave(String, usize),                            //CLIENT DISCONNECTED
-    ServerSay(String),                               //SERVER MESSAGE
-    Role(Role, Option<String>),                      //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
-    History(Vec<StoredMessage>, Vec<[u8; 32]>),      //STORED MESSAGES, AND WHICH OF THEIR PICTURES WE HOLD
-    ChannelChanged(Option<String>),                  //WE SWITCHED CHANNEL
-    ChannelCreated(String),                          //CHANNEL CREATED
-    ChannelDestroyed(String),                        //CHANNEL ABANDONED
-    Muted,                                           //HAHA
-    InvalidUsage,                                    //INVALID COMMAND USAGE
-    VersionFailed,                                   //FETCHING VERSIONS FAILED
-    VersionMismatch(String, String),                 //MISMATCH GIT HASH
-    UnsafeVersion(usize, Version, String),           //OLD VERSION
-    Username(bool, u64, u64),                        //USERNAME PROMPT
-    VoiceEnabled,                                    //VOICE CHAT ENABLED
-    VoiceDeviceFailed,                               //REBUILDING THE AUDIO STREAMS FAILED
-    VoiceHandshakeFailed,                            //THE SERVER NEVER ANSWERED THE UDP HANDSHAKE
-    VoiceDisabled,                                   //VOICE CHAT DISABLED
-    List(Vec<OnlineUser>),                           //LIST OF USERS
-    ServerSettings(Vec<ServerSetting>, bool),        //server.toml AS THE SERVER HOLDS IT (TRUE = IT HAS JUST BEEN SAVED)
-    ServerBans(Vec<BanEntry>, Vec<BanEntry>),        //server_bans.toml AS THE SERVER HOLDS IT (USERNAMES, ADDRESSES)
-    Upload(String),                                  //UPLOADING FILE
-    Image(String),                                   //UPLOADING IMAGE
-    ImageDisplay(String, String, Box<DynamicImage>), //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
-    ImageData([u8; 32], Option<Box<DynamicImage>>),   //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
-    ImagePending(String, String, [u8; 32]),          //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
-    ImageOffer(String, String, [u8; 32]),            //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
-    ImageRequest([u8; 32]),                          //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
-    ImageFailed(String, String),                     //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
-    Uploaded(String, String),                        //USER UPLOADED FILE
-    Download(String),                                //DOWNLOADING FILE
-    Downloaded(String),                              //DOWNLOADED FILE
-    DownloadFailed(String),                          //DOWNLOADING FAILED
-    Files(Vec<UserFile>),                            //FILE LIST
-    Screens(Vec<UserScreen>),                        //SCREENSHARE LIST
-    UploadLimit,                                     //MAX CONCURRENT UPLOADS REACHED
-    Screen(bool),                                    //TOGGLED SCREENSHARE
-    ScreenFailed(String),                            //SCREEN CAPTURE FAILED
-    Attach(String),                                  //ATTACHED SCREENSHARE
-    Deattach(String),                                //DEATTACHED SCREENSHARE
-    Attached(String),                                //SOMEBODY ATTACHED OUR SCREENSHARE
-    Deattached(String),                              //SOMEBODY DEATTACHED OUR SCREENSHARE
-    Screenshare(String),                             //SOMEBODY STARTED SCREENSHARING
-    ScreenshareEnd(String),                          //SOMEBODY STOPPED SCREENSHARING
-    IncompatibleVersion(String, String),             //INCOMPATIBLE SERVER VERSION
-    UsernameRejected,                                //USERNAME REJECTED BY SERVER
-    PasswordRejected(u64),                           //PASSWORD REJECTED BY SERVER
-    SpamWarning,                                     //SPAM WARNING
-    Socks5Voice,                                     //DISABLED VOICE ON SOCKS5
-    DisabledFeature,                                 //DISABLED FEATURE
-    Quit,                                            //SERVER QUIT COMMUNICATION
+    Register,                                                    //REGISTER PROMPT
+    Login,                                                       //LOGIN PROMPT
+    FirstUser,                                                   //FIRST USER
+    Authenticated(Role),                                         //LOGIN SUCCESSFUL, ROLE
+    Connected(String),                                           //SUCCESSFUL CONNECTION MESSAGE
+    Message(String, String, usize, MessageColors),               //RECEIVED MESSAGE
+    PrivateMessageSent(String, usize, String),                   //SENT PM
+    PrivateMessageRecv(String, usize, String),                   //RECEIVED PM
+    TofuError,                                                   //TOFU VERIFICATION REJECTED BY THE USER
+    TofuPrompt(TofuRequest),                                     //TOFU DECISION ASKED OF THE USER
+    TofuSkip(String),                                            //TOFU VERIFICATION SKIPPED
+    ReconnectFailed,                                             //RECONNECTING AFTER PINNING THE KEY FAILED
+    HandshakeFailed(String),                                     //THE KEY EXCHANGE DID NOT ADD UP
+    VoiceActivity(Vec<VoiceUser>),                               //VOICE OVERLAY
+    VoiceRoster(Vec<(usize, String)>),                           //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
+    VoiceJoin(usize, String),                                    //SOMEBODY JOINED VOICE IN OUR CHANNEL
+    VoiceLeave(usize),                                           //SOMEBODY LEFT VOICE IN OUR CHANNEL
+    Join(String),                                                //CLIENT CONNECTED
+    Leave(String, usize),                                        //CLIENT DISCONNECTED
+    ServerSay(String),                                           //SERVER MESSAGE
+    Role(Role, Option<String>),                                  //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
+    History(Vec<StoredMessage>, Vec<[u8; 32]>),                  //STORED MESSAGES, AND WHICH OF THEIR PICTURES WE HOLD
+    ChannelChanged(Option<String>),                              //WE SWITCHED CHANNEL
+    ChannelCreated(String),                                      //CHANNEL CREATED
+    ChannelDestroyed(String),                                    //CHANNEL ABANDONED
+    Muted,                                                       //HAHA
+    InvalidUsage,                                                //INVALID COMMAND USAGE
+    VersionFailed,                                               //FETCHING VERSIONS FAILED
+    VersionMismatch(String, String),                             //MISMATCH GIT HASH
+    UnsafeVersion(usize, Version, String),                       //OLD VERSION
+    Username(bool, u64, u64),                                    //USERNAME PROMPT
+    VoiceEnabled,                                                //VOICE CHAT ENABLED
+    VoiceDeviceFailed,                                           //REBUILDING THE AUDIO STREAMS FAILED
+    VoiceHandshakeFailed,                                        //THE SERVER NEVER ANSWERED THE UDP HANDSHAKE
+    VoiceDisabled,                                               //VOICE CHAT DISABLED
+    List(Vec<OnlineUser>),                                       //LIST OF USERS
+    ServerSettings(Vec<ServerSetting>, bool),                    //server.toml AS THE SERVER HOLDS IT
+    ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml AS THE SERVER HOLDS IT (USERNAMES, ADDRESSES)
+    Upload(String),                                              //UPLOADING FILE
+    Image(String),                                               //UPLOADING IMAGE
+    ImageDisplay(String, String, Box<DynamicImage>, Option<u8>), //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
+    ImageData([u8; 32], Option<Box<DynamicImage>>),              //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
+    ImagePending(String, String, [u8; 32], Option<u8>),          //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
+    ImageOffer(String, String, [u8; 32], Option<u8>),            //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
+    ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
+    ImageFailed(String, String, Option<u8>),                     //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
+    Uploaded(String, String),                                    //USER UPLOADED FILE
+    Download(String),                                            //DOWNLOADING FILE
+    Downloaded(String),                                          //DOWNLOADED FILE
+    DownloadFailed(String),                                      //DOWNLOADING FAILED
+    Files(Vec<UserFile>),                                        //FILE LIST
+    Screens(Vec<UserScreen>),                                    //SCREENSHARE LIST
+    UploadLimit,                                                 //MAX CONCURRENT UPLOADS REACHED
+    Screen(bool),                                                //TOGGLED SCREENSHARE
+    ScreenFailed(String),                                        //SCREEN CAPTURE FAILED
+    Attach(String),                                              //ATTACHED SCREENSHARE
+    Deattach(String),                                            //DEATTACHED SCREENSHARE
+    Attached(String),                                            //SOMEBODY ATTACHED OUR SCREENSHARE
+    Deattached(String),                                          //SOMEBODY DEATTACHED OUR SCREENSHARE
+    Screenshare(String),                                         //SOMEBODY STARTED SCREENSHARING
+    ScreenshareEnd(String),                                      //SOMEBODY STOPPED SCREENSHARING
+    IncompatibleVersion(String, String),                         //INCOMPATIBLE SERVER VERSION
+    UsernameRejected,                                            //USERNAME REJECTED BY SERVER
+    PasswordRejected(u64),                                       //PASSWORD REJECTED BY SERVER
+    SpamWarning,                                                 //SPAM WARNING
+    Socks5Voice,                                                 //DISABLED VOICE ON SOCKS5
+    DisabledFeature,                                             //DISABLED FEATURE
+    Quit,                                                        //SERVER QUIT COMMUNICATION
 }
 
 //LISTS
@@ -863,7 +863,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //EITHER THE PICTURE OR THE OFFER OF IT
-            PacketCode::ImageDisplay { username, filename, hash, data } =>
+            PacketCode::ImageDisplay { username, filename, hash, data, username_color } =>
             {
                 let image_tx = tx.clone();
 
@@ -884,7 +884,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                             cache::store(&digest, &data).await;
                         }
 
-                        image_tx.send(ClientEvent::ImageOffer(username, filename, hash)).await.unwrap();
+                        image_tx.send(ClientEvent::ImageOffer(username, filename, hash, username_color)).await.unwrap();
                     });
 
                     continue;
@@ -903,7 +903,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     {
                         //A LIVE PICTURE IS NOT A CLICK-TO-LOAD ONE, SO IT IS ASKED FOR WITHOUT A CLICK -
                         //BUT BY THE EVENT LOOP, WHICH OWNS THE WRITE HALF AND THE SEQUENCE COUNTER
-                        image_tx.send(ClientEvent::ImagePending(username, filename, hash)).await.unwrap();
+                        image_tx.send(ClientEvent::ImagePending(username, filename, hash, username_color)).await.unwrap();
 
                         return;
                     };
@@ -930,8 +930,8 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                     image_tx.send(match image
                     {
-                        Some(image) => ClientEvent::ImageDisplay(username, filename, Box::new(image)),
-                        None => ClientEvent::ImageFailed(username, filename),
+                        Some(image) => ClientEvent::ImageDisplay(username, filename, Box::new(image), username_color),
+                        None => ClientEvent::ImageFailed(username, filename, username_color),
                     }).await.unwrap();
                 });
 

@@ -71,6 +71,7 @@ pub enum ConnectionType //TYPES OF TCP CHANNEL
     Image
     {
         uid: u64,
+        username_color: Option<u8>,
     },
     FileDownload
     {

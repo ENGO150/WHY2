@@ -79,25 +79,27 @@ impl App
             ClientEvent::Message(message, username, id, colors) => self.push_message(username, id, message, colors),
 
             //A PICTURE IS AN ENTRY OF ITS OWN - THE PANE RESERVES ROWS FOR IT AND draw PAINTS THEM
-            ClientEvent::ImageDisplay(username, filename, image) => self.push_image(username, filename, *image),
+            ClientEvent::ImageDisplay(username, filename, image, color) =>
+                self.push_image(username, filename, *image, color),
 
             //IT PASSED THE SERVER'S HEADER CHECK AND STILL WOULD NOT DECODE, SO SAY SO WHERE IT WOULD HAVE BEEN
             //AN OFFER WE DID NOT HOLD. THE CAPTION GOES UP NOW, THE LOOP ASKS FOR THE PICTURE, AND IT
             //FILLS THE CAPTION WHEN IT ARRIVES
-            ClientEvent::ImagePending(username, filename, hash) =>
+            ClientEvent::ImagePending(username, filename, hash, color) =>
             {
-                self.push_caption(username, filename, hash, true);
+                self.push_caption(username, filename, hash, true, color);
                 self.image_requests.push(hash);
             },
 
             //THE SAME LINE WITH THE BUTTON STILL ON IT: auto_show_images IS OFF, SO NOBODY ASKED FOR
             //THIS PICTURE AND NOTHING IS COMING UNTIL SOMEBODY CLICKS
-            ClientEvent::ImageOffer(username, filename, hash) => self.push_caption(username, filename, hash, false),
+            ClientEvent::ImageOffer(username, filename, hash, color) =>
+                self.push_caption(username, filename, hash, false, color),
 
             //A CLICK THE CACHE COULD NOT ANSWER, SO THE SERVER IS ASKED AFTER ALL
             ClientEvent::ImageRequest(hash) => self.image_requests.push(hash),
 
-            ClientEvent::ImageFailed(username, filename) => self.push_styled(
+            ClientEvent::ImageFailed(username, filename, _) => self.push_styled(
                 format!("{username} sent an image that could not be displayed ({filename})."), theme::ERROR),
 
             ClientEvent::PrivateMessageSent(to, id, msg) =>
@@ -297,7 +299,7 @@ impl App
                         //A PICTURE WE HOLD IS ALREADY ON ITS WAY INTO THE PANE, SO IT SAYS SO INSTEAD OF
                         //OFFERING A BUTTON THAT WOULD ASK FOR IT AGAIN
                         Some(hash) => self.push_caption(message.username, message.text, hash,
-                            cached.contains(&hash)),
+                            cached.contains(&hash), message.colors.username_color),
                         None => self.push_history(message.username, message.text, message.colors),
                     }
                 }

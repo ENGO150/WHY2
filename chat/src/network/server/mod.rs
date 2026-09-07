@@ -991,6 +991,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 let image = matches!(read, PacketCode::Image { .. });
 
+                //AN IMAGE'S LINE NAMES THE SENDER LIKE A MESSAGE DOES, SO IT CARRIES THEIR COLOR
+                let username_color = match &read
+                {
+                    PacketCode::Image { username_color, .. } => *username_color,
+                    _ => None,
+                };
+
                 //CHECK IF IMAGE WAS ALREADY UPLOADED
                 if image && config::messages::has_image(&hash)
                 {
@@ -1008,7 +1015,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //KEEP IT, ON THE SAME TERMS AS AN UPLOAD OF IT WOULD HAVE BEEN
                     if channel.is_none() && config::read_config::<bool>("persistent_messages")
                     {
-                        config::messages::store_image(&username, &filename, &hash);
+                        config::messages::store_image(&username, &filename, &hash, username_color);
                     }
 
                     send_to_all(PacketCode::ImageDisplay
@@ -1017,6 +1024,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         filename: filename.clone(),
                         hash,
                         data: None,
+                        username_color,
                     }, true, channel.as_deref());
 
                     //TELL THE UPLOADER THERE IS NOTHING TO SEND
@@ -1026,6 +1034,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         filename,
                         token: None,
                         uid: None,
+                        username_color,
                     }, Some(&keys)).await;
 
                     log::info!("Image already stored, upload skipped: {peer_addr}");
@@ -1046,7 +1055,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 let uid = rand::random::<u64>();
                 let token = open_connection(id, if image
                 {
-                    ConnectionType::Image { uid }
+                    ConnectionType::Image { uid, username_color }
                 } else
                 {
                     ConnectionType::FileUpload { uid }
@@ -1063,6 +1072,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         filename: String::new(), //THE UPLOAD'S OWN METADATA CARRIES IT FROM HERE
                         token: Some(token),
                         uid: Some(uid),
+                        username_color,
                     }
                 } else
                 {

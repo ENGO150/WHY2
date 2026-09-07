@@ -137,7 +137,16 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
 //LISTS
 pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new()); //LIST FOR ACTIVE FILE UPLOADS
 
-pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid: u64, task: AbortHandle, persistent: bool)
+pub async fn download
+(
+    token: [u8; 32],
+    id: usize,
+    streams: &mut Streams<'_>,
+    uid: u64,
+    task: AbortHandle,
+    persistent: bool,
+    username_color: Option<u8>,
+)
 {
     //GET CLIENT INFO
     let (keys, username, peer_addr) =
@@ -440,7 +449,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
                 //KEEP IT, ON THE SAME TERMS AS A MESSAGE
                 let kept = channel.is_none() && config::read_config::<bool>("persistent_messages");
 
-                if kept { config::messages::store_image(&username, &filename, &final_hash); }
+                if kept { config::messages::store_image(&username, &filename, &final_hash, username_color); }
 
                 //AND WHAT IS NOT KEPT IS NOT LEFT BEHIND: NOTHING BUT THE HISTORY EVER NAMES A FILE IN
                 //server_images/, SO A PICTURE POSTED IN A CHANNEL (OR WITH THE HISTORY OFF) IS AS TEMPORARY AS
@@ -455,6 +464,7 @@ pub async fn download(token: [u8; 32], id: usize, streams: &mut Streams<'_>, uid
                     filename,
                     hash: final_hash,
                     data: Some(data),
+                    username_color,
                 }, true, channel.as_deref());
             }
         } else

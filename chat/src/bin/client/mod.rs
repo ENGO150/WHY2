@@ -646,6 +646,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                                             .unwrap_or("unnamed_file").to_string(),
                                                         token: None,
                                                         uid: None,
+                                                        username_color: get_colors().username_color,
                                                     },
 
                                                     false => PacketCode::Upload { hash, token: None, uid: None },

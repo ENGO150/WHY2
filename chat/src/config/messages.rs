@@ -95,13 +95,13 @@ pub fn store(username: &str, text: &str, colors: &MessageColors) //APPEND MESSAG
     });
 }
 
-pub fn store_image(username: &str, filename: &str, hash: &[u8; 32])
+pub fn store_image(username: &str, filename: &str, hash: &[u8; 32], username_color: Option<u8>)
 {
     push(StoredMessage
     {
         username: username.to_string(),
         text: filename.to_string(),
-        colors: MessageColors { username_color: None, message_color: None },
+        colors: MessageColors { username_color, message_color: None },
         image: Some(*hash),
     });
 }

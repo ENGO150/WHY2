@@ -256,15 +256,23 @@ async fn main()
 
                             match conn_type
                             {
-                                ConnectionType::FileUpload { uid } | ConnectionType::Image { uid } =>
+                                ConnectionType::FileUpload { uid } | ConnectionType::Image { uid, .. } =>
                                 {
+                                    //AN IMAGE IS THE ONE UPLOAD THAT PUTS UP A LINE, SO IT IS THE ONE THAT
+                                    //NAMES A SENDER TO COLOR
+                                    let (persistent, username_color) = match conn_type
+                                    {
+                                        ConnectionType::Image { username_color, .. } => (true, username_color),
+                                        _ => (false, None),
+                                    };
+
                                     log::info!("Auxiliary connection ({}): {owner}",
-                                        if matches!(conn_type, ConnectionType::Image { .. }) { "image upload" } else { "file upload" });
+                                        if persistent { "image upload" } else { "file upload" });
 
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (mut read_stream, write_stream) = stream.into_split();
-                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task, matches!(conn_type, ConnectionType::Image { .. })).await;
+                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task, persistent, username_color).await;
                                     });
                                     return;
                                 },

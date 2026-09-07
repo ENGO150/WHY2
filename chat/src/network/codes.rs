@@ -131,9 +131,10 @@ pub enum PacketCode //CONTROL CODES
     Image
     {
         hash: [u8; 32],
-        filename: String, //WHAT THE PICTURE IS CALLED, NEEDED BEFORE THE UPLOAD IN CASE THERE IS NONE
+        filename: String,
         token: Option<[u8; 32]>,
         uid: Option<u64>,
+        username_color: Option<u8>,
     },
 
     //SERVER -> CLIENT | A STORED IMAGE, AS IT WAS UPLOADED
@@ -143,6 +144,7 @@ pub enum PacketCode //CONTROL CODES
         filename: String,
         hash: [u8; 32],
         data: Option<Vec<u8>>,
+        username_color: Option<u8>,
     },
 
     //CLIENT <> SERVER | ASK FOR ONE OF THE HISTORY'S PICTURES, ANSWERED WITH data (None = IT IS GONE).

@@ -90,11 +90,16 @@ impl Theme
 
             //ONLY THE CAPTION - THE PICTURE IS DRAWN OVER THE ROWS THE WRAP RESERVES UNDER IT. WHILE THERE
             //ARE NONE THE CAPTION SAYS WHY, AND OFFERS THE CLICK THAT FETCHES THE PICTURE
-            Entry::Image { username, filename, picture, .. } =>
+            Entry::Image { username, filename, username_color, picture, .. } =>
             {
                 let mut spans = vec!
                 [
-                    Span::styled(username.clone(), ACCENT),
+                    //THE SENDER'S OWN COLOR WHERE THERE IS ONE, THE CHROME'S ACCENT WHERE THERE IS NOT
+                    match username_color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
+                    {
+                        Some(color) => Span::styled(username.clone(), Style::new().fg(Color::from_crossterm(color))),
+                        None => Span::styled(username.clone(), ACCENT),
+                    },
                     Span::styled(format!(" sent an image ({filename})"), DIM),
                 ];
 
