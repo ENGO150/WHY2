@@ -104,6 +104,14 @@ pub enum Entry //ONE ROW OF HISTORY
         colors: MessageColors,
     },
 
+    //A LINE WHOSE TAIL IS SOMETHING SOMEBODY TYPED - A PRIVATE MESSAGE. THE PREFIX IS THE CLIENT'S OWN
+    //WORDING AND IS STYLED ALREADY; THE TEXT GOES THROUGH THE MARKUP THE WAY A CHANNEL MESSAGE DOES
+    Prefixed
+    {
+        prefix: Vec<Span<'static>>,
+        text: String,
+    },
+
     //A PICTURE SOMEBODY SENT. THE LINE IS ITS CAPTION - THE PICTURE IS DRAWN OVER THE ROWS RESERVED UNDER
     //IT, ONCE THERE IS ONE TO DRAW: A REPLAYED IMAGE ARRIVES AS A HASH AND IS ONLY FETCHED IF IT IS ASKED
     //FOR, WHICH IS WHAT KEEPS A LOGIN FROM PULLING EVERY PICTURE EVER POSTED
@@ -337,6 +345,12 @@ impl App
     pub fn push_message(&mut self, username: String, id: usize, text: String, colors: MessageColors)
     {
         self.push_entry(Entry::Message { username, id, text, colors });
+    }
+
+    //A PRIVATE MESSAGE - THE SAME, BEHIND A PREFIX THE CLIENT WROTE
+    pub fn push_prefixed(&mut self, prefix: Vec<Span<'static>>, text: String)
+    {
+        self.push_entry(Entry::Prefixed { prefix, text });
     }
 
     //A REPLAYED MESSAGE IS STORED UNRENDERED FOR THE SAME REASON A LIVE ONE IS
@@ -796,7 +810,7 @@ impl App
         {
             let row = lines.len() as u16;
 
-            lines.extend(wrap_line(&self.theme.render(&self.messages[entry]), width));
+            lines.extend(self.theme.render(&self.messages[entry], width));
 
             //AN IMAGE RESERVES ITS ROWS AS BLANK LINES, SO THE SCROLL OFFSET STAYS EXACT AND THE PANE
             //STAYS A LIST OF LINES - THE PICTURE IS PAINTED OVER THEM AFTERWARDS

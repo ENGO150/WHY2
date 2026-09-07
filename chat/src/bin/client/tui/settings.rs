@@ -222,6 +222,8 @@ impl Settings
         rows.push(Row::Item(Item::client("Show images automatically", "auto_show_images",
             toggle_value("auto_show_images", false))));
 
+        rows.push(Row::Item(Item::client("Math rendering", "render_math", toggle_value("render_math", false))));
+
         rows.push(Row::Item(Item::client("Show client IDs", "show_id", toggle_value("show_id", false))));
 
         self.rows = rows;

@@ -104,20 +104,20 @@ impl App
 
             ClientEvent::PrivateMessageSent(to, id, msg) =>
             {
-                self.push(Line::from(vec!
+                self.push_prefixed(vec!
                 [
                     Span::styled("[PM TO] ", theme::ACCENT),
-                    Span::raw(format!("{to} ({id}): {msg}")),
-                ]));
+                    Span::raw(format!("{to} ({id}): ")),
+                ], msg);
             },
 
             ClientEvent::PrivateMessageRecv(from, id, msg) =>
             {
-                self.push(Line::from(vec!
+                self.push_prefixed(vec!
                 [
                     Span::styled("[PM FROM] ", theme::ACCENT),
-                    Span::raw(format!("{from} ({id}): {msg}")),
-                ]));
+                    Span::raw(format!("{from} ({id}): ")),
+                ], msg);
             },
 
             ClientEvent::TofuPrompt(request) =>

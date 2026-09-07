@@ -354,7 +354,9 @@ fn draw_logo(frame: &mut Frame, area: Rect)
 
             let Some(cell) = buffer.cell_mut((x + column as u16, y + row_index as u16)) else { continue; };
 
-            if cell.symbol().trim().is_empty() //FREE CELL - THE LOGO OWNS IT OUTRIGHT
+            //A PAINTED BACKGROUND IS AS MUCH A CLAIM AS A CHARACTER IS: A CODE BLOCK'S PADDING IS BLANK
+            //CELLS THAT ARE STILL PART OF ITS BOX, AND THE LOGO COMING THROUGH THEM WOULD PUNCH HOLES IN IT
+            if cell.symbol().trim().is_empty() && cell.bg == Color::Reset //FREE CELL - THE LOGO OWNS IT OUTRIGHT
             {
                 cell.set_char(symbol);
                 cell.set_style(theme::LOGO);

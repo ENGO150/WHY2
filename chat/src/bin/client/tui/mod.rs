@@ -21,6 +21,8 @@ pub mod draw;
 pub mod event;
 pub mod input;
 pub mod login;
+pub mod markup;
+pub mod math;
 pub mod palette;
 pub mod settings;
 pub mod state;
