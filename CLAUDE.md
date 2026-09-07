@@ -193,6 +193,21 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     never through `load_from_memory`. The residual is `MAX_IMAGE_ALLOC` × however many images a
     sender can post, which is what the ordinary spam window bounds — `PacketCode::Image` is
     deliberately *not* in `receive`'s exemption list.
+  - **A decoded picture is always frames, never one image** (`client::Animation`, a `Vec<ImageFrame>`).
+    An animated GIF sent through `/image` is uploaded and stored as the bytes it is — nothing on the
+    path re-encodes it — so the only thing that ever flattened it was the decode, which took the first
+    frame and threw the rest away. `decode_image` therefore branches on the *format*: GIF, animated
+    WebP and APNG go through `AnimationDecoder` and everything else (including a GIF of one frame, and
+    a WebP or PNG carrying no animation) comes back through `ImageReader` as the single frame it is. A
+    still is one `ImageFrame` and an animation is all of them, so every path below carries the same
+    type and only the pane cares which it was handed.
+    **The frame budget is its own, because `MAX_IMAGE_ALLOC` bounds one picture and an animation is a
+    picture per frame** — 8MB of GIF on the wire is hundreds of them held at once. `MAX_ANIMATION_FRAMES`
+    and `MAX_ANIMATION_ALLOC` cap what is kept, and a budget running out (or a frame that will not
+    decode) **truncates rather than fails**: what has already been decoded still plays, since half a
+    GIF beats no picture at all. A frame asking for less than `MIN_FRAME_DELAY` is asking for "as fast
+    as possible" and gets `DEFAULT_FRAME_DELAY`, which is the answer every browser has given since
+    Netscape.
   - **Fetching is spaced on the server** (`listen_client`'s `PacketCode::ImageData` arm). The
     request is a hash and the answer is a disk read, a whole `RexStream` decrypt and up to
     `MAX_IMAGE_SIZE` back on the wire, so it is the one packet where a client's cost and everybody
@@ -718,6 +733,25 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - The message pane is wrapped by `state::wrap_line` (cached per width + history generation) rather
     than by `Paragraph`, so the scroll offset is exact. `App::scroll == None` means stuck to the
     bottom.
+  - **A picture in the pane is an animation with one frame in it, and the redraw tick is its clock.**
+    `Fitted` holds every frame at the height `IMAGE_ROWS` allows (cut down once, in `App::fit` — an
+    animation is all of its frames in memory at the same time), plus which one the protocol currently
+    holds and when the next is due; `App::advance_animations` is called from `tui::run`'s 33 ms tick,
+    steps whatever is due and sets `App::dirty`, which is the only thing that repaints the pane. The
+    tick is therefore also the floor on the frame rate — a GIF asking for 10 ms is played at the tick
+    and not faster — and a frame that comes due late is **skipped rather than shown late**, so the pace
+    stays the animation's own. Nothing bumps `generation`: every frame of a GIF is the same size, so the
+    rows it reserves cannot change and the wrap does not need redoing.
+    - **Only the pictures on screen are stepped.** Fitting a frame and handing it to the terminal is the
+      whole cost of an animation, and a pane of scrolled-past GIFs would pay it for every one of them
+      every tick. The placements it filters on are the last frame's, which is exactly what was drawn.
+    - **The protocol is rebuilt around its own `StatefulProtocolType`, never asked for again from the
+      `Picker`.** That type carries the id the terminal knows this picture by, so reusing it *replaces*
+      the picture kitty-side; a fresh protocol per frame would leave a new image behind in the terminal
+      thirty times a second. There is no public way to hand an existing `StatefulProtocol` a new source
+      image, so `protocol_type_owned()` + `StatefulProtocol::new` is how the id survives the frame.
+    - A pane that was not drawn for `ANIMATION_CATCHUP` starts again from now instead of winding through
+      every frame it missed.
   - **Capturing the mouse takes the terminal's own drag-select away, so the client provides one**
     (`App::selection`, `mouse_capture = true`). A press in the message pane anchors it, a drag extends
     it and the release copies — but a press is **not** a selection until a drag arrives (`dragged`),

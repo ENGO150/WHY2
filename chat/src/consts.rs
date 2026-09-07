@@ -48,9 +48,6 @@ pub const CLIENT_IMAGES_DIR: &str      = "/client_images";                      
 pub const SERVER_KEYS_CONFIG: &str     = "/server_keys.toml";                         //SERVER PUBKEY CONFIG FILE
 pub const SERVER_KEYS_DIR: &str        = "/server_keys";                              //SERVER KEYS DIRECTORY
 
-//AT-REST KEYS SIT IN THE CONFIG ROOT RATHER THAN IN server_keys/: THAT DIRECTORY IS THE SERVER'S
-//IDENTITY, AND NONE OF THESE ARE DERIVED FROM IT (THAT IS THE POINT OF THEM) - THE CLIENT HAS NO
-//IDENTITY THERE AT ALL, AND NEVER CREATES THE DIRECTORY
 pub const SERVER_HISTORY_KEY: &str     = "/server_history_key";                       //MESSAGE HISTORY AT-REST KEY FILE
 pub const SERVER_IMAGE_KEY: &str       = "/server_image_key";                         //PERSISTENT IMAGE KEY FILE
 pub const CLIENT_CACHE_KEY: &str       = "/client_cache_key";                         //CACHED IMAGE AT-REST KEY FILE
@@ -85,10 +82,14 @@ pub const MAX_IMAGE_DIMENSION: u32     = 16_384;                                
 
 pub const DISK_TAG_SIZE: usize         = 32;                                          //HMAC-SHA256 TAG ON AN ENCRYPTED FILE
 
-//THE SERVER'S server_images/ IS OWNED BY THE HISTORY AND DIES WITH IT; A CLIENT CACHE IS OWNED BY NOTHING,
-//SO ITS ONLY BOUND IS THIS ONE - THE OLDEST FILES GO WHEN A WRITE TAKES IT OVER
 pub const MAX_IMAGE_CACHE: u64         = 512 * MEGABYTE as u64;                       //MOST DISK THE IMAGE CACHE MAY TAKE
 pub const MAX_IMAGE_ALLOC: u64         = 256 * MEGABYTE as u64;                       //MOST MEMORY ONE DECODE MAY TAKE (256MB)
+
+pub const MAX_ANIMATION_FRAMES: usize  = 512;                                         //FRAMES OF ONE ANIMATION THAT ARE KEPT
+pub const MAX_ANIMATION_ALLOC: u64     = 64 * MEGABYTE as u64;                        //MOST MEMORY ONE ANIMATION MAY TAKE (64MB)
+
+pub const MIN_FRAME_DELAY: Duration        = Duration::from_millis(20);               //FASTEST A FRAME MAY ASK TO BE HELD
+pub const DEFAULT_FRAME_DELAY: Duration    = Duration::from_millis(100);              //WHAT A FRAME ASKING FOR LESS GETS
 
 pub const IMAGE_REQUEST_DELAY: Duration    = Duration::from_millis(500);              //SPACING OF ONE CLIENT'S IMAGE FETCHES
 

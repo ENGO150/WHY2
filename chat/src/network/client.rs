@@ -57,9 +57,19 @@ use tokio_socks::tcp::Socks5Stream;
 
 use image::
 {
+    Frames,
     Limits,
+    ImageFormat,
     ImageReader,
+    ImageDecoder,
     DynamicImage,
+    AnimationDecoder,
+    codecs::
+    {
+        gif::GifDecoder,
+        png::PngDecoder,
+        webp::WebPDecoder,
+    },
 };
 
 use zeroize::Zeroizing;
@@ -136,6 +146,15 @@ pub struct VoiceUser
     pub is_local: bool,        //AM I THE USER?
 }
 
+pub struct ImageFrame
+{
+    pub image: DynamicImage,
+    pub delay: Duration, //HOW LONG IT IS HELD BEFORE THE NEXT ONE - MEANINGLESS ON A STILL, WHICH NEVER ADVANCES
+}
+
+//TYPES
+pub type Animation = Vec<ImageFrame>; //A DECODED PICTURE
+
 //ENUMS
 #[derive(PartialEq)]
 enum Handshake
@@ -187,8 +206,8 @@ pub enum ClientEvent
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml AS THE SERVER HOLDS IT (USERNAMES, ADDRESSES)
     Upload(String),                                              //UPLOADING FILE
     Image(String),                                               //UPLOADING IMAGE
-    ImageDisplay(String, String, Box<DynamicImage>, Option<u8>), //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
-    ImageData([u8; 32], Option<Box<DynamicImage>>),              //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
+    ImageDisplay(String, String, Animation, Option<u8>),         //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
+    ImageData([u8; 32], Option<Animation>),                      //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
     ImagePending(String, String, [u8; 32], Option<u8>),          //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
     ImageOffer(String, String, [u8; 32], Option<u8>),            //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
     ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
@@ -383,22 +402,110 @@ fn auto_show_images() -> bool
     config::read_config::<bool>("auto_show_images")
 }
 
-fn decode_image(data: &[u8]) -> Option<DynamicImage>
+fn decode_limits() -> Limits
 {
-    let mut reader = ImageReader::new(Cursor::new(data)).with_guessed_format().ok()?;
-
     let mut limits = Limits::default();
 
     limits.max_image_width = Some(consts::MAX_IMAGE_DIMENSION);
     limits.max_image_height = Some(consts::MAX_IMAGE_DIMENSION);
     limits.max_alloc = Some(consts::MAX_IMAGE_ALLOC);
 
-    reader.limits(limits);
-
-    reader.decode().ok()
+    limits
 }
 
-async fn digest_and_decode(data: Arc<Vec<u8>>) -> ([u8; 32], Option<DynamicImage>)
+fn decode_image(data: &[u8]) -> Option<Animation>
+{
+    let mut reader = ImageReader::new(Cursor::new(data)).with_guessed_format().ok()?;
+
+    reader.limits(decode_limits());
+
+    //ONLY AN ANIMATED FORMAT IS DECODED AS FRAMES - A STILL GOES THROUGH THE READER LIKE ANY OTHER
+    let animated = match reader.format()
+    {
+        Some(ImageFormat::Gif) => gif_frames(data),
+        Some(ImageFormat::WebP) => webp_frames(data),
+        Some(ImageFormat::Png) => apng_frames(data),
+
+        _ => None,
+    };
+
+    if let Some(frames) = animated && frames.len() > 1 { return Some(frames); }
+
+    Some(vec![ImageFrame { image: reader.decode().ok()?, delay: Duration::ZERO }])
+}
+
+fn gif_frames(data: &[u8]) -> Option<Animation>
+{
+    let mut decoder = GifDecoder::new(Cursor::new(data)).ok()?;
+
+    decoder.set_limits(decode_limits()).ok()?;
+
+    collect_frames(decoder.into_frames())
+}
+
+fn webp_frames(data: &[u8]) -> Option<Animation>
+{
+    let mut decoder = WebPDecoder::new(Cursor::new(data)).ok()?;
+
+    if !decoder.has_animation() { return None; }
+
+    decoder.set_limits(decode_limits()).ok()?;
+
+    collect_frames(decoder.into_frames())
+}
+
+fn apng_frames(data: &[u8]) -> Option<Animation>
+{
+    let mut decoder = PngDecoder::new(Cursor::new(data)).ok()?;
+
+    if !decoder.is_apng().ok()? { return None; }
+
+    decoder.set_limits(decode_limits()).ok()?;
+
+    collect_frames(decoder.apng().ok()?.into_frames())
+}
+
+//THE FRAMES OF ONE ANIMATION, UNDER BOTH BUDGETS
+fn collect_frames(frames: Frames<'_>) -> Option<Animation>
+{
+    let mut animation: Animation = Vec::new();
+    let mut alloc = 0u64;
+
+    for frame in frames.take(consts::MAX_ANIMATION_FRAMES)
+    {
+        let Ok(frame) = frame else { break };
+
+        let delay = match frame.delay().numer_denom_ms()
+        {
+            (_, 0) => consts::DEFAULT_FRAME_DELAY,
+            (numer, denom) => Duration::from_micros(numer as u64 * 1_000 / denom as u64),
+        };
+
+        let image = DynamicImage::from(frame.into_buffer());
+
+        alloc += image.width() as u64 * image.height() as u64 * 4;
+
+        if alloc > consts::MAX_ANIMATION_ALLOC && !animation.is_empty() { break; }
+
+        animation.push(ImageFrame
+        {
+            image,
+            delay: match delay < consts::MIN_FRAME_DELAY
+            {
+                true => consts::DEFAULT_FRAME_DELAY,
+                false => delay,
+            },
+        });
+    }
+
+    match animation.is_empty()
+    {
+        true => None,
+        false => Some(animation),
+    }
+}
+
+async fn digest_and_decode(data: Arc<Vec<u8>>) -> ([u8; 32], Option<Animation>)
 {
     task::spawn_blocking(move || (crypto::sha256(&data), decode_image(&data)))
         .await.expect("Decoding image panicked")
@@ -418,7 +525,7 @@ pub fn fetch_image(hash: [u8; 32], tx: Sender<ClientEvent>)
 
         tx.send(match cached
         {
-            Some(image) => ClientEvent::ImageData(hash, Some(Box::new(image))),
+            Some(image) => ClientEvent::ImageData(hash, Some(image)),
             None => ClientEvent::ImageRequest(hash),
         }).await.unwrap();
     });
@@ -540,7 +647,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                         if let Some(image) = image
                         {
-                            image_tx.send(ClientEvent::ImageData(hash, Some(Box::new(image)))).await.unwrap();
+                            image_tx.send(ClientEvent::ImageData(hash, Some(image))).await.unwrap();
                         }
                     }
                 });
@@ -856,7 +963,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                         None => None,
                     };
 
-                    image_tx.send(ClientEvent::ImageData(hash, image.map(Box::new))).await.unwrap();
+                    image_tx.send(ClientEvent::ImageData(hash, image)).await.unwrap();
                 });
 
                 continue;
@@ -930,7 +1037,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                     image_tx.send(match image
                     {
-                        Some(image) => ClientEvent::ImageDisplay(username, filename, Box::new(image), username_color),
+                        Some(image) => ClientEvent::ImageDisplay(username, filename, image, username_color),
                         None => ClientEvent::ImageFailed(username, filename, username_color),
                     }).await.unwrap();
                 });

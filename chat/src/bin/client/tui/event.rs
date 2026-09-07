@@ -80,7 +80,7 @@ impl App
 
             //A PICTURE IS AN ENTRY OF ITS OWN - THE PANE RESERVES ROWS FOR IT AND draw PAINTS THEM
             ClientEvent::ImageDisplay(username, filename, image, color) =>
-                self.push_image(username, filename, *image, color),
+                self.push_image(username, filename, image, color),
 
             //IT PASSED THE SERVER'S HEADER CHECK AND STILL WOULD NOT DECODE, SO SAY SO WHERE IT WOULD HAVE BEEN
             //AN OFFER WE DID NOT HOLD. THE CAPTION GOES UP NOW, THE LOOP ASKS FOR THE PICTURE, AND IT
@@ -306,7 +306,7 @@ impl App
             },
 
             //THE ANSWER TO A CLICKED CAPTION - OR THE LACK OF ONE, WHICH THE CAPTION THEN SAYS
-            ClientEvent::ImageData(hash, image) => self.deliver_image(hash, image.map(|image| *image)),
+            ClientEvent::ImageData(hash, image) => self.deliver_image(hash, image),
 
             //server.toml CAME BACK - EITHER THE COPY WE ASKED FOR, OR THE ONE THE SERVER JUST STORED
             ClientEvent::ServerSettings(settings, saved) =>

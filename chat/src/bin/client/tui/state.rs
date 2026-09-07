@@ -56,7 +56,7 @@ use crate::
     network::
     {
         codes::{ MessageColors, OnlineUser },
-        client::{ self, VoiceUser },
+        client::{ self, Animation, ImageFrame, VoiceUser },
     },
 };
 
@@ -78,6 +78,7 @@ use super::
 
 //CONSTS
 pub const HISTORY_LIMIT: usize = 5000; //CAP THE MESSAGE PANE SO RE-WRAPPING EACH FRAME STAYS CHEAP
+pub const ANIMATION_CATCHUP: Duration = Duration::from_secs(1); //BEHIND BY MORE THAN THIS AND AN ANIMATION RESTARTS FROM NOW
 pub const IMAGE_ROWS: u16 = 20;        //TALLEST AN IMAGE MAY BE DRAWN - THE PANE IS A CHAT, NOT A VIEWER
 pub const NOTICE_DURATION: Duration = Duration::from_secs(2); //HOW LONG THE PANE'S TOAST STAYS UP
 
@@ -137,7 +138,9 @@ pub enum Picture
 //STRUCTS
 pub struct Fitted //A PICTURE AT THE SIZE THE PANE DRAWS IT AT
 {
-    pub source: DynamicImage,               //THE PICTURE ITSELF, KEPT TO FIT AGAIN AT A NEW PANE WIDTH
+    pub frames: Animation,                  //THE PICTURE ITSELF, KEPT TO FIT AGAIN AT A NEW PANE WIDTH
+    pub current: usize,                     //WHICH FRAME `protocol` HOLDS - A STILL HAS ONLY THE ONE
+    pub next: Instant,                      //WHEN THE FRAME AFTER IT IS DUE
     pub rows: u16,                          //ROWS IT RESERVES AT THAT WIDTH
     pub fitted: u16,                        //THE WIDTH `protocol` WAS FITTED TO
     pub protocol: Option<StatefulProtocol>, //None UNTIL THE FIRST WRAP KNOWS HOW WIDE THE PANE IS
@@ -360,7 +363,7 @@ impl App
     }
 
     //A PICTURE THAT ARRIVED WITH ITS OWN BYTES - A LIVE ONE, OR A REPLAYED ONE THAT WAS ASKED FOR
-    pub fn push_image(&mut self, username: String, filename: String, image: DynamicImage,
+    pub fn push_image(&mut self, username: String, filename: String, image: Animation,
         username_color: Option<u8>)
     {
         let picture = self.fit(image);
@@ -403,7 +406,7 @@ impl App
     //STILL WITHOUT IT - THE SECOND ONE ASKED FOR ITSELF AND IS ANSWERED BY ITS OWN PACKET.
     //Absent COUNTS AS WELL AS Waiting: A PICTURE FOUND IN THE CACHE ANSWERS A CAPTION NOBODY CLICKED,
     //WHICH IS THE WHOLE POINT OF HAVING KEPT IT. A REFUSAL ONLY MARKS A LINE THAT DID ASK
-    pub fn deliver_image(&mut self, hash: [u8; 32], image: Option<DynamicImage>)
+    pub fn deliver_image(&mut self, hash: [u8; 32], image: Option<Animation>)
     {
         let (picture, asked) = match image
         {
@@ -432,18 +435,76 @@ impl App
 
     //IT IS NEVER DRAWN TALLER THAN IMAGE_ROWS, SO NOTHING ABOVE THAT IS WORTH KEEPING - AND THE PROTOCOL
     //HOLDS ON TO WHAT IT IS GIVEN, WHICH FOR A PHONE PHOTO IS TENS OF MEGABYTES DECODED
-    fn fit(&self, image: DynamicImage) -> Picture
+    fn fit(&self, image: Animation) -> Picture
     {
         let font = self.picker.font_size();
         let limit = IMAGE_ROWS as u32 * font.height as u32;
 
-        let source = match image.height() > limit
+        //EVERY FRAME IS HELD AT ONCE, SO EVERY ONE OF THEM IS CUT DOWN
+        let frames = image.into_iter().map(|ImageFrame { image, delay }|
         {
-            true => image.resize(image.width(), limit, FilterType::Triangle),
-            false => image,
-        };
+            let image = match image.height() > limit
+            {
+                true => image.resize(image.width(), limit, FilterType::Triangle),
+                false => image,
+            };
 
-        Picture::Ready(Box::new(Fitted { source, rows: 1, fitted: 0, protocol: None }))
+            ImageFrame { image, delay }
+        }).collect::<Animation>();
+
+        let next = Instant::now() + frames.first().map(|frame| frame.delay).unwrap_or_default();
+
+        Picture::Ready(Box::new(Fitted { frames, current: 0, next, rows: 1, fitted: 0, protocol: None }))
+    }
+
+    //STEP EVERY ANIMATION THAT IS DUE A FRAME - THE REDRAW TICK IS THE FLOOR ON HOW FAST ONE IS PLAYED
+    pub fn advance_animations(&mut self)
+    {
+        let pane = self.pane;
+
+        if pane.width == 0 || pane.height == 0 { return; }
+
+        let now = Instant::now();
+        let offset = self.pane_offset;
+        let font = self.picker.font_size();
+
+        //ONLY THE PICTURES ON SCREEN - A FRAME COSTS A FIT AND A TRANSMIT
+        let visible = self.placements(pane.width).into_iter()
+            .filter(|placement| placement.height > 0
+                && placement.row < offset + pane.height
+                && placement.row + placement.height > offset)
+            .map(|placement| placement.entry)
+            .collect::<Vec<usize>>();
+
+        for entry in visible
+        {
+            let Some(Entry::Image { picture: Picture::Ready(ready), .. }) = self.messages.get_mut(entry)
+                else { continue };
+
+            //A STILL NEVER ADVANCES, AND AN UNFITTED PICTURE HAS NO PROTOCOL TO REPLACE
+            if ready.frames.len() < 2 || ready.protocol.is_none() || now < ready.next { continue; }
+
+            //TOO FAR BEHIND TO WIND THROUGH EVERY MISSED FRAME
+            if now.duration_since(ready.next) > ANIMATION_CATCHUP { ready.next = now; }
+
+            while now >= ready.next
+            {
+                ready.current = (ready.current + 1) % ready.frames.len();
+                ready.next += ready.frames[ready.current].delay;
+            }
+
+            let image = fit_image(&ready.frames[ready.current].image, ready.fitted, font);
+
+            //REUSING THE PROTOCOL TYPE KEEPS THE TERMINAL'S IMAGE ID, SO THE FRAME REPLACES THE LAST ONE
+            ready.protocol = ready.protocol.take().map(|protocol|
+            {
+                let background = protocol.background_color();
+
+                StatefulProtocol::new(image, font, background, protocol.protocol_type_owned())
+            });
+
+            self.dirty = true;
+        }
     }
 
     //THE QUERY WANTS STDIO TO ITSELF: AFTER THE ALTERNATE SCREEN IS UP, BEFORE ANYTHING READS EVENTS.
@@ -827,7 +888,7 @@ impl App
                     {
                         if ready.fitted != width || ready.protocol.is_none()
                         {
-                            let image = fit_image(&ready.source, width, font);
+                            let image = fit_image(&ready.frames[ready.current].image, width, font);
 
                             ready.rows = (image.height().div_ceil(font.height as u32) as u16).clamp(1, IMAGE_ROWS);
                             ready.protocol = Some(self.picker.new_resize_protocol(image));

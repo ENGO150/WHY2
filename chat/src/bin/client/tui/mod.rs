@@ -280,6 +280,9 @@ pub async fn run
 
             _ = tick.tick() =>
             {
+                //THE TICK IS THE ANIMATIONS' CLOCK
+                app.advance_animations();
+
                 //SILENT ROSTER REFRESH (/list IS REQUEST/RESPONSE, THE SIDEBAR NEEDS FEEDING)
                 if app.refresh_online && let Some(write_stream) = write_stream.as_ref()
                 {
