@@ -900,10 +900,50 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     exiting on the first `EADDRINUSE`, because the non-`exec` path starts the replacement beside a
     process that may still be holding the port.
   - Chat messages live in `App::messages` as `state::Entry::Message` (username/id/text/colors), not as
-    rendered `Line`s — `Theme::render` turns an entry into a line on every wrap, so a `show_id` or
-    `disable_colors` change repaints the messages already in the pane. Anything that rewrites
+    rendered `Line`s — `Theme::render` turns an entry into the rows it occupies on every wrap, so a
+    `show_id` or `disable_colors` change repaints the messages already in the pane. Anything that rewrites
     config-driven styling must call `App::reload_theme` (which bumps the wrap-cache generation), never
     `Theme::reload` on its own.
+  - **What somebody typed goes through `tui/markup.rs`, and that is why `Theme::render` returns rows
+    rather than one logical line.** Everything a user wrote is parsed there — Discord's fenced ```` ``` ````
+    blocks and inline `` ` `` code, plus `$…$`/`$$…$$` math — and the parser **never consumes what it cannot
+    close**: an unterminated fence is backticks somebody typed, not a block that swallows the rest of the
+    message. A backslash takes the markup off the character after it, and a delimiter that was not found
+    once is not searched for again (a message of nothing but backticks would otherwise cost a scan per
+    backtick).
+    A fenced block is **rows, not text**: they are padded to the pane so the block reads as a box, which
+    is exactly why they cannot be handed to `state::wrap_line` afterwards — code is broken where it runs
+    out of cells, not at the last space before it, and the padding must not be re-wrapped. That padding is
+    also why `draw::draw_logo` treats a painted background as a claimed cell: blank cells that are part of
+    a box are not free ones, and the watermark used to come through them.
+    The markup reaches a private message too (`Entry::Prefixed`, a client-written prefix in front of a
+    user-written tail) but deliberately not `Entry::Line`, which is the client's *own* output — `/help`
+    and `/list` are not somebody's text and have nothing to parse.
+  - **`tui/math.rs` lays TeX out in cells, and it is a subset on purpose.** A terminal has one font size
+    and a fixed grid, so what is rendered is the part of the notation the grid can carry: a `Block` is a
+    rectangle of cells plus the row the next one lines up with, and every step (a fraction over its rule,
+    a root under its bar, an operator with its limits, a `\left(` stretched to what it holds) is a
+    combination of those. Nothing is ever placed by counting rows from the top, which is what keeps a
+    fraction inside an exponent inside a root aligned with its neighbours.
+    - **Display math (`$$…$$`) owns its rows and is laid out in two dimensions; inline math has to fit on
+      the row it was typed on**, so it is set linearly instead — a script becomes a Unicode superscript
+      where one exists (`x²`, `aᵢⱼ`) and `^(…)` where it does not, and a fraction becomes `a/b` rather
+      than silently taking two rows off the message. A display that would be wider than the pane falls
+      back to the same linear form and is wrapped: a truncated formula is worse than a plain one.
+    - **Unknown commands cost their backslash and nothing else** — `\foobar` sets as `foobar` — so an
+      environment this does not implement (`\begin{matrix}`, and anything else with a 2D structure of its
+      own) comes out as the words it was written with rather than as a hole. The scripts of `\int` stay at
+      its side while `\sum`'s go over and under it (`BIG`), because that is where each one belongs.
+    - **The parser's depth is bounded (`MAX_DEPTH`) because nothing else bounds it**: the string is off the
+      network, and a message of ten thousand open braces would otherwise recurse until the stack ended.
+    - Math that the message gave no colour of its own is `theme::MATH`; math inside a coloured message
+      keeps the sender's colour, the way the rest of their text does.
+    - **`render_math` (client.toml, default on, a `/settings` row) turns the whole of it off**, and with it
+      off a dollar sign is a dollar sign: `parse` never opens a math segment, so the formula is shown as
+      it was typed rather than as an approximation of itself. It is deliberately separate from the code
+      markup, which has no switch — a fenced block is what the sender meant either way, while a formula a
+      terminal cannot set faithfully is a matter of taste. `Theme` caches the key like the rest of them,
+      so toggling the row repaints the messages already in the pane through `App::reload_theme`.
   - Transient prompts belong in the chrome, not the history. The username/password steps live in the
     connect box and vanish once answered; nothing pushes them into `App::messages`. Block commands (`/help`, `/list`, `/files`, …) end without a trailing
     blank line — the styled headings already separate them.
