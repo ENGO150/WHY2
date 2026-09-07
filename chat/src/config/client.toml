@@ -46,7 +46,7 @@ message_color = "none" # Color of message (change via command)
 mouse_capture = true # Capture the mouse for wheel scrolling and drag-select (replaces the terminal's own)
 disable_logo = false # Hide the logo drawn behind the chat
 auto_show_images = false # Show pictures as they are posted
-render_math = true # Render $math$ and $$math$$ in messages (a TeX subset, drawn with the characters a terminal has)
+render_math = true # Render $math$ and $$math$$ in messages
 
 # Other
 show_id = false # Show client IDs in chat
