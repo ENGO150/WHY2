@@ -16,7 +16,7 @@
 
 [package]
 name = "why2-chat"
-version = "2.1.1"
+version = "2.1.2"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true

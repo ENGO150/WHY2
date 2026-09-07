@@ -1,6 +1,13 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.1.2:
+- 495a0a67: animate GIFs in the chat pane
+- c415434f: upgrade chat dependencies
+- 45c40470: fix TeX rendering config entry
+- db10946d: render code blocks and math in chat messages
+- 9f26ffe4: send username_color with images
+
 v2.1.1:
 - 0cf08812: make the server's log level configurable
 - 82d4972e: say when the message history is discarded
