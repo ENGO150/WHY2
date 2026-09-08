@@ -1,6 +1,14 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.1.3:
+- 938b0682: fix history cycling on multi-line input
+- 05a9a919: show the last keyframe when a viewer attaches
+- ca92ab16: fix voice capture not starting mid-sentence
+- e14d2ec4: implement token bucket rate limiting for voice connections
+- a7a99a80: implement token bucket rate limiting on server
+- 98b3f8a7: apply SpamWarning only to regular Message packets
+
 v2.1.2:
 - 495a0a67: animate GIFs in the chat pane
 - c415434f: upgrade chat dependencies
