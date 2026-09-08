@@ -30,7 +30,8 @@ pub const AGC_MAX_GAIN: f32         = 40.0;                                     
 pub const AGC_MIN_GAIN: f32         = 0.05;                                     //MIN GAIN (-26dB, TAMES HOT MICS)
 pub const LIMITER_KNEE: f32         = 0.7;                                      //SOFT CLIPPING STARTS AT THIS AMPLITUDE
 
-pub const NOISE_FLOOR_ALPHA: f32    = 0.05;                                     //EMA SMOOTHING FACTOR
+pub const NOISE_FLOOR_ALPHA: f32    = 0.05;                                     //EMA SMOOTHING FACTOR WHILE THE FLOOR FALLS
+pub const NOISE_FLOOR_RISE: f32     = 0.005;                                    //EMA SMOOTHING FACTOR WHILE IT RISES (SLOW, SO SPEECH CANNOT TEACH IT)
 pub const NOISE_OPEN_MULT: f32      = 3.5;                                      //OPEN TRESHOLD
 pub const NOISE_CLOSE_MULT: f32     = 2.0;                                      //CLOSE TRESHOLD (HYSTERESIS)
 pub const MIN_TRESHOLD_OPEN: f32    = 0.0008;                                   //HARD MINIMUM FOR OPEN

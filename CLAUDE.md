@@ -508,6 +508,22 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     did not match the window.
   - `YuvRenderer` knows nothing about windows, so the conversion is rendered offscreen and checked
     without a display — that is how the colour tests run headless in CI.
+- **The capture gate's noise floor tracks down fast and up slowly, and a frame it would open on never
+  feeds it at all** (`voice/client/mod.rs`'s VAD). The floor is an EMA over the frames the gate is
+  *closed* for, which is the right window — while somebody is speaking the gate is open and the floor
+  is frozen — but it says nothing about the frames *before* the gate has ever opened. `build_input_stream`
+  is called when a client joins voice, so the floor starts at `INITIAL_NOISE_FLOOR`, a guess; somebody
+  who joins mid-sentence is speaking into a closed gate, and a symmetric EMA learned that voice as the
+  noise floor. `NOISE_OPEN_MULT` then put the open threshold above the speech that had just taught it,
+  and it stayed there for as long as they kept talking — the gate opened only once they stopped (the
+  floor decaying back to the room) and started again, which is exactly what it looked like from the
+  other end. So a rise is `NOISE_FLOOR_RISE` (an order of magnitude slower than the fall) and only from
+  a frame under the current open threshold: the pauses between syllables are enough to pull the floor
+  down to the room within a few hundred ms while the speech itself can no longer push it up. Genuine
+  noise — a fan starting — is still tracked, a few seconds later rather than half a second later, which
+  is the trade. It costs nothing on the settled case: once the gate has opened, the floor was already
+  frozen for the whole of it.
+
 - **`network/voice/client/aec.rs`** — keeps WHY2's own playback out of the shared screen audio. The
   share captures the output sink's monitor (or the WASAPI loopback), which is the *finished* mix, so
   the voice channel is in it and a viewer who is also in that channel hears themselves come back a

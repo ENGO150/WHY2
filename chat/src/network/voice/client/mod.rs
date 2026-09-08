@@ -548,10 +548,19 @@ fn build_input_stream(device: &Device, config: StreamConfig, current_generation:
             let mut envelope = agc_envelope_cb.lock().unwrap();
             let mut gain = agc_gain_cb.lock().unwrap();
 
-            //PREVENT NOISE FLOOR CONTAMINATION BY VOICE
+            //PREVENT NOISE FLOOR CONTAMINATION BY VOICE: A FRAME THE GATE WOULD OPEN ON NEVER FEEDS THE
+            //FLOOR, AND WHAT IS LEFT IS TRACKED DOWN FAST AND UP SLOWLY
             if !*gate
             {
-                *nf += (rms - *nf) * consts::NOISE_FLOOR_ALPHA;
+                let open = (*nf * consts::NOISE_OPEN_MULT).max(consts::MIN_TRESHOLD_OPEN);
+
+                if rms < *nf
+                {
+                    *nf += (rms - *nf) * consts::NOISE_FLOOR_ALPHA;
+                } else if rms < open
+                {
+                    *nf += (rms - *nf) * consts::NOISE_FLOOR_RISE;
+                }
             }
 
             //DYNAMIC TRESHOLDS
