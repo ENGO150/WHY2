@@ -114,8 +114,39 @@ impl InputBuffer
         self.cursor = i;
     }
 
+    //VERTICAL MOTION
+    //A MULTI-LINE BUFFER OWNS UP/DOWN: THEY STEP BETWEEN ITS LINES INSTEAD OF PAGING HISTORY
+    pub fn up(&mut self)
+    {
+        if !self.is_multiline() { return self.history_up(); }
+
+        let start = self.line_start();
+
+        if start == 0 { self.cursor = 0; return; }
+
+        let column = self.cursor - start;
+        let previous = self.chars[..start - 1].iter().rposition(|c| *c == '\n').map(|i| i + 1).unwrap_or(0);
+
+        self.cursor = (previous + column).min(start - 1);
+    }
+
+    pub fn down(&mut self)
+    {
+        if !self.is_multiline() { return self.history_down(); }
+
+        let end = self.line_end();
+
+        if end == self.chars.len() { self.cursor = end; return; }
+
+        let column = self.cursor - self.line_start();
+        let next = end + 1;
+        let next_end = self.chars[next..].iter().position(|c| *c == '\n').map(|i| next + i).unwrap_or(self.chars.len());
+
+        self.cursor = (next + column).min(next_end);
+    }
+
     //HISTORY
-    pub fn history_up(&mut self)
+    fn history_up(&mut self)
     {
         if self.history.is_empty() || self.history_pos == 0 { return; }
 
@@ -135,7 +166,7 @@ impl InputBuffer
         self.set(&self.history[found].clone());
     }
 
-    pub fn history_down(&mut self)
+    fn history_down(&mut self)
     {
         if self.history_pos >= self.history.len() { return; }
 
@@ -245,6 +276,8 @@ impl InputBuffer
     }
 
     //PRIVATE
+    fn is_multiline(&self) -> bool { self.chars.contains(&'\n') }
+
     fn matches(&self, entry: &str) -> bool //IS THIS ENTRY A CANDIDATE FOR THE RUNNING SEARCH?
     {
         self.prefix.as_ref().is_none_or(|p| entry.starts_with(p.as_str()))

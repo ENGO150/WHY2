@@ -637,8 +637,8 @@ async fn handle_key
         KeyCode::Home => app.input.home(),
         KeyCode::End => app.input.end(),
 
-        KeyCode::Up => if app.palette.is_active() { app.palette.previous() } else { app.input.history_up() },
-        KeyCode::Down => if app.palette.is_active() { app.palette.next() } else { app.input.history_down() },
+        KeyCode::Up => if app.palette.is_active() { app.palette.previous() } else { app.input.up() },
+        KeyCode::Down => if app.palette.is_active() { app.palette.next() } else { app.input.down() },
 
         KeyCode::PageUp => app.scroll_up(viewport.saturating_sub(1).max(1), viewport),
         KeyCode::PageDown => app.scroll_down(viewport.saturating_sub(1).max(1), viewport),
