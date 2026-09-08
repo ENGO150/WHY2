@@ -442,14 +442,10 @@ pub async fn receive
                     let mut grace = true;
 
                     //SPAM
-                    if !matches!(packet.code, PacketCode::KeepAlive | PacketCode::ImageData { .. }) &&
-                        !matches!(packet.code, PacketCode::KeyExchangeOffer { .. } | PacketCode::KeyExchangeReply { .. })
+                    if let PacketCode::Message { ref text, .. } = packet.code
                     {
-                        //MESSAGE SIZE (ONLY FOR AUTHENTICATED)
-                        if let PacketCode::Message { ref text, .. } = packet.code
-                        {
-                            disconnect = text.len() > config::read_config("max_message_length");
-                        }
+                        //MESSAGE SIZE
+                        disconnect = text.len() > config::read_config("max_message_length");
 
                         if !disconnect && config::read_config("spam_protection") && conn.is_authenticated() &&
                             Instant::now().duration_since(*conn.last_activity()) <
