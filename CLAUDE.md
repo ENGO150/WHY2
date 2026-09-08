@@ -462,10 +462,33 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
       the freeze is the same picture without the bandwidth.
       Audio is shed by itself and needs none of this: a 20 ms frame is self-contained, so the queue
       being full costs exactly that frame.
+    - **An attach opens on the share's last keyframe rather than on black.** A viewer used to be
+      built by the share loop, on the next frame to arrive, and then had to wait for the IDR after
+      that before anything was decodable — so attaching cost up to `FORCED_INTRA_INTERVAL` of black
+      on a busy desktop, and twice that on a still one, which reads as a share that is broken rather
+      than one that is starting. `SHARES` (a `DashMap` keyed by sharer id, put up by the share loop
+      and taken down by `ScreenTransferGuard`) carries two things the accept loop can reach: the last
+      access unit `is_keyframe` accepted, and the viewers built since the loop last looked.
+      `screen::server::attach` — called from `bin/server.rs`'s `ConnectionType::Attach` arm, where
+      the socket actually arrives — builds the `Viewer` there, pushes that cached keyframe into its
+      queue, and leaves it in `pending` for the share loop to adopt on its next frame. **Building it
+      at the attach is half the fix**: a still desktop sends one frame every `FORCED_INTRA_INTERVAL`,
+      so a viewer that only exists once one arrives cannot be shown anything before then, cache or no
+      cache. Nothing new crosses the wire and the sharer is not asked for anything — the server has no
+      encoder and no way to request a keyframe, which is the same constraint `needs_key` lives under.
+      The cached picture is up to `FORCED_INTRA_INTERVAL` stale and the frames since it went to
+      somebody else, so a new viewer starts `needs_key` **like a shed one** and snaps to live on the
+      next IDR — that is also why a fresh `Viewer` is `needs_key: true` rather than `false`, which
+      used to put P-frames on the wire for a viewer with no reference picture to decode them against.
+      The keyframe is cached *after* the forward, so a viewer adopted this iteration is not handed the
+      frame it is about to be sent. A muted sharer's placeholder is all IDRs, so the cache fills with
+      those too and an attach to a muted share opens on the placeholder.
     - Dropping a `Viewer` **aborts** its task rather than closing the channel: the task it is
       standing down is by definition one that may be parked in `write_all` on a socket that will
       never drain, and it would not reach the next `recv` to notice. That socket is being discarded
-      either way — the viewer detached, or re-attached under a new token, which is a new stream.
+      either way — the viewer detached, or re-attached under a new token, which is a new stream. The
+      loop's `retain` therefore matches on the *token* as well as the id: a re-attachment is a
+      different `Viewer` for the same client, and the new one arrives through `pending`.
     - **Known gap: the sharer is no longer told when a viewer cannot keep up.** Forwarding inline at
       least backpressured them; now nothing does, so a share sized for a link nobody has is simply
       shed at the server, per viewer, forever. This is the same missing feedback signal the bitrate
