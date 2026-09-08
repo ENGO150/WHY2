@@ -314,17 +314,29 @@ async fn main()
 
                                     let attached = if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
                                     {
-                                        conn.attach_screen(sharer_id, Arc::new(Mutex::new(write_stream)), token);
-                                        true
-                                    } else { false };
+                                        let stream = Arc::new(Mutex::new(write_stream));
+                                        let keys = conn.keys().cloned();
 
-                                    //THE GUARD IS GONE BY HERE - log_addr WALKS THE SAME MAP
+                                        conn.attach_screen(sharer_id, stream.clone(), token);
+
+                                        keys.map(|keys| (stream, keys))
+                                    } else { None };
+
+                                    //THE GUARD IS GONE BY HERE - log_addr AND THE SHARE MAP ARE WALKED WITHOUT IT
                                     match attached
                                     {
-                                        true => log::info!("Auxiliary connection (screen viewer): {owner} watching {}",
-                                            server::log_addr(&sharer_id)),
+                                        //THE VIEWER'S TASK IS BUILT HERE, NOT ON THE SHARE'S NEXT FRAME: A STILL
+                                        //DESKTOP SENDS ONE EVERY `FORCED_INTRA_INTERVAL`, AND WAITING FOR IT IS
+                                        //THE BLACK RECTANGLE AN ATTACH USED TO OPEN ON
+                                        Some((stream, keys)) => match screen_server::attach(sharer_id, id, &keys, stream, token)
+                                        {
+                                            true => log::info!("Auxiliary connection (screen viewer): {owner} watching {}",
+                                                server::log_addr(&sharer_id)),
 
-                                        false => log::warn!("Screen viewer dropped (connection gone): {owner}"),
+                                            false => log::warn!("Screen viewer dropped (share gone): {owner}"),
+                                        },
+
+                                        None => log::warn!("Screen viewer dropped (connection gone): {owner}"),
                                     }
 
                                     return;

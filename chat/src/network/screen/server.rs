@@ -20,8 +20,15 @@ use std::
 {
     time::Instant,
     collections::HashMap,
-    sync::{ Arc, LazyLock },
+    sync::
+    {
+        Arc,
+        LazyLock,
+        Mutex as MutexSync,
+    },
 };
+
+use dashmap::DashMap;
 
 use tokio::
 {
@@ -64,10 +71,19 @@ use crate::
 //      -x264-params keyint=1:min-keyint=1:scenecut=0:repeat-headers=1 -f h264 assets/muted.h264
 static MUTED_ANIMATION: LazyLock<Vec<Vec<u8>>> = LazyLock::new(|| split_access_units(include_bytes!("./assets/muted.h264")));
 
+//EVERY RUNNING SHARE, REACHABLE FROM WHERE A VIEWER ATTACHES RATHER THAN ONLY FROM THE SHARE'S OWN TASK
+static SHARES: LazyLock<DashMap<usize, Arc<Share>>> = LazyLock::new(|| DashMap::new());
+
 //STRUCTS
 struct ScreenTransferGuard
 {
     id: usize,
+}
+
+struct Share //WHAT A SHARE LEAVES WHERE AN ATTACHING VIEWER CAN REACH IT
+{
+    keyframe: MutexSync<Option<Vec<u8>>>,     //THE LAST PICTURE THAT STANDS ON ITS OWN
+    pending: MutexSync<Vec<(usize, Viewer)>>, //VIEWERS BUILT AT THE ATTACH, WAITING TO BE PICKED UP
 }
 
 struct Viewer //ONE ATTACHED CLIENT, AND THE TASK THAT WRITES TO IT
@@ -83,6 +99,9 @@ impl Drop for ScreenTransferGuard
 {
     fn drop(&mut self)
     {
+        //NOTHING MAY ATTACH TO A SHARE THAT IS OVER
+        SHARES.remove(&self.id);
+
         if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&self.id))
         {
             //REMOVE SCREEN STREAM
@@ -173,7 +192,9 @@ fn spawn_viewer //ONE TASK PER VIEWER, SO A SLOW ONE BLOCKS ONLY ITSELF
         }
     }).abort_handle();
 
-    Some(Viewer { token, tx, task, needs_key: false })
+    //A VIEWER THAT HAS JUST ATTACHED HAS NO PICTURE TO PREDICT FROM EITHER, SO IT STARTS IN THE
+    //SAME STATE AS A SHED ONE: NOTHING BUT AN IDR IS WORTH THE BANDWIDTH UNTIL IT HAS ONE
+    Some(Viewer { token, tx, task, needs_key: true })
 }
 
 fn muted_frame(started: &Instant) -> Option<usize> //INDEX OF THE PLACEHOLDER FRAME DUE RIGHT NOW
@@ -218,6 +239,42 @@ async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
 }
 
 //PUBLIC
+pub fn attach //BUILD A VIEWER WHERE IT ATTACHES, AND GIVE IT SOMETHING TO SHOW STRAIGHT AWAY
+(
+    sharer_id: usize,
+    client_id: usize,
+    keys: &SharedKeys,
+    stream: Arc<Mutex<OwnedWriteHalf>>,
+    token: [u8; 32],
+) -> bool
+{
+    //THE SHARE IS OVER (OR NEVER STARTED)
+    let Some(share) = SHARES.get(&sharer_id).map(|share| share.clone()) else { return false; };
+
+    let Some(viewer) = spawn_viewer(stream, keys, token) else { return false; };
+
+    //THE WINDOW OPENS ON THE SHARE'S LAST KEYFRAME RATHER THAN ON BLACK. IT IS AT MOST
+    //`FORCED_INTRA_INTERVAL` OLD AND THE FRAMES SINCE IT WENT TO SOMEBODY ELSE, SO THE VIEWER STAYS
+    //`needs_key` AND SNAPS TO LIVE ON THE NEXT IDR - A STILL PICTURE THAT IS A LITTLE BEHIND READS AS
+    //A SHARE THAT IS STARTING, WHERE AN EMPTY ONE READS AS A SHARE THAT IS BROKEN
+    if let Some(frame) = share.keyframe.lock().ok().and_then(|frame| frame.clone())
+    {
+        let _ = viewer.tx.try_send(ScreenPacketCode::Video { data: frame });
+    }
+
+    //PICKED UP BY THE SHARE LOOP ON ITS NEXT FRAME
+    match share.pending.lock()
+    {
+        Ok(mut pending) =>
+        {
+            pending.push((client_id, viewer));
+
+            true
+        },
+        Err(_) => false,
+    }
+}
+
 pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task: AbortHandle)
 {
     //GET CLIENT KEYS
@@ -267,6 +324,15 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
     let started = Instant::now();
     let mut sent_muted_frame = None;
 
+    //REACHABLE FROM THE ACCEPT LOOP FROM HERE ON - A VIEWER IS BUILT WHERE IT ATTACHES
+    let share = Arc::new(Share
+    {
+        keyframe: MutexSync::new(None),
+        pending: MutexSync::new(Vec::new()),
+    });
+
+    SHARES.insert(id, share.clone());
+
     //LOOP READING
     loop
     {
@@ -310,22 +376,29 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             },
         };
 
-        //COLLECT ALL ATTACHED CLIENT STREAMS (THE KEYS COME ALONG ONLY WHEN A TASK STILL HAS TO BE BUILT)
-        let entries: Vec<(usize, Arc<Mutex<OwnedWriteHalf>>, [u8; 32], Option<SharedKeys>)> = server::CONNECTIONS.iter().filter_map(|entry|
+        //TAKE ON WHOEVER ATTACHED SINCE THE LAST FRAME. THEIR TASK WAS BUILT AT THE ATTACH AND HAS
+        //ALREADY BEEN HANDED THE PICTURE THE SHARE STOOD ON THEN - INSERTING OVER AN OLD ENTRY DROPS
+        //IT, WHICH IS WHAT RETIRES A RE-ATTACHMENT'S PREVIOUS TASK
+        let arrivals = share.pending.lock().map(|mut pending| pending.drain(..).collect::<Vec<_>>()).unwrap_or_default();
+
+        for (client_id, viewer) in arrivals
+        {
+            viewers.insert(client_id, viewer);
+
+            log::info!("Screen viewer serving ({} attached): share of {owner}", viewers.len());
+        }
+
+        //COLLECT WHO IS STILL ATTACHED TO US, BY THE ATTACHMENT THEIR TASK WAS BUILT FOR
+        let entries: Vec<(usize, [u8; 32])> = server::CONNECTIONS.iter().filter_map(|entry|
         {
             match entry.value()
             {
-                Connection::Authenticated { id: client_id, attached_screen, keys, .. } =>
+                Connection::Authenticated { id: client_id, attached_screen, .. } =>
                 {
                     //FILTER ATTACHED CLIENTS
                     if let Some(attached_screen) = attached_screen && attached_screen.target_id == id
                     {
-                        //A VIEWER WE ARE ALREADY SERVING KEEPS ITS TASK, AND WITH IT ITS REX STREAM
-                        let known = viewers.get(client_id).is_some_and(|v| v.token == attached_screen.token);
-
-                        //FOUND, COLLECT
-                        Some((*client_id, attached_screen.stream.clone(), attached_screen.token,
-                            if known { None } else { Some(keys.clone()) }))
+                        Some((*client_id, attached_screen.token))
                     } else { None }
                 },
                 _ => None,
@@ -333,31 +406,15 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         }).collect();
 
         //RETIRE WHOEVER LEFT - DROPPING A `Viewer` ABORTS ITS TASK AND CLOSES ITS SOCKET
-        viewers.retain(|client_id, _| entries.iter().any(|(e, ..)| e == client_id));
+        viewers.retain(|client_id, viewer| entries.iter().any(|(e, token)| e == client_id && *token == viewer.token));
 
         //FORWARD PACKET
         let keyframe = matches!(&read, ScreenPacketCode::Video { data } if is_keyframe(data));
 
-        for (client_id, stream, token, keys) in entries
+        for (client_id, viewer) in viewers.iter_mut()
         {
-            //A NEW ATTACHMENT (OR A RE-ATTACHMENT UNDER A NEW TOKEN) NEEDS A TASK OF ITS OWN
-            if let Some(keys) = keys
-            {
-                let Some(viewer) = spawn_viewer(stream, &keys, token) else
-                {
-                    log::warn!("Screen viewer refused (stream setup failed): share of {owner}");
-                    continue;
-                };
-
-                log::info!("Screen viewer serving ({} attached): share of {owner}", viewers.len() + 1);
-
-                viewers.insert(client_id, viewer);
-            }
-
-            let Some(viewer) = viewers.get_mut(&client_id) else { continue; };
-
             //PREVENT FEEDBACK
-            if client_id == id && matches!(read, ScreenPacketCode::Audio { .. }) { continue; }
+            if *client_id == id && matches!(read, ScreenPacketCode::Audio { .. }) { continue; }
 
             //A VIEWER THAT MISSED A FRAME CANNOT DECODE A PREDICTED ONE - IT HOLDS ITS LAST PICTURE
             //UNTIL AN IDR COMES ROUND (AT MOST `FORCED_INTRA_INTERVAL`) RATHER THAN BE HANDED RUBBISH
@@ -384,6 +441,13 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
                     viewer.needs_key = true;
                 }
             }
+        }
+
+        //KEEP THE LAST PICTURE THAT STANDS ON ITS OWN. IT IS WHAT THE NEXT ATTACH IS HANDED, AND IT
+        //IS KEPT *AFTER* THE FORWARD SO A VIEWER IS NEVER HANDED THE FRAME IT IS ABOUT TO BE SENT
+        if keyframe && let ScreenPacketCode::Video { data } = &read
+        {
+            if let Ok(mut cached) = share.keyframe.lock() { *cached = Some(data.clone()); }
         }
     }
 
