@@ -51,6 +51,9 @@ max_packet_size = 2000000 # Maximal packet size (2MB)
 max_message_length = 256 # Maximal text message length
 min_message_delay = 750 # Minimal ms delay between user messages (to prevent spamming)
 max_message_delay_violations = 3 # Maximal 'spam' messages that can be sent without getting disconnected
+max_packet_rate = 15 # Maximal sustained packets per second from one client (other packets get slowed down, not refused)
+max_packet_burst = 30 # Packets a client may send back-to-back before being slowed down to max_packet_rate
+max_packet_rate_violations = 40 # Maximal packets in a row that had to be slowed down before getting disconnected
 
 # Channel
 max_channel_length = 20 # Maximal length of channel name

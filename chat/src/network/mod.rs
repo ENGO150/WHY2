@@ -73,6 +73,9 @@ use std::
 };
 
 #[cfg(feature = "server")]
+use tokio::time;
+
+#[cfg(feature = "server")]
 use crate::config;
 
 //TRAITS
@@ -440,6 +443,8 @@ pub async fn receive
                     let mut shared_key = None;
                     let mut disconnect = false;
                     let mut grace = true;
+                    let mut reason = ("spam", "SPAM");
+                    let mut wait = Duration::ZERO;
 
                     //SPAM
                     if let PacketCode::Message { ref text, .. } = packet.code
@@ -463,6 +468,23 @@ pub async fn receive
                         }
 
                         *conn.last_activity_mut() = Instant::now(); //RESET last_activity
+                    }
+
+                    //PACKET RATE
+                    if !disconnect && config::read_config("spam_protection") &&
+                        !matches!(packet.code, PacketCode::KeepAlive | PacketCode::KeyExchangeOffer { .. } |
+                            PacketCode::KeyExchangeReply { .. })
+                    {
+                        wait = conn.take_credit(config::read_config("max_packet_rate"),
+                            config::read_config("max_packet_burst"));
+
+                        //STILL OVERDRAWN AFTER BEING SLOWED DOWN THIS LONG IS A FLOOD, NOT A BURST
+                        if !wait.is_zero() &&
+                            conn.throttles().copied().unwrap_or(0) > config::read_config::<usize>("max_packet_rate_violations")
+                        {
+                            disconnect = true;
+                            reason = ("packet rate", "RATE");
+                        }
                     }
 
                     //SEQ
@@ -489,11 +511,19 @@ pub async fn receive
                     //TOO MANY VIOLATIONS, BYE
                     if disconnect
                     {
-                        log::warn!("Disconnecting ({}): {}", if !grace { "invalid sequence number" } else { "spam" },
+                        log::warn!("Disconnecting ({}): {}", if !grace { "invalid sequence number" } else { reason.0 },
                             read.peer_addr);
 
-                        server::remove_connection(&read.peer_addr, grace, Some(if !grace { "SEQ" } else { "SPAM" })).await;
+                        server::remove_connection(&read.peer_addr, grace, Some(if !grace { "SEQ" } else { reason.1 })).await;
                         return None;
+                    }
+
+                    //OVERDRAWN
+                    if !wait.is_zero()
+                    {
+                        log::debug!("Packet held for {}ms: {}", wait.as_millis(), read.peer_addr);
+
+                        time::sleep(wait).await;
                     }
                 }
             }

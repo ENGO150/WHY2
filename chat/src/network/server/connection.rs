@@ -104,6 +104,9 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         last_key_exchange: Instant,                              //TIME OF LAST REKEY
         last_image: Instant,                                     //TIME OF LAST SERVED IMAGE FETCH
         spam_violations: usize,                                  //SPAM VIOLATIONS (unexpected, huh?)
+        credit: f32,                                             //PACKET RATE TOKENS LEFT
+        refill: Instant,                                         //WHEN credit WAS LAST TOPPED UP
+        throttles: usize,                                        //PACKETS IN A ROW THAT HAD TO WAIT FOR CREDIT
         channel: Option<String>,                                 //CHANNEL
         seq: usize,                                              //SEQUENCE NUMBER (CLIENT -> SERVER)
         server_seq: usize,                                       //SEQUENCE NUMBER (SERVER -> CLIENT)
@@ -296,6 +299,61 @@ impl Connection
             Self::Authenticated { spam_violations, .. } => Some(spam_violations),
             Self::NonAuthenticated { .. } => None,
         }
+    }
+
+    //GET PACKET RATE CREDIT FROM Connection
+    pub fn credit(&self) -> Option<&f32>
+    {
+        match self
+        {
+            Self::Authenticated { credit, .. } => Some(credit),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //GET LAST CREDIT REFILL FROM Connection
+    pub fn refill(&self) -> Option<&Instant>
+    {
+        match self
+        {
+            Self::Authenticated { refill, .. } => Some(refill),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //GET CONSECUTIVE THROTTLES FROM Connection
+    pub fn throttles(&self) -> Option<&usize>
+    {
+        match self
+        {
+            Self::Authenticated { throttles, .. } => Some(throttles),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //PAY FOR ONE PACKET OUT OF THE RATE BUCKET
+    pub fn take_credit(&mut self, rate: f32, burst: f32) -> Duration
+    {
+        let Self::Authenticated { credit, refill, throttles, .. } = self else { return Duration::ZERO; };
+
+        //A CONFIG OF ZERO WOULD BE A BUCKET THAT NEVER FILLS AND A WAIT OF INFINITY
+        let rate = rate.max(0.001);
+        let burst = burst.max(1.0);
+
+        //TOP UP FOR THE TIME SINCE THE LAST PACKET, THEN PAY FOR THIS ONE
+        *credit = (*credit + refill.elapsed().as_secs_f32() * rate).min(burst) - 1.0;
+        *refill = Instant::now();
+
+        if *credit >= 0.0
+        {
+            *throttles = 0;
+            return Duration::ZERO;
+        }
+
+        //OVERDRAWN - THE CREDIT IS EARNED BACK ON THIS CONNECTION'S OWN READ LOOP
+        *throttles += 1;
+
+        Duration::from_secs_f32(-*credit / rate)
     }
 
     //GET CHANNEL
