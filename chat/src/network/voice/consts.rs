@@ -54,6 +54,9 @@ pub const HELLO_INTERVAL: u64       = 200;                                      
 pub const HELLO_TIMEOUT: u64        = 5000;                                     //HOW LONG THE HANDSHAKE MAY GO UNANSWERED (MS)
 
 pub const RECV_TIMEOUT: u64         = 200;                                      //UDP RECEIVE POLL TIMEOUT (MS)
+
+pub const MAX_PACKET_RATE: f32      = (1000 / FRAME_MS) as f32 * 1.5;           //PACKETS PER SECOND ONE VOICE SESSION MAY SUSTAIN
+pub const MAX_PACKET_BURST: f32     = MAX_PACKET_RATE / 2.0;                    //WHAT IT MAY SEND AT ONCE (~500ms OF JITTER AND REORDERING)
 pub const SEND_CHANNEL_BOUND: usize = 8;                                        //AUDIO CALLBACK -> NETWORK TASK BUFFER
 
 pub const AEC_REFERENCE_CAPACITY: usize   = (SAMPLE_RATE * 2) as usize;         //REFERENCE RING (~2s, DRAINED IN LOCKSTEP SO IT SITS NEAR EMPTY)

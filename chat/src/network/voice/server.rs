@@ -56,6 +56,9 @@ pub struct Connection
     seq: usize,                //SEQUENCE NUMBER
     server_seq: usize,         //SERVER SEQUENCE NUMBER
     packet_accumulator: usize, //PACKET ACCUMULATOR
+    credit: f32,               //PACKET RATE TOKENS LEFT
+    refill: Instant,           //WHEN credit WAS LAST TOPPED UP
+    throttled: bool,           //THE LAST PACKET WAS ALREADY OVER THE RATE (SO ONE LINE IS LOGGED, NOT ONE PER DROP)
 }
 
 //LISTS
@@ -87,6 +90,17 @@ impl Connection
     pub fn server_seq_mut(&mut self) -> &mut usize
     {
         &mut self.server_seq
+    }
+
+    //PAY FOR ONE PACKET OUT OF THE RATE BUCKET
+    fn take_credit(&mut self) -> bool
+    {
+        //TOP UP FOR THE TIME SINCE THE LAST PACKET, THEN PAY FOR THIS ONE
+        self.credit = (self.credit + self.refill.elapsed().as_secs_f32() * consts::MAX_PACKET_RATE)
+            .min(consts::MAX_PACKET_BURST) - 1.0;
+        self.refill = Instant::now();
+
+        self.credit >= 0.0
     }
 }
 
@@ -237,6 +251,21 @@ pub async fn listen_client_voice(socket: UdpSocket)
                 if received.seq <= conn.seq { continue; } //IGNORE INVALID SEQs
                 conn.seq = received.seq;
 
+                //PACKET RATE
+                if config::read_config("spam_protection") && !conn.take_credit()
+                {
+                    if !conn.throttled
+                    {
+                        conn.throttled = true;
+                        log::warn!("Voice packets over the rate dropped: main connection {}",
+                            server::log_addr(&received.id));
+                    }
+
+                    continue;
+                }
+
+                conn.throttled = false;
+
                 //ACTIVITY TIMER
                 conn.packet_accumulator += 1;
                 if conn.packet_accumulator >= consts::ACTIVITY_TRESHOLD
@@ -257,6 +286,9 @@ pub async fn listen_client_voice(socket: UdpSocket)
                     seq: received.seq,
                     server_seq: 0,
                     packet_accumulator: 0,
+                    credit: consts::MAX_PACKET_BURST,
+                    refill: Instant::now(),
+                    throttled: false,
                 });
 
                 log::info!("New voice connection: {}", server::log_addr(&received.id));

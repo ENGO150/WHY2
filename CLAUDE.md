@@ -203,6 +203,26 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     wrong reason. The ceiling is deliberately far short of that (40 packets at 15/s is ~2.7s against a
     30s keepalive window). `Message` *is* charged, for uniform accounting; `min_message_delay` is
     stricter by an order of magnitude, so the bucket never bites a message first.
+  - **Voice has a bucket of its own, and it sheds instead of waiting.** `voice/server.rs`'s
+    `Connection::take_credit` is the same arithmetic against `voice::consts::MAX_PACKET_RATE` /
+    `MAX_PACKET_BURST`, charged per datagram after the seq check, and an overdrawn packet is dropped.
+    It cannot be held: `listen_client_voice` is the **one UDP socket every client on the server speaks
+    through**, so a sleep there would stall everybody's call rather than the sender's. The rate is the
+    codec's and lives in `voice/consts.rs` rather than in `server.toml` — one frame per `FRAME_MS` is
+    50 packets a second, and the headroom above that is jitter, not taste — while `spam_protection`
+    still switches it off. What it bounds is amplification: a voice packet is fanned out to the whole
+    channel, and the seq only has to *rise*, which costs a flood nothing. Only the first drop of a run
+    is logged (`throttled`), since the flood it is reporting would otherwise be a flood of log lines.
+    **Known gap:** this sits *after* `voice::receive`, so it bounds the fan-out and not the per-packet
+    decrypt that same shared loop does for every datagram naming a known id — bounding that means a
+    bucket keyed on the source address, ahead of the decrypt.
+  - **The auxiliary TCP sockets (file, screen, attach) deliberately have none of this.** There a packet
+    *is* the payload rather than a request, so a packets-per-second cap is a throughput cap in disguise
+    — it would fight the encoder's own frame rate and duplicate the backpressure TCP already applies —
+    and their costs are bounded in the units that fit them (`max_upload_size`, `MAX_IMAGE_SIZE`,
+    `max_client_parallel_uploads`, `VIEWER_CHANNEL_BOUND`, `SOCKET_BUFFER`). They are limited at the
+    door instead: every one of them needs a token minted over the main connection, and *that* request
+    is charged to the bucket like any other packet.
   - The bucket is carried across a rekey and a channel switch for the same reason `last_image` is — a
     client that could refill it by switching channels would not be limited at all — and a
     `NonAuthenticated` connection pays nothing here, being bounded by `max_unauth_clients` and
