@@ -181,6 +181,33 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   `(&mut OwnedReadHalf, Arc<tokio::sync::Mutex<OwnedWriteHalf>>)` alias in `consts.rs`.
   Sequence numbers are used to prevent replay/reordering; obfuscation (`obfuscate_data`, a simple
   XOR) is a distinct, non-cryptographic layer applied on top of the real encryption.
+- **A client is rate-limited twice, by two different rules, because a typed message and a packet are
+  not the same thing.** `min_message_delay` is a minimum *gap*, and it applies to `PacketCode::Message`
+  alone: a person typing faster than that is spamming, so they earn a `SpamWarning` and
+  `max_message_delay_violations` of them ends the session. Nothing else on the wire has that shape —
+  `/list`, a channel switch, a file offer and the cache's `ImageData` walk all arrive in legitimate
+  bursts, and holding them to a gap would warn a user about traffic they never authored. So everything
+  else is bounded by *rate*: a token bucket per connection (`Connection::take_credit`, called from
+  `network::receive`'s server block, the one funnel every authenticated TCP packet passes through),
+  refilled lazily at `max_packet_rate` a second up to `max_packet_burst` — two `f32`s and an `Instant`,
+  so it costs no timer task and no client-sized ring of timestamps.
+  - **It throttles rather than warns**, which is the `IMAGE_REQUEST_DELAY` pattern generalised: an
+    overdrawn packet is answered late, the wait sitting on **that connection's own read loop** so it
+    costs nobody else, needs no new packet code and needs no client change at all. Disconnect is only
+    the ceiling — since the sleep is already backpressure, credit can keep falling only if the client
+    is pipelining without waiting, so `max_packet_rate_violations` counts *consecutive* throttled
+    packets and the disconnect reason is `RATE`.
+  - **`KeepAlive` and the rekey pair pay nothing**: they are the server's own schedule, not the
+    client's traffic, and a throttled client's keepalive answer is stuck behind its own packets in the
+    same stream and cannot be reordered — a stall long enough to miss one would disconnect it for the
+    wrong reason. The ceiling is deliberately far short of that (40 packets at 15/s is ~2.7s against a
+    30s keepalive window). `Message` *is* charged, for uniform accounting; `min_message_delay` is
+    stricter by an order of magnitude, so the bucket never bites a message first.
+  - The bucket is carried across a rekey and a channel switch for the same reason `last_image` is — a
+    client that could refill it by switching channels would not be limited at all — and a
+    `NonAuthenticated` connection pays nothing here, being bounded by `max_unauth_clients` and
+    `max_auth_time` instead. All three keys are live (read at point of use, so they are not in
+    `SERVER_RESTART_SETTINGS`) and gated by the same `spam_protection` switch as the message rule.
 - **The two costs an image puts on somebody else are bounded explicitly, because neither is bounded
   by the 8MB `MAX_IMAGE_SIZE` the server accepts.**
   - **Decoding is limited on the client** (`network/client.rs::decode_image`). `MAX_IMAGE_SIZE`
