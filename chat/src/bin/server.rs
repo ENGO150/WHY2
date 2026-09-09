@@ -111,7 +111,10 @@ async fn main()
         .init()
         .unwrap();
 
-    log::info!("WHY2 server {} ({}), log level {level}", misc::get_version(), env!("WHY2_GIT_HASH"));
+    log::info!("WHY2 server v{}{}, log level {level}", misc::get_version(), if !env!("WHY2_GIT_HASH").is_empty()
+    {
+        format!(" ({})", env!("WHY2_GIT_HASH"))
+    } else { String::new() });
 
     //CONFIGURATION
     misc::check_version().await; //CHECK WHY2 VERSION
