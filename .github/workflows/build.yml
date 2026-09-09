@@ -108,10 +108,21 @@ jobs:
 
           # ACTIONS_ID_TOKEN_REQUEST_{URL,TOKEN} are injected by `id-token: write`.
           # A fresh token per file: the endpoint accepts each `jti` exactly once.
+          #
+          # The answer is parsed separately rather than piped straight into jq: under
+          # `pipefail` a non-JSON answer makes jq exit non-zero, which killed the whole
+          # step from inside the retry loop that was meant to survive it.
           mint() {
-            curl -sS \
+            local answer token
+
+            answer="$(curl -sS --fail-with-body \
               -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}" | jq -r .value
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}")" || return 1
+
+            token="$(printf '%s' "$answer" | jq -r '.value // empty' 2>/dev/null)" || return 1
+            [ -n "$token" ] || return 1
+
+            printf '%s' "$token"
           }
 
           # Retried by hand rather than with --retry: the endpoint spends a
@@ -123,12 +134,16 @@ jobs:
             sum="$(sha256sum "$file" | cut -d' ' -f1)"
 
             while true; do
-              token="$(mint)"
-              echo "::add-mask::$token"
+              if token="$(mint)"; then
+                echo "::add-mask::$token"
+              else
+                echo "could not mint a token for $variant" >&2
+                token=""
+              fi
 
               # --fail-with-body, not -f: the endpoint's rejection reason is in
               # the body, and -f discards it.
-              if curl -sS --fail-with-body \
+              if [ -n "$token" ] && curl -sS --fail-with-body \
                    -X PUT "$ENDPOINT/$variant" \
                    -H "Authorization: Bearer $token" \
                    -H "X-Content-SHA256: $sum" \
@@ -137,13 +152,17 @@ jobs:
                 return 0
               fi
 
-              if [ "$attempt" -ge 3 ]; then
+              if [ "$attempt" -ge 4 ]; then
                 echo "giving up on $variant after $attempt attempts" >&2
                 return 1
               fi
 
+              # Backed off rather than retried flat: a Cloudflare 524 means the Pi is
+              # still busy with the files sent a moment ago, and coming back in five
+              # seconds asks the same busy disk.
+              sleep $((attempt * 15))
+
               attempt=$((attempt + 1))
-              sleep 5
             done
           }
 
