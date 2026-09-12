@@ -413,6 +413,23 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - On Wayland a picked monitor also **pins the polling path**: the recorder there is an
     xdg-desktop-portal request whose picker chooses the output itself, so upgrading to it would throw
     the selection away and ask again.
+  - **The recorder is drained on a thread of its own, and that is not buffering for its own sake.**
+    xcap delivers frames over a `sync_channel(0)` — a rendezvous — so its capture thread sits blocked
+    in `send` for the whole of our colour conversion, GPU readback and H.264 encode, and the frame
+    period is capture *plus* encode rather than the larger of the two. That costs little where a
+    grab is cheap; on Windows it is most of the budget, because xcap's `texture_to_frame` pays a
+    fresh `CreateTexture2D` staging allocation, a GPU→CPU `Map`, a zeroed `vec!`, a row-wise memcpy,
+    a **whole extra `to_owned()` clone** and a scalar per-pixel BGRA→RGBA swizzle for every single
+    frame — which is why a Windows share ran at a visibly lower rate than a Linux one on the same
+    hardware. `drain_frames` moves the `Receiver` onto its own thread and keeps the newest frame in
+    a one-slot `LatestFrame` (a `Mutex<Option<Frame>>` and a `Condvar`), so the next grab overlaps
+    the encode instead of queueing behind it. Keeping only the newest is the same shedding rule the
+    rest of the path runs on — an unread frame is already stale — so the slot replaces the old
+    `try_recv` drain rather than adding a queue. **Known ceiling:** this makes the period
+    `max(capture, encode)`; xcap's per-frame Windows cost itself is untouched and still caps the
+    rate at high resolutions. Cutting that means not going through `texture_to_frame` — a reusable
+    staging texture and handing the BGRA straight to the shader, which the converter could swizzle
+    for free — and that is a fork of xcap's Windows backend, not a change here.
   - `WHY2_CAPTURE_BACKEND` (`recorder` / `legacy`) pins a backend; `WHY2_CAPTURE_PROBE_TIMEOUT`
     overrides the probe deadline in seconds. Both exist so a machine where the heuristic picks
     wrong is one env var away from the old behaviour.
