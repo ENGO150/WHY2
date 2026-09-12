@@ -81,6 +81,7 @@ use super::
     login::
     {
         Login,
+        Reconnect,
         Stage as LoginStage,
     },
 };
@@ -145,7 +146,7 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     if app.settings.open { draw_settings(frame, &mut app.settings, area); }
 
     //CONNECT BOX
-    if let Some(login) = &app.login { draw_login(frame, login, area); }
+    if let Some(login) = &app.login { draw_login(frame, login, &app.reconnect, area); }
 
     //SERVER-KEY PROMPT ON TOP
     if let Some(prompt) = &app.tofu { draw_tofu(frame, prompt, area); }
@@ -926,7 +927,7 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
     frame.render_widget(Paragraph::new(lines), text_area);
 }
 
-fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
+fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rect)
 {
     let width = consts::LOGIN_WIDTH.min(area.width.saturating_sub(2)).max(1);
     let inner_width = width.saturating_sub(4); //BORDERS PLUS A COLUMN OF AIR EACH SIDE
@@ -951,7 +952,9 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
     //STATUS ROW, WRAPPED
     let status = match (login.busy, login.error.as_deref(), login.hint.as_deref())
     {
-        (true, ..) => Line::from(Span::styled(login.waiting(), theme::ACCENT)),
+        //A RETRY SAYS SO INSTEAD, SINCE NOBODY ASKED FOR IT
+        (true, ..) => Line::from(Span::styled(reconnect.status()
+            .unwrap_or_else(|| login.waiting().to_owned()), theme::ACCENT)),
         (false, Some(error), _) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
         (false, None, Some(hint)) => Line::from(Span::styled(hint.to_string(), theme::DIM)),
         (false, None, None) => Line::default(),

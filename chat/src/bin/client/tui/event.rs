@@ -45,6 +45,7 @@ impl App
             {
                 if let Some(login) = self.login.as_mut() { login.ask(Stage::Password { register: true }, None); }
 
+                self.answer_step(Stage::Password { register: true });
                 self.dirty = true;
             },
 
@@ -52,6 +53,7 @@ impl App
             {
                 if let Some(login) = self.login.as_mut() { login.ask(Stage::Password { register: false }, None); }
 
+                self.answer_step(Stage::Password { register: false });
                 self.dirty = true;
             },
 
@@ -66,6 +68,9 @@ impl App
                 self.role = role;
                 self.push_styled("Login successful. Press Ctrl+H for help.", theme::OK);
                 self.refresh_online = true;
+
+                //THESE ANSWERS ARE WORTH REPLAYING NOW
+                self.reconnect.accepted();
             },
 
             ClientEvent::Connected(server_name) =>
@@ -222,6 +227,7 @@ impl App
 
                 if let Some(login) = self.login.as_mut() { login.ask(Stage::Username, Some(hint)); }
 
+                self.answer_step(Stage::Username);
                 self.dirty = true;
             },
 
@@ -588,6 +594,8 @@ impl App
                     None => self.push_styled("Username rejected!", theme::ERROR),
                 }
 
+                //A REPLAYED ANSWER THE SERVER REFUSES IS NOT ONE TO REPLAY AGAIN
+                self.reconnect.forget();
                 self.dirty = true;
             },
 

@@ -28,6 +28,10 @@ pub const ANIMATION_CATCHUP: Duration = Duration::from_secs(1);    //BEHIND BY M
 pub const REDRAW_INTERVAL: Duration   = Duration::from_millis(33); //COALESCE REDRAWS - VoiceActivity FIRES PER VOICE PACKET
 pub const SCROLL_STEP: u16            = 3;
 
+//RECONNECT
+pub const RECONNECT_DELAY: Duration   = Duration::from_secs(3);    //HOW LONG A DROPPED SESSION WAITS BEFORE DIALLING AGAIN
+pub const RECONNECT_ATTEMPTS: u32     = 5;                         //AND HOW MANY TIMES IT TRIES BEFORE LEAVING THE BOX UP
+
 //LAYOUT
 pub const SIDEBAR_WIDTH: u16          = 24;
 pub const SIDEBAR_MIN_TERM_WIDTH: u16 = 70;                        //BELOW THIS THE SIDEBAR IS DROPPED

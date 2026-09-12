@@ -16,7 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::io::Error;
+use std::
+{
+    io::Error,
+    time::Instant,
+};
 
 use crossterm::event::
 {
@@ -24,6 +28,8 @@ use crossterm::event::
     KeyEvent,
     KeyModifiers,
 };
+
+use zeroize::Zeroizing;
 
 use tokio::
 {
@@ -40,6 +46,7 @@ use crate::
 
 use super::
 {
+    consts,
     input::InputBuffer,
     state::App,
 };
@@ -77,7 +84,103 @@ pub struct Login //THE CONNECT PROMPT
     attempt: u64,              //ONLY THE NEWEST ATTEMPT'S RESULT IS ACCEPTED
 }
 
+//WHAT AN AUTOMATIC RE-DIAL NEEDS AFTER A DROPPED SESSION
+#[derive(Default)]
+pub struct Reconnect
+{
+    credentials: Option<(String, Zeroizing<String>)>, //WHAT GOT US IN, ONCE IT ACTUALLY DID
+    typed: (String, Zeroizing<String>),               //THE ANSWERS OF THE STEPS IN FLIGHT
+    due: Option<Instant>,                             //WHEN TO DIAL AGAIN
+    left: u32,                                        //ATTEMPTS BEFORE IT GIVES UP AND WAITS FOR A KEY
+    answers: u32,                                     //REPLIES THIS DIAL MAY STILL REPLAY - USERNAME AND PASSWORD
+    retrying: bool,                                   //THE BOX IS BUSY BECAUSE OF US, NOT BECAUSE OF A KEYPRESS
+    pub submit: bool,                                 //AN ANSWER IS IN THE FIELD FOR THE TICK TO SEND
+}
+
 //IMPLEMENTATIONS
+impl Reconnect
+{
+    //KEEP WHAT WAS TYPED AT EACH STEP
+    pub fn remember(&mut self, stage: Stage, text: &str)
+    {
+        match stage
+        {
+            Stage::Username => self.typed.0 = text.to_owned(),
+            Stage::Password { .. } => self.typed.1 = Zeroizing::new(text.to_owned()),
+            Stage::Address => {},
+        }
+    }
+
+    //THE PAIR WORKED, SO IT IS WORTH REPLAYING
+    pub fn accepted(&mut self)
+    {
+        self.credentials = Some(self.typed.clone());
+        self.left = consts::RECONNECT_ATTEMPTS;
+        self.retrying = false;
+        self.due = None;
+    }
+
+    //THE USER ASKED TO LEAVE, OR CANCELLED THE DIAL
+    pub fn forget(&mut self) { *self = Self::default(); }
+
+    //SCHEDULE A DIAL, IF THERE IS ANYTHING TO LOG BACK IN WITH
+    pub fn arm(&mut self) -> bool
+    {
+        if self.credentials.is_none() || self.left == 0
+        {
+            self.retrying = false; //OUT OF TRIES - THE NEXT DIAL IS THE USER'S OWN
+
+            return false;
+        }
+
+        self.left -= 1;
+        self.retrying = true;
+        self.answers = 2; //A SERVER THAT KEEPS ASKING IS NOT ANSWERED FOREVER
+        self.due = Some(Instant::now() + consts::RECONNECT_DELAY);
+
+        true
+    }
+
+    //WHAT THE BOX SAYS WHILE IT IS DIALLING ITSELF BACK
+    pub fn status(&self) -> Option<String>
+    {
+        self.retrying.then(|| format!("Connection lost, reconnecting… ({}/{})",
+            consts::RECONNECT_ATTEMPTS - self.left, consts::RECONNECT_ATTEMPTS))
+    }
+
+    //WHETHER THE WAIT IS UP
+    pub fn take_due(&mut self) -> bool
+    {
+        if self.due.is_none_or(|due| Instant::now() < due) { return false; }
+
+        self.due = None;
+
+        true
+    }
+
+    //THE ANSWER THE SERVER'S NEXT STEP WANTS
+    pub fn answer(&mut self, stage: Stage) -> Option<String>
+    {
+        //ONLY A DIAL WE STARTED REPLAYS ANYTHING - A DIAL THE USER TYPED IS THEIRS TO ANSWER
+        if !self.retrying || self.answers == 0 { return None; }
+
+        let (username, password) = self.credentials.as_ref()?;
+
+        let answer = match stage
+        {
+            Stage::Username => username.clone(),
+            Stage::Password { register: false } => password.to_string(),
+
+            //A REGISTRATION MEANS THE ACCOUNT IS GONE - ASK
+            _ => return None,
+        };
+
+        self.answers -= 1;
+
+        Some(answer)
+    }
+}
+
 impl Default for Login
 {
     fn default() -> Self { Self::new() }
@@ -180,6 +283,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Action
         login.busy = false;
         login.error = None;
 
+        //A CANCELLED DIAL IS NOT ONE TO REPEAT
+        app.reconnect.forget();
+
         return Action::None;
     }
 
@@ -254,11 +360,15 @@ pub fn take_input(app: &mut App) -> String
 
     //ONLY THE ADDRESS IS TRIMMED HERE
     let text = login.input.text();
+    let stage = login.stage;
 
     login.input = InputBuffer::new();
     login.error = None;
     login.hint = None;
     login.busy = true;
+
+    //A RECONNECT REPLAYS THIS
+    app.reconnect.remember(stage, &text);
 
     text
 }

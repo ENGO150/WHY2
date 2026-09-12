@@ -70,7 +70,7 @@ use super::
 {
     consts,
     input::InputBuffer,
-    login::Login,
+    login::{ Login, Reconnect, Stage },
     palette::Palette,
     settings::Settings,
     tofu::Prompt,
@@ -209,6 +209,7 @@ pub struct App
     pub leaving: bool,      //THE USER ASKED TO LEAVE
     pub logging_out: bool,  //THE USER ASKED TO LOG OUT
     pub disconnect_reason: Option<String>, //WHY THE SERVER IS ABOUT TO DROP US
+    pub reconnect: Reconnect, //DIALS ITSELF BACK AFTER A DROP THE USER DID NOT ASK FOR
     pub drop_stream: bool,  //THE LOOP OWNS THE WRITE HALF
     pub should_quit: bool,
     pub exit_code: i32,
@@ -274,6 +275,7 @@ impl App
             leaving: false,
             logging_out: false,
             disconnect_reason: None,
+            reconnect: Reconnect::default(),
             drop_stream: false,
             should_quit: false,
             exit_code: 0,
@@ -568,11 +570,26 @@ impl App
         self.dirty = true;
     }
 
+    //PUT A REPLAYED ANSWER IN THE FIELD FOR THE TICK TO SEND
+    pub fn answer_step(&mut self, stage: Stage)
+    {
+        let Some(answer) = self.reconnect.answer(stage) else { return };
+
+        if let Some(login) = self.login.as_mut() { login.input.insert_str(&answer); }
+
+        self.reconnect.submit = true;
+    }
+
     //THROW THE SESSION AWAY, BRING BACK THE BOX
     pub fn disconnected(&mut self, reason: impl Into<String>)
     {
         //CARRY THE DIAL COUNTER OVER
         let attempt = self.login.as_ref().map_or(0, Login::attempt);
+        //A LOGOUT IS NOT A NET FAIL - IT ASKED FOR THIS
+        if self.logging_out { self.reconnect.forget(); }
+
+        //DIAL BACK UNLESS WE HAVE RUN OUT OF TRIES - THE REASON IS WHAT IS LEFT ON SCREEN IF WE HAVE
+        let retrying = self.reconnect.arm();
 
         self.login = Some(Login::again(&self.address, attempt, reason.into()));
         self.drop_stream = true; //THE WRITE HALF BELONGS TO THE EVENT LOOP
@@ -606,6 +623,9 @@ impl App
         self.disconnect_reason = None;
 
         reset_session();
+
+        //THE BOX IS BUSY UNTIL THE WAIT IS UP
+        if retrying && let Some(login) = self.login.as_mut() { login.busy = true; }
 
         self.dirty = true;
     }

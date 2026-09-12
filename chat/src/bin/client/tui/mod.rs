@@ -273,6 +273,20 @@ pub async fn run
                 //THE TICK IS THE ANIMATIONS' CLOCK
                 app.advance_animations();
 
+                //A DROPPED SESSION DIALS ITSELF BACK
+                if app.reconnect.take_due() { login::connect(app, &connect_tx); }
+
+                //AND ANSWERS THE IDENTITY STEPS ITSELF
+                if app.reconnect.submit && let Some(write_stream) = write_stream.as_ref()
+                {
+                    app.reconnect.submit = false;
+
+                    let answer = login::take_input(app);
+                    let write_stream = write_stream.clone();
+
+                    crate::submit(app, &write_stream, answer).await;
+                }
+
                 //SILENT ROSTER REFRESH
                 if app.refresh_online && let Some(write_stream) = write_stream.as_ref()
                 {
@@ -331,6 +345,9 @@ fn connected
         Err(error) =>
         {
             if let Some(prompt) = app.login.as_mut() { prompt.failed(&error); }
+
+            //KEEP TRYING WHILE THERE ARE TRIES LEFT
+            if app.reconnect.arm() && let Some(prompt) = app.login.as_mut() { prompt.busy = true; }
 
             return;
         },
