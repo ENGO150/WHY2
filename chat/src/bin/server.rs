@@ -44,6 +44,7 @@ use why2_chat::
 {
     misc,
     config,
+    consts,
     options,
     crypto::kex,
     network::
@@ -60,18 +61,13 @@ use why2_chat::
     },
 };
 
-//CONSTS
-const BIND_ATTEMPTS: usize = 15;   //~3 SECONDS OF THEM
-const BIND_RETRY_DELAY: u64 = 200; //MS BETWEEN THEM
-const ACCEPT_RETRY_DELAY: u64 = 100; //MS TO WAIT OUT A FAILING accept()
-
 //FUNCTIONS
 //BIND, RETRYING WHILE THE PORT IS STILL HELD
 async fn bind<T>(what: &str, address: &str, bind: impl AsyncFn() -> Result<T>) -> T
 {
     let mut last = None;
 
-    for attempt in 0..BIND_ATTEMPTS
+    for attempt in 0..consts::BIND_ATTEMPTS
     {
         match bind().await
         {
@@ -81,7 +77,7 @@ async fn bind<T>(what: &str, address: &str, bind: impl AsyncFn() -> Result<T>) -
             {
                 last = Some(error);
 
-                if attempt + 1 < BIND_ATTEMPTS { time::sleep(Duration::from_millis(BIND_RETRY_DELAY)).await; }
+                if attempt + 1 < consts::BIND_ATTEMPTS { time::sleep(Duration::from_millis(consts::BIND_RETRY_DELAY)).await; }
             }
         }
     }
@@ -382,7 +378,7 @@ async fn main()
                 log::error!("Connection failed: {}", e);
 
                 //THE SERVER'S OWN PROBLEM (NO FILE DESCRIPTORS LEFT) PERSISTS AND WOULD SPIN THE LOOP
-                time::sleep(Duration::from_millis(ACCEPT_RETRY_DELAY)).await;
+                time::sleep(Duration::from_millis(consts::ACCEPT_RETRY_DELAY)).await;
             }
         }
     }

@@ -59,6 +59,7 @@ pub const RECV_TIMEOUT: u64         = 200;                                      
 pub const MAX_PACKET_RATE: f32      = (1000 / FRAME_MS) as f32 * 1.5;           //PACKETS PER SECOND ONE VOICE SESSION MAY SUSTAIN
 pub const MAX_PACKET_BURST: f32     = MAX_PACKET_RATE / 2.0;                    //WHAT IT MAY SEND AT ONCE (~500ms OF JITTER AND REORDERING)
 pub const SEND_CHANNEL_BOUND: usize = 8;                                        //AUDIO CALLBACK -> NETWORK TASK BUFFER
+pub const VOLUME_MAX: u32           = 200;                                      //LOUDEST VOLUME SETTING (PERCENT)
 
 pub const AEC_REFERENCE_CAPACITY: usize   = (SAMPLE_RATE * 2) as usize;         //REFERENCE RING
 pub const AEC_SEARCH_RANGE: usize         = (SAMPLE_RATE * 3 / 10) as usize;    //FURTHEST THE PLAYBACK MAY LAG THE CAPTURE
@@ -79,3 +80,4 @@ pub const AEC_ROLLBACK_MARGIN: f32        = 3.0;                                
 pub const AEC_ROLLBACK_DECAY: f32         = 1.0;                                //dB THE STANDARD TO BEAT FORGETS EACH WINDOW
 pub const AEC_ROLLBACK_LIMIT: usize       = 3;                                  //ROLLBACKS IN A ROW THAT DO NOT RESCUE IT
 pub const AEC_SCORE_FLOOR: f32            = 0.05;                               //TOO LITTLE WENT THROUGH THAT WINDOW TO JUDGE IT
+pub const AEC_HISTORY: usize              = AEC_SEARCH_RANGE + AEC_WINDOW;      //HOW MUCH OF EACH SIDE THE SEARCH NEEDS

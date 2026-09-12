@@ -89,9 +89,6 @@ pub struct Canceller
     gain: f32,
 }
 
-//HOW MUCH OF EACH SIDE THE SEARCH NEEDS
-const HISTORY: usize = consts::AEC_SEARCH_RANGE + consts::AEC_WINDOW;
-
 //GLOBAL VARIABLES
 static REFERENCE: Mutex<Option<HeapProd<f32>>> = Mutex::new(None); //THE VOICE OUTPUT CALLBACK'S END OF THE TAP
 static ACTIVE: AtomicBool = AtomicBool::new(false);                //IS ANYBODY SHARING?
@@ -146,12 +143,12 @@ impl Canceller
                     self.phantoms = 0; //NOTHING IS ALIGNED TO ANYTHING YET
                     self.capture.push_back(captured);
 
-                    while self.reference.len() > HISTORY { self.reference.pop_front(); }
-                    while self.capture.len() > HISTORY { self.capture.pop_front(); }
+                    while self.reference.len() > consts::AEC_HISTORY { self.reference.pop_front(); }
+                    while self.capture.len() > consts::AEC_HISTORY { self.capture.pop_front(); }
 
                     self.countdown = self.countdown.saturating_sub(1);
 
-                    if self.countdown == 0 && self.capture.len() == HISTORY
+                    if self.countdown == 0 && self.capture.len() == consts::AEC_HISTORY
                     {
                         self.search();
                     }
@@ -525,8 +522,8 @@ pub fn start() -> Option<Canceller>
         current: 0.,
         next: 0.,
 
-        reference: VecDeque::with_capacity(HISTORY + 1),
-        capture: VecDeque::with_capacity(HISTORY + 1),
+        reference: VecDeque::with_capacity(consts::AEC_HISTORY + 1),
+        capture: VecDeque::with_capacity(consts::AEC_HISTORY + 1),
 
         weights: vec![0.; consts::AEC_TAPS],
         best: vec![0.; consts::AEC_TAPS],

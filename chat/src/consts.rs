@@ -66,6 +66,10 @@ pub const CONNECT_TIMEOUT: u64         = 3000;                                  
 pub const MAX_HANDSHAKES_PER_IP: usize = 8;                                           //MAX CONCURRENT HANDSKAKES PER IP
 pub const REKEY_INTERVAL: u64          = 600;                                         //INTERVAL FOR RE-REKEYING (SECS)
 
+pub const BIND_ATTEMPTS: usize         = 15;                                          //BINDS BEFORE GIVING UP (~3 SECONDS OF THEM)
+pub const BIND_RETRY_DELAY: u64        = 200;                                         //MS BETWEEN THEM
+pub const ACCEPT_RETRY_DELAY: u64      = 100;                                         //MS TO WAIT OUT A FAILING accept()
+
 pub const EVENT_CHANNEL_BOUND: usize   = 1024;                                        //CLIENT UI EVENT BUFFER
 
 pub const SERVER_RESTART_SETTINGS: &[&str] =                                          //SERVER SETTINGS THAT REQUIRE

@@ -27,10 +27,7 @@ use std::sync::
     },
 };
 
-use crate::config;
-
-//CONSTS
-pub const VOLUME_MAX: u32 = 200; //LOUDEST SETTING (PERCENT)
+use crate::{ config, network::voice::consts };
 
 //OPTIONS
 static SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (CLIENT -> SERVER)
@@ -83,7 +80,7 @@ pub fn set_use_voice(value: bool) //FORCE USE VOICE (A LOST SESSION TAKES THE CA
 //AUDIO PREFERENCES
 pub fn clamp_volume(percent: u32) -> u32 //KEEP A VOLUME INSIDE THE SUPPORTED RANGE
 {
-    percent.min(VOLUME_MAX)
+    percent.min(consts::VOLUME_MAX)
 }
 
 pub fn init_audio() //TOUCH EVERY PREFERENCE
