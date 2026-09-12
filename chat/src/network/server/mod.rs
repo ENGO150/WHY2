@@ -847,7 +847,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         match read
         {
             //MESSAGE
-            PacketCode::Message { text, .. } =>
+            PacketCode::MessageRequest { text } =>
             {
                 //SILENCE MUTED USERS
                 if *CONNECTIONS.get(&peer_addr).unwrap().muted()

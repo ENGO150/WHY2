@@ -77,8 +77,8 @@ use why2_chat::
     network::
     {
         self,
+        codes::PacketCode,
         client::{ self, ClientEvent },
-        codes::{ PacketCode, MessageColors },
     },
 };
 
@@ -688,14 +688,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         },
         LoginState::PasswordLogin => PacketCode::PasswordL { password: Some(input) },
         LoginState::PasswordRegister => PacketCode::PasswordR { password: Some(input) },
-        //NO COLORS, USERNAME OR ID - THE SERVER FILLS THOSE
-        LoginState::None => PacketCode::Message
-        {
-            text: input,
-            username: None,
-            id: None,
-            colors: MessageColors { username_color: None, message_color: None },
-        },
+        LoginState::None => PacketCode::MessageRequest { text: input },
     };
 
     network::send(&mut *write_stream.lock().await, packet, options::get_keys().as_ref()).await;

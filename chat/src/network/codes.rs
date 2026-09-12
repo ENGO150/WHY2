@@ -34,7 +34,13 @@ use crate::
 #[derive(SchemaWrite, SchemaRead, Clone)]
 pub enum PacketCode //CONTROL CODES
 {
-    //CLIENT <> SERVER | TEXT MESSAGE
+    //CLIENT -> SERVER | TEXT MESSAGE REQUEST
+    MessageRequest
+    {
+        text: String,
+    },
+
+    //SERVER -> CLIENT | TEXT MESSAGE
     Message
     {
         text: String,
@@ -102,12 +108,6 @@ pub enum PacketCode //CONTROL CODES
     VoiceJoin
     {
         username: String,
-        id: usize,
-    },
-
-    //SERVER -> CLIENT | CLIENT LEFT VOICE
-    VoiceLeave
-    {
         id: usize,
     },
 
@@ -210,6 +210,7 @@ pub enum PacketCode //CONTROL CODES
     ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
     ChannelDestroyed { name: String },              //SERVER -> CLIENT | CHANNEL ABANDONED
     VoiceClients { clients: Vec<(usize, String)> }, //SERVER -> CLIENT | THE CHANNEL'S VOICE ROSTER
+    VoiceLeave { id: usize },                       //SERVER -> CLIENT | CLIENT LEFT VOICE
     Files { users: Option<Vec<UserFile>> },         //CLIENT <> SERVER | LIST UPLOADED FILES
     Screens { users: Option<Vec<UserScreen>> },     //CLIENT <> SERVER | LIST SCREENSHARES
     Deattach { username: Option<String> },          //CLIENT <> SERVER | DEATTACH CLIENT SCREENSHARE
@@ -221,6 +222,7 @@ pub enum PacketCode //CONTROL CODES
     Voice { token: Option<[u8; 32]> },              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
     Join { username: String },                      //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     List { users: Option<Vec<OnlineUser>> },        //CLIENT <> SERVER | PRINT CONNECTED USERS
+
     ServerKick { id: usize },                       //CLIENT -> SERVER | KICK USER
     ServerMute { id: usize },                       //CLIENT -> SERVER | MUTE USER
     ServerBan { id: usize },                        //CLIENT -> SERVER | BAN USER
@@ -250,6 +252,7 @@ impl PacketCode
     {
         match self
         {
+            Self::MessageRequest { .. } => "MessageRequest",
             Self::Message { .. } => "Message",
             Self::KeyExchangeOffer { .. } => "KeyExchangeOffer",
             Self::KeyExchangeReply { .. } => "KeyExchangeReply",

@@ -447,7 +447,7 @@ pub async fn receive
                     let mut wait = Duration::ZERO;
 
                     //SPAM
-                    if let PacketCode::Message { ref text, .. } = packet.code
+                    if let PacketCode::MessageRequest { ref text } = packet.code
                     {
                         //MESSAGE SIZE
                         disconnect = text.len() > config::read_config("max_message_length");
