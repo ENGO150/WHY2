@@ -171,7 +171,7 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::Shar
     hkdf.expand(format!("{}-encryption", info).as_bytes(), &mut encryption_key).expect("HKDF expand failed");
     hkdf.expand(format!("{}-mac", info).as_bytes(), &mut mac).expect("HKDF expand failed");
 
-    //CONVERT ENCRYPTION KEY BYTES TO i64s & RETURN TOGETHER WITH MAC
+    //CONVERT KEY BYTES TO i64s & RETURN WITH THE MAC
     (Zeroizing::new(encryption_key.chunks(8).map(|chunk|
     {
         let mut bytes = [0u8; 8];
@@ -192,7 +192,7 @@ fn media_key(filename: &str) -> Zeroizing<[u8; 32]>
         return Zeroizing::new(key);
     }
 
-    //NO KEY, OR A TRUNCATED ONE - THE HISTORY UNDER IT IS UNREADABLE EITHER WAY, SO START A NEW ONE
+    //NO KEY, OR A TRUNCATED ONE - START A NEW ONE
     let mut key = Zeroizing::new([0u8; 32]);
     SysRng.try_fill_bytes(key.as_mut()).expect("Failed to generate history key");
 
@@ -228,8 +228,7 @@ fn generate_pem_keys() -> (Zeroizing<String>, String) //CREATE ECC KEYS IN THE O
     (private_pem, public_pem.to_string())
 }
 
-//THE FILE IS 0600 WHEREVER IT LANDS, WHICH IS WHAT PROTECTS THE BYTES - THE CONFIG ROOT IS NOT 0700 LIKE
-//server_keys/ IS, SO THE NAME IS VISIBLE TO OTHER LOCAL USERS AND THE CONTENT IS NOT
+//THE FILE IS 0600 WHEREVER IT LANDS
 #[cfg(feature = "chat")]
 fn write_secure_key(path: String, data: &[u8]) //WRITE A SECRET TO DISK, READABLE BY NOBODY ELSE
 {
@@ -389,7 +388,7 @@ pub fn derive_shared_secret //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPT
         &mut combined
     ).unwrap();
 
-    //USE HKDF TO DERIVE SEPARATE ENCRYPTION AND MAC KEY
+    //HKDF SEPARATE ENCRYPTION AND MAC KEYS
     derive_encryption_keys(&combined, misc::get_version())
 }
 
@@ -410,6 +409,6 @@ pub fn decapsulate_pq(ephemeral: &Ephemeral, ciphertext: &Ciphertext<MlKem768>) 
 #[cfg(feature = "server")]
 impl Ephemeral
 {
-    //THE ECC HALF IS CONSUMED BY THE AGREEMENT, WHICH IS ALSO WHAT ENDS ITS LIFE
+    //THE AGREEMENT CONSUMES THE ECC HALF
     pub fn into_ecc(self) -> SecretKey { self.ecc }
 }

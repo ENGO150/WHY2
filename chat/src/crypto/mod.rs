@@ -114,7 +114,7 @@ impl RexPacketStream
         if data.len() < 32 { return None; }
         let (tag, ciphertext) = data.split_at(32);
 
-        //VERIFY BEFORE DECRYPTING (CONSTANT TIME); STREAM STAYS UNTOUCHED ON FAILURE
+        //VERIFY BEFORE DECRYPTING (CONSTANT TIME)
         self.mac(ciphertext).verify_slice(tag).ok()?;
         self.counter += 1;
 
@@ -297,11 +297,11 @@ fn disk_keys(salt: &[u8], ikm: &[u8]) -> DiskKeys
     const KEY_LEN: usize = consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT * 2;
     const NONCE_LEN: usize = consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT;
 
-    //GRID KEY, AT THE FULL KEYDIM SO Grid::from_key DOES NOT RE-DERIVE IT
+    //GRID KEY, AT THE FULL KEYDIM
     let mut key_bytes = Zeroizing::new(vec![0u8; KEY_LEN * 8]);
     hkdf.expand(b"WHY2-IMAGE-KEY", &mut key_bytes).expect("HKDF expand failed");
 
-    //NONCE, EXPANDED SEPARATELY SO IT SHARES NO MATERIAL WITH THE KEY
+    //NONCE, EXPANDED SEPARATELY
     let mut nonce_bytes = Zeroizing::new(vec![0u8; NONCE_LEN * 8]);
     hkdf.expand(b"WHY2-IMAGE-NONCE", &mut nonce_bytes).expect("HKDF expand failed");
 
@@ -376,7 +376,7 @@ pub fn history_keys() -> SharedKeys //AT-REST KEYS FOR THE MESSAGE HISTORY
 {
     let hkdf = Hkdf::<Sha256>::new(None, kex::history_key().as_ref());
 
-    //GRID KEY, AT THE FULL KEYDIM SO encrypt_packet DOES NOT RE-DERIVE IT
+    //GRID KEY, AT THE FULL KEYDIM
     const KEY_LEN: usize = consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT * 2;
 
     let mut key_bytes = Zeroizing::new(vec![0u8; KEY_LEN * 8]);
@@ -384,7 +384,7 @@ pub fn history_keys() -> SharedKeys //AT-REST KEYS FOR THE MESSAGE HISTORY
 
     let key = key_bytes.chunks_exact(8).map(|c| i64::from_be_bytes(c.try_into().unwrap())).collect();
 
-    //MAC KEY, EXPANDED SEPARATELY SO THE TAG NEVER SHARES MATERIAL WITH THE CIPHER
+    //MAC KEY, EXPANDED SEPARATELY
     let mut mac_key = Zeroizing::new(vec![0u8; 32]);
     hkdf.expand(b"WHY2-HISTORY-MAC", &mut mac_key).expect("HKDF expand failed");
 

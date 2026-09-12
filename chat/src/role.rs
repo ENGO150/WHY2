@@ -35,8 +35,7 @@ macro_rules! roles
 {
     ($($variant:ident => $name:literal,)+) =>
     {
-        //THE ORDER *IS* THE PERMISSION CHECK: EVERY GATE IN THE PROTOCOL IS `role >= Role::Something`,
-        //SO Ord IS DERIVED FROM THE DECLARATION ORDER AND THE VARIANTS RUN LOWEST RANK FIRST
+        //THE ORDER IS THE PERMISSION CHECK
         #[derive(SchemaWrite, SchemaRead, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
         pub enum Role
         {
@@ -76,7 +75,7 @@ impl FromStr for Role
 {
     type Err = ();
 
-    //A RANK IS ITS NAME EVERYWHERE IT IS READ - TYPED INTO /server role, AND STORED IN server_users.toml
+    //A RANK IS ITS NAME EVERYWHERE IT IS READ
     fn from_str(text: &str) -> result::Result<Self, Self::Err>
     {
         Self::ALL.iter().find(|role| role.name().eq_ignore_ascii_case(text.trim())).copied().ok_or(())

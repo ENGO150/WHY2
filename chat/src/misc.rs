@@ -80,7 +80,7 @@ pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
 
 pub async fn check_version(#[cfg(feature = "client_base")] tx: &Sender<ClientEvent>) //CHECK FOR LATEST WHY2 VERSION
 {
-    //FETCH METADATA (USE CUSTOM User-Agent, FOR CRATES.IO TO WORK) - BLOCKING HTTP, KEEP IT OFF THE RUNTIME
+    //FETCH METADATA (CUSTOM User-Agent, BLOCKING)
     let metadata_raw = match tokio::task::spawn_blocking(|| fetch_data(consts::METADATA_URL)).await
         .expect("Fetching versions panicked")
     {
@@ -108,7 +108,7 @@ pub async fn check_version(#[cfg(feature = "client_base")] tx: &Sender<ClientEve
         .and_then(|v| v.as_str())
         .unwrap();
 
-    //OUTDATED VERSION, CALCULATE HOW MANY NEWER VERSIONS EXIST
+    //OUTDATED VERSION, COUNT THE NEWER ONES
     let current_version = get_version();
     if current_version != newest_version
     {
@@ -177,8 +177,7 @@ pub fn is_image(header: &[u8]) -> bool //CHECK FOR SUPPORTED IMAGE
 
     if MAGIC.iter().any(|magic| header.starts_with(magic)) { return true; }
 
-    //THE OTHER TWO ARE NOT PLAIN PREFIXES: WEBP CARRIES ITS TAG BEHIND THE RIFF LENGTH, AND A NETPBM
-    //MAGIC IS ONLY TWO BYTES, SO THE WHITESPACE THE FORMAT DEMANDS AFTER IT IS PART OF THE CHECK
+    //WEBP SITS BEHIND THE RIFF LENGTH
     (header.len() >= 12 && header.starts_with(b"RIFF") && &header[8..12] == b"WEBP") ||
     (header.len() >= 3 && header[0] == b'P' && (b'1'..=b'7').contains(&header[1]) &&
         header[2].is_ascii_whitespace())
@@ -190,8 +189,6 @@ pub fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOA
     env::temp_dir().join(consts::UPLOADS_DIR).join(username)
 }
 
-//AN IMAGE IS KEPT, SO IT LIVES UNDER THE CONFIG DIR RATHER THAN IN TEMP - NOTHING ELSE SEPARATES
-//THE TWO, AND A TEMP DIR IS EXACTLY THE THING THE HOST IS FREE TO SWEEP BETWEEN RESTARTS
 #[cfg(feature = "server")]
 pub fn get_image_dir() -> PathBuf //DIRECTORY FOR PERSISTENT IMAGES
 {
@@ -232,8 +229,7 @@ pub fn restart() -> !
 
     let arguments: Vec<String> = env::args().skip(1).collect();
 
-    //ON UNIX THE PROCESS IMAGE IS REPLACED, KEEPING THE PID - WHATEVER SUPERVISES THE SERVER (systemd,
-    //docker) NEVER SEES IT GO AWAY, AND THE LISTENING SOCKET IS CLOSED BY THE exec ITSELF (CLOSE-ON-EXEC)
+    //REPLACE THE PROCESS IMAGE, KEEPING THE PID
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -244,8 +240,7 @@ pub fn restart() -> !
         log::error!("Restart failed: {error}");
     }
 
-    //EVERYWHERE ELSE THERE IS NO exec, SO THE REPLACEMENT IS STARTED BESIDE US AND WE STAND DOWN - IT CAN
-    //REACH ITS bind BEFORE WE ARE GONE, WHICH IS WHAT THE BINARY'S RETRY IS FOR
+    //START THE REPLACEMENT BESIDE US AND STAND DOWN
     #[cfg(not(unix))]
     match std::process::Command::new(&executable).args(&arguments).spawn()
     {

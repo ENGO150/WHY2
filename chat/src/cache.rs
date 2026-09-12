@@ -40,7 +40,7 @@ use crate::
 };
 
 //PRIVATE
-//WHICH SERVER'S CACHE WE ARE LOOKING AT. NO SESSION MEANS NO SCOPE, AND NOTHING IS READ OR WRITTEN
+//RESOLVE WHICH SERVER'S CACHE A HASH BELONGS TO
 fn scope(hash: &[u8; 32]) -> Option<(String, PathBuf)>
 {
     let fingerprint = options::get_fingerprint();
@@ -52,8 +52,7 @@ fn scope(hash: &[u8; 32]) -> Option<(String, PathBuf)>
     Some((fingerprint, path))
 }
 
-//THE OLDEST FILES GO UNTIL THE CACHE IS BACK UNDER ITS BOUND. mtime IS THE ORDER, AND EVERY HIT TOUCHES
-//THE FILE IT READ, SO WHAT IS DROPPED IS WHAT HAS NOT BEEN LOOKED AT RATHER THAN WHAT ARRIVED FIRST
+//DROP THE OLDEST FILES UNTIL THE CACHE FITS
 async fn evict(directory: &PathBuf)
 {
     let Ok(mut entries) = fs::read_dir(directory).await else { return };
@@ -84,7 +83,7 @@ async fn evict(directory: &PathBuf)
     }
 }
 
-//SEAL ONE PICTURE FOR DISK, THE SAME WAY THE SERVER SEALS ITS OWN: ENCRYPT-THEN-MAC, TAG LAST
+//SEAL ONE PICTURE FOR DISK: ENCRYPT-THEN-MAC
 fn seal(fingerprint: &str, hash: &[u8; 32], data: &[u8]) -> Option<Vec<u8>>
 {
     let (key, nonce, mac_key) = crypto::cache_keys(fingerprint, hash);
@@ -105,8 +104,7 @@ fn seal(fingerprint: &str, hash: &[u8; 32], data: &[u8]) -> Option<Vec<u8>>
 }
 
 //PUBLIC
-//IS THIS PICTURE HERE? ONE stat, NO KEY AND NO DECRYPT - THE CAPTION ONLY NEEDS TO KNOW WHETHER IT IS
-//WORTH OFFERING A BUTTON FOR, AND THE PICTURE ITSELF IS READ A MOMENT LATER ANYWAY
+//CHECK WHETHER A PICTURE IS CACHED
 pub async fn has(hash: &[u8; 32]) -> bool
 {
     let Some((_, path)) = scope(hash) else { return false };
@@ -114,9 +112,7 @@ pub async fn has(hash: &[u8; 32]) -> bool
     fs::try_exists(&path).await.unwrap_or(false)
 }
 
-//READ ONE CACHED PICTURE BACK. THE KEYS IT WAS SEALED WITH COME FROM THE FINGERPRINT AND THE HASH THE
-//FILE IS NAMED AFTER, SO THE TAG SAYS THREE THINGS AT ONCE: THAT WE WROTE IT, THAT IT IS WHOLE, AND THAT
-//IT IS THE PICTURE THIS NAME PROMISES. NOTHING IS DECRYPTED UNTIL IT VERIFIES
+//READ ONE CACHED PICTURE BACK, VERIFYING IT
 pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
 {
     let (fingerprint, path) = scope(hash)?;
@@ -125,9 +121,7 @@ pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
 
     let (key, nonce, mac_key) = crypto::cache_keys(&fingerprint, hash);
 
-    //A FILE THAT DOES NOT VERIFY IS NOT A PICTURE WE CAN EVER USE, AND store WILL NOT OVERWRITE IT
-    //BECAUSE THE NAME IS THE CONTENT - SO IT GOES, AND THE NEXT FETCH REFILLS IT. A HALF-WRITTEN FILE
-    //LEFT BY A CRASH OR A FULL DISK IS EXACTLY THIS CASE
+    //DELETE A FILE THAT DOES NOT VERIFY
     let Some(ciphertext) = crypto::disk_open(&mac_key, &sealed) else
     {
         let _ = fs::remove_file(&path).await;
@@ -143,8 +137,7 @@ pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
     let mut image = crypto::i64_to_bytes(&decrypted);
     image.truncate(ciphertext.len());
 
-    //A HIT IS A USE, AND THE EVICTION ORDER IS THE ONLY THING THAT CARES. ONE utimensat IS NOT WORTH A
-    //TASK OF ITS OWN, AND A FAILURE ONLY COSTS THIS PICTURE ITS PLACE IN THE QUEUE
+    //TOUCH THE FILE FOR THE EVICTION ORDER
     if let Ok(file) = std::fs::File::options().write(true).open(&path)
     {
         let _ = file.set_times(FileTimes::new().set_modified(SystemTime::now()));
@@ -153,13 +146,12 @@ pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
     Some(image)
 }
 
-//AND KEEP ONE. THE BYTES ARE WHAT CAME OFF THE WIRE, NOT WHAT THEY DECODED TO: THE PICTURE IS REFITTED
-//AT EVERY PANE WIDTH, SO IT IS THE SOURCE THAT IS WORTH KEEPING
+//SEAL AND STORE THE BYTES OFF THE WIRE
 pub async fn store(hash: &[u8; 32], data: &[u8])
 {
     let Some((fingerprint, path)) = scope(hash) else { return };
 
-    //NOTHING IS OVERWRITTEN - THE NAME IS THE CONTENT, SO A FILE THAT IS THERE IS ALREADY THIS PICTURE
+    //NOTHING IS OVERWRITTEN - THE NAME IS THE CONTENT
     if fs::try_exists(&path).await.unwrap_or(false) { return; }
 
     let Some(directory) = path.parent().map(PathBuf::from) else { return };

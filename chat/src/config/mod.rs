@@ -133,11 +133,11 @@ where
         return string_value.parse::<T>().expect("Parsing config value failed");
     }
 
-    //KEYS NOT FOUND IN CONFIG, FETCH CONFIG AND INSERT NEW KEY
+    //KEY NOT IN CONFIG, INSERT IT
     let mut default_config: DocumentMut = get_config().parse().expect("Failed to parse config");
     for (key, old_value) in data.as_table()
     {
-        //NEW CONFIG CONTAINS SAME KEY AS THE OLD ONE, USE OLD VALUE
+        //KEY IS IN BOTH, USE THE OLD VALUE
         if let Some(item) = default_config.get_mut(key)
         {
             //COPY OLD VALUE
@@ -156,7 +156,7 @@ fn set_value(table: &mut Table, key: &str, value: Value) //ASSIGN ONE KEY, KEEPI
 {
     if let Some(item) = table.get_mut(key)
     {
-        //KEEP THE TRAILING COMMENT THE DEFAULT CONFIG SHIPPED WITH
+        //KEEP THE DEFAULT CONFIG'S TRAILING COMMENT
         let decor = item.as_value().map(|old| old.decor().clone());
         let mut value = value;
 

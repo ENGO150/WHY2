@@ -33,8 +33,7 @@ use crate::
     },
 };
 
-//THE HEADING A KEY SITS UNDER - THE LAST COMMENT BLOCK ABOVE IT. THE LICENSE BLOCK AT THE TOP OF THE FILE
-//IS NOT ONE: IT IS SEPARATED FROM THE FIRST KEY BY A BLANK LINE, WHICH IS WHAT STARTS THE BLOCK OVER
+//THE HEADING A KEY SITS UNDER
 fn heading(prefix: &str) -> Option<String>
 {
     let mut heading = None;
@@ -50,8 +49,7 @@ fn heading(prefix: &str) -> Option<String>
     heading
 }
 
-//EVERY KEY OF server.toml AS THE CLIENT EDITS IT. THE FILE ITSELF IS THE LIST - NOTHING HERE NAMES A KEY,
-//SO A KEY ADDED TO THE DEFAULT CONFIG SHOWS UP IN THE OVERLAY WITHOUT ANY FURTHER WORK
+//EVERY KEY OF server.toml AS THE CLIENT EDITS IT
 pub fn all() -> Vec<ServerSetting>
 {
     let data = super::get_data(&super::config_path(consts::SERVER_CONFIG));
@@ -62,10 +60,10 @@ pub fn all() -> Vec<ServerSetting>
 
     for (key, item) in table.iter()
     {
-        //A KEY OF A DATATYPE THE CONFIG READER DOES NOT UNDERSTAND HAS NO ROW TO BE EDITED IN
+        //A DATATYPE THE CONFIG READER DOES NOT UNDERSTAND
         let Some(value) = item.as_value() else { continue };
 
-        //THE HEADING CARRIES DOWN THE FILE UNTIL THE NEXT ONE
+        //THE HEADING CARRIES DOWN TO THE NEXT ONE
         if let Some(prefix) = table.key(key).and_then(|key| key.leaf_decor().prefix()).and_then(RawString::as_str)
             && let Some(found) = heading(prefix)
         {
@@ -89,7 +87,7 @@ pub fn all() -> Vec<ServerSetting>
             section: section.clone(),
             description,
 
-            //SAVING ONE OF THESE STORES IT, AND THE RUNNING SERVER GOES ON USING WHAT IT READ AT STARTUP
+            //THESE ARE STORED BUT NOT USED UNTIL A RESTART
             restart: consts::SERVER_RESTART_SETTINGS.contains(&key),
         });
     }
@@ -97,8 +95,7 @@ pub fn all() -> Vec<ServerSetting>
     settings
 }
 
-//STORE WHAT THE CLIENT SENT BACK, RETURNING HOW MANY ROWS WERE ACCEPTED. A KEY THE CONFIG DOES NOT ALREADY
-//HAVE, OR ONE THAT COMES BACK AS A DIFFERENT DATATYPE, IS DROPPED - THE CLIENT DOES NOT GET TO INVENT KEYS
+//STORE THE CLIENT'S ROWS, DROPPING UNKNOWN ONES
 pub fn write(settings: &[ServerSetting]) -> usize
 {
     let data = super::get_data(&super::config_path(consts::SERVER_CONFIG));
@@ -119,7 +116,7 @@ pub fn write(settings: &[ServerSetting]) -> usize
         Some((setting.key.as_str(), value))
     }).collect();
 
-    //ONE PASS OVER THE DOCUMENT, SO THE FILE IS REWRITTEN ONCE NO MATTER HOW MANY ROWS CHANGED
+    //ONE PASS, SO THE FILE IS REWRITTEN ONCE
     super::with_cached_mut(&super::config_path(consts::SERVER_CONFIG), |doc|
     {
         for (key, value) in &accepted { super::set_value(doc.as_table_mut(), key, value.clone()); }

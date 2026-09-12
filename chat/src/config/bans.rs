@@ -32,8 +32,7 @@ use crate::
     network::codes::BanEntry,
 };
 
-//ADD ONE SUBJECT TO A LIST OF server_bans.toml. USERNAMES AND ADDRESSES GET A LIST OF THEIR OWN SO A
-//USERNAME THAT LOOKS LIKE AN ADDRESS - OR THE OTHER WAY AROUND - CANNOT BAN THE WRONG SUBJECT
+//BAN ONE USERNAME OR ADDRESS
 fn set_ban(doc: &mut DocumentMut, section: &str, key: &str)
 {
     //A MISSING LIST BECOMES AN EMPTY ONE FIRST
@@ -44,7 +43,7 @@ fn set_ban(doc: &mut DocumentMut, section: &str, key: &str)
 
     let bans = doc.get_mut(section).and_then(Item::as_array_mut).expect("Ban list is not an array");
 
-    //BEING ON THE LIST IS THE WHOLE BAN, SO BANNING TWICE MUST NOT LIST THE SUBJECT TWICE
+    //BANNING TWICE MUST NOT LIST THE SUBJECT TWICE
     if !bans.iter().any(|ban| ban.as_str() == Some(key)) { bans.push(key); }
 }
 

@@ -68,8 +68,7 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
         return Vec::new();
     };
 
-    //A HISTORY THAT WILL NOT VERIFY IS DROPPED RATHER THAN REFUSED, WHICH IS WORTH SAYING OUT LOUD: IT IS
-    //ALSO WHAT A FILE WRITTEN UNDER ANOTHER SERVER'S KEY, OR A TAMPERED ONE, LOOKS LIKE FROM HERE
+    //A HISTORY THAT WILL NOT VERIFY IS DROPPED
     let Some(plaintext) = crypto::decrypt_packet::
         <{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(bytes, &KEYS)
     else
@@ -131,7 +130,7 @@ pub fn store_image(username: &str, filename: &str, hash: &[u8; 32])
 
 fn push(message: Record) //APPEND ONE ENTRY AND REWRITE THE FILE
 {
-    //A HISTORY OF NOTHING IS NOT A HISTORY - DO NOT TOUCH THE FILE AT ALL
+    //A HISTORY OF NOTHING DOES NOT TOUCH THE FILE
     let limit: usize = super::read_config("max_persistent_messages");
     if limit == 0 { return; }
 
@@ -139,13 +138,11 @@ fn push(message: Record) //APPEND ONE ENTRY AND REWRITE THE FILE
 
     history.push(message);
 
-    //THE HISTORY IS A WINDOW OVER THE LAST limit MESSAGES, SO THE OLDEST GO AS THE NEW ONES ARRIVE
+    //KEEP THE LAST limit MESSAGES
     let over = history.len().saturating_sub(limit);
     let dropped: Vec<[u8; 32]> = history.drain(..over).filter_map(|message| message.image).collect();
 
-    //AND A PICTURE IS KEPT BY THE HISTORY AND BY NOTHING ELSE, SO AN ENTRY LEAVING THE WINDOW IS THE END
-    //OF IT. THE SAME PICTURE POSTED TWICE IS ONE FILE (IT IS NAMED AFTER ITS CONTENT), SO WHAT IS LEFT
-    //HAS TO BE ASKED FIRST - THE OLDER LINE GOING DOES NOT TAKE THE NEWER ONE'S PICTURE WITH IT
+    //A PICTURE ANOTHER ENTRY STILL NAMES STAYS
     let orphans: Vec<[u8; 32]> = dropped.into_iter()
         .filter(|hash| !history.iter().any(|message| message.image.as_ref() == Some(hash)))
         .collect();
@@ -156,7 +153,7 @@ fn push(message: Record) //APPEND ONE ENTRY AND REWRITE THE FILE
 
     fs::write(path(), sealed).expect("Saving message history failed");
 
-    drop(history); //THE FILES ARE NOT THE HISTORY'S BUSINESS - THE LOCK IS DONE WITH
+    drop(history); //THE FILES ARE NOT THE HISTORY'S BUSINESS
 
     if !orphans.is_empty() { log::info!("Dropping {} stored images with no history entry left", orphans.len()); }
 
@@ -168,17 +165,14 @@ pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
     HISTORY.lock().unwrap().iter().any(|message| message.image.as_ref() == Some(hash))
 }
 
-//EVERY PICTURE THE HISTORY DOES NOT NAME IS SCRAP: NOTHING ELSE EVER POINTS AT server_images/, SO A FILE THAT
-//OUTLIVED ITS ENTRY CAN ONLY SIT THERE - AN UPLOAD ABANDONED HALFWAY, A CRASH BETWEEN THE RENAME AND THE
-//ENTRY, A HISTORY DISCARDED WHOLE BY DROPPING ITS KEY. THIS IS A STARTUP JOB AND HAS TO STAY ONE: AN
-//UPLOAD IN FLIGHT IS BUILT IN THAT SAME DIRECTORY UNDER ITS UID, AND A SWEEP WOULD TAKE IT
+//DELETE EVERY PICTURE THE HISTORY DOES NOT NAME
 pub fn sweep_images()
 {
     let Ok(directory) = fs::read_dir(misc::get_image_dir()) else { return }; //NO DIRECTORY, NOTHING TO SWEEP
 
     let files: Vec<_> = directory.flatten().map(|entry| entry.path()).collect();
 
-    //AN EMPTY DIRECTORY IS NOT WORTH TOUCHING THE HISTORY OVER - THE FIRST READ OF IT MINTS ITS AT-REST KEY
+    //AN EMPTY DIRECTORY IS NOT WORTH A HISTORY READ
     if files.is_empty() { return; }
 
     let kept: HashSet<String> = HISTORY.lock().unwrap().iter()
@@ -206,7 +200,7 @@ pub fn all() -> Vec<StoredMessage>
 
     history.into_iter().map(|message|
     {
-        //WHAT server_users.toml HOLDS FOR THEM RIGHT NOW - THE RECORD ITSELF CARRIES NO COLOR TO PREFER
+        //WHAT server_users.toml HOLDS FOR THEM NOW
         let stored = looked_up.entry(message.username.clone())
             .or_insert_with(|| super::users::colors(&message.username));
 

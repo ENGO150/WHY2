@@ -64,8 +64,7 @@ const BIND_ATTEMPTS: usize = 15;   //~3 SECONDS OF THEM
 const BIND_RETRY_DELAY: u64 = 200; //MS BETWEEN THEM
 
 //FUNCTIONS
-//THE PORT IS WAITED FOR RATHER THAN GIVEN UP ON AT THE FIRST TRY: A RESTART ON A PLATFORM WITHOUT exec
-//STARTS THE REPLACEMENT BESIDE THE OLD PROCESS, WHICH MAY STILL BE HOLDING IT FOR A MOMENT
+//BIND, RETRYING WHILE THE PORT IS STILL HELD
 async fn bind<T>(what: &str, address: &str, bind: impl AsyncFn() -> Result<T>) -> T
 {
     let mut last = None;
@@ -98,7 +97,7 @@ async fn quit() //DISCONNECT ALL USERS
 #[tokio::main]
 async fn main()
 {
-    //THE CONFIG COMES FIRST - THE LOG LEVEL IS IN IT, AND NOTHING BEFORE THE LOGGER HAS ANYTHING TO SAY
+    //THE CONFIG COMES FIRST - THE LOG LEVEL IS IN IT
     config::init_config(); //CREATE server.toml CONFIGURATION
 
     //INIT LOGGER
@@ -111,7 +110,7 @@ async fn main()
         .init()
         .unwrap();
 
-    config::users::migrate(); //GIVE server_users.toml ENTRIES FROM BEFORE THE COLORS MOVED HERE THEIR DEFAULTS
+    config::users::migrate(); //DEFAULT THE COLOR KEYS IN OLDER ENTRIES
 
     log::info!("WHY2 server v{}{}, log level {level}", misc::get_version(), if !env!("WHY2_GIT_HASH").is_empty()
     {
@@ -147,7 +146,7 @@ async fn main()
 
     log::info!("Listening on {address}"); //PRINT INFO
 
-    //WHAT THIS SERVER WILL AND WILL NOT DO, ONCE, RATHER THAN GUESSED AT FROM THE PACKETS THAT GET REFUSED
+    //WHAT THIS SERVER WILL AND WILL NOT DO
     log::info!
     (
         "Voice: {}, screenshare: {}, registration: {}, version check: {}, history: {}, spam protection: {}",
@@ -225,7 +224,7 @@ async fn main()
                     continue;
                 }
 
-                //TAKE A HANDSHAKE SLOT - AN UNIDENTIFIED SOCKET COUNTS AGAINST NO OTHER LIMIT
+                //TAKE A HANDSHAKE SLOT
                 let slot = match HandshakeSlot::reserve(peer_addr.ip())
                 {
                     Some(s) => s,
@@ -236,8 +235,7 @@ async fn main()
                     }
                 };
 
-                //READ THE HEADER IN THE CONNECTION'S OWN TASK, NEVER HERE: A PEER THAT CONNECTS AND SAYS
-                //NOTHING WOULD OTHERWISE HOLD THE ACCEPT LOOP FOR THE WHOLE TIMEOUT, ONE SOCKET AT A TIME
+                //READ THE HEADER IN THE CONNECTION'S OWN TASK
                 tokio::spawn(async move
                 {
                     let _slot = slot; //RELEASED HOWEVER THE HANDSHAKE ENDS
@@ -255,8 +253,7 @@ async fn main()
 
                         if let Some((_, (id, conn_type, _))) = server::PENDING_TOKENS.remove(&token)
                         {
-                            //AN AUXILIARY SOCKET IS LOGGED AS THE CONNECTION THAT ASKED FOR IT - ITS OWN
-                            //ADDRESS IS AN EPHEMERAL PORT NOTHING ELSE IN THE LOG EVER NAMES
+                            //LOG AN AUXILIARY SOCKET AS ITS MAIN CONNECTION
                             let owner = server::log_addr(&id);
 
                             match conn_type
@@ -308,7 +305,7 @@ async fn main()
                                     //A SHARE'S BACKLOG IS LATENCY, NOT CAPACITY
                                     screen::cap_socket_buffers(&stream);
 
-                                    //ONLY THE WRITE HALF IS EVER USED FOR AN ATTACHED VIEWER
+                                    //ONLY THE WRITE HALF IS USED FOR A VIEWER
                                     let (_read_stream, write_stream) = stream.into_split();
 
                                     let attached = if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
@@ -321,12 +318,10 @@ async fn main()
                                         keys.map(|keys| (stream, keys))
                                     } else { None };
 
-                                    //THE GUARD IS GONE BY HERE - log_addr AND THE SHARE MAP ARE WALKED WITHOUT IT
+                                    //THE GUARD IS GONE BY HERE
                                     match attached
                                     {
-                                        //THE VIEWER'S TASK IS BUILT HERE, NOT ON THE SHARE'S NEXT FRAME: A STILL
-                                        //DESKTOP SENDS ONE EVERY `FORCED_INTRA_INTERVAL`, AND WAITING FOR IT IS
-                                        //THE BLACK RECTANGLE AN ATTACH USED TO OPEN ON
+                                        //BUILD THE VIEWER'S TASK HERE
                                         Some((stream, keys)) => match screen_server::attach(sharer_id, id, &keys, stream, token)
                                         {
                                             true => log::info!("Auxiliary connection (screen viewer): {owner} watching {}",

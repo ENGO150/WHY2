@@ -75,7 +75,7 @@ pub enum Command
     Invalid,                                    //INVALID COMMAND
 }
 
-//ONE ACTION OF A COMMAND THAT TAKES ONE - THE COMMAND WORD ALONE DOES NOTHING (/server mute <id>)
+//ONE ACTION OF A COMMAND (/server mute <id>)
 #[derive(Clone, PartialEq)]
 pub enum Subcommand
 {
@@ -91,8 +91,7 @@ pub enum Subcommand
     Settings, //SERVER CONFIGURATION
 }
 
-//A PARAMETER WITH A CLOSED SET OF ANSWERS - THE PALETTE OFFERS THEM INSTEAD OF LEAVING THE USER GUESSING.
-//THE VARIANT ONLY NAMES THE SET; THE VALUES THEMSELVES LIVE WHERE THEY ARE ALREADY DEFINED (colors::COLORS)
+//A PARAMETER THE PALETTE CAN OFFER ANSWERS FOR
 #[derive(Clone, Copy, PartialEq)]
 pub enum ArgValues
 {
@@ -111,7 +110,7 @@ pub struct CommandArg //COMMAND PARAMETER
     pub values: ArgValues, //WHAT MAY BE TYPED HERE, WHEN THAT IS A KNOWN, SHORT LIST
 }
 
-pub struct SubcommandInfo //SUBCOMMAND INFO - CARRIES ITS OWN ROLE, SO ONE COMMAND CAN HOLD ACTIONS OF DIFFERENT RANKS
+pub struct SubcommandInfo //SUBCOMMAND INFO
 {
     pub subcommand: Subcommand,
     pub triggers: &'static [&'static str],
@@ -672,10 +671,10 @@ pub const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 //IMPLEMENTATIONS
 impl CommandInfo
 {
-    //THE COMMAND IS OFFERED TO role - HIDING IT IS COSMETIC, THE SERVER STILL CHECKS EVERY PRIVILEGED PACKET ITSELF
+    //WHETHER role IS OFFERED THE COMMAND
     pub fn available(&self, role: Role) -> bool
     {
-        //A COMMAND THAT IS NOTHING BUT A DOORWAY TO ITS ACTIONS IS WORTH SHOWING ONLY WHILE ONE OF THEM IS LEFT
+        //HIDE A DOORWAY COMMAND WITH NO ACTIONS LEFT
         role >= self.minimal_role && (self.subcommands.is_empty() || self.actions(role).next().is_some())
     }
 
@@ -694,8 +693,7 @@ impl SubcommandInfo
 {
     pub fn available(&self, role: Role) -> bool { role >= self.minimal_role }
 
-    //WHETHER THE WHOLE PARAMETER IS A TARGET ID - THE REST TAKE THEIR PARAMETER AS TEXT, AND AN ACTION
-    //THAT TAKES AN ID *AND* SOMETHING ELSE (Role) SPLITS IT ITSELF
+    //WHETHER THE WHOLE PARAMETER IS A TARGET ID
     pub fn takes_id(&self) -> bool
     {
         matches!(self.subcommand, Subcommand::Mute
@@ -757,9 +755,7 @@ impl Command
             Command::List => Some(Ok(PacketCode::List { users: None })),
             Command::Files => Some(Ok(PacketCode::Files { users: None })),
 
-            //THE MONITOR IS PICKED ON THIS MACHINE AND NEVER LEAVES IT - THE SERVER ONLY EVER TOGGLES THE
-            //SHARE. THE PICK LASTS EXACTLY AS LONG AS THE SHARE DOES (THE STOP CLEARS IT), SO A BARE
-            //COMMAND ALWAYS STARTS ON THE DEFAULT MONITOR, AND NAMING ANOTHER ONE MID-SHARE SWAPS TO IT.
+            //RESOLVE THE MONITOR LOCALLY
             #[cfg(feature = "client_screen")]
             Command::Screen =>
             {
@@ -767,21 +763,16 @@ impl Command
 
                 let Some(selection) = parameters.map(str::trim).filter(|m| !m.is_empty()) else
                 {
-                    //NO MONITOR NAMED: STOP THE SHARE, OR START ONE ON THE DEFAULT MONITOR
+                    //NO MONITOR NAMED: TOGGLE THE SHARE
                     if !sharing { screen_options::set_monitor(None); }
 
                     return Some(Ok(PacketCode::Screen { token: None }));
                 };
 
-                //RESOLVED BEFORE IT IS STORED, SO A MONITOR THAT DOES NOT EXIST IS REFUSED ON THE SPOT
-                //RATHER THAN STARTING A SHARE THAT DIES, AND SO WHAT IS COMPARED BELOW IS THE MONITOR
-                //ITSELF RATHER THAN WHICHEVER OF ITS TWO SPELLINGS WAS TYPED
+                //RESOLVE BEFORE STORING, SO AN UNKNOWN ONE FAILS
                 let Ok(monitor) = screen_capture::resolve_monitor(selection) else { return Some(Err(())) };
 
-                //THE MONITOR WE ARE ALREADY ON ENDS THE SHARE, LIKE A BARE /screen: ASKING FOR WHAT IS
-                //ALREADY ON THE WIRE IS THE ONE CASE WHERE A SWAP WOULD MEAN NOTHING. THE PICK IS LEFT
-                //ALONE HERE - IT IS THE SHARE STOPPING THAT CLEARS IT, AND SWAPPING TO THE MONITOR WE
-                //ARE ABOUT TO STOP CAPTURING WOULD ONLY MAKE THE CAPTURE RESTART ON ITS WAY OUT
+                //NAMING THE CAPTURED MONITOR ENDS THE SHARE
                 if sharing && screen_capture::current_monitor().is_some_and(|current| current == monitor)
                 {
                     return Some(Ok(PacketCode::Screen { token: None }));
@@ -789,8 +780,7 @@ impl Command
 
                 screen_options::set_monitor(Some(monitor));
 
-                //SWAP THE CAPTURE OVER INSTEAD OF TOGGLING: THE SERVER ONLY EVER KNOWS *THAT* WE ARE
-                //SHARING, SO THE RUNNING CAPTURE PICKS THE NEW MONITOR UP AND NOTHING IS SENT AT ALL
+                //SWAP THE RUNNING CAPTURE OVER, SENDING NOTHING
                 if sharing { return None; }
 
                 Some(Ok(PacketCode::Screen { token: None }))
@@ -799,8 +789,7 @@ impl Command
             #[cfg(feature = "client_screen")] Command::Deattach => Some(Ok(PacketCode::Deattach { username: None } )),
             #[cfg(feature = "client_screen")] Command::Screens => Some(Ok(PacketCode::Screens { users: None })),
 
-            //THE SAME PACKET AS /exit - THE TWO DIFFER ONLY IN WHAT THE CLIENT DOES WITH THE DISCONNECT
-            //THAT COMES BACK: ONE ENDS THE PROCESS, THE OTHER LANDS IN THE CONNECT BOX
+            //SAME PACKET AS /exit
             Command::Exit | Command::Logout => Some(Ok(PacketCode::Disconnect)),
             #[cfg(feature = "client_voice")] Command::Voice => Some(Ok(PacketCode::Voice { token: None })),
 

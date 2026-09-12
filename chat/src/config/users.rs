@@ -45,7 +45,7 @@ fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD O
     {
         let users = doc.as_table_mut();
 
-        //A MISSING OR LEGACY FLAT ENTRY BECOMES AN EMPTY SUBTABLE FIRST
+        //A MISSING OR FLAT ENTRY BECOMES A SUBTABLE
         if users.get(username).and_then(Item::as_table_like).is_none()
         {
             users.insert(username, Item::Table(Table::new()));
@@ -82,8 +82,7 @@ pub fn colors(username: &str) -> MessageColors //RETURN COLORS OF username
     }
 }
 
-//STORE ONE OF THE COLORS OF username, BY NAME. THE CODE COMES OFF THE WIRE, SO ONE OUTSIDE THE TABLE IS
-//STORED AS NO COLOR RATHER THAN REFUSED - colors::name IS THE CHECK
+//STORE ONE OF username's COLORS, BY NAME
 pub fn set_color(username: &str, username_color: bool, code: u8)
 {
     let key = COLOR_KEYS[usize::from(!username_color)];
@@ -103,7 +102,7 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
     write_user_field(username, "password", hash.into()); //PASSWORD
     set_role(username, if first_user { Role::Owner } else { Role::User }); //ROLE (OWNER IF THIS IS THE FIRST USER)
 
-    //NO COLORS YET, BUT THE KEYS ARE THERE - THE FILE SAYS WHAT IS SETTABLE
+    //NO COLORS YET, BUT THE KEYS ARE THERE
     for key in COLOR_KEYS { write_user_field(username, key, colors::NONE.into()); }
 
     first_user
