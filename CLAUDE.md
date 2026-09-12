@@ -683,6 +683,37 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   session it lands in — the server updates the live `Connection` and tells that client, whose
   `App::role` is what the palette and `/help` read — so the per-connection role is re-read on every
   packet rather than latched at login.
+- **The chat colors are the server's, and the client neither stores nor sends them.** `/color` and `/ucolor`
+  are unchanged from where the user stands, but `color_handler` only asks: it sends
+  `PacketCode::Colors { username, color }` — which of the two, and the code — and the server stores it under
+  the user's entry in `server_users.toml` (`config::users::set_color`). The packet coming back is the whole
+  answer, since there is nothing for the client to keep; it is what prints "Color set successfully.".
+  - **A message is painted on the way out.** `listen_client`'s `Message` arm drops whatever colors the
+    packet arrived with and fills in `config::users::colors(&username)` — a sender no more names its own
+    colour than it names its own id or username, all three of which the server has always filled in. A
+    client sends `MessageColors` empty. The same lookup is what an image line's `username_color` now comes
+    from (the `Upload`/`Image` arm), so `PacketCode::Image` no longer carries one at all; the colour is
+    taken at the request and rides the token to the upload socket as it did before.
+  - That is what makes the colour **global across devices** without a second copy anywhere: `client.toml`
+    has no colour keys (only `disable_colors`, which is a local preference), and there is no session value
+    for them either — the client never learns its own colours, because nothing it draws needs them. Every
+    line in the pane, its own included, is painted from the colors the *server* put on that packet.
+  - **A code is stored as its name.** `colors::COLORS` (the 16 names, in wire order) moved out of the
+    client binary into the library for this: the wire carries a position in that list, but a file an
+    operator opens should say `username_color = "red"`, and a name survives a reordering of the list that a
+    position would silently repaint. `colors::name` is also the validation — a code off the wire is a
+    client's word, and anything outside the table stores as `"none"` rather than being refused. The
+    client's own `colors.rs` is left with the crossterm half alone, deriving each `Color` from the name via
+    `Color::try_from` (every one of the 16 is a name crossterm parses, which is what made the pair table it
+    used to hold redundant) and re-exporting `colors::code` so a typed name is resolved in one place.
+    `to_color` goes straight through that lookup: `ansi_(n)` and `rgb_(r,g,b)` are colours a code cannot
+    carry, and are refused where they are typed rather than accepted and then ignored on every message.
+  - **`config::users::migrate()`** (called from `bin/server.rs` right after the logger, and marked in the
+    code to go with the next version bump) writes the two keys into entries that predate them, in one pass
+    over the document. `colors()` would read a missing key as no
+    colour anyway — the point is that every entry has the same shape and the file states what is settable.
+    A legacy *flat* entry is left alone; `write_user_field` turns one into a subtable the first time
+    anything is stored for it.
 - **`config/mod.rs`** — TOML config for client (`client.toml`) and server (`server.toml`), plus
   server user store (`server_users.toml`), server ban list (`server_bans.toml`) and server keypair
   storage (`server_keys/{private,public}`), all under `WHY2_CONFIG_DIR`
@@ -697,8 +728,17 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
 - **`config/messages.rs`** (feature `server`) — the lobby's message history, off by default
   (`persistent_messages`), kept as the last `max_persistent_messages` messages. **It is the one
   thing under the config dir that is not TOML**: `server_messages.bin` is a `wincode`-encoded
-  `Vec<StoredMessage>`, the same encoding the packets use, so a message is stored the way it is sent
-  — colors and all — instead of being flattened into text.
+  `Vec<Record>`, the same encoding the packets use, so a message is stored the way it is sent instead
+  of being flattened into text.
+  - **`Record` is not `StoredMessage`, and the difference is the colors.** What is kept is who said
+    it, what they said and the picture if it was one; the colors are looked up per sender in `all()`
+    and put on the wire `StoredMessage` there. So a replay is painted the way the sender looks **now**
+    — somebody who recolours themselves recolours everything they ever said, which is what the colors
+    living on the account rather than in the packet means once there is a file involved. It also means
+    the file cannot hold a colour that no longer exists, `/color` never has to rewrite a history, and an
+    existing history can be carried across the format change by dropping a field rather than a file.
+    The lookup is per sender, not per line: a colour is a couple of reads of `server_users.toml`, and a
+    history is routinely a handful of people saying `max_persistent_messages` things.
   - **It is encrypted at rest, authenticated, under a key nobody has to manage.**
     `crypto::history_keys` HKDFs the `why2` grid key and the HMAC key out of `kex::history_key` — 32
     random bytes in `server_keys/history_key`, written the first time the history is touched — and
@@ -722,8 +762,14 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     textbook keystream reuse.
   - **The in-memory `HISTORY` is the working set**, and the file is the copy of it that survives a
     restart: it is read once, on first touch, and only ever written after that. A missing, truncated,
-    tampered, older-format file, or one written under another server's keys, all load as an empty
+    tampered, unrecognisable file, or one written under another server's keys, all load as an empty
     history rather than refusing to start.
+    The one older format that is *not* thrown away is the one with the colors still in the record
+    (`migrate`, marked in the code to go with the next version bump): it is read as the shape it is and
+    the colors dropped, since `all()` puts them back on every line from the account anyway. It converts
+    **in memory only** — the next message rewrites the file, and until one arrives a restart simply
+    costs the same read again, which is cheaper than a rewrite on a path that has not been asked to
+    write anything yet.
   - **Only the lobby has one.** A channel exists exactly as long as somebody is in it, so there is
     nothing to keep it against; `server::listen_client`'s `Message` arm stores only while
     `channel.is_none()`.
@@ -731,20 +777,22 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     drop each other's message or leave a half-written file behind.
   - The history is sent once, as `PacketCode::History`, immediately after `Accept` (`send_history`)
     — every client starts in the lobby, so a channel switch has nothing to replay and asks for
-    nothing. `StoredMessage` keeps the username, the text and the colors, but **no id**: the session
+    nothing. The packet keeps the username, the text and the colors, but **no id**: the session
     that said it is gone and whoever holds that id now is somebody else. The client replays it as
     `state::Entry::History` — an ordinary chat line rendered through `Theme::render` (so
     `disable_colors` reaches it like any other message) minus the id column, under a
     `Message history (n):` heading that is what separates it from what is being said now.
   - **An image line carries the sender's username color, the way a message does.** It is the username
     color *only*: an image line's text is the filename, which is the client's own wording and not
-    something the sender typed, so there is no message color to keep and `StoredMessage`'s stays
-    `None`. The server has no standing notion of a client's colors — they arrive with each
-    `PacketCode::Message` — so the upload request carries it (`PacketCode::Image`), the token it mints
-    holds it until the upload socket attaches (`ConnectionType::Image`), and `PacketCode::ImageDisplay`
-    hands it to the clients watching live so a picture looks the same before and after a restart. A
-    fileshare puts up no line and has none, which is why `download`'s `username_color` is the image
-    path's alone while `persistent` stays what says an upload is one.
+    something the sender typed, so there is no message color to keep and the packet's stays `None`.
+    It is looked up where the line is built — `all()` for a replay, and
+    `config::users::colors(&username).username_color` beside each `PacketCode::ImageDisplay` for the
+    clients watching live (`file/server.rs` after an upload, the `Upload`/`Image` arm for a picture the
+    history already holds) — so a picture looks the same before and after a restart without anything
+    carrying a colour for it. Nothing on the upload path does: `PacketCode::Image` has no colour field
+    and neither does `ConnectionType::Image`, since the colour is a lookup at the point of use and a
+    token is not the place to park one. A fileshare puts up no line and has none, which is why
+    `persistent` is all `download` needs to tell the two apart.
     It reaches a consumer of the crate through the events, not only through the packet: a library user
     only ever sees `ClientEvent`, so every one of the four a live picture can put a line up with carries
     it — `ImageDisplay`, `ImagePending` (the caption a cache miss puts up before the fetch),
