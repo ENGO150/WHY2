@@ -804,6 +804,16 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
 - **`bin/client/`** — the client entrypoint (`mod.rs`), the full-screen TUI (`tui/`, ratatui over
   the crossterm backend), and color handling (`colors.rs`).
 
+  **The TUI's tuning knobs all live in `tui/consts.rs`**, the way the library's do in `consts.rs` and
+  the two protocol extensions' do in `network/{screen,voice}/consts.rs` — pane and layout sizes,
+  the redraw interval, popup row counts, the button labels, the markup/math limits. A new one goes
+  there rather than at the top of the file that reads it: half of them are read by `draw.rs` as well
+  as by the module that owns the behaviour, and as file-local consts they were being reached for
+  across modules (`palette::MAX_ROWS`, `tofu::CHALLENGE`) which is a const module with extra steps.
+  What deliberately stays out is anything that is not a knob: `theme.rs`'s palette, `math.rs`'s
+  symbol tables, `command.rs`'s command list, and the `include_str!`s (`draw.rs`'s logo, the two
+  `.wgsl` shaders, `gpu.rs`'s `WORKGROUP`, which must match a literal in the shader beside it).
+
   **The client renders through one event loop — there is no printing anywhere else.**
   `tui::run` (`tui/mod.rs`) is a single `tokio::select!` over four sources: the
   `crossterm::EventStream` (keys, resize, mouse wheel), the `mpsc::Receiver<ClientEvent>`, the
