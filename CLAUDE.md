@@ -863,6 +863,29 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     belongs to the event loop, so the reset only sets `App::drop_stream` and `tui::run` drops it.
     The one disconnect that still ends the process is the one the user asked for: `submit` sets
     `App::leaving` on `Command::Exit`, and the `Quit` arm honours it.
+  - **And a session the user did not end dials itself back** (`login::Reconnect`). The box it comes
+    back to already has the address, so the only thing standing between a dropped link and the chat is
+    the username and password being typed again — which is what `Reconnect` keeps: the two answers are
+    recorded as they are submitted (`login::take_input`) and only promoted to credentials on
+    `Authenticated`, so what is replayed is a pair that demonstrably worked. `App::disconnected` arms it,
+    the redraw tick dials once `RECONNECT_DELAY` is up, and the `Username`/`Login` arms
+    put the stored answer in the field for that same tick to send — nothing new crosses the wire, and a
+    reconnect walks the ordinary login path packet for packet.
+    **The box says so while it is doing it**, since nobody asked for this dial: the status row is
+    `Reconnect::status` (`Connection lost, reconnecting… (2/5)`) rather than `Login::waiting`'s
+    `Connecting…`, and the box is `busy` for the wait as well as the dial, so `Esc` cancels the whole
+    thing. The drop reason is what the row underneath would have said, so it is left in `Login::error`
+    for the one case it is still worth reading: the retries running out, where nothing dialled at all.
+    What bounds it is that every failure is one of `RECONNECT_ATTEMPTS`, counted across the *whole*
+    attempt (a refused dial in `tui::connected`, a failed handshake, a server that drops us again) and
+    reset only by an `Authenticated`, and that a dial may replay two answers and no more — a server that
+    keeps asking is not answered forever. The replay is gated on `retrying`, which is the same flag the
+    status row reads, so it covers exactly the dials *we* started: once the tries run out the flag goes
+    down with them, and the address the user then types is a login they answer themselves rather than
+    one that fills itself in. It is given up on rather than retried when the answer stops
+    being ours to give: a `/logout`, an `Esc` on the prompt, a `Register` step (the account is gone, so
+    there is nothing to replay) or a rejected username all `forget` the pair outright. A `Command::Exit`
+    never reaches this — it ends the process.
   - C libraries that write to fd 2 (cpal/ALSA, openh264/xcap) corrupt the frame; the existing
     `gag::Gag::stderr()` wrappers in `network/voice/client` must stay.
   - `tui::install_panic_hook` is called first thing in `main` and is **not optional**. The release
