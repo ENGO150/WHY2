@@ -111,6 +111,8 @@ async fn main()
         .init()
         .unwrap();
 
+    config::users::migrate(); //GIVE server_users.toml ENTRIES FROM BEFORE THE COLORS MOVED HERE THEIR DEFAULTS
+
     log::info!("WHY2 server v{}{}, log level {level}", misc::get_version(), if !env!("WHY2_GIT_HASH").is_empty()
     {
         format!(" ({})", env!("WHY2_GIT_HASH"))
@@ -259,15 +261,9 @@ async fn main()
 
                             match conn_type
                             {
-                                ConnectionType::FileUpload { uid } | ConnectionType::Image { uid, .. } =>
+                                ConnectionType::FileUpload { uid } | ConnectionType::Image { uid } =>
                                 {
-                                    //AN IMAGE IS THE ONE UPLOAD THAT PUTS UP A LINE, SO IT IS THE ONE THAT
-                                    //NAMES A SENDER TO COLOR
-                                    let (persistent, username_color) = match conn_type
-                                    {
-                                        ConnectionType::Image { username_color, .. } => (true, username_color),
-                                        _ => (false, None),
-                                    };
+                                    let persistent = matches!(conn_type, ConnectionType::Image { .. });
 
                                     log::info!("Auxiliary connection ({}): {owner}",
                                         if persistent { "image upload" } else { "file upload" });
@@ -275,7 +271,7 @@ async fn main()
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (mut read_stream, write_stream) = stream.into_split();
-                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task, persistent, username_color).await;
+                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task, persistent).await;
                                     });
                                     return;
                                 },

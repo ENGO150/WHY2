@@ -45,8 +45,6 @@ use tokio::
 
 use sha2::{ Sha256, Digest };
 
-use crossterm::style::Color;
-
 use unicode_width::UnicodeWidthStr;
 
 use ratatui::text::{ Line, Span };
@@ -262,7 +260,10 @@ fn mute(app: &mut App, parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
     ), theme::OK);
 }
 
-fn to_color(color: &str) -> Result<(u8, String), ()> //CONVERT STRING TO COLOR CODE
+//THE NAME AS SOMEBODY TYPED IT, TO THE CODE THE WIRE CARRIES. A COLOR crossterm WOULD PARSE IS NOT
+//NECESSARILY ONE WE CAN SEND: ansi_(n) AND rgb_(r,g,b) HAVE NOWHERE TO GO IN A CODE AND ARE REFUSED HERE
+//RATHER THAN ACCEPTED AND THEN SILENTLY IGNORED ON EVERY MESSAGE
+fn to_color(color: &str) -> Option<u8>
 {
     //FORMAT COLOR STRING
     let mut formatted_color = color.replace(" ", "_").to_lowercase();
@@ -271,42 +272,32 @@ fn to_color(color: &str) -> Result<(u8, String), ()> //CONVERT STRING TO COLOR C
         formatted_color = formatted_color.replacen("dark", "dark_", 1);
     }
 
-    //A COLOR THAT PARSES IS NOT NECESSARILY ONE WE CAN SEND: THE WIRE CARRIES A CODE, SO ansi_(n) AND rgb_(r,g,b)
-    //HAVE NOWHERE TO GO AND USED TO BE ACCEPTED, WRITTEN TO THE CONFIG AND THEN SILENTLY IGNORED ON EVERY MESSAGE
-    let color = Color::try_from(formatted_color.as_str()).map_err(|_| ())?;
-    let code = colors::color_to_u8(&color);
-
-    if code == 255 { return Err(()); }
-
-    Ok((code, formatted_color))
+    colors::code(&formatted_color)
 }
 
-fn color_handler(app: &mut App, config_key: &str, parameters: Option<String>) //HANDLE COLOR CHANGE
+//HANDLE COLOR CHANGE. THE SERVER KEEPS THE COLORS AND PAINTS EVERY MESSAGE WITH THEM, SO ALL THIS DOES IS
+//ASK - THERE IS NOTHING TO STORE AND NOTHING TO READ BACK. THE NAME IS STILL CHECKED HERE, SO A COLOR NO
+//CODE CAN CARRY GETS THE SAME ANSWER IT ALWAYS GOT INSTEAD OF A ROUND TRIP
+async fn color_handler
+(
+    app: &mut App,
+    write_stream: &Arc<MutexAsync<OwnedWriteHalf>>,
+    username: bool,
+    parameters: Option<String>,
+)
 {
     //CHECK FOR PARAMETERS
     let Some(parameters) = parameters else { return invalid_usage(app, None) };
 
     //CHECK FOR COLOR VALIDITY
-    if let Ok((_, formatted_name)) = to_color(&parameters)
+    let Some(code) = to_color(&parameters) else
     {
-        //SAVE COLOR TO CONFIG
-        config::client_write(config_key, &formatted_name);
-        app.reload_theme();
+        return app.push_styled("Invalid color! Type the command again and pick one of the offered colors.",
+            theme::ERROR);
+    };
 
-        app.push_styled("Color set successfully.", theme::OK);
-    } else
-    {
-        app.push_styled("Invalid color! Type the command again and pick one of the offered colors.", theme::ERROR);
-    }
-}
-
-fn get_colors() -> MessageColors //READ COLORS FROM CONFIG
-{
-    MessageColors
-    {
-        username_color: to_color(&config::read_config::<String>("username_color")).ok().map(|(c, _)| c),
-        message_color: to_color(&config::read_config::<String>("message_color")).ok().map(|(c, _)| c),
-    }
+    network::send(&mut *write_stream.lock().await, PacketCode::Colors { username, color: code },
+        options::get_keys().as_ref()).await;
 }
 
 //EVERY DEVICE THE VOICE CLIENT COULD OPEN. THE LIST COMES FROM THE VOICE CLIENT ITSELF, SO IT IS ENUMERATED
@@ -646,7 +637,6 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                                             .unwrap_or("unnamed_file").to_string(),
                                                         token: None,
                                                         uid: None,
-                                                        username_color: get_colors().username_color,
                                                     },
 
                                                     false => PacketCode::Upload { hash, token: None, uid: None },
@@ -668,8 +658,8 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
                         Command::Server => server_command(app, write_stream, parameters).await,
 
-                        Command::UsernameColor => color_handler(app, "username_color", parameters),
-                        Command::MessageColor => color_handler(app, "message_color", parameters),
+                        Command::UsernameColor => color_handler(app, write_stream, true, parameters).await,
+                        Command::MessageColor => color_handler(app, write_stream, false, parameters).await,
 
                         #[cfg(feature = "client_voice")]
                         Command::Mute => mute(app, parameters),
@@ -717,7 +707,14 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         },
         LoginState::PasswordLogin => PacketCode::PasswordL { password: Some(input) },
         LoginState::PasswordRegister => PacketCode::PasswordR { password: Some(input) },
-        LoginState::None => PacketCode::Message { text: input, colors: get_colors(), username: None, id: None },
+        //NO COLORS, NO USERNAME AND NO ID: ALL THREE ARE THE SERVER'S TO FILL IN ON THE WAY OUT
+        LoginState::None => PacketCode::Message
+        {
+            text: input,
+            username: None,
+            id: None,
+            colors: MessageColors { username_color: None, message_color: None },
+        },
     };
 
     network::send(&mut *write_stream.lock().await, packet, options::get_keys().as_ref()).await;

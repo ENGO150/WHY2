@@ -19,9 +19,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     fs,
-    collections::HashSet,
+    collections::{ HashMap, HashSet },
     sync::{ LazyLock, Mutex },
 };
+
+use wincode::{ SchemaWrite, SchemaRead };
 
 use why2::consts as why2_consts;
 
@@ -37,9 +39,18 @@ use crate::
     },
 };
 
+//STRUCTS
+#[derive(SchemaWrite, SchemaRead, Clone)]
+struct Record //ONE MESSAGE RECORD
+{
+    username: String,
+    text: String,
+    image: Option<[u8; 32]>,
+}
+
 //GLOBAL VARIABLES
-static HISTORY: LazyLock<Mutex<Vec<StoredMessage>>> = LazyLock::new(|| Mutex::new(load())); //MESSAGE HISTORY
-static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                    //AT-REST KEYS
+static HISTORY: LazyLock<Mutex<Vec<Record>>> = LazyLock::new(|| Mutex::new(load())); //MESSAGE HISTORY
+static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);             //AT-REST KEYS
 
 //FUNCTIONS
 //PRIVATE
@@ -48,7 +59,7 @@ fn path() -> String //WHERE THE HISTORY IS KEPT
     super::config_path(consts::SERVER_MESSAGES_FILE)
 }
 
-fn load() -> Vec<StoredMessage> //READ THE HISTORY OFF DISK
+fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
 {
     //NO FILE IS AN EMPTY HISTORY
     let Ok(bytes) = fs::read(path()) else
@@ -67,7 +78,7 @@ fn load() -> Vec<StoredMessage> //READ THE HISTORY OFF DISK
         return Vec::new();
     };
 
-    match wincode::config::deserialize::<Vec<StoredMessage>, _>(&plaintext, consts::PACKET_CONFIG)
+    match wincode::config::deserialize::<Vec<Record>, _>(&plaintext, consts::PACKET_CONFIG)
     {
         Ok(history) =>
         {
@@ -75,38 +86,50 @@ fn load() -> Vec<StoredMessage> //READ THE HISTORY OFF DISK
             history
         },
 
-        Err(_) =>
-        {
-            log::error!("Message history is of an older format, it is being ignored");
-            Vec::new()
-        }
+        Err(_) => migrate(&plaintext), //MAYBE IT IS ONE THE COLORS ARE STILL IN
     }
 }
 
-//PUBLIC
-pub fn store(username: &str, text: &str, colors: &MessageColors) //APPEND MESSAGE
+fn migrate(plaintext: &[u8]) -> Vec<Record>
 {
-    push(StoredMessage
+    let Ok(history) = wincode::config::deserialize::<Vec<StoredMessage>, _>(plaintext, consts::PACKET_CONFIG) else
+    {
+        log::error!("Message history is of an older format, it is being ignored");
+        return Vec::new();
+    };
+
+    log::info!("Migrated {} stored messages, their colors dropped", history.len());
+
+    history.into_iter().map(|message| Record
+    {
+        username: message.username,
+        text: message.text,
+        image: message.image,
+    }).collect()
+}
+
+//PUBLIC
+pub fn store(username: &str, text: &str) //APPEND MESSAGE
+{
+    push(Record
     {
         username: username.to_string(),
         text: text.to_string(),
-        colors: colors.clone(),
         image: None,
     });
 }
 
-pub fn store_image(username: &str, filename: &str, hash: &[u8; 32], username_color: Option<u8>)
+pub fn store_image(username: &str, filename: &str, hash: &[u8; 32])
 {
-    push(StoredMessage
+    push(Record
     {
         username: username.to_string(),
         text: filename.to_string(),
-        colors: MessageColors { username_color, message_color: None },
         image: Some(*hash),
     });
 }
 
-fn push(message: StoredMessage) //APPEND ONE ENTRY AND REWRITE THE FILE
+fn push(message: Record) //APPEND ONE ENTRY AND REWRITE THE FILE
 {
     //A HISTORY OF NOTHING IS NOT A HISTORY - DO NOT TOUCH THE FILE AT ALL
     let limit: usize = super::read_config("max_persistent_messages");
@@ -175,7 +198,28 @@ pub fn sweep_images()
     if swept > 0 { log::info!("Swept {swept} stored images nothing names any more"); }
 }
 
-pub fn all() -> Vec<StoredMessage> //EVERY STORED LOBBY MESSAGE, OLDEST FIRST
+//EVERY STORED LOBBY MESSAGE, OLDEST FIRST
+pub fn all() -> Vec<StoredMessage>
 {
-    HISTORY.lock().unwrap().clone()
+    let history = HISTORY.lock().unwrap().clone();
+    let mut looked_up: HashMap<String, MessageColors> = HashMap::new();
+
+    history.into_iter().map(|message|
+    {
+        //WHAT server_users.toml HOLDS FOR THEM RIGHT NOW - THE RECORD ITSELF CARRIES NO COLOR TO PREFER
+        let stored = looked_up.entry(message.username.clone())
+            .or_insert_with(|| super::users::colors(&message.username));
+
+        StoredMessage
+        {
+            username: message.username,
+            text: message.text,
+            colors: match message.image.is_some()
+            {
+                true => MessageColors { username_color: stored.username_color, message_color: None },
+                false => stored.clone(),
+            },
+            image: message.image,
+        }
+    }).collect()
 }

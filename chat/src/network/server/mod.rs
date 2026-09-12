@@ -854,7 +854,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         match read
         {
             //MESSAGE
-            PacketCode::Message { text, colors, .. } =>
+            PacketCode::Message { text, .. } =>
             {
                 //SILENCE MUTED USERS
                 if *CONNECTIONS.get(&peer_addr).unwrap().muted()
@@ -867,13 +867,16 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 let text = text.trim().to_owned();
 
+                //GET USER'S COLORS
+                let colors = config::users::colors(&username);
+
                 log::info!("Message ({} chars) in {}: {peer_addr}", text.chars().count(),
                     if channel.is_some() { "channel" } else { "lobby" });
 
                 //KEEP IT - ONLY THE LOBBY HAS A HISTORY, A CHANNEL IS AS TEMPORARY AS THE CLIENTS IN IT
                 if channel.is_none() && config::read_config::<bool>("persistent_messages")
                 {
-                    config::messages::store(&username, &text, &colors);
+                    config::messages::store(&username, &text);
                 }
 
                 //SEND MESSAGE TO ALL USERS
@@ -1001,13 +1004,6 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 let image = matches!(read, PacketCode::Image { .. });
 
-                //AN IMAGE'S LINE NAMES THE SENDER LIKE A MESSAGE DOES, SO IT CARRIES THEIR COLOR
-                let username_color = match &read
-                {
-                    PacketCode::Image { username_color, .. } => *username_color,
-                    _ => None,
-                };
-
                 //CHECK IF IMAGE WAS ALREADY UPLOADED
                 if image && config::messages::has_image(&hash)
                 {
@@ -1025,16 +1021,17 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //KEEP IT, ON THE SAME TERMS AS AN UPLOAD OF IT WOULD HAVE BEEN
                     if channel.is_none() && config::read_config::<bool>("persistent_messages")
                     {
-                        config::messages::store_image(&username, &filename, &hash, username_color);
+                        config::messages::store_image(&username, &filename, &hash);
                     }
 
+                    //AN IMAGE'S LINE NAMES THE SENDER LIKE A MESSAGE DOES, SO IT IS COLORED LIKE ONE
                     send_to_all(PacketCode::ImageDisplay
                     {
                         username: username.clone(),
                         filename: filename.clone(),
                         hash,
                         data: None,
-                        username_color,
+                        username_color: config::users::colors(&username).username_color,
                     }, true, channel.as_deref());
 
                     //TELL THE UPLOADER THERE IS NOTHING TO SEND
@@ -1044,7 +1041,6 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         filename,
                         token: None,
                         uid: None,
-                        username_color,
                     }, Some(&keys)).await;
 
                     log::info!("Image already stored, upload skipped: {peer_addr}");
@@ -1065,7 +1061,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 let uid = rand::random::<u64>();
                 let token = open_connection(id, if image
                 {
-                    ConnectionType::Image { uid, username_color }
+                    ConnectionType::Image { uid }
                 } else
                 {
                     ConnectionType::FileUpload { uid }
@@ -1082,7 +1078,6 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         filename: String::new(), //THE UPLOAD'S OWN METADATA CARRIES IT FROM HERE
                         token: Some(token),
                         uid: Some(uid),
-                        username_color,
                     }
                 } else
                 {
@@ -1546,6 +1541,22 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
+            },
+
+            //A /color OR /ucolor. EVERY USER SETS THEIR OWN, SO THERE IS NOTHING TO CHECK BUT THE CODE
+            //ITSELF, AND colors::name TURNS ANYTHING OUTSIDE THE TABLE INTO NO COLOR. THE ANSWER IS THIS
+            //PACKET BACK, WHICH IS ALL THE CLIENT NEEDS: IT KEEPS NO COPY OF WHAT IT JUST SET
+            PacketCode::Colors { username: username_color, color } =>
+            {
+                log::info!("Color set: {peer_addr}");
+
+                config::users::set_color(&username, username_color, color);
+
+                network::send(&mut *streams.1.lock().await, PacketCode::Colors
+                {
+                    username: username_color,
+                    color,
+                }, Some(&keys)).await;
             },
 
             //BAN LIST

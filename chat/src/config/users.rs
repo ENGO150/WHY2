@@ -25,9 +25,19 @@ use toml_edit::
 
 use crate::
 {
+    colors,
     consts,
     role::Role,
+    network::codes::MessageColors,
 };
+
+const COLOR_KEYS: [&str; 2] = ["username_color", "message_color"]; //THE COLORS AS server_users.toml SPELLS THEM
+
+fn user_field(username: &str, key: &str) -> Option<String> //READ ONE FIELD OF username
+{
+    super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).get(username)?
+        .as_table_like()?.get(key)?.as_str().map(str::to_string)
+}
 
 fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD OF username TO server_users.toml
 {
@@ -53,14 +63,32 @@ pub fn len() -> usize //COUNT USERS
 
 pub fn password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF username
 {
-    super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).get(username)?
-        .as_table_like()?.get("password")?.as_str().map(str::to_string)
+    user_field(username, "password")
 }
 
 pub fn role(username: &str) -> Option<Role> //RETURN ROLE OF username
 {
-    super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).get(username)?
-        .as_table_like()?.get("role")?.as_str()?.parse().ok()
+    user_field(username, "role")?.parse().ok()
+}
+
+pub fn colors(username: &str) -> MessageColors //RETURN COLORS OF username
+{
+    let mut codes = COLOR_KEYS.iter().map(|key| user_field(username, key).as_deref().and_then(colors::code));
+
+    MessageColors
+    {
+        username_color: codes.next().flatten(),
+        message_color: codes.next().flatten(),
+    }
+}
+
+//STORE ONE OF THE COLORS OF username, BY NAME. THE CODE COMES OFF THE WIRE, SO ONE OUTSIDE THE TABLE IS
+//STORED AS NO COLOR RATHER THAN REFUSED - colors::name IS THE CHECK
+pub fn set_color(username: &str, username_color: bool, code: u8)
+{
+    let key = COLOR_KEYS[usize::from(!username_color)];
+
+    write_user_field(username, key, colors::name(Some(code)).into());
 }
 
 pub fn set_role(username: &str, role: Role) //STORE A NEW ROLE FOR username
@@ -75,10 +103,29 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
     write_user_field(username, "password", hash.into()); //PASSWORD
     set_role(username, if first_user { Role::Owner } else { Role::User }); //ROLE (OWNER IF THIS IS THE FIRST USER)
 
+    //NO COLORS YET, BUT THE KEYS ARE THERE - THE FILE SAYS WHAT IS SETTABLE
+    for key in COLOR_KEYS { write_user_field(username, key, colors::NONE.into()); }
+
     first_user
 }
 
 pub fn contains(key: &str) -> bool //CHECK IF server_users.toml contains
 {
     super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).get(key).is_some()
+}
+
+pub fn migrate() //MIGRATE COLORS (will be removed with next version bump)
+{
+    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
+    {
+        for (_, entry) in doc.as_table_mut().iter_mut()
+        {
+            let Some(user) = entry.as_table_like_mut() else { continue };
+
+            for key in COLOR_KEYS
+            {
+                if user.get(key).is_none() { user.insert(key, Item::Value(colors::NONE.into())); }
+            }
+        }
+    });
 }

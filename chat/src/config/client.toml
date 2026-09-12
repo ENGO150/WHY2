@@ -39,8 +39,6 @@ screen_volume = 100 # Volume of an attached screen share's audio in percent (0-2
 
 # Colors
 disable_colors = false # Disable message colors
-username_color = "none" # Color of username (change via command)
-message_color = "none" # Color of message (change via command)
 
 # Interface
 mouse_capture = true # Capture the mouse for wheel scrolling and drag-select (replaces the terminal's own)

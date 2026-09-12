@@ -134,7 +134,6 @@ pub enum PacketCode //CONTROL CODES
         filename: String,
         token: Option<[u8; 32]>,
         uid: Option<u64>,
-        username_color: Option<u8>,
     },
 
     //SERVER -> CLIENT | A STORED IMAGE, AS IT WAS UPLOADED
@@ -183,6 +182,13 @@ pub enum PacketCode //CONTROL CODES
         id: usize,                //TARGET USER
         role: Role,               //THE ROLE THEY ARE BEING GIVEN
         username: Option<String>, //REQUEST: None | SERVER ANSWER: THE TARGET, SO THE ISSUER SEES WHO IT LANDED ON
+    },
+
+    //CLIENT <> SERVER | SET ONE CHAT COLOR (THE SAME PACKET BACK IS THE SERVER SAYING IT STORED IT)
+    Colors
+    {
+        username: bool, //TRUE = THE USERNAME'S COLOR, FALSE = THE MESSAGE'S
+        color: u8,
     },
 
     //CLIENT <> SERVER | READ AND WRITE server.toml
@@ -269,6 +275,7 @@ impl PacketCode
             Self::ServerBans { .. } => "ServerBans",
             Self::ServerRole { .. } => "ServerRole",
             Self::ServerSettings { .. } => "ServerSettings",
+            Self::Colors { .. } => "Colors",
             Self::Version { .. } => "Version",
             Self::Username { .. } => "Username",
             Self::PasswordL { .. } => "PasswordL",

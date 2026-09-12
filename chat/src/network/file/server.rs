@@ -145,7 +145,6 @@ pub async fn download
     uid: u64,
     task: AbortHandle,
     persistent: bool,
-    username_color: Option<u8>,
 )
 {
     //GET CLIENT INFO
@@ -449,7 +448,7 @@ pub async fn download
                 //KEEP IT, ON THE SAME TERMS AS A MESSAGE
                 let kept = channel.is_none() && config::read_config::<bool>("persistent_messages");
 
-                if kept { config::messages::store_image(&username, &filename, &final_hash, username_color); }
+                if kept { config::messages::store_image(&username, &filename, &final_hash); }
 
                 //AND WHAT IS NOT KEPT IS NOT LEFT BEHIND: NOTHING BUT THE HISTORY EVER NAMES A FILE IN
                 //server_images/, SO A PICTURE POSTED IN A CHANNEL (OR WITH THE HISTORY OFF) IS AS TEMPORARY AS
@@ -457,14 +456,16 @@ pub async fn download
                 //ALREADY THERE IS SOMEBODY ELSE'S ENTRY AND NOT OURS TO DELETE
                 if !kept && insert { let _ = fs::remove_file(&new_path).await; }
 
-                //A PICTURE THAT HAS JUST BEEN UPLOADED IS ONE NOBODY CAN HOLD YET, SO IT GOES OUT WHOLE
+                //A PICTURE THAT HAS JUST BEEN UPLOADED IS ONE NOBODY CAN HOLD YET, SO IT GOES OUT WHOLE.
+                //THE LINE NAMES THE SENDER, SO IT IS COLORED LIKE A MESSAGE - LOOKED UP HERE, WHERE THE
+                //LINE IS BUILT, RATHER THAN CARRIED THROUGH THE TOKEN FROM WHEN THE UPLOAD WAS ASKED FOR
                 server::send_to_all(PacketCode::ImageDisplay
                 {
                     username: username.clone(),
                     filename,
                     hash: final_hash,
                     data: Some(data),
-                    username_color,
+                    username_color: config::users::colors(&username).username_color,
                 }, true, channel.as_deref());
             }
         } else

@@ -203,6 +203,7 @@ pub enum ClientEvent
     VoiceDisabled,                                               //VOICE CHAT DISABLED
     List(Vec<OnlineUser>),                                       //LIST OF USERS
     ServerSettings(Vec<ServerSetting>, bool),                    //server.toml AS THE SERVER HOLDS IT
+    Colors,                                                      //A /color LANDED ON THE SERVER
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml AS THE SERVER HOLDS IT (USERNAMES, ADDRESSES)
     Upload(String),                                              //UPLOADING FILE
     Image(String),                                               //UPLOADING IMAGE
@@ -905,6 +906,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::ServerBans { users, ips } =>
             {
                 tx.send(ClientEvent::ServerBans(users.unwrap_or_default(), ips.unwrap_or_default())).await.unwrap();
+            },
+
+            //THE SERVER STORED A COLOR
+            PacketCode::Colors { .. } =>
+            {
+                tx.send(ClientEvent::Colors).await.unwrap();
             },
 
             //LIST OF ONLINE USERS

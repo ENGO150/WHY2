@@ -327,6 +327,10 @@ impl App
                 self.dirty = true;
             },
 
+            //THE ANSWER TO A /color. THE COLOR ITSELF IS THE SERVER'S AND IS NEVER HELD HERE, AND NOTHING
+            //IN THE PANE CHANGES COLOR FOR IT - EVERY LINE IN IT KEEPS THE COLORS IT WAS SAID IN
+            ClientEvent::Colors => self.push_styled("Color set successfully.", theme::OK),
+
             //ASKED FOR BY /server bans, AND SENT AGAIN AFTER EVERY PARDON - THE IDS RENUMBER WHEN ONE
             //IS LIFTED, SO THE ANSWER TO A PARDON IS THE NEW LIST RATHER THAN AN 'OK' OVER A STALE ONE
             ClientEvent::ServerBans(users, ips) =>

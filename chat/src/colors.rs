@@ -16,17 +16,36 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod colors;
-pub mod config;
-pub mod consts;
-pub mod crypto;
-pub mod misc;
-pub mod network;
-pub mod options;
-pub mod role;
+//CONSTS
+pub const COLORS: [&str; 16] = //COLOR CODES
+[
+    "black",
+    "dark_red",
+    "dark_green",
+    "dark_yellow",
+    "dark_blue",
+    "dark_magenta",
+    "dark_cyan",
+    "grey",
+    "dark_grey",
+    "red",
+    "green",
+    "yellow",
+    "blue",
+    "magenta",
+    "cyan",
+    "white",
+];
 
-#[cfg(feature = "client_base")]
-pub mod cache;
+pub const NONE: &str = "none"; //NO COLOR
 
-#[cfg(feature = "client_base")]
-pub mod command;
+//FUNCTIONS
+pub fn name(code: Option<u8>) -> &'static str //COLOR TO CODE
+{
+    code.and_then(|code| COLORS.get(code as usize)).copied().unwrap_or(NONE)
+}
+
+pub fn code(name: &str) -> Option<u8> //CODE TO COLOR
+{
+    COLORS.iter().position(|color| color.eq_ignore_ascii_case(name)).map(|index| index as u8)
+}
