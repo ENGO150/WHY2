@@ -132,8 +132,8 @@ pub struct TofuRequest
 {
     pub host: String,           //WHAT THE KEY IS PINNED AGAINST
     pub hash: String,           //SHA256 OF THE SERVER'S PUBLIC KEYS
-    pub mismatch: bool,         //A KEY IS ALREADY PINNED FOR host AND DIFFERS (NOT A FIRST CONTACT)
-    pub pinned: Option<String>, //THE FINGERPRINT ON RECORD, SHOWN BESIDE THE NEW ONE ON A MISMATCH
+    pub mismatch: bool,         //A KEY IS PINNED FOR host AND DIFFERS
+    pub pinned: Option<String>, //THE FINGERPRINT ON RECORD
     pub reply: oneshot::Sender<bool>,
 }
 
@@ -142,14 +142,14 @@ pub struct VoiceUser
     pub id: usize,             //ID OF USER
     pub username: String,      //USERNAME TO DISPLAY
     pub is_speaking: bool,     //TAKE A WILD GUESS
-    pub latency: Option<u128>, //USER'S PING - None WHILE WE ARE NOT RECEIVING THEM (WE ARE NOT IN VOICE)
+    pub latency: Option<u128>, //USER'S PING
     pub is_local: bool,        //AM I THE USER?
 }
 
 pub struct ImageFrame
 {
     pub image: DynamicImage,
-    pub delay: Duration, //HOW LONG IT IS HELD BEFORE THE NEXT ONE - MEANINGLESS ON A STILL, WHICH NEVER ADVANCES
+    pub delay: Duration, //HOW LONG IT IS HELD BEFORE THE NEXT ONE
 }
 
 //TYPES
@@ -160,7 +160,7 @@ pub type Animation = Vec<ImageFrame>; //A DECODED PICTURE
 enum Handshake
 {
     Ready,     //KEYS AGREED - THE SESSION CAN START
-    Reconnect, //THE USER JUST PINNED THIS KEY - START OVER SO THE SESSION IS ONE THE PIN WAS CHECKED AGAINST
+    Reconnect, //THE USER JUST PINNED THIS KEY
     Failed,    //REFUSED - THE CLIENT IS DONE
 }
 
@@ -204,7 +204,7 @@ pub enum ClientEvent
     List(Vec<OnlineUser>),                                       //LIST OF USERS
     ServerSettings(Vec<ServerSetting>, bool),                    //server.toml AS THE SERVER HOLDS IT
     Colors,                                                      //A /color LANDED ON THE SERVER
-    ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml AS THE SERVER HOLDS IT (USERNAMES, ADDRESSES)
+    ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
     Upload(String),                                              //UPLOADING FILE
     Image(String),                                               //UPLOADING IMAGE
     ImageDisplay(String, String, Animation, Option<u8>),         //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
@@ -256,7 +256,7 @@ async fn key_exchange
         //READ MESSAGE
         let Some(received) = network::receive(streams, exchange_keys, None).await else
         {
-            //THE SERVER WENT AWAY MID-HANDSHAKE - NOTHING TO VERIFY AND NOTHING TO ASK THE USER
+            //THE SERVER WENT AWAY MID-HANDSHAKE
             tx.send(ClientEvent::Quit).await.ok();
 
             return Handshake::Failed;
@@ -265,14 +265,14 @@ async fn key_exchange
         if let PacketCode::KeyExchangeOffer { offer } = received { break offer; }
     };
 
-    //VERIFY PUBKEY VALIDITY (TOFU) - ONLY THE STATIC IDENTITY IS PINNED, THE OTHER TWO KEYS ARE EPHEMERAL
+    //VERIFY PUBKEY VALIDITY (TOFU)
     let host = streams.0.peer_addr().unwrap().ip().to_string();
     let verdict = if env!("WHY2_SKIP_TOFU") == "false"
     {
         Some(keys::check(&host, &kex::public_bytes(&offer.static_ecc)))
     } else { None };
 
-    //THE STATIC KEY SIGNS THE EPHEMERAL ONES AND DOES NOTHING ELSE
+    //THE STATIC KEY SIGNS THE EPHEMERAL ONES
     if !kex::verify_offer(&options::get_obfuscation_key(), &offer.static_ecc, &offer.eph_ecc, &offer.pq, &offer.sig)
     {
         tx.send(ClientEvent::HandshakeFailed(String::from("Server identity did not sign its exchange keys."))).await.ok();
@@ -292,13 +292,13 @@ async fn key_exchange
         reply: Box::new(schema::Reply { eph_ecc: pk, pq: pq_ciphertext }),
     }, exchange_keys).await;
 
-    //CALCULATE SHARED SECRET (HYBRID) - AGAINST THE SERVER'S EPHEMERAL KEY, NOT ITS IDENTITY
+    //CALCULATE SHARED SECRET (HYBRID)
     *keys = kex::derive_shared_secret(sk, &offer.eph_ecc, pq_secret);
 
     //SET GLOBAL VARIABLES
     options::set_keys(keys.clone());
 
-    //ACT ON THE TOFU VERDICT NOW THAT THE SERVER HAS ITS ANSWER
+    //ACT ON THE TOFU VERDICT
     let hash = keys::hash(&kex::public_bytes(&offer.static_ecc));
 
     //SET SERVER FINGERPRINT
@@ -313,7 +313,7 @@ async fn key_exchange
 
         Some(status) =>
         {
-            //ASK THE USER IN THE TUI INSTEAD OF DROPPING THEM BACK TO THE SHELL
+            //ASK THE USER IN THE TUI
             let (reply, answer) = oneshot::channel();
 
             tx.send(ClientEvent::TofuPrompt(TofuRequest
@@ -325,7 +325,7 @@ async fn key_exchange
                 reply,
             })).await.unwrap();
 
-            //A DROPPED SENDER (THE CLIENT IS QUITTING) COUNTS AS A REFUSAL
+            //A DROPPED SENDER COUNTS AS A REFUSAL
             if !answer.await.unwrap_or(false)
             {
                 //GRACEFULLY DISCONNECT FROM SERVER
@@ -338,7 +338,7 @@ async fn key_exchange
                 return Handshake::Failed;
             }
 
-            //PIN THE KEY - THE NEXT CONNECTION TO host VERIFIES AGAINST IT
+            //PIN THE KEY
             keys::save(&host, &hash);
 
             if exchange_keys.is_none()
@@ -396,13 +396,13 @@ pub async fn connect(connecting_addr: String) -> Result<(OwnedReadHalf, OwnedWri
         })
 }
 
-//DECODE UNDER EXPLICIT LIMITS - MAX_IMAGE_SIZE BOUNDS THE BYTES ON THE WIRE AND NOT WHAT THEY UNPACK TO
-//WHETHER A PICTURE IS DRAWN AS IT ARRIVES, OR WAITS TO BE CLICKED THE WAY A REPLAYED ONE DOES
+//WHETHER A PICTURE IS DRAWN AS IT ARRIVES
 fn auto_show_images() -> bool
 {
     config::read_config::<bool>("auto_show_images")
 }
 
+//DECODE LIMITS - THE WIRE SIZE BOUNDS NOTHING HERE
 fn decode_limits() -> Limits
 {
     let mut limits = Limits::default();
@@ -420,7 +420,7 @@ fn decode_image(data: &[u8]) -> Option<Animation>
 
     reader.limits(decode_limits());
 
-    //ONLY AN ANIMATED FORMAT IS DECODED AS FRAMES - A STILL GOES THROUGH THE READER LIKE ANY OTHER
+    //ONLY AN ANIMATED FORMAT IS DECODED AS FRAMES
     let animated = match reader.format()
     {
         Some(ImageFormat::Gif) => gif_frames(data),
@@ -537,7 +537,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
     let mut keys = (Zeroizing::new(vec![]), Zeroizing::new(vec![]));
 
-    //ACCEPTING A SERVER KEY PINS IT AND RECONNECTS, SO THE HANDSHAKE IS RUN AGAIN ON THE NEW SOCKET
+    //PIN THE KEY AND RUN THE HANDSHAKE AGAIN
     loop
     {
         //SEND HEADER
@@ -551,7 +551,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             Handshake::Ready => break,
             Handshake::Failed => return,
 
-            //THE SERVER WENT AWAY BETWEEN THE TWO CONNECTIONS - NOTHING LEFT TO TALK TO
+            //THE SERVER WENT AWAY BETWEEN CONNECTIONS
             Handshake::Reconnect => if !reconnect(streams).await
             {
                 tx.send(ClientEvent::ReconnectFailed).await.unwrap();
@@ -575,7 +575,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
     let mut first_message = true;
 
     //CONNECTION PROPERTIES
-    let mut id = 0usize; //ID SET BY SERVER - THE VOICE ROSTER IS EVERYBODY BUT US, SO EVERY BUILD NEEDS IT
+    let mut id = 0usize; //ID SET BY SERVER
     #[cfg(feature = "client_voice")]
     let mut username: Option<String> = None;
 
@@ -612,14 +612,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 tx.send(ClientEvent::Message(text, username.unwrap(), id.unwrap(), colors)).await.unwrap();
             }
 
-            //THE LOBBY'S STORED MESSAGES - EVERYTHING SAID BEFORE WE GOT HERE
+            //THE LOBBY'S STORED MESSAGES
             PacketCode::History { messages } =>
             {
                 let hashes: Vec<[u8; 32]> = messages.iter().filter_map(|message| message.image).collect();
 
-                //WHICH OF THEM WE ALREADY HOLD, BEFORE THE CAPTIONS GO UP: ONE THAT IS ABOUT TO FILL
-                //ITSELF MUST NOT OFFER A BUTTON THAT ASKS FOR WHAT IS ALREADY ON ITS WAY.
-                //WITH auto_show_images OFF NOTHING IS ABOUT TO FILL ITSELF, SO EVERY CAPTION IS A BUTTON
+                //WHICH OF THEM WE ALREADY HOLD
                 let auto_show = auto_show_images();
                 let mut cached: Vec<[u8; 32]> = Vec::new();
 
@@ -701,8 +699,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 //WAIT FOR SERVER TO INIT KEY EXCHANGE
                 let current_keys = keys.clone();
 
-                //A REKEY THAT DOES NOT VERIFY ENDS THE SESSION. CARRYING ON UNDER THE OLD KEYS WOULD MEAN
-                //SHRUGGING OFF A PEER THAT JUST FAILED TO PROVE IT IS STILL THE ONE WE PINNED
+                //A REKEY THAT DOES NOT VERIFY ENDS THE SESSION
                 if key_exchange(streams, &mut keys, &tx, Some(&current_keys)).await != Handshake::Ready { return; }
             }
 
@@ -824,7 +821,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     continue;
                 }
 
-                //FOLLOW THE SERVER INSTEAD OF TOGGLING, SO BOTH SIDES CANNOT DRIFT APART
+                //FOLLOW THE SERVER INSTEAD OF TOGGLING
                 voice_options::set_use_voice(token.is_some());
 
                 //TOGGLE VOICE (& PRINT STATUS)
@@ -843,11 +840,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 }).await.unwrap();
             },
 
-            //THE WHOLE VOICE ROSTER - SENT ON LOGIN, ON A CHANNEL SWITCH AND WHEN WE JOIN VOICE, SO IT
-            //ARRIVES WHETHER OR NOT WE ARE IN VOICE OURSELVES. IT IS THE TRUTH, NOT AN ADDITION
+            //THE WHOLE VOICE ROSTER
             PacketCode::VoiceClients { clients } =>
             {
-                //ADD CLIENTS WE CAN ACTUALLY HEAR (THE CONSUMERS WERE CLEARED BY WHATEVER ASKED FOR THIS)
+                //ADD CLIENTS WE CAN ACTUALLY HEAR
                 #[cfg(feature = "client_voice")]
                 if voice_options::get_use_voice()
                 {
@@ -863,7 +859,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //CLIENT JOINED VOICE
             PacketCode::VoiceJoin { username, id: sid } =>
             {
-                //OUR OWN JOIN COMES BACK TO US TOO - THE ROSTER IS EVERYBODY ELSE
+                //OUR OWN JOIN COMES BACK TO US TOO
                 if id == sid { continue; }
 
                 #[cfg(feature = "client_voice")]
@@ -890,19 +886,19 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 tx.send(ClientEvent::ServerSay(message)).await.unwrap();
             }
 
-            //A ROLE WAS SET - EITHER ON SOMEBODY ELSE (WE ASKED FOR IT) OR ON US (SOMEBODY ELSE DID)
+            //A ROLE WAS SET, ON US OR ON SOMEBODY ELSE
             PacketCode::ServerRole { role, username, .. } =>
             {
                 tx.send(ClientEvent::Role(role, username)).await.unwrap();
             },
 
-            //server.toml, EITHER BECAUSE WE ASKED FOR IT OR BECAUSE THE SERVER JUST STORED WHAT WE SENT
+            //server.toml, ASKED FOR OR JUST STORED
             PacketCode::ServerSettings { settings, save } =>
             {
                 tx.send(ClientEvent::ServerSettings(settings.unwrap_or_default(), save)).await.unwrap();
             },
 
-            //THE BAN LIST, EITHER BECAUSE WE ASKED FOR IT OR BECAUSE THE SERVER JUST LIFTED ONE
+            //THE BAN LIST, ASKED FOR OR JUST LIFTED
             PacketCode::ServerBans { users, ips } =>
             {
                 tx.send(ClientEvent::ServerBans(users.unwrap_or_default(), ips.unwrap_or_default())).await.unwrap();
@@ -923,8 +919,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //UPLOAD APPROVAL
             PacketCode::Upload { hash, token, uid } | PacketCode::Image { hash, token, uid, .. } =>
             {
-                //NO TOKEN IS THE SERVER SAYING IT ALREADY HAS THIS PICTURE. IT IS ON THE CHANNEL ALREADY
-                //(ImageDisplay IS ON ITS WAY), SO THE UPLOAD IS SIMPLY DROPPED WHERE IT WAS PARKED
+                //NO TOKEN MEANS THE SERVER HAS THIS PICTURE
                 let (Some(token), Some(uid)) = (token, uid) else
                 {
                     ACTIVE_UPLOADS.lock().unwrap().remove(&hash);
@@ -948,7 +943,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //SOMEBODY'S IMAGE
-            //ONE OF THOSE, ASKED FOR AND ANSWERED. IT IS DECODED OFF THE LOOP LIKE ANY OTHER PICTURE
+            //ONE OF THOSE, DECODED OFF THE LOOP
             PacketCode::ImageData { hash, data } =>
             {
                 let image_tx = tx.clone();
@@ -981,7 +976,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 let image_tx = tx.clone();
 
-                //NOTHING IS UNPACKED WITHOUT A CLICK WHILE auto_show_images IS OFF
+                //auto_show_images OFF: UNPACK NOTHING
                 if !auto_show_images()
                 {
                     tokio::spawn(async move
@@ -1006,7 +1001,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                 tokio::spawn(async move
                 {
-                    //AN OFFER IS ANSWERED OUT OF THE CACHE, AND ONLY ASKED FOR WHEN IT IS NOT THERE
+                    //ANSWER AN OFFER OUT OF THE CACHE FIRST
                     let (data, fresh) = match data
                     {
                         Some(data) => (Some(Arc::new(data)), true),
@@ -1015,8 +1010,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                     let Some(data) = data else
                     {
-                        //A LIVE PICTURE IS NOT A CLICK-TO-LOAD ONE, SO IT IS ASKED FOR WITHOUT A CLICK -
-                        //BUT BY THE EVENT LOOP, WHICH OWNS THE WRITE HALF AND THE SEQUENCE COUNTER
+                        //ASK FROM THE EVENT LOOP, WHICH OWNS THE WRITE HALF
                         image_tx.send(ClientEvent::ImagePending(username, filename, hash, username_color)).await.unwrap();
 
                         return;
@@ -1024,8 +1018,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                     let image = match fresh
                     {
-                        //OFF THE WIRE: THE NAME IS THE CONTENT, SO IT IS FILED UNDER WHAT IT HASHES TO
-                        //AND NOT UNDER WHAT THE PACKET CALLED IT
+                        //OFF THE WIRE: FILE IT UNDER WHAT IT HASHES TO
                         true =>
                         {
                             let (digest, image) = digest_and_decode(data.clone()).await;
@@ -1035,9 +1028,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                             image
                         },
 
-                        //OUT OF THE CACHE, WHERE IT IS ALREADY FILED UNDER THIS HASH - THERE IS NOTHING
-                        //TO CHECK AND NOTHING TO WRITE, AND HASHING IT AGAIN WOULD BE A WHOLE PASS OVER
-                        //THE PICTURE ON THE ONE PATH THE CACHE EXISTS TO MAKE CHEAP
+                        //OUT OF THE CACHE, ALREADY FILED UNDER THIS HASH
                         false => task::spawn_blocking(move || decode_image(&data))
                             .await.expect("Decoding image panicked"),
                     };
@@ -1082,14 +1073,14 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 tx.send(ClientEvent::UploadLimit).await.unwrap();
             },
 
-            //SCREEN UPLOAD APPROVAL (OR AN UNSOLICITED STOP WHEN THE SHARE DIES SERVER-SIDE)
+            //SCREEN UPLOAD APPROVAL, OR AN UNSOLICITED STOP
             #[cfg(feature = "client_screen")]
             PacketCode::Screen { token } =>
             {
-                //FOLLOW THE SERVER INSTEAD OF TOGGLING, SO BOTH SIDES CANNOT DRIFT APART
+                //FOLLOW THE SERVER INSTEAD OF TOGGLING
                 screen_options::set_use_screen(token.is_some());
 
-                //THE MONITOR WAS THIS SHARE'S, NOT THIS SESSION'S - THE NEXT BARE /screen STARTS ON THE DEFAULT ONE
+                //THE MONITOR WAS THIS SHARE'S, NOT THIS SESSION'S
                 if token.is_none() { screen_options::set_monitor(None); }
 
                 tx.send(match token

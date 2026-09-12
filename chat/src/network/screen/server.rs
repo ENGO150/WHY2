@@ -61,17 +61,11 @@ use crate::
 
 //PRIVATE
 //STATICS
-//WHAT A MUTED SHARER'S VIEWERS GET INSTEAD OF THEIR SCREEN, AS ANNEX-B H.264. IT IS COMMITTED
-//PRE-ENCODED (FROM `assets/muted.gif`) BECAUSE THE SERVER HAS NO ENCODER AND MUST NOT GROW ONE -
-//`openh264` IS A CLIENT-ONLY DEPENDENCY. EVERY FRAME IS AN IDR CARRYING ITS OWN SPS/PPS, SO ANY
-//ONE OF THEM CAN BE HANDED TO A VIEWER THAT ATTACHED HALF A LOOP AGO AND STILL DECODE:
-//
-//  ffmpeg -i assets/muted.gif -an -vf "pad=220:216:0:0:color=black,format=yuv420p" \
-//      -c:v libx264 -profile:v baseline -preset veryslow -crf 20 \
-//      -x264-params keyint=1:min-keyint=1:scenecut=0:repeat-headers=1 -f h264 assets/muted.h264
+//A MUTED SHARER'S PLACEHOLDER, ANNEX-B H.264
+//ffmpeg -i assets/muted.gif -an -vf "pad=220:216:0:0:color=black,format=yuv420p" -c:v libx264 -profile:v baseline -preset veryslow -crf 20 -x264-params keyint=1:min-keyint=1:scenecut=0:repeat-headers=1 -f h264 assets/muted.h264
 static MUTED_ANIMATION: LazyLock<Vec<Vec<u8>>> = LazyLock::new(|| split_access_units(include_bytes!("./assets/muted.h264")));
 
-//EVERY RUNNING SHARE, REACHABLE FROM WHERE A VIEWER ATTACHES RATHER THAN ONLY FROM THE SHARE'S OWN TASK
+//EVERY RUNNING SHARE, REACHABLE FROM AN ATTACH
 static SHARES: LazyLock<DashMap<usize, Arc<Share>>> = LazyLock::new(|| DashMap::new());
 
 //STRUCTS
@@ -91,7 +85,7 @@ struct Viewer //ONE ATTACHED CLIENT, AND THE TASK THAT WRITES TO IT
     token: [u8; 32],              //THE ATTACHMENT THIS TASK WAS BUILT FOR
     tx: Sender<ScreenPacketCode>, //HANDOFF TO THAT TASK
     task: AbortHandle,            //THE TASK ITSELF
-    needs_key: bool,              //SOMETHING WAS SHED - NOTHING IS DECODABLE UNTIL THE NEXT IDR
+    needs_key: bool,              //SHED: WAITING FOR THE NEXT IDR
 }
 
 //IMPLEMENTATIONS
@@ -114,8 +108,7 @@ impl Drop for Viewer
 {
     fn drop(&mut self)
     {
-        //THE TASK MAY BE PARKED IN `write_all` ON A SOCKET THAT WILL NEVER DRAIN, SO CLOSING THE
-        //CHANNEL IS NOT ENOUGH TO END IT - IT WOULD NEVER REACH THE NEXT `recv`
+        //THE TASK MAY BE PARKED IN write_all
         self.task.abort();
     }
 }
@@ -132,10 +125,10 @@ fn split_access_units(bitstream: &[u8]) -> Vec<Vec<u8>> //CUT AN ANNEX-B STREAM 
         //NOT A START CODE
         if bitstream[index..index + 3] != [0, 0, 1] { index += 1; continue; }
 
-        //AN SPS OPENS A FRAME (EVERY FRAME REPEATS ITS HEADERS), SO THE PREVIOUS ONE ENDS HERE
+        //AN SPS OPENS A FRAME, SO THE PREVIOUS ONE ENDS
         if bitstream[index + 3] & 0x1f == 7
         {
-            //BACK UP OVER THE LEADING ZERO OF A FOUR-BYTE START CODE
+            //BACK UP OVER A FOUR-BYTE START CODE
             let mut boundary = index;
             while boundary > 0 && bitstream[boundary - 1] == 0 { boundary -= 1; }
 
@@ -156,8 +149,7 @@ fn split_access_units(bitstream: &[u8]) -> Vec<Vec<u8>> //CUT AN ANNEX-B STREAM 
 
 fn is_keyframe(bitstream: &[u8]) -> bool //DOES THIS ACCESS UNIT STAND ON ITS OWN?
 {
-    //ONLY AN IDR (NAL TYPE 5), OR THE SPS (7) THE ENCODER REPEATS IN FRONT OF ONE, CAN BE DECODED
-    //WITHOUT THE FRAMES BEFORE IT - WHICH IS THE ONLY THING A VIEWER THAT HAS BEEN SHED CAN USE
+    //ONLY AN IDR (5), OR AN SPS (7) IN FRONT OF ONE
     let mut index = 0;
     while index + 3 < bitstream.len()
     {
@@ -178,7 +170,7 @@ fn spawn_viewer //ONE TASK PER VIEWER, SO A SLOW ONE BLOCKS ONLY ITSELF
     token: [u8; 32],
 ) -> Option<Viewer>
 {
-    //THE REX STREAM AND THE SEQUENCE NUMBER ARE PER VIEWER, SO THEY MOVE INTO THE TASK WITH IT
+    //THE REX STREAM AND SEQUENCE ARE PER VIEWER
     let mut rex_stream = crypto::init_rex_stream(keys, &token)?;
     let (tx, mut rx) = mpsc::channel(screen::consts::VIEWER_CHANNEL_BOUND);
 
@@ -192,17 +184,13 @@ fn spawn_viewer //ONE TASK PER VIEWER, SO A SLOW ONE BLOCKS ONLY ITSELF
         }
     }).abort_handle();
 
-    //A VIEWER THAT HAS JUST ATTACHED HAS NO PICTURE TO PREDICT FROM EITHER, SO IT STARTS IN THE
-    //SAME STATE AS A SHED ONE: NOTHING BUT AN IDR IS WORTH THE BANDWIDTH UNTIL IT HAS ONE
+    //A JUST-ATTACHED VIEWER STARTS LIKE A SHED ONE
     Some(Viewer { token, tx, task, needs_key: true })
 }
 
 fn muted_frame(started: &Instant) -> Option<usize> //INDEX OF THE PLACEHOLDER FRAME DUE RIGHT NOW
 {
-    //THE ANIMATION IS PLAYED OFF THE WALL CLOCK RATHER THAN OFF ARRIVING FRAMES: THE SHARER'S
-    //FRAME RATE IS WHATEVER THEIR DESKTOP IS DOING, AND ADVANCING PER ARRIVAL WOULD PLAY THE LOOP
-    //AT THAT SPEED. THE FLIP SIDE IS THAT A *STILL* DESKTOP ONLY SENDS ONE FRAME EVERY
-    //`FORCED_INTRA_INTERVAL`, WHICH IS ALL THE PLACEHOLDER GETS TO ADVANCE ON
+    //PLAY THE ANIMATION OFF THE WALL CLOCK
     let frames = MUTED_ANIMATION.len();
     if frames == 0 { return None; }
 
@@ -211,7 +199,7 @@ fn muted_frame(started: &Instant) -> Option<usize> //INDEX OF THE PLACEHOLDER FR
 
 async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
 {
-    //TAKE THE SHARE STATE (WITHOUT ABORTING - WE *ARE* THE SHARE TASK)
+    //TAKE THE SHARE STATE WITHOUT ABORTING
     let (write_stream, keys, username) =
     {
         let mut conn = match server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
@@ -220,7 +208,7 @@ async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
             None => return
         };
 
-        //ALREADY TORN DOWN (AND NOTIFIED) BY SOMEBODY ELSE
+        //ALREADY TORN DOWN BY SOMEBODY ELSE
         if conn.take_screen_stream().is_none() { return; }
 
         (conn.write_stream().clone(), conn.keys().cloned(), conn.username().cloned())
@@ -239,7 +227,7 @@ async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
 }
 
 //PUBLIC
-pub fn attach //BUILD A VIEWER WHERE IT ATTACHES, AND GIVE IT SOMETHING TO SHOW STRAIGHT AWAY
+pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
 (
     sharer_id: usize,
     client_id: usize,
@@ -253,10 +241,7 @@ pub fn attach //BUILD A VIEWER WHERE IT ATTACHES, AND GIVE IT SOMETHING TO SHOW 
 
     let Some(viewer) = spawn_viewer(stream, keys, token) else { return false; };
 
-    //THE WINDOW OPENS ON THE SHARE'S LAST KEYFRAME RATHER THAN ON BLACK. IT IS AT MOST
-    //`FORCED_INTRA_INTERVAL` OLD AND THE FRAMES SINCE IT WENT TO SOMEBODY ELSE, SO THE VIEWER STAYS
-    //`needs_key` AND SNAPS TO LIVE ON THE NEXT IDR - A STILL PICTURE THAT IS A LITTLE BEHIND READS AS
-    //A SHARE THAT IS STARTING, WHERE AN EMPTY ONE READS AS A SHARE THAT IS BROKEN
+    //OPEN ON THE SHARE'S LAST KEYFRAME
     if let Some(frame) = share.keyframe.lock().ok().and_then(|frame| frame.clone())
     {
         let _ = viewer.tx.try_send(ScreenPacketCode::Video { data: frame });
@@ -303,7 +288,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         }
     };
 
-    //THE SHARE'S OWN SOCKET IS AUXILIARY - EVERY LINE ABOUT IT IS KEYED BY THE MAIN CONNECTION
+    //AN AUXILIARY SOCKET IS LOGGED AS THE MAIN ONE
     let owner = server::log_addr(&id);
 
     log::info!("Screen share started: {owner}");
@@ -314,7 +299,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
     //LOCAL SEQ
     let mut seq = 0usize;
 
-    //ONE ENTRY PER ATTACHED VIEWER, EACH WITH ITS OWN WRITER TASK
+    //ONE ENTRY PER ATTACHED VIEWER
     let mut viewers = HashMap::<usize, Viewer>::new();
 
     //INIT REX STREAM
@@ -324,7 +309,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
     let started = Instant::now();
     let mut sent_muted_frame = None;
 
-    //REACHABLE FROM THE ACCEPT LOOP FROM HERE ON - A VIEWER IS BUILT WHERE IT ATTACHES
+    //REACHABLE FROM THE ACCEPT LOOP FROM HERE ON
     let share = Arc::new(Share
     {
         keyframe: MutexSync::new(None),
@@ -343,13 +328,13 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             None => break
         };
 
-        //IS THE SHARER MUTED? (COLLECT AND DROP THE GUARD - IT MUST NOT BE HELD ACROSS THE SENDS BELOW)
+        //IS THE SHARER MUTED? (DROP THE GUARD)
         let muted = server::CONNECTIONS.iter()
             .find(|c| c.id() == Some(&id))
             .map(|c| *c.muted())
             .unwrap_or(false);
 
-        //SILENCE MUTED USERS - THEIR SCREEN NEVER LEAVES THE SERVER, THE PLACEHOLDER GOES OUT IN ITS PLACE
+        //SILENCE MUTED USERS, SEND THE PLACEHOLDER
         let read = match (muted, read)
         {
             //NOT MUTED, FORWARD WHATEVER CAME IN
@@ -360,15 +345,14 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
                 read
             },
 
-            //MUTED AUDIO IS SIMPLY DROPPED - THERE IS NOTHING TO PUT IN ITS PLACE
+            //MUTED AUDIO IS SIMPLY DROPPED
             (true, ScreenPacketCode::Audio { .. }) => continue,
 
             (true, ScreenPacketCode::Video { .. }) =>
             {
                 let Some(frame) = muted_frame(&started) else { continue; };
 
-                //THE SHARER SENDS FAR FASTER THAN THE PLACEHOLDER ADVANCES - RESENDING THE SAME
-                //FRAME WOULD ONLY COST EVERY VIEWER AN IDR TO REDRAW THE PICTURE THEY ALREADY HAVE
+                //DO NOT RESEND THE SAME PLACEHOLDER FRAME
                 if sent_muted_frame == Some(frame) { continue; }
                 sent_muted_frame = Some(frame);
 
@@ -376,9 +360,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             },
         };
 
-        //TAKE ON WHOEVER ATTACHED SINCE THE LAST FRAME. THEIR TASK WAS BUILT AT THE ATTACH AND HAS
-        //ALREADY BEEN HANDED THE PICTURE THE SHARE STOOD ON THEN - INSERTING OVER AN OLD ENTRY DROPS
-        //IT, WHICH IS WHAT RETIRES A RE-ATTACHMENT'S PREVIOUS TASK
+        //TAKE ON WHOEVER ATTACHED SINCE THE LAST FRAME
         let arrivals = share.pending.lock().map(|mut pending| pending.drain(..).collect::<Vec<_>>()).unwrap_or_default();
 
         for (client_id, viewer) in arrivals
@@ -388,7 +370,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             log::info!("Screen viewer serving ({} attached): share of {owner}", viewers.len());
         }
 
-        //COLLECT WHO IS STILL ATTACHED TO US, BY THE ATTACHMENT THEIR TASK WAS BUILT FOR
+        //COLLECT WHO IS STILL ATTACHED TO US
         let entries: Vec<(usize, [u8; 32])> = server::CONNECTIONS.iter().filter_map(|entry|
         {
             match entry.value()
@@ -405,7 +387,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             }
         }).collect();
 
-        //RETIRE WHOEVER LEFT - DROPPING A `Viewer` ABORTS ITS TASK AND CLOSES ITS SOCKET
+        //RETIRE WHOEVER LEFT, ABORTING THEIR TASK
         viewers.retain(|client_id, viewer| entries.iter().any(|(e, token)| e == client_id && *token == viewer.token));
 
         //FORWARD PACKET
@@ -416,8 +398,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             //PREVENT FEEDBACK
             if *client_id == id && matches!(read, ScreenPacketCode::Audio { .. }) { continue; }
 
-            //A VIEWER THAT MISSED A FRAME CANNOT DECODE A PREDICTED ONE - IT HOLDS ITS LAST PICTURE
-            //UNTIL AN IDR COMES ROUND (AT MOST `FORCED_INTRA_INTERVAL`) RATHER THAN BE HANDED RUBBISH
+            //A VIEWER THAT MISSED A FRAME WAITS FOR AN IDR
             if viewer.needs_key && matches!(read, ScreenPacketCode::Video { .. })
             {
                 if !keyframe { continue; }
@@ -427,13 +408,10 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
                 viewer.needs_key = false;
             }
 
-            //A FULL QUEUE MEANS *THIS* VIEWER'S LINK CANNOT CARRY THE SHARE. SHEDDING THE FRAME IS
-            //THE WHOLE POINT: THE SHARE RUNS AT THE SHARER'S RATE AND A SLOW VIEWER PAYS ALONE,
-            //WHERE FORWARDING INLINE MADE EVERYBODY WAIT FOR THE WORST LINK ON THE SERVER
+            //A FULL QUEUE MEANS SHED THE FRAME
             if viewer.tx.try_send(read.clone()).is_err()
             {
-                //A LINE PER SHED FRAME WOULD BE ONE PER FRAME ON A LINK THAT CANNOT CARRY THE SHARE AT ALL,
-                //SO ONLY THE FIRST OF A RUN IS WORTH SAYING: THE REST ARE THE SAME VIEWER STILL BEHIND
+                //ONLY THE FIRST SHED FRAME OF A RUN IS LOGGED
                 if matches!(read, ScreenPacketCode::Video { .. })
                 {
                     if !viewer.needs_key { log::warn!("Screen viewer shed (link too slow): share of {owner}"); }
@@ -443,14 +421,13 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             }
         }
 
-        //KEEP THE LAST PICTURE THAT STANDS ON ITS OWN. IT IS WHAT THE NEXT ATTACH IS HANDED, AND IT
-        //IS KEPT *AFTER* THE FORWARD SO A VIEWER IS NEVER HANDED THE FRAME IT IS ABOUT TO BE SENT
+        //KEEP THE LAST KEYFRAME FOR THE NEXT ATTACH
         if keyframe && let ScreenPacketCode::Video { data } = &read
         {
             if let Ok(mut cached) = share.keyframe.lock() { *cached = Some(data.clone()); }
         }
     }
 
-    //THE UPLOAD SOCKET DIED - NOBODY ELSE KNOWS THE SHARE IS OVER
+    //THE UPLOAD SOCKET DIED
     end_share(id).await;
 }

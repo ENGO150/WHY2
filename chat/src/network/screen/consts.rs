@@ -30,24 +30,24 @@ pub const FRAME_POLL_INTERVAL: Duration   = Duration::from_millis(1000 / TARGET_
 
 pub const WINIT_SIZE: (u32, u32)          = (1920, 1080);                                    //DEFAULT WINIT WINDOW SIZE
 pub const WAYLAND_RECONNECT_FAILURES: u32 = 3;                                               //CONSECUTIVE CAPTURE FAILURES BEFORE RECONNECTING
-pub const WAYLAND_LEAK_BUDGET: u64        = 128 * 1024 * 1024;                               //COMPOSITOR MEMORY A SHARE MAY STRAND BEFORE THE CONNECTION IS RECYCLED (SEE capture_loop_wayshot)
+pub const WAYLAND_LEAK_BUDGET: u64        = 128 * 1024 * 1024;                               //COMPOSITOR MEMORY A SHARE MAY STRAND
 
 pub const MULTIPLEX_CHANNEL_BOUND: usize  = 2;                                               //NETWORK BUFFER (VIDEO/AUDIO HANDOFF)
 pub const CAPTURE_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 4;                     //CAPTURE BUFFER (~160ms)
 pub const PLAYBACK_CHANNEL_BOUND: usize   = MULTIPLEX_CHANNEL_BOUND + 1;                     //PLAYBACK BUFFER (~60ms)
 pub const NETWORK_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 8;                     //NETWORK RECEIVE BUFFER (~320ms)
-pub const AUDIO_BACKLOG_TARGET: usize     = MULTIPLEX_CHANNEL_BOUND * 2 + 1;                 //AUDIO FRAMES THE RECEIVE QUEUE IS SHED BACK DOWN TO (~100ms OF JITTER TOLERANCE, SEE spawn_audio_playback)
-pub const VIEWER_CHANNEL_BOUND: usize     = MULTIPLEX_CHANNEL_BOUND * 4;                     //SERVER-SIDE FORWARD QUEUE, PER VIEWER (~270ms BEFORE THAT VIEWER ALONE IS SHED)
+pub const AUDIO_BACKLOG_TARGET: usize     = MULTIPLEX_CHANNEL_BOUND * 2 + 1;                 //AUDIO FRAMES THE RECEIVE QUEUE IS SHED BACK DOWN TO
+pub const VIEWER_CHANNEL_BOUND: usize     = MULTIPLEX_CHANNEL_BOUND * 4;                     //SERVER-SIDE FORWARD QUEUE, PER VIEWER
 
-pub const SOCKET_BUFFER: usize            = 128 * 1024;                                      //KERNEL QUEUE A SCREEN SHARE SOCKET MAY HOLD (SEE cap_socket_buffers)
+pub const SOCKET_BUFFER: usize            = 128 * 1024;                                      //KERNEL QUEUE A SCREEN SHARE SOCKET MAY HOLD
 
-pub const FORCED_INTRA_INTERVAL: Duration  = Duration::from_secs(2);      //MAX GAP BETWEEN ENCODED FRAMES (KEEPS A LATE VIEWER SYNCED)
+pub const FORCED_INTRA_INTERVAL: Duration  = Duration::from_secs(2);      //MAX GAP BETWEEN ENCODED FRAMES
 pub const RECORDER_POLL_INTERVAL: Duration = Duration::from_millis(100);  //HOW OFTEN THE RECORDER LOOP RECHECKS `running` WHILE IDLE
 pub const BACKEND_OVERRIDE_VAR: &str       = "WHY2_CAPTURE_BACKEND";      //PINS A CAPTURE BACKEND ("recorder" / "legacy")
 pub const PROBE_TIMEOUT_VAR: &str          = "WHY2_CAPTURE_PROBE_TIMEOUT"; //OVERRIDES THE PROBE TIMEOUT, IN SECONDS
 pub const RECORDER_PROBE_TIMEOUT: Duration = Duration::from_secs(30);     //HOW LONG THE RECORDER PROBE MAY BLOCK BEFORE WE FALL BACK
 pub const CONVERTER_OVERRIDE_VAR: &str     = "WHY2_CAPTURE_CONVERTER"; //PINS THE RGBA -> I420 PATH ("gpu" / "cpu")
-pub const MONITOR_LIST_TTL: Duration       = Duration::from_secs(5);      //HOW LONG THE PALETTE'S MONITOR LIST IS REUSED BEFORE THE DISPLAY SERVER IS ASKED AGAIN
-pub const RECORDER_FIRST_FRAME: Duration  = Duration::from_secs(5);   //A RECORDER THAT DELIVERS NOTHING IN THIS LONG IS TREATED AS BROKEN
+pub const MONITOR_LIST_TTL: Duration       = Duration::from_secs(5);      //HOW LONG THE PALETTE'S MONITOR LIST IS REUSED
+pub const RECORDER_FIRST_FRAME: Duration  = Duration::from_secs(5);   //NO FRAME IN THIS LONG MEANS A BROKEN RECORDER
 
-pub const MUTED_FRAME_INTERVAL: Duration  = Duration::from_millis(100); //FRAME DURATION OF THE PLACEHOLDER SHOWN WHILE A SHARER IS MUTED (10 FPS)
+pub const MUTED_FRAME_INTERVAL: Duration  = Duration::from_millis(100); //FRAME DURATION OF THE MUTED PLACEHOLDER (10 FPS)

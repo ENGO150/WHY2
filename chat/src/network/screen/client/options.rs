@@ -38,18 +38,13 @@ use crate::
 static USE_SCREEN: AtomicBool = AtomicBool::new(false);
 static ATTACH_SCREEN: AtomicBool = AtomicBool::new(false);
 
-//WHICH MONITOR /screen SHARES, BY NAME. THE CHOICE NEVER LEAVES THIS MACHINE (THE SERVER ONLY EVER
-//TOGGLES THE SHARE) AND IT IS NOT REMEMBERED PAST THE SHARE THAT ASKED FOR IT: EVERY PATH THAT ENDS
-//A SHARE PUTS IT BACK TO `None`, WHICH IS THE DEFAULT (PRIMARY) MONITOR.
+//WHICH MONITOR /screen SHARES, BY NAME
 static MONITOR: RwLock<Option<String>> = RwLock::new(None);
 
-//BUMPED WHENEVER THE PICK ACTUALLY CHANGES. A RUNNING CAPTURE WATCHES IT AND STARTS OVER ON THE NEW
-//MONITOR, WHICH IS WHAT MAKES `/screen OTHER` A SWAP RATHER THAN THE END OF THE SHARE.
+//BUMPED WHENEVER THE PICK CHANGES
 static MONITOR_GENERATION: AtomicUsize = AtomicUsize::new(0);
 
-//HOW LOUD AN ATTACHED SHARE'S AUDIO IS PLAYED, IN PERCENT. READ ONCE PER OUTPUT CALLBACK, SO
-///settings CHANGES IT UNDER A RUNNING ATTACH. IT IS A PLAYBACK GAIN ONLY - THE SHARER SENDS WHAT
-//THEY SEND, AND NOBODY ELSE HEARS THIS.
+//HOW LOUD AN ATTACHED SHARE IS PLAYED, IN PERCENT
 static SCREEN_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(voice_options::clamp_volume(config::read_config::<u32>("screen_volume")) as usize));
 
 //USE SCREEN
@@ -84,7 +79,7 @@ pub fn set_monitor(monitor: Option<String>)
 {
     let mut current = MONITOR.write().unwrap();
 
-    if *current == monitor { return; } //THE SAME MONITOR IS NOT A SWAP - NOBODY HAS TO START OVER FOR IT
+    if *current == monitor { return; } //THE SAME MONITOR IS NOT A SWAP
 
     *current = monitor;
 

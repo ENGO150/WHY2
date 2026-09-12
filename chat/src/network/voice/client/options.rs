@@ -39,7 +39,7 @@ static SERVER_SEQ: AtomicUsize = AtomicUsize::new(0); //PACKET SEQUENCE NUMBER (
 
 static USE_VOICE: AtomicBool = AtomicBool::new(false);
 
-//AUDIO PREFERENCES - SEEDED FROM client.toml, LIVE-EDITED BY /settings
+//AUDIO PREFERENCES - client.toml PLUS /settings
 static INPUT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(clamp_volume(config::read_config::<u32>("input_volume")) as usize));
 static OUTPUT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(clamp_volume(config::read_config::<u32>("output_volume")) as usize));
 static NOISE_SUPPRESSION: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(config::read_config::<bool>("noise_suppression")));
@@ -86,7 +86,7 @@ pub fn clamp_volume(percent: u32) -> u32 //KEEP A VOLUME INSIDE THE SUPPORTED RA
     percent.min(VOLUME_MAX)
 }
 
-pub fn init_audio() //TOUCH EVERY PREFERENCE SO NO AUDIO CALLBACK EVER PAYS FOR THE CONFIG READ
+pub fn init_audio() //TOUCH EVERY PREFERENCE
 {
     get_input_volume();
     get_output_volume();
@@ -145,7 +145,7 @@ pub fn set_automatic_gain(value: bool)
 }
 
 //DEVICE GENERATION
-pub fn device_generation() -> usize //A RUNNING VOICE SESSION REBUILDS ITS STREAMS WHEN THIS MOVES
+pub fn device_generation() -> usize //BUMPED WHEN THE PICKED DEVICES CHANGE
 {
     DEVICE_GENERATION.load(Ordering::Relaxed)
 }

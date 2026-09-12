@@ -123,8 +123,7 @@ impl GpuConverter
 {
     pub fn supports(width: u32, height: u32) -> bool //DIMENSIONS THE SHADER'S WORD PACKING CAN HANDLE
     {
-        //FOUR LUMA SAMPLES ARE PACKED PER OUTPUT WORD AND FOUR CHROMA SAMPLES PER CHROMA WORD, SO A
-        //ROW MUST BE A WHOLE NUMBER OF WORDS IN BOTH PLANES. ANYTHING ELSE FALLS BACK TO THE CPU.
+        //A ROW MUST BE WHOLE PACKED WORDS IN BOTH PLANES
         width % 8 == 0 && height % 2 == 0 && width > 0 && height > 0
     }
 
@@ -148,8 +147,7 @@ impl GpuConverter
             ..Default::default()
         })).map_err(|e| format!("requesting a GPU device failed ({e})"))?;
 
-        //A SHADER THAT FAILS TO COMPILE MUST SURFACE AS AN Err RATHER THAN AS A PANIC INSIDE wgpu,
-        //BECAUSE THE ONLY SENSIBLE ANSWER TO IT IS TO GO ON USING THE CPU PATH
+        //A SHADER THAT WILL NOT COMPILE IS AN Err
         let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
 
         let module = device.create_shader_module(ShaderModuleDescriptor
@@ -194,7 +192,7 @@ impl GpuConverter
 
     fn prepare(&mut self, width: u32, height: u32)
     {
-        //REALLOCATE ONLY WHEN THE MONITOR RESOLUTION ACTUALLY CHANGED
+        //REALLOCATE ONLY ON A REAL RESOLUTION CHANGE
         if self.resources.as_ref().is_some_and(|r| r.width == width && r.height == height) { return; }
 
         let pixels = width as u64 * height as u64;
@@ -229,8 +227,7 @@ impl GpuConverter
             mapped_at_creation: false,
         });
 
-        //THE UNIFORM IS WRITTEN BY HAND RATHER THAN THROUGH bytemuck - FOUR u32 IS NOT WORTH A
-        //DEPENDENCY, AND THE STD140 LAYOUT OF FOUR SCALARS IS JUST THEIR CONCATENATION
+        //THE UNIFORM IS WRITTEN BY HAND
         let mut dimensions = Vec::with_capacity(16);
         for value in [width, height, y_words as u32, c_words as u32]
         {
@@ -296,8 +293,7 @@ impl GpuConverter
 
         let resources = self.resources.as_ref().expect("prepare always installs resources");
 
-        //THE SOURCE IS UPLOADED AS PACKED RGBA WORDS. THE SHADER UNPACKS BYTE 0 AS RED, WHICH IS
-        //ONLY THE RIGHT READING ON A LITTLE-ENDIAN HOST - EVERY PLATFORM THIS CLIENT BUILDS FOR IS
+        //PACKED RGBA WORDS (LITTLE-ENDIAN HOSTS ONLY)
         self.queue.write_buffer(&resources.source, 0, &rgba[..expected]);
 
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor
@@ -321,8 +317,7 @@ impl GpuConverter
 
         self.queue.submit(Some(encoder.finish()));
 
-        //READ BACK. THIS IS THE PIPELINE'S ONLY GPU SYNC POINT, AND IT IS WHY THE CONVERTER IS
-        //WORTH IT ONLY BECAUSE THE RESULT IS 1.5 BYTES PER PIXEL AGAINST THE 4 THAT WENT UP.
+        //READ BACK, THE PIPELINE'S ONLY GPU SYNC POINT
         let slice = resources.staging.slice(..);
         let (ready_tx, ready_rx) = std::sync::mpsc::channel();
 

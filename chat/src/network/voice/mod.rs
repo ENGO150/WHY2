@@ -53,13 +53,13 @@ use crate::options as chat_options;
 #[derive(SchemaRead, SchemaWrite)]
 pub enum VoicePacketCode
 {
-    //INIT PACKET - CLAIMS THE VOICE SLOT THE TCP SESSION OPENED
+    //INIT PACKET - CLAIMS THE VOICE SLOT
     Hello
     {
         token: [u8; 32], //TOKEN HANDED OUT OVER THE AUTHENTICATED TCP CHANNEL
     },
 
-    //Hello ACCEPTED - UDP IS LOSSY, SO THE CLIENT REPEATS Hello UNTIL THIS COMES BACK
+    //Hello ACCEPTED - THE CLIENT REPEATS UNTIL THIS
     HelloAck,
 
     //AUDIO TRANSMIT
@@ -176,7 +176,7 @@ pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //
                 }
             }
 
-            //POLL SO THE VOICE DISABLE CHECK ABOVE STAYS RESPONSIVE
+            //POLL SO THE VOICE DISABLE CHECK STAYS RESPONSIVE
             #[cfg(not(feature = "server"))]
             {
                 match tokio::time::timeout(Duration::from_millis(consts::RECV_TIMEOUT), socket.recv_from(&mut buffer)).await

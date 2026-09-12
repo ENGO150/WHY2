@@ -120,13 +120,12 @@ struct LocalStream
     _input: Stream,
     _output: Stream,
 
-    //THE PAIR THIS WAS BUILT FROM (EMPTY = SYSTEM DEFAULT), SO A FAILED SWITCH CAN GO BACK TO IT
+    //THE PAIR THIS WAS BUILT FROM (EMPTY = DEFAULT)
     input_id: String,
     output_id: String,
 }
 
-//ONE DEVICE AS THE SETTINGS OVERLAY SHOWS IT. THE id IS WHAT client.toml STORES AND WHAT find_devices
-//MATCHES ON - THE label IS ONLY EVER DISPLAYED, AND IS NOT UNIQUE ON ALSA.
+//ONE DEVICE AS /settings SHOWS IT
 #[derive(Clone)]
 pub struct AudioDevice
 {
@@ -178,23 +177,19 @@ impl Drop for StreamGuard
                 *streams = None;
             }
 
-            //NOTHING OF OURS REACHES THE SINK ANY MORE, SO A RUNNING SHARE MUST STOP SUBTRACTING
+            //A RUNNING SHARE MUST STOP SUBTRACTING
             aec::set_rate(0);
         }
     }
 }
 
 //PRIVATE
-fn device_id(device: &Device) -> String //THE HOST-QUALIFIED cpal ID, E.G. "alsa:plughw:CARD=1,DEV=0"
+fn device_id(device: &Device) -> String //THE HOST-QUALIFIED cpal ID
 {
     device.id().map(|id| id.to_string()).unwrap_or_default()
 }
 
-//WHETHER A DEVICE IS WORTH OFFERING IN /settings. ALSA ENUMERATES EVERY PCM PLUGIN, MOST OF WHICH SHARE
-//THE SAME DESCRIPTION AND EITHER CANNOT BE OPENED AT ALL (hw:, surround*, iec958 ON A STEREO CARD) OR
-//DUPLICATE ONE THAT CAN - plughw: DOES THE FORMAT CONVERSION FOR US, SO IT IS THE ONE WE KEEP. cards IS
-//CLEARED ONCE A SOUND SERVER IS IN THE PICTURE: IT HOLDS THE CARDS ITSELF AND ALSA ONLY REPORTS THEM BUSY,
-//SO THE SERVER'S OWN HOST IS WHERE A NAMED DEVICE COMES FROM.
+//WHETHER A DEVICE IS WORTH OFFERING IN /settings
 fn is_usable(id: &str, cards: bool) -> bool
 {
     #[cfg(target_os = "linux")]
@@ -203,7 +198,7 @@ fn is_usable(id: &str, cards: bool) -> bool
 
         if pcm == "null" { return false; }
 
-        //A PLUGIN WITHOUT A CARD (default, sysdefault, pipewire, pulse, ...) IS THE SOUND SERVER ITSELF
+        //A PLUGIN WITHOUT A CARD IS THE SOUND SERVER
         if !pcm.contains("CARD=") { return true; }
 
         cards && pcm.starts_with("plughw:")
@@ -216,9 +211,7 @@ fn is_usable(id: &str, cards: bool) -> bool
     }
 }
 
-//EVERY HOST THE VOICE CLIENT IS WILLING TO OPEN A DEVICE IN, LOWEST LATENCY FIRST. audio_host() IS WHERE
-//THE SYSTEM DEFAULT COMES FROM; THE SOUND SERVER'S OWN HOST FOLLOWS IT, BECAUSE PIPEWIRE/PULSEAUDIO HOLD
-//THE RAW CARDS AND ALSA CAN ONLY REPORT THEM AS BUSY - PICKING A NAMED DEVICE HAS TO GO THROUGH THE SERVER.
+//EVERY HOST WE OPEN DEVICES IN, BEST LATENCY FIRST
 fn audio_hosts() -> Vec<Host>
 {
     let primary = audio_host();
@@ -230,16 +223,13 @@ fn audio_hosts() -> Vec<Host>
     hosts
 }
 
-//EVERY DEVICE THE VOICE CLIENT COULD OPEN, ENUMERATED IN THE SAME HOSTS THAT LATER OPEN THEM - THE LIST
-//THAT /settings SHOWS AND THE ID IT WRITES HAVE TO COME FROM THE SAME PLACE, OR THE SAVED DEVICE MATCHES
-//NOTHING WHEN THE TIME COMES TO OPEN IT.
-//BLOCKING, AND ALSA SPEAKS TO fd 2 - HENCE THE GAG.
+//EVERY DEVICE WE COULD OPEN (BLOCKING, GAGGED)
 pub fn list_devices() -> (Vec<AudioDevice>, Vec<AudioDevice>) //(INPUT, OUTPUT)
 {
     let _stderr_gag = Gag::stderr().ok();
     let hosts = audio_hosts();
 
-    //WITH A SOUND SERVER RUNNING, THE RAW ALSA CARDS BELONG TO IT AND ARE NOT OURS TO OPEN
+    //A SOUND SERVER HOLDS THE RAW ALSA CARDS
     let cards = hosts.len() == 1;
 
     let collect = |input: bool|
@@ -271,12 +261,11 @@ fn collect_devices(host: &Host, input: bool, cards: bool, out: &mut Vec<AudioDev
         out.push(AudioDevice { id, label });
     }
 
-    //EACH HOST IS SORTED WITHIN ITSELF, SO THE ORDER OF THE HOSTS THEMSELVES SURVIVES
+    //SORT WITHIN EACH HOST, KEEPING THE HOST ORDER
     out[start..].sort_by(|a, b| a.label.cmp(&b.label).then_with(|| a.id.cmp(&b.id)));
 }
 
-//THE DEVICE wanted POINTS AT, OR THE SYSTEM DEFAULT WHEN IT IS EMPTY. THE ID CARRIES ITS HOST, SO A DEVICE
-//IS LOOKED FOR IN EVERY HOST AND CAN ONLY EVER MATCH THE ONE IT CAME FROM.
+//THE DEVICE wanted NAMES, OR THE SYSTEM DEFAULT
 fn pick_device(wanted: &str, input: bool) -> Option<Device>
 {
     let hosts = audio_hosts();
@@ -294,7 +283,7 @@ fn pick_device(wanted: &str, input: bool) -> Option<Device>
         .collect();
 
     devices.iter().find(|device| device_id(device) == wanted)
-        //A CONFIG WRITTEN BEFORE DEVICES WERE STORED BY ID STILL HOLDS A DESCRIPTION
+        //AN OLD CONFIG STILL HOLDS A DESCRIPTION
         .or_else(|| devices.iter().find(|device| device.description().is_ok_and(|desc| desc.to_string() == wanted)))
         .cloned()
 }
@@ -339,7 +328,7 @@ pub fn configure_device(device: &cpal::Device, supported_configs: impl Iterator<
 
 fn transmit_audio(encoder: &Encoder, frame: &mut [f32], buffer: &mut [u8], tx: &Sender<Vec<u8>>)
 {
-    //MICROPHONE VOLUME (/settings) - APPLIED AFTER THE AGC, SO IT STAYS THE USER'S LAST WORD ON THE LEVEL
+    //MICROPHONE VOLUME (/settings), AFTER THE AGC
     let gain = options::get_input_gain();
     if gain != 1.
     {
@@ -352,17 +341,17 @@ fn transmit_audio(encoder: &Encoder, frame: &mut [f32], buffer: &mut [u8], tx: &
     //ENCODE (IGNORE ERRORS)
     if let Ok(len) = encoder.encode_float(&frame, buffer)
     {
-        //HAND OVER TO THE NETWORK TASK (NEVER BLOCK THE AUDIO CALLBACK)
+        //HAND OVER TO THE NETWORK TASK
         tx.try_send(buffer[..len].to_vec()).ok();
     }
 }
 
-//NORMALIZE ONE FRAME IN PLACE, MUST BE CALLED ON EVERY TRANSMITTED FRAME IN ORDER (THE GAIN IS STATEFUL)
+//NORMALIZE ONE FRAME IN PLACE (STATEFUL, IN ORDER)
 fn apply_agc(frame: &mut [f32], rms: f32, is_speech: bool, envelope: &mut f32, gain: &mut f32)
 {
-    if !options::automatic_gain() { return; } //TURNED OFF IN /settings - THE RAW LEVEL GOES OUT AS CAPTURED
+    if !options::automatic_gain() { return; } //TURNED OFF IN /settings
 
-    //TRACK THE SPEECH LEVEL ONLY WHILE SOMEBODY IS ACTUALLY TALKING
+    //TRACK THE SPEECH LEVEL ONLY WHILE TALKING
     if is_speech
     {
         let smoothing = if rms > *envelope { consts::AGC_ATTACK } else { consts::AGC_RELEASE };
@@ -374,7 +363,7 @@ fn apply_agc(frame: &mut [f32], rms: f32, is_speech: bool, envelope: &mut f32, g
     let slew = if target_gain < *gain { consts::AGC_GAIN_DOWN } else { consts::AGC_GAIN_UP };
     *gain += (target_gain - *gain) * slew;
 
-    //APPLY WITH A SOFT KNEE, EVERYTHING BELOW THE KNEE STAYS UNTOUCHED
+    //APPLY WITH A SOFT KNEE
     for sample in frame.iter_mut()
     {
         let amplified = *sample * *gain;
@@ -406,7 +395,7 @@ fn audio_host() -> Host //THE HOST THE VOICE CLIENT TALKS TO
     }
 }
 
-//CAPTURE SIDE. EVERY PIECE OF STATE (VAD, AGC, RESAMPLER) IS BUILT HERE, SO A REBUILD STARTS FROM A CLEAN SLATE.
+//CAPTURE SIDE - VAD, AGC AND RESAMPLER ARE BUILT HERE
 fn build_input_stream(device: &Device, config: StreamConfig, current_generation: usize, packet_tx: Sender<Vec<u8>>) -> Option<Stream>
 {
     //PREPARE OPUS ENCODER
@@ -448,7 +437,7 @@ fn build_input_stream(device: &Device, config: StreamConfig, current_generation:
     let agc_gain_cb = agc_gain.clone();
     device.build_input_stream(config, move |data: &[f32], _: &_|
     {
-        //CHECK FOR MUTING (A MICROPHONE TURNED DOWN TO 0% IS OFF, VOICE ACTIVITY INCLUDED)
+        //CHECK FOR MUTING (0% MICROPHONE IS OFF)
         if chat_options::is_muted(None) || options::get_input_volume() == 0
         {
             LOCAL_DISPLAY_HOLD.store(0, Ordering::Relaxed); //CLEAR VAD WINDOW
@@ -517,7 +506,7 @@ fn build_input_stream(device: &Device, config: StreamConfig, current_generation:
         {
             let mut frame: Vec<f32> = input_accum.drain(0..consts::FRAME_SIZE).collect();
 
-            //NOISE REDUCTION (SKIPPED WHEN TURNED OFF IN /settings)
+            //NOISE REDUCTION (SKIPPED WHEN TURNED OFF)
             for chunk in frame.chunks_mut(consts::SAMPLE_RATE as usize / 100)
             {
                 if options::noise_suppression() && chunk.len() == consts::SAMPLE_RATE as usize / 100
@@ -539,7 +528,7 @@ fn build_input_stream(device: &Device, config: StreamConfig, current_generation:
                 }
             }
 
-            //VAD (RUNS ON THE CLEAN SIGNAL, BEFORE THE AGC, SO THE TRESHOLDS STAY COMPARABLE ACROSS FRAMES)
+            //VAD, ON THE CLEAN SIGNAL BEFORE THE AGC
             let rms = (frame.iter().map(|&x| x * x).sum::<f32>() / frame.len() as f32 + 1e-10).sqrt(); //RMS CALCULATION (+ SMALL BIAS)
             let mut gate = gate_open.lock().unwrap();
             let mut preroll = preroll_buffer.lock().unwrap();
@@ -548,8 +537,7 @@ fn build_input_stream(device: &Device, config: StreamConfig, current_generation:
             let mut envelope = agc_envelope_cb.lock().unwrap();
             let mut gain = agc_gain_cb.lock().unwrap();
 
-            //PREVENT NOISE FLOOR CONTAMINATION BY VOICE: A FRAME THE GATE WOULD OPEN ON NEVER FEEDS THE
-            //FLOOR, AND WHAT IS LEFT IS TRACKED DOWN FAST AND UP SLOWLY
+            //TRACK THE NOISE FLOOR DOWN FAST, UP SLOWLY
             if !*gate
             {
                 let open = (*nf * consts::NOISE_OPEN_MULT).max(consts::MIN_TRESHOLD_OPEN);
@@ -573,7 +561,7 @@ fn build_input_stream(device: &Device, config: StreamConfig, current_generation:
             {
                 *gate = true; //SPEAKING
 
-                //SEND STORED FRAMES (QUIET LEAD-IN, SO NORMALIZE THEM BUT KEEP THEM OUT OF THE ENVELOPE)
+                //SEND STORED FRAMES, KEPT OUT OF THE ENVELOPE
                 for mut old_frame in preroll.drain(..)
                 {
                     apply_agc(&mut old_frame, rms, false, &mut envelope, &mut gain);
@@ -610,7 +598,7 @@ fn build_input_stream(device: &Device, config: StreamConfig, current_generation:
             {
                 LOCAL_DISPLAY_HOLD.store((consts::SAMPLE_RATE * consts::DISPLAY_HOLD as u32 / 1000) as usize, Ordering::Relaxed);
 
-                //ONLY FRAMES CARRYING REAL SPEECH ENERGY FEED THE ENVELOPE, HOLD-TAIL FRAMES DO NOT
+                //ONLY REAL SPEECH FEEDS THE ENVELOPE
                 apply_agc(&mut frame, rms, rms >= treshold_close, &mut envelope, &mut gain);
                 transmit_audio(&opus_encoder, &mut frame, &mut encoded_buffer, &packet_tx);
             }
@@ -618,7 +606,7 @@ fn build_input_stream(device: &Device, config: StreamConfig, current_generation:
     }, |_| {}, None).ok()
 }
 
-//PLAYBACK SIDE. THE PEERS THEMSELVES LIVE IN CONSUMERS, WHICH A REBUILD LEAVES ALONE.
+//PLAYBACK SIDE - THE PEERS LIVE IN CONSUMERS
 fn build_output_stream(device: &Device, config: StreamConfig, current_generation: usize) -> Option<Stream>
 {
     //OUTPUT RESAMPLING
@@ -629,8 +617,7 @@ fn build_output_stream(device: &Device, config: StreamConfig, current_generation
     //OUTPUT INTERPOLATION
     let output_resample_step = output_source_rate / output_target_rate;
 
-    //THE SCREEN SHARE SUBTRACTS THIS STREAM BACK OUT OF THE SINK MONITOR (SEE aec.rs), AND NEEDS THE RATE
-    //IT IS PRODUCED AT. IT IS ALSO HOW A REBUILT STREAM TELLS THE CANCELLER TO FIND THE DELAY AGAIN.
+    //THE SHARE NEEDS THIS STREAM'S RATE (SEE aec.rs)
     aec::set_rate(config.sample_rate);
 
     let mut reference = Vec::with_capacity(consts::FRAME_SIZE);
@@ -706,8 +693,7 @@ fn build_output_stream(device: &Device, config: StreamConfig, current_generation
             //SOFT CLIPPING (HYPERBOLIC TANGENT)
             mixed_sample = mixed_sample.tanh();
 
-            //THE REFERENCE IS TAPPED HERE, PAST EVERY STAGE THAT SHAPES IT - WHAT THE SINK RECEIVES IS
-            //WHAT THE SHARE HAS TO TAKE BACK OUT, AND A SILENT FRAME COUNTS AS MUCH AS A LOUD ONE
+            //TAP THE REFERENCE PAST EVERY SHAPING STAGE
             reference.push(mixed_sample);
 
             //WRITE SAMPLE TO ALL CHANNELS
@@ -723,12 +709,12 @@ fn build_output_stream(device: &Device, config: StreamConfig, current_generation
     }, |_| {}, None).ok()
 }
 
-//BOTH STREAMS, ALREADY PLAYING. wanted OVERRIDES THE CONFIGURED PAIR (USED TO GO BACK TO A DEVICE THAT WORKED).
+//BOTH STREAMS, PLAYING. wanted OVERRIDES THE CONFIG
 fn build_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>, wanted: Option<(String, String)>) -> Option<LocalStream>
 {
     let (wanted_input, wanted_output) = wanted.unwrap_or_else(configured_ids);
 
-    //FIND INPUT/OUTPUT DEVICE (SUPPRESS STDERR TO AVOID ALSA ERRORS)
+    //FIND INPUT/OUTPUT DEVICE (GAGGED STDERR)
     let (input_device, output_device) =
     {
         let _stderr_gag = Gag::stderr().ok();
@@ -760,12 +746,10 @@ fn build_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>, wanted:
     })
 }
 
-//SWAPS IN A FRESHLY BUILT PAIR AFTER A /settings DEVICE CHANGE. THE UDP SESSION, THE PEERS AND THE JITTER
-//BUFFERS ARE UNTOUCHED - ONLY THE TWO CPAL STREAMS ARE REPLACED.
+//SWAP IN A NEW PAIR, LEAVING THE UDP SESSION ALONE
 fn replace_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> bool
 {
-    //THE OLD PAIR HAS TO STOP BEFORE THE NEW ONE OPENS - AN ALSA PCM IS EXCLUSIVE, SO THE DEVICE THAT IS
-    //KEPT ACROSS THE SWITCH (ONLY ONE OF THE TWO USUALLY CHANGES) WOULD REFUSE THE SECOND OPEN
+    //THE OLD PAIR STOPS FIRST - AN ALSA PCM IS EXCLUSIVE
     let previous = LOCAL_STREAMS.lock().unwrap().take();
     let restore = previous.as_ref().map(|streams| (streams.input_id.clone(), streams.output_id.clone()));
     drop(previous);
@@ -777,8 +761,7 @@ fn replace_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> bo
         return true;
     }
 
-    //THE NEW DEVICE WILL NOT OPEN - PUT THE CALL BACK ON THE PAIR THAT WAS PLAYING, AND POINT THE CONFIG
-    //AT IT AGAIN, SO THE SETTINGS ROW AND THE NEXT JOIN BOTH AGREE WITH WHAT IS ACTUALLY RUNNING
+    //PUT THE OLD PAIR BACK AND POINT THE CONFIG AT IT
     if let Some((input_id, output_id)) = restore
     {
         config::client_write("input_device", &input_id);
@@ -807,7 +790,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     options::set_seq(0);
     options::set_server_seq(0);
 
-    //LOAD THE AUDIO PREFERENCES WHILE WE ARE STILL ALLOWED TO TOUCH THE FILESYSTEM
+    //LOAD THE AUDIO PREFERENCES
     options::init_audio();
 
     //DUPLICATE STREAM GUARDS
@@ -834,7 +817,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
             //CHECK GENERATION
             if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
 
-            //THE SLOT IS NOT OURS YET - THE SERVER WOULD ONLY DROP THIS
+            //THE SLOT IS NOT OURS YET
             if !send_handshake.load(Ordering::Relaxed) { continue; }
 
             voice::send(&send_socket, id, VoicePacketCode::Audio
@@ -875,8 +858,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
                 //THE SESSION WENT AWAY UNDER US
                 if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation || !options::get_use_voice() { return; }
 
-                //NOTHING CAME BACK - LEAVE THE CALL THE WAY A DEAD DEVICE DOES, RATHER THAN SIT IN A
-                //CALL NOBODY CAN HEAR
+                //LEAVE THE CALL LIKE A DEAD DEVICE DOES
                 if Instant::now() >= deadline
                 {
                     tx.send(ClientEvent::VoiceHandshakeFailed).await.ok();
@@ -901,7 +883,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     sfx::clear_effects();
     sfx::queue_effect(SoundEffect::Join);
 
-    //START VOICE ACTIVITY DISPLAY & PING TASK (ALSO THE ONE PLACE THAT NOTICES A /settings DEVICE CHANGE)
+    //START THE ACTIVITY & PING TASK
     let vad_socket = socket.clone();
     tokio::spawn(async move
     {
@@ -910,7 +892,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
 
         loop
         {
-            //A LEFTOVER TASK FROM AN EARLIER SESSION MUST NOT TOUCH THIS ONE'S STREAMS
+            //A LEFTOVER TASK MUST NOT TOUCH THESE STREAMS
             if AUDIO_GENERATION.load(Ordering::Relaxed) != current_generation { return; }
 
             //QUIT ON /leave
@@ -920,13 +902,13 @@ pub async fn listen_server_voice //SERVER -> CLIENT
                 return;
             }
 
-            //THE USER PICKED A DIFFERENT DEVICE - REBUILD BOTH STREAMS, KEEP THE CALL
+            //REBUILD BOTH STREAMS, KEEP THE CALL
             let generation = options::device_generation();
             if generation != devices
             {
                 devices = generation;
 
-                //A DEVICE THAT WILL NOT OPEN IS WORTH SAYING OUT LOUD - THE OLD ONE KEEPS RUNNING
+                //SAY SO WHEN A DEVICE WILL NOT OPEN
                 if !replace_streams(current_generation, &packet_tx)
                 {
                     tx.send(ClientEvent::VoiceDeviceFailed).await.unwrap();
@@ -988,14 +970,14 @@ pub async fn listen_server_voice //SERVER -> CLIENT
         if network_buffer.seq <= options::get_server_seq() { continue; } //INGORE INVALID SEQs
         options::set_server_seq(network_buffer.seq); //SET SERVER SEQ
 
-        //HANDSHAKE ANSWERED - THE SLOT IS OURS, STOP REPEATING Hello AND START SENDING
+        //HANDSHAKE ANSWERED - STOP REPEATING Hello
         if let VoicePacketCode::HelloAck = network_buffer.code
         {
             handshake.store(true, Ordering::Relaxed);
             continue;
         }
 
-        //PING HAS TO BE ANSWERED OUTSIDE OF THE CONSUMERS LOCK
+        //ANSWER PING OUTSIDE THE CONSUMERS LOCK
         let mut pong: Option<u128> = None;
 
         if let Some((stream, peer)) = CONSUMERS.lock().unwrap().get_mut(&network_buffer.id)
@@ -1075,7 +1057,7 @@ pub fn remove_all_consumers()
 {
     CONSUMERS.lock().unwrap().clear();
 
-    //PLAY JOIN SOUND EFFECT (THIS IS CALLED ON CHANNEL CHANGE)
+    //PLAY JOIN SOUND EFFECT
     sfx::queue_effect(SoundEffect::Join);
 }
 

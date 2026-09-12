@@ -84,15 +84,13 @@ impl Session
 
         for (index, compressed) in pending.iter().enumerate()
         {
-            //DECODE H.264 BITSTREAM - EVERY FRAME MUST BE DECODED, H.264 IS TEMPORALLY PREDICTED
-            //AND SKIPPING ONE WOULD BREAK PREDICTION FOR THE FRAMES THAT FOLLOW
+            //DECODE EVERY FRAME - H.264 IS PREDICTED
             let Ok(Some(yuv)) = self.decoder.decode(compressed) else { continue; };
 
-            //ONLY THE NEWEST FRAME IS EVER SEEN, SO THE OLDER ONES SKIP THE UPLOAD ENTIRELY
+            //ONLY THE NEWEST FRAME IS UPLOADED
             if index != newest { continue; }
 
-            //THE PLANES GO STRAIGHT UP AS THEY ARE - NO CPU I420 -> RGBA PASS, AND 1.5 BYTES PER
-            //PIXEL ON THE BUS INSTEAD OF 4. THE FRAGMENT SHADER DOES THE CONVERSION.
+            //THE PLANES GO UP AS THEY ARE
             self.surface.upload(&yuv);
 
             self.frame_dirty = true;
@@ -130,7 +128,7 @@ impl ScreenShareApp
 
     fn create_session(&mut self, event_loop: &ActiveEventLoop, request: ScreenShareRequest)
     {
-        //CHECK IF ANOTHER ATTACH IS ALIVE (RECYCLE WINDOW)
+        //CHECK IF ANOTHER ATTACH IS ALIVE
         if let Some(session) = self.sessions.values_mut().next()
         {
             let old_running = session.running.clone();
@@ -160,7 +158,7 @@ impl ScreenShareApp
 
         let size = window.inner_size();
 
-        //A VIEWER WE CANNOT PAINT IS NOT A VIEWER; THE WINDOW IS DROPPED RATHER THAN LEFT BLANK
+        //DROP A WINDOW WE CANNOT PAINT
         let Ok(surface) = VideoSurface::new(window.clone(), size.width, size.height) else { return; };
 
         let window_id = window.id();
@@ -228,7 +226,7 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
                 {
                     session.running.store(false, Ordering::Relaxed);
 
-                    //DEATTACH ON SERVER (HANDED OVER TO THE ASYNC SIDE)
+                    //DEATTACH ON SERVER
                     session.deattach.send(()).ok();
                 }
             },

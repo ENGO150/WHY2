@@ -221,7 +221,7 @@ pub async fn send_tcp //SEND packet TO stream
         },
     };
 
-    //CONVERT ENCRYPTED OUTPUT TO BYTES ([LENGTH][DATA])
+    //CONVERT ENCRYPTED OUTPUT TO BYTES
     let packet_len = final_bytes.len();
     let mut transmission_packet = Vec::with_capacity(4 + packet_len);
     transmission_packet.extend_from_slice(&(packet_len as u32).to_be_bytes());
@@ -262,11 +262,11 @@ pub async fn read_tcp
 
         max_packet_size = if auxiliary
         {
-            //SIDE CHANNELS ONLY EVER CARRY UPLOAD CHUNKS AND ENCODED FRAMES
+            //SIDE CHANNELS ONLY CARRY CHUNKS AND FRAMES
             chat_consts::MAX_AUXILIARY_PACKET_SIZE
         } else if !spam_protection && authenticated
         {
-            //SPAM PROTECTION OFF MEANS "ALLOW BIG MESSAGES", NOT "ALLOW ANY ALLOCATION AT ALL"
+            //BIG MESSAGES, NOT UNBOUNDED ALLOCATIONS
             chat_consts::MAX_PACKET_CEILING
         } else //SET MAX PACKET SIZE IF SPAM PROTECTION IS ENABLED
         {
@@ -478,7 +478,7 @@ pub async fn receive
                         wait = conn.take_credit(config::read_config("max_packet_rate"),
                             config::read_config("max_packet_burst"));
 
-                        //STILL OVERDRAWN AFTER BEING SLOWED DOWN THIS LONG IS A FLOOD, NOT A BURST
+                        //STILL OVERDRAWN AFTER A WAIT IS A FLOOD
                         if !wait.is_zero() &&
                             conn.throttles().copied().unwrap_or(0) > config::read_config::<usize>("max_packet_rate_violations")
                         {

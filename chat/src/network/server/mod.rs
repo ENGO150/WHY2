@@ -112,9 +112,7 @@ async fn send_history(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKe
     let stored = config::messages::all();
     if stored.is_empty() { return; }
 
-    //THE REPLAY IS ONE PACKET, SO IT IS THE NEWEST PART OF THE HISTORY THAT FITS IN ONE: A PACKET OVER THE
-    //CLIENT'S CEILING IS NOT TRIMMED THERE, IT IS REFUSED AND THE SOCKET DROPPED. THE PICTURES ARE NOT IN
-    //IT - AN IMAGE IS ITS HASH HERE, AND THE CLIENT ASKS FOR THE ONES IT WANTS TO SEE (PacketCode::ImageData)
+    //THE NEWEST HISTORY THAT FITS IN ONE PACKET
     let mut messages: Vec<StoredMessage> = Vec::new();
     let mut budget = consts::MAX_HISTORY_SIZE;
 
@@ -130,7 +128,7 @@ async fn send_history(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKe
 
     if messages.is_empty() { return; }
 
-    messages.reverse(); //OLDEST FIRST AGAIN - THE BUDGET IS SPENT FROM THE NEWEST END, THE PANE READS FROM THE OTHER
+    messages.reverse(); //OLDEST FIRST AGAIN
 
     log::debug!("Replaying history ({} messages)", messages.len());
 
@@ -150,10 +148,7 @@ async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //RE
 }
 
 //PUBLIC
-//THE ADDRESS EVERY LINE ABOUT A CLIENT IS KEYED BY. AN AUXILIARY SOCKET (AN UPLOAD, A DOWNLOAD, A SHARE, A
-//VIEWER, A VOICE SESSION) IS A CONNECTION OF ITS OWN ON AN EPHEMERAL PORT THAT NOTHING ELSE IN THE LOG EVER
-//NAMES, SO IT IS LOGGED AS THE MAIN CONNECTION THAT ASKED FOR IT AND THE TWO CAN BE READ TOGETHER.
-//NEVER CALL THIS WHILE HOLDING A CONNECTIONS GUARD - IT WALKS THE SAME MAP
+//A CLIENT'S MAIN ADDRESS (NEVER UNDER A GUARD)
 pub fn log_addr(id: &usize) -> String
 {
     CONNECTIONS.iter().find(|conn| conn.id() == Some(id))
@@ -171,7 +166,7 @@ where
 
     let handle = tokio::spawn(async move
     {
-        //WAIT FOR OWN HANDLE (PREVENTS RACE WITH REGISTRATION)
+        //WAIT FOR OWN HANDLE (PREVENTS A RACE)
         let task = match rx.await
         {
             Ok(t) => t,
@@ -295,7 +290,7 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         CONNECTIONS.len(),
     );
 
-    //SHUT DOWN THE HANDLER TASK (MUST BE LAST - THIS MAY BE THE CALLING TASK ITSELF)
+    //SHUT DOWN THE HANDLER TASK (MUST BE LAST)
     connection.task().abort();
 }
 
@@ -557,9 +552,9 @@ fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW T
 }
 
 //PUBLIC
-pub async fn notify(id: usize, code: PacketCode) //SEND PACKET TO THE CLIENT WITH id (NOTHING HAPPENS IF IT IS GONE)
+pub async fn notify(id: usize, code: PacketCode) //SEND PACKET TO THE CLIENT WITH id
 {
-    //COLLECT INTO LOCALS FIRST - THE GUARD MUST NOT LIVE ACROSS THE await
+    //COLLECT INTO LOCALS - NO GUARD ACROSS THE await
     let target = CONNECTIONS.iter().find(|conn| conn.id() == Some(&id))
         .map(|conn| (conn.write_stream().clone(), conn.keys().cloned()));
 
@@ -746,7 +741,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
         log::info!("Registering new user: {peer_addr}");
 
-        //HASH PASSWORD (ARGON2 IS CPU HEAVY, KEEP IT OFF THE RUNTIME)
+        //HASH PASSWORD (ARGON2 IS CPU HEAVY)
         let hash = task::spawn_blocking(move || password::hash_password(password.as_ref().unwrap().as_str()))
             .await.expect("Hashing password failed");
 
@@ -774,7 +769,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             }
         };
 
-        //VERIFY PASSWORD (ARGON2 IS CPU HEAVY, KEEP IT OFF THE RUNTIME)
+        //VERIFY PASSWORD (ARGON2 IS CPU HEAVY)
         let valid = if password.is_empty() || config::bans::banned(&username)
         {
             false
@@ -787,7 +782,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             false
         };
 
-        //INVALID PASSWORD (OR FAKE LOGIN), DISCONNECT CLIENT
+        //INVALID PASSWORD, DISCONNECT CLIENT
         if !valid
         {
             log::warn!("Login refused: {peer_addr}");
@@ -805,7 +800,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //AUTHENTICATE CLIENT
     authenticate_client(&peer_addr, &username, role, id);
 
-    //SEND WHAT WAS SAID IN THE LOBBY BEFORE THIS CLIENT ARRIVED
+    //SEND WHAT WAS SAID IN THE LOBBY BEFORE THIS
     send_history(&streams.1, &keys).await;
 
     //TELL CLIENT TO START CHATTING
@@ -814,7 +809,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //SEND JOIN MESSAGE
     send_to_all(PacketCode::Join { username: username.clone() }, false, None);
 
-    //TELL THE CLIENT WHO IS ALREADY IN VOICE - THE ROSTER IS SHOWN WHETHER OR NOT THEY JOIN IT
+    //TELL THE CLIENT WHO IS ALREADY IN VOICE
     if options::voice_chat_enabled()
     {
         send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
@@ -842,12 +837,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             handshake::key_exchange(streams, &peer_addr, &obfuscation_key, &mut keys, Some(&current_keys)).await; //INIT REKEY
         }
 
-        //THE ROLE IS RE-READ RATHER THAN LATCHED AT LOGIN: /server role APPLIES TO THE SESSION IT LANDS
-        //ON, SO A DEMOTION HAS TO REACH THESE CHECKS BEFORE THE NEXT PRIVILEGED PACKET DOES
+        //RE-READ THE ROLE RATHER THAN LATCH IT
         let role = CONNECTIONS.get(&peer_addr).and_then(|entry| entry.role().copied()).unwrap_or(role);
 
-        //WHAT ARRIVED, NEVER WHAT WAS IN IT: A CONTROL CODE IS THE SERVER'S OWN VOCABULARY, WHILE THE TEXT,
-        //THE FILENAMES AND THE CHANNEL NAMES BESIDE IT ARE WHAT THE USERS TYPED AND ARE NOT LOGGED ANYWHERE
+        //WHAT ARRIVED, NEVER WHAT WAS IN IT
         log::debug!("Packet {}: {peer_addr}", read.name());
 
         //CLIENT CODES
@@ -873,7 +866,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 log::info!("Message ({} chars) in {}: {peer_addr}", text.chars().count(),
                     if channel.is_some() { "channel" } else { "lobby" });
 
-                //KEEP IT - ONLY THE LOBBY HAS A HISTORY, A CHANNEL IS AS TEMPORARY AS THE CLIENTS IN IT
+                //KEEP IT - ONLY THE LOBBY HAS A HISTORY
                 if channel.is_none() && config::read_config::<bool>("persistent_messages")
                 {
                     config::messages::store(&username, &text);
@@ -909,7 +902,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 {
                     log::info!("Voice slot opened: {peer_addr}");
 
-                    //OPEN THE VOICE SLOT AND ACKNOWLEDGE WITH THE TOKEN THAT CLAIMS IT OVER UDP
+                    //OPEN THE VOICE SLOT AND SEND ITS TOKEN
                     let token = voice_server::open_connection(id, username.clone());
                     network::send(&mut *streams.1.lock().await, PacketCode::Voice { token: Some(token) }, Some(&keys)).await;
 
@@ -939,7 +932,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //CHECK PARAMETER VALIDITY
                 if tchannel.iter().all(|s| !s.is_empty() && s.len() <= config::read_config("max_channel_length") && s.chars().all(|c| c.is_ascii_alphanumeric() && c != ' '))
                 {
-                    //SEND VoiceLeave CODE TO OLD CHANNEL (ONLY IF THERE WAS ANYTHING TO LEAVE)
+                    //SEND VoiceLeave CODE TO OLD CHANNEL
                     if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
                     {
                         send_to_all(PacketCode::VoiceLeave { id }, true, channel.as_deref());
@@ -1018,13 +1011,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         _ => String::from("unnamed_file"),
                     };
 
-                    //KEEP IT, ON THE SAME TERMS AS AN UPLOAD OF IT WOULD HAVE BEEN
+                    //KEEP IT, ON AN UPLOAD'S TERMS
                     if channel.is_none() && config::read_config::<bool>("persistent_messages")
                     {
                         config::messages::store_image(&username, &filename, &hash);
                     }
 
-                    //AN IMAGE'S LINE NAMES THE SENDER LIKE A MESSAGE DOES, SO IT IS COLORED LIKE ONE
+                    //AN IMAGE LINE IS COLORED LIKE A MESSAGE
                     send_to_all(PacketCode::ImageDisplay
                     {
                         username: username.clone(),
@@ -1292,12 +1285,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 network::send(&mut *streams.1.lock().await, PacketCode::Files { users: Some(users) }, Some(&keys)).await;
             },
 
-            //ONE OF THE HISTORY'S PICTURES, ASKED FOR BY A CLIENT THAT WAS SHOWN ITS CAPTION. THE HISTORY
-            //IS THE GUARD: A HASH IT DOES NOT NAME IS NOT SERVED, SO NOTHING ELSE IN server_images/ IS REACHABLE
+            //ONE OF THE HISTORY'S PICTURES
             PacketCode::ImageData { hash, .. } =>
             {
-                //CHEAP TO ASK FOR, EXPENSIVE TO ANSWER - SO ONE CLIENT IS HELD TO ONE PER
-                //IMAGE_REQUEST_DELAY, SERVED LATE RATHER THAN REFUSED (THE CLIENT NEVER RETRIES)
+                //ONE REQUEST PER IMAGE_REQUEST_DELAY
                 let wait = CONNECTIONS.get(&peer_addr)
                     .and_then(|conn| conn.last_image().map(|last| consts::IMAGE_REQUEST_DELAY
                         .saturating_sub(last.elapsed())))
@@ -1437,7 +1428,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 match muted
                 {
-                    //THE GUARD IS DROPPED BEFORE THE SEND BELOW, AND BEFORE THIS LINE
+                    //THE GUARD IS DROPPED BEFORE THIS
                     Some((target, muted)) => log::info!("{} by {peer_addr}: {target}",
                         if muted { "Mute" } else { "Unmute" }),
 
@@ -1543,9 +1534,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 }
             },
 
-            //A /color OR /ucolor. EVERY USER SETS THEIR OWN, SO THERE IS NOTHING TO CHECK BUT THE CODE
-            //ITSELF, AND colors::name TURNS ANYTHING OUTSIDE THE TABLE INTO NO COLOR. THE ANSWER IS THIS
-            //PACKET BACK, WHICH IS ALL THE CLIENT NEEDS: IT KEEPS NO COPY OF WHAT IT JUST SET
+            //A /color OR /ucolor; ANSWER WITH THE STORED PAIR
             PacketCode::Colors { username: username_color, color } =>
             {
                 log::info!("Color set: {peer_addr}");
@@ -1726,7 +1715,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
-                //A SAVE WITHOUT ROWS IS NOT A SAVE, AND A READ IGNORES WHATEVER IT WAS SENT WITH
+                //A SAVE WITHOUT ROWS IS NOT A SAVE
                 if save && let Some(settings) = &settings
                 {
                     let accepted = config::settings::write(settings);
@@ -1758,10 +1747,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 log::info!("Restart requested by {peer_addr}");
 
-                //IN A TASK OF ITS OWN, BECAUSE disconnect_all ABORTS THIS ONE
+                //IN ITS OWN TASK - disconnect_all ABORTS THIS ONE
                 tokio::spawn(async
                 {
-                    //EVERYONE IS SENT OFF FIRST, SO A CLIENT READS A DISCONNECT RATHER THAN A DEAD SOCKET
+                    //SEND EVERYONE OFF FIRST
                     disconnect_all().await;
 
                     misc::restart();

@@ -98,14 +98,14 @@ pub enum PacketCode //CONTROL CODES
         id: usize,
     },
 
-    //SERVER -> CLIENT | CLIENT JOINED VOICE (SENT TO THE WHOLE CHANNEL, NOT ONLY TO ITS VOICE USERS)
+    //SERVER -> CLIENT | CLIENT JOINED VOICE
     VoiceJoin
     {
         username: String,
         id: usize,
     },
 
-    //SERVER -> CLIENT | CLIENT LEFT VOICE (SENT TO THE WHOLE CHANNEL, NOT ONLY TO ITS VOICE USERS)
+    //SERVER -> CLIENT | CLIENT LEFT VOICE
     VoiceLeave
     {
         id: usize,
@@ -146,7 +146,7 @@ pub enum PacketCode //CONTROL CODES
         username_color: Option<u8>,
     },
 
-    //CLIENT <> SERVER | ASK FOR ONE OF THE HISTORY'S PICTURES, ANSWERED WITH data (None = IT IS GONE).
+    //CLIENT <> SERVER | ASK FOR A STORED PICTURE
     ImageData
     {
         hash: [u8; 32],
@@ -171,7 +171,7 @@ pub enum PacketCode //CONTROL CODES
     //CLIENT <> SERVER | READ server_bans.toml
     ServerBans
     {
-        //REQUEST: BOTH None | SERVER ANSWER: THE WHOLE BAN LIST, ONE VEC PER SECTION
+        //REQUEST: BOTH None | ANSWER: THE WHOLE BAN LIST
         users: Option<Vec<BanEntry>>,
         ips: Option<Vec<BanEntry>>,
     },
@@ -181,10 +181,10 @@ pub enum PacketCode //CONTROL CODES
     {
         id: usize,                //TARGET USER
         role: Role,               //THE ROLE THEY ARE BEING GIVEN
-        username: Option<String>, //REQUEST: None | SERVER ANSWER: THE TARGET, SO THE ISSUER SEES WHO IT LANDED ON
+        username: Option<String>, //REQUEST: None | SERVER ANSWER: THE TARGET
     },
 
-    //CLIENT <> SERVER | SET ONE CHAT COLOR (THE SAME PACKET BACK IS THE SERVER SAYING IT STORED IT)
+    //CLIENT <> SERVER | SET ONE CHAT COLOR
     Colors
     {
         username: bool, //TRUE = THE USERNAME'S COLOR, FALSE = THE MESSAGE'S
@@ -194,10 +194,10 @@ pub enum PacketCode //CONTROL CODES
     //CLIENT <> SERVER | READ AND WRITE server.toml
     ServerSettings
     {
-        //REQUEST: None | SERVER ANSWER: THE WHOLE CONFIG | SAVE: THE ROWS THAT CHANGED
+        //REQUEST: None | ANSWER: THE CONFIG | SAVE: THE ROWS
         settings: Option<Vec<ServerSetting>>,
 
-        //FALSE = READ, TRUE = WRITE - AND THE SERVER ACKNOWLEDGES A WRITE WITH THE STORED CONFIG BACK
+        //FALSE = READ, TRUE = WRITE
         save: bool,
     },
 
@@ -209,7 +209,7 @@ pub enum PacketCode //CONTROL CODES
     Channel { channel: Option<String> },            //SERVER <> CLIENT | CHANNEL CHANGE
     ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
     ChannelDestroyed { name: String },              //SERVER -> CLIENT | CHANNEL ABANDONED
-    VoiceClients { clients: Vec<(usize, String)> }, //SERVER -> CLIENT | THE CHANNEL'S WHOLE VOICE ROSTER (SELF EXCLUDED)
+    VoiceClients { clients: Vec<(usize, String)> }, //SERVER -> CLIENT | THE CHANNEL'S VOICE ROSTER
     Files { users: Option<Vec<UserFile>> },         //CLIENT <> SERVER | LIST UPLOADED FILES
     Screens { users: Option<Vec<UserScreen>> },     //CLIENT <> SERVER | LIST SCREENSHARES
     Deattach { username: Option<String> },          //CLIENT <> SERVER | DEATTACH CLIENT SCREENSHARE
@@ -242,15 +242,10 @@ pub enum PacketCode //CONTROL CODES
     ServerRestart,    //CLIENT -> SERVER | RESTART THE SERVER PROCESS
 }
 
-//STRUCTS
-//ONE server.toml KEY AS THE CLIENT EDITS IT. THE SERVER IS THE ONLY PLACE THAT KNOWS WHICH KEYS EXIST,
-//SO IT SENDS THE HEADING AND THE TRAILING COMMENT ALONG - THE CLIENT RENDERS WHATEVER IT IS GIVEN
 //IMPLEMENTATIONS
 impl PacketCode
 {
-    //THE VARIANT'S NAME, AND NOTHING THAT CAME WITH IT. THIS IS WHAT THE SERVER LOG NAMES A PACKET BY: A
-    //CONTROL CODE IS THE PROTOCOL'S OWN VOCABULARY, WHILE EVERY FIELD BESIDE IT (THE TEXT, THE FILENAMES,
-    //THE USERNAMES, THE PASSWORDS, THE TOKENS) IS THE USERS' AND IS NEVER WRITTEN DOWN
+    //THE VARIANT'S NAME, FOR THE SERVER LOG
     pub fn name(&self) -> &'static str
     {
         match self
@@ -318,6 +313,8 @@ impl PacketCode
     }
 }
 
+//STRUCTS
+//ONE server.toml KEY AS THE CLIENT EDITS IT
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
 pub struct ServerSetting
 {
@@ -325,10 +322,10 @@ pub struct ServerSetting
     pub value: SettingValue,
     pub section: String,     //THE '# Network' HEADING THE KEY SITS UNDER
     pub description: String, //THE TRAILING COMMENT ON THE KEY'S OWN LINE
-    pub restart: bool,       //THE SERVER READS THIS ONE ONLY WHILE STARTING UP (consts::SERVER_RESTART_SETTINGS)
+    pub restart: bool,       //READ ONLY WHILE THE SERVER IS STARTING UP
 }
 
-//THE THREE DATATYPES config_read UNDERSTANDS - A VALUE THAT COMES BACK AS A DIFFERENT ONE IS REFUSED
+//THE THREE DATATYPES config_read UNDERSTANDS
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
 pub enum SettingValue
 {
@@ -344,7 +341,7 @@ pub struct StoredMessage
     pub username: String,
     pub text: String,            //THE MESSAGE - OR THE FILENAME, WHEN THIS LINE IS AN IMAGE
     pub colors: MessageColors,
-    pub image: Option<[u8; 32]>, //CONTENT HASH OF THE PICTURE, WHICH IS WHAT MAKES THIS LINE ONE
+    pub image: Option<[u8; 32]>, //CONTENT HASH OF THE PICTURE
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]

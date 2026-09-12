@@ -51,7 +51,7 @@ use crate::
 };
 
 //STRUCTS
-pub struct HandshakeSlot //RESERVATION HELD BY A SOCKET THAT HAS NOT IDENTIFIED ITSELF YET (SEE HANDSHAKE BUDGET)
+pub struct HandshakeSlot //RESERVATION HELD BY AN UNIDENTIFIED SOCKET
 {
     ip: IpAddr, //PEER THE SLOT WAS TAKEN FOR
 }
@@ -67,7 +67,7 @@ static HANDSHAKES_PER_IP: LazyLock<DashMap<IpAddr, usize>> = LazyLock::new(|| Da
 //IMPLEMENTATIONS
 impl HandshakeSlot
 {
-    //TAKE A SLOT FOR A FRESHLY ACCEPTED SOCKET, None IF THE BUDGET IS FULL
+    //TAKE A SLOT, None IF THE BUDGET IS FULL
     pub fn reserve(ip: IpAddr) -> Option<Self>
     {
         let budget = max_handshakes();
@@ -97,12 +97,12 @@ impl HandshakeSlot
 
 impl Drop for HandshakeSlot
 {
-    //RELEASE THE SLOT, WHICHEVER WAY THE HANDSHAKE ENDED
+    //RELEASE THE SLOT
     fn drop(&mut self)
     {
         HANDSHAKES.fetch_sub(1, Ordering::Relaxed);
 
-        //DROP THE GUARD BEFORE REMOVING - BOTH TOUCH THE SAME SHARD
+        //DROP THE GUARD BEFORE REMOVING
         let empty = if let Some(mut slots) = HANDSHAKES_PER_IP.get_mut(&self.ip)
         {
             *slots = slots.saturating_sub(1);
@@ -123,7 +123,7 @@ where
     //WAIT FOR KeyExchange
     let message = loop
     {
-        //READ MESSAGE (WITH TIMEOUT FOR ZOMBIE CONNECTIONS)
+        //READ MESSAGE (WITH TIMEOUT)
         let received = match tokio::time::timeout(Duration::from_millis(2000), network::receive(streams, keys, None)).await
         {
             Ok(Some(r)) => r,
@@ -153,7 +153,7 @@ pub(super) async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
 {
     log::debug!("{}: {peer_addr}", if rekey_trigger.is_some() { "Rekey" } else { "Key exchange" });
 
-    //SIGN A FRESH EPHEMERAL PAIR WITH THE STATIC IDENTITY
+    //SIGN A FRESH EPHEMERAL PAIR
     let (ephemeral, offer) = kex::create_offer(nonce);
 
     //ATOMIC SEND
@@ -184,7 +184,7 @@ pub(super) async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
         }
     };
 
-    //DERIVE SHARED KEYS - THE PACKET SCHEMA ALREADY PROVED BOTH HALVES ARE KEYS, SO NOTHING CAN FAIL HERE
+    //DERIVE SHARED KEYS
     let PacketCode::KeyExchangeReply { reply } = message else { unreachable!("what"); };
 
     //DECAPSULATE PQ

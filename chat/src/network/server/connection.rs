@@ -260,7 +260,7 @@ impl Connection
         }
     }
 
-    //GET LAST SERVED IMAGE FETCH FROM Connection AS MUTABLE
+    //GET LAST SERVED IMAGE FETCH AS MUTABLE
     pub fn last_image_mut(&mut self) -> Option<&mut Instant>
     {
         match self
@@ -335,11 +335,11 @@ impl Connection
     {
         let Self::Authenticated { credit, refill, throttles, .. } = self else { return Duration::ZERO; };
 
-        //A CONFIG OF ZERO WOULD BE A BUCKET THAT NEVER FILLS AND A WAIT OF INFINITY
+        //A CONFIG OF ZERO WOULD NEVER REFILL
         let rate = rate.max(0.001);
         let burst = burst.max(1.0);
 
-        //TOP UP FOR THE TIME SINCE THE LAST PACKET, THEN PAY FOR THIS ONE
+        //TOP UP FOR THE ELAPSED TIME, THEN PAY
         *credit = (*credit + refill.elapsed().as_secs_f32() * rate).min(burst) - 1.0;
         *refill = Instant::now();
 
@@ -349,7 +349,7 @@ impl Connection
             return Duration::ZERO;
         }
 
-        //OVERDRAWN - THE CREDIT IS EARNED BACK ON THIS CONNECTION'S OWN READ LOOP
+        //OVERDRAWN - WAIT ON THIS CONNECTION'S OWN LOOP
         *throttles += 1;
 
         Duration::from_secs_f32(-*credit / rate)
@@ -538,7 +538,7 @@ impl Connection
         }
     }
 
-    //TAKE SCREEN UPLOAD STREAM WITHOUT ABORTING IT (FOR THE SHARE TASK TEARING ITSELF DOWN)
+    //TAKE SCREEN UPLOAD STREAM WITHOUT ABORTING IT
     pub fn take_screen_stream(&mut self) -> Option<(usize, AbortHandle)>
     {
         if let Self::Authenticated { screen_stream, peer_addr, id, .. } = self

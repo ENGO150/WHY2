@@ -191,10 +191,7 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
 
         if !chunk.is_empty()
         {
-            //A CHUNK THE CHANNEL COULD NOT HOLD IS DROPPED - THE CAPTURE TASK IS BLOCKED ON THE NETWORK,
-            //AND A REALTIME CALLBACK CANNOT WAIT FOR IT. THE CANCELLER LINES THE REFERENCE UP AGAINST THE
-            //CAPTURE BY COUNT, THOUGH, SO IT HAS TO BE TOLD: FRAMES THAT VANISH HERE AND NOWHERE ELSE
-            //SHIFT ITS ALIGNMENT BY EXACTLY THIS MANY, WHICH IS WHY THE ECHO COMES BACK ON A BAD LINK.
+            //DROP A CHUNK, TELLING THE CANCELLER SO
             if let Err(error) = chunk_tx.try_send(chunk)
             {
                 aec::skip_reference(error.into_inner().len() / 2);
@@ -204,8 +201,7 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
 
     stream.play().unwrap();
 
-    //TAKE OUR OWN VOICE PLAYBACK BACK OUT OF THE LOOPBACK, SO A VIEWER IN THE SAME CHANNEL DOES NOT HEAR
-    //THEMSELVES. DROPPING THIS UNINSTALLS THE TAP, INCLUDING ON EVERY EARLY RETURN BELOW.
+    //TAKE OUR OWN VOICE PLAYBACK OUT OF THE LOOPBACK
     let mut canceller = aec::start();
 
     let mut out = vec![0u8; screen_consts::MAX_PACKET_SIZE];
@@ -333,8 +329,7 @@ pub async fn spawn_audio_playback(mut rx: Receiver<AudioFrame>, running: Arc<Ato
             let mut interpolated_r = current_frame.1 + (next_frame.1 - current_frame.1) * resample_pos;
             resample_pos += output_resample_step;
 
-            //ATTACHED SHARE VOLUME (/settings), SOFT CLIPPED LIKE THE VOICE MIX SO ANYTHING PAST
-            //100% BENDS INSTEAD OF WRAPPING
+            //ATTACHED SHARE VOLUME (/settings), SOFT CLIPPED
             if gain != 1.
             {
                 interpolated_l = (interpolated_l * gain).tanh();
@@ -373,16 +368,7 @@ pub async fn spawn_audio_playback(mut rx: Receiver<AudioFrame>, running: Arc<Ato
         {
             Ok(Some(mut frame)) =>
             {
-                //A QUEUE THAT HAS GROWN NEVER SHRINKS ON ITS OWN. THE CONSUMER IS A SOUND CARD AND
-                //THE PRODUCER IS THE SHARER'S, SO THE TWO RUN AT THE SAME RATE FOREVER: WHATEVER
-                //DEPTH ONE BAD MOMENT ON THE LINK PUSHES IN STAYS IN, AS PERMANENT LATENCY ON THE
-                //AUDIO *AND* ON THE VIDEO BEHIND IT IN THE SAME TCP STREAM. SO THE BACKLOG IS
-                //THROWN AWAY RATHER THAN PLAYED THROUGH - IT COSTS A CLICK, ONCE, AND BUYS THE
-                //DIFFERENCE BACK. ONLY THE NEWEST FRAME IS DECODED; THE OLDER ONES ARE NOT
-                //CONCEALED, BECAUSE NOBODY IS GOING TO HEAR THEM EITHER WAY.
-                //`AUDIO_BACKLOG_TARGET` IS NOT ZERO ON PURPOSE: THE QUEUE IS ALSO THE JITTER BUFFER,
-                //AND DRAINING IT FLAT WOULD TRADE THE LATENCY FOR A GAP IN EVERY LATE PACKET. THE
-                //CHANNEL'S OWN BOUND IS THE CEILING THIS REPLACES, NOT THE DEPTH IT SHOULD SIT AT
+                //THROW THE BACKLOG AWAY, DECODE THE NEWEST FRAME
                 while rx.len() > screen_consts::AUDIO_BACKLOG_TARGET
                 {
                     match rx.try_recv()

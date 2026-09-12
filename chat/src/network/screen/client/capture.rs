@@ -67,7 +67,7 @@ fn monitor_name(monitor: &Monitor) -> String
     monitor.name().unwrap_or_else(|_| "unknown".to_owned())
 }
 
-fn monitor_list(monitors: &[Monitor]) -> String //THE MONITORS AS THE USER MAY NAME THEM, FOR THE ERROR THAT LISTS THEM
+fn monitor_list(monitors: &[Monitor]) -> String //THE MONITORS AS THE USER MAY NAME THEM
 {
     monitors.iter().enumerate()
         .map(|(index, monitor)| format!("{} ({})", index + 1, monitor_name(monitor)))
@@ -75,8 +75,7 @@ fn monitor_list(monitors: &[Monitor]) -> String //THE MONITORS AS THE USER MAY N
         .join(", ")
 }
 
-//THE MONITOR THE USER ASKED FOR, BY 1-BASED INDEX OR BY NAME. AN UNKNOWN ONE IS AN ERROR RATHER THAN
-//A SILENT FALL BACK TO THE PRIMARY: SHARING A SCREEN THE USER DID NOT PICK IS THE WORSE OUTCOME.
+//THE MONITOR ASKED FOR, BY 1-BASED INDEX OR NAME
 fn select_monitor(monitors: Vec<Monitor>, selection: &str) -> Result<Monitor, String>
 {
     if let Ok(index) = selection.parse::<usize>()
@@ -91,7 +90,7 @@ fn select_monitor(monitors: Vec<Monitor>, selection: &str) -> Result<Monitor, St
         .ok_or_else(|| format!("no monitor called '{selection}' - available: {}", monitor_list(&monitors)))
 }
 
-fn get_target_monitor() -> Result<Monitor, String> //THE MONITOR TO SHARE: THE PICKED ONE, OTHERWISE THE PRIMARY
+fn get_target_monitor() -> Result<Monitor, String> //THE MONITOR TO SHARE
 {
     let monitors = Monitor::all().map_err(|e| format!("failed to enumerate monitors ({e})"))?;
 
@@ -108,9 +107,7 @@ fn get_target_monitor() -> Result<Monitor, String> //THE MONITOR TO SHARE: THE P
     }
 }
 
-//THE NAME OF THE MONITOR `selection` ASKS FOR. THE COMMAND RESOLVES BEFORE IT STORES ANYTHING, SO A
-//MONITOR THAT DOES NOT EXIST IS REFUSED WHILE THE USER IS STILL LOOKING AT WHAT THEY TYPED - AND SO
-//WHAT IS STORED IS THE MONITOR ITSELF RATHER THAN ONE OF THE WAYS OF SPELLING IT
+//THE NAME selection RESOLVES TO
 pub fn resolve_monitor(selection: &str) -> Result<String, String>
 {
     let monitors = Monitor::all().map_err(|e| format!("failed to enumerate monitors ({e})"))?;
@@ -123,9 +120,7 @@ pub fn current_monitor() -> Option<String> //WHAT A SHARE WOULD CAPTURE RIGHT NO
     get_target_monitor().ok().map(|monitor| monitor_name(&monitor))
 }
 
-//THE NAMES THE PALETTE OFFERS. IT ASKS ON EVERY KEYSTROKE OF THE PARAMETER, AND ENUMERATING MONITORS
-//IS A ROUND TRIP TO THE DISPLAY SERVER, SO THE ANSWER IS HELD FOR A MOMENT - LONG ENOUGH TO COVER
-//TYPING, SHORT ENOUGH THAT A MONITOR PLUGGED IN MID-SESSION SHOWS UP WITHOUT A RESTART
+//THE NAMES THE PALETTE OFFERS, CACHED
 pub fn monitor_names() -> Vec<String>
 {
     static CACHE: RwLock<Option<(Instant, Vec<String>)>> = RwLock::new(None);
@@ -144,9 +139,7 @@ pub fn monitor_names() -> Vec<String>
     names
 }
 
-//SET BY THE BACKGROUND PROBE THE MOMENT THE OS-NATIVE RECORDER HAS PROVEN ITSELF, AND OBSERVED BY
-//THE POLLING LOOPS SO THEY STAND DOWN. IT IS DELIBERATELY *NOT* `running`: standing the legacy path
-//down is not ending the share, and clearing `running` would end it.
+//SET ONCE THE OS-NATIVE RECORDER HAS PROVEN ITSELF
 static UPGRADING: AtomicBool = AtomicBool::new(false);
 
 fn upgrading() -> bool
@@ -189,9 +182,7 @@ pub fn capture_loop //CAPTURE LOOP
 
         let outcome = capture_backend(frame_tx.clone(), running.clone(), fps);
 
-        //THE BACKEND STOOD DOWN BECAUSE THE MONITOR CHANGED UNDER IT, NOT BECAUSE THE SHARE ENDED:
-        //START OVER ON THE NEW ONE. THE VIEWER PAYS ONE KEYFRAME FOR IT (THE ENCODER IS NEW) AND
-        //NOTHING ELSE - THE SOCKET, THE TOKEN AND THE SERVER'S IDEA OF WHO IS SHARING ALL SURVIVE
+        //THE MONITOR CHANGED - START OVER ON THE NEW ONE
         if !switched(generation) || !running.load(Ordering::Relaxed) || !options::get_use_screen()
         {
             return outcome;
@@ -211,8 +202,7 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
     fps: u32,
 ) -> Result<(), String>
 {
-    //AN EXPLICIT OVERRIDE SKIPS THE PROBE ENTIRELY - THIS IS WHAT PINS A BACKEND ON HARDWARE
-    //WHERE THE PREFERRED ONE MISBEHAVES
+    //AN EXPLICIT OVERRIDE PINS A BACKEND
     match env::var(consts::BACKEND_OVERRIDE_VAR).unwrap_or_default().to_lowercase().as_str()
     {
         "recorder" => return capture_loop_recorder(frame_tx, running, fps),
@@ -220,9 +210,7 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
         _ => {},
     }
 
-    //A PICKED MONITOR IS THE ONE THING THE PORTAL RECORDER CANNOT BE TOLD: ON WAYLAND IT IS THE USER'S
-    //OWN PICKER THAT CHOOSES THE OUTPUT, SO UPGRADING TO IT WOULD QUIETLY THROW THE SELECTION AWAY -
-    //AND ASK AGAIN ON TOP OF IT. THE POLLING PATH HONOURS THE CHOICE, SO IT KEEPS THE SHARE.
+    //ON WAYLAND A PICKED MONITOR PINS THE POLLING PATH
     #[cfg(target_os = "linux")]
     if wayland() && options::get_monitor().is_some()
     {
@@ -247,8 +235,7 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
         {
             let session = open_recorder();
 
-            //THE FLAG GOES UP BEFORE THE SEND: IT IS WHAT MAKES THE POLLING LOOP STAND DOWN, AND ONLY
-            //ONCE IT HAS STOOD DOWN IS ANYBODY WAITING ON THE CHANNEL
+            //THE FLAG GOES UP BEFORE THE SEND
             if session.is_ok() { UPGRADING.store(true, Ordering::Relaxed); }
 
             probe_tx.send(session).ok();
@@ -256,7 +243,7 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
 
         let outcome = legacy_capture_loop(frame_tx.clone(), running.clone(), fps);
 
-        //ENDED ON ITS OWN TERMS - STOPPED, OR THE SCREEN OPTION WENT OFF
+        //ENDED ON ITS OWN TERMS
         if !upgrading() && (outcome.is_ok() || !running.load(Ordering::Relaxed)) { return outcome; }
 
         let probed = if upgrading()
@@ -272,7 +259,7 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
 
         match probed
         {
-            //A PROVEN RECORDER IS WORTH TAKING EVEN IF THE POLLING PATH ERRORED ON ITS WAY OUT
+            //TAKE A PROVEN RECORDER EVEN AFTER A POLLING ERROR
             Some(Ok(session)) if running.load(Ordering::Relaxed) => run_recorder(session, frame_tx, running, fps),
             _ => outcome,
         }
@@ -312,7 +299,7 @@ impl YuvScratch
 
     fn fill(&mut self, width: u32, height: u32, rgba: &[u8]) -> &YUVBuffer
     {
-        //RESIZE ONLY WHEN THE MONITOR RESOLUTION ACTUALLY CHANGED
+        //RESIZE ONLY ON A REAL RESOLUTION CHANGE
         if self.width != width || self.height != height
         {
             self.buffer = YUVBuffer::new(width as usize, height as usize);
@@ -336,8 +323,7 @@ impl Converter
 {
     fn select() -> Self
     {
-        //AN EXPLICIT "cpu" PINS THE OLD PATH; ANYTHING ELSE MERELY *PREFERS* THE GPU, WHICH STILL
-        //HAS TO INITIALISE SUCCESSFULLY BEFORE IT IS USED
+        //AN EXPLICIT "cpu" PINS THE OLD PATH
         if env::var(consts::CONVERTER_OVERRIDE_VAR).unwrap_or_default().eq_ignore_ascii_case("cpu")
         {
             return Converter::Cpu(YuvScratch::new());
@@ -347,7 +333,7 @@ impl Converter
         {
             Ok(converter) => Converter::Gpu(Box::new(converter)),
 
-            //NO ADAPTER, NO DRIVER, A HEADLESS BOX - THE CPU PATH IS ALWAYS THERE
+            //NO ADAPTER OR DRIVER - USE THE CPU PATH
             Err(_) => Converter::Cpu(YuvScratch::new()),
         }
     }
@@ -375,14 +361,13 @@ impl FrameEncoder
 
     fn encode(&mut self, width: u32, height: u32, rgba: &[u8]) -> Result<Option<Vec<u8>>, String>
     {
-        //I420 CONVERSION PANICS ON ODD DIMENSIONS - FAIL CLEANLY INSTEAD
+        //I420 CONVERSION PANICS ON ODD DIMENSIONS
         if width % 2 != 0 || height % 2 != 0
         {
             return Err(format!("unsupported capture resolution {width}x{height} (must be even)"));
         }
 
-        //openh264 FIXES ITS RESOLUTION ON THE FIRST FRAME, SO A MONITOR RECONFIGURED MID-SHARE
-        //NEEDS A FRESH ENCODER RATHER THAN A CORRUPT STREAM
+        //A RESIZE NEEDS A FRESH ENCODER
         if self.dimensions.is_some_and(|previous| previous != (width, height))
         {
             self.encoder = create_encoder(self.fps)?;
@@ -390,8 +375,7 @@ impl FrameEncoder
 
         self.dimensions = Some((width, height));
 
-        //A GPU THAT FAILS MID-SESSION (DEVICE LOST, A RESOLUTION THE PACKING CANNOT EXPRESS) DROPS
-        //BACK TO THE CPU FOR GOOD RATHER THAN RETRYING EVERY FRAME
+        //A GPU THAT FAILS DROPS BACK TO THE CPU FOR GOOD
         if let Converter::Gpu(_) = &self.converter
             && !GpuConverter::supports(width, height)
         {
@@ -430,8 +414,7 @@ impl FrameEncoder
             },
         };
 
-        //THE GPU REFUSED THIS FRAME - SWITCH PERMANENTLY AND REDO IT ON THE CPU, SO THE VIEWER
-        //NEVER SEES A GAP IN THE PREDICTED STREAM
+        //SWITCH TO THE CPU AND REDO THE FRAME
         let data = match bitstream
         {
             Some(result) => result,
@@ -453,7 +436,7 @@ impl FrameEncoder
             },
         };
 
-        //SKIP EMPTY FRAMES (ENCODER MAY DECIDE NO DATA IS NEEDED)
+        //SKIP EMPTY FRAMES
         if data.is_empty()
         {
             return Ok(None);
@@ -464,8 +447,7 @@ impl FrameEncoder
 
     fn dispatch(&mut self, frame_tx: &Sender<Vec<u8>>, frame: Vec<u8>) //HAND A FRAME TO THE NETWORK TASK
     {
-        //A FULL CHANNEL MEANS THE NETWORK FELL BEHIND AND THIS FRAME IS GONE, SO THE NEXT ONE
-        //CANNOT BE A PREDICTED ONE
+        //THIS FRAME IS GONE, SO THE NEXT CANNOT PREDICT IT
         if frame_tx.try_send(frame).is_err()
         {
             self.force_intra_frame();
@@ -502,7 +484,7 @@ fn capture_loop_xcap
 
     let mut encoder = FrameEncoder::new(fps as f32)?;
 
-    //PREVIOUS FRAME, KEPT BY MOVE - COPYING ITS BYTES OUT WOULD COST A FULL-FRAME memcpy EVERY TICK
+    //PREVIOUS FRAME, KEPT BY MOVE
     let mut last_image: Option<xcap::image::RgbaImage> = None;
     let mut last_encode_time = Instant::now();
 
@@ -519,7 +501,7 @@ fn capture_loop_xcap
         {
             let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
 
-            //memcmp EARLY-EXITS ON THE FIRST DIFFERING BYTE, SO THIS IS CHEAP WHEN THE SCREEN MOVED
+            //CHEAP WHEN THE SCREEN MOVED - memcmp EARLY-EXITS
             let changed = last_image.as_ref().is_none_or(|previous| previous.as_raw() != image.as_raw());
 
             if force_encode || changed
@@ -547,9 +529,7 @@ fn select_output(wayshot: &libwayshot::WayshotConnection) -> Result<libwayshot::
 
     if outputs.is_empty() { return Err("compositor reported no outputs".to_owned()); }
 
-    //A PICKED MONITOR IS RESOLVED HERE TOO, AND IS THE ONE CASE THAT MAY FAIL: THE COMPOSITOR AND xcap
-    //NUMBER THEIR OUTPUTS INDEPENDENTLY, SO THE SELECTION IS TURNED INTO A NAME FIRST AND THE NAME IS
-    //WHAT THE OUTPUT IS FOUND BY. FALLING BACK TO ANOTHER SCREEN HERE WOULD SHARE ONE NOBODY ASKED FOR.
+    //FIND THE PICKED OUTPUT, FAILING IF IT IS GONE
     let picked = options::get_monitor().is_some();
 
     match get_target_monitor().and_then(|m| m.name().map_err(|e| e.to_string()))
@@ -565,15 +545,14 @@ fn select_output(wayshot: &libwayshot::WayshotConnection) -> Result<libwayshot::
         Err(_) => {},
     }
 
-    //FALLBACK: THE OUTPUT AT THE ORIGIN OF THE LAYOUT, OTHERWISE THE FIRST ONE
+    //FALLBACK: THE OUTPUT AT THE LAYOUT ORIGIN
     Ok(outputs.iter()
         .find(|o| o.logical_region.inner.position.x == 0 && o.logical_region.inner.position.y == 0)
         .unwrap_or(&outputs[0])
         .clone())
 }
 
-//A FRESH CONNECTION ONTO THE SAME OUTPUT. USED BOTH WHEN CAPTURE BREAKS AND, ROUTINELY, TO HAND THE
-//COMPOSITOR BACK THE MEMORY EVERY CAPTURE STRANDS (SEE THE LEAK NOTE IN capture_loop_wayshot).
+//A FRESH CONNECTION ONTO THE SAME OUTPUT
 #[cfg(target_os = "linux")]
 fn reconnect_wayshot(name: &str) -> Option<(libwayshot::WayshotConnection, libwayshot::output::OutputInfo)>
 {
@@ -602,7 +581,7 @@ fn capture_loop_wayshot
 
     let mut encoder = FrameEncoder::new(fps as f32)?;
 
-    //PROBE ONCE UP FRONT SO AN UNSUPPORTED COMPOSITOR REPORTS A USEFUL ERROR RATHER THAN A BLANK SHARE
+    //PROBE ONCE SO A BAD COMPOSITOR REPORTS AN ERROR
     let first_image = wayshot.screenshot_single_output(&target_output, true)
         .map_err(|e| format!("capturing {} failed ({e}) - your compositor must support \
             ext-image-copy-capture-v1 or wlr-screencopy-v1", target_output.name))?
@@ -614,7 +593,7 @@ fn capture_loop_wayshot
         encoder.dispatch(&frame_tx, compressed);
     }
 
-    //PREVIOUS FRAME, KEPT BY MOVE (SEE capture_loop_xcap) - THIS PATH USED TO ENCODE EVERY TICK UNCONDITIONALLY
+    //PREVIOUS FRAME, KEPT BY MOVE (SEE capture_loop_xcap)
     let mut last_image = Some(first_image);
 
     let mut last_encode_time = Instant::now();
@@ -622,10 +601,7 @@ fn capture_loop_wayshot
     let mut failures = 0u32;
     let mut next_tick = Instant::now() + target_interval;
 
-    //libwayshot BINDS A FRESH wl_shm PER CAPTURE AND NEVER RELEASES IT, SO THE COMPOSITOR HOLDS ON TO ONE
-    //FULL-SCREEN BUFFER FOR EVERY FRAME WE TAKE - MEASURED AT ~5.5 MB A FRAME, WHICH IS ~10 GB A MINUTE AT
-    //30 FPS AND TAKES THE WHOLE MACHINE DOWN WITH IT. IT IS ALL HANDED BACK WHEN THE CLIENT DISCONNECTS,
-    //AND RECONNECTING COSTS 0.4 ms, SO THE SHARE SIMPLY RECYCLES ITS CONNECTION BEFORE THE BILL GETS BIG.
+    //COUNT THE STRANDED BYTES AND RECONNECT
     let mut stranded = 0u64;
 
     while running.load(Ordering::Relaxed) && !upgrading() && !switched(generation)
@@ -662,8 +638,7 @@ fn capture_loop_wayshot
                     last_encode_time = Instant::now();
                 }
 
-                //NOTHING WAS MISSED AND THE PICTURE HAS NOT MOVED, SO THIS COSTS NEITHER A KEYFRAME NOR THE
-                //CHANGE DETECTION - ONLY THE RECONNECT ITSELF
+                //NOTHING WAS MISSED
                 if stranded >= consts::WAYLAND_LEAK_BUDGET
                 {
                     if let Some((connection, output)) = reconnect_wayshot(&target_output.name)
@@ -676,7 +651,7 @@ fn capture_loop_wayshot
                 }
             },
 
-            //RECONNECT ONLY WHEN CAPTURE ACTUALLY BREAKS (E.G. THE OUTPUT WAS HOTPLUGGED)
+            //RECONNECT ONLY WHEN CAPTURE BREAKS
             Err(_) =>
             {
                 failures += 1;
@@ -688,7 +663,7 @@ fn capture_loop_wayshot
                         wayshot = connection;
                         target_output = output;
 
-                        //FORCE A KEYFRAME - THE VIEWER HAS MISSED FRAMES WHILE WE WERE DOWN
+                        //FORCE A KEYFRAME - FRAMES WERE MISSED
                         encoder.force_intra_frame();
                         last_image = None;
                     }
@@ -706,7 +681,7 @@ fn capture_loop_wayshot
 }
 
 //STRUCTS
-struct RecorderSession //A STARTED OS-NATIVE RECORDER, ITS FRAME CHANNEL, AND ITS PROVEN FIRST FRAME
+struct RecorderSession //A STARTED OS-NATIVE RECORDER, ITS FRAME CHANNEL
 {
     recorder: VideoRecorder,
     frames: Receiver<Frame>,
@@ -723,10 +698,7 @@ fn open_recorder() -> Result<RecorderSession, String> //THE BLOCKING HALF OF THE
     recorder.start()
         .map_err(|e| format!("starting the OS screen recorder failed ({e})"))?;
 
-    //A RECORDER THAT STARTS IS NOT A RECORDER THAT WORKS. xcap's X11 RECORDER, FOR ONE, REPORTS
-    //SUCCESS AND THEN NEVER DELIVERS A SINGLE FRAME - ACCEPTING IT ON THE STRENGTH OF `start()`
-    //WOULD HAND THE VIEWER A PERMANENTLY BLANK SHARE THAT NO FALLBACK COULD EVER RESCUE, BECAUSE
-    //NOTHING WOULD HAVE FAILED. SO THE PROBE IS ONLY SATISFIED BY AN ACTUAL FRAME.
+    //DEMAND AN ACTUAL FRAME
     let first = frames.recv_timeout(consts::RECORDER_FIRST_FRAME)
         .map_err(|_| "the OS screen recorder started but delivered no frames".to_owned())?;
 
@@ -742,8 +714,7 @@ fn probe_timeout() -> Duration
         .unwrap_or(consts::RECORDER_PROBE_TIMEOUT)
 }
 
-//SEE `capture_loop`: A macOS SESSION CANNOT CROSS A THREAD, AND HAS NO PORTAL TO WAIT ON EITHER,
-//SO THE BOUND IT WOULD BUY IS THE ONE `open_recorder` ALREADY IMPOSES ON THE FIRST FRAME
+//A macOS SESSION CANNOT CROSS A THREAD
 #[cfg(target_os = "macos")]
 fn start_recorder() -> Result<RecorderSession, String>
 {
@@ -753,16 +724,12 @@ fn start_recorder() -> Result<RecorderSession, String>
 #[cfg(not(target_os = "macos"))]
 fn start_recorder() -> Result<RecorderSession, String> //PROBE THE OS-NATIVE RECORDER, BOUNDED
 {
-    //THE PROBE RUNS ON A THREAD OF ITS OWN BECAUSE IT CAN BLOCK FOR AN UNBOUNDED TIME: ON WAYLAND
-    //IT IS AN xdg-desktop-portal SCREENCAST REQUEST, WHICH SITS THERE UNTIL SOMEBODY ANSWERS THE
-    //PICKER - AND NEVER RETURNS AT ALL IF NO PORTAL IMPLEMENTATION IS LISTENING. RUNNING IT INLINE
-    //WOULD WEDGE THE WHOLE CAPTURE THREAD WITH NO WAY BACK TO THE FALLBACK PATH.
+    //THE PROBE CAN BLOCK, SO IT GETS ITS OWN THREAD
     let (probe_tx, probe_rx) = mpsc::channel();
 
     thread::spawn(move ||
     {
-        //A LATE ANSWER FINDS THE RECEIVER GONE; THE SESSION IS THEN DROPPED HERE, WHICH STOPS THE
-        //RECORDER AND RELEASES THE PORTAL SESSION RATHER THAN LEAKING IT
+        //DROP A LATE SESSION, RELEASING THE PORTAL
         probe_tx.send(open_recorder()).ok();
     });
 
@@ -790,14 +757,13 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
 
     let mut last_encode_time = Instant::now();
 
-    //SET BACK BY ONE INTERVAL SO THE VERY FIRST FRAME IS NOT HELD FOR THE FPS BUDGET
+    //DO NOT HOLD THE FIRST FRAME FOR THE FPS BUDGET
     let mut last_dispatch = Instant::now() - min_interval;
 
-    //THE PREVIOUS FRAME'S BYTES. UNLIKE THE POLLING PATHS THIS BACKEND ONLY SPEAKS WHEN THE SCREEN
-    //CHANGED ON MOST PLATFORMS, SO THE COMPARISON USUALLY EARLY-EXITS ON THE FIRST BYTE
+    //THE PREVIOUS FRAME'S BYTES
     let mut last_raw: Option<Vec<u8>> = None;
 
-    //THE FRAME THE PROBE ALREADY PAID FOR GOES OUT RATHER THAN BEING THROWN AWAY
+    //SEND THE FRAME THE PROBE ALREADY PAID FOR
     let mut pending = Some(first);
 
     let generation = options::monitor_generation();
@@ -806,7 +772,7 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
     {
         if !running.load(Ordering::Relaxed) { break Ok(()); }
 
-        //THE MONITOR WAS PICKED AGAIN - HAND THE RECORDER BACK SO capture_loop CAN OPEN THE NEW ONE
+        //HAND THE RECORDER BACK ON A MONITOR SWITCH
         if switched(generation) { break Ok(()); }
 
         //EXIT ON DISABLED SCREEN
@@ -816,8 +782,7 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
             break Ok(());
         }
 
-        //THE TIMEOUT IS ONLY THERE SO `running` IS STILL OBSERVED ON A PERFECTLY IDLE SCREEN -
-        //AN IDLE DESKTOP COSTS US NOTHING BUT THIS WAKEUP, WHERE THE POLLING PATHS GRABBED A FULL FRAME
+        //THE TIMEOUT IS ONLY THERE TO OBSERVE running
         let mut frame = match pending.take()
         {
             Some(frame) => frame,
@@ -830,7 +795,7 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
             },
         };
 
-        //A COMPOSITOR MAY DELIVER FASTER THAN WE ENCODE; KEEP THE NEWEST FRAME AND DROP THE REST
+        //KEEP THE NEWEST FRAME AND DROP THE REST
         while let Ok(newer) = frames.try_recv()
         {
             frame = newer;

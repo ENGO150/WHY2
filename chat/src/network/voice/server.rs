@@ -58,11 +58,11 @@ pub struct Connection
     packet_accumulator: usize, //PACKET ACCUMULATOR
     credit: f32,               //PACKET RATE TOKENS LEFT
     refill: Instant,           //WHEN credit WAS LAST TOPPED UP
-    throttled: bool,           //THE LAST PACKET WAS ALREADY OVER THE RATE (SO ONE LINE IS LOGGED, NOT ONE PER DROP)
+    throttled: bool,           //THE LAST PACKET WAS ALREADY OVER THE RATE
 }
 
 //LISTS
-//CONNECTION (NONE UNTIL THE Hello ARRIVES), USERNAME, TOKEN THAT CLAIMS THE SLOT
+//CONNECTION (NONE UNTIL Hello), USERNAME, TOKEN
 pub static CONNECTIONS: LazyLock<DashMap<usize, (Option<Connection>, String, [u8; 32])>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //IMPLEMENTATIONS
@@ -95,7 +95,7 @@ impl Connection
     //PAY FOR ONE PACKET OUT OF THE RATE BUCKET
     fn take_credit(&mut self) -> bool
     {
-        //TOP UP FOR THE TIME SINCE THE LAST PACKET, THEN PAY FOR THIS ONE
+        //TOP UP FOR THE ELAPSED TIME, THEN PAY
         self.credit = (self.credit + self.refill.elapsed().as_secs_f32() * consts::MAX_PACKET_RATE)
             .min(consts::MAX_PACKET_BURST) - 1.0;
         self.refill = Instant::now();
@@ -162,7 +162,7 @@ pub fn open_connection(id: usize, username: String) -> [u8; 32] //OPEN A VOICE S
     let mut token = [0u8; 32];
     SysRng.try_fill_bytes(&mut token).unwrap();
 
-    //THE SLOT STAYS UNBOUND UNTIL A Hello CARRYING THIS TOKEN ARRIVES OVER UDP
+    //THE SLOT STAYS UNBOUND UNTIL A Hello ARRIVES
     CONNECTIONS.insert(id, (None, username, token));
 
     token
@@ -184,8 +184,7 @@ pub fn find_channel(id: &usize) -> Option<Option<String>>
 
 pub fn remove_connection(id: &usize) //REMOVE CONNECTION
 {
-    //THE UDP ADDRESS IS THE CLIENT'S VOICE SOCKET AND NOTHING ELSE IN THE LOG NAMES IT, SO THE LINE IS
-    //KEYED BY THE TCP CONNECTION THAT ASKED FOR THE SLOT
+    //KEY THE LINE BY THE TCP CONNECTION
     if let Some((_, (conn, _, _))) = CONNECTIONS.remove(id)
     {
         log::info!("Close voice connection ({}): {}",
@@ -217,7 +216,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
         //CHECK IF ID IS IN CONNECTIONS
         if let Some(mut entry) = CONNECTIONS.get_mut(&received.id)
         {
-            //A Hello IS THE ONLY PACKET THAT MAY CLAIM OR MOVE A SLOT, AND ONLY WITH THE RIGHT TOKEN
+            //ONLY A Hello WITH THE RIGHT TOKEN CLAIMS A SLOT
             let valid_hello = match received.code
             {
                 VoicePacketCode::Hello { ref token } => tokens_match(token, &entry.2),
@@ -229,8 +228,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
             {
                 if conn.addr != addr
                 {
-                    //A Hello CARRYING THE TOKEN MAY MOVE THE SESSION ANYWHERE; ANYTHING ELSE ONLY FOLLOWS
-                    //A NAT PORT SHIFT, WHICH KEEPS THE ADDRESS THE SESSION IS ALREADY ON
+                    //ANYTHING ELSE ONLY FOLLOWS A NAT SHIFT
                     if valid_hello || conn.addr.ip() == addr.ip()
                     {
                         log::debug!("Voice session moved ({}): main connection {}",
@@ -275,8 +273,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
                 }
             } else //NOT BOUND YET, ADD ADDRESS
             {
-                //WITHOUT THE TOKEN THERE IS NOTHING TO BIND TO: THE SLOT WAITS FOR THE CLIENT THAT WAS
-                //HANDED IT OVER TCP, NOT FOR WHOEVER SPEAKS FIRST
+                //WITHOUT THE TOKEN THERE IS NOTHING TO BIND TO
                 if !valid_hello { continue; }
 
                 entry.0 = Some(Connection
@@ -301,7 +298,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
         //CODES
         match received.code
         {
-            //HANDSHAKE - ANSWER EVERY Hello, INCLUDING THE REPEATS THAT CROSSED AN ACK ON THE WIRE
+            //HANDSHAKE - ANSWER EVERY Hello, REPEATS INCLUDED
             VoicePacketCode::Hello { .. } =>
             {
                 if let Some(ref keys) = find_key(&received.id)

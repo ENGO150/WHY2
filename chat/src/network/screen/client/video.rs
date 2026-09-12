@@ -85,7 +85,7 @@ use wgpu::
 const SHADER: &str = include_str!("yuv_to_rgba.wgsl");
 
 //STRUCTS
-struct Planes //ONE TEXTURE PER I420 PLANE, ALLOCATED AT THE DECODER'S STRIDE
+struct Planes //ONE TEXTURE PER I420 PLANE, AT THE STRIDE
 {
     width: u32,
     height: u32,
@@ -110,7 +110,7 @@ pub struct YuvRenderer //THE PART THAT NEEDS NO WINDOW
     planes: Option<Planes>,
 }
 
-//THE FORMAT THE FINISHED PICTURE IS WRITTEN THROUGH. NEVER AN sRGB ONE - SEE `VideoSurface::new`.
+//THE FORMAT THE PICTURE IS WRITTEN THROUGH
 fn present_format(surface: TextureFormat) -> TextureFormat
 {
     surface.remove_srgb_suffix()
@@ -120,8 +120,7 @@ pub struct VideoSurface //A WINDOW AND THE RENDERER THAT PAINTS IT
 {
     surface: Surface<'static>,
     configuration: SurfaceConfiguration,
-    //THE FORMAT WE *WRITE* THROUGH, WHICH IS NOT ALWAYS THE ONE THE SURFACE IS CONFIGURED WITH -
-    //SEE THE NOTE ON THE sRGB DOUBLE-ENCODE IN `VideoSurface::new`
+    //THE FORMAT WE WRITE THROUGH
     view_format: TextureFormat,
     renderer: YuvRenderer,
 }
@@ -145,8 +144,7 @@ fn plane_texture(device: &Device, label: &str, width: u32, height: u32) -> Textu
 
 fn upload_plane(queue: &Queue, texture: &Texture, data: &[u8], stride: u32, height: u32)
 {
-    //`Queue::write_texture` STAGES INTERNALLY, SO UNLIKE A BUFFER-TO-TEXTURE COPY IT PLACES NO
-    //256-BYTE ALIGNMENT DEMAND ON THE ROW PITCH - WHICH IS WHY THE STRIDE CAN GO UP UNTOUCHED
+    //write_texture STAGES, SO THE PITCH NEEDS NO ALIGN
     queue.write_texture
     (
         TexelCopyTextureInfo
@@ -220,8 +218,7 @@ impl YuvRenderer
         let sampler = device.create_sampler(&SamplerDescriptor
         {
             label: Some("frame"),
-            //CLAMP MATTERS: THE PLANES ARE PADDED OUT TO THEIR STRIDE, SO REPEATING WOULD WRAP
-            //THE GARBAGE PAST THE END OF A ROW BACK INTO THE PICTURE
+            //CLAMP: REPEATING WOULD WRAP THE PADDING IN
             address_mode_u: AddressMode::ClampToEdge,
             address_mode_v: AddressMode::ClampToEdge,
             address_mode_w: AddressMode::ClampToEdge,
@@ -318,8 +315,7 @@ impl YuvRenderer
     {
         let Some(planes) = &self.planes else { return; };
 
-        //LETTERBOX RATHER THAN STRETCH - THE `pixels` PATH USED ScalingMode::Fill, WHICH SILENTLY
-        //DISTORTED ANY SHARE WHOSE ASPECT DID NOT MATCH THE WINDOW
+        //LETTERBOX RATHER THAN STRETCH
         let frame_aspect = planes.width as f32 / planes.height as f32;
         let target_aspect = target.0.max(1) as f32 / target.1.max(1) as f32;
 
@@ -331,7 +327,7 @@ impl YuvRenderer
             [1.0, target_aspect / frame_aspect]
         };
 
-        //SPAN REACHES THE CENTRE OF THE LAST REAL TEXEL; OFFSET STARTS AT THE CENTRE OF THE FIRST
+        //SPAN AND OFFSET REACH THE TEXEL CENTRES
         let span = |real: u32, stride: u32| -> [f32; 2]
         {
             [(real.saturating_sub(1)) as f32 / stride as f32, 0.5 / stride as f32]
@@ -371,7 +367,7 @@ impl YuvRenderer
                     resolve_target: None,
                     ops: Operations
                     {
-                        //THE LETTERBOX BARS ARE THIS CLEAR, NOT A STRETCHED PICTURE
+                        //THE LETTERBOX BARS
                         load: LoadOp::Clear(Color::BLACK),
                         store: StoreOp::Store,
                     },
@@ -418,15 +414,10 @@ impl VideoSurface
 
         let format = capabilities.formats[0];
 
-        //THE FRAGMENT SHADER ALREADY EMITS DISPLAY-REFERRED sRGB: BT.601 OUTPUT IS GAMMA-ENCODED
-        //VIDEO, NOT LINEAR LIGHT. WRITING IT THROUGH AN *sRGB* VIEW MAKES THE GPU ENCODE IT A
-        //SECOND TIME, WHICH LIFTS EVERY MIDTONE AND DRAINS THE WHOLE PICTURE GREY - THE EXACT
-        //WASHED-OUT LOOK, NOT A SUBTLE SHIFT. THE PICTURE THEREFORE GOES OUT THROUGH THE LINEAR
-        //VIEW OF WHATEVER THE SURFACE PREFERS, WHICH IS ALSO WHY THE HEADLESS TESTS (Rgba8Unorm,
-        //NON-sRGB BY CONSTRUCTION) AGREED WITH THE CPU REFERENCE WHILE A REAL WINDOW DID NOT.
+        //WRITE THROUGH A LINEAR VIEW - THE SHADER EMITS sRGB
         let view_format = present_format(format);
 
-        //ASKING FOR THE SAME FORMAT BACK IS NOT A VIEW FORMAT, IT IS THE DEFAULT
+        //THE SAME FORMAT BACK IS NOT A VIEW FORMAT
         let view_formats = if view_format == format { vec![] } else { vec![view_format] };
 
         let configuration = SurfaceConfiguration
@@ -435,13 +426,12 @@ impl VideoSurface
             format,
             width: width.max(1),
             height: height.max(1),
-            //THE SHARE IS LIVE: A LATE FRAME IS WORSE THAN A DROPPED ONE, AND Fifo WOULD QUEUE THEM
+            //THE SHARE IS LIVE, SO NEVER QUEUE FRAMES
             present_mode: capabilities.present_modes.iter().copied()
                 .find(|mode| *mode == PresentMode::Mailbox)
                 .unwrap_or(PresentMode::Fifo),
             alpha_mode: capabilities.alpha_modes[0],
-            //Auto IS THE ONE THAT KEEPS THE BACKEND OUT OF OUR ENCODING: ANYTHING WIDE-GAMUT OR HDR
-            //WOULD CHANGE WHAT THE FRAGMENT SHADER IS EXPECTED TO EMIT, AND IT ALREADY EMITS sRGB
+            //Auto KEEPS THE BACKEND OUT OF OUR ENCODING
             color_space: SurfaceColorSpace::Auto,
             view_formats,
             desired_maximum_frame_latency: 2,
@@ -476,12 +466,10 @@ impl VideoSurface
         {
             CurrentSurfaceTexture::Success(frame) | CurrentSurfaceTexture::Suboptimal(frame) => frame,
 
-            //TRANSIENT: THE WINDOW IS MINIMISED OR THE COMPOSITOR IS BUSY. SKIP THE FRAME - A LIVE
-            //SHARE HAS A NEWER ONE COMING ANYWAY
+            //TRANSIENT (MINIMISED, BUSY): SKIP THE FRAME
             CurrentSurfaceTexture::Timeout | CurrentSurfaceTexture::Occluded => return,
 
-            //THE SURFACE ITSELF WENT STALE (MOVED BETWEEN MONITORS, COMPOSITOR RESTARTED) -
-            //RECONFIGURE AND LET THE NEXT REDRAW HAVE IT
+            //THE SURFACE WENT STALE: RECONFIGURE
             _ =>
             {
                 self.surface.configure(&self.renderer.device, &self.configuration);

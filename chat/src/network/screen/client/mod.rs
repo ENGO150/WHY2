@@ -78,7 +78,7 @@ pub struct ScreenShareRequest
 {
     pub rx: Receiver<Vec<u8>>,
     pub running: Arc<AtomicBool>,
-    pub deattach: UnboundedSender<()>, //DEATTACH REQUEST FROM THE WINDOW (SENT TO THE SERVER BY A TASK)
+    pub deattach: UnboundedSender<()>, //DEATTACH REQUEST FROM THE WINDOW
 }
 
 //ENUMS
@@ -91,9 +91,7 @@ pub enum UserEvent //CUSTOM WINIT EVENTS
 //GLOBAL VARIABLES
 pub static SCREEN_SHARE_PROXY: RwLock<Option<EventLoopProxy<UserEvent>>> = RwLock::new(None);
 
-//WHERE AN ATTACHED SHARE'S PICTURE GOES WHEN THE CLIENT HAS A SURFACE OF ITS OWN. A CLIENT THAT SETS THIS
-//IS HANDED THE H.264 ACCESS UNITS AS THEY ARRIVE AND DRAWS THEM ITSELF, AND NO WINDOW IS OPENED FOR IT -
-//WHICH IS THE ONLY WAY TO WATCH A SHARE IN A PROCESS WHOSE MAIN THREAD IS ALREADY SOMEBODY ELSE'S
+//WHERE AN ATTACHED SHARE'S PICTURE GOES
 pub static SCREEN_FRAME_SINK: RwLock<Option<UnboundedSender<Vec<u8>>>> = RwLock::new(None);
 
 pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
@@ -102,7 +100,7 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
     let (_read_stream, mut write_stream) = client::connect(chat_options::get_server_address()).await
         .expect("Screen upload connection failed");
 
-    //KEEP THE UPLOAD'S BACKLOG WHERE THE ENCODER CAN SEE IT
+    //KEEP THE UPLOAD'S BACKLOG VISIBLE TO THE ENCODER
     screen::cap_socket_buffers(write_stream.as_ref());
 
     //SEND TOKEN
@@ -114,7 +112,7 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
 
     let running = Arc::new(AtomicBool::new(true));
 
-    //SPAWN CAPTURE TASKS (CAPTURE IS A BLOCKING CPU LOOP, KEEP IT OFF THE RUNTIME)
+    //SPAWN CAPTURE TASKS (BLOCKING CPU LOOP)
     let running_capture = running.clone();
     let running_audio = running.clone();
     let capture = task::spawn_blocking(move || capture::capture_loop(tx, running_capture, consts::TARGET_FPS));
@@ -162,7 +160,7 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
         }
     }
 
-    //STOP THE CAPTURE LOOP AND REPORT WHY IT ENDED (THE SERVER ONLY EVER SEES A DEAD SOCKET)
+    //STOP THE CAPTURE LOOP AND REPORT WHY
     running.store(false, Ordering::Relaxed);
 
     let reason = match capture.await
@@ -184,7 +182,7 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
     let (mut read_stream, mut write_stream) = client::connect(chat_options::get_server_address()).await
         .expect("Screen download connection failed");
 
-    //KEEP THE DOWNLOAD'S BACKLOG WHERE IT CAN STILL BE SHED
+    //KEEP THE DOWNLOAD'S BACKLOG SHEDDABLE
     screen::cap_socket_buffers(read_stream.as_ref());
 
     //SEND TOKEN (HAHA, SLEEP TOKEN)
@@ -201,7 +199,7 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
     //INIT REX STREAM
     let mut rex_stream = crypto::init_rex_stream(chat_options::get_keys().as_ref().unwrap(), &token).unwrap();
 
-    //BRIDGE THE WINIT EVENT LOOP (NOT ASYNC) BACK TO THE SERVER
+    //BRIDGE THE WINIT EVENT LOOP BACK TO THE SERVER
     let (deattach_tx, mut deattach_rx) = mpsc::unbounded_channel::<()>();
     tokio::spawn(async move
     {
@@ -243,8 +241,7 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
             {
                 ScreenPacketCode::Video { data } =>
                 {
-                    //CLONED OUT OF THE LOCK RATHER THAN HELD ACROSS THE HANDOVER, SINCE THE SINK MAY BE
-                    //REPLACED WHILE A SHARE IS RUNNING
+                    //CLONED OUT OF THE LOCK - THE SINK MAY CHANGE
                     let sink = SCREEN_FRAME_SINK.read().unwrap().clone();
 
                     match sink
@@ -264,16 +261,14 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
 
                 ScreenPacketCode::Audio { data } =>
                 {
-                    //VIDEO AND AUDIO SHARE ONE TCP STREAM, SO WAITING HERE STOPS THE PICTURE TOO -
-                    //A PLAYBACK PATH THAT HAS FALLEN BEHIND WOULD HOLD THE READER, CLOSE THE
-                    //RECEIVE WINDOW AND BACK THE WHOLE SHARE UP. 20 ms OF SOUND IS THE CHEAPER LOSS
+                    //ONE TCP STREAM, SO DROP RATHER THAN WAIT
                     audio_tx.try_send(AudioFrame { data }).ok();
                 },
             }
         }
     });
 
-    //A CLIENT DRAWING THE FRAMES ITSELF GETS NO WINDOW - THE SINK IS THE WHOLE OF THE DISPLAY THEN
+    //A CLIENT DRAWING THE FRAMES GETS NO WINDOW
     if SCREEN_FRAME_SINK.read().unwrap().is_some() { return }
 
     if let Some(proxy) = SCREEN_SHARE_PROXY.read().unwrap().as_ref()

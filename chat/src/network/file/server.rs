@@ -103,7 +103,7 @@ impl Drop for FileTransferGuard
             //REMOVE FILE STREAM
             conn.remove_file_stream(self.uid);
 
-            //REMOVE JUNK FILE - THE UPLOAD CARRIES ITS OWN PATH, SINCE AN IMAGE IS NOT BUILT IN THE TEMP DIR
+            //REMOVE JUNK FILE
             if let Some((_, active)) = ACTIVE_FILESHARES.remove(&self.uid)
             {
                 let _ = std::fs::remove_file(&active.path);
@@ -125,12 +125,10 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
     pub filename: String,       //FILENAME
     pub client_id: usize,       //ID OF SENDER
     pub path: PathBuf,          //WHERE THE UPLOAD IS BEING BUILT
-    pub image: Option<Vec<u8>>, //THE PLAINTEXT, KEPT ONLY FOR AN IMAGE - IT IS SENT ON WHEN IT IS WHOLE
+    pub image: Option<Vec<u8>>, //THE PLAINTEXT, KEPT ONLY FOR AN IMAGE
     pub stream: RexStream,
 
-    //THE TAG BEING BUILT OVER WHAT GOES TO DISK, FOR AN IMAGE ONLY. A FILESHARE'S KEY IS RANDOM AND DIES
-    //WITH THE PROCESS, SO THERE IS NO LEAKED COPY OF ONE TO AUTHENTICATE - AND IT IS STREAMED BACK OUT
-    //CHUNK BY CHUNK, WHICH A TRAILING TAG COULD NOT BE CHECKED AHEAD OF ANYWAY
+    //THE DISK TAG BEING BUILT, FOR AN IMAGE ONLY
     pub mac: Option<Hmac<Sha256>>,
 }
 
@@ -212,7 +210,7 @@ pub async fn download
         return;
     }
 
-    //AN IMAGE IS NOT ONLY STORED, IT IS PUSHED TO EVERY CLIENT IN THE CHANNEL AS ONE PACKET
+    //AN IMAGE IS ALSO PUSHED TO THE WHOLE CHANNEL
     if persistent && size > consts::MAX_IMAGE_SIZE as u64
     {
         log::warn!("Image rejected ({size} bytes over the {} ceiling): {peer_addr}", consts::MAX_IMAGE_SIZE);
@@ -220,9 +218,7 @@ pub async fn download
         return;
     }
 
-    //CREATE KEY & NONCE FOR FILE ENCRYPTION ON DISK. A FILESHARE KEEPS ITS RANDOM PAIR IN
-    //AVAILABLE_FILES AND DIES WITH THE PROCESS; AN IMAGE IS NOT IN THAT LIST AND OUTLIVES IT, SO ITS
-    //PAIR IS DERIVED FROM THE SERVER'S IMAGE KEY AND THE HASH THE FILE IS NAMED AFTER INSTEAD
+    //CREATE KEY & NONCE FOR ENCRYPTION ON DISK
     let (disk_key, disk_nonce, disk_mac) = match persistent
     {
         true =>
@@ -258,7 +254,7 @@ pub async fn download
         let disk_stream = RexStream::new(&Grid::from_key(&disk_key).unwrap(),
             Grid::from_flat(&disk_nonce).unwrap()).unwrap();
 
-        //CREATE THE FILE - IT IS BUILT UNDER THE UID AND ONLY NAMED ONCE IT IS WHOLE AND VERIFIED
+        //CREATE THE FILE, NAMED ONLY ONCE IT IS VERIFIED
         let upload_path = target_dir.join(uid.to_string());
         let upload_file = OpenOptions::new()
             .write(true)
@@ -293,7 +289,7 @@ pub async fn download
         return;
     }
 
-    //A FILESHARE IS WHATEVER THE UPLOADER SAYS IT IS; AN IMAGE IS NOT
+    //A FILESHARE IS WHAT THE UPLOADER SAYS IT IS
     let mut checked = !persistent;
 
     //LOOP READING CHUNKS
@@ -319,7 +315,7 @@ pub async fn download
             }
         }
 
-        //ENCRYPT CHUNK (NEVER HOLD THE UPLOAD ENTRY ACROSS AN AWAIT)
+        //ENCRYPT CHUNK (NO ENTRY HELD ACROSS AN AWAIT)
         let prepared =
         {
             match ACTIVE_FILESHARES.get_mut(&uid)
@@ -366,11 +362,10 @@ pub async fn download
             //UPDATE HASHER
             active.hasher.update(&data);
 
-            //AND THE TAG, OVER WHAT THE DISK ACTUALLY TOOK RATHER THAN WHAT WE PREPARED FOR IT
+            //AND THE TAG, OVER WHAT THE DISK TOOK
             if let Some(mac) = active.mac.as_mut() { mac.update(&encrypted_bytes); }
 
-            //KEEP THE PLAINTEXT OF AN IMAGE - WHAT GOES TO DISK IS ENCRYPTED, AND WHAT GOES TO THE
-            //CHANNEL IS THIS. READING IT BACK OFF THE DISK WOULD MEAN DECRYPTING WHAT WE JUST HELD
+            //KEEP AN IMAGE'S PLAINTEXT FOR THE CHANNEL
             if let Some(buffer) = active.image.as_mut() { buffer.extend_from_slice(&data); }
 
             //CHECK SIZE
@@ -393,7 +388,7 @@ pub async fn download
                 active.mac.take())
         };
 
-        //THE TAG GOES ON THE END, WHICH IS THE ONLY PLACE AN UPLOAD BEING WRITTEN AS IT ARRIVES CAN PUT IT
+        //THE TAG GOES ON THE END
         if let Some(mac) = mac
         {
             let tag = crypto::disk_tag(mac, final_size);
@@ -450,15 +445,10 @@ pub async fn download
 
                 if kept { config::messages::store_image(&username, &filename, &final_hash); }
 
-                //AND WHAT IS NOT KEPT IS NOT LEFT BEHIND: NOTHING BUT THE HISTORY EVER NAMES A FILE IN
-                //server_images/, SO A PICTURE POSTED IN A CHANNEL (OR WITH THE HISTORY OFF) IS AS TEMPORARY AS
-                //THE LINE IT CAME ON. insert IS THE GUARD - THE NAME IS THE CONTENT, SO A HASH THAT WAS
-                //ALREADY THERE IS SOMEBODY ELSE'S ENTRY AND NOT OURS TO DELETE
+                //DELETE A PICTURE NOTHING KEPT
                 if !kept && insert { let _ = fs::remove_file(&new_path).await; }
 
-                //A PICTURE THAT HAS JUST BEEN UPLOADED IS ONE NOBODY CAN HOLD YET, SO IT GOES OUT WHOLE.
-                //THE LINE NAMES THE SENDER, SO IT IS COLORED LIKE A MESSAGE - LOOKED UP HERE, WHERE THE
-                //LINE IS BUILT, RATHER THAN CARRIED THROUGH THE TOKEN FROM WHEN THE UPLOAD WAS ASKED FOR
+                //A FRESH PICTURE GOES OUT WHOLE
                 server::send_to_all(PacketCode::ImageDisplay
                 {
                     username: username.clone(),
