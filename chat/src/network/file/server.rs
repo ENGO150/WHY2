@@ -248,7 +248,11 @@ pub async fn download
     if !valid && size / consts::MEGABYTE as u64 <= config::read_config::<u64>("max_upload_size")
     {
         //CREATE UPLOAD DIRECTORY
-        fs::create_dir_all(&target_dir).await.expect("Creating upload directory failed");
+        if let Err(e) = fs::create_dir_all(&target_dir).await
+        {
+            log::error!("Creating upload directory failed ({e}): {peer_addr}");
+            return;
+        }
 
         //CREATE REXSTREAM FOR FILE ENCRYPTION ON DISK
         let disk_stream = RexStream::new(&Grid::from_key(&disk_key).unwrap(),
@@ -256,11 +260,19 @@ pub async fn download
 
         //CREATE THE FILE, NAMED ONLY ONCE IT IS VERIFIED
         let upload_path = target_dir.join(uid.to_string());
-        let upload_file = OpenOptions::new()
+        let upload_file = match OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&upload_path)
-            .await.expect("Creating upload file failed");
+            .await
+        {
+            Ok(f) => f,
+            Err(e) =>
+            {
+                log::error!("Creating upload file failed ({e}): {peer_addr}");
+                return;
+            }
+        };
 
         //ADD ACTIVE UPLOAD
         ACTIVE_FILESHARES.insert(uid, ActiveFileshare

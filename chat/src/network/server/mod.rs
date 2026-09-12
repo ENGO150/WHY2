@@ -793,7 +793,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     }
 
     let id = get_latest_id(); //GENERATE ID FOR CLIENT
-    let role = config::users::role(&username).unwrap(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
+    let role = config::users::role(&username).unwrap_or_default(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
 
     let mut channel: Option<String> = None; //CURRENT CLIENT CHANNEL
 
@@ -850,7 +850,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::MessageRequest { text } =>
             {
                 //SILENCE MUTED USERS
-                if *CONNECTIONS.get(&peer_addr).unwrap().muted()
+                if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
                 {
                     log::debug!("Message dropped (muted): {peer_addr}");
 
@@ -989,7 +989,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::Upload { hash, .. } | PacketCode::Image { hash, .. } =>
             {
                 //SILENCE MUTED USERS
-                if *CONNECTIONS.get(&peer_addr).unwrap().muted()
+                if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
                     continue;
@@ -1261,9 +1261,9 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     if !uploads.is_empty() //DO NOT ADD USERS WITH NO UPLOADS
                     {
                         //GET ID TO THE USERNAME
-                        let id = CONNECTIONS.iter()
+                        let Some(id) = CONNECTIONS.iter()
                             .find(|c| c.username() == Some(&username))
-                            .and_then(|c| c.id().copied()).unwrap();
+                            .and_then(|c| c.id().copied()) else { continue }; //ALREADY GONE
 
                         //GET USER'S UPLOADS
                         let upload: Vec<(String, usize)> = uploads.iter().enumerate()
@@ -1348,7 +1348,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             PacketCode::PrivateMessage { text, id: recipient_id, .. } =>
             {
                 //SILENCE MUTED USERS
-                if *CONNECTIONS.get(&peer_addr).unwrap().muted()
+                if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
                     continue;
@@ -1388,7 +1388,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     }
 
                     //SEND CONFIRMATION BACK TO SENDER
-                    let recipient_uname = CONNECTIONS.get(&recipient_addr).and_then(|e| e.username().cloned()).unwrap();
+                    let Some(recipient_uname) = CONNECTIONS.get(&recipient_addr)
+                        .and_then(|e| e.username().cloned()) else { continue }; //RECIPIENT LEFT MID-SEND
                     network::send(&mut *streams.1.lock().await, PacketCode::PrivateMessageBack
                     {
                         text,
