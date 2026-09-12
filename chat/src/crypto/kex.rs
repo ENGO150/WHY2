@@ -159,7 +159,7 @@ fn transcript(nonce: &[u8; 32], eph_ecc: &PublicKey, pq: &EncapsulationKey768) -
     message
 }
 
-fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::SharedKeys //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
+fn derive_encryption_keys(shared_secret: &[u8]) -> consts_chat::SharedKeys //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
 {
     let hkdf = Hkdf::<Sha256>::new(None, shared_secret);
 
@@ -168,8 +168,8 @@ fn derive_encryption_keys(shared_secret: &[u8], info: &str) -> consts_chat::Shar
     let mut mac = Zeroizing::new(vec![0u8; 32]);
 
     //EXPAND
-    hkdf.expand(format!("{}-encryption", info).as_bytes(), &mut encryption_key).expect("HKDF expand failed");
-    hkdf.expand(format!("{}-mac", info).as_bytes(), &mut mac).expect("HKDF expand failed");
+    hkdf.expand(b"WHY2-encryption", &mut encryption_key).expect("HKDF expand failed");
+    hkdf.expand(b"WHY2-mac", &mut mac).expect("HKDF expand failed");
 
     //CONVERT KEY BYTES TO i64s & RETURN WITH THE MAC
     (Zeroizing::new(encryption_key.chunks(8).map(|chunk|
@@ -388,8 +388,8 @@ pub fn derive_shared_secret //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPT
         &mut combined
     ).unwrap();
 
-    //HKDF SEPARATE ENCRYPTION AND MAC KEYS
-    derive_encryption_keys(&combined, misc::get_version())
+    //HKDF SEPARATE ENCRYPTION AND MAC KEYS - NOT THE VERSION, THE HANDSHAKE HAS TO SURVIVE A MISMATCH
+    derive_encryption_keys(&combined)
 }
 
 pub fn encapsulate_pq(peer_ek: &EncapsulationKey768) -> (Ciphertext<MlKem768>, Zeroizing<Vec<u8>>)
