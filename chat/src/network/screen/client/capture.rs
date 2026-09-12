@@ -24,6 +24,8 @@ use std::
     sync::
     {
         Arc,
+        Condvar,
+        Mutex,
         RwLock,
         atomic::{ AtomicBool, Ordering },
         mpsc::Receiver,
@@ -681,6 +683,63 @@ fn capture_loop_wayshot
 }
 
 //STRUCTS
+struct LatestFrame //ONE-SLOT FRAME HANDOFF
+{
+    slot: Mutex<Option<Frame>>,
+    ready: Condvar,
+    draining: AtomicBool, //THE LOOP STILL WANTS FRAMES
+    ended: AtomicBool,    //THE RECORDER STOPPED DELIVERING
+}
+
+impl LatestFrame
+{
+    fn new() -> Self
+    {
+        Self
+        {
+            slot: Mutex::new(None),
+            ready: Condvar::new(),
+            draining: AtomicBool::new(true),
+            ended: AtomicBool::new(false),
+        }
+    }
+
+    fn take(&self, timeout: Duration) -> Option<Frame> //THE NEWEST FRAME, OR NOTHING
+    {
+        let (mut slot, _) = self.ready
+            .wait_timeout_while(self.slot.lock().unwrap(), timeout, |slot| slot.is_none())
+            .unwrap();
+
+        slot.take()
+    }
+}
+
+//DRAIN THE RECORDER ALONGSIDE THE ENCODE
+fn drain_frames(frames: Receiver<Frame>, latest: Arc<LatestFrame>)
+{
+    thread::spawn(move ||
+    {
+        while latest.draining.load(Ordering::Relaxed)
+        {
+            match frames.recv_timeout(consts::RECORDER_POLL_INTERVAL)
+            {
+                //KEEP ONLY THE NEWEST
+                Ok(frame) =>
+                {
+                    *latest.slot.lock().unwrap() = Some(frame);
+                    latest.ready.notify_one();
+                },
+
+                Err(RecvTimeoutError::Timeout) => {},
+                Err(RecvTimeoutError::Disconnected) => break,
+            }
+        }
+
+        latest.ended.store(true, Ordering::Relaxed);
+        latest.ready.notify_one();
+    });
+}
+
 struct RecorderSession //A STARTED OS-NATIVE RECORDER, ITS FRAME CHANNEL
 {
     recorder: VideoRecorder,
@@ -751,6 +810,10 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
 {
     let RecorderSession { recorder, frames, first } = session;
 
+    let latest = Arc::new(LatestFrame::new());
+
+    drain_frames(frames, latest.clone());
+
     let mut encoder = FrameEncoder::new(fps as f32)?;
 
     let min_interval = Duration::from_secs_f64(1.0 / fps as f64);
@@ -783,23 +846,17 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
         }
 
         //THE TIMEOUT IS ONLY THERE TO OBSERVE running
-        let mut frame = match pending.take()
+        let frame = match pending.take()
         {
             Some(frame) => frame,
 
-            None => match frames.recv_timeout(consts::RECORDER_POLL_INTERVAL)
+            None => match latest.take(consts::RECORDER_POLL_INTERVAL)
             {
-                Ok(frame) => frame,
-                Err(RecvTimeoutError::Timeout) => continue,
-                Err(RecvTimeoutError::Disconnected) => break Err("the OS screen recorder stopped delivering frames".to_owned()),
+                Some(frame) => frame,
+                None if latest.ended.load(Ordering::Relaxed) => break Err("the OS screen recorder stopped delivering frames".to_owned()),
+                None => continue,
             },
         };
-
-        //KEEP THE NEWEST FRAME AND DROP THE REST
-        while let Ok(newer) = frames.try_recv()
-        {
-            frame = newer;
-        }
 
         let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
 
@@ -825,6 +882,8 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
         last_encode_time = last_dispatch;
         last_raw = Some(frame.raw);
     };
+
+    latest.draining.store(false, Ordering::Relaxed);
 
     recorder.stop().ok();
 
