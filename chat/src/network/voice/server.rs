@@ -313,7 +313,8 @@ pub async fn listen_client_voice(socket: UdpSocket)
             VoicePacketCode::Audio { data, .. } =>
             {
                 //SILENCE MUTED USERS
-                if *server::CONNECTIONS.iter().find(|c| c.id() == Some(&received.id)).unwrap().muted() { continue; }
+                if server::CONNECTIONS.iter().find(|c| c.id() == Some(&received.id))
+                    .is_none_or(|c| *c.muted()) { continue; } //GONE COUNTS AS MUTED
 
                 //VALIDATE PACKET IF IT CONTAINS AUDIO
                 if !validate_opus_packet(&data)
@@ -353,7 +354,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
                     {
                         data: data.clone(),
                         username: Some(username.clone()),
-                    }, addr, recipient_id, keys).await.unwrap();
+                    }, addr, recipient_id, keys).await.ok();
                 }
             }
 
@@ -390,7 +391,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
                     voice::send(&socket, received.id, VoicePacketCode::Ping
                     {
                         timestamp,
-                    }, addr, recipient_id, keys).await.unwrap();
+                    }, addr, recipient_id, keys).await.ok();
                 }
             }
 
@@ -412,7 +413,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
                     {
                         target_id,
                         timestamp,
-                    }, &addr, &target_id, keys).await.unwrap();
+                    }, &addr, &target_id, keys).await.ok();
                 }
 
                 continue;
