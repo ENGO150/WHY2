@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 //MODULES
+pub mod consts;
 pub mod draw;
 pub mod event;
 pub mod input;
@@ -32,7 +33,6 @@ pub mod tofu;
 use std::
 {
     sync::Arc,
-    time::Duration,
     io::
     {
         self,
@@ -110,10 +110,6 @@ use crate::
 use login::{ Action, ConnectResult };
 
 pub use state::App;
-
-//CONSTS
-const REDRAW_INTERVAL: Duration = Duration::from_millis(33); //COALESCE REDRAWS - VoiceActivity FIRES PER VOICE PACKET
-const SCROLL_STEP: u16 = 3;
 
 //TYPES
 pub type Tui = Terminal<CrosstermBackend<Stdout>>;
@@ -224,7 +220,7 @@ pub async fn run
 )
 {
     let mut reader = EventStream::new();
-    let mut tick = time::interval(REDRAW_INTERVAL);
+    let mut tick = time::interval(consts::REDRAW_INTERVAL);
     tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
     let mut events_open = true;
@@ -387,8 +383,8 @@ async fn handle_terminal_event
                 MouseEventKind::ScrollUp if app.settings.open => settings::scroll(app, -1),
                 MouseEventKind::ScrollDown if app.settings.open => settings::scroll(app, 1),
 
-                MouseEventKind::ScrollUp => app.scroll_up(SCROLL_STEP, viewport),
-                MouseEventKind::ScrollDown => app.scroll_down(SCROLL_STEP, viewport),
+                MouseEventKind::ScrollUp => app.scroll_up(consts::SCROLL_STEP, viewport),
+                MouseEventKind::ScrollDown => app.scroll_down(consts::SCROLL_STEP, viewport),
 
                 //A PRESS ANCHORS A SELECTION
                 MouseEventKind::Down(MouseButton::Left) if selectable(app) =>

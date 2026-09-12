@@ -49,28 +49,30 @@ use crate::
 };
 
 #[cfg(feature = "client_voice")]
-use crate::network::voice::client::options as voice_options;
+use crate::network::voice::
+{
+    consts as voice_consts,
+    client::options as voice_options,
+};
 
 use super::
 {
+    consts,
     theme,
     state::{ self, App },
     palette::
     {
-        self,
         Entry,
         Values,
         PaletteMode,
     },
     tofu::
     {
-        self,
         Prompt,
         Stage,
     },
     settings::
     {
-        self,
         Row,
         Value,
         Settings,
@@ -83,26 +85,8 @@ use super::
     },
 };
 
-//CONSTS
-const SIDEBAR_WIDTH: u16          = 24;
-const SIDEBAR_MIN_TERM_WIDTH: u16 = 70; //BELOW THIS THE SIDEBAR IS DROPPED
-const INPUT_MIN_HEIGHT: u16       = 3;
-const INPUT_MAX_HEIGHT: u16       = 8;
-const CHANNELS_MIN_HEIGHT: u16    = 12; //SIDEBAR ROWS THE CHANNEL LIST NEEDS
-const SETTINGS_WIDTH: u16         = 62; //SETTINGS OVERLAY, CAPPED TO THE TERMINAL
-const TOFU_WIDTH: u16             = 64; //SERVER IDENTITY OVERLAY, CAPPED TO THE TERMINAL
-const LOGIN_WIDTH: u16            = 52; //CONNECT PROMPT, CAPPED TO THE TERMINAL
-const FIELD_ROW: u16              = 1;  //THE ADDRESS FIELD SITS ONE ROW UNDER ITS OWN LABEL
-const SETTINGS_VALUE_WIDTH: u16   = 20; //NARROWEST THE VALUE COLUMN MAY GET (BAR + PERCENTAGE)
-
 //PROJECT LOGO WATERMARK
 const LOGO: &str = include_str!("./assets/rexlogo");
-
-#[cfg(feature = "client_voice")]
-const SLIDER_WIDTH: usize         = 14; //CELLS OF VOLUME BAR
-
-//SELECTION GAP FROM A LIST'S EDGES
-const SCROLL_GAP: usize           = 4;
 
 //ENUMS
 enum Panel //SIDEBAR SECTIONS, IN THE ORDER THEY ARE STACKED
@@ -127,18 +111,18 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     let input_width = area.width.saturating_sub(4).max(1); //BORDERS + "> "
     let (input_lines, cursor) = app.input.render(input_width, false);
     let input_height = if connecting { 0 }
-        else { (input_lines.len() as u16 + 2).clamp(INPUT_MIN_HEIGHT, INPUT_MAX_HEIGHT) };
+        else { (input_lines.len() as u16 + 2).clamp(consts::INPUT_MIN_HEIGHT, consts::INPUT_MAX_HEIGHT) };
 
     let [main_area, input_area] = Layout::vertical
     ([
-        Constraint::Min(INPUT_MIN_HEIGHT),
+        Constraint::Min(consts::INPUT_MIN_HEIGHT),
         Constraint::Length(input_height),
     ]).areas(area);
 
     //MESSAGES + SIDEBAR
-    let (messages_area, sidebar_area) = if area.width >= SIDEBAR_MIN_TERM_WIDTH && options::get_sending_messages()
+    let (messages_area, sidebar_area) = if area.width >= consts::SIDEBAR_MIN_TERM_WIDTH && options::get_sending_messages()
     {
-        let [m, s] = Layout::horizontal([Constraint::Min(0), Constraint::Length(SIDEBAR_WIDTH)]).areas(main_area);
+        let [m, s] = Layout::horizontal([Constraint::Min(0), Constraint::Length(consts::SIDEBAR_WIDTH)]).areas(main_area);
         (m, Some(s))
     } else
     {
@@ -271,7 +255,7 @@ fn window(offset: usize, selected: usize, total: usize, visible: usize) -> usize
     let max = total.saturating_sub(visible);
 
     //A SHORT LIST KEEPS WHAT IT CAN
-    let gap = SCROLL_GAP.min(visible.saturating_sub(1) / 2);
+    let gap = consts::SCROLL_GAP.min(visible.saturating_sub(1) / 2);
 
     let mut first = offset.min(max);
 
@@ -359,7 +343,7 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect)
 
     let limit = area.height.saturating_sub(3).max(3);
 
-    if area.height >= CHANNELS_MIN_HEIGHT && !app.channels.is_empty()
+    if area.height >= consts::CHANNELS_MIN_HEIGHT && !app.channels.is_empty()
     {
         constraints.push(Constraint::Length((app.channels.len() as u16 + 2).clamp(3, limit)));
         panels.push(Panel::Channels);
@@ -549,7 +533,7 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect)
         PaletteMode::Signature(..) => (1, 0, String::from(" Parameters ")),
     };
 
-    let rows = total.min(palette::MAX_ROWS);
+    let rows = total.min(consts::MAX_ROWS);
 
     //KEEP THE SELECTION IN VIEW
     let first = window(app.palette.offset, selected, total, rows);
@@ -684,7 +668,7 @@ fn capitalize(name: &str) -> String
 //THE /settings OVERLAY
 fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 {
-    let width = SETTINGS_WIDTH.min(area.width.saturating_sub(2)).max(1);
+    let width = consts::SETTINGS_WIDTH.min(area.width.saturating_sub(2)).max(1);
     let inner_width = width.saturating_sub(2) as usize;
 
     if area.height < 5 || inner_width < 12 { return; }
@@ -722,7 +706,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 
     let visible = match &state.picker
     {
-        Some(_) => total.min(settings::MAX_PICKER_ROWS).min(rows_room),
+        Some(_) => total.min(consts::MAX_PICKER_ROWS).min(rows_room),
         None => total.min(rows_room),
     }.max(1);
 
@@ -748,7 +732,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
     {
         Row::Item(item) => Some(item.label.width()),
         Row::Header(_) | Row::Action(_) => None,
-    }).max().unwrap_or(0).min(inner_width.saturating_sub(SETTINGS_VALUE_WIDTH as usize + 3));
+    }).max().unwrap_or(0).min(inner_width.saturating_sub(consts::SETTINGS_VALUE_WIDTH as usize + 3));
 
     //LABELS GIVE WAY FIRST ON A NARROW TERMINAL
 
@@ -820,7 +804,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 //SERVER IDENTITY PROMPT
 fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
 {
-    let width = TOFU_WIDTH.min(area.width.saturating_sub(2)).max(1);
+    let width = consts::TOFU_WIDTH.min(area.width.saturating_sub(2)).max(1);
     let inner_width = width.saturating_sub(4); //BORDERS PLUS A COLUMN OF AIR EACH SIDE
 
     if area.height < 9 || inner_width < 20 { return; }
@@ -881,18 +865,18 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
         lines.append(&mut state::wrap_line(&Line::from(Span::styled(format!
         (
             "Type '{}' to replace the pinned key with this one:",
-            tofu::CHALLENGE,
+            consts::CHALLENGE,
         ), theme::TEXT)), inner_width));
 
         lines.push(Line::from(vec!
         [
             Span::styled(prompt.typed.clone(), theme::ACCENT),
-            Span::styled("_".repeat(tofu::CHALLENGE.chars().count().saturating_sub(typed)), theme::DIM),
+            Span::styled("_".repeat(consts::CHALLENGE.chars().count().saturating_sub(typed)), theme::DIM),
         ]).centered());
 
         if prompt.wrong
         {
-            lines.push(Line::from(Span::styled(format!("Type '{}' to go through with it.", tofu::CHALLENGE),
+            lines.push(Line::from(Span::styled(format!("Type '{}' to go through with it.", consts::CHALLENGE),
                 theme::ERROR)).centered());
         }
     } else
@@ -944,7 +928,7 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
 
 fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
 {
-    let width = LOGIN_WIDTH.min(area.width.saturating_sub(2)).max(1);
+    let width = consts::LOGIN_WIDTH.min(area.width.saturating_sub(2)).max(1);
     let inner_width = width.saturating_sub(4); //BORDERS PLUS A COLUMN OF AIR EACH SIDE
     let field_width = inner_width.saturating_sub(2); //"> " GUTTER
 
@@ -1029,7 +1013,7 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
         frame.set_cursor_position(Position::new
         (
             text_area.x + 2 + cursor.0.min(field_width.saturating_sub(1)),
-            text_area.y + FIELD_ROW + cursor.1,
+            text_area.y + consts::FIELD_ROW + cursor.1,
         ));
     }
 }
@@ -1049,7 +1033,7 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
         Row::Header(_) => return Vec::new(),
 
         //SAY WHAT A BUTTON DOES, OR WHY IT WILL NOT
-        Row::Action(label) if **label == *settings::RESTART_LABEL =>
+        Row::Action(label) if **label == *consts::RESTART_LABEL =>
         {
             spans.push(Span::styled("Restart the server \u{2014} every client is disconnected and the whole config is read again.", theme::DIM));
 
@@ -1093,7 +1077,7 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
         Row::Action(label) =>
         {
             //A BUTTON IS LIVE WHEN IT HAS SOMETHING TO DO
-            let restart = **label == *settings::RESTART_LABEL;
+            let restart = **label == *consts::RESTART_LABEL;
             let live = if restart { !_state.unsaved() } else { _state.unsaved() };
             let armed = restart && _state.confirm;
 
@@ -1171,12 +1155,12 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
         Value::Volume(percent) =>
         {
             //THE BAR IS THE WHOLE RANGE
-            let filled = (*percent as usize * SLIDER_WIDTH).div_ceil(voice_options::VOLUME_MAX as usize);
+            let filled = (*percent as usize * consts::SLIDER_WIDTH).div_ceil(voice_consts::VOLUME_MAX as usize);
 
             vec!
             [
                 Span::styled("█".repeat(filled), theme::ACCENT),
-                Span::styled("░".repeat(SLIDER_WIDTH.saturating_sub(filled)), theme::BORDER),
+                Span::styled("░".repeat(consts::SLIDER_WIDTH.saturating_sub(filled)), theme::BORDER),
                 Span::styled(format!(" {percent:>3}%"), if *percent == 0 { theme::DIM } else { theme::TEXT }),
             ]
         },
@@ -1186,7 +1170,7 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
         {
             if id.is_empty()
             {
-                vec![Span::styled(settings::DEFAULT_DEVICE, theme::DIM)]
+                vec![Span::styled(consts::DEFAULT_DEVICE, theme::DIM)]
             } else
             {
                 vec![Span::styled(truncate(&_state.device_label(id, *input), _width), theme::ACCENT)]
@@ -1201,7 +1185,7 @@ fn picker_line(entry: &DeviceEntry, selected: bool, width: usize) -> Line<'stati
     //ENTRY 0 IS THE SYSTEM DEFAULT
     let (text, style) = if entry.id.is_empty()
     {
-        (String::from(settings::DEFAULT_DEVICE), theme::DIM)
+        (String::from(consts::DEFAULT_DEVICE), theme::DIM)
     } else
     {
         (truncate(&entry.label, width.saturating_sub(3)), theme::TEXT)

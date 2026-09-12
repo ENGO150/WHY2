@@ -35,19 +35,11 @@ use why2_chat::network::voice::client::options as voice_options;
 #[cfg(feature = "client_screen")]
 use why2_chat::network::screen::client::options as screen_options;
 
-use super::state::App;
-
-//CONSTS
-pub const MAX_PICKER_ROWS: usize = 8; //VISIBLE DEVICE ROWS BEFORE THE PICKER SCROLLS
-
-pub const SAVE_LABEL: &str = "Save";              //THE BUTTON THE SERVER ROWS ARE SENT BACK WITH
-pub const RESTART_LABEL: &str = "Restart server"; //AND THE ONE THAT PUTS THE STARTUP-ONLY ONES IN USE
-
-#[cfg(feature = "client_voice")]
-pub const DEFAULT_DEVICE: &str = "System default"; //SHOWN FOR AN EMPTY input_device/output_device
-
-#[cfg(feature = "client_voice")]
-const VOLUME_STEP: u32 = 5;
+use super::
+{
+    consts,
+    state::App,
+};
 
 //ENUMS
 pub enum Value
@@ -274,8 +266,8 @@ impl Settings
             }));
         }
 
-        rows.push(Row::Action(SAVE_LABEL)); //NOTHING LEAVES THIS BOX UNTIL THIS IS PRESSED
-        rows.push(Row::Action(RESTART_LABEL));
+        rows.push(Row::Action(consts::SAVE_LABEL)); //NOTHING LEAVES THIS BOX UNTIL THIS IS PRESSED
+        rows.push(Row::Action(consts::RESTART_LABEL));
 
         self.rows = rows;
         self.picker = None;
@@ -406,7 +398,7 @@ impl Settings
     #[cfg(feature = "client_voice")]
     pub fn device_label(&self, id: &str, input: bool) -> String
     {
-        if id.is_empty() { return String::from(DEFAULT_DEVICE); }
+        if id.is_empty() { return String::from(consts::DEFAULT_DEVICE); }
 
         let devices = if input { &self.devices.input } else { &self.devices.output };
 
@@ -682,10 +674,10 @@ fn adjust(app: &mut App, direction: i32)
         {
             let next = if direction > 0
             {
-                voice_options::clamp_volume(percent.saturating_add(VOLUME_STEP))
+                voice_options::clamp_volume(percent.saturating_add(consts::VOLUME_STEP))
             } else
             {
-                percent.saturating_sub(VOLUME_STEP)
+                percent.saturating_sub(consts::VOLUME_STEP)
             };
 
             if next == percent { return; }
@@ -724,7 +716,7 @@ fn activate(app: &mut App)
         Some(Selected::Number(number)) => app.settings.edit = Some(number.to_string()),
         Some(Selected::Text(text)) => app.settings.edit = Some(text),
 
-        Some(Selected::Action(RESTART_LABEL)) => restart(app),
+        Some(Selected::Action(consts::RESTART_LABEL)) => restart(app),
         Some(Selected::Action(_)) => save(app),
 
         #[cfg(feature = "client_voice")]
@@ -884,7 +876,7 @@ fn device_entries(app: &App, input: bool) -> Vec<DeviceEntry>
 {
     let devices = if input { &app.settings.devices.input } else { &app.settings.devices.output };
 
-    let mut entries = vec![DeviceEntry { id: String::new(), label: String::from(DEFAULT_DEVICE) }];
+    let mut entries = vec![DeviceEntry { id: String::new(), label: String::from(consts::DEFAULT_DEVICE) }];
     entries.extend(devices.iter().cloned());
 
     //A CONFIGURED BUT UNPLUGGED DEVICE KEEPS ITS ROW

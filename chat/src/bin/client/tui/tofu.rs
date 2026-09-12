@@ -27,12 +27,10 @@ use crate::network::client::TofuRequest;
 
 use super::
 {
+    consts,
     theme,
     state::App,
 };
-
-//CONSTANTS
-pub const CHALLENGE: &str = "yes"; //WHAT THE SECOND STAGE WANTS TYPED OUT
 
 //ENUMS
 //A MISMATCH IS ASKED TWICE
@@ -149,7 +147,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
             //LETTERS ONLY, NO LONGER THAN THE WORD
             KeyCode::Char(character)
                 if character.is_ascii_alphabetic()
-                    && prompt.typed.chars().count() < CHALLENGE.chars().count()
+                    && prompt.typed.chars().count() < consts::CHALLENGE.chars().count()
                     && !key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
             {
                 prompt.typed.push(character.to_ascii_lowercase());
@@ -173,7 +171,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
 
             KeyCode::Enter =>
             {
-                if prompt.typed == CHALLENGE { answer(app, true); } else { prompt.wrong = true; }
+                if prompt.typed == consts::CHALLENGE { answer(app, true); } else { prompt.wrong = true; }
             },
 
             _ => {},

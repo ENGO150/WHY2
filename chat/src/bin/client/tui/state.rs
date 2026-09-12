@@ -20,7 +20,7 @@ use std::
 {
     mem,
     iter,
-    time::{ Duration, Instant },
+    time::Instant,
     collections::
     {
         BTreeMap,
@@ -68,6 +68,7 @@ use crate::network::screen::client::options as screen_options;
 
 use super::
 {
+    consts,
     input::InputBuffer,
     login::Login,
     palette::Palette,
@@ -75,12 +76,6 @@ use super::
     tofu::Prompt,
     theme::Theme,
 };
-
-//CONSTS
-pub const HISTORY_LIMIT: usize = 5000; //CAP THE MESSAGE PANE SO RE-WRAPPING EACH FRAME STAYS CHEAP
-pub const ANIMATION_CATCHUP: Duration = Duration::from_secs(1); //BEHIND BY MORE THAN THIS AND IT RESTARTS
-pub const IMAGE_ROWS: u16 = 20;        //TALLEST AN IMAGE MAY BE DRAWN
-pub const NOTICE_DURATION: Duration = Duration::from_secs(2); //HOW LONG THE PANE'S TOAST STAYS UP
 
 //ENUMS
 pub enum Entry //ONE ROW OF HISTORY
@@ -423,7 +418,7 @@ impl App
     fn fit(&self, image: Animation) -> Picture
     {
         let font = self.picker.font_size();
-        let limit = IMAGE_ROWS as u32 * font.height as u32;
+        let limit = consts::IMAGE_ROWS as u32 * font.height as u32;
 
         //EVERY FRAME IS HELD AT ONCE
         let frames = image.into_iter().map(|ImageFrame { image, delay }|
@@ -470,7 +465,7 @@ impl App
             if ready.frames.len() < 2 || ready.protocol.is_none() || now < ready.next { continue; }
 
             //TOO FAR BEHIND TO CATCH UP
-            if now.duration_since(ready.next) > ANIMATION_CATCHUP { ready.next = now; }
+            if now.duration_since(ready.next) > consts::ANIMATION_CATCHUP { ready.next = now; }
 
             while now >= ready.next
             {
@@ -502,7 +497,7 @@ impl App
     {
         self.messages.push_back(entry);
 
-        while self.messages.len() > HISTORY_LIMIT { self.messages.pop_front(); }
+        while self.messages.len() > consts::HISTORY_LIMIT { self.messages.pop_front(); }
 
         self.generation += 1;
         self.dirty = true;
@@ -732,7 +727,7 @@ impl App
     pub fn notice(&self) -> Option<&str>
     {
         self.notice.as_ref()
-            .filter(|(_, shown)| shown.elapsed() < NOTICE_DURATION)
+            .filter(|(_, shown)| shown.elapsed() < consts::NOTICE_DURATION)
             .map(|(text, _)| text.as_str())
     }
 
@@ -859,7 +854,7 @@ impl App
                         {
                             let image = fit_image(&ready.frames[ready.current].image, width, font);
 
-                            ready.rows = (image.height().div_ceil(font.height as u32) as u16).clamp(1, IMAGE_ROWS);
+                            ready.rows = (image.height().div_ceil(font.height as u32) as u16).clamp(1, consts::IMAGE_ROWS);
                             ready.protocol = Some(self.picker.new_resize_protocol(image));
                             ready.fitted = width;
                         }
@@ -890,7 +885,7 @@ impl App
 fn fit_image(image: &DynamicImage, width: u16, font: FontSize) -> DynamicImage
 {
     let available_width = width.max(1) as u32 * font.width as u32;
-    let available_height = IMAGE_ROWS as u32 * font.height as u32;
+    let available_height = consts::IMAGE_ROWS as u32 * font.height as u32;
 
     match image.width() > available_width || image.height() > available_height
     {

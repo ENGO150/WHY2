@@ -26,11 +26,7 @@ use ratatui::
     text::{ Line, Span },
 };
 
-use super::{ markup, theme };
-
-//CONSTS
-const INDENT: &str = "  "; //DISPLAY MATH IS SET IN FROM THE PANE, THE WAY A BLOCK IS
-const MAX_DEPTH: usize = 32; //A BRACE THIS DEEP IS A BRACE
+use super::{ consts, markup, theme };
 
 //STRUCTS
 //A RECTANGLE OF CELLS PLUS ITS BASELINE ROW
@@ -167,13 +163,13 @@ pub fn display(source: &str, width: u16) -> Vec<Line<'static>>
     let block = layout(&nodes, true);
     let style = theme::MATH;
 
-    if block.width() + INDENT.len() > width.max(1) as usize
+    if block.width() + consts::INDENT.len() > width.max(1) as usize
     {
         return super::state::wrap_line(&Line::from(Span::styled(linear(&nodes), style)), width);
     }
 
     block.rows.into_iter()
-        .map(|row| Line::from(Span::styled(format!("{INDENT}{}", row.trim_end()), style)))
+        .map(|row| Line::from(Span::styled(format!("{}{}", consts::INDENT, row.trim_end()), style)))
         .collect()
 }
 
@@ -474,7 +470,7 @@ impl Parser
         {
             None => Node::Sym(String::new()),
 
-            Some('{') if self.depth < MAX_DEPTH =>
+            Some('{') if self.depth < consts::MAX_DEPTH =>
             {
                 self.pos += 1;
                 self.depth += 1;
@@ -531,7 +527,7 @@ impl Parser
             "mathbb" => Node::Sym(alphabet(&self.raw_argument(), BLACKBOARD)),
             "mathcal" | "mathscr" => Node::Sym(alphabet(&self.raw_argument(), SCRIPT_CAPS)),
 
-            "left" if self.depth < MAX_DEPTH =>
+            "left" if self.depth < consts::MAX_DEPTH =>
             {
                 self.depth += 1;
 

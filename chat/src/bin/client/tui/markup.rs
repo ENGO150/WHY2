@@ -31,12 +31,8 @@ use super::
     math,
     theme,
     state,
+    consts,
 };
-
-//CONSTS
-const GUTTER: u16 = 2;      //THE BAR AND THE SPACE AFTER IT
-const TAB: usize = 4;       //A TAB IS EXPANDED, SINCE A CELL GRID HAS NO TAB STOPS
-const MAX_LANG: usize = 20; //LONGER THAN THIS AND THE FIRST WORD IS CODE
 
 //ENUMS
 //WHAT A MESSAGE IS MADE OF, MARKUP OFF
@@ -129,7 +125,7 @@ fn close(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &
 //A FENCED BLOCK, PADDED AND NEVER WORD-WRAPPED
 fn block(out: &mut Vec<Line<'static>>, lang: Option<&str>, body: &str, width: u16)
 {
-    let inner = width.saturating_sub(GUTTER).max(1) as usize;
+    let inner = width.saturating_sub(consts::GUTTER).max(1) as usize;
 
     //NOTHING HIGHLIGHTS, SO THE LANGUAGE IS SHOWN
     if let Some(lang) = lang.filter(|lang| !lang.is_empty())
@@ -168,7 +164,7 @@ fn expand_tabs(line: &str) -> String
     {
         match c
         {
-            '\t' => out.extend(std::iter::repeat_n(' ', TAB - out.chars().count() % TAB)),
+            '\t' => out.extend(std::iter::repeat_n(' ', consts::TAB - out.chars().count() % consts::TAB)),
             '\r' => {},
             _ => out.push(c),
         }
@@ -307,7 +303,7 @@ fn is_language(word: &str) -> bool
 {
     let word = word.trim();
 
-    !word.is_empty() && word.len() <= MAX_LANG
+    !word.is_empty() && word.len() <= consts::MAX_LANG
         && word.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '#' | '-' | '_' | '.'))
 }
 

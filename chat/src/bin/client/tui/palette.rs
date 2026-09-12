@@ -39,9 +39,6 @@ use crate::
 
 use super::theme;
 
-//CONSTS
-pub const MAX_ROWS: usize = 8; //VISIBLE POPUP ROWS
-
 //ENUMS
 pub enum PaletteMode
 {
