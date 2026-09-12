@@ -569,7 +569,8 @@ impl App
 
             ClientEvent::IncompatibleVersion(version, server_version) =>
             {
-                self.push_styled(format!("Incompatible version! ({version}/{server_version})"), theme::ERROR);
+                //THE BOX IS STILL UP, SO THE HISTORY IS NOT WHERE THIS IS READ
+                self.disconnect_reason = Some(format!("Incompatible version! ({version}/{server_version})"));
             },
 
             ClientEvent::VersionMismatch(client_version, server_version) =>
@@ -632,7 +633,11 @@ impl App
                 } else if self.logging_out
                 {
                     self.disconnected("Logged out.");
-                } else { self.disconnected("Server quit communication."); }
+                } else
+                {
+                    let reason = self.disconnect_reason.take();
+                    self.disconnected(reason.unwrap_or_else(|| String::from("Server quit communication.")));
+                }
             },
 
             //SIDEBAR-ONLY, NOTHING IS ASKED OF THE SERVER

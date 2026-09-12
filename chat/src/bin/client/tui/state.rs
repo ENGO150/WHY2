@@ -208,6 +208,7 @@ pub struct App
     //LIFECYCLE
     pub leaving: bool,      //THE USER ASKED TO LEAVE
     pub logging_out: bool,  //THE USER ASKED TO LOG OUT
+    pub disconnect_reason: Option<String>, //WHY THE SERVER IS ABOUT TO DROP US
     pub drop_stream: bool,  //THE LOOP OWNS THE WRITE HALF
     pub should_quit: bool,
     pub exit_code: i32,
@@ -272,6 +273,7 @@ impl App
             image_requests: Vec::new(),
             leaving: false,
             logging_out: false,
+            disconnect_reason: None,
             drop_stream: false,
             should_quit: false,
             exit_code: 0,
@@ -601,6 +603,7 @@ impl App
         self.refresh_online = false;
         self.image_requests.clear();
         self.logging_out = false; //THE NEXT DROP IS THE NEXT SESSION'S TO EXPLAIN
+        self.disconnect_reason = None;
 
         reset_session();
 
