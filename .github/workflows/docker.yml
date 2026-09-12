@@ -51,6 +51,10 @@ jobs:
           VERSION=$(grep '^version =' chat/Cargo.toml | head -n1 | sed -E 's/version\s*=\s*"(.*)"/\1/')
           echo "value=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Extract git hash
+        id: hash
+        run: echo "value=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -68,5 +72,7 @@ jobs:
           file: chat/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            WHY2_GIT_HASH=${{ steps.hash.outputs.value }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

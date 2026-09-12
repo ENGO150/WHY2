@@ -21,6 +21,8 @@ RUN apk add --no-cache musl-dev
 WORKDIR /app
 COPY . .
 
+ARG WHY2_GIT_HASH=""
+ENV WHY2_GIT_HASH=$WHY2_GIT_HASH
 ENV WHY2_CONFIG_DIR="/data"
 RUN cargo build --bin why2-server --no-default-features --features server,windows_resources --release
 

@@ -125,16 +125,17 @@ fn main()
     println!("cargo:rustc-env=WHY2_CONFIG_DIR={config_dir}");
     println!("cargo:rerun-if-env-changed=WHY2_CONFIG_DIR");
 
-    //HASH
-    let git_hash = Command::new("git")
+    //HASH (ENV FIRST: DOCKER/CI BUILDS HAVE NO GIT)
+    let git_hash = env::var("WHY2_GIT_HASH").ok().filter(|s| !s.is_empty()).unwrap_or_else(|| Command::new("git")
         .args(&["rev-parse", "--short", "HEAD"])
         .output()
         .ok()
         .and_then(|output| String::from_utf8(output.stdout).ok())
         .map(|s| s.trim().to_string())
-        .unwrap_or_else(|| String::new());
+        .unwrap_or_else(|| String::new()));
 
     println!("cargo:rustc-env=WHY2_GIT_HASH={git_hash}");
+    println!("cargo:rerun-if-env-changed=WHY2_GIT_HASH");
     println!("cargo:rerun-if-changed=../.git/HEAD");
     println!("cargo:rerun-if-changed=../.git/index");
 
