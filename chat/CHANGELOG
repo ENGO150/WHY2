@@ -1,6 +1,27 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.1.4:
+- 11438aae: overlap screen capture with the encode
+- dddef45c: reconnect automatically after a lost session
+- 2b5eb09d: display incompatible version message in login screen
+- e89edc02: do not bake WHY2 version into HKDF info
+- ca44b557: move the remaining chat consts into their consts modules
+- b601ca62: move the client TUI consts into a consts module
+- 7f453bd2: prevent resource exhaustion on EMFILE/ENFILE
+- 5c058a97: apply spam limits to PMs
+- a7da4bdc: prevent client-triggerable panics
+- 8c05030c: prevent voice server panic
+- bcd81ae0: use env for git hash in Dockerfile
+- 0e344146: prevent false git hash mismatch
+- ff359db6: use MessageRequest PacketCode on client
+- 4ed9d120: upgrade chat dependencies
+- 089829e2: shorten server and config comments
+- 25fe1eab: shorten networking comments
+- 28192bb7: shorten client comments
+- c39424bd: move chat colors handling to server
+- 88f67a3d: do not log server hash on missing WHY2_GIT_HASH
+
 v2.1.3:
 - 938b0682: fix history cycling on multi-line input
 - 05a9a919: show the last keyframe when a viewer attaches
