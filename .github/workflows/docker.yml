@@ -20,9 +20,6 @@ on:
   push:
     branches: [ development, stable, release ]
 
-env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/why2
-
 jobs:
   build:
     strategy:
@@ -56,11 +53,15 @@ jobs:
         id: hash
         run: echo "value=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
+      - name: Image name
+        id: image
+        run: echo "value=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/why2" >> $GITHUB_OUTPUT
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ steps.image.outputs.value }}
 
       - name: Build and push by digest
         id: build
@@ -72,7 +73,7 @@ jobs:
           build-args: |
             WHY2_GIT_HASH=${{ steps.hash.outputs.value }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ steps.image.outputs.value }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -123,11 +124,15 @@ jobs:
           VERSION=$(grep '^version =' chat/Cargo.toml | head -n1 | sed -E 's/version\s*=\s*"(.*)"/\1/')
           echo "value=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Image name
+        id: image
+        run: echo "value=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/why2" >> $GITHUB_OUTPUT
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ steps.image.outputs.value }}
           tags: |
             type=raw,value=${{ github.ref_name }},enable=${{ github.ref_name != 'release' }}
             type=raw,value=${{ steps.version.outputs.value }},enable=${{ github.ref_name == 'release' }}
@@ -138,4 +143,4 @@ jobs:
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+            $(printf '${{ steps.image.outputs.value }}@sha256:%s ' *)
