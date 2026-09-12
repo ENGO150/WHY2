@@ -107,13 +107,12 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
 {
     let Some(info) = command::COMMAND_LIST.iter().find(|info| info.command == Command::Server) else { return };
 
-    //HIDING THE COMMAND DOES NOT STOP ANYBODY TYPING IT OUT, AND REFUSING IT WOULD CONFIRM IT EXISTS -
-    //TO A ROLE THAT MAY NOT RUN IT, IT IS SIMPLY NOT A COMMAND
+    //A COMMAND OUR ROLE MAY NOT RUN IS NO COMMAND
     if !info.available(app.role) { return invalid_usage(app, Some("command")); }
 
     let Some(parameters) = parameters else { return invalid_usage(app, None) };
 
-    //THE ACTION IS THE FIRST WORD, WHATEVER IT TAKES FOLLOWS IT
+    //THE ACTION IS THE FIRST WORD
     let (action, tail) = match parameters.split_once(char::is_whitespace)
     {
         Some((action, tail)) => (action, tail.trim()),
@@ -122,13 +121,13 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
 
     let Some(sub) = info.action(action) else { return invalid_usage(app, Some("action")) };
 
-    //AN ACTION ABOVE OUR ROLE IS UNKNOWN FOR THE SAME REASON THE COMMAND IS
+    //AN ACTION ABOVE OUR ROLE IS UNKNOWN
     if !sub.available(app.role) { return invalid_usage(app, Some("action")); }
 
-    //AN ACTION THAT TAKES A PARAMETER NEEDS ONE, WHATEVER IT IS
+    //AN ACTION THAT TAKES A PARAMETER NEEDS ONE
     if !sub.args.is_empty() && tail.is_empty() { return invalid_usage(app, None); }
 
-    //MOST ACTIONS ARE AIMED AT A USER AND TAKE AN ID - THE REST READ `tail` AS TEXT
+    //MOST ACTIONS TAKE AN ID, THE REST TAKE TEXT
     let id = match sub.takes_id()
     {
         true => match tail.parse::<usize>()
@@ -207,8 +206,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
             }, options::get_keys().as_ref()).await;
         },
 
-        //THE ONE ACTION THAT AIMS AT A USER AND STILL TAKES SOMETHING ELSE - THE ROLE IS RESOLVED HERE,
-        //SO A NAME NOBODY KNOWS IS INVALID USAGE ON THE SPOT RATHER THAN A PACKET THE SERVER REFUSES
+        //THE ONE ACTION THAT TAKES AN ID AND MORE
         Subcommand::Role =>
         {
             let Some((target, role)) = tail.split_once(char::is_whitespace) else { return invalid_usage(app, None) };
@@ -260,9 +258,7 @@ fn mute(app: &mut App, parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
     ), theme::OK);
 }
 
-//THE NAME AS SOMEBODY TYPED IT, TO THE CODE THE WIRE CARRIES. A COLOR crossterm WOULD PARSE IS NOT
-//NECESSARILY ONE WE CAN SEND: ansi_(n) AND rgb_(r,g,b) HAVE NOWHERE TO GO IN A CODE AND ARE REFUSED HERE
-//RATHER THAN ACCEPTED AND THEN SILENTLY IGNORED ON EVERY MESSAGE
+//A TYPED NAME TO THE CODE THE WIRE CARRIES
 fn to_color(color: &str) -> Option<u8>
 {
     //FORMAT COLOR STRING
@@ -275,9 +271,7 @@ fn to_color(color: &str) -> Option<u8>
     colors::code(&formatted_color)
 }
 
-//HANDLE COLOR CHANGE. THE SERVER KEEPS THE COLORS AND PAINTS EVERY MESSAGE WITH THEM, SO ALL THIS DOES IS
-//ASK - THERE IS NOTHING TO STORE AND NOTHING TO READ BACK. THE NAME IS STILL CHECKED HERE, SO A COLOR NO
-//CODE CAN CARRY GETS THE SAME ANSWER IT ALWAYS GOT INSTEAD OF A ROUND TRIP
+//HANDLE COLOR CHANGE: CHECK IT AND ASK THE SERVER
 async fn color_handler
 (
     app: &mut App,
@@ -300,8 +294,7 @@ async fn color_handler
         options::get_keys().as_ref()).await;
 }
 
-//EVERY DEVICE THE VOICE CLIENT COULD OPEN. THE LIST COMES FROM THE VOICE CLIENT ITSELF, SO IT IS ENUMERATED
-//IN THE SAME cpal HOST THAT LATER OPENS THE CHOSEN DEVICE (BLOCKING, HENCE spawn_blocking).
+//EVERY DEVICE THE VOICE CLIENT COULD OPEN (BLOCKING)
 async fn audio_devices() -> Devices
 {
     #[cfg(not(feature = "client_voice"))]
@@ -333,7 +326,7 @@ fn device_entry(device: voice::AudioDevice) -> DeviceEntry
 #[tokio::main]
 async fn main()
 {
-    //RESTORE THE TERMINAL EVEN ON A PANIC - THE RELEASE PROFILE USES panic = "abort", SO Drop NEVER RUNS
+    //RESTORE THE TERMINAL EVEN ON A PANIC
     tui::install_panic_hook();
 
     //CREATE CHANNEL
@@ -342,7 +335,7 @@ async fn main()
     //CONFIGURATION
     config::init_config(); //CREATE client.toml CONFIGURATION
 
-    //CHECK WHY2 VERSION - IT REPORTS THROUGH tx LIKE ANYTHING ELSE, SO IT MUST NOT HOLD UP THE FIRST FRAME
+    //CHECK WHY2 VERSION - REPORTED THROUGH tx
     let version_tx = tx.clone();
     tokio::spawn(async move { misc::check_version(&version_tx).await; });
 
@@ -367,25 +360,24 @@ async fn main()
 
 async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>)
 {
-    //CHECK IF SOCKS5 IS ENABLED (EVERY DIAL THE CONNECT PROMPT MAKES GOES THROUGH IT)
+    //CHECK IF SOCKS5 IS ENABLED
     if config::read_config("socks5_enabled")
     {
         options::enable_socks5();
     }
 
-    //ENTER THE TUI RIGHT AWAY - THE ADDRESS IS ASKED FOR INSIDE IT, AND SO IS EVERYTHING AFTER IT
+    //ENTER THE TUI RIGHT AWAY
     let mut app = App::new();
 
     let guard = TerminalGuard::enter().expect("Entering the alternate screen failed");
     let mut terminal = tui::init().expect("Creating the terminal backend failed");
 
-    //ASK THE TERMINAL WHAT IT CAN DRAW AND HOW BIG ITS CELLS ARE - THE QUERY WRITES AND READS STDIO, SO
-    //IT GOES HERE: THE ALTERNATE SCREEN IS UP AND NOTHING IS READING EVENTS YET
+    //ASK THE TERMINAL WHAT IT CAN DRAW
     app.init_picker();
 
     tui::run(&mut terminal, &mut app, &mut rx, &tx).await;
 
-    //LEAVE THE ALTERNATE SCREEN BEFORE SAYING ANYTHING ELSE
+    //LEAVE THE ALTERNATE SCREEN FIRST
     drop(guard);
 
     if let Some(message) = app.quit_message.take() { println!("{message}"); }
@@ -393,7 +385,7 @@ async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>
     process::exit(app.exit_code);
 }
 
-//HANDLES ONE SUBMITTED LINE: SLASH COMMAND, LOGIN STEP OR CHAT MESSAGE
+//HANDLE ONE SUBMITTED LINE
 pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, input: String)
 {
     let input = if options::get_asking_password() { input } else { input.trim().to_string() };
@@ -407,10 +399,10 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         let mut command_used = false;
         if let (Some(command), parameters) = command::get_command(&input)
         {
-            //SEND CODE ON A SIMPLE COMMAND, CONTINUE OTHERWISE (RELEASE THE STREAM LOCK FIRST)
+            //SEND A SIMPLE COMMAND'S CODE, ELSE CONTINUE
             let sent = command::send_command_code(&mut *write_stream.lock().await, &command, &parameters).await;
 
-            //A REQUEST/RESPONSE COMMAND THE USER TYPED WANTS ITS ANSWER ECHOED INTO THE PANE
+            //ECHO A REQUEST/RESPONSE ANSWER INTO THE PANE
             if sent == Some(true)
             {
                 match command
@@ -419,11 +411,10 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                     #[cfg(feature = "client_screen")]
                     Command::Screens => app.screens_requested = true,
 
-                    //THE DISCONNECT THAT COMES BACK IS ONE THE USER ASKED FOR, SO IT ENDS THE CLIENT
-                    //INSTEAD OF DROPPING BACK INTO THE CONNECT BOX
+                    //A DISCONNECT THE USER ASKED FOR ENDS THE CLIENT
                     Command::Exit => app.leaving = true,
 
-                    //AND THE ONE /logout ASKED FOR IS NOT AN ERROR EITHER - IT GOES BACK TO THE CONNECT BOX
+                    //A /logout IS NOT AN ERROR EITHER
                     Command::Logout => app.logging_out = true,
                     _ => {},
                 }
@@ -444,9 +435,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         //HELP
                         Command::Help =>
                         {
-                            //WHAT OUR ROLE MAY RUN - THE WIDTHS AND THE TRUNK ARE MEASURED OVER THIS, NOT OVER THE WHOLE LIST.
-                            //A COMMAND THAT TAKES AN ACTION IS LISTED AS ITS ACTIONS: /server ALONE RUNS NOTHING,
-                            //AND ITS ACTIONS ARE NOT ALL OF THE SAME RANK
+                            //THE COMMANDS OUR ROLE MAY RUN
                             let commands = command::COMMAND_LIST.iter()
                                 .filter(|info| info.available(app.role))
                                 .flat_map(|info| -> Box<dyn Iterator<Item = palette::Entry>>
@@ -458,11 +447,10 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                     }
                                 }).collect::<Vec<palette::Entry>>();
 
-                            //COLUMN WIDTHS ARE MEASURED, NOT GUESSED - LONG SIGNATURES MUST NOT PUSH THE REST OUT OF LINE
+                            //MEASURE THE COLUMN WIDTHS
                             let signature_width = commands.iter().map(palette::Entry::width).max().unwrap_or(0);
 
-                            //ONLY SHORTCUT-CARRYING ROWS NEED A PADDED DESCRIPTION, AND PADDING TO THE
-                            //LONGEST DESCRIPTION OF ALL WOULD PUSH THEM OFF THE PANE
+                            //ONLY SHORTCUT-CARRYING ROWS ARE PADDED
                             let description_width = commands.iter()
                                 .filter(|entry| !entry.shortcut().is_empty())
                                 .map(|entry| entry.description().width()).max().unwrap_or(0);
@@ -502,7 +490,6 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             if let Some(parameters) = parameters
                             {
                                 //CHECK IF COMMAND/ALIAS EXISTS
-                                //AN ACTION IS ASKED ABOUT THE WAY IT IS RUN: /info server mute
                                 let (word, action) = match parameters.split_once(char::is_whitespace)
                                 {
                                     Some((word, action)) => (word, Some(action.trim())),
@@ -511,7 +498,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
                                 if let Some(info) = command::COMMAND_LIST.iter()
                                     .find(|c| c.available(app.role) && c.triggers.iter().any(|t| t.eq_ignore_ascii_case(word)))
-                                    //AN ACTION THAT WAS NAMED HAS TO EXIST AND BE OURS TO RUN, OTHERWISE THIS IS NOT A COMMAND WE KNOW
+                                    //A NAMED ACTION HAS TO EXIST AND BE OURS TO RUN
                                     && let Some(entry) = match action
                                     {
                                         Some(action) => info.action(action).filter(|sub| sub.available(app.role))
@@ -551,9 +538,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             if !valid { invalid_usage(app, None); }
                         },
 
-                        //ONE REQUEST, TWO CODES: A PERSISTENT IMAGE IS ASKED FOR EXACTLY THE WAY A
-                        //FILESHARE IS - THE PATH IS CHECKED AND THE FILE HASHED IDENTICALLY, AND ONLY THE
-                        //CODE THE SERVER IS ASKED WITH DECIDES WHICH OF THE TWO IT BECOMES
+                        //ONE REQUEST FOR BOTH, ONLY THE CODE DIFFERS
                         Command::Upload | Command::Image =>
                         {
                             //CHECK PATH
@@ -571,9 +556,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                     let keys = options::get_keys();
                                     let image = command == Command::Image;
 
-                                    //THE HEADER IS READ BEFORE THE SERVER IS ASKED FOR ANYTHING, SO A FILE
-                                    //THAT IS NOT AN IMAGE COSTS NO CONNECTION AND NO HASH. THE SERVER STILL
-                                    //CHECKS THE BYTES IT RECEIVES - NOTHING MAKES A CLIENT RUN THIS
+                                    //READ THE HEADER BEFORE ASKING THE SERVER
                                     let mut header = Vec::new();
 
                                     if image
@@ -581,12 +564,11 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                         file.by_ref().take(consts::IMAGE_HEADER_SIZE as u64)
                                             .read_to_end(&mut header).ok();
 
-                                        //THE HASH IS TAKEN FROM THE SAME HANDLE, SO GIVE BACK WHAT WAS READ
+                                        //GIVE BACK WHAT WAS READ - THE HASH REUSES IT
                                         file.rewind().ok();
                                     }
 
-                                    //THE SERVER TURNS AN OVERSIZED IMAGE DOWN AS INVALID USAGE, WHICH SAYS
-                                    //NOTHING ABOUT WHY - THE SIZE IS KNOWN HERE, SO IT IS SAID HERE
+                                    //REFUSE AN OVERSIZED IMAGE HERE
                                     if image && path.metadata().map(|m| m.len()).unwrap_or(0) >
                                         consts::MAX_IMAGE_SIZE as u64
                                     {
@@ -599,7 +581,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                     {
                                         tokio::spawn(async move
                                         {
-                                            //GET SHA256 FILE HASH (BLOCKING I/O + CPU, KEEP IT OFF THE RUNTIME)
+                                            //GET SHA256 FILE HASH (BLOCKING I/O + CPU)
                                             let hash: Option<[u8; 32]> = task::spawn_blocking(move ||
                                             {
                                                 let mut hasher = Sha256::new();
@@ -653,7 +635,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             } else { invalid_usage(app, None); }
                         },
 
-                        //THE DEVICE LIST IS ENUMERATED HERE, ONCE, SO THE DRAW PATH NEVER TALKS TO cpal
+                        //ENUMERATE THE DEVICES ONCE, OFF THE DRAW PATH
                         Command::Settings => app.settings.open(audio_devices().await),
 
                         Command::Server => server_command(app, write_stream, parameters).await,
@@ -664,8 +646,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         #[cfg(feature = "client_voice")]
                         Command::Mute => mute(app, parameters),
 
-                        //NOTHING WENT TO THE SERVER BECAUSE NOTHING HAD TO: THE SHARE IS ALREADY UP AND
-                        //ONLY THE MONITOR UNDER IT CHANGED, WHICH THE RUNNING CAPTURE PICKS UP ON ITS OWN
+                        //A SWAP SENT NOTHING - ONLY THE MONITOR CHANGED
                         #[cfg(feature = "client_screen")]
                         Command::Screen => app.push_styled(match screen::capture::current_monitor()
                         {
@@ -707,7 +688,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         },
         LoginState::PasswordLogin => PacketCode::PasswordL { password: Some(input) },
         LoginState::PasswordRegister => PacketCode::PasswordR { password: Some(input) },
-        //NO COLORS, NO USERNAME AND NO ID: ALL THREE ARE THE SERVER'S TO FILL IN ON THE WAY OUT
+        //NO COLORS, USERNAME OR ID - THE SERVER FILLS THOSE
         LoginState::None => PacketCode::Message
         {
             text: input,

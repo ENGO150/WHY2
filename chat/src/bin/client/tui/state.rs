@@ -78,8 +78,8 @@ use super::
 
 //CONSTS
 pub const HISTORY_LIMIT: usize = 5000; //CAP THE MESSAGE PANE SO RE-WRAPPING EACH FRAME STAYS CHEAP
-pub const ANIMATION_CATCHUP: Duration = Duration::from_secs(1); //BEHIND BY MORE THAN THIS AND AN ANIMATION RESTARTS FROM NOW
-pub const IMAGE_ROWS: u16 = 20;        //TALLEST AN IMAGE MAY BE DRAWN - THE PANE IS A CHAT, NOT A VIEWER
+pub const ANIMATION_CATCHUP: Duration = Duration::from_secs(1); //BEHIND BY MORE THAN THIS AND IT RESTARTS
+pub const IMAGE_ROWS: u16 = 20;        //TALLEST AN IMAGE MAY BE DRAWN
 pub const NOTICE_DURATION: Duration = Duration::from_secs(2); //HOW LONG THE PANE'S TOAST STAYS UP
 
 //ENUMS
@@ -87,7 +87,7 @@ pub enum Entry //ONE ROW OF HISTORY
 {
     Line(Line<'static>), //ALREADY STYLED - CLIENT OUTPUT, NOTICES, BLOCK COMMANDS
 
-    //A CHAT MESSAGE KEEPS ITS PARTS, SO show_id/disable_colors CAN BE APPLIED TO IT AGAIN LATER
+    //A CHAT MESSAGE, STORED UNRENDERED
     Message
     {
         username: String,
@@ -96,8 +96,7 @@ pub enum Entry //ONE ROW OF HISTORY
         colors: MessageColors,
     },
 
-    //A REPLAYED MESSAGE FROM THE SERVER'S HISTORY - THE SAME THING WITHOUT AN ID, SINCE THE SESSION
-    //THAT SAID IT IS GONE AND WHOEVER HOLDS THAT ID NOW IS SOMEBODY ELSE
+    //A REPLAYED MESSAGE, WITHOUT AN ID
     History
     {
         username: String,
@@ -105,28 +104,25 @@ pub enum Entry //ONE ROW OF HISTORY
         colors: MessageColors,
     },
 
-    //A LINE WHOSE TAIL IS SOMETHING SOMEBODY TYPED - A PRIVATE MESSAGE. THE PREFIX IS THE CLIENT'S OWN
-    //WORDING AND IS STYLED ALREADY; THE TEXT GOES THROUGH THE MARKUP THE WAY A CHANNEL MESSAGE DOES
+    //A CLIENT PREFIX IN FRONT OF TYPED TEXT
     Prefixed
     {
         prefix: Vec<Span<'static>>,
         text: String,
     },
 
-    //A PICTURE SOMEBODY SENT. THE LINE IS ITS CAPTION - THE PICTURE IS DRAWN OVER THE ROWS RESERVED UNDER
-    //IT, ONCE THERE IS ONE TO DRAW: A REPLAYED IMAGE ARRIVES AS A HASH AND IS ONLY FETCHED IF IT IS ASKED
-    //FOR, WHICH IS WHAT KEEPS A LOGIN FROM PULLING EVERY PICTURE EVER POSTED
+    //A PICTURE AND ITS CAPTION
     Image
     {
         username: String,
         filename: String,
-        username_color: Option<u8>, //THE SENDER'S, LIKE A MESSAGE'S - THE CAPTION NAMES THEM THE SAME WAY
-        hash: Option<[u8; 32]>,     //WHAT TO ASK THE SERVER FOR - None WHEN IT ARRIVED WITH ITS PICTURE
+        username_color: Option<u8>, //THE SENDER'S, LIKE A MESSAGE'S
+        hash: Option<[u8; 32]>,     //WHAT TO ASK THE SERVER FOR
         picture: Picture,
     },
 }
 
-//WHAT THERE IS TO DRAW UNDER A CAPTION - AND, WHILE THERE IS NOTHING, WHAT THE CAPTION OFFERS INSTEAD
+//WHAT THERE IS TO DRAW UNDER A CAPTION
 pub enum Picture
 {
     Absent,            //NOT ASKED FOR YET
@@ -150,19 +146,18 @@ pub struct Fitted //A PICTURE AT THE SIZE THE PANE DRAWS IT AT
 pub struct Placement //WHERE ONE IMAGE SITS IN THE WRAPPED VIEW
 {
     pub entry: usize,  //WHICH App::messages ENTRY IT BELONGS TO
-    pub caption: u16,  //FIRST ROW OF THE CAPTION, WHICH IS ALSO WHAT IS CLICKED TO FETCH THE PICTURE
+    pub caption: u16,  //FIRST ROW OF THE CAPTION
     pub row: u16,      //FIRST RESERVED ROW (WHERE THE CAPTION ENDS)
     pub height: u16,   //RESERVED ROWS - 0 WHILE THERE IS NO PICTURE
 }
 
-//A DRAG IN THE MESSAGE PANE. BOTH ENDS ARE ROWS OF THE WRAPPED VIEW RATHER THAN TERMINAL ROWS, SO
-//SCROLLING DURING (OR AFTER) A DRAG MOVES THE HIGHLIGHT WITH THE TEXT INSTEAD OF LEAVING IT BEHIND
+//A DRAG, IN WRAPPED-VIEW ROWS
 #[derive(Clone, Copy)]
 pub struct Selection
 {
     pub anchor: (u16, u16), //(ROW IN THE WRAPPED VIEW, COLUMN INSIDE THE PANE)
     pub cursor: (u16, u16),
-    pub dragged: bool,      //A DRAG EVER ARRIVED - UNTIL THEN THE PRESS IS STILL A PLAIN CLICK
+    pub dragged: bool,      //A DRAG EVER ARRIVED
 }
 
 //STRUCTS
@@ -180,9 +175,9 @@ pub struct App
     pub role: Role,       //OUR OWN ROLE
     pub online: Vec<OnlineUser>,
     pub channels: BTreeSet<String>, //NAMED CHANNELS THE SERVER CURRENTLY HOLDS
-    pub voice: Vec<VoiceUser>, //WHAT THE VOICE PANEL DRAWS - rebuild_voice MAKES IT OUT OF THE TWO BELOW
+    pub voice: Vec<VoiceUser>, //WHAT THE VOICE PANEL DRAWS
     pub voice_roster: BTreeMap<usize, String>, //WHO THE SERVER SAYS IS IN VOICE IN OUR CHANNEL (US EXCLUDED)
-    pub voice_activity: Vec<VoiceUser>, //WHO WE ARE ACTUALLY HEARING - EMPTY WHILE WE ARE NOT IN VOICE
+    pub voice_activity: Vec<VoiceUser>, //WHO WE ARE ACTUALLY HEARING
     pub voice_enabled: bool,
 
     //CONNECTION (SHOWN IN THE MESSAGE PANE TITLE)
@@ -193,33 +188,32 @@ pub struct App
     pub input: InputBuffer,
     pub palette: Palette,
     pub settings: Settings, //SETTINGS OVERLAY (CLOSED UNLESS THE USER OPENED IT)
-    pub login: Option<Login>, //CONNECT BOX - UP FROM THE FIRST FRAME UNTIL THE SERVER ACCEPTS US
-    pub tofu: Option<Prompt>, //SERVER IDENTITY PROMPT - OUTRANKS EVERY OTHER OVERLAY WHILE IT IS UP
+    pub login: Option<Login>, //CONNECT BOX
+    pub tofu: Option<Prompt>, //SERVER IDENTITY PROMPT
     pub theme: Theme,
     pub picker: Picker, //WHAT THE TERMINAL CAN DRAW, AND HOW BIG ITS CELLS ARE
 
-    //WHERE THE MESSAGE PANE WAS LAST DRAWN, WHICH IS THE ONLY WAY A CLICK CAN BE TURNED INTO A LINE
+    //WHERE THE MESSAGE PANE WAS LAST DRAWN
     pub pane: Rect,
     pub pane_offset: u16,
     pub selection: Option<Selection>, //A DRAG-SELECTED RUN OF THE PANE, KEPT UNTIL THE NEXT PRESS
 
-    //SOMETHING THAT HAPPENED RATHER THAN SOMETHING THAT WAS SAID, SO IT GOES IN THE CHROME AND EXPIRES
+    //A TOAST IN THE CHROME, WHICH EXPIRES
     pub notice: Option<(String, Instant)>,
 
-    //REQUEST BOOKKEEPING (A LIST/SCREENS RESPONSE IS ONLY ECHOED WHEN THE USER ASKED FOR IT)
+    //REQUEST BOOKKEEPING
     pub list_requested: bool,
     #[cfg(feature = "client_screen")]
     pub screens_requested: bool,
     pub refresh_online: bool, //THE LOOP SHOULD SEND A SILENT PacketCode::List
 
-    //OFFERED PICTURES WE DID NOT HOLD. THE LOOP OWNS THE WRITE HALF AND THE SEQUENCE COUNTER, SO IT DOES
-    //THE ASKING - A TASK OF ITS OWN WOULD RACE BOTH
+    //PICTURES TO ASK THE SERVER FOR
     pub image_requests: Vec<[u8; 32]>,
 
     //LIFECYCLE
-    pub leaving: bool,      //THE USER ASKED TO LEAVE, SO THE DISCONNECT THAT FOLLOWS ENDS THE CLIENT
-    pub logging_out: bool,  //THE USER ASKED TO LOG OUT, SO THAT DISCONNECT IS NOT AN ERROR - IT IS THE POINT
-    pub drop_stream: bool,  //THE LOOP OWNS THE WRITE HALF - IT HAS TO CLOSE IT AFTER A LOST SESSION
+    pub leaving: bool,      //THE USER ASKED TO LEAVE
+    pub logging_out: bool,  //THE USER ASKED TO LOG OUT
+    pub drop_stream: bool,  //THE LOOP OWNS THE WRITE HALF
     pub should_quit: bool,
     pub exit_code: i32,
     pub quit_message: Option<String>, //PRINTED ON THE NORMAL SCREEN AFTER TEARDOWN
@@ -271,7 +265,7 @@ impl App
             login: Some(Login::new()),
             tofu: None,
             theme: Theme::load(),
-            picker: Picker::halfblocks(), //UNTIL init_picker HAS ASKED THE TERMINAL FOR SOMETHING BETTER
+            picker: Picker::halfblocks(), //UNTIL init_picker HAS ASKED THE TERMINAL
             pane: Rect::ZERO,
             pane_offset: 0,
             selection: None,
@@ -293,20 +287,19 @@ impl App
         }
     }
 
-    //THE PANEL IS THE SERVER'S ROSTER, DRESSED WITH WHATEVER THE LOCAL VOICE SESSION KNOWS ABOUT IT.
-    //THE TWO ARE SEPARATE BECAUSE ONLY ONE OF THEM ARRIVES WHILE WE ARE NOT IN VOICE OURSELVES
+    //BUILD THE PANEL FROM ROSTER + LOCAL SESSION
     pub fn rebuild_voice(&mut self)
     {
         let mut users: Vec<VoiceUser> = Vec::with_capacity(self.voice_roster.len() + 1);
 
-        //US - THE ROSTER NEVER NAMES US, AND ONLY THE LOCAL SESSION KNOWS WE ARE SPEAKING
+        //US, FROM THE LOCAL SESSION
         if self.voice_enabled
         {
             users.push(match self.voice_activity.iter().find(|user| user.is_local)
             {
                 Some(local) => VoiceUser { username: self.username.clone(), ..*local },
 
-                //THE FIRST activity TICK IS UP TO 100 ms AWAY - DO NOT BLINK OUT OF OUR OWN PANEL UNTIL THEN
+                //THE FIRST TICK IS UP TO 100 ms AWAY
                 None => VoiceUser
                 {
                     id: 0,
@@ -318,8 +311,7 @@ impl App
             });
         }
 
-        //EVERYBODY ELSE, IN ID ORDER (BTreeMap). A ROSTER ENTRY WE HAVE NO STREAM FOR IS STILL IN VOICE -
-        //IT IS US WHO CANNOT HEAR THEM, SO IT IS DRAWN WITHOUT A LATENCY RATHER THAN LEFT OUT
+        //EVERYBODY ELSE, IN ID ORDER
         for (id, username) in self.voice_roster.iter()
         {
             let heard = self.voice_activity.iter().find(|user| !user.is_local && user.id == *id);
@@ -344,25 +336,25 @@ impl App
         self.push_entry(Entry::Line(line));
     }
 
-    //A CHAT MESSAGE IS STORED UNRENDERED - draw RE-APPLIES THE THEME TO IT ON EVERY WRAP
+    //STORE A CHAT MESSAGE UNRENDERED
     pub fn push_message(&mut self, username: String, id: usize, text: String, colors: MessageColors)
     {
         self.push_entry(Entry::Message { username, id, text, colors });
     }
 
-    //A PRIVATE MESSAGE - THE SAME, BEHIND A PREFIX THE CLIENT WROTE
+    //A PRIVATE MESSAGE, BEHIND A PREFIX
     pub fn push_prefixed(&mut self, prefix: Vec<Span<'static>>, text: String)
     {
         self.push_entry(Entry::Prefixed { prefix, text });
     }
 
-    //A REPLAYED MESSAGE IS STORED UNRENDERED FOR THE SAME REASON A LIVE ONE IS
+    //STORE A REPLAYED MESSAGE UNRENDERED
     pub fn push_history(&mut self, username: String, text: String, colors: MessageColors)
     {
         self.push_entry(Entry::History { username, text, colors });
     }
 
-    //A PICTURE THAT ARRIVED WITH ITS OWN BYTES - A LIVE ONE, OR A REPLAYED ONE THAT WAS ASKED FOR
+    //A PICTURE THAT CAME WITH ITS BYTES
     pub fn push_image(&mut self, username: String, filename: String, image: Animation,
         username_color: Option<u8>)
     {
@@ -371,9 +363,7 @@ impl App
         self.push_entry(Entry::Image { username, filename, username_color, hash: None, picture });
     }
 
-    //AND ONE WITHOUT ITS PICTURE. A REPLAYED LINE WAITS TO BE CLICKED (Absent); A LIVE ONE THE SERVER
-    //ONLY OFFERED HAS ALREADY BEEN ASKED FOR BY THE TIME IT GETS HERE (Waiting), SINCE NOBODY CHOOSES
-    //TO SEE A PICTURE THAT IS BEING SENT TO THEM ANYWAY
+    //A CAPTION WITHOUT ITS PICTURE
     pub fn push_caption(&mut self, username: String, filename: String, hash: [u8; 32], pending: bool,
         username_color: Option<u8>)
     {
@@ -386,8 +376,7 @@ impl App
         self.push_entry(Entry::Image { username, filename, username_color, hash: Some(hash), picture });
     }
 
-    //A CLICKED CAPTION. THE HASH IT COMES BACK WITH IS WHAT THE CALLER ASKS THE SERVER FOR - None MEANS
-    //THERE IS NOTHING TO ASK FOR (THE PICTURE IS ALREADY HERE, OR ALREADY ON ITS WAY)
+    //A CLICKED CAPTION
     pub fn request_image(&mut self, entry: usize) -> Option<[u8; 32]>
     {
         let Some(Entry::Image { hash, picture, .. }) = self.messages.get_mut(entry) else { return None };
@@ -402,10 +391,7 @@ impl App
         *hash
     }
 
-    //THE ANSWER TO ONE OF THOSE. THE SAME PICTURE CAN BE IN THE PANE TWICE, SO IT FILLS THE OLDEST LINE
-    //STILL WITHOUT IT - THE SECOND ONE ASKED FOR ITSELF AND IS ANSWERED BY ITS OWN PACKET.
-    //Absent COUNTS AS WELL AS Waiting: A PICTURE FOUND IN THE CACHE ANSWERS A CAPTION NOBODY CLICKED,
-    //WHICH IS THE WHOLE POINT OF HAVING KEPT IT. A REFUSAL ONLY MARKS A LINE THAT DID ASK
+    //FILL THE OLDEST LINE STILL WAITING
     pub fn deliver_image(&mut self, hash: [u8; 32], image: Option<Animation>)
     {
         let (picture, asked) = match image
@@ -433,14 +419,13 @@ impl App
         self.dirty = true;
     }
 
-    //IT IS NEVER DRAWN TALLER THAN IMAGE_ROWS, SO NOTHING ABOVE THAT IS WORTH KEEPING - AND THE PROTOCOL
-    //HOLDS ON TO WHAT IT IS GIVEN, WHICH FOR A PHONE PHOTO IS TENS OF MEGABYTES DECODED
+    //CUT EVERY FRAME DOWN TO IMAGE_ROWS
     fn fit(&self, image: Animation) -> Picture
     {
         let font = self.picker.font_size();
         let limit = IMAGE_ROWS as u32 * font.height as u32;
 
-        //EVERY FRAME IS HELD AT ONCE, SO EVERY ONE OF THEM IS CUT DOWN
+        //EVERY FRAME IS HELD AT ONCE
         let frames = image.into_iter().map(|ImageFrame { image, delay }|
         {
             let image = match image.height() > limit
@@ -457,7 +442,7 @@ impl App
         Picture::Ready(Box::new(Fitted { frames, current: 0, next, rows: 1, fitted: 0, protocol: None }))
     }
 
-    //STEP EVERY ANIMATION THAT IS DUE A FRAME - THE REDRAW TICK IS THE FLOOR ON HOW FAST ONE IS PLAYED
+    //STEP EVERY ANIMATION THAT IS DUE
     pub fn advance_animations(&mut self)
     {
         let pane = self.pane;
@@ -468,7 +453,7 @@ impl App
         let offset = self.pane_offset;
         let font = self.picker.font_size();
 
-        //ONLY THE PICTURES ON SCREEN - A FRAME COSTS A FIT AND A TRANSMIT
+        //ONLY THE PICTURES ON SCREEN
         let visible = self.placements(pane.width).into_iter()
             .filter(|placement| placement.height > 0
                 && placement.row < offset + pane.height
@@ -481,10 +466,10 @@ impl App
             let Some(Entry::Image { picture: Picture::Ready(ready), .. }) = self.messages.get_mut(entry)
                 else { continue };
 
-            //A STILL NEVER ADVANCES, AND AN UNFITTED PICTURE HAS NO PROTOCOL TO REPLACE
+            //A STILL NEVER ADVANCES
             if ready.frames.len() < 2 || ready.protocol.is_none() || now < ready.next { continue; }
 
-            //TOO FAR BEHIND TO WIND THROUGH EVERY MISSED FRAME
+            //TOO FAR BEHIND TO CATCH UP
             if now.duration_since(ready.next) > ANIMATION_CATCHUP { ready.next = now; }
 
             while now >= ready.next
@@ -495,7 +480,7 @@ impl App
 
             let image = fit_image(&ready.frames[ready.current].image, ready.fitted, font);
 
-            //REUSING THE PROTOCOL TYPE KEEPS THE TERMINAL'S IMAGE ID, SO THE FRAME REPLACES THE LAST ONE
+            //REUSE THE PROTOCOL TYPE TO KEEP THE IMAGE ID
             ready.protocol = ready.protocol.take().map(|protocol|
             {
                 let background = protocol.background_color();
@@ -507,8 +492,7 @@ impl App
         }
     }
 
-    //THE QUERY WANTS STDIO TO ITSELF: AFTER THE ALTERNATE SCREEN IS UP, BEFORE ANYTHING READS EVENTS.
-    //A TERMINAL THAT DOES NOT ANSWER STILL GETS PICTURES - HALFBLOCKS ARE A FALLBACK, NOT A FAILURE
+    //THE QUERY WANTS STDIO TO ITSELF
     pub fn init_picker(&mut self)
     {
         if let Ok(picker) = Picker::from_query_stdio() { self.picker = picker; }
@@ -536,7 +520,7 @@ impl App
         self.push(Line::from(Span::styled(text.into(), style)));
     }
 
-    //CLEARS THE PANE BEING LOOKED AT (A CHANNEL SWITCH PARKS IT INSTEAD - SEE switch_channel)
+    //CLEAR THE PANE BEING LOOKED AT
     pub fn clear_messages(&mut self)
     {
         self.messages.clear();
@@ -549,8 +533,7 @@ impl App
         self.dirty = true;
     }
 
-    //A CHANNEL SWITCH PARKS THE PANE WE ARE LEAVING INSTEAD OF THROWING IT AWAY, AND PUTS BACK THE ONE
-    //WE ARE ENTERING - STEPPING OUT OF THE LOBBY AND BACK NO LONGER COSTS WHAT WAS SAID IN IT
+    //PARK THE OLD PANE, PUT BACK THE NEW ONE
     pub fn switch_channel(&mut self, channel: String)
     {
         if channel == self.channel { return; }
@@ -571,37 +554,33 @@ impl App
         self.dirty = true;
     }
 
-    //A CHANNEL EXISTS EXACTLY AS LONG AS SOMEBODY SITS IN IT, SO THE SCROLLBACK OF ONE NOBODY IS IN ANY
-    //MORE IS NOT WORTH KEEPING. THE LOBBY IS NOT IN THE LIST AND ALWAYS EXISTS; THE PANE WE ARE READING
-    //IS NOT IN THE MAP AT ALL
+    //DROP THE SCROLLBACK OF AN EMPTY CHANNEL
     pub fn prune_panes(&mut self)
     {
         self.panes.retain(|channel, _| channel.is_empty() || self.channels.contains(channel));
     }
 
-    //RE-READS THE CONFIG-DRIVEN STYLING AND REPAINTS THE WHOLE HISTORY WITH IT
+    //RE-READ THE STYLING AND REPAINT THE HISTORY
     pub fn reload_theme(&mut self)
     {
         self.theme.reload();
 
-        //THE WRAP CACHE HOLDS RENDERED LINES, SO IT HAS TO GO WITH IT
+        //THE WRAP CACHE HOLDS RENDERED LINES
         self.generation += 1;
         self.wrapped = None;
         self.dirty = true;
     }
 
-    //THE SERVER CLOSED THE SOCKET ON US. THE SESSION IS OVER, THE CLIENT IS NOT: EVERYTHING THE SESSION
-    //BUILT UP IS THROWN AWAY AND THE CONNECT BOX COMES BACK AT THE ADDRESS STEP, PREFILLED WITH THE ADDRESS
-    //AND CARRYING THE REASON, SO THE NEXT TRY (HERE OR ELSEWHERE) IS ONE KEYSTROKE AWAY.
+    //THROW THE SESSION AWAY, BRING BACK THE BOX
     pub fn disconnected(&mut self, reason: impl Into<String>)
     {
-        //A DIAL CANCELLED BEFORE THIS SESSION MUST NOT LAND ON THE NEW PROMPT EITHER, SO THE COUNTER LIVES ON
+        //CARRY THE DIAL COUNTER OVER
         let attempt = self.login.as_ref().map_or(0, Login::attempt);
 
         self.login = Some(Login::again(&self.address, attempt, reason.into()));
-        self.drop_stream = true; //THE WRITE HALF BELONGS TO THE EVENT LOOP - IT CLOSES IT ON THE NEXT PASS
+        self.drop_stream = true; //THE WRITE HALF BELONGS TO THE EVENT LOOP
 
-        //A NEW SESSION STARTS BLANK - AND UNLIKE A CHANNEL SWITCH, NOTHING IS PARKED FOR LATER
+        //A NEW SESSION STARTS BLANK
         self.clear_messages();
         self.panes.clear();
         self.channel.clear();
@@ -666,7 +645,7 @@ impl App
         self.dirty = true;
     }
 
-    //WRAPPED VIEW (CACHED PER WIDTH + HISTORY GENERATION)
+    //WRAPPED VIEW (CACHED PER WIDTH + GENERATION)
     pub fn wrapped_lines(&mut self, width: u16) -> &[Line<'static>]
     {
         self.rewrap(width);
@@ -674,9 +653,7 @@ impl App
         &self.wrapped.as_ref().unwrap().2
     }
 
-    //WHERE THE PICTURES SIT IN THAT VIEW - draw NEEDS THE ROWS AND THE ENTRY BEHIND EACH OF THEM
-    //WHICH IMAGE'S CAPTION IS UNDER THE POINTER. THE WHOLE CAPTION IS THE TARGET RATHER THAN THE PROMPT
-    //IN IT - IT IS ONE LINE OF A CHAT PANE, AND MISSING IT BY A COLUMN WOULD BE THE COMMON CASE
+    //WHICH IMAGE'S CAPTION IS UNDER THE POINTER
     pub fn image_at(&mut self, column: u16, row: u16) -> Option<usize>
     {
         let pane = self.pane;
@@ -692,8 +669,7 @@ impl App
     }
 
     //SELECTION
-    //A PRESS INSIDE THE PANE STARTS ONE. IT IS NOT A SELECTION YET - UNTIL A DRAG ARRIVES IT IS A CLICK,
-    //WHICH IS WHAT KEEPS AN IMAGE CAPTION CLICKABLE
+    //A PRESS STARTS ONE; A DRAG MAKES IT A SELECTION
     pub fn selection_start(&mut self, column: u16, row: u16) -> bool
     {
         let pane = self.pane;
@@ -709,16 +685,14 @@ impl App
         true
     }
 
-    //A DRAG PAST EITHER EDGE SCROLLS THE PANE INSTEAD OF STOPPING AT IT - THE ANCHOR IS A WRAPPED-VIEW
-    //ROW, SO WHAT WAS ALREADY SELECTED STAYS SELECTED WHILE THE VIEW MOVES UNDER IT
+    //A DRAG PAST AN EDGE SCROLLS THE PANE
     pub fn selection_extend(&mut self, column: u16, row: u16)
     {
         let pane = self.pane;
 
         if self.selection.is_none() || pane.height == 0 { return; }
 
-        //THE ROW THE SCROLL IS ABOUT TO REVEAL IS THE ONE BEING DRAGGED ONTO, AND pane_offset ONLY
-        //CATCHES UP AT THE NEXT DRAW - SO IT IS NAMED HERE RATHER THAN READ BACK A FRAME LATE
+        //NAME THE ROW THE SCROLL IS ABOUT TO REVEAL
         let cell = match row
         {
             _ if row < pane.y =>
@@ -748,8 +722,7 @@ impl App
     }
 
     //TOAST
-    //A LINE IN THE PANE'S BOTTOM BORDER FOR THINGS THE USER DID, NOT THINGS ANYBODY SAID - THE HISTORY IS
-    //THE CONVERSATION AND NOTHING ELSE BELONGS IN IT
+    //A TOAST IN THE PANE'S BOTTOM BORDER
     pub fn notify(&mut self, text: impl Into<String>)
     {
         self.notice = Some((text.into(), Instant::now()));
@@ -763,8 +736,7 @@ impl App
             .map(|(text, _)| text.as_str())
     }
 
-    //THE TOAST GOES AWAY ON ITS OWN, SO SOMETHING HAS TO NOTICE THAT NOTHING HAPPENED - THE REDRAW TICK
-    //ASKS EVERY PASS, AND ONLY THE PASS IT EXPIRES ON COSTS A FRAME
+    //DROP THE TOAST ONCE IT IS OLD
     pub fn expire_notice(&mut self)
     {
         if self.notice.is_some() && self.notice().is_none()
@@ -779,7 +751,7 @@ impl App
         if self.selection.take().is_some() { self.dirty = true; }
     }
 
-    //WHICH COLUMNS OF ONE WRAPPED ROW ARE SELECTED (INCLUSIVE), IF ANY - THIS IS WHAT draw PAINTS
+    //WHICH COLUMNS OF A ROW ARE SELECTED
     pub fn selection_columns(&self, row: u16) -> Option<(u16, u16)>
     {
         let selection = self.selection?;
@@ -798,8 +770,7 @@ impl App
         (first <= final_column).then_some((first, final_column))
     }
 
-    //THE SELECTED TEXT, ROW BY ROW. THE ROWS ARE THE WRAPPED ONES RATHER THAN THE MESSAGES BEHIND THEM,
-    //SO WHAT IS COPIED IS EXACTLY WHAT IS HIGHLIGHTED
+    //THE SELECTED TEXT
     pub fn selection_text(&mut self) -> Option<String>
     {
         let selection = self.selection?;
@@ -833,8 +804,7 @@ impl App
         (!text.trim().is_empty()).then_some(text)
     }
 
-    //A TERMINAL CELL AS A PLACE IN THE WRAPPED VIEW. OUT-OF-PANE COORDINATES ARE CLAMPED RATHER THAN
-    //REFUSED - A DRAG ROUTINELY LEAVES THE PANE AND STILL MEANS SOMETHING
+    //A TERMINAL CELL AS A WRAPPED-VIEW PLACE
     fn pane_cell(&self, column: u16, row: u16) -> (u16, u16)
     {
         let pane = self.pane;
@@ -845,6 +815,7 @@ impl App
         (self.pane_offset + row, column)
     }
 
+    //WHERE THE PICTURES SIT IN THE WRAPPED VIEW
     pub fn placements(&mut self, width: u16) -> Vec<Placement>
     {
         self.rewrap(width);
@@ -873,15 +844,13 @@ impl App
 
             lines.extend(self.theme.render(&self.messages[entry], width));
 
-            //AN IMAGE RESERVES ITS ROWS AS BLANK LINES, SO THE SCROLL OFFSET STAYS EXACT AND THE PANE
-            //STAYS A LIST OF LINES - THE PICTURE IS PAINTED OVER THEM AFTERWARDS
+            //AN IMAGE RESERVES ITS ROWS AS BLANK LINES
             if let Entry::Image { picture, .. } = &mut self.messages[entry]
             {
                 let caption = row;
                 let row = lines.len() as u16;
 
-                //THE FIT HAPPENS HERE AND NOWHERE ELSE, SO THE PROTOCOL ALWAYS HOLDS THE PICTURE AT THE
-                //SIZE IT IS DRAWN AT - WHICH IS WHAT LETS draw CROP IT INSTEAD OF SHRINKING IT
+                //FIT THE PICTURE HERE AND NOWHERE ELSE
                 let height = match picture
                 {
                     Picture::Ready(ready) =>
@@ -898,7 +867,7 @@ impl App
                         ready.rows
                     },
 
-                    //A CAPTION WITHOUT A PICTURE RESERVES NOTHING - IT IS ONE LINE OFFERING TO FETCH ONE
+                    //A CAPTION WITHOUT A PICTURE RESERVES NOTHING
                     _ => 0,
                 };
 
@@ -917,8 +886,7 @@ impl App
 }
 
 //FUNCTIONS
-//A PICTURE SHRUNK INTO THE PANE - NEVER GROWN INTO IT, SO A SMALL ONE KEEPS ITS OWN SIZE. WHAT COMES BACK
-//IS EXACTLY WHAT THE TERMINAL DRAWS, SO THE ROWS IT RESERVES CANNOT DISAGREE WITH THE PICTURE IN THEM
+//SHRINK A PICTURE INTO THE PANE, NEVER GROW IT
 fn fit_image(image: &DynamicImage, width: u16, font: FontSize) -> DynamicImage
 {
     let available_width = width.max(1) as u32 * font.width as u32;
@@ -931,8 +899,7 @@ fn fit_image(image: &DynamicImage, width: u16, font: FontSize) -> DynamicImage
     }
 }
 
-//THE TEXT OF ONE WRAPPED LINE BETWEEN TWO CELL COLUMNS, BOTH INCLUSIVE. COLUMNS ARE CELLS AND NOT
-//CHARACTERS, SO A WIDE GLYPH IS TAKEN WHOLE THE MOMENT THE SELECTION TOUCHES EITHER HALF OF IT
+//ONE WRAPPED LINE BETWEEN TWO CELL COLUMNS
 fn slice_cells(line: &Line<'static>, from: usize, to: usize) -> String
 {
     let mut out = String::new();
@@ -1012,7 +979,7 @@ pub fn wrap_line(line: &Line<'static>, width: u16) -> Vec<Line<'static>> //WORD-
     out
 }
 
-fn split_words(text: &str) -> Vec<&str> //SPLIT INTO ALTERNATING RUNS OF WHITESPACE AND NON-WHITESPACE
+fn split_words(text: &str) -> Vec<&str> //SPLIT INTO RUNS OF WHITESPACE AND WORDS
 {
     let mut out = Vec::new();
     let mut start = 0usize;
@@ -1046,8 +1013,7 @@ fn text_width(text: &str) -> usize
     text.chars().map(|c| c.width().unwrap_or(0)).sum()
 }
 
-//EVERY PIECE OF SESSION STATE THAT LIVES OUTSIDE App - THE NEXT HANDSHAKE HAS TO START FROM THE SAME
-//PLACE THE FIRST ONE DID, AND ANY TASK STILL WATCHING THESE (THE VOICE SESSION, A SCREEN SHARE) HAS TO STOP
+//SESSION STATE THAT LIVES OUTSIDE App
 fn reset_session()
 {
     options::set_seq(0);
@@ -1058,7 +1024,7 @@ fn reset_session()
     options::set_channel(String::new());
     options::set_server_username("");
 
-    //A HALF-FINISHED UPLOAD BELONGS TO THE SOCKET THAT IS GONE
+    //A HALF-FINISHED UPLOAD IS GONE WITH THE SOCKET
     client::ACTIVE_UPLOADS.lock().unwrap().clear();
 
     #[cfg(feature = "client_voice")]

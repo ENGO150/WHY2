@@ -35,13 +35,12 @@ use super::
 //IMPLEMENTATIONS
 impl App
 {
-    //TRANSLATES ONE SERVER/CLIENT EVENT INTO STATE. NOTHING HERE PRINTS OR TOUCHES THE TERMINAL.
+    //TRANSLATE ONE EVENT INTO STATE, NEVER DRAWING
     pub fn apply(&mut self, event: ClientEvent)
     {
         match event
         {
-            //THE PROMPTS THEMSELVES LIVE IN THE CONNECT BOX - NOTHING GOES INTO THE HISTORY
-            //NOTHING IS PUSHED HERE, SO THE REDRAW HAS TO BE ASKED FOR - THE TICK ONLY DRAWS WHEN DIRTY
+            //THE PROMPTS LIVE IN THE CONNECT BOX
             ClientEvent::Register =>
             {
                 if let Some(login) = self.login.as_mut() { login.ask(Stage::Password { register: true }, None); }
@@ -75,28 +74,25 @@ impl App
                 self.server_name = server_name;
             },
 
-            //STORED UNRENDERED - App::theme TURNS IT INTO A LINE, AGAIN AFTER EVERY THEME CHANGE
+            //STORED UNRENDERED - App::theme MAKES THE LINE
             ClientEvent::Message(message, username, id, colors) => self.push_message(username, id, message, colors),
 
-            //A PICTURE IS AN ENTRY OF ITS OWN - THE PANE RESERVES ROWS FOR IT AND draw PAINTS THEM
+            //A PICTURE IS AN ENTRY OF ITS OWN
             ClientEvent::ImageDisplay(username, filename, image, color) =>
                 self.push_image(username, filename, image, color),
 
-            //IT PASSED THE SERVER'S HEADER CHECK AND STILL WOULD NOT DECODE, SO SAY SO WHERE IT WOULD HAVE BEEN
-            //AN OFFER WE DID NOT HOLD. THE CAPTION GOES UP NOW, THE LOOP ASKS FOR THE PICTURE, AND IT
-            //FILLS THE CAPTION WHEN IT ARRIVES
+            //A PICTURE WE DO NOT HOLD: CAPTION IT NOW
             ClientEvent::ImagePending(username, filename, hash, color) =>
             {
                 self.push_caption(username, filename, hash, true, color);
                 self.image_requests.push(hash);
             },
 
-            //THE SAME LINE WITH THE BUTTON STILL ON IT: auto_show_images IS OFF, SO NOBODY ASKED FOR
-            //THIS PICTURE AND NOTHING IS COMING UNTIL SOMEBODY CLICKS
+            //THE SAME LINE WITH THE BUTTON ON IT
             ClientEvent::ImageOffer(username, filename, hash, color) =>
                 self.push_caption(username, filename, hash, false, color),
 
-            //A CLICK THE CACHE COULD NOT ANSWER, SO THE SERVER IS ASKED AFTER ALL
+            //A CLICK THE CACHE COULD NOT ANSWER
             ClientEvent::ImageRequest(hash) => self.image_requests.push(hash),
 
             ClientEvent::ImageFailed(username, filename, _) => self.push_styled(
@@ -126,13 +122,13 @@ impl App
                 self.dirty = true;
             },
 
-            //REFUSING (OR FAILING) THE CHECK JUST ENDS THE SESSION - THE PROMPT ALREADY SAID WHY
+            //A REFUSED CHECK ENDS THE SESSION
             ClientEvent::TofuError => self.quit(1, None),
 
-            //THE SERVER WENT AWAY BETWEEN THE TWO CONNECTIONS - BACK TO THE ADDRESS, THE KEY IS PINNED NOW
+            //BACK TO THE ADDRESS, THE KEY IS PINNED NOW
             ClientEvent::ReconnectFailed => self.disconnected("Reconnecting to the server failed."),
 
-            //UNLIKE TofuError THERE WAS NO PROMPT TO EXPLAIN ITSELF, SO THE REASON GOES BACK WITH THE BOX
+            //THERE WAS NO PROMPT, SO THE REASON GOES BACK
             ClientEvent::HandshakeFailed(reason) => self.disconnected(reason),
 
             ClientEvent::TofuSkip(hash) =>
@@ -149,7 +145,7 @@ impl App
                 self.rebuild_voice();
             },
 
-            //THE WHOLE ROSTER - IT REPLACES WHAT WE HELD, IT DOES NOT ADD TO IT
+            //THE WHOLE ROSTER - IT REPLACES WHAT WE HELD
             ClientEvent::VoiceRoster(clients) =>
             {
                 self.voice_roster = clients.into_iter().collect();
@@ -187,14 +183,13 @@ impl App
                     Span::styled(format!("{uname} disconnected."), theme::DIM),
                 ]));
 
-                //NO PacketCode::List HERE: A KICK WOULD PUT ONE RIGHT BEHIND THE ServerKick PACKET AND
-                //EARN A SpamWarning. THE Leave PACKET NAMES THE USER, SO THE ROSTER CAN DROP THEM ITSELF
+                //Leave NAMES THE USER, SO DROP THEM HERE
                 self.online.retain(|user| user.id != id);
 
-                //A DISCONNECT IS BROADCAST TO EVERY CHANNEL AND CARRIES NO VoiceLeave OF ITS OWN
+                //A DISCONNECT CARRIES NO VoiceLeave
                 if self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
 
-                //SAME RULE AS ClientEvent::List - A CHANNEL EXISTS EXACTLY AS LONG AS SOMEBODY IS IN IT
+                //A CHANNEL EXISTS WHILE SOMEBODY IS IN IT
                 self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
                 self.prune_panes();
             },
@@ -241,7 +236,7 @@ impl App
             {
                 self.push_styled("Switching the audio device failed - the previous one is still in use.", theme::ERROR);
 
-                //THE VOICE CLIENT POINTED THE CONFIG BACK AT THE DEVICE THAT IS ACTUALLY PLAYING
+                //THE CONFIG POINTS AT THE DEVICE THAT PLAYS
                 #[cfg(feature = "client_voice")]
                 self.settings.refresh_devices();
             },
@@ -253,7 +248,7 @@ impl App
 
             ClientEvent::VoiceDisabled =>
             {
-                //ONLY OUR OWN HALF OF THE PANEL GOES - THE OTHERS ARE STILL IN VOICE, WE JUST STOPPED HEARING THEM
+                //ONLY OUR OWN HALF OF THE PANEL GOES
                 self.voice_enabled = false;
                 self.voice_activity.clear();
                 self.rebuild_voice();
@@ -270,8 +265,7 @@ impl App
                 ]));
             },
 
-            //A ROLE WAS SET. THE SERVER NAMES THE USER WHEN IT IS SOMEBODY ELSE, SO THE ONE WITHOUT A NAME
-            //IS OURS - AND THAT ONE HAS TO LAND IN App::role, WHICH IS WHAT THE PALETTE AND /help READ
+            //A ROLE WAS SET; AN UNNAMED ONE IS OURS
             ClientEvent::Role(role, username) =>
             {
                 match username
@@ -286,8 +280,7 @@ impl App
                 }
             },
 
-            //THE LOBBY'S STORED MESSAGES. AN IMAGE IN IT IS A CAPTION OFFERING TO FETCH THE PICTURE -
-            //REPLAYING THE PICTURES THEMSELVES WOULD MAKE EVERY LOGIN CARRY EVERY IMAGE EVER POSTED
+            //THE LOBBY'S STORED MESSAGES
             ClientEvent::History(messages, cached) =>
             {
                 self.push_styled(format!("Message history ({}):", messages.len()), theme::TITLE);
@@ -296,8 +289,7 @@ impl App
                 {
                     match message.image
                     {
-                        //A PICTURE WE HOLD IS ALREADY ON ITS WAY INTO THE PANE, SO IT SAYS SO INSTEAD OF
-                        //OFFERING A BUTTON THAT WOULD ASK FOR IT AGAIN
+                        //A PICTURE WE HOLD IS ALREADY ON ITS WAY
                         Some(hash) => self.push_caption(message.username, message.text, hash,
                             cached.contains(&hash), message.colors.username_color),
                         None => self.push_history(message.username, message.text, message.colors),
@@ -305,15 +297,15 @@ impl App
                 }
             },
 
-            //THE ANSWER TO A CLICKED CAPTION - OR THE LACK OF ONE, WHICH THE CAPTION THEN SAYS
+            //THE ANSWER TO A CLICKED CAPTION
             ClientEvent::ImageData(hash, image) => self.deliver_image(hash, image),
 
-            //server.toml CAME BACK - EITHER THE COPY WE ASKED FOR, OR THE ONE THE SERVER JUST STORED
+            //server.toml CAME BACK
             ClientEvent::ServerSettings(settings, saved) =>
             {
                 match saved
                 {
-                    //THE ANSWER TO A SAVE IS THE CONFIG AS IT ACTUALLY STANDS, SO A REFUSED ROW SNAPS BACK
+                    //A REFUSED ROW SNAPS BACK
                     true =>
                     {
                         if self.settings.open && self.settings.server { self.settings.stored(settings); }
@@ -327,12 +319,10 @@ impl App
                 self.dirty = true;
             },
 
-            //THE ANSWER TO A /color. THE COLOR ITSELF IS THE SERVER'S AND IS NEVER HELD HERE, AND NOTHING
-            //IN THE PANE CHANGES COLOR FOR IT - EVERY LINE IN IT KEEPS THE COLORS IT WAS SAID IN
+            //THE ANSWER TO A /color
             ClientEvent::Colors => self.push_styled("Color set successfully.", theme::OK),
 
-            //ASKED FOR BY /server bans, AND SENT AGAIN AFTER EVERY PARDON - THE IDS RENUMBER WHEN ONE
-            //IS LIFTED, SO THE ANSWER TO A PARDON IS THE NEW LIST RATHER THAN AN 'OK' OVER A STALE ONE
+            //THE BAN LIST
             ClientEvent::ServerBans(users, ips) =>
             {
                 if users.is_empty() && ips.is_empty()
@@ -342,7 +332,7 @@ impl App
                 {
                     self.push_styled(format!("Bans ({}):", users.len() + ips.len()), theme::TITLE);
 
-                    //TWO SECTIONS, EACH NUMBERED FROM ITS OWN ZERO - THE HEADING NAMES THE ACTION THAT LIFTS IT
+                    //TWO SECTIONS, EACH NUMBERED FROM ZERO
                     let sections = [("users", users), ("addresses", ips)];
                     let last_section = sections.iter().filter(|(_, bans)| !bans.is_empty()).count().saturating_sub(1);
 
@@ -360,7 +350,7 @@ impl App
                             Span::raw(name),
                         ]));
 
-                        //THE TRUNK KEEPS RUNNING PAST THE SUBJECTS UNLESS THIS IS THE LAST SECTION
+                        //THE TRUNK RUNS PAST A NON-LAST SECTION
                         let trunk = format!("{}  ", if last { " " } else { "│" });
                         let width = id_width(bans.iter().map(|ban| ban.id));
                         let last_ban = bans.len() - 1;
@@ -380,10 +370,10 @@ impl App
 
             ClientEvent::List(users) =>
             {
-                //ALWAYS REFRESH THE SIDEBAR; ONLY ECHO A BLOCK WHEN THE USER ASKED FOR ONE
+                //ALWAYS REFRESH THE SIDEBAR; ECHO ONLY IF ASKED
                 self.online = users;
 
-                //AUTHORITATIVE: A CHANNEL EXISTS EXACTLY AS LONG AS SOMEBODY IS IN IT
+                //A CHANNEL EXISTS WHILE SOMEBODY IS IN IT
                 self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
                 self.prune_panes();
 
@@ -404,7 +394,7 @@ impl App
                         spans.extend(id_column(user.id, width));
                         spans.push(Span::raw(user.username.clone()));
 
-                        //OUR OWN CHANNEL IS ACCENTED SO THE ROSTER SPLITS AT A GLANCE
+                        //ACCENT OUR OWN CHANNEL
                         if let Some(channel) = user.channel.clone()
                         {
                             let style = if channel == here { theme::ACCENT } else { theme::DIM };
@@ -463,8 +453,7 @@ impl App
                 {
                     self.push_styled(format!("Available files ({}):", users.len()), theme::TITLE);
 
-                    //THE OWNER IS THE BRANCH, THEIR FILES HANG OFF IT - THE TWO IDS SIDE BY SIDE
-                    //ARE THE TWO ARGUMENTS TO /download
+                    //THE OWNER IS THE BRANCH, THEIR FILES HANG OFF IT
                     let width = id_width(users.iter().map(|user| user.id));
                     let last = users.len() - 1;
 
@@ -477,7 +466,7 @@ impl App
 
                         self.push(Line::from(spans));
 
-                        //THE TRUNK KEEPS RUNNING PAST THE FILES UNLESS THIS IS THE LAST OWNER
+                        //THE TRUNK RUNS PAST A NON-LAST OWNER
                         let trunk = format!("{}  ", if index == last { " " } else { "│" });
                         let file_width = id_width(user.upload.iter().map(|(_, id)| *id));
                         let last_file = user.upload.len().saturating_sub(1);
@@ -547,7 +536,7 @@ impl App
                 self.push_text(format!("Deattached {username}'s screen sharing."));
             },
 
-            //BROADCAST TO EVERYBODY, US INCLUDED - ClientEvent::Screen ALREADY SAID IT ON THIS END
+            //BROADCAST TO EVERYBODY, US INCLUDED
             ClientEvent::Screenshare(username) if username != self.username =>
             {
                 self.push(Line::from(vec!
@@ -589,7 +578,7 @@ impl App
                     ({client_version}/{server_version})"), theme::NOTICE);
             },
 
-            //A REJECTION IS ALWAYS FOLLOWED BY THE RE-PROMPT, AND Login::ask KEEPS THE ERROR ON SCREEN
+            //Login::ask KEEPS THE ERROR ON SCREEN
             ClientEvent::UsernameRejected =>
             {
                 match self.login.as_mut()
@@ -634,8 +623,7 @@ impl App
                 self.push_styled("Fetching versions failed, this release could be unsafe!", theme::NOTICE);
             },
 
-            //THE SOCKET IS GONE, BUT THE CLIENT IS NOT: THE CONNECT BOX COMES BACK SO ANOTHER SERVER (OR THE
-            //SAME ONE AGAIN) IS ONE ENTER AWAY. ONLY A DISCONNECT THE USER ASKED FOR ENDS THE PROCESS.
+            //BACK TO THE CONNECT BOX UNLESS WE ASKED TO LEAVE
             ClientEvent::Quit =>
             {
                 if self.leaving
@@ -647,18 +635,14 @@ impl App
                 } else { self.disconnected("Server quit communication."); }
             },
 
-            //SIDEBAR-ONLY - THE CHANNEL LIST TRACKS THESE, THE HISTORY DOES NOT.
-            //NONE OF THEM ASKS THE SERVER FOR ANYTHING: A PacketCode::List HERE WOULD FOLLOW THE /channel
-            //THAT CAUSED IT INSIDE min_message_delay AND EARN A SPAM WARNING. THE SERVER BROADCASTS
-            //ChannelCreated/ChannelDestroyed TO EVERYONE, WHICH IS ALREADY THE WHOLE TRUTH ABOUT WHICH
-            //CHANNELS EXIST - A CHANNEL LIVES EXACTLY AS LONG AS SOMEBODY SITS IN IT.
+            //SIDEBAR-ONLY, NOTHING IS ASKED OF THE SERVER
             ClientEvent::ChannelChanged(channel) =>
             {
                 self.switch_channel(channel.clone().unwrap_or_default());
 
                 if let Some(name) = channel.clone() { self.channels.insert(name); }
 
-                //KEEP OUR OWN ROW HONEST UNTIL THE NEXT LIST REFRESHES EVERYBODY ELSE'S
+                //KEEP OUR OWN ROW HONEST UNTIL THE NEXT LIST
                 let me = self.username.clone();
 
                 if let Some(user) = self.online.iter_mut().find(|user| user.username == me)
@@ -666,7 +650,7 @@ impl App
                     user.channel = channel;
                 }
 
-                //THE VOICE ROSTER IS PER CHANNEL - THE NEW ONE'S ARRIVES RIGHT BEHIND THIS PACKET
+                //THE NEW CHANNEL'S ROSTER ARRIVES BEHIND THIS
                 self.voice_roster.clear();
                 self.voice_activity.clear();
                 self.rebuild_voice();
@@ -697,7 +681,7 @@ impl App
 }
 
 //PRIVATE
-//EVERY LIST BLOCK IS A TREE: ONE BRANCH PER ROW, THEN A RIGHT-ALIGNED ID COLUMN, THEN THE NAME
+//EVERY LIST BLOCK IS A TREE: BRANCH, ID, NAME
 fn id_width(ids: impl Iterator<Item = usize>) -> usize
 {
     ids.map(|id| id.to_string().len()).max().unwrap_or(1)

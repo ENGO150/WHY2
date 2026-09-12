@@ -45,16 +45,15 @@ use super::
 };
 
 //TYPES
-//ONE FINISHED DIAL ATTEMPT. THE ATTEMPT NUMBER IS WHAT LETS A CANCELLED CONNECTION BE THROWN AWAY
-//INSTEAD OF LANDING ON THE USER AFTER THEY HAVE MOVED ON.
+//ONE FINISHED DIAL ATTEMPT, NUMBERED
 pub type ConnectResult = (u64, Result<(OwnedReadHalf, OwnedWriteHalf), Error>);
 
 //ENUMS
-pub enum Action //WHAT THE LOOP HAS TO DO AFTER A KEYSTROKE - THE PROMPT ITSELF NEVER TOUCHES A SOCKET
+pub enum Action //WHAT THE LOOP HAS TO DO AFTER A KEYSTROKE
 {
     None,
     Connect,
-    Submit, //AN ANSWERED IDENTITY STEP, WHICH THE LOOP HANDS TO submit() LIKE ANY OTHER LINE
+    Submit, //AN ANSWERED IDENTITY STEP
     Quit,
 }
 
@@ -72,7 +71,7 @@ pub struct Login //THE CONNECT PROMPT
     pub input: InputBuffer,
     pub stage: Stage,
     pub busy: bool,            //A DIAL, OR AN ANSWER THE SERVER HAS NOT REPLIED TO YET
-    pub connected: bool,       //THE SOCKET IS OPEN, SO THERE IS NO DIAL LEFT TO BACK OUT OF
+    pub connected: bool,       //THE SOCKET IS OPEN
     pub error: Option<String>, //WHY THE LAST ONE DID NOT WORK
     pub hint: Option<String>,  //THE SERVER'S RULES FOR THE STEP ON SCREEN
     attempt: u64,              //ONLY THE NEWEST ATTEMPT'S RESULT IS ACCEPTED
@@ -90,16 +89,14 @@ impl Login
     {
         let mut input = InputBuffer::new();
 
-        //auto_connect DIALS THE CONFIGURED ADDRESS ON ITS OWN, SO IT IS THE ONE CASE THAT PREFILLS THE FIELD
+        //auto_connect IS THE ONE CASE THAT PREFILLS
         let auto = config::read_config::<bool>("auto_connect");
         if auto { input.insert_str(config::read_config::<String>("auto_connect_addr").trim()); }
 
         Self { input, stage: Stage::Address, busy: auto, connected: false, error: None, hint: None, attempt: 0 }
     }
 
-    //THE SERVER DROPPED US MID-SESSION: THE BOX COMES BACK AT THE ADDRESS STEP WITH THE ADDRESS STILL IN IT
-    //AND THE REASON UNDER IT. THE ATTEMPT COUNTER IS CARRIED OVER, SO A DIAL THAT WAS CANCELLED BEFORE THE
-    //DROP CANNOT LAND ON THE NEW PROMPT EITHER.
+    //COME BACK AT THE ADDRESS STEP AFTER A DROP
     pub fn again(address: &str, attempt: u64, error: String) -> Self
     {
         let mut input = InputBuffer::new();
@@ -112,7 +109,7 @@ impl Login
 
     pub fn attempt(&self) -> u64 { self.attempt }
 
-    //THE ATTEMPT A RESULT HAS TO BELONG TO IN ORDER TO COUNT
+    //THE ATTEMPT A RESULT HAS TO BELONG TO
     pub fn accepts(&self, attempt: u64) -> bool { self.busy && attempt == self.attempt }
 
     pub fn failed(&mut self, error: &Error)
@@ -121,8 +118,7 @@ impl Login
         self.error = Some(error.to_string());
     }
 
-    //THE SERVER ASKED FOR THE NEXT THING. THE ERROR IS LEFT ALONE ON PURPOSE - A REJECTION ARRIVES JUST
-    //BEFORE THE RE-PROMPT, AND THE USER STILL HAS TO READ IT.
+    //ASK THE NEXT STEP, KEEPING THE ERROR
     pub fn ask(&mut self, stage: Stage, hint: Option<String>)
     {
         self.stage = stage;
@@ -165,7 +161,7 @@ impl Login
         }
     }
 
-    //ESC ONLY HAS A DIAL TO ABANDON BEFORE THE SOCKET EXISTS - AFTER THAT IT LEAVES THE CLIENT
+    //ESC ABANDONS A DIAL, THEN LEAVES THE CLIENT
     pub fn cancellable(&self) -> bool { self.busy && !self.connected && self.stage == Stage::Address }
 }
 
@@ -175,13 +171,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Action
 {
     let Some(login) = app.login.as_mut() else { return Action::None };
 
-    //ESC BACKS OUT OF A DIAL FIRST, AND ONLY LEAVES THE CLIENT ONCE THERE IS NOTHING TO BACK OUT OF.
-    //THE IDENTITY STEPS HAVE NOTHING TO CANCEL - THE SERVER IS WAITING ON THE ANSWER, NOT US.
+    //ESC BACKS OUT OF A DIAL FIRST
     if key.code == KeyCode::Esc
     {
         if login.connected || login.stage != Stage::Address || !login.busy { return Action::Quit; }
 
-        //THE TASK IS LEFT TO FINISH ON ITS OWN - ITS RESULT NO LONGER MATCHES THE ATTEMPT NUMBER
+        //LEAVE THE TASK - ITS RESULT NO LONGER COUNTS
         login.busy = false;
         login.error = None;
 
@@ -207,7 +202,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Action
 
     match key.code
     {
-        //ONE FIELD, ONE LINE - THERE IS NOTHING AN ADDRESS COULD DO WITH A NEWLINE
+        //ONE FIELD, ONE LINE
         KeyCode::Char(character) => login.input.insert(character),
 
         KeyCode::Backspace => login.input.backspace(),
@@ -228,7 +223,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Action
                 } else { return Action::Connect; }
             },
 
-            //A PASSWORD IS TAKEN AS TYPED, SO IT IS THE RAW BUFFER THAT DECIDES WHETHER ANYTHING WAS ENTERED
+            //A PASSWORD IS TAKEN AS TYPED
             _ =>
             {
                 if login.input.text().is_empty()
@@ -252,13 +247,12 @@ pub fn insert_str(app: &mut App, text: &str) //A PASTE INTO WHICHEVER FIELD IS U
     }
 }
 
-//TAKES THE ANSWERED IDENTITY STEP OFF THE FIELD. THE BOX GOES BUSY UNTIL THE SERVER SAYS WHAT IS NEXT -
-//EITHER THE FOLLOWING STEP, A REJECTION, OR Authenticated, WHICH CLOSES IT ALTOGETHER.
+//TAKE THE ANSWERED STEP OFF THE FIELD, GO BUSY
 pub fn take_input(app: &mut App) -> String
 {
     let Some(login) = app.login.as_mut() else { return String::new() };
 
-    //ONLY THE ADDRESS IS TRIMMED HERE - submit() DECIDES THE REST, AND A PASSWORD KEEPS ITS SPACES
+    //ONLY THE ADDRESS IS TRIMMED HERE
     let text = login.input.text();
 
     login.input = InputBuffer::new();
@@ -269,7 +263,7 @@ pub fn take_input(app: &mut App) -> String
     text
 }
 
-//OPENS THE SOCKET IN A TASK OF ITS OWN, SO THE FRAME KEEPS BEING DRAWN WHILE A DEAD ADDRESS TIMES OUT
+//DIAL IN A TASK, SO THE FRAME KEEPS DRAWING
 pub fn connect(app: &mut App, results: &Sender<ConnectResult>)
 {
     let Some(login) = app.login.as_mut() else { return };
@@ -283,16 +277,16 @@ pub fn connect(app: &mut App, results: &Sender<ConnectResult>)
 
     let attempt = login.attempt;
 
-    //THE TITLE ONLY SHOWS A PORT WHEN ONE WAS ASKED FOR, SO THE ADDRESS IS ALSO KEPT AS TYPED
+    //KEEP THE ADDRESS AS TYPED FOR THE TITLE
     let mut address = display.clone();
     if !address.contains(':') { address.push_str(&format!(":{}", config::read_config::<u16>("default_port"))); }
 
     app.address = display;
 
-    //THE RECONNECT AFTER PINNING A SERVER KEY DIALS THIS, SO IT HAS TO BE THE RESOLVED ADDRESS
+    //THE RECONNECT AFTER PINNING DIALS THIS
     options::set_server_address(&address);
 
-    //A NEW CONNECTION COUNTS FROM ZERO ON BOTH SIDES - THE PREVIOUS SESSION LEFT ITS OWN NUMBERS BEHIND
+    //A NEW CONNECTION COUNTS FROM ZERO
     options::set_seq(0);
     options::set_server_seq(0);
 

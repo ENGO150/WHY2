@@ -115,7 +115,7 @@ impl InputBuffer
     }
 
     //VERTICAL MOTION
-    //A MULTI-LINE BUFFER OWNS UP/DOWN: THEY STEP BETWEEN ITS LINES INSTEAD OF PAGING HISTORY
+    //UP/DOWN STEP LINES IN A MULTI-LINE BUFFER
     pub fn up(&mut self)
     {
         if !self.is_multiline() { return self.history_up(); }
@@ -150,7 +150,7 @@ impl InputBuffer
     {
         if self.history.is_empty() || self.history_pos == 0 { return; }
 
-        //PARK THE LINE THE USER WAS TYPING; A HALF-WRITTEN MESSAGE ALSO LOCKS THE SEARCH TO ITSELF
+        //PARK THE LINE THE USER WAS TYPING
         if self.history_pos == self.history.len()
         {
             let typed = self.text();
@@ -231,7 +231,7 @@ impl InputBuffer
     }
 
     //RENDERING
-    //WRAPS THE BUFFER TO width AND RETURNS THE LINES PLUS THE (column, row) OF THE CURSOR
+    //WRAP TO width, RETURNING LINES AND THE CURSOR
     pub fn render(&self, width: u16, mask: bool) -> (Vec<Line<'static>>, (u16, u16))
     {
         let width = width.max(1) as usize;

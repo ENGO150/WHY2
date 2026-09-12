@@ -137,7 +137,7 @@ impl TerminalGuard
 
         if mouse { crossterm::execute!(io::stdout(), EnableMouseCapture)?; }
 
-        //Shift+Enter IS ONLY DISTINGUISHABLE WITH THE KITTY PROTOCOL; Alt+Enter IS THE UNIVERSAL FALLBACK
+        //Shift+Enter NEEDS KITTY; Alt+Enter ALWAYS WORKS
         let enhanced = terminal::supports_keyboard_enhancement().unwrap_or(false);
         if enhanced
         {
@@ -165,13 +165,13 @@ impl Drop for TerminalGuard
 
 //FUNCTIONS
 //PUBLIC
-//EVERY BLOCK-COMMAND LIST IS DRAWN AS A TREE, SO THE ROWS SHARE ONE SET OF BRANCH GLYPHS
+//THE BRANCH GLYPHS FOR BLOCK-COMMAND LISTS
 pub fn branch(last: bool) -> &'static str
 {
     if last { "╰─ " } else { "├─ " }
 }
 
-pub fn install_panic_hook() //MANDATORY: THE RELEASE PROFILE USES panic = "abort", SO Drop NEVER RUNS ON A PANIC
+pub fn install_panic_hook() //MANDATORY: THE RELEASE PROFILE USES panic = "abort"
 {
     let previous = std::panic::take_hook();
 
@@ -193,16 +193,13 @@ pub fn restore_terminal() //BEST-EFFORT, IDEMPOTENT
     let _ = stdout.flush();
 }
 
-//A SELECTION (AND THE CLICK IT MAY TURN OUT TO BE) BELONGS TO THE MESSAGE PANE, SO NOTHING DRAGS WHILE
-//AN OVERLAY OWNS THE SCREEN IN FRONT OF IT
+//NOTHING DRAGS WHILE AN OVERLAY IS UP
 fn selectable(app: &App) -> bool
 {
     app.tofu.is_none() && app.login.is_none() && !app.settings.open
 }
 
-//HAND THE SELECTION TO THE TERMINAL WITH OSC 52. THERE IS NO ANSWER TO THIS AND NO CLIPBOARD LIBRARY
-//BEHIND IT - THE TERMINAL EITHER TAKES IT OR IGNORES IT, AND EITHER WAY IT COSTS NO SYSTEM DEPENDENCY
-//AND WORKS THROUGH AN SSH SESSION, WHERE A LOCAL CLIPBOARD WOULD BE THE WRONG MACHINE'S
+//COPY WITH OSC 52, WHICH WORKS OVER SSH
 fn copy_to_clipboard(text: &str)
 {
     let mut stdout = io::stdout();
@@ -213,13 +210,11 @@ fn copy_to_clipboard(text: &str)
 
 pub fn init() -> Result<Tui>
 {
-    //NO Terminal::clear() HERE - IT QUERIES THE CURSOR POSITION (WHICH SOME TERMINALS NEVER ANSWER)
-    //AND THE ALTERNATE SCREEN STARTS BLANK ANYWAY
+    //NO Terminal::clear() - IT QUERIES THE CURSOR
     Terminal::new(CrosstermBackend::new(io::stdout()))
 }
 
-//THE SINGLE EVENT LOOP. EVERY TERMINAL WRITE IN THE CLIENT HAPPENS HERE - INCLUDING THE CONNECT PROMPT,
-//WHICH IS WHY THE SOCKET IS OPENED HERE AND NOT BEFORE THE ALTERNATE SCREEN IS ENTERED.
+//THE SINGLE EVENT LOOP AND EVERY TERMINAL WRITE
 pub async fn run
 (
     terminal: &mut Tui,
@@ -234,12 +229,12 @@ pub async fn run
 
     let mut events_open = true;
 
-    //NONE UNTIL THE CONNECT PROMPT HAS PRODUCED A SOCKET; WHILE IT IS NONE, THE PROMPT OWNS THE KEYBOARD
+    //NONE UNTIL THE CONNECT PROMPT HAS A SOCKET
     let mut write_stream: Option<Arc<MutexAsync<OwnedWriteHalf>>> = None;
 
     let (connect_tx, mut connect_rx) = mpsc::channel::<ConnectResult>(1);
 
-    //auto_connect DIALS WITHOUT WAITING FOR A KEYSTROKE, AND STILL DOES IT FROM INSIDE THE TUI
+    //auto_connect DIALS WITHOUT A KEYSTROKE
     if app.login.as_ref().is_some_and(|prompt| prompt.busy) { login::connect(app, &connect_tx); }
 
     loop
@@ -259,8 +254,7 @@ pub async fn run
                     None => events_open = false,
                 }
 
-                //A LOST SESSION LEAVES A DEAD WRITE HALF BEHIND - DROPPING IT SHUTS THE WRITE SIDE DOWN AND
-                //TAKES THE KEYBOARD BACK TO THE CONNECT BOX, WHICH IS THE ONLY THING ON SCREEN NOW ANYWAY
+                //DROP THE DEAD WRITE HALF
                 if app.drop_stream
                 {
                     app.drop_stream = false;
@@ -283,7 +277,7 @@ pub async fn run
                 //THE TICK IS THE ANIMATIONS' CLOCK
                 app.advance_animations();
 
-                //SILENT ROSTER REFRESH (/list IS REQUEST/RESPONSE, THE SIDEBAR NEEDS FEEDING)
+                //SILENT ROSTER REFRESH
                 if app.refresh_online && let Some(write_stream) = write_stream.as_ref()
                 {
                     app.refresh_online = false;
@@ -292,7 +286,7 @@ pub async fn run
                         PacketCode::List { users: None }, options::get_keys().as_ref()).await;
                 }
 
-                //AND THE PICTURES SOMEBODY OFFERED THAT WE DID NOT ALREADY HOLD
+                //AND THE OFFERED PICTURES WE DO NOT HOLD
                 if !app.image_requests.is_empty() && let Some(write_stream) = write_stream.as_ref()
                 {
                     let keys = options::get_keys();
@@ -337,7 +331,7 @@ fn connected
     {
         Ok(halves) => halves,
 
-        //THE ADDRESS STAYS ON SCREEN WITH THE REASON UNDER IT, SO THE NEXT TRY IS ONE EDIT AWAY
+        //KEEP THE ADDRESS ON SCREEN WITH THE REASON
         Err(error) =>
         {
             if let Some(prompt) = app.login.as_mut() { prompt.failed(&error); }
@@ -348,7 +342,7 @@ fn connected
 
     let stream = Arc::new(MutexAsync::new(write_half));
 
-    //THE HANDSHAKE (AND THE TOFU PROMPT INSIDE IT) RUNS FROM HERE ON, WITH THE TUI ALREADY UP
+    //THE HANDSHAKE RUNS WITH THE TUI ALREADY UP
     let listen_stream = stream.clone();
     let listen_tx = tx.clone();
 
@@ -361,8 +355,7 @@ fn connected
 
     if let Some(prompt) = app.login.as_mut() { prompt.connected = true; }
 
-    //THE BOX STAYS UP, STILL BUSY: THE HANDSHAKE IS RUNNING, AND THE USERNAME PROMPT THAT FOLLOWS IT IS
-    //THE SAME FIELD ASKING AGAIN. ClientEvent::Authenticated IS WHAT FINALLY CLOSES IT.
+    //THE BOX STAYS UP UNTIL Authenticated
 }
 
 async fn handle_terminal_event
@@ -390,15 +383,14 @@ async fn handle_terminal_event
 
             match mouse.kind
             {
-                //THE WHEEL DRIVES THE SETTINGS SELECTION WHILE THE OVERLAY IS UP
+                //THE WHEEL DRIVES THE SETTINGS SELECTION
                 MouseEventKind::ScrollUp if app.settings.open => settings::scroll(app, -1),
                 MouseEventKind::ScrollDown if app.settings.open => settings::scroll(app, 1),
 
                 MouseEventKind::ScrollUp => app.scroll_up(SCROLL_STEP, viewport),
                 MouseEventKind::ScrollDown => app.scroll_down(SCROLL_STEP, viewport),
 
-                //A PRESS IN THE PANE ANCHORS A SELECTION. IT IS NOT ONE YET - WITHOUT A DRAG BEHIND IT
-                //THE RELEASE IS AN ORDINARY CLICK, WHICH IS WHAT KEEPS THE IMAGE CAPTIONS CLICKABLE
+                //A PRESS ANCHORS A SELECTION
                 MouseEventKind::Down(MouseButton::Left) if selectable(app) =>
                 {
                     if !app.selection_start(mouse.column, mouse.row) { app.clear_selection(); }
@@ -411,12 +403,10 @@ async fn handle_terminal_event
 
                 MouseEventKind::Up(MouseButton::Left) if selectable(app) =>
                 {
-                    //WHETHER THIS WAS A SELECTION IS THE DRAG'S ANSWER AND NOT THE TEXT'S - A DRAG THAT
-                    //PICKED UP NOTHING BUT BLANKS IS STILL A DRAG, AND MUST NOT FETCH A PICTURE
+                    //THE DRAG SAYS WHETHER THIS WAS A SELECTION
                     if app.selection.is_some_and(|selection| selection.dragged)
                     {
-                        //THE TERMINAL'S OWN DRAG-SELECT IS GONE WHILE THE MOUSE IS CAPTURED, SO THE COPY IS
-                        //OURS TO MAKE: OSC 52 HANDS IT TO THE TERMINAL, WHICH ALSO WORKS OVER SSH
+                        //COPY WHILE THE MOUSE IS CAPTURED
                         if let Some(text) = app.selection_text()
                         {
                             let lines = text.lines().count();
@@ -428,10 +418,7 @@ async fn handle_terminal_event
                     {
                         app.clear_selection();
 
-                        //A CLICK ON AN IMAGE CAPTION FETCHES THE PICTURE - OUT OF THE CACHE IF IT IS
-                        //THERE, AND OFF THE SERVER OTHERWISE (ClientEvent::ImageRequest, WHICH THE TICK
-                        //BELOW SENDS). THE HISTORY REPLAYS HASHES RATHER THAN BYTES, SO THAT REQUEST IS
-                        //THE ONLY THING THAT EVER PUTS A STORED PICTURE ON THE WIRE
+                        //A CLICK ON A CAPTION FETCHES THE PICTURE
                         if write_stream.is_some()
                             && let Some(entry) = app.image_at(mouse.column, mouse.row)
                             && let Some(hash) = app.request_image(entry)
@@ -450,7 +437,7 @@ async fn handle_terminal_event
         Event::Resize(..) | Event::FocusGained | Event::FocusLost => app.dirty = true,
         Event::Paste(text) =>
         {
-            //A PASTE BELONGS TO THE CONNECT BOX WHILE IT IS UP, NOT TO THE CHAT LINE BEHIND IT
+            //A PASTE BELONGS TO THE CONNECT BOX
             if app.login.is_some()
             {
                 login::insert_str(app, &text);
@@ -480,8 +467,7 @@ async fn handle_key
 
     app.dirty = true;
 
-    //THE SERVER-KEY PROMPT OUTRANKS EVERYTHING, THE CONNECT BOX INCLUDED: THE NETWORK TASK IS PARKED ON
-    //ITS ANSWER, AND NOTHING MAY REACH A SERVER THE USER HAS NOT ACCEPTED YET
+    //THE SERVER-KEY PROMPT OUTRANKS EVERYTHING
     if app.tofu.is_some()
     {
         tofu::handle_key(app, key);
@@ -489,14 +475,14 @@ async fn handle_key
         return;
     }
 
-    //THEN THE CONNECT BOX, WHICH OWNS THE KEYBOARD ALL THE WAY THROUGH ADDRESS, USERNAME AND PASSWORD
+    //THEN THE CONNECT BOX
     if app.login.is_some()
     {
         match login::handle_key(app, key)
         {
             Action::Connect => login::connect(app, connect_tx),
 
-            //AN ANSWERED IDENTITY STEP IS AN ORDINARY SUBMITTED LINE - submit() TURNS IT INTO ITS PACKET
+            //AN ANSWERED STEP IS AN ORDINARY SUBMITTED LINE
             Action::Submit =>
             {
                 if let Some(write_stream) = write_stream
@@ -514,10 +500,10 @@ async fn handle_key
         return;
     }
 
-    //THE SETTINGS OVERLAY OWNS THE KEYBOARD WHILE IT IS UP - EXCEPT FOR ITS OWN SHORTCUT, WHICH CLOSES IT
+    //THE SETTINGS OVERLAY OWNS THE KEYBOARD
     if app.settings.open
     {
-        //Ctrl+S BELONGS TO THE SERVER ROWS, SO THE OVERLAY IS ASKED FIRST AND ONLY THEN THE SHORTCUT
+        //Ctrl+S BELONGS TO THE SERVER ROWS
         if control && settings_shortcut(key.code) && !(app.settings.server && key.code == KeyCode::Char('s'))
         {
             app.settings.close();
@@ -526,7 +512,7 @@ async fn handle_key
             settings::handle_key(app, key);
         }
 
-        //THE OVERLAY EDITS server.toml BUT DOES NOT OWN THE SOCKET - A PRESSED Save LANDS HERE
+        //A PRESSED Save LANDS HERE - THE SOCKET IS OURS
         if let Some(settings) = app.settings.take_save()
         {
             match write_stream
@@ -537,14 +523,14 @@ async fn handle_key
                         PacketCode::ServerSettings { settings: Some(settings), save: true },
                         options::get_keys().as_ref()).await;
 
-                    //STORED IS NOT THE SAME AS IN USE FOR THESE - SAY SO ONCE, WHERE THE USER READS THINGS
+                    //STORED IS NOT IN USE FOR THESE
                     if let Some(keys) = app.settings.restart_note.take()
                     {
                         app.push_styled(format!("{keys} takes effect when the server is restarted."), theme::NOTICE);
                     }
                 },
 
-                //NOTHING WENT OUT, SO NOTHING IS COMING BACK - THE ROWS STAY EDITABLE INSTEAD OF WAITING FOREVER
+                //NOTHING WENT OUT, SO THE ROWS STAY EDITABLE
                 None =>
                 {
                     app.settings.saving = false;
@@ -553,8 +539,7 @@ async fn handle_key
             }
         }
 
-        //AND SO DOES A CONFIRMED Restart. IT IS THE LAST THING THIS SOCKET CARRIES: THE SERVER ANSWERS BY
-        //DISCONNECTING EVERYBODY AND GOING DOWN, WHICH LANDS US BACK IN THE CONNECT BOX LIKE ANY OTHER DROP
+        //AND SO DOES A CONFIRMED Restart
         if app.settings.take_restart() && let Some(write_stream) = write_stream
         {
             network::send(&mut *write_stream.lock().await,
@@ -566,11 +551,10 @@ async fn handle_key
         return;
     }
 
-    //EVERYTHING BELOW EITHER SENDS SOMETHING OR EDITS THE LINE THAT WILL, SO IT NEEDS THE SOCKET THE
-    //CONNECT PROMPT OPENED (WHICH IS GONE BY NOW, SO THIS ONLY GUARDS THE UNREACHABLE CASE)
+    //EVERYTHING BELOW SENDS OR EDITS THE LINE
     let Some(write_stream) = write_stream else { return };
 
-    //NEWLINE (Alt+Enter EVERYWHERE, Shift+Enter WHERE THE TERMINAL REPORTS IT)
+    //NEWLINE (Alt+Enter, OR Shift+Enter IF REPORTED)
     if key.code == KeyCode::Enter && (alt || shift)
     {
         app.input.insert('\n');
@@ -595,7 +579,7 @@ async fn handle_key
             {
                 if let Some(info) = command::COMMAND_LIST.iter().find(|i| i.shortcut == Some(c))
                 {
-                    //CLEAR THE HALF-TYPED LINE FIRST (THE OLD read_input LEAKED IT)
+                    //CLEAR THE HALF-TYPED LINE FIRST
                     app.input.clear();
                     app.palette.dismiss();
 
@@ -653,7 +637,7 @@ async fn handle_key
 
         KeyCode::Enter =>
         {
-            //A HIGHLIGHTED PALETTE ENTRY THE USER HASN'T FULLY TYPED COMPLETES FIRST
+            //COMPLETE A HIGHLIGHTED PALETTE ENTRY FIRST
             if complete_selection(app, false) { return; }
 
             app.palette.dismiss();
@@ -666,9 +650,7 @@ async fn handle_key
     }
 }
 
-//WRITE THE HIGHLIGHTED ROW ONTO THE LINE, WHETHER IT IS A COMMAND OR ONE ANSWER OF A PARAMETER.
-//force IS Tab, WHICH COMPLETES WHATEVER IS HIGHLIGHTED; Enter ONLY COMPLETES WHAT IS NOT SPELLED OUT ALREADY,
-//SO A FINISHED LINE IS SENT INSTEAD OF BEING REWRITTEN. RETURNS WHETHER THE LINE WAS TOUCHED
+//WRITE THE HIGHLIGHTED ROW ONTO THE LINE
 fn complete_selection(app: &mut App, force: bool) -> bool
 {
     if let Some(values) = app.palette.values()
@@ -677,7 +659,7 @@ fn complete_selection(app: &mut App, force: bool) -> bool
 
         let Some(value) = values.selection().filter(|_| force || !values.typed(&input)) else { return false };
 
-        //EVERYTHING UP TO THE HALF-TYPED VALUE STAYS - THE PARAMETERS BEFORE IT WERE ANSWERED ALREADY
+        //KEEP EVERYTHING UP TO THE HALF-TYPED VALUE
         let kept = input.chars().take(values.start).collect::<String>();
 
         app.input.clear();
@@ -699,7 +681,7 @@ fn complete(app: &mut App, entry: palette::Entry)
     app.input.clear();
     app.input.insert_str(&entry.name());
 
-    //LEAVE ROOM FOR ARGUMENTS RIGHT AWAY - AN ACTION WORD COUNTS AS ONE, SO /server OPENS ITS OWN MENU
+    //LEAVE ROOM FOR ARGUMENTS RIGHT AWAY
     if !entry.args().is_empty() { app.input.insert(' '); }
 
     app.palette.update(&app.input.text(), app.role);

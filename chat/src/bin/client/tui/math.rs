@@ -16,11 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//TeX MATH, LAID OUT IN CELLS. THERE IS NO TYPESETTER HERE AND THERE CANNOT BE ONE - A TERMINAL HAS ONE
-//FONT SIZE AND A FIXED GRID - SO WHAT IS RENDERED IS THE PART OF THE NOTATION THE GRID CAN ACTUALLY
-//CARRY: A FRACTION IS THREE ROWS WITH A RULE BETWEEN THEM, A SUM'S LIMITS SIT OVER AND UNDER IT, AND A
-//SCRIPT BECOMES A UNICODE SUPERSCRIPT WHERE ONE EXISTS AND A RAISED ROW WHERE IT DOES NOT. ANYTHING
-//THIS CANNOT DRAW DEGRADES TO THE SOURCE IT CAME FROM RATHER THAN TO NOTHING
+//TeX MATH, LAID OUT IN CELLS
 
 use std::iter;
 
@@ -34,11 +30,10 @@ use super::{ markup, theme };
 
 //CONSTS
 const INDENT: &str = "  "; //DISPLAY MATH IS SET IN FROM THE PANE, THE WAY A BLOCK IS
-const MAX_DEPTH: usize = 32; //A BRACE THIS DEEP IS A BRACE, NOT A GROUP - THE PARSER RECURSES INTO THEM
+const MAX_DEPTH: usize = 32; //A BRACE THIS DEEP IS A BRACE
 
 //STRUCTS
-//A RECTANGLE OF CELLS AND THE ROW THE NEXT ONE LINES UP WITH. EVERY LAYOUT STEP IS A COMBINATION OF
-//THESE, WHICH IS WHAT KEEPS A FRACTION INSIDE AN EXPONENT INSIDE A ROOT LINED UP WITH ITS NEIGHBOURS
+//A RECTANGLE OF CELLS PLUS ITS BASELINE ROW
 #[derive(Clone)]
 pub struct Block
 {
@@ -84,7 +79,7 @@ impl Block
         }).collect()
     }
 
-    fn centre(&self, width: usize) -> Self //CENTRED IN A WIDER BOX - A NUMERATOR OVER A LONGER DENOMINATOR
+    fn centre(&self, width: usize) -> Self //CENTRED IN A WIDER BOX
     {
         let left = (width - self.width().min(width)) / 2;
 
@@ -96,8 +91,7 @@ impl Block
         }
     }
 
-    //SIDE BY SIDE ON A SHARED BASELINE. THE TALLER SIDE DECIDES HOW MANY ROWS THERE ARE ABOVE AND BELOW,
-    //AND BOTH ARE PADDED INTO THEM - NOTHING IS EVER PLACED BY COUNTING ROWS FROM THE TOP
+    //SIDE BY SIDE ON A SHARED BASELINE
     fn beside(self, other: Self) -> Self
     {
         if self.rows.iter().all(String::is_empty) && self.rows.len() == 1 { return other; }
@@ -130,8 +124,7 @@ impl Block
         Self { rows, baseline: above }
     }
 
-    //STACKED, WITH THE MIDDLE PIECE'S ROW AS THE BASELINE. A FRACTION AND AN OPERATOR'S LIMITS ARE THE
-    //SAME SHAPE - WHAT DIFFERS IS ONLY WHETHER THERE IS A RULE IN THE MIDDLE
+    //STACKED, THE MIDDLE PIECE'S ROW AS BASELINE
     fn stack(above: Vec<Self>, middle: Self, below: Vec<Self>) -> Self
     {
         let width = above.iter().chain(iter::once(&middle)).chain(below.iter())
@@ -152,8 +145,7 @@ impl Block
 }
 
 //FUNCTIONS
-//INLINE MATH. IT HAS TO FIT ON THE ROW IT IS TYPED ON, SO A LAYOUT THAT NEEDS MORE THAN ONE IS SET
-//LINEARLY INSTEAD - A FRACTION BECOMES a/b RATHER THAN SILENTLY TAKING TWO ROWS OFF THE MESSAGE
+//INLINE MATH, SET LINEARLY
 pub fn inline(source: &str, style: Style) -> Vec<Span<'static>>
 {
     let nodes = parse(source);
@@ -168,8 +160,7 @@ pub fn inline(source: &str, style: Style) -> Vec<Span<'static>>
     vec![Span::styled(text, math_style(style))]
 }
 
-//DISPLAY MATH, WHICH OWNS ITS ROWS AND CAN THEREFORE BE LAID OUT IN TWO DIMENSIONS. A RESULT WIDER THAN
-//THE PANE IS SET LINEARLY AND WRAPPED - A TRUNCATED FORMULA WOULD BE WORSE THAN A PLAIN ONE
+//DISPLAY MATH, IN TWO DIMENSIONS
 pub fn display(source: &str, width: u16) -> Vec<Line<'static>>
 {
     let nodes = parse(source);
@@ -209,15 +200,13 @@ fn one(node: &Node, display: bool) -> Block
         Node::List(nodes) => layout(nodes, display),
         Node::Big(op) => Block::text(op),
 
-        //THE RULE IS AS WIDE AS THE WIDER SIDE, AND IT IS THE BASELINE - SO x + a/b SITS ON THE RULE
-        //AND NOT ON THE NUMERATOR
+        //THE RULE IS THE WIDER SIDE, AND THE BASELINE
         Node::Frac(num, den) =>
         {
             let num = one(num, display);
             let den = one(den, display);
 
-            //A RULE OVER SOMETHING THAT IS ITSELF STACKED IS DRAWN WIDER THAN WHAT IT DIVIDES, WHICH IS
-            //THE ONLY THING SAYING WHICH OF THE RULES IN A NESTED FRACTION IS THE OUTER ONE
+            //DRAW A RULE WIDER THAN WHAT IT DIVIDES
             let stacked = !num.is_flat() || !den.is_flat();
             let width = num.width().max(den.width()) + if stacked { 2 } else { 0 };
 
@@ -229,7 +218,7 @@ fn one(node: &Node, display: bool) -> Block
             let inner = one(inner, display);
             let root = degree.as_deref().and_then(superscript).unwrap_or_default();
 
-            //A ROOT OVER MORE THAN ONE ROW HAS NO BAR THE GRID CAN DRAW, SO IT IS BRACKETED INSTEAD
+            //A MULTI-ROW ROOT IS BRACKETED INSTEAD
             if !inner.is_flat()
             {
                 return Block::text(&format!("{root}√")).beside(delimited('(', ')', inner));
@@ -243,7 +232,7 @@ fn one(node: &Node, display: bool) -> Block
 
         Node::Delim(open, close, inner) => delimited(*open, *close, one(inner, display)),
 
-        //AN OPERATOR'S LIMITS GO OVER AND UNDER IT, BUT ONLY WHERE THERE ARE ROWS TO PUT THEM ON
+        //LIMITS GO OVER AND UNDER, WHERE THERE IS ROOM
         Node::Script { base, sup, sub } =>
         {
             let big = matches!(**base, Node::Big(_));
@@ -262,8 +251,7 @@ fn one(node: &Node, display: bool) -> Block
     }
 }
 
-//A SCRIPT IS A UNICODE SUPERSCRIPT WHERE EVERY CHARACTER OF IT HAS ONE, A RAISED ROW WHERE IT DOES NOT
-//AND THERE ARE ROWS TO SPARE, AND ^(..) WHERE THERE IS NEITHER
+//A SCRIPT AS A SUPERSCRIPT, A RAISED ROW, OR ^(..)
 fn scripts(sup: Option<&Node>, sub: Option<&Node>, display: bool) -> Block
 {
     let sup = sup.map(|node| (one(node, false), linear_one(node)));
@@ -284,7 +272,7 @@ fn scripts(sup: Option<&Node>, sub: Option<&Node>, display: bool) -> Block
 
         _ => match display
         {
-            //THE COLUMN IS sup, THE BASELINE'S OWN (EMPTY) ROW, THEN sub - SO IT LINES UP BESIDE THE BASE
+            //sup, THE BASELINE'S OWN ROW, THEN sub
             true => Block::stack(sup.iter().map(|(block, _)| block.clone()).collect(),
                 Block::empty(), sub.iter().map(|(block, _)| block.clone()).collect()),
 
@@ -308,8 +296,7 @@ fn scripts(sup: Option<&Node>, sub: Option<&Node>, display: bool) -> Block
     }
 }
 
-//A BRACKET AS TALL AS WHAT IT HOLDS. THE PIECES ARE THE ONES UNICODE HAS FOR EXACTLY THIS; ANYTHING
-//WITHOUT THEM IS REPEATED, WHICH IS STILL A BRACKET OF THE RIGHT HEIGHT
+//A BRACKET AS TALL AS WHAT IT HOLDS
 fn delimited(open: char, close: char, inner: Block) -> Block
 {
     if inner.is_flat() || open == '.' && close == '.'
@@ -347,7 +334,7 @@ fn stretch_delim(delim: char, height: usize) -> Vec<String>
     }).collect()
 }
 
-//THE ONE-ROW FALLBACK, USED FOR INLINE MATH AND FOR A DISPLAY THAT WOULD NOT FIT
+//THE ONE-ROW FALLBACK
 fn linear(nodes: &[Node]) -> String
 {
     nodes.iter().map(linear_one).collect()
@@ -372,7 +359,7 @@ fn linear_one(node: &Node) -> String
         {
             let mut out = linear_one(base);
 
-            //AN EMPTY SCRIPT IS NOTHING RATHER THAN AN EMPTY PAIR OF BRACKETS
+            //AN EMPTY SCRIPT IS NOTHING
             if let Some(text) = sub.as_ref().map(|node| linear_one(node)).filter(|text| !text.is_empty())
             {
                 out.push_str(&subscript(&text).unwrap_or(format!("_({text})")));
@@ -388,7 +375,7 @@ fn linear_one(node: &Node) -> String
     }
 }
 
-//a/b NEEDS NO BRACKETS, (a + b)/2 DOES - ANYTHING THAT IS NOT ONE PIECE GETS THEM
+//a/b NEEDS NO BRACKETS, (a + b)/2 DOES
 fn bracketed(node: &Node) -> String
 {
     let text = linear_one(node);
@@ -400,8 +387,7 @@ fn bracketed(node: &Node) -> String
     }
 }
 
-//SCRIPTS. ALL OR NOTHING: A SCRIPT WITH ONE CHARACTER UNICODE CANNOT RAISE IS SET THE OTHER WAY ROUND
-//ENTIRELY, RATHER THAN HALF RAISED AND HALF NOT
+//SCRIPTS, ALL OR NOTHING
 fn superscript(text: &str) -> Option<String>
 {
     map_chars(text, "0123456789+-=()abcdefghijklmnoprstuvwxyz",
@@ -422,13 +408,12 @@ fn map_chars(text: &str, from: &str, to: &str) -> Option<String>
         .collect()
 }
 
-//THE PARSER. IT IS A SUBSET AND IT IS SUPPOSED TO BE ONE - WHAT IS NOT IN THE TABLE IS SET AS THE WORD
-//IT WAS WRITTEN AS, SO AN UNKNOWN COMMAND COSTS ITS BACKSLASH AND NOT THE FORMULA AROUND IT
+//THE PARSER; AN UNKNOWN WORD IS SET AS ITSELF
 struct Parser
 {
     chars: Vec<char>,
     pos: usize,
-    depth: usize, //NOTHING BOUNDS A MESSAGE'S NESTING BUT THIS - IT IS A STRING OFF THE NETWORK
+    depth: usize, //NOTHING BOUNDS A MESSAGE'S NESTING BUT THIS
 }
 
 impl Parser
@@ -448,7 +433,7 @@ impl Parser
                 continue;
             }
 
-            //\right BELONGS TO WHOEVER OPENED THE \left, SO IT ENDS THIS LIST WITHOUT BEING EATEN
+            //\right BELONGS TO WHOEVER OPENED THE \left
             if self.command_here().as_deref() == Some("right") { break; }
 
             out.push(self.atom());
@@ -504,7 +489,7 @@ impl Parser
 
             Some('\\') => self.command(),
 
-            //A SCRIPT WITH NOTHING IN FRONT OF IT STILL HAS A BASE - AN EMPTY ONE
+            //A SCRIPT WITH NO BASE GETS AN EMPTY ONE
             Some('^' | '_') => Node::Sym(String::new()),
 
             Some(c) =>
@@ -539,7 +524,7 @@ impl Parser
                 Node::Sqrt(Box::new(self.argument()), degree)
             },
 
-            //THE CONTENT IS WORDS RATHER THAN SYMBOLS, SO IT IS TAKEN AS IT WAS TYPED
+            //THE CONTENT IS WORDS, TAKEN AS TYPED
             "text" | "textrm" | "mathrm" | "mathbf" | "mathit" | "operatorname" =>
                 Node::Sym(self.raw_argument()),
 
@@ -553,7 +538,7 @@ impl Parser
                 let open = self.delimiter();
                 let inner = self.list(false);
 
-                //\right IS WHAT list STOPPED ON - IF IT IS MISSING, THE BRACKET SIMPLY HAS NO PARTNER
+                //A MISSING \right LEAVES THE BRACKET UNPARTNERED
                 let close = match self.command_here().as_deref() == Some("right")
                 {
                     true =>
@@ -583,7 +568,7 @@ impl Parser
         }
     }
 
-    fn argument(&mut self) -> Node //{...}, OR THE SINGLE THING AFTER IT - \frac12 IS A FRACTION
+    fn argument(&mut self) -> Node //{...}, OR THE SINGLE THING AFTER IT
     {
         self.skip_spaces();
 
@@ -641,7 +626,7 @@ impl Parser
 
         match self.command_here()
         {
-            //\left\{ AND \left\| ARE THE BRACKET AND NOT THE COMMAND
+            //\left\{ IS THE BRACKET, NOT THE COMMAND
             Some(name) =>
             {
                 self.pos += 1 + name.chars().count().max(1);
@@ -703,8 +688,7 @@ fn symbol(name: &str) -> Option<String>
 }
 
 //CONSTS
-//OPERATORS WHOSE SCRIPTS ARE LIMITS: IN DISPLAY MATH THEY GO OVER AND UNDER THE SIGN RATHER THAN BESIDE
-//IT. \int IS DELIBERATELY NOT ONE OF THEM - ITS BOUNDS SIT AT THE SIDE, WHICH IS WHERE A SCRIPT ALREADY IS
+//OPERATORS WHOSE SCRIPTS ARE LIMITS
 const BIG: [&str; 15] = ["sum", "prod", "coprod", "bigcup", "bigcap", "bigoplus", "bigotimes", "bigvee",
     "bigwedge", "lim", "limsup", "liminf", "max", "min", "sup"];
 
@@ -756,7 +740,7 @@ const SYMBOLS: &[(&str, &str)] =
     ("oint", "∮"), ("bigcup", "⋃"), ("bigcap", "⋂"), ("bigoplus", "⨁"), ("bigotimes", "⨂"),
     ("bigvee", "⋁"), ("bigwedge", "⋀"),
 
-    //SPACING AND ESCAPES - A CONTROL SYMBOL IS THE CHARACTER IT PROTECTS
+    //SPACING AND ESCAPES
     ("quad", "  "), ("qquad", "    "), (",", " "), (";", " "), (":", " "), ("!", ""), (" ", " "),
     ("{", "{"), ("}", "}"), ("%", "%"), ("&", "&"), ("#", "#"), ("_", "_"), ("$", "$"),
 ];

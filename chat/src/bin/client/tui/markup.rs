@@ -34,13 +34,12 @@ use super::
 };
 
 //CONSTS
-const GUTTER: u16 = 2;      //THE BAR AND THE SPACE AFTER IT, WHICH A BLOCK'S CONTENT DOES NOT GET
+const GUTTER: u16 = 2;      //THE BAR AND THE SPACE AFTER IT
 const TAB: usize = 4;       //A TAB IS EXPANDED, SINCE A CELL GRID HAS NO TAB STOPS
-const MAX_LANG: usize = 20; //LONGER THAN THIS AND THE FIRST WORD IS CODE, NOT A LANGUAGE NAME
+const MAX_LANG: usize = 20; //LONGER THAN THIS AND THE FIRST WORD IS CODE
 
 //ENUMS
-//WHAT A MESSAGE IS MADE OF ONCE THE MARKUP IS OFF IT. EVERYTHING THAT IS NOT ONE OF THESE IS Text,
-//INCLUDING MARKUP THAT NEVER CLOSED - AN UNTERMINATED FENCE IS BACKTICKS SOMEBODY TYPED, NOT A BLOCK
+//WHAT A MESSAGE IS MADE OF, MARKUP OFF
 enum Segment
 {
     Text(String),
@@ -51,24 +50,19 @@ enum Segment
 }
 
 //FUNCTIONS
-//ONE MESSAGE, WRAPPED. THE LINES COME BACK READY TO DRAW RATHER THAN AS ONE LOGICAL LINE, BECAUSE A
-//FENCED BLOCK IS ROWS AND NOT TEXT: IT IS PADDED TO THE PANE, SO IT HAS TO BE BROKEN WHERE IT IS BUILT
-//RATHER THAN HANDED TO THE WORD-WRAPPER AFTERWARDS.
-//math IS render_math: WITH IT OFF A DOLLAR SIGN IS A DOLLAR SIGN, SO THE FORMULA IS SHOWN AS IT WAS
-//TYPED RATHER THAN AS AN APPROXIMATION OF ITSELF - CODE IS NOT AFFECTED, IT IS A SEPARATE SETTING'S WORTH
+//ONE MESSAGE, AS THE ROWS IT DRAWS AS
 pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, math: bool)
     -> Vec<Line<'static>>
 {
     let mut out: Vec<Line<'static>> = Vec::new();
     let mut current = prefix;
-    let mut open = true; //A LINE IS BEING BUILT - AN EMPTY ONE IS STILL A LINE THE USER TYPED
+    let mut open = true; //A LINE IS BEING BUILT
 
     for segment in parse(text, math)
     {
         match segment
         {
-            //THE ONLY PLACE A LINE BREAK COMES FROM INSIDE TEXT: THE INPUT BAR IS MULTI-LINE, SO A
-            //MESSAGE CAN CARRY ONE
+            //THE ONLY LINE BREAK INSIDE TEXT
             Segment::Text(text) => for (i, part) in text.split('\n').enumerate()
             {
                 if i > 0
@@ -80,7 +74,7 @@ pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, 
                 if !part.is_empty() { current.push(Span::styled(part.to_owned(), style)); }
             },
 
-            //A NEWLINE INSIDE INLINE CODE IS A SPACE - IT IS ONE RUN OF TEXT, AND A FENCE IS WHAT SPANS ROWS
+            //A NEWLINE INSIDE INLINE CODE IS A SPACE
             Segment::Code(code) =>
             {
                 current.push(Span::styled(code.replace('\n', " "), theme::CODE));
@@ -93,8 +87,7 @@ pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, 
                 open = true;
             },
 
-            //BOTH OF THESE OWN THE ROWS THEY SIT ON, SO WHATEVER IS BEING BUILT GOES OUT FIRST - BUT AN
-            //EMPTY LINE IS NOT ONE OF THEM: THE NEWLINE IN FRONT OF A FENCE IS THE FENCE'S OWN
+            //BOTH OWN THEIR ROWS, SO CLOSE THE CURRENT RUN
             Segment::Block { lang, body } =>
             {
                 close(&mut out, &mut current, &mut open, width);
@@ -109,7 +102,7 @@ pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, 
         }
     }
 
-    //A MESSAGE THAT ENDS ON A BLOCK ENDS THERE - THE BLANK LINE UNDER IT WOULD BE A ROW OF THE PANE
+    //A MESSAGE THAT ENDS ON A BLOCK ENDS THERE
     if open || out.is_empty() { flush(&mut out, &mut current, &mut open, width); }
 
     out
@@ -117,7 +110,7 @@ pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, 
 
 fn flush(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &mut bool, width: u16)
 {
-    if !*open { return; } //NOTHING IS BEING BUILT - A BLOCK JUST ENDED, AND ITS LAST ROW IS THE LAST ROW
+    if !*open { return; } //NOTHING IS BEING BUILT
 
     out.extend(state::wrap_line(&Line::from(mem::take(current)), width));
 
@@ -133,14 +126,12 @@ fn close(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &
     }
 }
 
-//A FENCED BLOCK, AS ROWS PADDED TO THE PANE. THE PADDING IS WHAT MAKES IT A BOX RATHER THAN A RAGGED
-//RUN OF HIGHLIGHTED WORDS, AND IT IS ALSO WHY THESE ROWS ARE NEVER WORD-WRAPPED: CODE IS BROKEN WHERE
-//IT RUNS OUT OF CELLS, NOT AT THE LAST SPACE BEFORE IT
+//A FENCED BLOCK, PADDED AND NEVER WORD-WRAPPED
 fn block(out: &mut Vec<Line<'static>>, lang: Option<&str>, body: &str, width: u16)
 {
     let inner = width.saturating_sub(GUTTER).max(1) as usize;
 
-    //THE LANGUAGE IS NOT HIGHLIGHTED WITH (NOTHING HERE HIGHLIGHTS), SO IT IS SHOWN INSTEAD OF USED
+    //NOTHING HIGHLIGHTS, SO THE LANGUAGE IS SHOWN
     if let Some(lang) = lang.filter(|lang| !lang.is_empty())
     {
         out.push(row(pad(lang, inner), theme::CODE_LANG));
@@ -215,8 +206,7 @@ pub fn text_width(text: &str) -> usize
     text.chars().map(|c| c.width().unwrap_or(0)).sum()
 }
 
-//THE PARSER. IT NEVER FAILS AND NEVER CONSUMES ANYTHING IT CANNOT CLOSE - MARKUP THAT DOES NOT
-//TERMINATE IS THE CHARACTERS THAT WERE TYPED, WHICH IS THE ONLY BEHAVIOUR THAT CANNOT SWALLOW A MESSAGE
+//THE PARSER; IT NEVER CONSUMES AN UNCLOSED RUN
 fn parse(text: &str, math: bool) -> Vec<Segment>
 {
     let chars: Vec<char> = text.chars().collect();
@@ -225,14 +215,12 @@ fn parse(text: &str, math: bool) -> Vec<Segment>
     let mut buf = String::new();
     let mut i = 0usize;
 
-    //A DELIMITER THAT WAS NOT FOUND ONCE IS NOT THERE AT ALL: THE SEARCH ONLY EVER STARTS LATER IN THE
-    //MESSAGE, SO IT CANNOT SUCCEED AFTERWARDS. REMEMBERING THAT IS WHAT KEEPS A MESSAGE OF NOTHING BUT
-    //BACKTICKS FROM COSTING A SEARCH PER BACKTICK
+    //A DELIMITER NOT FOUND ONCE IS NOT SEARCHED AGAIN
     let mut missing = [false; 5];
 
     while i < chars.len()
     {
-        //A BACKSLASH TAKES THE MARKUP OFF WHATEVER FOLLOWS IT, AND OFF NOTHING ELSE
+        //A BACKSLASH TAKES THE MARKUP OFF WHAT FOLLOWS
         if chars[i] == '\\' && matches!(chars.get(i + 1), Some('`' | '$' | '\\'))
         {
             buf.push(chars[i + 1]);
@@ -264,7 +252,7 @@ fn parse(text: &str, math: bool) -> Vec<Segment>
     out
 }
 
-//A RUN OF THREE OR MORE BACKTICKS OPENS A FENCE, ONE OR TWO OPEN INLINE CODE THAT THE SAME RUN CLOSES
+//THREE BACKTICKS OPEN A FENCE, ONE OR TWO INLINE
 fn backtick(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String, missing: &mut [bool; 5])
     -> Option<usize>
 {
@@ -303,8 +291,7 @@ fn backtick(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String, 
     Some(next)
 }
 
-//DISCORD'S RULE: A FIRST WORD ON A LINE OF ITS OWN IS THE LANGUAGE, ANYTHING ELSE IS THE FIRST LINE OF
-//CODE. THE LEADING NEWLINE GOES EITHER WAY - IT IS THE FENCE'S, NOT THE CODE'S
+//DISCORD'S RULE: A LONE FIRST WORD IS THE LANGUAGE
 fn fence(inner: &str) -> Segment
 {
     let (lang, body) = match inner.split_once('\n')
@@ -324,8 +311,7 @@ fn is_language(word: &str) -> bool
         && word.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '#' | '-' | '_' | '.'))
 }
 
-//MATH. THE GUARDS ARE WHAT KEEPS PRICES OUT OF IT: AN OPENING $ IS NOT FOLLOWED BY A SPACE, A CLOSING
-//ONE IS NOT PRECEDED BY ONE AND NOT FOLLOWED BY A DIGIT, SO "$5 AND $10 LEFT" IS THREE WORDS AND NOT MATH
+//MATH, WITH THE GUARDS THAT KEEP PRICES OUT OF IT
 fn dollar(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String, missing: &mut [bool; 5])
     -> Option<usize>
 {
@@ -356,8 +342,7 @@ fn find(chars: &[char], from: usize, needle: &[char]) -> Option<usize> //FIRST n
         .find(|i| chars[*i..*i + needle.len()] == *needle)
 }
 
-//THE SAME, PAST BACKSLASHES. A FENCE IS SEARCHED FOR WITHOUT THIS: WHAT IS INSIDE ONE IS VERBATIM, SO A
-//LINE OF CODE ENDING IN A BACKSLASH CANNOT BE ALLOWED TO SWALLOW THE FENCE THAT CLOSES IT
+//THE SAME, PAST BACKSLASHES
 fn find_escaped(chars: &[char], from: usize, needle: &[char]) -> Option<usize>
 {
     let mut i = from;

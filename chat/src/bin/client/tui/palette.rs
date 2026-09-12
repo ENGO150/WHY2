@@ -47,13 +47,12 @@ pub enum PaletteMode
 {
     Hidden,                          //NOTHING TO SHOW
     Menu(Vec<Entry>, usize),         //MATCHING ENTRIES + SELECTION
-    Values(Values),                  //THE ANSWERS A PARAMETER ACCEPTS, WHERE THERE IS A KNOWN LIST OF THEM
+    Values(Values),                  //THE ANSWERS A PARAMETER ACCEPTS
     Signature(Entry, Option<usize>), //ONE ENTRY + THE PARAMETER BEING TYPED
 }
 
 //STRUCTS
-//ONE POPUP LINE - A COMMAND, OR ONE ACTION OF A COMMAND THAT TAKES ONE (/server mute).
-//AN ACTION SPEAKS FOR ITSELF FROM HERE ON: ITS OWN ARGUMENTS, ITS OWN DESCRIPTION, ITS OWN ROLE
+//ONE POPUP LINE - A COMMAND OR ONE OF ITS ACTIONS
 #[derive(Clone, Copy)]
 pub struct Entry
 {
@@ -61,25 +60,22 @@ pub struct Entry
     pub sub: Option<&'static SubcommandInfo>,
 }
 
-//WHAT MAY GO IN THE PARAMETER THE CARET IS ON. THE COLOR COMMANDS ARE THE REASON THIS EXISTS: THE VOCABULARY IS
-//crossterm'S OWN AND IS NOWHERE ON THE SCREEN, SO WITHOUT IT THE ONLY WAY TO LEARN A NAME IS TO GUESS ONE AND BE TOLD NO
+//WHAT MAY GO IN THE PARAMETER THE CARET IS ON
 pub struct Values
 {
     pub arg: &'static CommandArg,
 
-    //NOT &'static str: THE MONITORS OF THIS MACHINE ARE ONLY KNOWN AT RUNTIME, AND ARE READ AFRESH
-    //RATHER THAN LEAKED ONCE - ONE PLUGGED IN MID-SESSION IS STILL SUPPOSED TO SHOW UP HERE
+    //NOT &'static str: MONITORS ARE RUNTIME-ONLY
     pub matches: Vec<String>,
     pub selected: usize,
-    pub start: usize, //CHAR INDEX WHERE THE HALF-TYPED VALUE BEGINS - COMPLETING REPLACES EVERYTHING FROM HERE ON
+    pub start: usize, //CHAR INDEX WHERE THE HALF-TYPED VALUE BEGINS
 }
 
 pub struct Palette //SLASH-COMMAND AUTOCOMPLETE
 {
     pub mode: PaletteMode,
 
-    //FIRST VISIBLE ROW, WRITTEN BY THE DRAW PATH (THE ONLY PLACE THAT KNOWS HOW MANY FIT) AND KEPT BETWEEN
-    //FRAMES, SO THE LIST SCROLLS A GAP SHORT OF EITHER EDGE INSTEAD OF PINNING THE SELECTION TO ONE
+    //FIRST VISIBLE ROW, WRITTEN BY THE DRAW PATH
     pub offset: usize,
 }
 
@@ -100,7 +96,7 @@ impl Entry
         self.sub.map_or(self.info.description, |sub| sub.description)
     }
 
-    //ONLY WHOLE COMMANDS CARRY A SHORTCUT - A KEY THAT LANDED ON HALF OF ONE WOULD HAVE NOTHING TO RUN
+    //ONLY WHOLE COMMANDS CARRY A SHORTCUT
     pub fn shortcut(&self) -> String
     {
         match self.sub
@@ -110,7 +106,7 @@ impl Entry
         }
     }
 
-    //WHAT THE USER TYPES TO GET HERE, WITHOUT THE PARAMETERS (/server mute)
+    //WHAT THE USER TYPES TO GET HERE
     pub fn name(&self) -> String
     {
         let mut name = format!("{}{}", command::COMMAND_PREFIX, self.info.triggers[0].to_lowercase());
@@ -120,7 +116,7 @@ impl Entry
         name
     }
 
-    //FULL SIGNATURE AS PLAIN TEXT - USE THIS TO MEASURE THE COLUMN
+    //FULL SIGNATURE AS PLAIN TEXT, FOR MEASURING
     pub fn signature(&self) -> String
     {
         let args = self.args().iter().map(format_arg).collect::<Vec<String>>().join(" ");
@@ -131,7 +127,7 @@ impl Entry
 
     pub fn width(&self) -> usize { self.signature().width() }
 
-    //SAME SIGNATURE, STYLED: REQUIRED PARAMETERS STAND OUT, THE ACTIVE ONE MORE SO
+    //THE SAME SIGNATURE, STYLED
     pub fn spans(&self, active: Option<usize>) -> Vec<Span<'static>>
     {
         let mut spans = vec![Span::styled(self.name(), theme::TITLE)];
@@ -156,7 +152,7 @@ impl Entry
         spans
     }
 
-    //THE ENTRY IS ALREADY SPELLED OUT ON THE LINE, SO Enter SENDS IT INSTEAD OF COMPLETING IT
+    //ALREADY SPELLED OUT, SO Enter SENDS IT
     pub fn typed(&self, input: &str) -> bool
     {
         let Some(rest) = input.trim().strip_prefix(command::COMMAND_PREFIX) else { return false };
@@ -165,7 +161,7 @@ impl Entry
         {
             None => self.info.triggers.iter().any(|t| t.eq_ignore_ascii_case(rest)),
 
-            //BOTH WORDS HAVE TO BE THERE - THE COMMAND WORD ALONE IS NOT THIS ENTRY
+            //BOTH WORDS HAVE TO BE THERE
             Some(sub) => match rest.split_once(char::is_whitespace)
             {
                 Some((word, action)) => self.info.triggers.iter().any(|t| t.eq_ignore_ascii_case(word)) &&
@@ -181,7 +177,7 @@ impl Values
 {
     pub fn selection(&self) -> Option<&str> { self.matches.get(self.selected).map(String::as_str) }
 
-    //THE HIGHLIGHTED VALUE IS ALREADY SPELLED OUT ON THE LINE, SO Enter SENDS IT INSTEAD OF COMPLETING IT
+    //ALREADY SPELLED OUT, SO Enter SENDS IT
     pub fn typed(&self, input: &str) -> bool
     {
         let typed = input.chars().skip(self.start).collect::<String>();
@@ -189,7 +185,7 @@ impl Values
         self.selection().is_some_and(|value| value.eq_ignore_ascii_case(typed.trim()))
     }
 
-    //THE STYLE OF THE SWATCH DRAWN BESIDE A ROW - A NAME IS NOT WORTH MUCH IF IT DOES NOT SHOW ITS OWN COLOR
+    //THE SWATCH DRAWN BESIDE A ROW
     pub fn swatch(&self, value: &str) -> Option<Color>
     {
         match self.arg.values
@@ -212,7 +208,7 @@ impl Palette
         Self { mode: PaletteMode::Hidden, offset: 0 }
     }
 
-    //A MENU IS OPEN (NAVIGABLE + COMPLETABLE) - EITHER OF COMMANDS OR OF WHAT ONE PARAMETER ACCEPTS
+    //A MENU IS OPEN (NAVIGABLE + COMPLETABLE)
     pub fn is_active(&self) -> bool { matches!(self.mode, PaletteMode::Menu(..) | PaletteMode::Values(..)) }
 
     pub fn values(&self) -> Option<&Values>
@@ -224,13 +220,13 @@ impl Palette
         }
     }
 
-    //ANYTHING AT ALL IS ON SCREEN (MENU OR PARAMETER HINT)
+    //ANYTHING AT ALL IS ON SCREEN
     pub fn is_visible(&self) -> bool { !matches!(self.mode, PaletteMode::Hidden) }
 
-    //RECOMPUTE FROM THE CURRENT INPUT (role HIDES WHAT WE ARE NOT ALLOWED TO RUN)
+    //RECOMPUTE FROM THE CURRENT INPUT
     pub fn update(&mut self, input: &str, role: Role)
     {
-        //THE INPUT LINE BELONGS TO THE LOGIN PROMPT UNTIL AUTH IS DONE - COMMANDS ARE NOT DISPATCHED YET EITHER
+        //THE LOGIN PROMPT OWNS THE LINE UNTIL AUTH
         if !options::get_sending_messages()
         {
             self.dismiss();
@@ -257,7 +253,7 @@ impl Palette
                 self.menu(matches, rest);
             },
 
-            //COMMAND WORD IS FINISHED - HAND THE REST OF THE LINE TO ITS ACTIONS, OR HINT THE PARAMETER THE USER IS ON
+            //COMMAND WORD FINISHED - HAND OVER THE REST
             Some(split) =>
             {
                 let (word, tail) = rest.split_at(split);
@@ -269,7 +265,7 @@ impl Palette
                     return;
                 };
 
-                //A COMMAND THAT TAKES AN ACTION HAS NOTHING OF ITS OWN TO HINT - THE ACTION OWNS EVERYTHING PAST IT
+                //AN ACTION OWNS EVERYTHING PAST IT
                 if !info.subcommands.is_empty()
                 {
                     self.action(info, tail.trim_start(), role, input);
@@ -287,12 +283,12 @@ impl Palette
         }
     }
 
-    //THE ACTION WORD OF /command <action> ... - A MENU WHILE IT IS BEING TYPED, ITS PARAMETERS ONCE IT IS DONE
+    //THE ACTION WORD OF /command <action> ...
     fn action(&mut self, info: &'static CommandInfo, tail: &str, role: Role, input: &str)
     {
         match tail.find(char::is_whitespace)
         {
-            //STILL TYPING THE ACTION - FILTER WHAT OUR ROLE MAY RUN
+            //STILL TYPING THE ACTION
             None =>
             {
                 let candidate = tail.to_lowercase();
@@ -308,7 +304,7 @@ impl Palette
             {
                 let (action, tail) = tail.split_at(split);
 
-                //AN ACTION OUT OF OUR REACH IS NOT HINTED EITHER - IT IS NOT SUPPOSED TO BE THERE AT ALL
+                //AN ACTION OUT OF OUR REACH IS NOT HINTED
                 let Some(sub) = info.action(action).filter(|sub| sub.available(role)) else
                 {
                     self.dismiss();
@@ -326,7 +322,7 @@ impl Palette
         }
     }
 
-    //THE PARAMETER THE CARET IS ON: ITS OWN ANSWERS WHERE IT HAS A CLOSED SET OF THEM, OTHERWISE THE PLAIN SIGNATURE HINT
+    //THE PARAMETER THE CARET IS ON
     fn hint(&mut self, entry: Entry, tail: &str, input: &str)
     {
         let args = entry.args();
@@ -339,10 +335,10 @@ impl Palette
             let matches = vocabulary(arg.values).into_iter()
                 .filter(|value| value.to_lowercase().starts_with(&typed)).collect::<Vec<String>>();
 
-            //A TYPO IS NOT A REASON TO GO BLANK - THE SIGNATURE HINT BELOW STILL SAYS WHAT THE PARAMETER IS
+            //A TYPO STILL LEAVES THE SIGNATURE HINT
             if !matches.is_empty()
             {
-                //A FULLY TYPED VALUE WINS THE SELECTION, OTHERWISE KEEP IT WHERE IT WAS (SAME RULE AS THE COMMAND MENU)
+                //A FULLY TYPED VALUE WINS THE SELECTION
                 let exact = matches.iter().position(|value| value.eq_ignore_ascii_case(&typed));
 
                 let selected = match (exact, &self.mode)
@@ -367,7 +363,7 @@ impl Palette
         self.mode = PaletteMode::Signature(entry, active);
     }
 
-    //SHOW matches, KEEPING THE SELECTION WHERE IT WAS UNLESS typed SPELLS ONE OF THEM OUT IN FULL
+    //SHOW matches, KEEPING THE SELECTION
     fn menu(&mut self, matches: Vec<Entry>, typed: &str)
     {
         if matches.is_empty()
@@ -376,8 +372,7 @@ impl Palette
             return;
         }
 
-        //A FULLY TYPED WORD WINS THE SELECTION, OTHERWISE KEEP IT WHERE IT WAS.
-        //WITHOUT THIS, "/screens" HIGHLIGHTS "/screen" AND Enter RUNS THE WRONG COMMAND.
+        //A FULLY TYPED WORD WINS THE SELECTION
         let exact = matches.iter().position(|entry| match entry.sub
         {
             Some(sub) => sub.triggers.iter().any(|t| t.eq_ignore_ascii_case(typed)),
@@ -442,37 +437,34 @@ fn active_arg(args: &'static [CommandArg], tail: &str) -> Option<usize>
 {
     let given = tail.split_whitespace().count();
 
-    //A TRAILING SPACE MEANS THE USER MOVED ON TO THE NEXT PARAMETER
+    //A TRAILING SPACE MEANS THE NEXT PARAMETER
     let index = if tail.ends_with(char::is_whitespace) { given } else { given.saturating_sub(1) };
 
-    //THE LAST PARAMETER SWALLOWS THE REST OF THE LINE (E.G. A PRIVATE MESSAGE), SO THERE IS
-    //NEVER A PARAMETER BEYOND IT TO ADVANCE TO - KEEP IT ACTIVE NO MATTER HOW MUCH MORE IS TYPED
+    //THE LAST PARAMETER SWALLOWS THE REST
     Some(index.min(args.len() - 1))
 }
 
-//THE HALF-TYPED VALUE THE CARET IS ON - EMPTY ONCE THE USER HAS MOVED ON TO THE NEXT PARAMETER
+//THE HALF-TYPED VALUE THE CARET IS ON
 fn partial(tail: &str) -> &str
 {
     if tail.ends_with(char::is_whitespace) { "" } else { tail.split_whitespace().next_back().unwrap_or("") }
 }
 
-//THE ANSWERS THEMSELVES, READ WHERE THEY ARE ALREADY DEFINED RATHER THAN SPELLED OUT A SECOND TIME
+//THE ANSWERS, READ WHERE THEY ARE DEFINED
 fn vocabulary(values: ArgValues) -> Vec<String>
 {
     match values
     {
         ArgValues::Colors => colors::offered().into_iter().map(str::to_string).collect(),
 
-        //THE MONITORS ARE THE REASON A LIST MAY BE RUNTIME-BUILT AT ALL: NOTHING ON THE SCREEN NAMES
-        //THEM EITHER, AND A DISPLAY-SERVER NAME (DP-3, \\.\DISPLAY2) IS NOT SOMETHING TO GUESS AT
+        //THE MONITORS OF THIS MACHINE, READ AT RUNTIME
         #[cfg(feature = "client_screen")]
         ArgValues::Monitors => crate::screen::capture::monitor_names(),
 
         #[cfg(not(feature = "client_screen"))]
         ArgValues::Monitors => Vec::new(),
 
-        //THE ROLES ARE THE ONE VOCABULARY THAT IS ALSO A PROTOCOL VALUE - THE SERVER STORES THE NUMBER
-        //THE POSITION IN THIS LIST IS, SO OFFERING THE NAMES IS THE ONLY WAY THE TWO CANNOT DRIFT
+        //THE ROLES, OFFERED BY NAME
         ArgValues::Roles => Role::ALL.iter().map(Role::to_string).collect(),
 
         ArgValues::Free => Vec::new(),

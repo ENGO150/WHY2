@@ -35,9 +35,7 @@ use super::
 pub const CHALLENGE: &str = "yes"; //WHAT THE SECOND STAGE WANTS TYPED OUT
 
 //ENUMS
-//A MISMATCH IS ASKED TWICE. THE FIRST STAGE IS THE SAME TWO-BUTTON WARNING A FIRST CONTACT GETS; SAYING
-//"TRUST" THERE ONLY MOVES TO THE SECOND, WHERE THE WORD HAS TO BE TYPED OUT - SO REPLACING A PINNED KEY
-//CANNOT HAPPEN BY LEANING ON ⏎.
+//A MISMATCH IS ASKED TWICE
 #[derive(PartialEq)]
 pub enum Stage
 {
@@ -46,13 +44,12 @@ pub enum Stage
 }
 
 //STRUCTS
-//THE SERVER IDENTITY PROMPT - A MODAL OVERLAY, NOT A BLOCK COMMAND. WHILE IT IS UP IT OWNS THE KEYBOARD
-//AND THE NETWORK TASK IS PARKED ON ITS ANSWER, SO NOTHING THE USER TYPES CAN REACH AN UNTRUSTED SERVER.
+//THE SERVER IDENTITY PROMPT, A MODAL OVERLAY
 pub struct Prompt
 {
     pub host: String,
     pub hash: String,
-    pub pinned: Option<String>, //THE FINGERPRINT ON RECORD, SHOWN BESIDE THE NEW ONE ON A MISMATCH
+    pub pinned: Option<String>, //THE FINGERPRINT ON RECORD
     pub mismatch: bool,         //A PINNED KEY DIFFERS - THE LOUDER OF THE TWO WARNINGS
     pub accept: bool,           //SELECTED BUTTON, STARTING ON THE SAFE ONE
     pub stage: Stage,
@@ -90,8 +87,7 @@ impl Prompt
         }
     }
 
-    //THE FINGERPRINT IS 64 HEX CHARS - GROUPED IN EIGHTS AND BROKEN IN HALF SO IT FITS THE BOX AND CAN
-    //ACTUALLY BE COMPARED AGAINST WHAT THE OPERATOR PUBLISHED
+    //THE 64 HEX CHARS, GROUPED IN EIGHTS
     pub fn fingerprint(&self) -> Vec<String>
     {
         Self::group(&self.hash)
@@ -119,7 +115,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
 {
     let Some(prompt) = app.tofu.as_mut() else { return };
 
-    //REFUSING IS ALWAYS ONE KEY AWAY, AT EITHER STAGE; TRUSTING NEVER IS
+    //REFUSING IS ALWAYS ONE KEY AWAY, TRUSTING NEVER
     if key.code == KeyCode::Esc
     {
         answer(app, false);
@@ -136,7 +132,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
             {
                 let accept = prompt.accept;
 
-                //A FIRST CONTACT IS ANSWERED HERE; REPLACING A PINNED KEY STILL HAS TO PASS THE CHALLENGE
+                //A FIRST CONTACT IS ANSWERED HERE
                 if accept && prompt.mismatch
                 {
                     prompt.stage = Stage::Confirm;
@@ -150,8 +146,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
 
         Stage::Confirm => match key.code
         {
-            //LETTERS ONLY, NEVER MORE OF THEM THAN THE WORD IS LONG, AND NEVER OFF A SHORTCUT - Ctrl+C
-            //IS NOT THE LETTER c
+            //LETTERS ONLY, NO LONGER THAN THE WORD
             KeyCode::Char(character)
                 if character.is_ascii_alphabetic()
                     && prompt.typed.chars().count() < CHALLENGE.chars().count()
@@ -167,7 +162,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
                 prompt.wrong = false;
             },
 
-            //BACK OUT TO THE WARNING - STILL NOT AN ANSWER, JUST A STEP BACK
+            //BACK OUT TO THE WARNING
             KeyCode::Left | KeyCode::BackTab =>
             {
                 prompt.stage = Stage::Warn;
@@ -193,7 +188,7 @@ fn answer(app: &mut App, accept: bool)
 {
     let Some(prompt) = app.tofu.take() else { return };
 
-    //THE NETWORK TASK EITHER PINS THE KEY AND CARRIES ON, OR DISCONNECTS AND REPORTS TofuError
+    //THE NETWORK TASK PINS THE KEY OR DISCONNECTS
     let _ = prompt.request.reply.send(accept);
 
     if accept

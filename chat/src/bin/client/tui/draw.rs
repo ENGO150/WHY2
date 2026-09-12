@@ -85,24 +85,23 @@ use super::
 
 //CONSTS
 const SIDEBAR_WIDTH: u16          = 24;
-const SIDEBAR_MIN_TERM_WIDTH: u16 = 70; //BELOW THIS THE SIDEBAR IS DROPPED AND MESSAGES GO FULL-WIDTH
+const SIDEBAR_MIN_TERM_WIDTH: u16 = 70; //BELOW THIS THE SIDEBAR IS DROPPED
 const INPUT_MIN_HEIGHT: u16       = 3;
 const INPUT_MAX_HEIGHT: u16       = 8;
-const CHANNELS_MIN_HEIGHT: u16    = 12; //SIDEBAR ROWS NEEDED BEFORE THE CHANNEL LIST IS WORTH SHOWING
+const CHANNELS_MIN_HEIGHT: u16    = 12; //SIDEBAR ROWS THE CHANNEL LIST NEEDS
 const SETTINGS_WIDTH: u16         = 62; //SETTINGS OVERLAY, CAPPED TO THE TERMINAL
 const TOFU_WIDTH: u16             = 64; //SERVER IDENTITY OVERLAY, CAPPED TO THE TERMINAL
 const LOGIN_WIDTH: u16            = 52; //CONNECT PROMPT, CAPPED TO THE TERMINAL
 const FIELD_ROW: u16              = 1;  //THE ADDRESS FIELD SITS ONE ROW UNDER ITS OWN LABEL
 const SETTINGS_VALUE_WIDTH: u16   = 20; //NARROWEST THE VALUE COLUMN MAY GET (BAR + PERCENTAGE)
 
-//THE PROJECT LOGO, PAINTED IN THE MIDDLE OF THE MESSAGE PANE AS A WATERMARK
+//PROJECT LOGO WATERMARK
 const LOGO: &str = include_str!("./assets/rexlogo");
 
 #[cfg(feature = "client_voice")]
 const SLIDER_WIDTH: usize         = 14; //CELLS OF VOLUME BAR
 
-//ROWS KEPT BETWEEN THE SELECTION AND EITHER EDGE OF A SCROLLING LIST, SO THERE IS ALWAYS VISIBLE PROOF THAT
-//THE LIST GOES ON BEFORE IT STARTS MOVING
+//SELECTION GAP FROM A LIST'S EDGES
 const SCROLL_GAP: usize           = 4;
 
 //ENUMS
@@ -118,14 +117,13 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 {
     let area = frame.area();
 
-    //THE CONNECT BOX ASKS FOR EVERYTHING UNTIL WE ARE IN - THE INPUT BAR HAS NOTHING TO SAY YET, THE SAME
-    //WAY THE SIDEBAR HAS NOBODY TO LIST
+    //NO INPUT BAR OR SIDEBAR BEFORE LOGIN
     let connecting = app.login.is_some();
 
     //PAINT THE BASE FOREGROUND FIRST
     frame.buffer_mut().set_style(area, theme::TEXT);
 
-    //MEASURE THE INPUT FIRST - THE MAIN AREA GETS WHATEVER IS LEFT
+    //MEASURE THE INPUT FIRST
     let input_width = area.width.saturating_sub(4).max(1); //BORDERS + "> "
     let (input_lines, cursor) = app.input.render(input_width, false);
     let input_height = if connecting { 0 }
@@ -137,7 +135,7 @@ pub fn draw(frame: &mut Frame, app: &mut App)
         Constraint::Length(input_height),
     ]).areas(area);
 
-    //MESSAGES + SIDEBAR (THE SIDEBAR IS EMPTY UNTIL WE ARE AUTHENTICATED - DO NOT SPEND THE WIDTH ON IT)
+    //MESSAGES + SIDEBAR
     let (messages_area, sidebar_area) = if area.width >= SIDEBAR_MIN_TERM_WIDTH && options::get_sending_messages()
     {
         let [m, s] = Layout::horizontal([Constraint::Min(0), Constraint::Length(SIDEBAR_WIDTH)]).areas(main_area);
@@ -153,27 +151,26 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 
     if !connecting { draw_input(frame, app, input_area, input_lines, cursor); }
 
-    //THE LOGO GOES BEHIND ALL OF IT, IN THE MIDDLE OF THE SCREEN - THE OVERLAYS BELOW Clear THEIR OWN RECT, SO IT
-    //NEVER REACHES THEM
+    //LOGO BEHIND EVERYTHING
     if !app.theme.disable_logo { draw_logo(frame, area); }
 
-    //THE PALETTE FLOATS OVER THE BOTTOM OF THE MESSAGE PANE
+    //PALETTE OVER THE MESSAGE PANE
     if app.palette.is_visible() { draw_palette(frame, app, messages_area); }
 
-    //THE SETTINGS OVERLAY COVERS EVERYTHING ELSE (THE INPUT CURSOR IS SUPPRESSED IN draw_input)
+    //SETTINGS OVERLAY
     if app.settings.open { draw_settings(frame, &mut app.settings, area); }
 
-    //THE CONNECT BOX IS THE FIRST THING THE CLIENT EVER DRAWS, AND IT KEEPS ASKING UNTIL WE ARE LOGGED IN
+    //CONNECT BOX
     if let Some(login) = &app.login { draw_login(frame, login, area); }
 
-    //...AND THE SERVER-KEY PROMPT COVERS EVEN THAT, BECAUSE IT IS THE ONLY THING THE USER MAY ANSWER
+    //SERVER-KEY PROMPT ON TOP
     if let Some(prompt) = &app.tofu { draw_tofu(frame, prompt, area); }
 }
 
 //PRIVATE
 fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 {
-    //WHY2 ── <SERVER NAME> ── <ADDRESS AS TYPED> ── SOCKS5
+    //TITLE: WHY2 ── NAME ── ADDRESS ── SOCKS5
     let mut parts = vec![String::from("WHY2")];
 
     if !app.server_name.is_empty() { parts.push(app.server_name.clone()); }
@@ -193,8 +190,7 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         block = block.title_bottom(Line::from(Span::styled(format!(" ↓ {} new ", app.unread), theme::NOTICE)).right_aligned());
     }
 
-    //AND THE TOAST, ON THE OTHER END OF THE SAME BORDER - IT IS NOT PART OF THE CONVERSATION, SO IT NEVER
-    //ENTERS THE HISTORY AND TAKES NO ROW AWAY FROM IT
+    //TOAST ON THE SAME BORDER
     if let Some(notice) = app.notice()
     {
         block = block.title_bottom(Span::styled(format!(" {notice} "), theme::OK));
@@ -211,7 +207,7 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
     let max_offset = total.saturating_sub(viewport);
     let offset = app.scroll.map(|o| o.min(max_offset)).unwrap_or(max_offset);
 
-    //A CLICK ARRIVES AS A TERMINAL CELL AND NOTHING ELSE KNOWS WHERE THE PANE IS OR WHAT IT IS SHOWING
+    //REMEMBER THE PANE'S GEOMETRY FOR CLICKS
     app.pane = inner;
     app.pane_offset = offset;
 
@@ -224,7 +220,7 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 
     frame.render_widget(Paragraph::new(visible), inner);
 
-    //THE DRAG-SELECTED RUN, PAINTED OVER THE ROWS THAT WERE JUST DRAWN
+    //PAINT THE DRAG SELECTION
     for y in inner.y..inner.y + viewport
     {
         let Some((first, last)) = app.selection_columns(offset + (y - inner.y)) else { continue };
@@ -235,10 +231,7 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         }
     }
 
-    //THE PICTURES GO OVER THE ROWS THE WRAP RESERVED FOR THEM. THE PROTOCOL IS ALREADY FITTED TO THE PANE
-    //(state::rewrap), SO WHAT IS ASKED FOR HERE IS A CROP: ONE HANGING OFF THE TOP OR THE BOTTOM OF THE
-    //PANE LOSES THOSE ROWS RATHER THAN BEING SQUEEZED INTO THE ONES LEFT, WHICH IS WHY SCROLLING PAST A
-    //PICTURE NO LONGER RESIZES IT. resize_encode_render RE-ENCODES ONLY WHEN THE CROP ITSELF CHANGED
+    //DRAW PICTURES OVER THEIR RESERVED ROWS
     for placement in app.placements(inner.width)
     {
         let bottom = placement.row + placement.height;
@@ -248,8 +241,7 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 
         if last <= first { continue; }
 
-        //THE CROP COMES OFF WHICHEVER END IS OFF SCREEN, AND CAN ONLY COME OFF ONE OF THEM - SO A PANE
-        //TOO SHORT TO HOLD THE WHOLE PICTURE CUTS THE END THAT IS FURTHER OUT
+        //CROP WHICHEVER END IS FURTHER OFF SCREEN
         let clip_top = offset.saturating_sub(placement.row) > bottom.saturating_sub(offset + viewport);
 
         let area = Rect
@@ -269,23 +261,16 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         }
     }
 
-    //THE BACKLOG IS THE ONE THING THE MESSAGE PANE CANNOT SHOW BY ITSELF
+    //SHOW THE BACKLOG
     draw_scrollbar(frame, area, total as usize, viewport as usize, offset as usize);
 }
 
-//A SCROLLBAR DOWN THE RIGHT-HAND BORDER OF A BOX WHOSE LIST DOES NOT FIT. IT REPLACES BORDER CELLS RATHER THAN
-//CLAIMING A COLUMN OF ITS OWN, SO NOTHING GETS NARROWER FOR HAVING ONE, AND IT IS DRAWN ONLY WHILE THERE IS
-//SOMETHING OFF-SCREEN - A VISIBLE BAR ALWAYS MEANS "THERE IS MORE", NEVER JUST "THIS IS A LIST".
-//THE THUMB IS SIZED AND PLACED HERE INSTEAD OF BY ratatui's Scrollbar BECAUSE THAT ONE NEVER QUITE LANDS ON EITHER
-//END OF THE TRACK, AND THE ONE THING THE BAR HAS TO SAY UNAMBIGUOUSLY IS WHEN THE USER IS AT THE BOTTOM
-//WHERE A SCROLLING LIST STARTS DRAWING. THE OFFSET IS KEPT BY THE LIST BETWEEN FRAMES AND ONLY MOVES WHEN THE
-//SELECTION RUNS INTO THE GAP AT EITHER EDGE - DERIVING IT FROM THE SELECTION ALONE PINS THE SELECTION TO AN EDGE,
-//WHICH BOTH HIDES THAT THERE IS MORE BELOW AND SCROLLS ON EVERY SINGLE KEY ON THE WAY BACK UP
+//FIRST VISIBLE ROW OF A SCROLLING LIST
 fn window(offset: usize, selected: usize, total: usize, visible: usize) -> usize
 {
     let max = total.saturating_sub(visible);
 
-    //A LIST TOO SHORT TO HOLD TWO GAPS AND A SELECTION KEEPS WHATEVER IT CAN
+    //A SHORT LIST KEEPS WHAT IT CAN
     let gap = SCROLL_GAP.min(visible.saturating_sub(1) / 2);
 
     let mut first = offset.min(max);
@@ -297,6 +282,7 @@ fn window(offset: usize, selected: usize, total: usize, visible: usize) -> usize
     first.min(max)
 }
 
+//SCROLLBAR DOWN A BOX'S RIGHT BORDER
 fn draw_scrollbar(frame: &mut Frame, area: Rect, total: usize, visible: usize, first: usize)
 {
     if total <= visible || visible == 0 || area.width == 0 || area.height < 3 { return; }
@@ -307,7 +293,7 @@ fn draw_scrollbar(frame: &mut Frame, area: Rect, total: usize, visible: usize, f
 
     let max_first = total - visible;
 
-    //ROUNDED, SO A LONG LIST STILL GETS A THUMB AND A SHORT SCROLL STILL MOVES IT
+    //ROUND SO THE THUMB IS NEVER EMPTY
     let thumb = ((visible * track + total / 2) / total).clamp(1, track);
     let room = track - thumb;
     let start = if max_first == 0 { 0 } else { (first.min(max_first) * room + max_first / 2) / max_first };
@@ -331,9 +317,7 @@ fn draw_scrollbar(frame: &mut Frame, area: Rect, total: usize, visible: usize, f
     }
 }
 
-//THE LOGO GOES IN LAST AND CLAIMS NO CELL THAT IS ALREADY SPOKEN FOR: ON A FREE CELL IT DRAWS ITS OWN GLYPH, AND
-//UNDER A CHARACTER SOMEBODY ELSE PUT THERE IT ONLY TAKES THE BACKGROUND - SO MESSAGES READ OVER THE LOGO INSTEAD
-//OF PUNCHING HOLES IN IT, AND THE SHAPE STAYS WHOLE EITHER WAY
+//DRAW THE LOGO ON FREE CELLS ONLY
 fn draw_logo(frame: &mut Frame, area: Rect)
 {
     let rows = LOGO.lines().collect::<Vec<&str>>();
@@ -354,8 +338,7 @@ fn draw_logo(frame: &mut Frame, area: Rect)
 
             let Some(cell) = buffer.cell_mut((x + column as u16, y + row_index as u16)) else { continue; };
 
-            //A PAINTED BACKGROUND IS AS MUCH A CLAIM AS A CHARACTER IS: A CODE BLOCK'S PADDING IS BLANK
-            //CELLS THAT ARE STILL PART OF ITS BOX, AND THE LOGO COMING THROUGH THEM WOULD PUNCH HOLES IN IT
+            //A PAINTED BACKGROUND IS A CLAIMED CELL
             if cell.symbol().trim().is_empty() && cell.bg == Color::Reset //FREE CELL - THE LOGO OWNS IT OUTRIGHT
             {
                 cell.set_char(symbol);
@@ -370,7 +353,7 @@ fn draw_logo(frame: &mut Frame, area: Rect)
 
 fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect)
 {
-    //THE ONLINE LIST TAKES WHATEVER THE OTHER PANELS LEAVE BEHIND
+    //ONLINE LIST TAKES THE REST
     let mut constraints = vec![Constraint::Min(3)];
     let mut panels = vec![Panel::Online];
 
@@ -411,7 +394,7 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    //ID FIRST, RIGHT-ALIGNED, SO THE USERNAMES LINE UP IN ONE COLUMN
+    //ID COLUMN, RIGHT-ALIGNED
     let width = app.online.iter().map(|user| user.id.to_string().len()).max().unwrap_or(1);
 
     let me = app.username.clone();
@@ -468,7 +451,7 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
 
     let lines = app.voice.iter().map(|user|
     {
-        //A MUTE ONLY MEANS ANYTHING WHILE WE ARE THE ONE LISTENING
+        //MUTE ONLY SHOWS WHILE WE LISTEN
         #[cfg(feature = "client_voice")]
         let muted = app.voice_enabled && options::is_muted(if user.is_local { None } else { Some(user.id) });
 
@@ -487,7 +470,7 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
             theme::DIM
         };
 
-        //NO PING FOR SOMEBODY WE ARE NOT RECEIVING - THE ROSTER SAYS THEY ARE IN VOICE, NOTHING MORE
+        //NO PING FOR SOMEBODY WE DO NOT RECEIVE
         let latency = match user.latency
         {
             Some(latency) => format!(" {latency}ms"),
@@ -536,11 +519,11 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
     let [gutter, text_area] = Layout::horizontal([Constraint::Length(2), Constraint::Min(0)]).areas(inner);
     frame.render_widget(Paragraph::new(Span::styled("> ", theme::ACCENT)), gutter);
 
-    //SCROLL THE INPUT SO THE CURSOR STAYS VISIBLE IN A CAPPED-HEIGHT BOX
+    //SCROLL THE INPUT TO THE CURSOR
     let offset = cursor.1.saturating_sub(text_area.height.saturating_sub(1));
     frame.render_widget(Paragraph::new(lines).scroll((offset, 0)), text_area);
 
-    //NO CARET WHILE AN OVERLAY OWNS THE KEYBOARD (THE CONNECT PROMPT DRAWS ITS OWN)
+    //NO CARET WHILE AN OVERLAY HAS THE KEYBOARD
     if app.settings.open || app.tofu.is_some() || app.login.is_some() { return; }
 
     frame.set_cursor_position(Position::new
@@ -552,15 +535,14 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
 
 fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect)
 {
-    //HOW MANY ROWS THERE ARE, HOW MANY FIT AND WHAT THEY ARE CALLED - THE BOX IS MEASURED FROM THAT, AND ONLY THEN
-    //IS THERE A WIDTH TO FILL
+    //ROW COUNT, VISIBLE ROWS AND LABELS
     let (total, selected, title) = match &app.palette.mode
     {
         PaletteMode::Hidden => return,
 
         PaletteMode::Menu(matches, selected) => (matches.len(), *selected, String::from(" Commands ")),
 
-        //THE PARAMETER NAMES ITSELF - THE LIST IS ITS VOCABULARY, NOT THE COMMAND'S
+        //PARAMETER VALUE LIST
         PaletteMode::Values(values) =>
             (values.matches.len(), values.selected, format!(" {} ", capitalize(values.arg.name))),
 
@@ -569,8 +551,7 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect)
 
     let rows = total.min(palette::MAX_ROWS);
 
-    //KEEP THE SELECTION IN VIEW, A GAP SHORT OF EITHER EDGE - ONE PLACE, SO THE ROWS AND THE SCROLLBAR CANNOT
-    //DISAGREE ABOUT WHICH ONES THEY ARE
+    //KEEP THE SELECTION IN VIEW
     let first = window(app.palette.offset, selected, total, rows);
 
     app.palette.offset = first;
@@ -579,7 +560,7 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect)
 
     if area.height < height || area.width < 10 { return; }
 
-    //THE POPUP SITS ON THE BOTTOM EDGE OF THE MESSAGE PANE, DIRECTLY ABOVE THE INPUT
+    //POPUP ABOVE THE INPUT
     let popup = Rect
     {
         x: area.x,
@@ -588,7 +569,7 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect)
         height,
     };
 
-    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS, SO THE BASE FOREGROUND GOES BACK ON
+    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
     frame.buffer_mut().set_style(popup, theme::TEXT);
 
@@ -611,7 +592,7 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect)
     draw_scrollbar(frame, popup, total, rows, first);
 }
 
-//ONE ROW PER ANSWER THE PARAMETER ACCEPTS, EACH SHOWING ITS OWN COLOR - A NAME ALONE WOULD STILL BE A GUESS
+//ONE COLORED ROW PER ACCEPTED VALUE
 fn value_lines(values: &Values, rows: usize, first: usize) -> Vec<Line<'static>>
 {
     values.matches.iter().skip(first).take(rows).enumerate().map(|(row, value)|
@@ -620,7 +601,7 @@ fn value_lines(values: &Values, rows: usize, first: usize) -> Vec<Line<'static>>
 
         let mut spans = vec![Span::styled(if selected { "▌" } else { " " }, theme::ACCENT)];
 
-        //THE SWATCH IS PAINTED AS A BACKGROUND, SO EVEN black AND dark_grey ARE SOMETHING TO LOOK AT
+        //PAINT THE SWATCH AS A BACKGROUND
         if let Some(color) = values.swatch(value)
         {
             spans.push(Span::styled("    ", Style::new().bg(Color::from_crossterm(color))));
@@ -635,10 +616,10 @@ fn value_lines(values: &Values, rows: usize, first: usize) -> Vec<Line<'static>>
     }).collect()
 }
 
-//ONE ROW PER COMMAND (OR THE SINGLE PARAMETER HINT), IN ALIGNED COLUMNS
+//ONE ROW PER COMMAND, OR THE PARAMETER HINT
 fn entry_lines(app: &App, rows: usize, first: usize, width: usize) -> Vec<Line<'static>>
 {
-    //(COMMAND, PARAMETER TO HIGHLIGHT) PER ROW, PLUS WHICH ROW IS SELECTED
+    //ROWS, PLUS WHICH ONE IS SELECTED
     let (entries, selected) = match &app.palette.mode
     {
         PaletteMode::Menu(matches, selected) =>
@@ -657,7 +638,7 @@ fn entry_lines(app: &App, rows: usize, first: usize, width: usize) -> Vec<Line<'
         _ => return Vec::new(),
     };
 
-    //COLUMNS ARE MEASURED ACROSS THE VISIBLE ROWS SO DESCRIPTIONS AND SHORTCUTS LINE UP
+    //MEASURE COLUMNS ACROSS VISIBLE ROWS
     let signature_width = entries.iter().map(|(entry, _)| entry.width()).max().unwrap_or(0);
     let shortcut_width = entries.iter().map(|(entry, _)| entry.shortcut().width()).max().unwrap_or(0);
 
@@ -665,14 +646,14 @@ fn entry_lines(app: &App, rows: usize, first: usize, width: usize) -> Vec<Line<'
     {
         let mut spans = vec![Span::styled(if Some(row) == selected { "▌" } else { " " }, theme::ACCENT)];
 
-        //THE ACTIVE PARAMETER'S OWN DESCRIPTION TAKES OVER THE COLUMN WHILE IT'S BEING TYPED
+        //SHOW THE ACTIVE PARAMETER'S DESCRIPTION
         let description = active.and_then(|i| entry.args().get(i)).map_or(entry.description(), |arg| arg.description);
 
         spans.extend(entry.spans(*active));
         spans.push(Span::raw(" ".repeat(signature_width - entry.width() + 2)));
         spans.push(Span::styled(description.to_string(), theme::DIM));
 
-        //SHORTCUTS HUG THE RIGHT EDGE, IN THEIR OWN COLUMN
+        //SHORTCUTS IN THE RIGHT COLUMN
         if shortcut_width > 0
         {
             let used = 1 + signature_width + 2 + description.width();
@@ -688,7 +669,7 @@ fn entry_lines(app: &App, rows: usize, first: usize, width: usize) -> Vec<Line<'
     }).collect()
 }
 
-//"COLOR" -> "Color" - PARAMETER NAMES ARE STORED SHOUTED, TITLES ARE NOT
+//"COLOR" -> "Color"
 fn capitalize(name: &str) -> String
 {
     let mut chars = name.chars();
@@ -700,7 +681,7 @@ fn capitalize(name: &str) -> String
     }
 }
 
-//THE /settings OVERLAY - ONE CENTERED BOX, EITHER THE SETTING ROWS OR THE DEVICE PICKER ON TOP OF THEM
+//THE /settings OVERLAY
 fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 {
     let width = SETTINGS_WIDTH.min(area.width.saturating_sub(2)).max(1);
@@ -708,24 +689,21 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 
     if area.height < 5 || inner_width < 12 { return; }
 
-    //THE PICKER BORROWS THE SAME BOX, SO BOTH MODES ARE MEASURED THE SAME WAY
+    //BOTH MODES SHARE THE BOX
     let (title, total, selected) = match &state.picker
     {
         Some(picker) => (picker.title.to_string(), picker.entries.len(), picker.selected),
         None => (state.title(), state.rows.len(), state.selected),
     };
 
-    //THE SERVER'S COMMENT ON A KEY IS A WHOLE SENTENCE AND HAS NO BUSINESS IN A TITLE BAR, WHERE IT SHARES
-    //THE WIDTH WITH THE TITLE AND IS CUT OFF. IT IS WRAPPED INTO THE FOOT OF THE BOX INSTEAD, ACROSS THE
-    //FULL WIDTH AND OVER AS MANY LINES AS IT NEEDS
+    //WRAP THE SELECTED KEY'S COMMENT
     let hint_lines = match state.picker.is_none().then(|| state.rows.get(state.selected)).flatten()
     {
         Some(row) => description_lines(state, row, inner_width as u16),
         None => Vec::new(),
     };
 
-    //THE FOOT IS SIZED FOR THE LONGEST COMMENT IN THE BOX, NOT FOR THE ONE UNDER THE CURSOR - OTHERWISE THE
-    //WHOLE BOX GROWS AND SHRINKS AS THE SELECTION MOVES, WHICH IS UNREADABLE TO SCROLL THROUGH
+    //SIZE THE FOOT FOR THE LONGEST COMMENT
     let hint_height = match state.picker.is_some()
     {
         true => 0,
@@ -736,7 +714,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 
     let room = area.height.saturating_sub(4) as usize; //BORDERS PLUS A LINE OF AIR TOP AND BOTTOM
 
-    //THE RULE ABOVE IT COUNTS TOO - AND ON A TERMINAL WITH NO ROOM FOR BOTH, THE ROWS WIN
+    //THE ROWS WIN WHEN THERE IS NO ROOM
     let footer = match hint_height { 0 => 0, height => height + 1 };
     let footer = if room > footer { footer } else { 0 };
 
@@ -748,8 +726,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
         None => total.min(rows_room),
     }.max(1);
 
-    //KEEP THE SELECTION IN VIEW, A GAP SHORT OF EITHER EDGE - AND HAND THE LIST BACK BOTH WHERE THE VIEW ENDED
-    //UP AND HOW MANY ROWS FIT, WHICH IS WHAT PageUp/PageDown MOVE BY
+    //OFFSET AND VISIBLE ROW COUNT
     let offset = match &state.picker
     {
         Some(picker) => picker.offset,
@@ -766,14 +743,14 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
         None => state.offset = first,
     }
 
-    //THE VALUE COLUMN STARTS RIGHT BEHIND THE LONGEST LABEL, NOT AT SOME GUESSED OFFSET
+    //VALUE COLUMN BEHIND THE LONGEST LABEL
     let label_width = state.rows.iter().filter_map(|row| match row
     {
         Row::Item(item) => Some(item.label.width()),
         Row::Header(_) | Row::Action(_) => None,
     }).max().unwrap_or(0).min(inner_width.saturating_sub(SETTINGS_VALUE_WIDTH as usize + 3));
 
-    //ON A NARROW TERMINAL THE LABELS GIVE WAY FIRST - THE VALUES ARE WHAT THE USER IS HERE FOR
+    //LABELS GIVE WAY FIRST ON A NARROW TERMINAL
 
     let mut lines = match &state.picker
     {
@@ -792,7 +769,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 
     let rows_height = lines.len() as u16 + 2; //WHAT THE SCROLLBAR IS ALLOWED TO RUN DOWN
 
-    //THE DESCRIPTION SITS UNDER A RULE, SO IT READS AS AN EXPLANATION OF THE SELECTED ROW AND NOT AS A ROW
+    //DESCRIPTION UNDER A RULE
     if footer > 0
     {
         lines.push(Line::from(Span::styled("\u{2500}".repeat(inner_width), theme::BORDER)));
@@ -813,7 +790,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
         height,
     };
 
-    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS, SO THE BASE FOREGROUND GOES BACK ON
+    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
     frame.buffer_mut().set_style(popup, theme::TEXT);
 
@@ -836,14 +813,11 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 
     frame.render_widget(Paragraph::new(lines), inner);
 
-    //BOTH MODES SCROLL - THE DEVICE PICKER ALWAYS, THE SETTING ROWS ON A SHORT TERMINAL. THE TRACK IS THE
-    //ROWS' OWN HEIGHT, NOT THE BOX'S: THE DESCRIPTION UNDER THEM IS NOT SOMETHING THE BAR IS MEASURING
+    //THE TRACK IS THE ROWS' OWN HEIGHT, NOT THE BOX'S
     draw_scrollbar(frame, Rect { height: rows_height, ..popup }, total, visible, first);
 }
 
-//THE SERVER IDENTITY PROMPT. THE WHOLE POINT IS THAT THE FINGERPRINT IS READABLE AND THE SAFE ANSWER IS
-//THE ONE ALREADY SELECTED - TRUSTING TAKES A DELIBERATE MOVE PLUS ⏎. A MISMATCH GOES ONE STEP FURTHER AND
-//ASKS A SECOND TIME (tofu::Stage::Confirm), WHERE THE ANSWER HAS TO BE TYPED OUT.
+//SERVER IDENTITY PROMPT
 fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
 {
     let width = TOFU_WIDTH.min(area.width.saturating_sub(2)).max(1);
@@ -867,7 +841,7 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
             fingerprint below matches the one the server's operator published.",
     };
 
-    //THE BODY IS WRAPPED WITH THE SAME WRAPPER THE MESSAGE PANE USES, SO A NARROW TERMINAL STAYS READABLE
+    //WRAP THE BODY
     let mut lines = state::wrap_line(&Line::from(Span::styled(warning, theme::NOTICE)), inner_width);
 
     lines.push(Line::default());
@@ -877,7 +851,7 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
         Span::raw(prompt.host.clone()),
     ]));
 
-    //ON A MISMATCH BOTH FINGERPRINTS ARE ON SCREEN AT ONCE - THE DECISION IS A COMPARISON, NOT A GUESS
+    //SHOW BOTH FINGERPRINTS ON A MISMATCH
     for (index, row) in prompt.pinned_fingerprint().into_iter().enumerate()
     {
         lines.push(Line::from(vec!
@@ -941,7 +915,7 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
         height,
     };
 
-    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS, SO THE BASE FOREGROUND GOES BACK ON
+    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
     frame.buffer_mut().set_style(popup, theme::TEXT);
 
@@ -957,7 +931,7 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
-    //ONE COLUMN OF AIR EACH SIDE, MATCHING WHAT inner_width WAS MEASURED AGAINST
+    //ONE COLUMN OF AIR EACH SIDE
     let [_, text_area, _] = Layout::horizontal
     ([
         Constraint::Length(1),
@@ -990,9 +964,7 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
 
     lines.push(Line::default());
 
-    //THE STATUS ROW, ALWAYS IN THE SAME PLACE: WHAT IS HAPPENING, WHAT WENT WRONG, OR THE SERVER'S RULES.
-    //IT IS WRAPPED, NOT TRUNCATED - AN OS ERROR IS AS LONG AS IT IS, AND THE BOX GROWS A ROW INSTEAD OF
-    //SPILLING PAST ITS OWN BORDER.
+    //STATUS ROW, WRAPPED
     let status = match (login.busy, login.error.as_deref(), login.hint.as_deref())
     {
         (true, ..) => Line::from(Span::styled(login.waiting(), theme::ACCENT)),
@@ -1003,7 +975,7 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
 
     lines.extend(state::wrap_line(&status, inner_width));
 
-    //THE PROXY IS THE ADDRESS STEP'S BUSINESS - BY THE TIME WE ARE LOGGING IN IT HAS ALREADY DONE ITS JOB
+    //THE PROXY BELONGS TO THE ADDRESS STEP
     if login.stage == LoginStage::Address && options::socks5_enabled()
     {
         let proxy = Line::from(Span::styled(format!("Through SOCKS5 {}",
@@ -1022,7 +994,7 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
         height,
     };
 
-    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS, SO THE BASE FOREGROUND GOES BACK ON
+    frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
     frame.buffer_mut().set_style(popup, theme::TEXT);
 
@@ -1041,7 +1013,7 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
-    //ONE COLUMN OF AIR EACH SIDE, MATCHING WHAT inner_width WAS MEASURED AGAINST
+    //ONE COLUMN OF AIR EACH SIDE
     let [_, text_area, _] = Layout::horizontal
     ([
         Constraint::Length(1),
@@ -1051,7 +1023,7 @@ fn draw_login(frame: &mut Frame, login: &Login, area: Rect)
 
     frame.render_widget(Paragraph::new(lines), text_area);
 
-    //THIS BOX IS THE ONLY THING BEING TYPED INTO WHILE IT IS UP, SO IT KEEPS THE CARET
+    //THIS BOX KEEPS THE CARET
     if !login.busy
     {
         frame.set_cursor_position(Position::new
@@ -1067,8 +1039,7 @@ fn button(label: &'static str, selected: bool, style: Style) -> Span<'static>
     if selected { Span::styled(label, style.patch(theme::SELECTED)) } else { Span::styled(label, theme::DIM) }
 }
 
-//THE SELECTED ROW'S EXPLANATION, WRAPPED RATHER THAN CUT: server.toml's COMMENTS ARE FULL SENTENCES AND
-//THE ONLY THING SAYING WHAT A KEY DOES, SO LOSING THE END OF ONE LOSES THE POINT OF IT
+//WRAP THE SELECTED ROW'S DESCRIPTION
 fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'static>>
 {
     let mut spans = Vec::new();
@@ -1077,7 +1048,7 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
     {
         Row::Header(_) => return Vec::new(),
 
-        //A BUTTON SAYS WHAT PRESSING IT DOES - AND, WHEN IT WILL NOT DO IT YET, WHY NOT
+        //SAY WHAT A BUTTON DOES, OR WHY IT WILL NOT
         Row::Action(label) if **label == *settings::RESTART_LABEL =>
         {
             spans.push(Span::styled("Restart the server \u{2014} every client is disconnected and the whole config is read again.", theme::DIM));
@@ -1092,7 +1063,7 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
         {
             if !item.hint.is_empty() { spans.push(Span::styled(item.hint.clone(), theme::DIM)); }
 
-            //A KEY THE SERVER ONLY READS AT STARTUP IS SAID SO HERE - IT IS STORED EITHER WAY, JUST NOT USED YET
+            //MARK A STARTUP-ONLY KEY
             if item.restart
             {
                 let note = match spans.is_empty() { true => "restart required", false => " \u{b7} restart required" };
@@ -1111,17 +1082,17 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
 {
     let item = match row
     {
-        //A SECTION HEADING CARRIES A RULE OUT TO THE EDGE, WHICH IS WHAT SEPARATES THE GROUPS
+        //SECTION HEADING WITH A RULE
         Row::Header(label) => return Line::from(vec!
         [
             Span::styled(format!(" {label} "), theme::TITLE),
             Span::styled("─".repeat(width.saturating_sub(label.width() + 2)), theme::BORDER),
         ]),
 
-        //A BUTTON IS THE WHOLE ROW - IT HAS NO VALUE COLUMN TO LINE UP WITH
+        //A BUTTON IS THE WHOLE ROW
         Row::Action(label) =>
         {
-            //A BUTTON IS LIVE WHEN IT HAS SOMETHING TO DO: Save WITH EDITED ROWS IN THE BOX, Restart WITH NONE
+            //A BUTTON IS LIVE WHEN IT HAS SOMETHING TO DO
             let restart = **label == *settings::RESTART_LABEL;
             let live = if restart { !_state.unsaved() } else { _state.unsaved() };
             let armed = restart && _state.confirm;
@@ -1166,17 +1137,17 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
 
     let value_width = width.saturating_sub(label_width + 3);
 
-    //THE ROW BEING TYPED INTO SHOWS THE TEXT AS IT STANDS, CARET AND ALL - THE STORED VALUE IS BEHIND IT
+    //SHOW THE TEXT BEING TYPED, CARET AND ALL
     match _state.edit.as_ref().filter(|_| selected)
     {
         Some(edit) => spans.push(Span::styled(format!("{}▏", truncate(edit, value_width.saturating_sub(1))), theme::ACCENT)),
         None => spans.extend(value_spans(_state, &item.value, value_width)),
     }
 
-    //AN EDITED ROW IS MARKED UNTIL THE SERVER HAS SAID WHAT IT STORED
+    //MARK AN EDITED ROW
     if item.changed { spans.push(Span::styled(" ●", theme::NOTICE)); }
 
-    //AND ONE THE SERVER WILL NOT PICK UP UNTIL IT IS RESTARTED CARRIES THAT ON THE ROW, SAVED OR NOT
+    //MARK A ROW NEEDING A RESTART
     if item.restart { spans.push(Span::styled(" ↻", theme::DIM)); }
 
     let line = Line::from(spans);
@@ -1199,7 +1170,7 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
         #[cfg(feature = "client_voice")]
         Value::Volume(percent) =>
         {
-            //THE BAR IS THE WHOLE SUPPORTED RANGE, SO 100% SITS EXACTLY IN THE MIDDLE
+            //THE BAR IS THE WHOLE RANGE
             let filled = (*percent as usize * SLIDER_WIDTH).div_ceil(voice_options::VOLUME_MAX as usize);
 
             vec!
@@ -1227,7 +1198,7 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
 #[cfg(feature = "client_voice")]
 fn picker_line(entry: &DeviceEntry, selected: bool, width: usize) -> Line<'static>
 {
-    //ENTRY 0 IS THE EMPTY CONFIG VALUE, WHICH MEANS "WHATEVER THE SYSTEM PICKS"
+    //ENTRY 0 IS THE SYSTEM DEFAULT
     let (text, style) = if entry.id.is_empty()
     {
         (String::from(settings::DEFAULT_DEVICE), theme::DIM)
@@ -1276,7 +1247,7 @@ fn right_status(_app: &App) -> String
     #[cfg(feature = "client_voice")]
     if _app.voice_enabled
     {
-        //THE CAPTURE CALLBACK TREATS 0% AS OFF, SO THE STATUS LINE HAD BETTER AGREE
+        //0% IS OFF
         let off = options::is_muted(None) || voice_options::get_input_volume() == 0;
 
         parts.push(String::from(if off { "mic off" } else { "mic on" }));
@@ -1287,7 +1258,7 @@ fn right_status(_app: &App) -> String
     format!(" {} ", parts.join(" │ "))
 }
 
-//THE PANEL IS THE CHANNEL'S VOICE ROSTER, NOT OUR OWN SESSION - IT IS SHOWN WHETHER OR NOT WE ARE IN IT
+//THE CHANNEL'S VOICE ROSTER
 fn voice_visible(app: &App) -> bool
 {
     !app.voice.is_empty()

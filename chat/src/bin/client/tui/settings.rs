@@ -52,17 +52,17 @@ const VOLUME_STEP: u32 = 5;
 //ENUMS
 pub enum Value
 {
-    //THE CONFIG KEY IS THE TRUTH, invert FLIPS IT FOR KEYS PHRASED AS A NEGATIVE (disable_colors)
+    //A CONFIG KEY, invert FOR A NEGATIVE ONE
     Toggle { on: bool, invert: bool },
 
-    //THE TWO DATATYPES ONLY THE SERVER ROWS HAVE - BOTH ARE EDITED BY TYPING INTO THE ROW
+    //THE TWO SERVER-ONLY DATATYPES, EDITED BY TYPING
     Number(i64),
     Text(String),
 
     #[cfg(feature = "client_voice")]
     Volume(u32), //PERCENT
 
-    //THE cpal DEVICE ID, WHICH IS WHAT client.toml HOLDS - THE LABEL IS LOOKED UP FOR DISPLAY ONLY
+    //THE cpal DEVICE ID; THE LABEL IS DISPLAY ONLY
     #[cfg(feature = "client_voice")]
     Device { id: String, input: bool }, //EMPTY ID = SYSTEM DEFAULT
 }
@@ -81,12 +81,11 @@ pub struct Item
     pub key: String, //THE CONFIG KEY THIS ROW OWNS - client.toml's OR THE SERVER'S
     pub value: Value,
     pub hint: String,   //THE COMMENT THE SERVER SENT ALONG (EMPTY ON A CLIENT ROW)
-    pub changed: bool,  //EDITED AND NOT SAVED YET - ONLY A SERVER ROW IS EVER LEFT UNSAVED
-    pub restart: bool,  //SAVING IT STORES IT, BUT THE RUNNING SERVER KEEPS USING WHAT IT READ AT STARTUP
+    pub changed: bool,  //EDITED AND NOT SAVED YET
+    pub restart: bool,  //STORED ON SAVE, BUT ONLY READ AT STARTUP
 }
 
-//ONE DEVICE AS THE PICKER SHOWS IT. THE id IS WHAT client.toml HOLDS AND WHAT THE VOICE CLIENT OPENS -
-//THE label IS DISPLAY ONLY, AND IS NOT UNIQUE (ALSA HANDS OUT THE SAME DESCRIPTION TO SEVERAL PCMs).
+//ONE DEVICE AS THE PICKER SHOWS IT
 #[derive(Clone, Default)]
 pub struct DeviceEntry
 {
@@ -100,7 +99,7 @@ pub struct Picker //DEVICE LIST OPENED ON TOP OF THE SETTINGS ROWS
     pub entries: Vec<DeviceEntry>, //ENTRY 0 IS ALWAYS THE SYSTEM DEFAULT
     pub selected: usize,
     pub row: usize,    //THE SETTINGS ROW THAT OPENED IT
-    pub offset: usize, //FIRST VISIBLE ENTRY - THE DRAW PATH KEEPS IT, THE SAME WAY IT KEEPS Settings::offset
+    pub offset: usize, //FIRST VISIBLE ENTRY
 }
 
 #[derive(Default)]
@@ -120,25 +119,23 @@ pub struct Settings //THE /settings OVERLAY, IN EITHER OF ITS TWO MODES
     pub selected: usize,
     pub picker: Option<Picker>,
 
-    //WHERE THE VIEW STANDS, KEPT BETWEEN FRAMES SO IT ONLY MOVES WHEN THE SELECTION RUNS INTO THE GAP AT
-    //EITHER EDGE - DERIVING IT FROM THE SELECTION ALONE PINS THE SELECTION TO AN EDGE AND SCROLLS ON EVERY
-    //KEY. BOTH ARE WRITTEN BY THE DRAW PATH, WHICH IS THE ONLY PLACE THAT KNOWS HOW MANY ROWS FIT
+    //WHERE THE VIEW STANDS, WRITTEN BY THE DRAW PATH
     pub offset: usize,
-    pub page: usize, //ROWS THE LAST FRAME FIT, SO PageUp/PageDown MOVE BY WHAT IS ACTUALLY ON SCREEN
+    pub page: usize, //ROWS THE LAST FRAME FIT
 
-    //THE ROWS BELONG TO server.toml, WHICH IS NOT OURS TO WRITE - IT IS EDITED HERE AND SAVED IN ONE GO
+    //server.toml's ROWS, SAVED IN ONE GO
     pub server: bool,
     pub edit: Option<String>, //WHAT IS BEING TYPED INTO THE SELECTED ROW
-    pub saving: bool,         //A SAVE IS ON THE WIRE, WAITING FOR THE SERVER TO ANSWER WITH WHAT IT STORED
+    pub saving: bool,         //A SAVE IS ON THE WIRE
 
     save: Option<Vec<ServerSetting>>, //ROWS THE EVENT LOOP STILL HAS TO PUT ON THE WIRE
 
-    //THE STARTUP-ONLY KEYS IN THAT SAVE, SO THE EVENT LOOP CAN SAY THEY ARE STORED BUT NOT IN USE YET
+    //THE STARTUP-ONLY KEYS IN THAT SAVE
     pub restart_note: Option<String>,
 
-    //THE RESTART BUTTON ENDS EVERY SESSION ON THE SERVER, SO IT IS ARMED BY ONE PRESS AND FIRED BY THE NEXT
+    //ONE PRESS ARMS THE RESTART, THE NEXT FIRES IT
     pub confirm: bool,
-    restart: bool, //ARMED, CONFIRMED, AND STILL WAITING FOR THE EVENT LOOP TO PUT IT ON THE WIRE
+    restart: bool, //ARMED, CONFIRMED
 
     #[cfg(feature = "client_voice")]
     devices: Devices,
@@ -183,7 +180,7 @@ impl Settings
         }
     }
 
-    //OPEN THE OVERLAY, READING EVERY VALUE OUT OF THE CONFIG ONCE (THE DRAW PATH NEVER RE-READS IT)
+    //OPEN THE OVERLAY, READING THE CONFIG ONCE
     pub fn open(&mut self, devices: Devices)
     {
         let mut rows: Vec<Row> = Vec::new();
@@ -246,8 +243,7 @@ impl Settings
         self.step(1); //LAND ON THE FIRST ITEM, NOT ON THE HEADER ABOVE IT
     }
 
-    //THE SERVER'S OWN CONFIG. NOTHING HERE NAMES A KEY - THE ROWS, THE HEADINGS AND THE HINTS ARE ALL
-    //WHATEVER server.toml TURNED OUT TO HOLD, SO A KEY ADDED THERE NEEDS NO CLIENT CHANGE AT ALL
+    //THE SERVER'S OWN CONFIG ROWS
     pub fn open_server(&mut self, settings: Vec<ServerSetting>)
     {
         let mut rows: Vec<Row> = Vec::new();
@@ -274,7 +270,7 @@ impl Settings
                 },
                 hint: setting.description,
                 changed: false,
-                restart: setting.restart, //THE SERVER SAYS WHICH OF ITS OWN KEYS IT ONLY READS AT STARTUP
+                restart: setting.restart, //THE SERVER NAMES ITS STARTUP-ONLY KEYS
             }));
         }
 
@@ -307,7 +303,7 @@ impl Settings
         self.page = 0;
     }
 
-    pub fn title(&self) -> String //WHAT THE BOX CALLS ITSELF - AN UNSAVED SERVER ROW IS SAID SO IN THE TITLE
+    pub fn title(&self) -> String //WHAT THE BOX CALLS ITSELF
     {
         if !self.server { return String::from(" Settings "); }
 
@@ -321,28 +317,27 @@ impl Settings
         self.rows.iter().any(|row| matches!(row, Row::Item(item) if item.changed))
     }
 
-    //THE ROWS THE EVENT LOOP STILL HAS TO SEND - IT OWNS THE SOCKET, THIS OVERLAY DOES NOT
+    //THE ROWS THE EVENT LOOP STILL HAS TO SEND
     pub fn take_save(&mut self) -> Option<Vec<ServerSetting>> { self.save.take() }
 
-    //AND SO IS A CONFIRMED RESTART - THE OVERLAY NEVER TOUCHES THE SOCKET ITSELF
+    //AND A CONFIRMED RESTART
     pub fn take_restart(&mut self) -> bool { std::mem::take(&mut self.restart) }
 
-    //WHAT THE SERVER ANSWERED A SAVE WITH: THE CONFIG AS IT ACTUALLY STANDS NOW, SO A ROW IT REFUSED
-    //SNAPS BACK INSTEAD OF SITTING THERE LOOKING APPLIED. THE SELECTION IS KEPT WHERE THE USER LEFT IT
+    //TAKE THE SAVED CONFIG, KEEPING THE SELECTION
     pub fn stored(&mut self, settings: Vec<ServerSetting>)
     {
         let selected = self.selected;
-        let offset = self.offset; //THE VIEW STAYS WHERE IT WAS TOO - THE ROWS ARE THE SAME ONES
+        let offset = self.offset; //THE VIEW STAYS WHERE IT WAS TOO
 
         self.open_server(settings);
         self.selected = selected.min(self.rows.len().saturating_sub(1));
         self.offset = offset;
 
-        //THE ROW THE SELECTION LANDED ON MAY BE A HEADING NOW
+        //THE ROW LANDED ON MAY BE A HEADING NOW
         if matches!(self.rows.get(self.selected), Some(Row::Header(_))) { self.step(1); }
     }
 
-    //MOVE THE SELECTION BY delta ROWS, SKIPPING HEADERS AND STOPPING AT BOTH ENDS
+    //MOVE THE SELECTION, SKIPPING HEADERS
     fn step(&mut self, delta: isize)
     {
         if self.rows.is_empty() { return; }
@@ -364,8 +359,7 @@ impl Settings
         }
     }
 
-    //PageUp/PageDown TURN THE PAGE: THE VIEW MOVES BY WHAT THE LAST FRAME FIT AND THE SELECTION GOES WITH IT,
-    //RATHER THAN THE SELECTION DRAGGING THE VIEW ALONG A ROW AT A TIME
+    //PageUp/PageDown MOVE BY WHAT THE FRAME FIT
     fn page_move(&mut self, direction: isize)
     {
         if self.rows.is_empty() { return; }
@@ -379,8 +373,7 @@ impl Settings
         self.land(target as usize, direction);
     }
 
-    //LAND ON index, OR ON THE NEAREST ROW THAT IS NOT A HEADING - HEADINGS ARE NOT SELECTABLE ANYWHERE ELSE
-    //EITHER, AND ONE AT THE VERY END IS WHY THE OTHER DIRECTION IS TRIED AS WELL
+    //LAND ON index, OR THE NEAREST NON-HEADING ROW
     fn land(&mut self, index: usize, direction: isize)
     {
         if self.rows.is_empty() { return; }
@@ -396,7 +389,7 @@ impl Settings
         if self.selected == before { self.step(-direction); }
     }
 
-    //Home/End GO TO THE ENDS OF THE LIST, AND TAKE THE VIEW WITH THEM (THE DRAW PATH CLAMPS THE OFFSET)
+    //Home/End GO TO THE ENDS OF THE LIST
     fn first_row(&mut self)
     {
         self.offset = 0;
@@ -409,7 +402,7 @@ impl Settings
         self.land(self.rows.len().saturating_sub(1), -1);
     }
 
-    //WHAT A STORED DEVICE ID IS CALLED - A DEVICE THAT IS NOT IN THE LIST ANY MORE FALLS BACK TO ITS RAW ID
+    //WHAT A STORED DEVICE ID IS CALLED
     #[cfg(feature = "client_voice")]
     pub fn device_label(&self, id: &str, input: bool) -> String
     {
@@ -420,7 +413,7 @@ impl Settings
         devices.iter().find(|device| device.id == id).map(|device| device.label.clone()).unwrap_or_else(|| String::from(id))
     }
 
-    //RE-READ THE DEVICE ROWS OUT OF THE CONFIG - THE VOICE CLIENT PUTS THE OLD PAIR BACK WHEN A SWITCH FAILS
+    //RE-READ THE DEVICE ROWS OUT OF THE CONFIG
     #[cfg(feature = "client_voice")]
     pub fn refresh_devices(&mut self)
     {
@@ -436,7 +429,7 @@ impl Settings
     }
 }
 
-//READ A BOOLEAN SETTING AS THE ROW SHOWS IT - invert IS FOR KEYS PHRASED AS A NEGATIVE (disable_colors)
+//READ A BOOLEAN AS THE ROW SHOWS IT
 fn toggle_value(key: &str, invert: bool) -> Value
 {
     let stored = config::read_config::<bool>(key);
@@ -446,11 +439,10 @@ fn toggle_value(key: &str, invert: bool) -> Value
 
 //FUNCTIONS
 //PUBLIC
-//ONE KEYPRESS WHILE THE OVERLAY IS UP. A CLIENT ROW IS WRITTEN THROUGH IMMEDIATELY - A SERVER ROW IS NOT
-//OURS TO WRITE, SO IT IS HELD UNTIL Save AND SENT IN ONE GO.
+//ONE KEYPRESS WHILE THE OVERLAY IS UP
 pub fn handle_key(app: &mut App, key: KeyEvent)
 {
-    //THE DEVICE PICKER OWNS THE KEYBOARD WHILE IT IS OPEN
+    //THE DEVICE PICKER OWNS THE KEYBOARD
     if app.settings.picker.is_some()
     {
         handle_picker_key(app, key);
@@ -464,10 +456,10 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
         return;
     }
 
-    //AN ARMED RESTART SURVIVES ONLY THE KEY THAT CONFIRMS IT - ANYTHING ELSE PUTS THE BUTTON BACK
+    //ANYTHING BUT THE CONFIRMING KEY DISARMS IT
     if !matches!(key.code, KeyCode::Enter | KeyCode::Char(' ')) { app.settings.confirm = false; }
 
-    //Ctrl+S SAVES FROM WHEREVER THE SELECTION IS - THE BUTTON IS AT THE BOTTOM OF A LONG LIST
+    //Ctrl+S SAVES FROM ANY ROW
     if app.settings.server && key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('s')
     {
         save(app);
@@ -516,7 +508,7 @@ pub fn scroll(app: &mut App, delta: isize)
 //PRIVATE
 fn handle_picker_key(app: &mut App, key: KeyEvent)
 {
-    //CLOSING THE PICKER TAKES IT OUT OF App, SO THOSE TWO CASES COME BEFORE THE BORROW BELOW
+    //CLOSING THE PICKER TAKES IT OUT OF App
     match key.code
     {
         KeyCode::Esc =>
@@ -529,7 +521,7 @@ fn handle_picker_key(app: &mut App, key: KeyEvent)
         {
             let Some(picker) = app.settings.picker.take() else { return };
 
-            //ENTRY 0 IS THE SYSTEM DEFAULT, WHICH IS AN EMPTY CONFIG VALUE
+            //ENTRY 0 IS THE SYSTEM DEFAULT
             let chosen = picker.entries.get(picker.selected).map(|entry| entry.id.clone()).unwrap_or_default();
 
             set_device(app, picker.row, chosen);
@@ -548,7 +540,7 @@ fn handle_picker_key(app: &mut App, key: KeyEvent)
         KeyCode::Up => picker.selected = if picker.selected == 0 { picker.entries.len() - 1 } else { picker.selected - 1 },
         KeyCode::Down => picker.selected = (picker.selected + 1) % picker.entries.len(),
 
-        //THE PICKER HAS NO HEADINGS, SO A PAGE IS JUST A CLAMPED JUMP - THE VIEW FOLLOWS THE SAME WAY
+        //THE PICKER HAS NO HEADINGS, SO A PAGE IS A JUMP
         KeyCode::PageUp | KeyCode::PageDown =>
         {
             let direction: isize = if key.code == KeyCode::PageUp { -1 } else { 1 };
@@ -566,7 +558,7 @@ fn handle_picker_key(app: &mut App, key: KeyEvent)
     }
 }
 
-//TYPING INTO A Number/Text ROW. Esc PUTS THE OLD VALUE BACK, ⏎ KEEPS WHAT WAS TYPED
+//TYPING INTO A Number/Text ROW
 fn handle_edit_key(app: &mut App, key: KeyEvent)
 {
     match key.code
@@ -579,7 +571,7 @@ fn handle_edit_key(app: &mut App, key: KeyEvent)
 
         KeyCode::Char(c) =>
         {
-            //A NUMBER ROW ONLY TAKES A NUMBER - THE MINUS SIGN ONLY AS THE FIRST CHARACTER
+            //A NUMBER ROW ONLY TAKES DIGITS AND A LEADING -
             let numeric = matches!(app.settings.rows.get(app.settings.selected), Some(Row::Item(item))
                 if matches!(item.value, Value::Number(_)));
 
@@ -602,7 +594,7 @@ fn commit_edit(app: &mut App) //KEEP WHAT WAS TYPED, IF THE ROW CAN HOLD IT
 
     match &item.value
     {
-        //AN UNPARSEABLE NUMBER IS NOT A CHANGE - THE ROW KEEPS WHAT IT HAD
+        //AN UNPARSEABLE NUMBER IS NOT A CHANGE
         Value::Number(current) => match edit.trim().parse::<i64>()
         {
             Ok(number) if number != *current =>
@@ -624,7 +616,7 @@ fn commit_edit(app: &mut App) //KEEP WHAT WAS TYPED, IF THE ROW CAN HOLD IT
     }
 }
 
-//WHAT THE SELECTED ROW HOLDS, COPIED OUT SO THE ACTIONS BELOW CAN TOUCH App AGAIN
+//WHAT THE SELECTED ROW HOLDS, COPIED OUT
 enum Selected
 {
     Toggle(bool),
@@ -661,14 +653,14 @@ fn selected(app: &App) -> Option<Selected>
     }
 }
 
-//LEFT/RIGHT: SLIDE A VOLUME, FLIP A TOGGLE, STEP A NUMBER, OR CYCLE A DEVICE WITHOUT OPENING THE PICKER
+//LEFT/RIGHT: SLIDE, FLIP, STEP OR CYCLE A ROW
 fn adjust(app: &mut App, direction: i32)
 {
     let row = app.settings.selected;
 
     match selected(app)
     {
-        //A TOGGLE ONLY HAS TWO STATES, SO EITHER DIRECTION MEANS THE OTHER ONE
+        //EITHER DIRECTION FLIPS A TOGGLE
         Some(Selected::Toggle(on)) => if (direction > 0) != on { toggle(app) },
 
         Some(Selected::Number(number)) =>
@@ -682,7 +674,7 @@ fn adjust(app: &mut App, direction: i32)
             }
         },
 
-        //A FREE-FORM STRING HAS NO NEXT VALUE TO STEP TO - IT IS TYPED
+        //A FREE-FORM STRING IS TYPED, NOT STEPPED
         Some(Selected::Text(_)) | Some(Selected::Action(_)) => {},
 
         #[cfg(feature = "client_voice")]
@@ -720,7 +712,7 @@ fn adjust(app: &mut App, direction: i32)
     }
 }
 
-//ENTER/SPACE: FLIP A TOGGLE, START TYPING INTO A VALUE, PRESS THE BUTTON, OR OPEN THE DEVICE PICKER
+//ENTER/SPACE: FLIP, TYPE, PRESS OR OPEN A ROW
 fn activate(app: &mut App)
 {
     let _row = app.settings.selected; //ONLY THE AUDIO ROWS NEED TO KNOW WHICH ROW THEY ARE
@@ -757,13 +749,12 @@ fn activate(app: &mut App)
     }
 }
 
-//THE ONE BUTTON THAT ENDS THE SESSION FOR EVERYBODY ON THE SERVER, SO IT IS ASKED TWICE - AND NEVER WHILE
-//THERE ARE EDITED ROWS IN THE BOX, WHICH THE RESTART WOULD THROW AWAY UNREAD
+//ARM THE RESTART, THEN FIRE IT
 fn restart(app: &mut App)
 {
     if !app.settings.server || app.settings.saving || app.settings.unsaved() { return; }
 
-    //THE FIRST PRESS ONLY ARMS IT - THE BUTTON AND THE LINE UNDER IT BOTH SAY SO UNTIL SOMETHING CLEARS IT
+    //THE FIRST PRESS ONLY ARMS IT
     if !app.settings.confirm
     {
         app.settings.confirm = true;
@@ -772,12 +763,11 @@ fn restart(app: &mut App)
 
     app.settings.restart = true;
 
-    //THE SERVER GOES DOWN WITH THIS, SO THERE IS NOTHING LEFT FOR THE BOX TO SHOW OR TO SAVE
+    //THE SERVER GOES DOWN WITH THIS
     app.settings.close();
 }
 
-//HAND THE EDITED ROWS TO THE EVENT LOOP, WHICH IS WHERE THE SOCKET IS. THE ROWS STAY MARKED UNTIL THE
-//SERVER SAYS WHAT IT STORED - Settings::stored REBUILDS THEM FROM ITS ANSWER
+//HAND THE EDITED ROWS TO THE EVENT LOOP
 fn save(app: &mut App)
 {
     if !app.settings.server { return; }
@@ -801,7 +791,7 @@ fn save(app: &mut App)
                 _ => return None,
             },
 
-            //THE SERVER IS THE ONE WHO KNOWS THESE - SENDING THEM BACK WOULD ONLY BE US QUOTING IT
+            //THE SERVER ALREADY KNOWS THESE
             section: String::new(),
             description: String::new(),
             restart: false,
@@ -810,7 +800,7 @@ fn save(app: &mut App)
 
     if changed.is_empty() { return; }
 
-    //A KEY THE SERVER ONLY READS AT STARTUP IS STORED LIKE ANY OTHER - IT JUST WILL NOT DO ANYTHING YET
+    //A STARTUP-ONLY KEY IS STORED LIKE ANY OTHER
     let restart: Vec<&str> = app.settings.rows.iter().filter_map(|row| match row
     {
         Row::Item(item) if item.changed && item.restart => Some(item.key.as_str()),
@@ -827,7 +817,7 @@ fn toggle(app: &mut App)
 {
     let server = app.settings.server;
 
-    //FLIP THE ROW FIRST, THEN LET GO OF IT - THE FOLLOW-UP TOUCHES App AS A WHOLE
+    //FLIP THE ROW, THEN LET GO OF IT
     let changed = match app.settings.rows.get_mut(app.settings.selected)
     {
         Some(Row::Item(item)) => match &item.value
@@ -850,12 +840,12 @@ fn toggle(app: &mut App)
 
     let Some((key, next, invert)) = changed else { return };
 
-    //A SERVER ROW IS NOT OURS TO WRITE ANYWHERE - IT GOES BACK OVER THE WIRE ON Save
+    //A SERVER ROW GOES BACK OVER THE WIRE ON Save
     if server { return; }
 
     config::client_write_bool(&key, if invert { !next } else { next });
 
-    //THE INTERFACE ROWS ARE READ THROUGH App::theme, AND APPLY TO THE WHOLE PANE AT ONCE
+    //THE INTERFACE ROWS ARE READ THROUGH App::theme
     app.reload_theme();
 
     #[cfg(feature = "client_voice")]
@@ -881,14 +871,14 @@ fn set_device(app: &mut App, row: usize, chosen: String)
 
     config::client_write(&key, &chosen);
 
-    //A RUNNING VOICE SESSION REBUILDS ITS CPAL STREAMS ON THIS, WITHOUT DROPPING THE SESSION ITSELF
+    //A RUNNING VOICE SESSION REBUILDS ITS STREAMS
     voice_options::mark_devices_changed();
 }
 
 #[cfg(not(feature = "client_voice"))]
 fn set_device(_app: &mut App, _row: usize, _chosen: String) {}
 
-//THE SYSTEM DEFAULT PLUS EVERY DEVICE cpal REPORTED, WITH THE CONFIGURED ONE GUARANTEED TO BE IN THE LIST
+//THE SYSTEM DEFAULT PLUS EVERY REPORTED DEVICE
 #[cfg(feature = "client_voice")]
 fn device_entries(app: &App, input: bool) -> Vec<DeviceEntry>
 {
@@ -897,7 +887,7 @@ fn device_entries(app: &App, input: bool) -> Vec<DeviceEntry>
     let mut entries = vec![DeviceEntry { id: String::new(), label: String::from(DEFAULT_DEVICE) }];
     entries.extend(devices.iter().cloned());
 
-    //A DEVICE THAT IS CONFIGURED BUT CURRENTLY UNPLUGGED STILL DESERVES A ROW
+    //A CONFIGURED BUT UNPLUGGED DEVICE KEEPS ITS ROW
     let configured = config::read_config::<String>(if input { "input_device" } else { "output_device" });
     if !configured.is_empty() && !entries.iter().any(|entry| entry.id == configured)
     {
