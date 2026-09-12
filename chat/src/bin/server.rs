@@ -24,6 +24,7 @@ use std::
     sync::Arc,
     str::FromStr,
     time::Duration,
+    io::ErrorKind,
 };
 
 use tokio::
@@ -62,6 +63,7 @@ use why2_chat::
 //CONSTS
 const BIND_ATTEMPTS: usize = 15;   //~3 SECONDS OF THEM
 const BIND_RETRY_DELAY: u64 = 200; //MS BETWEEN THEM
+const ACCEPT_RETRY_DELAY: u64 = 100; //MS TO WAIT OUT A FAILING accept()
 
 //FUNCTIONS
 //BIND, RETRYING WHILE THE PORT IS STILL HELD
@@ -368,9 +370,19 @@ async fn main()
                 });
             },
 
+            //THE CLIENT DROPPED THE SOCKET BEFORE WE GOT TO IT
+            Err(e) if matches!(e.kind(), ErrorKind::ConnectionAborted | ErrorKind::ConnectionReset |
+                ErrorKind::Interrupted) =>
+            {
+                log::debug!("Connection aborted before accept: {}", e);
+            },
+
             Err(e) =>
             {
                 log::error!("Connection failed: {}", e);
+
+                //THE SERVER'S OWN PROBLEM (NO FILE DESCRIPTORS LEFT) PERSISTS AND WOULD SPIN THE LOOP
+                time::sleep(Duration::from_millis(ACCEPT_RETRY_DELAY)).await;
             }
         }
     }
