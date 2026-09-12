@@ -684,7 +684,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                 //COMPARSE HASHES
                 let client_hash = env!("WHY2_GIT_HASH");
-                if !client_hash.is_empty() && !git_hash.is_empty() && client_hash != git_hash
+                if !client_hash.is_empty() && !git_hash.is_empty() && !client_hash.starts_with(&git_hash) && !git_hash.starts_with(client_hash)
                 {
                     //DISPLAY VERSION MISMATCH
                     tx.send(ClientEvent::VersionMismatch(client_hash.to_string(), git_hash.to_string())).await.unwrap();
