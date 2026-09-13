@@ -74,6 +74,13 @@ pub enum PacketCode //CONTROL CODES
         git_hash: String,
     },
 
+    //SERVER <> CLIENT | PICK USERNAME
+    Username
+    {
+        username: Option<String>,
+        device: Option<Device>,
+    },
+
     //SERVER -> CLIENT | START CHATTING
     Accept
     {
@@ -202,7 +209,6 @@ pub enum PacketCode //CONTROL CODES
     },
 
     Version { version: Option<String> },            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
-    Username { username: Option<String> },          //SERVER <> CLIENT | PICK USERNAME
     PasswordL { password: Option<String> },         //SERVER -> CLIENT | LOGIN
     PasswordR { password: Option<String> },         //SERVER -> CLIENT | REGISTER
     History { messages: Vec<StoredMessage> },       //SERVER -> CLIENT | THE LOBBY'S STORED MESSAGES
@@ -382,4 +388,13 @@ pub struct OnlineUser //USER CONNECTED TO THE SERVER
     pub username: String,
     pub id: usize,
     pub channel: Option<String>,
+}
+
+//ENUMS
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub enum Device
+{
+    TUI,
+    Desktop,
+    Phone,
 }
