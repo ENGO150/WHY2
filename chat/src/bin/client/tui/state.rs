@@ -55,7 +55,12 @@ use crate::
     options::{ self, LoginState },
     network::
     {
-        codes::{ MessageColors, OnlineUser },
+        codes::
+        {
+            MessageColors,
+            OnlineUser,
+            Device,
+        },
         client::
         {
             self,
@@ -174,6 +179,7 @@ pub struct App
     pub username: String, //OUR OWN USERNAME (options::get_server_username IS THE SERVER'S NAME)
     pub role: Role,       //OUR OWN ROLE
     pub online: Vec<OnlineUser>,
+    pub devices: HashMap<String, Device>, //WHAT EACH USER JOINED ON, KEYED BY USERNAME
     pub channels: BTreeSet<String>, //NAMED CHANNELS THE SERVER CURRENTLY HOLDS
     pub voice: Vec<VoiceUser>, //WHAT THE VOICE PANEL DRAWS
     pub voice_roster: BTreeMap<usize, String>, //WHO THE SERVER SAYS IS IN VOICE IN OUR CHANNEL (US EXCLUDED)
@@ -254,6 +260,7 @@ impl App
             username: String::new(),
             role: Role::default(),
             online: Vec::new(),
+            devices: HashMap::new(),
             channels: BTreeSet::new(),
             voice: Vec::new(),
             voice_roster: BTreeMap::new(),
@@ -613,6 +620,7 @@ impl App
         self.role = Role::default(); //THE NEXT SERVER GRANTS ITS OWN
         self.server_name.clear();
         self.online.clear();
+        self.devices.clear();
         self.channels.clear();
         self.voice.clear();
         self.voice_roster.clear();

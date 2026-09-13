@@ -394,6 +394,7 @@ pub struct OnlineUser //USER CONNECTED TO THE SERVER
     pub username: String,
     pub id: usize,
     pub channel: Option<String>,
+    pub device: Option<Device>,
 }
 
 //ENUMS

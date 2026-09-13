@@ -352,7 +352,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                 }
             },
 
-            Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, role,
+            Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, device, role,
                 id, attached_screen, last_activity, last_image, channel, seq, server_seq, peer_addr, alive, muted,
                 credit, refill, throttles, .. } =>
             {
@@ -364,6 +364,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     screen_stream,
                     peer_addr,
                     username,
+                    device,
                     role,
                     id,
                     keys: keys.to_owned(),
@@ -386,7 +387,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
     });
 }
 
-fn authenticate_client(peer_addr: &SocketAddr, username: &str, role: Role, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
+fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<Device>, role: Role, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
     //UPDATE CONNECTION
     CONNECTIONS.alter(&peer_addr, |_, old_connection|
@@ -399,6 +400,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, role: Role, id: u
             screen_stream: None,
             peer_addr: *old_connection.peer_addr(),
             username: username.to_string(),
+            device: device.clone(),
             role,
             id,
             keys: old_connection.keys().unwrap().to_owned(),
@@ -442,6 +444,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             screen_stream: old_connection.screen_stream().clone(),
             peer_addr: *old_connection.peer_addr(),
             username: old_connection.username().unwrap().clone(),
+            device: old_connection.device().clone(),
             role: *old_connection.role().unwrap(),
             id: *old_connection.id().unwrap(),
             keys: old_connection.keys().unwrap().to_owned(),
@@ -805,7 +808,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     let mut channel: Option<String> = None; //CURRENT CLIENT CHANNEL
 
     //AUTHENTICATE CLIENT
-    authenticate_client(&peer_addr, &username, role, id);
+    authenticate_client(&peer_addr, &username, &device, role, id);
 
     //SEND WHAT WAS SAID IN THE LOBBY BEFORE THIS
     send_history(&streams.1, &keys).await;
@@ -979,13 +982,14 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
                 for connection_enum in CONNECTIONS.iter()
                 {
-                    if let Connection::Authenticated { username: uname, id: user_id, channel, .. } = connection_enum.value()
+                    if let Connection::Authenticated { username: uname, id: user_id, channel, device, .. } = connection_enum.value()
                     {
                         users.push(OnlineUser
                         {
                             username: uname.clone(),
                             id: *user_id,
                             channel: channel.clone(),
+                            device: device.clone(),
                         });
                     }
                 }

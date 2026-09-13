@@ -97,7 +97,11 @@ use crate::
     network::
     {
         self,
-        codes::PacketCode,
+        codes::
+        {
+            PacketCode,
+            Device,
+        },
         client::{ self, ClientEvent, image as client_image },
     },
     command::
@@ -165,6 +169,17 @@ impl Drop for TerminalGuard
 pub fn branch(last: bool) -> &'static str
 {
     if last { "╰─ " } else { "├─ " }
+}
+
+//HOW A SHARED DEVICE IS NAMED IN THE USER LISTS
+pub fn device_label(device: &Device) -> &'static str
+{
+    match device
+    {
+        Device::TUI => "tui",
+        Device::Desktop => "desktop",
+        Device::Phone => "phone",
+    }
 }
 
 pub fn install_panic_hook() //MANDATORY: THE RELEASE PROFILE USES panic = "abort"

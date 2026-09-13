@@ -39,6 +39,7 @@ use crate::
     config,
     role::Role,
     consts::SharedKeys,
+    network::codes::Device,
 };
 
 //STRUCTS
@@ -95,6 +96,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         screen_stream: Option<AbortHandle>,                      //SCREEN UPLOAD TASK
         peer_addr: SocketAddr,                                   //ADDRESS & PORT
         username: String,                                        //USERNAME
+        device: Option<Device>,                                  //WHAT THE CLIENT SAYS IT RUNS ON
         role: Role,                                              //ROLE
         id: usize,                                               //ID OF USER
         keys: SharedKeys,                                        //SHARED KEYS BETWEEN SERVER AND CLIENT (one to one)
@@ -353,6 +355,16 @@ impl Connection
         *throttles += 1;
 
         Duration::from_secs_f32(-*credit / rate)
+    }
+
+    //GET DEVICE
+    pub fn device(&self) -> &Option<Device>
+    {
+        match self
+        {
+            Self::Authenticated { device, .. } => device,
+            Self::NonAuthenticated { .. } => &None,
+        }
     }
 
     //GET CHANNEL

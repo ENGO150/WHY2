@@ -387,11 +387,19 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
     {
         let style = if user.username == me { theme::ACCENT } else { Style::default() };
 
-        Line::from(vec!
+        let mut spans = vec!
         [
             Span::styled(format!("{id:>width$}  ", id = user.id), theme::DIM),
             Span::styled(user.username.clone(), style),
-        ])
+        ];
+
+        //WHAT THEY ARE ON, IF THEY SHARE IT
+        if let Some(device) = app.devices.get(&user.username)
+        {
+            spans.push(Span::styled(format!(" {}", super::device_label(device)), theme::DIM));
+        }
+
+        Line::from(spans)
     }).collect::<Vec<Line>>();
 
     frame.render_widget(Paragraph::new(lines), inner);

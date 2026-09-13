@@ -72,6 +72,7 @@ use crate::
             UserFile,
             OnlineUser,
             UserScreen,
+            Device,
             ServerSetting,
             BanEntry,
         },
@@ -131,7 +132,7 @@ pub enum ClientEvent
     VoiceRoster(Vec<(usize, String)>),                           //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
     VoiceJoin(usize, String),                                    //SOMEBODY JOINED VOICE IN OUR CHANNEL
     VoiceLeave(usize),                                           //SOMEBODY LEFT VOICE IN OUR CHANNEL
-    Join(String),                                                //CLIENT CONNECTED
+    Join(String, Option<Device>),                                //CLIENT CONNECTED
     Leave(String, usize),                                        //CLIENT DISCONNECTED
     ServerSay(String),                                           //SERVER MESSAGE
     Role(Role, Option<String>),                                  //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
@@ -423,7 +424,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //JOIN MESSAGE (CLIENT CONNECTED)
-            PacketCode::Join { username: user } =>
+            PacketCode::Join { username: user, device } =>
             {
                 #[cfg(feature = "client_voice")]
                 if first_message
@@ -432,7 +433,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     username = Some(user.clone());
                 }
 
-                tx.send(ClientEvent::Join(user)).await.unwrap();
+                tx.send(ClientEvent::Join(user, device)).await.unwrap();
             }
 
             //LEAVE MESSAGE (CLIENT DISCONNECTED)

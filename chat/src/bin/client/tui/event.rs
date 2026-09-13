@@ -169,8 +169,11 @@ impl App
                 self.rebuild_voice();
             },
 
-            ClientEvent::Join(uname) =>
+            ClientEvent::Join(uname, device) =>
             {
+                //FILLS THE GAP UNTIL THE ROSTER ANSWERS
+                if let Some(device) = device { self.devices.insert(uname.clone(), device); }
+
                 self.push(Line::from(vec!
                 [
                     Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
@@ -190,6 +193,7 @@ impl App
 
                 //Leave NAMES THE USER, SO DROP THEM HERE
                 self.online.retain(|user| user.id != id);
+                self.devices.remove(&uname);
 
                 //A DISCONNECT CARRIES NO VoiceLeave
                 if self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
@@ -379,6 +383,11 @@ impl App
                 //ALWAYS REFRESH THE SIDEBAR; ECHO ONLY IF ASKED
                 self.online = users;
 
+                //THE ROSTER NAMES EVERYBODY, SO IT OWNS THE DEVICES
+                self.devices = self.online.iter()
+                    .filter_map(|user| Some((user.username.clone(), user.device.clone()?)))
+                    .collect();
+
                 //A CHANNEL EXISTS WHILE SOMEBODY IS IN IT
                 self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
                 self.prune_panes();
@@ -399,6 +408,12 @@ impl App
 
                         spans.extend(id_column(user.id, width));
                         spans.push(Span::raw(user.username.clone()));
+
+                        //WHAT THEY ARE ON, IF THEY SHARE IT
+                        if let Some(device) = self.devices.get(&user.username)
+                        {
+                            spans.push(Span::styled(format!("  {}", super::device_label(device)), theme::DIM));
+                        }
 
                         //ACCENT OUR OWN CHANNEL
                         if let Some(channel) = user.channel.clone()
