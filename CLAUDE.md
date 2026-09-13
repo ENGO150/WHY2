@@ -230,7 +230,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `SERVER_RESTART_SETTINGS`) and gated by the same `spam_protection` switch as the message rule.
 - **The two costs an image puts on somebody else are bounded explicitly, because neither is bounded
   by the 8MB `MAX_IMAGE_SIZE` the server accepts.**
-  - **Decoding is limited on the client** (`network/client.rs::decode_image`). `MAX_IMAGE_SIZE`
+  - **Decoding is limited on the client** (`network/client/image.rs::decode_image`). `MAX_IMAGE_SIZE`
     bounds the bytes on the wire and says nothing about what they unpack to: a 292KB PNG decodes to
     400MB, and `ImageDisplay` is **pushed rather than asked for**, so every client in the channel
     decodes whatever was posted, one unbounded `tokio::spawn` per packet. `image`'s own default
@@ -328,7 +328,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     over the cap drops the oldest files by mtime, and every hit touches the file it read so what goes
     is what has not been looked at.
   - **A replay fills from the cache without a packet.** `App::apply` is pure state mutation and
-    cannot do disk I/O, so the `History` arm in `network/client.rs` does it: first `cache::has` (one
+    cannot do disk I/O, so the `History` arm in `network/client/mod.rs` does it: first `cache::has` (one
     `stat` per picture, no key and no decrypt) to say which hashes we hold, so a caption that is about
     to fill itself comes up as `Picture::Waiting` (`[ loading... ]`) rather than `Absent`
     (`[ show ]`) — offering a button for a picture already on its way is the one thing it must not do,
@@ -339,7 +339,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `deliver_image` fills `Picture::Absent` as well as `Waiting`: an answer nobody clicked for is what
     a cache hit *is*. A refusal (`None`) still only marks a line that actually asked.
   - **`auto_show_images` (client.toml, default on) makes a live picture behave like a replayed one.**
-    With it off, `network/client.rs`'s `ImageDisplay` arm decodes nothing: the line goes up as a
+    With it off, `network/client/mod.rs`'s `ImageDisplay` arm decodes nothing: the line goes up as a
     caption with a `[ show ]` button (`ClientEvent::ImageOffer` → `push_caption(.., pending: false)`)
     and the history's cache prefetch is skipped, so every replayed caption is a button too. The two
     costs it declines are the ones the pushed path pays without being asked — the decode
@@ -352,8 +352,11 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     disk read, a whole `RexStream` decrypt and `MAX_IMAGE_SIZE` back on the wire for nothing. A miss
     comes back as `ClientEvent::ImageRequest` and joins `App::image_requests`, which the redraw tick
     sends — the event loop owns the write half and the sequence counter, so the fetch task cannot.
-- **`network/client.rs` / `network/server.rs`** — connection-level logic (handshake, auth, message
-  dispatch) for each side. `network/file`, `network/screen`, `network/voice` are protocol
+- **`network/client/` / `network/server/`** — connection-level logic (handshake, auth, message
+  dispatch) for each side, each a `mod.rs` holding the listen loop and the packet match beside the
+  pieces it is built out of: the client's key exchange, TOFU verdict and dial in `client/handshake.rs`
+  and its picture decoding in `client/image.rs`; the server's in `server/handshake.rs` and
+  `server/connection.rs`. `network/file`, `network/screen`, `network/voice` are protocol
   extensions with their own client/server submodules for file transfer, screen sharing (feature
   `client_screen`/`server`), and voice chat (`client_voice`/`server`) respectively — voice runs
   over UDP while text runs over TCP, on the same port.
@@ -397,7 +400,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     invalid usage on the spot rather than a share that starts and dies, and so `/screen 2` and
     `/screen DP-2` are recognised as the same monitor. **The pick lasts exactly as long as the share
     does** — it lives only in that atomic-style global, and every path that ends a share puts it back to
-    `None` (the `Screen { token: None }` arm in `network/client.rs`, `state::reset_session` for a lost
+    `None` (the `Screen { token: None }` arm in `network/client/mod.rs`, `state::reset_session` for a lost
     session), so a bare `/screen` always starts on the default monitor.
   - **`/screen MONITOR` while a share is running swaps the capture over instead of ending it.** The
     server only ever knows *that* we are sharing, so nothing is sent: `set_monitor` bumps
@@ -1171,7 +1174,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   CLI argument parsing respectively.
 
 When adding a new packet type or handler, changes typically need to touch: `network/codes.rs`
-(`PacketCode` enum) and both `network/client.rs` and `network/server.rs` (or the relevant
+(`PacketCode` enum) and both `network/client/mod.rs` and `network/server/mod.rs` (or the relevant
 file/screen/voice submodule).
 
 ## Server logging
