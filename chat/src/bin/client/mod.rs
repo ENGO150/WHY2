@@ -77,8 +77,12 @@ use why2_chat::
     network::
     {
         self,
-        codes::PacketCode,
         client::{ self, ClientEvent },
+        codes::
+        {
+            PacketCode,
+            Device,
+        },
     },
 };
 
@@ -269,6 +273,12 @@ fn to_color(color: &str) -> Option<u8>
     }
 
     colors::code(&formatted_color)
+}
+
+//WHAT WE TELL THE SERVER WE ARE RUNNING
+fn share_device() -> Option<Device>
+{
+    if config::read_config::<bool>("share_device") { Some(Device::TUI) } else { None }
 }
 
 //HANDLE COLOR CHANGE: CHECK IT AND ASK THE SERVER
@@ -684,7 +694,11 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         LoginState::Username =>
         {
             app.username = input.clone();
-            PacketCode::Username { username: Some(input) }
+            PacketCode::Username
+            {
+                username: Some(input),
+                device: share_device(),
+            }
         },
         LoginState::PasswordLogin => PacketCode::PasswordL { password: Some(input) },
         LoginState::PasswordRegister => PacketCode::PasswordR { password: Some(input) },
