@@ -41,10 +41,11 @@ screen_volume = 100 # Volume of an attached screen share's audio in percent (0-2
 disable_colors = false # Disable message colors
 
 # Interface
+show_id = false # Show client IDs in chat
 mouse_capture = true # Capture the mouse for wheel scrolling and drag-select (replaces the terminal's own)
 disable_logo = false # Hide the logo drawn behind the chat
 auto_show_images = false # Show pictures as they are posted
 render_math = true # Render $math$ and $$math$$ in messages
 
-# Other
-show_id = false # Show client IDs in chat
+# Privacy
+share_device = false # Tell others which client you are using (TUI, Desktop, Phone)

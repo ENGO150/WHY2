@@ -215,6 +215,10 @@ impl Settings
 
         rows.push(Row::Item(Item::client("Show client IDs", "show_id", toggle_value("show_id", false))));
 
+        rows.push(Row::Header(String::from("Privacy")));
+
+        rows.push(Row::Item(Item::client("Share device", "share_device", toggle_value("share_device", false))));
+
         self.rows = rows;
         self.picker = None;
         self.open = true;
