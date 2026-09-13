@@ -16,34 +16,25 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//MODULES
+pub mod image;
+pub mod handshake;
+
 use std::
 {
-    time::Duration,
     sync::{ Arc, Mutex },
     path::PathBuf,
     collections::BTreeMap,
-    io::
-    {
-        Cursor,
-        Error,
-        ErrorKind,
-    },
 };
 
 use tokio::
 {
-    time,
     task,
     io::AsyncWriteExt,
     sync::
     {
         oneshot,
         mpsc::Sender,
-    },
-    net::
-    {
-        TcpStream,
-        tcp::{ OwnedReadHalf, OwnedWriteHalf },
     },
 };
 
@@ -53,51 +44,25 @@ use rand::
     rngs::SysRng,
 };
 
-use tokio_socks::tcp::Socks5Stream;
-
-use image::
-{
-    Frames,
-    Limits,
-    ImageFormat,
-    ImageReader,
-    ImageDecoder,
-    DynamicImage,
-    AnimationDecoder,
-    codecs::
-    {
-        gif::GifDecoder,
-        png::PngDecoder,
-        webp::WebPDecoder,
-    },
-};
-
 use zeroize::Zeroizing;
 
 use semver::Version;
+
+use image::Animation;
+
+use handshake::Handshake;
 
 use crate::
 {
     misc,
     cache,
     role::Role,
-    crypto::{ self, kex },
+    crypto,
     options::{ self, LoginState },
-    config::
-    {
-        self,
-        keys::{ self, TofuCode },
-    },
-    consts::
-    {
-        self,
-        Streams,
-        SharedKeys,
-    },
+    consts::Streams,
     network::
     {
         self,
-        schema,
         file::client as file,
         codes::
         {
@@ -146,24 +111,7 @@ pub struct VoiceUser
     pub is_local: bool,        //AM I THE USER?
 }
 
-pub struct ImageFrame
-{
-    pub image: DynamicImage,
-    pub delay: Duration, //HOW LONG IT IS HELD BEFORE THE NEXT ONE
-}
-
-//TYPES
-pub type Animation = Vec<ImageFrame>; //A DECODED PICTURE
-
 //ENUMS
-#[derive(PartialEq)]
-enum Handshake
-{
-    Ready,     //KEYS AGREED - THE SESSION CAN START
-    Reconnect, //THE USER JUST PINNED THIS KEY
-    Failed,    //REFUSED - THE CLIENT IS DONE
-}
-
 pub enum ClientEvent
 {
     Register,                                                    //REGISTER PROMPT
@@ -239,299 +187,8 @@ pub enum ClientEvent
 
 //LISTS
 pub static ACTIVE_UPLOADS: Mutex<BTreeMap<[u8; 32], PathBuf>> = Mutex::new(BTreeMap::new()); //ACTIVE UPLOADS
-
 //FUNCTIONS
-//PRIVATE
-async fn key_exchange
-(
-    streams: &mut Streams<'_>,
-    keys: &mut SharedKeys,
-    tx: &Sender<ClientEvent>,
-    exchange_keys: Option<&SharedKeys>,
-) -> Handshake //KEY EXCHANGE FOR CLIENT-SIDE
-{
-    //WAIT FOR KeyExchangeOffer
-    let offer = loop
-    {
-        //READ MESSAGE
-        let Some(received) = network::receive(streams, exchange_keys, None).await else
-        {
-            //THE SERVER WENT AWAY MID-HANDSHAKE
-            tx.send(ClientEvent::Quit).await.ok();
-
-            return Handshake::Failed;
-        };
-
-        if let PacketCode::KeyExchangeOffer { offer } = received { break offer; }
-    };
-
-    //VERIFY PUBKEY VALIDITY (TOFU)
-    let host = streams.0.peer_addr().unwrap().ip().to_string();
-    let verdict = if env!("WHY2_SKIP_TOFU") == "false"
-    {
-        Some(keys::check(&host, &kex::public_bytes(&offer.static_ecc)))
-    } else { None };
-
-    //THE STATIC KEY SIGNS THE EPHEMERAL ONES
-    if !kex::verify_offer(&options::get_obfuscation_key(), &offer.static_ecc, &offer.eph_ecc, &offer.pq, &offer.sig)
-    {
-        tx.send(ClientEvent::HandshakeFailed(String::from("Server identity did not sign its exchange keys."))).await.ok();
-
-        return Handshake::Failed;
-    }
-
-    //GENERATE EPHEMERAL ECC KEYS
-    let (sk, pk) = kex::generate_ephemeral_keys();
-
-    //ENCAPSULATE PQ
-    let (pq_ciphertext, pq_secret) = kex::encapsulate_pq(&offer.pq);
-
-    //SEND PUBKEYS TO SERVER
-    network::send(&mut *streams.1.lock().await, PacketCode::KeyExchangeReply
-    {
-        reply: Box::new(schema::Reply { eph_ecc: pk, pq: pq_ciphertext }),
-    }, exchange_keys).await;
-
-    //CALCULATE SHARED SECRET (HYBRID)
-    *keys = kex::derive_shared_secret(sk, &offer.eph_ecc, pq_secret);
-
-    //SET GLOBAL VARIABLES
-    options::set_keys(keys.clone());
-
-    //ACT ON THE TOFU VERDICT
-    let hash = keys::hash(&kex::public_bytes(&offer.static_ecc));
-
-    //SET SERVER FINGERPRINT
-    options::set_fingerprint(&hash);
-
-    match verdict
-    {
-        //VERIFICATION DISABLED AT BUILD TIME
-        None => tx.send(ClientEvent::TofuSkip(hash)).await.unwrap(),
-
-        Some(TofuCode::Valid) => {},
-
-        Some(status) =>
-        {
-            //ASK THE USER IN THE TUI
-            let (reply, answer) = oneshot::channel();
-
-            tx.send(ClientEvent::TofuPrompt(TofuRequest
-            {
-                host: host.clone(),
-                hash: hash.clone(),
-                mismatch: matches!(status, TofuCode::Mismatch),
-                pinned: keys::pinned(&host),
-                reply,
-            })).await.unwrap();
-
-            //A DROPPED SENDER COUNTS AS A REFUSAL
-            if !answer.await.unwrap_or(false)
-            {
-                //GRACEFULLY DISCONNECT FROM SERVER
-                network::send(&mut *streams.1.lock().await, PacketCode::Disconnect, Some(keys)).await;
-
-                //END THE SESSION
-                tx.send(ClientEvent::TofuError).await.unwrap();
-
-                //EXIT
-                return Handshake::Failed;
-            }
-
-            //PIN THE KEY
-            keys::save(&host, &hash);
-
-            if exchange_keys.is_none()
-            {
-                //GRACEFULLY DISCONNECT FROM SERVER
-                network::send(&mut *streams.1.lock().await, PacketCode::Disconnect, Some(keys)).await;
-
-                return Handshake::Reconnect;
-            }
-        },
-    }
-
-    Handshake::Ready
-}
-
-async fn reconnect(streams: &mut Streams<'_>) -> bool
-{
-    let Ok((read_half, write_half)) = connect(options::get_server_address()).await else { return false };
-
-    *streams.0 = read_half;
-    *streams.1.lock().await = write_half;
-
-    //A NEW CONNECTION COUNTS FROM ZERO ON BOTH SIDES
-    options::set_seq(0);
-    options::set_server_seq(0);
-
-    true
-}
-
 //PUBLIC
-pub async fn connect(connecting_addr: String) -> Result<(OwnedReadHalf, OwnedWriteHalf), Error> //CONNECT TO SERVER
-{
-    let dial = async
-    {
-        if !options::socks5_enabled() //NO SOCKS5
-        {
-            TcpStream::connect(connecting_addr).await
-        } else //USE PROXY
-        {
-            let proxy_addr = config::read_config::<String>("socks5_addr");
-
-            Socks5Stream::connect(proxy_addr.as_str(), connecting_addr.as_str()).await
-                .map(|s| s.into_inner())
-                .map_err(Error::other)
-        }
-    };
-
-    time::timeout(Duration::from_millis(consts::CONNECT_TIMEOUT), dial).await
-        .unwrap_or_else(|_| Err(Error::new(ErrorKind::TimedOut, "Connection timed out.")))
-        .and_then(|s|
-        {
-            //SET TCP_NODELAY
-            s.set_nodelay(true)?;
-            Ok(s.into_split())
-        })
-}
-
-//WHETHER A PICTURE IS DRAWN AS IT ARRIVES
-fn auto_show_images() -> bool
-{
-    config::read_config::<bool>("auto_show_images")
-}
-
-//DECODE LIMITS - THE WIRE SIZE BOUNDS NOTHING HERE
-fn decode_limits() -> Limits
-{
-    let mut limits = Limits::default();
-
-    limits.max_image_width = Some(consts::MAX_IMAGE_DIMENSION);
-    limits.max_image_height = Some(consts::MAX_IMAGE_DIMENSION);
-    limits.max_alloc = Some(consts::MAX_IMAGE_ALLOC);
-
-    limits
-}
-
-fn decode_image(data: &[u8]) -> Option<Animation>
-{
-    let mut reader = ImageReader::new(Cursor::new(data)).with_guessed_format().ok()?;
-
-    reader.limits(decode_limits());
-
-    //ONLY AN ANIMATED FORMAT IS DECODED AS FRAMES
-    let animated = match reader.format()
-    {
-        Some(ImageFormat::Gif) => gif_frames(data),
-        Some(ImageFormat::WebP) => webp_frames(data),
-        Some(ImageFormat::Png) => apng_frames(data),
-
-        _ => None,
-    };
-
-    if let Some(frames) = animated && frames.len() > 1 { return Some(frames); }
-
-    Some(vec![ImageFrame { image: reader.decode().ok()?, delay: Duration::ZERO }])
-}
-
-fn gif_frames(data: &[u8]) -> Option<Animation>
-{
-    let mut decoder = GifDecoder::new(Cursor::new(data)).ok()?;
-
-    decoder.set_limits(decode_limits()).ok()?;
-
-    collect_frames(decoder.into_frames())
-}
-
-fn webp_frames(data: &[u8]) -> Option<Animation>
-{
-    let mut decoder = WebPDecoder::new(Cursor::new(data)).ok()?;
-
-    if !decoder.has_animation() { return None; }
-
-    decoder.set_limits(decode_limits()).ok()?;
-
-    collect_frames(decoder.into_frames())
-}
-
-fn apng_frames(data: &[u8]) -> Option<Animation>
-{
-    let mut decoder = PngDecoder::new(Cursor::new(data)).ok()?;
-
-    if !decoder.is_apng().ok()? { return None; }
-
-    decoder.set_limits(decode_limits()).ok()?;
-
-    collect_frames(decoder.apng().ok()?.into_frames())
-}
-
-//THE FRAMES OF ONE ANIMATION, UNDER BOTH BUDGETS
-fn collect_frames(frames: Frames<'_>) -> Option<Animation>
-{
-    let mut animation: Animation = Vec::new();
-    let mut alloc = 0u64;
-
-    for frame in frames.take(consts::MAX_ANIMATION_FRAMES)
-    {
-        let Ok(frame) = frame else { break };
-
-        let delay = match frame.delay().numer_denom_ms()
-        {
-            (_, 0) => consts::DEFAULT_FRAME_DELAY,
-            (numer, denom) => Duration::from_micros(numer as u64 * 1_000 / denom as u64),
-        };
-
-        let image = DynamicImage::from(frame.into_buffer());
-
-        alloc += image.width() as u64 * image.height() as u64 * 4;
-
-        if alloc > consts::MAX_ANIMATION_ALLOC && !animation.is_empty() { break; }
-
-        animation.push(ImageFrame
-        {
-            image,
-            delay: match delay < consts::MIN_FRAME_DELAY
-            {
-                true => consts::DEFAULT_FRAME_DELAY,
-                false => delay,
-            },
-        });
-    }
-
-    match animation.is_empty()
-    {
-        true => None,
-        false => Some(animation),
-    }
-}
-
-async fn digest_and_decode(data: Arc<Vec<u8>>) -> ([u8; 32], Option<Animation>)
-{
-    task::spawn_blocking(move || (crypto::sha256(&data), decode_image(&data)))
-        .await.expect("Decoding image panicked")
-}
-
-pub fn fetch_image(hash: [u8; 32], tx: Sender<ClientEvent>)
-{
-    tokio::spawn(async move
-    {
-        let cached = match cache::load(&hash).await
-        {
-            Some(data) => task::spawn_blocking(move || decode_image(&data))
-                .await.expect("Decoding image panicked"),
-
-            None => None,
-        };
-
-        tx.send(match cached
-        {
-            Some(image) => ClientEvent::ImageData(hash, Some(image)),
-            None => ClientEvent::ImageRequest(hash),
-        }).await.unwrap();
-    });
-}
-
 pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY
@@ -546,13 +203,13 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
         options::set_obfuscation_key(&header);
         streams.1.lock().await.write_all(&header).await.unwrap();
 
-        match key_exchange(streams, &mut keys, &tx, None).await
+        match handshake::key_exchange(streams, &mut keys, &tx, None).await
         {
             Handshake::Ready => break,
             Handshake::Failed => return,
 
             //THE SERVER WENT AWAY BETWEEN CONNECTIONS
-            Handshake::Reconnect => if !reconnect(streams).await
+            Handshake::Reconnect => if !handshake::reconnect(streams).await
             {
                 tx.send(ClientEvent::ReconnectFailed).await.unwrap();
                 return;
@@ -618,7 +275,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 let hashes: Vec<[u8; 32]> = messages.iter().filter_map(|message| message.image).collect();
 
                 //WHICH OF THEM WE ALREADY HOLD
-                let auto_show = auto_show_images();
+                let auto_show = image::auto_show_images();
                 let mut cached: Vec<[u8; 32]> = Vec::new();
 
                 if auto_show
@@ -641,7 +298,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     {
                         let Some(data) = cache::load(&hash).await else { continue };
 
-                        let image = task::spawn_blocking(move || decode_image(&data))
+                        let image = task::spawn_blocking(move || image::decode_image(&data))
                             .await.expect("Decoding image panicked");
 
                         if let Some(image) = image
@@ -700,7 +357,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 let current_keys = keys.clone();
 
                 //A REKEY THAT DOES NOT VERIFY ENDS THE SESSION
-                if key_exchange(streams, &mut keys, &tx, Some(&current_keys)).await != Handshake::Ready { return; }
+                if handshake::key_exchange(streams, &mut keys, &tx, Some(&current_keys)).await != Handshake::Ready { return; }
             }
 
             //PICK_USERNAME CODE - guess what
@@ -955,7 +612,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                         Some(data) =>
                         {
                             let data = Arc::new(data);
-                            let (digest, image) = digest_and_decode(data.clone()).await;
+                            let (digest, image) = image::digest_and_decode(data.clone()).await;
 
                             if digest == hash { cache::store(&hash, &data).await; }
 
@@ -977,7 +634,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 let image_tx = tx.clone();
 
                 //auto_show_images OFF: UNPACK NOTHING
-                if !auto_show_images()
+                if !image::auto_show_images()
                 {
                     tokio::spawn(async move
                     {
@@ -1021,7 +678,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                         //OFF THE WIRE: FILE IT UNDER WHAT IT HASHES TO
                         true =>
                         {
-                            let (digest, image) = digest_and_decode(data.clone()).await;
+                            let (digest, image) = image::digest_and_decode(data.clone()).await;
 
                             cache::store(&digest, &data).await;
 
@@ -1029,7 +686,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                         },
 
                         //OUT OF THE CACHE, ALREADY FILED UNDER THIS HASH
-                        false => task::spawn_blocking(move || decode_image(&data))
+                        false => task::spawn_blocking(move || image::decode_image(&data))
                             .await.expect("Decoding image panicked"),
                     };
 

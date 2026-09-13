@@ -61,8 +61,8 @@ use crate::
     network::
     {
         self,
-        client::{ self, ClientEvent },
         codes::PacketCode,
+        client::{ ClientEvent, handshake },
         screen::
         {
             self,
@@ -97,7 +97,7 @@ pub static SCREEN_FRAME_SINK: RwLock<Option<UnboundedSender<Vec<u8>>>> = RwLock:
 pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
-    let (_read_stream, mut write_stream) = client::connect(chat_options::get_server_address()).await
+    let (_read_stream, mut write_stream) = handshake::connect(chat_options::get_server_address()).await
         .expect("Screen upload connection failed");
 
     //KEEP THE UPLOAD'S BACKLOG VISIBLE TO THE ENCODER
@@ -179,7 +179,7 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
 pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
 {
     //INIT FILE CONNECTION
-    let (mut read_stream, mut write_stream) = client::connect(chat_options::get_server_address()).await
+    let (mut read_stream, mut write_stream) = handshake::connect(chat_options::get_server_address()).await
         .expect("Screen download connection failed");
 
     //KEEP THE DOWNLOAD'S BACKLOG SHEDDABLE

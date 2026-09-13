@@ -41,7 +41,7 @@ use crate::
 {
     config,
     options,
-    network::client,
+    network::client::handshake,
 };
 
 use super::
@@ -404,6 +404,6 @@ pub fn connect(app: &mut App, results: &Sender<ConnectResult>)
 
     tokio::spawn(async move
     {
-        let _ = results.send((attempt, client::connect(address).await)).await;
+        let _ = results.send((attempt, handshake::connect(address).await)).await;
     });
 }

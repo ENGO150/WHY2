@@ -56,7 +56,12 @@ use crate::
     network::
     {
         codes::{ MessageColors, OnlineUser },
-        client::{ self, Animation, ImageFrame, VoiceUser },
+        client::
+        {
+            self,
+            VoiceUser,
+            image::{ Animation, ImageFrame },
+        },
     },
 };
 

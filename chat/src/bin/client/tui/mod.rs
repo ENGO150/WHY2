@@ -98,7 +98,7 @@ use crate::
     {
         self,
         codes::PacketCode,
-        client::{ self, ClientEvent },
+        client::{ self, ClientEvent, image as client_image },
     },
     command::
     {
@@ -436,7 +436,7 @@ async fn handle_terminal_event
                             && let Some(entry) = app.image_at(mouse.column, mouse.row)
                             && let Some(hash) = app.request_image(entry)
                         {
-                            client::fetch_image(hash, tx.clone());
+                            client_image::fetch_image(hash, tx.clone());
                         }
                     }
                 },

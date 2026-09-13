@@ -44,7 +44,12 @@ use crate::
     {
         self,
         EncryptionMode,
-        client::{ self, ClientEvent },
+        client::
+        {
+            self,
+            ClientEvent,
+            handshake,
+        },
         file::
         {
             self,
@@ -57,7 +62,7 @@ use crate::
 pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientEvent>, persistent: bool)
 {
     //INIT FILE CONNECTION
-    let (_read_stream, mut write_stream) = client::connect(options::get_server_address()).await.expect("File connection failed");
+    let (_read_stream, mut write_stream) = handshake::connect(options::get_server_address()).await.expect("File connection failed");
 
     //SEND TOKEN
     write_stream.write_all(&token).await.unwrap();
@@ -104,7 +109,7 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
 pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
-    let (mut read_stream, mut write_stream) = client::connect(options::get_server_address()).await.expect("File connection failed");
+    let (mut read_stream, mut write_stream) = handshake::connect(options::get_server_address()).await.expect("File connection failed");
 
     //SEND TOKEN
     write_stream.write_all(&token).await.unwrap();
