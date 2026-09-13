@@ -423,8 +423,23 @@ pub async fn receive
     //DESERIALIZE AND RETURN
     match wincode::config::deserialize::<Packet, _>(&read.data, chat_consts::PACKET_CONFIG)
     {
-        Ok(packet) =>
+        #[allow(unused_mut)]
+        Ok(mut packet) =>
         {
+            //STRIP CONTROL CHARACTERS
+            #[cfg(feature = "server")]
+            if let PacketCode::MessageRequest { text } | PacketCode::PrivateMessage { text, .. } = &mut packet.code &&
+                text.chars().any(|c| c.is_control() && c != '\n')
+            {
+                *text = text.chars().filter_map(|c| match c
+                {
+                    '\n' => Some('\n'),
+                    '\t' => Some(' '),
+                    c if c.is_control() => None,
+                    c => Some(c),
+                }).collect();
+            }
+
             //SPAM, SEQ & LENGTH CHECKS (SERVER)
             #[cfg(feature = "server")]
             {
