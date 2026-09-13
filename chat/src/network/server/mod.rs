@@ -86,6 +86,7 @@ use crate::
             StoredMessage,
             UserFile,
             UserScreen,
+            Device,
         },
     },
 };
@@ -637,6 +638,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
     //GET USERNAME FROM USER
     let mut username: Option<String> = None; //USER ENTERED USERNAME
+    let mut device: Option<Device> = None; //USER DEVICE
 
     //USERNAME CONFIGS
     let max_tries = config::read_config::<usize>("max_auth_tries"); //MAX n
@@ -656,12 +658,16 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         log::debug!("Asking for username: {peer_addr} (try {}/{max_tries})", attempt + 1);
 
         //SEND PICK_USERNAME CODE
-        network::send(&mut *streams.1.lock().await, PacketCode::Username { username: None }, Some(&keys)).await;
+        network::send(&mut *streams.1.lock().await, PacketCode::Username
+        {
+            username: None,
+            device: None,
+        }, Some(&keys)).await;
 
         match network::receive(streams, Some(&keys), None).await
         {
             //USERNAME CONDITIONS MET, BREAK LOOP
-            Some(PacketCode::Username { username: uname }) =>
+            Some(PacketCode::Username { username: uname, device: dev }) =>
             {
                 if let Some(uname) = uname
                 {
@@ -670,6 +676,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         !user_connected(&uname) && uname != options::get_server_username()
                     {
                         username = Some(uname);
+                        device = dev;
                         break;
                     }
 
@@ -807,7 +814,11 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     network::send(&mut *streams.1.lock().await, PacketCode::Accept { id, role }, Some(&keys)).await;
 
     //SEND JOIN MESSAGE
-    send_to_all(PacketCode::Join { username: username.clone() }, false, None);
+    send_to_all(PacketCode::Join
+    {
+        username: username.clone(),
+        device,
+    }, false, None);
 
     //TELL THE CLIENT WHO IS ALREADY IN VOICE
     if options::voice_chat_enabled()
