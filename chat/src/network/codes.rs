@@ -88,6 +88,13 @@ pub enum PacketCode //CONTROL CODES
         role: Role,
     },
 
+    //SERVER -> CLIENT | CLIENT JOIN MESSAGE
+    Join
+    {
+        username: String,
+        device: Option<Device>,
+    },
+
     //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
     Leave
     {
@@ -226,7 +233,6 @@ pub enum PacketCode //CONTROL CODES
     Screenshare { username: String },               //SERVER -> CLIENT | CLIENT STARTED SCREENSHARING
     ScreenshareEnd { username: String },            //SERVER -> CLIENT | CLIENT STOPPED SCREENSHARING
     Voice { token: Option<[u8; 32]> },              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
-    Join { username: String },                      //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     List { users: Option<Vec<OnlineUser>> },        //CLIENT <> SERVER | PRINT CONNECTED USERS
 
     ServerKick { id: usize },                       //CLIENT -> SERVER | KICK USER
