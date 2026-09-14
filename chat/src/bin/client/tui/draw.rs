@@ -93,6 +93,7 @@ const LOGO: &str = include_str!("./assets/rexlogo");
 enum Panel //SIDEBAR SECTIONS, IN THE ORDER THEY ARE STACKED
 {
     Online,
+    Offline,
     Channels,
     Voice,
 }
@@ -338,11 +339,16 @@ fn draw_logo(frame: &mut Frame, area: Rect)
 
 fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect)
 {
-    //ONLINE LIST TAKES THE REST
-    let mut constraints = vec![Constraint::Min(3)];
-    let mut panels = vec![Panel::Online];
-
     let limit = area.height.saturating_sub(3).max(3);
+
+    //max_clients BOUNDS THE ONLINE LIST, SO THE OFFLINE ONE TAKES THE REST
+    let (mut constraints, mut panels) = match app.offline.is_empty()
+    {
+        true => (vec![Constraint::Min(3)], vec![Panel::Online]),
+
+        false => (vec![Constraint::Length((app.online.len() as u16 + 2).clamp(3, limit)), Constraint::Min(3)],
+            vec![Panel::Online, Panel::Offline]),
+    };
 
     if area.height >= consts::CHANNELS_MIN_HEIGHT && !app.channels.is_empty()
     {
@@ -363,6 +369,7 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect)
         match panel
         {
             Panel::Online => draw_online(frame, app, *area),
+            Panel::Offline => draw_offline(frame, app, *area),
             Panel::Channels => draw_channels(frame, app, *area),
             Panel::Voice => draw_voice(frame, app, *area),
         }
@@ -411,6 +418,25 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
 
         Line::from(spans)
     }).collect::<Vec<Line>>();
+
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
+{
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(theme::BORDER)
+        .title(Span::styled(format!(" Offline ({}) ", app.offline.len()), theme::TITLE));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let room = inner.width as usize;
+
+    let lines = app.offline.iter()
+        .map(|username| Line::from(Span::styled(truncate(username, room), theme::DIM)))
+        .collect::<Vec<Line>>();
 
     frame.render_widget(Paragraph::new(lines), inner);
 }

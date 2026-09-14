@@ -182,6 +182,8 @@ impl App
                     Span::styled(format!("{uname} connected."), theme::OK),
                 ]));
 
+                self.offline.remove(&uname); //THEY ARE HERE NOW
+
                 //Join NAMES THE USER, SO ADD THEM HERE - THE ROSTER MAY HOLD THEM ALREADY
                 if !self.online.iter().any(|user| user.id == id)
                 {
@@ -208,6 +210,9 @@ impl App
                 //Leave NAMES THE USER, SO DROP THEM HERE
                 self.online.retain(|user| user.id != id);
                 self.devices.remove(&uname);
+
+                //THE SERVER HAS NO GUESTS, SO A LEAVER IS A REGISTERED USER
+                if self.offline_listed { self.offline.insert(uname); }
 
                 //A DISCONNECT CARRIES NO VoiceLeave
                 if self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
@@ -392,10 +397,12 @@ impl App
                 }
             },
 
-            ClientEvent::List(users) =>
+            ClientEvent::List(users, registered) =>
             {
                 //ALWAYS REFRESH THE SIDEBAR; ECHO ONLY IF ASKED
                 self.online = users;
+                self.offline_listed = registered.is_some();
+                self.offline = registered.unwrap_or_default().into_iter().map(|user| user.username).collect();
                 self.sort_online();
                 self.dirty = true;
 
@@ -442,6 +449,22 @@ impl App
                     }).collect::<Vec<Line<'static>>>();
 
                     for row in rows { self.push(row); }
+
+                    //THE REGISTERED USERS NOBODY IS CONNECTED AS
+                    if !self.offline.is_empty()
+                    {
+                        let last = self.offline.len() - 1;
+
+                        self.push_styled(format!("Offline clients ({}):", self.offline.len()), theme::TITLE);
+
+                        let rows = self.offline.iter().enumerate().map(|(index, username)| Line::from(vec!
+                        [
+                            Span::styled(super::branch(index == last), theme::BORDER),
+                            Span::styled(username.clone(), theme::DIM),
+                        ])).collect::<Vec<Line<'static>>>();
+
+                        for row in rows { self.push(row); }
+                    }
                 }
 
                 self.dirty = true;

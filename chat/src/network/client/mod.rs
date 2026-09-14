@@ -71,6 +71,7 @@ use crate::
             StoredMessage,
             UserFile,
             OnlineUser,
+            OfflineUser,
             UserScreen,
             Device,
             ServerSetting,
@@ -150,7 +151,7 @@ pub enum ClientEvent
     VoiceDeviceFailed,                                           //REBUILDING THE AUDIO STREAMS FAILED
     VoiceHandshakeFailed,                                        //THE SERVER NEVER ANSWERED THE UDP HANDSHAKE
     VoiceDisabled,                                               //VOICE CHAT DISABLED
-    List(Vec<OnlineUser>),                                       //LIST OF USERS
+    List(Vec<OnlineUser>, Option<Vec<OfflineUser>>),             //LIST OF USERS, CONNECTED AND NOT
     ServerSettings(Vec<ServerSetting>, bool),                    //server.toml AS THE SERVER HOLDS IT
     Colors,                                                      //A /color LANDED ON THE SERVER
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
@@ -576,9 +577,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //LIST OF USERS
-            PacketCode::List { online, .. } =>
+            PacketCode::List { online, offline } =>
             {
-                tx.send(ClientEvent::List(online.unwrap())).await.unwrap();
+                tx.send(ClientEvent::List(online.unwrap(), offline)).await.unwrap();
             },
 
             //UPLOAD APPROVAL
