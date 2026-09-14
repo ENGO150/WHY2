@@ -83,6 +83,7 @@ use crate::
         {
             PacketCode,
             OnlineUser,
+            OfflineUser,
             StoredMessage,
             UserFile,
             UserScreen,
@@ -116,10 +117,29 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
         }
     }
 
-    log::debug!("Sending online list ({} users): {peer_addr}", users.len());
+    //GET OFFLINE USERS (IF ENABLED)
+    let offline = if config::read_config::<bool>("show_offline_users")
+    {
+        let connected: HashSet<&str> = users.iter().map(|user| user.username.as_str()).collect();
+
+        Some(config::users::all().into_iter()
+            .filter(|username| !connected.contains(username.as_str()))
+            .map(|username| OfflineUser { username })
+            .collect::<Vec<OfflineUser>>())
+    } else { None };
+
+    //LOG
+    log::debug!("Sending user list ({} online{}): {peer_addr}", users.len(), if let Some(ref offline) = offline
+    {
+        format!(", {} offline", offline.len())
+    } else { String::new() });
 
     //SEND LIST BACK TO CLIENT
-    network::send(&mut *write_stream.lock().await, PacketCode::List { online: Some(users), offline: None }, Some(&keys)).await;
+    network::send(&mut *write_stream.lock().await, PacketCode::List
+    {
+        online: Some(users),
+        offline: offline,
+    }, Some(&keys)).await;
 }
 
 async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys) //SEND THE WHOLE BAN LIST

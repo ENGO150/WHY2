@@ -61,6 +61,12 @@ pub fn len() -> usize //COUNT USERS
     super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).len()
 }
 
+pub fn all() -> Vec<String> //RETURN EVERY REGISTERED USERNAME
+{
+    super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).iter()
+        .map(|(username, _)| username.to_string()).collect()
+}
+
 pub fn password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF username
 {
     user_field(username, "password")
