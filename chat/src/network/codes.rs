@@ -399,6 +399,7 @@ pub struct BanEntry //ONE BANNED SUBJECT
 pub struct OnlineUser //USER CONNECTED TO THE SERVER
 {
     pub username: String,
+    pub username_color: Option<u8>,
     pub id: usize,
     pub channel: Option<String>,
     pub device: Option<Device>,
@@ -408,6 +409,7 @@ pub struct OnlineUser //USER CONNECTED TO THE SERVER
 pub struct OfflineUser //OFFLINE USER REGISTERED ON THE SERVER
 {
     pub username: String,
+    pub username_color: Option<u8>,
 }
 
 //ENUMS
