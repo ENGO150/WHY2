@@ -21,6 +21,7 @@ server_port = 1204 # Server port
 # Features
 enable_voice_chat = true # Enable VoIP
 enable_screenshare = true # Enable screensharing
+show_offline_users = true # Send offline users in list
 
 # Appearance
 server_name = "WHY2 Server" # Name of the server
