@@ -820,6 +820,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     send_to_all(PacketCode::Join
     {
         username: username.clone(),
+        id,
         device,
     }, false, None);
 
