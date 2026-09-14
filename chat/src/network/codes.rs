@@ -92,6 +92,7 @@ pub enum PacketCode //CONTROL CODES
     Join
     {
         username: String,
+        username_color: Option<u8>,
         id: usize,
         device: Option<Device>,
     },
