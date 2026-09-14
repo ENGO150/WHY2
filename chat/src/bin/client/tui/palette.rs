@@ -18,9 +18,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    ffi::OsStr,
     fs,
-    path::PathBuf,
+    path::
+    {
+        Path,
+        PathBuf,
+    },
 };
+
+use image::ImageFormat;
 
 use ratatui::text::Span;
 
@@ -198,7 +205,7 @@ impl Values
         match self.arg.values
         {
             ArgValues::Colors => colors::by_name(value),
-            ArgValues::Free | ArgValues::Monitors | ArgValues::Paths | ArgValues::Roles => None,
+            ArgValues::Free | ArgValues::Images | ArgValues::Monitors | ArgValues::Paths | ArgValues::Roles => None,
         }
     }
 }
@@ -458,8 +465,16 @@ fn partial(tail: &str) -> &str
     if tail.ends_with(char::is_whitespace) { "" } else { tail.split_whitespace().next_back().unwrap_or("") }
 }
 
+//WHETHER A FILE IS A PICTURE THIS CLIENT DECODES
+fn decodable(name: &str) -> bool
+{
+    let Some(extension) = Path::new(name).extension().and_then(OsStr::to_str) else { return false; };
+
+    ImageFormat::from_extension(extension).is_some_and(|format| format.reading_enabled())
+}
+
 //WHAT SITS BESIDE THE HALF-TYPED PATH
-fn paths(typed: &str) -> Vec<String>
+fn paths(typed: &str, images: bool) -> Vec<String>
 {
     //EVERYTHING PAST THE LAST SEPARATOR IS THE NAME BEING TYPED
     let (dir, prefix) = match typed.rfind('/')
@@ -484,7 +499,11 @@ fn paths(typed: &str) -> Vec<String>
         if name.starts_with('.') && !prefix.starts_with('.') { return None; }
 
         //A DIRECTORY CARRIES ITS SEPARATOR, SO Tab WALKS INTO IT
-        let separator = if entry.path().is_dir() { "/" } else { "" };
+        let directory = entry.path().is_dir();
+
+        if images && !directory && !decodable(&name) { return None; }
+
+        let separator = if directory { "/" } else { "" };
 
         Some(format!("{dir}{name}{separator}"))
     }).collect::<Vec<String>>();
@@ -501,7 +520,10 @@ fn vocabulary(values: ArgValues, typed: &str) -> Vec<String>
     match values
     {
         //THE FILESYSTEM, READ AT EVERY KEYSTROKE
-        ArgValues::Paths => paths(typed),
+        ArgValues::Paths => paths(typed, false),
+
+        //THE SAME, PICTURES ONLY
+        ArgValues::Images => paths(typed, true),
 
         ArgValues::Colors => colors::offered().into_iter().map(str::to_string).collect(),
 

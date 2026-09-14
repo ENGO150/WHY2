@@ -98,6 +98,7 @@ pub enum ArgValues
     Free,     //ANYTHING - A NAME, A MESSAGE, AN ID
     Colors,   //A crossterm COLOR NAME
     Paths,    //A FILE OR DIRECTORY BESIDE THE ONE BEING TYPED
+    Images,   //THE SAME AS Paths BUT DECODABLE PICTURES ONLY
     Monitors, //A MONITOR OF THIS MACHINE, AS THE DISPLAY SERVER NAMES IT
     Roles,    //A SERVER ROLE, BY THE NAME BOTH SIDES KNOW IT BY (role::Role)
 }
@@ -451,7 +452,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 name: "PATH",
                 description: "Path of target image",
                 required: true,
-                values: ArgValues::Paths,
+                values: ArgValues::Images,
             },
         ],
         description: "Uploads a persistent image",
