@@ -27,7 +27,6 @@ use std::
     iter,
     process,
     fs::File,
-    path::Path,
     sync::Arc,
     io::{ Read, Seek },
 };
@@ -554,13 +553,13 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             //CHECK PATH
                             if let Some(parameters) = parameters
                             {
-                                let path = Path::new(parameters.trim());
+                                //THE PALETTE OFFERS ~ PATHS, SO ONE HAS TO OPEN
+                                let path = misc::expand_home(parameters.trim());
 
                                 //TRY TO OPEN FILE
-                                if let Ok(file) = File::open(path) && path.metadata().is_ok() &&
+                                if let Ok(file) = File::open(&path) && path.metadata().is_ok() &&
                                     path.is_file() && path.file_name().and_then(|n| n.to_str()).is_some()
                                 {
-                                    let path = path.to_owned();
                                     let mut file = file;
                                     let write_stream = write_stream.clone();
                                     let keys = options::get_keys();

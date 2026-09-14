@@ -16,6 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::
+{
+    fs,
+    path::PathBuf,
+};
+
 use ratatui::text::Span;
 
 use crossterm::style::Color;
@@ -25,6 +31,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::
 {
     colors,
+    misc,
     options,
     role::Role,
     command::
@@ -37,7 +44,11 @@ use crate::
     },
 };
 
-use super::theme;
+use super::
+{
+    consts,
+    theme,
+};
 
 //ENUMS
 pub enum PaletteMode
@@ -188,7 +199,7 @@ impl Values
         match self.arg.values
         {
             ArgValues::Colors => colors::by_name(value),
-            ArgValues::Free | ArgValues::Monitors | ArgValues::Roles => None,
+            ArgValues::Free | ArgValues::Monitors | ArgValues::Paths | ArgValues::Roles => None,
         }
     }
 }
@@ -327,16 +338,17 @@ impl Palette
 
         if let Some(arg) = active.and_then(|i| args.get(i)) && arg.values != ArgValues::Free
         {
-            let typed = partial(tail).to_lowercase();
+            let typed = partial(tail);
+            let candidate = typed.to_lowercase();
 
-            let matches = vocabulary(arg.values).into_iter()
-                .filter(|value| value.to_lowercase().starts_with(&typed)).collect::<Vec<String>>();
+            let matches = vocabulary(arg.values, typed).into_iter()
+                .filter(|value| value.to_lowercase().starts_with(&candidate)).collect::<Vec<String>>();
 
             //A TYPO STILL LEAVES THE SIGNATURE HINT
             if !matches.is_empty()
             {
                 //A FULLY TYPED VALUE WINS THE SELECTION
-                let exact = matches.iter().position(|value| value.eq_ignore_ascii_case(&typed));
+                let exact = matches.iter().position(|value| value.eq_ignore_ascii_case(typed));
 
                 let selected = match (exact, &self.mode)
                 {
@@ -447,11 +459,51 @@ fn partial(tail: &str) -> &str
     if tail.ends_with(char::is_whitespace) { "" } else { tail.split_whitespace().next_back().unwrap_or("") }
 }
 
+//WHAT SITS BESIDE THE HALF-TYPED PATH
+fn paths(typed: &str) -> Vec<String>
+{
+    //EVERYTHING PAST THE LAST SEPARATOR IS THE NAME BEING TYPED
+    let (dir, prefix) = match typed.rfind('/')
+    {
+        Some(cut) => (&typed[..=cut], &typed[cut + 1..]),
+        None => ("", typed),
+    };
+
+    let target = if dir.is_empty() { PathBuf::from(".") } else { misc::expand_home(dir) };
+
+    let Ok(entries) = fs::read_dir(target) else { return Vec::new() };
+
+    let prefix = prefix.to_lowercase();
+
+    let mut matches = entries.flatten().filter_map(|entry|
+    {
+        let name = entry.file_name().into_string().ok()?;
+
+        if !name.to_lowercase().starts_with(&prefix) { return None; }
+
+        //A DOTFILE IS OFFERED ONLY WHEN ASKED FOR
+        if name.starts_with('.') && !prefix.starts_with('.') { return None; }
+
+        //A DIRECTORY CARRIES ITS SEPARATOR, SO Tab WALKS INTO IT
+        let separator = if entry.path().is_dir() { "/" } else { "" };
+
+        Some(format!("{dir}{name}{separator}"))
+    }).collect::<Vec<String>>();
+
+    matches.sort_unstable();
+    matches.truncate(consts::MAX_PATHS);
+
+    matches
+}
+
 //THE ANSWERS, READ WHERE THEY ARE DEFINED
-fn vocabulary(values: ArgValues) -> Vec<String>
+fn vocabulary(values: ArgValues, typed: &str) -> Vec<String>
 {
     match values
     {
+        //THE FILESYSTEM, READ AT EVERY KEYSTROKE
+        ArgValues::Paths => paths(typed),
+
         ArgValues::Colors => colors::offered().into_iter().map(str::to_string).collect(),
 
         //THE MONITORS OF THIS MACHINE, READ AT RUNTIME

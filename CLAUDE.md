@@ -976,6 +976,18 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `command::COMMAND_LIST` — never duplicate the trigger table. The popup has two modes
     (`PaletteMode`): a filtered command menu while the command word is still being typed, and a
     single-row signature hint highlighting the parameter the caret is on once it is finished.
+  - **A path parameter is completed off the disk** (`ArgValues::Paths`, `/upload` and `/image`). It is the
+    one vocabulary that depends on what has been typed so far rather than being a fixed list, so
+    `vocabulary` takes the half-typed value: everything past the last `/` is the name being matched and
+    what precedes it is the directory that is read. A directory is offered with its separator on the end,
+    which is what makes Tab walk into it — the completion re-runs `update`, and the next listing is the
+    directory's own. Dotfiles are offered only once a `.` is typed, and `MAX_PATHS` bounds a directory
+    nobody wants every entry of. The value is matched case-insensitively like every other one but is
+    **read and inserted as it is spelled on disk**, so `hint` keeps the typed text raw and lowercases only
+    for the comparison. `misc::expand_home` is what makes `~` mean anything — the listing and the upload
+    itself both go through it, since a path the palette offers has to be one the command can open. What it
+    cannot do is a path with a space in it: the parameter the caret is on is found by splitting on
+    whitespace, the way every other value is.
   - **Anything that scrolls says so**, via `draw::draw_scrollbar` — the message pane, the slash-command
     popup (commands *and* value lists) and the `/settings` box in both its modes. It overwrites cells of
     the box's own right border between the corners rather than claiming a column, so no list gets

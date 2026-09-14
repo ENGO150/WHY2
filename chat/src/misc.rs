@@ -209,6 +209,23 @@ pub fn hex(bytes: &[u8]) -> String //BYTES AS LOWERCASE HEX
 }
 
 #[cfg(feature = "client_base")]
+pub fn expand_home(path: &str) -> PathBuf //A LEADING ~ AS THE HOME DIRECTORY
+{
+    let Some(rest) = path.strip_prefix('~') else { return PathBuf::from(path) };
+
+    let Some(home) = dirs::home_dir() else { return PathBuf::from(path) };
+
+    match rest.strip_prefix('/')
+    {
+        Some(rest) => home.join(rest),
+        None if rest.is_empty() => home,
+
+        //~name IS SOMEBODY ELSE'S HOME, NOT OURS
+        None => PathBuf::from(path),
+    }
+}
+
+#[cfg(feature = "client_base")]
 pub fn get_image_cache_dir(fingerprint: &str) -> PathBuf //DIRECTORY FOR ONE SERVER'S CACHED IMAGES
 {
     PathBuf::from(get_why2_dir() + consts::CLIENT_IMAGES_DIR).join(fingerprint)

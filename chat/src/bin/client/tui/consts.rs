@@ -51,6 +51,7 @@ pub const SLIDER_WIDTH: usize         = 14;                        //CELLS OF VO
 //POPUPS
 pub const MAX_ROWS: usize             = 8;                         //VISIBLE PALETTE ROWS
 pub const MAX_PICKER_ROWS: usize      = 8;                         //VISIBLE DEVICE ROWS BEFORE THE PICKER SCROLLS
+pub const MAX_PATHS: usize            = 256;                       //DIRECTORY ENTRIES OFFERED FOR ONE PATH
 
 pub const SAVE_LABEL: &str            = "Save";                    //THE BUTTON THE SERVER ROWS ARE SENT BACK WITH
 pub const RESTART_LABEL: &str         = "Restart server";          //AND THE ONE THAT PUTS THE STARTUP-ONLY ONES IN USE
