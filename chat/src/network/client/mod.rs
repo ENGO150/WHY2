@@ -575,10 +575,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 tx.send(ClientEvent::Colors).await.unwrap();
             },
 
-            //LIST OF ONLINE USERS
-            PacketCode::List { users } =>
+            //LIST OF USERS
+            PacketCode::List { online, .. } =>
             {
-                tx.send(ClientEvent::List(users.unwrap())).await.unwrap();
+                tx.send(ClientEvent::List(online.unwrap())).await.unwrap();
             },
 
             //UPLOAD APPROVAL

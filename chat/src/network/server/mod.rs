@@ -119,7 +119,7 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
     log::debug!("Sending online list ({} users): {peer_addr}", users.len());
 
     //SEND LIST BACK TO CLIENT
-    network::send(&mut *write_stream.lock().await, PacketCode::List { users: Some(users) }, Some(&keys)).await;
+    network::send(&mut *write_stream.lock().await, PacketCode::List { online: Some(users), offline: None }, Some(&keys)).await;
 }
 
 async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys) //SEND THE WHOLE BAN LIST

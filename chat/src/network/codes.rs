@@ -183,6 +183,13 @@ pub enum PacketCode //CONTROL CODES
         token: Option<[u8; 32]>,
     },
 
+    //CLIENT <> SERVER | PRINT CONNECTED USERS
+    List
+    {
+        online: Option<Vec<OnlineUser>>,
+        offline: Option<Vec<OfflineUser>>,
+    },
+
     //CLIENT <> SERVER | READ server_bans.toml
     ServerBans
     {
@@ -234,7 +241,6 @@ pub enum PacketCode //CONTROL CODES
     Screenshare { username: String },               //SERVER -> CLIENT | CLIENT STARTED SCREENSHARING
     ScreenshareEnd { username: String },            //SERVER -> CLIENT | CLIENT STOPPED SCREENSHARING
     Voice { token: Option<[u8; 32]> },              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
-    List { users: Option<Vec<OnlineUser>> },        //CLIENT <> SERVER | PRINT CONNECTED USERS
 
     ServerKick { id: usize },                       //CLIENT -> SERVER | KICK USER
     ServerMute { id: usize },                       //CLIENT -> SERVER | MUTE USER
@@ -396,6 +402,12 @@ pub struct OnlineUser //USER CONNECTED TO THE SERVER
     pub id: usize,
     pub channel: Option<String>,
     pub device: Option<Device>,
+}
+
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub struct OfflineUser //OFFLINE USER REGISTERED ON THE SERVER
+{
+    pub username: String,
 }
 
 //ENUMS

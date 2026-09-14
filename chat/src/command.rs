@@ -753,7 +753,7 @@ impl Command
             },
 
             Command::Channel => Some(Ok(PacketCode::Channel { channel: parameters.map(str::to_string) })),
-            Command::List => Some(Ok(PacketCode::List { users: None })),
+            Command::List => Some(Ok(PacketCode::List { online: None, offline: None })),
             Command::Files => Some(Ok(PacketCode::Files { users: None })),
 
             //RESOLVE THE MONITOR LOCALLY
