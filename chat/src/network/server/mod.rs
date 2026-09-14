@@ -97,6 +97,31 @@ pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::ne
 pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
+async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &SocketAddr, keys: &SharedKeys) //SEND LIST OF USERS
+{
+    let mut users = Vec::new();
+
+    //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
+    for connection_enum in CONNECTIONS.iter()
+    {
+        if let Connection::Authenticated { username: uname, id: user_id, channel, device, .. } = connection_enum.value()
+        {
+            users.push(OnlineUser
+            {
+                username: uname.clone(),
+                id: *user_id,
+                channel: channel.clone(),
+                device: device.clone(),
+            });
+        }
+    }
+
+    log::debug!("Sending online list ({} users): {peer_addr}", users.len());
+
+    //SEND LIST BACK TO CLIENT
+    network::send(&mut *write_stream.lock().await, PacketCode::List { users: Some(users) }, Some(&keys)).await;
+}
+
 async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys) //SEND THE WHOLE BAN LIST
 {
     network::send(&mut *write_stream.lock().await, PacketCode::ServerBans
@@ -816,6 +841,9 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //TELL CLIENT TO START CHATTING
     network::send(&mut *streams.1.lock().await, PacketCode::Accept { id, role }, Some(&keys)).await;
 
+    //SEND LIST OF USERS
+    send_list(&streams.1, &peer_addr, &keys).await;
+
     //SEND JOIN MESSAGE
     send_to_all(PacketCode::Join
     {
@@ -978,27 +1006,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             //CLIENT REQUESTED LIST OF ONLINE USERS
             PacketCode::List { .. } =>
             {
-                let mut users = Vec::new();
-
-                //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
-                for connection_enum in CONNECTIONS.iter()
-                {
-                    if let Connection::Authenticated { username: uname, id: user_id, channel, device, .. } = connection_enum.value()
-                    {
-                        users.push(OnlineUser
-                        {
-                            username: uname.clone(),
-                            id: *user_id,
-                            channel: channel.clone(),
-                            device: device.clone(),
-                        });
-                    }
-                }
-
-                log::debug!("Sending online list ({} users): {peer_addr}", users.len());
-
-                //SEND LIST BACK TO CLIENT
-                network::send(&mut *streams.1.lock().await, PacketCode::List { users: Some(users) }, Some(&keys)).await;
+                //RESPOND
+                send_list(&streams.1, &peer_addr, &keys).await;
             },
 
             //NEW FILE UPLOAD
