@@ -21,7 +21,11 @@ use ratatui::text::{ Line, Span };
 use crate::
 {
     options,
-    network::client::ClientEvent,
+    network::
+    {
+        codes::OnlineUser,
+        client::ClientEvent,
+    },
 };
 
 use super::
@@ -169,10 +173,9 @@ impl App
                 self.rebuild_voice();
             },
 
-            ClientEvent::Join(uname, device) =>
+            ClientEvent::Join(uname, id, device) =>
             {
-                //FILLS THE GAP UNTIL THE ROSTER ANSWERS
-                if let Some(device) = device { self.devices.insert(uname.clone(), device); }
+                if let Some(device) = device.clone() { self.devices.insert(uname.clone(), device); }
 
                 self.push(Line::from(vec!
                 [
@@ -180,7 +183,17 @@ impl App
                     Span::styled(format!("{uname} connected."), theme::OK),
                 ]));
 
-                self.refresh_online = true;
+                //Join NAMES THE USER, SO ADD THEM HERE - THE ROSTER MAY HOLD THEM ALREADY
+                if !self.online.iter().any(|user| user.id == id)
+                {
+                    self.online.push(OnlineUser
+                    {
+                        username: uname,
+                        id,
+                        channel: None, //EVERYBODY STARTS IN THE LOBBY
+                        device,
+                    });
+                }
             },
 
             ClientEvent::Leave(uname, id) =>
