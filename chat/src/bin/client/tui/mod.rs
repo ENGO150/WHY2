@@ -302,16 +302,7 @@ pub async fn run
                     crate::submit(app, &write_stream, answer).await;
                 }
 
-                //SILENT ROSTER REFRESH
-                if app.refresh_online && let Some(write_stream) = write_stream.as_ref()
-                {
-                    app.refresh_online = false;
-
-                    network::send(&mut *write_stream.lock().await,
-                        PacketCode::List { users: None }, options::get_keys().as_ref()).await;
-                }
-
-                //AND THE OFFERED PICTURES WE DO NOT HOLD
+                //THE OFFERED PICTURES WE DO NOT HOLD
                 if !app.image_requests.is_empty() && let Some(write_stream) = write_stream.as_ref()
                 {
                     let keys = options::get_keys();

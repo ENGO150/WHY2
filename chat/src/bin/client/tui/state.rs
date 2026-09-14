@@ -211,7 +211,6 @@ pub struct App
     pub list_requested: bool,
     #[cfg(feature = "client_screen")]
     pub screens_requested: bool,
-    pub refresh_online: bool, //THE LOOP SHOULD SEND A SILENT PacketCode::List
 
     //PICTURES TO ASK THE SERVER FOR
     pub image_requests: Vec<[u8; 32]>,
@@ -282,7 +281,6 @@ impl App
             list_requested: false,
             #[cfg(feature = "client_screen")]
             screens_requested: false,
-            refresh_online: false,
             image_requests: Vec::new(),
             leaving: false,
             logging_out: false,
@@ -630,7 +628,6 @@ impl App
         self.list_requested = false;
         #[cfg(feature = "client_screen")]
         { self.screens_requested = false; }
-        self.refresh_online = false;
         self.image_requests.clear();
         self.logging_out = false; //THE NEXT DROP IS THE NEXT SESSION'S TO EXPLAIN
         self.disconnect_reason = None;

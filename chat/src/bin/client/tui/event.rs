@@ -71,7 +71,6 @@ impl App
                 self.login = None; //THE BOX HAS ASKED FOR EVERYTHING IT WAS GOING TO ASK FOR
                 self.role = role;
                 self.push_styled("Login successful. Press Ctrl+H for help.", theme::OK);
-                self.refresh_online = true;
 
                 //THESE ANSWERS ARE WORTH REPLAYING NOW
                 self.reconnect.accepted();
@@ -395,6 +394,7 @@ impl App
             {
                 //ALWAYS REFRESH THE SIDEBAR; ECHO ONLY IF ASKED
                 self.online = users;
+                self.dirty = true;
 
                 //THE ROSTER NAMES EVERYBODY, SO IT OWNS THE DEVICES
                 self.devices = self.online.iter()
