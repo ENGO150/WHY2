@@ -110,6 +110,7 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
             users.push(OnlineUser
             {
                 username: uname.clone(),
+                username_color: config::users::colors(uname).username_color,
                 id: *user_id,
                 channel: channel.clone(),
                 device: device.clone(),
@@ -124,8 +125,17 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
 
         Some(config::users::all().into_iter()
             .filter(|username| !connected.contains(username.as_str()))
-            .map(|username| OfflineUser { username })
-            .collect::<Vec<OfflineUser>>())
+            .map(|username|
+            {
+                //GET UNAME COLOR
+                let username_color = config::users::colors(&username).username_color;
+
+                OfflineUser
+                {
+                    username,
+                    username_color,
+                }
+            }).collect::<Vec<OfflineUser>>())
     } else { None };
 
     //LOG
