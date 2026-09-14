@@ -554,7 +554,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             if let Some(parameters) = parameters
                             {
                                 //THE PALETTE OFFERS ~ PATHS, SO ONE HAS TO OPEN
-                                let path = misc::expand_home(parameters.trim());
+                                let path = palette::expand_home(parameters.trim());
 
                                 //TRY TO OPEN FILE
                                 if let Ok(file) = File::open(&path) && path.metadata().is_ok() &&

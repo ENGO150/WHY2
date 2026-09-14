@@ -31,7 +31,6 @@ use unicode_width::UnicodeWidthStr;
 use crate::
 {
     colors,
-    misc,
     options,
     role::Role,
     command::
@@ -469,7 +468,7 @@ fn paths(typed: &str) -> Vec<String>
         None => ("", typed),
     };
 
-    let target = if dir.is_empty() { PathBuf::from(".") } else { misc::expand_home(dir) };
+    let target = if dir.is_empty() { PathBuf::from(".") } else { expand_home(dir) };
 
     let Ok(entries) = fs::read_dir(target) else { return Vec::new() };
 
@@ -532,3 +531,18 @@ pub fn format_arg(arg: &command::CommandArg) -> String //<REQUIRED> / [OPTIONAL]
     }
 }
 
+pub fn expand_home(path: &str) -> PathBuf //A LEADING ~ AS THE HOME DIRECTORY
+{
+    let Some(rest) = path.strip_prefix('~') else { return PathBuf::from(path) };
+
+    let Some(home) = dirs::home_dir() else { return PathBuf::from(path) };
+
+    match rest.strip_prefix('/')
+    {
+        Some(rest) => home.join(rest),
+        None if rest.is_empty() => home,
+
+        //~name IS SOMEBODY ELSE'S HOME, NOT OURS
+        None => PathBuf::from(path),
+    }
+}
