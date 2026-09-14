@@ -1003,14 +1003,18 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     and a join on an N-client server cost N roster walks and N full per-connection encrypted
     replies, since every client asked at once. A joining client is always in the lobby, so its entry
     is `channel: None`; `Leave` re-derives the channels from what is left.
-    `App::refresh_online` (a `PacketCode::List` request drained on the redraw tick) is therefore
-    left for the one thing no event can carry — `Authenticated`, where we arrive knowing nobody —
-    and `/list` is the explicit resync beside it.
-    **A channel switch must not trigger one**: it would land
-    inside the server's `min_message_delay` window right behind the `/channel` packet and earn a
-    `SpamWarning` (three of those disconnect). **`Leave` must not either, for the same reason**: it
-    is broadcast to the kicker as well, so a `/kick` would put the `List` request directly behind
-    its own `ServerKick` packet and warn the moderator for spam. The channel list is maintained from the globally
+    The one thing no event can carry is the roster we arrive to, and the server pushes that unasked
+    right behind `Accept` (`send_list`) the way it already pushes the history and the voice clients,
+    so the client asks for nothing at login either — `App::refresh_online` and the silent request the
+    redraw tick drained are gone, and `/list` is the only thing left that asks. It is also the
+    explicit resync, which is why the `List` arm always refreshes the sidebar and only *echoes* under
+    `list_requested`.
+    **Nothing else may quietly ask for one, and a channel switch least of all**: a `List` there
+    would land inside the server's `min_message_delay` window right behind the `/channel` packet and
+    earn a `SpamWarning` (three of those disconnect). **`Leave` must not either, for the same
+    reason**: it is broadcast to the kicker as well, so a `/kick` would put the request directly
+    behind its own `ServerKick` packet and warn the moderator for spam.
+    The channel list is maintained from the globally
     broadcast `ChannelCreated`/`ChannelDestroyed` packets plus whatever the last `List` showed —
     a channel exists exactly as long as somebody is in it, so the lobby is not one and is not
     listed. (`ChannelDestroyed` is only sent on a `/channel` switch, never on a disconnect, so
