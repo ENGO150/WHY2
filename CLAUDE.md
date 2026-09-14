@@ -1031,6 +1031,28 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     a channel exists exactly as long as somebody is in it, so the lobby is not one and is not
     listed. (`ChannelDestroyed` is only sent on a `/channel` switch, never on a disconnect, so
     re-deriving in the `Leave` arm is also what retires a channel whose last member dropped.)
+  - **The offline list is a second box, not a second kind of row in the first one**
+    (`draw::draw_offline`, `App::offline`). An account nobody is connected as has no session id, no
+    channel and no device — three of `OnlineUser`'s four fields — so it crosses the wire as
+    `OfflineUser` (a username) in `PacketCode::List`'s own `offline` field rather than as a flag on
+    an online entry. A sentinel id would be worse than redundant: the roster's dedup guard, `Leave`
+    and `/pm` are all keyed on the id, and every one of them would have to learn which ids are
+    fiction.
+    - **It is `server_users.toml` minus whoever is connected** (`send_list`, `config::users::all`),
+      gated by `show_offline_users`. What the gate protects is not cost but disclosure: with it on,
+      connecting tells you every account that has ever existed on the server, not just who is here.
+    - **`Join` and `Leave` maintain it the way they maintain the roster**, which works only because
+      there is no guest path — `listen_client`'s auth either registers the user or verifies a stored
+      password, so everybody in `CONNECTIONS` has an entry in the file and a leaver is by definition
+      a registered user. A guest mode would break that `Leave` line specifically.
+    - **The client has to know the difference between "none offline" and "not sent"**, which is why
+      `ClientEvent::List` carries the `Option` rather than an `unwrap_or_default`: with the gate off
+      the `Leave` arm would otherwise invent an offline user and materialise a box the operator
+      turned off. `App::offline_listed` is that bit.
+    - **`Online` is the box that gets sized and `Offline` takes the rest.** `max_clients` bounds the
+      first, so it fits; the second is every account on the server and grows without limit, so it is
+      the one that has to truncate. A registration by somebody else is invisible until they
+      disconnect or somebody types `/list` — nothing is broadcast on register.
   - **The voice panel is the channel's roster, not our own voice session**, so somebody who never
     types `/voice` still sees who is in it. `PacketCode::VoiceJoin`/`VoiceLeave` (named
     `ChannelJoin`/`ChannelLeave` before — they were always the *voice* pair, while
