@@ -381,7 +381,8 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::BORDER)
-        .title(Span::styled(format!(" Online ({}) ", app.online.len()), theme::TITLE));
+        .title(Span::styled(" Online ", theme::TITLE))
+        .title_top(Line::from(Span::styled(format!(" {} ", app.online.len()), theme::TITLE)).right_aligned());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -427,7 +428,8 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::BORDER)
-        .title(Span::styled(format!(" Offline ({}) ", app.offline.len()), theme::TITLE));
+        .title(Span::styled(" Offline ", theme::TITLE))
+        .title_top(Line::from(Span::styled(format!(" {} ", app.offline.len()), theme::TITLE)).right_aligned());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -446,7 +448,8 @@ fn draw_channels(frame: &mut Frame, app: &App, area: Rect)
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::BORDER)
-        .title(Span::styled(format!(" Channels ({}) ", app.channels.len()), theme::TITLE));
+        .title(Span::styled(" Channels ", theme::TITLE))
+        .title_top(Line::from(Span::styled(format!(" {} ", app.channels.len()), theme::TITLE)).right_aligned());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -473,7 +476,8 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::BORDER)
-        .title(Span::styled(" Voice ", theme::TITLE));
+        .title(Span::styled(" Voice ", theme::TITLE))
+        .title_top(Line::from(Span::styled(format!(" {} ", app.voice.len()), theme::TITLE)).right_aligned());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
