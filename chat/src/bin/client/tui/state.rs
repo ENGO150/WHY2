@@ -179,7 +179,7 @@ pub struct App
     pub username: String, //OUR OWN USERNAME (options::get_server_username IS THE SERVER'S NAME)
     pub role: Role,       //OUR OWN ROLE
     pub online: Vec<OnlineUser>,
-    pub offline: BTreeSet<String>, //REGISTERED USERS NOBODY IS CONNECTED AS
+    pub offline: BTreeMap<String, Option<u8>>, //REGISTERED USERS NOBODY IS CONNECTED AS, AND THEIR COLORS
     pub offline_listed: bool, //WHETHER THE SERVER SENDS THEM AT ALL
     pub devices: HashMap<String, Device>, //WHAT EACH USER JOINED ON, KEYED BY USERNAME
     pub channels: BTreeSet<String>, //NAMED CHANNELS THE SERVER CURRENTLY HOLDS
@@ -261,7 +261,7 @@ impl App
             username: String::new(),
             role: Role::default(),
             online: Vec::new(),
-            offline: BTreeSet::new(),
+            offline: BTreeMap::new(),
             offline_listed: false,
             devices: HashMap::new(),
             channels: BTreeSet::new(),

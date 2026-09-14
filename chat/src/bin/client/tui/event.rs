@@ -172,7 +172,7 @@ impl App
                 self.rebuild_voice();
             },
 
-            ClientEvent::Join(uname, id, device) =>
+            ClientEvent::Join(uname, username_color, id, device) =>
             {
                 if let Some(device) = device.clone() { self.devices.insert(uname.clone(), device); }
 
@@ -190,6 +190,7 @@ impl App
                     self.online.push(OnlineUser
                     {
                         username: uname,
+                        username_color,
                         id,
                         channel: None, //EVERYBODY STARTS IN THE LOBBY
                         device,
@@ -208,11 +209,13 @@ impl App
                 ]));
 
                 //Leave NAMES THE USER, SO DROP THEM HERE
+                let color = self.online.iter().find(|user| user.id == id).and_then(|user| user.username_color);
+
                 self.online.retain(|user| user.id != id);
                 self.devices.remove(&uname);
 
                 //THE SERVER HAS NO GUESTS, SO A LEAVER IS A REGISTERED USER
-                if self.offline_listed { self.offline.insert(uname); }
+                if self.offline_listed { self.offline.insert(uname, color); }
 
                 //A DISCONNECT CARRIES NO VoiceLeave
                 if self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
@@ -402,7 +405,8 @@ impl App
                 //ALWAYS REFRESH THE SIDEBAR; ECHO ONLY IF ASKED
                 self.online = users;
                 self.offline_listed = registered.is_some();
-                self.offline = registered.unwrap_or_default().into_iter().map(|user| user.username).collect();
+                self.offline = registered.unwrap_or_default().into_iter()
+                    .map(|user| (user.username, user.username_color)).collect();
                 self.sort_online();
                 self.dirty = true;
 
@@ -430,7 +434,7 @@ impl App
                         let mut spans = vec![Span::styled(super::branch(index == last), theme::BORDER)];
 
                         spans.extend(id_column(user.id, width));
-                        spans.push(Span::raw(user.username.clone()));
+                        spans.push(self.theme.colorize(user.username.clone(), user.username_color));
 
                         //WHAT THEY ARE ON, IF THEY SHARE IT
                         if let Some(device) = self.devices.get(&user.username)
@@ -457,10 +461,16 @@ impl App
 
                         self.push_styled(format!("Offline clients ({}):", self.offline.len()), theme::TITLE);
 
-                        let rows = self.offline.iter().enumerate().map(|(index, username)| Line::from(vec!
+                        let rows = self.offline.iter().enumerate().map(|(index, (username, color))| Line::from(vec!
                         [
                             Span::styled(super::branch(index == last), theme::BORDER),
-                            Span::styled(username.clone(), theme::DIM),
+
+                            //THEIR OWN COLOR, ELSE DIM
+                            match color
+                            {
+                                Some(_) => self.theme.colorize(username.clone(), *color),
+                                None => Span::styled(username.clone(), theme::DIM),
+                            },
                         ])).collect::<Vec<Line<'static>>>();
 
                         for row in rows { self.push(row); }

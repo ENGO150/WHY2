@@ -394,7 +394,12 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
     let me = app.username.clone();
     let lines = app.online.iter().map(|user|
     {
-        let style = if user.username == me { theme::ACCENT } else { Style::default() };
+        //OUR OWN ROW STAYS MARKED; EVERYBODY ELSE GETS THEIR COLOR
+        let style = match user.username == me
+        {
+            true => theme::ACCENT,
+            false => app.theme.style(user.username_color),
+        };
 
         //WHAT THEY ARE ON, IF THEY SHARE IT
         let device = app.devices.get(&user.username).map(|device| super::device_label(device)).unwrap_or_default();
@@ -436,9 +441,17 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
 
     let room = inner.width as usize;
 
-    let lines = app.offline.iter()
-        .map(|username| Line::from(Span::styled(truncate(username, room), theme::DIM)))
-        .collect::<Vec<Line>>();
+    let lines = app.offline.iter().map(|(username, color)|
+    {
+        let name = truncate(username, room);
+
+        //THEIR OWN COLOR, ELSE DIM
+        Line::from(match color
+        {
+            Some(_) => Span::styled(name, app.theme.style(*color)),
+            None => Span::styled(name, theme::DIM),
+        })
+    }).collect::<Vec<Line>>();
 
     frame.render_widget(Paragraph::new(lines), inner);
 }
