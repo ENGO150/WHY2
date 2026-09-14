@@ -453,28 +453,6 @@ impl App
                     }).collect::<Vec<Line<'static>>>();
 
                     for row in rows { self.push(row); }
-
-                    //THE REGISTERED USERS NOBODY IS CONNECTED AS
-                    if !self.offline.is_empty()
-                    {
-                        let last = self.offline.len() - 1;
-
-                        self.push_styled(format!("Offline clients ({}):", self.offline.len()), theme::TITLE);
-
-                        let rows = self.offline.iter().enumerate().map(|(index, (username, color))| Line::from(vec!
-                        [
-                            Span::styled(super::branch(index == last), theme::BORDER),
-
-                            //THEIR OWN COLOR, ELSE DIM
-                            match color
-                            {
-                                Some(_) => self.theme.colorize(username.clone(), *color),
-                                None => Span::styled(username.clone(), theme::DIM),
-                            },
-                        ])).collect::<Vec<Line<'static>>>();
-
-                        for row in rows { self.push(row); }
-                    }
                 }
 
                 self.dirty = true;
