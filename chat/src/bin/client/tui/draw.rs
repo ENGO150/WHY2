@@ -381,22 +381,32 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
 
     //ID COLUMN, RIGHT-ALIGNED
     let width = app.online.iter().map(|user| user.id.to_string().len()).max().unwrap_or(1);
+    let room = inner.width as usize;
 
     let me = app.username.clone();
     let lines = app.online.iter().map(|user|
     {
         let style = if user.username == me { theme::ACCENT } else { Style::default() };
 
+        //WHAT THEY ARE ON, IF THEY SHARE IT
+        let device = app.devices.get(&user.username).map(|device| super::device_label(device)).unwrap_or_default();
+        let reserved = if device.is_empty() { 0 } else { device.width() + 2 };
+
+        //THE NAME GIVES WAY TO THE DEVICE
+        let name = truncate(&user.username, room.saturating_sub(width + 2 + reserved));
+
         let mut spans = vec!
         [
             Span::styled(format!("{id:>width$}  ", id = user.id), theme::DIM),
-            Span::styled(user.username.clone(), style),
+            Span::styled(name.clone(), style),
         ];
 
-        //WHAT THEY ARE ON, IF THEY SHARE IT
-        if let Some(device) = app.devices.get(&user.username)
+        //DEVICE ON THE RIGHT EDGE
+        if !device.is_empty()
         {
-            spans.push(Span::styled(format!(" {}", super::device_label(device)), theme::DIM));
+            let pad = room.saturating_sub(width + 3 + name.width() + device.width());
+
+            spans.push(Span::styled(format!("{:pad$}{device} ", ""), theme::DIM));
         }
 
         Line::from(spans)

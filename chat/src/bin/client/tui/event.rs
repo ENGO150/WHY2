@@ -192,6 +192,8 @@ impl App
                         channel: None, //EVERYBODY STARTS IN THE LOBBY
                         device,
                     });
+
+                    self.sort_online();
                 }
             },
 
@@ -394,6 +396,7 @@ impl App
             {
                 //ALWAYS REFRESH THE SIDEBAR; ECHO ONLY IF ASKED
                 self.online = users;
+                self.sort_online();
                 self.dirty = true;
 
                 //THE ROSTER NAMES EVERYBODY, SO IT OWNS THE DEVICES

@@ -563,6 +563,14 @@ impl App
         self.dirty = true;
     }
 
+    //US FIRST, THE REST BY ID
+    pub fn sort_online(&mut self)
+    {
+        let me = self.username.clone();
+
+        self.online.sort_by_key(|user| (user.username != me, user.id));
+    }
+
     //DROP THE SCROLLBACK OF AN EMPTY CHANNEL
     pub fn prune_panes(&mut self)
     {
