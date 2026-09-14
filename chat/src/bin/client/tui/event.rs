@@ -648,7 +648,7 @@ impl App
             },
 
             //BACK TO THE CONNECT BOX UNLESS WE ASKED TO LEAVE
-            ClientEvent::Quit =>
+            ClientEvent::Quit(said) =>
             {
                 if self.leaving
                 {
@@ -658,6 +658,9 @@ impl App
                     self.disconnected("Logged out.");
                 } else
                 {
+                    //A SERVER THAT SAID SO IS NOT ONE TO DIAL BACK
+                    if said { self.reconnect.forget(); }
+
                     let reason = self.disconnect_reason.take();
                     self.disconnected(reason.unwrap_or_else(|| String::from("Server quit communication.")));
                 }

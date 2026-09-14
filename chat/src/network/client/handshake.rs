@@ -89,7 +89,7 @@ pub async fn key_exchange
         let Some(received) = network::receive(streams, exchange_keys, None).await else
         {
             //THE SERVER WENT AWAY MID-HANDSHAKE
-            tx.send(ClientEvent::Quit).await.ok();
+            tx.send(ClientEvent::Quit(false)).await.ok();
 
             return Handshake::Failed;
         };

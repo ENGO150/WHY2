@@ -183,7 +183,7 @@ pub enum ClientEvent
     SpamWarning,                                                 //SPAM WARNING
     Socks5Voice,                                                 //DISABLED VOICE ON SOCKS5
     DisabledFeature,                                             //DISABLED FEATURE
-    Quit,                                                        //SERVER QUIT COMMUNICATION
+    Quit(bool),                                                  //SERVER QUIT COMMUNICATION
 }
 
 //LISTS
@@ -240,10 +240,17 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
     //LOOP READING
     loop
     {
+        //SERVER DIED CHECK
+        let mut dropped = false;
+
         let read = match network::receive(streams, Some(&keys), None).await
         {
             Some(code) => code,
-            None => PacketCode::Disconnect,
+            None =>
+            {
+                dropped = true; //YUP, SERVER IS 6 FEET UNDER
+                PacketCode::Disconnect
+            },
         };
 
         //CHECK FOR MUTED CLIENT
@@ -850,7 +857,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //SERVER DOESN'T LIKE YA ANYMORE - EXIT
             PacketCode::Disconnect =>
             {
-                tx.send(ClientEvent::Quit).await.unwrap();
+                tx.send(ClientEvent::Quit(!dropped)).await.unwrap();
                 return;
             },
 
