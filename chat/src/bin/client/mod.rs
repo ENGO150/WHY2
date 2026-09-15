@@ -621,16 +621,14 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                                 //SEND UPLOAD REQUEST
                                                 let request = match image
                                                 {
-                                                    true => PacketCode::Image
+                                                    true => PacketCode::ImageRequest
                                                     {
                                                         hash,
                                                         filename: path.file_name().and_then(|n| n.to_str())
                                                             .unwrap_or("unnamed_file").to_string(),
-                                                        token: None,
-                                                        uid: None,
                                                     },
 
-                                                    false => PacketCode::Upload { hash, token: None, uid: None },
+                                                    false => PacketCode::UploadRequest { hash },
                                                 };
 
                                                 network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;

@@ -585,13 +585,6 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //UPLOAD APPROVAL
             PacketCode::Upload { hash, token, uid } | PacketCode::Image { hash, token, uid, .. } =>
             {
-                //NO TOKEN MEANS THE SERVER HAS THIS PICTURE
-                let (Some(token), Some(uid)) = (token, uid) else
-                {
-                    ACTIVE_UPLOADS.lock().unwrap().remove(&hash);
-                    continue;
-                };
-
                 //SPAWN UPLOAD TASK
                 let file_tx = tx.clone(); //CLONE TX
                 tokio::spawn(file::upload(token, uid, hash,
@@ -599,12 +592,19 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 continue;
             },
 
+            //DUPLICATE IMAGE
+            PacketCode::ImageDuplicate { hash } =>
+            {
+                ACTIVE_UPLOADS.lock().unwrap().remove(&hash);
+                continue;
+            },
+
             //DOWNLOAD
-            PacketCode::Download { token, .. } =>
+            PacketCode::Download { token } =>
             {
                 //SPAWN DOWNLOAD TASK
                 let file_tx = tx.clone(); //CLONE TX
-                tokio::spawn(file::download(token.unwrap(), file_tx));
+                tokio::spawn(file::download(token, file_tx));
                 continue;
             },
 
@@ -616,20 +616,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                 tokio::spawn(async move
                 {
-                    let image = match data
-                    {
-                        Some(data) =>
-                        {
-                            let data = Arc::new(data);
-                            let (digest, image) = image::digest_and_decode(data.clone()).await;
-
-                            if digest == hash { cache::store(&hash, &data).await; }
-
-                            image
-                        },
-
-                        None => None,
-                    };
+                    let data = Arc::new(data);
+                    let (digest, image) = image::digest_and_decode(data.clone()).await;
+                    if digest == hash { cache::store(&hash, &data).await; }
 
                     image_tx.send(ClientEvent::ImageData(hash, image)).await.unwrap();
                 });
@@ -718,10 +707,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //FILE LIST
             PacketCode::Files { users } =>
             {
-                if let Some(users) = users
-                {
-                    tx.send(ClientEvent::Files(users)).await.unwrap();
-                }
+                tx.send(ClientEvent::Files(users)).await.unwrap();
             },
 
             //SCREENSHARE LIST

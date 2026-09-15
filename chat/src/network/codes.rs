@@ -134,29 +134,34 @@ pub enum PacketCode //CONTROL CODES
         id: usize,
     },
 
-    //CLIENT <> SERVER | REQUEST FILE UPLOAD (OR APPROVAL FROM SERVER)
+    //SERVER -> CLIENT | FILE UPLOAD APPROVAL
     Upload
     {
         hash: [u8; 32],
-        token: Option<[u8; 32]>,
-        uid: Option<u64>,
+        token: [u8; 32],
+        uid: u64,
     },
 
-    //CLIENT <> SERVER | DOWNLOAD FILE FROM SERVER
-    Download
+    //CLIENT -> SERVER | DOWNLOAD FILE FROM SERVER
+    DownloadRequest
     {
-        id: Option<usize>,
-        file_id: Option<usize>,
-        token: Option<[u8; 32]>,
+        id: usize,
+        file_id: usize,
     },
 
-    //CLIENT <> SERVER | REQUEST IMAGE UPLOAD
-    Image
+    //CLIENT -> SERVER | REQUEST IMAGE UPLOAD
+    ImageRequest
     {
         hash: [u8; 32],
         filename: String,
-        token: Option<[u8; 32]>,
-        uid: Option<u64>,
+    },
+
+    //SERVER -> CLIENT | IMAGE UPLOAD APPROVAL
+    Image
+    {
+        hash: [u8; 32],
+        token: [u8; 32],
+        uid: u64,
     },
 
     //SERVER -> CLIENT | A STORED IMAGE, AS IT WAS UPLOADED
@@ -169,11 +174,11 @@ pub enum PacketCode //CONTROL CODES
         username_color: Option<u8>,
     },
 
-    //CLIENT <> SERVER | ASK FOR A STORED PICTURE
+    //SERVER -> CLIENT | ASK FOR A STORED PICTURE
     ImageData
     {
         hash: [u8; 32],
-        data: Option<Vec<u8>>,
+        data: Vec<u8>,
     },
 
     //SERVER -> CLIENT | ANNOUNCE NEW UPLOADED FILE
@@ -241,7 +246,12 @@ pub enum PacketCode //CONTROL CODES
     ChannelDestroyed { name: String },              //SERVER -> CLIENT | CHANNEL ABANDONED
     VoiceClients { clients: Vec<(usize, String)> }, //SERVER -> CLIENT | THE CHANNEL'S VOICE ROSTER
     VoiceLeave { id: usize },                       //SERVER -> CLIENT | CLIENT LEFT VOICE
-    Files { users: Option<Vec<UserFile>> },         //CLIENT <> SERVER | LIST UPLOADED FILES
+    UploadRequest { hash: [u8; 32] },               //CLIENT -> SERVER | REQUEST FILE UPLOAD
+    Download { token: [u8; 32] },                   //SERVER -> CLIENT | DOWNLOAD FILE FROM SERVER
+    ImageDuplicate { hash: [u8; 32] },              //SERVER -> CLIENT | IMAGE ALREADY UPLOADED
+    ImageDataRequest { hash: [u8; 32] },            //CLIENT -> SERVER | ASK FOR A STORED PICTURE
+    FilesRequest,                                   //CLIENT -> SERVER | REQUEST FILE LIST
+    Files { users: Vec<UserFile> },                 //SERVER -> CLIENT | LIST UPLOADED FILES
     Screens { users: Option<Vec<UserScreen>> },     //CLIENT <> SERVER | LIST SCREENSHARES
     Deattach { username: Option<String> },          //CLIENT <> SERVER | DEATTACH CLIENT SCREENSHARE
     Attached { username: String },                  //SERVER -> CLIENT | CLIENT ATTACHED LOCAL CLIENT SHARE
@@ -292,10 +302,15 @@ impl PacketCode
             Self::PrivateMessageBack { .. } => "PrivateMessageBack",
             Self::VoiceJoin { .. } => "VoiceJoin",
             Self::VoiceLeave { .. } => "VoiceLeave",
+            Self::UploadRequest { .. } => "UploadRequest",
             Self::Upload { .. } => "Upload",
+            Self::DownloadRequest { .. } => "DownloadRequest",
             Self::Download { .. } => "Download",
+            Self::ImageRequest { .. } => "ImageRequest",
+            Self::ImageDuplicate { .. } => "ImageDuplicate",
             Self::Image { .. } => "Image",
             Self::ImageDisplay { .. } => "ImageDisplay",
+            Self::ImageDataRequest { .. } => "ImageDataRequest",
             Self::ImageData { .. } => "ImageData",
             Self::Uploaded { .. } => "Uploaded",
             Self::Attach { .. } => "Attach",
@@ -313,6 +328,7 @@ impl PacketCode
             Self::ChannelCreated { .. } => "ChannelCreated",
             Self::ChannelDestroyed { .. } => "ChannelDestroyed",
             Self::VoiceClients { .. } => "VoiceClients",
+            Self::FilesRequest { .. } => "FilesRequest",
             Self::Files { .. } => "Files",
             Self::Screens { .. } => "Screens",
             Self::Deattach { .. } => "Deattach",

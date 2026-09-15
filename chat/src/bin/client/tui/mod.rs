@@ -310,8 +310,7 @@ pub async fn run
 
                     for hash in app.image_requests.drain(..)
                     {
-                        network::send(&mut *stream,
-                            PacketCode::ImageData { hash, data: None }, keys.as_ref()).await;
+                        network::send(&mut *stream, PacketCode::ImageDataRequest { hash }, keys.as_ref()).await;
                     }
                 }
 

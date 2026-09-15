@@ -1032,7 +1032,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //NEW FILE UPLOAD
-            PacketCode::Upload { hash, .. } | PacketCode::Image { hash, .. } =>
+            PacketCode::UploadRequest { hash } | PacketCode::ImageRequest { hash, .. } =>
             {
                 //SILENCE MUTED USERS
                 if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
@@ -1041,14 +1041,14 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
-                let image = matches!(read, PacketCode::Image { .. });
+                let image = matches!(read, PacketCode::ImageRequest { .. });
 
                 //CHECK IF IMAGE WAS ALREADY UPLOADED
                 if image && config::messages::has_image(&hash)
                 {
                     let filename = match &read
                     {
-                        PacketCode::Image { filename, .. } => Path::new(filename)
+                        PacketCode::ImageRequest { filename, .. } => Path::new(filename)
                             .file_name()
                             .and_then(|f| f.to_str())
                             .unwrap_or("unnamed_file")
@@ -1074,13 +1074,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     }, true, channel.as_deref());
 
                     //TELL THE UPLOADER THERE IS NOTHING TO SEND
-                    network::send(&mut *streams.1.lock().await, PacketCode::Image
-                    {
-                        hash,
-                        filename,
-                        token: None,
-                        uid: None,
-                    }, Some(&keys)).await;
+                    network::send(&mut *streams.1.lock().await, PacketCode::ImageDuplicate { hash }, Some(&keys)).await;
 
                     log::info!("Image already stored, upload skipped: {peer_addr}");
                     continue;
@@ -1114,17 +1108,16 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     PacketCode::Image
                     {
                         hash,
-                        filename: String::new(), //THE UPLOAD'S OWN METADATA CARRIES IT FROM HERE
-                        token: Some(token),
-                        uid: Some(uid),
+                        token,
+                        uid,
                     }
                 } else
                 {
                     PacketCode::Upload
                     {
                         hash,
-                        token: Some(token),
-                        uid: Some(uid),
+                        token,
+                        uid,
                     }
                 };
 
@@ -1133,16 +1126,15 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //DOWNLOAD
-            PacketCode::Download { id: owner_id, file_id, .. } =>
+            PacketCode::DownloadRequest { id: owner_id, file_id } =>
             {
                 //FIND USERNAME BY ID
                 let username = CONNECTIONS.iter()
-                    .find(|entry| entry.value().id() == owner_id.as_ref())
+                    .find(|entry| entry.value().id() == Some(&owner_id))
                     .and_then(|entry| entry.value().username().cloned());
 
                 //GET USER UPLOADS
                 if let Some(username) = username &&
-                    let Some(file_id) = file_id &&
                     let Some(file) = AVAILABLE_FILES.get(&username).and_then(|f| f.value().get(file_id).cloned())
                 {
                     //GENERATE RANDOM SHARE UID
@@ -1153,12 +1145,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //OPEN NEW CONNECTION
                     let token = open_connection(id, ConnectionType::FileDownload { uid, file });
 
-                    network::send(&mut *streams.1.lock().await, PacketCode::Download
-                    {
-                        token: Some(token),
-                        file_id: None,
-                        id: None,
-                    }, Some(&keys)).await;
+                    //SEND APPROVAL
+                    network::send(&mut *streams.1.lock().await, PacketCode::Download { token }, Some(&keys)).await;
 
                     //LOG START
                     log::info!("Download request ({} bytes): {peer_addr}", file_size);
@@ -1294,7 +1282,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //LIST FILES
-            PacketCode::Files { .. } =>
+            PacketCode::FilesRequest =>
             {
                 //GET ALL UPLOADS
                 let mut users = Vec::new();
@@ -1328,11 +1316,11 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 log::debug!("Sending file list ({} users): {peer_addr}", users.len());
 
                 //SEND LIST BACK TO CLIENT
-                network::send(&mut *streams.1.lock().await, PacketCode::Files { users: Some(users) }, Some(&keys)).await;
+                network::send(&mut *streams.1.lock().await, PacketCode::Files { users }, Some(&keys)).await;
             },
 
             //ONE OF THE HISTORY'S PICTURES
-            PacketCode::ImageData { hash, .. } =>
+            PacketCode::ImageDataRequest { hash } =>
             {
                 //ONE REQUEST PER IMAGE_REQUEST_DELAY
                 let wait = CONNECTIONS.get(&peer_addr)
@@ -1355,13 +1343,14 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     false => None,
                 };
 
-                match image.as_ref()
+                if let Some(data) = image
                 {
-                    Some(data) => log::info!("Image fetch served ({} bytes): {peer_addr}", data.len()),
-                    None => log::warn!("Image fetch refused (not in history): {peer_addr}"),
+                    log::info!("Image fetch served ({} bytes): {peer_addr}", data.len());
+                    network::send(&mut *streams.1.lock().await, PacketCode::ImageData { hash, data }, Some(&keys)).await;
+                } else
+                {
+                    log::warn!("Image fetch refused (not in history): {peer_addr}");
                 }
-
-                network::send(&mut *streams.1.lock().await, PacketCode::ImageData { hash, data: image }, Some(&keys)).await;
             },
 
             //LIST SCREENSHARES

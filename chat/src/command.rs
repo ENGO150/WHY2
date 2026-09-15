@@ -735,7 +735,7 @@ impl Command
 
                 Some(match parsed
                 {
-                    Some((id, file_id)) => Ok(PacketCode::Download { id: Some(id), file_id: Some(file_id), token: None }),
+                    Some((id, file_id)) => Ok(PacketCode::DownloadRequest { id, file_id }),
                     None => Err(()),
                 })
             },
@@ -755,7 +755,7 @@ impl Command
 
             Command::Channel => Some(Ok(PacketCode::Channel { channel: parameters.map(str::to_string) })),
             Command::List => Some(Ok(PacketCode::List { online: None, offline: None })),
-            Command::Files => Some(Ok(PacketCode::Files { users: None })),
+            Command::Files => Some(Ok(PacketCode::FilesRequest)),
 
             //RESOLVE THE MONITOR LOCALLY
             #[cfg(feature = "client_screen")]
