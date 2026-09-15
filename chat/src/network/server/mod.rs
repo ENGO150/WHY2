@@ -766,12 +766,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         for _ in 0..max_tries
         {
             //SEND REGISTER CODE
-            network::send(&mut *streams.1.lock().await, PacketCode::PasswordRRequest, Some(&keys)).await;
+            network::send(&mut *streams.1.lock().await, PacketCode::RegisterRequest, Some(&keys)).await;
 
             //WAIT FOR ANSWER
             match network::receive(streams, Some(&keys), None).await
             {
-                Some(PacketCode::PasswordR { password: pass }) =>
+                Some(PacketCode::Register { password: pass }) =>
                 {
                     let pass = Zeroizing::new(pass);
 
@@ -809,14 +809,14 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     } else //LOGIN
     {
         //SEND LOGIN CODE
-        network::send(&mut *streams.1.lock().await, PacketCode::PasswordLRequest, Some(&keys)).await;
+        network::send(&mut *streams.1.lock().await, PacketCode::LoginRequest, Some(&keys)).await;
 
         //WAIT FOR ANSWER
         let password = loop
         {
             match network::receive(streams, Some(&keys), None).await
             {
-                Some(PacketCode::PasswordL { password }) => break Zeroizing::new(password),
+                Some(PacketCode::Login { password }) => break Zeroizing::new(password),
 
                 _ => return remove_connection(&peer_addr, false, Some("login")).await,
             }

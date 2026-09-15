@@ -387,7 +387,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //REGISTER
-            PacketCode::PasswordRRequest =>
+            PacketCode::RegisterRequest =>
             {
                 options::set_asking_password(true);
 
@@ -400,15 +400,15 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     invalid_password = true;
                 }
 
-                options::set_login_state(LoginState::PasswordRegister);
+                options::set_login_state(LoginState::Register);
                 tx.send(ClientEvent::Register).await.unwrap();
             },
 
             //LOGIN
-            PacketCode::PasswordLRequest =>
+            PacketCode::LoginRequest =>
             {
                 options::set_asking_password(true);
-                options::set_login_state(LoginState::PasswordLogin);
+                options::set_login_state(LoginState::Login);
                 tx.send(ClientEvent::Login).await.unwrap();
             },
 

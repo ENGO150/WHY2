@@ -42,8 +42,8 @@ pub enum LoginState //STATE OF LOGIN
 {
     None,
     Username,
-    PasswordLogin,
-    PasswordRegister,
+    Login,
+    Register,
 }
 
 //SETTINGS

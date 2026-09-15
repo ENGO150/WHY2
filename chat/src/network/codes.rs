@@ -240,10 +240,10 @@ pub enum PacketCode //CONTROL CODES
 
     Version { version: String },                    //SERVER <> CLIENT | THE SENDER'S PKG VERSION
     UsernameRequest,                                //SERVER -> CLIENT | PICK USERNAME
-    PasswordLRequest,                               //SERVER -> CLIENT | LOGIN
-    PasswordRRequest,                               //SERVER -> CLIENT | REGISTER
-    PasswordL { password: String },                 //CLIENT -> SERVER | LOGIN
-    PasswordR { password: String },                 //CLIENT -> SERVER | REGISTER
+    LoginRequest,                                   //SERVER -> CLIENT | LOGIN
+    RegisterRequest,                                //SERVER -> CLIENT | REGISTER
+    Login { password: String },                     //CLIENT -> SERVER | LOGIN
+    Register { password: String },                  //CLIENT -> SERVER | REGISTER
     History { messages: Vec<StoredMessage> },       //SERVER -> CLIENT | THE LOBBY'S STORED MESSAGES
     Channel { channel: Option<String> },            //SERVER <> CLIENT | CHANNEL CHANGE
     ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
@@ -339,10 +339,10 @@ impl PacketCode
             Self::Version { .. } => "Version",
             Self::UsernameRequest { .. } => "UsernameRequest",
             Self::Username { .. } => "Username",
-            Self::PasswordLRequest { .. } => "PasswordLRequest",
-            Self::PasswordL { .. } => "PasswordL",
-            Self::PasswordRRequest { .. } => "PasswordRRequest",
-            Self::PasswordR { .. } => "PasswordR",
+            Self::LoginRequest { .. } => "LoginRequest",
+            Self::Login { .. } => "Login",
+            Self::RegisterRequest { .. } => "RegisterRequest",
+            Self::Register { .. } => "Register",
             Self::History { .. } => "History",
             Self::Channel { .. } => "Channel",
             Self::ChannelCreated { .. } => "ChannelCreated",

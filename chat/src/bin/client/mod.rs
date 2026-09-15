@@ -690,8 +690,8 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                 device: share_device(),
             }
         },
-        LoginState::PasswordLogin => PacketCode::PasswordL { password: input },
-        LoginState::PasswordRegister => PacketCode::PasswordR { password: input },
+        LoginState::Login => PacketCode::Login { password: input },
+        LoginState::Register => PacketCode::Register { password: input },
         LoginState::None => PacketCode::MessageRequest { text: input },
     };
 
