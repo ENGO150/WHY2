@@ -538,8 +538,7 @@ async fn handle_key
                 Some(write_stream) =>
                 {
                     network::send(&mut *write_stream.lock().await,
-                        PacketCode::ServerSettings { settings: Some(settings), save: true },
-                        options::get_keys().as_ref()).await;
+                        PacketCode::ServerSettingsSave { settings }, options::get_keys().as_ref()).await;
 
                     //STORED IS NOT IN USE FOR THESE
                     if let Some(keys) = app.settings.restart_note.take()

@@ -147,8 +147,8 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
     //SEND LIST BACK TO CLIENT
     network::send(&mut *write_stream.lock().await, PacketCode::List
     {
-        online: Some(users),
-        offline: offline,
+        online: users,
+        offline,
     }, Some(&keys)).await;
 }
 
@@ -156,8 +156,8 @@ async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys)
 {
     network::send(&mut *write_stream.lock().await, PacketCode::ServerBans
     {
-        users: Some(config::bans::users()),
-        ips: Some(config::bans::ips()),
+        users: config::bans::users(),
+        ips: config::bans::ips(),
     }, Some(keys)).await;
 }
 
@@ -637,7 +637,7 @@ pub async fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL AT
     for (stream_mutex, keys) in to_notify
     {
         network::send(&mut *stream_mutex.lock().await,
-            PacketCode::Deattach { username: Some(sharer_uname.to_owned()) }, keys.as_ref()).await;
+            PacketCode::Deattach { username: sharer_uname.to_owned() }, keys.as_ref()).await;
     }
 }
 
@@ -766,22 +766,20 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         for _ in 0..max_tries
         {
             //SEND REGISTER CODE
-            network::send(&mut *streams.1.lock().await, PacketCode::PasswordR { password: None }, Some(&keys)).await;
+            network::send(&mut *streams.1.lock().await, PacketCode::PasswordRRequest, Some(&keys)).await;
 
             //WAIT FOR ANSWER
             match network::receive(streams, Some(&keys), None).await
             {
                 Some(PacketCode::PasswordR { password: pass }) =>
                 {
-                    if let Some(pass) = pass
+                    let pass = Zeroizing::new(pass);
+
+                    //CHECK LENGTH
+                    if pass.len() >= config::read_config("min_password_length")
                     {
-                        let pass = Zeroizing::new(pass);
-                        //CHECK LENGTH
-                        if pass.len() >= config::read_config("min_password_length")
-                        {
-                            password = Some(pass);
-                            break;
-                        }
+                        password = Some(pass);
+                        break;
                     }
                 },
 
@@ -811,14 +809,14 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     } else //LOGIN
     {
         //SEND LOGIN CODE
-        network::send(&mut *streams.1.lock().await, PacketCode::PasswordL { password: None }, Some(&keys)).await;
+        network::send(&mut *streams.1.lock().await, PacketCode::PasswordLRequest, Some(&keys)).await;
 
         //WAIT FOR ANSWER
         let password = loop
         {
             match network::receive(streams, Some(&keys), None).await
             {
-                Some(PacketCode::PasswordL { password: Some(password) }) => break Zeroizing::new(password),
+                Some(PacketCode::PasswordL { password }) => break Zeroizing::new(password),
 
                 _ => return remove_connection(&peer_addr, false, Some("login")).await,
             }
@@ -940,8 +938,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 send_to_all(PacketCode::Message
                 {
                     text,
-                    username: Some(username.clone()),
-                    id: Some(id),
+                    username: username.clone(),
+                    id,
                     colors,
                 }, true, channel.as_deref());
             }
@@ -954,7 +952,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //VOICE CALL
-            PacketCode::Voice { .. } =>
+            PacketCode::VoiceRequest =>
             {
                 //CHECK DISABLED FEATURE
                 if !options::voice_chat_enabled()
@@ -1025,7 +1023,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //CLIENT REQUESTED LIST OF ONLINE USERS
-            PacketCode::List { .. } =>
+            PacketCode::ListRequest =>
             {
                 //RESPOND
                 send_list(&streams.1, &peer_addr, &keys).await;
@@ -1159,7 +1157,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //SCREEN SHARE
-            PacketCode::Screen { .. } =>
+            PacketCode::ScreenRequest =>
             {
                 //CHECK FOR DISABLING SCREEN SHARE
                 if let Some((Some(removed_id), Some(username))) = CONNECTIONS.get_mut(&peer_addr)
@@ -1202,14 +1200,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //SCREENSHARE ATTACH
-            PacketCode::Attach { id: sharer_id, .. } =>
+            PacketCode::AttachRequest { id: sharer_id } =>
             {
                 //FIND SHARER ADDRESS BY ID
-                let sharer_info = sharer_id.and_then(|sid|
-                {
-                    CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&sid) && entry.screen_stream().is_some())
-                        .and_then(|conn| conn.username().map(|u| (sid, u.to_owned())))
-                });
+                let sharer_info = CONNECTIONS.iter()
+                    .find(|entry| entry.value().id() == Some(&sharer_id) && entry.screen_stream().is_some())
+                    .and_then(|conn| conn.username().map(|u| (sharer_id, u.to_owned())));
 
                 if let Some((sharer_id, sharer_username)) = sharer_info &&
                     CONNECTIONS.get(&peer_addr).is_some_and(|c| c.attached_screen().as_ref()
@@ -1224,9 +1220,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //SEND ACCEPT
                     network::send(&mut *streams.1.lock().await, PacketCode::Attach
                     {
-                        id: None,
-                        username: Some(sharer_username.to_owned()),
-                        token: Some(token),
+                        username: sharer_username.to_owned(),
+                        token,
                     }, Some(&keys)).await;
 
                     //TELL THE SHARER WHO IS WATCHING
@@ -1247,7 +1242,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //SCREENSHARE DEATTACH
-            PacketCode::Deattach { .. } =>
+            PacketCode::DeattachRequest =>
             {
                 //DEATTACH
                 if let Some(sharer_id) = if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
@@ -1262,7 +1257,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //FIND SHARER USERNAME
                     let sharer_uname = CONNECTIONS.iter()
                         .find(|c| c.value().id() == Some(&sharer_id))
-                        .and_then(|c| c.value().username().cloned());
+                        .and_then(|c| c.value().username().cloned())
+                        .unwrap_or_default();
 
                     //SEND ACCEPT
                     network::send(&mut *streams.1.lock().await, PacketCode::Deattach { username: sharer_uname }, Some(&keys)).await;
@@ -1354,7 +1350,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //LIST SCREENSHARES
-            PacketCode::Screens { .. } =>
+            PacketCode::ScreensRequest =>
             {
                 let mut users = Vec::new();
 
@@ -1376,7 +1372,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 log::debug!("Sending screenshare list ({} users): {peer_addr}", users.len());
 
                 //SEND LIST BACK TO CLIENT
-                network::send(&mut *streams.1.lock().await, PacketCode::Screens { users: Some(users) }, Some(&keys)).await;
+                network::send(&mut *streams.1.lock().await, PacketCode::Screens { users }, Some(&keys)).await;
             },
 
             //PRIVATE MESSAGE
@@ -1585,7 +1581,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //BAN LIST
-            PacketCode::ServerBans { .. } =>
+            PacketCode::ServerBansRequest =>
             {
                 //VERIFY PERMISSIONS
                 if role < Role::Owner
@@ -1668,7 +1664,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //SET A USER'S ROLE
-            PacketCode::ServerRole { id: uid, role: new_role, .. } =>
+            PacketCode::ServerRoleRequest { id: uid, role: new_role } =>
             {
                 //VERIFY PERMISSIONS
                 if role < Role::Owner || id == uid || new_role > role
@@ -1740,7 +1736,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //SERVER CONFIGURATION
-            PacketCode::ServerSettings { settings, save } =>
+            PacketCode::ServerSettingsRequest | PacketCode::ServerSettingsSave { .. } =>
             {
                 //VERIFY PERMISSIONS
                 if role < Role::Owner
@@ -1751,20 +1747,24 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
-                //A SAVE WITHOUT ROWS IS NOT A SAVE
-                if save && let Some(settings) = &settings
+                //STORE THE ROWS OF A SAVE
+                let save = if let PacketCode::ServerSettingsSave { settings } = &read
                 {
                     let accepted = config::settings::write(settings);
 
                     log::info!("Server settings saved by {peer_addr}: {accepted}/{} rows accepted", settings.len());
-                } else if !save
+
+                    true
+                } else
                 {
                     log::info!("Server settings read by {peer_addr}");
-                }
+
+                    false
+                };
 
                 network::send(&mut *streams.1.lock().await, PacketCode::ServerSettings
                 {
-                    settings: Some(config::settings::all()),
+                    settings: config::settings::all(),
                     save,
                 }, Some(&keys)).await;
             },

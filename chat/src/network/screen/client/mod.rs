@@ -207,7 +207,7 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
         {
             //DEATTACH ON SERVER
             network::send(&mut *main_stream.lock().await,
-                PacketCode::Deattach { username: None }, chat_options::get_keys().as_ref()).await;
+                PacketCode::DeattachRequest, chat_options::get_keys().as_ref()).await;
         }
     });
 

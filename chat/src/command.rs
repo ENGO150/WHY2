@@ -748,13 +748,13 @@ impl Command
 
                 Some(match target_id
                 {
-                    Some(id) => Ok(PacketCode::Attach { id: Some(id), token: None, username: None }), //NOVÁ VARIANTA
+                    Some(id) => Ok(PacketCode::AttachRequest { id }), //NOVÁ VARIANTA
                     None => Err(()),
                 })
             },
 
             Command::Channel => Some(Ok(PacketCode::Channel { channel: parameters.map(str::to_string) })),
-            Command::List => Some(Ok(PacketCode::List { online: None, offline: None })),
+            Command::List => Some(Ok(PacketCode::ListRequest)),
             Command::Files => Some(Ok(PacketCode::FilesRequest)),
 
             //RESOLVE THE MONITOR LOCALLY
@@ -768,7 +768,7 @@ impl Command
                     //NO MONITOR NAMED: TOGGLE THE SHARE
                     if !sharing { screen_options::set_monitor(None); }
 
-                    return Some(Ok(PacketCode::Screen { token: None }));
+                    return Some(Ok(PacketCode::ScreenRequest));
                 };
 
                 //RESOLVE BEFORE STORING, SO AN UNKNOWN ONE FAILS
@@ -777,7 +777,7 @@ impl Command
                 //NAMING THE CAPTURED MONITOR ENDS THE SHARE
                 if sharing && screen_capture::current_monitor().is_some_and(|current| current == monitor)
                 {
-                    return Some(Ok(PacketCode::Screen { token: None }));
+                    return Some(Ok(PacketCode::ScreenRequest));
                 }
 
                 screen_options::set_monitor(Some(monitor));
@@ -785,15 +785,15 @@ impl Command
                 //SWAP THE RUNNING CAPTURE OVER, SENDING NOTHING
                 if sharing { return None; }
 
-                Some(Ok(PacketCode::Screen { token: None }))
+                Some(Ok(PacketCode::ScreenRequest))
             },
 
-            #[cfg(feature = "client_screen")] Command::Deattach => Some(Ok(PacketCode::Deattach { username: None } )),
-            #[cfg(feature = "client_screen")] Command::Screens => Some(Ok(PacketCode::Screens { users: None })),
+            #[cfg(feature = "client_screen")] Command::Deattach => Some(Ok(PacketCode::DeattachRequest)),
+            #[cfg(feature = "client_screen")] Command::Screens => Some(Ok(PacketCode::ScreensRequest)),
 
             //SAME PACKET AS /exit
             Command::Exit | Command::Logout => Some(Ok(PacketCode::Disconnect)),
-            #[cfg(feature = "client_voice")] Command::Voice => Some(Ok(PacketCode::Voice { token: None })),
+            #[cfg(feature = "client_voice")] Command::Voice => Some(Ok(PacketCode::VoiceRequest)),
 
             _ => None,
         }

@@ -258,7 +258,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
         #[cfg(feature = "client_voice")]
         if let PacketCode::Message { id, .. } = read
         {
-            if id.is_some() && options::is_muted(id) { continue; }
+            if options::is_muted(Some(id)) { continue; }
         }
 
         //KEEPALIVE
@@ -275,7 +275,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //REGULAR MESSAGE
             PacketCode::Message { text, username, id, colors } =>
             {
-                tx.send(ClientEvent::Message(text, username.unwrap(), id.unwrap(), colors)).await.unwrap();
+                tx.send(ClientEvent::Message(text, username, id, colors)).await.unwrap();
             }
 
             //THE LOBBY'S STORED MESSAGES
@@ -326,14 +326,14 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 let local_version = misc::get_version().to_string();
 
                 //NON MATCHING VERSION (WILL GET DISCONNECTED)
-                if let Some(version) = version && version != local_version
+                if version != local_version
                 {
                     tx.send(ClientEvent::IncompatibleVersion(local_version.clone(), version)).await.unwrap();
                 }
 
                 //RESPOND
                 network::send(&mut *streams.1.lock().await,
-                    PacketCode::Version { version: Some(local_version) }, Some(&keys)).await;
+                    PacketCode::Version { version: local_version }, Some(&keys)).await;
 
                 continue;
             }
@@ -387,7 +387,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //REGISTER
-            PacketCode::PasswordR { .. } =>
+            PacketCode::PasswordRRequest =>
             {
                 options::set_asking_password(true);
 
@@ -405,7 +405,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //LOGIN
-            PacketCode::PasswordL { .. } =>
+            PacketCode::PasswordLRequest =>
             {
                 options::set_asking_password(true);
                 options::set_login_state(LoginState::PasswordLogin);
@@ -561,13 +561,13 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //server.toml, ASKED FOR OR JUST STORED
             PacketCode::ServerSettings { settings, save } =>
             {
-                tx.send(ClientEvent::ServerSettings(settings.unwrap_or_default(), save)).await.unwrap();
+                tx.send(ClientEvent::ServerSettings(settings, save)).await.unwrap();
             },
 
             //THE BAN LIST, ASKED FOR OR JUST LIFTED
             PacketCode::ServerBans { users, ips } =>
             {
-                tx.send(ClientEvent::ServerBans(users.unwrap_or_default(), ips.unwrap_or_default())).await.unwrap();
+                tx.send(ClientEvent::ServerBans(users, ips)).await.unwrap();
             },
 
             //THE SERVER STORED A COLOR
@@ -579,7 +579,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //LIST OF USERS
             PacketCode::List { online, offline } =>
             {
-                tx.send(ClientEvent::List(online.unwrap(), offline)).await.unwrap();
+                tx.send(ClientEvent::List(online, offline)).await.unwrap();
             },
 
             //UPLOAD APPROVAL
@@ -713,10 +713,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //SCREENSHARE LIST
             PacketCode::Screens { users } =>
             {
-                if let Some(users) = users
-                {
-                    tx.send(ClientEvent::Screens(users)).await.unwrap();
-                }
+                tx.send(ClientEvent::Screens(users)).await.unwrap();
             },
 
             //MAX PARALLEL UPLOADS
@@ -750,15 +747,15 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
             //SCREENSHARE ATTACH
             #[cfg(feature = "client_screen")]
-            PacketCode::Attach { username, token, .. } =>
+            PacketCode::Attach { username, token } =>
             {
                 //ENABLE ATTACH
                 screen_options::set_attach_screen(true);
 
                 //SPAWN DOWNLOAD TASK
                 let main_stream = streams.1.clone();
-                tokio::spawn(screen::attach(token.unwrap(), main_stream));
-                tx.send(ClientEvent::Attach(username.unwrap())).await.unwrap();
+                tokio::spawn(screen::attach(token, main_stream));
+                tx.send(ClientEvent::Attach(username)).await.unwrap();
             },
 
             //SCREENSHARE DEATTACH
@@ -768,7 +765,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 //DISABLE ATTACH
                 screen_options::set_attach_screen(false);
 
-                tx.send(ClientEvent::Deattach(username.unwrap())).await.unwrap();
+                tx.send(ClientEvent::Deattach(username)).await.unwrap();
             },
 
             //SOMEBODY STARTED SCREENSHARING

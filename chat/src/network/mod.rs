@@ -428,7 +428,7 @@ pub async fn receive
         {
             //STRIP CONTROL CHARACTERS
             #[cfg(feature = "server")]
-            if let PacketCode::MessageRequest { text } | PacketCode::PrivateMessage { text, .. } = &mut packet.code &&
+            if let PacketCode::MessageRequest { text } | PacketCode::PrivateMessageRequest { text, .. } = &mut packet.code &&
                 text.chars().any(|c| c.is_control() && c != '\n')
             {
                 *text = text.chars().filter_map(|c| match c
@@ -463,7 +463,7 @@ pub async fn receive
 
                     //SPAM
                     if let PacketCode::MessageRequest { ref text } |
-                        PacketCode::PrivateMessage { ref text, .. } = packet.code
+                        PacketCode::PrivateMessageRequest { ref text, .. } = packet.code
                     {
                         //MESSAGE SIZE
                         disconnect = text.len() > config::read_config("max_message_length");

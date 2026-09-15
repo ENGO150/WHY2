@@ -44,8 +44,8 @@ pub enum PacketCode //CONTROL CODES
     Message
     {
         text: String,
-        username: Option<String>,
-        id: Option<usize>,
+        username: String,
+        id: usize,
         colors: MessageColors,
     },
 
@@ -188,35 +188,40 @@ pub enum PacketCode //CONTROL CODES
         username: String,
     },
 
-    //CLIENT <> SERVER | ATTACH CLIENT SCREENSHARE
+    //SERVER -> CLIENT | SCREENSHARE ATTACH APPROVAL
     Attach
     {
-        id: Option<usize>,
-        username: Option<String>,
-        token: Option<[u8; 32]>,
+        username: String,
+        token: [u8; 32],
     },
 
-    //CLIENT <> SERVER | PRINT CONNECTED USERS
+    //SERVER -> CLIENT | PRINT CONNECTED USERS
     List
     {
-        online: Option<Vec<OnlineUser>>,
+        online: Vec<OnlineUser>,
         offline: Option<Vec<OfflineUser>>,
     },
 
-    //CLIENT <> SERVER | READ server_bans.toml
+    //SERVER -> CLIENT | THE WHOLE BAN LIST
     ServerBans
     {
-        //REQUEST: BOTH None | ANSWER: THE WHOLE BAN LIST
-        users: Option<Vec<BanEntry>>,
-        ips: Option<Vec<BanEntry>>,
+        users: Vec<BanEntry>,
+        ips: Vec<BanEntry>,
     },
 
-    //CLIENT <> SERVER | SET A USER'S ROLE
+    //CLIENT -> SERVER | SET A USER'S ROLE
+    ServerRoleRequest
+    {
+        id: usize,  //TARGET USER
+        role: Role, //THE ROLE THEY ARE BEING GIVEN
+    },
+
+    //SERVER -> CLIENT | A ROLE WAS SET
     ServerRole
     {
-        id: usize,                //TARGET USER
-        role: Role,               //THE ROLE THEY ARE BEING GIVEN
-        username: Option<String>, //REQUEST: None | SERVER ANSWER: THE TARGET
+        id: usize,                //WHO WAS RETITLED
+        role: Role,               //THE ROLE THEY WERE GIVEN
+        username: Option<String>, //THE TARGET | None = THE RECIPIENT THEMSELVES
     },
 
     //CLIENT <> SERVER | SET ONE CHAT COLOR
@@ -226,20 +231,19 @@ pub enum PacketCode //CONTROL CODES
         color: u8,
     },
 
-    //CLIENT <> SERVER | READ AND WRITE server.toml
+    //SERVER -> CLIENT | THE WHOLE server.toml
     ServerSettings
     {
-        //REQUEST: None | ANSWER: THE CONFIG | SAVE: THE ROWS
-        settings: Option<Vec<ServerSetting>>,
-
-        //FALSE = READ, TRUE = WRITE
-        save: bool,
+        settings: Vec<ServerSetting>,
+        save: bool, //FALSE = READ ANSWER, TRUE = SAVE ACK
     },
 
-    Version { version: Option<String> },            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
+    Version { version: String },                    //SERVER <> CLIENT | THE SENDER'S PKG VERSION
     UsernameRequest,                                //SERVER -> CLIENT | PICK USERNAME
-    PasswordL { password: Option<String> },         //SERVER -> CLIENT | LOGIN
-    PasswordR { password: Option<String> },         //SERVER -> CLIENT | REGISTER
+    PasswordLRequest,                               //SERVER -> CLIENT | LOGIN
+    PasswordRRequest,                               //SERVER -> CLIENT | REGISTER
+    PasswordL { password: String },                 //CLIENT -> SERVER | LOGIN
+    PasswordR { password: String },                 //CLIENT -> SERVER | REGISTER
     History { messages: Vec<StoredMessage> },       //SERVER -> CLIENT | THE LOBBY'S STORED MESSAGES
     Channel { channel: Option<String> },            //SERVER <> CLIENT | CHANNEL CHANGE
     ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
@@ -251,23 +255,32 @@ pub enum PacketCode //CONTROL CODES
     ImageDuplicate { hash: [u8; 32] },              //SERVER -> CLIENT | IMAGE ALREADY UPLOADED
     ImageDataRequest { hash: [u8; 32] },            //CLIENT -> SERVER | ASK FOR A STORED PICTURE
     FilesRequest,                                   //CLIENT -> SERVER | REQUEST FILE LIST
+    ListRequest,                                    //CLIENT -> SERVER | REQUEST CONNECTED USERS
+    ScreensRequest,                                 //CLIENT -> SERVER | REQUEST SCREENSHARE LIST
+    DeattachRequest,                                //CLIENT -> SERVER | DEATTACH CLIENT SCREENSHARE
+    ScreenRequest,                                  //CLIENT -> SERVER | TOGGLE SCREENSHARE
+    AttachRequest { id: usize },                    //CLIENT -> SERVER | ATTACH CLIENT SCREENSHARE
+    VoiceRequest,                                   //CLIENT -> SERVER | ESTABLISH VOICE CONNECTION
+    ServerBansRequest,                              //CLIENT -> SERVER | READ server_bans.toml
+    ServerSettingsRequest,                          //CLIENT -> SERVER | READ server.toml
     Files { users: Vec<UserFile> },                 //SERVER -> CLIENT | LIST UPLOADED FILES
-    Screens { users: Option<Vec<UserScreen>> },     //CLIENT <> SERVER | LIST SCREENSHARES
-    Deattach { username: Option<String> },          //CLIENT <> SERVER | DEATTACH CLIENT SCREENSHARE
+    Screens { users: Vec<UserScreen> },             //SERVER -> CLIENT | LIST SCREENSHARES
+    Deattach { username: String },                  //SERVER -> CLIENT | DEATTACH CLIENT SCREENSHARE
     Attached { username: String },                  //SERVER -> CLIENT | CLIENT ATTACHED LOCAL CLIENT SHARE
     Deattached { username: String },                //SERVER -> CLIENT | CLIENT DEATTACHED LOCAL CLIENT SHARE
-    Screen { token: Option<[u8; 32]> },             //CLIENT <> SERVER | TOGGLE SCREENSHARE
+    Screen { token: Option<[u8; 32]> },             //SERVER -> CLIENT | SCREENSHARE APPROVAL | None = SHARE STOPPED
     Screenshare { username: String },               //SERVER -> CLIENT | CLIENT STARTED SCREENSHARING
     ScreenshareEnd { username: String },            //SERVER -> CLIENT | CLIENT STOPPED SCREENSHARING
-    Voice { token: Option<[u8; 32]> },              //CLIENT <> SERVER | ESTABLISH VOICE CONNECTION
+    Voice { token: Option<[u8; 32]> },              //SERVER -> CLIENT | VOICE APPROVAL | None = VOICE LEFT
 
-    ServerKick { id: usize },                       //CLIENT -> SERVER | KICK USER
-    ServerMute { id: usize },                       //CLIENT -> SERVER | MUTE USER
-    ServerBan { id: usize },                        //CLIENT -> SERVER | BAN USER
-    ServerBanIp { id: usize },                      //CLIENT -> SERVER | BAN USER'S IP
-    ServerPardon { id: usize },                     //CLIENT -> SERVER | LIFT A USERNAME BAN
-    ServerPardonIp { id: usize },                   //CLIENT -> SERVER | LIFT AN IP BAN
-    ServerSay { message: String },                  //CLIENT <> SERVER | SAY AS SERVER
+    ServerKick { id: usize },                            //CLIENT -> SERVER | KICK USER
+    ServerMute { id: usize },                            //CLIENT -> SERVER | MUTE USER
+    ServerBan { id: usize },                             //CLIENT -> SERVER | BAN USER
+    ServerBanIp { id: usize },                           //CLIENT -> SERVER | BAN USER'S IP
+    ServerPardon { id: usize },                          //CLIENT -> SERVER | LIFT A USERNAME BAN
+    ServerPardonIp { id: usize },                        //CLIENT -> SERVER | LIFT AN IP BAN
+    ServerSay { message: String },                       //CLIENT <> SERVER | SAY AS SERVER
+    ServerSettingsSave { settings: Vec<ServerSetting> }, //CLIENT -> SERVER | WRITE server.toml
 
     FirstUser,        //SERVER -> CLIENT | FIRST ONE TO REGISTER, OWNER ROLE ADDED
     Rekey,            //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)
@@ -313,15 +326,22 @@ impl PacketCode
             Self::ImageDataRequest { .. } => "ImageDataRequest",
             Self::ImageData { .. } => "ImageData",
             Self::Uploaded { .. } => "Uploaded",
+            Self::AttachRequest { .. } => "AttachRequest",
             Self::Attach { .. } => "Attach",
+            Self::ServerBansRequest { .. } => "ServerBansRequest",
             Self::ServerBans { .. } => "ServerBans",
+            Self::ServerRoleRequest { .. } => "ServerRoleRequest",
             Self::ServerRole { .. } => "ServerRole",
+            Self::ServerSettingsRequest { .. } => "ServerSettingsRequest",
+            Self::ServerSettingsSave { .. } => "ServerSettingsSave",
             Self::ServerSettings { .. } => "ServerSettings",
             Self::Colors { .. } => "Colors",
             Self::Version { .. } => "Version",
             Self::UsernameRequest { .. } => "UsernameRequest",
             Self::Username { .. } => "Username",
+            Self::PasswordLRequest { .. } => "PasswordLRequest",
             Self::PasswordL { .. } => "PasswordL",
+            Self::PasswordRRequest { .. } => "PasswordRRequest",
             Self::PasswordR { .. } => "PasswordR",
             Self::History { .. } => "History",
             Self::Channel { .. } => "Channel",
@@ -330,15 +350,20 @@ impl PacketCode
             Self::VoiceClients { .. } => "VoiceClients",
             Self::FilesRequest { .. } => "FilesRequest",
             Self::Files { .. } => "Files",
+            Self::ScreensRequest { .. } => "ScreensRequest",
             Self::Screens { .. } => "Screens",
+            Self::DeattachRequest { .. } => "DeattachRequest",
             Self::Deattach { .. } => "Deattach",
             Self::Attached { .. } => "Attached",
             Self::Deattached { .. } => "Deattached",
+            Self::ScreenRequest { .. } => "ScreenRequest",
             Self::Screen { .. } => "Screen",
             Self::Screenshare { .. } => "Screenshare",
             Self::ScreenshareEnd { .. } => "ScreenshareEnd",
+            Self::VoiceRequest { .. } => "VoiceRequest",
             Self::Voice { .. } => "Voice",
             Self::Join { .. } => "Join",
+            Self::ListRequest { .. } => "ListRequest",
             Self::List { .. } => "List",
             Self::ServerKick { .. } => "ServerKick",
             Self::ServerMute { .. } => "ServerMute",

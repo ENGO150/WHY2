@@ -178,11 +178,8 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
 
         Subcommand::Bans =>
         {
-            network::send(&mut *write_stream.lock().await, PacketCode::ServerBans
-            {
-                users: None,
-                ips: None,
-            }, options::get_keys().as_ref()).await;
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerBansRequest,
+                options::get_keys().as_ref()).await;
         },
 
         Subcommand::Pardon =>
@@ -217,21 +214,17 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
             let Ok(target) = target.parse::<usize>() else { return invalid_usage(app, None) };
             let Ok(role) = role.trim().parse::<Role>() else { return invalid_usage(app, Some("role")) };
 
-            network::send(&mut *write_stream.lock().await, PacketCode::ServerRole
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerRoleRequest
             {
                 id: target,
                 role,
-                username: None,
             }, options::get_keys().as_ref()).await;
         },
 
         Subcommand::Settings =>
         {
-            network::send(&mut *write_stream.lock().await, PacketCode::ServerSettings
-            {
-                settings: None,
-                save: false,
-            }, options::get_keys().as_ref()).await;
+            network::send(&mut *write_stream.lock().await, PacketCode::ServerSettingsRequest,
+                options::get_keys().as_ref()).await;
         },
     }
 }
@@ -697,8 +690,8 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                 device: share_device(),
             }
         },
-        LoginState::PasswordLogin => PacketCode::PasswordL { password: Some(input) },
-        LoginState::PasswordRegister => PacketCode::PasswordR { password: Some(input) },
+        LoginState::PasswordLogin => PacketCode::PasswordL { password: input },
+        LoginState::PasswordRegister => PacketCode::PasswordR { password: input },
         LoginState::None => PacketCode::MessageRequest { text: input },
     };
 

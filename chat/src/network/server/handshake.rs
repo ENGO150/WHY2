@@ -218,13 +218,13 @@ pub(super) async fn ask_version(streams: &mut Streams<'_>, keys: &SharedKeys) ->
 
     //ASK FOR VERSION
     network::send(&mut *streams.1.lock().await,
-        PacketCode::Version { version: Some(misc::get_version().to_string()) }, Some(keys)).await;
+        PacketCode::Version { version: misc::get_version().to_string() }, Some(keys)).await;
 
     //READ FROM UNTRUSTED CLIENT
     let read = untrusted_read(streams, |code| matches!(code, PacketCode::Version { .. }), Some(keys)).await?;
 
     if let PacketCode::Version { version } = read
     {
-        return version;
+        return Some(version);
     } { unreachable!("what"); }
 }
