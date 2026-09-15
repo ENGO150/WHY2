@@ -1,6 +1,44 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.2.0:
+- cdaba92f: load pictures only while they are on screen
+- b1abfb72: rename Password PacketCodes to Login & Register
+- 05588d9e: split remaining PacketCodes on request & reply packets
+- 58147d92: split fileshare packets on request & reply packets
+- 9bf42732: split PacketCode::PrivateMessage on request & reply packets
+- f630a676: split PacketCode::Username on request & reply packets
+- 910093c3: limit /images path helper only to valid images
+- 688a091e: drop TIFF & OpenEXR support
+- 590ceb6f: removed unused dependency features
+- a6aa0328: remove offline users from /list output
+- 1b4672c9: display username_color in panels
+- 3dcce81b: send uname color in PacketCode::Join
+- 6b12a28f: send uname colors in List packet
+- e611726b: add username_color to User listing
+- 98e7e4c0: align TUI block counters to the right
+- af9fe2c6: display offline users on client
+- 01fc807e: serialize offline users on server
+- 6afce80c: add OfflineUser to PacketCode::List
+- b57a5a2d: add show_offline_users entry to server config
+- 10aaced9: move misc::expand_home to TUI code
+- 4a2daca8: add path helper to upload & image commands
+- dd7f106b: add ArgValues::Paths to image & upload commands
+- db0d3cdc: anchor the device to the right of the online panel
+- de19956c: drop the silent roster request
+- d9b42b21: send List packet to client on auth
+- 61cffc35: maintain the online list from Join
+- 2e8fe0ea: add ID field to PacketCode::Join
+- a1018656: prevent reconnecting on graceful quit
+- da1609d1: display client device in TUI
+- 884598f4: forward device in Join packet
+- d101dbaf: add Device field to PacketCode::Join
+- 4fb39618: share device on client
+- c4e1d867: add device field to PacketCode::Username
+- 62eaabf3: split network::client into submodules
+- b27a05c6: add share_device client setting
+- c9c50d0a: strip control characters in network::receive
+
 v2.1.4:
 - 11438aae: overlap screen capture with the encode
 - dddef45c: reconnect automatically after a lost session
