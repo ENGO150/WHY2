@@ -1391,7 +1391,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //PRIVATE MESSAGE
-            PacketCode::PrivateMessage { text, id: recipient_id, .. } =>
+            PacketCode::PrivateMessageRequest { text, id: recipient_id } =>
             {
                 //SILENCE MUTED USERS
                 if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
@@ -1427,7 +1427,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                             network::send(&mut *recipient_stream.lock().await, PacketCode::PrivateMessage
                             {
                                 text: text.clone(),
-                                username: Some(username.clone()),
+                                username: username.clone(),
                                 id,
                             }, recipient_keys.as_ref()).await;
                         }

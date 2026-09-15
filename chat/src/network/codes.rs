@@ -104,11 +104,18 @@ pub enum PacketCode //CONTROL CODES
         id: usize,
     },
 
-    //CLIENT <> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
+    //CLIENT -> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
+    PrivateMessageRequest
+    {
+        text: String,
+        id: usize,
+    },
+
+    //SERVER -> CLIENT | SEND MESSAGE ONLY TO ONE CLIENT
     PrivateMessage
     {
         text: String,
-        username: Option<String>,
+        username: String,
         id: usize,
     },
 
@@ -280,6 +287,7 @@ impl PacketCode
             Self::Welcome { .. } => "Welcome",
             Self::Accept { .. } => "Accept",
             Self::Leave { .. } => "Leave",
+            Self::PrivateMessageRequest { .. } => "PrivateMessageRequest",
             Self::PrivateMessage { .. } => "PrivateMessage",
             Self::PrivateMessageBack { .. } => "PrivateMessageBack",
             Self::VoiceJoin { .. } => "VoiceJoin",

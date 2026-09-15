@@ -722,7 +722,7 @@ impl Command
 
                 Some(match parsed
                 {
-                    Some((id, text)) => Ok(PacketCode::PrivateMessage { id, text, username: None }),
+                    Some((id, text)) => Ok(PacketCode::PrivateMessageRequest { id, text }),
                     None => Err(()),
                 })
             },

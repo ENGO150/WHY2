@@ -816,7 +816,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //PRIVATE MESSAGE INCOMING
             PacketCode::PrivateMessage { text, username, id } =>
             {
-                tx.send(ClientEvent::PrivateMessageRecv(username.unwrap(), id, text)).await.unwrap();
+                tx.send(ClientEvent::PrivateMessageRecv(username, id, text)).await.unwrap();
             },
 
             //PRIVATE MESSAGE INCOMING
