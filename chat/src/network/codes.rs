@@ -74,10 +74,10 @@ pub enum PacketCode //CONTROL CODES
         git_hash: String,
     },
 
-    //SERVER <> CLIENT | PICK USERNAME
+    //CLIENT -> SERVER | PICK USERNAME
     Username
     {
-        username: Option<String>,
+        username: String,
         device: Option<Device>,
     },
 
@@ -225,6 +225,7 @@ pub enum PacketCode //CONTROL CODES
     },
 
     Version { version: Option<String> },            //SERVER <> CLIENT | ASK CLIENT FOR THEIR PKG VERSION
+    UsernameRequest,                                //SERVER -> CLIENT | PICK USERNAME
     PasswordL { password: Option<String> },         //SERVER -> CLIENT | LOGIN
     PasswordR { password: Option<String> },         //SERVER -> CLIENT | REGISTER
     History { messages: Vec<StoredMessage> },       //SERVER -> CLIENT | THE LOBBY'S STORED MESSAGES
@@ -295,6 +296,7 @@ impl PacketCode
             Self::ServerSettings { .. } => "ServerSettings",
             Self::Colors { .. } => "Colors",
             Self::Version { .. } => "Version",
+            Self::UsernameRequest { .. } => "UsernameRequest",
             Self::Username { .. } => "Username",
             Self::PasswordL { .. } => "PasswordL",
             Self::PasswordR { .. } => "PasswordR",

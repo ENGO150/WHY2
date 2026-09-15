@@ -715,34 +715,24 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     {
         log::debug!("Asking for username: {peer_addr} (try {}/{max_tries})", attempt + 1);
 
-        //SEND PICK_USERNAME CODE
-        network::send(&mut *streams.1.lock().await, PacketCode::Username
-        {
-            username: None,
-            device: None,
-        }, Some(&keys)).await;
+        //SEND PICK USERNAME CODE
+        network::send(&mut *streams.1.lock().await, PacketCode::UsernameRequest, Some(&keys)).await;
 
-        match network::receive(streams, Some(&keys), None).await
+        //READ USERNAME
+        if let Some(PacketCode::Username { username: uname, device: dev }) =
+            network::receive(streams, Some(&keys), None).await
         {
-            //USERNAME CONDITIONS MET, BREAK LOOP
-            Some(PacketCode::Username { username: uname, device: dev }) =>
+            //CHECK USERNAME VALIDITY
+            if uname.len() >= min_len && uname.len() <= max_len &&
+                uname.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') &&
+                !user_connected(&uname) && uname != options::get_server_username()
             {
-                if let Some(uname) = uname
-                {
-                    if uname.len() >= min_len && uname.len() <= max_len &&
-                        uname.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') &&
-                        !user_connected(&uname) && uname != options::get_server_username()
-                    {
-                        username = Some(uname);
-                        device = dev;
-                        break;
-                    }
+                username = Some(uname);
+                device = dev;
+                break; //USERNAME CONDITIONS MET, STOP ASKING
+            }
 
-                    log::debug!("Username refused: {peer_addr}");
-                }
-            },
-
-            _ => return remove_connection(&peer_addr, false, Some("username")).await,
+            log::debug!("Username refused: {peer_addr}");
         }
     }
 

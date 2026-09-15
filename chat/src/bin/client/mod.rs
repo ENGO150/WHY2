@@ -695,7 +695,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
             app.username = input.clone();
             PacketCode::Username
             {
-                username: Some(input),
+                username: input,
                 device: share_device(),
             }
         },

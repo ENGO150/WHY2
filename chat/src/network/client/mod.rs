@@ -369,8 +369,8 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 if handshake::key_exchange(streams, &mut keys, &tx, Some(&current_keys)).await != Handshake::Ready { return; }
             }
 
-            //PICK_USERNAME CODE - guess what
-            PacketCode::Username { .. } =>
+            //PICK USERNAME
+            PacketCode::UsernameRequest =>
             {
                 //INVALID UNAME
                 if invalid_username
