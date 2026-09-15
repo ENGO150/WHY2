@@ -295,27 +295,8 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     }
                 }
 
+                //THE PICTURES THEMSELVES ARE LOADED AS THEIR CAPTIONS COME INTO VIEW
                 tx.send(ClientEvent::History(messages, cached)).await.unwrap();
-
-                if !auto_show { continue; }
-
-                let image_tx = tx.clone();
-
-                tokio::spawn(async move
-                {
-                    for hash in hashes
-                    {
-                        let Some(data) = cache::load(&hash).await else { continue };
-
-                        let image = task::spawn_blocking(move || image::decode_image(&data))
-                            .await.expect("Decoding image panicked");
-
-                        if let Some(image) = image
-                        {
-                            image_tx.send(ClientEvent::ImageData(hash, Some(image))).await.unwrap();
-                        }
-                    }
-                });
 
                 continue;
             }

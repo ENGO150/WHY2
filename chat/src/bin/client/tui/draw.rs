@@ -217,6 +217,9 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         }
     }
 
+    //ONLY THE PICTURES ON SCREEN ARE HELD
+    app.load_visible(inner.width, offset, viewport);
+
     //DRAW PICTURES OVER THEIR RESERVED ROWS
     for placement in app.placements(inner.width)
     {

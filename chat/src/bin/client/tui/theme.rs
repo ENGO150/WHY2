@@ -112,7 +112,7 @@ impl Theme
                 match picture
                 {
                     Picture::Absent => spans.push(Span::styled(" [ show ]", ACCENT)),
-                    Picture::Waiting => spans.push(Span::styled(" [ loading... ]", DIM)),
+                    Picture::Waiting | Picture::Deferred => spans.push(Span::styled(" [ loading... ]", DIM)),
                     Picture::Gone => spans.push(Span::styled(" [ unavailable ]", ERROR)),
                     Picture::Ready(..) => {},
                 }

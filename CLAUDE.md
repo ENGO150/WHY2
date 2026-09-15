@@ -327,20 +327,39 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     and a picture dies with its entry; a client cache is owned by nothing, so a write that takes it
     over the cap drops the oldest files by mtime, and every hit touches the file it read so what goes
     is what has not been looked at.
-  - **A replay fills from the cache without a packet.** `App::apply` is pure state mutation and
-    cannot do disk I/O, so the `History` arm in `network/client/mod.rs` does it: first `cache::has` (one
-    `stat` per picture, no key and no decrypt) to say which hashes we hold, so a caption that is about
-    to fill itself comes up as `Picture::Waiting` (`[ loading... ]`) rather than `Absent`
-    (`[ show ]`) — offering a button for a picture already on its way is the one thing it must not do,
-    and `request_image` would refuse the click anyway. Then it sends the captions and
-    walks the hashes in one task, decoding hits **one at a time** — a login is the one place dozens of
-    pictures arrive at once, and a task each would be exactly the unbounded fan-out `MAX_IMAGE_ALLOC`
-    exists to bound. Each hit arrives as an ordinary `ClientEvent::ImageData`, which is why
-    `deliver_image` fills `Picture::Absent` as well as `Waiting`: an answer nobody clicked for is what
-    a cache hit *is*. A refusal (`None`) still only marks a line that actually asked.
+  - **A replay fills from the cache without a packet, and only for the pictures being looked at.**
+    `App::apply` is pure state mutation and cannot do disk I/O, so the `History` arm in
+    `network/client/mod.rs` does the one cheap half: `cache::has` (one `stat` per picture, no key and
+    no decrypt) says which hashes we hold, and those captions come up as `Picture::Deferred`
+    (`[ loading... ]`, the same line `Waiting` draws) rather than `Absent` (`[ show ]`) — offering a
+    button for a picture that is going to fill itself is the one thing it must not do, and
+    `request_image` would refuse the click anyway. **The decode is the expensive half and waits for
+    the picture to be on screen**: a login replays `max_persistent_messages` lines at once, and
+    decoding every cached one up front cost a `MAX_IMAGE_ALLOC` decode, a fit and a held protocol per
+    picture for a paneful nobody had scrolled to yet — which is what made `auto_show_images` lag.
+    `App::load_visible` flips a `Deferred` caption that has come into view to `Waiting` and puts its
+    hash in `App::image_loads`, which `tui::run`'s tick hands to `client::fetch_image` — the same
+    cache-then-server path a click takes, one task per picture that is actually being looked at. Each
+    hit arrives as an ordinary `ClientEvent::ImageData`, which is why `deliver_image` fills
+    `Picture::Absent` as well as `Waiting`: an answer nobody clicked for is what a cache hit *is*. It
+    deliberately does **not** fill a `Deferred` line — that one has not asked yet, and filling it
+    first would spend the answer on a caption that is still off screen. A refusal (`None`) still only
+    marks a line that actually asked.
+  - **A decoded picture is built for the terminal only while it is on screen, and put down again when
+    it leaves** (`App::load_visible`, called from `draw_messages` with the same width, offset and
+    viewport the pane was just drawn with). Fitting a picture to the pane is a resize of the whole
+    thing and the `StatefulProtocol` then holds that copy, so doing it in `rewrap` — as it used to —
+    meant every picture in the scrollback paid both, and a terminal resize re-fitted all of them in
+    one pass. `rewrap` now only *reserves* the rows, which is `fit_size` arithmetic over the frame's
+    dimensions and no pixels at all; `fit_image` derives from the same function, so the rows a picture
+    claims and the size it is drawn at cannot drift apart. An unloaded picture keeps its frames and
+    its `Unloaded` — the protocol type and background — because that is the id the terminal knows it
+    by: rebuilding through `StatefulProtocol::new` with the old type *replaces* the picture
+    kitty-side, while a fresh `new_resize_protocol` would leave the old one behind in the terminal
+    every time it was scrolled past.
   - **`auto_show_images` (client.toml, default on) makes a live picture behave like a replayed one.**
     With it off, `network/client/mod.rs`'s `ImageDisplay` arm decodes nothing: the line goes up as a
-    caption with a `[ show ]` button (`ClientEvent::ImageOffer` → `push_caption(.., pending: false)`)
+    caption with a `[ show ]` button (`ClientEvent::ImageOffer` → `push_caption(.., Picture::Absent, ..)`)
     and the history's cache prefetch is skipped, so every replayed caption is a button too. The two
     costs it declines are the ones the pushed path pays without being asked — the decode
     (`MAX_IMAGE_ALLOC` per picture, one per packet, for pictures nobody looked at) and the `ImageData`

@@ -302,6 +302,12 @@ pub async fn run
                     crate::submit(app, &write_stream, answer).await;
                 }
 
+                //THE PICTURES THAT SCROLLED INTO VIEW
+                for hash in app.image_loads.drain(..)
+                {
+                    client_image::fetch_image(hash, tx.clone());
+                }
+
                 //THE OFFERED PICTURES WE DO NOT HOLD
                 if !app.image_requests.is_empty() && let Some(write_stream) = write_stream.as_ref()
                 {

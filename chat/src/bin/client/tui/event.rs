@@ -31,7 +31,7 @@ use crate::
 use super::
 {
     theme,
-    state::App,
+    state::{ self, App },
     tofu::Prompt,
     login::Stage,
 };
@@ -92,13 +92,13 @@ impl App
             //A PICTURE WE DO NOT HOLD: CAPTION IT NOW
             ClientEvent::ImagePending(username, filename, hash, color) =>
             {
-                self.push_caption(username, filename, hash, true, color);
+                self.push_caption(username, filename, hash, state::Picture::Waiting, color);
                 self.image_requests.push(hash);
             },
 
             //THE SAME LINE WITH THE BUTTON ON IT
             ClientEvent::ImageOffer(username, filename, hash, color) =>
-                self.push_caption(username, filename, hash, false, color),
+                self.push_caption(username, filename, hash, state::Picture::Absent, color),
 
             //A CLICK THE CACHE COULD NOT ANSWER
             ClientEvent::ImageRequest(hash) => self.image_requests.push(hash),
@@ -321,9 +321,13 @@ impl App
                 {
                     match message.image
                     {
-                        //A PICTURE WE HOLD IS ALREADY ON ITS WAY
+                        //A PICTURE WE HOLD IS LOADED WHEN IT IS LOOKED AT
                         Some(hash) => self.push_caption(message.username, message.text, hash,
-                            cached.contains(&hash), message.colors.username_color),
+                            match cached.contains(&hash)
+                            {
+                                true => state::Picture::Deferred,
+                                false => state::Picture::Absent,
+                            }, message.colors.username_color),
                         None => self.push_history(message.username, message.text, message.colors),
                     }
                 }

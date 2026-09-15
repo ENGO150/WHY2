@@ -39,14 +39,14 @@ use ratatui::
 
 use unicode_width::UnicodeWidthChar;
 
-use image::DynamicImage;
+use image::{ DynamicImage, Rgba };
 
 use ratatui_image::
 {
     FontSize,
     FilterType,
     picker::Picker,
-    protocol::StatefulProtocol,
+    protocol::{ StatefulProtocol, StatefulProtocolType },
 };
 
 use crate::
@@ -131,6 +131,7 @@ pub enum Entry //ONE ROW OF HISTORY
 pub enum Picture
 {
     Absent,            //NOT ASKED FOR YET
+    Deferred,          //HELD IN THE CACHE, LOADED ONCE IT IS ON SCREEN
     Waiting,           //ASKED FOR, NOT HERE YET
     Gone,              //THE SERVER DOES NOT HAVE IT ANY MORE
     Ready(Box<Fitted>),
@@ -144,7 +145,15 @@ pub struct Fitted //A PICTURE AT THE SIZE THE PANE DRAWS IT AT
     pub next: Instant,                      //WHEN THE FRAME AFTER IT IS DUE
     pub rows: u16,                          //ROWS IT RESERVES AT THAT WIDTH
     pub fitted: u16,                        //THE WIDTH `protocol` WAS FITTED TO
-    pub protocol: Option<StatefulProtocol>, //None UNTIL THE FIRST WRAP KNOWS HOW WIDE THE PANE IS
+    pub protocol: Option<StatefulProtocol>, //None WHILE THE PICTURE IS OFF SCREEN
+    pub unloaded: Option<Unloaded>,         //THE TERMINAL'S ID FOR IT, KEPT WHILE IT IS
+}
+
+//WHAT AN UNLOADED PICTURE KEEPS OF ITS PROTOCOL
+pub struct Unloaded
+{
+    pub kind: StatefulProtocolType,
+    pub background: Option<Rgba<u8>>,
 }
 
 #[derive(Clone, Copy)]
@@ -217,6 +226,9 @@ pub struct App
     //PICTURES TO ASK THE SERVER FOR
     pub image_requests: Vec<[u8; 32]>,
 
+    //PICTURES THAT SCROLLED INTO VIEW, TO LOAD OUT OF THE CACHE
+    pub image_loads: Vec<[u8; 32]>,
+
     //LIFECYCLE
     pub leaving: bool,      //THE USER ASKED TO LEAVE
     pub logging_out: bool,  //THE USER ASKED TO LOG OUT
@@ -286,6 +298,7 @@ impl App
             #[cfg(feature = "client_screen")]
             screens_requested: false,
             image_requests: Vec::new(),
+            image_loads: Vec::new(),
             leaving: false,
             logging_out: false,
             disconnect_reason: None,
@@ -377,15 +390,9 @@ impl App
     }
 
     //A CAPTION WITHOUT ITS PICTURE
-    pub fn push_caption(&mut self, username: String, filename: String, hash: [u8; 32], pending: bool,
+    pub fn push_caption(&mut self, username: String, filename: String, hash: [u8; 32], picture: Picture,
         username_color: Option<u8>)
     {
-        let picture = match pending
-        {
-            true => Picture::Waiting,
-            false => Picture::Absent,
-        };
-
         self.push_entry(Entry::Image { username, filename, username_color, hash: Some(hash), picture });
     }
 
@@ -452,7 +459,16 @@ impl App
 
         let next = Instant::now() + frames.first().map(|frame| frame.delay).unwrap_or_default();
 
-        Picture::Ready(Box::new(Fitted { frames, current: 0, next, rows: 1, fitted: 0, protocol: None }))
+        Picture::Ready(Box::new(Fitted
+        {
+            frames,
+            current: 0,
+            next,
+            rows: 1,
+            fitted: 0,
+            protocol: None,
+            unloaded: None,
+        }))
     }
 
     //STEP EVERY ANIMATION THAT IS DUE
@@ -502,6 +518,63 @@ impl App
             });
 
             self.dirty = true;
+        }
+    }
+
+    //BUILD THE PICTURES ON SCREEN AND PUT THE REST DOWN
+    pub fn load_visible(&mut self, width: u16, offset: u16, height: u16)
+    {
+        let font = self.picker.font_size();
+
+        for placement in self.placements(width)
+        {
+            let visible = placement.caption < offset + height
+                && placement.row + placement.height > offset;
+
+            let Some(Entry::Image { hash, picture, .. }) = self.messages.get_mut(placement.entry)
+                else { continue };
+
+            match picture
+            {
+                //OUT OF THE CACHE, NOW THAT IT IS BEING LOOKED AT
+                Picture::Deferred if visible =>
+                {
+                    if let Some(hash) = *hash { self.image_loads.push(hash); }
+
+                    *picture = Picture::Waiting;
+                },
+
+                Picture::Ready(ready) => match visible
+                {
+                    true => if ready.fitted != width || ready.protocol.is_none()
+                    {
+                        let image = fit_image(&ready.frames[ready.current].image, width, font);
+
+                        //REUSE THE PROTOCOL TYPE TO KEEP THE IMAGE ID
+                        ready.protocol = Some(match ready.unloaded.take()
+                        {
+                            Some(Unloaded { kind, background }) =>
+                                StatefulProtocol::new(image, font, background, kind),
+
+                            None => self.picker.new_resize_protocol(image),
+                        });
+
+                        ready.fitted = width;
+                    },
+
+                    //OFF SCREEN KEEPS ONLY THE FRAMES
+                    false => if let Some(protocol) = ready.protocol.take()
+                    {
+                        ready.unloaded = Some(Unloaded
+                        {
+                            background: protocol.background_color(),
+                            kind: protocol.protocol_type_owned(),
+                        });
+                    },
+                },
+
+                _ => {},
+            }
         }
     }
 
@@ -643,6 +716,7 @@ impl App
         #[cfg(feature = "client_screen")]
         { self.screens_requested = false; }
         self.image_requests.clear();
+        self.image_loads.clear();
         self.logging_out = false; //THE NEXT DROP IS THE NEXT SESSION'S TO EXPLAIN
         self.disconnect_reason = None;
 
@@ -892,20 +966,15 @@ impl App
                 let caption = row;
                 let row = lines.len() as u16;
 
-                //FIT THE PICTURE HERE AND NOWHERE ELSE
+                //RESERVE THE ROWS HERE, BUILD THE PICTURE ONLY WHEN IT IS ON SCREEN
                 let height = match picture
                 {
                     Picture::Ready(ready) =>
                     {
-                        if ready.fitted != width || ready.protocol.is_none()
-                        {
-                            let image = fit_image(&ready.frames[ready.current].image, width, font);
+                        let frame = &ready.frames[ready.current].image;
+                        let (_, height) = fit_size(frame.width(), frame.height(), width, font);
 
-                            ready.rows = (image.height().div_ceil(font.height as u32) as u16).clamp(1, consts::IMAGE_ROWS);
-                            ready.protocol = Some(self.picker.new_resize_protocol(image));
-                            ready.fitted = width;
-                        }
-
+                        ready.rows = (height.div_ceil(font.height as u32) as u16).clamp(1, consts::IMAGE_ROWS);
                         ready.rows
                     },
 
@@ -928,16 +997,28 @@ impl App
 }
 
 //FUNCTIONS
+//THE SIZE A PICTURE IS DRAWN AT, NEVER LARGER THAN IT IS
+fn fit_size(width: u32, height: u32, pane: u16, font: FontSize) -> (u32, u32)
+{
+    let available_width = pane.max(1) as u32 * font.width as u32;
+    let available_height = consts::IMAGE_ROWS as u32 * font.height as u32;
+
+    if width <= available_width && height <= available_height { return (width, height); }
+
+    let ratio = f64::min(available_width as f64 / width as f64, available_height as f64 / height as f64);
+
+    (((width as f64 * ratio).round() as u32).max(1), ((height as f64 * ratio).round() as u32).max(1))
+}
+
 //SHRINK A PICTURE INTO THE PANE, NEVER GROW IT
 fn fit_image(image: &DynamicImage, width: u16, font: FontSize) -> DynamicImage
 {
-    let available_width = width.max(1) as u32 * font.width as u32;
-    let available_height = consts::IMAGE_ROWS as u32 * font.height as u32;
+    let (fit_width, fit_height) = fit_size(image.width(), image.height(), width, font);
 
-    match image.width() > available_width || image.height() > available_height
+    match (fit_width, fit_height) == (image.width(), image.height())
     {
-        true => image.resize(available_width, available_height, FilterType::Triangle),
-        false => image.clone(),
+        true => image.clone(),
+        false => image.resize_exact(fit_width, fit_height, FilterType::Triangle),
     }
 }
 
