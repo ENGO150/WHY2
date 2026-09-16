@@ -293,6 +293,16 @@ impl Connection
         }
     }
 
+    //UNSET LAST PM SENDER
+    pub fn unset_last_pm(&mut self)
+    {
+        match self
+        {
+            Self::Authenticated { last_pm, .. } => *last_pm = None,
+            _ => {},
+        }
+    }
+
     //GET LAST KEY EXCHANGE FROM Connection
     pub fn last_key_exchange(&self) -> Option<&Instant>
     {

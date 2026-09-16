@@ -325,6 +325,12 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         file::ACTIVE_FILESHARES.retain(|_, u| u.client_id != *connection.id().unwrap());
         AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
 
+        //REMOVE FROM last_pm
+        for mut conn in CONNECTIONS.iter_mut().filter(|c| c.last_pm().as_ref() == connection.id())
+        {
+            conn.unset_last_pm();
+        }
+
         //SEND LEAVE MESSAGE
         send_to_all(PacketCode::Leave
         {
