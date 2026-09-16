@@ -408,8 +408,8 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
             },
 
             Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, device, role,
-                id, attached_screen, last_activity, last_image, channel, seq, server_seq, peer_addr, alive, muted,
-                credit, refill, throttles, .. } =>
+                id, attached_screen, last_activity, last_image, last_pm, channel, seq, server_seq, peer_addr, alive,
+                muted, credit, refill, throttles, .. } =>
             {
                 Connection::Authenticated
                 {
@@ -427,6 +427,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     last_activity,
                     last_key_exchange: Instant::now(),
                     last_image,
+                    last_pm,
                     spam_violations: 0,
                     credit,
                     refill,
@@ -463,6 +464,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<D
             last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
             last_key_exchange: old_connection.last_key_exchange().copied().unwrap_or_else(Instant::now),
             last_image: Instant::now() - consts::IMAGE_REQUEST_DELAY,
+            last_pm: old_connection.last_pm(),
             spam_violations: 0,
             credit: config::read_config::<f32>("max_packet_burst"),
             refill: Instant::now(),
@@ -507,6 +509,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             last_activity: Instant::now(),
             last_key_exchange: *old_connection.last_key_exchange().unwrap(),
             last_image: *old_connection.last_image().unwrap(),
+            last_pm: old_connection.last_pm(),
             spam_violations: *old_connection.spam_violations().unwrap(),
             credit: *old_connection.credit().unwrap(),
             refill: *old_connection.refill().unwrap(),
@@ -1375,8 +1378,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 network::send(&mut *streams.1.lock().await, PacketCode::Screens { users }, Some(&keys)).await;
             },
 
-            //PRIVATE MESSAGE
-            PacketCode::PrivateMessageRequest { text, id: recipient_id } =>
+            //PRIVATE MESSAGE (OR REPLY)
+            PacketCode::PrivateMessageRequest { .. } | PacketCode::Re { .. } =>
             {
                 //SILENCE MUTED USERS
                 if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
@@ -1384,6 +1387,24 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
                     continue;
                 }
+
+                //GET RECIPIENT AND TEXT
+                let (recipient_id, text) = match read
+                {
+                    PacketCode::PrivateMessageRequest { text, id } => (id, text),
+                    PacketCode::Re { message } => //REPLY
+                    {
+                        if let Some(recipient_id) = CONNECTIONS.get(&peer_addr).and_then(|c| c.last_pm())
+                        {
+                            (recipient_id, message)
+                        } else
+                        {
+                            network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                            continue;
+                        }
+                    },
+                    _ => unreachable!("what the hell")
+                };
 
                 //FIND RECIPIENT BY ID
                 let recipient_addr = CONNECTIONS.iter()
@@ -1397,9 +1418,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
                     if recipient_id != id
                     {
-                        let recipient_data = if let Some(recipient) =
-                            CONNECTIONS.get(&recipient_addr)
+                        let recipient_data = if let Some(mut recipient) =
+                            CONNECTIONS.get_mut(&recipient_addr)
                         {
+                            //SAVE ID TO RECIPIENT'S last_pm
+                            recipient.set_last_pm(id);
+
                             Some((recipient.write_stream().clone(), recipient.keys().cloned()))
                         } else
                         {

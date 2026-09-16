@@ -104,6 +104,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         last_activity: Instant,                                  //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
         last_key_exchange: Instant,                              //TIME OF LAST REKEY
         last_image: Instant,                                     //TIME OF LAST SERVED IMAGE FETCH
+        last_pm: Option<usize>,                                  //ID OF LAST PM SENDER
         spam_violations: usize,                                  //SPAM VIOLATIONS (unexpected, huh?)
         credit: f32,                                             //PACKET RATE TOKENS LEFT
         refill: Instant,                                         //WHEN credit WAS LAST TOPPED UP
@@ -269,6 +270,26 @@ impl Connection
         {
             Self::Authenticated { last_image, .. } => Some(last_image),
             Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //GET LAST PM SENDER
+    pub fn last_pm(&self) -> Option<usize>
+    {
+        match self
+        {
+            Self::Authenticated { last_pm, .. } => *last_pm,
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //SET LAST PM SENDER
+    pub fn set_last_pm(&mut self, id: usize)
+    {
+        match self
+        {
+            Self::Authenticated { last_pm, .. } => *last_pm = Some(id),
+            _ => {},
         }
     }
 
