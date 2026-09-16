@@ -23,6 +23,7 @@ pub const HISTORY_LIMIT: usize        = 5000;                      //CAP THE MES
 pub const IMAGE_ROWS: u16             = 20;                        //TALLEST AN IMAGE MAY BE DRAWN
 pub const NOTICE_DURATION: Duration   = Duration::from_secs(2);    //HOW LONG THE PANE'S TOAST STAYS UP
 pub const ANIMATION_CATCHUP: Duration = Duration::from_secs(1);    //BEHIND BY MORE THAN THIS AND IT RESTARTS
+pub const MAX_URL: usize              = 2048;                      //LONGER THAN THIS AND A CLICK OPENS NOTHING
 
 //EVENT LOOP
 pub const REDRAW_INTERVAL: Duration   = Duration::from_millis(33); //COALESCE REDRAWS - VoiceActivity FIRES PER VOICE PACKET

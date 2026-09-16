@@ -33,6 +33,7 @@ pub mod tofu;
 use std::
 {
     sync::Arc,
+    process::{ self, Stdio },
     io::
     {
         self,
@@ -217,6 +218,26 @@ fn copy_to_clipboard(text: &str)
 
     let _ = write!(stdout, "\x1b]52;c;{}\x07", BASE64_STANDARD.encode(text));
     let _ = stdout.flush();
+}
+
+//HAND A LINK TO WHATEVER THE SYSTEM OPENS ONE WITH
+fn open_link(url: &str)
+{
+    let (program, args): (&str, &[&str]) = match std::env::consts::OS
+    {
+        "windows" => ("cmd", &["/c", "start", ""]),
+        "macos" => ("open", &[]),
+        _ => ("xdg-open", &[]),
+    };
+
+    //ITS OUTPUT WOULD LAND ON THE FRAME
+    let _ = process::Command::new(program)
+        .args(args)
+        .arg(url)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
 }
 
 pub fn init() -> Result<Tui>
@@ -442,8 +463,14 @@ async fn handle_terminal_event
                     {
                         app.clear_selection();
 
+                        //A CLICK ON A URL HANDS IT TO THE BROWSER
+                        if let Some(url) = app.link_at(mouse.column, mouse.row)
+                        {
+                            app.notify(format!("Opening {url}"));
+                            open_link(&url);
+                        }
                         //A CLICK ON A CAPTION FETCHES THE PICTURE
-                        if write_stream.is_some()
+                        else if write_stream.is_some()
                             && let Some(entry) = app.image_at(mouse.column, mouse.row)
                             && let Some(hash) = app.request_image(entry)
                         {

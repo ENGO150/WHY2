@@ -784,6 +784,20 @@ impl App
             .map(|placement| placement.entry)
     }
 
+    //AND WHICH URL IS, IF THE CELL IS ON ONE
+    pub fn link_at(&mut self, column: u16, row: u16) -> Option<String>
+    {
+        let pane = self.pane;
+
+        if column < pane.x || column >= pane.x + pane.width { return None; }
+        if row < pane.y || row >= pane.y + pane.height { return None; }
+
+        let (row, column) = self.pane_cell(column, row);
+        let line = self.wrapped_lines(pane.width).get(row as usize)?;
+
+        url(&word_at(line, column as usize)?)
+    }
+
     //SELECTION
     //A PRESS STARTS ONE; A DRAG MAKES IT A SELECTION
     pub fn selection_start(&mut self, column: u16, row: u16) -> bool
@@ -1023,6 +1037,55 @@ fn fit_image(image: &DynamicImage, width: u16, font: FontSize) -> DynamicImage
 }
 
 //ONE WRAPPED LINE BETWEEN TWO CELL COLUMNS
+fn word_at(line: &Line<'static>, column: usize) -> Option<String> //THE WHITESPACE-DELIMITED WORD OVER A CELL
+{
+    let mut word = String::new();
+    let mut start = 0usize;
+    let mut cell = 0usize;
+
+    for c in line.spans.iter().flat_map(|span| span.content.chars())
+    {
+        let w = c.width().unwrap_or(0).max(1);
+
+        match c.is_whitespace()
+        {
+            true =>
+            {
+                if (start..cell).contains(&column) { return Some(word); }
+
+                word.clear();
+                start = cell + w;
+            },
+
+            false => word.push(c),
+        }
+
+        cell += w;
+    }
+
+    (start..cell).contains(&column).then_some(word)
+}
+
+//A WEB LINK, WITHOUT WHAT PUNCTUATION IS ONLY LEANING ON IT
+fn url(word: &str) -> Option<String>
+{
+    let mut word = word.trim_start_matches(['(', '[', '<']);
+
+    while word.ends_with([')', ']', '>', '.', ',', '!', '?', ';', ':'])
+    {
+        //A CLOSING BRACKET THE LINK OPENED ITSELF IS PART OF IT
+        if word.ends_with(')') && word.matches('(').count() >= word.matches(')').count() { break; }
+
+        word = &word[..word.len() - 1];
+    }
+
+    //THE SCHEME IS THE ONLY PART A URL MAY SHOUT
+    let scheme = |n: usize, scheme: &str| word.get(..n).is_some_and(|head| head.eq_ignore_ascii_case(scheme));
+    let web = scheme(7, "http://") || scheme(8, "https://");
+
+    (web && word.len() <= consts::MAX_URL).then(|| word.to_owned())
+}
+
 fn slice_cells(line: &Line<'static>, from: usize, to: usize) -> String
 {
     let mut out = String::new();
