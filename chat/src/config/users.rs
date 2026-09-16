@@ -35,8 +35,8 @@ const COLOR_KEYS: [&str; 2] = ["username_color", "message_color"]; //THE COLORS 
 
 fn user_field(username: &str, key: &str) -> Option<String> //READ ONE FIELD OF username
 {
-    super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).get(username)?
-        .as_table_like()?.get(key)?.as_str().map(str::to_string)
+    super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(username)?
+        .as_table_like()?.get(key)?.as_str().map(str::to_string))
 }
 
 fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD OF username TO server_users.toml
@@ -58,13 +58,13 @@ fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD O
 
 pub fn len() -> usize //COUNT USERS
 {
-    super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).len()
+    super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.len())
 }
 
 pub fn all() -> Vec<String> //RETURN EVERY REGISTERED USERNAME
 {
-    super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).iter()
-        .map(|(username, _)| username.to_string()).collect()
+    super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.iter()
+        .map(|(username, _)| username.to_string()).collect())
 }
 
 pub fn password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF username
@@ -116,7 +116,7 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
 
 pub fn contains(key: &str) -> bool //CHECK IF server_users.toml contains
 {
-    super::get_data(&super::config_path(consts::SERVER_USERS_CONFIG)).get(key).is_some()
+    super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(key).is_some())
 }
 
 pub fn migrate() //MIGRATE COLORS (will be removed with next version bump)

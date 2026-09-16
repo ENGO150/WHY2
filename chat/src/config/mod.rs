@@ -37,6 +37,7 @@ use std::
     fmt::Debug,
     path::Path,
     str::FromStr,
+    time::SystemTime,
     collections::HashMap,
     io::{ self, Cursor },
     fs::{ self, File },
@@ -54,8 +55,15 @@ use toml_edit::
 use crate::{ consts, misc };
 
 //PRIVATE
+//STRUCTS
+struct Cached //A PARSED CONFIG AND THE FILE IT CAME FROM
+{
+    doc: DocumentMut,
+    stamp: Option<(SystemTime, u64)>,
+}
+
 //GLOBAL VARIABLES
-static CONFIG_CACHE: LazyLock<Mutex<HashMap<String, DocumentMut>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static CONFIG_CACHE: LazyLock<Mutex<HashMap<String, Cached>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 //FUNCTIONS
 fn config_path(filename: &str) -> String //GET CONFIGURATION PATH
@@ -77,37 +85,47 @@ fn get_config() -> &'static str //GET CONFIG FROM BINARY
     }
 }
 
-fn get_data(path: &str) -> DocumentMut //GET DocumentMut FROM path
+fn stamp(path: &str) -> Option<(SystemTime, u64)> //FILE FINGERPRINT
 {
-    //GET CONFIG CACHE
-    let mut cache = CONFIG_CACHE.lock().unwrap();
-    if let Some(doc) = cache.get(path)
+    let metadata = fs::metadata(path).ok()?;
+    Some((metadata.modified().ok()?, metadata.len()))
+}
+
+fn load<'a>(cache: &'a mut HashMap<String, Cached>, path: &str) -> &'a mut Cached //CACHE path, REPARSING A FILE THAT CHANGED
+{
+    let current = stamp(path); //TAKEN BEFORE THE READ, SO A RACE COSTS A REPARSE AND NOT A MISS
+
+    //AN UNREADABLE FILE KEEPS WHAT WE HOLD
+    let stale = match cache.get(path)
     {
-        //RETURN IF CACHED
-        return doc.clone();
+        Some(cached) => current.is_some() && cached.stamp != current,
+        None => true,
+    };
+
+    if stale
+    {
+        let content = fs::read_to_string(path).expect("Failed to read config");
+        cache.insert(path.to_string(), Cached { doc: content.parse().expect("Failed to parse config"), stamp: current });
     }
 
-    let content = fs::read_to_string(path).expect("Failed to read config"); //READ CONFIG FILE
-    let doc = content.parse::<DocumentMut>().expect("Failed to parse config"); //PARSE DOCUMENT
+    cache.get_mut(path).expect("Config cache missing")
+}
 
-    cache.insert(path.to_string(), doc.clone());
-    doc
+fn with_cached<F: FnOnce(&DocumentMut) -> R, R>(path: &str, f: F) -> R //READ THE CACHED DOCUMENT IN PLACE
+{
+    let mut cache = CONFIG_CACHE.lock().unwrap();
+    f(&load(&mut cache, path).doc)
 }
 
 fn with_cached_mut<F: FnOnce(&mut DocumentMut)>(path: &str, f: F)
 {
-    //LOAD CACHE IF MISSING
     let mut cache = CONFIG_CACHE.lock().unwrap();
-    if !cache.contains_key(path)
-    {
-        let content = fs::read_to_string(path).expect("Failed to read config");
-        cache.insert(path.to_string(), content.parse().expect("Failed to parse config"));
-    }
+    let cached = load(&mut cache, path);
 
-    let doc = cache.get_mut(path).unwrap();
-    f(doc);
+    f(&mut cached.doc);
 
-    fs::write(path, doc.to_string()).expect("Saving config failed"); //WRITE
+    fs::write(path, cached.doc.to_string()).expect("Saving config failed"); //WRITE
+    cached.stamp = stamp(path); //OUR OWN WRITE IS NOT A CHANGE
 }
 
 fn config_read<T: FromStr>(filename: &str, key: &str) -> T //READ CONFIG
@@ -115,27 +133,29 @@ where
     T::Err: Debug,
 {
     let path = config_path(filename);
-    let data = get_data(&path);
 
     //READ
-    if let Some(value) = data.get(key) //FOUND IN CONFIG
+    let found = with_cached(&path, |data| data.get(key).map(|value|
     {
         //USE APPROPRIATE DATATYPE
-        let string_value = match value.as_value().expect("Invalid config")
+        match value.as_value().expect("Invalid config")
         {
             Value::String(s) => s.value().to_string(),
             Value::Integer(i) => i.value().to_string(),
             Value::Boolean(b) => b.value().to_string(),
 
             _ => panic!("Unsupported config datatype")
-        };
+        }
+    }));
 
+    if let Some(string_value) = found //FOUND IN CONFIG
+    {
         return string_value.parse::<T>().expect("Parsing config value failed");
     }
 
     //KEY NOT IN CONFIG, INSERT IT
     let mut default_config: DocumentMut = get_config().parse().expect("Failed to parse config");
-    for (key, old_value) in data.as_table()
+    with_cached(&path, |data| for (key, old_value) in data.as_table()
     {
         //KEY IS IN BOTH, USE THE OLD VALUE
         if let Some(item) = default_config.get_mut(key)
@@ -143,7 +163,7 @@ where
             //COPY OLD VALUE
             *item.as_value_mut().expect("Updating config failed") = old_value.as_value().expect("Invalid config").clone();
         }
-    }
+    });
 
     //UPDATE
     with_cached_mut(&path, |doc| *doc = default_config);

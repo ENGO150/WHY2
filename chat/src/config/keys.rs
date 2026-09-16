@@ -52,7 +52,7 @@ pub fn check(host: &str, pubkey: &[u8]) -> TofuCode //CHECK PUBKEY VALIDITY (TOF
     let pubkey_string = hash(pubkey);
 
     //PEER PUBKEY STORED, CHECK VALIDITY
-    if super::get_data(&super::config_path(consts::SERVER_KEYS_CONFIG)).get(host).is_some()
+    if super::with_cached(&super::config_path(consts::SERVER_KEYS_CONFIG), |keys| keys.get(host).is_some())
     {
         //COMPARE
         return if super::config_read::<String>(consts::SERVER_KEYS_CONFIG, host) == pubkey_string
@@ -69,7 +69,7 @@ pub fn check(host: &str, pubkey: &[u8]) -> TofuCode //CHECK PUBKEY VALIDITY (TOF
 
 pub fn pinned(host: &str) -> Option<String> //THE FINGERPRINT CURRENTLY PINNED FOR host, IF ANY
 {
-    if super::get_data(&super::config_path(consts::SERVER_KEYS_CONFIG)).get(host).is_none() { return None; }
+    if super::with_cached(&super::config_path(consts::SERVER_KEYS_CONFIG), |keys| keys.get(host).is_none()) { return None; }
 
     Some(super::config_read::<String>(consts::SERVER_KEYS_CONFIG, host))
 }

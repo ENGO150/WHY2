@@ -52,55 +52,56 @@ fn heading(prefix: &str) -> Option<String>
 //EVERY KEY OF server.toml AS THE CLIENT EDITS IT
 pub fn all() -> Vec<ServerSetting>
 {
-    let data = super::get_data(&super::config_path(consts::SERVER_CONFIG));
-    let table = data.as_table();
-
-    let mut settings = Vec::new();
-    let mut section = String::new();
-
-    for (key, item) in table.iter()
+    super::with_cached(&super::config_path(consts::SERVER_CONFIG), |data|
     {
-        //A DATATYPE THE CONFIG READER DOES NOT UNDERSTAND
-        let Some(value) = item.as_value() else { continue };
+        let table = data.as_table();
 
-        //THE HEADING CARRIES DOWN TO THE NEXT ONE
-        if let Some(prefix) = table.key(key).and_then(|key| key.leaf_decor().prefix()).and_then(RawString::as_str)
-            && let Some(found) = heading(prefix)
+        let mut settings = Vec::new();
+        let mut section = String::new();
+
+        for (key, item) in table.iter()
         {
-            section = found;
+            //A DATATYPE THE CONFIG READER DOES NOT UNDERSTAND
+            let Some(value) = item.as_value() else { continue };
+
+            //THE HEADING CARRIES DOWN TO THE NEXT ONE
+            if let Some(prefix) = table.key(key).and_then(|key| key.leaf_decor().prefix()).and_then(RawString::as_str)
+                && let Some(found) = heading(prefix)
+            {
+                section = found;
+            }
+
+            let description = value.decor().suffix().and_then(RawString::as_str)
+                .map(|comment| comment.trim().trim_start_matches('#').trim().to_string()).unwrap_or_default();
+
+            settings.push(ServerSetting
+            {
+                key: key.to_string(),
+                value: match value
+                {
+                    Value::Boolean(on) => SettingValue::Toggle(*on.value()),
+                    Value::Integer(number) => SettingValue::Number(*number.value()),
+                    Value::String(text) => SettingValue::Text(text.value().clone()),
+
+                    _ => continue,
+                },
+                section: section.clone(),
+                description,
+
+                //THESE ARE STORED BUT NOT USED UNTIL A RESTART
+                restart: consts::SERVER_RESTART_SETTINGS.contains(&key),
+            });
         }
 
-        let description = value.decor().suffix().and_then(RawString::as_str)
-            .map(|comment| comment.trim().trim_start_matches('#').trim().to_string()).unwrap_or_default();
-
-        settings.push(ServerSetting
-        {
-            key: key.to_string(),
-            value: match value
-            {
-                Value::Boolean(on) => SettingValue::Toggle(*on.value()),
-                Value::Integer(number) => SettingValue::Number(*number.value()),
-                Value::String(text) => SettingValue::Text(text.value().clone()),
-
-                _ => continue,
-            },
-            section: section.clone(),
-            description,
-
-            //THESE ARE STORED BUT NOT USED UNTIL A RESTART
-            restart: consts::SERVER_RESTART_SETTINGS.contains(&key),
-        });
-    }
-
-    settings
+        settings
+    })
 }
 
 //STORE THE CLIENT'S ROWS, DROPPING UNKNOWN ONES
 pub fn write(settings: &[ServerSetting]) -> usize
 {
-    let data = super::get_data(&super::config_path(consts::SERVER_CONFIG));
-
-    let accepted: Vec<(&str, Value)> = settings.iter().filter_map(|setting|
+    let accepted: Vec<(&str, Value)> = super::with_cached(&super::config_path(consts::SERVER_CONFIG),
+        |data| settings.iter().filter_map(|setting|
     {
         let current = data.get(&setting.key).and_then(Item::as_value)?;
 
@@ -114,7 +115,7 @@ pub fn write(settings: &[ServerSetting]) -> usize
         };
 
         Some((setting.key.as_str(), value))
-    }).collect();
+    }).collect());
 
     //ONE PASS, SO THE FILE IS REWRITTEN ONCE
     super::with_cached_mut(&super::config_path(consts::SERVER_CONFIG), |doc|

@@ -58,19 +58,19 @@ fn unset_ban(doc: &mut DocumentMut, section: &str, id: usize) -> bool //REMOVES 
 
 fn ban_list(section: &str) -> Vec<BanEntry> //EVERY SUBJECT ON A LIST OF server_bans.toml, NUMBERED
 {
-    super::get_data(&super::config_path(consts::SERVER_BANS_CONFIG)).get(section)
+    super::with_cached(&super::config_path(consts::SERVER_BANS_CONFIG), |doc| doc.get(section)
         .and_then(Item::as_array)
         .map(|bans| bans.iter().enumerate()
             .filter_map(|(id, ban)| Some(BanEntry { id, subject: ban.as_str()?.to_string() }))
             .collect())
-        .unwrap_or_default()
+        .unwrap_or_default())
 }
 
 fn listed(section: &str, key: &str) -> bool //IS key ON A LIST OF server_bans.toml?
 {
-    super::get_data(&super::config_path(consts::SERVER_BANS_CONFIG)).get(section)
+    super::with_cached(&super::config_path(consts::SERVER_BANS_CONFIG), |doc| doc.get(section)
         .and_then(Item::as_array)
-        .is_some_and(|bans| bans.iter().any(|ban| ban.as_str() == Some(key)))
+        .is_some_and(|bans| bans.iter().any(|ban| ban.as_str() == Some(key))))
 }
 
 pub fn banned(username: &str) -> bool //IS username BANNED?
