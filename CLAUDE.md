@@ -1201,6 +1201,37 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     The markup reaches a private message too (`Entry::Prefixed`, a client-written prefix in front of a
     user-written tail) but deliberately not `Entry::Line`, which is the client's *own* output — `/help`
     and `/list` are not somebody's text and have nothing to parse.
+  - **The rest of the markdown is the same parser, which is what keeps it out of code.** Emphasis
+    (`*italic*`, `**bold**`, `__underline__`, `~~strikethrough~~`, and `_italic_`) and `[text](url)` are
+    delimiters in the *same* pass as the backticks and the dollars, not a second pass over the text
+    afterwards — so a run inside `` ` `` or a fence is never seen at all, the fence having been consumed
+    whole at its opening backtick. In the other direction an emphasis may still *span* a code span
+    (``**bold `code` bold**``), which is why `find_run` skips a code or math span as one unit when it looks
+    for the close: a delimiter found inside one would be consumed as code later and the emphasis would
+    never close, leaking its modifier to the end of the message. That is also the whole rule for opening —
+    a run opens **only when its close has already been found** (it is recorded with the position it will
+    close at, and the parser emits the `Close` when it reaches exactly that index), so `*unclosed` is an
+    asterisk somebody typed. Emphasis is a `Modifier` on a stack rather than a colour, so it composes with
+    the sender's own colour, with a heading and with inline code instead of replacing any of them, and
+    `_` alone demands word boundaries on both ends — `snake_case_word` is a word, not three italics.
+    A run is at most `MAX_RUN` delimiters long, which is not cosmetic: measuring the run unbounded at
+    every position makes a message of nothing but asterisks quadratic.
+  - **The line-level markdown is applied where a row starts, not where a delimiter is found** (`marker`).
+    Headings (`#`…`###`), `>` quotes, `-`/`*`/`+` and `1.` lists and `---` rules are only markers at the
+    head of a row — so `` `x` # y `` is a hash somebody typed — and the parser cannot decide that on its
+    own, since it does not know which text run begins a row. `render` tracks it instead: a marker is taken
+    only while nothing has been drawn on the row yet, and a heading restyles the **whole** row rather than
+    the run it was found in. A heading with no colour of its own takes `theme::HEADING`, the same rule
+    math runs on, so a coloured message stays the sender's colour throughout.
+    - **A marker also owns the rows its line wraps onto**, which is what `flush`'s hanging prefix is for:
+      the quote bar or the list indent is repeated in front of every wrapped row and the wrap width comes
+      down by its width, so a quoted paragraph reads as one quote instead of one bar and then loose text.
+      An escaped marker (`\#`) comes back as `Segment::Raw` rather than as text, which is what stops it
+      being re-read as a marker on the way out — the backslash is gone by then, so nothing else could
+      tell the two apart.
+    - A link is drawn as its text with the target dim beside it. There is no OSC 8 here and no clickable
+      cell, so hiding the URL behind the text would be hiding where it goes; a link whose text *is* its
+      URL is shown once.
   - **`tui/math.rs` lays TeX out in cells, and it is a subset on purpose.** A terminal has one font size
     and a fixed grid, so what is rendered is the part of the notation the grid can carry: a `Block` is a
     rectangle of cells plus the row the next one lines up with, and every step (a fraction over its rule,

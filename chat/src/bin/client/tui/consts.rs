@@ -68,5 +68,16 @@ pub const GUTTER: u16                 = 2;                         //A CODE BLOC
 pub const TAB: usize                  = 4;                         //A TAB IS EXPANDED, SINCE A CELL GRID HAS NO TAB STOPS
 pub const MAX_LANG: usize             = 20;                        //LONGER THAN THIS AND THE FIRST WORD IS CODE
 
+//MARKDOWN
+pub const MARKUP_KINDS: usize         = 9;                         //DELIMITERS THE PARSER GIVES UP ON SEPARATELY
+pub const ESCAPABLE: &str             = "`$*_~[\\#>-";             //WHAT A BACKSLASH TAKES THE MARKUP OFF
+pub const MAX_HEADING: usize          = 3;                         //MORE HASHES THAN THIS AND THE ROW IS TEXT
+pub const MAX_ORDINAL: usize          = 9;                         //AND MORE DIGITS THAN THIS IS NOT A LIST
+pub const MIN_RULE: usize             = 3;                         //MARKERS A HORIZONTAL RULE IS DRAWN FROM
+pub const MAX_RUN: usize              = 3;                         //AND DELIMITERS ONE EMPHASIS IS OPENED WITH
+pub const BULLET: &str                = "• ";                      //WHAT A LIST MARKER IS DRAWN AS
+pub const QUOTE: &str                 = "▏ ";                      //AND A BLOCKQUOTE'S EDGE
+pub const RULE: char                  = '─';
+
 pub const INDENT: &str                = "  ";                      //DISPLAY MATH IS SET IN FROM THE PANE, THE WAY A BLOCK IS
 pub const MAX_DEPTH: usize            = 32;                        //A BRACE THIS DEEP IS A BRACE

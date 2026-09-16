@@ -161,6 +161,13 @@ pub const CODE_BAR: Style = Style::new().fg(Color::Rgb(0x9D, 0xCE, 0xFF)).bg(COD
 pub const CODE_LANG: Style = Style::new().fg(Color::Rgb(0xCA, 0xB4, 0xB7)).bg(CODE_BG)
     .add_modifier(Modifier::ITALIC);
 
+//MARKDOWN
+pub const HEADING: Style = Style::new().fg(Color::Rgb(0xFF, 0xDD, 0xE2));      //A HEADING THE MESSAGE GAVE NO COLOUR
+pub const QUOTE: Style = Style::new().fg(Color::Rgb(0x9D, 0xCE, 0xFF));        //A BLOCKQUOTE'S EDGE
+pub const BULLET: Style = Style::new().fg(Color::Rgb(0x9D, 0xCE, 0xFF));       //AND A LIST MARKER
+pub const RULE: Style = Style::new().fg(Color::Rgb(0xCA, 0xB4, 0xB7));
+pub const LINK: Style = Style::new().fg(Color::Rgb(0x9D, 0xCE, 0xFF)).add_modifier(Modifier::UNDERLINED);
+
 pub const MATH: Style = Style::new().fg(Color::Rgb(0xFF, 0xDD, 0xE2));         //MATH THE MESSAGE GAVE NO COLOUR
 
 pub const SELECTED: Style = Style::new().bg(Color::Rgb(0x00, 0x5F, 0x5F));

@@ -20,7 +20,7 @@ use std::mem;
 
 use ratatui::
 {
-    style::Style,
+    style::{ Modifier, Style },
     text::{ Line, Span },
 };
 
@@ -34,15 +34,35 @@ use super::
     consts,
 };
 
+//STRUCTS
+struct Emphasis //AN OPEN RUN AND WHERE IT WAS FOUND TO CLOSE
+{
+    run: usize,
+    end: usize,
+    modifier: Modifier,
+}
+
+struct Marker<'a> //WHAT A ROW OPENS WITH ONCE ITS LINE MARKER IS OFF
+{
+    spans: Vec<Span<'static>>,   //THE MARKER, AS IT IS DRAWN
+    hanging: Vec<Span<'static>>, //WHAT ITS WRAPPED ROWS OPEN WITH
+    style: Style,                //A HEADING RESTYLES THE WHOLE ROW
+    rest: &'a str,
+}
+
 //ENUMS
 //WHAT A MESSAGE IS MADE OF, MARKUP OFF
 enum Segment
 {
     Text(String),
+    Raw(String),                                  //A CHARACTER THE BACKSLASH TOOK THE MARKUP OFF
     Code(String),                                 //INLINE `code`
     Block { lang: Option<String>, body: String }, //FENCED ```code```
     Math(String),                                 //INLINE $math$
     Display(String),                              //$$math$$
+    Link { text: String, url: String },           //[text](url)
+    Open(Modifier),                               //EMPHASIS OPENS
+    Close(Modifier),                              //AND CLOSES
 }
 
 //FUNCTIONS
@@ -52,7 +72,12 @@ pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, 
 {
     let mut out: Vec<Line<'static>> = Vec::new();
     let mut current = prefix;
-    let mut open = true; //A LINE IS BEING BUILT
+    let mut open = true;  //A LINE IS BEING BUILT
+    let mut start = true; //AND NOTHING IS ON IT YET
+
+    let mut line = style;                             //WHAT A HEADING RESTYLES THE ROW TO
+    let mut hanging: Vec<Span<'static>> = Vec::new(); //AND WHAT ITS WRAPPED ROWS OPEN WITH
+    let mut stack: Vec<Modifier> = Vec::new();
 
     for segment in parse(text, math)
     {
@@ -61,64 +86,162 @@ pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, 
             //THE ONLY LINE BREAK INSIDE TEXT
             Segment::Text(text) => for (i, part) in text.split('\n').enumerate()
             {
+                let mut part = part;
+
                 if i > 0
                 {
-                    flush(&mut out, &mut current, &mut open, width);
+                    flush(&mut out, &mut current, &mut open, width, &hanging);
+
+                    open = true;
+                    start = true;
+                    line = style;
+
+                    hanging.clear();
+                }
+
+                //A LINE OF NOTHING BUT DASHES IS A RULE
+                if start && is_rule(part)
+                {
+                    open = true;
+
+                    current.push(rule(&current, width));
+                    flush(&mut out, &mut current, &mut open, width, &hanging);
+
+                    start = false;
+
+                    continue;
+                }
+
+                if start && let Some(found) = marker(part, style)
+                {
+                    current.extend(found.spans);
+
+                    hanging = found.hanging;
+                    line = found.style;
+                    part = found.rest;
+                    start = false;
                     open = true;
                 }
 
-                if !part.is_empty() { current.push(Span::styled(part.to_owned(), style)); }
+                if !part.is_empty()
+                {
+                    current.push(Span::styled(part.to_owned(), line.add_modifier(active(&stack))));
+
+                    open = true;
+                    start = false;
+                }
+            },
+
+            Segment::Raw(text) =>
+            {
+                current.push(Span::styled(text, line.add_modifier(active(&stack))));
+
+                open = true;
+                start = false;
             },
 
             //A NEWLINE INSIDE INLINE CODE IS A SPACE
             Segment::Code(code) =>
             {
-                current.push(Span::styled(code.replace('\n', " "), theme::CODE));
+                current.push(Span::styled(code.replace('\n', " "), theme::CODE.add_modifier(active(&stack))));
+
                 open = true;
+                start = false;
+            },
+
+            //SHOWN AS ITS TEXT, WITH THE TARGET BESIDE IT
+            Segment::Link { text, url } =>
+            {
+                current.push(Span::styled(text.clone(), theme::LINK));
+
+                if url != text { current.push(Span::styled(format!(" ({url})"), theme::DIM)); }
+
+                open = true;
+                start = false;
             },
 
             Segment::Math(source) =>
             {
-                current.extend(math::inline(&source, style));
+                current.extend(math::inline(&source, line.add_modifier(active(&stack))));
+
                 open = true;
+                start = false;
             },
 
             //BOTH OWN THEIR ROWS, SO CLOSE THE CURRENT RUN
             Segment::Block { lang, body } =>
             {
-                close(&mut out, &mut current, &mut open, width);
+                close(&mut out, &mut current, &mut open, width, &hanging);
                 block(&mut out, lang.as_deref(), &body, width);
+
+                line = style;
+                start = true;
+
+                hanging.clear();
             },
 
             Segment::Display(source) =>
             {
-                close(&mut out, &mut current, &mut open, width);
+                close(&mut out, &mut current, &mut open, width, &hanging);
                 out.extend(math::display(&source, width));
+
+                line = style;
+                start = true;
+
+                hanging.clear();
             },
+
+            Segment::Open(modifier) => stack.push(modifier),
+            Segment::Close(modifier) => { stack.pop_if(|open| *open == modifier); },
         }
     }
 
     //A MESSAGE THAT ENDS ON A BLOCK ENDS THERE
-    if open || out.is_empty() { flush(&mut out, &mut current, &mut open, width); }
+    if open || out.is_empty() { flush(&mut out, &mut current, &mut open, width, &hanging); }
 
     out
 }
 
-fn flush(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &mut bool, width: u16)
+fn active(stack: &[Modifier]) -> Modifier //EVERY EMPHASIS THE TEXT IS INSIDE OF
+{
+    stack.iter().fold(Modifier::empty(), |all, modifier| all | *modifier)
+}
+
+fn flush(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &mut bool, width: u16,
+    hanging: &[Span<'static>])
 {
     if !*open { return; } //NOTHING IS BEING BUILT
 
-    out.extend(state::wrap_line(&Line::from(mem::take(current)), width));
+    let hang = hanging.iter().map(|span| text_width(&span.content)).sum::<usize>() as u16;
+    let rows = state::wrap_line(&Line::from(mem::take(current)), width.saturating_sub(hang));
+
+    //A WRAPPED ROW OPENS UNDER THE MARKER, NOT UNDER THE PANE
+    for (i, row) in rows.into_iter().enumerate()
+    {
+        match i > 0 && !hanging.is_empty()
+        {
+            true =>
+            {
+                let mut spans = hanging.to_vec();
+
+                spans.extend(row.spans);
+                out.push(Line::from(spans));
+            },
+
+            false => out.push(row),
+        }
+    }
 
     *open = false;
 }
 
-fn close(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &mut bool, width: u16)
+fn close(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &mut bool, width: u16,
+    hanging: &[Span<'static>])
 {
     match current.is_empty()
     {
         true => *open = false,
-        false => flush(out, current, open, width),
+        false => flush(out, current, open, width, hanging),
     }
 }
 
@@ -202,6 +325,98 @@ pub fn text_width(text: &str) -> usize
     text.chars().map(|c| c.width().unwrap_or(0)).sum()
 }
 
+//THE LINE-LEVEL MARKDOWN, TAKEN OFF THE FRONT OF A ROW
+fn marker(part: &str, style: Style) -> Option<Marker<'_>>
+{
+    let spaces = part.len() - part.trim_start_matches(' ').len();
+    let body = &part[spaces..];
+    let indent = || Span::raw(" ".repeat(spaces));
+
+    //A HEADING, WHOSE MARKER IS NOT DRAWN AT ALL
+    let hashes = body.chars().take_while(|c| *c == '#').count();
+
+    if (1..=consts::MAX_HEADING).contains(&hashes) && body[hashes..].starts_with(' ')
+    {
+        return Some(Marker
+        {
+            spans: vec![indent()],
+            hanging: vec![indent()],
+            style: heading(style, hashes),
+            rest: body[hashes..].trim_start_matches(' '),
+        });
+    }
+
+    if body.starts_with("> ") || body == ">"
+    {
+        return Some(Marker
+        {
+            spans: vec![indent(), Span::styled(consts::QUOTE, theme::QUOTE)],
+            hanging: vec![indent(), Span::styled(consts::QUOTE, theme::QUOTE)],
+            style,
+            rest: body[1..].strip_prefix(' ').unwrap_or(""),
+        });
+    }
+
+    if matches!(body.get(..2), Some("- " | "* " | "+ "))
+    {
+        return Some(Marker
+        {
+            spans: vec![indent(), Span::styled(consts::BULLET, theme::BULLET)],
+            hanging: vec![Span::raw(" ".repeat(spaces + text_width(consts::BULLET)))],
+            style,
+            rest: body[2..].trim_start_matches(' '),
+        });
+    }
+
+    //AN ORDERED LIST KEEPS THE NUMBER IT WAS TYPED WITH
+    let digits = body.chars().take_while(char::is_ascii_digit).count();
+
+    if (1..=consts::MAX_ORDINAL).contains(&digits) && matches!(body.chars().nth(digits), Some('.' | ')'))
+        && body[digits + 1..].starts_with(' ')
+    {
+        return Some(Marker
+        {
+            spans: vec![indent(), Span::styled(body[..digits + 2].to_owned(), theme::BULLET)],
+            hanging: vec![Span::raw(" ".repeat(spaces + digits + 2))],
+            style,
+            rest: body[digits + 2..].trim_start_matches(' '),
+        });
+    }
+
+    None
+}
+
+fn heading(style: Style, level: usize) -> Style //A HEADING KEEPS THE MESSAGE'S COLOUR WHERE IT HAS ONE
+{
+    let style = match style.fg
+    {
+        Some(_) => style,
+        None => style.patch(theme::HEADING),
+    };
+
+    match level
+    {
+        1 => style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        _ => style.add_modifier(Modifier::BOLD),
+    }
+}
+
+fn is_rule(text: &str) -> bool //THREE OR MORE OF THE SAME MARKER, AND NOTHING ELSE
+{
+    let text = text.trim();
+    let Some(first) = text.chars().next() else { return false };
+
+    matches!(first, '-' | '*' | '_') && text.chars().count() >= consts::MIN_RULE
+        && text.chars().all(|c| c == first)
+}
+
+fn rule(current: &[Span<'static>], width: u16) -> Span<'static> //FILLING WHAT IS LEFT OF THE ROW
+{
+    let used: usize = current.iter().map(|span| text_width(&span.content)).sum();
+
+    Span::styled(consts::RULE.to_string().repeat((width as usize).saturating_sub(used)), theme::RULE)
+}
+
 //THE PARSER; IT NEVER CONSUMES AN UNCLOSED RUN
 fn parse(text: &str, math: bool) -> Vec<Segment>
 {
@@ -209,17 +424,20 @@ fn parse(text: &str, math: bool) -> Vec<Segment>
 
     let mut out: Vec<Segment> = Vec::new();
     let mut buf = String::new();
+    let mut stack: Vec<Emphasis> = Vec::new();
     let mut i = 0usize;
 
     //A DELIMITER NOT FOUND ONCE IS NOT SEARCHED AGAIN
-    let mut missing = [false; 5];
+    let mut missing = [false; consts::MARKUP_KINDS];
 
     while i < chars.len()
     {
         //A BACKSLASH TAKES THE MARKUP OFF WHAT FOLLOWS
-        if chars[i] == '\\' && matches!(chars.get(i + 1), Some('`' | '$' | '\\'))
+        if chars[i] == '\\' && chars.get(i + 1).is_some_and(|c| consts::ESCAPABLE.contains(*c))
         {
-            buf.push(chars[i + 1]);
+            flush_text(&mut out, &mut buf);
+            out.push(Segment::Raw(chars[i + 1].to_string()));
+
             i += 2;
 
             continue;
@@ -229,6 +447,8 @@ fn parse(text: &str, math: bool) -> Vec<Segment>
         {
             '`' => backtick(&chars, i, &mut out, &mut buf, &mut missing),
             '$' if math => dollar(&chars, i, &mut out, &mut buf, &mut missing),
+            '[' => link(&chars, i, &mut out, &mut buf, &mut missing),
+            '*' | '_' | '~' => emphasis(&chars, i, &mut out, &mut buf, &mut stack, &mut missing, math),
             _ => None,
         };
 
@@ -249,8 +469,8 @@ fn parse(text: &str, math: bool) -> Vec<Segment>
 }
 
 //THREE BACKTICKS OPEN A FENCE, ONE OR TWO INLINE
-fn backtick(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String, missing: &mut [bool; 5])
-    -> Option<usize>
+fn backtick(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String,
+    missing: &mut [bool; consts::MARKUP_KINDS]) -> Option<usize>
 {
     let run = chars[i..].iter().take_while(|c| **c == '`').count();
     let kind = run.min(3) - 1;
@@ -308,8 +528,8 @@ fn is_language(word: &str) -> bool
 }
 
 //MATH, WITH THE GUARDS THAT KEEP PRICES OUT OF IT
-fn dollar(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String, missing: &mut [bool; 5])
-    -> Option<usize>
+fn dollar(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String,
+    missing: &mut [bool; consts::MARKUP_KINDS]) -> Option<usize>
 {
     let display = chars.get(i + 1) == Some(&'$');
     let close: Vec<char> = if display { vec!['$', '$'] } else { vec!['$'] };
@@ -330,6 +550,94 @@ fn dollar(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String, mi
     out.push(if display { Segment::Display(inner) } else { Segment::Math(inner) });
 
     Some(end + close.len())
+}
+
+//A LINK, WHOSE TARGET HAS TO BE ONE WORD
+fn link(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String,
+    missing: &mut [bool; consts::MARKUP_KINDS]) -> Option<usize>
+{
+    let kind = kind('[');
+
+    if missing[kind] { return None; }
+
+    let label = seen(find_escaped(chars, i + 1, &[']']), &mut missing[kind])?;
+
+    if chars.get(label + 1) != Some(&'(') { return None; }
+
+    let end = find(chars, label + 2, &[')'])?;
+    let text: String = chars[i + 1..label].iter().collect();
+    let url: String = chars[label + 2..end].iter().collect();
+
+    if text.is_empty() || url.is_empty() || url.chars().any(char::is_whitespace) { return None; }
+
+    flush_text(out, buf);
+    out.push(Segment::Link { text, url });
+
+    Some(end + 1)
+}
+
+//EMPHASIS; A RUN ONLY OPENS IF ITS CLOSE IS ALREADY IN SIGHT
+fn emphasis(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String, stack: &mut Vec<Emphasis>,
+    missing: &mut [bool; consts::MARKUP_KINDS], math: bool) -> Option<usize>
+{
+    //WHATEVER IS OPEN CLOSES HERE
+    if stack.last().is_some_and(|open| open.end == i)
+    {
+        let open = stack.pop()?;
+
+        flush_text(out, buf);
+        out.push(Segment::Close(open.modifier));
+
+        return Some(i + open.run);
+    }
+
+    let c = chars[i];
+    let run = chars[i..].iter().take_while(|x| **x == c).take(consts::MAX_RUN).count();
+    let modifier = modifier(c, run)?;
+    let kind = kind(c);
+
+    if missing[kind] { return None; }
+
+    let start = i + run;
+
+    if chars.get(start).is_none_or(|c| c.is_whitespace()) { return None; }
+    if c == '_' && i > 0 && chars[i - 1].is_alphanumeric() { return None; } //snake_case IS A WORD
+
+    let end = seen(find_run(chars, start, c, run, math), &mut missing[kind])?;
+
+    if c == '_' && chars.get(end + run).is_some_and(|c| c.is_alphanumeric()) { return None; }
+
+    flush_text(out, buf);
+    stack.push(Emphasis { run, end, modifier });
+    out.push(Segment::Open(modifier));
+
+    Some(start)
+}
+
+fn modifier(c: char, run: usize) -> Option<Modifier> //WHAT A RUN OF THAT LENGTH MEANS
+{
+    match (c, run)
+    {
+        ('*' | '_', 1) => Some(Modifier::ITALIC),
+        ('*', 2) => Some(Modifier::BOLD),
+        ('*', _) => Some(Modifier::BOLD | Modifier::ITALIC),
+        ('_', 2) => Some(Modifier::UNDERLINED),
+        ('_', _) => Some(Modifier::UNDERLINED | Modifier::ITALIC),
+        ('~', 1) => None,
+        ('~', _) => Some(Modifier::CROSSED_OUT),
+        _ => None,
+    }
+}
+
+fn kind(c: char) -> usize //ITS SLOT IN THE MISSING TABLE
+{
+    match c
+    {
+        '*' => 5,
+        '_' => 6,
+        '~' => 7,
+        _ => 8,
+    }
 }
 
 fn find(chars: &[char], from: usize, needle: &[char]) -> Option<usize> //FIRST needle AT OR AFTER from
@@ -354,6 +662,42 @@ fn find_escaped(chars: &[char], from: usize, needle: &[char]) -> Option<usize>
     None
 }
 
+//AND THE RUN THAT COULD CLOSE AN EMPHASIS, PAST CODE AND MATH
+fn find_run(chars: &[char], from: usize, needle: char, run: usize, math: bool) -> Option<usize>
+{
+    let mut i = from;
+
+    while i < chars.len()
+    {
+        if chars[i] == '\\' { i += 2; continue; }
+
+        if let Some(next) = span(chars, i, math) { i = next; continue; }
+
+        let len = chars[i..].iter().take_while(|c| **c == needle).take(run).count();
+
+        if len == 0 { i += 1; continue; }
+        if len >= run && !chars[i - 1].is_whitespace() { return Some(i); } //A CLOSE HANGS ON THE WORD BEFORE IT
+
+        i += len;
+    }
+
+    None
+}
+
+fn span(chars: &[char], i: usize, math: bool) -> Option<usize> //HOW FAR A CODE OR MATH SPAN AT i REACHES
+{
+    let delim = match chars[i]
+    {
+        '`' => '`',
+        '$' if math => '$',
+        _ => return None,
+    };
+
+    let run = chars[i..].iter().take_while(|c| **c == delim).count().min(3);
+
+    find(chars, i + run, &vec![delim; run]).map(|end| end + run)
+}
+
 fn seen(found: Option<usize>, missing: &mut bool) -> Option<usize> //A SEARCH THAT FAILED IS NOT REPEATED
 {
     *missing = found.is_none();
@@ -365,3 +709,4 @@ fn flush_text(out: &mut Vec<Segment>, buf: &mut String)
 {
     if !buf.is_empty() { out.push(Segment::Text(mem::take(buf))); }
 }
+
