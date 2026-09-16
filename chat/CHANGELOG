@@ -1,6 +1,16 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.2.1:
+- cb83b5ae: unset last_pm on disconnect
+- 7dd7d076: apply spam limits to PM replies
+- 7dbca761: implement PM replies on server
+- 7a79a6c4: add Re Command
+- 261090f9: add Re PacketCode
+- 12062407: implement URL opening
+- 3663d99c: render markdown in the message pane
+- a4eff219: implement config cache stamping
+
 v2.2.0:
 - cdaba92f: load pictures only while they are on screen
 - b1abfb72: rename Password PacketCodes to Login & Register
