@@ -68,6 +68,7 @@ pub enum Command
     #[cfg(feature = "client_screen")] Attach,   //ATTACH SCREEN SHARE
     #[cfg(feature = "client_screen")] Deattach, //DEATTACH SCREEN SHARE
     PrivateMessage,                             //ONE TO ONE MESSAGE
+    Re,                                         //REPLY TO PRIVATE MESSAGE
     Settings,                                   //OPEN THE SETTINGS OVERLAY
     Server,                                     //MODERATION ACTIONS (TAKES A SUBCOMMAND)
     UsernameColor,                              //SET COLOR OF USERNAME
@@ -575,6 +576,26 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Re,
+        triggers: &[ "RE", "REPLY", "RESPOND" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args:
+        &[
+            CommandArg
+            {
+                name: "MESSAGE",
+                description: "Message content",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Responds to last private message",
+    },
+
+    CommandInfo
+    {
         command: Command::Settings,
         triggers: &[ "SETTINGS", "SETUP", "CONFIG", "PREFERENCES", "AUDIO" ],
         shortcut: Some(','),
@@ -727,6 +748,15 @@ impl Command
                 })
             },
 
+            Command::Re =>
+            {
+                Some(match parameters
+                {
+                    Some(parameters) => Ok(PacketCode::Re { message: parameters.to_string() }),
+                    None => Err(()),
+                })
+            }
+
             Command::Download =>
             {
                 let parsed = parameters
@@ -748,7 +778,7 @@ impl Command
 
                 Some(match target_id
                 {
-                    Some(id) => Ok(PacketCode::AttachRequest { id }), //NOVÁ VARIANTA
+                    Some(id) => Ok(PacketCode::AttachRequest { id }),
                     None => Err(()),
                 })
             },
