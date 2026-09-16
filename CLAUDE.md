@@ -974,6 +974,19 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     taken down to a background, and a background **only** — every glyph keeps its own colour, so a
     username stays the colour it is being copied as. The accent at full strength would have to repaint
     the text dark to stay readable on it, which is exactly what a selection must not do.
+  - **Capturing the mouse takes the terminal's URL click away too, so the client opens them itself**
+    (`App::link_at`, `tui::open_link`). The terminal still *detects* a URL under the pointer — the hover
+    underline is its own — but while mouse reporting is on it never receives the click, so ctrl+click
+    does nothing; shift+click, which every terminal reserves as the bypass, is the one path that still
+    reaches it. A click that was not a drag therefore resolves the cell to the whitespace-delimited word
+    it is on (`word_at`, over the same wrapped rows the selection slices) and hands it to
+    `xdg-open`/`open`/`start` with its output on `/dev/null`, since anything it printed would land on the
+    frame. **It is the word that decides, not the markup**: a URL somebody simply typed is the common
+    case and is clickable exactly like a `[text](url)` one, which is also why `markup` draws a link's
+    target rather than hiding it. Only `http`/`https` are opened — every other scheme is somebody else's
+    text handed to a system opener — and the punctuation a link only leans on is trimmed, except a
+    closing bracket the link opened itself (`…/Foo_(bar)`). Over SSH this opens on the far machine, the
+    way a clipboard library would have written to the far clipboard; shift+click is the local path.
   - **A copy says so in the pane's bottom border, not in the history** (`App::notify`/`App::notice`,
     `draw_messages`' second `title_bottom`). The pane is the conversation, so something the user *did*
     does not belong in it as a line — and a toast that expires takes no row away from what was said.
