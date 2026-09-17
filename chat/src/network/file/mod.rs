@@ -97,10 +97,12 @@ pub async fn send_file //CHUNK FILE AND SEND TO STREAM
     rex_stream: &mut RexPacketStream,
     mut seq: Option<&mut usize>,
     #[cfg(feature = "server")] disk_stream: &mut RexStream,
+    mut progress: impl FnMut(u64), //BYTES SENT SO FAR
 )
 {
     let mut file = File::open(path).await.expect("Cannot open file for upload");
     let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+    let mut sent = 0u64;
 
     //LOOP READING
     loop
@@ -136,6 +138,10 @@ pub async fn send_file //CHUNK FILE AND SEND TO STREAM
                     code: FilePacketCode::Data { data: plaintext },
                     seq: 0,
                 }, EncryptionMode::Stream(rex_stream), seq.as_deref_mut()).await;
+
+                //REPORT PROGRESS
+                sent += bytes as u64;
+                progress(sent);
             },
             Err(_) => {}, //TODO: Implement
         }

@@ -24,6 +24,8 @@ pub const IMAGE_ROWS: u16             = 20;                        //TALLEST AN 
 pub const NOTICE_DURATION: Duration   = Duration::from_secs(2);    //HOW LONG THE PANE'S TOAST STAYS UP
 pub const ANIMATION_CATCHUP: Duration = Duration::from_secs(1);    //BEHIND BY MORE THAN THIS AND IT RESTARTS
 pub const MAX_URL: usize              = 2048;                      //LONGER THAN THIS AND A CLICK OPENS NOTHING
+pub const PROGRESS_CELLS: usize       = 24;                        //WIDE A TRANSFER'S BAR IS DRAWN
+pub const MIN_PROGRESS_CELLS: usize   = 8;                         //NARROWER THAN THIS AND THE BAR IS DROPPED
 
 //EVENT LOOP
 pub const REDRAW_INTERVAL: Duration   = Duration::from_millis(33); //COALESCE REDRAWS - VoiceActivity FIRES PER VOICE PACKET

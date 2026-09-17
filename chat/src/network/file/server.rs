@@ -561,7 +561,7 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
     log::info!("Download started ({} bytes): {peer_addr}", file.size);
 
     //START UPLOAD
-    file::send_file(file.path, write_stream, uid, &mut rex_stream, Some(&mut seq), &mut disk_stream).await;
+    file::send_file(file.path, write_stream, uid, &mut rex_stream, Some(&mut seq), &mut disk_stream, |_| {}).await;
 
     //LOG END
     log::info!("Download done: {peer_addr}");

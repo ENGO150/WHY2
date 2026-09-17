@@ -32,8 +32,9 @@ use crate::{ colors, config };
 
 use super::
 {
+    consts,
     markup,
-    state::{ self, Entry, Picture },
+    state::{ self, Entry, Picture, Transfer },
 };
 
 //STRUCTS
@@ -95,6 +96,8 @@ impl Theme
             Entry::Prefixed { prefix, text } =>
                 markup::render(prefix.clone(), text, Style::new(), width, self.render_math),
 
+            Entry::Transfer(transfer) => state::wrap_line(&Line::from(progress(transfer, width)), width),
+
             //ONLY THE CAPTION; THE PICTURE IS DRAWN UNDER IT
             Entry::Image { username, filename, username_color, picture, .. } =>
             {
@@ -134,6 +137,70 @@ impl Theme
             Some(c) if !self.disable_colors => Style::new().fg(Color::from_crossterm(c)),
             _ => Style::new(),
         }
+    }
+}
+
+//FUNCTIONS
+//A TRANSFER'S ROW - WHAT IT IS, ITS BAR, AND WHAT IT HAS MOVED
+fn progress(transfer: &Transfer, width: u16) -> Vec<Span<'static>>
+{
+    let Transfer { upload, image, filename, done, total, outcome, .. } = transfer;
+
+    let kind = if *image { "image" } else { "file" };
+
+    let (label, style) = match (outcome, upload)
+    {
+        (None, true) => (format!("Uploading {kind} \"{filename}\""), DIM),
+        (None, false) => (format!("Downloading {kind} \"{filename}\""), DIM),
+        (Some(true), true) => (format!("Uploaded {kind} \"{filename}\""), OK),
+        (Some(true), false) => (format!("Downloaded {kind} \"{filename}\""), OK),
+        (Some(false), _) => (format!("Transferring {kind} \"{filename}\" failed"), ERROR),
+    };
+
+    let percent = state::percent(*done, *total);
+
+    //THE BAR NEVER WIDER THAN HALF THE PANE
+    let cells = consts::PROGRESS_CELLS.min(width as usize / 2);
+    let filled = (percent as usize * cells) / 100;
+
+    let mut spans = vec![Span::styled(label, style)];
+
+    //A PANE TOO NARROW FOR A BAR STILL GETS THE NUMBERS
+    if cells >= consts::MIN_PROGRESS_CELLS
+    {
+        spans.extend(
+        [
+            Span::raw(" "),
+            Span::styled("▕", BORDER),
+            Span::styled("█".repeat(filled), if outcome.is_some() { style } else { ACCENT }),
+            Span::styled("░".repeat(cells - filled), BORDER),
+            Span::styled("▏", BORDER),
+        ]);
+    }
+
+    spans.push(Span::styled(format!(" {percent:>3}%  {}/{}", size(*done), size(*total)), DIM));
+
+    spans
+}
+
+//BYTES AS SOMETHING READABLE
+fn size(bytes: u64) -> String
+{
+    const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
+
+    let mut value = bytes as f64;
+    let mut unit = 0;
+
+    while value >= 1000.0 && unit < UNITS.len() - 1
+    {
+        value /= 1000.0;
+        unit += 1;
+    }
+
+    match unit
+    {
+        0 => format!("{bytes}B"),
+        _ => format!("{value:.1}{}", UNITS[unit]),
     }
 }
 

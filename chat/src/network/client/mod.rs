@@ -155,8 +155,8 @@ pub enum ClientEvent
     ServerSettings(Vec<ServerSetting>, bool),                    //server.toml AS THE SERVER HOLDS IT
     Colors,                                                      //A /color LANDED ON THE SERVER
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
-    Upload(String),                                              //UPLOADING FILE
-    Image(String),                                               //UPLOADING IMAGE
+    Upload(u64, String, u64),                                    //UPLOADING FILE (UID, NAME, SIZE)
+    Image(u64, String, u64),                                     //UPLOADING IMAGE (UID, NAME, SIZE)
     ImageDisplay(String, String, Animation, Option<u8>),         //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
     ImageData([u8; 32], Option<Animation>),                      //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
     ImagePending(String, String, [u8; 32], Option<u8>),          //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
@@ -164,9 +164,11 @@ pub enum ClientEvent
     ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
     ImageFailed(String, String, Option<u8>),                     //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
     Uploaded(String, String),                                    //USER UPLOADED FILE
-    Download(String),                                            //DOWNLOADING FILE
-    Downloaded(String),                                          //DOWNLOADED FILE
-    DownloadFailed(String),                                      //DOWNLOADING FAILED
+    UploadDone(u64, String),                                     //OUR OWN UPLOAD IS ON THE WIRE
+    Download(u64, String, u64),                                  //DOWNLOADING FILE (UID, NAME, SIZE)
+    Downloaded(u64, String),                                     //DOWNLOADED FILE
+    DownloadFailed(u64, String),                                 //DOWNLOADING FAILED
+    TransferProgress(u64, u64),                                  //HOW FAR A TRANSFER HAS GOT (UID, BYTES)
     Files(Vec<UserFile>),                                        //FILE LIST
     Screens(Vec<UserScreen>),                                    //SCREENSHARE LIST
     UploadLimit,                                                 //MAX CONCURRENT UPLOADS REACHED

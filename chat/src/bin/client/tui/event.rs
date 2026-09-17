@@ -462,14 +462,24 @@ impl App
                 self.dirty = true;
             },
 
-            ClientEvent::Upload(filename) =>
+            ClientEvent::Upload(uid, filename, size) =>
             {
-                self.push_text(format!("Uploading file \"{filename}\"..."));
+                self.push_transfer(uid, filename, size, true, false);
             },
 
-            ClientEvent::Image(filename) =>
+            ClientEvent::Image(uid, filename, size) =>
             {
-                self.push_text(format!("Uploading image \"{filename}\"..."));
+                self.push_transfer(uid, filename, size, true, true);
+            },
+
+            ClientEvent::UploadDone(uid, _) =>
+            {
+                self.finish_transfer(uid, true);
+            },
+
+            ClientEvent::TransferProgress(uid, done) =>
+            {
+                self.update_transfer(uid, done);
             },
 
             ClientEvent::Uploaded(username, filename) =>
@@ -481,19 +491,19 @@ impl App
                 ]));
             },
 
-            ClientEvent::Download(filename) =>
+            ClientEvent::Download(uid, filename, size) =>
             {
-                self.push_text(format!("Downloading file \"{filename}\"..."));
+                self.push_transfer(uid, filename, size, false, false);
             },
 
-            ClientEvent::Downloaded(filename) =>
+            ClientEvent::Downloaded(uid, _) =>
             {
-                self.push_styled(format!("File \"{filename}\" downloaded."), theme::OK);
+                self.finish_transfer(uid, true);
             },
 
-            ClientEvent::DownloadFailed(filename) =>
+            ClientEvent::DownloadFailed(uid, _) =>
             {
-                self.push_styled(format!("Downloading \"{filename}\" failed."), theme::ERROR);
+                self.finish_transfer(uid, false);
             },
 
             ClientEvent::Files(users) =>

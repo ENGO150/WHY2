@@ -77,10 +77,10 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
     //LOG
     tx.send(if persistent
     {
-        ClientEvent::Image(filename.clone())
+        ClientEvent::Image(uid, filename.clone(), size)
     } else
     {
-        ClientEvent::Upload(filename.clone())
+        ClientEvent::Upload(uid, filename.clone(), size)
     }).await.unwrap();
 
     //LOCAL SEQ COUNTER
@@ -96,14 +96,22 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
         code: FilePacketCode::Metadata
         {
             size,
-            filename,
+            filename: filename.clone(),
             hash: file_hash,
         },
         seq: 0,
     }, EncryptionMode::Stream(&mut rex_stream), Some(&mut seq)).await;
 
     //UPLOAD
-    file::send_file(path, write_stream, uid, &mut rex_stream, Some(&mut seq)).await;
+    let progress = tx.clone();
+
+    file::send_file(path, write_stream, uid, &mut rex_stream, Some(&mut seq), |sent|
+    {
+        progress.try_send(ClientEvent::TransferProgress(uid, sent)).ok(); //A DROPPED TICK COSTS NOTHING
+    }).await;
+
+    //DONE
+    tx.send(ClientEvent::UploadDone(uid, filename)).await.unwrap();
 }
 
 pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
@@ -124,9 +132,9 @@ pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     let mut rex_stream = chat_crypto::init_rex_stream(options::get_keys().as_ref().unwrap(), &token).unwrap();
 
     //RECEIVE FIRST PACKET (METADATA)
-    let (size, filename, hash) = match file::receive_file(&mut streams, &mut rex_stream, &mut seq).await
+    let (uid, size, filename, hash) = match file::receive_file(&mut streams, &mut rex_stream, &mut seq).await
     {
-        Some((_, FilePacketCode::Metadata { size, filename, hash })) => (size, filename, hash),
+        Some((uid, FilePacketCode::Metadata { size, filename, hash })) => (uid, size, filename, hash),
         _ => return,
     };
 
@@ -146,7 +154,7 @@ pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     fs::create_dir_all(&download_dir).await.expect("Creating download directory failed");
 
     //LOG
-    tx.send(ClientEvent::Download(filename.clone())).await.unwrap();
+    tx.send(ClientEvent::Download(uid, filename.clone(), size)).await.unwrap();
 
     //INIT COUNTERS
     let mut current_size = 0u64;
@@ -172,6 +180,9 @@ pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
             //UPDATE HASHER
             hasher.update(&data);
 
+            //REPORT PROGRESS
+            tx.try_send(ClientEvent::TransferProgress(uid, current_size)).ok();
+
             //CHECK IF DOWNLOADING FINISHED
             if current_size == size
             {
@@ -183,10 +194,10 @@ pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
                 //CHECK HASHES
                 tx.send(if hash == final_hash
                 {
-                    ClientEvent::Downloaded(filename)
+                    ClientEvent::Downloaded(uid, filename)
                 } else
                 {
-                    ClientEvent::DownloadFailed(filename)
+                    ClientEvent::DownloadFailed(uid, filename)
                 }).await.unwrap();
 
                 return;

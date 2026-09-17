@@ -116,6 +116,9 @@ pub enum Entry //ONE ROW OF HISTORY
         text: String,
     },
 
+    //A TRANSFER AND HOW FAR IT HAS GOT
+    Transfer(Transfer),
+
     //A PICTURE AND ITS CAPTION
     Image
     {
@@ -138,6 +141,17 @@ pub enum Picture
 }
 
 //STRUCTS
+pub struct Transfer //A FILE ON ITS WAY, IN OR OUT
+{
+    pub uid: u64,              //WHAT A PROGRESS TICK NAMES
+    pub upload: bool,          //WHICH WAY IT GOES
+    pub image: bool,           //WHAT TO CALL IT
+    pub filename: String,
+    pub done: u64,
+    pub total: u64,
+    pub outcome: Option<bool>, //None WHILE IT RUNS
+}
+
 pub struct Fitted //A PICTURE AT THE SIZE THE PANE DRAWS IT AT
 {
     pub frames: Animation,                  //THE PICTURE ITSELF, KEPT TO FIT AGAIN AT A NEW PANE WIDTH
@@ -387,6 +401,50 @@ impl App
         let picture = self.fit(image);
 
         self.push_entry(Entry::Image { username, filename, username_color, hash: None, picture });
+    }
+
+    //A TRANSFER STARTING
+    pub fn push_transfer(&mut self, uid: u64, filename: String, total: u64, upload: bool, image: bool)
+    {
+        self.push_entry(Entry::Transfer(Transfer { uid, upload, image, filename, done: 0, total, outcome: None }));
+    }
+
+    //MOVE A TRANSFER'S BAR ALONG
+    pub fn update_transfer(&mut self, uid: u64, done: u64)
+    {
+        let Some(transfer) = self.transfer(uid) else { return };
+
+        let before = percent(transfer.done, transfer.total);
+
+        transfer.done = done;
+
+        //THE ROW ONLY CHANGES WITH THE PERCENTAGE
+        if percent(done, transfer.total) == before { return; }
+
+        self.generation += 1;
+        self.dirty = true;
+    }
+
+    //A TRANSFER THAT ENDED, WELL OR NOT
+    pub fn finish_transfer(&mut self, uid: u64, ok: bool)
+    {
+        let Some(transfer) = self.transfer(uid) else { return };
+
+        transfer.done = transfer.total;
+        transfer.outcome = Some(ok);
+
+        self.generation += 1;
+        self.dirty = true;
+    }
+
+    //THE NEWEST ROW THAT TICK NAMES
+    fn transfer(&mut self, uid: u64) -> Option<&mut Transfer>
+    {
+        self.messages.iter_mut().rev().find_map(|entry| match entry
+        {
+            Entry::Transfer(transfer) if transfer.uid == uid => Some(transfer),
+            _ => None,
+        })
     }
 
     //A CAPTION WITHOUT ITS PICTURE
@@ -1011,6 +1069,16 @@ impl App
 }
 
 //FUNCTIONS
+//HOW FAR ALONG, IN WHOLE PERCENT
+pub fn percent(done: u64, total: u64) -> u64
+{
+    match total
+    {
+        0 => 100,
+        total => (done.min(total) * 100) / total,
+    }
+}
+
 //THE SIZE A PICTURE IS DRAWN AT, NEVER LARGER THAN IT IS
 fn fit_size(width: u32, height: u32, pane: u16, font: FontSize) -> (u32, u32)
 {
