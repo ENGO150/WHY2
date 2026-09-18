@@ -1109,6 +1109,43 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
       one unasked, straight behind the `Channel` packet) and on a lost session. A disconnect
       needs no `VoiceLeave`: `Leave` is broadcast to every channel and names the id, so the arm
       drops them itself — the same reason it maintains `App::online` by hand.
+  - **The typing indicator is a statement with a lifetime, not an event.** `TYPING_INTERVAL` (3s) is the
+    fastest a client re-states it and `TYPING_TIMEOUT` (6s) is how long a receiver believes it; the timeout
+    is deliberately twice the interval, so one dropped or throttled packet does not make the indicator
+    blink. Both live in `consts.rs` rather than in `tui/consts.rs` — the pair is protocol, and the two sides
+    only agree because the relationship holds.
+    - **The key handler never sends it.** `InputBuffer::revision` is bumped by every content-changing edit
+      and by nothing else (cursor motion, history recall and scrolling are not typing), `handle_terminal_event`
+      compares it across one key event and calls `App::typed`, and that only raises a flag. The redraw tick
+      is what sends, which coalesces a burst of forty keystrokes into one packet and keeps the socket off
+      the key path — the same reason `image_requests` exists, the event loop owning the write half and the
+      sequence counter. An overlay (the connect box, `/settings`, TOFU) never touches `App::input`, so the
+      revision cannot move while one of them owns the keyboard.
+    - **An empty line or a leading `/` is not a message**, and both *reset* `typing_sent` rather than merely
+      failing to set the flag: a command is not something to announce (`/pm` least of all, which would tell
+      a channel you are writing at one person), and clearing the line — which is what submitting does — has
+      to leave the next burst free to send at once instead of waiting out the interval it never used.
+    - **It is charged to the packet bucket like anything else.** At one per 3s it is nothing against
+      `max_packet_rate`, so it needs no exemption, and being charged is what bounds a client that lies about
+      the interval. `min_message_delay` does not reach it — that rule is `PacketCode::Message` alone.
+    - **The server re-states the interval rather than trusting it** (`Connection::last_typing`, the
+      `IMAGE_REQUEST_DELAY` pattern again, carried across a rekey and a channel switch for the same reason
+      `last_image` is). What that bounds is not the client's cost but the **amplification**: a typing notice
+      is fanned out to the whole channel with an independent REX encryption per recipient. It is dropped
+      rather than held — a notice served late is a lie about the present — and a muted user broadcasts none.
+      `send_to_others` excludes the sender, who does not need telling.
+    - **Stopping is mostly free.** The `Message` arm clears that username on arrival — a message from
+      somebody *is* the proof they stopped — `Leave` drops them like it drops the roster entry, and everything
+      else (an emptied line, a `/`) simply expires. An explicit stop packet would double the traffic for a
+      cosmetic gain.
+    - **It is drawn in the pane's bottom border, never as a line**, beside the toast and the unread badge:
+      it is not something that was said, and pushing it into `App::messages` would fight the wrap cache and
+      the scroll offset. `set_typing` sets `dirty` only for a *new* name and `expire_typing` only when the
+      set actually shrinks — a re-statement changes nothing on screen, and dirtying on it would repaint the
+      pane every three seconds per typist.
+    - `typing_indicator` gates **both directions** on the client (client.toml, default on, a `/settings` row):
+      somebody who does not want to broadcast it does not want to receive it either. The server's key of the
+      same name is live-read and refuses the broadcast outright.
   - Block-command output (`/list`, `/files`, `/screens`, `/help`, `/info`) is a tree, not a table:
     every row opens with `tui::branch` (`├─`/`╰─`, `│` continuing the trunk past a non-last owner's
     files in `/files`) in `theme::BORDER`, then a right-aligned dim id column, then the name. Keep
