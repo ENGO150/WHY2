@@ -182,6 +182,12 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         block = block.title_bottom(Span::styled(format!(" {notice} "), theme::OK));
     }
 
+    //AND WHOEVER IS WRITING
+    if let Some(typing) = app.typing_line()
+    {
+        block = block.title_bottom(Span::styled(format!(" {typing} "), theme::DIM));
+    }
+
     let inner = block.inner(area);
     frame.render_widget(block, area);
 

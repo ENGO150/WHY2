@@ -238,6 +238,7 @@ pub enum PacketCode //CONTROL CODES
         save: bool, //FALSE = READ ANSWER, TRUE = SAVE ACK
     },
 
+    Typing { username: String },                    //SERVER -> CLIENT | SOMEBODY IN THE CHANNEL IS WRITING
     Version { version: String },                    //SERVER <> CLIENT | THE SENDER'S PKG VERSION
     UsernameRequest,                                //SERVER -> CLIENT | PICK USERNAME
     LoginRequest,                                   //SERVER -> CLIENT | LOGIN
@@ -257,6 +258,7 @@ pub enum PacketCode //CONTROL CODES
     ImageDataRequest { hash: [u8; 32] },            //CLIENT -> SERVER | ASK FOR A STORED PICTURE
     FilesRequest,                                   //CLIENT -> SERVER | REQUEST FILE LIST
     ListRequest,                                    //CLIENT -> SERVER | REQUEST CONNECTED USERS
+    TypingRequest,                                  //CLIENT -> SERVER | WE ARE WRITING A MESSAGE
     ScreensRequest,                                 //CLIENT -> SERVER | REQUEST SCREENSHARE LIST
     DeattachRequest,                                //CLIENT -> SERVER | DEATTACH CLIENT SCREENSHARE
     ScreenRequest,                                  //CLIENT -> SERVER | TOGGLE SCREENSHARE
@@ -338,6 +340,8 @@ impl PacketCode
             Self::ServerSettingsSave { .. }    => "ServerSettingsSave",
             Self::ServerSettings { .. }        => "ServerSettings",
             Self::Colors { .. }                => "Colors",
+            Self::TypingRequest { .. }         => "TypingRequest",
+            Self::Typing { .. }                => "Typing",
             Self::Version { .. }               => "Version",
             Self::UsernameRequest { .. }       => "UsernameRequest",
             Self::Username { .. }              => "Username",

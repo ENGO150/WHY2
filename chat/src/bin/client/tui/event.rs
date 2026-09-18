@@ -83,7 +83,14 @@ impl App
             },
 
             //STORED UNRENDERED - App::theme MAKES THE LINE
-            ClientEvent::Message(message, username, id, colors) => self.push_message(username, id, message, colors),
+            ClientEvent::Message(message, username, id, colors) =>
+            {
+                //A MESSAGE IS THE PROOF THEY STOPPED
+                self.stopped_typing(&username);
+                self.push_message(username, id, message, colors);
+            },
+
+            ClientEvent::Typing(username) => self.set_typing(username),
 
             //A PICTURE IS AN ENTRY OF ITS OWN
             ClientEvent::ImageDisplay(username, filename, image, color) =>
@@ -213,6 +220,7 @@ impl App
 
                 self.online.retain(|user| user.id != id);
                 self.devices.remove(&uname);
+                self.stopped_typing(&uname);
 
                 //THE SERVER HAS NO GUESTS, SO A LEAVER IS A REGISTERED USER
                 if self.offline_listed { self.offline.insert(uname, color); }

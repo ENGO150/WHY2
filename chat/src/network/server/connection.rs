@@ -104,6 +104,7 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         last_activity: Instant,                                  //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
         last_key_exchange: Instant,                              //TIME OF LAST REKEY
         last_image: Instant,                                     //TIME OF LAST SERVED IMAGE FETCH
+        last_typing: Instant,                                    //TIME OF LAST FORWARDED TYPING NOTICE
         last_pm: Option<usize>,                                  //ID OF LAST PM SENDER
         spam_violations: usize,                                  //SPAM VIOLATIONS (unexpected, huh?)
         credit: f32,                                             //PACKET RATE TOKENS LEFT
@@ -269,6 +270,26 @@ impl Connection
         match self
         {
             Self::Authenticated { last_image, .. } => Some(last_image),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //GET LAST FORWARDED TYPING NOTICE
+    pub fn last_typing(&self) -> Option<&Instant>
+    {
+        match self
+        {
+            Self::Authenticated { last_typing, .. } => Some(last_typing),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
+    //GET LAST FORWARDED TYPING NOTICE AS MUTABLE
+    pub fn last_typing_mut(&mut self) -> Option<&mut Instant>
+    {
+        match self
+        {
+            Self::Authenticated { last_typing, .. } => Some(last_typing),
             Self::NonAuthenticated { .. } => None,
         }
     }

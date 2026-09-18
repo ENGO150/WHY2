@@ -97,6 +97,9 @@ pub const DEFAULT_FRAME_DELAY: Duration    = Duration::from_millis(100);        
 
 pub const IMAGE_REQUEST_DELAY: Duration    = Duration::from_millis(500);              //SPACING OF ONE CLIENT'S IMAGE FETCHES
 
+pub const TYPING_INTERVAL: Duration        = Duration::from_secs(3);                  //HOW OFTEN A WRITING CLIENT RESTATES IT
+pub const TYPING_TIMEOUT: Duration         = Duration::from_secs(6);                  //HOW LONG A RECEIVER BELIEVES IT
+
 pub const MAX_AUXILIARY_PACKET_SIZE: usize = UPLOAD_CHUNK_SIZE * 2;                   //FILE/SCREEN SIDE CHANNELS (2MB)
 pub const MAX_PACKET_CEILING: usize        = 16 * MEGABYTE;                           //ABSOLUTE CEILING WHEN SPAM PROTECTION IS OFF (16MB)
 

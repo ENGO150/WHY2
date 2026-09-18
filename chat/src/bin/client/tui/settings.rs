@@ -219,6 +219,9 @@ impl Settings
 
         rows.push(Row::Item(Item::client("Share device", "share_device", toggle_value("share_device", false))));
 
+        rows.push(Row::Item(Item::client("Typing indicator", "typing_indicator",
+            toggle_value("typing_indicator", false))));
+
         self.rows = rows;
         self.picker = None;
         self.open = true;

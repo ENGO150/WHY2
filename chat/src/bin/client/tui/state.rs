@@ -51,6 +51,7 @@ use ratatui_image::
 
 use crate::
 {
+    config,
     role::Role,
     options::{ self, LoginState },
     network::
@@ -232,6 +233,11 @@ pub struct App
     //A TOAST IN THE CHROME, WHICH EXPIRES
     pub notice: Option<(String, Instant)>,
 
+    //WHO IS WRITING IN OUR CHANNEL, AND WHEN THEY LAST SAID SO
+    pub typing_users: BTreeMap<String, Instant>,
+    typing: bool,                   //THE LINE CHANGED SINCE THE LAST TICK
+    typing_sent: Option<Instant>,   //WHEN WE LAST TOLD THE SERVER
+
     //REQUEST BOOKKEEPING
     pub list_requested: bool,
     #[cfg(feature = "client_screen")]
@@ -308,6 +314,9 @@ impl App
             pane_offset: 0,
             selection: None,
             notice: None,
+            typing_users: BTreeMap::new(),
+            typing: false,
+            typing_sent: None,
             list_requested: false,
             #[cfg(feature = "client_screen")]
             screens_requested: false,
@@ -689,6 +698,8 @@ impl App
         self.messages = self.panes.remove(&channel).unwrap_or_default();
         self.channel = channel;
 
+        self.typing_users.clear();
+
         self.wrapped = None;
         self.selection = None;
         self.scroll = None;
@@ -769,6 +780,10 @@ impl App
         self.voice_roster.clear();
         self.voice_activity.clear();
         self.voice_enabled = false;
+
+        self.typing_users.clear();
+        self.typing = false;
+        self.typing_sent = None;
 
         self.list_requested = false;
         #[cfg(feature = "client_screen")]
@@ -931,6 +946,77 @@ impl App
         {
             self.notice = None;
             self.dirty = true;
+        }
+    }
+
+    //TYPING
+    //THE LINE CHANGED - WE ARE WRITING A MESSAGE
+    pub fn typed(&mut self)
+    {
+        let text = self.input.text();
+        let text = text.trim_start();
+
+        //AN EMPTY LINE OR A COMMAND IS NOT A MESSAGE
+        if text.is_empty() || text.starts_with('/')
+        {
+            self.typing = false;
+            self.typing_sent = None;
+
+            return;
+        }
+
+        self.typing = config::read_config::<bool>("typing_indicator");
+    }
+
+    //WHETHER THE TICK OWES THE SERVER A TypingRequest
+    pub fn take_typing(&mut self) -> bool
+    {
+        if !mem::take(&mut self.typing) { return false; }
+
+        //ONE PER TYPING_INTERVAL, WHATEVER WAS TYPED
+        if self.typing_sent.is_some_and(|sent| sent.elapsed() < crate::consts::TYPING_INTERVAL) { return false; }
+
+        self.typing_sent = Some(Instant::now());
+
+        true
+    }
+
+    //SOMEBODY IN OUR CHANNEL IS WRITING
+    pub fn set_typing(&mut self, username: String)
+    {
+        if !config::read_config::<bool>("typing_indicator") { return; }
+
+        //A RESTATEMENT CHANGES NOTHING ON SCREEN
+        if self.typing_users.insert(username, Instant::now()).is_none() { self.dirty = true; }
+    }
+
+    //A MESSAGE IS THE PROOF THEY STOPPED
+    pub fn stopped_typing(&mut self, username: &str)
+    {
+        if self.typing_users.remove(username).is_some() { self.dirty = true; }
+    }
+
+    //DROP WHOEVER HAS NOT RESTATED IT
+    pub fn expire_typing(&mut self)
+    {
+        let before = self.typing_users.len();
+
+        self.typing_users.retain(|_, seen| seen.elapsed() < crate::consts::TYPING_TIMEOUT);
+
+        if self.typing_users.len() != before { self.dirty = true; }
+    }
+
+    //WHAT THE PANE'S BORDER SAYS ABOUT IT
+    pub fn typing_line(&self) -> Option<String>
+    {
+        let names: Vec<&str> = self.typing_users.keys().map(String::as_str).collect();
+
+        match names.as_slice()
+        {
+            [] => None,
+            [one] => Some(format!("{one} is typing…")),
+            [one, two] => Some(format!("{one} and {two} are typing…")),
+            _ => Some(format!("{} people are typing…", names.len())),
         }
     }
 

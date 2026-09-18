@@ -49,3 +49,4 @@ render_math = true # Render $math$ and $$math$$ in messages
 
 # Privacy
 share_device = false # Tell others which client you are using (TUI, Desktop, Phone)
+typing_indicator = true # Tell the channel while you are writing a message, and show when others are

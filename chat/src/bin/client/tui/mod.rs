@@ -341,7 +341,15 @@ pub async fn run
                     }
                 }
 
+                //TELL THE CHANNEL WE ARE WRITING
+                if app.take_typing() && let Some(write_stream) = write_stream.as_ref()
+                {
+                    network::send(&mut *write_stream.lock().await,
+                        PacketCode::TypingRequest, options::get_keys().as_ref()).await;
+                }
+
                 app.expire_notice();
+                app.expire_typing();
 
                 if app.dirty
                 {
@@ -419,7 +427,12 @@ async fn handle_terminal_event
         {
             if key.kind == KeyEventKind::Release { return; }
 
+            let revision = app.input.revision();
+
             handle_key(app, key, write_stream, connect_tx, message_viewport(terminal)).await;
+
+            //A CHANGED LINE IS SOMEBODY WRITING
+            if app.input.revision() != revision { app.typed(); }
         },
 
         Event::Mouse(mouse) =>
@@ -496,6 +509,7 @@ async fn handle_terminal_event
             {
                 app.input.insert_str(&text);
                 app.palette.update(&app.input.text(), app.role);
+                app.typed();
             }
 
             app.dirty = true;

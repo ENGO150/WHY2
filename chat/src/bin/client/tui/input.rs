@@ -29,6 +29,7 @@ pub struct InputBuffer //MULTI-LINE INPUT BUFFER
     history_pos: usize,
     stash: Option<String>, //IN-PROGRESS LINE PARKED WHILE PAGING HISTORY
     prefix: Option<String>, //PREFIX THE SEARCH IS LOCKED TO (NEVER A COMMAND)
+    revision: u64,          //BUMPED BY EVERY EDIT OF THE LINE
 }
 
 //IMPLEMENTATIONS
@@ -41,19 +42,22 @@ impl InputBuffer
 {
     pub fn new() -> Self
     {
-        Self { chars: Vec::new(), cursor: 0, history: Vec::new(), history_pos: 0, stash: None, prefix: None }
+        Self { chars: Vec::new(), cursor: 0, history: Vec::new(), history_pos: 0, stash: None, prefix: None, revision: 0 }
     }
 
     //QUERIES
     pub fn is_empty(&self) -> bool { self.chars.is_empty() }
     pub fn text(&self) -> String { self.chars.iter().collect() }
     pub fn cursor(&self) -> usize { self.cursor }
+    pub fn revision(&self) -> u64 { self.revision }
 
     //EDITING
     pub fn insert(&mut self, c: char)
     {
         self.chars.insert(self.cursor, c);
         self.cursor += 1;
+
+        self.revision += 1;
     }
 
     pub fn insert_str(&mut self, text: &str)
@@ -67,12 +71,19 @@ impl InputBuffer
         {
             self.cursor -= 1;
             self.chars.remove(self.cursor);
+
+            self.revision += 1;
         }
     }
 
     pub fn delete(&mut self)
     {
-        if self.cursor < self.chars.len() { self.chars.remove(self.cursor); }
+        if self.cursor < self.chars.len()
+        {
+            self.chars.remove(self.cursor);
+
+            self.revision += 1;
+        }
     }
 
     pub fn delete_word(&mut self) //CTRL+W
@@ -80,6 +91,8 @@ impl InputBuffer
         let start = self.word_start();
         self.chars.drain(start..self.cursor);
         self.cursor = start;
+
+        self.revision += 1;
     }
 
     pub fn kill_to_start(&mut self) //CTRL+U
@@ -87,12 +100,16 @@ impl InputBuffer
         let start = self.line_start();
         self.chars.drain(start..self.cursor);
         self.cursor = start;
+
+        self.revision += 1;
     }
 
     pub fn kill_to_end(&mut self) //CTRL+K
     {
         let end = self.line_end();
         self.chars.drain(self.cursor..end);
+
+        self.revision += 1;
     }
 
     //MOTION
@@ -218,6 +235,8 @@ impl InputBuffer
     {
         self.chars.clear();
         self.cursor = 0;
+
+        self.revision += 1;
     }
 
     pub fn take(&mut self) -> String //COLLECT AND CLEAR

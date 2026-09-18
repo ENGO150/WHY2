@@ -141,6 +141,7 @@ pub enum ClientEvent
     ChannelChanged(Option<String>),                              //WE SWITCHED CHANNEL
     ChannelCreated(String),                                      //CHANNEL CREATED
     ChannelDestroyed(String),                                    //CHANNEL ABANDONED
+    Typing(String),                                              //SOMEBODY IN OUR CHANNEL IS WRITING
     Muted,                                                       //HAHA
     InvalidUsage,                                                //INVALID COMMAND USAGE
     VersionFailed,                                               //FETCHING VERSIONS FAILED
@@ -458,6 +459,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::ChannelDestroyed { name } =>
             {
                 tx.send(ClientEvent::ChannelDestroyed(name)).await.unwrap();
+            },
+
+            //SOMEBODY IS WRITING
+            PacketCode::Typing { username } =>
+            {
+                tx.send(ClientEvent::Typing(username)).await.unwrap();
             },
 
             //SERVER ALLOWED VOICE

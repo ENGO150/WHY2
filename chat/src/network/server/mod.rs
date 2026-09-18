@@ -267,6 +267,35 @@ pub fn send_to_all(code: PacketCode, filter_channel: bool, channel: Option<&str>
     }
 }
 
+pub fn send_to_others(code: PacketCode, channel: Option<&str>, except: usize) //SEND PACKET TO A CHANNEL, SENDER EXCLUDED
+{
+    //COLLECT EACH OTHER CLIENT IN SAME CHANNEL
+    let entries: Vec<Connection> = CONNECTIONS.iter().filter_map(|entry|
+    {
+        match entry.value()
+        {
+            Connection::Authenticated { channel: c, id, .. } if c.as_deref() == channel && *id != except =>
+            {
+                //FOUND, COLLECT
+                Some(entry.value().clone())
+            },
+            _ => None,
+        }
+    }).collect();
+
+    for ref entry in entries
+    {
+        let write_stream = entry.write_stream().clone();
+        let code = code.clone();
+        let keys = entry.keys().cloned();
+
+        tokio::spawn(async move
+        {
+            network::send(&mut *write_stream.lock().await, code, keys.as_ref()).await;
+        });
+    }
+}
+
 pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTION BY PEER ADDRESS
 {
     //REMOVE CONNECTION
@@ -414,7 +443,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
             },
 
             Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, device, role,
-                id, attached_screen, last_activity, last_image, last_pm, channel, seq, server_seq, peer_addr, alive,
+                id, attached_screen, last_activity, last_image, last_typing, last_pm, channel, seq, server_seq, peer_addr, alive,
                 muted, credit, refill, throttles, .. } =>
             {
                 Connection::Authenticated
@@ -433,6 +462,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     last_activity,
                     last_key_exchange: Instant::now(),
                     last_image,
+                    last_typing,
                     last_pm,
                     spam_violations: 0,
                     credit,
@@ -470,6 +500,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<D
             last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
             last_key_exchange: old_connection.last_key_exchange().copied().unwrap_or_else(Instant::now),
             last_image: Instant::now() - consts::IMAGE_REQUEST_DELAY,
+            last_typing: Instant::now() - consts::TYPING_INTERVAL,
             last_pm: old_connection.last_pm(),
             spam_violations: 0,
             credit: config::read_config::<f32>("max_packet_burst"),
@@ -515,6 +546,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             last_activity: Instant::now(),
             last_key_exchange: *old_connection.last_key_exchange().unwrap(),
             last_image: *old_connection.last_image().unwrap(),
+            last_typing: *old_connection.last_typing().unwrap(),
             last_pm: old_connection.last_pm(),
             spam_violations: *old_connection.spam_violations().unwrap(),
             credit: *old_connection.credit().unwrap(),
@@ -952,6 +984,41 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     colors,
                 }, true, channel.as_deref());
             }
+
+            //SOMEBODY IS WRITING
+            PacketCode::TypingRequest =>
+            {
+                //CHECK DISABLED FEATURE
+                if !config::read_config::<bool>("typing_indicator")
+                {
+                    log::debug!("Typing dropped (disabled): {peer_addr}");
+                    continue;
+                }
+
+                //SILENCE MUTED USERS
+                if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
+                {
+                    log::debug!("Typing dropped (muted): {peer_addr}");
+                    continue;
+                }
+
+                //ONE NOTICE PER TYPING_INTERVAL, WHATEVER THE CLIENT SENDS
+                let fresh = CONNECTIONS.get(&peer_addr)
+                    .and_then(|conn| conn.last_typing().map(|last| last.elapsed() >= consts::TYPING_INTERVAL))
+                    .unwrap_or_default(); //GUARD DROPPED HERE
+
+                if !fresh
+                {
+                    log::debug!("Typing dropped (too soon): {peer_addr}");
+                    continue;
+                }
+
+                if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
+                    && let Some(last) = conn.last_typing_mut() { *last = Instant::now(); }
+
+                //SEND NOTICE TO THE REST OF THE CHANNEL
+                send_to_others(PacketCode::Typing { username: username.clone() }, channel.as_deref(), id);
+            },
 
             //CLIENT QUITS
             PacketCode::Disconnect =>
