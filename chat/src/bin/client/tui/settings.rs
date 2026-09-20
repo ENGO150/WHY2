@@ -26,7 +26,7 @@ use crossterm::event::
 use why2_chat::
 {
     config,
-    network::codes::{ ServerSetting, SettingValue },
+    network::codes::{ ServerSetting, SettingValue, UserProfile },
 };
 
 #[cfg(feature = "client_voice")]
@@ -42,6 +42,13 @@ use super::
 };
 
 //ENUMS
+pub enum Mode //WHAT THE BOX IS SHOWING
+{
+    Client,                  //client.toml, WRITTEN THROUGH ON EVERY EDIT
+    Server,                  //server.toml, HELD UNTIL Save
+    Profile { own: bool },   //A USER PROFILE | own = OURS, SO EDITABLE
+}
+
 pub enum Value
 {
     //A CONFIG KEY, invert FOR A NEGATIVE ONE
@@ -104,7 +111,7 @@ pub struct Devices //WHAT cpal REPORTED, ENUMERATED ONCE WHEN /settings IS TYPED
     pub output: Vec<DeviceEntry>,
 }
 
-pub struct Settings //THE /settings OVERLAY, IN EITHER OF ITS TWO MODES
+pub struct Settings //THE /settings OVERLAY, IN ANY OF ITS MODES
 {
     pub open: bool,
     pub rows: Vec<Row>,
@@ -115,12 +122,15 @@ pub struct Settings //THE /settings OVERLAY, IN EITHER OF ITS TWO MODES
     pub offset: usize,
     pub page: usize, //ROWS THE LAST FRAME FIT
 
-    //server.toml's ROWS, SAVED IN ONE GO
-    pub server: bool,
+    pub mode: Mode,
+    pub subject: String,      //WHOSE PROFILE, IN Profile MODE
+
+    //THE MODES THAT SAVE IN ONE GO
     pub edit: Option<String>, //WHAT IS BEING TYPED INTO THE SELECTED ROW
     pub saving: bool,         //A SAVE IS ON THE WIRE
 
     save: Option<Vec<ServerSetting>>, //ROWS THE EVENT LOOP STILL HAS TO PUT ON THE WIRE
+    profile: Option<UserProfile>,     //AND THE PROFILE, THE SAME WAY
 
     //THE STARTUP-ONLY KEYS IN THAT SAVE
     pub restart_note: Option<String>,
@@ -159,10 +169,12 @@ impl Settings
             picker: None,
             offset: 0,
             page: 0,
-            server: false,
+            mode: Mode::Client,
+            subject: String::new(),
             edit: None,
             saving: false,
             save: None,
+            profile: None,
             restart_note: None,
             confirm: false,
             restart: false,
@@ -225,7 +237,7 @@ impl Settings
         self.rows = rows;
         self.picker = None;
         self.open = true;
-        self.server = false;
+        self.mode = Mode::Client;
         self.edit = None;
         self.saving = false;
         self.selected = 0;
@@ -279,7 +291,7 @@ impl Settings
         self.rows = rows;
         self.picker = None;
         self.open = true;
-        self.server = true;
+        self.mode = Mode::Server;
         self.edit = None;
         self.saving = false;
         self.confirm = false;
@@ -289,12 +301,40 @@ impl Settings
         self.step(1);
     }
 
+    //SOMEBODY'S PROFILE - OURS TO EDIT, OR THEIRS TO READ
+    pub fn open_profile(&mut self, username: String, profile: UserProfile, own: bool)
+    {
+        let mut rows = vec![Row::Item(Item
+        {
+            label: String::from("Description"),
+            key: String::from("bio"),
+            value: Value::Text(profile.bio),
+            hint: String::new(),
+            changed: false,
+            restart: false,
+        })];
+
+        //NOTHING LEAVES THIS BOX UNTIL THIS IS PRESSED
+        if own { rows.push(Row::Action(consts::SAVE_LABEL)); }
+
+        self.rows = rows;
+        self.picker = None;
+        self.open = true;
+        self.mode = Mode::Profile { own };
+        self.subject = username;
+        self.edit = None;
+        self.saving = false;
+        self.confirm = false;
+        self.selected = 0;
+        self.offset = 0;
+    }
+
     pub fn close(&mut self)
     {
         self.open = false;
         self.picker = None;
         self.edit = None;
-        self.server = false;
+        self.mode = Mode::Client;
         self.saving = false;
         self.confirm = false;
         self.rows = Vec::new();
@@ -302,13 +342,28 @@ impl Settings
         self.page = 0;
     }
 
+    pub fn server(&self) -> bool { matches!(self.mode, Mode::Server) } //server.toml's ROWS
+
+    pub fn profile(&self) -> bool { matches!(self.mode, Mode::Profile { .. }) } //SOMEBODY'S PROFILE
+
+    pub fn readonly(&self) -> bool { matches!(self.mode, Mode::Profile { own: false }) } //A PROFILE THAT IS NOT OURS
+
+    //A MODE WHOSE ROWS ARE HELD UNTIL Save
+    pub fn deferred(&self) -> bool { matches!(self.mode, Mode::Server | Mode::Profile { own: true }) }
+
     pub fn title(&self) -> String //WHAT THE BOX CALLS ITSELF
     {
-        if !self.server { return String::from(" Settings "); }
+        let name = match self.mode
+        {
+            Mode::Client => return String::from(" Settings "),
+            Mode::Server => String::from("Server settings"),
+            Mode::Profile { own: true } => String::from("Your profile"),
+            Mode::Profile { own: false } => format!("{}'s profile", self.subject),
+        };
 
-        if self.saving { return String::from(" Server settings · saving… "); }
+        if self.saving { return format!(" {name} · saving… "); }
 
-        if self.unsaved() { String::from(" Server settings · unsaved ") } else { String::from(" Server settings ") }
+        if self.unsaved() { format!(" {name} · unsaved ") } else { format!(" {name} ") }
     }
 
     pub fn unsaved(&self) -> bool //A ROW HAS BEEN EDITED AND NOT SENT BACK YET
@@ -318,6 +373,9 @@ impl Settings
 
     //THE ROWS THE EVENT LOOP STILL HAS TO SEND
     pub fn take_save(&mut self) -> Option<Vec<ServerSetting>> { self.save.take() }
+
+    //AND THE PROFILE THE SAME
+    pub fn take_profile_save(&mut self) -> Option<UserProfile> { self.profile.take() }
 
     //AND A CONFIRMED RESTART
     pub fn take_restart(&mut self) -> bool { std::mem::take(&mut self.restart) }
@@ -334,6 +392,15 @@ impl Settings
 
         //THE ROW LANDED ON MAY BE A HEADING NOW
         if matches!(self.rows.get(self.selected), Some(Row::Header(_))) { self.step(1); }
+    }
+
+    //TAKE THE SAVED PROFILE, KEEPING THE SELECTION
+    pub fn stored_profile(&mut self, username: String, profile: UserProfile)
+    {
+        let selected = self.selected;
+
+        self.open_profile(username, profile, true);
+        self.selected = selected.min(self.rows.len().saturating_sub(1));
     }
 
     //MOVE THE SELECTION, SKIPPING HEADERS
@@ -459,7 +526,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
     if !matches!(key.code, KeyCode::Enter | KeyCode::Char(' ')) { app.settings.confirm = false; }
 
     //Ctrl+S SAVES FROM ANY ROW
-    if app.settings.server && key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('s')
+    if app.settings.deferred() && key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('s')
     {
         save(app);
         return;
@@ -655,6 +722,8 @@ fn selected(app: &App) -> Option<Selected>
 //LEFT/RIGHT: SLIDE, FLIP, STEP OR CYCLE A ROW
 fn adjust(app: &mut App, direction: i32)
 {
+    if app.settings.readonly() { return; }
+
     let row = app.settings.selected;
 
     match selected(app)
@@ -714,6 +783,8 @@ fn adjust(app: &mut App, direction: i32)
 //ENTER/SPACE: FLIP, TYPE, PRESS OR OPEN A ROW
 fn activate(app: &mut App)
 {
+    if app.settings.readonly() { return; }
+
     let _row = app.settings.selected; //ONLY THE AUDIO ROWS NEED TO KNOW WHICH ROW THEY ARE
 
     match selected(app)
@@ -751,7 +822,7 @@ fn activate(app: &mut App)
 //ARM THE RESTART, THEN FIRE IT
 fn restart(app: &mut App)
 {
-    if !app.settings.server || app.settings.saving || app.settings.unsaved() { return; }
+    if !app.settings.server() || app.settings.saving || app.settings.unsaved() { return; }
 
     //THE FIRST PRESS ONLY ARMS IT
     if !app.settings.confirm
@@ -769,7 +840,9 @@ fn restart(app: &mut App)
 //HAND THE EDITED ROWS TO THE EVENT LOOP
 fn save(app: &mut App)
 {
-    if !app.settings.server { return; }
+    if app.settings.profile() { return save_profile(app); }
+
+    if !app.settings.server() { return; }
 
     let changed: Vec<ServerSetting> = app.settings.rows.iter().filter_map(|row|
     {
@@ -812,9 +885,29 @@ fn save(app: &mut App)
     app.settings.save = Some(changed);
 }
 
+//HAND THE EDITED DESCRIPTION TO THE EVENT LOOP
+fn save_profile(app: &mut App)
+{
+    if !app.settings.unsaved() { return; }
+
+    let bio = app.settings.rows.iter().find_map(|row| match row
+    {
+        Row::Item(item) => match &item.value
+        {
+            Value::Text(text) => Some(text.clone()),
+            _ => None,
+        },
+
+        _ => None,
+    }).unwrap_or_default();
+
+    app.settings.saving = true;
+    app.settings.profile = Some(UserProfile { bio });
+}
+
 fn toggle(app: &mut App)
 {
-    let server = app.settings.server;
+    let deferred = app.settings.deferred();
 
     //FLIP THE ROW, THEN LET GO OF IT
     let changed = match app.settings.rows.get_mut(app.settings.selected)
@@ -825,7 +918,7 @@ fn toggle(app: &mut App)
             {
                 let (next, invert) = (!*on, *invert);
                 item.value = Value::Toggle { on: next, invert };
-                item.changed = item.changed || server;
+                item.changed = item.changed || deferred;
 
                 Some((item.key.clone(), next, invert))
             },
@@ -840,7 +933,7 @@ fn toggle(app: &mut App)
     let Some((key, next, invert)) = changed else { return };
 
     //A SERVER ROW GOES BACK OVER THE WIRE ON Save
-    if server { return; }
+    if deferred { return; }
 
     config::client_write_bool(&key, if invert { !next } else { next });
 

@@ -238,6 +238,17 @@ pub enum PacketCode //CONTROL CODES
         save: bool, //FALSE = READ ANSWER, TRUE = SAVE ACK
     },
 
+    //SERVER -> CLIENT | ONE USER'S PROFILE
+    Profile
+    {
+        username: String,
+        profile: UserProfile,
+        own: bool,  //OURS, SO EDITABLE
+        save: bool, //FALSE = READ ANSWER, TRUE = SAVE ACK
+    },
+
+    ProfileRequest { target: Option<String> },      //CLIENT -> SERVER | READ A PROFILE | None = OUR OWN
+    ProfileSave { profile: UserProfile },           //CLIENT -> SERVER | WRITE OUR OWN PROFILE
     Typing { username: String },                    //SERVER -> CLIENT | SOMEBODY IN THE CHANNEL IS WRITING
     Version { version: String },                    //SERVER <> CLIENT | THE SENDER'S PKG VERSION
     UsernameRequest,                                //SERVER -> CLIENT | PICK USERNAME
@@ -340,6 +351,9 @@ impl PacketCode
             Self::ServerSettingsSave { .. }    => "ServerSettingsSave",
             Self::ServerSettings { .. }        => "ServerSettings",
             Self::Colors { .. }                => "Colors",
+            Self::ProfileRequest { .. }        => "ProfileRequest",
+            Self::ProfileSave { .. }           => "ProfileSave",
+            Self::Profile { .. }               => "Profile",
             Self::TypingRequest { .. }         => "TypingRequest",
             Self::Typing { .. }                => "Typing",
             Self::Version { .. }               => "Version",
@@ -412,6 +426,13 @@ pub enum SettingValue
     Toggle(bool),
     Number(i64),
     Text(String),
+}
+
+//ONE USER'S PROFILE AS server_users.toml KEEPS IT
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq, Default)]
+pub struct UserProfile
+{
+    pub bio: String, //WHAT THE USER SAYS ABOUT THEMSELVES
 }
 
 //ONE MESSAGE AS server_messages.bin KEEPS IT

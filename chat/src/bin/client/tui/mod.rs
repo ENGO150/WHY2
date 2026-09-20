@@ -569,7 +569,7 @@ async fn handle_key
     if app.settings.open
     {
         //Ctrl+S BELONGS TO THE SERVER ROWS
-        if control && settings_shortcut(key.code) && !(app.settings.server && key.code == KeyCode::Char('s'))
+        if control && settings_shortcut(key.code) && !(app.settings.deferred() && key.code == KeyCode::Char('s'))
         {
             app.settings.close();
         } else
@@ -600,6 +600,19 @@ async fn handle_key
                     app.settings.saving = false;
                     app.settings.restart_note = None;
                 },
+            }
+        }
+
+        //A SAVED PROFILE GOES OUT THE SAME WAY
+        if let Some(profile) = app.settings.take_profile_save()
+        {
+            match write_stream
+            {
+                Some(write_stream) => network::send(&mut *write_stream.lock().await,
+                    PacketCode::ProfileSave { profile }, options::get_keys().as_ref()).await,
+
+                //NOTHING WENT OUT, SO THE ROW STAYS EDITABLE
+                None => app.settings.saving = false,
             }
         }
 

@@ -28,15 +28,27 @@ use crate::
     colors,
     consts,
     role::Role,
-    network::codes::MessageColors,
+    network::codes::
+    {
+        MessageColors,
+        UserProfile,
+    },
 };
 
 const COLOR_KEYS: [&str; 2] = ["username_color", "message_color"]; //THE COLORS AS server_users.toml SPELLS THEM
+const PROFILE_TABLE: &str = "profile";        //THE SUBTABLE A PROFILE SITS IN, APART FROM THE CREDENTIALS
+const PROFILE_KEYS: [&str; 1] = ["bio"];      //THE PROFILE AS server_users.toml SPELLS IT
 
 fn user_field(username: &str, key: &str) -> Option<String> //READ ONE FIELD OF username
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(username)?
         .as_table_like()?.get(key)?.as_str().map(str::to_string))
+}
+
+fn profile_field(username: &str, key: &str) -> Option<String> //READ ONE PROFILE FIELD OF username
+{
+    super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(username)?
+        .as_table_like()?.get(PROFILE_TABLE)?.as_table_like()?.get(key)?.as_str().map(str::to_string))
 }
 
 fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD OF username TO server_users.toml
@@ -53,6 +65,31 @@ fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD O
 
         users.get_mut(username).and_then(Item::as_table_like_mut)
             .expect("User entry is not a table").insert(key, Item::Value(value));
+    });
+}
+
+fn write_profile_field(username: &str, key: &str, value: Value) //WRITE ONE PROFILE FIELD TO server_users.toml
+{
+    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
+    {
+        let users = doc.as_table_mut();
+
+        //A MISSING OR FLAT ENTRY BECOMES A SUBTABLE
+        if users.get(username).and_then(Item::as_table_like).is_none()
+        {
+            users.insert(username, Item::Table(Table::new()));
+        }
+
+        let user = users.get_mut(username).and_then(Item::as_table_like_mut).expect("User entry is not a table");
+
+        //AND SO DOES A MISSING PROFILE
+        if user.get(PROFILE_TABLE).and_then(Item::as_table_like).is_none()
+        {
+            user.insert(PROFILE_TABLE, Item::Table(Table::new()));
+        }
+
+        user.get_mut(PROFILE_TABLE).and_then(Item::as_table_like_mut)
+            .expect("Profile entry is not a table").insert(key, Item::Value(value));
     });
 }
 
@@ -88,6 +125,19 @@ pub fn colors(username: &str) -> MessageColors //RETURN COLORS OF username
     }
 }
 
+pub fn profile(username: &str) -> UserProfile //RETURN PROFILE OF username
+{
+    UserProfile
+    {
+        bio: profile_field(username, "bio").unwrap_or_default(),
+    }
+}
+
+pub fn set_profile(username: &str, profile: &UserProfile) //STORE username's PROFILE
+{
+    write_profile_field(username, "bio", profile.bio.as_str().into());
+}
+
 //STORE ONE OF username's COLORS, BY NAME
 pub fn set_color(username: &str, username_color: bool, code: u8)
 {
@@ -108,8 +158,9 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
     write_user_field(username, "password", hash.into()); //PASSWORD
     set_role(username, if first_user { Role::Owner } else { Role::User }); //ROLE (OWNER IF THIS IS THE FIRST USER)
 
-    //NO COLORS YET, BUT THE KEYS ARE THERE
+    //NO COLORS OR PROFILE YET, BUT THE KEYS ARE THERE
     for key in COLOR_KEYS { write_user_field(username, key, colors::NONE.into()); }
+    for key in PROFILE_KEYS { write_profile_field(username, key, "".into()); }
 
     first_user
 }
@@ -119,7 +170,7 @@ pub fn contains(key: &str) -> bool //CHECK IF server_users.toml contains
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(key).is_some())
 }
 
-pub fn migrate() //MIGRATE COLORS (will be removed with next version bump)
+pub fn migrate() //MIGRATE COLORS AND PROFILES (will be removed with next version bump)
 {
     super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
     {
@@ -130,6 +181,19 @@ pub fn migrate() //MIGRATE COLORS (will be removed with next version bump)
             for key in COLOR_KEYS
             {
                 if user.get(key).is_none() { user.insert(key, Item::Value(colors::NONE.into())); }
+            }
+
+            //THE PROFILE IS A SUBTABLE OF ITS OWN
+            if user.get(PROFILE_TABLE).and_then(Item::as_table_like).is_none()
+            {
+                user.insert(PROFILE_TABLE, Item::Table(Table::new()));
+            }
+
+            let Some(profile) = user.get_mut(PROFILE_TABLE).and_then(Item::as_table_like_mut) else { continue };
+
+            for key in PROFILE_KEYS
+            {
+                if profile.get(key).is_none() { profile.insert(key, Item::Value("".into())); }
             }
         }
     });

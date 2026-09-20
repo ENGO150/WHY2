@@ -70,6 +70,7 @@ pub enum Command
     PrivateMessage,                             //ONE TO ONE MESSAGE
     Re,                                         //REPLY TO PRIVATE MESSAGE
     Settings,                                   //OPEN THE SETTINGS OVERLAY
+    Profile,                                    //OPEN A USER PROFILE
     Server,                                     //MODERATION ACTIONS (TAKES A SUBCOMMAND)
     UsernameColor,                              //SET COLOR OF USERNAME
     MessageColor,                               //SET COLOR OF MESSAGE
@@ -607,6 +608,26 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Profile,
+        triggers: &[ "PROFILE", "BIO", "ABOUT" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args:
+        &[
+            CommandArg
+            {
+                name: "USER",
+                description: "Username or ID, nobody for your own",
+                required: false,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Opens a user profile",
+    },
+
+    CommandInfo
+    {
         command: Command::UsernameColor,
         triggers: &[ "UCOLOR", "USERNAME" ],
         shortcut: None,
@@ -784,6 +805,13 @@ impl Command
             },
 
             Command::Channel => Some(Ok(PacketCode::Channel { channel: parameters.map(str::to_string) })),
+
+            //THE SERVER OPENS THE BOX, SINCE IT DECIDES WHAT WE MAY SEE
+            Command::Profile => Some(Ok(PacketCode::ProfileRequest
+            {
+                target: parameters.map(str::trim).filter(|target| !target.is_empty()).map(str::to_string),
+            })),
+
             Command::List => Some(Ok(PacketCode::ListRequest)),
             Command::Files => Some(Ok(PacketCode::FilesRequest)),
 

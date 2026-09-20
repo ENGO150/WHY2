@@ -85,6 +85,7 @@ use crate::
             OnlineUser,
             OfflineUser,
             StoredMessage,
+            UserProfile,
             UserFile,
             UserScreen,
             Device,
@@ -98,6 +99,19 @@ pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::ne
 pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
+fn resolve_user(target: &str) -> Option<String> //WHOSE PROFILE: A USERNAME, OR THE ID OF A SESSION THEY HAVE OPEN
+{
+    if users::contains(target) { return Some(target.to_string()); }
+
+    let id = target.parse::<usize>().ok()?;
+    CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&id)).and_then(|entry| entry.username().cloned())
+}
+
+fn clean(text: &str) -> String //WHAT A CLIENT MAY PUT IN A PROFILE
+{
+    text.chars().filter(|character| !character.is_control()).collect::<String>().trim().to_string()
+}
+
 async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &SocketAddr, keys: &SharedKeys) //SEND LIST OF USERS
 {
     let mut users = Vec::new();
@@ -1674,6 +1688,74 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 {
                     username: username_color,
                     color,
+                }, Some(&keys)).await;
+            },
+
+            //A PROFILE, ASKED FOR OR WRITTEN
+            PacketCode::ProfileRequest { .. } | PacketCode::ProfileSave { .. } =>
+            {
+                //CHECK DISABLED FEATURE
+                if !config::read_config::<bool>("profiles")
+                {
+                    log::warn!("Refused (profiles disabled): {peer_addr}");
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidFeature, Some(&keys)).await;
+                    continue;
+                }
+
+                //ONLY OUR OWN IS EVER WRITTEN
+                let save = matches!(read, PacketCode::ProfileSave { .. });
+
+                //WHOSE PROFILE IS BEING READ
+                let target = match &read
+                {
+                    PacketCode::ProfileRequest { target: Some(target) } => match resolve_user(target)
+                    {
+                        Some(found) => found,
+                        None =>
+                        {
+                            log::warn!("Profile refused (no such user): {peer_addr}");
+
+                            network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                            continue;
+                        },
+                    },
+
+                    _ => username.clone(),
+                };
+
+                //STORE WHAT A SAVE BROUGHT
+                if let PacketCode::ProfileSave { profile } = &read
+                {
+                    //BIO LIMITS
+                    let bio = clean(&profile.bio);
+                    let length = bio.chars().count();
+                    let limit = config::read_config::<usize>("max_profile_bio");
+
+                    //CHECK MAX BIO LENGTH
+                    if length > limit
+                    {
+                        log::warn!("Profile refused ({length} chars, limit {limit}): {peer_addr}");
+                        network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    } else
+                    {
+                        log::info!("Profile saved ({length} chars): {peer_addr}");
+                        users::set_profile(&username, &UserProfile { bio });
+                    }
+                } else
+                {
+                    log::info!("Profile read ({}): {peer_addr}", if target == username { "own" } else { "peer" });
+                }
+
+                //THE WHOLE PROFILE COMES BACK, SO A REFUSED DESCRIPTION SNAPS BACK
+                let own = target == username;
+
+                network::send(&mut *streams.1.lock().await, PacketCode::Profile
+                {
+                    profile: users::profile(&target),
+                    username: target,
+                    own,
+                    save,
                 }, Some(&keys)).await;
             },
 

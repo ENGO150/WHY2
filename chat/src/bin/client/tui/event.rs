@@ -352,12 +352,34 @@ impl App
                     //A REFUSED ROW SNAPS BACK
                     true =>
                     {
-                        if self.settings.open && self.settings.server { self.settings.stored(settings); }
+                        if self.settings.open && self.settings.server() { self.settings.stored(settings); }
 
                         self.push_styled("Server settings saved.", theme::OK);
                     },
 
                     false => self.settings.open_server(settings),
+                }
+
+                self.dirty = true;
+            },
+
+            //A PROFILE CAME BACK
+            ClientEvent::Profile(username, profile, own, saved) =>
+            {
+                match saved
+                {
+                    //A REFUSED DESCRIPTION SNAPS BACK
+                    true =>
+                    {
+                        if self.settings.open && self.settings.profile()
+                        {
+                            self.settings.stored_profile(username, profile);
+                        }
+
+                        self.push_styled("Profile saved.", theme::OK);
+                    },
+
+                    false => self.settings.open_profile(username, profile, own),
                 }
 
                 self.dirty = true;

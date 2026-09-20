@@ -73,6 +73,7 @@ use super::
     },
     settings::
     {
+        Mode,
         Row,
         Value,
         Settings,
@@ -849,12 +850,18 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 
     frame.buffer_mut().set_style(popup, theme::TEXT);
 
-    let hint = match (&state.picker, state.edit.is_some(), state.server)
+    let hint = match (state.picker.is_some(), state.edit.is_some())
     {
-        (Some(_), ..) => " ↑↓ select │ ⏎ apply │ Esc back ",
-        (None, true, _) => " type a value │ ⏎ keep │ Esc cancel ",
-        (None, false, true) => " ↑↓ move │ ←→ change │ ⏎ edit │ ^S save │ Esc close ",
-        (None, false, false) => " ↑↓ move │ ←→ change │ ⏎ select │ Esc close ",
+        (true, _) => " ↑↓ select │ ⏎ apply │ Esc back ",
+        (_, true) => " type a value │ ⏎ keep │ Esc cancel ",
+
+        _ => match state.mode
+        {
+            Mode::Client => " ↑↓ move │ ←→ change │ ⏎ select │ Esc close ",
+            Mode::Server => " ↑↓ move │ ←→ change │ ⏎ edit │ ^S save │ Esc close ",
+            Mode::Profile { own: true } => " ↑↓ move │ ⏎ edit │ ^S save │ Esc close ",
+            Mode::Profile { own: false } => " Esc close ",
+        },
     };
 
     let block = Block::bordered()
@@ -1114,7 +1121,19 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
             else if state.confirm { spans.push(Span::styled(" \u{b7} press again to confirm", theme::ERROR)); }
         },
 
+        Row::Action(_) if state.profile() =>
+            spans.push(Span::styled("Send the description to the server.", theme::DIM)),
+
         Row::Action(_) => spans.push(Span::styled("Send the edited rows to the server.", theme::DIM)),
+
+        //A DESCRIPTION IS PROSE, SO THE FOOT IS WHERE IT IS READ
+        Row::Item(item) if state.profile() => match &item.value
+        {
+            Value::Text(bio) if bio.is_empty() => spans.push(Span::styled("No description.", theme::DIM)),
+            Value::Text(bio) => spans.push(Span::styled(bio.clone(), theme::TEXT)),
+
+            _ => {},
+        },
 
         Row::Item(item) =>
         {

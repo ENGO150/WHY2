@@ -66,3 +66,7 @@ log_level = "info" # Log verbosity: off, error, warn, info, debug or trace (debu
 # History
 persistent_messages = false # Keep lobby messages on disk (encrypted) and send them to every client on login
 max_persistent_messages = 100000 # Number of lobby messages kept (the oldest go as new ones arrive)
+
+# Profiles
+profiles = true # Allow users to keep a profile others can look up
+max_profile_bio = 128 # Maximal length of a profile description

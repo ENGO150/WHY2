@@ -75,6 +75,7 @@ use crate::
             UserScreen,
             Device,
             ServerSetting,
+            UserProfile,
             BanEntry,
         },
     },
@@ -154,6 +155,7 @@ pub enum ClientEvent
     VoiceDisabled,                                               //VOICE CHAT DISABLED
     List(Vec<OnlineUser>, Option<Vec<OfflineUser>>),             //LIST OF USERS, CONNECTED AND NOT
     ServerSettings(Vec<ServerSetting>, bool),                    //server.toml AS THE SERVER HOLDS IT
+    Profile(String, UserProfile, bool, bool),                    //A PROFILE (WHOSE, IT, OURS, A SAVE ACK)
     Colors,                                                      //A /color LANDED ON THE SERVER
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
     Upload(u64, String, u64),                                    //UPLOADING FILE (UID, NAME, SIZE)
@@ -552,6 +554,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::ServerSettings { settings, save } =>
             {
                 tx.send(ClientEvent::ServerSettings(settings, save)).await.unwrap();
+            },
+
+            //A PROFILE, ASKED FOR OR JUST STORED
+            PacketCode::Profile { username, profile, own, save } =>
+            {
+                tx.send(ClientEvent::Profile(username, profile, own, save)).await.unwrap();
             },
 
             //THE BAN LIST, ASKED FOR OR JUST LIFTED
