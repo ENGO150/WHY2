@@ -752,7 +752,62 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     over the document. `colors()` would read a missing key as no
     colour anyway — the point is that every entry has the same shape and the file states what is settable.
     A legacy *flat* entry is left alone; `write_user_field` turns one into a subtable the first time
-    anything is stored for it.
+    anything is stored for it. It gives an entry its `profile` subtable in the same pass.
+- **A profile is the account's, and the client keeps none of it.** `/profile` opens your own and
+  `/profile USER` somebody else's; the fields are `bio`, `pronouns`, `website` and `status`. Like the colors, the client only asks
+  (`PacketCode::ProfileRequest`) and the server answers with the whole thing (`Profile`), so there is no
+  second copy anywhere and nothing in `client.toml` about it. The ack to a save is the whole profile
+  **again** rather than an "ok", which is what makes a refused description snap back in the row instead of
+  sitting there looking applied — the same shape `ServerSettings` has.
+  - **A profile is named, not numbered** (`server::resolve_user`): a username is what an account *is*,
+    while an id is only a session it happens to have open — an account nobody is connected as has no id at
+    all. So the parameter is resolved as a username first and as the id of a live session second, which is
+    what makes `/profile alice` and `/profile 3` the same profile without an id ever being the only way to
+    reach one.
+  - **It lives in `server_users.toml`, in a `[user.profile]` subtable.** A file of its own would buy a
+    second read path, a second lock and a second migration for what is the same kind of per-account text
+    the colors already are. The nesting is what keeps it apart from the credentials: `password` sits in that
+    same entry, so anything reading or writing "the profile" walks a subtable that cannot contain the hash.
+  - **The overlay does it, in a third mode** (`settings::Mode`, which replaced the `server: bool` — two
+    bools would be four states and two of them nonsense). An own profile is held until `[ Save ]`/Ctrl+S
+    like the server rows; somebody else's is `readonly` — no button, no edit key, and the box says
+    `Esc close` and nothing about changing anything, since the client is not the one who decides what it
+    may see.
+  - **A field is prose, so the row is a preview and the foot is where it is read.** The row shows the value
+    truncated beside its label (and the caret while it is typed), while `draw::description_lines` puts the
+    whole thing through `state::wrap_line` into the description foot — the same foot the server's comments
+    use, sized for the longest, so the text gets the box's width rather than one truncated row of it. An
+    empty field says so in the foot by its own label (`No pronouns.`), which is why the placeholder is
+    derived from the label rather than written per field.
+  - **`UserProfile::KEYS` is the only place the fields are spelled.** The wire struct, the `[user.profile]`
+    keys (`config::users::PROFILE_KEYS` *is* that list), the rows the box is built from and the server's
+    per-field checks all walk it in the same order, so a new field is one entry, one struct field and one
+    `field_mut` arm — and the file, the packet and the box cannot disagree about what a profile has.
+    `field_label` is the one exception: the row for `bio` says `Description`, everything else is its key
+    capitalised.
+  - **`status` is the stored line, not presence.** What somebody is up to *until they change it* belongs on
+    the account like the rest of the profile; online/away/DND does not — it dies with the connection, so it
+    would live on `Connection`, ride on `OnlineUser`/`Join` and belong in the sidebar rather than in a box
+    somebody has to open. Putting presence in the TOML would leave a crashed client "online" in a file
+    forever.
+  - **A website is refused where it is typed** (`settings::commit_edit`), the way `/color` refuses a colour
+    a code cannot carry rather than storing it and ignoring it later. The scheme rule is
+    `misc::is_web_url` — `http`/`https` only, since the value is eventually handed to a system opener —
+    and it lives in the library because the server has to apply the same rule to a client's word and
+    `state::url` (a clicked link in the pane) is the same question asked of a typed word. The length bound
+    stays with each caller: `MAX_URL` for a word in the pane, `max_profile_field` for the stored field.
+  - **`⏎` on somebody else's website opens it**, which is the one thing a read-only profile still does.
+    There is no mouse hit-testing inside the overlay, so a click cannot reach a row — but the selection
+    already names one, so the keyboard needs no rects; it goes through the same `tui::open_link` and
+    `Opening {url}` toast a clicked link in the pane does.
+  - **What a client may store is bounded at the door.** `profiles` (server.toml) switches the whole thing
+    off with `InvalidFeature`; `max_profile_bio` and `max_profile_field` are **refused rather than
+    truncated**, and control characters are stripped where the packet arrives, since a row is one line and
+    the foot is wrapped. A refusal is **all four fields or none** — the save is one packet and the ack is
+    the whole profile, so storing the fields that happened to fit would leave the box showing a profile the
+    server does not hold. The keys are live-read, the request is charged to the packet bucket like anything
+    else, and the log gets an address, a field name, a character count and `own`/`peer` — a field's *name*
+    is the server's own vocabulary, its content is the user's and never reaches the log.
 - **`config/mod.rs`** — TOML config for client (`client.toml`) and server (`server.toml`), plus
   server user store (`server_users.toml`), server ban list (`server_bans.toml`) and server keypair
   storage (`server_keys/{private,public}`), all under `WHY2_CONFIG_DIR`
