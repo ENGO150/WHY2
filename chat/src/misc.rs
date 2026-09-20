@@ -180,6 +180,15 @@ pub fn is_image(header: &[u8]) -> bool //CHECK FOR SUPPORTED IMAGE
         header[2].is_ascii_whitespace())
 }
 
+#[cfg(feature = "chat")]
+pub fn is_web_url(url: &str) -> bool //A LINK SAFE TO HAND A SYSTEM OPENER
+{
+    let scheme = |length: usize, scheme: &str| url.get(..length)
+        .is_some_and(|head| head.eq_ignore_ascii_case(scheme));
+
+    scheme(7, "http://") || scheme(8, "https://")
+}
+
 #[cfg(feature = "server")]
 pub fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOAD
 {

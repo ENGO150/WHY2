@@ -37,7 +37,7 @@ use crate::
 
 const COLOR_KEYS: [&str; 2] = ["username_color", "message_color"]; //THE COLORS AS server_users.toml SPELLS THEM
 const PROFILE_TABLE: &str = "profile";        //THE SUBTABLE A PROFILE SITS IN, APART FROM THE CREDENTIALS
-const PROFILE_KEYS: [&str; 1] = ["bio"];      //THE PROFILE AS server_users.toml SPELLS IT
+const PROFILE_KEYS: [&str; 4] = UserProfile::KEYS; //THE PROFILE AS server_users.toml SPELLS IT
 
 fn user_field(username: &str, key: &str) -> Option<String> //READ ONE FIELD OF username
 {
@@ -127,15 +127,23 @@ pub fn colors(username: &str) -> MessageColors //RETURN COLORS OF username
 
 pub fn profile(username: &str) -> UserProfile //RETURN PROFILE OF username
 {
+    let mut fields = PROFILE_KEYS.iter().map(|key| profile_field(username, key).unwrap_or_default());
+
     UserProfile
     {
-        bio: profile_field(username, "bio").unwrap_or_default(),
+        bio: fields.next().unwrap_or_default(),
+        pronouns: fields.next().unwrap_or_default(),
+        website: fields.next().unwrap_or_default(),
+        status: fields.next().unwrap_or_default(),
     }
 }
 
 pub fn set_profile(username: &str, profile: &UserProfile) //STORE username's PROFILE
 {
-    write_profile_field(username, "bio", profile.bio.as_str().into());
+    for (key, value) in PROFILE_KEYS.iter().zip(profile.fields())
+    {
+        write_profile_field(username, key, value.into());
+    }
 }
 
 //STORE ONE OF username's COLORS, BY NAME

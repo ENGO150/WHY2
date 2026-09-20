@@ -70,3 +70,4 @@ max_persistent_messages = 100000 # Number of lobby messages kept (the oldest go 
 # Profiles
 profiles = true # Allow users to keep a profile others can look up
 max_profile_bio = 128 # Maximal length of a profile description
+max_profile_field = 64 # Maximal length of a profile's pronouns, website and status

@@ -407,6 +407,32 @@ impl PacketCode
     }
 }
 
+impl UserProfile
+{
+    //THE KEYS server_users.toml STORES THE FIELDS UNDER, IN THEIR OWN ORDER
+    pub const KEYS: [&'static str; 4] = [ "bio", "pronouns", "website", "status" ];
+
+    //THE FIELDS IN THE ORDER server_users.toml SPELLS THEM
+    pub fn fields(&self) -> [&str; 4]
+    {
+        [ &self.bio, &self.pronouns, &self.website, &self.status ]
+    }
+
+    //ONE FIELD BY THE KEY IT IS STORED UNDER
+    pub fn field_mut(&mut self, key: &str) -> Option<&mut String>
+    {
+        match key
+        {
+            "bio" => Some(&mut self.bio),
+            "pronouns" => Some(&mut self.pronouns),
+            "website" => Some(&mut self.website),
+            "status" => Some(&mut self.status),
+
+            _ => None,
+        }
+    }
+}
+
 //STRUCTS
 //ONE server.toml KEY AS THE CLIENT EDITS IT
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
@@ -432,7 +458,10 @@ pub enum SettingValue
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq, Default)]
 pub struct UserProfile
 {
-    pub bio: String, //WHAT THE USER SAYS ABOUT THEMSELVES
+    pub bio: String,      //WHAT THE USER SAYS ABOUT THEMSELVES
+    pub pronouns: String, //HOW THEY ARE REFERRED TO
+    pub website: String,  //A LINK OF THEIRS, http/https ONLY
+    pub status: String,   //WHAT THEY ARE UP TO, UNTIL THEY CHANGE IT
 }
 
 //ONE MESSAGE AS server_messages.bin KEEPS IT

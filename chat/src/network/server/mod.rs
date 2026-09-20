@@ -1727,20 +1727,48 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //STORE WHAT A SAVE BROUGHT
                 if let PacketCode::ProfileSave { profile } = &read
                 {
-                    //BIO LIMITS
-                    let bio = clean(&profile.bio);
-                    let length = bio.chars().count();
-                    let limit = config::read_config::<usize>("max_profile_bio");
+                    //FIELD LIMITS
+                    let bio_limit = config::read_config::<usize>("max_profile_bio");
+                    let field_limit = config::read_config::<usize>("max_profile_field");
 
-                    //CHECK MAX BIO LENGTH
-                    if length > limit
+                    let mut stored = UserProfile::default();
+                    let mut refused = false;
+
+                    //EVERY FIELD IS CLEANED AND CHECKED, AND ONE BAD ONE REFUSES THE LOT
+                    for (key, value) in UserProfile::KEYS.iter().zip(profile.fields())
                     {
-                        log::warn!("Profile refused ({length} chars, limit {limit}): {peer_addr}");
+                        let value = clean(value);
+                        let length = value.chars().count();
+                        let limit = if *key == "bio" { bio_limit } else { field_limit };
+
+                        //CHECK MAX FIELD LENGTH
+                        if length > limit
+                        {
+                            log::warn!("Profile refused ({key}, {length} chars, limit {limit}): {peer_addr}");
+                            refused = true;
+                            break;
+                        }
+
+                        //ONLY A LINK A CLIENT MAY OPEN IS STORED AS A WEBSITE
+                        if *key == "website" && !value.is_empty() && !misc::is_web_url(&value)
+                        {
+                            log::warn!("Profile refused ({key}, not a link): {peer_addr}");
+                            refused = true;
+                            break;
+                        }
+
+                        if let Some(field) = stored.field_mut(key) { *field = value; }
+                    }
+
+                    if refused
+                    {
                         network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     } else
                     {
+                        let length: usize = stored.fields().iter().map(|field| field.chars().count()).sum();
+
                         log::info!("Profile saved ({length} chars): {peer_addr}");
-                        users::set_profile(&username, &UserProfile { bio });
+                        users::set_profile(&username, &stored);
                     }
                 } else
                 {

@@ -860,7 +860,13 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
             Mode::Client => " ↑↓ move │ ←→ change │ ⏎ select │ Esc close ",
             Mode::Server => " ↑↓ move │ ←→ change │ ⏎ edit │ ^S save │ Esc close ",
             Mode::Profile { own: true } => " ↑↓ move │ ⏎ edit │ ^S save │ Esc close ",
-            Mode::Profile { own: false } => " Esc close ",
+
+            //THE ONE THING A PROFILE THAT IS NOT OURS STILL DOES
+            Mode::Profile { own: false } => match state.link().is_some()
+            {
+                true => " ↑↓ move │ ⏎ open link │ Esc close ",
+                false => " ↑↓ move │ Esc close ",
+            },
         },
     };
 
@@ -1126,11 +1132,13 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
 
         Row::Action(_) => spans.push(Span::styled("Send the edited rows to the server.", theme::DIM)),
 
-        //A DESCRIPTION IS PROSE, SO THE FOOT IS WHERE IT IS READ
+        //A FIELD IS PROSE OR A LINK, SO THE FOOT IS WHERE IT IS READ
         Row::Item(item) if state.profile() => match &item.value
         {
-            Value::Text(bio) if bio.is_empty() => spans.push(Span::styled("No description.", theme::DIM)),
-            Value::Text(bio) => spans.push(Span::styled(bio.clone(), theme::TEXT)),
+            Value::Text(text) if text.is_empty() =>
+                spans.push(Span::styled(format!("No {}.", item.label.to_lowercase()), theme::DIM)),
+
+            Value::Text(text) => spans.push(Span::styled(text.clone(), theme::TEXT)),
 
             _ => {},
         },

@@ -26,6 +26,7 @@ use crossterm::event::
 use why2_chat::
 {
     config,
+    misc,
     network::codes::{ ServerSetting, SettingValue, UserProfile },
 };
 
@@ -302,17 +303,18 @@ impl Settings
     }
 
     //SOMEBODY'S PROFILE - OURS TO EDIT, OR THEIRS TO READ
-    pub fn open_profile(&mut self, username: String, profile: UserProfile, own: bool)
+    pub fn open_profile(&mut self, username: String, mut profile: UserProfile, own: bool)
     {
-        let mut rows = vec![Row::Item(Item
+        //ONE ROW PER FIELD, IN THE ORDER THE PROFILE ITSELF KEEPS THEM
+        let mut rows: Vec<Row> = UserProfile::KEYS.iter().map(|key| Row::Item(Item
         {
-            label: String::from("Description"),
-            key: String::from("bio"),
-            value: Value::Text(profile.bio),
+            label: field_label(key),
+            key: (*key).to_string(),
+            value: Value::Text(profile.field_mut(key).map(std::mem::take).unwrap_or_default()),
             hint: String::new(),
             changed: false,
             restart: false,
-        })];
+        })).collect();
 
         //NOTHING LEAVES THIS BOX UNTIL THIS IS PRESSED
         if own { rows.push(Row::Action(consts::SAVE_LABEL)); }
@@ -350,6 +352,17 @@ impl Settings
 
     //A MODE WHOSE ROWS ARE HELD UNTIL Save
     pub fn deferred(&self) -> bool { matches!(self.mode, Mode::Server | Mode::Profile { own: true }) }
+
+    //THE SELECTED ROW'S LINK, WHEN IT IS ONE
+    pub fn link(&self) -> Option<&str>
+    {
+        if !self.profile() { return None; }
+
+        let Some(Row::Item(item)) = self.rows.get(self.selected) else { return None };
+        let Value::Text(text) = &item.value else { return None };
+
+        (item.key == "website" && misc::is_web_url(text)).then_some(text.as_str())
+    }
 
     pub fn title(&self) -> String //WHAT THE BOX CALLS ITSELF
     {
@@ -492,6 +505,16 @@ impl Settings
                 item.value = Value::Device { id: config::read_config::<String>(&item.key), input };
             }
         }
+    }
+}
+
+//WHAT A PROFILE FIELD IS CALLED IN THE BOX
+fn field_label(key: &str) -> String
+{
+    match key
+    {
+        "bio" => String::from("Description"),
+        other => other[..1].to_uppercase() + &other[1..],
     }
 }
 
@@ -656,6 +679,14 @@ fn commit_edit(app: &mut App) //KEEP WHAT WAS TYPED, IF THE ROW CAN HOLD IT
 {
     let Some(edit) = app.settings.edit.take() else { return };
 
+    //A WEBSITE IS REFUSED WHERE IT IS TYPED, NOT AFTER THE SERVER HAS SEEN IT
+    if selected_key(&app.settings) == Some("website") && !edit.trim().is_empty()
+        && !misc::is_web_url(edit.trim())
+    {
+        app.notify("A website has to start with http:// or https://");
+        return;
+    }
+
     let Some(Row::Item(item)) = app.settings.rows.get_mut(app.settings.selected) else { return };
 
     match &item.value
@@ -679,6 +710,16 @@ fn commit_edit(app: &mut App) //KEEP WHAT WAS TYPED, IF THE ROW CAN HOLD IT
         },
 
         _ => {},
+    }
+}
+
+//THE CONFIG KEY THE SELECTED ROW OWNS
+fn selected_key(settings: &Settings) -> Option<&str>
+{
+    match settings.rows.get(settings.selected)?
+    {
+        Row::Item(item) => Some(item.key.as_str()),
+        Row::Header(_) | Row::Action(_) => None,
     }
 }
 
@@ -783,7 +824,17 @@ fn adjust(app: &mut App, direction: i32)
 //ENTER/SPACE: FLIP, TYPE, PRESS OR OPEN A ROW
 fn activate(app: &mut App)
 {
-    if app.settings.readonly() { return; }
+    //A PROFILE THAT IS NOT OURS CHANGES NOTHING, BUT ITS LINK STILL OPENS
+    if app.settings.readonly()
+    {
+        if let Some(url) = app.settings.link().map(str::to_owned)
+        {
+            super::open_link(&url);
+            app.notify(format!("Opening {url}"));
+        }
+
+        return;
+    }
 
     let _row = app.settings.selected; //ONLY THE AUDIO ROWS NEED TO KNOW WHICH ROW THEY ARE
 
@@ -885,24 +936,24 @@ fn save(app: &mut App)
     app.settings.save = Some(changed);
 }
 
-//HAND THE EDITED DESCRIPTION TO THE EVENT LOOP
+//HAND THE EDITED FIELDS TO THE EVENT LOOP
 fn save_profile(app: &mut App)
 {
     if !app.settings.unsaved() { return; }
 
-    let bio = app.settings.rows.iter().find_map(|row| match row
-    {
-        Row::Item(item) => match &item.value
-        {
-            Value::Text(text) => Some(text.clone()),
-            _ => None,
-        },
+    let mut profile = UserProfile::default();
 
-        _ => None,
-    }).unwrap_or_default();
+    //EVERY ROW GOES, CHANGED OR NOT - THE SERVER STORES THE WHOLE PROFILE
+    for row in &app.settings.rows
+    {
+        let Row::Item(item) = row else { continue };
+        let Value::Text(text) = &item.value else { continue };
+
+        if let Some(field) = profile.field_mut(&item.key) { *field = text.clone(); }
+    }
 
     app.settings.saving = true;
-    app.settings.profile = Some(UserProfile { bio });
+    app.settings.profile = Some(profile);
 }
 
 fn toggle(app: &mut App)

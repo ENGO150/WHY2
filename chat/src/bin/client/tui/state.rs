@@ -52,6 +52,7 @@ use ratatui_image::
 use crate::
 {
     config,
+    misc,
     role::Role,
     options::{ self, LoginState },
     network::
@@ -1233,11 +1234,8 @@ fn url(word: &str) -> Option<String>
         word = &word[..word.len() - 1];
     }
 
-    //THE SCHEME IS THE ONLY PART A URL MAY SHOUT
-    let scheme = |n: usize, scheme: &str| word.get(..n).is_some_and(|head| head.eq_ignore_ascii_case(scheme));
-    let web = scheme(7, "http://") || scheme(8, "https://");
-
-    (web && word.len() <= consts::MAX_URL).then(|| word.to_owned())
+    //THE SCHEME RULE IS THE LIBRARY'S, THE LENGTH IS THIS PANE'S
+    (misc::is_web_url(word) && word.len() <= consts::MAX_URL).then(|| word.to_owned())
 }
 
 fn slice_cells(line: &Line<'static>, from: usize, to: usize) -> String
