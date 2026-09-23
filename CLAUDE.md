@@ -1013,6 +1013,45 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
       image, so `protocol_type_owned()` + `StatefulProtocol::new` is how the id survives the frame.
     - A pane that was not drawn for `ANIMATION_CATCHUP` starts again from now instead of winding through
       every frame it missed.
+  - **A picture is handed to the terminal last, and a box is put back on top of it**
+    (`draw::draw_pictures`, called at the end of `draw` after every overlay). A graphics-protocol picture is
+    not cells: ratatui-image writes one escape into the **first cell of each row**
+    (`CellDiffOption::ForcedWidth(1)`) which draws that whole row of kitty unicode placeholders, and marks
+    every other cell of the row `Skip` so nothing overwrites them. That is two things the cell diff cannot
+    see, and both were bugs:
+    - A box drawn over a picture erases the placeholders it covers — kitty drops a placement the moment its
+      placeholder cells go — and **the diff cannot put them back**: the picture's first cell is unchanged
+      from the frame before, so nothing is re-emitted. The picture kept the hole and the box's glyphs sat in
+      it until the terminal was resized, which re-fits every picture and repaints the screen, which is why
+      resizing was the only cure.
+    - And anything that re-rendered the picture *while* the box was up — the pane scrolling because a line
+      arrived (`Profile saved.` does exactly that), or an animation frame — wrote the whole placeholder row
+      straight across the box, whose cells are unchanged in the buffer and so are never rewritten. The box
+      came back eaten wherever a picture was behind it.
+    **Suppressing a covered picture is not the answer** — it was tried, and hiding a whole picture because a
+    box clips a corner of it is worse than the artefact it avoids. So the picture is always drawn, and what
+    the box has on those cells is copied out first (`overlay_cells`) and written back over it afterwards.
+    A picture therefore shows everywhere the box is not, which is all a row-at-a-time protocol allows: the
+    cells to one side of a box are the row's own, and the ones under it are the box's.
+  - **The box's cells are written back with `AlwaysUpdate`, and the picture's row with a changed symbol.**
+    Those are not interchangeable, which is the whole subtlety:
+    - The restored box cells are unchanged in the buffer, so the diff would skip them and the picture's row
+      write — which *has* changed — would rub the box out. They are ordinary single-width text, so
+      `AlwaysUpdate` is exactly right, and the first cell of a picture row is a lower column than any of
+      them: within one frame the row is written and the box then lands on top of it.
+    - The picture's own first cell must **not** use `AlwaysUpdate`. That option makes the diff measure the
+      cell from its symbol, and the symbol is an escape sequence tens of columns wide, so the diff skips the
+      rest of that row — which is precisely where a box that has just closed left its glyphs. `replace_rows`
+      prepends a second `\x1b[s` instead (saving the cursor twice is the same as saving it once), so the cell
+      *reads* differently, is written again under its forced width of 1, and the rest of the row is still
+      diffed: the row's own write clears what the box left inside the picture's columns and the ordinary diff
+      clears what it left outside them.
+  - **`App::overlays_drawn` hands back the previous frame's rects** as it stores this frame's, which is how
+    "a box was over this picture and is no longer" is known — the only case that needs the row replaced.
+    The rects come from the boxes themselves: `draw_palette`/`draw_settings`/`draw_login`/`draw_tofu` each
+    return the popup they drew (`Rect::ZERO` when the terminal had no room for one) and `draw` collects them.
+    Recomputing that geometry would be a second copy of arithmetic that depends on the rows, the description
+    foot and the terminal size, and the two would drift.
   - **Capturing the mouse takes the terminal's own drag-select away, so the client provides one**
     (`App::selection`, `mouse_capture = true`). A press in the message pane anchors it, a drag extends
     it and the release copies — but a press is **not** a selection until a drag arrives (`dragged`),
