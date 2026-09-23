@@ -20,6 +20,7 @@ use ratatui::
 {
     Frame,
     backend::FromCrossterm,
+    buffer::{ Cell, CellDiffOption },
     style::{ Color, Style },
     text::{ Line, Span },
     widgets::
@@ -141,17 +142,23 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     //LOGO BEHIND EVERYTHING
     if !app.theme.disable_logo { draw_logo(frame, area); }
 
+    //EVERY BOX SAYS WHAT IT COVERED
+    let mut overlays: Vec<Rect> = Vec::new();
+
     //PALETTE OVER THE MESSAGE PANE
-    if app.palette.is_visible() { draw_palette(frame, app, messages_area); }
+    if app.palette.is_visible() { overlays.push(draw_palette(frame, app, messages_area)); }
 
     //SETTINGS OVERLAY
-    if app.settings.open { draw_settings(frame, &mut app.settings, area); }
+    if app.settings.open { overlays.push(draw_settings(frame, &mut app.settings, area)); }
 
     //CONNECT BOX
-    if let Some(login) = &app.login { draw_login(frame, login, &app.reconnect, area); }
+    if let Some(login) = &app.login { overlays.push(draw_login(frame, login, &app.reconnect, area)); }
 
     //SERVER-KEY PROMPT ON TOP
-    if let Some(prompt) = &app.tofu { draw_tofu(frame, prompt, area); }
+    if let Some(prompt) = &app.tofu { overlays.push(draw_tofu(frame, prompt, area)); }
+
+    //PICTURES LAST, WITH WHATEVER A BOX HAS ON THEM PUT BACK ON TOP
+    draw_pictures(frame, app, &overlays);
 }
 
 //PRIVATE
@@ -227,7 +234,22 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
     //ONLY THE PICTURES ON SCREEN ARE HELD
     app.load_visible(inner.width, offset, viewport);
 
-    //DRAW PICTURES OVER THEIR RESERVED ROWS
+    //SHOW THE BACKLOG
+    draw_scrollbar(frame, area, total as usize, viewport as usize, offset as usize);
+}
+
+//PICTURES GO ON LAST, AND A BOX IS PUT BACK OVER WHATEVER ROW ONE CLAIMS
+fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect])
+{
+    let inner = app.pane;
+
+    if inner.width == 0 || inner.height == 0 { return; }
+
+    let (offset, viewport) = (app.pane_offset, inner.height);
+
+    //WHERE THE BOXES WERE ON THE LAST FRAME
+    let previous = app.overlays_drawn(overlays);
+
     for placement in app.placements(inner.width)
     {
         let bottom = placement.row + placement.height;
@@ -248,17 +270,74 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
             height: last - first,
         };
 
+        let covered = overlays.iter().any(|overlay| overlay.intersects(area));
+
+        //WHAT A BOX HAS ON THESE CELLS, BEFORE THE PICTURE CLAIMS THE WHOLE ROW
+        let kept = if covered { overlay_cells(frame, area, overlays) } else { Vec::new() };
+
+        let mut drawn = false;
+
         if let Some(state::Entry::Image { picture: state::Picture::Ready(ready), .. }) =
             app.messages.get_mut(placement.entry) && let Some(protocol) = ready.protocol.as_mut()
         {
             let resize = Resize::Crop(Some(CropOptions { clip_top, clip_left: false }));
 
             protocol.resize_encode_render(&resize, area, frame.buffer_mut());
+
+            drawn = true;
+        }
+
+        match covered
+        {
+            //THE BOX GOES BACK ON TOP OF THE ROW THE PICTURE JUST WROTE
+            true => for (x, y, cell) in kept
+            {
+                if let Some(target) = frame.buffer_mut().cell_mut((x, y))
+                {
+                    *target = cell;
+                    target.set_diff_option(CellDiffOption::AlwaysUpdate);
+                }
+            },
+
+            //A BOX THAT HAS GONE LEAVES GLYPHS ONLY THE ROW'S OWN WRITE CAN RUB OUT
+            false => if drawn && previous.iter().any(|overlay| overlay.intersects(area))
+            {
+                replace_rows(frame, area);
+            },
+        }
+    }
+}
+
+//THE CELLS A BOX HAS INSIDE area, COPIED OUT
+fn overlay_cells(frame: &mut Frame, area: Rect, overlays: &[Rect]) -> Vec<(u16, u16, Cell)>
+{
+    let mut cells = Vec::new();
+
+    for y in area.y..area.y + area.height
+    {
+        for x in area.x..area.x + area.width
+        {
+            if !overlays.iter().any(|overlay| overlay.contains((x, y).into())) { continue; }
+
+            if let Some(cell) = frame.buffer_mut().cell((x, y)) { cells.push((x, y, cell.clone())); }
         }
     }
 
-    //SHOW THE BACKLOG
-    draw_scrollbar(frame, area, total as usize, viewport as usize, offset as usize);
+    cells
+}
+
+//ONE CELL CARRIES A WHOLE ROW OF A PICTURE, AND THE DIFF WRITES IT AGAIN ONLY IF IT READS DIFFERENTLY
+fn replace_rows(frame: &mut Frame, area: Rect)
+{
+    for y in area.y..area.y + area.height
+    {
+        let Some(cell) = frame.buffer_mut().cell_mut((area.x, y)) else { continue };
+
+        //SAVING THE CURSOR TWICE IS THE SAME AS SAVING IT ONCE - THE CELL'S WIDTH STAYS THE ONE IT IS FORCED TO
+        let symbol = format!("\x1b[s{}", cell.symbol());
+
+        cell.set_symbol(&symbol);
+    }
 }
 
 //FIRST VISIBLE ROW OF A SCROLLING LIST
@@ -589,12 +668,12 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
     ));
 }
 
-fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect)
+fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect) -> Rect
 {
     //ROW COUNT, VISIBLE ROWS AND LABELS
     let (total, selected, title) = match &app.palette.mode
     {
-        PaletteMode::Hidden => return,
+        PaletteMode::Hidden => return Rect::ZERO,
 
         PaletteMode::Menu(matches, selected) => (matches.len(), *selected, String::from(" Commands ")),
 
@@ -614,7 +693,7 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect)
 
     let height = rows as u16 + 2;
 
-    if area.height < height || area.width < 10 { return; }
+    if area.height < height || area.width < 10 { return Rect::ZERO; }
 
     //POPUP ABOVE THE INPUT
     let popup = Rect
@@ -646,6 +725,8 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect)
     frame.render_widget(Paragraph::new(lines), inner);
 
     draw_scrollbar(frame, popup, total, rows, first);
+
+    popup
 }
 
 //ONE COLORED ROW PER ACCEPTED VALUE
@@ -738,12 +819,12 @@ fn capitalize(name: &str) -> String
 }
 
 //THE /settings OVERLAY
-fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
+fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect) -> Rect
 {
     let width = consts::SETTINGS_WIDTH.min(area.width.saturating_sub(2)).max(1);
     let inner_width = width.saturating_sub(2) as usize;
 
-    if area.height < 5 || inner_width < 12 { return; }
+    if area.height < 5 || inner_width < 12 { return Rect::ZERO; }
 
     //BOTH MODES SHARE THE BOX
     let (title, total, selected) = match &state.picker
@@ -883,15 +964,17 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect)
 
     //THE TRACK IS THE ROWS' OWN HEIGHT, NOT THE BOX'S
     draw_scrollbar(frame, Rect { height: rows_height, ..popup }, total, visible, first);
+
+    popup
 }
 
 //SERVER IDENTITY PROMPT
-fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
+fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
 {
     let width = consts::TOFU_WIDTH.min(area.width.saturating_sub(2)).max(1);
     let inner_width = width.saturating_sub(4); //BORDERS PLUS A COLUMN OF AIR EACH SIDE
 
-    if area.height < 9 || inner_width < 20 { return; }
+    if area.height < 9 || inner_width < 20 { return Rect::ZERO; }
 
     let confirming = prompt.stage == Stage::Confirm;
 
@@ -1008,15 +1091,17 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect)
     ]).areas(inner);
 
     frame.render_widget(Paragraph::new(lines), text_area);
+
+    popup
 }
 
-fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rect)
+fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rect) -> Rect
 {
     let width = consts::LOGIN_WIDTH.min(area.width.saturating_sub(2)).max(1);
     let inner_width = width.saturating_sub(4); //BORDERS PLUS A COLUMN OF AIR EACH SIDE
     let field_width = inner_width.saturating_sub(2); //"> " GUTTER
 
-    if area.height < 8 || field_width < 8 { return; }
+    if area.height < 8 || field_width < 8 { return Rect::ZERO; }
 
     let (field, cursor) = login.input.render(field_width, login.masked());
 
@@ -1102,6 +1187,8 @@ fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rec
             text_area.y + consts::FIELD_ROW + cursor.1,
         ));
     }
+
+    popup
 }
 
 fn button(label: &'static str, selected: bool, style: Style) -> Span<'static>

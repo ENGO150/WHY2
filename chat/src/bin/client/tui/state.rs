@@ -261,6 +261,9 @@ pub struct App
     pub quit_message: Option<String>, //PRINTED ON THE NORMAL SCREEN AFTER TEARDOWN
     pub dirty: bool,
 
+    //WHAT THE LAST FRAME DREW OVER THE PANE
+    overlays: Vec<Rect>,
+
     //WRAP CACHE
     generation: u64,
     wrapped: Option<(u16, u64, Vec<Line<'static>>, Vec<Placement>)>,
@@ -310,6 +313,7 @@ impl App
             login: Some(Login::new()),
             tofu: None,
             theme: Theme::load(),
+            overlays: Vec::new(),
             picker: Picker::halfblocks(), //UNTIL init_picker HAS ASKED THE TERMINAL
             pane: Rect::ZERO,
             pane_offset: 0,
@@ -938,6 +942,16 @@ impl App
         self.notice.as_ref()
             .filter(|(_, shown)| shown.elapsed() < consts::NOTICE_DURATION)
             .map(|(text, _)| text.as_str())
+    }
+
+    //TAKE THE BOXES OF THIS FRAME, HANDING BACK THE LAST FRAME'S
+    pub fn overlays_drawn(&mut self, overlays: &[Rect]) -> Vec<Rect>
+    {
+        let previous = std::mem::take(&mut self.overlays);
+
+        self.overlays.extend_from_slice(overlays);
+
+        previous
     }
 
     //DROP THE TOAST ONCE IT IS OLD
