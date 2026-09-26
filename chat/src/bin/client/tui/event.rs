@@ -224,6 +224,8 @@ impl App
                 self.push_styled("You have been muted by moderator.", theme::NOTICE);
             },
 
+            ClientEvent::Deleted(message_id) => self.delete_message(message_id),
+
             ClientEvent::InvalidUsage =>
             {
                 //A REFUSED SAVE LEAVES THE BOX EDITABLE

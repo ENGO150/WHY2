@@ -145,6 +145,7 @@ pub enum ClientEvent
     Typing(String),                                              //SOMEBODY IN OUR CHANNEL IS WRITING
     Muted,                                                       //HAHA
     InvalidUsage,                                                //INVALID COMMAND USAGE
+    Deleted(u64),                                                //A MESSAGE WAS DELETED (MESSAGE ID)
     VersionFailed,                                               //FETCHING VERSIONS FAILED
     VersionMismatch(String, String),                             //MISMATCH GIT HASH
     UnsafeVersion(usize, Version, String),                       //OLD VERSION
@@ -809,6 +810,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 tx.send(ClientEvent::Muted).await.unwrap();
             }
+
+            //A MESSAGE WAS DELETED
+            PacketCode::Deleted { message_id } =>
+            {
+                tx.send(ClientEvent::Deleted(message_id)).await.unwrap();
+            },
 
             //CLIENT MESSED SOME COMMAND UP
             PacketCode::InvalidUsage =>

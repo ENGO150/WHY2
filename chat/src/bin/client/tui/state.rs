@@ -138,6 +138,19 @@ pub enum Entry //ONE ROW OF HISTORY
     },
 }
 
+impl Entry
+{
+    pub fn message_id(&self) -> Option<u64> //THE SERVER'S ID, IF IT IS A MESSAGE
+    {
+        match self
+        {
+            Entry::Message { message_id, .. } | Entry::History { message_id, .. } | Entry::Image { message_id, .. } =>
+                Some(*message_id),
+            _ => None,
+        }
+    }
+}
+
 //WHAT THERE IS TO DRAW UNDER A CAPTION
 pub enum Picture
 {
@@ -283,7 +296,7 @@ pub struct App
 
     //WRAP CACHE
     generation: u64,
-    wrapped: Option<(u16, u64, Vec<Line<'static>>, Vec<Placement>)>,
+    wrapped: Option<(u16, u64, Vec<Line<'static>>, Vec<Placement>, Vec<u16>)>,
 }
 
 //IMPLEMENTATIONS
@@ -470,6 +483,62 @@ impl App
             selection.anchor.0 = selection.anchor.0.saturating_add(grown);
             selection.cursor.0 = selection.cursor.0.saturating_add(grown);
         }
+    }
+
+    //DROP A DELETED MESSAGE FROM WHICHEVER PANE HOLDS IT
+    pub fn delete_message(&mut self, message_id: u64)
+    {
+        let lobby = self.channel.is_empty();
+
+        if let Some(index) = self.messages.iter().position(|entry| entry.message_id() == Some(message_id))
+        {
+            self.remove_entry(index, lobby);
+        }
+        //A PARKED PANE ONLY LOSES THE ENTRY
+        else if let Some(pane) = self.panes.get_mut("")
+            && let Some(index) = pane.iter().position(|entry| entry.message_id() == Some(message_id))
+        {
+            pane.remove(index);
+            self.shift_anchor(index);
+        }
+    }
+
+    //REMOVE AN ENTRY OF THE PANE BEING LOOKED AT
+    fn remove_entry(&mut self, index: usize, lobby: bool)
+    {
+        self.rewrap(self.pane.width);
+
+        let first = self.wrapped.as_ref().and_then(|wrapped| wrapped.4.get(index).copied()).unwrap_or(0);
+        let before = self.wrapped_len();
+
+        self.messages.remove(index);
+        if lobby { self.shift_anchor(index); }
+
+        self.generation += 1;
+        self.dirty = true;
+
+        let removed = before.saturating_sub(self.wrapped_rows());
+
+        //ROWS BELOW IT MOVE UP, ROWS INSIDE IT LAND ON ITS START
+        let shift = |row: u16| match row
+        {
+            row if row >= first + removed => row - removed,
+            row if row > first => first,
+            row => row,
+        };
+
+        if let Some(scroll) = self.scroll.as_mut() { *scroll = shift(*scroll); }
+
+        if let Some(selection) = self.selection.as_mut()
+        {
+            selection.anchor.0 = shift(selection.anchor.0);
+            selection.cursor.0 = shift(selection.cursor.0);
+        }
+    }
+
+    fn shift_anchor(&mut self, index: usize) //THE REPLAYED ENTRIES MOVE UP WITH IT
+    {
+        if let Some(anchor) = self.history_anchor.as_mut() && index < *anchor { *anchor -= 1; }
     }
 
     //ROWS THE PANE WRAPS TO AT ITS LAST WIDTH
@@ -1384,7 +1453,7 @@ impl App
     {
         let stale = match &self.wrapped
         {
-            Some((w, g, _, _)) => *w != width || *g != self.generation,
+            Some((w, g, ..)) => *w != width || *g != self.generation,
             None => true,
         };
 
@@ -1394,10 +1463,12 @@ impl App
 
         let mut lines: Vec<Line<'static>> = Vec::new();
         let mut placements: Vec<Placement> = Vec::new();
+        let mut starts: Vec<u16> = Vec::with_capacity(self.messages.len());
 
         for entry in 0..self.messages.len()
         {
             let row = lines.len() as u16;
+            starts.push(row);
 
             lines.extend(self.theme.render(&self.messages[entry], width));
 
@@ -1428,12 +1499,12 @@ impl App
             }
         }
 
-        self.wrapped = Some((width, self.generation, lines, placements));
+        self.wrapped = Some((width, self.generation, lines, placements, starts));
     }
 
     fn wrapped_len(&self) -> u16
     {
-        self.wrapped.as_ref().map(|(_, _, lines, _)| lines.len() as u16).unwrap_or(0)
+        self.wrapped.as_ref().map(|(_, _, lines, ..)| lines.len() as u16).unwrap_or(0)
     }
 }
 

@@ -1116,6 +1116,9 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 if allowed && config::messages::delete(message_id)
                 {
                     log::info!("Message deleted ({}): {peer_addr}", if own { "own" } else { "peer" });
+
+                    //EVERY CLIENT HOLDS A LOBBY PANE
+                    send_to_all(PacketCode::Deleted { message_id }, false, None);
                 } else
                 {
                     log::warn!("Delete refused (no such message, or permissions): {peer_addr}");
