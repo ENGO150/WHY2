@@ -88,6 +88,16 @@ pub enum PacketCode //CONTROL CODES
         role: Role,
     },
 
+    //SERVER -> CLIENT | A PAGE OF THE LOBBY'S STORED MESSAGES
+    History
+    {
+        messages: Vec<StoredMessage>,
+        start: u64,  //ABSOLUTE INDEX OF THE FIRST ONE
+        more: bool,  //OLDER ONES LEFT
+        kept: u64,   //MESSAGES KEPT
+        older: bool, //AN ANSWER TO HistoryRequest
+    },
+
     //SERVER -> CLIENT | CLIENT JOIN MESSAGE
     Join
     {
@@ -257,7 +267,7 @@ pub enum PacketCode //CONTROL CODES
     RegisterRequest,                                //SERVER -> CLIENT | REGISTER
     Login { password: String },                     //CLIENT -> SERVER | LOGIN
     Register { password: String },                  //CLIENT -> SERVER | REGISTER
-    History { messages: Vec<StoredMessage> },       //SERVER -> CLIENT | THE LOBBY'S STORED MESSAGES
+    HistoryRequest { before: u64 },                 //CLIENT -> SERVER | THE PAGE BEFORE THIS INDEX
     Re { message: String },                         //CLIENT -> SERVER | REPLY TO LAST PM
     Channel { channel: Option<String> },            //SERVER <> CLIENT | CHANNEL CHANGE
     ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
@@ -366,6 +376,7 @@ impl PacketCode
             Self::RegisterRequest { .. }       => "RegisterRequest",
             Self::Register { .. }              => "Register",
             Self::History { .. }               => "History",
+            Self::HistoryRequest { .. }        => "HistoryRequest",
             Self::Channel { .. }               => "Channel",
             Self::ChannelCreated { .. }        => "ChannelCreated",
             Self::ChannelDestroyed { .. }      => "ChannelDestroyed",

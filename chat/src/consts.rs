@@ -86,7 +86,7 @@ pub const AVATAR_DIMENSION: u32        = 512;                                   
 pub const ANIMATED_AVATAR_DIMENSION: u32 = 256;                                       //AND OF AN ANIMATED ONE
 pub const AVATAR_TEMP_PREFIX: &str     = "why2_avatar_";                              //TEMP FILE A CUT AVATAR IS UPLOADED FROM
 pub const AVATAR_GIF_SPEED: i32        = 10;                                          //GIF QUANTISER SPEED (1 BEST, 30 FASTEST)
-pub const MAX_HISTORY_SIZE: usize      = 12 * MEGABYTE;                               //BIGGEST HISTORY THE SERVER REPLAYS (12MB)
+pub const MAX_HISTORY_SIZE: usize      = 12 * MEGABYTE;                               //BIGGEST HISTORY PAGE THE SERVER SENDS (12MB)
 pub const MAX_IMAGE_DIMENSION: u32     = 16_384;                                      //WIDEST/TALLEST PICTURE A CLIENT DECODES
 
 pub const DISK_TAG_SIZE: usize         = 32;                                          //HMAC-SHA256 TAG ON AN ENCRYPTED FILE

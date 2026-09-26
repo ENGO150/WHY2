@@ -48,9 +48,24 @@ struct Record //ONE MESSAGE RECORD
     image: Option<[u8; 32]>,
 }
 
+struct History //THE RECORDS AND WHERE THEY START
+{
+    base: u64,            //ABSOLUTE INDEX OF records[0]
+    records: Vec<Record>,
+}
+
+//ONE PAGE OF THE HISTORY
+pub struct Page
+{
+    pub messages: Vec<StoredMessage>,
+    pub start: u64, //ABSOLUTE INDEX OF THE FIRST ONE
+    pub more: bool, //OLDER ONES LEFT
+    pub kept: u64,  //MESSAGES KEPT
+}
+
 //GLOBAL VARIABLES
-static HISTORY: LazyLock<Mutex<Vec<Record>>> = LazyLock::new(|| Mutex::new(load())); //MESSAGE HISTORY
-static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);             //AT-REST KEYS
+static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History { base: 0, records: load() })); //MESSAGE HISTORY
+static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                                       //AT-REST KEYS
 
 //FUNCTIONS
 //PRIVATE
@@ -134,13 +149,16 @@ fn push(message: Record) //APPEND ONE ENTRY AND REWRITE THE FILE
     let limit: usize = super::read_config("max_persistent_messages");
     if limit == 0 { return; }
 
-    let mut history = HISTORY.lock().unwrap();
+    let mut guard = HISTORY.lock().unwrap();
 
-    history.push(message);
+    guard.records.push(message);
 
     //KEEP THE LAST limit MESSAGES
-    let over = history.len().saturating_sub(limit);
-    let dropped: Vec<[u8; 32]> = history.drain(..over).filter_map(|message| message.image).collect();
+    let over = guard.records.len().saturating_sub(limit);
+    let dropped: Vec<[u8; 32]> = guard.records.drain(..over).filter_map(|message| message.image).collect();
+
+    guard.base += over as u64;
+    let history = &guard.records;
 
     //A PICTURE ANOTHER ENTRY - OR A PROFILE - STILL NAMES STAYS
     let orphans: Vec<[u8; 32]> = dropped.into_iter()
@@ -154,7 +172,7 @@ fn push(message: Record) //APPEND ONE ENTRY AND REWRITE THE FILE
 
     fs::write(path(), sealed).expect("Saving message history failed");
 
-    drop(history); //THE FILES ARE NOT THE HISTORY'S BUSINESS
+    drop(guard); //THE FILES ARE NOT THE HISTORY'S BUSINESS
 
     if !orphans.is_empty() { log::info!("Dropping {} stored images with no history entry left", orphans.len()); }
 
@@ -163,7 +181,7 @@ fn push(message: Record) //APPEND ONE ENTRY AND REWRITE THE FILE
 
 pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
 {
-    HISTORY.lock().unwrap().iter().any(|message| message.image.as_ref() == Some(hash))
+    HISTORY.lock().unwrap().records.iter().any(|message| message.image.as_ref() == Some(hash))
 }
 
 pub fn stored(hash: &[u8; 32]) -> bool //IS THIS PICTURE ONE THE SERVER KEEPS AT ALL?
@@ -181,7 +199,7 @@ pub fn sweep_images()
     //AN EMPTY DIRECTORY IS NOT WORTH A HISTORY READ
     if files.is_empty() { return; }
 
-    let mut kept: HashSet<String> = HISTORY.lock().unwrap().iter()
+    let mut kept: HashSet<String> = HISTORY.lock().unwrap().records.iter()
         .filter_map(|message| message.image.as_ref().map(|hash| misc::hex(hash)))
         .collect();
 
@@ -201,13 +219,39 @@ pub fn sweep_images()
     if swept > 0 { log::info!("Swept {swept} stored images nothing names any more"); }
 }
 
-//EVERY STORED LOBBY MESSAGE, OLDEST FIRST
-pub fn all() -> Vec<StoredMessage>
+//THE NEWEST MESSAGES BEFORE before, OLDEST FIRST
+pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
 {
-    let history = HISTORY.lock().unwrap().clone();
+    let (records, start, more, kept) =
+    {
+        let history = HISTORY.lock().unwrap();
+
+        let end = history.base + history.records.len() as u64;
+        let before = before.unwrap_or(end).clamp(history.base, end);
+
+        let mut size = 0;
+        let mut start = before;
+
+        //WALK BACK UNTIL THE PAGE IS FULL
+        while start > history.base && ((before - start) as usize) < count
+        {
+            let record = &history.records[(start - 1 - history.base) as usize];
+
+            size += record.username.len() + record.text.len();
+            if size > budget && start != before { break; }
+
+            start -= 1;
+        }
+
+        let from = (start - history.base) as usize;
+        let to = (before - history.base) as usize;
+
+        (history.records[from..to].to_vec(), start, start > history.base, history.records.len() as u64)
+    };
+
     let mut looked_up: HashMap<String, MessageColors> = HashMap::new();
 
-    history.into_iter().map(|message|
+    let messages = records.into_iter().map(|message|
     {
         //WHAT server_users.toml HOLDS FOR THEM NOW
         let stored = looked_up.entry(message.username.clone())
@@ -224,5 +268,7 @@ pub fn all() -> Vec<StoredMessage>
             },
             image: message.image,
         }
-    }).collect()
+    }).collect();
+
+    Page { messages, start, more, kept }
 }

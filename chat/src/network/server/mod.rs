@@ -84,7 +84,6 @@ use crate::
             PacketCode,
             OnlineUser,
             OfflineUser,
-            StoredMessage,
             UserProfile,
             UserFile,
             UserScreen,
@@ -175,34 +174,26 @@ async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys)
     }, Some(keys)).await;
 }
 
-async fn send_history(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys) //SEND THE STORED LOBBY MESSAGES
+async fn send_history(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys, before: Option<u64>) //SEND A PAGE OF THE STORED LOBBY MESSAGES
 {
     if !config::read_config::<bool>("persistent_messages") { return; }
 
-    let stored = config::messages::all();
-    if stored.is_empty() { return; }
+    let count: usize = config::read_config("history_page");
+    let page = config::messages::page(before, count.max(1), consts::MAX_HISTORY_SIZE);
 
-    //THE NEWEST HISTORY THAT FITS IN ONE PACKET
-    let mut messages: Vec<StoredMessage> = Vec::new();
-    let mut budget = consts::MAX_HISTORY_SIZE;
+    //NOTHING STORED IS NOT WORTH A HEADING
+    if before.is_none() && page.messages.is_empty() { return; }
 
-    for message in stored.into_iter().rev()
+    log::debug!("Replaying history ({} messages)", page.messages.len());
+
+    network::send(&mut *write_stream.lock().await, PacketCode::History
     {
-        let size = message.username.len() + message.text.len();
-        if size > budget { break; }
-
-        budget -= size;
-
-        messages.push(message);
-    }
-
-    if messages.is_empty() { return; }
-
-    messages.reverse(); //OLDEST FIRST AGAIN
-
-    log::debug!("Replaying history ({} messages)", messages.len());
-
-    network::send(&mut *write_stream.lock().await, PacketCode::History { messages }, Some(keys)).await;
+        messages: page.messages,
+        start: page.start,
+        more: page.more,
+        kept: page.kept,
+        older: before.is_some(),
+    }, Some(keys)).await;
 }
 
 async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTIONS BY IP
@@ -909,7 +900,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     authenticate_client(&peer_addr, &username, &device, role, id);
 
     //SEND WHAT WAS SAID IN THE LOBBY BEFORE THIS
-    send_history(&streams.1, &keys).await;
+    send_history(&streams.1, &keys, None).await;
 
     //TELL CLIENT TO START CHATTING
     network::send(&mut *streams.1.lock().await, PacketCode::Accept { id, role }, Some(&keys)).await;
@@ -1405,6 +1396,9 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 network::send(&mut *streams.1.lock().await, PacketCode::Files { users }, Some(&keys)).await;
             },
 
+            //AN OLDER PAGE OF THE HISTORY
+            PacketCode::HistoryRequest { before } => send_history(&streams.1, &keys, Some(before)).await,
+
             //ONE OF THE HISTORY'S PICTURES
             PacketCode::ImageDataRequest { hash } =>
             {
@@ -1436,6 +1430,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 } else
                 {
                     log::warn!("Image fetch refused (nothing names it): {peer_addr}");
+
+                    //AN EMPTY ANSWER SO THE CAPTION STOPS WAITING
+                    network::send(&mut *streams.1.lock().await, PacketCode::ImageData
+                    {
+                        hash,
+                        data: Vec::new(),
+                    }, Some(&keys)).await;
                 }
             },
 
