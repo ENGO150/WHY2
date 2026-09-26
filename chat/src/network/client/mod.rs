@@ -160,13 +160,13 @@ pub enum ClientEvent
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
     Upload(u64, String, u64),                                    //UPLOADING FILE (UID, NAME, SIZE)
     Image(u64, String, u64),                                     //UPLOADING IMAGE (UID, NAME, SIZE)
-    ImageDisplay(String, String, Animation, Option<u8>),         //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
+    ImageDisplay(String, String, u64, Animation, Option<u8>),    //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
     ImageData([u8; 32], Option<Animation>),                      //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
-    ImagePending(String, String, [u8; 32], Option<u8>),          //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
-    ImageOffer(String, String, [u8; 32], Option<u8>),            //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
+    ImagePending(String, String, u64, [u8; 32], Option<u8>),     //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
+    ImageOffer(String, String, u64, [u8; 32], Option<u8>),       //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
     ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
     AvatarFailed(String),                                        //CUTTING OUR AVATAR FAILED
-    ImageFailed(String, String, Option<u8>),                     //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
+    ImageFailed(String, String, u64, Option<u8>),                //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
     Uploaded(String, String),                                    //USER UPLOADED FILE
     UploadDone(u64, String),                                     //OUR OWN UPLOAD IS ON THE WIRE
     Download(u64, String, u64),                                  //DOWNLOADING FILE (UID, NAME, SIZE)
@@ -611,7 +611,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //EITHER THE PICTURE OR THE OFFER OF IT
-            PacketCode::ImageDisplay { username, filename, hash, data, username_color } =>
+            PacketCode::ImageDisplay { username, filename, message_id, hash, data, username_color } =>
             {
                 let image_tx = tx.clone();
 
@@ -632,7 +632,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                             cache::store(&digest, &data).await;
                         }
 
-                        image_tx.send(ClientEvent::ImageOffer(username, filename, hash, username_color)).await.unwrap();
+                        image_tx.send(ClientEvent::ImageOffer(username, filename, message_id, hash, username_color)).await.unwrap();
                     });
 
                     continue;
@@ -650,7 +650,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     let Some(data) = data else
                     {
                         //ASK FROM THE EVENT LOOP, WHICH OWNS THE WRITE HALF
-                        image_tx.send(ClientEvent::ImagePending(username, filename, hash, username_color)).await.unwrap();
+                        image_tx.send(ClientEvent::ImagePending(username, filename, message_id, hash, username_color)).await.unwrap();
 
                         return;
                     };
@@ -674,8 +674,8 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                     image_tx.send(match image
                     {
-                        Some(image) => ClientEvent::ImageDisplay(username, filename, image, username_color),
-                        None => ClientEvent::ImageFailed(username, filename, username_color),
+                        Some(image) => ClientEvent::ImageDisplay(username, filename, message_id, image, username_color),
+                        None => ClientEvent::ImageFailed(username, filename, message_id, username_color),
                     }).await.unwrap();
                 });
 

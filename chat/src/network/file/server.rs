@@ -490,7 +490,11 @@ pub async fn download
                 //KEEP IT, ON THE SAME TERMS AS A MESSAGE
                 let kept = channel.is_none() && config::read_config::<bool>("persistent_messages");
 
-                if kept { config::messages::store_image(&username, &filename, &final_hash); }
+                let message_id = match kept
+                {
+                    true => config::messages::store_image(&username, &filename, &final_hash),
+                    false => config::messages::next_id(),
+                };
 
                 //DELETE A PICTURE NOTHING KEPT
                 if !kept && insert { let _ = fs::remove_file(&new_path).await; }
@@ -500,6 +504,7 @@ pub async fn download
                 {
                     username: username.clone(),
                     filename,
+                    message_id,
                     hash: final_hash,
                     data: Some(data),
                     username_color: config::users::colors(&username).username_color,

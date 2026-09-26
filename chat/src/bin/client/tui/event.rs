@@ -83,34 +83,34 @@ impl App
             },
 
             //STORED UNRENDERED - App::theme MAKES THE LINE
-            ClientEvent::Message(message, username, id, _, colors) =>
+            ClientEvent::Message(message, username, id, message_id, colors) =>
             {
                 //A MESSAGE IS THE PROOF THEY STOPPED
                 self.stopped_typing(&username);
-                self.push_message(username, id, message, colors);
+                self.push_message(username, id, message_id, message, colors);
             },
 
             ClientEvent::Typing(username) => self.set_typing(username),
 
             //A PICTURE IS AN ENTRY OF ITS OWN
-            ClientEvent::ImageDisplay(username, filename, image, color) =>
-                self.push_image(username, filename, image, color),
+            ClientEvent::ImageDisplay(username, filename, message_id, image, color) =>
+                self.push_image(username, filename, message_id, image, color),
 
             //A PICTURE WE DO NOT HOLD: CAPTION IT NOW
-            ClientEvent::ImagePending(username, filename, hash, color) =>
+            ClientEvent::ImagePending(username, filename, message_id, hash, color) =>
             {
-                self.push_caption(username, filename, hash, state::Picture::Waiting, color);
+                self.push_caption(username, filename, message_id, hash, state::Picture::Waiting, color);
                 self.image_requests.push(hash);
             },
 
             //THE SAME LINE WITH THE BUTTON ON IT
-            ClientEvent::ImageOffer(username, filename, hash, color) =>
-                self.push_caption(username, filename, hash, state::Picture::Absent, color),
+            ClientEvent::ImageOffer(username, filename, message_id, hash, color) =>
+                self.push_caption(username, filename, message_id, hash, state::Picture::Absent, color),
 
             //A CLICK THE CACHE COULD NOT ANSWER
             ClientEvent::ImageRequest(hash) => self.image_requests.push(hash),
 
-            ClientEvent::ImageFailed(username, filename, _) => self.push_styled(
+            ClientEvent::ImageFailed(username, filename, ..) => self.push_styled(
                 format!("{username} sent an image that could not be displayed ({filename})."), theme::ERROR),
 
             ClientEvent::PrivateMessageSent(to, id, msg, colors) => self.push_private(true, to, id, msg, colors),
@@ -321,6 +321,7 @@ impl App
                     {
                         username: message.username,
                         filename: message.text,
+                        message_id: message.message_id,
                         username_color: message.colors.username_color,
                         hash: Some(hash),
                         picture: match auto_show
@@ -330,7 +331,13 @@ impl App
                         },
                     },
 
-                    None => state::Entry::History { username: message.username, text: message.text, colors: message.colors },
+                    None => state::Entry::History
+                    {
+                        username: message.username,
+                        message_id: message.message_id,
+                        text: message.text,
+                        colors: message.colors,
+                    },
                 }).collect();
 
                 match older

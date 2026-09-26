@@ -43,6 +43,7 @@ pub struct Theme //CACHED CONFIG-DRIVEN STYLING
     pub disable_colors: bool,
     pub disable_logo: bool,
     pub show_id: bool,
+    pub show_message_ids: bool,
     pub render_math: bool,
 }
 
@@ -56,6 +57,7 @@ impl Theme
             disable_colors: config::read_config::<bool>("disable_colors"),
             disable_logo: config::read_config::<bool>("disable_logo"),
             show_id: config::read_config::<bool>("show_id"),
+            show_message_ids: config::read_config::<bool>("show_message_ids"),
             render_math: config::read_config::<bool>("render_math"),
         }
     }
@@ -72,12 +74,13 @@ impl Theme
         {
             Entry::Line(line) => state::wrap_line(line, width),
 
-            Entry::Message { username, id, text, colors } =>
+            Entry::Message { username, id, message_id, text, colors } =>
             {
                 let id = if self.show_id { format!(" ({id})") } else { String::new() };
 
                 let prefix = vec!
                 [
+                    self.message_id(*message_id),
                     self.colorize(username.clone(), colors.username_color),
                     Span::styled(id, DIM),
                     Span::raw(": "),
@@ -87,8 +90,9 @@ impl Theme
             },
 
             //THE SAME LINE WITHOUT THE ID COLUMN
-            Entry::History { username, text, colors } => markup::render(vec!
+            Entry::History { username, message_id, text, colors } => markup::render(vec!
             [
+                self.message_id(*message_id),
                 self.colorize(username.clone(), colors.username_color),
                 Span::raw(": "),
             ], text, self.style(colors.message_color), width, self.render_math),
@@ -108,10 +112,11 @@ impl Theme
             Entry::Transfer(transfer) => state::wrap_line(&Line::from(progress(transfer, width)), width),
 
             //ONLY THE CAPTION; THE PICTURE IS DRAWN UNDER IT
-            Entry::Image { username, filename, username_color, picture, .. } =>
+            Entry::Image { username, filename, message_id, username_color, picture, .. } =>
             {
                 let mut spans = vec!
                 [
+                    self.message_id(*message_id),
                     //THE SENDER'S COLOR, ELSE THE CHROME'S ACCENT
                     match username_color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
                     {
@@ -132,6 +137,11 @@ impl Theme
                 state::wrap_line(&Line::from(spans), width)
             },
         }
+    }
+
+    fn message_id(&self, message_id: u64) -> Span<'static> //MESSAGE ID PREFIX
+    {
+        Span::styled(if self.show_message_ids { format!("#{message_id} ") } else { String::new() }, DIM)
     }
 
     pub fn colorize(&self, text: String, color: Option<u8>) -> Span<'static> //COLORIZE text IF PASSED COLOR

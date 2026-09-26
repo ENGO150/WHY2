@@ -1158,16 +1158,18 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     };
 
                     //KEEP IT, ON AN UPLOAD'S TERMS
-                    if channel.is_none() && config::read_config::<bool>("persistent_messages")
+                    let message_id = match channel.is_none() && config::read_config::<bool>("persistent_messages")
                     {
-                        config::messages::store_image(&username, &filename, &hash);
-                    }
+                        true => config::messages::store_image(&username, &filename, &hash),
+                        false => config::messages::next_id(),
+                    };
 
                     //AN IMAGE LINE IS COLORED LIKE A MESSAGE
                     send_to_all(PacketCode::ImageDisplay
                     {
                         username: username.clone(),
                         filename: filename.clone(),
+                        message_id,
                         hash,
                         data: None,
                         username_color: config::users::colors(&username).username_color,

@@ -182,6 +182,7 @@ pub enum PacketCode //CONTROL CODES
     {
         username: String,
         filename: String,
+        message_id: u64,
         hash: [u8; 32],
         data: Option<Vec<u8>>,
         username_color: Option<u8>,

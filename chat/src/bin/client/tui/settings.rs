@@ -252,6 +252,7 @@ impl Settings
         rows.push(Row::Item(Item::client("Math rendering", "render_math", toggle_value("render_math", false))));
 
         rows.push(Row::Item(Item::client("Show client IDs", "show_id", toggle_value("show_id", false))));
+        rows.push(Row::Item(Item::client("Show message IDs", "show_message_ids", toggle_value("show_message_ids", false))));
 
         rows.push(Row::Header(String::from("Privacy")));
 
