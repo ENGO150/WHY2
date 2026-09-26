@@ -1,6 +1,18 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.2.2:
+- 8f370812: upgrade dependencies
+- f5c0af64: load history pages and pictures as they scroll into view
+- be35788b: page the lobby history on the server
+- 1e11001a: implement avatar cropping to square dims
+- 8db810df: implement avatars in user profiles
+- 5c8f88e1: fix TUI overlay rendering
+- ebb01c09: add website, pronouns & status to profiles
+- 1a540ee7: implement user profile bios
+- 344c2641: implement typing indicator
+- 8c332d67: implement upload progress bar
+
 v2.2.1:
 - cb83b5ae: unset last_pm on disconnect
 - 7dd7d076: apply spam limits to PM replies
