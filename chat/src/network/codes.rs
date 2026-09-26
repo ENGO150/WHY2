@@ -485,6 +485,7 @@ pub struct UserProfile
 pub struct StoredMessage
 {
     pub username: String,
+    pub message_id: u64,
     pub text: String,            //THE MESSAGE - OR THE FILENAME, WHEN THIS LINE IS AN IMAGE
     pub colors: MessageColors,
     pub image: Option<[u8; 32]>, //CONTENT HASH OF THE PICTURE

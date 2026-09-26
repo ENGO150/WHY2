@@ -43,6 +43,15 @@ use crate::
 #[derive(SchemaWrite, SchemaRead, Clone)]
 struct Record //ONE MESSAGE RECORD
 {
+    id: u64,
+    username: String,
+    text: String,
+    image: Option<[u8; 32]>,
+}
+
+#[derive(SchemaRead)]
+struct LegacyRecord //A RECORD BEFORE IDS (remove with next version bump)
+{
     username: String,
     text: String,
     image: Option<[u8; 32]>,
@@ -51,6 +60,7 @@ struct Record //ONE MESSAGE RECORD
 struct History //THE RECORDS AND WHERE THEY START
 {
     base: u64,            //ABSOLUTE INDEX OF records[0]
+    next: u64,            //NEXT MESSAGE ID
     records: Vec<Record>,
 }
 
@@ -64,8 +74,27 @@ pub struct Page
 }
 
 //GLOBAL VARIABLES
-static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History { base: 0, records: load() })); //MESSAGE HISTORY
+static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History::new())); //MESSAGE HISTORY
 static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                                       //AT-REST KEYS
+
+//IMPLEMENTATIONS
+impl History
+{
+    fn new() -> Self //LOAD AND CONTINUE THE IDS
+    {
+        let records = load();
+        let next = records.last().map_or(0, |message| message.id + 1);
+
+        Self { base: 0, next, records }
+    }
+
+    fn take_id(&mut self) -> u64 //HAND OUT THE NEXT ID
+    {
+        let id = self.next;
+        self.next += 1;
+        id
+    }
+}
 
 //FUNCTIONS
 //PRIVATE
@@ -100,22 +129,23 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
             history
         },
 
-        Err(_) => migrate(&plaintext), //MAYBE IT IS ONE THE COLORS ARE STILL IN
+        Err(_) => migrate(&plaintext), //MAYBE IT IS ONE WITHOUT IDS
     }
 }
 
-fn migrate(plaintext: &[u8]) -> Vec<Record>
+fn migrate(plaintext: &[u8]) -> Vec<Record> //NUMBER A HISTORY WITHOUT IDS (remove with next version bump)
 {
-    let Ok(history) = wincode::config::deserialize::<Vec<StoredMessage>, _>(plaintext, consts::PACKET_CONFIG) else
+    let Ok(history) = wincode::config::deserialize::<Vec<LegacyRecord>, _>(plaintext, consts::PACKET_CONFIG) else
     {
         log::error!("Message history is of an older format, it is being ignored");
         return Vec::new();
     };
 
-    log::info!("Migrated {} stored messages, their colors dropped", history.len());
+    log::info!("Migrated {} stored messages, ids assigned", history.len());
 
-    history.into_iter().map(|message| Record
+    history.into_iter().zip(0..).map(|(message, id)| Record
     {
+        id,
         username: message.username,
         text: message.text,
         image: message.image,
@@ -123,35 +153,32 @@ fn migrate(plaintext: &[u8]) -> Vec<Record>
 }
 
 //PUBLIC
-pub fn store(username: &str, text: &str) //APPEND MESSAGE
+pub fn next_id() -> u64 //ID FOR A MESSAGE THAT IS NOT KEPT
 {
-    push(Record
-    {
-        username: username.to_string(),
-        text: text.to_string(),
-        image: None,
-    });
+    HISTORY.lock().unwrap().take_id()
 }
 
-pub fn store_image(username: &str, filename: &str, hash: &[u8; 32])
+pub fn store(username: &str, text: &str) -> u64 //APPEND MESSAGE
 {
-    push(Record
-    {
-        username: username.to_string(),
-        text: filename.to_string(),
-        image: Some(*hash),
-    });
+    push(username, text, None)
 }
 
-fn push(message: Record) //APPEND ONE ENTRY AND REWRITE THE FILE
+pub fn store_image(username: &str, filename: &str, hash: &[u8; 32]) -> u64
 {
-    //A HISTORY OF NOTHING DOES NOT TOUCH THE FILE
+    push(username, filename, Some(*hash))
+}
+
+fn push(username: &str, text: &str, image: Option<[u8; 32]>) -> u64 //APPEND ONE ENTRY AND REWRITE THE FILE
+{
     let limit: usize = super::read_config("max_persistent_messages");
-    if limit == 0 { return; }
 
     let mut guard = HISTORY.lock().unwrap();
+    let id = guard.take_id();
 
-    guard.records.push(message);
+    //A HISTORY OF NOTHING DOES NOT TOUCH THE FILE
+    if limit == 0 { return id; }
+
+    guard.records.push(Record { id, username: username.to_string(), text: text.to_string(), image });
 
     //KEEP THE LAST limit MESSAGES
     let over = guard.records.len().saturating_sub(limit);
@@ -177,6 +204,8 @@ fn push(message: Record) //APPEND ONE ENTRY AND REWRITE THE FILE
     if !orphans.is_empty() { log::info!("Dropping {} stored images with no history entry left", orphans.len()); }
 
     for hash in orphans { let _ = fs::remove_file(misc::get_image_dir().join(misc::hex(&hash))); }
+
+    id
 }
 
 pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
@@ -259,6 +288,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
 
         StoredMessage
         {
+            message_id: message.id,
             username: message.username,
             text: message.text,
             colors: match message.image.is_some()
