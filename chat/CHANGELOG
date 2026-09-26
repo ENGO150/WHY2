@@ -1,6 +1,9 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.2.4:
+- 29a5c204: add possibility to reference user in Ban & Role commands by username
+
 v2.2.3:
 - 5cb93b30: use why2 v1.5.3 on chat
 - 90fd22f4: filter channel on client, not server
