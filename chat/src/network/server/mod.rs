@@ -244,14 +244,14 @@ where
     task
 }
 
-pub fn send_to_all(code: PacketCode, filter_channel: bool, channel: Option<&str>) //SEND PACKET TO ALL CLIENTS
+pub fn send_to_all(code: PacketCode) //SEND PACKET TO ALL CLIENTS
 {
-    //COLLECT EACH CLIENT IN SAME CHANNEL
+    //COLLECT EACH CLIENT
     let entries: Vec<Connection> = CONNECTIONS.iter().filter_map(|entry|
     {
         match entry.value()
         {
-            Connection::Authenticated { channel: c, .. } if !filter_channel || c.as_deref() == channel =>
+            Connection::Authenticated { .. } =>
             {
                 //FOUND, COLLECT
                 Some(entry.value().clone())
@@ -371,7 +371,7 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         {
             username: connection.username().unwrap().to_string(),
             id: *connection.id().unwrap(),
-        }, false, None);
+        });
     }
 
     log::info!
@@ -584,7 +584,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             send_to_all(PacketCode::ChannelDestroyed
             {
                 name: old_channel,
-            }, false, None);
+            });
         }
     }
 
@@ -599,7 +599,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             send_to_all(PacketCode::ChannelCreated
             {
                 name: channel.clone(),
-            }, false, None);
+            });
         }
     }
 }
@@ -916,7 +916,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         username_color: config::users::colors(&username).username_color,
         id,
         device,
-    }, false, None);
+    });
 
     //TELL THE CLIENT WHO IS ALREADY IN VOICE
     if options::voice_chat_enabled()
@@ -979,7 +979,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     false => config::messages::next_id(),
                 };
 
-                //SEND MESSAGE TO ALL USERS
+                //SEND MESSAGE TO ALL USERS, TAGGED WITH ITS CHANNEL
                 send_to_all(PacketCode::Message
                 {
                     text,
@@ -987,7 +987,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     id,
                     message_id,
                     colors: config::users::colors(&username),
-                }, true, channel.as_deref());
+                    channel: Some(channel.clone()),
+                });
             }
 
             //SOMEBODY IS WRITING
@@ -1050,7 +1051,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     network::send(&mut *streams.1.lock().await, PacketCode::Voice { token: Some(token) }, Some(&keys)).await;
 
                     //SEND CODE TO CHANNEL
-                    send_to_all(PacketCode::VoiceJoin { username: username.clone(), id }, true, channel.as_deref());
+                    send_to_all(PacketCode::VoiceJoin { username: username.clone(), id, channel: channel.clone() });
 
                     //SEND CONNECTED CLIENTS
                     send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
@@ -1062,7 +1063,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     network::send(&mut *streams.1.lock().await, PacketCode::Voice { token: None }, Some(&keys)).await;
 
                     //SEND CODE TO LAST CHANNEL
-                    send_to_all(PacketCode::VoiceLeave { id }, true, channel.as_deref());
+                    send_to_all(PacketCode::VoiceLeave { id, channel: channel.clone() });
 
                     //REMOVE FROM VOICE
                     voice_server::remove_connection(&id);
@@ -1078,7 +1079,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //SEND VoiceLeave CODE TO OLD CHANNEL
                     if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
                     {
-                        send_to_all(PacketCode::VoiceLeave { id }, true, channel.as_deref());
+                        send_to_all(PacketCode::VoiceLeave { id, channel: channel.clone() });
                     }
 
                     //UPDATE CHANNEL
@@ -1089,7 +1090,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //SEND CODE TO CHANNEL
                     if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&id)
                     {
-                        send_to_all(PacketCode::VoiceJoin { username: username.clone(), id }, true, channel.as_deref());
+                        send_to_all(PacketCode::VoiceJoin { username: username.clone(), id, channel: channel.clone() });
                     }
 
                     //SEND CONNECTED CLIENTS
@@ -1118,7 +1119,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     log::info!("Message deleted ({}): {peer_addr}", if own { "own" } else { "peer" });
 
                     //EVERY CLIENT HOLDS A LOBBY PANE
-                    send_to_all(PacketCode::Deleted { message_id }, false, None);
+                    send_to_all(PacketCode::Deleted { message_id });
                 } else
                 {
                     log::warn!("Delete refused (no such message, or permissions): {peer_addr}");
@@ -1176,7 +1177,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         hash,
                         data: None,
                         username_color: config::users::colors(&username).username_color,
-                    }, true, channel.as_deref());
+                        channel: Some(channel.clone()),
+                    });
 
                     //TELL THE UPLOADER THERE IS NOTHING TO SEND
                     network::send(&mut *streams.1.lock().await, PacketCode::ImageDuplicate { hash }, Some(&keys)).await;
@@ -1279,7 +1281,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     network::send(&mut *streams.1.lock().await, PacketCode::Screen { token: None }, Some(&keys)).await;
 
                     //NOTIFY USERS ABOUT SCREEN
-                    send_to_all(PacketCode::ScreenshareEnd { username: username.clone() }, false, None);
+                    send_to_all(PacketCode::ScreenshareEnd { username: username.clone() });
 
                     continue;
                 }
@@ -1294,7 +1296,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     }, Some(&keys)).await;
 
                     //NOTIFY USERS ABOUT SCREEN
-                    send_to_all(PacketCode::Screenshare { username: username.clone() }, false, None);
+                    send_to_all(PacketCode::Screenshare { username: username.clone() });
 
                     //LOG START
                     log::info!("Screen share: {peer_addr}");
@@ -2003,7 +2005,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 log::info!("Server announcement ({} chars) by {peer_addr}", message.chars().count());
 
                 //SEND BACK TO ALL CLIENTS ACROSS ALL CHANNELS
-                send_to_all(PacketCode::ServerSay { message }, false, None);
+                send_to_all(PacketCode::ServerSay { message });
             },
 
             //SET A USER'S ROLE

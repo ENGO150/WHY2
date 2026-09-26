@@ -122,7 +122,7 @@ pub enum ClientEvent
     FirstUser,                                                   //FIRST USER
     Authenticated(Role),                                         //LOGIN SUCCESSFUL, ROLE
     Connected(String),                                           //SUCCESSFUL CONNECTION MESSAGE
-    Message(String, String, usize, u64, MessageColors),          //RECEIVED MESSAGE
+    Message(String, String, usize, u64, MessageColors, Option<Option<String>>), //RECEIVED MESSAGE, ITS CHANNEL
     PrivateMessageSent(String, usize, String, MessageColors),    //SENT PM
     PrivateMessageRecv(String, usize, String, MessageColors),    //RECEIVED PM
     TofuError,                                                   //TOFU VERIFICATION REJECTED BY THE USER
@@ -165,6 +165,7 @@ pub enum ClientEvent
     ImageData([u8; 32], Option<Animation>),                      //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
     ImagePending(String, String, u64, [u8; 32], Option<u8>),     //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
     ImageOffer(String, String, u64, [u8; 32], Option<u8>),       //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
+    ImageParked(String, String, String, u64, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE IN ANOTHER CHANNEL (CHANNEL FIRST)
     ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
     AvatarFailed(String),                                        //CUTTING OUR AVATAR FAILED
     ImageFailed(String, String, u64, Option<u8>),                //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
@@ -280,9 +281,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
         match read
         {
             //REGULAR MESSAGE
-            PacketCode::Message { text, username, id, message_id, colors } =>
+            PacketCode::Message { text, username, id, message_id, colors, channel } =>
             {
-                tx.send(ClientEvent::Message(text, username, id, message_id, colors)).await.unwrap();
+                tx.send(ClientEvent::Message(text, username, id, message_id, colors, channel)).await.unwrap();
             }
 
             //THE LOBBY'S STORED MESSAGES
@@ -502,10 +503,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             }
 
             //CLIENT JOINED VOICE
-            PacketCode::VoiceJoin { username, id: sid } =>
+            PacketCode::VoiceJoin { username, id: sid, channel } =>
             {
                 //OUR OWN JOIN COMES BACK TO US TOO
-                if id == sid { continue; }
+                if id == sid || channel.unwrap_or_default() != options::get_channel() { continue; }
 
                 #[cfg(feature = "client_voice")]
                 if voice_options::get_use_voice()
@@ -517,8 +518,11 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //CLIENT LEFT VOICE
-            PacketCode::VoiceLeave { id } =>
+            PacketCode::VoiceLeave { id, channel } =>
             {
+                //ANOTHER CHANNEL'S VOICE
+                if channel.unwrap_or_default() != options::get_channel() { continue; }
+
                 #[cfg(feature = "client_voice")]
                 voice_client::remove_consumer(&id);
 
@@ -612,12 +616,14 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //EITHER THE PICTURE OR THE OFFER OF IT
-            PacketCode::ImageDisplay { username, filename, message_id, hash, data, username_color } =>
+            PacketCode::ImageDisplay { username, filename, message_id, hash, data, username_color, channel } =>
             {
                 let image_tx = tx.clone();
 
-                //auto_show_images OFF: UNPACK NOTHING
-                if !image::auto_show_images()
+                //ANOTHER CHANNEL'S PICTURE: CACHE IT, DECODE NOTHING
+                let elsewhere = channel.map(Option::unwrap_or_default).filter(|channel| *channel != options::get_channel());
+
+                if elsewhere.is_some() || !image::auto_show_images()
                 {
                     tokio::spawn(async move
                     {
@@ -633,7 +639,11 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                             cache::store(&digest, &data).await;
                         }
 
-                        image_tx.send(ClientEvent::ImageOffer(username, filename, message_id, hash, username_color)).await.unwrap();
+                        image_tx.send(match elsewhere
+                        {
+                            Some(channel) => ClientEvent::ImageParked(channel, username, filename, message_id, hash, username_color),
+                            None => ClientEvent::ImageOffer(username, filename, message_id, hash, username_color),
+                        }).await.unwrap();
                     });
 
                     continue;

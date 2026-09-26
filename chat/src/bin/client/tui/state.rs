@@ -433,6 +433,27 @@ impl App
         self.push_entry(Entry::Message { username, id, message_id, text, colors });
     }
 
+    //STORE AN ENTRY IN ANOTHER CHANNEL'S PARKED PANE
+    pub fn park_entry(&mut self, channel: String, entry: Entry)
+    {
+        let lobby = channel.is_empty();
+        let pane = self.panes.entry(channel).or_default();
+
+        pane.push_back(entry);
+
+        while pane.len() > consts::HISTORY_LIMIT
+        {
+            pane.pop_front();
+
+            //THE REPLAYED ENTRIES MOVE UP, OR GO
+            if lobby
+            {
+                self.history_anchor = self.history_anchor.and_then(|anchor| anchor.checked_sub(1));
+                if self.history_anchor.is_none() { self.history_cursor = None; }
+            }
+        }
+    }
+
     //STORE A PRIVATE MESSAGE UNRENDERED
     pub fn push_private(&mut self, sent: bool, username: String, id: usize, text: String, colors: MessageColors)
     {

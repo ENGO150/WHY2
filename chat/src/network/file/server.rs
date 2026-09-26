@@ -508,7 +508,8 @@ pub async fn download
                     hash: final_hash,
                     data: Some(data),
                     username_color: config::users::colors(&username).username_color,
-                }, true, channel.as_deref());
+                    channel: Some(channel.clone()),
+                });
             }
         } else
         {
@@ -517,7 +518,7 @@ pub async fn download
             {
                 username: username.clone(),
                 filename: filename.clone(),
-            }, false, None);
+            });
 
             if insert
             {

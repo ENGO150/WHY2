@@ -83,11 +83,21 @@ impl App
             },
 
             //STORED UNRENDERED - App::theme MAKES THE LINE
-            ClientEvent::Message(message, username, id, message_id, colors) =>
+            ClientEvent::Message(message, username, id, message_id, colors, channel) =>
             {
-                //A MESSAGE IS THE PROOF THEY STOPPED
-                self.stopped_typing(&username);
-                self.push_message(username, id, message_id, message, colors);
+                //None = EVERY PANE, Some(None) = THE LOBBY
+                match channel.map(Option::unwrap_or_default)
+                {
+                    Some(channel) if channel != self.channel =>
+                        self.park_entry(channel, state::Entry::Message { username, id, message_id, text: message, colors }),
+
+                    _ =>
+                    {
+                        //A MESSAGE IS THE PROOF THEY STOPPED
+                        self.stopped_typing(&username);
+                        self.push_message(username, id, message_id, message, colors);
+                    },
+                }
             },
 
             ClientEvent::Typing(username) => self.set_typing(username),
@@ -106,6 +116,23 @@ impl App
             //THE SAME LINE WITH THE BUTTON ON IT
             ClientEvent::ImageOffer(username, filename, message_id, hash, color) =>
                 self.push_caption(username, filename, message_id, hash, state::Picture::Absent, color),
+
+            //LOADED ONCE ITS PANE IS LOOKED AT
+            ClientEvent::ImageParked(channel, username, filename, message_id, hash, username_color) =>
+            {
+                let picture = match client_image::auto_show_images()
+                {
+                    true => state::Picture::Deferred,
+                    false => state::Picture::Absent,
+                };
+
+                //WE MAY HAVE SWITCHED THERE SINCE
+                match channel == self.channel
+                {
+                    true => self.push_caption(username, filename, message_id, hash, picture, username_color),
+                    false => self.park_entry(channel, state::Entry::Image { username, filename, message_id, username_color, hash: Some(hash), picture }),
+                }
+            },
 
             //A CLICK THE CACHE COULD NOT ANSWER
             ClientEvent::ImageRequest(hash) => self.image_requests.push(hash),

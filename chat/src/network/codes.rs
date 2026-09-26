@@ -48,6 +48,7 @@ pub enum PacketCode //CONTROL CODES
         id: usize,
         message_id: u64,
         colors: MessageColors,
+        channel: Option<Option<String>>,
     },
 
     //SERVER -> CLIENT | KEY EXCHANGE OFFER
@@ -145,6 +146,7 @@ pub enum PacketCode //CONTROL CODES
     {
         username: String,
         id: usize,
+        channel: Option<String>,
     },
 
     //SERVER -> CLIENT | FILE UPLOAD APPROVAL
@@ -186,6 +188,7 @@ pub enum PacketCode //CONTROL CODES
         hash: [u8; 32],
         data: Option<Vec<u8>>,
         username_color: Option<u8>,
+        channel: Option<Option<String>>,
     },
 
     //SERVER -> CLIENT | ASK FOR A STORED PICTURE
@@ -261,48 +264,48 @@ pub enum PacketCode //CONTROL CODES
         save: bool, //FALSE = READ ANSWER, TRUE = SAVE ACK
     },
 
-    ProfileRequest { target: Option<String> },      //CLIENT -> SERVER | READ A PROFILE | None = OUR OWN
-    ProfileSave { profile: UserProfile },           //CLIENT -> SERVER | WRITE OUR OWN PROFILE
-    AvatarRequest { hash: Option<[u8; 32]> },       //CLIENT -> SERVER | SET OUR PICTURE | None = DROP IT
-    Typing { username: String },                    //SERVER -> CLIENT | SOMEBODY IN THE CHANNEL IS WRITING
-    Version { version: String },                    //SERVER <> CLIENT | THE SENDER'S PKG VERSION
-    UsernameRequest,                                //SERVER -> CLIENT | PICK USERNAME
-    LoginRequest,                                   //SERVER -> CLIENT | LOGIN
-    RegisterRequest,                                //SERVER -> CLIENT | REGISTER
-    Login { password: String },                     //CLIENT -> SERVER | LOGIN
-    Register { password: String },                  //CLIENT -> SERVER | REGISTER
-    HistoryRequest { before: u64 },                 //CLIENT -> SERVER | THE PAGE BEFORE THIS MESSAGE ID
-    DeleteRequest { message_id: u64 },              //CLIENT -> SERVER | DELETE A STORED MESSAGE
-    Deleted { message_id: u64 },                    //SERVER -> CLIENT | A MESSAGE WAS DELETED
-    Re { message: String },                         //CLIENT -> SERVER | REPLY TO LAST PM
-    Channel { channel: Option<String> },            //SERVER <> CLIENT | CHANNEL CHANGE
-    ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
-    ChannelDestroyed { name: String },              //SERVER -> CLIENT | CHANNEL ABANDONED
-    VoiceClients { clients: Vec<(usize, String)> }, //SERVER -> CLIENT | THE CHANNEL'S VOICE ROSTER
-    VoiceLeave { id: usize },                       //SERVER -> CLIENT | CLIENT LEFT VOICE
-    UploadRequest { hash: [u8; 32] },               //CLIENT -> SERVER | REQUEST FILE UPLOAD
-    Download { token: [u8; 32] },                   //SERVER -> CLIENT | DOWNLOAD FILE FROM SERVER
-    ImageDuplicate { hash: [u8; 32] },              //SERVER -> CLIENT | IMAGE ALREADY UPLOADED
-    ImageDataRequest { hash: [u8; 32] },            //CLIENT -> SERVER | ASK FOR A STORED PICTURE
-    FilesRequest,                                   //CLIENT -> SERVER | REQUEST FILE LIST
-    ListRequest,                                    //CLIENT -> SERVER | REQUEST CONNECTED USERS
-    TypingRequest,                                  //CLIENT -> SERVER | WE ARE WRITING A MESSAGE
-    ScreensRequest,                                 //CLIENT -> SERVER | REQUEST SCREENSHARE LIST
-    DeattachRequest,                                //CLIENT -> SERVER | DEATTACH CLIENT SCREENSHARE
-    ScreenRequest,                                  //CLIENT -> SERVER | TOGGLE SCREENSHARE
-    AttachRequest { id: usize },                    //CLIENT -> SERVER | ATTACH CLIENT SCREENSHARE
-    VoiceRequest,                                   //CLIENT -> SERVER | ESTABLISH VOICE CONNECTION
-    ServerBansRequest,                              //CLIENT -> SERVER | READ server_bans.toml
-    ServerSettingsRequest,                          //CLIENT -> SERVER | READ server.toml
-    Files { users: Vec<UserFile> },                 //SERVER -> CLIENT | LIST UPLOADED FILES
-    Screens { users: Vec<UserScreen> },             //SERVER -> CLIENT | LIST SCREENSHARES
-    Deattach { username: String },                  //SERVER -> CLIENT | DEATTACH CLIENT SCREENSHARE
-    Attached { username: String },                  //SERVER -> CLIENT | CLIENT ATTACHED LOCAL CLIENT SHARE
-    Deattached { username: String },                //SERVER -> CLIENT | CLIENT DEATTACHED LOCAL CLIENT SHARE
-    Screen { token: Option<[u8; 32]> },             //SERVER -> CLIENT | SCREENSHARE APPROVAL | None = SHARE STOPPED
-    Screenshare { username: String },               //SERVER -> CLIENT | CLIENT STARTED SCREENSHARING
-    ScreenshareEnd { username: String },            //SERVER -> CLIENT | CLIENT STOPPED SCREENSHARING
-    Voice { token: Option<[u8; 32]> },              //SERVER -> CLIENT | VOICE APPROVAL | None = VOICE LEFT
+    ProfileRequest { target: Option<String> },         //CLIENT -> SERVER | READ A PROFILE | None = OUR OWN
+    ProfileSave { profile: UserProfile },              //CLIENT -> SERVER | WRITE OUR OWN PROFILE
+    AvatarRequest { hash: Option<[u8; 32]> },          //CLIENT -> SERVER | SET OUR PICTURE | None = DROP IT
+    Typing { username: String },                       //SERVER -> CLIENT | SOMEBODY IN THE CHANNEL IS WRITING
+    Version { version: String },                       //SERVER <> CLIENT | THE SENDER'S PKG VERSION
+    UsernameRequest,                                   //SERVER -> CLIENT | PICK USERNAME
+    LoginRequest,                                      //SERVER -> CLIENT | LOGIN
+    RegisterRequest,                                   //SERVER -> CLIENT | REGISTER
+    Login { password: String },                        //CLIENT -> SERVER | LOGIN
+    Register { password: String },                     //CLIENT -> SERVER | REGISTER
+    HistoryRequest { before: u64 },                    //CLIENT -> SERVER | THE PAGE BEFORE THIS MESSAGE ID
+    DeleteRequest { message_id: u64 },                 //CLIENT -> SERVER | DELETE A STORED MESSAGE
+    Deleted { message_id: u64 },                       //SERVER -> CLIENT | A MESSAGE WAS DELETED
+    Re { message: String },                            //CLIENT -> SERVER | REPLY TO LAST PM
+    Channel { channel: Option<String> },               //SERVER <> CLIENT | CHANNEL CHANGE
+    ChannelCreated { name: String },                   //SERVER -> CLIENT | CHANNEL CREATED
+    ChannelDestroyed { name: String },                 //SERVER -> CLIENT | CHANNEL ABANDONED
+    VoiceClients { clients: Vec<(usize, String)> },    //SERVER -> CLIENT | THE CHANNEL'S VOICE ROSTER
+    VoiceLeave { id: usize, channel: Option<String> }, //SERVER -> CLIENT | CLIENT LEFT VOICE
+    UploadRequest { hash: [u8; 32] },                  //CLIENT -> SERVER | REQUEST FILE UPLOAD
+    Download { token: [u8; 32] },                      //SERVER -> CLIENT | DOWNLOAD FILE FROM SERVER
+    ImageDuplicate { hash: [u8; 32] },                 //SERVER -> CLIENT | IMAGE ALREADY UPLOADED
+    ImageDataRequest { hash: [u8; 32] },               //CLIENT -> SERVER | ASK FOR A STORED PICTURE
+    FilesRequest,                                      //CLIENT -> SERVER | REQUEST FILE LIST
+    ListRequest,                                       //CLIENT -> SERVER | REQUEST CONNECTED USERS
+    TypingRequest,                                     //CLIENT -> SERVER | WE ARE WRITING A MESSAGE
+    ScreensRequest,                                    //CLIENT -> SERVER | REQUEST SCREENSHARE LIST
+    DeattachRequest,                                   //CLIENT -> SERVER | DEATTACH CLIENT SCREENSHARE
+    ScreenRequest,                                     //CLIENT -> SERVER | TOGGLE SCREENSHARE
+    AttachRequest { id: usize },                       //CLIENT -> SERVER | ATTACH CLIENT SCREENSHARE
+    VoiceRequest,                                      //CLIENT -> SERVER | ESTABLISH VOICE CONNECTION
+    ServerBansRequest,                                 //CLIENT -> SERVER | READ server_bans.toml
+    ServerSettingsRequest,                             //CLIENT -> SERVER | READ server.toml
+    Files { users: Vec<UserFile> },                    //SERVER -> CLIENT | LIST UPLOADED FILES
+    Screens { users: Vec<UserScreen> },                //SERVER -> CLIENT | LIST SCREENSHARES
+    Deattach { username: String },                     //SERVER -> CLIENT | DEATTACH CLIENT SCREENSHARE
+    Attached { username: String },                     //SERVER -> CLIENT | CLIENT ATTACHED LOCAL CLIENT SHARE
+    Deattached { username: String },                   //SERVER -> CLIENT | CLIENT DEATTACHED LOCAL CLIENT SHARE
+    Screen { token: Option<[u8; 32]> },                //SERVER -> CLIENT | SCREENSHARE APPROVAL | None = SHARE STOPPED
+    Screenshare { username: String },                  //SERVER -> CLIENT | CLIENT STARTED SCREENSHARING
+    ScreenshareEnd { username: String },               //SERVER -> CLIENT | CLIENT STOPPED SCREENSHARING
+    Voice { token: Option<[u8; 32]> },                 //SERVER -> CLIENT | VOICE APPROVAL | None = VOICE LEFT
 
     ServerKick { id: usize },                            //CLIENT -> SERVER | KICK USER
     ServerMute { id: usize },                            //CLIENT -> SERVER | MUTE USER
