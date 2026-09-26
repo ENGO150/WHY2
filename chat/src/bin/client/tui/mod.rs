@@ -616,6 +616,32 @@ async fn handle_key
             }
         }
 
+        //AND THE PICTURE, AS AN UPLOAD OR A DROP
+        if let Some(path) = app.settings.take_avatar_save()
+        {
+            let sent = match write_stream
+            {
+                Some(write_stream) if path.is_empty() =>
+                {
+                    network::send(&mut *write_stream.lock().await,
+                        PacketCode::AvatarRequest { hash: None }, options::get_keys().as_ref()).await;
+
+                    Ok(())
+                },
+
+                Some(write_stream) => crate::upload(write_stream, &path, crate::Upload::Avatar),
+                None => Err(String::new()),
+            };
+
+            //NOTHING WENT OUT, SO THE ROW STAYS EDITABLE
+            if let Err(error) = sent
+            {
+                app.settings.saving = false;
+
+                if !error.is_empty() { app.notify(error); }
+            }
+        }
+
         //AND SO DOES A CONFIRMED Restart
         if app.settings.take_restart() && let Some(write_stream) = write_stream
         {

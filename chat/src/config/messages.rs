@@ -142,9 +142,10 @@ fn push(message: Record) //APPEND ONE ENTRY AND REWRITE THE FILE
     let over = history.len().saturating_sub(limit);
     let dropped: Vec<[u8; 32]> = history.drain(..over).filter_map(|message| message.image).collect();
 
-    //A PICTURE ANOTHER ENTRY STILL NAMES STAYS
+    //A PICTURE ANOTHER ENTRY - OR A PROFILE - STILL NAMES STAYS
     let orphans: Vec<[u8; 32]> = dropped.into_iter()
         .filter(|hash| !history.iter().any(|message| message.image.as_ref() == Some(hash)))
+        .filter(|hash| !super::users::names_avatar(hash))
         .collect();
 
     //ENCRYPT-THEN-MAC THE WHOLE HISTORY
@@ -165,6 +166,11 @@ pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
     HISTORY.lock().unwrap().iter().any(|message| message.image.as_ref() == Some(hash))
 }
 
+pub fn stored(hash: &[u8; 32]) -> bool //IS THIS PICTURE ONE THE SERVER KEEPS AT ALL?
+{
+    has_image(hash) || super::users::names_avatar(hash)
+}
+
 //DELETE EVERY PICTURE THE HISTORY DOES NOT NAME
 pub fn sweep_images()
 {
@@ -175,9 +181,12 @@ pub fn sweep_images()
     //AN EMPTY DIRECTORY IS NOT WORTH A HISTORY READ
     if files.is_empty() { return; }
 
-    let kept: HashSet<String> = HISTORY.lock().unwrap().iter()
+    let mut kept: HashSet<String> = HISTORY.lock().unwrap().iter()
         .filter_map(|message| message.image.as_ref().map(|hash| misc::hex(hash)))
         .collect();
+
+    //A PROFILE OWNS ITS PICTURE THE WAY AN ENTRY OWNS ITS OWN
+    kept.extend(super::users::avatars().iter().map(|hash| misc::hex(hash)));
 
     let mut swept = 0;
 

@@ -45,6 +45,7 @@ pub const SETTINGS_WIDTH: u16         = 62;                        //SETTINGS OV
 pub const TOFU_WIDTH: u16             = 64;                        //SERVER IDENTITY OVERLAY, CAPPED TO THE TERMINAL
 pub const LOGIN_WIDTH: u16            = 52;                        //CONNECT PROMPT, CAPPED TO THE TERMINAL
 pub const FIELD_ROW: u16              = 1;                         //THE ADDRESS FIELD SITS ONE ROW UNDER ITS OWN LABEL
+pub const AVATAR_ROWS: u16            = 10;                        //ROWS A PROFILE PICTURE CLAIMS IN THE BOX
 pub const SETTINGS_VALUE_WIDTH: u16   = 20;                        //NARROWEST THE VALUE COLUMN MAY GET (BAR + PERCENTAGE)
 pub const SCROLL_GAP: usize           = 4;                         //SELECTION GAP FROM A LIST'S EDGES
 
@@ -56,6 +57,8 @@ pub const MAX_ROWS: usize             = 8;                         //VISIBLE PAL
 pub const MAX_PICKER_ROWS: usize      = 8;                         //VISIBLE DEVICE ROWS BEFORE THE PICKER SCROLLS
 pub const MAX_PATHS: usize            = 256;                       //DIRECTORY ENTRIES OFFERED FOR ONE PATH
 
+pub const AVATAR_LABEL: &str         = "Avatar";                  //THE AVATAR ROW IN AN OWN PROFILE
+pub const AVATAR_KEY: &str           = "avatar";                  //AND THE KEY IT GOES BY
 pub const SAVE_LABEL: &str            = "Save";                    //THE BUTTON THE SERVER ROWS ARE SENT BACK WITH
 pub const RESTART_LABEL: &str         = "Restart server";          //AND THE ONE THAT PUTS THE STARTUP-ONLY ONES IN USE
 pub const CHALLENGE: &str             = "yes";                     //WHAT TOFU'S SECOND STAGE WANTS TYPED OUT

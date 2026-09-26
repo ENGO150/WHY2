@@ -27,6 +27,7 @@ use std::
     iter,
     process,
     fs::File,
+    path::PathBuf,
     sync::Arc,
     io::{ Read, Seek },
 };
@@ -387,6 +388,116 @@ async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>
     process::exit(app.exit_code);
 }
 
+//WHAT AN UPLOAD IS FOR
+#[derive(Clone, Copy, PartialEq)]
+pub enum Upload
+{
+    File,
+    Image,
+    Avatar,
+}
+
+//CHECK A FILE, THEN HASH IT AND ASK THE SERVER FOR AN UPLOAD
+pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: Upload) -> Result<(), String>
+{
+    let (mut file, path) = check_upload(path, kind)?;
+
+    let write_stream = write_stream.clone();
+    let keys = options::get_keys();
+
+    tokio::spawn(async move
+    {
+        //GET SHA256 FILE HASH (BLOCKING I/O + CPU)
+        let hash: Option<[u8; 32]> = task::spawn_blocking(move ||
+        {
+            let mut hasher = Sha256::new();
+            let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+
+            //LOOP READING
+            let success = loop
+            {
+                match file.read(&mut buffer)
+                {
+                    Ok(0) => break true,
+                    Ok(bytes) => hasher.update(&buffer[..bytes]),
+                    Err(_) => break false,
+                }
+            };
+
+            //FINALIZE HASH
+            if success { Some(hasher.finalize().into()) } else { None }
+        }).await.expect("Hashing file failed");
+
+        //REQUEST FILE UPLOAD
+        if let Some(hash) = hash
+        {
+            //STORE UPLOAD IN ACTIVE UPLOADS LIST
+            client::ACTIVE_UPLOADS.lock().unwrap()
+                .insert(hash, path.canonicalize().unwrap());
+
+            //SEND UPLOAD REQUEST
+            let request = match kind
+            {
+                Upload::Avatar => PacketCode::AvatarRequest { hash: Some(hash) },
+
+                Upload::Image => PacketCode::ImageRequest
+                {
+                    hash,
+                    filename: path.file_name().and_then(|n| n.to_str())
+                        .unwrap_or("unnamed_file").to_string(),
+                },
+
+                Upload::File => PacketCode::UploadRequest { hash },
+            };
+
+            network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
+        }
+    });
+
+    Ok(())
+}
+
+//OPEN A FILE AND REFUSE WHAT THE SERVER WOULD
+pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
+{
+    //THE PALETTE OFFERS ~ PATHS, SO ONE HAS TO OPEN
+    let path = palette::expand_home(path.trim());
+
+    //TRY TO OPEN FILE
+    let Ok(mut file) = File::open(&path) else { return Err(String::from("File not found!")) };
+
+    if !path.is_file() || path.file_name().and_then(|n| n.to_str()).is_none()
+    {
+        return Err(String::from("File not found!"));
+    }
+
+    if kind == Upload::File { return Ok((file, path)); }
+
+    //READ THE HEADER BEFORE ASKING THE SERVER
+    let mut header = Vec::new();
+
+    file.by_ref().take(consts::IMAGE_HEADER_SIZE as u64).read_to_end(&mut header).ok();
+
+    //GIVE BACK WHAT WAS READ - THE HASH REUSES IT
+    file.rewind().ok();
+
+    //REFUSE AN OVERSIZED IMAGE HERE
+    let ceiling = match kind
+    {
+        Upload::Avatar => consts::MAX_AVATAR_SIZE,
+        _ => consts::MAX_IMAGE_SIZE,
+    };
+
+    if path.metadata().map(|m| m.len()).unwrap_or(0) > ceiling as u64
+    {
+        return Err(format!("Image is too large! (limit is {}MB)", ceiling / consts::MEGABYTE));
+    }
+
+    if !misc::is_image(&header) { return Err(String::from("Not an image!")); }
+
+    Ok((file, path))
+}
+
 //HANDLE ONE SUBMITTED LINE
 pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, input: String)
 {
@@ -540,99 +651,16 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             if !valid { invalid_usage(app, None); }
                         },
 
-                        //ONE REQUEST FOR BOTH, ONLY THE CODE DIFFERS
-                        Command::Upload | Command::Image =>
+                        Command::Upload | Command::Image => match parameters
                         {
-                            //CHECK PATH
-                            if let Some(parameters) = parameters
+                            Some(path) =>
                             {
-                                //THE PALETTE OFFERS ~ PATHS, SO ONE HAS TO OPEN
-                                let path = palette::expand_home(parameters.trim());
+                                let kind = if command == Command::Image { Upload::Image } else { Upload::File };
 
-                                //TRY TO OPEN FILE
-                                if let Ok(file) = File::open(&path) && path.metadata().is_ok() &&
-                                    path.is_file() && path.file_name().and_then(|n| n.to_str()).is_some()
-                                {
-                                    let mut file = file;
-                                    let write_stream = write_stream.clone();
-                                    let keys = options::get_keys();
-                                    let image = command == Command::Image;
+                                if let Err(error) = upload(write_stream, &path, kind) { app.push_styled(error, theme::ERROR); }
+                            },
 
-                                    //READ THE HEADER BEFORE ASKING THE SERVER
-                                    let mut header = Vec::new();
-
-                                    if image
-                                    {
-                                        file.by_ref().take(consts::IMAGE_HEADER_SIZE as u64)
-                                            .read_to_end(&mut header).ok();
-
-                                        //GIVE BACK WHAT WAS READ - THE HASH REUSES IT
-                                        file.rewind().ok();
-                                    }
-
-                                    //REFUSE AN OVERSIZED IMAGE HERE
-                                    if image && path.metadata().map(|m| m.len()).unwrap_or(0) >
-                                        consts::MAX_IMAGE_SIZE as u64
-                                    {
-                                        app.push_styled(format!("Image is too large! (limit is {}MB)",
-                                            consts::MAX_IMAGE_SIZE / consts::MEGABYTE), theme::ERROR);
-                                    } else if image && !misc::is_image(&header)
-                                    {
-                                        app.push_styled("Not an image!", theme::ERROR);
-                                    } else
-                                    {
-                                        tokio::spawn(async move
-                                        {
-                                            //GET SHA256 FILE HASH (BLOCKING I/O + CPU)
-                                            let hash: Option<[u8; 32]> = task::spawn_blocking(move ||
-                                            {
-                                                let mut hasher = Sha256::new();
-                                                let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
-
-                                                //LOOP READING
-                                                let success = loop
-                                                {
-                                                    match file.read(&mut buffer)
-                                                    {
-                                                        Ok(0) => break true,
-                                                        Ok(bytes) => hasher.update(&buffer[..bytes]),
-                                                        Err(_) => break false,
-                                                    }
-                                                };
-
-                                                //FINALIZE HASH
-                                                if success { Some(hasher.finalize().into()) } else { None }
-                                            }).await.expect("Hashing file failed");
-
-                                            //REQUEST FILE UPLOAD
-                                            if let Some(hash) = hash
-                                            {
-                                                //STORE UPLOAD IN ACTIVE UPLOADS LIST
-                                                client::ACTIVE_UPLOADS.lock().unwrap()
-                                                    .insert(hash, path.canonicalize().unwrap());
-
-                                                //SEND UPLOAD REQUEST
-                                                let request = match image
-                                                {
-                                                    true => PacketCode::ImageRequest
-                                                    {
-                                                        hash,
-                                                        filename: path.file_name().and_then(|n| n.to_str())
-                                                            .unwrap_or("unnamed_file").to_string(),
-                                                    },
-
-                                                    false => PacketCode::UploadRequest { hash },
-                                                };
-
-                                                network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
-                                            }
-                                        });
-                                    }
-                                } else //NON-EXISTING FILE
-                                {
-                                    app.push_styled("File not found!", theme::ERROR);
-                                }
-                            } else { invalid_usage(app, None); }
+                            None => invalid_usage(app, None),
                         },
 
                         //ENUMERATE THE DEVICES ONCE, OFF THE DRAW PATH

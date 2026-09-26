@@ -474,8 +474,11 @@ fn decodable(name: &str) -> bool
 }
 
 //WHAT SITS BESIDE THE HALF-TYPED PATH
-fn paths(typed: &str, images: bool) -> Vec<String>
+pub fn paths(typed: &str, images: bool) -> Vec<String>
 {
+    //A BARE ~ IS THE HOME DIRECTORY
+    if typed == "~" { return vec![String::from("~/")]; }
+
     //EVERYTHING PAST THE LAST SEPARATOR IS THE NAME BEING TYPED
     let (dir, prefix) = match typed.rfind('/')
     {

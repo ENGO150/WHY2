@@ -57,6 +57,16 @@ use crate::
 };
 
 //ENUMS
+//WHAT AN UPLOAD IS FOR - A FILESHARE, A CHAT PICTURE OR A PROFILE PICTURE
+#[cfg(feature = "server")]
+#[derive(Clone, Copy, PartialEq)]
+pub enum UploadKind
+{
+    File,
+    Image,
+    Avatar,
+}
+
 #[derive(SchemaWrite, SchemaRead, Clone)]
 pub enum FilePacketCode
 {
@@ -82,6 +92,23 @@ pub struct FilePacket //FILE CHUNK
 }
 
 //IMPLEMENTATIONS
+#[cfg(feature = "server")]
+impl UploadKind
+{
+    //A PICTURE IS NAMED AFTER ITS CONTENT AND SEALED UNDER ITS HASH
+    pub fn persistent(&self) -> bool { !matches!(self, Self::File) }
+
+    pub fn name(&self) -> &'static str
+    {
+        match self
+        {
+            Self::File => "file",
+            Self::Image => "image",
+            Self::Avatar => "avatar",
+        }
+    }
+}
+
 impl SequencedPacket for FilePacket
 {
     fn seq(&self) -> usize { self.seq }

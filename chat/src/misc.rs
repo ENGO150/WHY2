@@ -202,6 +202,21 @@ pub fn get_image_dir() -> PathBuf //DIRECTORY FOR PERSISTENT IMAGES
 }
 
 #[cfg(feature = "chat")]
+pub fn unhex(text: &str) -> Option<[u8; 32]> //A 32-BYTE HASH BACK OUT OF HEX
+{
+    if text.len() != 64 { return None; }
+
+    let mut bytes = [0u8; 32];
+
+    for (byte, pair) in bytes.iter_mut().zip(text.as_bytes().chunks(2))
+    {
+        *byte = u8::from_str_radix(std::str::from_utf8(pair).ok()?, 16).ok()?;
+    }
+
+    Some(bytes)
+}
+
+#[cfg(feature = "chat")]
 pub fn hex(bytes: &[u8]) -> String //BYTES AS LOWERCASE HEX
 {
     let mut string = String::with_capacity(bytes.len() * 2);

@@ -81,6 +81,7 @@ use crate::
             self,
             FilePacket,
             FilePacketCode,
+            UploadKind,
         },
     },
 };
@@ -142,7 +143,7 @@ pub async fn download
     streams: &mut Streams<'_>,
     uid: u64,
     task: AbortHandle,
-    persistent: bool,
+    kind: UploadKind,
 )
 {
     //GET CLIENT INFO
@@ -197,7 +198,9 @@ pub async fn download
         _ => return
     };
 
-    log::info!("Upload started ({size} bytes, {}): {peer_addr}", if persistent { "image" } else { "file" });
+    let persistent = kind.persistent();
+
+    log::info!("Upload started ({size} bytes, {}): {peer_addr}", kind.name());
 
     let mut valid = false;
 
@@ -210,10 +213,16 @@ pub async fn download
         return;
     }
 
-    //AN IMAGE IS ALSO PUSHED TO THE WHOLE CHANNEL
-    if persistent && size > consts::MAX_IMAGE_SIZE as u64
+    //A PICTURE IS ALSO PUSHED TO SOMEBODY ELSE, AND A KEPT ONE IS SMALLER STILL
+    let ceiling = match kind
     {
-        log::warn!("Image rejected ({size} bytes over the {} ceiling): {peer_addr}", consts::MAX_IMAGE_SIZE);
+        UploadKind::Avatar => consts::MAX_AVATAR_SIZE,
+        _ => consts::MAX_IMAGE_SIZE,
+    };
+
+    if persistent && size > ceiling as u64
+    {
+        log::warn!("Upload rejected ({}, {size} bytes over the {ceiling} ceiling): {peer_addr}", kind.name());
         server::notify(id, PacketCode::InvalidUsage).await;
         return;
     }
@@ -439,12 +448,30 @@ pub async fn download
         if fs::rename(&current_path, &new_path).await.is_err() { return; }
 
         //LOG FILE UPLOAD
-        log::info!("Upload done ({final_size} bytes, {}): {peer_addr}", if persistent { "image" } else { "file" });
+        log::info!("Upload done ({final_size} bytes, {}): {peer_addr}", kind.name());
 
         let filename = filename.into_string().unwrap_or("unnamed_file".to_string());
 
+        //A PROFILE PICTURE IS NOBODY ELSE'S BUSINESS, AND THE ACCOUNT KEEPS IT
+        if kind == UploadKind::Avatar
+        {
+            //THE PICTURE THIS ONE REPLACES MAY HAVE NOTHING LEFT NAMING IT
+            config::users::set_avatar(&username, Some(&final_hash));
+            config::messages::sweep_images();
+
+            log::info!("Avatar set: {peer_addr}");
+
+            //THE WHOLE PROFILE COMES BACK, LIKE A SAVE'S
+            server::notify(id, PacketCode::Profile
+            {
+                profile: config::users::profile(&username),
+                username: username.clone(),
+                own: true,
+                save: true,
+            }).await;
+        }
         //AN IMAGE IS SHOWN, NOT ANNOUNCED
-        if persistent
+        else if persistent
         {
             if let Some(data) = image
             {
@@ -565,6 +592,14 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
 
     //LOG END
     log::info!("Download done: {peer_addr}");
+}
+
+//THE PLAINTEXT SIZE OF A STORED PICTURE, TAG TAKEN OFF
+pub async fn image_size(hash: &[u8; 32]) -> Option<u64>
+{
+    let sealed = fs::metadata(misc::get_image_dir().join(misc::hex(hash))).await.ok()?.len();
+
+    Some(sealed.saturating_sub(consts::DISK_TAG_SIZE as u64))
 }
 
 //READ ONE STORED IMAGE BACK OFF DISK

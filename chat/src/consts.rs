@@ -81,6 +81,7 @@ pub const MEGABYTE: usize              = 1_000_000;                             
 pub const UPLOAD_CHUNK_SIZE: usize     = MEGABYTE;                                    //FILE UPLOAD CHUNK (1MB)
 pub const IMAGE_HEADER_SIZE: usize     = 16;                                          //BYTES AN IMAGE IS RECOGNISED BY
 pub const MAX_IMAGE_SIZE: usize        = 8 * MEGABYTE;                                //BIGGEST IMAGE THE SERVER PASSES ON (8MB)
+pub const MAX_AVATAR_SIZE: usize       = 2 * MEGABYTE;                                //BIGGEST AVATAR THE SERVER KEEPS (2MB)
 pub const MAX_HISTORY_SIZE: usize      = 12 * MEGABYTE;                               //BIGGEST HISTORY THE SERVER REPLAYS (12MB)
 pub const MAX_IMAGE_DIMENSION: u32     = 16_384;                                      //WIDEST/TALLEST PICTURE A CLIENT DECODES
 

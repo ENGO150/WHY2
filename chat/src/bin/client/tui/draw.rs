@@ -41,12 +41,13 @@ use ratatui::
 
 use unicode_width::UnicodeWidthStr;
 
-use ratatui_image::{ CropOptions, Resize, ResizeEncodeRender };
+use ratatui_image::{ CropOptions, FontSize, Resize, ResizeEncodeRender };
 
 use crate::
 {
     config,
     options,
+    consts as chat_consts,
 };
 
 #[cfg(feature = "client_voice")]
@@ -149,7 +150,12 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     if app.palette.is_visible() { overlays.push(draw_palette(frame, app, messages_area)); }
 
     //SETTINGS OVERLAY
-    if app.settings.open { overlays.push(draw_settings(frame, &mut app.settings, area)); }
+    if app.settings.open
+    {
+        let font = app.picker.font_size();
+
+        overlays.push(draw_settings(frame, &mut app.settings, area, font));
+    }
 
     //CONNECT BOX
     if let Some(login) = &app.login { overlays.push(draw_login(frame, login, &app.reconnect, area)); }
@@ -158,7 +164,41 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     if let Some(prompt) = &app.tofu { overlays.push(draw_tofu(frame, prompt, area)); }
 
     //PICTURES LAST, WITH WHATEVER A BOX HAS ON THEM PUT BACK ON TOP
-    draw_pictures(frame, app, &overlays);
+    let rewritten = draw_pictures(frame, app, &overlays);
+
+    //AND A PROFILE PICTURE ON TOP OF THE BOX THAT RESERVED THE ROWS FOR IT
+    draw_avatar(frame, app, &rewritten);
+}
+
+//THE PROFILE PICTURE, INSIDE THE SETTINGS BOX
+fn draw_avatar(frame: &mut Frame, app: &mut App, rewritten: &[u16])
+{
+    let area = app.settings.picture_area;
+
+    if area.width == 0 || area.height == 0 { return; }
+
+    //A BOX ABOVE IT OWNS THOSE CELLS, AND NOTHING DIFFS A PICTURE AWAY
+    if app.login.is_some() || app.tofu.is_some() { return; }
+
+    app.load_avatar(area.width);
+
+    if let Some(ready) = app.settings.picture.as_mut() && let Some(protocol) = ready.protocol.as_mut()
+    {
+        protocol.resize_encode_render(&Resize::Crop(None), area, frame.buffer_mut());
+
+        //A PANE PICTURE REWRITTEN ACROSS OUR ROWS TAKES THEM, SO THEY GO AGAIN AFTER IT
+        let marks = rewritten.iter().copied().filter(|y| (area.y..area.y + area.height).contains(y)).map(|y|
+        {
+            //NEVER THE SAME MARK TWICE IN A ROW
+            let times = match app.avatar_marks.iter().find(|(row, _)| *row == y) { Some((_, 1)) => 2, _ => 1 };
+
+            mark(frame, area.x, y, times);
+
+            (y, times)
+        }).collect();
+
+        app.avatar_marks = marks;
+    }
 }
 
 //PRIVATE
@@ -239,16 +279,21 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 }
 
 //PICTURES GO ON LAST, AND A BOX IS PUT BACK OVER WHATEVER ROW ONE CLAIMS
-fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect])
+fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect]) -> Vec<u16>
 {
     let inner = app.pane;
 
-    if inner.width == 0 || inner.height == 0 { return; }
+    if inner.width == 0 || inner.height == 0 { return app.picture_rows_drawn(Vec::new()); }
 
     let (offset, viewport) = (app.pane_offset, inner.height);
 
     //WHERE THE BOXES WERE ON THE LAST FRAME
     let previous = app.overlays_drawn(overlays);
+
+    //A BOX THAT MOVED GETS ONE MORE FRAME
+    if previous != overlays { app.dirty = true; }
+
+    let mut rows = Vec::new();
 
     for placement in app.placements(inner.width)
     {
@@ -287,25 +332,36 @@ fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect])
             drawn = true;
         }
 
-        match covered
+        //A BOX THAT MOVED OR WENT LEAVES GLYPHS ONLY THE ROW'S OWN WRITE CAN RUB OUT
+        if drawn && previous != overlays && previous.iter().any(|overlay| overlay.intersects(area))
         {
-            //THE BOX GOES BACK ON TOP OF THE ROW THE PICTURE JUST WROTE
-            true => for (x, y, cell) in kept
-            {
-                if let Some(target) = frame.buffer_mut().cell_mut((x, y))
-                {
-                    *target = cell;
-                    target.set_diff_option(CellDiffOption::AlwaysUpdate);
-                }
-            },
+            replace_rows(frame, area, overlays);
+        }
 
-            //A BOX THAT HAS GONE LEAVES GLYPHS ONLY THE ROW'S OWN WRITE CAN RUB OUT
-            false => if drawn && previous.iter().any(|overlay| overlay.intersects(area))
+        //WHAT EACH ROW'S FIRST CELL WILL SEND
+        if drawn
+        {
+            for y in area.y..area.y + area.height
             {
-                replace_rows(frame, area);
-            },
+                if overlays.iter().any(|overlay| overlay.contains((area.x, y).into())) { continue; }
+
+                if let Some(cell) = frame.buffer_mut().cell((area.x, y)) { rows.push((y, cell.symbol().to_string())); }
+            }
+        }
+
+        //THE BOX GOES BACK ON TOP OF THE ROW THE PICTURE JUST WROTE
+        for (x, y, cell) in kept
+        {
+            if let Some(target) = frame.buffer_mut().cell_mut((x, y))
+            {
+                *target = cell;
+                target.set_diff_option(CellDiffOption::AlwaysUpdate);
+            }
         }
     }
+
+    //THE ROWS THE TERMINAL IS SENT AGAIN
+    app.picture_rows_drawn(rows)
 }
 
 //THE CELLS A BOX HAS INSIDE area, COPIED OUT
@@ -327,10 +383,13 @@ fn overlay_cells(frame: &mut Frame, area: Rect, overlays: &[Rect]) -> Vec<(u16, 
 }
 
 //ONE CELL CARRIES A WHOLE ROW OF A PICTURE, AND THE DIFF WRITES IT AGAIN ONLY IF IT READS DIFFERENTLY
-fn replace_rows(frame: &mut Frame, area: Rect)
+fn replace_rows(frame: &mut Frame, area: Rect, overlays: &[Rect])
 {
     for y in area.y..area.y + area.height
     {
+        //A ROW WHOSE FIRST CELL IS A BOX'S IS NOT THE PICTURE'S
+        if overlays.iter().any(|overlay| overlay.contains((area.x, y).into())) { continue; }
+
         let Some(cell) = frame.buffer_mut().cell_mut((area.x, y)) else { continue };
 
         //SAVING THE CURSOR TWICE IS THE SAME AS SAVING IT ONCE - THE CELL'S WIDTH STAYS THE ONE IT IS FORCED TO
@@ -338,6 +397,16 @@ fn replace_rows(frame: &mut Frame, area: Rect)
 
         cell.set_symbol(&symbol);
     }
+}
+
+//MAKE ONE PICTURE ROW'S FIRST CELL READ DIFFERENTLY
+fn mark(frame: &mut Frame, x: u16, y: u16, times: usize)
+{
+    let Some(cell) = frame.buffer_mut().cell_mut((x, y)) else { return };
+
+    let symbol = format!("{}{}", "\x1b[s".repeat(times), cell.symbol());
+
+    cell.set_symbol(&symbol);
 }
 
 //FIRST VISIBLE ROW OF A SCROLLING LIST
@@ -819,7 +888,7 @@ fn capitalize(name: &str) -> String
 }
 
 //THE /settings OVERLAY
-fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect) -> Rect
+fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect, font: FontSize) -> Rect
 {
     let width = consts::SETTINGS_WIDTH.min(area.width.saturating_sub(2)).max(1);
     let inner_width = width.saturating_sub(2) as usize;
@@ -849,7 +918,14 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect) -> Rect
             .max().unwrap_or(0),
     };
 
-    let room = area.height.saturating_sub(4) as usize; //BORDERS PLUS A LINE OF AIR TOP AND BOTTOM
+    //THE PICTURE CLAIMS ROWS AT THE TOP, AND THE ROWS GET WHAT IS LEFT
+    let picture = match state.picker.is_some()
+    {
+        true => 0,
+        false => state.picture_rows(),
+    };
+
+    let room = (area.height.saturating_sub(4) as usize).saturating_sub(picture as usize); //BORDERS PLUS A LINE OF AIR TOP AND BOTTOM
 
     //THE ROWS WIN WHEN THERE IS NO ROOM
     let footer = match hint_height { 0 => 0, height => height + 1 };
@@ -906,6 +982,9 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect) -> Rect
 
     let rows_height = lines.len() as u16 + 2; //WHAT THE SCROLLBAR IS ALLOWED TO RUN DOWN
 
+    //THE PICTURE'S ROWS ARE RESERVED, NOT DRAWN INTO
+    if picture > 0 { lines.splice(0..0, std::iter::repeat_n(Line::default(), picture as usize)); }
+
     //DESCRIPTION UNDER A RULE
     if footer > 0
     {
@@ -934,6 +1013,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect) -> Rect
     let hint = match (state.picker.is_some(), state.edit.is_some())
     {
         (true, _) => " ↑↓ select │ ⏎ apply │ Esc back ",
+        (_, true) if state.editing_avatar() => " ↑↓ select │ Tab complete │ ⏎ keep │ Esc cancel ",
         (_, true) => " type a value │ ⏎ keep │ Esc cancel ",
 
         _ => match state.mode
@@ -962,8 +1042,28 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect) -> Rect
 
     frame.render_widget(Paragraph::new(lines), inner);
 
+    //WHERE THE PICTURE GOES, CENTRED IN THE ROWS IT CLAIMED
+    state.picture_area = match state.picture.as_ref().filter(|_| picture > 0)
+    {
+        Some(ready) =>
+        {
+            let (width, height) = state::picture_cells(&ready.frames[ready.current].image,
+                inner.width, consts::AVATAR_ROWS, font);
+
+            Rect
+            {
+                x: inner.x + inner.width.saturating_sub(width) / 2,
+                y: inner.y + consts::AVATAR_ROWS.saturating_sub(height) / 2,
+                width,
+                height,
+            }
+        },
+
+        None => Rect::ZERO,
+    };
+
     //THE TRACK IS THE ROWS' OWN HEIGHT, NOT THE BOX'S
-    draw_scrollbar(frame, Rect { height: rows_height, ..popup }, total, visible, first);
+    draw_scrollbar(frame, Rect { y: popup.y + picture, height: rows_height, ..popup }, total, visible, first);
 
     popup
 }
@@ -1201,6 +1301,26 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
 {
     let mut spans = Vec::new();
 
+    //THE PATHS BESIDE A TYPED AVATAR
+    if let Row::Item(item) = row && item.key == consts::AVATAR_KEY && state.editing_avatar() && !state.paths.is_empty()
+    {
+        let visible = state.paths.len().min(consts::MAX_ROWS);
+        let first = window(0, state.path, state.paths.len(), visible);
+
+        return state.paths.iter().enumerate().skip(first).take(visible).map(|(index, path)|
+        {
+            let selected = index == state.path;
+
+            let line = Line::from(vec!
+            [
+                Span::styled(if selected { "▌ " } else { "  " }, theme::ACCENT),
+                Span::styled(truncate(path, (width as usize).saturating_sub(2)), if selected { theme::ACCENT } else { theme::TEXT }),
+            ]);
+
+            if selected { line.style(theme::SELECTED) } else { line }
+        }).collect();
+    }
+
     match row
     {
         Row::Header(_) => return Vec::new(),
@@ -1222,6 +1342,15 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
         //A FIELD IS PROSE OR A LINK, SO THE FOOT IS WHERE IT IS READ
         Row::Item(item) if state.profile() => match &item.value
         {
+            Value::Avatar(Some(path)) if path.is_empty() =>
+                spans.push(Span::styled("Your avatar is removed on save.", theme::NOTICE)),
+
+            Value::Avatar(Some(path)) => spans.push(Span::styled(format!("{path} is uploaded on save."), theme::TEXT)),
+
+            Value::Avatar(None) => spans.push(Span::styled(format!(
+                "Type a path to an image (up to {}MB), or clear it to remove your avatar.",
+                chat_consts::MAX_AVATAR_SIZE / chat_consts::MEGABYTE), theme::DIM)),
+
             Value::Text(text) if text.is_empty() =>
                 spans.push(Span::styled(format!("No {}.", item.label.to_lowercase()), theme::DIM)),
 
@@ -1337,6 +1466,11 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
 
         Value::Text(text) if text.is_empty() => vec![Span::styled("(empty)", theme::DIM)],
         Value::Text(text) => vec![Span::styled(truncate(text, _width), theme::TEXT)],
+
+        Value::Avatar(None) if _state.avatar.is_some() => vec![Span::styled("set", theme::TEXT)],
+        Value::Avatar(None) => vec![Span::styled("(none)", theme::DIM)],
+        Value::Avatar(Some(path)) if path.is_empty() => vec![Span::styled("remove", theme::NOTICE)],
+        Value::Avatar(Some(path)) => vec![Span::styled(truncate(path, _width), theme::TEXT)],
 
         #[cfg(feature = "client_voice")]
         Value::Volume(percent) =>

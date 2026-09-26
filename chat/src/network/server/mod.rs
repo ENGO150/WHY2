@@ -1132,7 +1132,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 let image = matches!(read, PacketCode::ImageRequest { .. });
 
                 //CHECK IF IMAGE WAS ALREADY UPLOADED
-                if image && config::messages::has_image(&hash)
+                if image && config::messages::stored(&hash)
                 {
                     let filename = match &read
                     {
@@ -1423,7 +1423,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
                     && let Some(last) = conn.last_image_mut() { *last = Instant::now(); }
 
-                let image = match config::messages::has_image(&hash)
+                let image = match config::messages::stored(&hash)
                 {
                     true => file::read_image(&hash).await,
                     false => None,
@@ -1435,7 +1435,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     network::send(&mut *streams.1.lock().await, PacketCode::ImageData { hash, data }, Some(&keys)).await;
                 } else
                 {
-                    log::warn!("Image fetch refused (not in history): {peer_addr}");
+                    log::warn!("Image fetch refused (nothing names it): {peer_addr}");
                 }
             },
 
@@ -1784,6 +1784,92 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     username: target,
                     own,
                     save,
+                }, Some(&keys)).await;
+            },
+
+            //THE PROFILE PICTURE, SET OR DROPPED
+            PacketCode::AvatarRequest { hash } =>
+            {
+                //CHECK DISABLED FEATURE
+                if !config::read_config::<bool>("profiles")
+                {
+                    log::warn!("Refused (profiles disabled): {peer_addr}");
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidFeature, Some(&keys)).await;
+                    continue;
+                }
+
+                //SILENCE MUTED USERS
+                if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
+                    continue;
+                }
+
+                match hash
+                {
+                    //A PICTURE THE SERVER ALREADY KEEPS COSTS NO UPLOAD
+                    Some(hash) if config::messages::stored(&hash) =>
+                    {
+                        //THE CEILING IS THE CEILING EITHER WAY - A CHAT PICTURE IS ALLOWED TO BE BIGGER
+                        let size = file::image_size(&hash).await.unwrap_or_default();
+
+                        if size > consts::MAX_AVATAR_SIZE as u64
+                        {
+                            log::warn!("Avatar refused ({size} bytes over the {} ceiling): {peer_addr}",
+                                consts::MAX_AVATAR_SIZE);
+
+                            network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                            continue;
+                        }
+
+                        config::users::set_avatar(&username, Some(&hash));
+                        config::messages::sweep_images();
+
+                        log::info!("Avatar set (already stored): {peer_addr}");
+
+                        network::send(&mut *streams.1.lock().await, PacketCode::ImageDuplicate { hash }, Some(&keys)).await;
+                    },
+
+                    //ANYTHING ELSE IS AN UPLOAD, AND THE PROFILE IS WRITTEN WHEN IT LANDS
+                    Some(hash) =>
+                    {
+                        //PREVENT TOKEN SPAM
+                        let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count();
+                        if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
+                        {
+                            log::warn!("Upload refused ({active_count} already running): {peer_addr}");
+
+                            network::send(&mut *streams.1.lock().await, PacketCode::UploadLimit, Some(&keys)).await;
+                            continue;
+                        }
+
+                        let uid = rand::random::<u64>();
+                        let token = open_connection(id, ConnectionType::Avatar { uid });
+
+                        log::info!("Upload request (avatar): {peer_addr}");
+
+                        network::send(&mut *streams.1.lock().await, PacketCode::Image { hash, token, uid }, Some(&keys)).await;
+                        continue;
+                    },
+
+                    //DROPPED, AND SO IS THE FILE IF NOTHING ELSE NAMES IT
+                    None =>
+                    {
+                        config::users::set_avatar(&username, None);
+                        config::messages::sweep_images();
+
+                        log::info!("Avatar dropped: {peer_addr}");
+                    },
+                }
+
+                //THE WHOLE PROFILE COMES BACK, LIKE A SAVE'S
+                network::send(&mut *streams.1.lock().await, PacketCode::Profile
+                {
+                    profile: config::users::profile(&username),
+                    username: username.clone(),
+                    own: true,
+                    save: true,
                 }, Some(&keys)).await;
             },
 

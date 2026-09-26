@@ -341,8 +341,12 @@ impl App
                 }
             },
 
-            //THE ANSWER TO A CLICKED CAPTION
-            ClientEvent::ImageData(hash, image) => self.deliver_image(hash, image),
+            //THE ANSWER TO A CLICKED CAPTION, OR TO THE PROFILE BOX
+            ClientEvent::ImageData(hash, image) => match self.wants_avatar(&hash)
+            {
+                true => self.deliver_avatar(hash, image),
+                false => self.deliver_image(hash, image),
+            },
 
             //server.toml CAME BACK
             ClientEvent::ServerSettings(settings, saved) =>
@@ -380,6 +384,13 @@ impl App
                     },
 
                     false => self.settings.open_profile(username, profile, own),
+                }
+
+                //THE PICTURE IT NAMES IS FETCHED LIKE A CAPTION'S
+                if self.settings.open && self.settings.picture.is_none()
+                    && let Some(hash) = self.settings.avatar
+                {
+                    self.image_loads.push(hash);
                 }
 
                 self.dirty = true;

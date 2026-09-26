@@ -263,6 +263,8 @@ pub struct App
 
     //WHAT THE LAST FRAME DREW OVER THE PANE
     overlays: Vec<Rect>,
+    picture_rows: Vec<(u16, String)>, //AND EACH PICTURE ROW'S FIRST CELL
+    pub avatar_marks: Vec<(u16, usize)>, //HOW MANY TIMES EACH AVATAR ROW WAS MARKED
 
     //WRAP CACHE
     generation: u64,
@@ -314,6 +316,8 @@ impl App
             tofu: None,
             theme: Theme::load(),
             overlays: Vec::new(),
+            picture_rows: Vec::new(),
+            avatar_marks: Vec::new(),
             picker: Picker::halfblocks(), //UNTIL init_picker HAS ASKED THE TERMINAL
             pane: Rect::ZERO,
             pane_offset: 0,
@@ -514,8 +518,14 @@ impl App
     //CUT EVERY FRAME DOWN TO IMAGE_ROWS
     fn fit(&self, image: Animation) -> Picture
     {
+        Picture::Ready(self.fit_rows(image, consts::IMAGE_ROWS))
+    }
+
+    //THE SAME, TO WHATEVER ROW BUDGET THE PICTURE IS DRAWN UNDER
+    fn fit_rows(&self, image: Animation, rows: u16) -> Box<Fitted>
+    {
         let font = self.picker.font_size();
-        let limit = consts::IMAGE_ROWS as u32 * font.height as u32;
+        let limit = rows as u32 * font.height as u32;
 
         //EVERY FRAME IS HELD AT ONCE
         let frames = image.into_iter().map(|ImageFrame { image, delay }|
@@ -531,7 +541,7 @@ impl App
 
         let next = Instant::now() + frames.first().map(|frame| frame.delay).unwrap_or_default();
 
-        Picture::Ready(Box::new(Fitted
+        Box::new(Fitted
         {
             frames,
             current: 0,
@@ -540,12 +550,88 @@ impl App
             fitted: 0,
             protocol: None,
             unloaded: None,
-        }))
+        })
+    }
+
+    //THE PROFILE PICTURE THE BOX ASKED FOR
+    pub fn deliver_avatar(&mut self, hash: [u8; 32], image: Option<Animation>)
+    {
+        let Some(image) = image else { return };
+
+        self.settings.picture = Some(self.fit_rows(image, consts::AVATAR_ROWS));
+        self.settings.picture_of = Some(hash);
+        self.dirty = true;
+    }
+
+    //WHETHER A PICTURE THAT CAME BACK IS THE ONE THE PROFILE BOX IS WAITING FOR
+    pub fn wants_avatar(&self, hash: &[u8; 32]) -> bool
+    {
+        self.settings.open && self.settings.avatar.as_ref() == Some(hash)
+            && self.settings.picture_of.as_ref() != Some(hash)
+    }
+
+    //BUILD THE PROFILE PICTURE AT THE SIZE THE BOX RESERVED FOR IT
+    pub fn load_avatar(&mut self, width: u16)
+    {
+        let font = self.picker.font_size();
+
+        let Some(ready) = self.settings.picture.as_mut() else { return };
+
+        if ready.fitted == width && ready.protocol.is_some() { return; }
+
+        let image = fit_image(&ready.frames[ready.current].image, width, consts::AVATAR_ROWS, font);
+
+        //REUSE THE PROTOCOL TYPE TO KEEP THE IMAGE ID
+        ready.protocol = match ready.protocol.take()
+        {
+            Some(protocol) => Some(StatefulProtocol::new(image, font,
+                protocol.background_color(), protocol.protocol_type_owned())),
+
+            None => Some(self.picker.new_resize_protocol(image)),
+        };
+
+        ready.fitted = width;
+    }
+
+    //AND STEP IT, WHICH THE PANE'S CLOCK DOES NOT REACH
+    fn advance_avatar(&mut self)
+    {
+        if !self.settings.open { return; }
+
+        let font = self.picker.font_size();
+        let now = Instant::now();
+
+        let Some(ready) = self.settings.picture.as_mut() else { return };
+
+        //A STILL NEVER ADVANCES
+        if ready.frames.len() < 2 || ready.protocol.is_none() || now < ready.next { return; }
+
+        //TOO FAR BEHIND TO CATCH UP
+        if now.duration_since(ready.next) > consts::ANIMATION_CATCHUP { ready.next = now; }
+
+        while now >= ready.next
+        {
+            ready.current = (ready.current + 1) % ready.frames.len();
+            ready.next += ready.frames[ready.current].delay;
+        }
+
+        let image = fit_image(&ready.frames[ready.current].image, ready.fitted, consts::AVATAR_ROWS, font);
+
+        ready.protocol = ready.protocol.take().map(|protocol|
+        {
+            let background = protocol.background_color();
+
+            StatefulProtocol::new(image, font, background, protocol.protocol_type_owned())
+        });
+
+        self.dirty = true;
     }
 
     //STEP EVERY ANIMATION THAT IS DUE
     pub fn advance_animations(&mut self)
     {
+        self.advance_avatar();
+
         let pane = self.pane;
 
         if pane.width == 0 || pane.height == 0 { return; }
@@ -579,7 +665,7 @@ impl App
                 ready.next += ready.frames[ready.current].delay;
             }
 
-            let image = fit_image(&ready.frames[ready.current].image, ready.fitted, font);
+            let image = fit_image(&ready.frames[ready.current].image, ready.fitted, consts::IMAGE_ROWS, font);
 
             //REUSE THE PROTOCOL TYPE TO KEEP THE IMAGE ID
             ready.protocol = ready.protocol.take().map(|protocol|
@@ -620,7 +706,7 @@ impl App
                 {
                     true => if ready.fitted != width || ready.protocol.is_none()
                     {
-                        let image = fit_image(&ready.frames[ready.current].image, width, font);
+                        let image = fit_image(&ready.frames[ready.current].image, width, consts::IMAGE_ROWS, font);
 
                         //REUSE THE PROTOCOL TYPE TO KEEP THE IMAGE ID
                         ready.protocol = Some(match ready.unloaded.take()
@@ -954,6 +1040,18 @@ impl App
         previous
     }
 
+    //TAKE THIS FRAME'S PICTURE ROWS, HANDING BACK THE ONES THAT CHANGED
+    pub fn picture_rows_drawn(&mut self, rows: Vec<(u16, String)>) -> Vec<u16>
+    {
+        let changed = rows.iter()
+            .filter(|row| !self.picture_rows.contains(row))
+            .map(|(y, _)| *y).collect();
+
+        self.picture_rows = rows;
+
+        changed
+    }
+
     //DROP THE TOAST ONCE IT IS OLD
     pub fn expire_notice(&mut self)
     {
@@ -1145,7 +1243,7 @@ impl App
                     Picture::Ready(ready) =>
                     {
                         let frame = &ready.frames[ready.current].image;
-                        let (_, height) = fit_size(frame.width(), frame.height(), width, font);
+                        let (_, height) = fit_size(frame.width(), frame.height(), width, consts::IMAGE_ROWS, font);
 
                         ready.rows = (height.div_ceil(font.height as u32) as u16).clamp(1, consts::IMAGE_ROWS);
                         ready.rows
@@ -1181,10 +1279,10 @@ pub fn percent(done: u64, total: u64) -> u64
 }
 
 //THE SIZE A PICTURE IS DRAWN AT, NEVER LARGER THAN IT IS
-fn fit_size(width: u32, height: u32, pane: u16, font: FontSize) -> (u32, u32)
+fn fit_size(width: u32, height: u32, pane: u16, rows: u16, font: FontSize) -> (u32, u32)
 {
     let available_width = pane.max(1) as u32 * font.width as u32;
-    let available_height = consts::IMAGE_ROWS as u32 * font.height as u32;
+    let available_height = rows as u32 * font.height as u32;
 
     if width <= available_width && height <= available_height { return (width, height); }
 
@@ -1193,10 +1291,19 @@ fn fit_size(width: u32, height: u32, pane: u16, font: FontSize) -> (u32, u32)
     (((width as f64 * ratio).round() as u32).max(1), ((height as f64 * ratio).round() as u32).max(1))
 }
 
-//SHRINK A PICTURE INTO THE PANE, NEVER GROW IT
-fn fit_image(image: &DynamicImage, width: u16, font: FontSize) -> DynamicImage
+//THE CELLS A PICTURE CLAIMS AT THAT SIZE
+pub fn picture_cells(image: &DynamicImage, pane: u16, rows: u16, font: FontSize) -> (u16, u16)
 {
-    let (fit_width, fit_height) = fit_size(image.width(), image.height(), width, font);
+    let (width, height) = fit_size(image.width(), image.height(), pane, rows, font);
+
+    ((width.div_ceil(font.width as u32) as u16).max(1).min(pane),
+        (height.div_ceil(font.height as u32) as u16).clamp(1, rows))
+}
+
+//SHRINK A PICTURE INTO THE PANE, NEVER GROW IT
+fn fit_image(image: &DynamicImage, width: u16, rows: u16, font: FontSize) -> DynamicImage
+{
+    let (fit_width, fit_height) = fit_size(image.width(), image.height(), width, rows, font);
 
     match (fit_width, fit_height) == (image.width(), image.height())
     {

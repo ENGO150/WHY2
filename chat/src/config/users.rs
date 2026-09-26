@@ -27,6 +27,7 @@ use crate::
 {
     colors,
     consts,
+    misc,
     role::Role,
     network::codes::
     {
@@ -38,6 +39,7 @@ use crate::
 const COLOR_KEYS: [&str; 2] = ["username_color", "message_color"]; //THE COLORS AS server_users.toml SPELLS THEM
 const PROFILE_TABLE: &str = "profile";        //THE SUBTABLE A PROFILE SITS IN, APART FROM THE CREDENTIALS
 const PROFILE_KEYS: [&str; 4] = UserProfile::KEYS; //THE PROFILE AS server_users.toml SPELLS IT
+const AVATAR_KEY: &str = "avatar";            //THE PICTURE'S HASH, WHICH IS NOT A TYPED FIELD
 
 fn user_field(username: &str, key: &str) -> Option<String> //READ ONE FIELD OF username
 {
@@ -135,10 +137,32 @@ pub fn profile(username: &str) -> UserProfile //RETURN PROFILE OF username
         pronouns: fields.next().unwrap_or_default(),
         website: fields.next().unwrap_or_default(),
         status: fields.next().unwrap_or_default(),
+        avatar: avatar(username),
     }
 }
 
-pub fn set_profile(username: &str, profile: &UserProfile) //STORE username's PROFILE
+pub fn avatar(username: &str) -> Option<[u8; 32]> //RETURN username's PICTURE
+{
+    misc::unhex(&profile_field(username, AVATAR_KEY)?)
+}
+
+pub fn set_avatar(username: &str, hash: Option<&[u8; 32]>) //STORE username's PICTURE
+{
+    write_profile_field(username, AVATAR_KEY, hash.map(|hash| misc::hex(hash)).unwrap_or_default().into());
+}
+
+pub fn names_avatar(hash: &[u8; 32]) -> bool //DOES ANY ACCOUNT NAME THIS PICTURE?
+{
+    all().iter().any(|username| avatar(username).as_ref() == Some(hash))
+}
+
+pub fn avatars() -> Vec<[u8; 32]> //EVERY PICTURE THE ACCOUNTS NAME
+{
+    all().iter().filter_map(|username| avatar(username)).collect()
+}
+
+//STORE username's TYPED FIELDS - THE PICTURE IS SET BY AN UPLOAD, NOT BY A SAVE
+pub fn set_profile(username: &str, profile: &UserProfile)
 {
     for (key, value) in PROFILE_KEYS.iter().zip(profile.fields())
     {
@@ -169,6 +193,7 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
     //NO COLORS OR PROFILE YET, BUT THE KEYS ARE THERE
     for key in COLOR_KEYS { write_user_field(username, key, colors::NONE.into()); }
     for key in PROFILE_KEYS { write_profile_field(username, key, "".into()); }
+    write_profile_field(username, AVATAR_KEY, "".into());
 
     first_user
 }
@@ -199,7 +224,7 @@ pub fn migrate() //MIGRATE COLORS AND PROFILES (will be removed with next versio
 
             let Some(profile) = user.get_mut(PROFILE_TABLE).and_then(Item::as_table_like_mut) else { continue };
 
-            for key in PROFILE_KEYS
+            for key in PROFILE_KEYS.iter().chain(std::iter::once(&AVATAR_KEY))
             {
                 if profile.get(key).is_none() { profile.insert(key, Item::Value("".into())); }
             }

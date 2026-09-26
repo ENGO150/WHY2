@@ -49,7 +49,7 @@ use why2_chat::
     crypto::kex,
     network::
     {
-        file::server as file,
+        file::{ server as file, UploadKind },
         screen::{ self, server as screen_server },
         voice::server as voice_server,
         server::
@@ -256,17 +256,22 @@ async fn main()
 
                             match conn_type
                             {
-                                ConnectionType::FileUpload { uid } | ConnectionType::Image { uid } =>
+                                ConnectionType::FileUpload { uid } | ConnectionType::Image { uid }
+                                    | ConnectionType::Avatar { uid } =>
                                 {
-                                    let persistent = matches!(conn_type, ConnectionType::Image { .. });
+                                    let kind = match conn_type
+                                    {
+                                        ConnectionType::Image { .. } => UploadKind::Image,
+                                        ConnectionType::Avatar { .. } => UploadKind::Avatar,
+                                        _ => UploadKind::File,
+                                    };
 
-                                    log::info!("Auxiliary connection ({}): {owner}",
-                                        if persistent { "image upload" } else { "file upload" });
+                                    log::info!("Auxiliary connection ({} upload): {owner}", kind.name());
 
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (mut read_stream, write_stream) = stream.into_split();
-                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task, persistent).await;
+                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task, kind).await;
                                     });
                                     return;
                                 },

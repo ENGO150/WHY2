@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use ratatui::layout::Rect;
+
 use crossterm::event::
 {
     KeyCode,
@@ -39,7 +41,11 @@ use why2_chat::network::screen::client::options as screen_options;
 use super::
 {
     consts,
-    state::App,
+    state::
+    {
+        App,
+        Fitted,
+    },
 };
 
 //ENUMS
@@ -58,6 +64,9 @@ pub enum Value
     //THE TWO SERVER-ONLY DATATYPES, EDITED BY TYPING
     Number(i64),
     Text(String),
+
+    //A PATH TO UPLOAD | None = UNTOUCHED, EMPTY = DROP IT
+    Avatar(Option<String>),
 
     #[cfg(feature = "client_voice")]
     Volume(u32), //PERCENT
@@ -126,12 +135,21 @@ pub struct Settings //THE /settings OVERLAY, IN ANY OF ITS MODES
     pub mode: Mode,
     pub subject: String,      //WHOSE PROFILE, IN Profile MODE
 
+    //THE PICTURE A PROFILE NAMES, THE ONE THAT IS BUILT, AND WHERE THE BOX PUT IT
+    pub avatar: Option<[u8; 32]>,
+    pub picture: Option<Box<Fitted>>,
+    pub picture_of: Option<[u8; 32]>,
+    pub picture_area: Rect,
+
     //THE MODES THAT SAVE IN ONE GO
     pub edit: Option<String>, //WHAT IS BEING TYPED INTO THE SELECTED ROW
+    pub paths: Vec<String>,   //PATHS OFFERED FOR THE AVATAR ROW
+    pub path: usize,          //THE ONE SELECTED
     pub saving: bool,         //A SAVE IS ON THE WIRE
 
     save: Option<Vec<ServerSetting>>, //ROWS THE EVENT LOOP STILL HAS TO PUT ON THE WIRE
     profile: Option<UserProfile>,     //AND THE PROFILE, THE SAME WAY
+    avatar_save: Option<String>,      //AND THE AVATAR
 
     //THE STARTUP-ONLY KEYS IN THAT SAVE
     pub restart_note: Option<String>,
@@ -172,10 +190,17 @@ impl Settings
             page: 0,
             mode: Mode::Client,
             subject: String::new(),
+            avatar: None,
+            picture: None,
+            picture_of: None,
+            picture_area: Rect::ZERO,
             edit: None,
+            paths: Vec::new(),
+            path: 0,
             saving: false,
             save: None,
             profile: None,
+            avatar_save: None,
             restart_note: None,
             confirm: false,
             restart: false,
@@ -305,8 +330,24 @@ impl Settings
     //SOMEBODY'S PROFILE - OURS TO EDIT, OR THEIRS TO READ
     pub fn open_profile(&mut self, username: String, mut profile: UserProfile, own: bool)
     {
+        //THE AVATAR IS TYPED AS A PATH
+        let mut rows: Vec<Row> = match own
+        {
+            true => vec![Row::Item(Item
+            {
+                label: String::from(consts::AVATAR_LABEL),
+                key: String::from(consts::AVATAR_KEY),
+                value: Value::Avatar(None),
+                hint: String::new(),
+                changed: false,
+                restart: false,
+            })],
+
+            false => Vec::new(),
+        };
+
         //ONE ROW PER FIELD, IN THE ORDER THE PROFILE ITSELF KEEPS THEM
-        let mut rows: Vec<Row> = UserProfile::KEYS.iter().map(|key| Row::Item(Item
+        rows.extend(UserProfile::KEYS.iter().map(|key| Row::Item(Item
         {
             label: field_label(key),
             key: (*key).to_string(),
@@ -314,10 +355,19 @@ impl Settings
             hint: String::new(),
             changed: false,
             restart: false,
-        })).collect();
+        })));
 
         //NOTHING LEAVES THIS BOX UNTIL THIS IS PRESSED
         if own { rows.push(Row::Action(consts::SAVE_LABEL)); }
+
+        //A PICTURE THAT IS NOT THE ONE ALREADY BUILT IS PUT DOWN
+        self.avatar = profile.avatar;
+
+        if self.picture_of != self.avatar
+        {
+            self.picture = None;
+            self.picture_of = None;
+        }
 
         self.rows = rows;
         self.picker = None;
@@ -329,12 +379,18 @@ impl Settings
         self.confirm = false;
         self.selected = 0;
         self.offset = 0;
+
+        self.land(0, 1);
     }
 
     pub fn close(&mut self)
     {
         self.open = false;
         self.picker = None;
+        self.avatar = None;
+        self.picture = None;
+        self.picture_of = None;
+        self.picture_area = Rect::ZERO;
         self.edit = None;
         self.mode = Mode::Client;
         self.saving = false;
@@ -342,6 +398,34 @@ impl Settings
         self.rows = Vec::new();
         self.offset = 0;
         self.page = 0;
+    }
+
+    //ROWS THE PICTURE CLAIMS AT THE TOP OF THE BOX, THE LINE OF AIR UNDER IT INCLUDED
+    pub fn picture_rows(&self) -> u16
+    {
+        match self.picture.is_some()
+        {
+            true => consts::AVATAR_ROWS + 1,
+            false => 0,
+        }
+    }
+
+    //THE AVATAR ROW IS BEING TYPED INTO
+    pub fn editing_avatar(&self) -> bool
+    {
+        self.edit.is_some() && matches!(self.rows.get(self.selected), Some(Row::Item(item)) if item.key == consts::AVATAR_KEY)
+    }
+
+    //RE-READ THE PATHS BESIDE WHAT IS TYPED
+    fn refresh_paths(&mut self)
+    {
+        self.paths = match (self.editing_avatar(), self.edit.as_deref())
+        {
+            (true, Some(edit)) => super::palette::paths(edit, true),
+            _ => Vec::new(),
+        };
+
+        self.path = 0;
     }
 
     pub fn server(&self) -> bool { matches!(self.mode, Mode::Server) } //server.toml's ROWS
@@ -389,6 +473,9 @@ impl Settings
 
     //AND THE PROFILE THE SAME
     pub fn take_profile_save(&mut self) -> Option<UserProfile> { self.profile.take() }
+
+    //AND THE AVATAR
+    pub fn take_avatar_save(&mut self) -> Option<String> { self.avatar_save.take() }
 
     //AND A CONFIRMED RESTART
     pub fn take_restart(&mut self) -> bool { std::mem::take(&mut self.restart) }
@@ -650,6 +737,8 @@ fn handle_picker_key(app: &mut App, key: KeyEvent)
 //TYPING INTO A Number/Text ROW
 fn handle_edit_key(app: &mut App, key: KeyEvent)
 {
+    let count = app.settings.paths.len();
+
     match key.code
     {
         KeyCode::Esc => app.settings.edit = None,
@@ -657,6 +746,17 @@ fn handle_edit_key(app: &mut App, key: KeyEvent)
         KeyCode::Enter => commit_edit(app),
 
         KeyCode::Backspace => { if let Some(edit) = app.settings.edit.as_mut() { edit.pop(); } },
+
+        //WALK THE OFFERED PATHS
+        KeyCode::Up if count > 0 => app.settings.path = (app.settings.path + count - 1) % count,
+        KeyCode::Down if count > 0 => app.settings.path = (app.settings.path + 1) % count,
+
+        //TAKE THE SELECTED ONE
+        KeyCode::Tab if count > 0 =>
+        {
+            let chosen = app.settings.paths[app.settings.path].clone();
+            app.settings.edit = Some(chosen);
+        },
 
         KeyCode::Char(c) =>
         {
@@ -673,6 +773,11 @@ fn handle_edit_key(app: &mut App, key: KeyEvent)
 
         _ => {},
     }
+
+    //THE LIST FOLLOWS THE TEXT
+    if matches!(key.code, KeyCode::Backspace | KeyCode::Tab | KeyCode::Char(_)) { app.settings.refresh_paths(); }
+
+    if app.settings.edit.is_none() { app.settings.paths.clear(); }
 }
 
 fn commit_edit(app: &mut App) //KEEP WHAT WAS TYPED, IF THE ROW CAN HOLD IT
@@ -684,6 +789,29 @@ fn commit_edit(app: &mut App) //KEEP WHAT WAS TYPED, IF THE ROW CAN HOLD IT
         && !misc::is_web_url(edit.trim())
     {
         app.notify("A website has to start with http:// or https://");
+        return;
+    }
+
+    //AN AVATAR IS CHECKED WHERE IT IS TYPED
+    if selected_key(&app.settings) == Some(consts::AVATAR_KEY)
+    {
+        let path = edit.trim().to_string();
+
+        //NOTHING TO DROP
+        if path.is_empty() && app.settings.avatar.is_none() { return; }
+
+        if !path.is_empty() && let Err(error) = crate::check_upload(&path, crate::Upload::Avatar)
+        {
+            app.notify(error);
+            return;
+        }
+
+        if let Some(Row::Item(item)) = app.settings.rows.get_mut(app.settings.selected)
+        {
+            item.value = Value::Avatar(Some(path));
+            item.changed = true;
+        }
+
         return;
     }
 
@@ -750,6 +878,7 @@ fn selected(app: &App) -> Option<Selected>
             Value::Toggle { on, .. } => Selected::Toggle(*on),
             Value::Number(number) => Selected::Number(*number),
             Value::Text(text) => Selected::Text(text.clone()),
+            Value::Avatar(path) => Selected::Text(path.clone().unwrap_or_default()),
 
             #[cfg(feature = "client_voice")]
             Value::Volume(percent) => Selected::Volume(item.key.clone(), *percent),
@@ -843,7 +972,11 @@ fn activate(app: &mut App)
         Some(Selected::Toggle(_)) => toggle(app),
 
         Some(Selected::Number(number)) => app.settings.edit = Some(number.to_string()),
-        Some(Selected::Text(text)) => app.settings.edit = Some(text),
+        Some(Selected::Text(text)) =>
+        {
+            app.settings.edit = Some(text);
+            app.settings.refresh_paths();
+        },
 
         Some(Selected::Action(consts::RESTART_LABEL)) => restart(app),
         Some(Selected::Action(_)) => save(app),
@@ -942,18 +1075,32 @@ fn save_profile(app: &mut App)
     if !app.settings.unsaved() { return; }
 
     let mut profile = UserProfile::default();
+    let mut fields = false;
 
     //EVERY ROW GOES, CHANGED OR NOT - THE SERVER STORES THE WHOLE PROFILE
     for row in &app.settings.rows
     {
         let Row::Item(item) = row else { continue };
-        let Value::Text(text) = &item.value else { continue };
 
-        if let Some(field) = profile.field_mut(&item.key) { *field = text.clone(); }
+        match &item.value
+        {
+            Value::Text(text) =>
+            {
+                if let Some(field) = profile.field_mut(&item.key) { *field = text.clone(); }
+
+                fields |= item.changed;
+            },
+
+            //THE AVATAR GOES ON ITS OWN
+            Value::Avatar(Some(path)) if item.changed => app.settings.avatar_save = Some(path.clone()),
+
+            _ => {},
+        }
     }
 
     app.settings.saving = true;
-    app.settings.profile = Some(profile);
+
+    if fields { app.settings.profile = Some(profile); }
 }
 
 fn toggle(app: &mut App)

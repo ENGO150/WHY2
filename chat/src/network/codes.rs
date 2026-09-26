@@ -249,6 +249,7 @@ pub enum PacketCode //CONTROL CODES
 
     ProfileRequest { target: Option<String> },      //CLIENT -> SERVER | READ A PROFILE | None = OUR OWN
     ProfileSave { profile: UserProfile },           //CLIENT -> SERVER | WRITE OUR OWN PROFILE
+    AvatarRequest { hash: Option<[u8; 32]> },       //CLIENT -> SERVER | SET OUR PICTURE | None = DROP IT
     Typing { username: String },                    //SERVER -> CLIENT | SOMEBODY IN THE CHANNEL IS WRITING
     Version { version: String },                    //SERVER <> CLIENT | THE SENDER'S PKG VERSION
     UsernameRequest,                                //SERVER -> CLIENT | PICK USERNAME
@@ -353,6 +354,7 @@ impl PacketCode
             Self::Colors { .. }                => "Colors",
             Self::ProfileRequest { .. }        => "ProfileRequest",
             Self::ProfileSave { .. }           => "ProfileSave",
+            Self::AvatarRequest { .. }         => "AvatarRequest",
             Self::Profile { .. }               => "Profile",
             Self::TypingRequest { .. }         => "TypingRequest",
             Self::Typing { .. }                => "Typing",
@@ -458,10 +460,11 @@ pub enum SettingValue
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq, Default)]
 pub struct UserProfile
 {
-    pub bio: String,      //WHAT THE USER SAYS ABOUT THEMSELVES
-    pub pronouns: String, //HOW THEY ARE REFERRED TO
-    pub website: String,  //A LINK OF THEIRS, http/https ONLY
-    pub status: String,   //WHAT THEY ARE UP TO, UNTIL THEY CHANGE IT
+    pub bio: String,              //WHAT THE USER SAYS ABOUT THEMSELVES
+    pub pronouns: String,         //HOW THEY ARE REFERRED TO
+    pub website: String,          //A LINK OF THEIRS, http/https ONLY
+    pub status: String,           //WHAT THEY ARE UP TO, UNTIL THEY CHANGE IT
+    pub avatar: Option<[u8; 32]>, //PROFILE PICTURE
 }
 
 //ONE MESSAGE AS server_messages.bin KEEPS IT
