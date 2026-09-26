@@ -265,6 +265,19 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     for the rest of the session. The wait sits on that connection's own read loop, which is the
     backpressure and costs nobody else. `last_image` is carried across a rekey and a channel switch
     — a client that could reset it by switching channels would not be limited at all.
+    A request for a picture nothing names is **answered with empty data** rather than silence: it
+    decodes to nothing, so the caption goes to `[ unavailable ]`, and it frees the client's in-flight
+    slot (below), which silence would hold forever.
+  - **The client keeps at most `MAX_IMAGE_FETCHES` fetches in flight** (`App::take_image_requests`,
+    drained by the redraw tick; `App::fetched` frees a slot on any `ImageData`). The server serves one
+    per `IMAGE_REQUEST_DELAY` on the connection's own read loop, so every queued fetch is also that
+    long of the client's *other* packets waiting behind it — scrolling fast through a history of
+    pictures used to queue one per caption it passed. A queued request whose caption has left the
+    screen before its turn is not sent at all: the caption goes back to `Picture::Deferred` and asks
+    again if it comes back into view. A request with no waiting caption in the pane (the profile
+    box's avatar) is always sent. A channel switch turns the parked pane's `Waiting` captions back to
+    `Deferred` for the same reason — `deliver_image` only searches the pane being looked at, so an
+    answer arriving meanwhile would never reach them.
   - **`server_images/` is sealed encrypt-then-MAC, and it is read back in the chunks it was written
     in.** `crypto::image_keys` HKDFs a key, nonce and MAC key per picture out of `server_image_key`
     salted with the hash the file is named after, so nothing about the pair is kept anywhere and two
@@ -327,19 +340,19 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     and a picture dies with its entry; a client cache is owned by nothing, so a write that takes it
     over the cap drops the oldest files by mtime, and every hit touches the file it read so what goes
     is what has not been looked at.
-  - **A replay fills from the cache without a packet, and only for the pictures being looked at.**
-    `App::apply` is pure state mutation and cannot do disk I/O, so the `History` arm in
-    `network/client/mod.rs` does the one cheap half: `cache::has` (one `stat` per picture, no key and
-    no decrypt) says which hashes we hold, and those captions come up as `Picture::Deferred`
+  - **A replayed picture is loaded when it is looked at, from the cache or else from the server.**
+    With `auto_show_images` on, every replayed caption comes up as `Picture::Deferred`
     (`[ loading... ]`, the same line `Waiting` draws) rather than `Absent` (`[ show ]`) — offering a
     button for a picture that is going to fill itself is the one thing it must not do, and
-    `request_image` would refuse the click anyway. **The decode is the expensive half and waits for
-    the picture to be on screen**: a login replays `max_persistent_messages` lines at once, and
-    decoding every cached one up front cost a `MAX_IMAGE_ALLOC` decode, a fit and a held protocol per
-    picture for a paneful nobody had scrolled to yet — which is what made `auto_show_images` lag.
+    `request_image` would refuse the click anyway. Nothing is checked at replay time: it used to
+    `stat` the cache per picture and leave the misses as buttons, so an uncached picture was never
+    shown unasked. **The load waits for the picture to be on screen**: decoding every one up front
+    cost a `MAX_IMAGE_ALLOC` decode, a fit and a held protocol per picture for a paneful nobody had
+    scrolled to yet — and fetching every miss would be a whole history's pictures off the server.
     `App::load_visible` flips a `Deferred` caption that has come into view to `Waiting` and puts its
     hash in `App::image_loads`, which `tui::run`'s tick hands to `client::fetch_image` — the same
-    cache-then-server path a click takes, one task per picture that is actually being looked at. Each
+    cache-then-server path a click takes, one task per picture that is actually being looked at; a
+    miss joins the capped fetch queue above. Each
     hit arrives as an ordinary `ClientEvent::ImageData`, which is why `deliver_image` fills
     `Picture::Absent` as well as `Waiting`: an answer nobody clicked for is what a cache hit *is*. It
     deliberately does **not** fill a `Deferred` line — that one has not asked yet, and filling it
@@ -360,7 +373,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - **`auto_show_images` (client.toml, default on) makes a live picture behave like a replayed one.**
     With it off, `network/client/mod.rs`'s `ImageDisplay` arm decodes nothing: the line goes up as a
     caption with a `[ show ]` button (`ClientEvent::ImageOffer` → `push_caption(.., Picture::Absent, ..)`)
-    and the history's cache prefetch is skipped, so every replayed caption is a button too. The two
+    and every replayed caption comes up `Absent`, so it is a button too. The two
     costs it declines are the ones the pushed path pays without being asked — the decode
     (`MAX_IMAGE_ALLOC` per picture, one per packet, for pictures nobody looked at) and the `ImageData`
     fetch that answers an offer. Bytes that arrived **anyway** are still hashed and cached: they are
@@ -888,7 +901,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   `Vec<Record>`, the same encoding the packets use, so a message is stored the way it is sent instead
   of being flattened into text.
   - **`Record` is not `StoredMessage`, and the difference is the colors.** What is kept is who said
-    it, what they said and the picture if it was one; the colors are looked up per sender in `all()`
+    it, what they said and the picture if it was one; the colors are looked up per sender in `page()`
     and put on the wire `StoredMessage` there. So a replay is painted the way the sender looks **now**
     — somebody who recolours themselves recolours everything they ever said, which is what the colors
     living on the account rather than in the packet means once there is a file involved. It also means
@@ -923,7 +936,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     history rather than refusing to start.
     The one older format that is *not* thrown away is the one with the colors still in the record
     (`migrate`, marked in the code to go with the next version bump): it is read as the shape it is and
-    the colors dropped, since `all()` puts them back on every line from the account anyway. It converts
+    the colors dropped, since `page()` puts them back on every line from the account anyway. It converts
     **in memory only** — the next message rewrites the file, and until one arrives a restart simply
     costs the same read again, which is cheaper than a rewrite on a path that has not been asked to
     write anything yet.
@@ -932,9 +945,25 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `channel.is_none()`.
   - The append-trim-write runs under the one `HISTORY` lock, so two clients talking at once cannot
     drop each other's message or leave a half-written file behind.
-  - The history is sent once, as `PacketCode::History`, immediately after `Accept` (`send_history`)
-    — every client starts in the lobby, so a channel switch has nothing to replay and asks for
-    nothing. The packet keeps the username, the text and the colors, but **no id**: the session
+  - **The history is sent a page at a time** (`send_history`, `messages::page`): the newest
+    `history_page` messages right before `Accept`, and each older page when the client asks for it
+    with `HistoryRequest { before }`. Every client starts in the lobby, so a channel switch has nothing
+    to replay. A page is also cut at `MAX_HISTORY_SIZE` bytes, but always holds at least one message
+    so the cursor always moves.
+    - **The cursor is an absolute index, and it is in memory only.** `HISTORY` keeps `base`, the
+      index of its first record, and bumps it by whatever the trim drops, so a cursor stays pointing
+      at the same message while newer ones arrive and older ones go — an offset from either end
+      would not. It need not survive a restart: a restart ends every session, and every session
+      starts from the newest page again.
+    - **The client asks when the top of the lobby pane comes within a screen**
+      (`App::load_visible`), one page in flight at a time (`history_pending`), sent by the redraw
+      tick. `App::history_anchor` is where the first replayed entry sits, so an older page goes in
+      *under* the `Message history (n):` heading rather than above the connect lines; `n` is the
+      number the server keeps, not the number shown. `prepend_history` moves `App::scroll` and the
+      selection down by the rows it added, so the view stays on what it was showing. Paging stops at
+      `more: false`, at the pane's `HISTORY_LIMIT`, and once the anchor itself has been evicted; an
+      answer that lands while we are in a channel is dropped, and asked for again on the way back.
+    The packet keeps the username, the text and the colors, but **no id**: the session
     that said it is gone and whoever holds that id now is somebody else. The client replays it as
     `state::Entry::History` — an ordinary chat line rendered through `Theme::render` (so
     `disable_colors` reaches it like any other message) minus the id column, under a
@@ -942,7 +971,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - **An image line carries the sender's username color, the way a message does.** It is the username
     color *only*: an image line's text is the filename, which is the client's own wording and not
     something the sender typed, so there is no message color to keep and the packet's stays `None`.
-    It is looked up where the line is built — `all()` for a replay, and
+    It is looked up where the line is built — `page()` for a replay, and
     `config::users::colors(&username).username_color` beside each `PacketCode::ImageDisplay` for the
     clients watching live (`file/server.rs` after an upload, the `Upload`/`Image` arm for a picture the
     history already holds) — so a picture looks the same before and after a restart without anything
