@@ -1103,6 +1103,27 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 }
             },
 
+            //DELETE A STORED MESSAGE
+            PacketCode::DeleteRequest { message_id } =>
+            {
+                let author = config::messages::author(message_id);
+                let own = author.as_deref() == Some(username.as_str());
+
+                //OWN, OR A LOWER RANK'S AS A MODERATOR
+                let allowed = own || author.is_some_and(|author| role >= Role::Moderator
+                    && config::users::role(&author).is_none_or(|author_role| author_role < role));
+
+                if allowed && config::messages::delete(message_id)
+                {
+                    log::info!("Message deleted ({}): {peer_addr}", if own { "own" } else { "peer" });
+                } else
+                {
+                    log::warn!("Delete refused (no such message, or permissions): {peer_addr}");
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                }
+            },
+
             //CLIENT REQUESTED LIST OF ONLINE USERS
             PacketCode::ListRequest =>
             {

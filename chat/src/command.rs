@@ -67,6 +67,7 @@ pub enum Command
     #[cfg(feature = "client_screen")] Screen,   //TOGGLE SCREEN SHARING
     #[cfg(feature = "client_screen")] Attach,   //ATTACH SCREEN SHARE
     #[cfg(feature = "client_screen")] Deattach, //DEATTACH SCREEN SHARE
+    Delete,                                     //DELETE A STORED MESSAGE
     PrivateMessage,                             //ONE TO ONE MESSAGE
     Re,                                         //REPLY TO PRIVATE MESSAGE
     Settings,                                   //OPEN THE SETTINGS OVERLAY
@@ -597,6 +598,26 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Delete,
+        triggers: &[ "DELETE", "DEL", "RM" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "ID of the message",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Deletes a message from the history",
+    },
+
+    CommandInfo
+    {
         command: Command::Settings,
         triggers: &[ "SETTINGS", "SETUP", "CONFIG", "PREFERENCES", "AUDIO" ],
         shortcut: Some(','),
@@ -803,6 +824,12 @@ impl Command
                     None => Err(()),
                 })
             },
+
+            Command::Delete => Some(match parameters.and_then(|p| p.parse::<u64>().ok())
+            {
+                Some(message_id) => Ok(PacketCode::DeleteRequest { message_id }),
+                None => Err(()),
+            }),
 
             Command::Channel => Some(Ok(PacketCode::Channel { channel: parameters.map(str::to_string) })),
 

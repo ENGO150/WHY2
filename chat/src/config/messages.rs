@@ -57,9 +57,8 @@ struct LegacyRecord //A RECORD BEFORE IDS (remove with next version bump)
     image: Option<[u8; 32]>,
 }
 
-struct History //THE RECORDS AND WHERE THEY START
+struct History //THE RECORDS AND THE NEXT ID
 {
-    base: u64,            //ABSOLUTE INDEX OF records[0]
     next: u64,            //NEXT MESSAGE ID
     records: Vec<Record>,
 }
@@ -68,7 +67,7 @@ struct History //THE RECORDS AND WHERE THEY START
 pub struct Page
 {
     pub messages: Vec<StoredMessage>,
-    pub start: u64, //ABSOLUTE INDEX OF THE FIRST ONE
+    pub start: u64, //ID OF THE FIRST ONE
     pub more: bool, //OLDER ONES LEFT
     pub kept: u64,  //MESSAGES KEPT
 }
@@ -85,7 +84,7 @@ impl History
         let records = load();
         let next = records.last().map_or(0, |message| message.id + 1);
 
-        Self { base: 0, next, records }
+        Self { next, records }
     }
 
     fn take_id(&mut self) -> u64 //HAND OUT THE NEXT ID
@@ -93,6 +92,27 @@ impl History
         let id = self.next;
         self.next += 1;
         id
+    }
+
+    fn position(&self, id: u64) -> usize //INDEX OF THE FIRST RECORD AT OR AFTER id
+    {
+        self.records.partition_point(|message| message.id < id)
+    }
+
+    fn save(&self) //ENCRYPT-THEN-MAC THE WHOLE HISTORY
+    {
+        let bytes = wincode::config::serialize(&self.records, consts::PACKET_CONFIG).expect("Encoding message history failed");
+        let sealed = crypto::encrypt_packet::<{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(&bytes, &KEYS);
+
+        fs::write(path(), sealed).expect("Saving message history failed");
+    }
+
+    fn orphans(&self, dropped: Vec<[u8; 32]>) -> Vec<[u8; 32]> //DROPPED PICTURES NOTHING NAMES
+    {
+        dropped.into_iter()
+            .filter(|hash| !self.records.iter().any(|message| message.image.as_ref() == Some(hash)))
+            .filter(|hash| !super::users::names_avatar(hash))
+            .collect()
     }
 }
 
@@ -184,28 +204,47 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>) -> u64 //APPEND ONE
     let over = guard.records.len().saturating_sub(limit);
     let dropped: Vec<[u8; 32]> = guard.records.drain(..over).filter_map(|message| message.image).collect();
 
-    guard.base += over as u64;
-    let history = &guard.records;
-
     //A PICTURE ANOTHER ENTRY - OR A PROFILE - STILL NAMES STAYS
-    let orphans: Vec<[u8; 32]> = dropped.into_iter()
-        .filter(|hash| !history.iter().any(|message| message.image.as_ref() == Some(hash)))
-        .filter(|hash| !super::users::names_avatar(hash))
-        .collect();
+    let orphans = guard.orphans(dropped);
 
-    //ENCRYPT-THEN-MAC THE WHOLE HISTORY
-    let bytes = wincode::config::serialize(&*history, consts::PACKET_CONFIG).expect("Encoding message history failed");
-    let sealed = crypto::encrypt_packet::<{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(&bytes, &KEYS);
-
-    fs::write(path(), sealed).expect("Saving message history failed");
-
+    guard.save();
     drop(guard); //THE FILES ARE NOT THE HISTORY'S BUSINESS
 
+    remove_images(orphans);
+
+    id
+}
+
+fn remove_images(orphans: Vec<[u8; 32]>) //DELETE PICTURES NOTHING NAMES
+{
     if !orphans.is_empty() { log::info!("Dropping {} stored images with no history entry left", orphans.len()); }
 
     for hash in orphans { let _ = fs::remove_file(misc::get_image_dir().join(misc::hex(&hash))); }
+}
 
-    id
+pub fn author(id: u64) -> Option<String> //WHO SAID MESSAGE id
+{
+    let history = HISTORY.lock().unwrap();
+
+    history.records.get(history.position(id)).filter(|message| message.id == id).map(|message| message.username.clone())
+}
+
+pub fn delete(id: u64) -> bool //REMOVE MESSAGE id AND REWRITE THE FILE
+{
+    let mut guard = HISTORY.lock().unwrap();
+
+    let index = guard.position(id);
+    if guard.records.get(index).is_none_or(|message| message.id != id) { return false; }
+
+    let dropped: Vec<[u8; 32]> = guard.records.remove(index).image.into_iter().collect();
+    let orphans = guard.orphans(dropped);
+
+    guard.save();
+    drop(guard);
+
+    remove_images(orphans);
+
+    true
 }
 
 pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
@@ -255,27 +294,25 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
     {
         let history = HISTORY.lock().unwrap();
 
-        let end = history.base + history.records.len() as u64;
-        let before = before.unwrap_or(end).clamp(history.base, end);
+        let to = before.map_or(history.records.len(), |id| history.position(id));
 
         let mut size = 0;
-        let mut start = before;
+        let mut from = to;
 
         //WALK BACK UNTIL THE PAGE IS FULL
-        while start > history.base && ((before - start) as usize) < count
+        while from > 0 && to - from < count
         {
-            let record = &history.records[(start - 1 - history.base) as usize];
+            let record = &history.records[from - 1];
 
             size += record.username.len() + record.text.len();
-            if size > budget && start != before { break; }
+            if size > budget && from != to { break; }
 
-            start -= 1;
+            from -= 1;
         }
 
-        let from = (start - history.base) as usize;
-        let to = (before - history.base) as usize;
+        let start = history.records.get(from).map_or(history.next, |message| message.id);
 
-        (history.records[from..to].to_vec(), start, start > history.base, history.records.len() as u64)
+        (history.records[from..to].to_vec(), start, from > 0, history.records.len() as u64)
     };
 
     let mut looked_up: HashMap<String, MessageColors> = HashMap::new();

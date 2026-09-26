@@ -270,7 +270,8 @@ pub enum PacketCode //CONTROL CODES
     RegisterRequest,                                //SERVER -> CLIENT | REGISTER
     Login { password: String },                     //CLIENT -> SERVER | LOGIN
     Register { password: String },                  //CLIENT -> SERVER | REGISTER
-    HistoryRequest { before: u64 },                 //CLIENT -> SERVER | THE PAGE BEFORE THIS INDEX
+    HistoryRequest { before: u64 },                 //CLIENT -> SERVER | THE PAGE BEFORE THIS MESSAGE ID
+    DeleteRequest { message_id: u64 },              //CLIENT -> SERVER | DELETE A STORED MESSAGE
     Re { message: String },                         //CLIENT -> SERVER | REPLY TO LAST PM
     Channel { channel: Option<String> },            //SERVER <> CLIENT | CHANNEL CHANGE
     ChannelCreated { name: String },                //SERVER -> CLIENT | CHANNEL CREATED
@@ -401,6 +402,7 @@ impl PacketCode
             Self::Join { .. }                  => "Join",
             Self::ListRequest { .. }           => "ListRequest",
             Self::List { .. }                  => "List",
+            Self::DeleteRequest { .. }         => "DeleteRequest",
             Self::ServerKick { .. }            => "ServerKick",
             Self::ServerMute { .. }            => "ServerMute",
             Self::ServerBan { .. }             => "ServerBan",
