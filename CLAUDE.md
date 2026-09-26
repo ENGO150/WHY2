@@ -760,12 +760,9 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     used to hold redundant) and re-exporting `colors::code` so a typed name is resolved in one place.
     `to_color` goes straight through that lookup: `ansi_(n)` and `rgb_(r,g,b)` are colours a code cannot
     carry, and are refused where they are typed rather than accepted and then ignored on every message.
-  - **`config::users::migrate()`** (called from `bin/server.rs` right after the logger, and marked in the
-    code to go with the next version bump) writes the two keys into entries that predate them, in one pass
-    over the document. `colors()` would read a missing key as no
-    colour anyway — the point is that every entry has the same shape and the file states what is settable.
-    A legacy *flat* entry is left alone; `write_user_field` turns one into a subtable the first time
-    anything is stored for it. It gives an entry its `profile` subtable in the same pass.
+  - There is no migration for entries that predate the color and profile keys: `colors()` reads a
+    missing key as no colour, and `write_user_field`/`write_profile_field` create the subtable (and turn a
+    legacy *flat* entry into one) the first time anything is stored for it.
 - **A profile is the account's, and the client keeps none of it.** `/profile` opens your own and
   `/profile USER` somebody else's; the fields are `bio`, `pronouns`, `website` and `status`, plus the
   picture. Like the colors, the client only asks
@@ -905,8 +902,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     and put on the wire `StoredMessage` there. So a replay is painted the way the sender looks **now**
     — somebody who recolours themselves recolours everything they ever said, which is what the colors
     living on the account rather than in the packet means once there is a file involved. It also means
-    the file cannot hold a colour that no longer exists, `/color` never has to rewrite a history, and an
-    existing history can be carried across the format change by dropping a field rather than a file.
+    the file cannot hold a colour that no longer exists and `/color` never has to rewrite a history.
     The lookup is per sender, not per line: a colour is a couple of reads of `server_users.toml`, and a
     history is routinely a handful of people saying `max_persistent_messages` things.
   - **It is encrypted at rest, authenticated, under a key nobody has to manage.**
@@ -934,12 +930,19 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     restart: it is read once, on first touch, and only ever written after that. A missing, truncated,
     tampered, unrecognisable file, or one written under another server's keys, all load as an empty
     history rather than refusing to start.
-    The one older format that is *not* thrown away is the one with the colors still in the record
-    (`migrate`, marked in the code to go with the next version bump): it is read as the shape it is and
-    the colors dropped, since `page()` puts them back on every line from the account anyway. It converts
-    **in memory only** — the next message rewrites the file, and until one arrives a restart simply
-    costs the same read again, which is cheaper than a rewrite on a path that has not been asked to
-    write anything yet.
+    The one older format that is *not* thrown away is the one from before message ids (`migrate`, marked
+    in the code to go with the next version bump): it is read through `LegacyRecord` and numbered `0..n`
+    in order, so the ids rise with the records like any others. It converts **in memory only** — the
+    numbering is deterministic, so a restart before the next message rewrites the file derives the same
+    ids again.
+  - **Every message has a server-assigned id** (`Record::id`, `StoredMessage::message_id`,
+    `PacketCode::Message::message_id`), which is how a message is named from outside — deleting one is
+    what it is for. It is not the sender's `id`, which is a session. One counter serves the lobby and
+    every channel (`History::next`, seeded from the last stored id + 1), and it is taken **under the
+    `HISTORY` lock** — `store` allocates the id itself and `next_id` covers a message that is not kept —
+    so the history's ids rise in the order its records do. Unique per process plus the stored history is
+    enough: a restart ends every session and a client's panes die with it, so an id reused for a channel
+    message after a restart can never match anything a client still shows.
   - **Only the lobby has one.** A channel exists exactly as long as somebody is in it, so there is
     nothing to keep it against; `server::listen_client`'s `Message` arm stores only while
     `channel.is_none()`.
