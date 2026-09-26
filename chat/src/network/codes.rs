@@ -309,7 +309,7 @@ pub enum PacketCode //CONTROL CODES
     ServerKick { id: usize },                            //CLIENT -> SERVER | KICK USER
     ServerMute { id: usize },                            //CLIENT -> SERVER | MUTE USER
     ServerBan { target: String },                        //CLIENT -> SERVER | BAN USER
-    ServerBanIp { target: String },                      //CLIENT -> SERVER | BAN USER'S IP
+    ServerBanIp { id: usize },                           //CLIENT -> SERVER | BAN USER'S IP
     ServerPardon { id: usize },                          //CLIENT -> SERVER | LIFT A USERNAME BAN
     ServerPardonIp { id: usize },                        //CLIENT -> SERVER | LIFT AN IP BAN
     ServerSay { message: String },                       //CLIENT <> SERVER | SAY AS SERVER

@@ -200,8 +200,8 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "USER",
-                description: "Username or ID of target user",
+                name: "ID",
+                description: "Target user",
                 required: true,
                 values: ArgValues::Free,
             },
@@ -763,6 +763,7 @@ impl SubcommandInfo
     {
         matches!(self.subcommand, Subcommand::Mute
             | Subcommand::Kick
+            | Subcommand::BanIp
             | Subcommand::Pardon
             | Subcommand::PardonIp)
     }

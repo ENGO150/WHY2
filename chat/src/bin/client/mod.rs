@@ -173,7 +173,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
         {
             network::send(&mut *write_stream.lock().await, PacketCode::ServerBanIp
             {
-                target: tail.to_owned(),
+                id: id.unwrap(),
             }, options::get_keys().as_ref()).await;
         },
 

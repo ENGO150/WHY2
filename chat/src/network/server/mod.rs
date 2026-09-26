@@ -1700,10 +1700,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //BAN USER'S IP
-            PacketCode::ServerBanIp { target } =>
+            PacketCode::ServerBanIp { id: uid } =>
             {
                 //VERIFY PERMISSIONS
-                if role < Role::Owner
+                if role < Role::Owner || id == uid
                 {
                     log::warn!("Refused (permissions): {peer_addr}");
 
@@ -1711,19 +1711,17 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
-                //FIND TARGET ADDRESS
-                let session = resolve_user(&target)
-                    .filter(|target| *target != username)
-                    .and_then(|target| session_of(&target));
+                //FIND TARGET USER
+                let target = CONNECTIONS.iter()
+                    .find(|entry| entry.value().id() == Some(&uid))
+                    .map(|entry| *entry.key());
 
-                if let Some(addr) = session
+                if let Some(addr) = target
                 {
                     log::info!("IP ban by {peer_addr}: {}", addr.ip());
 
                     config::bans::ban_ip(&addr.ip());
                     remove_connections(&addr.ip(), true, Some("ip ban")).await;
-
-                    send_bans(&streams.1, &keys).await;
                 } else //USER NOT FOUND
                 {
                     log::warn!("IP ban refused (no such user): {peer_addr}");

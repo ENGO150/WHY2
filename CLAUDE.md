@@ -769,15 +769,14 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   session it lands in — the server updates the live `Connection` and tells that client, whose
   `App::role` is what the palette and `/help` read — so the per-connection role is re-read on every
   packet rather than latched at login.
-- **A moderation target is an account, not a session.** `/server ban`, `banip` and `role` take
+- **A moderation target is an account, not a session.** `/server ban` and `role` take
   a username or a live session id, resolved to a username by `server::resolve_user` — the same lookup
   `/profile` uses — and then find the account's session, if it has one (`server::session_of`; there
   is at most one, since `user_connected` refuses a username already in `CONNECTIONS` at login).
   That is what lets an owner ban or retitle somebody who is offline, since an offline account has no
-  id. `banip` still needs somebody connected, since the server keeps no last-seen address.
-  A ban and a `banip` are answered with the ban list, as a pardon is, since an offline target leaves
-  nothing else to show that it worked. `/server kick` and `/server mute` are still by id: kicking
-  somebody who is not there means nothing.
+  id. A ban is answered with the ban list, as a pardon is, since an offline target leaves nothing
+  else to show that it worked. `/server kick`, `banip` and `mute` are still by id: they only mean
+  anything for somebody who is connected, and the server keeps no last-seen address to ban.
 - **The chat colors are the server's, and the client neither stores nor sends them.** `/color` and `/ucolor`
   are unchanged from where the user stands, but `color_handler` only asks: it sends
   `PacketCode::Colors { username, color }` — which of the two, and the code — and the server stores it under
