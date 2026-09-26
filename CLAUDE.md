@@ -754,7 +754,8 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     A legacy *flat* entry is left alone; `write_user_field` turns one into a subtable the first time
     anything is stored for it. It gives an entry its `profile` subtable in the same pass.
 - **A profile is the account's, and the client keeps none of it.** `/profile` opens your own and
-  `/profile USER` somebody else's; the fields are `bio`, `pronouns`, `website` and `status`. Like the colors, the client only asks
+  `/profile USER` somebody else's; the fields are `bio`, `pronouns`, `website` and `status`, plus the
+  picture. Like the colors, the client only asks
   (`PacketCode::ProfileRequest`) and the server answers with the whole thing (`Profile`), so there is no
   second copy anywhere and nothing in `client.toml` about it. The ack to a save is the whole profile
   **again** rather than an "ok", which is what makes a refused description snap back in the row instead of
@@ -808,6 +809,68 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     server does not hold. The keys are live-read, the request is charged to the packet bucket like anything
     else, and the log gets an address, a field name, a character count and `own`/`peer` — a field's *name*
     is the server's own vocabulary, its content is the user's and never reaches the log.
+  - **The picture is a hash, not a field, and it is the chat pictures' own machinery.** `UserProfile::avatar`
+    is an `Option<[u8; 32]>` sitting deliberately *outside* `KEYS`: the four fields are prose somebody types,
+    checked by length and refused together, while a picture is bytes that had to be uploaded first. So
+    `ProfileSave` never carries it (`set_profile` writes the typed fields only, and the server ignores
+    whatever avatar a save arrives with). It is set from the box itself: an own profile opens on an `Avatar`
+    row (`settings::Value::Avatar`) that is typed as a path, completed off the disk by the same
+    `palette::paths` `/image` uses (listed in the description foot, ↑↓ to pick, Tab to take it), checked
+    where it is typed by the same `check_upload` `/upload` and `/image` go through, and held until
+    `[ Save ]` like the fields — clearing it drops the avatar. On save it is its own request
+    (`take_avatar_save`), sent beside `ProfileSave` rather
+    than in it, and only the half that actually changed goes out. There is no `/avatar` command. What it names is an ordinary stored picture in `server_images/`, keyed by content like any
+    other, so the whole path already exists: `AvatarRequest` mints an upload token
+    (`ConnectionType::Avatar`) exactly as `/image` does, the client fetches it back through `ImageDataRequest`
+    and the cache, and a picture that is *already* stored costs no upload at all (`ImageDuplicate`, the same
+    answer `/image` gets).
+    - **The retention rule is what had to change**, and it is the one thing a second copy would have bought
+      instead. `server_images/` was owned by the history alone — a picture died with its entry — so an avatar
+      kept there is a picture two different things name. `config::messages::stored` is that predicate
+      (`has_image` **or** `users::names_avatar`), and it is what the fetch arm serves on and what an upload
+      dedups against; `push`'s orphan filter and `sweep_images` both keep what a profile names. That is also
+      why setting or dropping an avatar sweeps: the picture it *replaced* may have nothing left naming it.
+    - **The ceiling is `MAX_AVATAR_SIZE`, and it is checked on both roads in.** An upload is refused over it
+      in `file/server.rs` like an oversized image, and naming an already-stored picture is refused the same
+      way (`file::image_size`) — otherwise an 8MB chat picture could be pinned as an avatar forever, which is
+      the one thing the dedup shortcut would let a client do for free.
+    - **An avatar is a square, cut by the client and only checked by the server.** Cropping rather than padding,
+      because a fill colour is a background the file would carry into every terminal theme. The client does the
+      work (`network::client::image::make_avatar`): the centred square, scaled to at most `AVATAR_DIMENSION`
+      (`ANIMATED_AVATAR_DIMENSION` for an animation, which is every frame at once), written as a PNG or, when it
+      moves, a GIF. It goes through `decode_image`, so the decode is bounded like any picture's, and the
+      source is allowed `MAX_IMAGE_SIZE`: `MAX_AVATAR_SIZE` is checked against the *cut* copy, which is
+      parked in the temp dir (`misc::avatar_temp`) because the upload sends from a path, and removed once it
+      is sent or the server already has it. A failure there comes back as `ClientEvent::AvatarFailed`.
+      **The server decodes nothing.** Cutting there would mean decoding untrusted pictures on the server, and
+      re-encoding one changes the hash it is named, keyed and MAC'd under. It checks the shape off the header
+      instead (`misc::is_avatar` — a PNG's IHDR or a GIF's screen descriptor, which is why the client only ever
+      writes those two), on the first chunk of an upload and on the stored copy when the dedup shortcut names
+      one — a chat picture was never cut, so that road would otherwise pin any shape as an avatar.
+    - **It is answered with the whole profile, from wherever it lands.** The `AvatarRequest` arm answers the
+      two cases it can settle at once; an upload's answer comes from `file/server.rs` when the last chunk is
+      in, which is why that path sends `Profile { save: true }` rather than announcing anything — an avatar is
+      the only picture on the server that is *not* pushed to a channel, since nobody sees it until they open
+      the box.
+  - **The picture is drawn inside the box, and the box reserves the rows before it exists.**
+    `Settings::picture` holds the fitted picture, `picture_of` which hash it is (so a save's ack does not put
+    down a picture it is about to want again), and `picture_area` where the draw path put it;
+    `Settings::picture_rows` is what `draw_settings` takes off the rows' room. It is drawn in `draw_avatar`,
+    **after** `draw_pictures` — a graphics-protocol picture is not cells, so it has to go on last, the same
+    reason the pane's do, and being inside a box that is itself restored over the pane's pictures means it
+    must go on after that restore. `AVATAR_ROWS` is its budget, which is why `fit_size`/`fit_image` take a
+    row count instead of reading `IMAGE_ROWS` themselves, and `App::advance_avatar` steps it off the same
+    tick as the pane's animations — an animated avatar plays, the pane's clock simply does not reach into the
+    overlay.
+    - **A pane picture sharing a terminal row with it takes that row away.** A picture is sent one escape per
+      row, and a pane picture's row is written across the whole of its width — straight through the box and
+      over the avatar's cells — whenever that row is sent again (an animation frame, a box that moved). The
+      avatar's own first cell has not changed, so the diff never sends it back and the avatar comes out with
+      rows missing. `draw_pictures` therefore returns the rows whose first cell differs from the last frame's
+      (`App::picture_rows_drawn`), and `draw_avatar` marks the same rows of the avatar so they go out after
+      them — the avatar is further right, so within the row it is written last. The mark alternates between
+      one and two cursor saves (`App::avatar_marks`), because a pane GIF rewrites its row every frame and the
+      same mark twice would read as unchanged.
 - **`config/mod.rs`** — TOML config for client (`client.toml`) and server (`server.toml`), plus
   server user store (`server_users.toml`), server ban list (`server_bans.toml`) and server keypair
   storage (`server_keys/{private,public}`), all under `WHY2_CONFIG_DIR`
@@ -1048,6 +1111,14 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
       clears what it left outside them.
   - **`App::overlays_drawn` hands back the previous frame's rects** as it stores this frame's, which is how
     "a box was over this picture and is no longer" is known — the only case that needs the row replaced.
+    That includes a box that is **still** over it but has changed shape: a box that shrinks (the profile
+    box's path list emptying as a path is typed) leaves glyphs on the cells it gave up exactly like one
+    that closed, so the replace fires whenever the rects differ, not only when none cover the picture any
+    more — and it skips a row whose first cell is still the box's, since that row's picture is not drawn.
+    **One frame is not enough for that**: the rows written on the frame the box changes shape still leave
+    its old glyphs up, and it is the frame *after* — where the first cell reads plain again and is emitted
+    once more — that clears them (which is why a focus change, a bare redraw, used to be the cure). So
+    `draw_pictures` sets `App::dirty` whenever the rects changed, and the next tick draws that frame.
     The rects come from the boxes themselves: `draw_palette`/`draw_settings`/`draw_login`/`draw_tofu` each
     return the popup they drew (`Rect::ZERO` when the terminal had no room for one) and `draw` collects them.
     Recomputing that geometry would be a second copy of arithmetic that depends on the rows, the description
