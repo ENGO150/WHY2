@@ -330,15 +330,27 @@ pub async fn run
                 }
 
                 //THE OFFERED PICTURES WE DO NOT HOLD
-                if !app.image_requests.is_empty() && let Some(write_stream) = write_stream.as_ref()
+                if let Some(write_stream) = write_stream.as_ref()
                 {
-                    let keys = options::get_keys();
-                    let mut stream = write_stream.lock().await;
+                    let requests = app.take_image_requests();
 
-                    for hash in app.image_requests.drain(..)
+                    if !requests.is_empty()
                     {
-                        network::send(&mut *stream, PacketCode::ImageDataRequest { hash }, keys.as_ref()).await;
+                        let keys = options::get_keys();
+                        let mut stream = write_stream.lock().await;
+
+                        for hash in requests
+                        {
+                            network::send(&mut *stream, PacketCode::ImageDataRequest { hash }, keys.as_ref()).await;
+                        }
                     }
+                }
+
+                //THE NEXT PAGE UP OF THE LOBBY'S HISTORY
+                if let Some(write_stream) = write_stream.as_ref() && let Some(before) = app.history_request.take()
+                {
+                    network::send(&mut *write_stream.lock().await,
+                        PacketCode::HistoryRequest { before }, options::get_keys().as_ref()).await;
                 }
 
                 //TELL THE CHANNEL WE ARE WRITING

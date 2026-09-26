@@ -24,7 +24,7 @@ use crate::
     network::
     {
         codes::OnlineUser,
-        client::ClientEvent,
+        client::{ ClientEvent, image as client_image },
     },
 };
 
@@ -324,31 +324,51 @@ impl App
             },
 
             //THE LOBBY'S STORED MESSAGES
-            ClientEvent::History(messages, cached) =>
+            ClientEvent::History(messages, start, more, kept, older) =>
             {
-                self.push_styled(format!("Message history ({}):", messages.len()), theme::TITLE);
+                //A PICTURE IS LOADED WHEN IT IS LOOKED AT
+                let auto_show = client_image::auto_show_images();
 
-                for message in messages
+                let entries = messages.into_iter().map(|message| match message.image
                 {
-                    match message.image
+                    Some(hash) => state::Entry::Image
                     {
-                        //A PICTURE WE HOLD IS LOADED WHEN IT IS LOOKED AT
-                        Some(hash) => self.push_caption(message.username, message.text, hash,
-                            match cached.contains(&hash)
-                            {
-                                true => state::Picture::Deferred,
-                                false => state::Picture::Absent,
-                            }, message.colors.username_color),
-                        None => self.push_history(message.username, message.text, message.colors),
-                    }
+                        username: message.username,
+                        filename: message.text,
+                        username_color: message.colors.username_color,
+                        hash: Some(hash),
+                        picture: match auto_show
+                        {
+                            true => state::Picture::Deferred,
+                            false => state::Picture::Absent,
+                        },
+                    },
+
+                    None => state::Entry::History { username: message.username, text: message.text, colors: message.colors },
+                }).collect();
+
+                match older
+                {
+                    true => self.prepend_history(entries, start, more),
+
+                    false =>
+                    {
+                        self.push_styled(format!("Message history ({kept}):"), theme::TITLE);
+                        self.start_history(entries, start, more);
+                    },
                 }
             },
 
             //THE ANSWER TO A CLICKED CAPTION, OR TO THE PROFILE BOX
-            ClientEvent::ImageData(hash, image) => match self.wants_avatar(&hash)
+            ClientEvent::ImageData(hash, image) =>
             {
-                true => self.deliver_avatar(hash, image),
-                false => self.deliver_image(hash, image),
+                self.fetched(&hash);
+
+                match self.wants_avatar(&hash)
+                {
+                    true => self.deliver_avatar(hash, image),
+                    false => self.deliver_image(hash, image),
+                }
             },
 
             //server.toml CAME BACK

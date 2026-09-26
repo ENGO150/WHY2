@@ -21,6 +21,7 @@ use std::time::Duration;
 //MESSAGE PANE
 pub const HISTORY_LIMIT: usize        = 5000;                      //CAP THE MESSAGE PANE SO RE-WRAPPING EACH FRAME STAYS CHEAP
 pub const IMAGE_ROWS: u16             = 20;                        //TALLEST AN IMAGE MAY BE DRAWN
+pub const MAX_IMAGE_FETCHES: usize    = 2;                         //PICTURES ASKED OF THE SERVER AT ONCE
 pub const NOTICE_DURATION: Duration   = Duration::from_secs(2);    //HOW LONG THE PANE'S TOAST STAYS UP
 pub const ANIMATION_CATCHUP: Duration = Duration::from_secs(1);    //BEHIND BY MORE THAN THIS AND IT RESTARTS
 pub const MAX_URL: usize              = 2048;                      //LONGER THAN THIS AND A CLICK OPENS NOTHING

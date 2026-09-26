@@ -104,14 +104,6 @@ fn seal(fingerprint: &str, hash: &[u8; 32], data: &[u8]) -> Option<Vec<u8>>
 }
 
 //PUBLIC
-//CHECK WHETHER A PICTURE IS CACHED
-pub async fn has(hash: &[u8; 32]) -> bool
-{
-    let Some((_, path)) = scope(hash) else { return false };
-
-    fs::try_exists(&path).await.unwrap_or(false)
-}
-
 //READ ONE CACHED PICTURE BACK, VERIFYING IT
 pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
 {

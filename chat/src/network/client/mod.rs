@@ -138,7 +138,7 @@ pub enum ClientEvent
     Leave(String, usize),                                        //CLIENT DISCONNECTED
     ServerSay(String),                                           //SERVER MESSAGE
     Role(Role, Option<String>),                                  //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
-    History(Vec<StoredMessage>, Vec<[u8; 32]>),                  //STORED MESSAGES, AND WHICH OF THEIR PICTURES WE HOLD
+    History(Vec<StoredMessage>, u64, bool, u64, bool),           //A PAGE OF STORED MESSAGES (START, MORE, KEPT, OLDER)
     ChannelChanged(Option<String>),                              //WE SWITCHED CHANNEL
     ChannelCreated(String),                                      //CHANNEL CREATED
     ChannelDestroyed(String),                                    //CHANNEL ABANDONED
@@ -285,24 +285,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             }
 
             //THE LOBBY'S STORED MESSAGES
-            PacketCode::History { messages } =>
+            PacketCode::History { messages, start, more, kept, older } =>
             {
-                let hashes: Vec<[u8; 32]> = messages.iter().filter_map(|message| message.image).collect();
-
-                //WHICH OF THEM WE ALREADY HOLD
-                let auto_show = image::auto_show_images();
-                let mut cached: Vec<[u8; 32]> = Vec::new();
-
-                if auto_show
-                {
-                    for hash in &hashes
-                    {
-                        if cache::has(hash).await { cached.push(*hash); }
-                    }
-                }
-
-                //THE PICTURES THEMSELVES ARE LOADED AS THEIR CAPTIONS COME INTO VIEW
-                tx.send(ClientEvent::History(messages, cached)).await.unwrap();
+                tx.send(ClientEvent::History(messages, start, more, kept, older)).await.unwrap();
 
                 continue;
             }

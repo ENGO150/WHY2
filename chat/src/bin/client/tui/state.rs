@@ -136,7 +136,7 @@ pub enum Entry //ONE ROW OF HISTORY
 pub enum Picture
 {
     Absent,            //NOT ASKED FOR YET
-    Deferred,          //HELD IN THE CACHE, LOADED ONCE IT IS ON SCREEN
+    Deferred,          //LOADED ONCE IT IS ON SCREEN
     Waiting,           //ASKED FOR, NOT HERE YET
     Gone,              //THE SERVER DOES NOT HAVE IT ANY MORE
     Ready(Box<Fitted>),
@@ -250,6 +250,15 @@ pub struct App
     //PICTURES THAT SCROLLED INTO VIEW, TO LOAD OUT OF THE CACHE
     pub image_loads: Vec<[u8; 32]>,
 
+    //PICTURES ASKED OF THE SERVER, NOT ANSWERED YET
+    image_fetching: Vec<[u8; 32]>,
+
+    //LOBBY HISTORY PAGING
+    history_anchor: Option<usize>,    //WHERE THE FIRST REPLAYED ENTRY SITS IN THE LOBBY PANE
+    history_cursor: Option<u64>,      //ITS SERVER INDEX, WHILE OLDER ONES ARE LEFT
+    history_pending: bool,            //A PAGE WAS ASKED FOR
+    pub history_request: Option<u64>, //THE PAGE THE TICK ASKS FOR
+
     //LIFECYCLE
     pub leaving: bool,      //THE USER ASKED TO LEAVE
     pub logging_out: bool,  //THE USER ASKED TO LOG OUT
@@ -331,6 +340,11 @@ impl App
             screens_requested: false,
             image_requests: Vec::new(),
             image_loads: Vec::new(),
+            image_fetching: Vec::new(),
+            history_anchor: None,
+            history_cursor: None,
+            history_pending: false,
+            history_request: None,
             leaving: false,
             logging_out: false,
             disconnect_reason: None,
@@ -406,10 +420,124 @@ impl App
         self.push_entry(Entry::Prefixed { prefix, text });
     }
 
-    //STORE A REPLAYED MESSAGE UNRENDERED
-    pub fn push_history(&mut self, username: String, text: String, colors: MessageColors)
+    //THE NEWEST PAGE OF THE LOBBY'S HISTORY
+    pub fn start_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
     {
-        self.push_entry(Entry::History { username, text, colors });
+        self.history_anchor = Some(self.messages.len());
+        self.history_cursor = more.then_some(start);
+
+        for entry in entries { self.push_entry(entry); }
+    }
+
+    //AN OLDER PAGE, ABOVE WHAT IS ALREADY THERE
+    pub fn prepend_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
+    {
+        self.history_pending = false;
+
+        //ONLY THE LOBBY'S PANE HAS A HISTORY
+        if !self.channel.is_empty() { return; }
+
+        let Some(anchor) = self.history_anchor else { return };
+
+        //THE PANE'S CAP ENDS THE PAGING
+        let room = consts::HISTORY_LIMIT.saturating_sub(self.messages.len());
+        let skip = entries.len().saturating_sub(room);
+
+        self.history_cursor = (more && skip == 0).then_some(start);
+
+        let before = self.wrapped_rows();
+
+        let tail = self.messages.split_off(anchor);
+        self.messages.extend(entries.into_iter().skip(skip));
+        self.messages.extend(tail);
+
+        self.generation += 1;
+        self.dirty = true;
+
+        //KEEP THE VIEW ON WHAT IT WAS SHOWING
+        let grown = self.wrapped_rows().saturating_sub(before);
+
+        if let Some(scroll) = self.scroll.as_mut() { *scroll = scroll.saturating_add(grown); }
+
+        if let Some(selection) = self.selection.as_mut()
+        {
+            selection.anchor.0 = selection.anchor.0.saturating_add(grown);
+            selection.cursor.0 = selection.cursor.0.saturating_add(grown);
+        }
+    }
+
+    //ROWS THE PANE WRAPS TO AT ITS LAST WIDTH
+    fn wrapped_rows(&mut self) -> u16
+    {
+        self.rewrap(self.pane.width);
+        self.wrapped_len()
+    }
+
+    //THE QUEUED FETCHES STILL WORTH MAKING, A FEW AT A TIME
+    pub fn take_image_requests(&mut self) -> Vec<[u8; 32]>
+    {
+        if self.image_requests.is_empty() { return Vec::new(); }
+
+        let drawn = self.pane.height > 0;
+        let visible = match drawn
+        {
+            true => self.on_screen(),
+            false => Vec::new(),
+        };
+
+        let mut send = Vec::new();
+        let mut queued = Vec::new();
+
+        for hash in mem::take(&mut self.image_requests)
+        {
+            let waiting: Vec<usize> = self.messages.iter().enumerate()
+                .filter(|(_, entry)| matches!(entry, Entry::Image { hash: Some(h), picture: Picture::Waiting, .. } if *h == hash))
+                .map(|(entry, _)| entry)
+                .collect();
+
+            //SCROLLED AWAY BEFORE ITS TURN
+            if drawn && !waiting.is_empty() && !waiting.iter().any(|entry| visible.contains(entry))
+            {
+                for entry in waiting
+                {
+                    if let Some(Entry::Image { picture, .. }) = self.messages.get_mut(entry) { *picture = Picture::Deferred; }
+                }
+
+                continue;
+            }
+
+            match self.image_fetching.len() < consts::MAX_IMAGE_FETCHES
+            {
+                true =>
+                {
+                    self.image_fetching.push(hash);
+                    send.push(hash);
+                },
+
+                false => queued.push(hash),
+            }
+        }
+
+        self.image_requests = queued;
+
+        send
+    }
+
+    //A FETCH CAME BACK
+    pub fn fetched(&mut self, hash: &[u8; 32])
+    {
+        if let Some(index) = self.image_fetching.iter().position(|h| h == hash) { self.image_fetching.swap_remove(index); }
+    }
+
+    //ENTRIES WHOSE CAPTION IS ON SCREEN
+    fn on_screen(&mut self) -> Vec<usize>
+    {
+        let (offset, height) = (self.pane_offset, self.pane.height);
+
+        self.placements(self.pane.width).into_iter()
+            .filter(|placement| placement.caption < offset + height && placement.row + placement.height > offset)
+            .map(|placement| placement.entry)
+            .collect()
     }
 
     //A PICTURE THAT CAME WITH ITS BYTES
@@ -684,6 +812,14 @@ impl App
     {
         let font = self.picker.font_size();
 
+        //THE TOP OF THE LOBBY'S HISTORY IS IN SIGHT
+        if offset < height && self.channel.is_empty() && !self.history_pending
+            && let Some(cursor) = self.history_cursor
+        {
+            self.history_pending = true;
+            self.history_request = Some(cursor);
+        }
+
         for placement in self.placements(width)
         {
             let visible = placement.caption < offset + height
@@ -746,7 +882,17 @@ impl App
     {
         self.messages.push_back(entry);
 
-        while self.messages.len() > consts::HISTORY_LIMIT { self.messages.pop_front(); }
+        while self.messages.len() > consts::HISTORY_LIMIT
+        {
+            self.messages.pop_front();
+
+            //THE REPLAYED ENTRIES MOVE UP, OR GO
+            if self.channel.is_empty()
+            {
+                self.history_anchor = self.history_anchor.and_then(|anchor| anchor.checked_sub(1));
+                if self.history_anchor.is_none() { self.history_cursor = None; }
+            }
+        }
 
         self.generation += 1;
         self.dirty = true;
@@ -773,6 +919,13 @@ impl App
         self.scroll = None;
         self.unread = 0;
 
+        //NOTHING LEFT TO PAGE ABOVE
+        if self.channel.is_empty()
+        {
+            self.history_anchor = None;
+            self.history_cursor = None;
+        }
+
         self.generation += 1;
         self.dirty = true;
     }
@@ -782,7 +935,13 @@ impl App
     {
         if channel == self.channel { return; }
 
-        let parked = mem::take(&mut self.messages);
+        let mut parked = mem::take(&mut self.messages);
+
+        //AN ANSWER WOULD LAND IN THE WRONG PANE
+        for entry in parked.iter_mut()
+        {
+            if let Entry::Image { picture: picture @ Picture::Waiting, .. } = entry { *picture = Picture::Deferred; }
+        }
 
         if !parked.is_empty() { self.panes.insert(mem::take(&mut self.channel), parked); }
 
@@ -881,6 +1040,11 @@ impl App
         { self.screens_requested = false; }
         self.image_requests.clear();
         self.image_loads.clear();
+        self.image_fetching.clear();
+        self.history_anchor = None;
+        self.history_cursor = None;
+        self.history_pending = false;
+        self.history_request = None;
         self.logging_out = false; //THE NEXT DROP IS THE NEXT SESSION'S TO EXPLAIN
         self.disconnect_reason = None;
 
