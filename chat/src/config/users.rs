@@ -202,32 +202,3 @@ pub fn contains(key: &str) -> bool //CHECK IF server_users.toml contains
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(key).is_some())
 }
-
-pub fn migrate() //MIGRATE COLORS AND PROFILES (will be removed with next version bump)
-{
-    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
-    {
-        for (_, entry) in doc.as_table_mut().iter_mut()
-        {
-            let Some(user) = entry.as_table_like_mut() else { continue };
-
-            for key in COLOR_KEYS
-            {
-                if user.get(key).is_none() { user.insert(key, Item::Value(colors::NONE.into())); }
-            }
-
-            //THE PROFILE IS A SUBTABLE OF ITS OWN
-            if user.get(PROFILE_TABLE).and_then(Item::as_table_like).is_none()
-            {
-                user.insert(PROFILE_TABLE, Item::Table(Table::new()));
-            }
-
-            let Some(profile) = user.get_mut(PROFILE_TABLE).and_then(Item::as_table_like_mut) else { continue };
-
-            for key in PROFILE_KEYS.iter().chain(std::iter::once(&AVATAR_KEY))
-            {
-                if profile.get(key).is_none() { profile.insert(key, Item::Value("".into())); }
-            }
-        }
-    });
-}
