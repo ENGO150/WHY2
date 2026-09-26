@@ -88,6 +88,7 @@ use crate::
             UserFile,
             UserScreen,
             Device,
+            MessageColors,
         },
     },
 };
@@ -1534,12 +1535,20 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     //SEND CONFIRMATION BACK TO SENDER
                     let Some(recipient_uname) = CONNECTIONS.get(&recipient_addr)
                         .and_then(|e| e.username().cloned()) else { continue }; //RECIPIENT LEFT MID-SEND
+
+                    //GET TARGET USERNAME COLOR
+                    let recipient_color = config::users::colors(&recipient_uname).username_color;
+
                     network::send(&mut *streams.1.lock().await, PacketCode::PrivateMessageBack
                     {
                         text,
                         id: recipient_id,
                         username: recipient_uname,
-                        colors,
+                        colors: MessageColors //ADJUST COLORS TO USE TARGET UNAME COLOR
+                        {
+                            username_color: recipient_color,
+                            message_color: colors.message_color,
+                        },
                     }, Some(&keys)).await;
                 } else
                 {
