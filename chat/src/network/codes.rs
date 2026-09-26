@@ -46,6 +46,7 @@ pub enum PacketCode //CONTROL CODES
         text: String,
         username: String,
         id: usize,
+        message_id: u64,
         colors: MessageColors,
     },
 
@@ -484,8 +485,8 @@ pub struct UserProfile
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
 pub struct StoredMessage
 {
-    pub username: String,
     pub message_id: u64,
+    pub username: String,
     pub text: String,            //THE MESSAGE - OR THE FILENAME, WHEN THIS LINE IS AN IMAGE
     pub colors: MessageColors,
     pub image: Option<[u8; 32]>, //CONTENT HASH OF THE PICTURE

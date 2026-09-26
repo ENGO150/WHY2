@@ -973,10 +973,11 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     if channel.is_some() { "channel" } else { "lobby" });
 
                 //KEEP IT - ONLY THE LOBBY HAS A HISTORY
-                if channel.is_none() && config::read_config::<bool>("persistent_messages")
+                let message_id = match channel.is_none() && config::read_config::<bool>("persistent_messages")
                 {
-                    config::messages::store(&username, &text);
-                }
+                    true => config::messages::store(&username, &text),
+                    false => config::messages::next_id(),
+                };
 
                 //SEND MESSAGE TO ALL USERS
                 send_to_all(PacketCode::Message
@@ -984,6 +985,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     text,
                     username: username.clone(),
                     id,
+                    message_id,
                     colors: config::users::colors(&username),
                 }, true, channel.as_deref());
             }

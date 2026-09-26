@@ -83,7 +83,7 @@ impl App
             },
 
             //STORED UNRENDERED - App::theme MAKES THE LINE
-            ClientEvent::Message(message, username, id, colors) =>
+            ClientEvent::Message(message, username, id, _, colors) =>
             {
                 //A MESSAGE IS THE PROOF THEY STOPPED
                 self.stopped_typing(&username);
