@@ -123,8 +123,8 @@ pub enum ClientEvent
     Authenticated(Role),                                         //LOGIN SUCCESSFUL, ROLE
     Connected(String),                                           //SUCCESSFUL CONNECTION MESSAGE
     Message(String, String, usize, MessageColors),               //RECEIVED MESSAGE
-    PrivateMessageSent(String, usize, String),                   //SENT PM
-    PrivateMessageRecv(String, usize, String),                   //RECEIVED PM
+    PrivateMessageSent(String, usize, String, MessageColors),    //SENT PM
+    PrivateMessageRecv(String, usize, String, MessageColors),    //RECEIVED PM
     TofuError,                                                   //TOFU VERIFICATION REJECTED BY THE USER
     TofuPrompt(TofuRequest),                                     //TOFU DECISION ASKED OF THE USER
     TofuSkip(String),                                            //TOFU VERIFICATION SKIPPED
@@ -781,15 +781,15 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //PRIVATE MESSAGE INCOMING
-            PacketCode::PrivateMessage { text, username, id } =>
+            PacketCode::PrivateMessage { text, username, id, colors } =>
             {
-                tx.send(ClientEvent::PrivateMessageRecv(username, id, text)).await.unwrap();
+                tx.send(ClientEvent::PrivateMessageRecv(username, id, text, colors)).await.unwrap();
             },
 
             //PRIVATE MESSAGE INCOMING
-            PacketCode::PrivateMessageBack { text, username, id } =>
+            PacketCode::PrivateMessageBack { text, username, id, colors } =>
             {
-                tx.send(ClientEvent::PrivateMessageSent(username, id, text)).await.unwrap();
+                tx.send(ClientEvent::PrivateMessageSent(username, id, text, colors)).await.unwrap();
             },
 
             //SPAM WARNING

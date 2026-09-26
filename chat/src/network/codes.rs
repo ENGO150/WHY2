@@ -127,6 +127,7 @@ pub enum PacketCode //CONTROL CODES
         text: String,
         username: String,
         id: usize,
+        colors: MessageColors,
     },
 
     //SERVER -> CLIENT | SEND MESSAGE BACK TO SENDER
@@ -135,6 +136,7 @@ pub enum PacketCode //CONTROL CODES
         text: String,
         username: String,
         id: usize,
+        colors: MessageColors,
     },
 
     //SERVER -> CLIENT | CLIENT JOINED VOICE

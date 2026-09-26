@@ -968,9 +968,6 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 let text = text.trim().to_owned();
 
-                //GET USER'S COLORS
-                let colors = config::users::colors(&username);
-
                 log::info!("Message ({} chars) in {}: {peer_addr}", text.chars().count(),
                     if channel.is_some() { "channel" } else { "lobby" });
 
@@ -986,7 +983,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     text,
                     username: username.clone(),
                     id,
-                    colors,
+                    colors: config::users::colors(&username),
                 }, true, channel.as_deref());
             }
 
@@ -1503,6 +1500,9 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 {
                     log::info!("Private message ({} chars): {peer_addr} -> {recipient_addr}", text.chars().count());
 
+                    //GET COLORS
+                    let colors = config::users::colors(&username);
+
                     //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
                     if recipient_id != id
                     {
@@ -1526,6 +1526,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                                 text: text.clone(),
                                 username: username.clone(),
                                 id,
+                                colors: colors.clone(),
                             }, recipient_keys.as_ref()).await;
                         }
                     }
@@ -1538,6 +1539,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         text,
                         id: recipient_id,
                         username: recipient_uname,
+                        colors,
                     }, Some(&keys)).await;
                 } else
                 {
