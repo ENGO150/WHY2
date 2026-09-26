@@ -99,12 +99,19 @@ pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::ne
 pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
-fn resolve_user(target: &str) -> Option<String> //WHOSE PROFILE: A USERNAME, OR THE ID OF A SESSION THEY HAVE OPEN
+fn resolve_user(target: &str) -> Option<String> //A USERNAME, OR THE ID OF A SESSION THEY HAVE OPEN
 {
     if users::contains(target) { return Some(target.to_string()); }
 
     let id = target.parse::<usize>().ok()?;
     CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&id)).and_then(|entry| entry.username().cloned())
+}
+
+fn session_of(username: &str) -> Option<SocketAddr> //THE SESSION username HAS OPEN
+{
+    CONNECTIONS.iter()
+        .find(|entry| entry.role().is_some() && entry.username().is_some_and(|name| name == username))
+        .map(|entry| *entry.key())
 }
 
 fn clean(text: &str) -> String //WHAT A CLIENT MAY PUT IN A PROFILE
@@ -1658,10 +1665,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //BAN USER
-            PacketCode::ServerBan { id: uid } =>
+            PacketCode::ServerBan { target } =>
             {
                 //VERIFY PERMISSIONS
-                if role < Role::Owner || id == uid
+                if role < Role::Owner
                 {
                     log::warn!("Refused (permissions): {peer_addr}");
 
@@ -1670,16 +1677,20 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 }
 
                 //FIND TARGET USER
-                let target = CONNECTIONS.iter()
-                    .find(|entry| entry.value().id() == Some(&uid))
-                    .map(|entry| (*entry.key(), entry.username().cloned()));
-
-                if let Some((addr, Some(username))) = target
+                if let Some(target) = resolve_user(&target).filter(|target| *target != username)
                 {
-                    log::info!("Ban by {peer_addr}: {addr}");
+                    let session = session_of(&target);
 
-                    config::bans::ban(&username);
-                    remove_connection(&addr, true, Some("ban")).await;
+                    log::info!("Ban by {peer_addr}: {}", session.map_or("offline user".to_string(), |addr| addr.to_string()));
+
+                    config::bans::ban(&target);
+
+                    if let Some(addr) = session
+                    {
+                        remove_connection(&addr, true, Some("ban")).await;
+                    }
+
+                    send_bans(&streams.1, &keys).await;
                 } else //USER NOT FOUND
                 {
                     log::warn!("Ban refused (no such user): {peer_addr}");
@@ -1689,10 +1700,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //BAN USER'S IP
-            PacketCode::ServerBanIp { id: uid } =>
+            PacketCode::ServerBanIp { target } =>
             {
                 //VERIFY PERMISSIONS
-                if role < Role::Owner || id == uid
+                if role < Role::Owner
                 {
                     log::warn!("Refused (permissions): {peer_addr}");
 
@@ -1700,17 +1711,19 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
-                //FIND TARGET USER
-                let target = CONNECTIONS.iter()
-                    .find(|entry| entry.value().id() == Some(&uid))
-                    .map(|entry| *entry.key());
+                //FIND TARGET ADDRESS
+                let session = resolve_user(&target)
+                    .filter(|target| *target != username)
+                    .and_then(|target| session_of(&target));
 
-                if let Some(addr) = target
+                if let Some(addr) = session
                 {
                     log::info!("IP ban by {peer_addr}: {}", addr.ip());
 
                     config::bans::ban_ip(&addr.ip());
                     remove_connections(&addr.ip(), true, Some("ip ban")).await;
+
+                    send_bans(&streams.1, &keys).await;
                 } else //USER NOT FOUND
                 {
                     log::warn!("IP ban refused (no such user): {peer_addr}");
@@ -2009,10 +2022,10 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //SET A USER'S ROLE
-            PacketCode::ServerRoleRequest { id: uid, role: new_role } =>
+            PacketCode::ServerRoleRequest { target, role: new_role } =>
             {
                 //VERIFY PERMISSIONS
-                if role < Role::Owner || id == uid || new_role > role
+                if role < Role::Owner || new_role > role
                 {
                     log::warn!("Refused (permissions): {peer_addr}");
 
@@ -2021,12 +2034,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 }
 
                 //FIND TARGET USER
-                let target = CONNECTIONS.iter()
-                    .find(|entry| entry.value().id() == Some(&uid))
-                    .map(|entry| (entry.username().cloned(), entry.role().copied()));
+                let target = resolve_user(&target)
+                    .filter(|target| *target != username)
+                    .and_then(|target| Some((users::role(&target)?, target)));
 
                 //CHECK FOR VALID TARGET
-                let Some((Some(target_username), Some(target_role))) = target else
+                let Some((target_role, target_username)) = target else
                 {
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
@@ -2039,13 +2052,14 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
-                log::info!("Role change by {peer_addr}: {} is now {new_role} (was {target_role})", log_addr(&uid));
+                log::info!("Role change by {peer_addr}: {} is now {new_role} (was {target_role})",
+                    session_of(&target_username).map_or("offline user".to_string(), |addr| addr.to_string()));
 
                 //STORE
                 users::set_role(&target_username, new_role);
 
                 //APPLY TO WHATEVER SESSIONS USER HAS OPENED
-                let sessions: Vec<(usize, Arc<Mutex<OwnedWriteHalf>>, SharedKeys)> =
+                let sessions: Vec<(Arc<Mutex<OwnedWriteHalf>>, SharedKeys)> =
                 {
                     let mut sessions = Vec::new();
 
@@ -2054,18 +2068,17 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     {
                         entry.set_role(new_role);
 
-                        sessions.push((entry.id().copied().unwrap(), entry.write_stream().clone(), entry.keys().cloned().unwrap()));
+                        sessions.push((entry.write_stream().clone(), entry.keys().cloned().unwrap()));
                     }
 
                     sessions
                 };
 
                 //TELL THE TARGET
-                for (sid, write_stream, target_keys) in sessions
+                for (write_stream, target_keys) in sessions
                 {
                     network::send(&mut *write_stream.lock().await, PacketCode::ServerRole
                     {
-                        id: sid,
                         role: new_role,
                         username: None,
                     }, Some(&target_keys)).await;
@@ -2074,7 +2087,6 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //TELL THE ISSUER
                 network::send(&mut *streams.1.lock().await, PacketCode::ServerRole
                 {
-                    id: uid,
                     role: new_role,
                     username: Some(target_username),
                 }, Some(&keys)).await;

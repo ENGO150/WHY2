@@ -229,14 +229,13 @@ pub enum PacketCode //CONTROL CODES
     //CLIENT -> SERVER | SET A USER'S ROLE
     ServerRoleRequest
     {
-        id: usize,  //TARGET USER
-        role: Role, //THE ROLE THEY ARE BEING GIVEN
+        target: String, //TARGET USER | A USERNAME, OR THE ID OF A SESSION
+        role: Role,     //THE ROLE THEY ARE BEING GIVEN
     },
 
     //SERVER -> CLIENT | A ROLE WAS SET
     ServerRole
     {
-        id: usize,                //WHO WAS RETITLED
         role: Role,               //THE ROLE THEY WERE GIVEN
         username: Option<String>, //THE TARGET | None = THE RECIPIENT THEMSELVES
     },
@@ -309,8 +308,8 @@ pub enum PacketCode //CONTROL CODES
 
     ServerKick { id: usize },                            //CLIENT -> SERVER | KICK USER
     ServerMute { id: usize },                            //CLIENT -> SERVER | MUTE USER
-    ServerBan { id: usize },                             //CLIENT -> SERVER | BAN USER
-    ServerBanIp { id: usize },                           //CLIENT -> SERVER | BAN USER'S IP
+    ServerBan { target: String },                        //CLIENT -> SERVER | BAN USER
+    ServerBanIp { target: String },                      //CLIENT -> SERVER | BAN USER'S IP
     ServerPardon { id: usize },                          //CLIENT -> SERVER | LIFT A USERNAME BAN
     ServerPardonIp { id: usize },                        //CLIENT -> SERVER | LIFT AN IP BAN
     ServerSay { message: String },                       //CLIENT <> SERVER | SAY AS SERVER

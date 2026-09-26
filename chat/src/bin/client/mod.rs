@@ -106,7 +106,7 @@ fn invalid_usage(app: &mut App, subject: Option<&str>) //PUSH 'INVALID' MESSAGE
     app.push_styled(format!("Invalid {}! Press Ctrl+H for help.", subject.unwrap_or("usage")), theme::ERROR);
 }
 
-//MODERATION ACTIONS - /server <action> [id]
+//MODERATION ACTIONS - /server <action> [target]
 async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, parameters: Option<String>)
 {
     let Some(info) = command::COMMAND_LIST.iter().find(|info| info.command == Command::Server) else { return };
@@ -131,7 +131,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
     //AN ACTION THAT TAKES A PARAMETER NEEDS ONE
     if !sub.args.is_empty() && tail.is_empty() { return invalid_usage(app, None); }
 
-    //MOST ACTIONS TAKE AN ID, THE REST TAKE TEXT
+    //SOME ACTIONS TAKE AN ID, THE REST TAKE TEXT
     let id = match sub.takes_id()
     {
         true => match tail.parse::<usize>()
@@ -165,7 +165,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
         {
             network::send(&mut *write_stream.lock().await, PacketCode::ServerBan
             {
-                id: id.unwrap(),
+                target: tail.to_owned(),
             }, options::get_keys().as_ref()).await;
         },
 
@@ -173,7 +173,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
         {
             network::send(&mut *write_stream.lock().await, PacketCode::ServerBanIp
             {
-                id: id.unwrap(),
+                target: tail.to_owned(),
             }, options::get_keys().as_ref()).await;
         },
 
@@ -207,17 +207,16 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
             }, options::get_keys().as_ref()).await;
         },
 
-        //THE ONE ACTION THAT TAKES AN ID AND MORE
+        //THE ONE ACTION THAT TAKES A USER AND MORE
         Subcommand::Role =>
         {
             let Some((target, role)) = tail.split_once(char::is_whitespace) else { return invalid_usage(app, None) };
 
-            let Ok(target) = target.parse::<usize>() else { return invalid_usage(app, None) };
             let Ok(role) = role.trim().parse::<Role>() else { return invalid_usage(app, Some("role")) };
 
             network::send(&mut *write_stream.lock().await, PacketCode::ServerRoleRequest
             {
-                id: target,
+                target: target.to_owned(),
                 role,
             }, options::get_keys().as_ref()).await;
         },
