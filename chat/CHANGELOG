@@ -1,6 +1,21 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.2.3:
+- 5cb93b30: use why2 v1.5.3 on chat
+- 90fd22f4: filter channel on client, not server
+- 5e6c4f20: render images before scrolling to them
+- 4952b06e: fix image rendering on scroll
+- 91eea11b: remove messages from client-side message history on server delete
+- 26f5b897: display message IDs
+- bc73ddd4: implement message deleting
+- 0210d65b: add message_id to PacketCode::Message
+- 433cfff4: add message ids to message history
+- 8d534dde: remove server_users.toml migration
+- 34c884e1: wire PMs MessageColors
+- 7669e25f: adjust MessageColors on PrivateMessageBack to use recipient uname color
+- 01642fb9: add MessageColors to PacketCode::PrivateMessage & PacketCode::PrivateMessageBack
+
 v2.2.2:
 - 8f370812: upgrade dependencies
 - f5c0af64: load history pages and pictures as they scroll into view
