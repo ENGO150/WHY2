@@ -334,6 +334,14 @@ pub async fn download
                 server::notify(id, PacketCode::InvalidUsage).await;
                 return;
             }
+
+            //AN AVATAR IS A SQUARE, CUT BY THE CLIENT
+            if kind == UploadKind::Avatar && !misc::is_avatar(&data)
+            {
+                log::warn!("Avatar rejected (not a square of at most {}px): {peer_addr}", consts::AVATAR_DIMENSION);
+                server::notify(id, PacketCode::InvalidUsage).await;
+                return;
+            }
         }
 
         //ENCRYPT CHUNK (NO ENTRY HELD ACROSS AN AWAIT)

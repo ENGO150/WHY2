@@ -36,11 +36,14 @@ use image::
     ImageFormat,
     ImageReader,
     ImageDecoder,
+    Delay,
+    Frame,
     DynamicImage,
     AnimationDecoder,
+    imageops::FilterType,
     codecs::
     {
-        gif::GifDecoder,
+        gif::{ GifDecoder, GifEncoder, Repeat },
         png::PngDecoder,
         webp::WebPDecoder,
     },
@@ -176,6 +179,48 @@ pub fn decode_image(data: &[u8]) -> Option<Animation>
     if let Some(frames) = animated && frames.len() > 1 { return Some(frames); }
 
     Some(vec![ImageFrame { image: reader.decode().ok()?, delay: Duration::ZERO }])
+}
+
+//CUT A PICTURE TO THE CENTRED SQUARE AN AVATAR IS, AS A PNG OR AN ANIMATED GIF
+pub fn make_avatar(data: &[u8]) -> Option<(Vec<u8>, &'static str)>
+{
+    let frames = decode_image(data)?;
+    let first = &frames.first()?.image;
+
+    let side = first.width().min(first.height());
+
+    if side == 0 { return None; }
+
+    let (x, y) = ((first.width() - side) / 2, (first.height() - side) / 2);
+    let animated = frames.len() > 1;
+
+    let target = side.min(if animated { consts::ANIMATED_AVATAR_DIMENSION } else { consts::AVATAR_DIMENSION });
+    let square = |image: &DynamicImage| image.crop_imm(x, y, side, side).resize_exact(target, target, FilterType::Triangle);
+
+    let mut out = Vec::new();
+
+    match animated
+    {
+        false =>
+        {
+            square(first).write_to(&mut Cursor::new(&mut out), ImageFormat::Png).ok()?;
+
+            Some((out, "png"))
+        },
+
+        true =>
+        {
+            {
+                let mut encoder = GifEncoder::new_with_speed(&mut out, consts::AVATAR_GIF_SPEED);
+                encoder.set_repeat(Repeat::Infinite).ok()?;
+
+                encoder.encode_frames(frames.iter().map(|frame| Frame::from_parts(square(&frame.image).to_rgba8(),
+                    0, 0, Delay::from_saturating_duration(frame.delay)))).ok()?;
+            }
+
+            Some((out, "gif"))
+        },
+    }
 }
 
 pub async fn digest_and_decode(data: Arc<Vec<u8>>) -> ([u8; 32], Option<Animation>)

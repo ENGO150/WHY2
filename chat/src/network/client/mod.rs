@@ -165,6 +165,7 @@ pub enum ClientEvent
     ImagePending(String, String, [u8; 32], Option<u8>),          //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
     ImageOffer(String, String, [u8; 32], Option<u8>),            //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
     ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
+    AvatarFailed(String),                                        //CUTTING OUR AVATAR FAILED
     ImageFailed(String, String, Option<u8>),                     //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
     Uploaded(String, String),                                    //USER UPLOADED FILE
     UploadDone(u64, String),                                     //OUR OWN UPLOAD IS ON THE WIRE
@@ -593,7 +594,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //DUPLICATE IMAGE
             PacketCode::ImageDuplicate { hash } =>
             {
-                ACTIVE_UPLOADS.lock().unwrap().remove(&hash);
+                if let Some(path) = ACTIVE_UPLOADS.lock().unwrap().remove(&hash) { misc::drop_avatar_temp(&path); }
                 continue;
             },
 

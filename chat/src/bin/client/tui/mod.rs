@@ -429,7 +429,7 @@ async fn handle_terminal_event
 
             let revision = app.input.revision();
 
-            handle_key(app, key, write_stream, connect_tx, message_viewport(terminal)).await;
+            handle_key(app, key, write_stream, tx, connect_tx, message_viewport(terminal)).await;
 
             //A CHANGED LINE IS SOMEBODY WRITING
             if app.input.revision() != revision { app.typed(); }
@@ -522,6 +522,7 @@ async fn handle_key
     app: &mut App,
     key: KeyEvent,
     write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>,
+    tx: &Sender<ClientEvent>,
     connect_tx: &Sender<ConnectResult>,
     viewport: u16,
 )
@@ -629,7 +630,7 @@ async fn handle_key
                     Ok(())
                 },
 
-                Some(write_stream) => crate::upload(write_stream, &path, crate::Upload::Avatar),
+                Some(write_stream) => crate::upload(write_stream, &path, crate::Upload::Avatar, Some(tx.clone())),
                 None => Err(String::new()),
             };
 

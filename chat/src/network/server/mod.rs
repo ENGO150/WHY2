@@ -1823,6 +1823,16 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                             continue;
                         }
 
+                        //A CHAT PICTURE IS NOT CUT, SO IT HAS TO BE A SQUARE ALREADY
+                        if !file::read_image(&hash).await.is_some_and(|image| misc::is_avatar(&image))
+                        {
+                            log::warn!("Avatar refused (not a square of at most {}px): {peer_addr}",
+                                consts::AVATAR_DIMENSION);
+
+                            network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                            continue;
+                        }
+
                         config::users::set_avatar(&username, Some(&hash));
                         config::messages::sweep_images();
 

@@ -37,6 +37,7 @@ use sha2::{ Sha256, Digest };
 
 use crate::
 {
+    misc,
     config,
     options,
     crypto as chat_crypto,
@@ -105,10 +106,12 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
     //UPLOAD
     let progress = tx.clone();
 
-    file::send_file(path, write_stream, uid, &mut rex_stream, Some(&mut seq), |sent|
+    file::send_file(path.clone(), write_stream, uid, &mut rex_stream, Some(&mut seq), |sent|
     {
         progress.try_send(ClientEvent::TransferProgress(uid, sent)).ok(); //A DROPPED TICK COSTS NOTHING
     }).await;
+
+    misc::drop_avatar_temp(&path);
 
     //DONE
     tx.send(ClientEvent::UploadDone(uid, filename)).await.unwrap();

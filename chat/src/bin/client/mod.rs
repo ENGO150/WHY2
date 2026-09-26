@@ -77,7 +77,7 @@ use why2_chat::
     network::
     {
         self,
-        client::{ self, ClientEvent },
+        client::{ self, ClientEvent, image as client_image },
         codes::
         {
             PacketCode,
@@ -398,63 +398,89 @@ pub enum Upload
 }
 
 //CHECK A FILE, THEN HASH IT AND ASK THE SERVER FOR AN UPLOAD
-pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: Upload) -> Result<(), String>
+pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: Upload, tx: Option<Sender<ClientEvent>>)
+    -> Result<(), String>
 {
-    let (mut file, path) = check_upload(path, kind)?;
+    let (file, path) = check_upload(path, kind)?;
 
     let write_stream = write_stream.clone();
     let keys = options::get_keys();
 
     tokio::spawn(async move
     {
-        //GET SHA256 FILE HASH (BLOCKING I/O + CPU)
-        let hash: Option<[u8; 32]> = task::spawn_blocking(move ||
+        //HASH IT, OR CUT IT FIRST (BLOCKING I/O + CPU)
+        let prepared = task::spawn_blocking(move || match kind
         {
-            let mut hasher = Sha256::new();
-            let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
-
-            //LOOP READING
-            let success = loop
-            {
-                match file.read(&mut buffer)
-                {
-                    Ok(0) => break true,
-                    Ok(bytes) => hasher.update(&buffer[..bytes]),
-                    Err(_) => break false,
-                }
-            };
-
-            //FINALIZE HASH
-            if success { Some(hasher.finalize().into()) } else { None }
+            Upload::Avatar => cut_avatar(file),
+            _ => hash_file(file).map(|hash| (hash, path)).ok_or_else(|| String::from("Reading the file failed!")),
         }).await.expect("Hashing file failed");
 
-        //REQUEST FILE UPLOAD
-        if let Some(hash) = hash
+        let (hash, path) = match prepared
         {
-            //STORE UPLOAD IN ACTIVE UPLOADS LIST
-            client::ACTIVE_UPLOADS.lock().unwrap()
-                .insert(hash, path.canonicalize().unwrap());
-
-            //SEND UPLOAD REQUEST
-            let request = match kind
+            Ok(prepared) => prepared,
+            Err(error) =>
             {
-                Upload::Avatar => PacketCode::AvatarRequest { hash: Some(hash) },
+                if let Some(tx) = tx { tx.send(ClientEvent::AvatarFailed(error)).await.ok(); }
+                return;
+            },
+        };
 
-                Upload::Image => PacketCode::ImageRequest
-                {
-                    hash,
-                    filename: path.file_name().and_then(|n| n.to_str())
-                        .unwrap_or("unnamed_file").to_string(),
-                },
+        //STORE UPLOAD IN ACTIVE UPLOADS LIST
+        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("unnamed_file").to_string();
 
-                Upload::File => PacketCode::UploadRequest { hash },
-            };
+        client::ACTIVE_UPLOADS.lock().unwrap().insert(hash, path.canonicalize().unwrap_or(path));
 
-            network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
-        }
+        //SEND UPLOAD REQUEST
+        let request = match kind
+        {
+            Upload::Avatar => PacketCode::AvatarRequest { hash: Some(hash) },
+            Upload::Image => PacketCode::ImageRequest { hash, filename },
+            Upload::File => PacketCode::UploadRequest { hash },
+        };
+
+        network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
     });
 
     Ok(())
+}
+
+//SHA256 OF A WHOLE FILE
+fn hash_file(mut file: File) -> Option<[u8; 32]>
+{
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+
+    //LOOP READING
+    loop
+    {
+        match file.read(&mut buffer)
+        {
+            Ok(0) => break Some(hasher.finalize().into()),
+            Ok(bytes) => hasher.update(&buffer[..bytes]),
+            Err(_) => break None,
+        }
+    }
+}
+
+//CUT AN AVATAR TO ITS SQUARE AND PARK IT FOR THE UPLOAD
+fn cut_avatar(mut file: File) -> Result<([u8; 32], PathBuf), String>
+{
+    let mut data = Vec::new();
+    file.read_to_end(&mut data).map_err(|_| String::from("Reading the file failed!"))?;
+
+    let (avatar, extension) = client_image::make_avatar(&data).ok_or_else(|| String::from("That image could not be read!"))?;
+
+    if avatar.len() > consts::MAX_AVATAR_SIZE
+    {
+        return Err(format!("Avatar is too large even cut down! (limit is {}MB)", consts::MAX_AVATAR_SIZE / consts::MEGABYTE));
+    }
+
+    let hash: [u8; 32] = Sha256::digest(&avatar).into();
+    let path = misc::avatar_temp(&hash, extension);
+
+    std::fs::write(&path, &avatar).map_err(|_| String::from("Writing the cut avatar failed!"))?;
+
+    Ok((hash, path))
 }
 
 //OPEN A FILE AND REFUSE WHAT THE SERVER WOULD
@@ -482,15 +508,9 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
     file.rewind().ok();
 
     //REFUSE AN OVERSIZED IMAGE HERE
-    let ceiling = match kind
+    if path.metadata().map(|m| m.len()).unwrap_or(0) > consts::MAX_IMAGE_SIZE as u64
     {
-        Upload::Avatar => consts::MAX_AVATAR_SIZE,
-        _ => consts::MAX_IMAGE_SIZE,
-    };
-
-    if path.metadata().map(|m| m.len()).unwrap_or(0) > ceiling as u64
-    {
-        return Err(format!("Image is too large! (limit is {}MB)", ceiling / consts::MEGABYTE));
+        return Err(format!("Image is too large! (limit is {}MB)", consts::MAX_IMAGE_SIZE / consts::MEGABYTE));
     }
 
     if !misc::is_image(&header) { return Err(String::from("Not an image!")); }
@@ -657,7 +677,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             {
                                 let kind = if command == Command::Image { Upload::Image } else { Upload::File };
 
-                                if let Err(error) = upload(write_stream, &path, kind) { app.push_styled(error, theme::ERROR); }
+                                if let Err(error) = upload(write_stream, &path, kind, None) { app.push_styled(error, theme::ERROR); }
                             },
 
                             None => invalid_usage(app, None),

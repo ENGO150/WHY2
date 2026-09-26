@@ -82,6 +82,10 @@ pub const UPLOAD_CHUNK_SIZE: usize     = MEGABYTE;                              
 pub const IMAGE_HEADER_SIZE: usize     = 16;                                          //BYTES AN IMAGE IS RECOGNISED BY
 pub const MAX_IMAGE_SIZE: usize        = 8 * MEGABYTE;                                //BIGGEST IMAGE THE SERVER PASSES ON (8MB)
 pub const MAX_AVATAR_SIZE: usize       = 2 * MEGABYTE;                                //BIGGEST AVATAR THE SERVER KEEPS (2MB)
+pub const AVATAR_DIMENSION: u32        = 512;                                         //SIDE OF THE SQUARE AN AVATAR IS CUT TO
+pub const ANIMATED_AVATAR_DIMENSION: u32 = 256;                                       //AND OF AN ANIMATED ONE
+pub const AVATAR_TEMP_PREFIX: &str     = "why2_avatar_";                              //TEMP FILE A CUT AVATAR IS UPLOADED FROM
+pub const AVATAR_GIF_SPEED: i32        = 10;                                          //GIF QUANTISER SPEED (1 BEST, 30 FASTEST)
 pub const MAX_HISTORY_SIZE: usize      = 12 * MEGABYTE;                               //BIGGEST HISTORY THE SERVER REPLAYS (12MB)
 pub const MAX_IMAGE_DIMENSION: u32     = 16_384;                                      //WIDEST/TALLEST PICTURE A CLIENT DECODES
 

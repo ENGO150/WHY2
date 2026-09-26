@@ -156,6 +156,32 @@ pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
     }
 }
 
+//A PNG'S OR GIF'S SIZE, READ OFF ITS HEADER
+pub fn image_dimensions(header: &[u8]) -> Option<(u32, u32)>
+{
+    let be = |at: usize| u32::from_be_bytes(header[at..at + 4].try_into().unwrap());
+    let le = |at: usize| u16::from_le_bytes([header[at], header[at + 1]]) as u32;
+
+    if header.len() >= 24 && header.starts_with(b"\x89PNG\r\n\x1a\n") && &header[12..16] == b"IHDR"
+    {
+        return Some((be(16), be(20)));
+    }
+
+    if header.len() >= 10 && (header.starts_with(b"GIF87a") || header.starts_with(b"GIF89a"))
+    {
+        return Some((le(6), le(8)));
+    }
+
+    None
+}
+
+//A SQUARE PNG OR GIF NO BIGGER THAN AN AVATAR IS CUT TO
+pub fn is_avatar(header: &[u8]) -> bool
+{
+    matches!(image_dimensions(header), Some((width, height))
+        if width == height && width > 0 && width <= consts::AVATAR_DIMENSION)
+}
+
 pub fn is_image(header: &[u8]) -> bool //CHECK FOR SUPPORTED IMAGE
 {
     const MAGIC: [&[u8]; 10] =
@@ -227,6 +253,21 @@ pub fn hex(bytes: &[u8]) -> String //BYTES AS LOWERCASE HEX
     }
 
     string
+}
+
+#[cfg(feature = "client_base")]
+pub fn avatar_temp(hash: &[u8; 32], extension: &str) -> PathBuf //WHERE A CUT AVATAR WAITS FOR ITS UPLOAD
+{
+    env::temp_dir().join(format!("{}{}.{extension}", consts::AVATAR_TEMP_PREFIX, hex(hash)))
+}
+
+#[cfg(feature = "client_base")]
+pub fn drop_avatar_temp(path: &Path) //REMOVE ONE, IF THAT IS WHAT path IS
+{
+    let ours = path.parent() == Some(env::temp_dir().as_path()) && path.file_name()
+        .and_then(|name| name.to_str()).is_some_and(|name| name.starts_with(consts::AVATAR_TEMP_PREFIX));
+
+    if ours { let _ = fs::remove_file(path); }
 }
 
 #[cfg(feature = "client_base")]

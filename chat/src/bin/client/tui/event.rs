@@ -240,6 +240,9 @@ impl App
 
             ClientEvent::InvalidUsage =>
             {
+                //A REFUSED SAVE LEAVES THE BOX EDITABLE
+                self.settings.saving = false;
+
                 self.push_styled("Invalid usage! Press Ctrl+H for help.", theme::ERROR);
             },
 
@@ -394,6 +397,13 @@ impl App
                 }
 
                 self.dirty = true;
+            },
+
+            //OUR AVATAR COULD NOT BE CUT, SO NOTHING WENT OUT
+            ClientEvent::AvatarFailed(error) =>
+            {
+                self.settings.saving = false;
+                self.push_styled(error, theme::ERROR);
             },
 
             //THE ANSWER TO A /color

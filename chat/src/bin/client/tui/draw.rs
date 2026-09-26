@@ -1348,8 +1348,8 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
             Value::Avatar(Some(path)) => spans.push(Span::styled(format!("{path} is uploaded on save."), theme::TEXT)),
 
             Value::Avatar(None) => spans.push(Span::styled(format!(
-                "Type a path to an image (up to {}MB), or clear it to remove your avatar.",
-                chat_consts::MAX_AVATAR_SIZE / chat_consts::MEGABYTE), theme::DIM)),
+                "Type a path to an image (up to {}MB) to have its centre cut to a square, or clear it to remove your avatar.",
+                chat_consts::MAX_IMAGE_SIZE / chat_consts::MEGABYTE), theme::DIM)),
 
             Value::Text(text) if text.is_empty() =>
                 spans.push(Span::styled(format!("No {}.", item.label.to_lowercase()), theme::DIM)),
