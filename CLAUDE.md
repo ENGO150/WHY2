@@ -228,12 +228,37 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `NonAuthenticated` connection pays nothing here, being bounded by `max_unauth_clients` and
     `max_auth_time` instead. All three keys are live (read at point of use, so they are not in
     `SERVER_RESTART_SETTINGS`) and gated by the same `spam_protection` switch as the message rule.
+- **`server::send_to_all` goes to every authenticated client, and the client decides what belongs in which
+  pane.** It takes the packet and nothing else — there is no channel filter on the server. A packet whose
+  meaning depends on a channel names it instead, and the client files it:
+  - **`Message` and `ImageDisplay` carry `channel: Option<Option<String>>`**: `Some(None)` is the lobby,
+    `Some(Some(name))` a named channel, and `None` means every pane (nothing sends that yet). A line for the
+    channel being read goes into `App::messages` as before; any other goes into that channel's *parked* pane
+    (`App::park_entry`, trimmed to `HISTORY_LIMIT` like `push_entry`). This is the whole point of it: a
+    message said in a channel we are not standing in used to never reach us, so it was missing from that
+    pane on the way back until a reconnect. A pane for a channel we never visited is created on the spot
+    and pruned like any other.
+  - **A parked picture is cached, never decoded.** `network/client/mod.rs`'s `ImageDisplay` arm checks the
+    channel against `options::get_channel()` first; a foreign one stores the bytes if they came (the same
+    rule `auto_show_images` off follows) and raises `ClientEvent::ImageParked`, which parks a caption as
+    `Picture::Deferred` (`Absent` with `auto_show_images` off). It loads when that pane is looked at, the
+    same way a replayed picture does. If we switched into the channel while the event was on its way, the
+    arm pushes the caption into the live pane instead — parking it under the channel being read would be
+    overwritten by the next `switch_channel`.
+  - **`VoiceJoin`/`VoiceLeave` carry `channel: Option<String>`** and the client ignores one for a channel it
+    is not in, before it touches the roster or the audio consumers — adding a consumer for somebody in
+    another channel would play them.
+  - **Be honest about what this costs.** Every channel's text reaches every client on the server, so a
+    channel is a place to talk, not a way to keep anything from anybody's client; and a fresh picture's
+    payload goes out once per client on the server rather than once per client in the channel.
+    `send_to_others` (the typing indicator) still filters on the server — a notice nobody is looking at is
+    worth nothing parked.
 - **The two costs an image puts on somebody else are bounded explicitly, because neither is bounded
   by the 8MB `MAX_IMAGE_SIZE` the server accepts.**
   - **Decoding is limited on the client** (`network/client/image.rs::decode_image`). `MAX_IMAGE_SIZE`
     bounds the bytes on the wire and says nothing about what they unpack to: a 292KB PNG decodes to
     400MB, and `ImageDisplay` is **pushed rather than asked for**, so every client in the channel
-    decodes whatever was posted, one unbounded `tokio::spawn` per packet. `image`'s own default
+    decodes whatever was posted (clients elsewhere only cache it), one unbounded `tokio::spawn` per packet. `image`'s own default
     (`Limits::default()`, which `load_from_memory` uses) caps a single decode at 512MB and does not
     bound the dimensions at all — that is a limit on one picture, not on a flood. Every decode
     therefore goes through `ImageReader` with `MAX_IMAGE_DIMENSION` and `MAX_IMAGE_ALLOC` set, and
@@ -282,7 +307,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     in.** `crypto::image_keys` HKDFs a key, nonce and MAC key per picture out of `server_image_key`
     salted with the hash the file is named after, so nothing about the pair is kept anywhere and two
     pictures never share a keystream. The tag is required for the same reason the history's is: a
-    stored picture is decrypted and pushed to every client in the channel, so bare CTR would put
+    stored picture is decrypted and pushed to every client on the server, so bare CTR would put
     attacker-flippable bytes into every one of their decoders. `file/server.rs` MACs an upload
     **as it arrives** — `ActiveFileshare::mac` is fed whatever the disk actually took, and
     `crypto::disk_tag` binds the length and appends the tag once the last chunk is in, which is why
@@ -301,8 +326,8 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   makes a replayed image appear at all without asking anybody, and what lets the server stop pushing
   the ones everybody already holds.
   - **`ImageDisplay` carries a hash and an optional payload.** `send_to_all` clones the whole
-    `PacketCode` per recipient and every connection has its own keys, so an 8MB picture in a
-    20-client channel is 20 clones and 20 independent REX encryptions — there is no shared ciphertext
+    `PacketCode` per recipient and every connection has its own keys, so an 8MB picture on a
+    20-client server is 20 clones and 20 independent REX encryptions — there is no shared ciphertext
     to reuse, so the only saving is not sending the bytes N times. The branch is the one the upload
     arm already computes: a picture `config::messages::has_image` does not know is one nobody can
     hold, and goes out whole (`file/server.rs`); one it does know has been posted here before, so it
@@ -349,7 +374,16 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     shown unasked. **The load waits for the picture to be on screen**: decoding every one up front
     cost a `MAX_IMAGE_ALLOC` decode, a fit and a held protocol per picture for a paneful nobody had
     scrolled to yet — and fetching every miss would be a whole history's pictures off the server.
-    `App::load_visible` flips a `Deferred` caption that has come into view to `Waiting` and puts its
+    **"On screen" means within reach, not strictly in view** (`state::in_reach`): the pane is treated
+    as `PRELOAD_SCREENS` screens taller in both directions, so a picture is fetched, decoded and fitted
+    while it is still a scroll away and is already whole when it arrives. Loading it only once it was
+    in view meant every picture popped in under the reader's eyes while they scrolled — captions
+    appearing, then the rows opening up — which read as a pane that was broken. The margin is a whole
+    screen rather than a row count because a scroll step is a fraction of one and PageUp is one; it is
+    bounded, so this is still a paneful or two of pictures and never the whole history. The same window
+    is what `take_image_requests` keeps a queued fetch for, and animations are still stepped only while
+    actually on screen (`advance_animations`) — a preloaded GIF needs its protocol, not its clock.
+    `App::load_visible` flips a `Deferred` caption that has come within reach to `Waiting` and puts its
     hash in `App::image_loads`, which `tui::run`'s tick hands to `client::fetch_image` — the same
     cache-then-server path a click takes, one task per picture that is actually being looked at; a
     miss joins the capped fetch queue above. Each
@@ -358,7 +392,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     deliberately does **not** fill a `Deferred` line — that one has not asked yet, and filling it
     first would spend the answer on a caption that is still off screen. A refusal (`None`) still only
     marks a line that actually asked.
-  - **A decoded picture is built for the terminal only while it is on screen, and put down again when
+  - **A decoded picture is built for the terminal only while it is within reach, and put down again when
     it leaves** (`App::load_visible`, called from `draw_messages` with the same width, offset and
     viewport the pane was just drawn with). Fitting a picture to the pane is a resize of the whole
     thing and the `StatefulProtocol` then holds that copy, so doing it in `rewrap` — as it used to —
@@ -943,6 +977,21 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     so the history's ids rise in the order its records do. Unique per process plus the stored history is
     enough: a restart ends every session and a client's panes die with it, so an id reused for a channel
     message after a restart can never match anything a client still shows.
+  - **A stored message can be deleted** (`/delete ID` → `PacketCode::DeleteRequest`,
+    `config::messages::delete`): your own, or as a moderator one by a lower rank than yours — the same
+    "no peer or superior" rule kick and mute use, with the author named by the record's username, so
+    it survives a reconnect. It is removed from `HISTORY` and the file is rewritten, and a picture
+    nothing else names goes with it. A refusal (no such message, or not yours to delete) is
+    `InvalidUsage`. A channel message, text or image, is never stored and so cannot be deleted.
+    - **A success is broadcast to every client** as `PacketCode::Deleted { message_id }` — only the
+      lobby is stored, and every client holds a lobby pane, live or parked — and
+      `App::delete_message` removes the entry outright rather than leaving a tombstone. In the pane
+      being looked at, `App::scroll`, the selection and `history_anchor` move up by the rows it took
+      (the wrap cache keeps each entry's first row for exactly this); in the parked lobby pane only
+      the anchor needs it.
+    - The id is drawn as a dim `#N` in front of the username on live and replayed lines alike, image
+      captions included — `ImageDisplay` and its four events carry it (`show_message_ids`,
+      client.toml, default on, a `/settings` row).
   - **Only the lobby has one.** A channel exists exactly as long as somebody is in it, so there is
     nothing to keep it against; `server::listen_client`'s `Message` arm stores only while
     `channel.is_none()`.
@@ -953,13 +1002,13 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     with `HistoryRequest { before }`. Every client starts in the lobby, so a channel switch has nothing
     to replay. A page is also cut at `MAX_HISTORY_SIZE` bytes, but always holds at least one message
     so the cursor always moves.
-    - **The cursor is an absolute index, and it is in memory only.** `HISTORY` keeps `base`, the
-      index of its first record, and bumps it by whatever the trim drops, so a cursor stays pointing
-      at the same message while newer ones arrive and older ones go — an offset from either end
-      would not. It need not survive a restart: a restart ends every session, and every session
-      starts from the newest page again.
-    - **The client asks when the top of the lobby pane comes within a screen**
-      (`App::load_visible`), one page in flight at a time (`history_pending`), sent by the redraw
+    - **The cursor is a message id**, found by binary search (`History::position`) since the ids rise
+      with the records. It stays pointing at the same message while newer ones arrive, older ones are
+      trimmed and one in the middle is deleted — an offset from either end, or a position, would not.
+      The client treats it as opaque and only hands it back.
+    - **The client asks when the top of the lobby pane comes within `PRELOAD_SCREENS` + 1 screens**
+      (`App::load_visible`) — the same lookahead the pictures use, so an older page is usually in
+      before the reader hits the top and waits on it — one page in flight at a time (`history_pending`), sent by the redraw
       tick. `App::history_anchor` is where the first replayed entry sits, so an older page goes in
       *under* the `Message history (n):` heading rather than above the connect lines; `n` is the
       number the server keeps, not the number shown. `prepend_history` moves `App::scroll` and the
@@ -1232,7 +1281,9 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `App::panes` holds the others' scrollback keyed by name (`""` is the lobby), so stepping out of the
     lobby and back shows what was said in it rather than an empty pane; the scroll position and the
     unread count are the *view's*, and reset on every switch. Nothing is replayed from the server for
-    this — a channel switch asks for nothing, so the scrollback only exists client-side.
+    this — a channel switch asks for nothing, so the scrollback only exists client-side. A parked pane
+    keeps filling while we are away, since messages and pictures reach every client tagged with their
+    channel (`App::park_entry`, see `send_to_all` above).
     What keeps that bounded is the same rule the sidebar runs on: a channel exists exactly as long as
     somebody is in it, so `App::prune_panes` drops the parked pane of a channel that no longer has
     anybody in it (after every roster re-derivation, and in the `ChannelDestroyed` arm). The lobby is
@@ -1285,12 +1336,13 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - **The voice panel is the channel's roster, not our own voice session**, so somebody who never
     types `/voice` still sees who is in it. `PacketCode::VoiceJoin`/`VoiceLeave` (named
     `ChannelJoin`/`ChannelLeave` before — they were always the *voice* pair, while
-    `ChannelCreated`/`ChannelDestroyed` are the text-channel one) already went to the whole channel;
-    what made them invisible was the client, which handled them only under `client_voice` and only
+    `ChannelCreated`/`ChannelDestroyed` are the text-channel one) go to every client, naming the channel
+    they happened in, and a client drops the ones for a channel it is not standing in.
+    What once made them invisible was the client, which handled them only under `client_voice` and only
     to add and drop audio consumers. Both arms now also raise a `ClientEvent`, and
     `PacketCode::VoiceClients` — the whole roster, self excluded — is sent on login as well as on a
     channel switch and on joining voice, so a client that never joins still learns who was already
-    talking when it arrived. Nothing new crosses the wire for this.
+    talking when it arrived.
     - **The two sources are kept apart and merged on the way to the panel.** `App::voice_roster` is
       the server's truth (who is in voice in our channel) and `App::voice_activity` is the last
       `VoiceActivity` tick from the local voice session (who is *speaking*, and their ping); only
