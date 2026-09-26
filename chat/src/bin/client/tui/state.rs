@@ -604,13 +604,13 @@ impl App
         if let Some(index) = self.image_fetching.iter().position(|h| h == hash) { self.image_fetching.swap_remove(index); }
     }
 
-    //ENTRIES WHOSE CAPTION IS ON SCREEN
+    //ENTRIES WHOSE CAPTION IS WITHIN REACH
     fn on_screen(&mut self) -> Vec<usize>
     {
         let (offset, height) = (self.pane_offset, self.pane.height);
 
         self.placements(self.pane.width).into_iter()
-            .filter(|placement| placement.caption < offset + height && placement.row + placement.height > offset)
+            .filter(|placement| in_reach(placement, offset, height))
             .map(|placement| placement.entry)
             .collect()
     }
@@ -882,13 +882,13 @@ impl App
         }
     }
 
-    //BUILD THE PICTURES ON SCREEN AND PUT THE REST DOWN
+    //BUILD THE PICTURES WITHIN REACH AND PUT THE REST DOWN
     pub fn load_visible(&mut self, width: u16, offset: u16, height: u16)
     {
         let font = self.picker.font_size();
 
-        //THE TOP OF THE LOBBY'S HISTORY IS IN SIGHT
-        if offset < height && self.channel.is_empty() && !self.history_pending
+        //THE TOP OF THE LOBBY'S HISTORY IS WITHIN REACH
+        if offset < height.saturating_mul(consts::PRELOAD_SCREENS + 1) && self.channel.is_empty() && !self.history_pending
             && let Some(cursor) = self.history_cursor
         {
             self.history_pending = true;
@@ -897,15 +897,14 @@ impl App
 
         for placement in self.placements(width)
         {
-            let visible = placement.caption < offset + height
-                && placement.row + placement.height > offset;
+            let visible = in_reach(&placement, offset, height);
 
             let Some(Entry::Image { hash, picture, .. }) = self.messages.get_mut(placement.entry)
                 else { continue };
 
             match picture
             {
-                //OUT OF THE CACHE, NOW THAT IT IS BEING LOOKED AT
+                //OUT OF THE CACHE, NOW THAT IT IS NEARLY IN VIEW
                 Picture::Deferred if visible =>
                 {
                     if let Some(hash) = *hash { self.image_loads.push(hash); }
@@ -1526,6 +1525,15 @@ pub fn percent(done: u64, total: u64) -> u64
 }
 
 //THE SIZE A PICTURE IS DRAWN AT, NEVER LARGER THAN IT IS
+//ON SCREEN OR WITHIN PRELOAD_SCREENS OF IT
+fn in_reach(placement: &Placement, offset: u16, height: u16) -> bool
+{
+    let margin = height.saturating_mul(consts::PRELOAD_SCREENS);
+
+    placement.caption < offset.saturating_add(height).saturating_add(margin)
+        && placement.row + placement.height > offset.saturating_sub(margin)
+}
+
 fn fit_size(width: u32, height: u32, pane: u16, rows: u16, font: FontSize) -> (u32, u32)
 {
     let available_width = pane.max(1) as u32 * font.width as u32;
