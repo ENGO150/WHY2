@@ -764,11 +764,20 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   (`Accept`, `ServerRole`), so a role that does not exist is not a value the protocol can carry.
   A rank is its name everywhere it is read or written — typed into `/server role`, and stored in
   `server_users.toml` — so there is one spelling of it and nothing to convert between.
-  Ranks are handed out with `/server role <id> <role>` (owner only; the server refuses granting above
+  Ranks are handed out with `/server role <user> <role>` (owner only; the server refuses granting above
   your own rank, retitling yourself, or touching a peer or superior). A granted role applies to the
   session it lands in — the server updates the live `Connection` and tells that client, whose
   `App::role` is what the palette and `/help` read — so the per-connection role is re-read on every
   packet rather than latched at login.
+- **A moderation target is an account, not a session.** `/server ban`, `banip` and `role` take
+  a username or a live session id, resolved to a username by `server::resolve_user` — the same lookup
+  `/profile` uses — and then find the account's session, if it has one (`server::session_of`; there
+  is at most one, since `user_connected` refuses a username already in `CONNECTIONS` at login).
+  That is what lets an owner ban or retitle somebody who is offline, since an offline account has no
+  id. `banip` still needs somebody connected, since the server keeps no last-seen address.
+  A ban and a `banip` are answered with the ban list, as a pardon is, since an offline target leaves
+  nothing else to show that it worked. `/server kick` and `/server mute` are still by id: kicking
+  somebody who is not there means nothing.
 - **The chat colors are the server's, and the client neither stores nor sends them.** `/color` and `/ucolor`
   are unchanged from where the user stands, but `color_handler` only asks: it sends
   `PacketCode::Colors { username, color }` — which of the two, and the code — and the server stores it under
