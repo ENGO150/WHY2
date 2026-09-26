@@ -1,6 +1,9 @@
 WHY2 (Core) Changelog
 =====================
 
+v1.5.3:
+- 8f370812: upgrade dependencies
+
 v1.5.2:
 - ffc8b2a6: implement lightweight MDS matrices
 - 275e7edb: increase SUBCELL_ROUNDS to 5
