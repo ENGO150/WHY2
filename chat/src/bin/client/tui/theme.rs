@@ -93,8 +93,17 @@ impl Theme
                 Span::raw(": "),
             ], text, self.style(colors.message_color), width, self.render_math),
 
-            Entry::Prefixed { prefix, text } =>
-                markup::render(prefix.clone(), text, Style::new(), width, self.render_math),
+            Entry::Private { sent, username, id, text, colors } =>
+            {
+                let prefix = vec!
+                [
+                    Span::styled(if *sent { "[PM TO] " } else { "[PM FROM] " }, ACCENT),
+                    self.colorize(username.clone(), colors.username_color),
+                    Span::raw(format!(" ({id}): ")),
+                ];
+
+                markup::render(prefix, text, self.style(colors.message_color), width, self.render_math)
+            },
 
             Entry::Transfer(transfer) => state::wrap_line(&Line::from(progress(transfer, width)), width),
 

@@ -111,11 +111,14 @@ pub enum Entry //ONE ROW OF HISTORY
         colors: MessageColors,
     },
 
-    //A CLIENT PREFIX IN FRONT OF TYPED TEXT
-    Prefixed
+    //A PRIVATE MESSAGE, STORED UNRENDERED
+    Private
     {
-        prefix: Vec<Span<'static>>,
+        sent: bool, //TO username, ELSE FROM
+        username: String,
+        id: usize,
         text: String,
+        colors: MessageColors,
     },
 
     //A TRANSFER AND HOW FAR IT HAS GOT
@@ -414,10 +417,10 @@ impl App
         self.push_entry(Entry::Message { username, id, text, colors });
     }
 
-    //A PRIVATE MESSAGE, BEHIND A PREFIX
-    pub fn push_prefixed(&mut self, prefix: Vec<Span<'static>>, text: String)
+    //STORE A PRIVATE MESSAGE UNRENDERED
+    pub fn push_private(&mut self, sent: bool, username: String, id: usize, text: String, colors: MessageColors)
     {
-        self.push_entry(Entry::Prefixed { prefix, text });
+        self.push_entry(Entry::Private { sent, username, id, text, colors });
     }
 
     //THE NEWEST PAGE OF THE LOBBY'S HISTORY

@@ -1442,9 +1442,12 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     out of cells, not at the last space before it, and the padding must not be re-wrapped. That padding is
     also why `draw::draw_logo` treats a painted background as a claimed cell: blank cells that are part of
     a box are not free ones, and the watermark used to come through them.
-    The markup reaches a private message too (`Entry::Prefixed`, a client-written prefix in front of a
-    user-written tail) but deliberately not `Entry::Line`, which is the client's *own* output — `/help`
-    and `/list` are not somebody's text and have nothing to parse.
+    The markup reaches a private message too (`Entry::Private`) but deliberately not `Entry::Line`, which
+    is the client's *own* output — `/help` and `/list` are not somebody's text and have nothing to parse.
+    A private message is stored unrendered like `Entry::Message`, so `disable_colors` repaints it. Its
+    `MessageColors` always describe the line as drawn: the name's colour belongs to the name shown, and
+    the message colour to whoever wrote the text — so `PrivateMessageBack` carries the **recipient's**
+    username colour beside the sender's message colour, and the client paints both unconditionally.
   - **The rest of the markdown is the same parser, which is what keeps it out of code.** Emphasis
     (`*italic*`, `**bold**`, `__underline__`, `~~strikethrough~~`, and `_italic_`) and `[text](url)` are
     delimiters in the *same* pass as the backticks and the dollars, not a second pass over the text

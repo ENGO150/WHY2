@@ -113,23 +113,9 @@ impl App
             ClientEvent::ImageFailed(username, filename, _) => self.push_styled(
                 format!("{username} sent an image that could not be displayed ({filename})."), theme::ERROR),
 
-            ClientEvent::PrivateMessageSent(to, id, msg) =>
-            {
-                self.push_prefixed(vec!
-                [
-                    Span::styled("[PM TO] ", theme::ACCENT),
-                    Span::raw(format!("{to} ({id}): ")),
-                ], msg);
-            },
+            ClientEvent::PrivateMessageSent(to, id, msg, colors) => self.push_private(true, to, id, msg, colors),
 
-            ClientEvent::PrivateMessageRecv(from, id, msg) =>
-            {
-                self.push_prefixed(vec!
-                [
-                    Span::styled("[PM FROM] ", theme::ACCENT),
-                    Span::raw(format!("{from} ({id}): ")),
-                ], msg);
-            },
+            ClientEvent::PrivateMessageRecv(from, id, msg, colors) => self.push_private(false, from, id, msg, colors),
 
             ClientEvent::TofuPrompt(request) =>
             {
