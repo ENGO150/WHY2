@@ -1279,6 +1279,12 @@ impl App
         previous
     }
 
+    //WHETHER THE LAST FRAME SENT THIS ROW
+    pub fn picture_row_sent(&self, y: u16, symbol: &str) -> bool
+    {
+        self.picture_rows.iter().any(|(row, sent)| *row == y && sent == symbol)
+    }
+
     //TAKE THIS FRAME'S PICTURE ROWS, HANDING BACK THE ONES THAT CHANGED
     pub fn picture_rows_drawn(&mut self, rows: Vec<(u16, String)>) -> Vec<u16>
     {

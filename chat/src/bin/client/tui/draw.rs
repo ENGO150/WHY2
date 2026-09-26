@@ -320,7 +320,7 @@ fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect]) -> Vec<u16
         //WHAT A BOX HAS ON THESE CELLS, BEFORE THE PICTURE CLAIMS THE WHOLE ROW
         let kept = if covered { overlay_cells(frame, area, overlays) } else { Vec::new() };
 
-        let mut drawn = false;
+        let (mut drawn, mut encoded) = (false, false);
 
         if let Some(state::Entry::Image { picture: state::Picture::Ready(ready), .. }) =
             app.messages.get_mut(placement.entry) && let Some(protocol) = ready.protocol.as_mut()
@@ -330,6 +330,7 @@ fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect]) -> Vec<u16
             protocol.resize_encode_render(&resize, area, frame.buffer_mut());
 
             drawn = true;
+            encoded = protocol.last_encoding_result().is_some();
         }
 
         //A BOX THAT MOVED OR WENT LEAVES GLYPHS ONLY THE ROW'S OWN WRITE CAN RUB OUT
@@ -337,6 +338,9 @@ fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect]) -> Vec<u16
         {
             replace_rows(frame, area, overlays);
         }
+
+        //A RETRANSMITTED PICTURE SENDS EVERY ROW AGAIN
+        if drawn && encoded { resend_rows(frame, app, area, overlays); }
 
         //WHAT EACH ROW'S FIRST CELL WILL SEND
         if drawn
@@ -396,6 +400,24 @@ fn replace_rows(frame: &mut Frame, area: Rect, overlays: &[Rect])
         let symbol = format!("\x1b[s{}", cell.symbol());
 
         cell.set_symbol(&symbol);
+    }
+}
+
+//MAKE EACH ROW'S FIRST CELL DIFFER FROM THE LAST FRAME'S
+fn resend_rows(frame: &mut Frame, app: &App, area: Rect, overlays: &[Rect])
+{
+    for y in area.y..area.y + area.height
+    {
+        if overlays.iter().any(|overlay| overlay.contains((area.x, y).into())) { continue; }
+
+        let Some(cell) = frame.buffer_mut().cell_mut((area.x, y)) else { continue };
+
+        while app.picture_row_sent(y, cell.symbol())
+        {
+            let symbol = format!("\x1b[s{}", cell.symbol());
+
+            cell.set_symbol(&symbol);
+        }
     }
 }
 
