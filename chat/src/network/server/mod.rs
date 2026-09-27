@@ -797,7 +797,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             //CHECK USERNAME VALIDITY
             if uname.len() >= min_len && uname.len() <= max_len &&
                 uname.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') &&
-                !user_connected(&uname) && uname != options::get_server_username()
+                !user_connected(&uname) && uname != options::get_server_username() &&
+                uname != "everyone"
             {
                 username = Some(uname);
                 device = dev;
