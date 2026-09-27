@@ -16,6 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use chrono::
+{
+    DateTime,
+    Local,
+};
+
 use ratatui::
 {
     text::{ Line, Span },
@@ -44,6 +50,7 @@ pub struct Theme //CACHED CONFIG-DRIVEN STYLING
     pub disable_logo: bool,
     pub show_id: bool,
     pub show_message_ids: bool,
+    pub show_timestamps: bool,
     pub render_math: bool,
 }
 
@@ -58,6 +65,7 @@ impl Theme
             disable_logo: config::read_config::<bool>("disable_logo"),
             show_id: config::read_config::<bool>("show_id"),
             show_message_ids: config::read_config::<bool>("show_message_ids"),
+            show_timestamps: config::read_config::<bool>("show_timestamps"),
             render_math: config::read_config::<bool>("render_math"),
         }
     }
@@ -74,12 +82,13 @@ impl Theme
         {
             Entry::Line(line) => state::wrap_line(line, width),
 
-            Entry::Message { username, id, message_id, text, colors } =>
+            Entry::Message { username, id, message_id, timestamp, text, colors } =>
             {
                 let id = if self.show_id { format!(" ({id})") } else { String::new() };
 
                 let prefix = vec!
                 [
+                    self.timestamp(*timestamp),
                     self.message_id(*message_id),
                     self.colorize(username.clone(), colors.username_color),
                     Span::styled(id, DIM),
@@ -90,8 +99,9 @@ impl Theme
             },
 
             //THE SAME LINE WITHOUT THE ID COLUMN
-            Entry::History { username, message_id, text, colors } => markup::render(vec!
+            Entry::History { username, message_id, timestamp, text, colors } => markup::render(vec!
             [
+                self.timestamp(*timestamp),
                 self.message_id(*message_id),
                 self.colorize(username.clone(), colors.username_color),
                 Span::raw(": "),
@@ -112,10 +122,11 @@ impl Theme
             Entry::Transfer(transfer) => state::wrap_line(&Line::from(progress(transfer, width)), width),
 
             //ONLY THE CAPTION; THE PICTURE IS DRAWN UNDER IT
-            Entry::Image { username, filename, message_id, username_color, picture, .. } =>
+            Entry::Image { username, filename, message_id, timestamp, username_color, picture, .. } =>
             {
                 let mut spans = vec!
                 [
+                    self.timestamp(*timestamp),
                     self.message_id(*message_id),
                     //THE SENDER'S COLOR, ELSE THE CHROME'S ACCENT
                     match username_color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
@@ -137,6 +148,23 @@ impl Theme
                 state::wrap_line(&Line::from(spans), width)
             },
         }
+    }
+
+    fn timestamp(&self, timestamp: Option<u64>) -> Span<'static> //SEND TIME PREFIX, LOCAL
+    {
+        let Some(time) = timestamp.filter(|_| self.show_timestamps)
+            .and_then(|timestamp| DateTime::from_timestamp(timestamp as i64, 0))
+            .map(|time| time.with_timezone(&Local))
+        else { return Span::raw("") };
+
+        //OLDER THAN TODAY GETS THE DATE
+        let format = match time.date_naive() == Local::now().date_naive()
+        {
+            true => "%H:%M ",
+            false => "%Y-%m-%d %H:%M ",
+        };
+
+        Span::styled(time.format(format).to_string(), DIM)
     }
 
     fn message_id(&self, message_id: u64) -> Span<'static> //MESSAGE ID PREFIX

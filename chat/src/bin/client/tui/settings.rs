@@ -253,6 +253,7 @@ impl Settings
 
         rows.push(Row::Item(Item::client("Show client IDs", "show_id", toggle_value("show_id", false))));
         rows.push(Row::Item(Item::client("Show message IDs", "show_message_ids", toggle_value("show_message_ids", false))));
+        rows.push(Row::Item(Item::client("Show timestamps", "show_timestamps", toggle_value("show_timestamps", false))));
 
         rows.push(Row::Header(String::from("Privacy")));
 

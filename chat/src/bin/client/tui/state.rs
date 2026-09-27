@@ -101,6 +101,7 @@ pub enum Entry //ONE ROW OF HISTORY
         username: String,
         id: usize,
         message_id: u64,
+        timestamp: Option<u64>, //UNIX SECONDS
         text: String,
         colors: MessageColors,
     },
@@ -110,6 +111,7 @@ pub enum Entry //ONE ROW OF HISTORY
     {
         username: String,
         message_id: u64,
+        timestamp: Option<u64>,
         text: String,
         colors: MessageColors,
     },
@@ -133,6 +135,7 @@ pub enum Entry //ONE ROW OF HISTORY
         username: String,
         filename: String,
         message_id: u64,
+        timestamp: Option<u64>,
         username_color: Option<u8>, //THE SENDER'S, LIKE A MESSAGE'S
         hash: Option<[u8; 32]>,     //WHAT TO ASK THE SERVER FOR
         picture: Picture,
@@ -431,9 +434,10 @@ impl App
     }
 
     //STORE A CHAT MESSAGE UNRENDERED
-    pub fn push_message(&mut self, username: String, id: usize, message_id: u64, text: String, colors: MessageColors)
+    pub fn push_message(&mut self, username: String, id: usize, message_id: u64, timestamp: Option<u64>, text: String,
+        colors: MessageColors)
     {
-        self.push_entry(Entry::Message { username, id, message_id, text, colors });
+        self.push_entry(Entry::Message { username, id, message_id, timestamp, text, colors });
     }
 
     //STORE AN ENTRY IN ANOTHER CHANNEL'S PARKED PANE
@@ -640,12 +644,12 @@ impl App
     }
 
     //A PICTURE THAT CAME WITH ITS BYTES
-    pub fn push_image(&mut self, username: String, filename: String, message_id: u64, image: Animation,
-        username_color: Option<u8>)
+    pub fn push_image(&mut self, username: String, filename: String, message_id: u64, timestamp: Option<u64>,
+        image: Animation, username_color: Option<u8>)
     {
         let picture = self.fit(image);
 
-        self.push_entry(Entry::Image { username, filename, message_id, username_color, hash: None, picture });
+        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: None, picture });
     }
 
     //A TRANSFER STARTING
@@ -693,10 +697,10 @@ impl App
     }
 
     //A CAPTION WITHOUT ITS PICTURE
-    pub fn push_caption(&mut self, username: String, filename: String, message_id: u64, hash: [u8; 32],
-        picture: Picture, username_color: Option<u8>)
+    pub fn push_caption(&mut self, username: String, filename: String, message_id: u64, timestamp: Option<u64>,
+        hash: [u8; 32], picture: Picture, username_color: Option<u8>)
     {
-        self.push_entry(Entry::Image { username, filename, message_id, username_color, hash: Some(hash), picture });
+        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture });
     }
 
     //A CLICKED CAPTION

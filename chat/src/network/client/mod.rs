@@ -122,7 +122,7 @@ pub enum ClientEvent
     FirstUser,                                                   //FIRST USER
     Authenticated(Role),                                         //LOGIN SUCCESSFUL, ROLE
     Connected(String),                                           //SUCCESSFUL CONNECTION MESSAGE
-    Message(String, String, usize, u64, MessageColors, Option<Option<String>>), //RECEIVED MESSAGE, ITS CHANNEL
+    Message(String, String, usize, u64, MessageColors, Option<Option<String>>, Option<u64>), //RECEIVED MESSAGE, ITS CHANNEL, WHEN
     PrivateMessageSent(String, usize, String, MessageColors),    //SENT PM
     PrivateMessageRecv(String, usize, String, MessageColors),    //RECEIVED PM
     TofuError,                                                   //TOFU VERIFICATION REJECTED BY THE USER
@@ -163,11 +163,11 @@ pub enum ClientEvent
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
     Upload(u64, String, u64),                                    //UPLOADING FILE (UID, NAME, SIZE)
     Image(u64, String, u64),                                     //UPLOADING IMAGE (UID, NAME, SIZE)
-    ImageDisplay(String, String, u64, Animation, Option<u8>),    //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
+    ImageDisplay(String, String, u64, Option<u64>, Animation, Option<u8>), //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
     ImageData([u8; 32], Option<Animation>),                      //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
-    ImagePending(String, String, u64, [u8; 32], Option<u8>),     //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
-    ImageOffer(String, String, u64, [u8; 32], Option<u8>),       //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
-    ImageParked(String, String, String, u64, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE IN ANOTHER CHANNEL (CHANNEL FIRST)
+    ImagePending(String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
+    ImageOffer(String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
+    ImageParked(String, String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE IN ANOTHER CHANNEL (CHANNEL FIRST)
     ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
     AvatarFailed(String),                                        //CUTTING OUR AVATAR FAILED
     ImageFailed(String, String, u64, Option<u8>),                //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
@@ -283,9 +283,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
         match read
         {
             //REGULAR MESSAGE
-            PacketCode::Message { text, username, id, message_id, colors, channel } =>
+            PacketCode::Message { text, username, id, message_id, colors, channel, timestamp } =>
             {
-                tx.send(ClientEvent::Message(text, username, id, message_id, colors, channel)).await.unwrap();
+                tx.send(ClientEvent::Message(text, username, id, message_id, colors, channel, timestamp)).await.unwrap();
             }
 
             //THE LOBBY'S STORED MESSAGES
@@ -630,7 +630,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //EITHER THE PICTURE OR THE OFFER OF IT
-            PacketCode::ImageDisplay { username, filename, message_id, hash, data, username_color, channel } =>
+            PacketCode::ImageDisplay { username, filename, message_id, hash, data, username_color, channel, timestamp } =>
             {
                 let image_tx = tx.clone();
 
@@ -655,8 +655,8 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                         image_tx.send(match elsewhere
                         {
-                            Some(channel) => ClientEvent::ImageParked(channel, username, filename, message_id, hash, username_color),
-                            None => ClientEvent::ImageOffer(username, filename, message_id, hash, username_color),
+                            Some(channel) => ClientEvent::ImageParked(channel, username, filename, message_id, timestamp, hash, username_color),
+                            None => ClientEvent::ImageOffer(username, filename, message_id, timestamp, hash, username_color),
                         }).await.unwrap();
                     });
 
@@ -675,7 +675,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     let Some(data) = data else
                     {
                         //ASK FROM THE EVENT LOOP, WHICH OWNS THE WRITE HALF
-                        image_tx.send(ClientEvent::ImagePending(username, filename, message_id, hash, username_color)).await.unwrap();
+                        image_tx.send(ClientEvent::ImagePending(username, filename, message_id, timestamp, hash, username_color)).await.unwrap();
 
                         return;
                     };
@@ -699,7 +699,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                     image_tx.send(match image
                     {
-                        Some(image) => ClientEvent::ImageDisplay(username, filename, message_id, image, username_color),
+                        Some(image) => ClientEvent::ImageDisplay(username, filename, message_id, timestamp, image, username_color),
                         None => ClientEvent::ImageFailed(username, filename, message_id, username_color),
                     }).await.unwrap();
                 });

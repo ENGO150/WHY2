@@ -83,19 +83,19 @@ impl App
             },
 
             //STORED UNRENDERED - App::theme MAKES THE LINE
-            ClientEvent::Message(message, username, id, message_id, colors, channel) =>
+            ClientEvent::Message(message, username, id, message_id, colors, channel, timestamp) =>
             {
                 //None = EVERY PANE, Some(None) = THE LOBBY
                 match channel.map(Option::unwrap_or_default)
                 {
                     Some(channel) if channel != self.channel =>
-                        self.park_entry(channel, state::Entry::Message { username, id, message_id, text: message, colors }),
+                        self.park_entry(channel, state::Entry::Message { username, id, message_id, timestamp, text: message, colors }),
 
                     _ =>
                     {
                         //A MESSAGE IS THE PROOF THEY STOPPED
                         self.stopped_typing(&username);
-                        self.push_message(username, id, message_id, message, colors);
+                        self.push_message(username, id, message_id, timestamp, message, colors);
                     },
                 }
             },
@@ -103,22 +103,22 @@ impl App
             ClientEvent::Typing(username) => self.set_typing(username),
 
             //A PICTURE IS AN ENTRY OF ITS OWN
-            ClientEvent::ImageDisplay(username, filename, message_id, image, color) =>
-                self.push_image(username, filename, message_id, image, color),
+            ClientEvent::ImageDisplay(username, filename, message_id, timestamp, image, color) =>
+                self.push_image(username, filename, message_id, timestamp, image, color),
 
             //A PICTURE WE DO NOT HOLD: CAPTION IT NOW
-            ClientEvent::ImagePending(username, filename, message_id, hash, color) =>
+            ClientEvent::ImagePending(username, filename, message_id, timestamp, hash, color) =>
             {
-                self.push_caption(username, filename, message_id, hash, state::Picture::Waiting, color);
+                self.push_caption(username, filename, message_id, timestamp, hash, state::Picture::Waiting, color);
                 self.image_requests.push(hash);
             },
 
             //THE SAME LINE WITH THE BUTTON ON IT
-            ClientEvent::ImageOffer(username, filename, message_id, hash, color) =>
-                self.push_caption(username, filename, message_id, hash, state::Picture::Absent, color),
+            ClientEvent::ImageOffer(username, filename, message_id, timestamp, hash, color) =>
+                self.push_caption(username, filename, message_id, timestamp, hash, state::Picture::Absent, color),
 
             //LOADED ONCE ITS PANE IS LOOKED AT
-            ClientEvent::ImageParked(channel, username, filename, message_id, hash, username_color) =>
+            ClientEvent::ImageParked(channel, username, filename, message_id, timestamp, hash, username_color) =>
             {
                 let picture = match client_image::auto_show_images()
                 {
@@ -129,8 +129,8 @@ impl App
                 //WE MAY HAVE SWITCHED THERE SINCE
                 match channel == self.channel
                 {
-                    true => self.push_caption(username, filename, message_id, hash, picture, username_color),
-                    false => self.park_entry(channel, state::Entry::Image { username, filename, message_id, username_color, hash: Some(hash), picture }),
+                    true => self.push_caption(username, filename, message_id, timestamp, hash, picture, username_color),
+                    false => self.park_entry(channel, state::Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture }),
                 }
             },
 
@@ -351,6 +351,7 @@ impl App
                         username: message.username,
                         filename: message.text,
                         message_id: message.message_id,
+                        timestamp: message.timestamp,
                         username_color: message.colors.username_color,
                         hash: Some(hash),
                         picture: match auto_show
@@ -364,6 +365,7 @@ impl App
                     {
                         username: message.username,
                         message_id: message.message_id,
+                        timestamp: message.timestamp,
                         text: message.text,
                         colors: message.colors,
                     },
