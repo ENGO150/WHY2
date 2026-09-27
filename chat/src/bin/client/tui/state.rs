@@ -33,7 +33,7 @@ use std::
 use ratatui::
 {
     layout::Rect,
-    style::Style,
+    style::{ Color, Style },
     text::{ Line, Span },
 };
 
@@ -45,7 +45,7 @@ use ratatui_image::
 {
     FontSize,
     FilterType,
-    picker::Picker,
+    picker::{ Capability, Picker, cap_parser::QueryStdioOptions },
     protocol::{ StatefulProtocol, StatefulProtocolType },
 };
 
@@ -87,7 +87,7 @@ use super::
     palette::{ self, Palette },
     settings::Settings,
     tofu::Prompt,
-    theme::Theme,
+    theme::{ self, Theme },
 };
 
 //ENUMS
@@ -152,6 +152,11 @@ impl Entry
                 Some(*message_id),
             _ => None,
         }
+    }
+
+    pub fn striped(&self) -> bool //WHETHER IT TAKES PART IN THE STRIPES
+    {
+        matches!(self, Entry::Message { .. } | Entry::History { .. } | Entry::Private { .. } | Entry::Image { .. })
     }
 }
 
@@ -301,7 +306,9 @@ pub struct App
 
     //WRAP CACHE
     generation: u64,
-    wrapped: Option<(u16, u64, Vec<Line<'static>>, Vec<Placement>, Vec<u16>, Vec<bool>)>,
+    wrapped: Option<(u16, u64, Vec<Line<'static>>, Vec<Placement>, Vec<u16>, Vec<Option<Style>>)>,
+    stripe: bool, //PARITY OF THE MESSAGES TRIMMED OFF THE TOP
+    pub stripe_bg: Color,
 }
 
 //IMPLEMENTATIONS
@@ -380,6 +387,8 @@ impl App
             quit_message: None,
             dirty: true,
             generation: 0,
+            stripe: false,
+            stripe_bg: theme::STRIPE_FALLBACK,
             wrapped: None,
         }
     }
@@ -977,7 +986,20 @@ impl App
     //THE QUERY WANTS STDIO TO ITSELF
     pub fn init_picker(&mut self)
     {
-        if let Ok(picker) = Picker::from_query_stdio() { self.picker = picker; }
+        let options = QueryStdioOptions { terminal_background_color_osc: true, ..Default::default() };
+
+        let Ok(picker) = Picker::from_query_stdio_with_options(options) else { return };
+
+        //THE STRIPE FOLLOWS THE TERMINAL'S BACKGROUND
+        let background = picker.capabilities().iter().find_map(|capability| match capability
+        {
+            Capability::Background(r, g, b) => Some((*r, *g, *b)),
+            _ => None,
+        });
+
+        self.stripe_bg = theme::stripe(background);
+        self.picker = picker;
+        self.generation += 1;
     }
 
     fn push_entry(&mut self, entry: Entry)
@@ -986,7 +1008,7 @@ impl App
 
         while self.messages.len() > consts::HISTORY_LIMIT
         {
-            self.messages.pop_front();
+            if self.messages.pop_front().is_some_and(|entry| entry.striped()) { self.stripe = !self.stripe; }
 
             //THE REPLAYED ENTRIES MOVE UP, OR GO
             if self.channel.is_empty()
@@ -1192,10 +1214,10 @@ impl App
         self.dirty = true;
     }
 
-    //WHETHER A WRAPPED ROW BELONGS TO A MESSAGE MENTIONING US
-    pub fn mentioned(&self, row: u16) -> bool
+    //THE BACKGROUND OF A WRAPPED ROW, IF ANY
+    pub fn tint(&self, row: u16) -> Option<Style>
     {
-        self.wrapped.as_ref().and_then(|wrapped| wrapped.5.get(row as usize).copied()).unwrap_or(false)
+        self.wrapped.as_ref().and_then(|wrapped| wrapped.5.get(row as usize).copied().flatten())
     }
 
     //RECOMPUTE THE PALETTE FROM THE INPUT
@@ -1518,7 +1540,8 @@ impl App
         let mut lines: Vec<Line<'static>> = Vec::new();
         let mut placements: Vec<Placement> = Vec::new();
         let mut starts: Vec<u16> = Vec::with_capacity(self.messages.len());
-        let mut mentions: Vec<bool> = Vec::new();
+        let mut tints: Vec<Option<Style>> = Vec::new();
+        let mut stripe = self.stripe;
 
         for entry in 0..self.messages.len()
         {
@@ -1537,8 +1560,19 @@ impl App
                 _ => false,
             };
 
-            mentions.resize(lines.len(), false);
-            mentions[row as usize..].fill(mentioned);
+            //EVERY OTHER MESSAGE GETS A STRIPE
+            let striped = self.messages[entry].striped();
+            if striped { stripe = !stripe; }
+
+            let tint = match (mentioned, striped && stripe)
+            {
+                (true, _) => Some(theme::MENTION),
+                (false, true) => Some(Style::new().bg(self.stripe_bg)),
+                (false, false) => None,
+            };
+
+            tints.resize(lines.len(), None);
+            tints[row as usize..].fill(tint);
 
             //AN IMAGE RESERVES ITS ROWS AS BLANK LINES
             if let Entry::Image { picture, .. } = &mut self.messages[entry]
@@ -1564,12 +1598,13 @@ impl App
 
                 placements.push(Placement { entry, caption, row, height });
                 lines.extend(iter::repeat_n(Line::default(), height as usize));
+                tints.resize(lines.len(), tint);
             }
         }
 
-        mentions.resize(lines.len(), false);
+        tints.resize(lines.len(), None);
 
-        self.wrapped = Some((width, self.generation, lines, placements, starts, mentions));
+        self.wrapped = Some((width, self.generation, lines, placements, starts, tints));
     }
 
     fn wrapped_len(&self) -> u16

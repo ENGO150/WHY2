@@ -202,6 +202,19 @@ impl Theme
 }
 
 //FUNCTIONS
+//THE TERMINAL'S BACKGROUND, A LITTLE LIGHTER
+pub fn stripe(background: Option<(u8, u8, u8)>) -> Color
+{
+    let Some((r, g, b)) = background else { return STRIPE_FALLBACK };
+
+    //A LIGHT BACKGROUND GOES DARKER INSTEAD
+    let light = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000 > 128;
+    let target = if light { 0.0 } else { 255.0 };
+    let nudge = |c: u8| (c as f32 + (target - c as f32) * STRIPE_LIFT).round() as u8;
+
+    Color::Rgb(nudge(r), nudge(g), nudge(b))
+}
+
 //A TRANSFER'S ROW - WHAT IT IS, ITS BAR, AND WHAT IT HAS MOVED
 fn progress(transfer: &Transfer, width: u16) -> Vec<Span<'static>>
 {
@@ -299,6 +312,10 @@ pub const LINK: Style = Style::new().fg(Color::Rgb(0x9D, 0xCE, 0xFF)).add_modifi
 pub const MATH: Style = Style::new().fg(Color::Rgb(0xFF, 0xDD, 0xE2));         //MATH THE MESSAGE GAVE NO COLOUR
 
 pub const SELECTED: Style = Style::new().bg(Color::Rgb(0x00, 0x5F, 0x5F));
+
+//EVERY OTHER MESSAGE, A BACKGROUND ONLY
+pub const STRIPE_FALLBACK: Color = Color::Rgb(0x1B, 0x1F, 0x24);               //FAINT SLATE, WHEN THE TERMINAL WILL NOT SAY
+const STRIPE_LIFT: f32 = 0.07;                                                  //HOW FAR OFF THE TERMINAL'S BACKGROUND
 
 //A MESSAGE THAT MENTIONS US, A BACKGROUND ONLY
 pub const MENTION: Style = Style::new().bg(Color::Rgb(0x4B, 0x3A, 0x1F));

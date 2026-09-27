@@ -143,7 +143,7 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     if !connecting { draw_input(frame, app, input_area, input_lines, cursor); }
 
     //LOGO BEHIND EVERYTHING
-    if !app.theme.disable_logo { draw_logo(frame, area); }
+    if !app.theme.disable_logo { draw_logo(frame, area, app.stripe_bg); }
 
     //EVERY BOX SAYS WHAT IT COVERED
     let mut overlays: Vec<Rect> = Vec::new();
@@ -265,14 +265,14 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 
     frame.render_widget(Paragraph::new(visible), inner);
 
-    //TINT THE ROWS THAT MENTION US
+    //TINT THE STRIPED AND MENTIONING ROWS
     for y in inner.y..inner.y + viewport
     {
-        if !app.mentioned(offset + (y - inner.y)) { continue; }
+        let Some(tint) = app.tint(offset + (y - inner.y)) else { continue };
 
         for x in inner.x..inner.x + inner.width
         {
-            if let Some(cell) = frame.buffer_mut().cell_mut((x, y)) && cell.bg == Color::Reset { cell.set_style(theme::MENTION); }
+            if let Some(cell) = frame.buffer_mut().cell_mut((x, y)) && cell.bg == Color::Reset { cell.set_style(tint); }
         }
     }
 
@@ -500,7 +500,7 @@ fn draw_scrollbar(frame: &mut Frame, area: Rect, total: usize, visible: usize, f
 }
 
 //DRAW THE LOGO ON FREE CELLS ONLY
-fn draw_logo(frame: &mut Frame, area: Rect)
+fn draw_logo(frame: &mut Frame, area: Rect, stripe: Color)
 {
     let rows = LOGO.lines().collect::<Vec<&str>>();
     let height = rows.len() as u16;
@@ -520,12 +520,14 @@ fn draw_logo(frame: &mut Frame, area: Rect)
 
             let Some(cell) = buffer.cell_mut((x + column as u16, y + row_index as u16)) else { continue; };
 
-            //A PAINTED BACKGROUND IS A CLAIMED CELL
-            if cell.symbol().trim().is_empty() && cell.bg == Color::Reset //FREE CELL - THE LOGO OWNS IT OUTRIGHT
+            //A PAINTED BACKGROUND IS A CLAIMED CELL, A STRIPE IS NOT
+            let unpainted = cell.bg == Color::Reset || cell.bg == stripe;
+
+            if cell.symbol().trim().is_empty() && unpainted //FREE CELL - THE LOGO OWNS IT OUTRIGHT
             {
                 cell.set_char(symbol);
                 cell.set_style(theme::LOGO);
-            } else if cell.bg == Color::Reset //TAKEN, BUT NOTHING IS PAINTED BEHIND IT YET
+            } else if unpainted //TAKEN, BUT NOTHING IS PAINTED BEHIND IT YET
             {
                 cell.set_style(theme::LOGO_UNDER);
             }
