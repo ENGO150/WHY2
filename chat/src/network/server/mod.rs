@@ -990,10 +990,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 log::info!("Message ({} chars) in {}: {peer_addr}", text.chars().count(),
                     if channel.is_some() { "channel" } else { "lobby" });
 
+                let timestamp = config::messages::timestamp();
+
                 //KEEP IT - ONLY THE LOBBY HAS A HISTORY
                 let message_id = match channel.is_none() && config::read_config::<bool>("persistent_messages")
                 {
-                    true => config::messages::store(&username, &text),
+                    true => config::messages::store(&username, &text, timestamp),
                     false => config::messages::next_id(),
                 };
 
@@ -1006,6 +1008,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     message_id,
                     colors: config::users::colors(&username),
                     channel: Some(channel.clone()),
+                    timestamp,
                 });
             }
 
@@ -1179,10 +1182,12 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         _ => String::from("unnamed_file"),
                     };
 
+                    let timestamp = config::messages::timestamp();
+
                     //KEEP IT, ON AN UPLOAD'S TERMS
                     let message_id = match channel.is_none() && config::read_config::<bool>("persistent_messages")
                     {
-                        true => config::messages::store_image(&username, &filename, &hash),
+                        true => config::messages::store_image(&username, &filename, &hash, timestamp),
                         false => config::messages::next_id(),
                     };
 
@@ -1196,6 +1201,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                         data: None,
                         username_color: config::users::colors(&username).username_color,
                         channel: Some(channel.clone()),
+                        timestamp,
                     });
 
                     //TELL THE UPLOADER THERE IS NOTHING TO SEND

@@ -49,6 +49,7 @@ pub enum PacketCode //CONTROL CODES
         message_id: u64,
         colors: MessageColors,
         channel: Option<Option<String>>,
+        timestamp: Option<u64>, //UNIX SECONDS
     },
 
     //SERVER -> CLIENT | KEY EXCHANGE OFFER
@@ -190,6 +191,7 @@ pub enum PacketCode //CONTROL CODES
         data: Option<Vec<u8>>,
         username_color: Option<u8>,
         channel: Option<Option<String>>,
+        timestamp: Option<u64>, //UNIX SECONDS
     },
 
     //SERVER -> CLIENT | ASK FOR A STORED PICTURE
@@ -515,6 +517,7 @@ pub struct StoredMessage
     pub text: String,            //THE MESSAGE - OR THE FILENAME, WHEN THIS LINE IS AN IMAGE
     pub colors: MessageColors,
     pub image: Option<[u8; 32]>, //CONTENT HASH OF THE PICTURE
+    pub timestamp: Option<u64>,  //UNIX SECONDS
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]

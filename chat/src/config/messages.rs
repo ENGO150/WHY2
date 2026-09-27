@@ -21,6 +21,7 @@ use std::
     fs,
     collections::{ HashMap, HashSet },
     sync::{ LazyLock, Mutex },
+    time::{ SystemTime, UNIX_EPOCH },
 };
 
 use wincode::{ SchemaWrite, SchemaRead };
@@ -42,6 +43,16 @@ use crate::
 //STRUCTS
 #[derive(SchemaWrite, SchemaRead, Clone)]
 struct Record //ONE MESSAGE RECORD
+{
+    id: u64,
+    username: String,
+    text: String,
+    image: Option<[u8; 32]>,
+    timestamp: Option<u64>, //UNIX SECONDS
+}
+
+#[derive(SchemaRead)]
+struct IdRecord //A RECORD BEFORE TIMESTAMPS (remove with next version bump)
 {
     id: u64,
     username: String,
@@ -72,6 +83,9 @@ pub struct Page
     pub kept: u64,  //MESSAGES KEPT
 }
 
+//CONSTS
+const MAGIC: &[u8; 8] = b"WHY2MSG\x02"; //FORMAT MARKER
+
 //GLOBAL VARIABLES
 static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History::new())); //MESSAGE HISTORY
 static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                                       //AT-REST KEYS
@@ -101,7 +115,8 @@ impl History
 
     fn save(&self) //ENCRYPT-THEN-MAC THE WHOLE HISTORY
     {
-        let bytes = wincode::config::serialize(&self.records, consts::PACKET_CONFIG).expect("Encoding message history failed");
+        let mut bytes = MAGIC.to_vec();
+        bytes.extend(wincode::config::serialize(&self.records, consts::PACKET_CONFIG).expect("Encoding message history failed"));
         let sealed = crypto::encrypt_packet::<{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(&bytes, &KEYS);
 
         fs::write(path(), sealed).expect("Saving message history failed");
@@ -141,7 +156,10 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
         return Vec::new();
     };
 
-    match wincode::config::deserialize::<Vec<Record>, _>(&plaintext, consts::PACKET_CONFIG)
+    //NO MARKER IS AN OLDER FORMAT
+    let Some(records) = plaintext.strip_prefix(MAGIC) else { return migrate(&plaintext) };
+
+    match wincode::config::deserialize::<Vec<Record>, _>(records, consts::PACKET_CONFIG)
     {
         Ok(history) =>
         {
@@ -149,16 +167,40 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
             history
         },
 
-        Err(_) => migrate(&plaintext), //MAYBE IT IS ONE WITHOUT IDS
+        Err(_) => unreadable(),
     }
 }
 
-fn migrate(plaintext: &[u8]) -> Vec<Record> //NUMBER A HISTORY WITHOUT IDS (remove with next version bump)
+fn unreadable() -> Vec<Record> //KEEP A COPY, START EMPTY
 {
+    let backup = format!("{}.old", path());
+    let _ = fs::copy(path(), &backup);
+
+    log::error!("Message history could not be read, it is being ignored (copy kept as {backup})");
+    Vec::new()
+}
+
+fn migrate(plaintext: &[u8]) -> Vec<Record> //LOAD AN OLDER HISTORY WITHOUT TIMESTAMPS (remove with next version bump)
+{
+    //IDS, NO TIMESTAMPS
+    if let Ok(history) = wincode::config::deserialize::<Vec<IdRecord>, _>(plaintext, consts::PACKET_CONFIG)
+    {
+        log::info!("Migrated {} stored messages, no timestamps", history.len());
+
+        return history.into_iter().map(|message| Record
+        {
+            id: message.id,
+            username: message.username,
+            text: message.text,
+            image: message.image,
+            timestamp: None,
+        }).collect();
+    }
+
+    //NEITHER IDS NOR TIMESTAMPS
     let Ok(history) = wincode::config::deserialize::<Vec<LegacyRecord>, _>(plaintext, consts::PACKET_CONFIG) else
     {
-        log::error!("Message history is of an older format, it is being ignored");
-        return Vec::new();
+        return unreadable();
     };
 
     log::info!("Migrated {} stored messages, ids assigned", history.len());
@@ -169,26 +211,33 @@ fn migrate(plaintext: &[u8]) -> Vec<Record> //NUMBER A HISTORY WITHOUT IDS (remo
         username: message.username,
         text: message.text,
         image: message.image,
+        timestamp: None,
     }).collect()
 }
 
 //PUBLIC
+pub fn timestamp() -> Option<u64> //NOW, IF TIMESTAMPS ARE ON
+{
+    super::read_config::<bool>("message_timestamps")
+        .then(|| SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |time| time.as_secs()))
+}
+
 pub fn next_id() -> u64 //ID FOR A MESSAGE THAT IS NOT KEPT
 {
     HISTORY.lock().unwrap().take_id()
 }
 
-pub fn store(username: &str, text: &str) -> u64 //APPEND MESSAGE
+pub fn store(username: &str, text: &str, timestamp: Option<u64>) -> u64 //APPEND MESSAGE
 {
-    push(username, text, None)
+    push(username, text, None, timestamp)
 }
 
-pub fn store_image(username: &str, filename: &str, hash: &[u8; 32]) -> u64
+pub fn store_image(username: &str, filename: &str, hash: &[u8; 32], timestamp: Option<u64>) -> u64
 {
-    push(username, filename, Some(*hash))
+    push(username, filename, Some(*hash), timestamp)
 }
 
-fn push(username: &str, text: &str, image: Option<[u8; 32]>) -> u64 //APPEND ONE ENTRY AND REWRITE THE FILE
+fn push(username: &str, text: &str, image: Option<[u8; 32]>, timestamp: Option<u64>) -> u64 //APPEND ONE ENTRY AND REWRITE THE FILE
 {
     let limit: usize = super::read_config("max_persistent_messages");
 
@@ -198,7 +247,7 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>) -> u64 //APPEND ONE
     //A HISTORY OF NOTHING DOES NOT TOUCH THE FILE
     if limit == 0 { return id; }
 
-    guard.records.push(Record { id, username: username.to_string(), text: text.to_string(), image });
+    guard.records.push(Record { id, username: username.to_string(), text: text.to_string(), image, timestamp });
 
     //KEEP THE LAST limit MESSAGES
     let over = guard.records.len().saturating_sub(limit);
@@ -334,6 +383,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
                 false => stored.clone(),
             },
             image: message.image,
+            timestamp: message.timestamp,
         }
     }).collect();
 

@@ -490,9 +490,10 @@ pub async fn download
                 //KEEP IT, ON THE SAME TERMS AS A MESSAGE
                 let kept = channel.is_none() && config::read_config::<bool>("persistent_messages");
 
+                let timestamp = config::messages::timestamp();
                 let message_id = match kept
                 {
-                    true => config::messages::store_image(&username, &filename, &final_hash),
+                    true => config::messages::store_image(&username, &filename, &final_hash, timestamp),
                     false => config::messages::next_id(),
                 };
 
@@ -509,6 +510,7 @@ pub async fn download
                     data: Some(data),
                     username_color: config::users::colors(&username).username_color,
                     channel: Some(channel.clone()),
+                    timestamp,
                 });
             }
         } else

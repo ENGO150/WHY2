@@ -59,6 +59,7 @@ max_packet_rate_violations = 40 # Maximal packets in a row that had to be slowed
 # Channel
 max_channel_length = 20 # Maximal length of channel name
 typing_indicator = true # Tell a channel which of its clients are writing a message
+message_timestamps = true # Tell clients when each message was sent (and keep it in the history)
 
 # Logging
 log_level = "info" # Log verbosity: off, error, warn, info, debug or trace (debug logs every packet)
