@@ -88,8 +88,9 @@ impl Theme
 
                 let prefix = vec!
                 [
-                    self.timestamp(*timestamp),
                     self.message_id(*message_id),
+                    self.separator(*timestamp),
+                    self.timestamp(*timestamp),
                     self.colorize(username.clone(), colors.username_color),
                     Span::styled(id, DIM),
                     Span::raw(": "),
@@ -101,8 +102,9 @@ impl Theme
             //THE SAME LINE WITHOUT THE ID COLUMN
             Entry::History { username, message_id, timestamp, text, colors } => markup::render(vec!
             [
-                self.timestamp(*timestamp),
                 self.message_id(*message_id),
+                self.separator(*timestamp),
+                self.timestamp(*timestamp),
                 self.colorize(username.clone(), colors.username_color),
                 Span::raw(": "),
             ], text, self.style(colors.message_color), width, self.render_math),
@@ -126,8 +128,9 @@ impl Theme
             {
                 let mut spans = vec!
                 [
-                    self.timestamp(*timestamp),
                     self.message_id(*message_id),
+                    self.separator(*timestamp),
+                    self.timestamp(*timestamp),
                     //THE SENDER'S COLOR, ELSE THE CHROME'S ACCENT
                     match username_color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
                     {
@@ -165,6 +168,13 @@ impl Theme
         };
 
         Span::styled(time.format(format).to_string(), DIM)
+    }
+
+    fn separator(&self, timestamp: Option<u64>) -> Span<'static> //BETWEEN ID AND TIME, WHEN BOTH SHOW
+    {
+        let both = self.show_message_ids && self.show_timestamps && timestamp.is_some();
+
+        Span::styled(if both { "· " } else { "" }, BORDER)
     }
 
     fn message_id(&self, message_id: u64) -> Span<'static> //MESSAGE ID PREFIX
