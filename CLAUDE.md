@@ -985,6 +985,19 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     so the history's ids rise in the order its records do. Unique per process plus the stored history is
     enough: a restart ends every session and a client's panes die with it, so an id reused for a channel
     message after a restart can never match anything a client still shows.
+  - **A message carries when it was sent, as the server saw it** (`timestamp: Option<u64>`, unix seconds, on
+    `Record`, `StoredMessage`, `PacketCode::Message` and `ImageDisplay`). It is taken once per message by
+    `messages::timestamp()` and the same value goes on the wire and into the record, so a replay shows the
+    time the live line did. `message_timestamps` (server.toml, live) turns it off, and then it is `None`
+    everywhere — `page()` strips a stored one too, so turning it off hides the old ones without touching the
+    file — which is also what a record from before timestamps loads as (`IdRecord` in `migrate`).
+    **The ids stay the order**: the history is never sorted by time, so a clock that jumps cannot reorder
+    it or break `History::position`. The client formats it in local time (`Theme::timestamp`, `chrono`),
+    with the date only when it is not today, behind `show_timestamps` (client.toml, a `/settings` row).
+    A file written since starts with `MAGIC`, which is how it is told apart from the older ones — not
+    `deserialize_exact`: the decrypted plaintext is padded to whole grids, so exact decoding rejects every
+    history, and doing that once emptied a real one. A history that will not parse is copied to
+    `server_messages.bin.old` before it is ignored, since the next message would otherwise overwrite it.
   - **A stored message can be deleted** (`/delete ID` → `PacketCode::DeleteRequest`,
     `config::messages::delete`): your own, or as a moderator one by a lower rank than yours — the same
     "no peer or superior" rule kick and mute use, with the author named by the record's username, so
