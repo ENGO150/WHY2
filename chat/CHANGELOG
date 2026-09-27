@@ -2,6 +2,21 @@ WHY2 (Chat) Changelog
 =====================
 
 v2.2.4:
+- 36a6b54f: add option to disable message stripes
+- 784f0330: stripe every other message
+- 8ec039e5: move message id to the end of the line
+- 6430a5dd: disable "everyone" username
+- 8be4517f: implement user mentions
+- ecf34a13: move MID to the left of timestamp
+- 4e77218b: hide timestamps when turned off on server
+- c9f17966: handle timestamps on client
+- 82d9253a: implement timestamps on server
+- 214145bf: add chrono client dependency
+- e8869dff: implement account deletion
+- 7712cddc: handle password changes on client
+- a10883ed: handle password changes on server
+- 99a49675: add account commands
+- ce5822d7: revert username trigger for BanIP
 - 29a5c204: add possibility to reference user in Ban & Role commands by username
 
 v2.2.3:
