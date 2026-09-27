@@ -226,6 +226,9 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
             network::send(&mut *write_stream.lock().await, PacketCode::ServerSettingsRequest,
                 options::get_keys().as_ref()).await;
         },
+
+        //ACCOUNT ACTIONS
+        Subcommand::Delete | Subcommand::Passwd => invalid_usage(app, Some("action")),
     }
 }
 
@@ -686,6 +689,9 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         Command::Settings => app.settings.open(audio_devices().await),
 
                         Command::Server => server_command(app, write_stream, parameters).await,
+
+                        //NOT WIRED YET
+                        Command::Account => {},
 
                         Command::UsernameColor => color_handler(app, write_stream, true, parameters).await,
                         Command::MessageColor => color_handler(app, write_stream, false, parameters).await,

@@ -73,6 +73,7 @@ pub enum Command
     Settings,                                   //OPEN THE SETTINGS OVERLAY
     Profile,                                    //OPEN A USER PROFILE
     Server,                                     //MODERATION ACTIONS (TAKES A SUBCOMMAND)
+    Account,                                    //ACCOUNT ACTIONS (TAKES A SUBCOMMAND)
     UsernameColor,                              //SET COLOR OF USERNAME
     MessageColor,                               //SET COLOR OF MESSAGE
     Invalid,                                    //INVALID COMMAND
@@ -92,6 +93,8 @@ pub enum Subcommand
     Say,      //SAY AS SERVER
     Role,     //SET A USER'S ROLE
     Settings, //SERVER CONFIGURATION
+    Delete,   //DELETE OWN ACCOUNT
+    Passwd,   //CHANGE OWN PASSWORD
 }
 
 //A PARAMETER THE PALETTE CAN OFFER ANSWERS FOR
@@ -305,6 +308,27 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         minimal_role: Role::Owner,
         args: &[],
         description: "Opens the server configuration",
+    },
+];
+
+pub const ACCOUNT_SUBCOMMANDS: &[SubcommandInfo] =
+&[
+    SubcommandInfo
+    {
+        subcommand: Subcommand::Delete,
+        triggers: &[ "DELETE", "REMOVE", "CLOSE" ],
+        minimal_role: Role::User,
+        args: &[],
+        description: "Deletes your account",
+    },
+
+    SubcommandInfo
+    {
+        subcommand: Subcommand::Passwd,
+        triggers: &[ "PASSWD", "PASSWORD", "CHANGEPASS" ],
+        minimal_role: Role::User,
+        args: &[],
+        description: "Changes your password",
     },
 ];
 
@@ -705,6 +729,26 @@ pub const COMMAND_LIST: &[CommandInfo] =
             },
         ],
         description: "Moderation actions",
+    },
+
+    CommandInfo
+    {
+        command: Command::Account,
+        triggers: &[ "ACCOUNT", "MANAGEMENT", "CLIENT" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: ACCOUNT_SUBCOMMANDS,
+        args:
+        &[
+            CommandArg
+            {
+                name: "ACTION",
+                description: "Account action",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Account actions",
     },
 
     CommandInfo
