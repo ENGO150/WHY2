@@ -51,23 +51,6 @@ struct Record //ONE MESSAGE RECORD
     timestamp: Option<u64>, //UNIX SECONDS
 }
 
-#[derive(SchemaRead)]
-struct IdRecord //A RECORD BEFORE TIMESTAMPS (remove with next version bump)
-{
-    id: u64,
-    username: String,
-    text: String,
-    image: Option<[u8; 32]>,
-}
-
-#[derive(SchemaRead)]
-struct LegacyRecord //A RECORD BEFORE IDS (remove with next version bump)
-{
-    username: String,
-    text: String,
-    image: Option<[u8; 32]>,
-}
-
 struct History //THE RECORDS AND THE NEXT ID
 {
     next: u64,            //NEXT MESSAGE ID
@@ -156,8 +139,8 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
         return Vec::new();
     };
 
-    //NO MARKER IS AN OLDER FORMAT
-    let Some(records) = plaintext.strip_prefix(MAGIC) else { return migrate(&plaintext) };
+    //NO MARKER IS UNREADABLE
+    let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };
 
     match wincode::config::deserialize::<Vec<Record>, _>(records, consts::PACKET_CONFIG)
     {
@@ -178,41 +161,6 @@ fn unreadable() -> Vec<Record> //KEEP A COPY, START EMPTY
 
     log::error!("Message history could not be read, it is being ignored (copy kept as {backup})");
     Vec::new()
-}
-
-fn migrate(plaintext: &[u8]) -> Vec<Record> //LOAD AN OLDER HISTORY WITHOUT TIMESTAMPS (remove with next version bump)
-{
-    //IDS, NO TIMESTAMPS
-    if let Ok(history) = wincode::config::deserialize::<Vec<IdRecord>, _>(plaintext, consts::PACKET_CONFIG)
-    {
-        log::info!("Migrated {} stored messages, no timestamps", history.len());
-
-        return history.into_iter().map(|message| Record
-        {
-            id: message.id,
-            username: message.username,
-            text: message.text,
-            image: message.image,
-            timestamp: None,
-        }).collect();
-    }
-
-    //NEITHER IDS NOR TIMESTAMPS
-    let Ok(history) = wincode::config::deserialize::<Vec<LegacyRecord>, _>(plaintext, consts::PACKET_CONFIG) else
-    {
-        return unreadable();
-    };
-
-    log::info!("Migrated {} stored messages, ids assigned", history.len());
-
-    history.into_iter().zip(0..).map(|(message, id)| Record
-    {
-        id,
-        username: message.username,
-        text: message.text,
-        image: message.image,
-        timestamp: None,
-    }).collect()
 }
 
 //PUBLIC

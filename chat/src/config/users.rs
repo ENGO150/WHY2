@@ -59,7 +59,7 @@ fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD O
     {
         let users = doc.as_table_mut();
 
-        //A MISSING OR FLAT ENTRY BECOMES A SUBTABLE
+        //A MISSING ENTRY BECOMES A SUBTABLE
         if users.get(username).and_then(Item::as_table_like).is_none()
         {
             users.insert(username, Item::Table(Table::new()));
@@ -76,7 +76,7 @@ fn write_profile_field(username: &str, key: &str, value: Value) //WRITE ONE PROF
     {
         let users = doc.as_table_mut();
 
-        //A MISSING OR FLAT ENTRY BECOMES A SUBTABLE
+        //A MISSING ENTRY BECOMES A SUBTABLE
         if users.get(username).and_then(Item::as_table_like).is_none()
         {
             users.insert(username, Item::Table(Table::new()));

@@ -803,8 +803,8 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `to_color` goes straight through that lookup: `ansi_(n)` and `rgb_(r,g,b)` are colours a code cannot
     carry, and are refused where they are typed rather than accepted and then ignored on every message.
   - There is no migration for entries that predate the color and profile keys: `colors()` reads a
-    missing key as no colour, and `write_user_field`/`write_profile_field` create the subtable (and turn a
-    legacy *flat* entry into one) the first time anything is stored for it.
+    missing key as no colour, and `write_user_field`/`write_profile_field` create the subtable the first
+    time anything is stored for it.
 - **A profile is the account's, and the client keeps none of it.** `/profile` opens your own and
   `/profile USER` somebody else's; the fields are `bio`, `pronouns`, `website` and `status`, plus the
   picture. Like the colors, the client only asks
@@ -971,12 +971,8 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - **The in-memory `HISTORY` is the working set**, and the file is the copy of it that survives a
     restart: it is read once, on first touch, and only ever written after that. A missing, truncated,
     tampered, unrecognisable file, or one written under another server's keys, all load as an empty
-    history rather than refusing to start.
-    The one older format that is *not* thrown away is the one from before message ids (`migrate`, marked
-    in the code to go with the next version bump): it is read through `LegacyRecord` and numbered `0..n`
-    in order, so the ids rise with the records like any others. It converts **in memory only** — the
-    numbering is deterministic, so a restart before the next message rewrites the file derives the same
-    ids again.
+    history rather than refusing to start. There is no migration: a file from before `MAGIC` is
+    unreadable like any other.
   - **Every message has a server-assigned id** (`Record::id`, `StoredMessage::message_id`,
     `PacketCode::Message::message_id`), which is how a message is named from outside — deleting one is
     what it is for. It is not the sender's `id`, which is a session. One counter serves the lobby and
@@ -990,11 +986,11 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `messages::timestamp()` and the same value goes on the wire and into the record, so a replay shows the
     time the live line did. `message_timestamps` (server.toml, live) turns it off, and then it is `None`
     everywhere — `page()` strips a stored one too, so turning it off hides the old ones without touching the
-    file — which is also what a record from before timestamps loads as (`IdRecord` in `migrate`).
+    file.
     **The ids stay the order**: the history is never sorted by time, so a clock that jumps cannot reorder
     it or break `History::position`. The client formats it in local time (`Theme::timestamp`, `chrono`),
     with the date only when it is not today, behind `show_timestamps` (client.toml, a `/settings` row).
-    A file written since starts with `MAGIC`, which is how it is told apart from the older ones — not
+    A file starts with `MAGIC`, which is how it is recognised — not
     `deserialize_exact`: the decrypted plaintext is padded to whole grids, so exact decoding rejects every
     history, and doing that once emptied a real one. A history that will not parse is copied to
     `server_messages.bin.old` before it is ignored, since the next message would otherwise overwrite it.
