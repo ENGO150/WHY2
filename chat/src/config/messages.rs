@@ -365,6 +365,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
     };
 
     let mut looked_up: HashMap<String, MessageColors> = HashMap::new();
+    let timestamps = super::read_config::<bool>("message_timestamps");
 
     let messages = records.into_iter().map(|message|
     {
@@ -383,7 +384,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
                 false => stored.clone(),
             },
             image: message.image,
-            timestamp: message.timestamp,
+            timestamp: message.timestamp.filter(|_| timestamps), //HIDDEN WHILE TURNED OFF
         }
     }).collect();
 
