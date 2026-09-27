@@ -1010,9 +1010,26 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
       being looked at, `App::scroll`, the selection and `history_anchor` move up by the rows it took
       (the wrap cache keeps each entry's first row for exactly this); in the parked lobby pane only
       the anchor needs it.
-    - The id is drawn as a dim `#N` in front of the username on live and replayed lines alike, image
+    - The id is drawn as a dim `#N` right-aligned on the last row of the entry (`Theme::message_id`,
+      a row of its own when the last one has no room), on live and replayed lines alike, image
       captions included — `ImageDisplay` and its four events carry it (`show_message_ids`,
-      client.toml, default on, a `/settings` row).
+      client.toml, default on, a `/settings` row). It trails the line rather than leading it so the
+      timestamp and the username line up down the pane.
+  - **Every other chat entry is striped** (`App::stripe_bg`, a background only), which is what
+    separates one message from the next now that a wrapped one is several rows. The tint is per
+    wrapped row in the wrap cache (`App::tint`), beside the mention tint it replaced — a mention wins
+    over a stripe. Only `Entry::striped` kinds count, so the client's own output (`/help`, transfers)
+    neither takes a stripe nor shifts the parity. `App::stripe` flips for each striped entry trimmed
+    off the top at `HISTORY_LIMIT`; counting from the top alone would flip every stripe in the pane
+    on each new message once the pane is full. `draw_logo` treats the stripe as unpainted, or the
+    watermark would vanish from every other message.
+    **The stripe is the one chrome colour taken from the user's scheme**, on purpose: a shade has to
+    be relative to the background it sits on, and any fixed `Rgb` is a colour cast on somebody's
+    terminal. `init_picker` asks for the background (OSC 11, ratatui-image's
+    `terminal_background_color_osc`, in the same query it already makes) and `theme::stripe` moves it
+    `STRIPE_LIFT` towards white, or towards black on a light background. A terminal that does not
+    answer gets `STRIPE_FALLBACK`. `message_stripes` (client.toml, default on, a `/settings` row)
+    turns them off.
   - **Only the lobby has one.** A channel exists exactly as long as somebody is in it, so there is
     nothing to keep it against; `server::listen_client`'s `Message` arm stores only while
     `channel.is_none()`.
