@@ -88,26 +88,22 @@ impl Theme
 
                 let prefix = vec!
                 [
-                    self.message_id(*message_id),
-                    self.separator(*timestamp),
                     self.timestamp(*timestamp),
                     self.colorize(username.clone(), colors.username_color),
                     Span::styled(id, DIM),
                     Span::raw(": "),
                 ];
 
-                markup::render(prefix, text, self.style(colors.message_color), width, self.render_math)
+                self.message_id(markup::render(prefix, text, self.style(colors.message_color), width, self.render_math), *message_id, width)
             },
 
             //THE SAME LINE WITHOUT THE ID COLUMN
-            Entry::History { username, message_id, timestamp, text, colors } => markup::render(vec!
+            Entry::History { username, message_id, timestamp, text, colors } => self.message_id(markup::render(vec!
             [
-                self.message_id(*message_id),
-                self.separator(*timestamp),
                 self.timestamp(*timestamp),
                 self.colorize(username.clone(), colors.username_color),
                 Span::raw(": "),
-            ], text, self.style(colors.message_color), width, self.render_math),
+            ], text, self.style(colors.message_color), width, self.render_math), *message_id, width),
 
             Entry::Private { sent, username, id, text, colors } =>
             {
@@ -128,8 +124,6 @@ impl Theme
             {
                 let mut spans = vec!
                 [
-                    self.message_id(*message_id),
-                    self.separator(*timestamp),
                     self.timestamp(*timestamp),
                     //THE SENDER'S COLOR, ELSE THE CHROME'S ACCENT
                     match username_color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
@@ -148,7 +142,7 @@ impl Theme
                     Picture::Ready(..) => {},
                 }
 
-                state::wrap_line(&Line::from(spans), width)
+                self.message_id(state::wrap_line(&Line::from(spans), width), *message_id, width)
             },
         }
     }
@@ -170,16 +164,26 @@ impl Theme
         Span::styled(time.format(format).to_string(), DIM)
     }
 
-    fn separator(&self, timestamp: Option<u64>) -> Span<'static> //BETWEEN ID AND TIME, WHEN BOTH SHOW
+    //MESSAGE ID, RIGHT-ALIGNED ON THE LAST ROW
+    fn message_id(&self, mut lines: Vec<Line<'static>>, message_id: u64, width: u16) -> Vec<Line<'static>>
     {
-        let both = self.show_message_ids && self.show_timestamps && timestamp.is_some();
+        if !self.show_message_ids { return lines; }
 
-        Span::styled(if both { "· " } else { "" }, BORDER)
-    }
+        let tag = format!("#{message_id}");
+        let width = width as usize;
 
-    fn message_id(&self, message_id: u64) -> Span<'static> //MESSAGE ID PREFIX
-    {
-        Span::styled(if self.show_message_ids { format!("#{message_id} ") } else { String::new() }, DIM)
+        match lines.last_mut()
+        {
+            Some(last) if last.width() + 1 + tag.len() <= width =>
+            {
+                last.spans.push(Span::raw(" ".repeat(width - last.width() - tag.len())));
+                last.spans.push(Span::styled(tag, DIM));
+            },
+
+            _ => lines.push(Line::from(vec![Span::raw(" ".repeat(width.saturating_sub(tag.len()))), Span::styled(tag, DIM)])),
+        }
+
+        lines
     }
 
     pub fn colorize(&self, text: String, color: Option<u8>) -> Span<'static> //COLORIZE text IF PASSED COLOR
