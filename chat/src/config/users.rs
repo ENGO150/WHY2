@@ -183,11 +183,16 @@ pub fn set_role(username: &str, role: Role) //STORE A NEW ROLE FOR username
     write_user_field(username, "role", role.name().into());
 }
 
+pub fn set_password(username: &str, hash: &str) //SET USER PASSWORD
+{
+    write_user_field(username, "password", hash.into());
+}
+
 pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON FIRST USER
 {
     let first_user = len() == 0; //SELF-EXPLANATORY, INNIT?
 
-    write_user_field(username, "password", hash.into()); //PASSWORD
+    set_password(username, hash); //PASSWORD
     set_role(username, if first_user { Role::Owner } else { Role::User }); //ROLE (OWNER IF THIS IS THE FIRST USER)
 
     //NO COLORS OR PROFILE YET, BUT THE KEYS ARE THERE

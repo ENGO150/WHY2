@@ -216,6 +216,23 @@ async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //RE
     }
 }
 
+fn validate_password(password: &str) -> bool //CHECK PASSWORD LENGTH (AND POSSIBLY STRENGTH IN THE FUTURE)
+{
+    password.len() >= config::read_config("min_password_length")
+}
+
+async fn verify_password(username: &str, password: Zeroizing<String>) -> bool
+{
+    if let Some(hashed) = config::users::password(username)
+    {
+        task::spawn_blocking(move || password::compare_password_hash(&hashed, &password))
+            .await.expect("Comparing password failed")
+    } else //UNKNOWN USER (OR FAKE LOGIN)
+    {
+        false
+    }
+}
+
 //PUBLIC
 //A CLIENT'S MAIN ADDRESS (NEVER UNDER A GUARD)
 pub fn log_addr(id: &usize) -> String
@@ -829,8 +846,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 {
                     let pass = Zeroizing::new(pass);
 
-                    //CHECK LENGTH
-                    if pass.len() >= config::read_config("min_password_length")
+                    //VALIDATE
+                    if validate_password(&pass)
                     {
                         password = Some(pass);
                         break;
@@ -880,14 +897,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         let valid = if password.is_empty() || config::bans::banned(&username)
         {
             false
-        } else if let Some(hashed) = config::users::password(&username)
-        {
-            task::spawn_blocking(move || password::compare_password_hash(&hashed, &password))
-                .await.expect("Comparing password failed")
-        } else //UNKNOWN USER (OR FAKE LOGIN)
-        {
-            false
-        };
+        } else { verify_password(&username, password).await };
 
         //INVALID PASSWORD, DISCONNECT CLIENT
         if !valid
@@ -1728,6 +1738,32 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                 }
+            },
+
+            //PASSWORD CHANGE
+            PacketCode::AccountPasswdRequest { old_password, new_password } =>
+            {
+                //ZEROIZE PASSWORDS
+                let (old_password, new_password) = (Zeroizing::new(old_password), Zeroizing::new(new_password));
+
+                //VERIFY BOTH PASSWORDS
+                let valid = if validate_password(&new_password) && verify_password(&username, old_password).await
+                {
+                    //HASH PASSWORD
+                    let hash = task::spawn_blocking(move || password::hash_password(&new_password))
+                        .await.expect("Hashing password failed");
+
+                    //SAVE PASSWORD
+                    config::users::set_password(&username, &hash);
+
+                    //LOG
+                    log::info!("Password changed: {peer_addr}");
+
+                    true
+                } else { false };
+
+                //REPLY TO USER
+                network::send(&mut *streams.1.lock().await, PacketCode::AccountPasswd { valid }, Some(&keys)).await;
             },
 
             //A /color OR /ucolor; ANSWER WITH THE STORED PAIR

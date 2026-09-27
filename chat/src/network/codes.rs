@@ -240,18 +240,25 @@ pub enum PacketCode //CONTROL CODES
         username: Option<String>, //THE TARGET | None = THE RECIPIENT THEMSELVES
     },
 
-    //CLIENT <> SERVER | SET ONE CHAT COLOR
-    Colors
-    {
-        username: bool, //TRUE = THE USERNAME'S COLOR, FALSE = THE MESSAGE'S
-        color: u8,
-    },
-
     //SERVER -> CLIENT | THE WHOLE server.toml
     ServerSettings
     {
         settings: Vec<ServerSetting>,
         save: bool, //FALSE = READ ANSWER, TRUE = SAVE ACK
+    },
+
+    //CLIENT -> SERVER | PASSWORD CHANGE REQUEST
+    AccountPasswdRequest
+    {
+        old_password: String,
+        new_password: String,
+    },
+
+    //CLIENT <> SERVER | SET ONE CHAT COLOR
+    Colors
+    {
+        username: bool, //TRUE = THE USERNAME'S COLOR, FALSE = THE MESSAGE'S
+        color: u8,
     },
 
     //SERVER -> CLIENT | ONE USER'S PROFILE
@@ -315,6 +322,8 @@ pub enum PacketCode //CONTROL CODES
     ServerSay { message: String },                       //CLIENT <> SERVER | SAY AS SERVER
     ServerSettingsSave { settings: Vec<ServerSetting> }, //CLIENT -> SERVER | WRITE server.toml
 
+    AccountPasswd { valid: bool }, //SERVER -> CLIENT | PASSWORD CHANGE ACK (FALSE = INVALID PASSWORD)
+
     FirstUser,        //SERVER -> CLIENT | FIRST ONE TO REGISTER, OWNER ROLE ADDED
     Rekey,            //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)
     Disconnect,       //SERVER <> CLIENT | QUIT COMMUNICATION
@@ -369,6 +378,8 @@ impl PacketCode
             Self::ServerSettingsRequest { .. } => "ServerSettingsRequest",
             Self::ServerSettingsSave { .. }    => "ServerSettingsSave",
             Self::ServerSettings { .. }        => "ServerSettings",
+            Self::AccountPasswdRequest { .. }  => "AccountPasswdRequest",
+            Self::AccountPasswd { .. }         => "AccountPasswd",
             Self::Colors { .. }                => "Colors",
             Self::ProfileRequest { .. }        => "ProfileRequest",
             Self::ProfileSave { .. }           => "ProfileSave",
