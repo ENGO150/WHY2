@@ -53,6 +53,7 @@ use tui::
 {
     theme,
     palette,
+    account::Passwd,
     App,
     TerminalGuard,
     settings::Devices,
@@ -229,6 +230,22 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
 
         //ACCOUNT ACTIONS
         Subcommand::Delete | Subcommand::Passwd => invalid_usage(app, Some("action")),
+    }
+}
+
+//ACCOUNT ACTIONS - /account <action>
+fn account_command(app: &mut App, parameters: Option<String>)
+{
+    let Some(info) = command::COMMAND_LIST.iter().find(|info| info.command == Command::Account) else { return };
+
+    let Some(sub) = parameters.as_deref().and_then(|p| info.action(p)) else { return invalid_usage(app, Some("action")) };
+
+    match sub.subcommand
+    {
+        Subcommand::Passwd => app.passwd = Some(Passwd::new()),
+
+        //NOT WIRED YET
+        _ => {},
     }
 }
 
@@ -690,8 +707,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
                         Command::Server => server_command(app, write_stream, parameters).await,
 
-                        //NOT WIRED YET
-                        Command::Account => {},
+                        Command::Account => account_command(app, parameters),
 
                         Command::UsernameColor => color_handler(app, write_stream, true, parameters).await,
                         Command::MessageColor => color_handler(app, write_stream, false, parameters).await,

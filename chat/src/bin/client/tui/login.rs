@@ -111,6 +111,12 @@ impl Reconnect
         }
     }
 
+    //A CHANGED PASSWORD REPLACES THE ONE WE WOULD REPLAY
+    pub fn passwd(&mut self, password: &str)
+    {
+        if let Some((_, stored)) = self.credentials.as_mut() { *stored = Zeroizing::new(password.to_owned()); }
+    }
+
     //THE PAIR WORKED, SO IT IS WORTH REPLAYING
     pub fn accepted(&mut self)
     {
@@ -291,58 +297,66 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Action
 
     if login.busy { return Action::None; } //NOTHING IS EDITABLE WHILE AN ANSWER IS IN FLIGHT
 
+    if edit(&mut login.input, key) || key.code != KeyCode::Enter { return Action::None; }
+
+    match login.stage
+    {
+        Stage::Address =>
+        {
+            if login.address().is_empty()
+            {
+                login.error = Some(String::from("Enter the address of a server."));
+            } else { return Action::Connect; }
+        },
+
+        //A PASSWORD IS TAKEN AS TYPED
+        _ =>
+        {
+            if login.input.text().is_empty()
+            {
+                login.error = Some(format!("Enter a {}.", login.label().to_lowercase()));
+            } else { return Action::Submit; }
+        },
+    }
+
+    Action::None
+}
+
+//EDIT A ONE-LINE FIELD, TRUE IF THE KEY WAS TAKEN
+pub fn edit(input: &mut InputBuffer, key: KeyEvent) -> bool
+{
     if key.modifiers.contains(KeyModifiers::CONTROL)
     {
         match key.code
         {
-            KeyCode::Char('a') => login.input.home(),
-            KeyCode::Char('e') => login.input.end(),
-            KeyCode::Char('u') => login.input.kill_to_start(),
-            KeyCode::Char('k') => login.input.kill_to_end(),
-            KeyCode::Char('w') => login.input.delete_word(),
+            KeyCode::Char('a') => input.home(),
+            KeyCode::Char('e') => input.end(),
+            KeyCode::Char('u') => input.kill_to_start(),
+            KeyCode::Char('k') => input.kill_to_end(),
+            KeyCode::Char('w') => input.delete_word(),
             _ => {},
         }
 
-        return Action::None;
+        return true;
     }
 
     match key.code
     {
         //ONE FIELD, ONE LINE
-        KeyCode::Char(character) => login.input.insert(character),
+        KeyCode::Char(character) => input.insert(character),
 
-        KeyCode::Backspace => login.input.backspace(),
-        KeyCode::Delete => login.input.delete(),
+        KeyCode::Backspace => input.backspace(),
+        KeyCode::Delete => input.delete(),
 
-        KeyCode::Left => login.input.left(),
-        KeyCode::Right => login.input.right(),
-        KeyCode::Home => login.input.home(),
-        KeyCode::End => login.input.end(),
+        KeyCode::Left => input.left(),
+        KeyCode::Right => input.right(),
+        KeyCode::Home => input.home(),
+        KeyCode::End => input.end(),
 
-        KeyCode::Enter => match login.stage
-        {
-            Stage::Address =>
-            {
-                if login.address().is_empty()
-                {
-                    login.error = Some(String::from("Enter the address of a server."));
-                } else { return Action::Connect; }
-            },
-
-            //A PASSWORD IS TAKEN AS TYPED
-            _ =>
-            {
-                if login.input.text().is_empty()
-                {
-                    login.error = Some(format!("Enter a {}.", login.label().to_lowercase()));
-                } else { return Action::Submit; }
-            },
-        },
-
-        _ => {},
+        _ => return false,
     }
 
-    Action::None
+    true
 }
 
 pub fn insert_str(app: &mut App, text: &str) //A PASTE INTO WHICHEVER FIELD IS UP

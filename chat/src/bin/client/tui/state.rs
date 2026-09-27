@@ -81,6 +81,7 @@ use crate::network::screen::client::options as screen_options;
 use super::
 {
     consts,
+    account::Passwd,
     input::InputBuffer,
     login::{ Login, Reconnect, Stage },
     palette::Palette,
@@ -242,6 +243,7 @@ pub struct App
     pub settings: Settings, //SETTINGS OVERLAY (CLOSED UNLESS THE USER OPENED IT)
     pub login: Option<Login>, //CONNECT BOX
     pub tofu: Option<Prompt>, //SERVER IDENTITY PROMPT
+    pub passwd: Option<Passwd>, //PASSWORD CHANGE BOX
     pub theme: Theme,
     pub picker: Picker, //WHAT THE TERMINAL CAN DRAW, AND HOW BIG ITS CELLS ARE
 
@@ -342,6 +344,7 @@ impl App
             settings: Settings::new(),
             login: Some(Login::new()),
             tofu: None,
+            passwd: None,
             theme: Theme::load(),
             overlays: Vec::new(),
             picture_rows: Vec::new(),
@@ -1112,6 +1115,7 @@ impl App
         self.palette.dismiss();
         self.settings.close();
         self.tofu = None;
+        self.passwd = None;
 
         self.username.clear();
         self.role = Role::default(); //THE NEXT SERVER GRANTS ITS OWN

@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 //MODULES
+pub mod account;
 pub mod consts;
 pub mod draw;
 pub mod event;
@@ -113,6 +114,7 @@ use crate::
 };
 
 use login::{ Action, ConnectResult };
+use account::Passwd;
 
 pub use state::App;
 
@@ -208,7 +210,7 @@ pub fn restore_terminal() //BEST-EFFORT, IDEMPOTENT
 //NOTHING DRAGS WHILE AN OVERLAY IS UP
 fn selectable(app: &App) -> bool
 {
-    app.tofu.is_none() && app.login.is_none() && !app.settings.open
+    app.tofu.is_none() && app.login.is_none() && app.passwd.is_none() && !app.settings.open
 }
 
 //COPY WITH OSC 52, WHICH WORKS OVER SSH
@@ -517,6 +519,9 @@ async fn handle_terminal_event
             if app.login.is_some()
             {
                 login::insert_str(app, &text);
+            } else if app.passwd.is_some()
+            {
+                account::insert_str(app, &text);
             } else
             {
                 app.input.insert_str(&text);
@@ -573,6 +578,26 @@ async fn handle_key
 
             Action::Quit => app.quit(0, None),
             Action::None => {},
+        }
+
+        return;
+    }
+
+    //THEN THE PASSWORD CHANGE BOX
+    if app.passwd.is_some()
+    {
+        account::handle_key(app, key);
+
+        //A CONFIRMED CHANGE GOES OUT HERE
+        if let Some((old_password, new_password)) = app.passwd.as_mut().and_then(Passwd::take_request)
+        {
+            match write_stream
+            {
+                Some(write_stream) => network::send(&mut *write_stream.lock().await,
+                    PacketCode::AccountPasswdRequest { old_password, new_password }, options::get_keys().as_ref()).await,
+
+                None => app.passwd = None,
+            }
         }
 
         return;

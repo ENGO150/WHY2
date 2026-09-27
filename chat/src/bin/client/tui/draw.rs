@@ -87,6 +87,8 @@ use super::
         Reconnect,
         Stage as LoginStage,
     },
+    account::{ LABELS, Passwd },
+    input::InputBuffer,
 };
 
 //PROJECT LOGO WATERMARK
@@ -156,6 +158,9 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 
         overlays.push(draw_settings(frame, &mut app.settings, area, font));
     }
+
+    //PASSWORD CHANGE BOX
+    if let Some(passwd) = &app.passwd { overlays.push(draw_passwd(frame, passwd, area)); }
 
     //CONNECT BOX
     if let Some(login) = &app.login { overlays.push(draw_login(frame, login, &app.reconnect, area)); }
@@ -750,7 +755,7 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
     frame.render_widget(Paragraph::new(lines).scroll((offset, 0)), text_area);
 
     //NO CARET WHILE AN OVERLAY HAS THE KEYBOARD
-    if app.settings.open || app.tofu.is_some() || app.login.is_some() { return; }
+    if app.settings.open || app.tofu.is_some() || app.login.is_some() || app.passwd.is_some() { return; }
 
     frame.set_cursor_position(Position::new
     (
@@ -1219,28 +1224,8 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
 
 fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rect) -> Rect
 {
-    let width = consts::LOGIN_WIDTH.min(area.width.saturating_sub(2)).max(1);
-    let inner_width = width.saturating_sub(4); //BORDERS PLUS A COLUMN OF AIR EACH SIDE
-    let field_width = inner_width.saturating_sub(2); //"> " GUTTER
-
-    if area.height < 8 || field_width < 8 { return Rect::ZERO; }
-
-    let (field, cursor) = login.input.render(field_width, login.masked());
-
-    let mut lines = vec![Line::from(Span::styled(login.label(), theme::DIM))];
-
-    for (index, line) in field.into_iter().enumerate()
-    {
-        let mut spans = vec![Span::styled(if index == 0 { "> " } else { "  " }, theme::ACCENT)];
-        spans.extend(line.spans);
-
-        lines.push(Line::from(spans));
-    }
-
-    lines.push(Line::default());
-
-    //STATUS ROW, WRAPPED
-    let status = match (login.busy, login.error.as_deref(), login.hint.as_deref())
+    //STATUS ROW
+    let mut notes = vec![match (login.busy, login.error.as_deref(), login.hint.as_deref())
     {
         //A RETRY SAYS SO INSTEAD, SINCE NOBODY ASKED FOR IT
         (true, ..) => Line::from(Span::styled(reconnect.status()
@@ -1248,18 +1233,91 @@ fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rec
         (false, Some(error), _) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
         (false, None, Some(hint)) => Line::from(Span::styled(hint.to_string(), theme::DIM)),
         (false, None, None) => Line::default(),
-    };
-
-    lines.extend(state::wrap_line(&status, inner_width));
+    }];
 
     //THE PROXY BELONGS TO THE ADDRESS STEP
     if login.stage == LoginStage::Address && options::socks5_enabled()
     {
-        let proxy = Line::from(Span::styled(format!("Through SOCKS5 {}",
-            config::read_config::<String>("socks5_addr")), theme::DIM));
-
-        lines.extend(state::wrap_line(&proxy, inner_width));
+        notes.push(Line::from(Span::styled(format!("Through SOCKS5 {}",
+            config::read_config::<String>("socks5_addr")), theme::DIM)));
     }
+
+    let footer = match (login.stage, login.busy, login.cancellable())
+    {
+        (_, true, true) => " Esc cancel ",
+        (_, true, false) => " Esc quit ",
+        (LoginStage::Address, false, _) => " ⏎ connect │ Esc quit ",
+        (_, false, _) => " ⏎ continue │ Esc quit ",
+    };
+
+    draw_form(frame, area, login.title(), &[(login.label(), &login.input)], login.masked(), notes, footer, (!login.busy).then_some(0))
+}
+
+fn draw_passwd(frame: &mut Frame, passwd: &Passwd, area: Rect) -> Rect
+{
+    let status = match (passwd.busy, passwd.error.as_deref())
+    {
+        (true, _) => Line::from(Span::styled("Waiting for the server…", theme::ACCENT)),
+        (false, Some(error)) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
+        (false, None) => Line::default(),
+    };
+
+    let footer = if passwd.busy { "" } else { " ↑↓ field │ ⏎ next │ Esc cancel " };
+
+    let fields: Vec<(&str, &InputBuffer)> = LABELS.iter().copied().zip(passwd.fields.iter()).collect();
+
+    draw_form(frame, area, " Change password ", &fields, true, vec![status], footer, (!passwd.busy).then_some(passwd.focus))
+}
+
+//A CENTRED BOX WITH LABELLED FIELDS AND A STATUS UNDER THEM
+#[allow(clippy::too_many_arguments)]
+fn draw_form
+(
+    frame: &mut Frame,
+    area: Rect,
+    title: &'static str,
+    fields: &[(&str, &InputBuffer)],
+    masked: bool,
+    notes: Vec<Line<'static>>,
+    footer: &'static str,
+    focus: Option<usize>,
+) -> Rect
+{
+    let width = consts::LOGIN_WIDTH.min(area.width.saturating_sub(2)).max(1);
+    let inner_width = width.saturating_sub(4); //BORDERS PLUS A COLUMN OF AIR EACH SIDE
+    let field_width = inner_width.saturating_sub(2); //"> " GUTTER
+
+    if area.height < 8 || field_width < 8 { return Rect::ZERO; }
+
+    let mut lines: Vec<Line> = Vec::new();
+    let mut caret = None;
+
+    for (index, (label, input)) in fields.iter().enumerate()
+    {
+        let (field, cursor) = input.render(field_width, masked);
+        let focused = focus == Some(index);
+
+        //A BLANK ROW BETWEEN FIELDS
+        if index > 0 { lines.push(Line::default()); }
+
+        if focused { caret = Some((cursor.0, lines.len() as u16 + consts::FIELD_ROW + cursor.1)); }
+
+        lines.push(Line::from(Span::styled(*label, theme::DIM)));
+
+        for (row, line) in field.into_iter().enumerate()
+        {
+            let gutter = if row > 0 { "  " } else { "> " };
+            let mut spans = vec![Span::styled(gutter, if focused { theme::ACCENT } else { theme::DIM })];
+            spans.extend(line.spans);
+
+            lines.push(Line::from(spans));
+        }
+    }
+
+    lines.push(Line::default());
+
+    //NOTES, WRAPPED
+    for note in &notes { lines.extend(state::wrap_line(note, inner_width)); }
 
     let height = (lines.len() as u16 + 2).min(area.height);
 
@@ -1278,14 +1336,8 @@ fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rec
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::BORDER_ACTIVE)
-        .title(Span::styled(login.title(), theme::TITLE))
-        .title_bottom(Line::from(Span::styled(match (login.stage, login.busy, login.cancellable())
-        {
-            (_, true, true) => " Esc cancel ",
-            (_, true, false) => " Esc quit ",
-            (LoginStage::Address, false, _) => " ⏎ connect │ Esc quit ",
-            (_, false, _) => " ⏎ continue │ Esc quit ",
-        }, theme::DIM)).centered());
+        .title(Span::styled(title, theme::TITLE))
+        .title_bottom(Line::from(Span::styled(footer, theme::DIM)).centered());
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -1301,12 +1353,12 @@ fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rec
     frame.render_widget(Paragraph::new(lines), text_area);
 
     //THIS BOX KEEPS THE CARET
-    if !login.busy
+    if let Some((column, row)) = caret
     {
         frame.set_cursor_position(Position::new
         (
-            text_area.x + 2 + cursor.0.min(field_width.saturating_sub(1)),
-            text_area.y + consts::FIELD_ROW + cursor.1,
+            text_area.x + 2 + column.min(field_width.saturating_sub(1)),
+            text_area.y + row,
         ));
     }
 

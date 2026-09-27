@@ -412,6 +412,34 @@ impl App
                 self.dirty = true;
             },
 
+            //A PASSWORD CHANGE CAME BACK
+            ClientEvent::Passwd(changed) =>
+            {
+                match changed
+                {
+                    true =>
+                    {
+                        //A RECONNECT REPLAYS THE NEW ONE
+                        if let Some(passwd) = self.passwd.take() { self.reconnect.passwd(passwd.new_password()); }
+
+                        self.push_styled("Password changed.", theme::OK);
+                    },
+
+                    false =>
+                    {
+                        let message = String::from("Wrong current password, or the new one does not meet the requirements.");
+
+                        match self.passwd.as_mut()
+                        {
+                            Some(passwd) => passwd.rejected(message),
+                            None => self.push_styled(message, theme::ERROR),
+                        }
+                    },
+                }
+
+                self.dirty = true;
+            },
+
             //A PROFILE CAME BACK
             ClientEvent::Profile(username, profile, own, saved) =>
             {

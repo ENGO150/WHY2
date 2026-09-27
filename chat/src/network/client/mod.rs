@@ -156,6 +156,7 @@ pub enum ClientEvent
     VoiceDisabled,                                               //VOICE CHAT DISABLED
     List(Vec<OnlineUser>, Option<Vec<OfflineUser>>),             //LIST OF USERS, CONNECTED AND NOT
     ServerSettings(Vec<ServerSetting>, bool),                    //server.toml AS THE SERVER HOLDS IT
+    Passwd(bool),                                                //A PASSWORD CHANGE ANSWERED
     Profile(String, UserProfile, bool, bool),                    //A PROFILE (WHOSE, IT, OURS, A SAVE ACK)
     Colors,                                                      //A /color LANDED ON THE SERVER
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
@@ -545,6 +546,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::ServerSettings { settings, save } =>
             {
                 tx.send(ClientEvent::ServerSettings(settings, save)).await.unwrap();
+            },
+
+            //A PASSWORD CHANGE ANSWERED
+            PacketCode::AccountPasswd { valid } =>
+            {
+                tx.send(ClientEvent::Passwd(valid)).await.unwrap();
             },
 
             //A PROFILE, ASKED FOR OR JUST STORED
