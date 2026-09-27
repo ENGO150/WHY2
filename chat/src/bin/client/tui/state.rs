@@ -84,7 +84,7 @@ use super::
     account::Account,
     input::InputBuffer,
     login::{ Login, Reconnect, Stage },
-    palette::Palette,
+    palette::{ self, Palette },
     settings::Settings,
     tofu::Prompt,
     theme::Theme,
@@ -301,7 +301,7 @@ pub struct App
 
     //WRAP CACHE
     generation: u64,
-    wrapped: Option<(u16, u64, Vec<Line<'static>>, Vec<Placement>, Vec<u16>)>,
+    wrapped: Option<(u16, u64, Vec<Line<'static>>, Vec<Placement>, Vec<u16>, Vec<bool>)>,
 }
 
 //IMPLEMENTATIONS
@@ -1192,6 +1192,26 @@ impl App
         self.dirty = true;
     }
 
+    //WHETHER A WRAPPED ROW BELONGS TO A MESSAGE MENTIONING US
+    pub fn mentioned(&self, row: u16) -> bool
+    {
+        self.wrapped.as_ref().and_then(|wrapped| wrapped.5.get(row as usize).copied()).unwrap_or(false)
+    }
+
+    //RECOMPUTE THE PALETTE FROM THE INPUT
+    pub fn refresh_palette(&mut self)
+    {
+        let mut users = self.online.iter().map(|user| user.username.clone())
+            .chain(self.offline.keys().cloned())
+            .filter(|user| *user != self.username)
+            .collect::<Vec<String>>();
+
+        users.sort_unstable_by_key(|user| user.to_lowercase());
+        users.dedup();
+
+        self.palette.update(&self.input.text(), self.role, &users);
+    }
+
     //WRAPPED VIEW (CACHED PER WIDTH + GENERATION)
     pub fn wrapped_lines(&mut self, width: u16) -> &[Line<'static>]
     {
@@ -1498,6 +1518,7 @@ impl App
         let mut lines: Vec<Line<'static>> = Vec::new();
         let mut placements: Vec<Placement> = Vec::new();
         let mut starts: Vec<u16> = Vec::with_capacity(self.messages.len());
+        let mut mentions: Vec<bool> = Vec::new();
 
         for entry in 0..self.messages.len()
         {
@@ -1505,6 +1526,19 @@ impl App
             starts.push(row);
 
             lines.extend(self.theme.render(&self.messages[entry], width));
+
+            //A MESSAGE FROM SOMEBODY ELSE NAMING US
+            let mentioned = match &self.messages[entry]
+            {
+                Entry::Message { username, text, .. } | Entry::History { username, text, .. } |
+                Entry::Private { sent: false, username, text, .. } =>
+                    *username != self.username && palette::mentions(text, &self.username),
+
+                _ => false,
+            };
+
+            mentions.resize(lines.len(), false);
+            mentions[row as usize..].fill(mentioned);
 
             //AN IMAGE RESERVES ITS ROWS AS BLANK LINES
             if let Entry::Image { picture, .. } = &mut self.messages[entry]
@@ -1533,7 +1567,9 @@ impl App
             }
         }
 
-        self.wrapped = Some((width, self.generation, lines, placements, starts));
+        mentions.resize(lines.len(), false);
+
+        self.wrapped = Some((width, self.generation, lines, placements, starts, mentions));
     }
 
     fn wrapped_len(&self) -> u16

@@ -296,6 +296,9 @@ pub const MATH: Style = Style::new().fg(Color::Rgb(0xFF, 0xDD, 0xE2));         /
 
 pub const SELECTED: Style = Style::new().bg(Color::Rgb(0x00, 0x5F, 0x5F));
 
+//A MESSAGE THAT MENTIONS US, A BACKGROUND ONLY
+pub const MENTION: Style = Style::new().bg(Color::Rgb(0x4B, 0x3A, 0x1F));
+
 //THE DRAG SELECTION, A BACKGROUND ONLY
 pub const SELECTION: Style = Style::new().bg(Color::Rgb(0x30, 0x45, 0x63));
 

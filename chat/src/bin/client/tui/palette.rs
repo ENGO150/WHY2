@@ -20,6 +20,7 @@ use std::
 {
     ffi::OsStr,
     fs,
+    iter,
     path::
     {
         Path,
@@ -77,7 +78,7 @@ pub struct Entry
 //WHAT MAY GO IN THE PARAMETER THE CARET IS ON
 pub struct Values
 {
-    pub arg: &'static CommandArg,
+    pub arg: Option<&'static CommandArg>, //NONE FOR A MENTION
 
     //NOT &'static str: MONITORS ARE RUNTIME-ONLY
     pub matches: Vec<String>,
@@ -202,11 +203,16 @@ impl Values
     //THE SWATCH DRAWN BESIDE A ROW
     pub fn swatch(&self, value: &str) -> Option<Color>
     {
-        match self.arg.values
+        match self.arg.map(|arg| arg.values)
         {
-            ArgValues::Colors => colors::by_name(value),
-            ArgValues::Free | ArgValues::Images | ArgValues::Monitors | ArgValues::Paths | ArgValues::Roles => None,
+            Some(ArgValues::Colors) => colors::by_name(value),
+            _ => None,
         }
+    }
+
+    pub fn title(&self) -> &'static str
+    {
+        self.arg.map_or("Mentions", |arg| arg.name)
     }
 }
 
@@ -238,7 +244,7 @@ impl Palette
     pub fn is_visible(&self) -> bool { !matches!(self.mode, PaletteMode::Hidden) }
 
     //RECOMPUTE FROM THE CURRENT INPUT
-    pub fn update(&mut self, input: &str, role: Role)
+    pub fn update(&mut self, input: &str, role: Role, users: &[String])
     {
         //THE LOGIN PROMPT OWNS THE LINE UNTIL AUTH
         if !options::get_sending_messages()
@@ -246,6 +252,8 @@ impl Palette
             self.dismiss();
             return;
         }
+
+        if self.mention(input, users) { return; }
 
         let Some(rest) = input.strip_prefix(command::COMMAND_PREFIX) else
         {
@@ -336,6 +344,29 @@ impl Palette
         }
     }
 
+    //AN @NAME BEING TYPED AT THE END OF THE LINE
+    fn mention(&mut self, input: &str, users: &[String]) -> bool
+    {
+        let typed = partial(input);
+
+        let Some(name) = typed.strip_prefix('@') else { return false };
+
+        if !name.chars().all(mention_char) { return false; }
+
+        let candidate = typed.to_lowercase();
+
+        let matches = iter::once(consts::MENTION_EVERYONE).chain(users.iter().map(String::as_str))
+            .map(|user| format!("@{user}"))
+            .filter(|value| value.to_lowercase().starts_with(&candidate))
+            .collect::<Vec<String>>();
+
+        if matches.is_empty() { return false; }
+
+        self.offer(None, matches, typed, input);
+
+        true
+    }
+
     //THE PARAMETER THE CARET IS ON
     fn hint(&mut self, entry: Entry, tail: &str, input: &str)
     {
@@ -353,29 +384,34 @@ impl Palette
             //A TYPO STILL LEAVES THE SIGNATURE HINT
             if !matches.is_empty()
             {
-                //A FULLY TYPED VALUE WINS THE SELECTION
-                let exact = matches.iter().position(|value| value.eq_ignore_ascii_case(typed));
-
-                let selected = match (exact, &self.mode)
-                {
-                    (Some(exact), _) => exact,
-                    (None, PaletteMode::Values(values)) => values.selected.min(matches.len() - 1),
-                    (None, _) => 0,
-                };
-
-                self.mode = PaletteMode::Values(Values
-                {
-                    arg,
-                    matches,
-                    selected,
-                    start: input.chars().count() - typed.chars().count(),
-                });
-
+                self.offer(Some(arg), matches, typed, input);
                 return;
             }
         }
 
         self.mode = PaletteMode::Signature(entry, active);
+    }
+
+    //SHOW matches FOR THE HALF-TYPED typed, KEEPING THE SELECTION
+    fn offer(&mut self, arg: Option<&'static CommandArg>, matches: Vec<String>, typed: &str, input: &str)
+    {
+        //A FULLY TYPED VALUE WINS THE SELECTION
+        let exact = matches.iter().position(|value| value.eq_ignore_ascii_case(typed));
+
+        let selected = match (exact, &self.mode)
+        {
+            (Some(exact), _) => exact,
+            (None, PaletteMode::Values(values)) => values.selected.min(matches.len() - 1),
+            (None, _) => 0,
+        };
+
+        self.mode = PaletteMode::Values(Values
+        {
+            arg,
+            matches,
+            selected,
+            start: input.chars().count() - typed.chars().count(),
+        });
     }
 
     //SHOW matches, KEEPING THE SELECTION
@@ -463,6 +499,36 @@ fn active_arg(args: &'static [CommandArg], tail: &str) -> Option<usize>
 fn partial(tail: &str) -> &str
 {
     if tail.ends_with(char::is_whitespace) { "" } else { tail.split_whitespace().next_back().unwrap_or("") }
+}
+
+//A CHARACTER A USERNAME MAY HOLD
+pub fn mention_char(c: char) -> bool
+{
+    c.is_ascii_alphanumeric() || c == '_' || c == '-'
+}
+
+//WHETHER text MENTIONS username OR EVERYONE
+pub fn mentions(text: &str, username: &str) -> bool
+{
+    if username.is_empty() { return false; }
+
+    let mut rest = text;
+    let mut before = None;
+
+    while let Some(at) = rest.find('@')
+    {
+        let boundary = rest[..at].chars().next_back().or(before).is_none_or(|c| !mention_char(c));
+
+        let name = &rest[at + 1..];
+        let word = &name[..name.find(|c| !mention_char(c)).unwrap_or(name.len())];
+
+        if boundary && (word.eq_ignore_ascii_case(username) || word.eq_ignore_ascii_case(consts::MENTION_EVERYONE)) { return true; }
+
+        before = Some('@');
+        rest = name;
+    }
+
+    false
 }
 
 //WHETHER A FILE IS A PICTURE THIS CLIENT DECODES

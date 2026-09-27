@@ -58,6 +58,7 @@ pub const SLIDER_WIDTH: usize         = 14;                        //CELLS OF VO
 pub const MAX_ROWS: usize             = 8;                         //VISIBLE PALETTE ROWS
 pub const MAX_PICKER_ROWS: usize      = 8;                         //VISIBLE DEVICE ROWS BEFORE THE PICKER SCROLLS
 pub const MAX_PATHS: usize            = 256;                       //DIRECTORY ENTRIES OFFERED FOR ONE PATH
+pub const MENTION_EVERYONE: &str      = "everyone";                //THE MENTION THAT REACHES EVERYBODY
 
 pub const AVATAR_LABEL: &str         = "Avatar";                  //THE AVATAR ROW IN AN OWN PROFILE
 pub const AVATAR_KEY: &str           = "avatar";                  //AND THE KEY IT GOES BY

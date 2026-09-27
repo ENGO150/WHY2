@@ -265,6 +265,17 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 
     frame.render_widget(Paragraph::new(visible), inner);
 
+    //TINT THE ROWS THAT MENTION US
+    for y in inner.y..inner.y + viewport
+    {
+        if !app.mentioned(offset + (y - inner.y)) { continue; }
+
+        for x in inner.x..inner.x + inner.width
+        {
+            if let Some(cell) = frame.buffer_mut().cell_mut((x, y)) && cell.bg == Color::Reset { cell.set_style(theme::MENTION); }
+        }
+    }
+
     //PAINT THE DRAG SELECTION
     for y in inner.y..inner.y + viewport
     {
@@ -775,7 +786,7 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect) -> Rect
 
         //PARAMETER VALUE LIST
         PaletteMode::Values(values) =>
-            (values.matches.len(), values.selected, format!(" {} ", capitalize(values.arg.name))),
+            (values.matches.len(), values.selected, format!(" {} ", capitalize(values.title()))),
 
         PaletteMode::Signature(..) => (1, 0, String::from(" Parameters ")),
     };

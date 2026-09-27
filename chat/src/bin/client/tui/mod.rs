@@ -525,7 +525,7 @@ async fn handle_terminal_event
             } else
             {
                 app.input.insert_str(&text);
-                app.palette.update(&app.input.text(), app.role);
+                app.refresh_palette();
                 app.typed();
             }
 
@@ -737,7 +737,7 @@ async fn handle_key
             _ => {},
         }
 
-        app.palette.update(&app.input.text(), app.role);
+        app.refresh_palette();
 
         return;
     }
@@ -747,19 +747,19 @@ async fn handle_key
         KeyCode::Char(c) =>
         {
             app.input.insert(c);
-            app.palette.update(&app.input.text(), app.role);
+            app.refresh_palette();
         },
 
         KeyCode::Backspace =>
         {
             app.input.backspace();
-            app.palette.update(&app.input.text(), app.role);
+            app.refresh_palette();
         },
 
         KeyCode::Delete =>
         {
             app.input.delete();
-            app.palette.update(&app.input.text(), app.role);
+            app.refresh_palette();
         },
 
         KeyCode::Left => if alt { app.input.word_left() } else { app.input.left() },
@@ -810,7 +810,7 @@ fn complete_selection(app: &mut App, force: bool) -> bool
 
         app.input.clear();
         app.input.insert_str(&format!("{kept}{value}"));
-        app.palette.update(&app.input.text(), app.role);
+        app.refresh_palette();
 
         return true;
     }
@@ -830,7 +830,7 @@ fn complete(app: &mut App, entry: palette::Entry)
     //LEAVE ROOM FOR ARGUMENTS RIGHT AWAY
     if !entry.args().is_empty() { app.input.insert(' '); }
 
-    app.palette.update(&app.input.text(), app.role);
+    app.refresh_palette();
 }
 
 fn settings_shortcut(code: KeyCode) -> bool //Ctrl+<SHORTCUT OF /settings>
