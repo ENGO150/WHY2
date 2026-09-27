@@ -203,6 +203,11 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
     first_user
 }
 
+pub fn remove(username: &str) //DELETE username's ENTRY
+{
+    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc| { doc.as_table_mut().remove(username); });
+}
+
 pub fn contains(key: &str) -> bool //CHECK IF server_users.toml contains
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(key).is_some())

@@ -87,7 +87,7 @@ use super::
         Reconnect,
         Stage as LoginStage,
     },
-    account::{ LABELS, Passwd },
+    account::{ Account, Kind },
     input::InputBuffer,
 };
 
@@ -159,8 +159,8 @@ pub fn draw(frame: &mut Frame, app: &mut App)
         overlays.push(draw_settings(frame, &mut app.settings, area, font));
     }
 
-    //PASSWORD CHANGE BOX
-    if let Some(passwd) = &app.passwd { overlays.push(draw_passwd(frame, passwd, area)); }
+    //ACCOUNT FORM
+    if let Some(form) = &app.account { overlays.push(draw_account(frame, form, area)); }
 
     //CONNECT BOX
     if let Some(login) = &app.login { overlays.push(draw_login(frame, login, &app.reconnect, area)); }
@@ -755,7 +755,7 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
     frame.render_widget(Paragraph::new(lines).scroll((offset, 0)), text_area);
 
     //NO CARET WHILE AN OVERLAY HAS THE KEYBOARD
-    if app.settings.open || app.tofu.is_some() || app.login.is_some() || app.passwd.is_some() { return; }
+    if app.settings.open || app.tofu.is_some() || app.login.is_some() || app.account.is_some() { return; }
 
     frame.set_cursor_position(Position::new
     (
@@ -1253,20 +1253,27 @@ fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rec
     draw_form(frame, area, login.title(), &[(login.label(), &login.input)], login.masked(), notes, footer, (!login.busy).then_some(0))
 }
 
-fn draw_passwd(frame: &mut Frame, passwd: &Passwd, area: Rect) -> Rect
+fn draw_account(frame: &mut Frame, form: &Account, area: Rect) -> Rect
 {
-    let status = match (passwd.busy, passwd.error.as_deref())
+    let status = match (form.busy, form.armed, form.error.as_deref())
     {
-        (true, _) => Line::from(Span::styled("Waiting for the server…", theme::ACCENT)),
-        (false, Some(error)) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
-        (false, None) => Line::default(),
+        (true, ..) => Line::from(Span::styled("Waiting for the server…", theme::ACCENT)),
+        (false, true, _) => Line::from(Span::styled("This cannot be undone. Press ⏎ again to delete your account.", theme::ERROR)),
+        (false, false, Some(error)) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
+        (false, false, None) => Line::default(),
     };
 
-    let footer = if passwd.busy { "" } else { " ↑↓ field │ ⏎ next │ Esc cancel " };
+    let footer = match (form.busy, form.kind, form.armed)
+    {
+        (true, ..) => "",
+        (false, Kind::Passwd, _) => " ↑↓ field │ ⏎ next │ Esc cancel ",
+        (false, Kind::Delete, false) => " ⏎ delete │ Esc cancel ",
+        (false, Kind::Delete, true) => " ⏎ confirm │ Esc cancel ",
+    };
 
-    let fields: Vec<(&str, &InputBuffer)> = LABELS.iter().copied().zip(passwd.fields.iter()).collect();
+    let fields: Vec<(&str, &InputBuffer)> = form.kind.labels().iter().copied().zip(form.fields.iter()).collect();
 
-    draw_form(frame, area, " Change password ", &fields, true, vec![status], footer, (!passwd.busy).then_some(passwd.focus))
+    draw_form(frame, area, form.kind.title(), &fields, true, vec![status], footer, (!form.busy).then_some(form.focus))
 }
 
 //A CENTRED BOX WITH LABELLED FIELDS AND A STATUS UNDER THEM

@@ -53,7 +53,7 @@ use tui::
 {
     theme,
     palette,
-    account::Passwd,
+    account::{ Account, Kind },
     App,
     TerminalGuard,
     settings::Devices,
@@ -240,13 +240,11 @@ fn account_command(app: &mut App, parameters: Option<String>)
 
     let Some(sub) = parameters.as_deref().and_then(|p| info.action(p)) else { return invalid_usage(app, Some("action")) };
 
-    match sub.subcommand
+    app.account = Some(Account::new(match sub.subcommand
     {
-        Subcommand::Passwd => app.passwd = Some(Passwd::new()),
-
-        //NOT WIRED YET
-        _ => {},
-    }
+        Subcommand::Delete => Kind::Delete,
+        _ => Kind::Passwd,
+    }));
 }
 
 #[cfg(feature = "client_voice")]

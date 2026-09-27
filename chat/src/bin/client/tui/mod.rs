@@ -114,7 +114,7 @@ use crate::
 };
 
 use login::{ Action, ConnectResult };
-use account::Passwd;
+use account::{ Account, Request };
 
 pub use state::App;
 
@@ -210,7 +210,7 @@ pub fn restore_terminal() //BEST-EFFORT, IDEMPOTENT
 //NOTHING DRAGS WHILE AN OVERLAY IS UP
 fn selectable(app: &App) -> bool
 {
-    app.tofu.is_none() && app.login.is_none() && app.passwd.is_none() && !app.settings.open
+    app.tofu.is_none() && app.login.is_none() && app.account.is_none() && !app.settings.open
 }
 
 //COPY WITH OSC 52, WHICH WORKS OVER SSH
@@ -519,7 +519,7 @@ async fn handle_terminal_event
             if app.login.is_some()
             {
                 login::insert_str(app, &text);
-            } else if app.passwd.is_some()
+            } else if app.account.is_some()
             {
                 account::insert_str(app, &text);
             } else
@@ -583,20 +583,25 @@ async fn handle_key
         return;
     }
 
-    //THEN THE PASSWORD CHANGE BOX
-    if app.passwd.is_some()
+    //THEN THE ACCOUNT FORM
+    if app.account.is_some()
     {
         account::handle_key(app, key);
 
-        //A CONFIRMED CHANGE GOES OUT HERE
-        if let Some((old_password, new_password)) = app.passwd.as_mut().and_then(Passwd::take_request)
+        //A CONFIRMED FORM GOES OUT HERE
+        if let Some(request) = app.account.as_mut().and_then(Account::take_request)
         {
+            let packet = match request
+            {
+                Request::Passwd(old_password, new_password) => PacketCode::AccountPasswdRequest { old_password, new_password },
+                Request::Delete(password) => PacketCode::AccountDeleteRequest { password },
+            };
+
             match write_stream
             {
-                Some(write_stream) => network::send(&mut *write_stream.lock().await,
-                    PacketCode::AccountPasswdRequest { old_password, new_password }, options::get_keys().as_ref()).await,
+                Some(write_stream) => network::send(&mut *write_stream.lock().await, packet, options::get_keys().as_ref()).await,
 
-                None => app.passwd = None,
+                None => app.account = None,
             }
         }
 

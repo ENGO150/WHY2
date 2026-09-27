@@ -114,6 +114,7 @@ pub enum PacketCode //CONTROL CODES
     {
         username: String,
         id: usize,
+        registered: bool, //FALSE = THE ACCOUNT WENT WITH THEM
     },
 
     //CLIENT -> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
@@ -254,6 +255,9 @@ pub enum PacketCode //CONTROL CODES
         new_password: String,
     },
 
+    //CLIENT -> SERVER | ACCOUNT DELETION REQUEST
+    AccountDeleteRequest { password: String },
+
     //CLIENT <> SERVER | SET ONE CHAT COLOR
     Colors
     {
@@ -323,6 +327,7 @@ pub enum PacketCode //CONTROL CODES
     ServerSettingsSave { settings: Vec<ServerSetting> }, //CLIENT -> SERVER | WRITE server.toml
 
     AccountPasswd { valid: bool }, //SERVER -> CLIENT | PASSWORD CHANGE ACK (FALSE = INVALID PASSWORD)
+    AccountDelete { valid: bool }, //SERVER -> CLIENT | ACCOUNT DELETION ACK (FALSE = INVALID PASSWORD)
 
     FirstUser,        //SERVER -> CLIENT | FIRST ONE TO REGISTER, OWNER ROLE ADDED
     Rekey,            //SERVER -> CLIENT | TRIGGER KEY EXCHANGE (USED FOR RE-KEYING)
@@ -380,6 +385,8 @@ impl PacketCode
             Self::ServerSettings { .. }        => "ServerSettings",
             Self::AccountPasswdRequest { .. }  => "AccountPasswdRequest",
             Self::AccountPasswd { .. }         => "AccountPasswd",
+            Self::AccountDeleteRequest { .. }  => "AccountDeleteRequest",
+            Self::AccountDelete { .. }         => "AccountDelete",
             Self::Colors { .. }                => "Colors",
             Self::ProfileRequest { .. }        => "ProfileRequest",
             Self::ProfileSave { .. }           => "ProfileSave",

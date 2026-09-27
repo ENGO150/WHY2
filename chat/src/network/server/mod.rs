@@ -393,8 +393,9 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         //SEND LEAVE MESSAGE
         send_to_all(PacketCode::Leave
         {
-            username: connection.username().unwrap().to_string(),
+            username: username.to_string(),
             id: *connection.id().unwrap(),
+            registered: config::users::contains(username),
         });
     }
 
@@ -1764,6 +1765,25 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 //REPLY TO USER
                 network::send(&mut *streams.1.lock().await, PacketCode::AccountPasswd { valid }, Some(&keys)).await;
+            },
+
+            //ACCOUNT DELETION
+            PacketCode::AccountDeleteRequest { password } =>
+            {
+                let valid = verify_password(&username, Zeroizing::new(password)).await;
+
+                //REPLY TO USER
+                network::send(&mut *streams.1.lock().await, PacketCode::AccountDelete { valid }, Some(&keys)).await;
+
+                if !valid { continue; }
+
+                //DELETE THE ACCOUNT AND ITS AVATAR
+                config::users::remove(&username);
+                config::messages::sweep_images();
+
+                log::info!("Account deleted: {peer_addr}");
+
+                return remove_connection(&peer_addr, true, Some("account deleted")).await;
             },
 
             //A /color OR /ucolor; ANSWER WITH THE STORED PAIR

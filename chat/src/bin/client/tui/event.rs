@@ -220,7 +220,7 @@ impl App
                 }
             },
 
-            ClientEvent::Leave(uname, id) =>
+            ClientEvent::Leave(uname, id, registered) =>
             {
                 self.push(Line::from(vec!
                 [
@@ -235,8 +235,8 @@ impl App
                 self.devices.remove(&uname);
                 self.stopped_typing(&uname);
 
-                //THE SERVER HAS NO GUESTS, SO A LEAVER IS A REGISTERED USER
-                if self.offline_listed { self.offline.insert(uname, color); }
+                //A DELETED ACCOUNT IS NOT OFFLINE
+                if self.offline_listed && registered { self.offline.insert(uname, color); }
 
                 //A DISCONNECT CARRIES NO VoiceLeave
                 if self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
@@ -420,7 +420,7 @@ impl App
                     true =>
                     {
                         //A RECONNECT REPLAYS THE NEW ONE
-                        if let Some(passwd) = self.passwd.take() { self.reconnect.passwd(passwd.new_password()); }
+                        if let Some(form) = self.account.take() { self.reconnect.passwd(form.new_password()); }
 
                         self.push_styled("Password changed.", theme::OK);
                     },
@@ -429,9 +429,36 @@ impl App
                     {
                         let message = String::from("Wrong current password, or the new one does not meet the requirements.");
 
-                        match self.passwd.as_mut()
+                        match self.account.as_mut()
                         {
-                            Some(passwd) => passwd.rejected(message),
+                            Some(form) => form.rejected(message),
+                            None => self.push_styled(message, theme::ERROR),
+                        }
+                    },
+                }
+
+                self.dirty = true;
+            },
+
+            //AN ACCOUNT DELETION CAME BACK
+            ClientEvent::AccountDeleted(deleted) =>
+            {
+                match deleted
+                {
+                    //THE SERVER HANGS UP NEXT
+                    true =>
+                    {
+                        self.account = None;
+                        self.disconnect_reason = Some(String::from("Account deleted."));
+                    },
+
+                    false =>
+                    {
+                        let message = String::from("Wrong password.");
+
+                        match self.account.as_mut()
+                        {
+                            Some(form) => form.rejected(message),
                             None => self.push_styled(message, theme::ERROR),
                         }
                     },

@@ -32,49 +32,84 @@ use super::
     state::App,
 };
 
-//CONSTS
-pub const LABELS: [&str; 3] = [ "Current password", "New password", "Confirm new password" ]; //ONE FIELD EACH
+//ENUMS
+#[derive(Clone, Copy, PartialEq)] //WHAT THE FORM DOES
+pub enum Kind
+{
+    Passwd,
+    Delete,
+}
+
+pub enum Request //A FINISHED FORM FOR THE LOOP TO SEND
+{
+    Passwd(String, String), //CURRENT, NEW
+    Delete(String),         //CURRENT
+}
 
 //STRUCTS
-pub struct Passwd //THE PASSWORD CHANGE FORM
+pub struct Account //AN ACCOUNT FORM
 {
-    pub fields: [InputBuffer; 3],
+    pub kind: Kind,
+    pub fields: Vec<InputBuffer>,
     pub focus: usize,
     pub busy: bool,            //WAITING FOR THE SERVER
+    pub armed: bool,           //DELETION ASKED ONCE, WAITING FOR THE SECOND ⏎
     pub error: Option<String>, //WHY THE LAST ONE DID NOT WORK
     new: Zeroizing<String>,    //THE PASSWORD SENT, FOR THE RECONNECT
-    request: bool,             //A FINISHED CHANGE FOR THE LOOP TO SEND
+    request: bool,             //A FINISHED FORM FOR THE LOOP TO SEND
 }
 
 //IMPLEMENTATIONS
-impl Default for Passwd
+impl Kind
 {
-    fn default() -> Self { Self::new() }
+    pub fn labels(&self) -> &'static [&'static str]
+    {
+        match self
+        {
+            Kind::Passwd => &[ "Current password", "New password", "Confirm new password" ],
+            Kind::Delete => &[ "Current password" ],
+        }
+    }
+
+    pub fn title(&self) -> &'static str
+    {
+        match self
+        {
+            Kind::Passwd => " Change password ",
+            Kind::Delete => " Delete account ",
+        }
+    }
 }
 
-impl Passwd
+impl Account
 {
-    pub fn new() -> Self
+    pub fn new(kind: Kind) -> Self
     {
         Self
         {
-            fields: [InputBuffer::new(), InputBuffer::new(), InputBuffer::new()],
+            kind,
+            fields: kind.labels().iter().map(|_| InputBuffer::new()).collect(),
             focus: 0,
             busy: false,
+            armed: false,
             error: None,
             new: Zeroizing::default(),
             request: false,
         }
     }
 
-    //THE PAIR TO SEND, ONCE
-    pub fn take_request(&mut self) -> Option<(String, String)>
+    //THE REQUEST TO SEND, ONCE
+    pub fn take_request(&mut self) -> Option<Request>
     {
         if !self.request { return None; }
 
         self.request = false;
 
-        Some((self.fields[0].text(), self.new.to_string()))
+        Some(match self.kind
+        {
+            Kind::Passwd => Request::Passwd(self.fields[0].text(), self.new.to_string()),
+            Kind::Delete => Request::Delete(self.fields[0].text()),
+        })
     }
 
     //THE NEW PASSWORD, FOR THE RECONNECT
@@ -83,7 +118,7 @@ impl Passwd
     //START OVER WITH AN ERROR
     pub fn rejected(&mut self, error: String)
     {
-        *self = Self::new();
+        *self = Self::new(self.kind);
         self.error = Some(error);
     }
 
@@ -94,24 +129,40 @@ impl Passwd
         if let Some(empty) = self.fields.iter().position(InputBuffer::is_empty)
         {
             self.focus = empty;
-            self.error = Some(format!("Enter the {}.", LABELS[empty].to_lowercase()));
+            self.error = Some(format!("Enter the {}.", self.kind.labels()[empty].to_lowercase()));
 
             return;
         }
 
-        let new = Zeroizing::new(self.fields[1].text());
-
-        //MISMATCH, RETYPE THE CONFIRMATION
-        if *new != self.fields[2].text()
+        match self.kind
         {
-            self.fields[2].clear();
-            self.focus = 2;
-            self.error = Some(String::from("Passwords do not match."));
+            Kind::Passwd =>
+            {
+                let new = Zeroizing::new(self.fields[1].text());
 
-            return;
+                //MISMATCH, RETYPE THE CONFIRMATION
+                if *new != self.fields[2].text()
+                {
+                    self.fields[2].clear();
+                    self.focus = 2;
+                    self.error = Some(String::from("Passwords do not match."));
+
+                    return;
+                }
+
+                self.new = new;
+            },
+
+            //ASK TWICE
+            Kind::Delete => if !self.armed
+            {
+                self.armed = true;
+                self.error = None;
+
+                return;
+            },
         }
 
-        self.new = new;
         self.error = None;
         self.busy = true;
         self.request = true;
@@ -122,37 +173,39 @@ impl Passwd
 //PUBLIC
 pub fn handle_key(app: &mut App, key: KeyEvent)
 {
-    let Some(passwd) = app.passwd.as_mut() else { return };
+    let Some(form) = app.account.as_mut() else { return };
 
     //NOTHING UNTIL THE SERVER ANSWERS
-    if passwd.busy { return; }
+    if form.busy { return; }
 
-    let last = passwd.fields.len() - 1;
+    let last = form.fields.len() - 1;
 
     match key.code
     {
         //ESC CLOSES
-        KeyCode::Esc => app.passwd = None,
+        KeyCode::Esc => app.account = None,
 
         //MOVE BETWEEN FIELDS
-        KeyCode::Up | KeyCode::BackTab => passwd.focus = passwd.focus.saturating_sub(1),
-        KeyCode::Down | KeyCode::Tab => passwd.focus = (passwd.focus + 1).min(last),
+        KeyCode::Up | KeyCode::BackTab => form.focus = form.focus.saturating_sub(1),
+        KeyCode::Down | KeyCode::Tab => form.focus = (form.focus + 1).min(last),
 
         //ENTER STEPS DOWN, THE LAST ONE SUBMITS
-        KeyCode::Enter => match passwd.focus == last
+        KeyCode::Enter => match form.focus == last
         {
-            true => passwd.submit(),
-            false => passwd.focus += 1,
+            true => form.submit(),
+            false => form.focus += 1,
         },
 
-        _ => { login::edit(&mut passwd.fields[passwd.focus], key); },
+        //AN EDIT TAKES THE CONFIRMATION BACK
+        _ => if login::edit(&mut form.fields[form.focus], key) { form.armed = false; },
     }
 }
 
 pub fn insert_str(app: &mut App, text: &str) //A PASTE INTO THE FOCUSED FIELD
 {
-    if let Some(passwd) = app.passwd.as_mut() && !passwd.busy
+    if let Some(form) = app.account.as_mut() && !form.busy
     {
-        passwd.fields[passwd.focus].insert_str(&text.replace(['\r', '\n'], ""));
+        form.fields[form.focus].insert_str(&text.replace(['\r', '\n'], ""));
+        form.armed = false;
     }
 }

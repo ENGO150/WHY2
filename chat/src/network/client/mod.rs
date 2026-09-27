@@ -135,7 +135,7 @@ pub enum ClientEvent
     VoiceJoin(usize, String),                                    //SOMEBODY JOINED VOICE IN OUR CHANNEL
     VoiceLeave(usize),                                           //SOMEBODY LEFT VOICE IN OUR CHANNEL
     Join(String, Option<u8>, usize, Option<Device>),             //CLIENT CONNECTED
-    Leave(String, usize),                                        //CLIENT DISCONNECTED
+    Leave(String, usize, bool),                                  //CLIENT DISCONNECTED (ACCOUNT STILL EXISTS)
     ServerSay(String),                                           //SERVER MESSAGE
     Role(Role, Option<String>),                                  //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
     History(Vec<StoredMessage>, u64, bool, u64, bool),           //A PAGE OF STORED MESSAGES (START, MORE, KEPT, OLDER)
@@ -157,6 +157,7 @@ pub enum ClientEvent
     List(Vec<OnlineUser>, Option<Vec<OfflineUser>>),             //LIST OF USERS, CONNECTED AND NOT
     ServerSettings(Vec<ServerSetting>, bool),                    //server.toml AS THE SERVER HOLDS IT
     Passwd(bool),                                                //A PASSWORD CHANGE ANSWERED
+    AccountDeleted(bool),                                        //AN ACCOUNT DELETION ANSWERED
     Profile(String, UserProfile, bool, bool),                    //A PROFILE (WHOSE, IT, OURS, A SAVE ACK)
     Colors,                                                      //A /color LANDED ON THE SERVER
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
@@ -420,9 +421,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             }
 
             //LEAVE MESSAGE (CLIENT DISCONNECTED)
-            PacketCode::Leave { username, id } =>
+            PacketCode::Leave { username, id, registered } =>
             {
-                tx.send(ClientEvent::Leave(username, id)).await.unwrap();
+                tx.send(ClientEvent::Leave(username, id, registered)).await.unwrap();
 
                 #[cfg(feature = "client_voice")]
                 voice_client::remove_consumer(&id);
@@ -552,6 +553,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::AccountPasswd { valid } =>
             {
                 tx.send(ClientEvent::Passwd(valid)).await.unwrap();
+            },
+
+            //AN ACCOUNT DELETION ANSWERED
+            PacketCode::AccountDelete { valid } =>
+            {
+                tx.send(ClientEvent::AccountDeleted(valid)).await.unwrap();
             },
 
             //A PROFILE, ASKED FOR OR JUST STORED
