@@ -1561,7 +1561,7 @@ impl App
             };
 
             //EVERY OTHER MESSAGE GETS A STRIPE
-            let striped = self.messages[entry].striped();
+            let striped = self.theme.message_stripes && self.messages[entry].striped();
             if striped { stripe = !stripe; }
 
             let tint = match (mentioned, striped && stripe)

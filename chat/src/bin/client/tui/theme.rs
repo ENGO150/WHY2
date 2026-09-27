@@ -51,6 +51,7 @@ pub struct Theme //CACHED CONFIG-DRIVEN STYLING
     pub show_id: bool,
     pub show_message_ids: bool,
     pub show_timestamps: bool,
+    pub message_stripes: bool,
     pub render_math: bool,
 }
 
@@ -66,6 +67,7 @@ impl Theme
             show_id: config::read_config::<bool>("show_id"),
             show_message_ids: config::read_config::<bool>("show_message_ids"),
             show_timestamps: config::read_config::<bool>("show_timestamps"),
+            message_stripes: config::read_config::<bool>("message_stripes"),
             render_math: config::read_config::<bool>("render_math"),
         }
     }
