@@ -108,6 +108,12 @@ impl History
         self.records.partition_point(|message| message.id < id)
     }
 
+    fn find(&self, id: u64) -> Option<usize> //INDEX OF RECORD id, IF KEPT
+    {
+        let index = self.position(id);
+        self.records.get(index).is_some_and(|message| message.id == id).then_some(index)
+    }
+
     fn save(&self) //ENCRYPT-THEN-MAC THE WHOLE HISTORY
     {
         let mut bytes = MAGIC.to_vec();
@@ -254,19 +260,23 @@ fn remove_images(orphans: Vec<[u8; 32]>) //DELETE PICTURES NOTHING NAMES
     for hash in orphans { let _ = fs::remove_file(misc::get_image_dir().join(misc::hex(&hash))); }
 }
 
+pub fn exists(id: u64) -> bool //IS MESSAGE id IN THE HISTORY?
+{
+    HISTORY.lock().unwrap().find(id).is_some()
+}
+
 pub fn author(id: u64) -> Option<String> //WHO SAID MESSAGE id
 {
     let history = HISTORY.lock().unwrap();
 
-    history.records.get(history.position(id)).filter(|message| message.id == id).map(|message| message.username.clone())
+    history.find(id).map(|index| history.records[index].username.clone())
 }
 
 pub fn delete(id: u64) -> bool //REMOVE MESSAGE id AND REWRITE THE FILE
 {
     let mut guard = HISTORY.lock().unwrap();
 
-    let index = guard.position(id);
-    if guard.records.get(index).is_none_or(|message| message.id != id) { return false; }
+    let Some(index) = guard.find(id) else { return false };
 
     let dropped: Vec<[u8; 32]> = guard.records.remove(index).image.into_iter().collect();
     let orphans = guard.orphans(dropped);
