@@ -134,7 +134,7 @@ jobs:
         with:
           images: ${{ steps.image.outputs.value }}
           tags: |
-            type=raw,value=${{ github.ref_name }},enable=${{ github.ref_name != 'release' }}
+            type=raw,value=${{ github.ref_name }}
             type=raw,value=${{ steps.version.outputs.value }},enable=${{ github.ref_name == 'release' }}
             type=raw,value=latest,enable=${{ github.ref_name == 'stable' }}
 
