@@ -1625,6 +1625,32 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 }
             },
 
+            //MESSAGE HEART REACTION
+            PacketCode::HeartRequest { message_id } =>
+            {
+                //SILENCE MUTED USERS
+                if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
+                {
+                    log::debug!("Message dropped (muted): {peer_addr}");
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
+                    continue;
+                }
+
+                //CHECK MESSAGE ID VALIDITY
+                if !config::messages::exists(message_id)
+                {
+                    log::warn!("Heart refused (invalid message): {peer_addr}");
+
+                    //SEND InvalidUsage CODE
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                //TOGGLE A HEART
+                config::messages::heart(message_id, &username);
+            },
+
             //MUTE USER
             PacketCode::ServerMute { id } =>
             {
