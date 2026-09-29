@@ -247,6 +247,32 @@ fn account_command(app: &mut App, parameters: Option<String>)
     }));
 }
 
+fn hearts(app: &mut App, parameters: Option<String>) //LIST WHO HEARTED A MESSAGE
+{
+    let Some(message_id) = parameters.and_then(|p| p.parse::<u64>().ok()) else { return invalid_usage(app, None) };
+
+    let Some(hearts) = app.hearts_of(message_id) else
+    {
+        app.push_styled(format!("Message #{message_id} is not loaded."), theme::ERROR);
+        return;
+    };
+
+    if hearts.is_empty()
+    {
+        app.push_styled(format!("Nobody hearted #{message_id}."), theme::NOTICE);
+        return;
+    }
+
+    app.push_styled(format!("Hearts on #{message_id} ({}):", hearts.len()), theme::TITLE);
+
+    let last = hearts.len() - 1;
+
+    for (index, username) in hearts.into_iter().enumerate()
+    {
+        app.push(Line::from(vec![Span::styled(tui::branch(index == last), theme::BORDER), Span::raw(username)]));
+    }
+}
+
 #[cfg(feature = "client_voice")]
 fn mute(app: &mut App, parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
 {
@@ -706,6 +732,8 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         Command::Server => server_command(app, write_stream, parameters).await,
 
                         Command::Account => account_command(app, parameters),
+
+                        Command::Hearts => hearts(app, parameters),
 
                         Command::UsernameColor => color_handler(app, write_stream, true, parameters).await,
                         Command::MessageColor => color_handler(app, write_stream, false, parameters).await,

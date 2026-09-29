@@ -70,6 +70,7 @@ pub enum Command
     Delete,                                     //DELETE A STORED MESSAGE
     PrivateMessage,                             //ONE TO ONE MESSAGE
     Heart,                                      //TOGGLE MESSAGE HEART REACTION
+    Hearts,                                     //LIST WHO HEARTED A MESSAGE
     Reply,                                      //REPLY TO MESSAGE
     Re,                                         //REPLY TO PRIVATE MESSAGE
     Settings,                                   //OPEN THE SETTINGS OVERLAY
@@ -620,6 +621,26 @@ pub const COMMAND_LIST: &[CommandInfo] =
             },
         ],
         description: "Toggles heart reaction on a message.",
+    },
+
+    CommandInfo
+    {
+        command: Command::Hearts,
+        triggers: &[ "HEARTS", "LIKES", "STARS", "REACTIONS" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "ID of the message",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Lists who hearted a message.",
     },
 
     CommandInfo

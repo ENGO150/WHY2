@@ -577,6 +577,14 @@ impl App
         }
     }
 
+    //WHO HEARTED A LOADED MESSAGE
+    pub fn hearts_of(&self, message_id: u64) -> Option<Vec<String>>
+    {
+        self.messages.iter().chain(self.panes.get("").into_iter().flatten())
+            .find(|entry| entry.message_id() == Some(message_id))
+            .map(|entry| entry.hearts().to_vec())
+    }
+
     //A MESSAGE'S HEARTS CHANGED
     pub fn set_hearts(&mut self, message_id: u64, hearts: Vec<String>)
     {
