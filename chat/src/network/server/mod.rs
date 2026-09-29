@@ -989,7 +989,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //CHECK REPLY VALIDITY
                 if let Some(reply) = reply && !config::messages::exists(reply)
                 {
-                    log::debug!("Message dropped (invalid reply): {peer_addr}");
+                    log::warn!("Message refused (invalid reply): {peer_addr}");
 
                     //SEND InvalidUsage CODE
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
@@ -1006,7 +1006,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //KEEP IT - ONLY THE LOBBY HAS A HISTORY
                 let message_id = match channel.is_none() && config::read_config::<bool>("persistent_messages")
                 {
-                    true => config::messages::store(&username, &text, timestamp, None),
+                    true => config::messages::store(&username, &text, timestamp, reply),
                     false => config::messages::next_id(),
                 };
 
