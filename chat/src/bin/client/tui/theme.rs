@@ -78,13 +78,21 @@ impl Theme
     }
 
     //STYLE AND WRAP ONE HISTORY ENTRY
-    pub fn render(&self, entry: &Entry, width: u16) -> Vec<Line<'static>>
+    pub fn render(&self, entry: &Entry, width: u16, target: Option<&Entry>) -> Vec<Line<'static>>
+    {
+        let mut lines: Vec<Line<'static>> = entry.reply().map(|reply| self.reply_row(reply, target, width)).into_iter().collect();
+
+        lines.extend(self.render_entry(entry, width));
+        lines
+    }
+
+    fn render_entry(&self, entry: &Entry, width: u16) -> Vec<Line<'static>>
     {
         match entry
         {
             Entry::Line(line) => state::wrap_line(line, width),
 
-            Entry::Message { username, id, message_id, timestamp, text, colors } =>
+            Entry::Message { username, id, message_id, timestamp, text, colors, .. } =>
             {
                 let id = if self.show_id { format!(" ({id})") } else { String::new() };
 
@@ -100,7 +108,7 @@ impl Theme
             },
 
             //THE SAME LINE WITHOUT THE ID COLUMN
-            Entry::History { username, message_id, timestamp, text, colors } => self.message_id(markup::render(vec!
+            Entry::History { username, message_id, timestamp, text, colors, .. } => self.message_id(markup::render(vec!
             [
                 self.timestamp(*timestamp),
                 self.colorize(username.clone(), colors.username_color),
@@ -147,6 +155,43 @@ impl Theme
                 self.message_id(state::wrap_line(&Line::from(spans), width), *message_id, width)
             },
         }
+    }
+
+    //ONE ROW NAMING THE MESSAGE A REPLY ANSWERS
+    fn reply_row(&self, reply: u64, target: Option<&Entry>, width: u16) -> Line<'static>
+    {
+        let mut spans = vec![Span::styled(consts::REPLY, BORDER)];
+
+        match target
+        {
+            Some(Entry::Message { username, text, colors, .. } | Entry::History { username, text, colors, .. }) =>
+            {
+                spans.push(self.colorize(username.clone(), colors.username_color));
+                spans.push(Span::styled(format!(": {}", text.lines().next().unwrap_or_default()), DIM));
+            },
+
+            Some(Entry::Image { username, filename, username_color, .. }) =>
+            {
+                spans.push(self.colorize(username.clone(), *username_color));
+                spans.push(Span::styled(format!(" sent an image ({filename})"), DIM));
+            },
+
+            //NOT IN THE PANE
+            _ => spans.push(Span::styled(format!("#{reply}"), DIM)),
+        }
+
+        //ALWAYS ONE ROW
+        let mut rows = state::wrap_line(&Line::from(spans), width.saturating_sub(1));
+        let cut = rows.len() > 1;
+        let mut row = rows.swap_remove(0);
+
+        if cut
+        {
+            if row.spans.last().is_some_and(|span| span.content.trim().is_empty()) { row.spans.pop(); }
+            row.spans.push(Span::styled("…", DIM));
+        }
+
+        row
     }
 
     fn timestamp(&self, timestamp: Option<u64>) -> Span<'static> //SEND TIME PREFIX, LOCAL

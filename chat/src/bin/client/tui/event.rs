@@ -83,19 +83,19 @@ impl App
             },
 
             //STORED UNRENDERED - App::theme MAKES THE LINE
-            ClientEvent::Message(message, username, id, message_id, colors, channel, timestamp) =>
+            ClientEvent::Message(message, username, id, message_id, colors, channel, timestamp, reply) =>
             {
                 //None = EVERY PANE, Some(None) = THE LOBBY
                 match channel.map(Option::unwrap_or_default)
                 {
                     Some(channel) if channel != self.channel =>
-                        self.park_entry(channel, state::Entry::Message { username, id, message_id, timestamp, text: message, colors }),
+                        self.park_entry(channel, state::Entry::Message { username, id, message_id, timestamp, text: message, colors, reply }),
 
                     _ =>
                     {
                         //A MESSAGE IS THE PROOF THEY STOPPED
                         self.stopped_typing(&username);
-                        self.push_message(username, id, message_id, timestamp, message, colors);
+                        self.push_message(username, id, message_id, timestamp, message, colors, reply);
                     },
                 }
             },
@@ -368,6 +368,7 @@ impl App
                         timestamp: message.timestamp,
                         text: message.text,
                         colors: message.colors,
+                        reply: message.reply,
                     },
                 }).collect();
 

@@ -87,6 +87,7 @@ pub const MAX_RUN: usize              = 3;                         //AND DELIMIT
 pub const BULLET: &str                = "• ";                      //WHAT A LIST MARKER IS DRAWN AS
 pub const QUOTE: &str                 = "▏ ";                      //AND A BLOCKQUOTE'S EDGE
 pub const RULE: char                  = '─';
+pub const REPLY: &str                 = "╭─ ";                     //WHAT A REPLY'S QUOTE OPENS WITH
 
 pub const INDENT: &str                = "  ";                      //DISPLAY MATH IS SET IN FROM THE PANE, THE WAY A BLOCK IS
 pub const MAX_DEPTH: usize            = 32;                        //A BRACE THIS DEEP IS A BRACE

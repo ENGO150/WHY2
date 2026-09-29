@@ -104,6 +104,7 @@ pub enum Entry //ONE ROW OF HISTORY
         timestamp: Option<u64>, //UNIX SECONDS
         text: String,
         colors: MessageColors,
+        reply: Option<u64>,     //THE MESSAGE IT ANSWERS
     },
 
     //A REPLAYED MESSAGE, WITHOUT A CLIENT ID
@@ -114,6 +115,7 @@ pub enum Entry //ONE ROW OF HISTORY
         timestamp: Option<u64>,
         text: String,
         colors: MessageColors,
+        reply: Option<u64>,
     },
 
     //A PRIVATE MESSAGE, STORED UNRENDERED
@@ -150,6 +152,24 @@ impl Entry
         {
             Entry::Message { message_id, .. } | Entry::History { message_id, .. } | Entry::Image { message_id, .. } =>
                 Some(*message_id),
+            _ => None,
+        }
+    }
+
+    pub fn username(&self) -> Option<&str> //WHO SAID IT, IF IT IS A MESSAGE
+    {
+        match self
+        {
+            Entry::Message { username, .. } | Entry::History { username, .. } | Entry::Image { username, .. } => Some(username),
+            _ => None,
+        }
+    }
+
+    pub fn reply(&self) -> Option<u64> //THE MESSAGE IT ANSWERS
+    {
+        match self
+        {
+            Entry::Message { reply, .. } | Entry::History { reply, .. } => *reply,
             _ => None,
         }
     }
@@ -444,9 +464,9 @@ impl App
 
     //STORE A CHAT MESSAGE UNRENDERED
     pub fn push_message(&mut self, username: String, id: usize, message_id: u64, timestamp: Option<u64>, text: String,
-        colors: MessageColors)
+        colors: MessageColors, reply: Option<u64>)
     {
-        self.push_entry(Entry::Message { username, id, message_id, timestamp, text, colors });
+        self.push_entry(Entry::Message { username, id, message_id, timestamp, text, colors, reply });
     }
 
     //STORE AN ENTRY IN ANOTHER CHANNEL'S PARKED PANE
@@ -1543,19 +1563,27 @@ impl App
         let mut tints: Vec<Option<Style>> = Vec::new();
         let mut stripe = self.stripe;
 
+        //WHERE EACH MESSAGE SITS, FOR THE REPLIES
+        let index: HashMap<u64, usize> = self.messages.iter().enumerate()
+            .filter_map(|(entry, message)| Some((message.message_id()?, entry)))
+            .collect();
+
         for entry in 0..self.messages.len()
         {
             let row = lines.len() as u16;
             starts.push(row);
 
-            lines.extend(self.theme.render(&self.messages[entry], width));
+            let target = self.messages[entry].reply().and_then(|id| index.get(&id)).map(|&target| &self.messages[target]);
 
-            //A MESSAGE FROM SOMEBODY ELSE NAMING US
+            lines.extend(self.theme.render(&self.messages[entry], width, target));
+
+            //A MESSAGE FROM SOMEBODY ELSE NAMING US, OR ANSWERING US
             let mentioned = match &self.messages[entry]
             {
                 Entry::Message { username, text, .. } | Entry::History { username, text, .. } |
                 Entry::Private { sent: false, username, text, .. } =>
-                    *username != self.username && palette::mentions(text, &self.username),
+                    *username != self.username && (palette::mentions(text, &self.username)
+                        || target.is_some_and(|target| target.username() == Some(self.username.as_str()))),
 
                 _ => false,
             };
