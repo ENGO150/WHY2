@@ -105,6 +105,7 @@ pub enum Entry //ONE ROW OF HISTORY
         text: String,
         colors: MessageColors,
         reply: Option<u64>,     //THE MESSAGE IT ANSWERS
+        hearts: Vec<String>,    //WHO HEARTED IT
     },
 
     //A REPLAYED MESSAGE, WITHOUT A CLIENT ID
@@ -116,6 +117,7 @@ pub enum Entry //ONE ROW OF HISTORY
         text: String,
         colors: MessageColors,
         reply: Option<u64>,
+        hearts: Vec<String>,
     },
 
     //A PRIVATE MESSAGE, STORED UNRENDERED
@@ -141,6 +143,7 @@ pub enum Entry //ONE ROW OF HISTORY
         username_color: Option<u8>, //THE SENDER'S, LIKE A MESSAGE'S
         hash: Option<[u8; 32]>,     //WHAT TO ASK THE SERVER FOR
         picture: Picture,
+        hearts: Vec<String>,
     },
 }
 
@@ -163,6 +166,20 @@ impl Entry
             Entry::Message { username, .. } | Entry::History { username, .. } | Entry::Image { username, .. } => Some(username),
             _ => None,
         }
+    }
+
+    pub fn hearts(&self) -> &[String] //WHO HEARTED IT
+    {
+        match self
+        {
+            Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. } => hearts,
+            _ => &[],
+        }
+    }
+
+    fn set_hearts(&mut self, new: Vec<String>) //REPLACE WHO HEARTED IT
+    {
+        if let Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. } = self { *hearts = new; }
     }
 
     pub fn reply(&self) -> Option<u64> //THE MESSAGE IT ANSWERS
@@ -466,7 +483,7 @@ impl App
     pub fn push_message(&mut self, username: String, id: usize, message_id: u64, timestamp: Option<u64>, text: String,
         colors: MessageColors, reply: Option<u64>)
     {
-        self.push_entry(Entry::Message { username, id, message_id, timestamp, text, colors, reply });
+        self.push_entry(Entry::Message { username, id, message_id, timestamp, text, colors, reply, hearts: Vec::new() });
     }
 
     //STORE AN ENTRY IN ANOTHER CHANNEL'S PARKED PANE
@@ -557,6 +574,48 @@ impl App
         {
             pane.remove(index);
             self.shift_anchor(index);
+        }
+    }
+
+    //A MESSAGE'S HEARTS CHANGED
+    pub fn set_hearts(&mut self, message_id: u64, hearts: Vec<String>)
+    {
+        let Some(index) = self.messages.iter().position(|entry| entry.message_id() == Some(message_id)) else
+        {
+            //A PARKED PANE ONLY UPDATES THE ENTRY
+            if let Some(entry) = self.panes.get_mut("").and_then(|pane| pane.iter_mut().find(|entry| entry.message_id() == Some(message_id)))
+            {
+                entry.set_hearts(hearts);
+            }
+
+            return;
+        };
+
+        self.rewrap(self.pane.width);
+
+        let before = self.wrapped_len();
+        let end = self.wrapped.as_ref().and_then(|wrapped| wrapped.4.get(index + 1).copied()).unwrap_or(before);
+
+        self.messages[index].set_hearts(hearts);
+
+        self.generation += 1;
+        self.dirty = true;
+
+        let delta = self.wrapped_rows() as i32 - before as i32;
+
+        //ROWS BELOW IT MOVE WITH IT
+        let shift = |row: u16| match row >= end
+        {
+            true => (row as i32 + delta).max(0) as u16,
+            false => row,
+        };
+
+        if let Some(scroll) = self.scroll.as_mut() { *scroll = shift(*scroll); }
+
+        if let Some(selection) = self.selection.as_mut()
+        {
+            selection.anchor.0 = shift(selection.anchor.0);
+            selection.cursor.0 = shift(selection.cursor.0);
         }
     }
 
@@ -678,7 +737,7 @@ impl App
     {
         let picture = self.fit(image);
 
-        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: None, picture });
+        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: None, picture, hearts: Vec::new() });
     }
 
     //A TRANSFER STARTING
@@ -729,7 +788,7 @@ impl App
     pub fn push_caption(&mut self, username: String, filename: String, message_id: u64, timestamp: Option<u64>,
         hash: [u8; 32], picture: Picture, username_color: Option<u8>)
     {
-        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture });
+        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new() });
     }
 
     //A CLICKED CAPTION
@@ -1575,7 +1634,7 @@ impl App
 
             let target = self.messages[entry].reply().and_then(|id| index.get(&id)).map(|&target| &self.messages[target]);
 
-            lines.extend(self.theme.render(&self.messages[entry], width, target));
+            lines.extend(self.theme.render(&self.messages[entry], width, target, &self.username));
 
             //A MESSAGE FROM SOMEBODY ELSE NAMING US, OR ANSWERING US
             let mentioned = match &self.messages[entry]

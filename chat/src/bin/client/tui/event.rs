@@ -89,7 +89,7 @@ impl App
                 match channel.map(Option::unwrap_or_default)
                 {
                     Some(channel) if channel != self.channel =>
-                        self.park_entry(channel, state::Entry::Message { username, id, message_id, timestamp, text: message, colors, reply }),
+                        self.park_entry(channel, state::Entry::Message { username, id, message_id, timestamp, text: message, colors, reply, hearts: Vec::new() }),
 
                     _ =>
                     {
@@ -130,7 +130,7 @@ impl App
                 match channel == self.channel
                 {
                     true => self.push_caption(username, filename, message_id, timestamp, hash, picture, username_color),
-                    false => self.park_entry(channel, state::Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture }),
+                    false => self.park_entry(channel, state::Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new() }),
                 }
             },
 
@@ -253,6 +253,8 @@ impl App
 
             ClientEvent::Deleted(message_id) => self.delete_message(message_id),
 
+            ClientEvent::Hearts(message_id, hearts) => self.set_hearts(message_id, hearts),
+
             ClientEvent::InvalidUsage =>
             {
                 //A REFUSED SAVE LEAVES THE BOX EDITABLE
@@ -359,6 +361,7 @@ impl App
                             true => state::Picture::Deferred,
                             false => state::Picture::Absent,
                         },
+                        hearts: message.hearts,
                     },
 
                     None => state::Entry::History
@@ -369,6 +372,7 @@ impl App
                         text: message.text,
                         colors: message.colors,
                         reply: message.reply,
+                        hearts: message.hearts,
                     },
                 }).collect();
 

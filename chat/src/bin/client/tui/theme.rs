@@ -78,11 +78,18 @@ impl Theme
     }
 
     //STYLE AND WRAP ONE HISTORY ENTRY
-    pub fn render(&self, entry: &Entry, width: u16, target: Option<&Entry>) -> Vec<Line<'static>>
+    pub fn render(&self, entry: &Entry, width: u16, target: Option<&Entry>, me: &str) -> Vec<Line<'static>>
     {
         let mut lines: Vec<Line<'static>> = entry.reply().map(|reply| self.reply_row(reply, target, width)).into_iter().collect();
 
-        lines.extend(self.render_entry(entry, width));
+        let rows = self.render_entry(entry, width);
+
+        lines.extend(match entry.message_id()
+        {
+            Some(message_id) => self.trailer(rows, message_id, entry.hearts(), me, width),
+            None => rows,
+        });
+
         lines
     }
 
@@ -92,7 +99,7 @@ impl Theme
         {
             Entry::Line(line) => state::wrap_line(line, width),
 
-            Entry::Message { username, id, message_id, timestamp, text, colors, .. } =>
+            Entry::Message { username, id, timestamp, text, colors, .. } =>
             {
                 let id = if self.show_id { format!(" ({id})") } else { String::new() };
 
@@ -104,16 +111,16 @@ impl Theme
                     Span::raw(": "),
                 ];
 
-                self.message_id(markup::render(prefix, text, self.style(colors.message_color), width, self.render_math), *message_id, width)
+                markup::render(prefix, text, self.style(colors.message_color), width, self.render_math)
             },
 
             //THE SAME LINE WITHOUT THE ID COLUMN
-            Entry::History { username, message_id, timestamp, text, colors, .. } => self.message_id(markup::render(vec!
+            Entry::History { username, timestamp, text, colors, .. } => markup::render(vec!
             [
                 self.timestamp(*timestamp),
                 self.colorize(username.clone(), colors.username_color),
                 Span::raw(": "),
-            ], text, self.style(colors.message_color), width, self.render_math), *message_id, width),
+            ], text, self.style(colors.message_color), width, self.render_math),
 
             Entry::Private { sent, username, id, text, colors } =>
             {
@@ -130,7 +137,7 @@ impl Theme
             Entry::Transfer(transfer) => state::wrap_line(&Line::from(progress(transfer, width)), width),
 
             //ONLY THE CAPTION; THE PICTURE IS DRAWN UNDER IT
-            Entry::Image { username, filename, message_id, timestamp, username_color, picture, .. } =>
+            Entry::Image { username, filename, timestamp, username_color, picture, .. } =>
             {
                 let mut spans = vec!
                 [
@@ -152,7 +159,7 @@ impl Theme
                     Picture::Ready(..) => {},
                 }
 
-                self.message_id(state::wrap_line(&Line::from(spans), width), *message_id, width)
+                state::wrap_line(&Line::from(spans), width)
             },
         }
     }
@@ -211,23 +218,42 @@ impl Theme
         Span::styled(time.format(format).to_string(), DIM)
     }
 
-    //MESSAGE ID, RIGHT-ALIGNED ON THE LAST ROW
-    fn message_id(&self, mut lines: Vec<Line<'static>>, message_id: u64, width: u16) -> Vec<Line<'static>>
+    //HEARTS AND MESSAGE ID, RIGHT-ALIGNED ON THE LAST ROW
+    fn trailer(&self, mut lines: Vec<Line<'static>>, message_id: u64, hearts: &[String], me: &str, width: u16) -> Vec<Line<'static>>
     {
-        if !self.show_message_ids { return lines; }
+        let mut tag: Vec<Span<'static>> = Vec::new();
 
-        let tag = format!("#{message_id}");
+        if !hearts.is_empty()
+        {
+            let style = if hearts.iter().any(|name| name == me) { HEART } else { DIM };
+            tag.push(Span::styled(format!("{} {}", consts::HEART, hearts.len()), style));
+        }
+
+        if self.show_message_ids
+        {
+            if !tag.is_empty() { tag.push(Span::raw(" ")); }
+            tag.push(Span::styled(format!("#{message_id}"), DIM));
+        }
+
+        if tag.is_empty() { return lines; }
+
+        let tag_width: usize = tag.iter().map(Span::width).sum();
         let width = width as usize;
 
         match lines.last_mut()
         {
-            Some(last) if last.width() + 1 + tag.len() <= width =>
+            Some(last) if last.width() + 1 + tag_width <= width =>
             {
-                last.spans.push(Span::raw(" ".repeat(width - last.width() - tag.len())));
-                last.spans.push(Span::styled(tag, DIM));
+                last.spans.push(Span::raw(" ".repeat(width - last.width() - tag_width)));
+                last.spans.extend(tag);
             },
 
-            _ => lines.push(Line::from(vec![Span::raw(" ".repeat(width.saturating_sub(tag.len()))), Span::styled(tag, DIM)])),
+            _ =>
+            {
+                let mut row = vec![Span::raw(" ".repeat(width.saturating_sub(tag_width)))];
+                row.extend(tag);
+                lines.push(Line::from(row));
+            },
         }
 
         lines
@@ -334,6 +360,7 @@ pub const DIM: Style = Style::new().fg(Color::Rgb(0xCA, 0xB4, 0xB7));
 pub const ACCENT: Style = Style::new().fg(Color::Rgb(0x9D, 0xCE, 0xFF));
 pub const NOTICE: Style = Style::new().fg(Color::Rgb(0xFF, 0xDD, 0xE2));        //PALE PINK
 pub const ERROR: Style = Style::new().fg(Color::Rgb(0xF6, 0x46, 0xC6));         //HOT MAGENTA
+pub const HEART: Style = Style::new().fg(Color::Rgb(0xFF, 0x6B, 0x8B));         //ROSE RED - A HEART WE GAVE
 pub const OK: Style = Style::new().fg(Color::Rgb(0xFF, 0xBB, 0xBA));            //SALMON
 pub const SPEAKING: Style = Style::new().fg(Color::Rgb(0xFF, 0xBB, 0xBA)).add_modifier(Modifier::BOLD);
 
