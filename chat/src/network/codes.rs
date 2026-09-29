@@ -145,6 +145,13 @@ pub enum PacketCode //CONTROL CODES
         colors: MessageColors,
     },
 
+    //SERVER -> CLIENT | HEART REACTION
+    Heart
+    {
+        message_id: u64,
+        username: String,
+    },
+
     //SERVER -> CLIENT | CLIENT JOINED VOICE
     VoiceJoin
     {

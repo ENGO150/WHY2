@@ -1649,6 +1649,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
                 //TOGGLE A HEART
                 config::messages::heart(message_id, &username);
+
+                //FORWARD TO ALL USERS
+                send_to_all(PacketCode::Heart
+                {
+                    message_id,
+                    username: username.clone(),
+                });
             },
 
             //MUTE USER
