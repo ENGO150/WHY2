@@ -149,7 +149,7 @@ pub enum PacketCode //CONTROL CODES
     Heart
     {
         message_id: u64,
-        username: String,
+        hearts: Vec<String>,
     },
 
     //SERVER -> CLIENT | CLIENT JOINED VOICE
@@ -374,6 +374,7 @@ impl PacketCode
             Self::PrivateMessageBack { .. }    => "PrivateMessageBack",
             Self::Re { .. }                    => "Re",
             Self::HeartRequest { .. }          => "HeartRequest",
+            Self::Heart { .. }                 => "Heart",
             Self::VoiceJoin { .. }             => "VoiceJoin",
             Self::VoiceLeave { .. }            => "VoiceLeave",
             Self::UploadRequest { .. }         => "UploadRequest",

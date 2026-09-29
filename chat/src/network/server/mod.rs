@@ -1637,25 +1637,18 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     continue;
                 }
 
-                //CHECK MESSAGE ID VALIDITY
-                if !config::messages::exists(message_id)
+                //TOGGLE A HEART
+                let Some(hearts) = config::messages::heart(message_id, &username) else
                 {
                     log::warn!("Heart refused (invalid message): {peer_addr}");
 
                     //SEND InvalidUsage CODE
                     network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
-                }
-
-                //TOGGLE A HEART
-                config::messages::heart(message_id, &username);
+                };
 
                 //FORWARD TO ALL USERS
-                send_to_all(PacketCode::Heart
-                {
-                    message_id,
-                    username: username.clone(),
-                });
+                send_to_all(PacketCode::Heart { message_id, hearts });
             },
 
             //MUTE USER
