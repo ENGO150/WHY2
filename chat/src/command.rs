@@ -69,6 +69,7 @@ pub enum Command
     #[cfg(feature = "client_screen")] Deattach, //DEATTACH SCREEN SHARE
     Delete,                                     //DELETE A STORED MESSAGE
     PrivateMessage,                             //ONE TO ONE MESSAGE
+    Heart,                                      //TOGGLE MESSAGE HEART REACTION
     Reply,                                      //REPLY TO MESSAGE
     Re,                                         //REPLY TO PRIVATE MESSAGE
     Settings,                                   //OPEN THE SETTINGS OVERLAY
@@ -603,6 +604,26 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Heart,
+        triggers: &[ "HEART", "UNHEART", "LIKE", "REACT", "STAR" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "ID of the message",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Toggles heart reaction on a message.",
+    },
+
+    CommandInfo
+    {
         command: Command::Reply,
         triggers: &[ "REPLY", "RESPOND" ],
         shortcut: None,
@@ -860,6 +881,12 @@ impl Command
                     None => Err(()),
                 })
             },
+
+            Command::Heart => Some(match parameters.and_then(|p| p.parse::<u64>().ok())
+            {
+                Some(message_id) => Ok(PacketCode::HeartRequest { message_id }),
+                None => Err(()),
+            }),
 
             Command::Reply =>
             {
