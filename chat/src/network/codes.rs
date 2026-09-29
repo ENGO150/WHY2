@@ -292,6 +292,7 @@ pub enum PacketCode //CONTROL CODES
     DeleteRequest { message_id: u64 },                 //CLIENT -> SERVER | DELETE A STORED MESSAGE
     Deleted { message_id: u64 },                       //SERVER -> CLIENT | A MESSAGE WAS DELETED
     Re { message: String },                            //CLIENT -> SERVER | REPLY TO LAST PM
+    HeartRequest { message_id: u64 },                  //CLIENT -> SERVER | REQUEST HEART REACTION TO MESSAGE
     Channel { channel: Option<String> },               //SERVER <> CLIENT | CHANNEL CHANGE
     ChannelCreated { name: String },                   //SERVER -> CLIENT | CHANNEL CREATED
     ChannelDestroyed { name: String },                 //SERVER -> CLIENT | CHANNEL ABANDONED
@@ -365,6 +366,7 @@ impl PacketCode
             Self::PrivateMessage { .. }        => "PrivateMessage",
             Self::PrivateMessageBack { .. }    => "PrivateMessageBack",
             Self::Re { .. }                    => "Re",
+            Self::HeartRequest { .. }          => "HeartRequest",
             Self::VoiceJoin { .. }             => "VoiceJoin",
             Self::VoiceLeave { .. }            => "VoiceLeave",
             Self::UploadRequest { .. }         => "UploadRequest",
