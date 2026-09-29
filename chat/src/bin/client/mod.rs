@@ -759,7 +759,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         },
         LoginState::Login => PacketCode::Login { password: input },
         LoginState::Register => PacketCode::Register { password: input },
-        LoginState::None => PacketCode::MessageRequest { text: input },
+        LoginState::None => PacketCode::MessageRequest { text: input, reply: None },
     };
 
     network::send(&mut *write_stream.lock().await, packet, options::get_keys().as_ref()).await;

@@ -69,6 +69,7 @@ pub enum Command
     #[cfg(feature = "client_screen")] Deattach, //DEATTACH SCREEN SHARE
     Delete,                                     //DELETE A STORED MESSAGE
     PrivateMessage,                             //ONE TO ONE MESSAGE
+    Reply,                                      //REPLY TO MESSAGE
     Re,                                         //REPLY TO PRIVATE MESSAGE
     Settings,                                   //OPEN THE SETTINGS OVERLAY
     Profile,                                    //OPEN A USER PROFILE
@@ -602,8 +603,35 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Reply,
+        triggers: &[ "REPLY", "RESPOND" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "ID of the message",
+                required: true,
+                values: ArgValues::Free,
+            },
+            CommandArg
+            {
+                name: "MESSAGE",
+                description: "Message content",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Responds to message",
+    },
+
+    CommandInfo
+    {
         command: Command::Re,
-        triggers: &[ "RE", "REPLY", "RESPOND" ],
+        triggers: &[ "RE", "ANSWER" ],
         shortcut: None,
         minimal_role: Role::User,
         subcommands: &[],
@@ -829,6 +857,19 @@ impl Command
                 Some(match parsed
                 {
                     Some((id, text)) => Ok(PacketCode::PrivateMessageRequest { id, text }),
+                    None => Err(()),
+                })
+            },
+
+            Command::Reply =>
+            {
+                let parsed = parameters
+                    .and_then(|p| p.split_once(' '))
+                    .and_then(|(reply, text)| Some((reply.parse::<u64>().ok()?, text.to_string())));
+
+                Some(match parsed
+                {
+                    Some((reply, text)) => Ok(PacketCode::MessageRequest { text, reply: Some(reply) }),
                     None => Err(()),
                 })
             },

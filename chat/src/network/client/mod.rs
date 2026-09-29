@@ -122,7 +122,7 @@ pub enum ClientEvent
     FirstUser,                                                   //FIRST USER
     Authenticated(Role),                                         //LOGIN SUCCESSFUL, ROLE
     Connected(String),                                           //SUCCESSFUL CONNECTION MESSAGE
-    Message(String, String, usize, u64, MessageColors, Option<Option<String>>, Option<u64>), //RECEIVED MESSAGE, ITS CHANNEL, WHEN
+    Message(String, String, usize, u64, MessageColors, Option<Option<String>>, Option<u64>, Option<u64>), //RECEIVED MESSAGE, ITS CHANNEL, WHEN, WHAT IT REPLIES TO
     PrivateMessageSent(String, usize, String, MessageColors),    //SENT PM
     PrivateMessageRecv(String, usize, String, MessageColors),    //RECEIVED PM
     TofuError,                                                   //TOFU VERIFICATION REJECTED BY THE USER
@@ -283,9 +283,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
         match read
         {
             //REGULAR MESSAGE
-            PacketCode::Message { text, username, id, message_id, colors, channel, timestamp, .. } =>
+            PacketCode::Message { text, username, id, message_id, colors, channel, timestamp, reply } =>
             {
-                tx.send(ClientEvent::Message(text, username, id, message_id, colors, channel, timestamp)).await.unwrap();
+                tx.send(ClientEvent::Message(text, username, id, message_id, colors, channel, timestamp, reply)).await.unwrap();
             }
 
             //THE LOBBY'S STORED MESSAGES
