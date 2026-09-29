@@ -50,6 +50,7 @@ pub enum PacketCode //CONTROL CODES
         colors: MessageColors,
         channel: Option<Option<String>>,
         timestamp: Option<u64>, //UNIX SECONDS
+        reply: Option<u64>,     //ID OF THE MESSAGE REPLIED TO
     },
 
     //SERVER -> CLIENT | KEY EXCHANGE OFFER
@@ -518,6 +519,7 @@ pub struct StoredMessage
     pub colors: MessageColors,
     pub image: Option<[u8; 32]>, //CONTENT HASH OF THE PICTURE
     pub timestamp: Option<u64>,  //UNIX SECONDS
+    pub reply: Option<u64>,      //ID OF THE MESSAGE REPLIED TO
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]

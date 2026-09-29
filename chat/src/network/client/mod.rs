@@ -283,7 +283,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
         match read
         {
             //REGULAR MESSAGE
-            PacketCode::Message { text, username, id, message_id, colors, channel, timestamp } =>
+            PacketCode::Message { text, username, id, message_id, colors, channel, timestamp, .. } =>
             {
                 tx.send(ClientEvent::Message(text, username, id, message_id, colors, channel, timestamp)).await.unwrap();
             }

@@ -996,7 +996,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //KEEP IT - ONLY THE LOBBY HAS A HISTORY
                 let message_id = match channel.is_none() && config::read_config::<bool>("persistent_messages")
                 {
-                    true => config::messages::store(&username, &text, timestamp),
+                    true => config::messages::store(&username, &text, timestamp, None),
                     false => config::messages::next_id(),
                 };
 
@@ -1010,6 +1010,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     colors: config::users::colors(&username),
                     channel: Some(channel.clone()),
                     timestamp,
+                    reply: None,
                 });
             }
 

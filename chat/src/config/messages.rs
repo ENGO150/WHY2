@@ -49,6 +49,17 @@ struct Record //ONE MESSAGE RECORD
     text: String,
     image: Option<[u8; 32]>,
     timestamp: Option<u64>, //UNIX SECONDS
+    reply: Option<u64>,     //ID OF THE MESSAGE REPLIED TO
+}
+
+#[derive(SchemaRead)]
+struct TimestampRecord //A RECORD BEFORE REPLIES (remove with next version bump)
+{
+    id: u64,
+    username: String,
+    text: String,
+    image: Option<[u8; 32]>,
+    timestamp: Option<u64>,
 }
 
 struct History //THE RECORDS AND THE NEXT ID
@@ -67,7 +78,8 @@ pub struct Page
 }
 
 //CONSTS
-const MAGIC: &[u8; 8] = b"WHY2MSG\x02"; //FORMAT MARKER
+const MAGIC: &[u8; 8] = b"WHY2MSG\x03"; //FORMAT MARKER
+const MAGIC_V2: &[u8; 8] = b"WHY2MSG\x02"; //MARKER BEFORE REPLIES (remove with next version bump)
 
 //GLOBAL VARIABLES
 static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History::new())); //MESSAGE HISTORY
@@ -139,6 +151,9 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
         return Vec::new();
     };
 
+    //AN OLDER MARKER IS AN OLDER FORMAT
+    if let Some(records) = plaintext.strip_prefix(MAGIC_V2) { return migrate(records); }
+
     //NO MARKER IS UNREADABLE
     let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };
 
@@ -163,6 +178,26 @@ fn unreadable() -> Vec<Record> //KEEP A COPY, START EMPTY
     Vec::new()
 }
 
+fn migrate(records: &[u8]) -> Vec<Record> //LOAD A HISTORY WITHOUT REPLIES (remove with next version bump)
+{
+    let Ok(history) = wincode::config::deserialize::<Vec<TimestampRecord>, _>(records, consts::PACKET_CONFIG) else
+    {
+        return unreadable();
+    };
+
+    log::info!("Migrated {} stored messages, no replies", history.len());
+
+    history.into_iter().map(|message| Record
+    {
+        id: message.id,
+        username: message.username,
+        text: message.text,
+        image: message.image,
+        timestamp: message.timestamp,
+        reply: None,
+    }).collect()
+}
+
 //PUBLIC
 pub fn timestamp() -> Option<u64> //NOW, IF TIMESTAMPS ARE ON
 {
@@ -175,17 +210,17 @@ pub fn next_id() -> u64 //ID FOR A MESSAGE THAT IS NOT KEPT
     HISTORY.lock().unwrap().take_id()
 }
 
-pub fn store(username: &str, text: &str, timestamp: Option<u64>) -> u64 //APPEND MESSAGE
+pub fn store(username: &str, text: &str, timestamp: Option<u64>, reply: Option<u64>) -> u64 //APPEND MESSAGE
 {
-    push(username, text, None, timestamp)
+    push(username, text, None, timestamp, reply)
 }
 
 pub fn store_image(username: &str, filename: &str, hash: &[u8; 32], timestamp: Option<u64>) -> u64
 {
-    push(username, filename, Some(*hash), timestamp)
+    push(username, filename, Some(*hash), timestamp, None)
 }
 
-fn push(username: &str, text: &str, image: Option<[u8; 32]>, timestamp: Option<u64>) -> u64 //APPEND ONE ENTRY AND REWRITE THE FILE
+fn push(username: &str, text: &str, image: Option<[u8; 32]>, timestamp: Option<u64>, reply: Option<u64>) -> u64 //APPEND ONE ENTRY AND REWRITE THE FILE
 {
     let limit: usize = super::read_config("max_persistent_messages");
 
@@ -195,7 +230,7 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>, timestamp: Option<u
     //A HISTORY OF NOTHING DOES NOT TOUCH THE FILE
     if limit == 0 { return id; }
 
-    guard.records.push(Record { id, username: username.to_string(), text: text.to_string(), image, timestamp });
+    guard.records.push(Record { id, username: username.to_string(), text: text.to_string(), image, timestamp, reply });
 
     //KEEP THE LAST limit MESSAGES
     let over = guard.records.len().saturating_sub(limit);
@@ -333,6 +368,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
             },
             image: message.image,
             timestamp: message.timestamp.filter(|_| timestamps), //HIDDEN WHILE TURNED OFF
+            reply: message.reply,
         }
     }).collect();
 
