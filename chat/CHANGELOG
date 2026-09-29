@@ -1,6 +1,25 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.2.5:
+- f32f04b3: upgrade chat dependencies
+- 19718f35: implement Hearts command
+- a3839052: render message hearts on client
+- 2cc8fd24: forward heart updates to client events
+- 5988388f: send all 'hearters' in PacketCode::Heart
+- b21c7f09: add Heart command
+- b8018fc2: forward heart reaction to all users
+- 935cb0cd: implement HeartRequest on server
+- 0e95b855: add PacketCode::HeartRequest
+- 0767e310: add hearts to message history
+- 1db06655: render message replies on client
+- 20a8c7af: store replies in message history
+- 607f07de: wire message replies on client
+- 43a10a89: wire message replies on server
+- 294ab8a5: add messages::exists helper
+- 8becc248: add reply field to message structs
+- c4e62492: remove migration code
+
 v2.2.4:
 - 36a6b54f: add option to disable message stripes
 - 784f0330: stripe every other message
