@@ -971,10 +971,8 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - **The in-memory `HISTORY` is the working set**, and the file is the copy of it that survives a
     restart: it is read once, on first touch, and only ever written after that. A missing, truncated,
     tampered, unrecognisable file, or one written under another server's keys, all load as an empty
-    history rather than refusing to start. The one older format that is *not* thrown away is the one
-    from before replies (`MAGIC_V2`, `migrate`, marked in the code to go with the next version bump): it
-    is read through `TimestampRecord` and every record loads with `reply: None`. It converts **in memory
-    only** — the next message rewrites the file under `MAGIC`. Anything older is unreadable like any other.
+    history rather than refusing to start. There is no migration: a file under any marker other than
+    `MAGIC` is unreadable like any other.
   - **A message can name the message it replies to** (`reply: Option<u64>`, a message id, on
     `MessageRequest`, `Record`, `StoredMessage`, `PacketCode::Message` and `ClientEvent::Message`), set by
     `/reply ID MESSAGE` (`/re` is still the private-message answer). The server refuses a reply naming a
