@@ -146,6 +146,7 @@ pub enum ClientEvent
     Muted,                                                       //HAHA
     InvalidUsage,                                                //INVALID COMMAND USAGE
     Deleted(u64),                                                //A MESSAGE WAS DELETED (MESSAGE ID)
+    Hearts(u64, Vec<String>),                                    //A MESSAGE'S HEARTS CHANGED (MESSAGE ID, WHO)
     VersionFailed,                                               //FETCHING VERSIONS FAILED
     VersionMismatch(String, String),                             //MISMATCH GIT HASH
     UnsafeVersion(usize, Version, String),                       //OLD VERSION
@@ -839,6 +840,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::Deleted { message_id } =>
             {
                 tx.send(ClientEvent::Deleted(message_id)).await.unwrap();
+            },
+
+            //A MESSAGE'S HEARTS CHANGED
+            PacketCode::Heart { message_id, hearts } =>
+            {
+                tx.send(ClientEvent::Hearts(message_id, hearts)).await.unwrap();
             },
 
             //CLIENT MESSED SOME COMMAND UP
