@@ -50,6 +50,18 @@ struct Record //ONE MESSAGE RECORD
     image: Option<[u8; 32]>,
     timestamp: Option<u64>, //UNIX SECONDS
     reply: Option<u64>,     //ID OF THE MESSAGE REPLIED TO
+    hearts: Vec<String>,    //USERNAMES THAT HEARTED IT
+}
+
+#[derive(SchemaRead)]
+struct ReplyRecord //A RECORD BEFORE HEARTS (remove with next version bump)
+{
+    id: u64,
+    username: String,
+    text: String,
+    image: Option<[u8; 32]>,
+    timestamp: Option<u64>,
+    reply: Option<u64>,
 }
 
 #[derive(SchemaRead)]
@@ -78,7 +90,8 @@ pub struct Page
 }
 
 //CONSTS
-const MAGIC: &[u8; 8] = b"WHY2MSG\x03"; //FORMAT MARKER
+const MAGIC: &[u8; 8] = b"WHY2MSG\x04"; //FORMAT MARKER
+const MAGIC_V3: &[u8; 8] = b"WHY2MSG\x03"; //MARKER BEFORE HEARTS (remove with next version bump)
 const MAGIC_V2: &[u8; 8] = b"WHY2MSG\x02"; //MARKER BEFORE REPLIES (remove with next version bump)
 
 //GLOBAL VARIABLES
@@ -86,6 +99,40 @@ static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History::
 static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                                       //AT-REST KEYS
 
 //IMPLEMENTATIONS
+impl From<TimestampRecord> for Record //NO REPLY, NO HEARTS (remove with next version bump)
+{
+    fn from(message: TimestampRecord) -> Self
+    {
+        Self
+        {
+            id: message.id,
+            username: message.username,
+            text: message.text,
+            image: message.image,
+            timestamp: message.timestamp,
+            reply: None,
+            hearts: Vec::new(),
+        }
+    }
+}
+
+impl From<ReplyRecord> for Record //NO HEARTS (remove with next version bump)
+{
+    fn from(message: ReplyRecord) -> Self
+    {
+        Self
+        {
+            id: message.id,
+            username: message.username,
+            text: message.text,
+            image: message.image,
+            timestamp: message.timestamp,
+            reply: message.reply,
+            hearts: Vec::new(),
+        }
+    }
+}
+
 impl History
 {
     fn new() -> Self //LOAD AND CONTINUE THE IDS
@@ -158,7 +205,17 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
     };
 
     //AN OLDER MARKER IS AN OLDER FORMAT
-    if let Some(records) = plaintext.strip_prefix(MAGIC_V2) { return migrate(records); }
+    if let Some(records) = plaintext.strip_prefix(MAGIC_V2)
+    {
+        return migrate(wincode::config::deserialize::<Vec<TimestampRecord>, _>(records, consts::PACKET_CONFIG)
+            .map(|history| history.into_iter().map(Record::from).collect()));
+    }
+
+    if let Some(records) = plaintext.strip_prefix(MAGIC_V3)
+    {
+        return migrate(wincode::config::deserialize::<Vec<ReplyRecord>, _>(records, consts::PACKET_CONFIG)
+            .map(|history| history.into_iter().map(Record::from).collect()));
+    }
 
     //NO MARKER IS UNREADABLE
     let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };
@@ -184,24 +241,12 @@ fn unreadable() -> Vec<Record> //KEEP A COPY, START EMPTY
     Vec::new()
 }
 
-fn migrate(records: &[u8]) -> Vec<Record> //LOAD A HISTORY WITHOUT REPLIES (remove with next version bump)
+fn migrate<E>(history: Result<Vec<Record>, E>) -> Vec<Record> //LOAD AN OLDER FORMAT (remove with next version bump)
 {
-    let Ok(history) = wincode::config::deserialize::<Vec<TimestampRecord>, _>(records, consts::PACKET_CONFIG) else
-    {
-        return unreadable();
-    };
+    let Ok(history) = history else { return unreadable() };
 
-    log::info!("Migrated {} stored messages, no replies", history.len());
-
-    history.into_iter().map(|message| Record
-    {
-        id: message.id,
-        username: message.username,
-        text: message.text,
-        image: message.image,
-        timestamp: message.timestamp,
-        reply: None,
-    }).collect()
+    log::info!("Migrated {} stored messages from an older format", history.len());
+    history
 }
 
 //PUBLIC
@@ -236,7 +281,16 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>, timestamp: Option<u
     //A HISTORY OF NOTHING DOES NOT TOUCH THE FILE
     if limit == 0 { return id; }
 
-    guard.records.push(Record { id, username: username.to_string(), text: text.to_string(), image, timestamp, reply });
+    guard.records.push(Record
+    {
+        id,
+        username: username.to_string(),
+        text: text.to_string(),
+        image,
+        timestamp,
+        reply,
+        hearts: Vec::new(),
+    });
 
     //KEEP THE LAST limit MESSAGES
     let over = guard.records.len().saturating_sub(limit);
@@ -287,6 +341,25 @@ pub fn delete(id: u64) -> bool //REMOVE MESSAGE id AND REWRITE THE FILE
     remove_images(orphans);
 
     true
+}
+
+pub fn heart(id: u64, username: &str) -> Option<Vec<String>> //TOGGLE A HEART, THE NEW SET
+{
+    let mut guard = HISTORY.lock().unwrap();
+
+    let index = guard.find(id)?;
+    let hearts = &mut guard.records[index].hearts;
+
+    match hearts.iter().position(|name| name == username)
+    {
+        Some(heart) => { hearts.remove(heart); },
+        None => hearts.push(username.to_string()),
+    }
+
+    let hearts = hearts.clone();
+    guard.save();
+
+    Some(hearts)
 }
 
 pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
@@ -346,7 +419,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
         {
             let record = &history.records[from - 1];
 
-            size += record.username.len() + record.text.len();
+            size += record.username.len() + record.text.len() + record.hearts.iter().map(String::len).sum::<usize>();
             if size > budget && from != to { break; }
 
             from -= 1;
@@ -379,6 +452,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
             image: message.image,
             timestamp: message.timestamp.filter(|_| timestamps), //HIDDEN WHILE TURNED OFF
             reply: message.reply,
+            hearts: message.hearts,
         }
     }).collect();
 

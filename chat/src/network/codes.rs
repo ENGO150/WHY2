@@ -521,6 +521,7 @@ pub struct StoredMessage
     pub image: Option<[u8; 32]>, //CONTENT HASH OF THE PICTURE
     pub timestamp: Option<u64>,  //UNIX SECONDS
     pub reply: Option<u64>,      //ID OF THE MESSAGE REPLIED TO
+    pub hearts: Vec<String>,     //USERNAMES THAT HEARTED IT
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
