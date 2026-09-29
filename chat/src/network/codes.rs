@@ -38,6 +38,7 @@ pub enum PacketCode //CONTROL CODES
     MessageRequest
     {
         text: String,
+        reply: Option<u64>,
     },
 
     //SERVER -> CLIENT | TEXT MESSAGE

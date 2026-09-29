@@ -975,7 +975,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         match read
         {
             //MESSAGE
-            PacketCode::MessageRequest { text } =>
+            PacketCode::MessageRequest { text, reply } =>
             {
                 //SILENCE MUTED USERS
                 if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
@@ -983,6 +983,16 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     log::debug!("Message dropped (muted): {peer_addr}");
 
                     network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
+                    continue;
+                }
+
+                //CHECK REPLY VALIDITY
+                if let Some(reply) = reply && !config::messages::exists(reply)
+                {
+                    log::debug!("Message dropped (invalid reply): {peer_addr}");
+
+                    //SEND InvalidUsage CODE
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
                     continue;
                 }
 
@@ -1010,7 +1020,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     colors: config::users::colors(&username),
                     channel: Some(channel.clone()),
                     timestamp,
-                    reply: None,
+                    reply,
                 });
             }
 
