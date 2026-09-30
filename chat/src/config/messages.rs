@@ -51,6 +51,19 @@ struct Record //ONE MESSAGE RECORD
     timestamp: Option<u64>, //UNIX SECONDS
     reply: Option<u64>,     //ID OF THE MESSAGE REPLIED TO
     hearts: Vec<String>,    //USERNAMES THAT HEARTED IT
+    edited: bool,           //CHANGED SINCE SENT
+}
+
+#[derive(SchemaRead)]
+struct HeartRecord //A RECORD BEFORE EDITS (remove with next version bump)
+{
+    id: u64,
+    username: String,
+    text: String,
+    image: Option<[u8; 32]>,
+    timestamp: Option<u64>,
+    reply: Option<u64>,
+    hearts: Vec<String>,
 }
 
 struct History //THE RECORDS AND THE NEXT ID
@@ -69,13 +82,32 @@ pub struct Page
 }
 
 //CONSTS
-const MAGIC: &[u8; 8] = b"WHY2MSG\x04"; //FORMAT MARKER
+const MAGIC: &[u8; 8] = b"WHY2MSG\x05"; //FORMAT MARKER
+const MAGIC_V4: &[u8; 8] = b"WHY2MSG\x04"; //MARKER BEFORE EDITS (remove with next version bump)
 
 //GLOBAL VARIABLES
 static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History::new())); //MESSAGE HISTORY
 static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                                       //AT-REST KEYS
 
 //IMPLEMENTATIONS
+impl From<HeartRecord> for Record //NOT EDITED (remove with next version bump)
+{
+    fn from(message: HeartRecord) -> Self
+    {
+        Self
+        {
+            id: message.id,
+            username: message.username,
+            text: message.text,
+            image: message.image,
+            timestamp: message.timestamp,
+            reply: message.reply,
+            hearts: message.hearts,
+            edited: false,
+        }
+    }
+}
+
 impl History
 {
     fn new() -> Self //LOAD AND CONTINUE THE IDS
@@ -147,6 +179,13 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
         return Vec::new();
     };
 
+    //AN OLDER MARKER IS AN OLDER FORMAT
+    if let Some(records) = plaintext.strip_prefix(MAGIC_V4)
+    {
+        return migrate(wincode::config::deserialize::<Vec<HeartRecord>, _>(records, consts::PACKET_CONFIG)
+            .map(|history| history.into_iter().map(Record::from).collect()));
+    }
+
     //NO MARKER IS UNREADABLE
     let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };
 
@@ -169,6 +208,14 @@ fn unreadable() -> Vec<Record> //KEEP A COPY, START EMPTY
 
     log::error!("Message history could not be read, it is being ignored (copy kept as {backup})");
     Vec::new()
+}
+
+fn migrate<E>(history: Result<Vec<Record>, E>) -> Vec<Record> //LOAD AN OLDER FORMAT (remove with next version bump)
+{
+    let Ok(history) = history else { return unreadable() };
+
+    log::info!("Migrated {} stored messages from an older format", history.len());
+    history
 }
 
 //PUBLIC
@@ -212,6 +259,7 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>, timestamp: Option<u
         timestamp,
         reply,
         hearts: Vec::new(),
+        edited: false,
     });
 
     //KEEP THE LAST limit MESSAGES
@@ -375,6 +423,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
             timestamp: message.timestamp.filter(|_| timestamps), //HIDDEN WHILE TURNED OFF
             reply: message.reply,
             hearts: message.hearts,
+            edited: message.edited,
         }
     }).collect();
 
