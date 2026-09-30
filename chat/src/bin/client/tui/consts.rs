@@ -89,6 +89,7 @@ pub const QUOTE: &str                 = "▏ ";                      //AND A BLO
 pub const RULE: char                  = '─';
 pub const REPLY: &str                 = "╭─ ";                     //WHAT A REPLY'S QUOTE OPENS WITH
 pub const HEART: &str                 = "♥";                       //A MESSAGE'S HEART COUNT
+pub const EDITED: &str                = "(edited)";                //A REWORDED MESSAGE'S MARK
 
 pub const INDENT: &str                = "  ";                      //DISPLAY MATH IS SET IN FROM THE PANE, THE WAY A BLOCK IS
 pub const MAX_DEPTH: usize            = 32;                        //A BRACE THIS DEEP IS A BRACE

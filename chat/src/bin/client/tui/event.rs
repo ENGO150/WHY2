@@ -89,7 +89,7 @@ impl App
                 match channel.map(Option::unwrap_or_default)
                 {
                     Some(channel) if channel != self.channel =>
-                        self.park_entry(channel, state::Entry::Message { username, id, message_id, timestamp, text: message, colors, reply, hearts: Vec::new() }),
+                        self.park_entry(channel, state::Entry::Message { username, id, message_id, timestamp, text: message, colors, reply, hearts: Vec::new(), edited: false }),
 
                     _ =>
                     {
@@ -255,6 +255,8 @@ impl App
 
             ClientEvent::Hearts(message_id, hearts) => self.set_hearts(message_id, hearts),
 
+            ClientEvent::Edited(message_id, text) => self.edit_message(message_id, text),
+
             ClientEvent::InvalidUsage =>
             {
                 //A REFUSED SAVE LEAVES THE BOX EDITABLE
@@ -373,6 +375,7 @@ impl App
                         colors: message.colors,
                         reply: message.reply,
                         hearts: message.hearts,
+                        edited: message.edited,
                     },
                 }).collect();
 

@@ -106,6 +106,7 @@ pub enum Entry //ONE ROW OF HISTORY
         colors: MessageColors,
         reply: Option<u64>,     //THE MESSAGE IT ANSWERS
         hearts: Vec<String>,    //WHO HEARTED IT
+        edited: bool,           //CHANGED SINCE SENT
     },
 
     //A REPLAYED MESSAGE, WITHOUT A CLIENT ID
@@ -118,6 +119,7 @@ pub enum Entry //ONE ROW OF HISTORY
         colors: MessageColors,
         reply: Option<u64>,
         hearts: Vec<String>,
+        edited: bool,
     },
 
     //A PRIVATE MESSAGE, STORED UNRENDERED
@@ -180,6 +182,20 @@ impl Entry
     fn set_hearts(&mut self, new: Vec<String>) //REPLACE WHO HEARTED IT
     {
         if let Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. } = self { *hearts = new; }
+    }
+
+    pub fn edited(&self) -> bool //CHANGED SINCE SENT
+    {
+        matches!(self, Entry::Message { edited: true, .. } | Entry::History { edited: true, .. })
+    }
+
+    fn set_text(&mut self, new: String) //REWORD IT
+    {
+        if let Entry::Message { text, edited, .. } | Entry::History { text, edited, .. } = self
+        {
+            *text = new;
+            *edited = true;
+        }
     }
 
     pub fn reply(&self) -> Option<u64> //THE MESSAGE IT ANSWERS
@@ -483,7 +499,7 @@ impl App
     pub fn push_message(&mut self, username: String, id: usize, message_id: u64, timestamp: Option<u64>, text: String,
         colors: MessageColors, reply: Option<u64>)
     {
-        self.push_entry(Entry::Message { username, id, message_id, timestamp, text, colors, reply, hearts: Vec::new() });
+        self.push_entry(Entry::Message { username, id, message_id, timestamp, text, colors, reply, hearts: Vec::new(), edited: false });
     }
 
     //STORE AN ENTRY IN ANOTHER CHANNEL'S PARKED PANE
@@ -588,12 +604,24 @@ impl App
     //A MESSAGE'S HEARTS CHANGED
     pub fn set_hearts(&mut self, message_id: u64, hearts: Vec<String>)
     {
+        self.update_message(message_id, |entry| entry.set_hearts(hearts));
+    }
+
+    //A MESSAGE WAS REWORDED
+    pub fn edit_message(&mut self, message_id: u64, text: String)
+    {
+        self.update_message(message_id, |entry| entry.set_text(text));
+    }
+
+    //CHANGE A MESSAGE IN PLACE, WHICHEVER PANE HOLDS IT
+    fn update_message(&mut self, message_id: u64, change: impl FnOnce(&mut Entry))
+    {
         let Some(index) = self.messages.iter().position(|entry| entry.message_id() == Some(message_id)) else
         {
             //A PARKED PANE ONLY UPDATES THE ENTRY
             if let Some(entry) = self.panes.get_mut("").and_then(|pane| pane.iter_mut().find(|entry| entry.message_id() == Some(message_id)))
             {
-                entry.set_hearts(hearts);
+                change(entry);
             }
 
             return;
@@ -604,7 +632,7 @@ impl App
         let before = self.wrapped_len();
         let end = self.wrapped.as_ref().and_then(|wrapped| wrapped.4.get(index + 1).copied()).unwrap_or(before);
 
-        self.messages[index].set_hearts(hearts);
+        change(&mut self.messages[index]);
 
         self.generation += 1;
         self.dirty = true;

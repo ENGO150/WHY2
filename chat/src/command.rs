@@ -68,6 +68,7 @@ pub enum Command
     #[cfg(feature = "client_screen")] Attach,   //ATTACH SCREEN SHARE
     #[cfg(feature = "client_screen")] Deattach, //DEATTACH SCREEN SHARE
     Delete,                                     //DELETE A STORED MESSAGE
+    Edit,                                       //REWORD A STORED MESSAGE
     PrivateMessage,                             //ONE TO ONE MESSAGE
     Heart,                                      //TOGGLE MESSAGE HEART REACTION
     Hearts,                                     //LIST WHO HEARTED A MESSAGE
@@ -712,6 +713,33 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Edit,
+        triggers: &[ "EDIT", "E" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args:
+        &[
+            CommandArg
+            {
+                name: "ID",
+                description: "ID of the message",
+                required: true,
+                values: ArgValues::Free,
+            },
+            CommandArg
+            {
+                name: "MESSAGE",
+                description: "New message content",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "Edits your message in the history",
+    },
+
+    CommandInfo
+    {
         command: Command::Settings,
         triggers: &[ "SETTINGS", "SETUP", "CONFIG", "PREFERENCES", "AUDIO" ],
         shortcut: Some(','),
@@ -962,6 +990,19 @@ impl Command
                 Some(message_id) => Ok(PacketCode::DeleteRequest { message_id }),
                 None => Err(()),
             }),
+
+            Command::Edit =>
+            {
+                let parsed = parameters
+                    .and_then(|p| p.split_once(' '))
+                    .and_then(|(message_id, text)| Some((message_id.parse::<u64>().ok()?, text.to_string())));
+
+                Some(match parsed
+                {
+                    Some((message_id, text)) => Ok(PacketCode::EditRequest { message_id, text }),
+                    None => Err(()),
+                })
+            },
 
             Command::Channel => Some(Ok(PacketCode::Channel { channel: parameters.map(str::to_string) })),
 
