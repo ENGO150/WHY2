@@ -145,6 +145,20 @@ pub enum PacketCode //CONTROL CODES
         colors: MessageColors,
     },
 
+    //CLIENT -> SERVER | REWORD A STORED MESSAGE
+    EditRequest
+    {
+        message_id: u64,
+        text: String,
+    },
+
+    //SERVER -> CLIENT | A MESSAGE WAS REWORDED
+    Edited
+    {
+        message_id: u64,
+        text: String,
+    },
+
     //SERVER -> CLIENT | HEART REACTION
     Heart
     {
@@ -373,6 +387,8 @@ impl PacketCode
             Self::PrivateMessage { .. }        => "PrivateMessage",
             Self::PrivateMessageBack { .. }    => "PrivateMessageBack",
             Self::Re { .. }                    => "Re",
+            Self::EditRequest { .. }           => "EditRequest",
+            Self::Edited { .. }                => "Edited",
             Self::HeartRequest { .. }          => "HeartRequest",
             Self::Heart { .. }                 => "Heart",
             Self::VoiceJoin { .. }             => "VoiceJoin",
@@ -532,6 +548,7 @@ pub struct StoredMessage
     pub timestamp: Option<u64>,  //UNIX SECONDS
     pub reply: Option<u64>,      //ID OF THE MESSAGE REPLIED TO
     pub hearts: Vec<String>,     //USERNAMES THAT HEARTED IT
+    pub edited: bool,            //CHANGED SINCE SENT
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]

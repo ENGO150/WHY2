@@ -332,6 +332,23 @@ pub fn heart(id: u64, username: &str) -> Option<Vec<String>> //TOGGLE A HEART, T
     Some(hearts)
 }
 
+pub fn edit(id: u64, username: &str, text: &str) -> bool //REWORD OWN TEXT MESSAGE id
+{
+    let mut guard = HISTORY.lock().unwrap();
+
+    let Some(index) = guard.find(id) else { return false };
+    let record = &mut guard.records[index];
+
+    if record.username != username || record.image.is_some() { return false; }
+
+    record.text = text.to_string();
+    record.edited = true;
+
+    guard.save();
+
+    true
+}
+
 pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
 {
     HISTORY.lock().unwrap().records.iter().any(|message| message.image.as_ref() == Some(hash))

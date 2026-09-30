@@ -1161,6 +1161,35 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 }
             },
 
+            //REWORD A STORED MESSAGE
+            PacketCode::EditRequest { message_id, text } =>
+            {
+                //SILENCE MUTED USERS
+                if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
+                {
+                    log::debug!("Edit dropped (muted): {peer_addr}");
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
+                    continue;
+                }
+
+                let text = text.trim().to_owned();
+
+                //OWN TEXT MESSAGES ONLY
+                if !text.is_empty() && config::messages::edit(message_id, &username, &text)
+                {
+                    log::info!("Message edited ({} chars): {peer_addr}", text.chars().count());
+
+                    //EVERY CLIENT HOLDS A LOBBY PANE
+                    send_to_all(PacketCode::Edited { message_id, text });
+                } else
+                {
+                    log::warn!("Edit refused (no such message, empty, or permissions): {peer_addr}");
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                }
+            },
+
             //CLIENT REQUESTED LIST OF ONLINE USERS
             PacketCode::ListRequest =>
             {
