@@ -141,7 +141,7 @@ v1.4.3:
 - a87e485d: move latex parser to core
 - a56a9fdb: use readme in workspaces
 
-v1.4.3:
+v1.4.3-sync:
 - 13e3d076: split repository on workspaces
 
 v1.4.2:
@@ -234,7 +234,7 @@ v1.3.2:
 - fbbf11dc: update root docs
 - f20664e1: remove chat module lib
 
-v0.3.0-rex:
+v0.3.0-rex.1:
 - cd4b9168: fix crates.io problems caused by rust workspaces
 
 v0.3.0-rex:

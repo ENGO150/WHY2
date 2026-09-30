@@ -46,6 +46,8 @@ v2.2.4:
 - a10883ed: handle password changes on server
 - 99a49675: add account commands
 - ce5822d7: revert username trigger for BanIP
+
+v2.2.4-rc.1:
 - 29a5c204: add possibility to reference user in Ban & Role commands by username
 
 v2.2.3:
@@ -798,7 +800,7 @@ v1.4.3:
 - 23ac8b74: disable documentation generation for chat workspace
 - a56a9fdb: use readme in workspaces
 
-v1.4.3:
+v1.4.3-sync:
 - 94195048: use why-chat instead of why2_chat
 - cf78e481: use client feature defaultly on chat
 - 6fe799d3: move build script to chat workspace
@@ -1006,7 +1008,7 @@ v1.3.1:
 - 43bbc05b: prevent peer_addr unwrapping
 - 556b31ee: add stream shutdown to remove_connection fn
 
-v0.3.0-rex:
+v0.3.0-rex.1:
 - cd4b9168: fix crates.io problems caused by rust workspaces
 
 v0.3.0-rex:
