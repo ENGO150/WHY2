@@ -824,7 +824,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
     CommandInfo
     {
         command: Command::Logout,
-        triggers: &[ "LOGOUT", "SIGNOUT", "SWITCH" ],
+        triggers: &[ "LOGOUT", "SIGNOUT" ],
         shortcut: Some('o'),
         minimal_role: Role::User,
         subcommands: &[],
