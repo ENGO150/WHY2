@@ -21,7 +21,7 @@ use ratatui::
     Frame,
     backend::FromCrossterm,
     buffer::{ Cell, CellDiffOption },
-    style::{ Color, Style },
+    style::{ Color, Modifier, Style },
     text::{ Line, Span },
     widgets::
     {
@@ -597,7 +597,7 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
         {
             true => theme::ACCENT,
             false => app.theme.style(user.username_color),
-        };
+        }.add_modifier(Modifier::BOLD);
 
         //WHAT THEY ARE ON, IF THEY SHARE IT
         let device = app.devices.get(&user.username).map(|device| super::device_label(device)).unwrap_or_default();
@@ -646,8 +646,8 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
         //THEIR OWN COLOR, ELSE DIM
         Line::from(match color
         {
-            Some(_) => Span::styled(name, app.theme.style(*color)),
-            None => Span::styled(name, theme::DIM),
+            Some(_) => Span::styled(name, app.theme.style(*color).add_modifier(Modifier::BOLD)),
+            None => Span::styled(name, theme::DIM.add_modifier(Modifier::BOLD)),
         })
     }).collect::<Vec<Line>>();
 

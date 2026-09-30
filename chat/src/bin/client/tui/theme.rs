@@ -106,9 +106,9 @@ impl Theme
                 let prefix = vec!
                 [
                     self.timestamp(*timestamp),
-                    self.colorize(username.clone(), colors.username_color),
+                    self.name(username.clone(), colors.username_color),
                     Span::styled(id, DIM),
-                    Span::raw(": "),
+                    Span::styled(": ", DIM),
                 ];
 
                 markup::render(prefix, text, self.style(colors.message_color), width, self.render_math)
@@ -257,6 +257,11 @@ impl Theme
         }
 
         lines
+    }
+
+    fn name(&self, username: String, color: Option<u8>) -> Span<'static> //A SENDER'S NAME, BOLD
+    {
+        Span::styled(username, self.style(color).add_modifier(Modifier::BOLD))
     }
 
     pub fn colorize(&self, text: String, color: Option<u8>) -> Span<'static> //COLORIZE text IF PASSED COLOR
