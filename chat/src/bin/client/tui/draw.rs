@@ -520,8 +520,8 @@ fn draw_logo(frame: &mut Frame, area: Rect, stripe: Color)
 
             let Some(cell) = buffer.cell_mut((x + column as u16, y + row_index as u16)) else { continue; };
 
-            //A PAINTED BACKGROUND IS A CLAIMED CELL, A STRIPE IS NOT
-            let unpainted = cell.bg == Color::Reset || cell.bg == stripe;
+            //A PAINTED BACKGROUND IS A CLAIMED CELL, A STRIPE OR MENTION IS NOT
+            let unpainted = cell.bg == Color::Reset || cell.bg == stripe || Some(cell.bg) == theme::MENTION.bg;
 
             if cell.symbol().trim().is_empty() && unpainted //FREE CELL - THE LOGO OWNS IT OUTRIGHT
             {
