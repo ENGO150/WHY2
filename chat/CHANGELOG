@@ -1,6 +1,16 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.2.6:
+- c5473591: wire message edits on client
+- ad6df3cf: handle message edits on server
+- 0591bfe5: edited field to message history
+- 2e93de44: fix mention higlights covering logo
+- 615153f3: remove SWITCH trigger from Command::Logout
+- 1ba0f96f: improve TUI PMs rendering
+- aa5ea180: make usernames bold on TUI
+- fbed9a41: remove reply/reaction migration code
+
 v2.2.5:
 - f32f04b3: upgrade chat dependencies
 - 19718f35: implement Hearts command
