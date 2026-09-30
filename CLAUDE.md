@@ -971,8 +971,10 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - **The in-memory `HISTORY` is the working set**, and the file is the copy of it that survives a
     restart: it is read once, on first touch, and only ever written after that. A missing, truncated,
     tampered, unrecognisable file, or one written under another server's keys, all load as an empty
-    history rather than refusing to start. There is no migration: a file under any marker other than
-    `MAGIC` is unreadable like any other.
+    history rather than refusing to start. The one older format still read is the one from before
+    edits (`MAGIC_V4`, `migrate`, marked in the code to go with the next version bump): it loads through
+    `HeartRecord` with `edited: false`, in memory only — the next write rewrites the file under `MAGIC`.
+    Anything older is unreadable like any other.
   - **A message can name the message it replies to** (`reply: Option<u64>`, a message id, on
     `MessageRequest`, `Record`, `StoredMessage`, `PacketCode::Message` and `ClientEvent::Message`), set by
     `/reply ID MESSAGE` (`/re` is still the private-message answer). The server refuses a reply naming a
@@ -1018,6 +1020,16 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
       being looked at, `App::scroll`, the selection and `history_anchor` move up by the rows it took
       (the wrap cache keeps each entry's first row for exactly this); in the parked lobby pane only
       the anchor needs it.
+    - **A stored message can be edited by its author and nobody else** (`/edit ID MESSAGE` →
+      `PacketCode::EditRequest`, `config::messages::edit`). Unlike deleting, rank gives no right to it: a
+      moderator may remove somebody's words, but putting new ones in their mouth is not moderation. Only a
+      text record can be edited (an image line's text is the filename), and an empty edit is refused —
+      that is what `/delete` is for. The new text goes through the same control-character strip,
+      `max_message_length` and `min_message_delay` as a typed message, since it is fanned out to every
+      client like one. A success sets `Record::edited` and is broadcast as `PacketCode::Edited`;
+      `App::edit_message` rewords the entry in place (sharing `update_message` with the hearts, which
+      shifts the scroll and selection by the rows it gained or lost) and the trailer shows a dim
+      `(edited)`. A reply quoting it picks up the new text on the rewrap the generation bump causes.
     - The id is drawn as a dim `#N` right-aligned on the last row of the entry (`Theme::message_id`,
       a row of its own when the last one has no room), on live and replayed lines alike, image
       captions included — `ImageDisplay` and its four events carry it (`show_message_ids`,
