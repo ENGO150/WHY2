@@ -118,17 +118,17 @@ impl Theme
             Entry::History { username, timestamp, text, colors, .. } => markup::render(vec!
             [
                 self.timestamp(*timestamp),
-                self.colorize(username.clone(), colors.username_color),
-                Span::raw(": "),
+                self.name(username.clone(), colors.username_color),
+                Span::styled(": ", DIM),
             ], text, self.style(colors.message_color), width, self.render_math),
 
             Entry::Private { sent, username, id, text, colors } =>
             {
                 let prefix = vec!
                 [
-                    Span::styled(if *sent { "[PM TO] " } else { "[PM FROM] " }, ACCENT),
-                    self.colorize(username.clone(), colors.username_color),
-                    Span::raw(format!(" ({id}): ")),
+                    Span::styled(if *sent { "PM → " } else { "PM ← " }, ACCENT),
+                    self.name(username.clone(), colors.username_color),
+                    Span::styled(format!(" ({id}): "), DIM),
                 ];
 
                 markup::render(prefix, text, self.style(colors.message_color), width, self.render_math)
@@ -145,8 +145,8 @@ impl Theme
                     //THE SENDER'S COLOR, ELSE THE CHROME'S ACCENT
                     match username_color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
                     {
-                        Some(color) => Span::styled(username.clone(), Style::new().fg(Color::from_crossterm(color))),
-                        None => Span::styled(username.clone(), ACCENT),
+                        Some(color) => Span::styled(username.clone(), Style::new().fg(Color::from_crossterm(color)).add_modifier(Modifier::BOLD)),
+                        None => Span::styled(username.clone(), ACCENT.add_modifier(Modifier::BOLD)),
                     },
                     Span::styled(format!(" sent an image ({filename})"), DIM),
                 ];
