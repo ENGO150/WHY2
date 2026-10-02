@@ -852,7 +852,7 @@ fn value_lines(values: &Values, rows: usize, first: usize) -> Vec<Line<'static>>
         //PAINT THE SWATCH AS A BACKGROUND
         if let Some(color) = values.swatch(value)
         {
-            spans.push(Span::styled("    ", Style::new().bg(Color::from_crossterm(color))));
+            spans.push(Span::styled("    ", Style::new().bg(theme::ansi(Color::from_crossterm(color)))));
             spans.push(Span::raw(" "));
         }
 

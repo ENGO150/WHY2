@@ -1303,13 +1303,16 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     over the whole frame first (and over the palette popup again, since `Clear` resets those cells)
     so unstyled spans do not inherit the terminal's default foreground. Scheme-relative colors
     survive in exactly one place: `colors.rs`, where they are the user's own `/color`/`/ucolor`
-    choice.
+    choice — and even those are fixed under a palette that carries an `ansi` table (`theme::ansi`).
   - **The chrome palette is switchable, so the colours are accessors, not consts** (`theme::dim()`,
     `theme::accent()`, …, read from `theme::PALETTES[ACTIVE]`). `theme` in client.toml stores a palette's
     `id`, `Theme::load` selects it (an unknown id is the first entry, `why2`, the original look), and the
-    `/settings` `Theme` row cycles it live through `App::reload_theme`. `why2` paints no background and
-    keeps the terminal's; every other palette **paints its own** (`theme::base()` over the frame and each
-    popup), since its foregrounds are only readable on the background they were designed for. Anything
+    `/settings` `Theme` row cycles it live through `App::reload_theme`. Every palette **paints its own
+    background** (`theme::base()` over the frame and each popup), since its foregrounds are only readable
+    on the background they were designed for; `background: None` (the terminal's) is still supported but
+    no built-in palette uses it. **`why2` is absolute**: its background and its `ansi` table — the 16
+    colors a `/color` code names — are a snapshot of the author's kitty scheme, so it looks identical on
+    every terminal. The other palettes have `ansi: None` and leave user colors to the terminal. Anything
     that asks "is this cell unpainted" therefore has to accept `theme::background()` as well as
     `Color::Reset` — the row tints and the logo both do — and the stripe is derived from the palette's
     background before the terminal's. A new palette is one entry in `PALETTES`, still all `Color::Rgb`.

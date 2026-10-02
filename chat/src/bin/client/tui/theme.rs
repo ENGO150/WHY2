@@ -81,6 +81,7 @@ pub struct Palette //ONE COLOUR THEME
     pub arg_required: Color,
     pub arg_optional: Color,
     pub arg_active: Color,
+    pub ansi: Option<[Color; 16]>, //None = THE TERMINAL'S
 }
 
 //IMPLEMENTATIONS
@@ -175,7 +176,7 @@ impl Theme
                     //THE SENDER'S COLOR, ELSE THE CHROME'S ACCENT
                     match username_color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
                     {
-                        Some(color) => Span::styled(username.clone(), Style::new().fg(Color::from_crossterm(color)).add_modifier(Modifier::BOLD)),
+                        Some(color) => Span::styled(username.clone(), Style::new().fg(ansi(Color::from_crossterm(color))).add_modifier(Modifier::BOLD)),
                         None => Span::styled(username.clone(), accent().add_modifier(Modifier::BOLD)),
                     },
                     Span::styled(format!(" sent an image ({filename})"), dim()),
@@ -307,7 +308,7 @@ impl Theme
     {
         match color.and_then(colors::u8_to_color)
         {
-            Some(c) if !self.disable_colors => Style::new().fg(Color::from_crossterm(c)),
+            Some(c) if !self.disable_colors => Style::new().fg(ansi(Color::from_crossterm(c))),
             _ => Style::new(),
         }
     }
@@ -438,6 +439,33 @@ pub fn background() -> Option<Color> //THE PALETTE'S OWN BACKGROUND, IF IT PAINT
     palette().background.map(|(r, g, b)| Color::Rgb(r, g, b))
 }
 
+pub fn ansi(color: Color) -> Color //A NAMED COLOR, AS THE PALETTE FIXES IT
+{
+    let index = match color
+    {
+        Color::Black => 0,
+        Color::Red => 1,
+        Color::Green => 2,
+        Color::Yellow => 3,
+        Color::Blue => 4,
+        Color::Magenta => 5,
+        Color::Cyan => 6,
+        Color::Gray => 7,
+        Color::DarkGray => 8,
+        Color::LightRed => 9,
+        Color::LightGreen => 10,
+        Color::LightYellow => 11,
+        Color::LightBlue => 12,
+        Color::LightMagenta => 13,
+        Color::LightCyan => 14,
+        Color::White => 15,
+        Color::Indexed(index) if index < 16 => index as usize,
+        _ => return color,
+    };
+
+    palette().ansi.map_or(color, |ansi| ansi[index])
+}
+
 pub fn palette() -> &'static Palette
 {
     &PALETTES[ACTIVE.load(Ordering::Relaxed)]
@@ -471,11 +499,16 @@ pub const PALETTES: &[Palette] = &
     Palette
     {
         id: "why2", name: "WHY2",
-        background: None,
+        background: bg(0x1B1A1C),
         text: rgb(0xEED1D6), muted: rgb(0xCAB4B7), accent: rgb(0x9DCEFF), highlight: rgb(0xFFDDE2),
         error: rgb(0xF646C6), heart: rgb(0xFF6B8B), ok: rgb(0xFFBBBA), logo: rgb(0x5C464B),
         code_bg: rgb(0x2E2428), selected: rgb(0x005F5F), mention: rgb(0x4B3A1F), selection: rgb(0x304563),
         arg_required: rgb(0xD7AF87), arg_optional: rgb(0xFFB4AB), arg_active: rgb(0xFFAF5F),
+        ansi: Some(
+        [
+            rgb(0x1B1A1C), rgb(0xE94AE6), rgb(0xFFBAC2), rgb(0xFFDDE7), rgb(0x92ABD6), rgb(0xCD98DC), rgb(0x94D0FB), rgb(0xEBD1D9),
+            rgb(0xC7B4BB), rgb(0xFFA0F2), rgb(0xFFFCFF), rgb(0xFFFFFF), rgb(0xCADEF6), rgb(0xFACAFF), rgb(0xF7FAFF), rgb(0xE8E0E9),
+        ]),
     },
     Palette
     {
@@ -485,6 +518,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xF38BA8), heart: rgb(0xEBA0AC), ok: rgb(0xA6E3A1), logo: rgb(0x495A80),
         code_bg: rgb(0x181825), selected: rgb(0x45475A), mention: rgb(0x433D3A), selection: rgb(0x394361),
         arg_required: rgb(0xFAB387), arg_optional: rgb(0xF2CDCD), arg_active: rgb(0xF9E2AF),
+        ansi: None,
     },
     Palette
     {
@@ -494,6 +528,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xD20F39), heart: rgb(0xE64553), ok: rgb(0x40A02B), logo: rgb(0xC1D2F5),
         code_bg: rgb(0xE6E9EF), selected: rgb(0xBCC0CC), mention: rgb(0xECDDCA), selection: rgb(0xC5D5F5),
         arg_required: rgb(0xFE640B), arg_optional: rgb(0xEA76CB), arg_active: rgb(0xDF8E1D),
+        ansi: None,
     },
     Palette
     {
@@ -503,6 +538,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xFF5555), heart: rgb(0xFF79C6), ok: rgb(0x50FA7B), logo: rgb(0x645484),
         code_bg: rgb(0x21222C), selected: rgb(0x44475A), mention: rgb(0x4B4C3F), selection: rgb(0x4D4467),
         arg_required: rgb(0xF1FA8C), arg_optional: rgb(0xFF79C6), arg_active: rgb(0xFFB86C),
+        ansi: None,
     },
     Palette
     {
@@ -512,6 +548,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xBF616A), heart: rgb(0xB48EAD), ok: rgb(0xA3BE8C), logo: rgb(0x526C7A),
         code_bg: rgb(0x272C36), selected: rgb(0x434C5E), mention: rgb(0x54524F), selection: rgb(0x445764),
         arg_required: rgb(0xD08770), arg_optional: rgb(0xB48EAD), arg_active: rgb(0xEBCB8B),
+        ansi: None,
     },
     Palette
     {
@@ -521,6 +558,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xFB4934), heart: rgb(0xD3869B), ok: rgb(0xB8BB26), logo: rgb(0x4C5A55),
         code_bg: rgb(0x1D2021), selected: rgb(0x504945), mention: rgb(0x524629), selection: rgb(0x3F4744),
         arg_required: rgb(0xFE8019), arg_optional: rgb(0xD3869B), arg_active: rgb(0xFABD2F),
+        ansi: None,
     },
     Palette
     {
@@ -530,6 +568,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xF7768E), heart: rgb(0xFF007C), ok: rgb(0x9ECE6A), logo: rgb(0x40517A),
         code_bg: rgb(0x16161E), selected: rgb(0x292E42), mention: rgb(0x423933), selection: rgb(0x283457),
         arg_required: rgb(0xE0AF68), arg_optional: rgb(0x7DCFFF), arg_active: rgb(0xFF9E64),
+        ansi: None,
     },
     Palette
     {
@@ -539,6 +578,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xE06C75), heart: rgb(0xBE5046), ok: rgb(0x98C379), logo: rgb(0x3F607F),
         code_bg: rgb(0x21252B), selected: rgb(0x3E4451), mention: rgb(0x4E4A42), selection: rgb(0x364D63),
         arg_required: rgb(0xE5C07B), arg_optional: rgb(0x56B6C2), arg_active: rgb(0xD19A66),
+        ansi: None,
     },
     Palette
     {
@@ -548,6 +588,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xDC322F), heart: rgb(0xD33682), ok: rgb(0x859900), logo: rgb(0x0F5174),
         code_bg: rgb(0x00212B), selected: rgb(0x073642), mention: rgb(0x243E2B), selection: rgb(0x0A435D),
         arg_required: rgb(0xCB4B16), arg_optional: rgb(0x6C71C4), arg_active: rgb(0xB58900),
+        ansi: None,
     },
     Palette
     {
@@ -557,6 +598,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xEB6F92), heart: rgb(0xEBBCBA), ok: rgb(0x9CCFD8), logo: rgb(0x5D5172),
         code_bg: rgb(0x1F1D2E), selected: rgb(0x403D52), mention: rgb(0x453935), selection: rgb(0x443B55),
         arg_required: rgb(0xF6C177), arg_optional: rgb(0xEBBCBA), arg_active: rgb(0xEA9A97),
+        ansi: None,
     },
     Palette
     {
@@ -566,6 +608,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xF85149), heart: rgb(0xFF7B72), ok: rgb(0x3FB950), logo: rgb(0x2B4D74),
         code_bg: rgb(0x161B22), selected: rgb(0x30363D), mention: rgb(0x342C19), selection: rgb(0x203651),
         arg_required: rgb(0xFFA657), arg_optional: rgb(0x79C0FF), arg_active: rgb(0xE3B341),
+        ansi: None,
     },
     Palette
     {
@@ -575,6 +618,7 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xCF222E), heart: rgb(0xBF3989), ok: rgb(0x1A7F37), logo: rgb(0xC9DEF7),
         code_bg: rgb(0xF6F8FA), selected: rgb(0xEAEEF2), mention: rgb(0xF6EDD5), selection: rgb(0xC2DAF6),
         arg_required: rgb(0xBC4C00), arg_optional: rgb(0x0550AE), arg_active: rgb(0x9A6700),
+        ansi: None,
     },
     Palette
     {
@@ -584,5 +628,6 @@ pub const PALETTES: &[Palette] = &
         error: rgb(0xE95678), heart: rgb(0xF09483), ok: rgb(0x29D398), logo: rgb(0x205D6E),
         code_bg: rgb(0x16161C), selected: rgb(0x2E303E), mention: rgb(0x483F3D), selection: rgb(0x1E4553),
         arg_required: rgb(0xFAB795), arg_optional: rgb(0xB877DB), arg_active: rgb(0xFAC29A),
+        ansi: None,
     },
 ];
