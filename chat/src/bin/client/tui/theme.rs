@@ -321,7 +321,7 @@ pub fn stripe(terminal: Option<(u8, u8, u8)>) -> Color
     let Some((r, g, b)) = palette().background.or(terminal) else { return STRIPE_FALLBACK };
 
     //A LIGHT BACKGROUND GOES DARKER INSTEAD
-    let light = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000 > 128;
+    let light = luma(r, g, b) > 128;
     let target = if light { 0.0 } else { 255.0 };
     let nudge = |c: u8| (c as f32 + (target - c as f32) * STRIPE_LIFT).round() as u8;
 
@@ -463,7 +463,33 @@ pub fn ansi(color: Color) -> Color //A NAMED COLOR, AS THE PALETTE FIXES IT
         _ => return color,
     };
 
-    palette().ansi.map_or(color, |ansi| ansi[index])
+    visible(palette().ansi.map_or(color, |ansi| ansi[index]))
+}
+
+fn visible(color: Color) -> Color //LIFT A COLOR THAT VANISHES INTO THE BACKGROUND
+{
+    let Some((r, g, b)) = palette().background else { return color };
+
+    //THE TERMINAL'S BLACK AND WHITE, ROUGHLY
+    let (cr, cg, cb) = match color
+    {
+        Color::Rgb(r, g, b) => (r, g, b),
+        Color::Black => (0, 0, 0),
+        Color::White => (255, 255, 255),
+        _ => return color,
+    };
+
+    if luma(r, g, b).abs_diff(luma(cr, cg, cb)) >= MIN_CONTRAST { return color; }
+
+    let Color::Rgb(tr, tg, tb) = palette().text else { return color };
+    let toward = |from: u8, to: u8| (from as f32 + (to as f32 - from as f32) * CONTRAST_LIFT).round() as u8;
+
+    Color::Rgb(toward(r, tr), toward(g, tg), toward(b, tb))
+}
+
+fn luma(r: u8, g: u8, b: u8) -> u32
+{
+    (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000
 }
 
 pub fn palette() -> &'static Palette
@@ -492,6 +518,10 @@ static ACTIVE: AtomicUsize = AtomicUsize::new(0);
 //EVERY OTHER MESSAGE, A BACKGROUND ONLY
 const STRIPE_FALLBACK: Color = Color::Rgb(0x1B, 0x1F, 0x24);                   //FAINT SLATE, WHEN THE TERMINAL WILL NOT SAY
 const STRIPE_LIFT: f32 = 0.07;                                                  //HOW FAR OFF THE BACKGROUND
+
+//A USER COLOR TOO CLOSE TO THE BACKGROUND
+const MIN_CONTRAST: u32 = 40;                                                   //LUMA DISTANCE BELOW WHICH IT IS LIFTED
+const CONTRAST_LIFT: f32 = 0.45;                                                //HOW FAR TOWARDS THE TEXT
 
 //THE BUILT-IN PALETTES, THE FIRST IS THE DEFAULT
 pub const PALETTES: &[Palette] = &
