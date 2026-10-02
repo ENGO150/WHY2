@@ -56,7 +56,9 @@ use cpal::
     Host,
     Stream,
     Device,
+    BufferSize,
     StreamConfig,
+    SupportedBufferSize,
     SupportedStreamConfig,
     SupportedStreamConfigRange,
     traits::
@@ -84,6 +86,7 @@ use ringbuf::
     traits::
     {
         Split,
+        Observer,
         Producer,
         Consumer,
     },
@@ -142,6 +145,7 @@ struct RemoteStream
 {
     consumer: HeapCons<f32>,   //RINGBUFFER READER
     resample_pos: f32,         //POSITION IN BETWEEN SAMPLES
+    step: f32,                 //RESAMPLER STEP, CATCH-UP INCLUDED
     current_sample: f32,       //CURRENT SAMPLE FOR INTERPOLATION
     next_sample: f32,          //NEXT SAMPLE FOR INTERPOLATION
     activity_hold: usize,      //ACTIVITY TIMER
@@ -293,34 +297,44 @@ fn configured_ids() -> (String, String) //THE PAIR client.toml CURRENTLY POINTS 
     (config::read_config::<String>("input_device"), config::read_config::<String>("output_device"))
 }
 
-pub fn configure_device(device: &cpal::Device, supported_configs: impl Iterator<Item = SupportedStreamConfigRange>, default_config: SupportedStreamConfig, is_input_stream: bool) -> StreamConfig
+pub fn configure_device
+(
+    device: &Device,
+    supported_configs: impl Iterator<Item = SupportedStreamConfigRange>,
+    default_config: SupportedStreamConfig,
+    is_input_stream: bool,
+) -> StreamConfig
 {
-    let mut config: StreamConfig = supported_configs
+    let supported = supported_configs
         .filter(|c| c.min_sample_rate() <= consts::SAMPLE_RATE && c.max_sample_rate() >= consts::SAMPLE_RATE)
         .next()
         .map(|c| c.with_sample_rate(consts::SAMPLE_RATE))
-        .unwrap_or(default_config.clone())
-        .into();
+        .unwrap_or(default_config.clone());
+
+    let mut config: StreamConfig = supported.clone().into();
 
     //TEST CONFIG (WASAPI FALLBACK)
-    if is_input_stream
+    let works = |config: &StreamConfig| if is_input_stream
     {
-        if let Ok(test_stream) = device.build_input_stream(config.clone(), |_: &[f32], _| {}, |_| {}, None)
-        {
-            drop(test_stream); //WORKS, PROCEED
-        } else
-        {
-            config = default_config.into(); //FALLBACK TO DEFAULT
-        }
+        device.build_input_stream(config.clone(), |_: &[f32], _| {}, |_| {}, None).is_ok()
     } else
     {
-        if let Ok(test_stream) = device.build_output_stream(config.clone(), |_: &mut [f32], _| {}, |_| {}, None)
-        {
-            drop(test_stream); //WORKS, PROCEED
-        } else
-        {
-            config = default_config.into(); //FALLBACK TO DEFAULT
-        }
+        device.build_output_stream(config.clone(), |_: &mut [f32], _| {}, |_| {}, None).is_ok()
+    };
+
+    //SHORT DEVICE PERIOD
+    if let SupportedBufferSize::Range { min, max } = *supported.buffer_size()
+    {
+        config.buffer_size = BufferSize::Fixed(consts::DEVICE_BUFFER.clamp(min, max));
+
+        if works(&config) { return config; }
+
+        config.buffer_size = BufferSize::Default; //DEVICE REFUSED IT
+    }
+
+    if !works(&config)
+    {
+        config = default_config.into(); //FALLBACK TO DEFAULT
     }
 
     config
@@ -635,6 +649,13 @@ fn build_output_stream(device: &Device, config: StreamConfig, current_generation
         let frames_to_write = data.len() / output_channels;
         let mut consumers_guard = CONSUMERS.lock().unwrap();
 
+        //SPEED UP A PEER THAT FELL BEHIND
+        for (stream, _) in consumers_guard.values_mut()
+        {
+            let catchup = if stream.consumer.occupied_len() > consts::JITTER_TARGET { 1. + consts::JITTER_CATCHUP } else { 1. };
+            stream.step = output_resample_step * catchup;
+        }
+
         reference.clear();
 
         for i in 0..frames_to_write
@@ -654,7 +675,7 @@ fn build_output_stream(device: &Device, config: StreamConfig, current_generation
 
                 //LINEAR INTERPOLATION
                 let interpolated = stream.current_sample + (stream.next_sample - stream.current_sample) * stream.resample_pos;
-                stream.resample_pos += output_resample_step; //MOVE RESAMPLER POSITION FOR THIS CLIENT
+                stream.resample_pos += stream.step; //MOVE RESAMPLER POSITION FOR THIS CLIENT
 
                 //ACTIVE SPEAKER DETECTION
                 if interpolated.abs() > consts::MIXING_TRESHOLD
@@ -995,6 +1016,13 @@ pub async fn listen_server_voice //SERVER -> CLIENT
                     //DECODE
                     if let Ok(decoded_len) = peer.decoder.decode_float(Some(&data), &mut decoded_buffer[..], false)
                     {
+                        //SHED A BACKLOG, OLDEST FIRST
+                        let depth = stream.consumer.occupied_len() + decoded_len;
+                        if depth > consts::JITTER_MAX
+                        {
+                            stream.consumer.skip(depth - consts::JITTER_TARGET);
+                        }
+
                         //PUSH TO RINGBUFFER
                         peer.producer.push_slice(&decoded_buffer[..decoded_len]);
                     }
@@ -1081,6 +1109,7 @@ pub fn add_consumer(id: usize, username: String)
     {
         consumer: consumer,
         resample_pos: 0.,
+        step: 1.,
         current_sample: 0.,
         next_sample: first_sample,
         activity_hold: 0,

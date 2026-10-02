@@ -47,6 +47,10 @@ pub const ACTIVITY_HOLD: usize      = (SAMPLE_RATE / 10) as usize;              
 pub const DISPLAY_HOLD: usize       = 200;                                      //ACTIVITY_HOLD BUT MS FOR DISPLAY WINDOW
 
 pub const JITTER_BUFFER_SIZE: usize = 20;                                       //FRAME SIZE OF JITTER BUFFER
+pub const JITTER_TARGET: usize      = FRAME_SIZE * 3;                           //DEPTH THE CATCH-UP STOPS AT (~60ms)
+pub const JITTER_MAX: usize         = FRAME_SIZE * 10;                          //DEPTH SHED BACK TO TARGET (~200ms)
+pub const JITTER_CATCHUP: f32       = 0.02;                                     //PLAYBACK SPEEDUP WHILE ABOVE TARGET
+pub const DEVICE_BUFFER: u32        = FRAME_SIZE as u32;                        //PREFERRED DEVICE PERIOD (~20ms)
 
 pub const GRID_WIDTH: usize         = 4;                                        //GRID WIDTH FOR VOICE PACKETS
 pub const GRID_HEIGHT: usize        = 4;                                        //GRID HEIGHT FOR VOICE PACKETS
