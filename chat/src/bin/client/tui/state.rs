@@ -362,6 +362,7 @@ pub struct App
     wrapped: Option<(u16, u64, Vec<Line<'static>>, Vec<Placement>, Vec<u16>, Vec<Option<Style>>)>,
     stripe: bool, //PARITY OF THE MESSAGES TRIMMED OFF THE TOP
     pub stripe_bg: Color,
+    terminal_bg: Option<(u8, u8, u8)>, //AS THE TERMINAL REPORTED IT
 }
 
 //IMPLEMENTATIONS
@@ -442,6 +443,7 @@ impl App
             generation: 0,
             stripe: false,
             stripe_bg: theme::stripe(None),
+            terminal_bg: None,
             wrapped: None,
         }
     }
@@ -1112,6 +1114,7 @@ impl App
             _ => None,
         });
 
+        self.terminal_bg = background;
         self.stripe_bg = theme::stripe(background);
         self.picker = picker;
         self.generation += 1;
@@ -1216,6 +1219,7 @@ impl App
     pub fn reload_theme(&mut self)
     {
         self.theme.reload();
+        self.stripe_bg = theme::stripe(self.terminal_bg);
 
         //THE WRAP CACHE HOLDS RENDERED LINES
         self.generation += 1;

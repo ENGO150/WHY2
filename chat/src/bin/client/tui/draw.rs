@@ -111,8 +111,8 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     //NO INPUT BAR OR SIDEBAR BEFORE LOGIN
     let connecting = app.login.is_some();
 
-    //PAINT THE BASE FOREGROUND FIRST
-    frame.buffer_mut().set_style(area, theme::text());
+    //PAINT THE BASE COLOURS FIRST
+    frame.buffer_mut().set_style(area, theme::base());
 
     //MEASURE THE INPUT FIRST
     let input_width = area.width.saturating_sub(4).max(1); //BORDERS + "> "
@@ -272,7 +272,8 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 
         for x in inner.x..inner.x + inner.width
         {
-            if let Some(cell) = frame.buffer_mut().cell_mut((x, y)) && cell.bg == Color::Reset { cell.set_style(tint); }
+            if let Some(cell) = frame.buffer_mut().cell_mut((x, y))
+                && (cell.bg == Color::Reset || Some(cell.bg) == theme::background()) { cell.set_style(tint); }
         }
     }
 
@@ -520,8 +521,9 @@ fn draw_logo(frame: &mut Frame, area: Rect, stripe: Color)
 
             let Some(cell) = buffer.cell_mut((x + column as u16, y + row_index as u16)) else { continue; };
 
-            //A PAINTED BACKGROUND IS A CLAIMED CELL, A STRIPE OR MENTION IS NOT
-            let unpainted = cell.bg == Color::Reset || cell.bg == stripe || Some(cell.bg) == theme::mention().bg;
+            //A PAINTED BACKGROUND IS A CLAIMED CELL, A STRIPE, MENTION OR THEME ONE IS NOT
+            let unpainted = cell.bg == Color::Reset || cell.bg == stripe || Some(cell.bg) == theme::mention().bg
+                || Some(cell.bg) == theme::background();
 
             if cell.symbol().trim().is_empty() && unpainted //FREE CELL - THE LOGO OWNS IT OUTRIGHT
             {
@@ -815,7 +817,7 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect) -> Rect
 
     frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
-    frame.buffer_mut().set_style(popup, theme::text());
+    frame.buffer_mut().set_style(popup, theme::base());
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
@@ -1048,7 +1050,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect, font: Font
 
     frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
-    frame.buffer_mut().set_style(popup, theme::text());
+    frame.buffer_mut().set_style(popup, theme::base());
 
     let hint = match (state.picker.is_some(), state.edit.is_some())
     {
@@ -1208,7 +1210,7 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
 
     frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
-    frame.buffer_mut().set_style(popup, theme::text());
+    frame.buffer_mut().set_style(popup, theme::base());
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
@@ -1351,7 +1353,7 @@ fn draw_form
 
     frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
-    frame.buffer_mut().set_style(popup, theme::text());
+    frame.buffer_mut().set_style(popup, theme::base());
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
