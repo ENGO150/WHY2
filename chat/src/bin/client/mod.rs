@@ -104,7 +104,7 @@ use why2_chat::network::screen::client::
 //HANDLER FNS
 fn invalid_usage(app: &mut App, subject: Option<&str>) //PUSH 'INVALID' MESSAGE
 {
-    app.push_styled(format!("Invalid {}! Press Ctrl+H for help.", subject.unwrap_or("usage")), theme::ERROR);
+    app.push_styled(format!("Invalid {}! Press Ctrl+H for help.", subject.unwrap_or("usage")), theme::error());
 }
 
 //MODERATION ACTIONS - /server <action> [target]
@@ -253,23 +253,23 @@ fn hearts(app: &mut App, parameters: Option<String>) //LIST WHO HEARTED A MESSAG
 
     let Some(hearts) = app.hearts_of(message_id) else
     {
-        app.push_styled(format!("Message #{message_id} is not loaded."), theme::ERROR);
+        app.push_styled(format!("Message #{message_id} is not loaded."), theme::error());
         return;
     };
 
     if hearts.is_empty()
     {
-        app.push_styled(format!("Nobody hearted #{message_id}."), theme::NOTICE);
+        app.push_styled(format!("Nobody hearted #{message_id}."), theme::notice());
         return;
     }
 
-    app.push_styled(format!("Hearts on #{message_id} ({}):", hearts.len()), theme::TITLE);
+    app.push_styled(format!("Hearts on #{message_id} ({}):", hearts.len()), theme::title());
 
     let last = hearts.len() - 1;
 
     for (index, username) in hearts.into_iter().enumerate()
     {
-        app.push(Line::from(vec![Span::styled(tui::branch(index == last), theme::BORDER), Span::raw(username)]));
+        app.push(Line::from(vec![Span::styled(tui::branch(index == last), theme::border()), Span::raw(username)]));
     }
 }
 
@@ -295,7 +295,7 @@ fn mute(app: &mut App, parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
         {
             format!(" ID {id}")
         } else { String::new() }
-    ), theme::OK);
+    ), theme::ok());
 }
 
 //A TYPED NAME TO THE CODE THE WIRE CARRIES
@@ -333,7 +333,7 @@ async fn color_handler
     let Some(code) = to_color(&parameters) else
     {
         return app.push_styled("Invalid color! Type the command again and pick one of the offered colors.",
-            theme::ERROR);
+            theme::error());
     };
 
     network::send(&mut *write_stream.lock().await, PacketCode::Colors { username, color: code },
@@ -633,14 +633,14 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
                             let last = commands.len().saturating_sub(1);
 
-                            app.push_styled("Commands:", theme::TITLE);
+                            app.push_styled("Commands:", theme::title());
 
                             for (index, entry) in commands.into_iter().enumerate() //ITERATE OVER ALL COMMANDS WE MAY RUN
                             {
                                 let shortcut = entry.shortcut();
                                 let padding = signature_width - entry.width();
 
-                                let mut spans = vec![Span::styled(tui::branch(index == last), theme::BORDER)];
+                                let mut spans = vec![Span::styled(tui::branch(index == last), theme::border())];
 
                                 spans.extend(entry.spans(None));
                                 spans.push(Span::raw(" ".repeat(padding + 2)));
@@ -650,9 +650,9 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                     "{description:<width$}",
                                     description = entry.description(),
                                     width = if shortcut.is_empty() { 0 } else { description_width },
-                                ), theme::DIM));
+                                ), theme::dim()));
 
-                                if !shortcut.is_empty() { spans.push(Span::styled(format!("  [{shortcut}]"), theme::ACCENT)); }
+                                if !shortcut.is_empty() { spans.push(Span::styled(format!("  [{shortcut}]"), theme::accent())); }
 
                                 app.push(Line::from(spans));
                             }
@@ -701,8 +701,8 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                     {
                                         app.push(Line::from(vec!
                                         [
-                                            Span::styled(tui::branch(index == last), theme::BORDER),
-                                            Span::styled(format!("{label:<12}"), theme::DIM),
+                                            Span::styled(tui::branch(index == last), theme::border()),
+                                            Span::styled(format!("{label:<12}"), theme::dim()),
                                             Span::raw(value),
                                         ]));
                                     }
@@ -720,7 +720,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             {
                                 let kind = if command == Command::Image { Upload::Image } else { Upload::File };
 
-                                if let Err(error) = upload(write_stream, &path, kind, None) { app.push_styled(error, theme::ERROR); }
+                                if let Err(error) = upload(write_stream, &path, kind, None) { app.push_styled(error, theme::error()); }
                             },
 
                             None => invalid_usage(app, None),
@@ -747,7 +747,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         {
                             Some(monitor) => format!("Sharing {monitor} now."),
                             None => String::from("Swapped the shared monitor."),
-                        }, theme::OK),
+                        }, theme::ok()),
 
                         //INVALID COMMAND
                         Command::Invalid => invalid_usage(app, Some("command")),

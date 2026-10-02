@@ -145,19 +145,19 @@ impl Entry
     //THE SAME SIGNATURE, STYLED
     pub fn spans(&self, active: Option<usize>) -> Vec<Span<'static>>
     {
-        let mut spans = vec![Span::styled(self.name(), theme::TITLE)];
+        let mut spans = vec![Span::styled(self.name(), theme::title())];
 
         for (i, arg) in self.args().iter().enumerate()
         {
             let style = if active == Some(i)
             {
-                theme::ARG_ACTIVE
+                theme::arg_active()
             } else if arg.required
             {
-                theme::ARG_REQUIRED
+                theme::arg_required()
             } else
             {
-                theme::ARG_OPTIONAL
+                theme::arg_optional()
             };
 
             spans.push(Span::raw(" "));

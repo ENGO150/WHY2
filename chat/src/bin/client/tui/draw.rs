@@ -112,7 +112,7 @@ pub fn draw(frame: &mut Frame, app: &mut App)
     let connecting = app.login.is_some();
 
     //PAINT THE BASE FOREGROUND FIRST
-    frame.buffer_mut().set_style(area, theme::TEXT);
+    frame.buffer_mut().set_style(area, theme::text());
 
     //MEASURE THE INPUT FIRST
     let input_width = area.width.saturating_sub(4).max(1); //BORDERS + "> "
@@ -220,25 +220,25 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 
     let mut block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(theme::BORDER)
-        .title(Span::styled(title, theme::TITLE));
+        .border_style(theme::border())
+        .title(Span::styled(title, theme::title()));
 
     //SCROLLED AWAY - ADVERTISE THE BACKLOG
     if app.scroll.is_some() && app.unread > 0
     {
-        block = block.title_bottom(Line::from(Span::styled(format!(" ↓ {} new ", app.unread), theme::NOTICE)).right_aligned());
+        block = block.title_bottom(Line::from(Span::styled(format!(" ↓ {} new ", app.unread), theme::notice())).right_aligned());
     }
 
     //TOAST ON THE SAME BORDER
     if let Some(notice) = app.notice()
     {
-        block = block.title_bottom(Span::styled(format!(" {notice} "), theme::OK));
+        block = block.title_bottom(Span::styled(format!(" {notice} "), theme::ok()));
     }
 
     //AND WHOEVER IS WRITING
     if let Some(typing) = app.typing_line()
     {
-        block = block.title_bottom(Span::styled(format!(" {typing} "), theme::DIM));
+        block = block.title_bottom(Span::styled(format!(" {typing} "), theme::dim()));
     }
 
     let inner = block.inner(area);
@@ -283,7 +283,7 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 
         for x in first..=last.min(inner.width.saturating_sub(1))
         {
-            if let Some(cell) = frame.buffer_mut().cell_mut((inner.x + x, y)) { cell.set_style(theme::SELECTION); }
+            if let Some(cell) = frame.buffer_mut().cell_mut((inner.x + x, y)) { cell.set_style(theme::selection()); }
         }
     }
 
@@ -490,11 +490,11 @@ fn draw_scrollbar(frame: &mut Frame, area: Rect, total: usize, visible: usize, f
         if row >= start && row < start + thumb
         {
             cell.set_symbol("\u{2588}");
-            cell.set_style(theme::ACCENT);
+            cell.set_style(theme::accent());
         } else
         {
             cell.set_symbol("\u{2502}");
-            cell.set_style(theme::BORDER);
+            cell.set_style(theme::border());
         }
     }
 }
@@ -521,15 +521,15 @@ fn draw_logo(frame: &mut Frame, area: Rect, stripe: Color)
             let Some(cell) = buffer.cell_mut((x + column as u16, y + row_index as u16)) else { continue; };
 
             //A PAINTED BACKGROUND IS A CLAIMED CELL, A STRIPE OR MENTION IS NOT
-            let unpainted = cell.bg == Color::Reset || cell.bg == stripe || Some(cell.bg) == theme::MENTION.bg;
+            let unpainted = cell.bg == Color::Reset || cell.bg == stripe || Some(cell.bg) == theme::mention().bg;
 
             if cell.symbol().trim().is_empty() && unpainted //FREE CELL - THE LOGO OWNS IT OUTRIGHT
             {
                 cell.set_char(symbol);
-                cell.set_style(theme::LOGO);
+                cell.set_style(theme::logo());
             } else if unpainted //TAKEN, BUT NOTHING IS PAINTED BEHIND IT YET
             {
-                cell.set_style(theme::LOGO_UNDER);
+                cell.set_style(theme::logo_under());
             }
         }
     }
@@ -578,9 +578,9 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
 {
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(theme::BORDER)
-        .title(Span::styled(" Online ", theme::TITLE))
-        .title_top(Line::from(Span::styled(format!(" {} ", app.online.len()), theme::TITLE)).right_aligned());
+        .border_style(theme::border())
+        .title(Span::styled(" Online ", theme::title()))
+        .title_top(Line::from(Span::styled(format!(" {} ", app.online.len()), theme::title())).right_aligned());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -595,7 +595,7 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
         //OUR OWN ROW STAYS MARKED; EVERYBODY ELSE GETS THEIR COLOR
         let style = match user.username == me
         {
-            true => theme::ACCENT,
+            true => theme::accent(),
             false => app.theme.style(user.username_color),
         }.add_modifier(Modifier::BOLD);
 
@@ -608,7 +608,7 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
 
         let mut spans = vec!
         [
-            Span::styled(format!("{id:>width$}  ", id = user.id), theme::DIM),
+            Span::styled(format!("{id:>width$}  ", id = user.id), theme::dim()),
             Span::styled(name.clone(), style),
         ];
 
@@ -617,7 +617,7 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
         {
             let pad = room.saturating_sub(width + 3 + name.width() + device.width());
 
-            spans.push(Span::styled(format!("{:pad$}{device} ", ""), theme::DIM));
+            spans.push(Span::styled(format!("{:pad$}{device} ", ""), theme::dim()));
         }
 
         Line::from(spans)
@@ -630,9 +630,9 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
 {
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(theme::BORDER)
-        .title(Span::styled(" Offline ", theme::TITLE))
-        .title_top(Line::from(Span::styled(format!(" {} ", app.offline.len()), theme::TITLE)).right_aligned());
+        .border_style(theme::border())
+        .title(Span::styled(" Offline ", theme::title()))
+        .title_top(Line::from(Span::styled(format!(" {} ", app.offline.len()), theme::title())).right_aligned());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -647,7 +647,7 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
         Line::from(match color
         {
             Some(_) => Span::styled(name, app.theme.style(*color).add_modifier(Modifier::BOLD)),
-            None => Span::styled(name, theme::DIM.add_modifier(Modifier::BOLD)),
+            None => Span::styled(name, theme::dim().add_modifier(Modifier::BOLD)),
         })
     }).collect::<Vec<Line>>();
 
@@ -658,9 +658,9 @@ fn draw_channels(frame: &mut Frame, app: &App, area: Rect)
 {
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(theme::BORDER)
-        .title(Span::styled(" Channels ", theme::TITLE))
-        .title_top(Line::from(Span::styled(format!(" {} ", app.channels.len()), theme::TITLE)).right_aligned());
+        .border_style(theme::border())
+        .title(Span::styled(" Channels ", theme::title()))
+        .title_top(Line::from(Span::styled(format!(" {} ", app.channels.len()), theme::title())).right_aligned());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -673,9 +673,9 @@ fn draw_channels(frame: &mut Frame, app: &App, area: Rect)
 
         Line::from(vec!
         [
-            Span::styled(if here { "▸ " } else { "  " }, theme::ACCENT),
-            Span::styled("#", theme::DIM),
-            Span::styled(name.clone(), if here { theme::ACCENT } else { Style::default() }),
+            Span::styled(if here { "▸ " } else { "  " }, theme::accent()),
+            Span::styled("#", theme::dim()),
+            Span::styled(name.clone(), if here { theme::accent() } else { Style::default() }),
         ])
     }).collect::<Vec<Line>>();
 
@@ -686,9 +686,9 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
 {
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(theme::BORDER)
-        .title(Span::styled(" Voice ", theme::TITLE))
-        .title_top(Line::from(Span::styled(format!(" {} ", app.voice.len()), theme::TITLE)).right_aligned());
+        .border_style(theme::border())
+        .title(Span::styled(" Voice ", theme::title()))
+        .title_top(Line::from(Span::styled(format!(" {} ", app.voice.len()), theme::title())).right_aligned());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -705,13 +705,13 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
         let marker = if muted { "✕" } else if user.is_speaking { "●" } else { "○" };
         let style = if muted
         {
-            theme::ERROR
+            theme::error()
         } else if user.is_speaking
         {
-            theme::SPEAKING
+            theme::speaking()
         } else
         {
-            theme::DIM
+            theme::dim()
         };
 
         //NO PING FOR SOMEBODY WE DO NOT RECEIVE
@@ -724,7 +724,7 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
         Line::from(vec!
         [
             Span::styled(format!("{marker} {}", user.username), style),
-            Span::styled(latency, theme::DIM),
+            Span::styled(latency, theme::dim()),
         ])
     }).collect::<Vec<Line>>();
 
@@ -750,9 +750,9 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(theme::BORDER_ACTIVE)
-        .title_bottom(Line::from(Span::styled(left, theme::DIM)))
-        .title_bottom(Line::from(Span::styled(right_status(app), theme::DIM)).right_aligned());
+        .border_style(theme::border_active())
+        .title_bottom(Line::from(Span::styled(left, theme::dim())))
+        .title_bottom(Line::from(Span::styled(right_status(app), theme::dim())).right_aligned());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -761,7 +761,7 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
 
     //"> " GUTTER
     let [gutter, text_area] = Layout::horizontal([Constraint::Length(2), Constraint::Min(0)]).areas(inner);
-    frame.render_widget(Paragraph::new(Span::styled("> ", theme::ACCENT)), gutter);
+    frame.render_widget(Paragraph::new(Span::styled("> ", theme::accent())), gutter);
 
     //SCROLL THE INPUT TO THE CURSOR
     let offset = cursor.1.saturating_sub(text_area.height.saturating_sub(1));
@@ -815,12 +815,12 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect) -> Rect
 
     frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
-    frame.buffer_mut().set_style(popup, theme::TEXT);
+    frame.buffer_mut().set_style(popup, theme::text());
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(theme::BORDER_ACTIVE)
-        .title(Span::styled(title, theme::TITLE));
+        .border_style(theme::border_active())
+        .title(Span::styled(title, theme::title()));
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -845,7 +845,7 @@ fn value_lines(values: &Values, rows: usize, first: usize) -> Vec<Line<'static>>
     {
         let selected = first + row == values.selected;
 
-        let mut spans = vec![Span::styled(if selected { "▌" } else { " " }, theme::ACCENT)];
+        let mut spans = vec![Span::styled(if selected { "▌" } else { " " }, theme::accent())];
 
         //PAINT THE SWATCH AS A BACKGROUND
         if let Some(color) = values.swatch(value)
@@ -858,7 +858,7 @@ fn value_lines(values: &Values, rows: usize, first: usize) -> Vec<Line<'static>>
 
         let line = Line::from(spans);
 
-        if selected { line.style(theme::SELECTED) } else { line }
+        if selected { line.style(theme::selected()) } else { line }
     }).collect()
 }
 
@@ -890,14 +890,14 @@ fn entry_lines(app: &App, rows: usize, first: usize, width: usize) -> Vec<Line<'
 
     entries.iter().enumerate().map(|(row, (entry, active))|
     {
-        let mut spans = vec![Span::styled(if Some(row) == selected { "▌" } else { " " }, theme::ACCENT)];
+        let mut spans = vec![Span::styled(if Some(row) == selected { "▌" } else { " " }, theme::accent())];
 
         //SHOW THE ACTIVE PARAMETER'S DESCRIPTION
         let description = active.and_then(|i| entry.args().get(i)).map_or(entry.description(), |arg| arg.description);
 
         spans.extend(entry.spans(*active));
         spans.push(Span::raw(" ".repeat(signature_width - entry.width() + 2)));
-        spans.push(Span::styled(description.to_string(), theme::DIM));
+        spans.push(Span::styled(description.to_string(), theme::dim()));
 
         //SHORTCUTS IN THE RIGHT COLUMN
         if shortcut_width > 0
@@ -906,12 +906,12 @@ fn entry_lines(app: &App, rows: usize, first: usize, width: usize) -> Vec<Line<'
             let shortcut = entry.shortcut();
 
             spans.push(Span::raw(" ".repeat(width.saturating_sub(used + shortcut_width + 1))));
-            spans.push(Span::styled(format!("{shortcut:>shortcut_width$} "), theme::ACCENT));
+            spans.push(Span::styled(format!("{shortcut:>shortcut_width$} "), theme::accent()));
         }
 
         let line = Line::from(spans);
 
-        if Some(row) == selected { line.style(theme::SELECTED) } else { line }
+        if Some(row) == selected { line.style(theme::selected()) } else { line }
     }).collect()
 }
 
@@ -1028,7 +1028,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect, font: Font
     //DESCRIPTION UNDER A RULE
     if footer > 0
     {
-        lines.push(Line::from(Span::styled("\u{2500}".repeat(inner_width), theme::BORDER)));
+        lines.push(Line::from(Span::styled("\u{2500}".repeat(inner_width), theme::border())));
 
         let blanks = hint_height - hint_lines.len(); //A SHORT COMMENT LEAVES THE REST OF THE FOOT EMPTY
 
@@ -1048,7 +1048,7 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect, font: Font
 
     frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
-    frame.buffer_mut().set_style(popup, theme::TEXT);
+    frame.buffer_mut().set_style(popup, theme::text());
 
     let hint = match (state.picker.is_some(), state.edit.is_some())
     {
@@ -1073,9 +1073,9 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect, font: Font
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(theme::BORDER_ACTIVE)
-        .title(Span::styled(title, theme::TITLE))
-        .title_bottom(Line::from(Span::styled(hint, theme::DIM)).centered());
+        .border_style(theme::border_active())
+        .title(Span::styled(title, theme::title()))
+        .title_bottom(Line::from(Span::styled(hint, theme::dim())).centered());
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -1133,12 +1133,12 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
     };
 
     //WRAP THE BODY
-    let mut lines = state::wrap_line(&Line::from(Span::styled(warning, theme::NOTICE)), inner_width);
+    let mut lines = state::wrap_line(&Line::from(Span::styled(warning, theme::notice())), inner_width);
 
     lines.push(Line::default());
     lines.push(Line::from(vec!
     [
-        Span::styled("Server   ", theme::DIM),
+        Span::styled("Server   ", theme::dim()),
         Span::raw(prompt.host.clone()),
     ]));
 
@@ -1147,8 +1147,8 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
     {
         lines.push(Line::from(vec!
         [
-            Span::styled(if index == 0 { "Pinned   " } else { "         " }, theme::DIM),
-            Span::styled(row, theme::DIM),
+            Span::styled(if index == 0 { "Pinned   " } else { "         " }, theme::dim()),
+            Span::styled(row, theme::dim()),
         ]));
     }
 
@@ -1158,8 +1158,8 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
     {
         lines.push(Line::from(vec!
         [
-            Span::styled(if index == 0 { label } else { "         " }, theme::DIM),
-            Span::styled(row, theme::ACCENT),
+            Span::styled(if index == 0 { label } else { "         " }, theme::dim()),
+            Span::styled(row, theme::accent()),
         ]));
     }
 
@@ -1173,26 +1173,26 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
         (
             "Type '{}' to replace the pinned key with this one:",
             consts::CHALLENGE,
-        ), theme::TEXT)), inner_width));
+        ), theme::text())), inner_width));
 
         lines.push(Line::from(vec!
         [
-            Span::styled(prompt.typed.clone(), theme::ACCENT),
-            Span::styled("_".repeat(consts::CHALLENGE.chars().count().saturating_sub(typed)), theme::DIM),
+            Span::styled(prompt.typed.clone(), theme::accent()),
+            Span::styled("_".repeat(consts::CHALLENGE.chars().count().saturating_sub(typed)), theme::dim()),
         ]).centered());
 
         if prompt.wrong
         {
             lines.push(Line::from(Span::styled(format!("Type '{}' to go through with it.", consts::CHALLENGE),
-                theme::ERROR)).centered());
+                theme::error())).centered());
         }
     } else
     {
         lines.push(Line::from(vec!
         [
-            button(" Reject ", !prompt.accept, theme::ERROR),
+            button(" Reject ", !prompt.accept, theme::error()),
             Span::raw("  "),
-            button(if prompt.mismatch { " Replace pinned key " } else { " Trust & save " }, prompt.accept, theme::OK),
+            button(if prompt.mismatch { " Replace pinned key " } else { " Trust & save " }, prompt.accept, theme::ok()),
         ]).centered());
     }
 
@@ -1208,16 +1208,16 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
 
     frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
-    frame.buffer_mut().set_style(popup, theme::TEXT);
+    frame.buffer_mut().set_style(popup, theme::text());
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(theme::ERROR)
-        .title(Span::styled(prompt.title(), theme::ERROR))
+        .border_style(theme::error())
+        .title(Span::styled(prompt.title(), theme::error()))
         .title_bottom(Line::from(Span::styled(if confirming
         {
             " type the word │ ⏎ confirm │ ← back │ Esc reject "
-        } else { " ←→ choose │ ⏎ confirm │ Esc reject " }, theme::DIM)).centered());
+        } else { " ←→ choose │ ⏎ confirm │ Esc reject " }, theme::dim())).centered());
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -1242,9 +1242,9 @@ fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rec
     {
         //A RETRY SAYS SO INSTEAD, SINCE NOBODY ASKED FOR IT
         (true, ..) => Line::from(Span::styled(reconnect.status()
-            .unwrap_or_else(|| login.waiting().to_owned()), theme::ACCENT)),
-        (false, Some(error), _) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
-        (false, None, Some(hint)) => Line::from(Span::styled(hint.to_string(), theme::DIM)),
+            .unwrap_or_else(|| login.waiting().to_owned()), theme::accent())),
+        (false, Some(error), _) => Line::from(Span::styled(error.to_string(), theme::error())),
+        (false, None, Some(hint)) => Line::from(Span::styled(hint.to_string(), theme::dim())),
         (false, None, None) => Line::default(),
     }];
 
@@ -1252,7 +1252,7 @@ fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rec
     if login.stage == LoginStage::Address && options::socks5_enabled()
     {
         notes.push(Line::from(Span::styled(format!("Through SOCKS5 {}",
-            config::read_config::<String>("socks5_addr")), theme::DIM)));
+            config::read_config::<String>("socks5_addr")), theme::dim())));
     }
 
     let footer = match (login.stage, login.busy, login.cancellable())
@@ -1270,9 +1270,9 @@ fn draw_account(frame: &mut Frame, form: &Account, area: Rect) -> Rect
 {
     let status = match (form.busy, form.armed, form.error.as_deref())
     {
-        (true, ..) => Line::from(Span::styled("Waiting for the server…", theme::ACCENT)),
-        (false, true, _) => Line::from(Span::styled("This cannot be undone. Press ⏎ again to delete your account.", theme::ERROR)),
-        (false, false, Some(error)) => Line::from(Span::styled(error.to_string(), theme::ERROR)),
+        (true, ..) => Line::from(Span::styled("Waiting for the server…", theme::accent())),
+        (false, true, _) => Line::from(Span::styled("This cannot be undone. Press ⏎ again to delete your account.", theme::error())),
+        (false, false, Some(error)) => Line::from(Span::styled(error.to_string(), theme::error())),
         (false, false, None) => Line::default(),
     };
 
@@ -1322,12 +1322,12 @@ fn draw_form
 
         if focused { caret = Some((cursor.0, lines.len() as u16 + consts::FIELD_ROW + cursor.1)); }
 
-        lines.push(Line::from(Span::styled(*label, theme::DIM)));
+        lines.push(Line::from(Span::styled(*label, theme::dim())));
 
         for (row, line) in field.into_iter().enumerate()
         {
             let gutter = if row > 0 { "  " } else { "> " };
-            let mut spans = vec![Span::styled(gutter, if focused { theme::ACCENT } else { theme::DIM })];
+            let mut spans = vec![Span::styled(gutter, if focused { theme::accent() } else { theme::dim() })];
             spans.extend(line.spans);
 
             lines.push(Line::from(spans));
@@ -1351,13 +1351,13 @@ fn draw_form
 
     frame.render_widget(Clear, popup); //Clear RESETS THE CELLS
 
-    frame.buffer_mut().set_style(popup, theme::TEXT);
+    frame.buffer_mut().set_style(popup, theme::text());
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(theme::BORDER_ACTIVE)
-        .title(Span::styled(title, theme::TITLE))
-        .title_bottom(Line::from(Span::styled(footer, theme::DIM)).centered());
+        .border_style(theme::border_active())
+        .title(Span::styled(title, theme::title()))
+        .title_bottom(Line::from(Span::styled(footer, theme::dim())).centered());
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -1387,7 +1387,7 @@ fn draw_form
 
 fn button(label: &'static str, selected: bool, style: Style) -> Span<'static>
 {
-    if selected { Span::styled(label, style.patch(theme::SELECTED)) } else { Span::styled(label, theme::DIM) }
+    if selected { Span::styled(label, style.patch(theme::selected())) } else { Span::styled(label, theme::dim()) }
 }
 
 //WRAP THE SELECTED ROW'S DESCRIPTION
@@ -1407,11 +1407,11 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
 
             let line = Line::from(vec!
             [
-                Span::styled(if selected { "▌ " } else { "  " }, theme::ACCENT),
-                Span::styled(truncate(path, (width as usize).saturating_sub(2)), if selected { theme::ACCENT } else { theme::TEXT }),
+                Span::styled(if selected { "▌ " } else { "  " }, theme::accent()),
+                Span::styled(truncate(path, (width as usize).saturating_sub(2)), if selected { theme::accent() } else { theme::text() }),
             ]);
 
-            if selected { line.style(theme::SELECTED) } else { line }
+            if selected { line.style(theme::selected()) } else { line }
         }).collect();
     }
 
@@ -1422,47 +1422,47 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
         //SAY WHAT A BUTTON DOES, OR WHY IT WILL NOT
         Row::Action(label) if **label == *consts::RESTART_LABEL =>
         {
-            spans.push(Span::styled("Restart the server \u{2014} every client is disconnected and the whole config is read again.", theme::DIM));
+            spans.push(Span::styled("Restart the server \u{2014} every client is disconnected and the whole config is read again.", theme::dim()));
 
-            if state.unsaved() { spans.push(Span::styled(" \u{b7} save your changes first", theme::NOTICE)); }
-            else if state.confirm { spans.push(Span::styled(" \u{b7} press again to confirm", theme::ERROR)); }
+            if state.unsaved() { spans.push(Span::styled(" \u{b7} save your changes first", theme::notice())); }
+            else if state.confirm { spans.push(Span::styled(" \u{b7} press again to confirm", theme::error())); }
         },
 
         Row::Action(_) if state.profile() =>
-            spans.push(Span::styled("Send the description to the server.", theme::DIM)),
+            spans.push(Span::styled("Send the description to the server.", theme::dim())),
 
-        Row::Action(_) => spans.push(Span::styled("Send the edited rows to the server.", theme::DIM)),
+        Row::Action(_) => spans.push(Span::styled("Send the edited rows to the server.", theme::dim())),
 
         //A FIELD IS PROSE OR A LINK, SO THE FOOT IS WHERE IT IS READ
         Row::Item(item) if state.profile() => match &item.value
         {
             Value::Avatar(Some(path)) if path.is_empty() =>
-                spans.push(Span::styled("Your avatar is removed on save.", theme::NOTICE)),
+                spans.push(Span::styled("Your avatar is removed on save.", theme::notice())),
 
-            Value::Avatar(Some(path)) => spans.push(Span::styled(format!("{path} is uploaded on save."), theme::TEXT)),
+            Value::Avatar(Some(path)) => spans.push(Span::styled(format!("{path} is uploaded on save."), theme::text())),
 
             Value::Avatar(None) => spans.push(Span::styled(format!(
                 "Type a path to an image (up to {}MB) to have its centre cut to a square, or clear it to remove your avatar.",
-                chat_consts::MAX_IMAGE_SIZE / chat_consts::MEGABYTE), theme::DIM)),
+                chat_consts::MAX_IMAGE_SIZE / chat_consts::MEGABYTE), theme::dim())),
 
             Value::Text(text) if text.is_empty() =>
-                spans.push(Span::styled(format!("No {}.", item.label.to_lowercase()), theme::DIM)),
+                spans.push(Span::styled(format!("No {}.", item.label.to_lowercase()), theme::dim())),
 
-            Value::Text(text) => spans.push(Span::styled(text.clone(), theme::TEXT)),
+            Value::Text(text) => spans.push(Span::styled(text.clone(), theme::text())),
 
             _ => {},
         },
 
         Row::Item(item) =>
         {
-            if !item.hint.is_empty() { spans.push(Span::styled(item.hint.clone(), theme::DIM)); }
+            if !item.hint.is_empty() { spans.push(Span::styled(item.hint.clone(), theme::dim())); }
 
             //MARK A STARTUP-ONLY KEY
             if item.restart
             {
                 let note = match spans.is_empty() { true => "restart required", false => " \u{b7} restart required" };
 
-                spans.push(Span::styled(note, theme::NOTICE));
+                spans.push(Span::styled(note, theme::notice()));
             }
         },
     }
@@ -1479,8 +1479,8 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
         //SECTION HEADING WITH A RULE
         Row::Header(label) => return Line::from(vec!
         [
-            Span::styled(format!(" {label} "), theme::TITLE),
-            Span::styled("─".repeat(width.saturating_sub(label.width() + 2)), theme::BORDER),
+            Span::styled(format!(" {label} "), theme::title()),
+            Span::styled("─".repeat(width.saturating_sub(label.width() + 2)), theme::border()),
         ]),
 
         //A BUTTON IS THE WHOLE ROW
@@ -1493,10 +1493,10 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
 
             let style = match (armed, selected, live)
             {
-                (true, _, _) => theme::ERROR,
-                (_, true, _) => theme::ACCENT,
-                (_, false, true) => theme::TEXT,
-                (_, false, false) => theme::DIM,
+                (true, _, _) => theme::error(),
+                (_, true, _) => theme::accent(),
+                (_, false, true) => theme::text(),
+                (_, false, false) => theme::dim(),
             };
 
             let text = match armed
@@ -1508,12 +1508,12 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
 
             let line = Line::from(vec!
             [
-                Span::styled(if selected { "▌" } else { " " }, theme::ACCENT),
+                Span::styled(if selected { "▌" } else { " " }, theme::accent()),
                 Span::raw(" ".repeat(padding)),
                 Span::styled(text, style),
             ]);
 
-            return if selected { line.style(theme::SELECTED) } else { line };
+            return if selected { line.style(theme::selected()) } else { line };
         },
 
         Row::Item(item) => item,
@@ -1521,11 +1521,11 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
 
     let mut spans = vec!
     [
-        Span::styled(if selected { "▌" } else { " " }, theme::ACCENT),
+        Span::styled(if selected { "▌" } else { " " }, theme::accent()),
         Span::styled
         (
             format!(" {:<label_width$}  ", truncate(&item.label, label_width)),
-            if selected { theme::ACCENT } else { theme::TEXT },
+            if selected { theme::accent() } else { theme::text() },
         ),
     ];
 
@@ -1534,37 +1534,37 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
     //SHOW THE TEXT BEING TYPED, CARET AND ALL
     match _state.edit.as_ref().filter(|_| selected)
     {
-        Some(edit) => spans.push(Span::styled(format!("{}▏", truncate(edit, value_width.saturating_sub(1))), theme::ACCENT)),
+        Some(edit) => spans.push(Span::styled(format!("{}▏", truncate(edit, value_width.saturating_sub(1))), theme::accent())),
         None => spans.extend(value_spans(_state, &item.value, value_width)),
     }
 
     //MARK AN EDITED ROW
-    if item.changed { spans.push(Span::styled(" ●", theme::NOTICE)); }
+    if item.changed { spans.push(Span::styled(" ●", theme::notice())); }
 
     //MARK A ROW NEEDING A RESTART
-    if item.restart { spans.push(Span::styled(" ↻", theme::DIM)); }
+    if item.restart { spans.push(Span::styled(" ↻", theme::dim())); }
 
     let line = Line::from(spans);
 
-    if selected { line.style(theme::SELECTED) } else { line }
+    if selected { line.style(theme::selected()) } else { line }
 }
 
 fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'static>>
 {
     match value
     {
-        Value::Toggle { on: true, .. } => vec![Span::styled("● on", theme::OK)],
-        Value::Toggle { on: false, .. } => vec![Span::styled("○ off", theme::DIM)],
+        Value::Toggle { on: true, .. } => vec![Span::styled("● on", theme::ok())],
+        Value::Toggle { on: false, .. } => vec![Span::styled("○ off", theme::dim())],
 
-        Value::Number(number) => vec![Span::styled(number.to_string(), theme::TEXT)],
+        Value::Number(number) => vec![Span::styled(number.to_string(), theme::text())],
 
-        Value::Text(text) if text.is_empty() => vec![Span::styled("(empty)", theme::DIM)],
-        Value::Text(text) => vec![Span::styled(truncate(text, _width), theme::TEXT)],
+        Value::Text(text) if text.is_empty() => vec![Span::styled("(empty)", theme::dim())],
+        Value::Text(text) => vec![Span::styled(truncate(text, _width), theme::text())],
 
-        Value::Avatar(None) if _state.avatar.is_some() => vec![Span::styled("set", theme::TEXT)],
-        Value::Avatar(None) => vec![Span::styled("(none)", theme::DIM)],
-        Value::Avatar(Some(path)) if path.is_empty() => vec![Span::styled("remove", theme::NOTICE)],
-        Value::Avatar(Some(path)) => vec![Span::styled(truncate(path, _width), theme::TEXT)],
+        Value::Avatar(None) if _state.avatar.is_some() => vec![Span::styled("set", theme::text())],
+        Value::Avatar(None) => vec![Span::styled("(none)", theme::dim())],
+        Value::Avatar(Some(path)) if path.is_empty() => vec![Span::styled("remove", theme::notice())],
+        Value::Avatar(Some(path)) => vec![Span::styled(truncate(path, _width), theme::text())],
 
         #[cfg(feature = "client_voice")]
         Value::Volume(percent) =>
@@ -1574,9 +1574,9 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
 
             vec!
             [
-                Span::styled("█".repeat(filled), theme::ACCENT),
-                Span::styled("░".repeat(consts::SLIDER_WIDTH.saturating_sub(filled)), theme::BORDER),
-                Span::styled(format!(" {percent:>3}%"), if *percent == 0 { theme::DIM } else { theme::TEXT }),
+                Span::styled("█".repeat(filled), theme::accent()),
+                Span::styled("░".repeat(consts::SLIDER_WIDTH.saturating_sub(filled)), theme::border()),
+                Span::styled(format!(" {percent:>3}%"), if *percent == 0 { theme::dim() } else { theme::text() }),
             ]
         },
 
@@ -1585,10 +1585,10 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
         {
             if id.is_empty()
             {
-                vec![Span::styled(consts::DEFAULT_DEVICE, theme::DIM)]
+                vec![Span::styled(consts::DEFAULT_DEVICE, theme::dim())]
             } else
             {
-                vec![Span::styled(truncate(&_state.device_label(id, *input), _width), theme::ACCENT)]
+                vec![Span::styled(truncate(&_state.device_label(id, *input), _width), theme::accent())]
             }
         },
     }
@@ -1600,19 +1600,19 @@ fn picker_line(entry: &DeviceEntry, selected: bool, width: usize) -> Line<'stati
     //ENTRY 0 IS THE SYSTEM DEFAULT
     let (text, style) = if entry.id.is_empty()
     {
-        (String::from(consts::DEFAULT_DEVICE), theme::DIM)
+        (String::from(consts::DEFAULT_DEVICE), theme::dim())
     } else
     {
-        (truncate(&entry.label, width.saturating_sub(3)), theme::TEXT)
+        (truncate(&entry.label, width.saturating_sub(3)), theme::text())
     };
 
     let line = Line::from(vec!
     [
-        Span::styled(if selected { "▌" } else { " " }, theme::ACCENT),
+        Span::styled(if selected { "▌" } else { " " }, theme::accent()),
         Span::styled(format!(" {text}"), style),
     ]);
 
-    if selected { line.style(theme::SELECTED) } else { line }
+    if selected { line.style(theme::selected()) } else { line }
 }
 
 #[cfg(not(feature = "client_voice"))]

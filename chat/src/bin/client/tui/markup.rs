@@ -143,7 +143,7 @@ pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, 
             //A NEWLINE INSIDE INLINE CODE IS A SPACE
             Segment::Code(code) =>
             {
-                current.push(Span::styled(code.replace('\n', " "), theme::CODE.add_modifier(active(&stack))));
+                current.push(Span::styled(code.replace('\n', " "), theme::code().add_modifier(active(&stack))));
 
                 open = true;
                 start = false;
@@ -152,9 +152,9 @@ pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, 
             //SHOWN AS ITS TEXT, WITH THE TARGET BESIDE IT
             Segment::Link { text, url } =>
             {
-                current.push(Span::styled(text.clone(), theme::LINK));
+                current.push(Span::styled(text.clone(), theme::link()));
 
-                if url != text { current.push(Span::styled(format!(" ({url})"), theme::DIM)); }
+                if url != text { current.push(Span::styled(format!(" ({url})"), theme::dim())); }
 
                 open = true;
                 start = false;
@@ -253,21 +253,21 @@ fn block(out: &mut Vec<Line<'static>>, lang: Option<&str>, body: &str, width: u1
     //NOTHING HIGHLIGHTS, SO THE LANGUAGE IS SHOWN
     if let Some(lang) = lang.filter(|lang| !lang.is_empty())
     {
-        out.push(row(pad(lang, inner), theme::CODE_LANG));
+        out.push(row(pad(lang, inner), theme::code_lang()));
     }
 
     for line in body.split('\n')
     {
         for chunk in split_cells(&expand_tabs(line), inner)
         {
-            out.push(row(pad(&chunk, inner), theme::CODE_BLOCK));
+            out.push(row(pad(&chunk, inner), theme::code_block()));
         }
     }
 }
 
 fn row(content: String, style: Style) -> Line<'static>
 {
-    Line::from(vec![Span::styled("▏ ", theme::CODE_BAR), Span::styled(content, style)])
+    Line::from(vec![Span::styled("▏ ", theme::code_bar()), Span::styled(content, style)])
 }
 
 fn pad(text: &str, width: usize) -> String
@@ -350,8 +350,8 @@ fn marker(part: &str, style: Style) -> Option<Marker<'_>>
     {
         return Some(Marker
         {
-            spans: vec![indent(), Span::styled(consts::QUOTE, theme::QUOTE)],
-            hanging: vec![indent(), Span::styled(consts::QUOTE, theme::QUOTE)],
+            spans: vec![indent(), Span::styled(consts::QUOTE, theme::quote())],
+            hanging: vec![indent(), Span::styled(consts::QUOTE, theme::quote())],
             style,
             rest: body[1..].strip_prefix(' ').unwrap_or(""),
         });
@@ -361,7 +361,7 @@ fn marker(part: &str, style: Style) -> Option<Marker<'_>>
     {
         return Some(Marker
         {
-            spans: vec![indent(), Span::styled(consts::BULLET, theme::BULLET)],
+            spans: vec![indent(), Span::styled(consts::BULLET, theme::bullet())],
             hanging: vec![Span::raw(" ".repeat(spaces + text_width(consts::BULLET)))],
             style,
             rest: body[2..].trim_start_matches(' '),
@@ -376,7 +376,7 @@ fn marker(part: &str, style: Style) -> Option<Marker<'_>>
     {
         return Some(Marker
         {
-            spans: vec![indent(), Span::styled(body[..digits + 2].to_owned(), theme::BULLET)],
+            spans: vec![indent(), Span::styled(body[..digits + 2].to_owned(), theme::bullet())],
             hanging: vec![Span::raw(" ".repeat(spaces + digits + 2))],
             style,
             rest: body[digits + 2..].trim_start_matches(' '),
@@ -391,7 +391,7 @@ fn heading(style: Style, level: usize) -> Style //A HEADING KEEPS THE MESSAGE'S 
     let style = match style.fg
     {
         Some(_) => style,
-        None => style.patch(theme::HEADING),
+        None => style.patch(theme::heading()),
     };
 
     match level
@@ -414,7 +414,7 @@ fn rule(current: &[Span<'static>], width: u16) -> Span<'static> //FILLING WHAT I
 {
     let used: usize = current.iter().map(|span| text_width(&span.content)).sum();
 
-    Span::styled(consts::RULE.to_string().repeat((width as usize).saturating_sub(used)), theme::RULE)
+    Span::styled(consts::RULE.to_string().repeat((width as usize).saturating_sub(used)), theme::rule())
 }
 
 //THE PARSER; IT NEVER CONSUMES AN UNCLOSED RUN

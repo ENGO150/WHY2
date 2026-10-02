@@ -441,7 +441,7 @@ impl App
             dirty: true,
             generation: 0,
             stripe: false,
-            stripe_bg: theme::STRIPE_FALLBACK,
+            stripe_bg: theme::stripe(None),
             wrapped: None,
         }
     }
@@ -1689,7 +1689,7 @@ impl App
 
             let tint = match (mentioned, striped && stripe)
             {
-                (true, _) => Some(theme::MENTION),
+                (true, _) => Some(theme::mention()),
                 (false, true) => Some(Style::new().bg(self.stripe_bg)),
                 (false, false) => None,
             };

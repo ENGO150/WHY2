@@ -63,14 +63,14 @@ impl App
 
             ClientEvent::FirstUser =>
             {
-                self.push_styled("You are the first user to register, owner role has been granted to you.", theme::NOTICE);
+                self.push_styled("You are the first user to register, owner role has been granted to you.", theme::notice());
             },
 
             ClientEvent::Authenticated(role) =>
             {
                 self.login = None; //THE BOX HAS ASKED FOR EVERYTHING IT WAS GOING TO ASK FOR
                 self.role = role;
-                self.push_styled("Login successful. Press Ctrl+H for help.", theme::OK);
+                self.push_styled("Login successful. Press Ctrl+H for help.", theme::ok());
 
                 //THESE ANSWERS ARE WORTH REPLAYING NOW
                 self.reconnect.accepted();
@@ -78,7 +78,7 @@ impl App
 
             ClientEvent::Connected(server_name) =>
             {
-                self.push_styled(format!("Successfully connected to {server_name}."), theme::OK);
+                self.push_styled(format!("Successfully connected to {server_name}."), theme::ok());
                 self.server_name = server_name;
             },
 
@@ -138,7 +138,7 @@ impl App
             ClientEvent::ImageRequest(hash) => self.image_requests.push(hash),
 
             ClientEvent::ImageFailed(username, filename, ..) => self.push_styled(
-                format!("{username} sent an image that could not be displayed ({filename})."), theme::ERROR),
+                format!("{username} sent an image that could not be displayed ({filename})."), theme::error()),
 
             ClientEvent::PrivateMessageSent(to, id, msg, colors) => self.push_private(true, to, id, msg, colors),
 
@@ -161,10 +161,10 @@ impl App
 
             ClientEvent::TofuSkip(hash) =>
             {
-                self.push_styled("SECURITY WARNING: UNKNOWN SERVER IDENTITY", theme::ERROR);
+                self.push_styled("SECURITY WARNING: UNKNOWN SERVER IDENTITY", theme::error());
                 self.push_styled("The server's identity key cannot be verified due to disabled ToFU \
-                    verification. If you don't recognize the identity key below, disconnect immediately!", theme::NOTICE);
-                self.push_styled(hash, theme::NOTICE);
+                    verification. If you don't recognize the identity key below, disconnect immediately!", theme::notice());
+                self.push_styled(hash, theme::notice());
             },
 
             ClientEvent::VoiceActivity(users) =>
@@ -198,8 +198,8 @@ impl App
 
                 self.push(Line::from(vec!
                 [
-                    Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
-                    Span::styled(format!("{uname} connected."), theme::OK),
+                    Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
+                    Span::styled(format!("{uname} connected."), theme::ok()),
                 ]));
 
                 self.offline.remove(&uname); //THEY ARE HERE NOW
@@ -224,8 +224,8 @@ impl App
             {
                 self.push(Line::from(vec!
                 [
-                    Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
-                    Span::styled(format!("{uname} disconnected."), theme::DIM),
+                    Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
+                    Span::styled(format!("{uname} disconnected."), theme::dim()),
                 ]));
 
                 //Leave NAMES THE USER, SO DROP THEM HERE
@@ -248,7 +248,7 @@ impl App
 
             ClientEvent::Muted =>
             {
-                self.push_styled("You have been muted by moderator.", theme::NOTICE);
+                self.push_styled("You have been muted by moderator.", theme::notice());
             },
 
             ClientEvent::Deleted(message_id) => self.delete_message(message_id),
@@ -262,13 +262,13 @@ impl App
                 //A REFUSED SAVE LEAVES THE BOX EDITABLE
                 self.settings.saving = false;
 
-                self.push_styled("Invalid usage! Press Ctrl+H for help.", theme::ERROR);
+                self.push_styled("Invalid usage! Press Ctrl+H for help.", theme::error());
             },
 
             ClientEvent::UnsafeVersion(newer_versions, current_version, newest_version) =>
             {
                 self.push_styled(format!("This release could be unsafe! You are {newer_versions} \
-                    versions behind! ({current_version}/{newest_version})"), theme::NOTICE);
+                    versions behind! ({current_version}/{newest_version})"), theme::notice());
             },
 
             ClientEvent::Username(disabled_registration, min_uname, max_uname) =>
@@ -291,12 +291,12 @@ impl App
             {
                 self.voice_enabled = true;
                 self.rebuild_voice();
-                self.push_styled("Voice enabled.", theme::OK);
+                self.push_styled("Voice enabled.", theme::ok());
             },
 
             ClientEvent::VoiceDeviceFailed =>
             {
-                self.push_styled("Switching the audio device failed - the previous one is still in use.", theme::ERROR);
+                self.push_styled("Switching the audio device failed - the previous one is still in use.", theme::error());
 
                 //THE CONFIG POINTS AT THE DEVICE THAT PLAYS
                 #[cfg(feature = "client_voice")]
@@ -305,7 +305,7 @@ impl App
 
             ClientEvent::VoiceHandshakeFailed =>
             {
-                self.push_styled("The server never answered the voice handshake - is UDP getting through?", theme::ERROR);
+                self.push_styled("The server never answered the voice handshake - is UDP getting through?", theme::error());
             },
 
             ClientEvent::VoiceDisabled =>
@@ -314,7 +314,7 @@ impl App
                 self.voice_enabled = false;
                 self.voice_activity.clear();
                 self.rebuild_voice();
-                self.push_styled("Voice disabled.", theme::DIM);
+                self.push_styled("Voice disabled.", theme::dim());
             },
 
             //SERVER MESSAGE
@@ -322,8 +322,8 @@ impl App
             {
                 self.push(Line::from(vec!
                 [
-                    Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
-                    Span::styled(message, theme::NOTICE),
+                    Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
+                    Span::styled(message, theme::notice()),
                 ]));
             },
 
@@ -332,12 +332,12 @@ impl App
             {
                 match username
                 {
-                    Some(username) => self.push_styled(format!("{username} is now {role}."), theme::NOTICE),
+                    Some(username) => self.push_styled(format!("{username} is now {role}."), theme::notice()),
 
                     None =>
                     {
                         self.role = role;
-                        self.push_styled(format!("You are now {role}."), theme::NOTICE);
+                        self.push_styled(format!("You are now {role}."), theme::notice());
                     },
                 }
             },
@@ -385,7 +385,7 @@ impl App
 
                     false =>
                     {
-                        self.push_styled(format!("Message history ({kept}):"), theme::TITLE);
+                        self.push_styled(format!("Message history ({kept}):"), theme::title());
                         self.start_history(entries, start, more);
                     },
                 }
@@ -413,7 +413,7 @@ impl App
                     {
                         if self.settings.open && self.settings.server() { self.settings.stored(settings); }
 
-                        self.push_styled("Server settings saved.", theme::OK);
+                        self.push_styled("Server settings saved.", theme::ok());
                     },
 
                     false => self.settings.open_server(settings),
@@ -432,7 +432,7 @@ impl App
                         //A RECONNECT REPLAYS THE NEW ONE
                         if let Some(form) = self.account.take() { self.reconnect.passwd(form.new_password()); }
 
-                        self.push_styled("Password changed.", theme::OK);
+                        self.push_styled("Password changed.", theme::ok());
                     },
 
                     false =>
@@ -442,7 +442,7 @@ impl App
                         match self.account.as_mut()
                         {
                             Some(form) => form.rejected(message),
-                            None => self.push_styled(message, theme::ERROR),
+                            None => self.push_styled(message, theme::error()),
                         }
                     },
                 }
@@ -469,7 +469,7 @@ impl App
                         match self.account.as_mut()
                         {
                             Some(form) => form.rejected(message),
-                            None => self.push_styled(message, theme::ERROR),
+                            None => self.push_styled(message, theme::error()),
                         }
                     },
                 }
@@ -490,7 +490,7 @@ impl App
                             self.settings.stored_profile(username, profile);
                         }
 
-                        self.push_styled("Profile saved.", theme::OK);
+                        self.push_styled("Profile saved.", theme::ok());
                     },
 
                     false => self.settings.open_profile(username, profile, own),
@@ -510,21 +510,21 @@ impl App
             ClientEvent::AvatarFailed(error) =>
             {
                 self.settings.saving = false;
-                self.push_styled(error, theme::ERROR);
+                self.push_styled(error, theme::error());
             },
 
             //THE ANSWER TO A /color
-            ClientEvent::Colors => self.push_styled("Color set successfully.", theme::OK),
+            ClientEvent::Colors => self.push_styled("Color set successfully.", theme::ok()),
 
             //THE BAN LIST
             ClientEvent::ServerBans(users, ips) =>
             {
                 if users.is_empty() && ips.is_empty()
                 {
-                    self.push_styled("No bans.", theme::DIM);
+                    self.push_styled("No bans.", theme::dim());
                 } else
                 {
-                    self.push_styled(format!("Bans ({}):", users.len() + ips.len()), theme::TITLE);
+                    self.push_styled(format!("Bans ({}):", users.len() + ips.len()), theme::title());
 
                     //TWO SECTIONS, EACH NUMBERED FROM ZERO
                     let sections = [("users", users), ("addresses", ips)];
@@ -540,7 +540,7 @@ impl App
 
                         self.push(Line::from(vec!
                         [
-                            Span::styled(super::branch(last), theme::BORDER),
+                            Span::styled(super::branch(last), theme::border()),
                             Span::raw(name),
                         ]));
 
@@ -551,7 +551,7 @@ impl App
 
                         for (index, ban) in bans.into_iter().enumerate()
                         {
-                            let mut spans = vec![Span::styled(format!("{trunk}{}", super::branch(index == last_ban)), theme::BORDER)];
+                            let mut spans = vec![Span::styled(format!("{trunk}{}", super::branch(index == last_ban)), theme::border())];
 
                             spans.extend(id_column(ban.id, width));
                             spans.push(Span::raw(ban.subject));
@@ -589,11 +589,11 @@ impl App
                     let width = id_width(self.online.iter().map(|user| user.id));
                     let last = self.online.len().saturating_sub(1);
 
-                    self.push_styled(format!("Online clients ({}):", self.online.len()), theme::TITLE);
+                    self.push_styled(format!("Online clients ({}):", self.online.len()), theme::title());
 
                     let rows = self.online.iter().enumerate().map(|(index, user)|
                     {
-                        let mut spans = vec![Span::styled(super::branch(index == last), theme::BORDER)];
+                        let mut spans = vec![Span::styled(super::branch(index == last), theme::border())];
 
                         spans.extend(id_column(user.id, width));
                         spans.push(self.theme.colorize(user.username.clone(), user.username_color));
@@ -601,13 +601,13 @@ impl App
                         //WHAT THEY ARE ON, IF THEY SHARE IT
                         if let Some(device) = self.devices.get(&user.username)
                         {
-                            spans.push(Span::styled(format!("  {}", super::device_label(device)), theme::DIM));
+                            spans.push(Span::styled(format!("  {}", super::device_label(device)), theme::dim()));
                         }
 
                         //ACCENT OUR OWN CHANNEL
                         if let Some(channel) = user.channel.clone()
                         {
-                            let style = if channel == here { theme::ACCENT } else { theme::DIM };
+                            let style = if channel == here { theme::accent() } else { theme::dim() };
                             spans.push(Span::styled(format!("  #{channel}"), style));
                         }
 
@@ -644,7 +644,7 @@ impl App
             {
                 self.push(Line::from(vec!
                 [
-                    Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
+                    Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
                     Span::raw(format!("{username} uploaded file \"{filename}\".")),
                 ]));
             },
@@ -668,10 +668,10 @@ impl App
             {
                 if users.is_empty()
                 {
-                    self.push_styled("No available files.", theme::DIM);
+                    self.push_styled("No available files.", theme::dim());
                 } else
                 {
-                    self.push_styled(format!("Available files ({}):", users.len()), theme::TITLE);
+                    self.push_styled(format!("Available files ({}):", users.len()), theme::title());
 
                     //THE OWNER IS THE BRANCH, THEIR FILES HANG OFF IT
                     let width = id_width(users.iter().map(|user| user.id));
@@ -679,7 +679,7 @@ impl App
 
                     for (index, user) in users.into_iter().enumerate()
                     {
-                        let mut spans = vec![Span::styled(super::branch(index == last), theme::BORDER)];
+                        let mut spans = vec![Span::styled(super::branch(index == last), theme::border())];
 
                         spans.extend(id_column(user.id, width));
                         spans.push(Span::raw(user.username.clone()));
@@ -693,7 +693,7 @@ impl App
 
                         for (file, (filename, file_id)) in user.upload.into_iter().enumerate()
                         {
-                            let mut spans = vec![Span::styled(format!("{trunk}{}", super::branch(file == last_file)), theme::BORDER)];
+                            let mut spans = vec![Span::styled(format!("{trunk}{}", super::branch(file == last_file)), theme::border())];
 
                             spans.extend(id_column(file_id, file_width));
                             spans.push(Span::raw(filename));
@@ -711,17 +711,17 @@ impl App
 
                 if users.is_empty()
                 {
-                    self.push_styled("No available screenshares.", theme::DIM);
+                    self.push_styled("No available screenshares.", theme::dim());
                 } else
                 {
-                    self.push_styled(format!("Screensharing clients ({}):", users.len()), theme::TITLE);
+                    self.push_styled(format!("Screensharing clients ({}):", users.len()), theme::title());
 
                     let width = id_width(users.iter().map(|user| user.id));
                     let last = users.len() - 1;
 
                     for (index, user) in users.into_iter().enumerate()
                     {
-                        let mut spans = vec![Span::styled(super::branch(index == last), theme::BORDER)];
+                        let mut spans = vec![Span::styled(super::branch(index == last), theme::border())];
 
                         spans.extend(id_column(user.id, width));
                         spans.push(Span::raw(user.username));
@@ -733,17 +733,17 @@ impl App
 
             ClientEvent::UploadLimit =>
             {
-                self.push_styled("Maximum concurrent uploads reached!", theme::ERROR);
+                self.push_styled("Maximum concurrent uploads reached!", theme::error());
             },
 
             ClientEvent::Screen(enabled) =>
             {
-                self.push_styled(format!("{} screen sharing.", if enabled { "Started" } else { "Stopped" }), theme::OK);
+                self.push_styled(format!("{} screen sharing.", if enabled { "Started" } else { "Stopped" }), theme::ok());
             },
 
             ClientEvent::ScreenFailed(reason) =>
             {
-                self.push_styled(format!("Screen sharing failed: {reason}."), theme::ERROR);
+                self.push_styled(format!("Screen sharing failed: {reason}."), theme::error());
             },
 
             ClientEvent::Attach(username) =>
@@ -761,8 +761,8 @@ impl App
             {
                 self.push(Line::from(vec!
                 [
-                    Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
-                    Span::styled(format!("{username} started screen sharing."), theme::NOTICE),
+                    Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
+                    Span::styled(format!("{username} started screen sharing."), theme::notice()),
                 ]));
             },
 
@@ -770,8 +770,8 @@ impl App
             {
                 self.push(Line::from(vec!
                 [
-                    Span::styled(format!("[{}] ", options::get_server_username()), theme::DIM),
-                    Span::styled(format!("{username} stopped screen sharing."), theme::DIM),
+                    Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
+                    Span::styled(format!("{username} stopped screen sharing."), theme::dim()),
                 ]));
             },
 
@@ -796,7 +796,7 @@ impl App
             ClientEvent::VersionMismatch(client_version, server_version) =>
             {
                 self.push_styled(format!("Version mismatch - some features may not work \
-                    ({client_version}/{server_version})"), theme::NOTICE);
+                    ({client_version}/{server_version})"), theme::notice());
             },
 
             //Login::ask KEEPS THE ERROR ON SCREEN
@@ -805,7 +805,7 @@ impl App
                 match self.login.as_mut()
                 {
                     Some(login) => login.error = Some(String::from("Username rejected!")),
-                    None => self.push_styled("Username rejected!", theme::ERROR),
+                    None => self.push_styled("Username rejected!", theme::error()),
                 }
 
                 //A REPLAYED ANSWER THE SERVER REFUSES IS NOT ONE TO REPLAY AGAIN
@@ -820,7 +820,7 @@ impl App
                 match self.login.as_mut()
                 {
                     Some(login) => login.error = Some(message),
-                    None => self.push_styled(message, theme::ERROR),
+                    None => self.push_styled(message, theme::error()),
                 }
 
                 self.dirty = true;
@@ -828,22 +828,22 @@ impl App
 
             ClientEvent::SpamWarning =>
             {
-                self.push_styled("Slow down! You're sending messages too quickly.", theme::NOTICE);
+                self.push_styled("Slow down! You're sending messages too quickly.", theme::notice());
             },
 
             ClientEvent::Socks5Voice =>
             {
-                self.push_styled("Voice chat cannot be enabled while using SOCKS5.", theme::ERROR);
+                self.push_styled("Voice chat cannot be enabled while using SOCKS5.", theme::error());
             },
 
             ClientEvent::DisabledFeature =>
             {
-                self.push_styled("Server has disabled the feature you requested.", theme::ERROR);
+                self.push_styled("Server has disabled the feature you requested.", theme::error());
             },
 
             ClientEvent::VersionFailed =>
             {
-                self.push_styled("Fetching versions failed, this release could be unsafe!", theme::NOTICE);
+                self.push_styled("Fetching versions failed, this release could be unsafe!", theme::notice());
             },
 
             //BACK TO THE CONNECT BOX UNLESS WE ASKED TO LEAVE
@@ -919,5 +919,5 @@ fn id_width(ids: impl Iterator<Item = usize>) -> usize
 
 fn id_column(id: usize, width: usize) -> Vec<Span<'static>>
 {
-    vec![Span::styled(format!("{id:>width$}  "), theme::DIM)]
+    vec![Span::styled(format!("{id:>width$}  "), theme::dim())]
 }

@@ -161,7 +161,7 @@ pub fn display(source: &str, width: u16) -> Vec<Line<'static>>
 {
     let nodes = parse(source);
     let block = layout(&nodes, true);
-    let style = theme::MATH;
+    let style = theme::math();
 
     if block.width() + consts::INDENT.len() > width.max(1) as usize
     {
@@ -178,7 +178,7 @@ fn math_style(style: Style) -> Style //MATH KEEPS THE MESSAGE'S COLOUR WHERE IT 
     match style.fg
     {
         Some(_) => style,
-        None => theme::MATH,
+        None => theme::math(),
     }
 }
 

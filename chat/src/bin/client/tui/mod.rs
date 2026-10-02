@@ -633,7 +633,7 @@ async fn handle_key
                     //STORED IS NOT IN USE FOR THESE
                     if let Some(keys) = app.settings.restart_note.take()
                     {
-                        app.push_styled(format!("{keys} takes effect when the server is restarted."), theme::NOTICE);
+                        app.push_styled(format!("{keys} takes effect when the server is restarted."), theme::notice());
                     }
                 },
 
@@ -691,7 +691,7 @@ async fn handle_key
             network::send(&mut *write_stream.lock().await,
                 PacketCode::ServerRestart, options::get_keys().as_ref()).await;
 
-            app.push_styled(String::from("Restarting the server..."), theme::NOTICE);
+            app.push_styled(String::from("Restarting the server..."), theme::notice());
         }
 
         return;
