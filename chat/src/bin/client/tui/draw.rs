@@ -1568,6 +1568,8 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
         Value::Avatar(Some(path)) if path.is_empty() => vec![Span::styled("remove", theme::notice())],
         Value::Avatar(Some(path)) => vec![Span::styled(truncate(path, _width), theme::text())],
 
+        Value::Theme(index) => vec![Span::styled(format!("◂ {} ▸", theme::PALETTES[*index].name), theme::accent())],
+
         #[cfg(feature = "client_voice")]
         Value::Volume(percent) =>
         {

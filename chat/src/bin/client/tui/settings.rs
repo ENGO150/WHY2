@@ -46,6 +46,7 @@ use super::
         App,
         Fitted,
     },
+    theme,
 };
 
 //ENUMS
@@ -67,6 +68,8 @@ pub enum Value
 
     //A PATH TO UPLOAD | None = UNTOUCHED, EMPTY = DROP IT
     Avatar(Option<String>),
+
+    Theme(usize), //INDEX INTO theme::PALETTES
 
     #[cfg(feature = "client_voice")]
     Volume(u32), //PERCENT
@@ -243,6 +246,9 @@ impl Settings
         }
 
         rows.push(Row::Header(String::from("Interface")));
+
+        rows.push(Row::Item(Item::client("Theme", "theme",
+            Value::Theme(theme::palette_index(&config::read_config::<String>("theme"))))));
 
         rows.push(Row::Item(Item::client("Message colors", "disable_colors", toggle_value("disable_colors", true))));
         rows.push(Row::Item(Item::client("Background logo", "disable_logo", toggle_value("disable_logo", true))));
@@ -861,6 +867,7 @@ enum Selected
     Number(i64),
     Text(String),
     Action(&'static str), //WHICH BUTTON - THE SERVER ROWS HAVE TWO OF THEM
+    Theme(usize),
 
     #[cfg(feature = "client_voice")]
     Volume(String, u32),
@@ -882,6 +889,7 @@ fn selected(app: &App) -> Option<Selected>
             Value::Number(number) => Selected::Number(*number),
             Value::Text(text) => Selected::Text(text.clone()),
             Value::Avatar(path) => Selected::Text(path.clone().unwrap_or_default()),
+            Value::Theme(index) => Selected::Theme(*index),
 
             #[cfg(feature = "client_voice")]
             Value::Volume(percent) => Selected::Volume(item.key.clone(), *percent),
@@ -913,6 +921,16 @@ fn adjust(app: &mut App, direction: i32)
                 item.value = Value::Number(next);
                 item.changed = true;
             }
+        },
+
+        Some(Selected::Theme(index)) =>
+        {
+            let next = (index as isize + direction as isize).rem_euclid(theme::PALETTES.len() as isize) as usize;
+
+            if let Some(Row::Item(item)) = app.settings.rows.get_mut(row) { item.value = Value::Theme(next); }
+
+            config::client_write("theme", theme::PALETTES[next].id);
+            app.reload_theme();
         },
 
         //A FREE-FORM STRING IS TYPED, NOT STEPPED
@@ -983,6 +1001,8 @@ fn activate(app: &mut App)
 
         Some(Selected::Action(consts::RESTART_LABEL)) => restart(app),
         Some(Selected::Action(_)) => save(app),
+
+        Some(Selected::Theme(_)) => adjust(app, 1),
 
         #[cfg(feature = "client_voice")]
         Some(Selected::Volume(..)) => adjust(app, 1),
