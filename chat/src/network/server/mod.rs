@@ -2189,38 +2189,19 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 //STORE
                 users::set_role(&target_username, new_role);
 
-                //APPLY TO WHATEVER SESSIONS USER HAS OPENED
-                let sessions: Vec<(Arc<Mutex<OwnedWriteHalf>>, SharedKeys)> =
+                //APPLY TO THEIR LIVE SESSION
+                for mut entry in CONNECTIONS.iter_mut()
+                    .filter(|entry| entry.username() == Some(&target_username) && entry.role().is_some())
                 {
-                    let mut sessions = Vec::new();
-
-                    for mut entry in CONNECTIONS.iter_mut()
-                        .filter(|entry| entry.username() == Some(&target_username) && entry.role().is_some())
-                    {
-                        entry.set_role(new_role);
-
-                        sessions.push((entry.write_stream().clone(), entry.keys().cloned().unwrap()));
-                    }
-
-                    sessions
-                };
-
-                //TELL THE TARGET
-                for (write_stream, target_keys) in sessions
-                {
-                    network::send(&mut *write_stream.lock().await, PacketCode::ServerRole
-                    {
-                        role: new_role,
-                        username: None,
-                    }, Some(&target_keys)).await;
+                    entry.set_role(new_role);
                 }
 
-                //TELL THE ISSUER
-                network::send(&mut *streams.1.lock().await, PacketCode::ServerRole
+                //TELL EVERYONE
+                send_to_all(PacketCode::ServerRole
                 {
+                    username: target_username,
                     role: new_role,
-                    username: Some(target_username),
-                }, Some(&keys)).await;
+                });
             },
 
             //SERVER CONFIGURATION

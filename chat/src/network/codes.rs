@@ -256,15 +256,15 @@ pub enum PacketCode //CONTROL CODES
     //CLIENT -> SERVER | SET A USER'S ROLE
     ServerRoleRequest
     {
-        target: String, //TARGET USER | A USERNAME, OR THE ID OF A SESSION
-        role: Role,     //THE ROLE THEY ARE BEING GIVEN
+        target: String,
+        role: Role,
     },
 
     //SERVER -> CLIENT | A ROLE WAS SET
     ServerRole
     {
-        role: Role,               //THE ROLE THEY WERE GIVEN
-        username: Option<String>, //THE TARGET | None = THE RECIPIENT THEMSELVES
+        username: String,
+        role: Role,
     },
 
     //SERVER -> CLIENT | THE WHOLE server.toml
