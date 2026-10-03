@@ -135,6 +135,7 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
                 id: *user_id,
                 channel: channel.clone(),
                 device: device.clone(),
+                role: config::users::role(uname).unwrap_or_default(),
             });
         }
     }
@@ -148,13 +149,15 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
             .filter(|username| !connected.contains(username.as_str()))
             .map(|username|
             {
-                //GET UNAME COLOR
+                //GET UNAME COLOR & ROLE
                 let username_color = config::users::colors(&username).username_color;
+                let role = config::users::role(&username).unwrap_or_default();
 
                 OfflineUser
                 {
                     username,
                     username_color,
+                    role,
                 }
             }).collect::<Vec<OfflineUser>>())
     } else { None };
