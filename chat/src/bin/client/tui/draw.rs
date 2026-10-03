@@ -47,6 +47,7 @@ use crate::
 {
     config,
     options,
+    role::Role,
     consts as chat_consts,
 };
 
@@ -546,7 +547,7 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect)
     {
         true => (vec![Constraint::Min(3)], vec![Panel::Online]),
 
-        false => (vec![Constraint::Length((app.online.len() as u16 + 2).clamp(3, limit)), Constraint::Min(3)],
+        false => (vec![Constraint::Length((online_rows(app) + 2).clamp(3, limit)), Constraint::Min(3)],
             vec![Panel::Online, Panel::Offline]),
     };
 
@@ -592,40 +593,68 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
     let room = inner.width as usize;
 
     let me = app.username.clone();
-    let lines = app.online.iter().map(|user|
+    let mut lines = Vec::new();
+
+    for section in app.online_sections()
     {
-        //OUR OWN ROW STAYS MARKED; EVERYBODY ELSE GETS THEIR COLOR
-        let style = match user.username == me
-        {
-            true => theme::accent(),
-            false => app.theme.style(user.username_color),
-        }.add_modifier(Modifier::BOLD);
+        //SECTION HEADER, ITS SIZE ON THE RIGHT
+        let label = section_label(section[0].role);
+        let count = section.len().to_string();
+        let pad = room.saturating_sub(label.width() + count.width() + 1);
 
-        //WHAT THEY ARE ON, IF THEY SHARE IT
-        let device = app.devices.get(&user.username).map(|device| super::device_label(device)).unwrap_or_default();
-        let reserved = if device.is_empty() { 0 } else { device.width() + 2 };
-
-        //THE NAME GIVES WAY TO THE DEVICE
-        let name = truncate(&user.username, room.saturating_sub(width + 2 + reserved));
-
-        let mut spans = vec!
+        lines.push(Line::from(vec!
         [
-            Span::styled(format!("{id:>width$}  ", id = user.id), theme::dim()),
-            Span::styled(name.clone(), style),
-        ];
+            Span::styled(label, theme::dim().add_modifier(Modifier::BOLD)),
+            Span::styled(format!("{:pad$}{count} ", ""), theme::dim()),
+        ]));
 
-        //DEVICE ON THE RIGHT EDGE
-        if !device.is_empty()
+        lines.extend(section.iter().map(|user|
         {
-            let pad = room.saturating_sub(width + 3 + name.width() + device.width());
+            //OUR OWN ROW STAYS MARKED; EVERYBODY ELSE GETS THEIR COLOR
+            let style = match user.username == me
+            {
+                true => theme::accent(),
+                false => app.theme.style(user.username_color),
+            }.add_modifier(Modifier::BOLD);
 
-            spans.push(Span::styled(format!("{:pad$}{device} ", ""), theme::dim()));
-        }
+            //WHAT THEY ARE ON, IF THEY SHARE IT
+            let device = app.devices.get(&user.username).map(|device| super::device_label(device)).unwrap_or_default();
+            let reserved = if device.is_empty() { 0 } else { device.width() + 2 };
 
-        Line::from(spans)
-    }).collect::<Vec<Line>>();
+            //THE NAME GIVES WAY TO THE DEVICE
+            let name = truncate(&user.username, room.saturating_sub(width + 2 + reserved));
+
+            let mut spans = vec!
+            [
+                Span::styled(format!("{id:>width$}  ", id = user.id), theme::dim()),
+                Span::styled(name.clone(), style),
+            ];
+
+            //DEVICE ON THE RIGHT EDGE
+            if !device.is_empty()
+            {
+                let pad = room.saturating_sub(width + 3 + name.width() + device.width());
+
+                spans.push(Span::styled(format!("{:pad$}{device} ", ""), theme::dim()));
+            }
+
+            Line::from(spans)
+        }));
+    }
 
     frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn online_rows(app: &App) -> u16 //USERS PLUS SECTION HEADERS
+{
+    (app.online.len() + app.online_sections().count()) as u16
+}
+
+fn section_label(role: Role) -> String //owner -> Owners
+{
+    let name = role.name();
+
+    format!("{}{}s", name[..1].to_uppercase(), &name[1..])
 }
 
 fn draw_offline(frame: &mut Frame, app: &App, area: Rect)

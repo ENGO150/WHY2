@@ -20,6 +20,7 @@ use std::
 {
     mem,
     iter,
+    cmp::Reverse,
     time::Instant,
     collections::
     {
@@ -1201,12 +1202,18 @@ impl App
         self.dirty = true;
     }
 
-    //US FIRST, THE REST BY ID
+    //HIGHEST ROLE FIRST, US FIRST IN OURS, THE REST BY ID
     pub fn sort_online(&mut self)
     {
         let me = self.username.clone();
 
-        self.online.sort_by_key(|user| (user.username != me, user.id));
+        self.online.sort_by_key(|user| (Reverse(user.role), user.username != me, user.id));
+    }
+
+    //THE ROSTER SPLIT BY ROLE
+    pub fn online_sections(&self) -> impl Iterator<Item = &[OnlineUser]>
+    {
+        self.online.chunk_by(|a, b| a.role == b.role)
     }
 
     //DROP THE SCROLLBACK OF AN EMPTY CHANNEL

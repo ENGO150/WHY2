@@ -192,7 +192,7 @@ impl App
                 self.rebuild_voice();
             },
 
-            ClientEvent::Join(uname, username_color, id, device) =>
+            ClientEvent::Join(uname, username_color, id, device, role) =>
             {
                 if let Some(device) = device.clone() { self.devices.insert(uname.clone(), device); }
 
@@ -214,6 +214,7 @@ impl App
                         id,
                         channel: None, //EVERYBODY STARTS IN THE LOBBY
                         device,
+                        role,
                     });
 
                     self.sort_online();
@@ -330,6 +331,12 @@ impl App
             //A ROLE WAS SET; AN UNNAMED ONE IS OURS
             ClientEvent::Role(role, username) =>
             {
+                //MOVE THEM TO THEIR NEW SECTION
+                let target = username.clone().unwrap_or_else(|| self.username.clone());
+
+                self.online.iter_mut().filter(|user| user.username == target).for_each(|user| user.role = role);
+                self.sort_online();
+
                 match username
                 {
                     Some(username) => self.push_styled(format!("{username} is now {role}."), theme::notice()),
