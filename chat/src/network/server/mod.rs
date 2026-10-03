@@ -935,6 +935,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         username_color: config::users::colors(&username).username_color,
         id,
         device,
+        role,
     });
 
     //TELL THE CLIENT WHO IS ALREADY IN VOICE

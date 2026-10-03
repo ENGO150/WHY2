@@ -134,7 +134,7 @@ pub enum ClientEvent
     VoiceRoster(Vec<(usize, String)>),                           //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
     VoiceJoin(usize, String),                                    //SOMEBODY JOINED VOICE IN OUR CHANNEL
     VoiceLeave(usize),                                           //SOMEBODY LEFT VOICE IN OUR CHANNEL
-    Join(String, Option<u8>, usize, Option<Device>),             //CLIENT CONNECTED
+    Join(String, Option<u8>, usize, Option<Device>, Role),       //CLIENT CONNECTED
     Leave(String, usize, bool),                                  //CLIENT DISCONNECTED (ACCOUNT STILL EXISTS)
     ServerSay(String),                                           //SERVER MESSAGE
     Role(Role, Option<String>),                                  //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
@@ -410,7 +410,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //JOIN MESSAGE (CLIENT CONNECTED)
-            PacketCode::Join { username: user, username_color, id, device } =>
+            PacketCode::Join { username: user, username_color, id, device, role } =>
             {
                 #[cfg(feature = "client_voice")]
                 if first_message
@@ -419,7 +419,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     username = Some(user.clone());
                 }
 
-                tx.send(ClientEvent::Join(user, username_color, id, device)).await.unwrap();
+                tx.send(ClientEvent::Join(user, username_color, id, device, role)).await.unwrap();
             }
 
             //LEAVE MESSAGE (CLIENT DISCONNECTED)

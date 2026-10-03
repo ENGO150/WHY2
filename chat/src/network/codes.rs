@@ -110,6 +110,7 @@ pub enum PacketCode //CONTROL CODES
         username_color: Option<u8>,
         id: usize,
         device: Option<Device>,
+        role: Role,
     },
 
     //SERVER -> CLIENT | CLIENT LEAVE MESSAGE
