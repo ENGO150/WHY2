@@ -137,7 +137,7 @@ pub enum ClientEvent
     Join(String, Option<u8>, usize, Option<Device>, Role),       //CLIENT CONNECTED
     Leave(String, usize, bool),                                  //CLIENT DISCONNECTED (ACCOUNT STILL EXISTS)
     ServerSay(String),                                           //SERVER MESSAGE
-    Role(Role, Option<String>),                                  //A ROLE WAS SET (THE ROLE, AND WHO ON - None IS US)
+    Role(Role, String),                                          //A ROLE WAS SET (THE ROLE, AND WHO ON)
     History(Vec<StoredMessage>, u64, bool, u64, bool),           //A PAGE OF STORED MESSAGES (START, MORE, KEPT, OLDER)
     ChannelChanged(Option<String>),                              //WE SWITCHED CHANNEL
     ChannelCreated(String),                                      //CHANNEL CREATED
@@ -540,7 +540,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             }
 
             //A ROLE WAS SET, ON US OR ON SOMEBODY ELSE
-            PacketCode::ServerRole { role, username, .. } =>
+            PacketCode::ServerRole { username, role } =>
             {
                 tx.send(ClientEvent::Role(role, username)).await.unwrap();
             },

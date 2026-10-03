@@ -328,24 +328,25 @@ impl App
                 ]));
             },
 
-            //A ROLE WAS SET; AN UNNAMED ONE IS OURS
+            //A ROLE WAS SET, ON US OR ON SOMEBODY ELSE
             ClientEvent::Role(role, username) =>
             {
                 //MOVE THEM TO THEIR NEW SECTION
-                let target = username.clone().unwrap_or_else(|| self.username.clone());
-
-                self.online.iter_mut().filter(|user| user.username == target).for_each(|user| user.role = role);
+                self.online.iter_mut().filter(|user| user.username == username).for_each(|user| user.role = role);
                 self.sort_online();
 
-                match username
-                {
-                    Some(username) => self.push_styled(format!("{username} is now {role}."), theme::notice()),
+                //AN OPEN PROFILE OF THEIRS
+                if self.settings.open && self.settings.profile() && self.settings.subject == username { self.settings.role = role; }
 
-                    None =>
+                match username == self.username
+                {
+                    true =>
                     {
                         self.role = role;
                         self.push_styled(format!("You are now {role}."), theme::notice());
                     },
+
+                    false => self.push_styled(format!("{username} is now {role}."), theme::notice()),
                 }
             },
 
