@@ -334,19 +334,15 @@ impl App
                 //MOVE THEM TO THEIR NEW SECTION
                 self.online.iter_mut().filter(|user| user.username == username).for_each(|user| user.role = role);
                 self.sort_online();
+                self.dirty = true;
 
                 //AN OPEN PROFILE OF THEIRS
                 if self.settings.open && self.settings.profile() && self.settings.subject == username { self.settings.role = role; }
 
-                match username == self.username
+                if username == self.username
                 {
-                    true =>
-                    {
-                        self.role = role;
-                        self.push_styled(format!("You are now {role}."), theme::notice());
-                    },
-
-                    false => self.push_styled(format!("{username} is now {role}."), theme::notice()),
+                    self.role = role;
+                    self.push_styled(format!("You are now {role}."), theme::notice());
                 }
             },
 
