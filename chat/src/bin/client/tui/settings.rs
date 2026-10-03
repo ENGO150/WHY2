@@ -29,6 +29,7 @@ use why2_chat::
 {
     config,
     misc,
+    role::Role,
     network::codes::{ ServerSetting, SettingValue, UserProfile },
 };
 
@@ -137,6 +138,7 @@ pub struct Settings //THE /settings OVERLAY, IN ANY OF ITS MODES
 
     pub mode: Mode,
     pub subject: String,      //WHOSE PROFILE, IN Profile MODE
+    pub role: Role,           //AND THEIR RANK
 
     //THE PICTURE A PROFILE NAMES, THE ONE THAT IS BUILT, AND WHERE THE BOX PUT IT
     pub avatar: Option<[u8; 32]>,
@@ -193,6 +195,7 @@ impl Settings
             page: 0,
             mode: Mode::Client,
             subject: String::new(),
+            role: Role::default(),
             avatar: None,
             picture: None,
             picture_of: None,
@@ -383,6 +386,7 @@ impl Settings
         self.open = true;
         self.mode = Mode::Profile { own };
         self.subject = username;
+        self.role = profile.role;
         self.edit = None;
         self.saving = false;
         self.confirm = false;

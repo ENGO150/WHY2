@@ -1102,11 +1102,17 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect, font: Font
         },
     };
 
-    let block = Block::bordered()
+    let mut block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::border_active())
         .title(Span::styled(title, theme::title()))
         .title_bottom(Line::from(Span::styled(hint, theme::dim())).centered());
+
+    //THE PROFILE'S RANK ON THE RIGHT
+    if state.profile() && state.picker.is_none()
+    {
+        block = block.title_top(Line::from(Span::styled(format!(" {} ", state.role), theme::dim())).right_aligned());
+    }
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
