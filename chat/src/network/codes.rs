@@ -535,6 +535,7 @@ pub struct UserProfile
     pub website: String,          //A LINK OF THEIRS, http/https ONLY
     pub status: String,           //WHAT THEY ARE UP TO, UNTIL THEY CHANGE IT
     pub avatar: Option<[u8; 32]>, //PROFILE PICTURE
+    pub role: Role,               //THEIR RANK
 }
 
 //ONE MESSAGE AS server_messages.bin KEEPS IT

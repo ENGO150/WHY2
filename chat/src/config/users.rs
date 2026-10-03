@@ -138,6 +138,7 @@ pub fn profile(username: &str) -> UserProfile //RETURN PROFILE OF username
         website: fields.next().unwrap_or_default(),
         status: fields.next().unwrap_or_default(),
         avatar: avatar(username),
+        role: role(username).unwrap_or_default(),
     }
 }
 
