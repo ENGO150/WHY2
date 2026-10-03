@@ -1,6 +1,27 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.2.7:
+- 922f28b3: upgrade chat dependencies
+- 3b30f96c: display role change notification only on target user
+- 08fcaec6: wire new role change announcements on client
+- ebc7ecc1: announce role change to all online users
+- e4951967: wire profile roles on TUI
+- e8fc74f6: add role into UserProfile
+- 8f2f18ff: separate user per role in user sidebar
+- ebd8b45a: add role field to OfflineUser & OnlineUser
+- 53038947: add role field to PacketCode::Join
+- 57035cab: add minimal contrast treshold
+- 3879224f: unite WHY2 theme across all terminals
+- f74d5b96: add theme setting to client
+- 72690189: paint theme backgrounds in TUI
+- fd04bbc8: use theme accessors across TUI
+- 0caf5030: add color theme palettes to TUI
+- 0d36ecb2: decrease voice buffer sizes
+- abde13e5: remove history migration code for edits
+- 2a4166a5: change default docker image tag to release
+- 0d16de1c: fix pre-release versions in CHANGELOGs
+
 v2.2.6:
 - c5473591: wire message edits on client
 - ad6df3cf: handle message edits on server
