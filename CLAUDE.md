@@ -1113,7 +1113,9 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   form by count and binds it as `{count}` — so new user-facing text is a key in that file, never a
   literal. English is embedded and is the fallback for every key; `language` in client.toml picks
   another, read from `<config dir>/locales/<language>.toml` first and from the built-in `BUILTIN`
-  table second (a shipped translation is one file plus one line there). It switches live from the
+  table second (a shipped translation is one file plus one line there). Every built-in locale
+  except `en` and `cs` is machine-translated, and says so with ` [AI]` on its `meta.name`, which is
+  what the `Language` row shows; a human-checked translation drops the suffix. It switches live from the
   `/settings` `Language` row (`i18n::set_language`): each locale is parsed once and leaked, so `t!` can
   keep handing out `&'static str`, and the switch relabels the box and rewraps the pane through
   `App::reload_theme`. Lines already pushed as `Entry::Line` keep the language they were written in. Key rules:
