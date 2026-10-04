@@ -1,0 +1,559 @@
+# This is part of WHY2
+# Copyright (C) 2022-2026 Václav Šmejkal
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+[meta]
+name = "Czech"
+plurals = "one-few-other"
+
+[keys]
+ctrl = "Ctrl+{key}"
+
+[login]
+registration_disabled = "Registrace jsou vypnuté."
+username_rules = "a-Z, 0-9; {min}-{max} znaků"
+username_rejected = "Uživatelské jméno zamítnuto!"
+password_rejected = "Heslo zamítnuto! Zadejte alespoň {min} znaků."
+reconnecting = "Spojení přerušeno, probíhá opětovné připojování… ({attempt}/{attempts})"
+connecting = "Připojování…"
+exchanging_keys = "Probíhá výměna klíčů…"
+waiting = "Čeká se na server…"
+socks5 = "Skrz SOCKS5 {address}"
+unsigned_keys = "Identita serveru nepodepsala své klíče."
+timed_out = "Spojení vypršelo."
+
+[login.title]
+connect = "Připojit"
+identify = "Identifikace"
+register = "Registrace"
+login = "Přihlášení"
+
+[login.label]
+address = "Adresa serveru"
+username = "Uživatelské jméno"
+password = "Heslo"
+
+[login.missing]
+address = "Zadejte adresu serveru"
+username = "Zadejte uživatelské jméno."
+password = "Zadejte heslo."
+
+[tofu]
+challenge = "ano"
+accepted = "Identita serveru {host} přijmuta a uložena. Připojování..."
+server = "Server"
+pinned = "Připnutý"
+new_key = "Nový klíč"
+key = "Klíč"
+type_to_replace = "Napište '{word}' pro nahrazení připnutého klíče novým:"
+type_to_confirm = "Napište '{word}' pro potvrzení."
+reject = "Odmítnout"
+replace = "Nahradit připlý klíč"
+trust = "Důvěřovat & uložit"
+
+[tofu.title]
+confirm = "Potvrďte nový klíč serveru"
+changed = "Identita serveru byla změněna"
+unknown = "Neznámá identita serveru"
+
+[tofu.warning]
+confirm = "Nahrazení připnutého klíče zahodí jedinou věc, které může zabránit zachycení komunikace. Udělejte to pouze po kontrole otisku s operátorem skrz kanál, k němuž server nemá přístup."
+changed = "Server používá jiný klíč identity, než ten připnutý pro tuto adresu. Operátor mohl změnit klíče serveru, anebo někdo může zachytávat Vaší komunikaci."
+unknown = "Tato adresa zatím nemá žádný připnutý klíč identity. Povolte toto, pouze pokud se otisk níže shoduje s tím, který operátor serveru zveřejnil."
+
+[account]
+mismatch = "Hesla se neshodují."
+delete_warning = "Tato akce nemůže být navrácena. Stiskněte ⏎ znovu pro smazání Vašeho účtu."
+
+[account.title]
+passwd = "Změnit heslo"
+delete = "Smazat účet"
+
+[account.label]
+current = "Současné heslo"
+new = "Nové heslo"
+confirm = "Potvrďte nové heslo"
+
+[account.missing]
+current = "Zadejte současné heslo."
+new = "Zadejte nové heslo."
+confirm = "Zadejte potvrzení nového hesla."
+
+[event]
+first_user = "Jste první uživatel na serveru, byla Vám přidělena role vlastníka."
+login_ok = "Přihlášení proběhlo úšpěšně. Stiskněte Ctrl+H pro nápovědu."
+connected = "Úspěšně připojeno k {server_name}."
+image_failed = "{username} poslal/a obrázek, který se nepodařilo zobrazit ({filename})."
+reconnect_failed = "Opětovné připojení k serveru selhalo."
+joined = "{username} se připojil/a."
+left = "{username} se odpojil/a."
+muted = "Byli jste umlčeni moderátorem."
+voice_enabled = "Hlasová komunikace zapnuta."
+device_failed = "Změna audio zařízení selhala - používá se to předchozí."
+voice_handshake_failed = "Server neodpověděl na hlasové spojení - je povoleno UDP?"
+voice_disabled = "Hlasová komunikace vypnuta."
+role = "Nyní jste {role}."
+history = "Historie zpráv ({count}):"
+server_settings_saved = "Nastavení serveru uloženo."
+password_changed = "Heslo bylo změněno."
+password_refused = "Špatné současné heslo, anebo to nové nesplňuje požadavky."
+account_deleted = "Účet byl smazán."
+wrong_password = "Špatné heslo."
+profile_saved = "Profil byl uložen."
+color_set = "Barva byla nastavena."
+uploaded = "{username} nahrál/a soubor \"{filename}\"."
+upload_limit = "Maximální souběžná nahrávání byla dosažena!"
+incompatible_version = "Nekompatibilní verze! ({version}/{server_version})"
+version_mismatch = "Neshodující se verze - některé funkce nemusí fungovat ({client_version}/{server_version})"
+spam_warning = "Zpomalte! Posíláte zprávy příliš rychle."
+socks5_voice = "Hlasová komunikace nemůže být zapnuta během používání SOCKS5."
+disabled_feature = "Server vypl funkci kterou se snažíte použít."
+version_failed = "Kontrola verzí selhala, toto vydání nemusí být bezpečné!"
+quit = "Odpojeno od serveru."
+logged_out = "Odhlášeno."
+server_quit = "Server ukončil komunikace."
+
+[event.tofu_skip]
+title = "BEZPEČNOSTNÍ VAROVÁNÍ: NEZNÁMÁ IDENTITA SERVERU"
+body = "Klíč identity serveru nemohl být ověřen kvůli vypnutému ToFU ověřování. Pokud nepoznáváte klíč identity níže, okamžitě se odpojte!"
+
+[event.unsafe_version]
+one = "Toto vydání nemusí být bezpečné! Jste {count} verzí pozadu! ({current_version}/{newest_version})"
+other = "Toto vydání nemusí být bezpečné! Jste {count} verzí pozadu! ({current_version}/{newest_version})"
+
+[event.bans]
+none = "Žádné bany."
+title = "Bany ({count}):"
+users = "uživatelé"
+addresses = "adresy"
+
+[event.list]
+title = "Online uživatelé ({count}):"
+
+[event.files]
+none = "Žádné dostupné soubory."
+title = "Dostupné soubory ({count}):"
+
+[event.screens]
+none = "Žádná dostupná sdílení obrazovek."
+title = "Sdílející uživatelé ({count}):"
+
+[event.screen]
+started = "Sdílení obrazovky bylo zapnuto."
+stopped = "Sdílení obrazovky bylo vypnuto."
+failed = "Sdílení obrazovky selhalo: {reason}."
+attach = "Připojeno ke sdílení obrazovky uživatele {username}."
+deattach = "Odpojeno od sdílení obrazovky uživatele {username}."
+peer_started = "{username} začal/a sdílet obrazovku."
+peer_stopped = "{username} přestal/a sdílet obrazovku."
+attached = "{username} se připojil/a k Vašemu sdílení obrazovky."
+deattached = "{username} se odpojil/a od Vašeho sdílení obrazovky."
+
+[invalid]
+usage = "Neplatné použití! Zmáčkněte Ctrl+H pro nápovědu."
+command = "Neplatný příkaz! Zmáčkněte Ctrl+H pro nápovědu."
+action = "Neplatná akce! Zmáčkněte Ctrl+H pro nápovědu."
+role = "Neplatná role! Zmáčkněte Ctrl+H pro nápovědu."
+color = "Neplatná barva! Zadejte příkaz znovu a vyberte platnou barvu."
+
+[typing]
+one = "{one} píše…"
+two = "{one} a {two} píšou…"
+
+[typing.many]
+other = "{count} uživatelů píše…"
+
+[message]
+pm = "PM"
+image = "{username} poslal/a obrázek ({filename})"
+show = "zobrazit"
+loading = "načítání..."
+unavailable = "nedostupný"
+edited = "upraveno"
+
+[time]
+today = "%H:%M"
+older = "%Y-%m-%d %H:%M"
+
+[transfer]
+uploading_file = "Nahrávání souboru \"{filename}\""
+uploading_image = "Nahrávání obrázku \"{filename}\""
+downloading = "Stahování souboru \"{filename}\""
+uploaded_file = "Soubor \"{filename}\" byl nahrán."
+uploaded_image = "Obrázek \"{filename}\" byl nahrán."
+downloaded = "Soubor \"{filename}\" byl stáhnut."
+failed_file = "Přenos souboru \"{filename}\" selhal."
+failed_image = "Přenos obrázku \"{filename}\" selhal"
+unknown_file = "Neznámý"
+
+[pane]
+unread = "{count} nových"
+
+[sidebar]
+online = "Online"
+offline = "Offline"
+channels = "Kanály"
+voice = "Hlasová komunikace"
+
+[sidebar.roles]
+user = "Uživatelé"
+moderator = "Moderátoři"
+owner = "Vlastníci"
+
+[device]
+tui = "tui"
+desktop = "desktop"
+phone = "phone"
+
+[palette]
+mentions = "Zmínky"
+commands = "Příkazy"
+parameters = "Parametry"
+
+[help]
+title = "Příkazy:"
+
+[info]
+aliases = "Aliasy"
+shortcut = "Zkratka"
+description = "Popisek"
+none = "Nic"
+
+[hearts]
+not_loaded = "Zpráva #{message_id} není načtená."
+none = "Nikdo nelajkoval #{message_id}."
+title = "Lajky na #{message_id} ({count}):"
+
+[mute]
+muted = "Úspěšně umlčeno."
+unmuted = "Úspěšně odmlčeno."
+muted_id = "Úspěšně umlčen uživatel s ID {id}."
+unmuted_id = "Úspěšně odmlčen uživatel s ID {id}."
+
+[upload]
+read_failed = "Čtení souboru selhalo!"
+unreadable_image = "Tento obrázek nemohl být přečten!"
+avatar_too_large = "Avatar je příliš velký! (limit is {limit}MB)"
+avatar_write_failed = "Uložení avataru selhalo!"
+not_found = "Soubor nebyl nalezen!"
+image_too_large = "Obrázek je příliš velký! (limit je {limit}MB)"
+not_image = "Toto není obrázek!"
+
+[screen]
+swapped_to = "Sdílení monitoru {monitor}."
+swapped = "Sdílený monitor byl změněn."
+unknown_monitor = "neznámý"
+window = "WHY2 Sdílení Obrazovky"
+window_fps = "WHY2 Sdílení Obrazovky ({fps} FPS)"
+
+[screen.error]
+no_monitor = "žádný monitor se jménem '{selection}' - dostupné: {available}"
+enumerate = "získávání monitorů selhalo ({error})"
+no_monitors = "nebyly nazeleny žádné monitory"
+encoder = "vytvoření H.264 kodéru selhalo ({error})"
+resolution = "nepodporované rozlišení {width}x{height}"
+encode = "H.264 kódování selhalo ({error})"
+no_outputs = "kompozitor nevrátil žádné výstupy"
+no_output = "kompozitor nezná žádný výstup '{name}'"
+wayland = "sdílení obrazovky na wayland není dostupné ({error})"
+wayland_capture = "zachytávání {output} selhalo ({error}) - Váš kompozitor musí podporovat ext-image-copy-capture-v1 nebo wlr-screencopy-v1"
+recorder_unavailable = "nahrávání obrazovky OS je nedostupné ({error})"
+recorder_start = "spuštění nahrávání obrazovky OS selhalo ({error})"
+recorder_silent = "nahrávání obrazovky OS se spustilo, ale nevrátilo žádné snímky"
+recorder_timeout = "nahrávání obrazovky OS neodpovědělo včas"
+recorder_probe = "sonda nahrávání obrazovky OS skončila"
+recorder_stopped = "nahrávání obrazovky OS přestalo vracet snímky"
+crashed = "sdílení obrazky spadlo"
+
+[settings]
+restart_note = "{keys} se aplikuje až po restartu serveru."
+restarting = "Restartování serveru..."
+save = "Uložit"
+restart = "Restartovat server"
+avatar = "Avatar"
+default_device = "Výchozí nastavení systému"
+restart_description = "Restart serveru — každý klient je odpojen a konfigurace je znovu-načtena."
+save_first = "nejdříve uložte své změny"
+press_again_confirm = "zmáčkněte znovu pro potvrzení"
+save_profile_description = "Poslad popisek serveru."
+save_description = "Poslat upravené řádky serveru."
+restart_required = "vyžadován restart"
+press_again = "zmáčkněte znovu"
+on = "zapnuto"
+off = "vypnuto"
+empty = "prázdné"
+
+[settings.section]
+audio = "Audio"
+interface = "Prostředí"
+privacy = "Soukromí"
+
+[settings.row]
+input_device = "Vstupní zařízení"
+output_device = "Výstupní zařízení"
+input_volume = "Vstupní hlasitost"
+output_volume = "Výstupní hlasitost"
+screen_volume = "Hlasitost sdílené obrazovky"
+noise_suppression = "Potlačení šumu"
+automatic_gain = "Automatická citlivost"
+theme = "Motiv"
+disable_colors = "Barvy zpráv"
+disable_logo = "Logo na pozadí"
+auto_show_images = "Automaticky zobrazovat obrázky"
+render_math = "Renderování matemmatických výrazů"
+show_id = "Zobrazovat ID klientů"
+show_message_ids = "Zobrazovat ID zpráv"
+show_timestamps = "Zobrazovat časová razítka"
+message_stripes = "Pruhy zpráv"
+share_device = "Sdílet zařízení"
+typing_indicator = "Indikátor psaní"
+
+[settings.title]
+client = "Nastavení"
+server = "Nastavení serveru"
+own_profile = "Váš profil"
+profile = "Profil uživatele {username}"
+saving = "{name} · ukládání…"
+unsaved = "{name} · neuloženo"
+
+[profile]
+bio = "Popisek"
+pronouns = "Zájmena"
+website = "Webová stránka"
+status = "Status"
+bad_website = "Webová stránka musí začínat s http:// nebo https://"
+empty_field = "Žádné {field}."
+
+[profile.avatar]
+removed = "Váš avatar bude odebrán po uložení."
+uploaded = "{path} bude nahrán po uložení."
+help = "Napište cestu k obrázku (do {limit}MB) nebo ji smažte pro odebrání Vašeho avataru."
+set = "nastavit"
+none = "nic"
+remove = "odebrat"
+
+[profile.empty]
+bio = "Žádný popisek."
+pronouns = "Žádná zájmena."
+website = "Žádná webová stránka."
+status = "Žádný status."
+
+[hint.settings]
+picker = "↑↓ výběr │ ⏎ aplikovat │ Esc zpět"
+avatar = "↑↓ výběr │ Tab doplnit │ ⏎ ponechat │ Esc zrušit"
+edit = "napište hodnotu │ ⏎ ponechat │ Esc zrušit"
+client = "↑↓ pohyb │ ←→ změna │ ⏎ vybrat │ Esc zrušit"
+server = "↑↓ pohyb │ ←→ změna │ ⏎ upravit │ ^S uložit │ Esc zrušit"
+own_profile = "↑↓ pohyb │ ⏎ upravit │ ^S uložit │ Esc zrušit"
+profile_link = "↑↓ pohyb │ ⏎ otevřít odkaz │ Esc zavřít"
+profile = "↑↓ pohyb │ Esc zavřít"
+
+[hint.tofu]
+confirm = "napište to slovo │ ⏎ potvrdit │ ← zpět │ Esc zamítnout"
+warn = "←→ vybrat │ ⏎ potvrdit │ Esc zamítnout"
+
+[hint.login]
+cancel = "Esc zrušit"
+quit = "Esc ukončit"
+connect = "⏎ připojit │ Esc ukončit"
+continue = "⏎ pokračovat │ Esc ukončit"
+
+[hint.account]
+passwd = "↑↓ pole │ ⏎ další │ Esc zrušit"
+delete = "⏎ odstranit │ Esc zrušit"
+confirm = "⏎ potvrdit │ Esc zrušit"
+
+[status]
+mic_off = "vypnutý mikrofon"
+mic_on = "zapnutý mikrofon"
+settings = "Ctrl+, nastavení"
+
+[tui]
+input_failed = "Čtení vstupu z terminálu selhalo."
+opening = "Otevírání {url}"
+
+[tui.copied]
+one = "Zkopírováno {count} řádek do schránky"
+other = "Zkopírování {count} řádek do schránky"
+
+[arg]
+id = "ID"
+user = "UŽIVATEL"
+message = "ZPRÁVA"
+role = "ROLE"
+command = "PŘÍKAZ"
+name = "JMÉNO"
+path = "CESTA"
+user_id = "ID UŽIVATELE"
+file_id = "ID SOUBORU"
+monitor = "MONITOR"
+color = "BARVA"
+action = "AKCE"
+
+[command.help]
+description = "Vypíše všechny dostupné příkazy"
+
+[command.info]
+args.command = "Zvolený příkaz"
+description = "Zobrazí informace příkazu"
+
+[command.voice]
+description = "Zapne/Vypne hlasovou komunikaci"
+
+[command.mute]
+args.id = "ID zvoleného uživatele"
+description = "Umlčí/Odmlčí uživatele/Vás"
+
+[command.channel]
+args.name = "Jméno kanálu"
+description = "Přepne do kanálu/lobby pokud je JMÉNO vynecháno"
+
+[command.upload]
+args.path = "Cesta k souboru"
+description = "Nahraje soubor na server"
+
+[command.download]
+args.user_id = "ID nahrávájícího uživatele"
+args.file_id = "ID zvoleného souboru"
+description = "Stáhno soubor ze serveru"
+
+[command.image]
+args.path = "Cesta k obrázku"
+description = "Nahraje přetrvávající obrázek"
+
+[command.screen]
+args.monitor = "Index/jméno monitoru ke sdílení"
+description = "Vypne/Zapne sdílení obrazovky nebo změní sdílený monitor"
+
+[command.attach]
+args.id = "ID sdílejícího uživatele"
+description = "Připojí se ke sdílení obrazovky."
+
+[command.deattach]
+description = "Odpojí se od sdílení obrazovky."
+
+[command.list]
+description = "Zobrazí připojené uživatele a jejich ID"
+
+[command.files]
+description = "Zobrazí dostupné soubory a jejich ID"
+
+[command.screens]
+description = "Zobrazí uživatele sdílející obrazovku"
+
+[command.pm]
+args.id = "ID zvoleného uživatele"
+args.message = "Obsah zprávy"
+description = "Pošle soukromou zprávu"
+
+[command.heart]
+args.id = "ID zprávy"
+description = "Olajkuje zprávu"
+
+[command.hearts]
+args.id = "ID zprávy"
+description = "Zobrazí uživatele lajkující zprávu"
+
+[command.reply]
+args.id = "ID zprávy"
+args.message = "Obsah zprávy"
+description = "Odpoví na zprávu"
+
+[command.re]
+args.message = "Obsah zprávy"
+description = "Odpoví na poslední soukromou zprávu"
+
+[command.delete]
+args.id = "ID zprávy"
+description = "Smaže zprávu z historie"
+
+[command.edit]
+args.id = "ID zprávy"
+args.message = "Nový obsah zprávy"
+description = "Upraví Vaší zprávu v historii"
+
+[command.settings]
+description = "Otevře nastavení audia a prostředí"
+
+[command.profile]
+args.user = "Uživatel nebo ID, nic pro Vás"
+description = "Otevře profil uživatele"
+
+[command.ucolor]
+args.color = "Zvolená barva"
+description = "Nastaví barvu uživatelského jména"
+
+[command.color]
+args.color = "Zvolená barva"
+description = "Nastaví barvu zpráv"
+
+[command.server]
+args.action = "Moderátorská akce"
+description = "Moderátorské akce"
+
+[command.server.mute]
+args.id = "Zvolený uživatel"
+description = "Umlčí uživatele na straně serveru"
+
+[command.server.kick]
+args.id = "Zvolený uživatel"
+description = "Odpojí uživatele od serveru"
+
+[command.server.ban]
+args.user = "Uživatelské jméno nebo ID zvoleného uživatele"
+description = "Udělí ban uživateli"
+
+[command.server.banip]
+args.id = "Zvolený uživatel"
+description = "Udělí IP ban uživateli"
+
+[command.server.banlist]
+description = "Zobrazí každý ban"
+
+[command.server.pardon]
+args.id = "ID zabanovaného uživatele"
+description = "Odebere ban uživatele"
+
+[command.server.pardonip]
+args.id = "ID zabanované adresy"
+description = "Odebere IP ban"
+
+[command.server.say]
+args.message = "Zpráva ke zveřejnení"
+description = "Zveřejní zprávu jako server"
+
+[command.server.role]
+args.user = "Uživateské jméno nebo ID zvoleného uživatele"
+args.role = "Role k přidělení"
+description = "Nastaví uživatelovu roli na serveru"
+
+[command.server.settings]
+description = "Otevře konfiguraci serveru"
+
+[command.account]
+args.action = "Akce účtu"
+description = "Akce účtu"
+
+[command.account.delete]
+description = "Odstraní Váš účet"
+
+[command.account.passwd]
+description = "Změní Vaše heslo"
+
+[command.logout]
+description = "Odpojí se od serveru a vrátí se na přihlašovací obrazovku"
+
+[command.exit]
+description = "Odpojí se od serveru"

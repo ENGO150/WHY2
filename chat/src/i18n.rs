@@ -51,10 +51,12 @@ struct Locale //ONE LANGUAGE'S TEXT, FLATTENED TO DOTTED KEYS
 
 //CONSTS
 const ENGLISH: &str = include_str!("../locales/en.toml");
+const CZECH: &str = include_str!("../locales/cz.toml"); //i spent a fucking hour translating it
 
 const BUILTIN: &[(&str, &str)] = //LANGUAGES SHIPPED IN THE BINARY
 &[
     ("en", ENGLISH),
+    ("cz", CZECH),
 ];
 
 //GLOBAL VARIABLES
