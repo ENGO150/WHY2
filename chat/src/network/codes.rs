@@ -285,8 +285,8 @@ pub enum PacketCode //CONTROL CODES
     //CLIENT -> SERVER | ACCOUNT DELETION REQUEST
     AccountDeleteRequest { password: String },
 
-    //CLIENT <> SERVER | SET ONE CHAT COLOR
-    Colors
+    //CLIENT -> SERVER | SET ONE CHAT COLOR
+    ColorRequest
     {
         username: bool, //TRUE = THE USERNAME'S COLOR, FALSE = THE MESSAGE'S
         color: u8,
@@ -344,6 +344,7 @@ pub enum PacketCode //CONTROL CODES
     Screenshare { username: String },                  //SERVER -> CLIENT | CLIENT STARTED SCREENSHARING
     ScreenshareEnd { username: String },               //SERVER -> CLIENT | CLIENT STOPPED SCREENSHARING
     Voice { token: Option<[u8; 32]> },                 //SERVER -> CLIENT | VOICE APPROVAL | None = VOICE LEFT
+    Color,                                             //SERVER -> CLIENT | COLOR SET
 
     ServerKick { id: usize },                            //CLIENT -> SERVER | KICK USER
     ServerMute { id: usize },                            //CLIENT -> SERVER | MUTE USER
@@ -419,7 +420,8 @@ impl PacketCode
             Self::AccountPasswd { .. }         => "AccountPasswd",
             Self::AccountDeleteRequest { .. }  => "AccountDeleteRequest",
             Self::AccountDelete { .. }         => "AccountDelete",
-            Self::Colors { .. }                => "Colors",
+            Self::ColorRequest { .. }          => "ColorRequest",
+            Self::Color { .. }                 => "Color",
             Self::ProfileRequest { .. }        => "ProfileRequest",
             Self::ProfileSave { .. }           => "ProfileSave",
             Self::AvatarRequest { .. }         => "AvatarRequest",

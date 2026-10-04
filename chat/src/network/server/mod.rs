@@ -1868,18 +1868,14 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 return remove_connection(&peer_addr, true, Some("account deleted")).await;
             },
 
-            //A /color OR /ucolor; ANSWER WITH THE STORED PAIR
-            PacketCode::Colors { username: username_color, color } =>
+            //A /color OR /ucolor
+            PacketCode::ColorRequest { username: username_color, color } =>
             {
                 log::info!("Color set: {peer_addr}");
 
                 config::users::set_color(&username, username_color, color);
 
-                network::send(&mut *streams.1.lock().await, PacketCode::Colors
-                {
-                    username: username_color,
-                    color,
-                }, Some(&keys)).await;
+                network::send(&mut *streams.1.lock().await, PacketCode::Color, Some(&keys)).await;
             },
 
             //A PROFILE, ASKED FOR OR WRITTEN

@@ -579,7 +579,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //THE SERVER STORED A COLOR
-            PacketCode::Colors { .. } =>
+            PacketCode::Color =>
             {
                 tx.send(ClientEvent::Colors(None)).await.unwrap();
             },

@@ -338,7 +338,7 @@ async fn color_handler
         return app.push_styled(t!("invalid.color"), theme::error());
     };
 
-    network::send(&mut *write_stream.lock().await, PacketCode::Colors { username, color: code },
+    network::send(&mut *write_stream.lock().await, PacketCode::ColorRequest { username, color: code },
         options::get_keys().as_ref()).await;
 }
 
