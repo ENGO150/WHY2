@@ -174,6 +174,14 @@ fn category(rule: &str, count: u64) -> &'static str //WHICH PLURAL FORM A COUNT 
             _ => "many",
         },
 
+        //POLISH
+        "polish" => match (count, count % 10, count % 100)
+        {
+            (1, ..) => "one",
+            (_, 2..=4, rest) if !(12..=14).contains(&rest) => "few",
+            _ => "many",
+        },
+
         _ => if count == 1 { "one" } else { "other" },
     }
 }

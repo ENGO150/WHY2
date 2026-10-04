@@ -22,7 +22,7 @@
 #   wants them. Write {{ or }} for a literal brace in a text that has placeholders.
 # - A table of one/few/many/other is a plural; [meta] plurals picks the rule:
 #   "one-other" (English, German, ...), "one-few-other" (Czech, Slovak),
-#   "one-few-many" (Russian, Ukrainian, ...) or "other" (no plural forms).
+#   "one-few-many" (Russian, Ukrainian, ...), "polish" or "other" (no plural forms).
 # - Command names, color names, role names and the server's own settings are what people
 #   type or what the server sends, so they are not in here.
 # - time.* are chrono format strings.
