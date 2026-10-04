@@ -287,6 +287,7 @@ pub struct App
     //SIDEBAR
     pub username: String, //OUR OWN USERNAME (options::get_server_username IS THE SERVER'S NAME)
     pub role: Role,       //OUR OWN ROLE
+    pub color: Option<u8>, //OUR OWN USERNAME COLOR
     pub online: Vec<OnlineUser>,
     pub offline: BTreeMap<String, Option<u8>>, //REGISTERED USERS NOBODY IS CONNECTED AS, AND THEIR COLORS
     pub offline_listed: bool, //WHETHER THE SERVER SENDS THEM AT ALL
@@ -395,6 +396,7 @@ impl App
             unread: 0,
             username: String::new(),
             role: Role::default(),
+            color: None,
             online: Vec::new(),
             offline: BTreeMap::new(),
             offline_listed: false,
@@ -1273,6 +1275,7 @@ impl App
 
         self.username.clear();
         self.role = Role::default(); //THE NEXT SERVER GRANTS ITS OWN
+        self.color = None;
         self.server_name.clear();
         self.online.clear();
         self.offline.clear();

@@ -161,7 +161,7 @@ pub enum ClientEvent
     Passwd(bool),                                                //A PASSWORD CHANGE ANSWERED
     AccountDeleted(bool),                                        //AN ACCOUNT DELETION ANSWERED
     Profile(String, UserProfile, bool, bool),                    //A PROFILE (WHOSE, IT, OURS, A SAVE ACK)
-    Colors,                                                      //A /color LANDED ON THE SERVER
+    Colors(Option<MessageColors>),                               //A /color LANDED ON THE SERVER OR INIT COLORS
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
     Upload(u64, String, u64),                                    //UPLOADING FILE (UID, NAME, SIZE)
     Image(u64, String, u64),                                     //UPLOADING IMAGE (UID, NAME, SIZE)
@@ -397,12 +397,15 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //START CHATTING
-            PacketCode::Accept { id: sid, role } =>
+            PacketCode::Accept { id: sid, role, colors } =>
             {
                 tx.send(ClientEvent::Authenticated(role)).await.unwrap();
 
                 //SET SERVER-SIDE ID
                 id = sid;
+
+                //SET COLORS
+                tx.send(ClientEvent::Colors(Some(colors))).await.unwrap();
 
                 //ALLOW MESSAGE HISTORY & COMMANDS
                 options::set_sending_messages(true);
@@ -578,7 +581,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //THE SERVER STORED A COLOR
             PacketCode::Colors { .. } =>
             {
-                tx.send(ClientEvent::Colors).await.unwrap();
+                tx.send(ClientEvent::Colors(None)).await.unwrap();
             },
 
             //LIST OF USERS

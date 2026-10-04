@@ -612,10 +612,15 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
 
         lines.extend(section.iter().map(|user|
         {
-            //OUR OWN ROW STAYS MARKED; EVERYBODY ELSE GETS THEIR COLOR
+            //OUR OWN COLOR, ELSE ACCENT; EVERYBODY ELSE GETS THEIRS
             let style = match user.username == me
             {
-                true => theme::accent(),
+                true => match app.color.filter(|_| !app.theme.disable_colors)
+                {
+                    Some(_) => app.theme.style(app.color),
+                    None => theme::accent(),
+                },
+
                 false => app.theme.style(user.username_color),
             }.add_modifier(Modifier::BOLD);
 

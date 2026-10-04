@@ -91,6 +91,7 @@ pub enum PacketCode //CONTROL CODES
     {
         id: usize,
         role: Role,
+        colors: MessageColors,
     },
 
     //SERVER -> CLIENT | A PAGE OF THE LOBBY'S STORED MESSAGES

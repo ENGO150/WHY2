@@ -925,8 +925,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //SEND WHAT WAS SAID IN THE LOBBY BEFORE THIS
     send_history(&streams.1, &keys, None).await;
 
-    //TELL CLIENT TO START CHATTING
-    network::send(&mut *streams.1.lock().await, PacketCode::Accept { id, role }, Some(&keys)).await;
+    //TELL CLIENT ALL REQUIRED DATA
+    network::send(&mut *streams.1.lock().await, PacketCode::Accept
+    {
+        id,
+        role,
+        colors: config::users::colors(&username),
+    }, Some(&keys)).await;
 
     //SEND LIST OF USERS
     send_list(&streams.1, &peer_addr, &keys).await;

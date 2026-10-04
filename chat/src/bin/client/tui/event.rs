@@ -517,8 +517,15 @@ impl App
                 self.push_styled(error, theme::error());
             },
 
+            //OUR COLORS AT LOGIN
+            ClientEvent::Colors(Some(colors)) =>
+            {
+                self.color = colors.username_color;
+                self.dirty = true;
+            },
+
             //THE ANSWER TO A /color
-            ClientEvent::Colors => self.push_styled(t!("event.color_set"), theme::ok()),
+            ClientEvent::Colors(None) => self.push_styled(t!("event.color_set"), theme::ok()),
 
             //THE BAN LIST
             ClientEvent::ServerBans(users, ips) =>
