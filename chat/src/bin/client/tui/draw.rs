@@ -1606,6 +1606,7 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
         Value::Avatar(Some(path)) => vec![Span::styled(truncate(path, _width), theme::text())],
 
         Value::Theme(index) => vec![Span::styled(format!("◂ {} ▸", theme::PALETTES[*index].name), theme::accent())],
+        Value::Language(code) => vec![Span::styled(format!("◂ {} ▸", i18n::language_name(code)), theme::accent())],
 
         #[cfg(feature = "client_voice")]
         Value::Volume(percent) =>

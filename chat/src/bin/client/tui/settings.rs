@@ -73,6 +73,7 @@ pub enum Value
     Avatar(Option<String>),
 
     Theme(usize), //INDEX INTO theme::PALETTES
+    Language(String), //A LOCALE CODE
 
     #[cfg(feature = "client_voice")]
     Volume(u32), //PERCENT
@@ -252,6 +253,9 @@ impl Settings
 
         rows.push(Row::Header(t!("settings.section.interface").to_owned()));
 
+        rows.push(Row::Item(Item::client(t!("settings.row.language"), "language",
+            Value::Language(config::read_config::<String>("language").trim().to_owned()))));
+
         rows.push(Row::Item(Item::client(t!("settings.row.theme"), "theme",
             Value::Theme(theme::palette_index(&config::read_config::<String>("theme"))))));
 
@@ -292,6 +296,22 @@ impl Settings
         let _ = devices;
 
         self.step(1); //LAND ON THE FIRST ITEM, NOT ON THE HEADER ABOVE IT
+    }
+
+    //REBUILD THE CLIENT ROWS IN THE CURRENT LANGUAGE
+    pub fn relabel(&mut self)
+    {
+        let (selected, offset) = (self.selected, self.offset);
+
+        #[cfg(feature = "client_voice")]
+        let devices = std::mem::take(&mut self.devices);
+
+        #[cfg(not(feature = "client_voice"))]
+        let devices = Devices::default();
+
+        self.open(devices);
+        self.selected = selected;
+        self.offset = offset;
     }
 
     //THE SERVER'S OWN CONFIG ROWS
@@ -870,6 +890,7 @@ enum Selected
     Text(String),
     Action(&'static str), //WHICH BUTTON - THE SERVER ROWS HAVE TWO OF THEM
     Theme(usize),
+    Language(String),
 
     #[cfg(feature = "client_voice")]
     Volume(String, u32),
@@ -892,6 +913,7 @@ fn selected(app: &App) -> Option<Selected>
             Value::Text(text) => Selected::Text(text.clone()),
             Value::Avatar(path) => Selected::Text(path.clone().unwrap_or_default()),
             Value::Theme(index) => Selected::Theme(*index),
+            Value::Language(code) => Selected::Language(code.clone()),
 
             #[cfg(feature = "client_voice")]
             Value::Volume(percent) => Selected::Volume(item.key.clone(), *percent),
@@ -932,6 +954,23 @@ fn adjust(app: &mut App, direction: i32)
             if let Some(Row::Item(item)) = app.settings.rows.get_mut(row) { item.value = Value::Theme(next); }
 
             config::client_write("theme", theme::PALETTES[next].id);
+            app.reload_theme();
+        },
+
+        Some(Selected::Language(code)) =>
+        {
+            let languages = i18n::languages();
+
+            if languages.is_empty() { return; }
+
+            let current = languages.iter().position(|language| *language == code).unwrap_or(0);
+            let next = &languages[(current as isize + direction as isize).rem_euclid(languages.len() as isize) as usize];
+
+            config::client_write("language", next);
+            i18n::set_language(next);
+
+            //EVERY LABEL IN THE BOX AND THE PANE
+            app.settings.relabel();
             app.reload_theme();
         },
 
@@ -1004,7 +1043,7 @@ fn activate(app: &mut App)
         Some(Selected::Action(consts::RESTART_LABEL)) => restart(app),
         Some(Selected::Action(_)) => save(app),
 
-        Some(Selected::Theme(_)) => adjust(app, 1),
+        Some(Selected::Theme(_)) | Some(Selected::Language(_)) => adjust(app, 1),
 
         #[cfg(feature = "client_voice")]
         Some(Selected::Volume(..)) => adjust(app, 1),

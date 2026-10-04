@@ -24,7 +24,12 @@ use std::
         Display,
         Write,
     },
-    sync::LazyLock,
+    sync::
+    {
+        LazyLock,
+        Mutex,
+        RwLock,
+    },
     collections::HashMap,
 };
 
@@ -56,22 +61,17 @@ const CZECH: &str = include_str!("../locales/cz.toml"); //i spent a fucking hour
 const BUILTIN: &[(&str, &str)] = //LANGUAGES SHIPPED IN THE BINARY
 &[
     ("en", ENGLISH),
-    ("cz", CZECH),
+    ("cs", CZECH),
 ];
 
 //GLOBAL VARIABLES
 static FALLBACK: LazyLock<Locale> = LazyLock::new(|| parse(ENGLISH).expect("Parsing the English locale failed"));
 
-static ACTIVE: LazyLock<Option<Locale>> = LazyLock::new(||
+static LOADED: LazyLock<Mutex<HashMap<String, Option<&'static Locale>>>> = LazyLock::new(Default::default); //EVERY LANGUAGE READ SO FAR
+
+static ACTIVE: LazyLock<RwLock<Option<&'static Locale>>> = LazyLock::new(||
 {
-    let code = config::read_config::<String>("language");
-    let code = code.trim();
-
-    //A FILE IN THE CONFIG DIR WINS OVER A BUILT-IN ONE
-    let path = format!("{}{}/{code}.toml", misc::get_why2_dir(), consts::LOCALES_DIR);
-
-    fs::read_to_string(path).ok().and_then(|content| parse(&content))
-        .or_else(|| BUILTIN.iter().find(|(name, _)| *name == code).and_then(|(_, content)| parse(content)))
+    RwLock::new(load(config::read_config::<String>("language").trim()))
 });
 
 //MACROS
@@ -104,6 +104,27 @@ macro_rules! tn //PLURAL TEXT, THE COUNT IS {count}
 
 //FUNCTIONS
 //PRIVATE
+fn locales_dir() -> String
+{
+    format!("{}{}", misc::get_why2_dir(), consts::LOCALES_DIR)
+}
+
+fn load(code: &str) -> Option<&'static Locale> //A LANGUAGE BY CODE, PARSED ONCE
+{
+    *LOADED.lock().unwrap().entry(code.to_owned()).or_insert_with(||
+    {
+        //A FILE IN THE CONFIG DIR WINS OVER A BUILT-IN ONE
+        fs::read_to_string(format!("{}/{code}.toml", locales_dir())).ok().and_then(|content| parse(&content))
+            .or_else(|| BUILTIN.iter().find(|(name, _)| *name == code).and_then(|(_, content)| parse(content)))
+            .map(|locale| &*Box::leak(Box::new(locale)))
+    })
+}
+
+fn active() -> Option<&'static Locale>
+{
+    *ACTIVE.read().unwrap()
+}
+
 fn parse(content: &str) -> Option<Locale>
 {
     let document = content.parse::<DocumentMut>().ok()?;
@@ -169,9 +190,42 @@ fn plural_in(locale: &'static Locale, key: &str, count: u64) -> Option<&'static 
 }
 
 //PUBLIC
+pub fn languages() -> Vec<String> //EVERY LANGUAGE THAT LOADS, BUILT-IN FIRST
+{
+    let mut codes: Vec<String> = BUILTIN.iter().map(|(code, _)| (*code).to_owned()).collect();
+
+    let mut extra: Vec<String> = fs::read_dir(locales_dir()).into_iter().flatten().flatten()
+        .filter_map(|entry|
+        {
+            let path = entry.path();
+
+            if path.extension()? != "toml" { return None; }
+
+            path.file_stem()?.to_str().map(str::to_owned)
+        })
+        .filter(|code| !codes.contains(code))
+        .collect();
+
+    extra.sort();
+    codes.append(&mut extra);
+    codes.retain(|code| load(code).is_some());
+
+    codes
+}
+
+pub fn language_name(code: &str) -> &str //WHAT A LANGUAGE CALLS ITSELF
+{
+    load(code).and_then(|locale| lookup(locale, "meta.name")).unwrap_or(code)
+}
+
+pub fn set_language(code: &str) //SWITCH THE ACTIVE LANGUAGE
+{
+    *ACTIVE.write().unwrap() = load(code);
+}
+
 pub fn get(key: &str) -> Option<&'static str> //TEXT FOR key, IF ANY LOCALE HAS IT
 {
-    ACTIVE.as_ref().and_then(|locale| lookup(locale, key)).or_else(|| lookup(&FALLBACK, key))
+    active().and_then(|locale| lookup(locale, key)).or_else(|| lookup(&FALLBACK, key))
 }
 
 pub fn text(key: &'static str) -> &'static str //TEXT FOR key, OR THE KEY ITSELF
@@ -181,7 +235,7 @@ pub fn text(key: &'static str) -> &'static str //TEXT FOR key, OR THE KEY ITSELF
 
 pub fn plural(key: &'static str, count: u64) -> &'static str //THE FORM OF key FOR count
 {
-    ACTIVE.as_ref().and_then(|locale| plural_in(locale, key, count))
+    active().and_then(|locale| plural_in(locale, key, count))
         .or_else(|| plural_in(&FALLBACK, key, count))
         .unwrap_or(key)
 }
