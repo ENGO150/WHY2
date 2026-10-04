@@ -102,7 +102,7 @@ confirm = "Confirm new password"
 [account.missing]
 current = "Enter the current password."
 new = "Enter the new password."
-confirm = "Enter the confirm new password."
+confirm = "Confirm the new password."
 
 [event]
 first_user = "You are the first user to register, owner role has been granted to you."
@@ -332,6 +332,7 @@ show_timestamps = "Show timestamps"
 message_stripes = "Message stripes"
 share_device = "Share device"
 typing_indicator = "Typing indicator"
+language = "Language"
 
 [settings.title]
 client = "Settings"

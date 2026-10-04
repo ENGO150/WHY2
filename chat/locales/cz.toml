@@ -321,6 +321,7 @@ show_timestamps = "Zobrazovat časová razítka"
 message_stripes = "Pruhy zpráv"
 share_device = "Sdílet zařízení"
 typing_indicator = "Indikátor psaní"
+language = "Jazyk"
 
 [settings.title]
 client = "Nastavení"
