@@ -830,14 +830,14 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     truncated beside its label (and the caret while it is typed), while `draw::description_lines` puts the
     whole thing through `state::wrap_line` into the description foot — the same foot the server's comments
     use, sized for the longest, so the text gets the box's width rather than one truncated row of it. An
-    empty field says so in the foot by its own label (`No pronouns.`), which is why the placeholder is
-    derived from the label rather than written per field.
+    empty field says so in the foot (`No pronouns.`, `profile.empty.<key>` in the locale), falling back to
+    one built from the label for a field the locale does not name.
   - **`UserProfile::KEYS` is the only place the fields are spelled.** The wire struct, the `[user.profile]`
     keys (`config::users::PROFILE_KEYS` *is* that list), the rows the box is built from and the server's
     per-field checks all walk it in the same order, so a new field is one entry, one struct field and one
     `field_mut` arm — and the file, the packet and the box cannot disagree about what a profile has.
-    `field_label` is the one exception: the row for `bio` says `Description`, everything else is its key
-    capitalised.
+    The row labels come from the locale (`profile.<key>`, so `bio` says `Description`); a key the locale
+    does not name is shown capitalised, which keeps a new field one entry here and nothing else.
   - **`status` is the stored line, not presence.** What somebody is up to *until they change it* belongs on
     the account like the rest of the profile; online/away/DND does not — it dies with the connection, so it
     would live on `Connection`, ride on `OnlineUser`/`Join` and belong in the sidebar rather than in a box
@@ -1099,13 +1099,34 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
 
   **The TUI's tuning knobs all live in `tui/consts.rs`**, the way the library's do in `consts.rs` and
   the two protocol extensions' do in `network/{screen,voice}/consts.rs` — pane and layout sizes,
-  the redraw interval, popup row counts, the button labels, the markup/math limits. A new one goes
+  the redraw interval, popup row counts, the markup/math limits. A new one goes
   there rather than at the top of the file that reads it: half of them are read by `draw.rs` as well
   as by the module that owns the behaviour, and as file-local consts they were being reached for
-  across modules (`palette::MAX_ROWS`, `tofu::CHALLENGE`) which is a const module with extra steps.
+  across modules (`palette::MAX_ROWS`) which is a const module with extra steps.
   What deliberately stays out is anything that is not a knob: `theme.rs`'s palette, `math.rs`'s
   symbol tables, `command.rs`'s command list, and the `include_str!`s (`draw.rs`'s logo, the two
   `.wgsl` shaders, `gpu.rs`'s `WORKGROUP`, which must match a literal in the shader beside it).
+
+  **Every word the client shows lives in `chat/locales/en.toml`, not in the source** (`i18n.rs`,
+  `client_base`). Code asks for it by key — `t!("event.joined", username)` fills `{username}` and
+  returns a `String`, `t!("key")` alone a `&'static str`, `tn!("tui.copied", lines)` picks a plural
+  form by count and binds it as `{count}` — so new user-facing text is a key in that file, never a
+  literal. English is embedded and is the fallback for every key; `language` in client.toml picks
+  another, read from `<config dir>/locales/<language>.toml` first and from the built-in `BUILTIN`
+  table second (a shipped translation is one file plus one line there). It is read once, so a change
+  takes a restart. Key rules:
+  - **A placeholder is a whole sentence's**, never glued from fragments: "Invalid usage!" and "Invalid
+    action!" are two keys, not "Invalid {thing}!", because other languages inflect the noun. A styled
+    span inside a sentence (an image caption's username) is placed with `i18n::split` around the
+    placeholder rather than by assuming it comes first.
+  - **Padding and glyphs stay in the code**: a box title is stored as `Connect` and drawn as ` Connect `,
+    a toggle as `on` and drawn as `● on`, and label columns are measured from the translated text
+    rather than padded to an English width.
+  - **What people type or the server sends is not translated**: command triggers, colour and role names,
+    `@everyone` and `server.toml`'s own keys and comments. The command table (`command.rs`) holds keys
+    for the descriptions and argument names only, resolved where they are drawn.
+  - Diagnostics that never reach the TUI (the GPU converter's and the viewer window's fallback reasons,
+    `expect` messages) stay as literals.
 
   **The client renders through one event loop — there is no printing anywhere else.**
   `tui::run` (`tui/mod.rs`) is a single `tokio::select!` over four sources: the
