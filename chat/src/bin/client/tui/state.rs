@@ -302,6 +302,13 @@ pub struct App
     pub address: String,     //AS THE USER TYPED IT - NO IMPLICIT PORT
     pub server_name: String, //THE SERVER'S OWN NAME, ONCE IT HAS INTRODUCED ITSELF
 
+    //THE SERVER'S PICTURE, THE ONE THAT IS BUILT, AND WHERE THE SIDEBAR PUT IT
+    pub server_icon: Option<[u8; 32]>,
+    pub icon: Option<Box<Fitted>>,
+    icon_of: Option<[u8; 32]>,
+    pub icon_area: Rect,
+    pub icon_request: bool, //THE TICK ASKS FOR IT
+
     //INPUT
     pub input: InputBuffer,
     pub palette: Palette,
@@ -408,6 +415,11 @@ impl App
             voice_enabled: false,
             address: String::new(),
             server_name: String::new(),
+            server_icon: None,
+            icon: None,
+            icon_of: None,
+            icon_area: Rect::ZERO,
+            icon_request: false,
             input: InputBuffer::new(),
             palette: Palette::new(),
             settings: Settings::new(),
@@ -935,24 +947,7 @@ impl App
     //BUILD THE PROFILE PICTURE AT THE SIZE THE BOX RESERVED FOR IT
     pub fn load_avatar(&mut self, width: u16)
     {
-        let font = self.picker.font_size();
-
-        let Some(ready) = self.settings.picture.as_mut() else { return };
-
-        if ready.fitted == width && ready.protocol.is_some() { return; }
-
-        let image = fit_image(&ready.frames[ready.current].image, width, consts::AVATAR_ROWS, font);
-
-        //REUSE THE PROTOCOL TYPE TO KEEP THE IMAGE ID
-        ready.protocol = match ready.protocol.take()
-        {
-            Some(protocol) => Some(StatefulProtocol::new(image, font,
-                protocol.background_color(), protocol.protocol_type_owned())),
-
-            None => Some(self.picker.new_resize_protocol(image)),
-        };
-
-        ready.fitted = width;
+        if let Some(ready) = self.settings.picture.as_mut() { load_fitted(&self.picker, ready, width, consts::AVATAR_ROWS); }
     }
 
     //AND STEP IT, WHICH THE PANE'S CLOCK DOES NOT REACH
@@ -961,38 +956,73 @@ impl App
         if !self.settings.open { return; }
 
         let font = self.picker.font_size();
-        let now = Instant::now();
 
-        let Some(ready) = self.settings.picture.as_mut() else { return };
-
-        //A STILL NEVER ADVANCES
-        if ready.frames.len() < 2 || ready.protocol.is_none() || now < ready.next { return; }
-
-        //TOO FAR BEHIND TO CATCH UP
-        if now.duration_since(ready.next) > consts::ANIMATION_CATCHUP { ready.next = now; }
-
-        while now >= ready.next
+        if let Some(ready) = self.settings.picture.as_mut() && step_fitted(ready, consts::AVATAR_ROWS, font)
         {
-            ready.current = (ready.current + 1) % ready.frames.len();
-            ready.next += ready.frames[ready.current].delay;
+            self.dirty = true;
+        }
+    }
+
+    //THE SERVER'S PICTURE, NAMED OR DROPPED
+    pub fn set_server_icon(&mut self, hash: Option<[u8; 32]>)
+    {
+        self.server_icon = hash;
+
+        if self.icon_of != hash
+        {
+            self.icon = None;
+            self.icon_of = None;
+
+            //FETCHED LIKE A CAPTION'S
+            if let Some(hash) = hash { self.image_loads.push(hash); }
         }
 
-        let image = fit_image(&ready.frames[ready.current].image, ready.fitted, consts::AVATAR_ROWS, font);
-
-        ready.protocol = ready.protocol.take().map(|protocol|
-        {
-            let background = protocol.background_color();
-
-            StatefulProtocol::new(image, font, background, protocol.protocol_type_owned())
-        });
-
         self.dirty = true;
+    }
+
+    //WHETHER A PICTURE THAT CAME BACK IS THE SERVER'S
+    pub fn wants_icon(&self, hash: &[u8; 32]) -> bool
+    {
+        self.server_icon.as_ref() == Some(hash) && self.icon_of.as_ref() != Some(hash)
+    }
+
+    pub fn deliver_icon(&mut self, hash: [u8; 32], image: Option<Animation>)
+    {
+        let Some(image) = image else { return };
+
+        self.icon = Some(self.fit_rows(image, consts::ICON_ROWS));
+        self.icon_of = Some(hash);
+        self.dirty = true;
+    }
+
+    //BUILD THE SERVER'S PICTURE AT THE SIZE THE SIDEBAR RESERVED FOR IT
+    pub fn load_icon(&mut self)
+    {
+        let width = self.icon_area.width;
+
+        if width == 0 { return; }
+
+        if let Some(ready) = self.icon.as_mut() { load_fitted(&self.picker, ready, width, consts::ICON_ROWS); }
+    }
+
+    //AND STEP IT WHILE IT IS ON SCREEN
+    fn advance_icon(&mut self)
+    {
+        if self.icon_area.width == 0 { return; }
+
+        let font = self.picker.font_size();
+
+        if let Some(ready) = self.icon.as_mut() && step_fitted(ready, consts::ICON_ROWS, font)
+        {
+            self.dirty = true;
+        }
     }
 
     //STEP EVERY ANIMATION THAT IS DUE
     pub fn advance_animations(&mut self)
     {
         self.advance_avatar();
+        self.advance_icon();
 
         let pane = self.pane;
 
@@ -1277,6 +1307,11 @@ impl App
         self.role = Role::default(); //THE NEXT SERVER GRANTS ITS OWN
         self.color = None;
         self.server_name.clear();
+        self.server_icon = None;
+        self.icon = None;
+        self.icon_of = None;
+        self.icon_area = Rect::ZERO;
+        self.icon_request = false;
         self.online.clear();
         self.offline.clear();
         self.offline_listed = false;
@@ -1792,6 +1827,55 @@ pub fn picture_cells(image: &DynamicImage, pane: u16, rows: u16, font: FontSize)
 
     ((width.div_ceil(font.width as u32) as u16).max(1).min(pane),
         (height.div_ceil(font.height as u32) as u16).clamp(1, rows))
+}
+
+//BUILD A PICTURE'S PROTOCOL AT width, UNLESS IT ALREADY IS
+fn load_fitted(picker: &Picker, ready: &mut Fitted, width: u16, rows: u16)
+{
+    if ready.fitted == width && ready.protocol.is_some() { return; }
+
+    let font = picker.font_size();
+    let image = fit_image(&ready.frames[ready.current].image, width, rows, font);
+
+    //REUSE THE PROTOCOL TYPE TO KEEP THE IMAGE ID
+    ready.protocol = match ready.protocol.take()
+    {
+        Some(protocol) => Some(StatefulProtocol::new(image, font,
+            protocol.background_color(), protocol.protocol_type_owned())),
+
+        None => Some(picker.new_resize_protocol(image)),
+    };
+
+    ready.fitted = width;
+}
+
+//STEP A PICTURE'S ANIMATION IF A FRAME IS DUE
+fn step_fitted(ready: &mut Fitted, rows: u16, font: FontSize) -> bool
+{
+    let now = Instant::now();
+
+    //A STILL NEVER ADVANCES
+    if ready.frames.len() < 2 || ready.protocol.is_none() || now < ready.next { return false; }
+
+    //TOO FAR BEHIND TO CATCH UP
+    if now.duration_since(ready.next) > consts::ANIMATION_CATCHUP { ready.next = now; }
+
+    while now >= ready.next
+    {
+        ready.current = (ready.current + 1) % ready.frames.len();
+        ready.next += ready.frames[ready.current].delay;
+    }
+
+    let image = fit_image(&ready.frames[ready.current].image, ready.fitted, rows, font);
+
+    ready.protocol = ready.protocol.take().map(|protocol|
+    {
+        let background = protocol.background_color();
+
+        StatefulProtocol::new(image, font, background, protocol.protocol_type_owned())
+    });
+
+    true
 }
 
 //SHRINK A PICTURE INTO THE PANE, NEVER GROW IT

@@ -100,6 +100,7 @@ const LOGO: &str = include_str!("./assets/rexlogo");
 //ENUMS
 enum Panel //SIDEBAR SECTIONS, IN THE ORDER THEY ARE STACKED
 {
+    Icon,
     Online,
     Offline,
     Channels,
@@ -141,7 +142,9 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 
     draw_messages(frame, app, messages_area);
 
-    if let Some(sidebar_area) = sidebar_area { draw_sidebar(frame, app, sidebar_area); }
+    //THE SERVER'S PICTURE GOES WHERE THE SIDEBAR PUT IT
+    app.icon_area = sidebar_area.map_or(Rect::ZERO, |sidebar_area| draw_sidebar(frame, app, sidebar_area));
+    app.load_icon();
 
     if !connecting { draw_input(frame, app, input_area, input_lines, cursor); }
 
@@ -302,10 +305,38 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect]) -> Vec<u16>
 {
     let inner = app.pane;
-
-    if inner.width == 0 || inner.height == 0 { return app.picture_rows_drawn(Vec::new()); }
-
     let (offset, viewport) = (app.pane_offset, inner.height);
+
+    //EVERY PICTURE ON SCREEN - A PANE ENTRY, OR None FOR THE SERVER'S
+    let mut pictures = Vec::new();
+
+    if inner.width > 0 && inner.height > 0
+    {
+        for placement in app.placements(inner.width)
+        {
+            let bottom = placement.row + placement.height;
+
+            let first = placement.row.max(offset);
+            let last = bottom.min(offset + viewport);
+
+            if last <= first { continue; }
+
+            //CROP WHICHEVER END IS FURTHER OFF SCREEN
+            let clip_top = offset.saturating_sub(placement.row) > bottom.saturating_sub(offset + viewport);
+
+            let area = Rect
+            {
+                x: inner.x,
+                y: inner.y + (first - offset),
+                width: inner.width,
+                height: last - first,
+            };
+
+            pictures.push((area, clip_top, Some(placement.entry)));
+        }
+    }
+
+    if app.icon_area.width > 0 && app.icon_area.height > 0 { pictures.push((app.icon_area, false, None)); }
 
     //WHERE THE BOXES WERE ON THE LAST FRAME
     let previous = app.overlays_drawn(overlays);
@@ -315,26 +346,8 @@ fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect]) -> Vec<u16
 
     let mut rows = Vec::new();
 
-    for placement in app.placements(inner.width)
+    for (area, clip_top, entry) in pictures
     {
-        let bottom = placement.row + placement.height;
-
-        let first = placement.row.max(offset);
-        let last = bottom.min(offset + viewport);
-
-        if last <= first { continue; }
-
-        //CROP WHICHEVER END IS FURTHER OFF SCREEN
-        let clip_top = offset.saturating_sub(placement.row) > bottom.saturating_sub(offset + viewport);
-
-        let area = Rect
-        {
-            x: inner.x,
-            y: inner.y + (first - offset),
-            width: inner.width,
-            height: last - first,
-        };
-
         let covered = overlays.iter().any(|overlay| overlay.intersects(area));
 
         //WHAT A BOX HAS ON THESE CELLS, BEFORE THE PICTURE CLAIMS THE WHOLE ROW
@@ -342,8 +355,18 @@ fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect]) -> Vec<u16
 
         let (mut drawn, mut encoded) = (false, false);
 
-        if let Some(state::Entry::Image { picture: state::Picture::Ready(ready), .. }) =
-            app.messages.get_mut(placement.entry) && let Some(protocol) = ready.protocol.as_mut()
+        let ready = match entry
+        {
+            Some(entry) => match app.messages.get_mut(entry)
+            {
+                Some(state::Entry::Image { picture: state::Picture::Ready(ready), .. }) => Some(ready),
+                _ => None,
+            },
+
+            None => app.icon.as_mut(),
+        };
+
+        if let Some(protocol) = ready.and_then(|ready| ready.protocol.as_mut())
         {
             let resize = Resize::Crop(Some(CropOptions { clip_top, clip_left: false }));
 
@@ -540,18 +563,34 @@ fn draw_logo(frame: &mut Frame, area: Rect, stripe: Color)
     }
 }
 
-fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect)
+fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) -> Rect
 {
     let limit = area.height.saturating_sub(3).max(3);
 
-    //max_clients BOUNDS THE ONLINE LIST, SO THE OFFLINE ONE TAKES THE REST
-    let (mut constraints, mut panels) = match app.offline.is_empty()
-    {
-        true => (vec![Constraint::Min(3)], vec![Panel::Online]),
+    let (mut constraints, mut panels) = (Vec::new(), Vec::new());
 
-        false => (vec![Constraint::Length((online_rows(app) + 2).clamp(3, limit)), Constraint::Min(3)],
-            vec![Panel::Online, Panel::Offline]),
-    };
+    //THE SERVER'S PICTURE ON TOP, ONCE IT IS HERE
+    if area.height >= consts::ICON_MIN_HEIGHT && app.icon.is_some()
+    {
+        constraints.push(Constraint::Length(consts::ICON_ROWS + 2));
+        panels.push(Panel::Icon);
+    }
+
+    //max_clients BOUNDS THE ONLINE LIST, SO THE OFFLINE ONE TAKES THE REST
+    match app.offline.is_empty()
+    {
+        true =>
+        {
+            constraints.push(Constraint::Min(3));
+            panels.push(Panel::Online);
+        },
+
+        false =>
+        {
+            constraints.extend([Constraint::Length((online_rows(app) + 2).clamp(3, limit)), Constraint::Min(3)]);
+            panels.extend([Panel::Online, Panel::Offline]);
+        },
+    }
 
     if area.height >= consts::CHANNELS_MIN_HEIGHT && !app.channels.is_empty()
     {
@@ -566,16 +605,50 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect)
     }
 
     let areas = Layout::vertical(constraints).split(area);
+    let mut icon = Rect::ZERO;
 
     for (area, panel) in areas.iter().zip(panels)
     {
         match panel
         {
+            Panel::Icon => icon = draw_icon(frame, app, *area),
             Panel::Online => draw_online(frame, app, *area),
             Panel::Offline => draw_offline(frame, app, *area),
             Panel::Channels => draw_channels(frame, app, *area),
             Panel::Voice => draw_voice(frame, app, *area),
         }
+    }
+
+    icon
+}
+
+//THE SERVER'S PICTURE, UNDER ITS NAME - THE PICTURE ITSELF GOES ON LAST
+fn draw_icon(frame: &mut Frame, app: &App, area: Rect) -> Rect
+{
+    let mut block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(theme::border());
+
+    if !app.server_name.is_empty()
+    {
+        block = block.title(Span::styled(format!(" {} ", app.server_name), theme::title()));
+    }
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let Some(ready) = app.icon.as_ref() else { return Rect::ZERO };
+
+    //CENTRED IN THE ROWS IT CLAIMED
+    let (width, height) = state::picture_cells(&ready.frames[ready.current].image,
+        inner.width, inner.height.min(consts::ICON_ROWS), app.picker.font_size());
+
+    Rect
+    {
+        x: inner.x + inner.width.saturating_sub(width) / 2,
+        y: inner.y + inner.height.saturating_sub(height) / 2,
+        width,
+        height,
     }
 }
 

@@ -48,6 +48,8 @@ pub const TOFU_WIDTH: u16             = 64;                        //SERVER IDEN
 pub const LOGIN_WIDTH: u16            = 52;                        //CONNECT PROMPT, CAPPED TO THE TERMINAL
 pub const FIELD_ROW: u16              = 1;                         //THE ADDRESS FIELD SITS ONE ROW UNDER ITS OWN LABEL
 pub const AVATAR_ROWS: u16            = 10;                        //ROWS A PROFILE PICTURE CLAIMS IN THE BOX
+pub const ICON_ROWS: u16              = 6;                         //ROWS THE SERVER'S PICTURE CLAIMS IN THE SIDEBAR
+pub const ICON_MIN_HEIGHT: u16        = 20;                        //SIDEBAR ROWS THE SERVER'S PICTURE NEEDS
 pub const SETTINGS_VALUE_WIDTH: u16   = 20;                        //NARROWEST THE VALUE COLUMN MAY GET (BAR + PERCENTAGE)
 pub const SCROLL_GAP: usize           = 4;                         //SELECTION GAP FROM A LIST'S EDGES
 

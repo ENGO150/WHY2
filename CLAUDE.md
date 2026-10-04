@@ -928,10 +928,24 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   `server_images/` like any picture, and fetched back through `ImageDataRequest` and the cache — only the
   owner differs: the hash lives in `server_icon` in the config root (`config::server_icon`), not in a
   profile, and `messages::stored`, `orphans` and `sweep_images` keep it for that reason.
-  - **It is asked for, not drawn.** Nothing sends it at login — the TUI has no use for it, so `Accept`
-    does not carry it; a client that wants it (WHY2-Desktop, as `ClientEvent::ServerIcon`) sends
-    `ServerIconRequest`. A change goes to every client as `ServerIcon { save: false }` (the setter gets
-    `save: true`, which is all the TUI shows). It is a hash only, so nobody downloads the picture unasked.
+  - **It is asked for, not pushed.** `Accept` does not carry it; a client that wants it sends
+    `ServerIconRequest`, and the library's `listen_server` deliberately does not, so WHY2-Desktop (which
+    asks for itself, as `ClientEvent::ServerIcon`) is not asked twice. The TUI asks from the redraw tick
+    once `Authenticated` lands (`App::icon_request`). A change goes to every client as
+    `ServerIcon { save: false }` (the setter gets `save: true`, which is the only one the TUI also prints).
+    It is a hash only, so the picture itself is fetched like an avatar's: `App::set_server_icon` puts the
+    hash in `image_loads` (cache first, then `ImageDataRequest`), and the `ImageData` arm hands it to
+    `deliver_icon` before the avatar/caption routing — one picture can be all three, which is why
+    `ImageFrame` is `Clone`.
+  - **The TUI draws it as the top panel of the sidebar**, titled with the server's name, `ICON_ROWS` tall,
+    and only once it has decoded and the sidebar has `ICON_MIN_HEIGHT` rows — until then, and for a server
+    with no icon, the sidebar is what it always was. `draw_sidebar` returns where the picture goes
+    (`App::icon_area`), and **the picture itself goes through `draw_pictures`**, as one more entry beside
+    the pane's placements: the settings box can reach over the sidebar, and everything about restoring a
+    box over a picture row (the copied-out cells, `replace_rows`, `resend_rows`) applies to it unchanged.
+    It never shares a row's escape with a pane picture, since the pane ends where the sidebar starts. It is
+    stepped from the same tick as the avatar (`advance_icon`, only while it has an area), and the avatar's
+    load and step are the same two functions (`load_fitted`, `step_fitted`) at a different row budget.
 - **`config/mod.rs`** — TOML config for client (`client.toml`) and server (`server.toml`), plus
   server user store (`server_users.toml`), server ban list (`server_bans.toml`) and server keypair
   storage (`server_keys/{private,public}`), all under `WHY2_CONFIG_DIR`

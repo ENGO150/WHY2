@@ -59,6 +59,7 @@ use crate::
 };
 
 //STRUCTS
+#[derive(Clone)]
 pub struct ImageFrame
 {
     pub image: DynamicImage,

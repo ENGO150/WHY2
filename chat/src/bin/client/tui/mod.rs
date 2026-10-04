@@ -327,6 +327,15 @@ pub async fn run
                     crate::submit(app, &write_stream, tx, answer).await;
                 }
 
+                //THE SERVER'S PICTURE, ONCE WE ARE IN
+                if app.icon_request && let Some(write_stream) = write_stream.as_ref()
+                {
+                    app.icon_request = false;
+
+                    network::send(&mut *write_stream.lock().await,
+                        PacketCode::ServerIconRequest, options::get_keys().as_ref()).await;
+                }
+
                 //THE PICTURES THAT SCROLLED INTO VIEW
                 for hash in app.image_loads.drain(..)
                 {

@@ -76,6 +76,9 @@ impl App
 
                 //THESE ANSWERS ARE WORTH REPLAYING NOW
                 self.reconnect.accepted();
+
+                //AND THE SERVER'S PICTURE IS WORTH ASKING FOR
+                self.icon_request = true;
             },
 
             ClientEvent::Connected(server_name) =>
@@ -395,10 +398,12 @@ impl App
                 }
             },
 
-            //THE ANSWER TO A CLICKED CAPTION, OR TO THE PROFILE BOX
+            //THE ANSWER TO A CLICKED CAPTION, THE PROFILE BOX OR THE SIDEBAR
             ClientEvent::ImageData(hash, image) =>
             {
                 self.fetched(&hash);
+
+                if self.wants_icon(&hash) { self.deliver_icon(hash, image.clone()); }
 
                 match self.wants_avatar(&hash)
                 {
@@ -524,14 +529,19 @@ impl App
                 self.dirty = true;
             },
 
-            //THE SERVER'S PICTURE, NOT DRAWN YET - ONLY OUR OWN SAVE SAYS ANYTHING
-            ClientEvent::ServerIcon(hash, save) => if save
+            //THE SERVER'S PICTURE - ONLY OUR OWN SAVE SAYS ANYTHING
+            ClientEvent::ServerIcon(hash, save) =>
             {
-                self.push_styled(match hash
+                if save
                 {
-                    Some(_) => t!("event.server_icon_set"),
-                    None => t!("event.server_icon_removed"),
-                }, theme::ok());
+                    self.push_styled(match hash
+                    {
+                        Some(_) => t!("event.server_icon_set"),
+                        None => t!("event.server_icon_removed"),
+                    }, theme::ok());
+                }
+
+                self.set_server_icon(hash);
             },
 
             //THE ANSWER TO A /color
