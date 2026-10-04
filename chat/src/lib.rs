@@ -30,3 +30,6 @@ pub mod cache;
 
 #[cfg(feature = "client_base")]
 pub mod command;
+
+#[cfg(feature = "client_base")]
+pub mod i18n;

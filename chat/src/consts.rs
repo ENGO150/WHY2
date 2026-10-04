@@ -44,6 +44,7 @@ pub const SERVER_BANS_CONFIG: &str     = "/server_bans.toml";                   
 pub const SERVER_MESSAGES_FILE: &str   = "/server_messages.bin";                      //SERVER MESSAGE HISTORY FILE
 pub const SERVER_IMAGES_DIR: &str      = "/server_images";                            //PERSISTENT IMAGE DIRECTORY
 pub const CLIENT_IMAGES_DIR: &str      = "/client_images";                            //CACHED IMAGE DIRECTORY
+pub const LOCALES_DIR: &str            = "/locales";                                  //USER TRANSLATION DIRECTORY
 
 pub const SERVER_KEYS_CONFIG: &str     = "/server_keys.toml";                         //SERVER PUBKEY CONFIG FILE
 pub const SERVER_KEYS_DIR: &str        = "/server_keys";                              //SERVER KEYS DIRECTORY
