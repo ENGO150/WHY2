@@ -187,7 +187,7 @@ edited = "upraveno"
 
 [time]
 today = "%H:%M"
-older = "%-d. %-m. %Y %H:%M"
+older = "%-d.%-m.%Y %H:%M"
 
 [transfer]
 uploading_file = "Nahrávání souboru \"{filename}\""
