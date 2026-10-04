@@ -1,0 +1,572 @@
+# This is part of WHY2
+# Copyright (C) 2022-2026 Václav Šmejkal
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# To translate: copy this file to <config dir>/locales/<language>.toml (the config dir is
+# ~/.config/WHY2 unless the build says otherwise), translate the values and set
+# `language = "<language>"` in client.toml.
+#
+# - {name} is filled in by the client; keep the placeholders, move them where the language
+#   wants them. Write {{ or }} for a literal brace in a text that has placeholders.
+# - A table of one/few/many/other is a plural; [meta] plurals picks the rule:
+#   "one-other" (English, German, ...), "one-few-other" (Czech, Slovak),
+#   "one-few-many" (Russian, Ukrainian, ...) or "other" (no plural forms).
+# - Command names, color names, role names and the server's own settings are what people
+#   type or what the server sends, so they are not in here.
+# - time.* are chrono format strings.
+
+[meta]
+name = "English"
+plurals = "one-other"
+
+[keys]
+ctrl = "Ctrl+{key}"
+
+[login]
+registration_disabled = "Registration is disabled."
+username_rules = "a-Z, 0-9; {min}-{max} characters"
+username_rejected = "Username rejected!"
+password_rejected = "Password rejected! Enter at least {min} characters."
+reconnecting = "Connection lost, reconnecting… ({attempt}/{attempts})"
+connecting = "Connecting…"
+exchanging_keys = "Exchanging keys…"
+waiting = "Waiting for the server…"
+socks5 = "Through SOCKS5 {address}"
+unsigned_keys = "Server identity did not sign its exchange keys."
+timed_out = "Connection timed out."
+
+[login.title]
+connect = "Connect"
+identify = "Identify"
+register = "Register"
+login = "Log in"
+
+[login.label]
+address = "Server address"
+username = "Username"
+password = "Password"
+
+[login.missing]
+address = "Enter the address of a server."
+username = "Enter a username."
+password = "Enter a password."
+
+[tofu]
+challenge = "yes"
+accepted = "Server identity for {host} accepted and saved. Reconnecting..."
+server = "Server"
+pinned = "Pinned"
+new_key = "New key"
+key = "Key"
+type_to_replace = "Type '{word}' to replace the pinned key with this one:"
+type_to_confirm = "Type '{word}' to go through with it."
+reject = "Reject"
+replace = "Replace pinned key"
+trust = "Trust & save"
+
+[tofu.title]
+confirm = "Confirm the new server key"
+changed = "Server identity changed"
+unknown = "Unknown server identity"
+
+[tofu.warning]
+confirm = "Replacing a pinned key throws away the only thing that would catch an interception. Do it only after checking the fingerprint with the operator over a channel this server cannot touch."
+changed = "The server is presenting a different identity key than the one pinned for this address. Either the operator replaced the server's keys, or somebody is sitting between you and it."
+unknown = "This address has no pinned identity key yet. Accept it only if the fingerprint below matches the one the server's operator published."
+
+[account]
+mismatch = "Passwords do not match."
+delete_warning = "This cannot be undone. Press ⏎ again to delete your account."
+
+[account.title]
+passwd = "Change password"
+delete = "Delete account"
+
+[account.label]
+current = "Current password"
+new = "New password"
+confirm = "Confirm new password"
+
+[account.missing]
+current = "Enter the current password."
+new = "Enter the new password."
+confirm = "Enter the confirm new password."
+
+[event]
+first_user = "You are the first user to register, owner role has been granted to you."
+login_ok = "Login successful. Press Ctrl+H for help."
+connected = "Successfully connected to {server_name}."
+image_failed = "{username} sent an image that could not be displayed ({filename})."
+reconnect_failed = "Reconnecting to the server failed."
+joined = "{username} connected."
+left = "{username} disconnected."
+muted = "You have been muted by moderator."
+voice_enabled = "Voice enabled."
+device_failed = "Switching the audio device failed - the previous one is still in use."
+voice_handshake_failed = "The server never answered the voice handshake - is UDP getting through?"
+voice_disabled = "Voice disabled."
+role = "You are now {role}."
+history = "Message history ({count}):"
+server_settings_saved = "Server settings saved."
+password_changed = "Password changed."
+password_refused = "Wrong current password, or the new one does not meet the requirements."
+account_deleted = "Account deleted."
+wrong_password = "Wrong password."
+profile_saved = "Profile saved."
+color_set = "Color set successfully."
+uploaded = "{username} uploaded file \"{filename}\"."
+upload_limit = "Maximum concurrent uploads reached!"
+incompatible_version = "Incompatible version! ({version}/{server_version})"
+version_mismatch = "Version mismatch - some features may not work ({client_version}/{server_version})"
+spam_warning = "Slow down! You're sending messages too quickly."
+socks5_voice = "Voice chat cannot be enabled while using SOCKS5."
+disabled_feature = "Server has disabled the feature you requested."
+version_failed = "Fetching versions failed, this release could be unsafe!"
+quit = "Disconnected from the server."
+logged_out = "Logged out."
+server_quit = "Server quit communication."
+
+[event.tofu_skip]
+title = "SECURITY WARNING: UNKNOWN SERVER IDENTITY"
+body = "The server's identity key cannot be verified due to disabled ToFU verification. If you don't recognize the identity key below, disconnect immediately!"
+
+[event.unsafe_version]
+one = "This release could be unsafe! You are {count} version behind! ({current_version}/{newest_version})"
+other = "This release could be unsafe! You are {count} versions behind! ({current_version}/{newest_version})"
+
+[event.bans]
+none = "No bans."
+title = "Bans ({count}):"
+users = "users"
+addresses = "addresses"
+
+[event.list]
+title = "Online clients ({count}):"
+
+[event.files]
+none = "No available files."
+title = "Available files ({count}):"
+
+[event.screens]
+none = "No available screenshares."
+title = "Screensharing clients ({count}):"
+
+[event.screen]
+started = "Started screen sharing."
+stopped = "Stopped screen sharing."
+failed = "Screen sharing failed: {reason}."
+attach = "Attached {username}'s screen sharing."
+deattach = "Deattached {username}'s screen sharing."
+peer_started = "{username} started screen sharing."
+peer_stopped = "{username} stopped screen sharing."
+attached = "{username} attached your screen sharing."
+deattached = "{username} deattached your screen sharing."
+
+[invalid]
+usage = "Invalid usage! Press Ctrl+H for help."
+command = "Invalid command! Press Ctrl+H for help."
+action = "Invalid action! Press Ctrl+H for help."
+role = "Invalid role! Press Ctrl+H for help."
+color = "Invalid color! Type the command again and pick one of the offered colors."
+
+[typing]
+one = "{one} is typing…"
+two = "{one} and {two} are typing…"
+
+[typing.many]
+other = "{count} people are typing…"
+
+[message]
+pm = "PM"
+image = "{username} sent an image ({filename})"
+show = "show"
+loading = "loading..."
+unavailable = "unavailable"
+edited = "edited"
+
+[time]
+today = "%H:%M"
+older = "%Y-%m-%d %H:%M"
+
+[transfer]
+uploading_file = "Uploading file \"{filename}\""
+uploading_image = "Uploading image \"{filename}\""
+downloading = "Downloading file \"{filename}\""
+uploaded_file = "Uploaded file \"{filename}\""
+uploaded_image = "Uploaded image \"{filename}\""
+downloaded = "Downloaded file \"{filename}\""
+failed_file = "Transferring file \"{filename}\" failed"
+failed_image = "Transferring image \"{filename}\" failed"
+unknown_file = "Unknown"
+
+[pane]
+unread = "{count} new"
+
+[sidebar]
+online = "Online"
+offline = "Offline"
+channels = "Channels"
+voice = "Voice"
+
+[sidebar.roles]
+user = "Users"
+moderator = "Moderators"
+owner = "Owners"
+
+[device]
+tui = "tui"
+desktop = "desktop"
+phone = "phone"
+
+[palette]
+mentions = "Mentions"
+commands = "Commands"
+parameters = "Parameters"
+
+[help]
+title = "Commands:"
+
+[info]
+aliases = "Aliases"
+shortcut = "Shortcut"
+description = "Description"
+none = "None"
+
+[hearts]
+not_loaded = "Message #{message_id} is not loaded."
+none = "Nobody hearted #{message_id}."
+title = "Hearts on #{message_id} ({count}):"
+
+[mute]
+muted = "Successfully muted."
+unmuted = "Successfully unmuted."
+muted_id = "Successfully muted ID {id}."
+unmuted_id = "Successfully unmuted ID {id}."
+
+[upload]
+read_failed = "Reading the file failed!"
+unreadable_image = "That image could not be read!"
+avatar_too_large = "Avatar is too large even cut down! (limit is {limit}MB)"
+avatar_write_failed = "Writing the cut avatar failed!"
+not_found = "File not found!"
+image_too_large = "Image is too large! (limit is {limit}MB)"
+not_image = "Not an image!"
+
+[screen]
+swapped_to = "Sharing {monitor} now."
+swapped = "Swapped the shared monitor."
+unknown_monitor = "unknown"
+window = "WHY2 ScreenShare"
+window_fps = "WHY2 Screenshare ({fps} FPS)"
+
+[screen.error]
+no_monitor = "no monitor called '{selection}' - available: {available}"
+enumerate = "failed to enumerate monitors ({error})"
+no_monitors = "no monitors found"
+encoder = "failed to create H.264 encoder ({error})"
+resolution = "unsupported capture resolution {width}x{height} (must be even)"
+encode = "H.264 encode failed ({error})"
+no_outputs = "compositor reported no outputs"
+no_output = "the compositor knows no output called '{name}'"
+wayland = "wayland screen capture is unavailable ({error})"
+wayland_capture = "capturing {output} failed ({error}) - your compositor must support ext-image-copy-capture-v1 or wlr-screencopy-v1"
+recorder_unavailable = "the OS screen recorder is unavailable ({error})"
+recorder_start = "starting the OS screen recorder failed ({error})"
+recorder_silent = "the OS screen recorder started but delivered no frames"
+recorder_timeout = "the OS screen recorder did not answer in time"
+recorder_probe = "the OS screen recorder probe died"
+recorder_stopped = "the OS screen recorder stopped delivering frames"
+crashed = "screen capture crashed"
+
+[settings]
+restart_note = "{keys} takes effect when the server is restarted."
+restarting = "Restarting the server..."
+save = "Save"
+restart = "Restart server"
+avatar = "Avatar"
+default_device = "System default"
+restart_description = "Restart the server — every client is disconnected and the whole config is read again."
+save_first = "save your changes first"
+press_again_confirm = "press again to confirm"
+save_profile_description = "Send the description to the server."
+save_description = "Send the edited rows to the server."
+restart_required = "restart required"
+press_again = "press again"
+on = "on"
+off = "off"
+empty = "empty"
+
+[settings.section]
+audio = "Audio"
+interface = "Interface"
+privacy = "Privacy"
+
+[settings.row]
+input_device = "Input device"
+output_device = "Output device"
+input_volume = "Input volume"
+output_volume = "Output volume"
+screen_volume = "Screen share volume"
+noise_suppression = "Noise suppression"
+automatic_gain = "Automatic gain"
+theme = "Theme"
+disable_colors = "Message colors"
+disable_logo = "Background logo"
+auto_show_images = "Show images automatically"
+render_math = "Math rendering"
+show_id = "Show client IDs"
+show_message_ids = "Show message IDs"
+show_timestamps = "Show timestamps"
+message_stripes = "Message stripes"
+share_device = "Share device"
+typing_indicator = "Typing indicator"
+
+[settings.title]
+client = "Settings"
+server = "Server settings"
+own_profile = "Your profile"
+profile = "{username}'s profile"
+saving = "{name} · saving…"
+unsaved = "{name} · unsaved"
+
+[profile]
+bio = "Description"
+pronouns = "Pronouns"
+website = "Website"
+status = "Status"
+bad_website = "A website has to start with http:// or https://"
+empty_field = "No {field}."
+
+[profile.avatar]
+removed = "Your avatar is removed on save."
+uploaded = "{path} is uploaded on save."
+help = "Type a path to an image (up to {limit}MB) to have its centre cut to a square, or clear it to remove your avatar."
+set = "set"
+none = "none"
+remove = "remove"
+
+[profile.empty]
+bio = "No description."
+pronouns = "No pronouns."
+website = "No website."
+status = "No status."
+
+[hint.settings]
+picker = "↑↓ select │ ⏎ apply │ Esc back"
+avatar = "↑↓ select │ Tab complete │ ⏎ keep │ Esc cancel"
+edit = "type a value │ ⏎ keep │ Esc cancel"
+client = "↑↓ move │ ←→ change │ ⏎ select │ Esc close"
+server = "↑↓ move │ ←→ change │ ⏎ edit │ ^S save │ Esc close"
+own_profile = "↑↓ move │ ⏎ edit │ ^S save │ Esc close"
+profile_link = "↑↓ move │ ⏎ open link │ Esc close"
+profile = "↑↓ move │ Esc close"
+
+[hint.tofu]
+confirm = "type the word │ ⏎ confirm │ ← back │ Esc reject"
+warn = "←→ choose │ ⏎ confirm │ Esc reject"
+
+[hint.login]
+cancel = "Esc cancel"
+quit = "Esc quit"
+connect = "⏎ connect │ Esc quit"
+continue = "⏎ continue │ Esc quit"
+
+[hint.account]
+passwd = "↑↓ field │ ⏎ next │ Esc cancel"
+delete = "⏎ delete │ Esc cancel"
+confirm = "⏎ confirm │ Esc cancel"
+
+[status]
+mic_off = "mic off"
+mic_on = "mic on"
+settings = "Ctrl+, settings"
+
+[tui]
+input_failed = "Reading terminal input failed."
+opening = "Opening {url}"
+
+[tui.copied]
+one = "Copied {count} line to the clipboard"
+other = "Copied {count} lines to the clipboard"
+
+[arg]
+id = "ID"
+user = "USER"
+message = "MESSAGE"
+role = "ROLE"
+command = "COMMAND"
+name = "NAME"
+path = "PATH"
+user_id = "USER ID"
+file_id = "FILE ID"
+monitor = "MONITOR"
+color = "COLOR"
+action = "ACTION"
+
+[command.help]
+description = "Prints all available commands"
+
+[command.info]
+args.command = "Target command"
+description = "Shows command info"
+
+[command.voice]
+description = "Toggles voice chat"
+
+[command.mute]
+args.id = "ID of target user"
+description = "Toggle-mutes user/yourself"
+
+[command.channel]
+args.name = "Name of channel"
+description = "Switches to channel/lobby if NAME is omitted"
+
+[command.upload]
+args.path = "Path of target file"
+description = "Uploads file to server"
+
+[command.download]
+args.user_id = "ID of uploader"
+args.file_id = "ID of target file"
+description = "Downloads file from server"
+
+[command.image]
+args.path = "Path of target image"
+description = "Uploads a persistent image"
+
+[command.screen]
+args.monitor = "Index or name of the monitor to share"
+description = "Toggles screensharing, or swaps the shared monitor while it runs"
+
+[command.attach]
+args.id = "ID of screensharing user"
+description = "Attaches client screenshare."
+
+[command.deattach]
+description = "Dettaches client screenshare."
+
+[command.list]
+description = "Shows connected users and their IDs"
+
+[command.files]
+description = "Shows available files and their IDs"
+
+[command.screens]
+description = "Shows all screensharing clients."
+
+[command.pm]
+args.id = "ID of target user"
+args.message = "Message content"
+description = "Sends private message"
+
+[command.heart]
+args.id = "ID of the message"
+description = "Toggles heart reaction on a message."
+
+[command.hearts]
+args.id = "ID of the message"
+description = "Lists who hearted a message."
+
+[command.reply]
+args.id = "ID of the message"
+args.message = "Message content"
+description = "Responds to message"
+
+[command.re]
+args.message = "Message content"
+description = "Responds to last private message"
+
+[command.delete]
+args.id = "ID of the message"
+description = "Deletes a message from the history"
+
+[command.edit]
+args.id = "ID of the message"
+args.message = "New message content"
+description = "Edits your message in the history"
+
+[command.settings]
+description = "Opens audio and interface settings"
+
+[command.profile]
+args.user = "Username or ID, nobody for your own"
+description = "Opens a user profile"
+
+[command.ucolor]
+args.color = "Target color"
+description = "Sets color of username"
+
+[command.color]
+args.color = "Target color"
+description = "Sets color of message"
+
+[command.server]
+args.action = "Moderation action"
+description = "Moderation actions"
+
+[command.server.mute]
+args.id = "Target user"
+description = "Mutes a user server-side"
+
+[command.server.kick]
+args.id = "Target user"
+description = "Disconnects a user from the server"
+
+[command.server.ban]
+args.user = "Username or ID of target user"
+description = "Bans a user from the server"
+
+[command.server.banip]
+args.id = "Target user"
+description = "Bans a user's IP from the server"
+
+[command.server.banlist]
+description = "Lists every ban"
+
+[command.server.pardon]
+args.id = "Banned user ID"
+description = "Removes a user ban"
+
+[command.server.pardonip]
+args.id = "Banned address ID"
+description = "Removes an IP ban"
+
+[command.server.say]
+args.message = "Message to broadcast"
+description = "Broadcasts message as server"
+
+[command.server.role]
+args.user = "Username or ID of target user"
+args.role = "Role to grant"
+description = "Sets a user's role on the server"
+
+[command.server.settings]
+description = "Opens the server configuration"
+
+[command.account]
+args.action = "Account action"
+description = "Account actions"
+
+[command.account.delete]
+description = "Deletes your account"
+
+[command.account.passwd]
+description = "Changes your password"
+
+[command.logout]
+description = "Disconnects from the server and returns to the login screen"
+
+[command.exit]
+description = "Disconnects from the server"
