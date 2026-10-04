@@ -97,6 +97,7 @@ pub enum Subcommand
     Say,      //SAY AS SERVER
     Role,     //SET A USER'S ROLE
     Settings, //SERVER CONFIGURATION
+    Icon,     //SERVER PICTURE
     Delete,   //DELETE OWN ACCOUNT
     Passwd,   //CHANGE OWN PASSWORD
 }
@@ -312,6 +313,24 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         minimal_role: Role::Owner,
         args: &[],
         description: "command.server.settings.description",
+    },
+
+    SubcommandInfo
+    {
+        subcommand: Subcommand::Icon,
+        triggers: &[ "ICON", "PICTURE", "LOGO" ],
+        minimal_role: Role::Owner,
+        args:
+        &[
+            CommandArg
+            {
+                name: "arg.path",
+                description: "command.server.icon.args.path",
+                required: false,
+                values: ArgValues::Images,
+            },
+        ],
+        description: "command.server.icon.description",
     },
 ];
 

@@ -107,6 +107,8 @@ voice_disabled = "语音已关闭。"
 role = "你现在的角色是 {role}。"
 history = "消息历史（{count}）："
 server_settings_saved = "服务器设置已保存。"
+server_icon_set = "服务器图标已设置。"
+server_icon_removed = "服务器图标已移除。"
 password_changed = "密码已修改。"
 password_refused = "当前密码错误，或新密码不符合要求。"
 account_deleted = "账户已删除。"
@@ -540,6 +542,10 @@ description = "设置用户在服务器上的角色"
 
 [command.server.settings]
 description = "打开服务器配置"
+
+[command.server.icon]
+args.path = "裁剪为图标的图片 - 省略则移除"
+description = "设置服务器图标，省略路径则移除"
 
 [command.account]
 args.action = "账户操作"

@@ -107,6 +107,8 @@ voice_disabled = "Sprachchat deaktiviert."
 role = "Deine Rolle ist jetzt {role}."
 history = "Nachrichtenverlauf ({count}):"
 server_settings_saved = "Servereinstellungen gespeichert."
+server_icon_set = "Server-Symbol gesetzt."
+server_icon_removed = "Server-Symbol entfernt."
 password_changed = "Passwort geändert."
 password_refused = "Falsches aktuelles Passwort, oder das neue erfüllt die Anforderungen nicht."
 account_deleted = "Konto gelöscht."
@@ -542,6 +544,10 @@ description = "Setzt die Rolle eines Benutzers auf dem Server"
 
 [command.server.settings]
 description = "Öffnet die Serverkonfiguration"
+
+[command.server.icon]
+args.path = "Bild, aus dem das Symbol zugeschnitten wird - weglassen zum Entfernen"
+description = "Setzt das Server-Symbol oder entfernt es, wenn PFAD fehlt"
 
 [command.account]
 args.action = "Kontoaktion"

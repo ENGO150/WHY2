@@ -107,6 +107,8 @@ voice_disabled = "Голос выключен."
 role = "Ваша роль теперь {role}."
 history = "История сообщений ({count}):"
 server_settings_saved = "Настройки сервера сохранены."
+server_icon_set = "Значок сервера установлен."
+server_icon_removed = "Значок сервера удалён."
 password_changed = "Пароль изменён."
 password_refused = "Неверный текущий пароль, или новый не соответствует требованиям."
 account_deleted = "Учётная запись удалена."
@@ -545,6 +547,10 @@ description = "Задаёт роль пользователя на сервер�
 
 [command.server.settings]
 description = "Открывает конфигурацию сервера"
+
+[command.server.icon]
+args.path = "Изображение, из которого вырезается значок - опустите, чтобы удалить его"
+description = "Устанавливает значок сервера или удаляет его, если ПУТЬ не указан"
 
 [command.account]
 args.action = "Действие с учётной записью"

@@ -107,6 +107,8 @@ voice_disabled = "Hlasová komunikácia vypnutá."
 role = "Vaša rola je teraz {role}."
 history = "História správ ({count}):"
 server_settings_saved = "Nastavenia servera uložené."
+server_icon_set = "Ikona servera nastavená."
+server_icon_removed = "Ikona servera odstránená."
 password_changed = "Heslo bolo zmenené."
 password_refused = "Nesprávne súčasné heslo, alebo nové nespĺňa požiadavky."
 account_deleted = "Účet bol zmazaný."
@@ -545,6 +547,10 @@ description = "Nastaví rolu používateľa na serveri"
 
 [command.server.settings]
 description = "Otvorí konfiguráciu servera"
+
+[command.server.icon]
+args.path = "Obrázok, z ktorého sa vyreže ikona - vynechajte na odstránenie"
+description = "Nastaví ikonu servera, alebo ju odstráni, ak chýba CESTA"
 
 [command.account]
 args.action = "Akcia účtu"

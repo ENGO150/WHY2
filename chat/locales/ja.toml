@@ -107,6 +107,8 @@ voice_disabled = "ボイスを無効にしました。"
 role = "あなたのロールは {role} になりました。"
 history = "メッセージ履歴（{count}）："
 server_settings_saved = "サーバー設定を保存しました。"
+server_icon_set = "サーバーアイコンを設定しました。"
+server_icon_removed = "サーバーアイコンを削除しました。"
 password_changed = "パスワードを変更しました。"
 password_refused = "現在のパスワードが違うか、新しいパスワードが要件を満たしていません。"
 account_deleted = "アカウントを削除しました。"
@@ -540,6 +542,10 @@ description = "サーバー上のユーザーのロールを設定します"
 
 [command.server.settings]
 description = "サーバーの設定を開きます"
+
+[command.server.icon]
+args.path = "アイコンに切り抜く画像 - 省略すると削除します"
+description = "サーバーアイコンを設定します。パスを省略すると削除します"
 
 [command.account]
 args.action = "アカウント操作"

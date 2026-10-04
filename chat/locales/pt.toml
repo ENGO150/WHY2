@@ -107,6 +107,8 @@ voice_disabled = "Voz desativada."
 role = "Seu cargo agora é {role}."
 history = "Histórico de mensagens ({count}):"
 server_settings_saved = "Configurações do servidor salvas."
+server_icon_set = "Ícone do servidor definido."
+server_icon_removed = "Ícone do servidor removido."
 password_changed = "Senha alterada."
 password_refused = "Senha atual incorreta, ou a nova não atende aos requisitos."
 account_deleted = "Conta excluída."
@@ -542,6 +544,10 @@ description = "Define o cargo de um usuário no servidor"
 
 [command.server.settings]
 description = "Abre a configuração do servidor"
+
+[command.server.icon]
+args.path = "Imagem a recortar como ícone - omita para removê-lo"
+description = "Define o ícone do servidor, ou remove-o se CAMINHO for omitido"
 
 [command.account]
 args.action = "Ação da conta"

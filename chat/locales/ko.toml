@@ -107,6 +107,8 @@ voice_disabled = "음성이 꺼졌습니다."
 role = "이제 역할이 {role}입니다."
 history = "메시지 기록 ({count}):"
 server_settings_saved = "서버 설정을 저장했습니다."
+server_icon_set = "서버 아이콘을 설정했습니다."
+server_icon_removed = "서버 아이콘을 삭제했습니다."
 password_changed = "비밀번호를 변경했습니다."
 password_refused = "현재 비밀번호가 틀렸거나 새 비밀번호가 요구 사항을 충족하지 않습니다."
 account_deleted = "계정을 삭제했습니다."
@@ -540,6 +542,10 @@ description = "서버에서 사용자의 역할을 설정합니다"
 
 [command.server.settings]
 description = "서버 설정을 엽니다"
+
+[command.server.icon]
+args.path = "아이콘으로 잘라낼 이미지 - 생략하면 삭제합니다"
+description = "서버 아이콘을 설정하거나, 경로를 생략하면 삭제합니다"
 
 [command.account]
 args.action = "계정 작업"

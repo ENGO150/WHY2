@@ -107,6 +107,8 @@ voice_disabled = "Spraak uitgeschakeld."
 role = "Je rol is nu {role}."
 history = "Berichtgeschiedenis ({count}):"
 server_settings_saved = "Serverinstellingen opgeslagen."
+server_icon_set = "Serverpictogram ingesteld."
+server_icon_removed = "Serverpictogram verwijderd."
 password_changed = "Wachtwoord gewijzigd."
 password_refused = "Verkeerd huidig wachtwoord, of het nieuwe voldoet niet aan de eisen."
 account_deleted = "Account verwijderd."
@@ -542,6 +544,10 @@ description = "Stelt de rol van een gebruiker op de server in"
 
 [command.server.settings]
 description = "Opent de serverconfiguratie"
+
+[command.server.icon]
+args.path = "Afbeelding om als pictogram bij te snijden - weglaten om het te verwijderen"
+description = "Stelt het serverpictogram in, of verwijdert het als PAD ontbreekt"
 
 [command.account]
 args.action = "Accountactie"

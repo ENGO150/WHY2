@@ -120,6 +120,8 @@ voice_disabled = "Voice disabled."
 role = "You are now {role}."
 history = "Message history ({count}):"
 server_settings_saved = "Server settings saved."
+server_icon_set = "Server icon set."
+server_icon_removed = "Server icon removed."
 password_changed = "Password changed."
 password_refused = "Wrong current password, or the new one does not meet the requirements."
 account_deleted = "Account deleted."
@@ -555,6 +557,10 @@ description = "Sets a user's role on the server"
 
 [command.server.settings]
 description = "Opens the server configuration"
+
+[command.server.icon]
+args.path = "Image to cut into the icon - omit to remove it"
+description = "Sets the server icon, or removes it if PATH is omitted"
 
 [command.account]
 args.action = "Account action"

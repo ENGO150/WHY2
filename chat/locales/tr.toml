@@ -107,6 +107,8 @@ voice_disabled = "Ses kapatıldı."
 role = "Rolünüz artık {role}."
 history = "Mesaj geçmişi ({count}):"
 server_settings_saved = "Sunucu ayarları kaydedildi."
+server_icon_set = "Sunucu simgesi ayarlandı."
+server_icon_removed = "Sunucu simgesi kaldırıldı."
 password_changed = "Parola değiştirildi."
 password_refused = "Mevcut parola yanlış ya da yeni parola gereksinimleri karşılamıyor."
 account_deleted = "Hesap silindi."
@@ -540,6 +542,10 @@ description = "Bir kullanıcının sunucudaki rolünü ayarlar"
 
 [command.server.settings]
 description = "Sunucu yapılandırmasını açar"
+
+[command.server.icon]
+args.path = "Simgeye kırpılacak görsel - kaldırmak için boş bırakın"
+description = "Sunucu simgesini ayarlar veya YOL verilmezse kaldırır"
 
 [command.account]
 args.action = "Hesap işlemi"
