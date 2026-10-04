@@ -57,11 +57,39 @@ struct Locale //ONE LANGUAGE'S TEXT, FLATTENED TO DOTTED KEYS
 //CONSTS
 const ENGLISH: &str = include_str!("../locales/en.toml");
 const CZECH: &str = include_str!("../locales/cz.toml"); //i spent a fucking hour translating it
+const GERMAN: &str = include_str!("../locales/de.toml");
+const SPANISH: &str = include_str!("../locales/es.toml");
+const FRENCH: &str = include_str!("../locales/fr.toml");
+const ITALIAN: &str = include_str!("../locales/it.toml");
+const PORTUGUESE: &str = include_str!("../locales/pt.toml");
+const DUTCH: &str = include_str!("../locales/nl.toml");
+const POLISH: &str = include_str!("../locales/pl.toml");
+const SLOVAK: &str = include_str!("../locales/sk.toml");
+const RUSSIAN: &str = include_str!("../locales/ru.toml");
+const UKRAINIAN: &str = include_str!("../locales/uk.toml");
+const TURKISH: &str = include_str!("../locales/tr.toml");
+const CHINESE: &str = include_str!("../locales/zh.toml");
+const JAPANESE: &str = include_str!("../locales/ja.toml");
+const KOREAN: &str = include_str!("../locales/ko.toml");
 
 const BUILTIN: &[(&str, &str)] = //LANGUAGES SHIPPED IN THE BINARY
 &[
     ("en", ENGLISH),
     ("cs", CZECH),
+    ("de", GERMAN),
+    ("es", SPANISH),
+    ("fr", FRENCH),
+    ("it", ITALIAN),
+    ("pt", PORTUGUESE),
+    ("nl", DUTCH),
+    ("pl", POLISH),
+    ("sk", SLOVAK),
+    ("ru", RUSSIAN),
+    ("uk", UKRAINIAN),
+    ("tr", TURKISH),
+    ("zh", CHINESE),
+    ("ja", JAPANESE),
+    ("ko", KOREAN),
 ];
 
 //GLOBAL VARIABLES

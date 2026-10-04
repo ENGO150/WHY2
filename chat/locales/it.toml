@@ -1,0 +1,560 @@
+# This is part of WHY2
+# Copyright (C) 2022-2026 Václav Šmejkal
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+[meta]
+name = "Italiano [AI]"
+plurals = "one-other"
+
+[keys]
+ctrl = "Ctrl+{key}"
+
+[login]
+registration_disabled = "La registrazione è disattivata."
+username_rules = "a-Z, 0-9; {min}-{max} caratteri"
+username_rejected = "Nome utente rifiutato!"
+password_rejected = "Password rifiutata! Inserisci almeno {min} caratteri."
+reconnecting = "Connessione persa, riconnessione… ({attempt}/{attempts})"
+connecting = "Connessione…"
+exchanging_keys = "Scambio delle chiavi…"
+waiting = "In attesa del server…"
+socks5 = "Tramite SOCKS5 {address}"
+unsigned_keys = "L'identità del server non ha firmato le sue chiavi di scambio."
+timed_out = "Connessione scaduta."
+
+[login.title]
+connect = "Connetti"
+identify = "Identificati"
+register = "Registrati"
+login = "Accedi"
+
+[login.label]
+address = "Indirizzo del server"
+username = "Nome utente"
+password = "Password"
+
+[login.missing]
+address = "Inserisci l'indirizzo di un server."
+username = "Inserisci un nome utente."
+password = "Inserisci una password."
+
+[tofu]
+challenge = "sì"
+accepted = "Identità del server {host} accettata e salvata. Riconnessione..."
+server = "Server"
+pinned = "Fissata"
+new_key = "Nuova chiave"
+key = "Chiave"
+type_to_replace = "Scrivi '{word}' per sostituire la chiave fissata con questa:"
+type_to_confirm = "Scrivi '{word}' per procedere."
+reject = "Rifiuta"
+replace = "Sostituisci la chiave fissata"
+trust = "Fidati e salva"
+
+[tofu.title]
+confirm = "Conferma la nuova chiave del server"
+changed = "L'identità del server è cambiata"
+unknown = "Identità del server sconosciuta"
+
+[tofu.warning]
+confirm = "Sostituire una chiave fissata elimina l'unica cosa in grado di rilevare un'intercettazione. Fallo solo dopo aver verificato l'impronta con l'operatore tramite un canale a cui questo server non ha accesso."
+changed = "Il server presenta una chiave di identità diversa da quella fissata per questo indirizzo. O l'operatore ha sostituito le chiavi del server, o qualcuno si è messo in mezzo tra te e il server."
+unknown = "Questo indirizzo non ha ancora una chiave di identità fissata. Accettala solo se l'impronta qui sotto corrisponde a quella pubblicata dall'operatore del server."
+
+[account]
+mismatch = "Le password non corrispondono."
+delete_warning = "Questa azione non può essere annullata. Premi di nuovo ⏎ per eliminare il tuo account."
+
+[account.title]
+passwd = "Cambia password"
+delete = "Elimina account"
+
+[account.label]
+current = "Password attuale"
+new = "Nuova password"
+confirm = "Conferma nuova password"
+
+[account.missing]
+current = "Inserisci la password attuale."
+new = "Inserisci la nuova password."
+confirm = "Conferma la nuova password."
+
+[event]
+first_user = "Sei il primo utente registrato, ti è stato assegnato il ruolo di proprietario."
+login_ok = "Accesso riuscito. Premi Ctrl+H per l'aiuto."
+connected = "Connesso a {server_name}."
+image_failed = "{username} ha inviato un'immagine che non è stato possibile mostrare ({filename})."
+reconnect_failed = "Riconnessione al server non riuscita."
+joined = "{username} si è connesso."
+left = "{username} si è disconnesso."
+muted = "Sei stato silenziato da un moderatore."
+voice_enabled = "Voce attivata."
+device_failed = "Cambio del dispositivo audio non riuscito - è ancora in uso quello precedente."
+voice_handshake_failed = "Il server non ha mai risposto all'handshake vocale - il traffico UDP passa?"
+voice_disabled = "Voce disattivata."
+role = "Il tuo ruolo ora è {role}."
+history = "Cronologia messaggi ({count}):"
+server_settings_saved = "Impostazioni del server salvate."
+password_changed = "Password cambiata."
+password_refused = "Password attuale errata, oppure quella nuova non soddisfa i requisiti."
+account_deleted = "Account eliminato."
+wrong_password = "Password errata."
+profile_saved = "Profilo salvato."
+color_set = "Colore impostato."
+uploaded = "{username} ha caricato il file \"{filename}\"."
+upload_limit = "Raggiunto il numero massimo di caricamenti simultanei!"
+incompatible_version = "Versione incompatibile! ({version}/{server_version})"
+version_mismatch = "Versioni diverse - alcune funzioni potrebbero non funzionare ({client_version}/{server_version})"
+spam_warning = "Rallenta! Stai inviando messaggi troppo velocemente."
+socks5_voice = "La chat vocale non può essere attivata mentre si usa SOCKS5."
+disabled_feature = "Il server ha disattivato la funzione richiesta."
+version_failed = "Recupero delle versioni non riuscito, questa versione potrebbe non essere sicura!"
+quit = "Disconnesso dal server."
+logged_out = "Disconnesso dall'account."
+server_quit = "Il server ha interrotto la comunicazione."
+
+[event.tofu_skip]
+title = "AVVISO DI SICUREZZA: IDENTITÀ DEL SERVER SCONOSCIUTA"
+body = "La chiave di identità del server non può essere verificata perché la verifica ToFU è disattivata. Se non riconosci la chiave di identità qui sotto, disconnettiti immediatamente!"
+
+[event.unsafe_version]
+one = "Questa versione potrebbe non essere sicura! Sei indietro di {count} versione! ({current_version}/{newest_version})"
+other = "Questa versione potrebbe non essere sicura! Sei indietro di {count} versioni! ({current_version}/{newest_version})"
+
+[event.bans]
+none = "Nessun ban."
+title = "Ban ({count}):"
+users = "utenti"
+addresses = "indirizzi"
+
+[event.list]
+title = "Client connessi ({count}):"
+
+[event.files]
+none = "Nessun file disponibile."
+title = "File disponibili ({count}):"
+
+[event.screens]
+none = "Nessuna condivisione schermo disponibile."
+title = "Client che condividono lo schermo ({count}):"
+
+[event.screen]
+started = "Condivisione schermo avviata."
+stopped = "Condivisione schermo interrotta."
+failed = "Condivisione schermo non riuscita: {reason}."
+attach = "Collegato alla condivisione schermo di {username}."
+deattach = "Scollegato dalla condivisione schermo di {username}."
+peer_started = "{username} ha iniziato a condividere lo schermo."
+peer_stopped = "{username} ha smesso di condividere lo schermo."
+attached = "{username} si è collegato alla tua condivisione schermo."
+deattached = "{username} si è scollegato dalla tua condivisione schermo."
+
+[invalid]
+usage = "Uso non valido! Premi Ctrl+H per l'aiuto."
+command = "Comando non valido! Premi Ctrl+H per l'aiuto."
+action = "Azione non valida! Premi Ctrl+H per l'aiuto."
+role = "Ruolo non valido! Premi Ctrl+H per l'aiuto."
+color = "Colore non valido! Riscrivi il comando e scegli uno dei colori proposti."
+
+[typing]
+one = "{one} sta scrivendo…"
+two = "{one} e {two} stanno scrivendo…"
+
+[typing.many]
+other = "{count} persone stanno scrivendo…"
+
+[message]
+pm = "MP"
+image = "{username} ha inviato un'immagine ({filename})"
+show = "mostra"
+loading = "caricamento..."
+unavailable = "non disponibile"
+edited = "modificato"
+
+[time]
+today = "%H:%M"
+older = "%d/%m/%Y %H:%M"
+
+[transfer]
+uploading_file = "Caricamento del file \"{filename}\""
+uploading_image = "Caricamento dell'immagine \"{filename}\""
+downloading = "Scaricamento del file \"{filename}\""
+uploaded_file = "File \"{filename}\" caricato"
+uploaded_image = "Immagine \"{filename}\" caricata"
+downloaded = "File \"{filename}\" scaricato"
+failed_file = "Trasferimento del file \"{filename}\" non riuscito"
+failed_image = "Trasferimento dell'immagine \"{filename}\" non riuscito"
+unknown_file = "Sconosciuto"
+
+[pane]
+unread = "{count} nuovi"
+
+[sidebar]
+online = "Online"
+offline = "Offline"
+channels = "Canali"
+voice = "Voce"
+
+[sidebar.roles]
+user = "Utenti"
+moderator = "Moderatori"
+owner = "Proprietari"
+
+[device]
+tui = "tui"
+desktop = "desktop"
+phone = "telefono"
+
+[palette]
+mentions = "Menzioni"
+commands = "Comandi"
+parameters = "Parametri"
+
+[help]
+title = "Comandi:"
+
+[info]
+aliases = "Alias"
+shortcut = "Scorciatoia"
+description = "Descrizione"
+none = "Nessuno"
+
+[hearts]
+not_loaded = "Il messaggio #{message_id} non è caricato."
+none = "Nessuno ha messo un cuore a #{message_id}."
+title = "Cuori su #{message_id} ({count}):"
+
+[mute]
+muted = "Silenziato."
+unmuted = "Audio riattivato."
+muted_id = "ID {id} silenziato."
+unmuted_id = "Audio riattivato per l'ID {id}."
+
+[upload]
+read_failed = "Lettura del file non riuscita!"
+unreadable_image = "Impossibile leggere quell'immagine!"
+avatar_too_large = "L'avatar è troppo grande anche ritagliato! (il limite è {limit}MB)"
+avatar_write_failed = "Salvataggio dell'avatar ritagliato non riuscito!"
+not_found = "File non trovato!"
+image_too_large = "L'immagine è troppo grande! (il limite è {limit}MB)"
+not_image = "Non è un'immagine!"
+
+[screen]
+swapped_to = "Ora condivido {monitor}."
+swapped = "Monitor condiviso cambiato."
+unknown_monitor = "sconosciuto"
+window = "WHY2 Condivisione schermo"
+window_fps = "WHY2 Condivisione schermo ({fps} FPS)"
+
+[screen.error]
+no_monitor = "nessun monitor chiamato '{selection}' - disponibili: {available}"
+enumerate = "impossibile elencare i monitor ({error})"
+no_monitors = "nessun monitor trovato"
+encoder = "impossibile creare l'encoder H.264 ({error})"
+resolution = "risoluzione di cattura non supportata {width}x{height} (deve essere pari)"
+encode = "codifica H.264 non riuscita ({error})"
+no_outputs = "il compositor non ha segnalato alcuna uscita"
+no_output = "il compositor non conosce nessuna uscita chiamata '{name}'"
+wayland = "la cattura dello schermo su Wayland non è disponibile ({error})"
+wayland_capture = "cattura di {output} non riuscita ({error}) - il tuo compositor deve supportare ext-image-copy-capture-v1 o wlr-screencopy-v1"
+recorder_unavailable = "il registratore dello schermo del sistema non è disponibile ({error})"
+recorder_start = "avvio del registratore dello schermo del sistema non riuscito ({error})"
+recorder_silent = "il registratore dello schermo del sistema si è avviato ma non ha fornito fotogrammi"
+recorder_timeout = "il registratore dello schermo del sistema non ha risposto in tempo"
+recorder_probe = "il test del registratore dello schermo del sistema si è interrotto"
+recorder_stopped = "il registratore dello schermo del sistema ha smesso di fornire fotogrammi"
+crashed = "la cattura dello schermo si è bloccata"
+
+[settings]
+restart_note = "{keys} avrà effetto al riavvio del server."
+restarting = "Riavvio del server..."
+save = "Salva"
+restart = "Riavvia server"
+avatar = "Avatar"
+default_device = "Predefinito di sistema"
+restart_description = "Riavvia il server — tutti i client vengono disconnessi e l'intera configurazione viene riletta."
+save_first = "salva prima le modifiche"
+press_again_confirm = "premi di nuovo per confermare"
+save_profile_description = "Invia la descrizione al server."
+save_description = "Invia le righe modificate al server."
+restart_required = "riavvio necessario"
+press_again = "premi di nuovo"
+on = "sì"
+off = "no"
+empty = "vuoto"
+
+[settings.section]
+audio = "Audio"
+interface = "Interfaccia"
+privacy = "Privacy"
+
+[settings.row]
+input_device = "Dispositivo di ingresso"
+output_device = "Dispositivo di uscita"
+input_volume = "Volume di ingresso"
+output_volume = "Volume di uscita"
+screen_volume = "Volume della condivisione schermo"
+noise_suppression = "Soppressione del rumore"
+automatic_gain = "Guadagno automatico"
+theme = "Tema"
+disable_colors = "Colori dei messaggi"
+disable_logo = "Logo di sfondo"
+auto_show_images = "Mostra le immagini automaticamente"
+render_math = "Rendering matematico"
+show_id = "Mostra gli ID dei client"
+show_message_ids = "Mostra gli ID dei messaggi"
+show_timestamps = "Mostra gli orari"
+message_stripes = "Strisce dei messaggi"
+share_device = "Condividi dispositivo"
+typing_indicator = "Indicatore di scrittura"
+language = "Lingua"
+
+[settings.title]
+client = "Impostazioni"
+server = "Impostazioni del server"
+own_profile = "Il tuo profilo"
+profile = "Profilo di {username}"
+saving = "{name} · salvataggio…"
+unsaved = "{name} · non salvato"
+
+[profile]
+bio = "Descrizione"
+pronouns = "Pronomi"
+website = "Sito web"
+status = "Stato"
+bad_website = "Un sito web deve iniziare con http:// o https://"
+empty_field = "{field}: vuoto."
+
+[profile.avatar]
+removed = "Il tuo avatar verrà rimosso al salvataggio."
+uploaded = "{path} verrà caricato al salvataggio."
+help = "Scrivi il percorso di un'immagine (fino a {limit}MB) da ritagliare al centro in un quadrato, oppure cancellalo per rimuovere il tuo avatar."
+set = "impostato"
+none = "nessuno"
+remove = "rimuovi"
+
+[profile.empty]
+bio = "Nessuna descrizione."
+pronouns = "Nessun pronome."
+website = "Nessun sito web."
+status = "Nessuno stato."
+
+[hint.settings]
+picker = "↑↓ scegli │ ⏎ applica │ Esc indietro"
+avatar = "↑↓ scegli │ Tab completa │ ⏎ mantieni │ Esc annulla"
+edit = "scrivi un valore │ ⏎ mantieni │ Esc annulla"
+client = "↑↓ sposta │ ←→ cambia │ ⏎ scegli │ Esc chiudi"
+server = "↑↓ sposta │ ←→ cambia │ ⏎ modifica │ ^S salva │ Esc chiudi"
+own_profile = "↑↓ sposta │ ⏎ modifica │ ^S salva │ Esc chiudi"
+profile_link = "↑↓ sposta │ ⏎ apri link │ Esc chiudi"
+profile = "↑↓ sposta │ Esc chiudi"
+
+[hint.tofu]
+confirm = "scrivi la parola │ ⏎ conferma │ ← indietro │ Esc rifiuta"
+warn = "←→ scegli │ ⏎ conferma │ Esc rifiuta"
+
+[hint.login]
+cancel = "Esc annulla"
+quit = "Esc esci"
+connect = "⏎ connetti │ Esc esci"
+continue = "⏎ continua │ Esc esci"
+
+[hint.account]
+passwd = "↑↓ campo │ ⏎ avanti │ Esc annulla"
+delete = "⏎ elimina │ Esc annulla"
+confirm = "⏎ conferma │ Esc annulla"
+
+[status]
+mic_off = "microfono spento"
+mic_on = "microfono acceso"
+settings = "Ctrl+, impostazioni"
+
+[tui]
+input_failed = "Lettura dell'input del terminale non riuscita."
+opening = "Apertura di {url}"
+
+[tui.copied]
+one = "{count} riga copiata negli appunti"
+other = "{count} righe copiate negli appunti"
+
+[arg]
+id = "ID"
+user = "UTENTE"
+message = "MESSAGGIO"
+role = "RUOLO"
+command = "COMANDO"
+name = "NOME"
+path = "PERCORSO"
+user_id = "ID UTENTE"
+file_id = "ID FILE"
+monitor = "MONITOR"
+color = "COLORE"
+action = "AZIONE"
+
+[command.help]
+description = "Mostra tutti i comandi disponibili"
+
+[command.info]
+args.command = "Comando di destinazione"
+description = "Mostra le informazioni di un comando"
+
+[command.voice]
+description = "Attiva o disattiva la chat vocale"
+
+[command.mute]
+args.id = "ID dell'utente"
+description = "Silenzia o riattiva un utente/te stesso"
+
+[command.channel]
+args.name = "Nome del canale"
+description = "Passa a un canale, o alla lobby se NOME è omesso"
+
+[command.upload]
+args.path = "Percorso del file"
+description = "Carica un file sul server"
+
+[command.download]
+args.user_id = "ID di chi l'ha caricato"
+args.file_id = "ID del file"
+description = "Scarica un file dal server"
+
+[command.image]
+args.path = "Percorso dell'immagine"
+description = "Carica un'immagine persistente"
+
+[command.screen]
+args.monitor = "Indice o nome del monitor da condividere"
+description = "Attiva o disattiva la condivisione schermo, o cambia il monitor mentre è attiva"
+
+[command.attach]
+args.id = "ID dell'utente che condivide"
+description = "Si collega a una condivisione schermo."
+
+[command.deattach]
+description = "Si scollega da una condivisione schermo."
+
+[command.list]
+description = "Mostra gli utenti connessi e i loro ID"
+
+[command.files]
+description = "Mostra i file disponibili e i loro ID"
+
+[command.screens]
+description = "Mostra tutti i client che condividono lo schermo."
+
+[command.pm]
+args.id = "ID dell'utente"
+args.message = "Contenuto del messaggio"
+description = "Invia un messaggio privato"
+
+[command.heart]
+args.id = "ID del messaggio"
+description = "Mette o toglie un cuore a un messaggio."
+
+[command.hearts]
+args.id = "ID del messaggio"
+description = "Mostra chi ha messo un cuore a un messaggio."
+
+[command.reply]
+args.id = "ID del messaggio"
+args.message = "Contenuto del messaggio"
+description = "Risponde a un messaggio"
+
+[command.re]
+args.message = "Contenuto del messaggio"
+description = "Risponde all'ultimo messaggio privato"
+
+[command.delete]
+args.id = "ID del messaggio"
+description = "Elimina un messaggio dalla cronologia"
+
+[command.edit]
+args.id = "ID del messaggio"
+args.message = "Nuovo contenuto del messaggio"
+description = "Modifica il tuo messaggio nella cronologia"
+
+[command.settings]
+description = "Apre le impostazioni audio e dell'interfaccia"
+
+[command.profile]
+args.user = "Nome utente o ID, niente per il tuo"
+description = "Apre il profilo di un utente"
+
+[command.ucolor]
+args.color = "Colore scelto"
+description = "Imposta il colore del nome utente"
+
+[command.color]
+args.color = "Colore scelto"
+description = "Imposta il colore dei messaggi"
+
+[command.server]
+args.action = "Azione di moderazione"
+description = "Azioni di moderazione"
+
+[command.server.mute]
+args.id = "Utente"
+description = "Silenzia un utente lato server"
+
+[command.server.kick]
+args.id = "Utente"
+description = "Disconnette un utente dal server"
+
+[command.server.ban]
+args.user = "Nome utente o ID dell'utente"
+description = "Banna un utente dal server"
+
+[command.server.banip]
+args.id = "Utente"
+description = "Banna l'IP di un utente dal server"
+
+[command.server.banlist]
+description = "Elenca tutti i ban"
+
+[command.server.pardon]
+args.id = "ID dell'utente bannato"
+description = "Rimuove il ban di un utente"
+
+[command.server.pardonip]
+args.id = "ID dell'indirizzo bannato"
+description = "Rimuove un ban IP"
+
+[command.server.say]
+args.message = "Messaggio da trasmettere"
+description = "Trasmette un messaggio come server"
+
+[command.server.role]
+args.user = "Nome utente o ID dell'utente"
+args.role = "Ruolo da assegnare"
+description = "Imposta il ruolo di un utente sul server"
+
+[command.server.settings]
+description = "Apre la configurazione del server"
+
+[command.account]
+args.action = "Azione sull'account"
+description = "Azioni sull'account"
+
+[command.account.delete]
+description = "Elimina il tuo account"
+
+[command.account.passwd]
+description = "Cambia la tua password"
+
+[command.logout]
+description = "Si disconnette dal server e torna alla schermata di accesso"
+
+[command.exit]
+description = "Si disconnette dal server"

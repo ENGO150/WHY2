@@ -1,0 +1,560 @@
+# This is part of WHY2
+# Copyright (C) 2022-2026 Václav Šmejkal
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+[meta]
+name = "Nederlands [AI]"
+plurals = "one-other"
+
+[keys]
+ctrl = "Ctrl+{key}"
+
+[login]
+registration_disabled = "Registratie is uitgeschakeld."
+username_rules = "a-Z, 0-9; {min}-{max} tekens"
+username_rejected = "Gebruikersnaam geweigerd!"
+password_rejected = "Wachtwoord geweigerd! Voer minstens {min} tekens in."
+reconnecting = "Verbinding verbroken, opnieuw verbinden… ({attempt}/{attempts})"
+connecting = "Verbinden…"
+exchanging_keys = "Sleutels uitwisselen…"
+waiting = "Wachten op de server…"
+socks5 = "Via SOCKS5 {address}"
+unsigned_keys = "De serveridentiteit heeft haar uitwisselingssleutels niet ondertekend."
+timed_out = "Time-out van de verbinding."
+
+[login.title]
+connect = "Verbinden"
+identify = "Identificeren"
+register = "Registreren"
+login = "Inloggen"
+
+[login.label]
+address = "Serveradres"
+username = "Gebruikersnaam"
+password = "Wachtwoord"
+
+[login.missing]
+address = "Voer het adres van een server in."
+username = "Voer een gebruikersnaam in."
+password = "Voer een wachtwoord in."
+
+[tofu]
+challenge = "ja"
+accepted = "Serveridentiteit voor {host} geaccepteerd en opgeslagen. Opnieuw verbinden..."
+server = "Server"
+pinned = "Vastgezet"
+new_key = "Nieuwe sleutel"
+key = "Sleutel"
+type_to_replace = "Typ '{word}' om de vastgezette sleutel door deze te vervangen:"
+type_to_confirm = "Typ '{word}' om door te gaan."
+reject = "Weigeren"
+replace = "Vastgezette sleutel vervangen"
+trust = "Vertrouwen & opslaan"
+
+[tofu.title]
+confirm = "Bevestig de nieuwe serversleutel"
+changed = "Serveridentiteit gewijzigd"
+unknown = "Onbekende serveridentiteit"
+
+[tofu.warning]
+confirm = "Een vastgezette sleutel vervangen gooit het enige weg dat een onderschepping zou opmerken. Doe dit alleen nadat je de vingerafdruk met de beheerder hebt gecontroleerd via een kanaal waar deze server niet bij kan."
+changed = "De server toont een andere identiteitssleutel dan de sleutel die voor dit adres is vastgezet. Óf de beheerder heeft de sleutels van de server vervangen, óf iemand zit tussen jou en de server in."
+unknown = "Dit adres heeft nog geen vastgezette identiteitssleutel. Accepteer hem alleen als de vingerafdruk hieronder overeenkomt met die van de serverbeheerder."
+
+[account]
+mismatch = "De wachtwoorden komen niet overeen."
+delete_warning = "Dit kan niet ongedaan worden gemaakt. Druk nogmaals op ⏎ om je account te verwijderen."
+
+[account.title]
+passwd = "Wachtwoord wijzigen"
+delete = "Account verwijderen"
+
+[account.label]
+current = "Huidig wachtwoord"
+new = "Nieuw wachtwoord"
+confirm = "Bevestig nieuw wachtwoord"
+
+[account.missing]
+current = "Voer het huidige wachtwoord in."
+new = "Voer het nieuwe wachtwoord in."
+confirm = "Bevestig het nieuwe wachtwoord."
+
+[event]
+first_user = "Je bent de eerste geregistreerde gebruiker, je hebt de rol eigenaar gekregen."
+login_ok = "Inloggen gelukt. Druk op Ctrl+H voor hulp."
+connected = "Verbonden met {server_name}."
+image_failed = "{username} heeft een afbeelding gestuurd die niet kon worden weergegeven ({filename})."
+reconnect_failed = "Opnieuw verbinden met de server is mislukt."
+joined = "{username} is verbonden."
+left = "{username} heeft de verbinding verbroken."
+muted = "Je bent gedempt door een moderator."
+voice_enabled = "Spraak ingeschakeld."
+device_failed = "Wisselen van audioapparaat mislukt - het vorige wordt nog gebruikt."
+voice_handshake_failed = "De server heeft nooit op de spraakhandshake geantwoord - komt UDP erdoor?"
+voice_disabled = "Spraak uitgeschakeld."
+role = "Je rol is nu {role}."
+history = "Berichtgeschiedenis ({count}):"
+server_settings_saved = "Serverinstellingen opgeslagen."
+password_changed = "Wachtwoord gewijzigd."
+password_refused = "Verkeerd huidig wachtwoord, of het nieuwe voldoet niet aan de eisen."
+account_deleted = "Account verwijderd."
+wrong_password = "Verkeerd wachtwoord."
+profile_saved = "Profiel opgeslagen."
+color_set = "Kleur ingesteld."
+uploaded = "{username} heeft bestand \"{filename}\" geüpload."
+upload_limit = "Maximaal aantal gelijktijdige uploads bereikt!"
+incompatible_version = "Incompatibele versie! ({version}/{server_version})"
+version_mismatch = "Versies komen niet overeen - sommige functies werken mogelijk niet ({client_version}/{server_version})"
+spam_warning = "Rustig aan! Je stuurt berichten te snel."
+socks5_voice = "Spraakchat kan niet worden ingeschakeld terwijl SOCKS5 wordt gebruikt."
+disabled_feature = "De server heeft de gevraagde functie uitgeschakeld."
+version_failed = "Ophalen van versies mislukt, deze release is mogelijk onveilig!"
+quit = "Verbinding met de server verbroken."
+logged_out = "Uitgelogd."
+server_quit = "De server heeft de communicatie beëindigd."
+
+[event.tofu_skip]
+title = "BEVEILIGINGSWAARSCHUWING: ONBEKENDE SERVERIDENTITEIT"
+body = "De identiteitssleutel van de server kan niet worden geverifieerd omdat ToFU-verificatie is uitgeschakeld. Als je de identiteitssleutel hieronder niet herkent, verbreek dan direct de verbinding!"
+
+[event.unsafe_version]
+one = "Deze release is mogelijk onveilig! Je loopt {count} versie achter! ({current_version}/{newest_version})"
+other = "Deze release is mogelijk onveilig! Je loopt {count} versies achter! ({current_version}/{newest_version})"
+
+[event.bans]
+none = "Geen bans."
+title = "Bans ({count}):"
+users = "gebruikers"
+addresses = "adressen"
+
+[event.list]
+title = "Verbonden clients ({count}):"
+
+[event.files]
+none = "Geen beschikbare bestanden."
+title = "Beschikbare bestanden ({count}):"
+
+[event.screens]
+none = "Geen beschikbare schermdelingen."
+title = "Clients die hun scherm delen ({count}):"
+
+[event.screen]
+started = "Schermdeling gestart."
+stopped = "Schermdeling gestopt."
+failed = "Schermdeling mislukt: {reason}."
+attach = "Aangesloten op de schermdeling van {username}."
+deattach = "Losgekoppeld van de schermdeling van {username}."
+peer_started = "{username} is begonnen met scherm delen."
+peer_stopped = "{username} is gestopt met scherm delen."
+attached = "{username} kijkt mee met je schermdeling."
+deattached = "{username} kijkt niet meer mee met je schermdeling."
+
+[invalid]
+usage = "Ongeldig gebruik! Druk op Ctrl+H voor hulp."
+command = "Ongeldig commando! Druk op Ctrl+H voor hulp."
+action = "Ongeldige actie! Druk op Ctrl+H voor hulp."
+role = "Ongeldige rol! Druk op Ctrl+H voor hulp."
+color = "Ongeldige kleur! Typ het commando opnieuw en kies een van de aangeboden kleuren."
+
+[typing]
+one = "{one} is aan het typen…"
+two = "{one} en {two} zijn aan het typen…"
+
+[typing.many]
+other = "{count} mensen zijn aan het typen…"
+
+[message]
+pm = "PB"
+image = "{username} heeft een afbeelding gestuurd ({filename})"
+show = "tonen"
+loading = "laden..."
+unavailable = "niet beschikbaar"
+edited = "bewerkt"
+
+[time]
+today = "%H:%M"
+older = "%d-%m-%Y %H:%M"
+
+[transfer]
+uploading_file = "Bestand \"{filename}\" uploaden"
+uploading_image = "Afbeelding \"{filename}\" uploaden"
+downloading = "Bestand \"{filename}\" downloaden"
+uploaded_file = "Bestand \"{filename}\" geüpload"
+uploaded_image = "Afbeelding \"{filename}\" geüpload"
+downloaded = "Bestand \"{filename}\" gedownload"
+failed_file = "Overdracht van bestand \"{filename}\" mislukt"
+failed_image = "Overdracht van afbeelding \"{filename}\" mislukt"
+unknown_file = "Onbekend"
+
+[pane]
+unread = "{count} nieuw"
+
+[sidebar]
+online = "Online"
+offline = "Offline"
+channels = "Kanalen"
+voice = "Spraak"
+
+[sidebar.roles]
+user = "Gebruikers"
+moderator = "Moderators"
+owner = "Eigenaren"
+
+[device]
+tui = "tui"
+desktop = "desktop"
+phone = "telefoon"
+
+[palette]
+mentions = "Vermeldingen"
+commands = "Commando's"
+parameters = "Parameters"
+
+[help]
+title = "Commando's:"
+
+[info]
+aliases = "Aliassen"
+shortcut = "Sneltoets"
+description = "Beschrijving"
+none = "Geen"
+
+[hearts]
+not_loaded = "Bericht #{message_id} is niet geladen."
+none = "Niemand heeft #{message_id} een hartje gegeven."
+title = "Hartjes op #{message_id} ({count}):"
+
+[mute]
+muted = "Gedempt."
+unmuted = "Demping opgeheven."
+muted_id = "ID {id} gedempt."
+unmuted_id = "Demping van ID {id} opgeheven."
+
+[upload]
+read_failed = "Lezen van het bestand mislukt!"
+unreadable_image = "Die afbeelding kon niet worden gelezen!"
+avatar_too_large = "De avatar is zelfs bijgesneden te groot! (limiet is {limit}MB)"
+avatar_write_failed = "Opslaan van de bijgesneden avatar mislukt!"
+not_found = "Bestand niet gevonden!"
+image_too_large = "Afbeelding is te groot! (limiet is {limit}MB)"
+not_image = "Geen afbeelding!"
+
+[screen]
+swapped_to = "Nu wordt {monitor} gedeeld."
+swapped = "Gedeelde monitor gewisseld."
+unknown_monitor = "onbekend"
+window = "WHY2 Scherm delen"
+window_fps = "WHY2 Scherm delen ({fps} FPS)"
+
+[screen.error]
+no_monitor = "geen monitor met de naam '{selection}' - beschikbaar: {available}"
+enumerate = "monitoren opsommen mislukt ({error})"
+no_monitors = "geen monitoren gevonden"
+encoder = "H.264-encoder maken mislukt ({error})"
+resolution = "niet-ondersteunde opnameresolutie {width}x{height} (moet even zijn)"
+encode = "H.264-codering mislukt ({error})"
+no_outputs = "de compositor meldt geen uitgangen"
+no_output = "de compositor kent geen uitgang met de naam '{name}'"
+wayland = "schermopname onder Wayland is niet beschikbaar ({error})"
+wayland_capture = "opnemen van {output} mislukt ({error}) - je compositor moet ext-image-copy-capture-v1 of wlr-screencopy-v1 ondersteunen"
+recorder_unavailable = "de schermrecorder van het systeem is niet beschikbaar ({error})"
+recorder_start = "starten van de schermrecorder van het systeem mislukt ({error})"
+recorder_silent = "de schermrecorder van het systeem startte maar leverde geen beelden"
+recorder_timeout = "de schermrecorder van het systeem antwoordde niet op tijd"
+recorder_probe = "de test van de schermrecorder van het systeem is gecrasht"
+recorder_stopped = "de schermrecorder van het systeem levert geen beelden meer"
+crashed = "schermopname gecrasht"
+
+[settings]
+restart_note = "{keys} wordt actief wanneer de server opnieuw wordt gestart."
+restarting = "Server wordt opnieuw gestart..."
+save = "Opslaan"
+restart = "Server herstarten"
+avatar = "Avatar"
+default_device = "Systeemstandaard"
+restart_description = "Start de server opnieuw — alle clients worden losgekoppeld en de hele configuratie wordt opnieuw ingelezen."
+save_first = "sla eerst je wijzigingen op"
+press_again_confirm = "druk nogmaals om te bevestigen"
+save_profile_description = "De beschrijving naar de server sturen."
+save_description = "De bewerkte rijen naar de server sturen."
+restart_required = "herstart vereist"
+press_again = "druk nogmaals"
+on = "aan"
+off = "uit"
+empty = "leeg"
+
+[settings.section]
+audio = "Audio"
+interface = "Interface"
+privacy = "Privacy"
+
+[settings.row]
+input_device = "Invoerapparaat"
+output_device = "Uitvoerapparaat"
+input_volume = "Invoervolume"
+output_volume = "Uitvoervolume"
+screen_volume = "Volume schermdeling"
+noise_suppression = "Ruisonderdrukking"
+automatic_gain = "Automatische versterking"
+theme = "Thema"
+disable_colors = "Berichtkleuren"
+disable_logo = "Achtergrondlogo"
+auto_show_images = "Afbeeldingen automatisch tonen"
+render_math = "Wiskunde weergeven"
+show_id = "Client-ID's tonen"
+show_message_ids = "Bericht-ID's tonen"
+show_timestamps = "Tijdstempels tonen"
+message_stripes = "Berichtstrepen"
+share_device = "Apparaat delen"
+typing_indicator = "Typindicator"
+language = "Taal"
+
+[settings.title]
+client = "Instellingen"
+server = "Serverinstellingen"
+own_profile = "Je profiel"
+profile = "Profiel van {username}"
+saving = "{name} · opslaan…"
+unsaved = "{name} · niet opgeslagen"
+
+[profile]
+bio = "Beschrijving"
+pronouns = "Voornaamwoorden"
+website = "Website"
+status = "Status"
+bad_website = "Een website moet beginnen met http:// of https://"
+empty_field = "{field}: leeg."
+
+[profile.avatar]
+removed = "Je avatar wordt bij opslaan verwijderd."
+uploaded = "{path} wordt bij opslaan geüpload."
+help = "Typ het pad naar een afbeelding (tot {limit}MB) waarvan het midden vierkant wordt bijgesneden, of maak het leeg om je avatar te verwijderen."
+set = "ingesteld"
+none = "geen"
+remove = "verwijderen"
+
+[profile.empty]
+bio = "Geen beschrijving."
+pronouns = "Geen voornaamwoorden."
+website = "Geen website."
+status = "Geen status."
+
+[hint.settings]
+picker = "↑↓ kiezen │ ⏎ toepassen │ Esc terug"
+avatar = "↑↓ kiezen │ Tab aanvullen │ ⏎ houden │ Esc annuleren"
+edit = "typ een waarde │ ⏎ houden │ Esc annuleren"
+client = "↑↓ bewegen │ ←→ wijzigen │ ⏎ kiezen │ Esc sluiten"
+server = "↑↓ bewegen │ ←→ wijzigen │ ⏎ bewerken │ ^S opslaan │ Esc sluiten"
+own_profile = "↑↓ bewegen │ ⏎ bewerken │ ^S opslaan │ Esc sluiten"
+profile_link = "↑↓ bewegen │ ⏎ link openen │ Esc sluiten"
+profile = "↑↓ bewegen │ Esc sluiten"
+
+[hint.tofu]
+confirm = "typ het woord │ ⏎ bevestigen │ ← terug │ Esc weigeren"
+warn = "←→ kiezen │ ⏎ bevestigen │ Esc weigeren"
+
+[hint.login]
+cancel = "Esc annuleren"
+quit = "Esc afsluiten"
+connect = "⏎ verbinden │ Esc afsluiten"
+continue = "⏎ doorgaan │ Esc afsluiten"
+
+[hint.account]
+passwd = "↑↓ veld │ ⏎ volgende │ Esc annuleren"
+delete = "⏎ verwijderen │ Esc annuleren"
+confirm = "⏎ bevestigen │ Esc annuleren"
+
+[status]
+mic_off = "microfoon uit"
+mic_on = "microfoon aan"
+settings = "Ctrl+, instellingen"
+
+[tui]
+input_failed = "Lezen van de terminalinvoer mislukt."
+opening = "{url} openen"
+
+[tui.copied]
+one = "{count} regel naar het klembord gekopieerd"
+other = "{count} regels naar het klembord gekopieerd"
+
+[arg]
+id = "ID"
+user = "GEBRUIKER"
+message = "BERICHT"
+role = "ROL"
+command = "COMMANDO"
+name = "NAAM"
+path = "PAD"
+user_id = "GEBRUIKERS-ID"
+file_id = "BESTANDS-ID"
+monitor = "MONITOR"
+color = "KLEUR"
+action = "ACTIE"
+
+[command.help]
+description = "Toont alle beschikbare commando's"
+
+[command.info]
+args.command = "Doelcommando"
+description = "Toont informatie over een commando"
+
+[command.voice]
+description = "Zet spraakchat aan of uit"
+
+[command.mute]
+args.id = "ID van de doelgebruiker"
+description = "Dempt een gebruiker/jezelf of heft het op"
+
+[command.channel]
+args.name = "Naam van het kanaal"
+description = "Gaat naar een kanaal, of naar de lobby als NAAM ontbreekt"
+
+[command.upload]
+args.path = "Pad van het bestand"
+description = "Uploadt een bestand naar de server"
+
+[command.download]
+args.user_id = "ID van de uploader"
+args.file_id = "ID van het bestand"
+description = "Downloadt een bestand van de server"
+
+[command.image]
+args.path = "Pad van de afbeelding"
+description = "Uploadt een blijvende afbeelding"
+
+[command.screen]
+args.monitor = "Index of naam van de te delen monitor"
+description = "Zet scherm delen aan of uit, of wisselt tijdens het delen van monitor"
+
+[command.attach]
+args.id = "ID van de delende gebruiker"
+description = "Sluit aan op een schermdeling."
+
+[command.deattach]
+description = "Koppelt los van een schermdeling."
+
+[command.list]
+description = "Toont verbonden gebruikers en hun ID's"
+
+[command.files]
+description = "Toont beschikbare bestanden en hun ID's"
+
+[command.screens]
+description = "Toont alle clients die hun scherm delen."
+
+[command.pm]
+args.id = "ID van de doelgebruiker"
+args.message = "Inhoud van het bericht"
+description = "Stuurt een privébericht"
+
+[command.heart]
+args.id = "ID van het bericht"
+description = "Geeft een bericht een hartje of haalt het weg."
+
+[command.hearts]
+args.id = "ID van het bericht"
+description = "Toont wie een bericht een hartje gaf."
+
+[command.reply]
+args.id = "ID van het bericht"
+args.message = "Inhoud van het bericht"
+description = "Reageert op een bericht"
+
+[command.re]
+args.message = "Inhoud van het bericht"
+description = "Reageert op het laatste privébericht"
+
+[command.delete]
+args.id = "ID van het bericht"
+description = "Verwijdert een bericht uit de geschiedenis"
+
+[command.edit]
+args.id = "ID van het bericht"
+args.message = "Nieuwe inhoud van het bericht"
+description = "Bewerkt je bericht in de geschiedenis"
+
+[command.settings]
+description = "Opent de audio- en interface-instellingen"
+
+[command.profile]
+args.user = "Gebruikersnaam of ID, leeg voor je eigen"
+description = "Opent een gebruikersprofiel"
+
+[command.ucolor]
+args.color = "Doelkleur"
+description = "Stelt de kleur van de gebruikersnaam in"
+
+[command.color]
+args.color = "Doelkleur"
+description = "Stelt de kleur van berichten in"
+
+[command.server]
+args.action = "Moderatieactie"
+description = "Moderatieacties"
+
+[command.server.mute]
+args.id = "Doelgebruiker"
+description = "Dempt een gebruiker aan de serverkant"
+
+[command.server.kick]
+args.id = "Doelgebruiker"
+description = "Verbreekt de verbinding van een gebruiker met de server"
+
+[command.server.ban]
+args.user = "Gebruikersnaam of ID van de doelgebruiker"
+description = "Verbant een gebruiker van de server"
+
+[command.server.banip]
+args.id = "Doelgebruiker"
+description = "Verbant het IP van een gebruiker van de server"
+
+[command.server.banlist]
+description = "Toont alle bans"
+
+[command.server.pardon]
+args.id = "ID van de verbannen gebruiker"
+description = "Heft een gebruikersban op"
+
+[command.server.pardonip]
+args.id = "ID van het verbannen adres"
+description = "Heft een IP-ban op"
+
+[command.server.say]
+args.message = "Te verzenden bericht"
+description = "Verzendt een bericht als de server"
+
+[command.server.role]
+args.user = "Gebruikersnaam of ID van de doelgebruiker"
+args.role = "Toe te kennen rol"
+description = "Stelt de rol van een gebruiker op de server in"
+
+[command.server.settings]
+description = "Opent de serverconfiguratie"
+
+[command.account]
+args.action = "Accountactie"
+description = "Accountacties"
+
+[command.account.delete]
+description = "Verwijdert je account"
+
+[command.account.passwd]
+description = "Wijzigt je wachtwoord"
+
+[command.logout]
+description = "Verbreekt de verbinding met de server en keert terug naar het inlogscherm"
+
+[command.exit]
+description = "Verbreekt de verbinding met de server"

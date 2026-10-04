@@ -1,0 +1,563 @@
+# This is part of WHY2
+# Copyright (C) 2022-2026 Václav Šmejkal
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+[meta]
+name = "Українська [AI]"
+plurals = "one-few-many"
+
+[keys]
+ctrl = "Ctrl+{key}"
+
+[login]
+registration_disabled = "Реєстрацію вимкнено."
+username_rules = "a-Z, 0-9; {min}-{max} символів"
+username_rejected = "Ім'я користувача відхилено!"
+password_rejected = "Пароль відхилено! Введіть щонайменше {min} символів."
+reconnecting = "З'єднання втрачено, повторне підключення… ({attempt}/{attempts})"
+connecting = "Підключення…"
+exchanging_keys = "Обмін ключами…"
+waiting = "Очікування сервера…"
+socks5 = "Через SOCKS5 {address}"
+unsigned_keys = "Ідентичність сервера не підписала свої ключі обміну."
+timed_out = "Час очікування з'єднання минув."
+
+[login.title]
+connect = "Підключення"
+identify = "Ідентифікація"
+register = "Реєстрація"
+login = "Вхід"
+
+[login.label]
+address = "Адреса сервера"
+username = "Ім'я користувача"
+password = "Пароль"
+
+[login.missing]
+address = "Введіть адресу сервера."
+username = "Введіть ім'я користувача."
+password = "Введіть пароль."
+
+[tofu]
+challenge = "так"
+accepted = "Ідентичність сервера {host} прийнято та збережено. Повторне підключення..."
+server = "Сервер"
+pinned = "Закріплений"
+new_key = "Новий ключ"
+key = "Ключ"
+type_to_replace = "Введіть '{word}', щоб замінити закріплений ключ цим:"
+type_to_confirm = "Введіть '{word}', щоб продовжити."
+reject = "Відхилити"
+replace = "Замінити закріплений ключ"
+trust = "Довіряти та зберегти"
+
+[tofu.title]
+confirm = "Підтвердьте новий ключ сервера"
+changed = "Ідентичність сервера змінилася"
+unknown = "Невідома ідентичність сервера"
+
+[tofu.warning]
+confirm = "Заміна закріпленого ключа відкидає єдине, що могло б виявити перехоплення. Робіть це лише після звірки відбитка з оператором каналом, до якого цей сервер не має доступу."
+changed = "Сервер показує ключ ідентичності, відмінний від закріпленого для цієї адреси. Або оператор замінив ключі сервера, або хтось перебуває між вами та сервером."
+unknown = "Для цієї адреси ще немає закріпленого ключа ідентичності. Приймайте його, лише якщо відбиток нижче збігається з опублікованим оператором сервера."
+
+[account]
+mismatch = "Паролі не збігаються."
+delete_warning = "Цю дію неможливо скасувати. Натисніть ⏎ ще раз, щоб видалити обліковий запис."
+
+[account.title]
+passwd = "Змінити пароль"
+delete = "Видалити обліковий запис"
+
+[account.label]
+current = "Поточний пароль"
+new = "Новий пароль"
+confirm = "Підтвердьте новий пароль"
+
+[account.missing]
+current = "Введіть поточний пароль."
+new = "Введіть новий пароль."
+confirm = "Підтвердьте новий пароль."
+
+[event]
+first_user = "Ви перший зареєстрований користувач, вам надано роль власника."
+login_ok = "Вхід виконано. Натисніть Ctrl+H для довідки."
+connected = "Підключено до {server_name}."
+image_failed = "{username} надіслав(-ла) зображення, яке не вдалося показати ({filename})."
+reconnect_failed = "Не вдалося повторно підключитися до сервера."
+joined = "{username} підключився(-лася)."
+left = "{username} відключився(-лася)."
+muted = "Модератор вимкнув вам звук."
+voice_enabled = "Голос увімкнено."
+device_failed = "Не вдалося змінити аудіопристрій - досі використовується попередній."
+voice_handshake_failed = "Сервер не відповів на встановлення голосового з'єднання - чи проходить UDP?"
+voice_disabled = "Голос вимкнено."
+role = "Ваша роль тепер {role}."
+history = "Історія повідомлень ({count}):"
+server_settings_saved = "Налаштування сервера збережено."
+password_changed = "Пароль змінено."
+password_refused = "Неправильний поточний пароль, або новий не відповідає вимогам."
+account_deleted = "Обліковий запис видалено."
+wrong_password = "Неправильний пароль."
+profile_saved = "Профіль збережено."
+color_set = "Колір встановлено."
+uploaded = "{username} завантажив(-ла) файл \"{filename}\"."
+upload_limit = "Досягнуто максимальної кількості одночасних завантажень!"
+incompatible_version = "Несумісна версія! ({version}/{server_version})"
+version_mismatch = "Версії не збігаються - деякі функції можуть не працювати ({client_version}/{server_version})"
+spam_warning = "Повільніше! Ви надсилаєте повідомлення занадто швидко."
+socks5_voice = "Голосовий чат не можна увімкнути під час використання SOCKS5."
+disabled_feature = "Сервер вимкнув запитану функцію."
+version_failed = "Не вдалося отримати версії, цей випуск може бути небезпечним!"
+quit = "Відключено від сервера."
+logged_out = "Ви вийшли."
+server_quit = "Сервер припинив зв'язок."
+
+[event.tofu_skip]
+title = "ПОПЕРЕДЖЕННЯ БЕЗПЕКИ: НЕВІДОМА ІДЕНТИЧНІСТЬ СЕРВЕРА"
+body = "Ключ ідентичності сервера неможливо перевірити, оскільки перевірку ToFU вимкнено. Якщо ви не впізнаєте ключ ідентичності нижче, негайно відключіться!"
+
+[event.unsafe_version]
+one = "Цей випуск може бути небезпечним! Ви відстаєте на {count} версію! ({current_version}/{newest_version})"
+few = "Цей випуск може бути небезпечним! Ви відстаєте на {count} версії! ({current_version}/{newest_version})"
+many = "Цей випуск може бути небезпечним! Ви відстаєте на {count} версій! ({current_version}/{newest_version})"
+
+[event.bans]
+none = "Банів немає."
+title = "Бани ({count}):"
+users = "користувачі"
+addresses = "адреси"
+
+[event.list]
+title = "Підключені клієнти ({count}):"
+
+[event.files]
+none = "Немає доступних файлів."
+title = "Доступні файли ({count}):"
+
+[event.screens]
+none = "Немає доступних трансляцій екрана."
+title = "Клієнти, що транслюють екран ({count}):"
+
+[event.screen]
+started = "Трансляцію екрана розпочато."
+stopped = "Трансляцію екрана зупинено."
+failed = "Трансляція екрана не вдалася: {reason}."
+attach = "Підключено до трансляції екрана {username}."
+deattach = "Відключено від трансляції екрана {username}."
+peer_started = "{username} розпочав(-ла) трансляцію екрана."
+peer_stopped = "{username} зупинив(-ла) трансляцію екрана."
+attached = "{username} підключився(-лася) до вашої трансляції екрана."
+deattached = "{username} відключився(-лася) від вашої трансляції екрана."
+
+[invalid]
+usage = "Неправильне використання! Натисніть Ctrl+H для довідки."
+command = "Неправильна команда! Натисніть Ctrl+H для довідки."
+action = "Неправильна дія! Натисніть Ctrl+H для довідки."
+role = "Неправильна роль! Натисніть Ctrl+H для довідки."
+color = "Неправильний колір! Введіть команду ще раз і виберіть один із запропонованих кольорів."
+
+[typing]
+one = "{one} друкує…"
+two = "{one} і {two} друкують…"
+
+[typing.many]
+few = "{count} особи друкують…"
+many = "{count} осіб друкують…"
+
+[message]
+pm = "ОП"
+image = "{username} надіслав(-ла) зображення ({filename})"
+show = "показати"
+loading = "завантаження..."
+unavailable = "недоступно"
+edited = "змінено"
+
+[time]
+today = "%H:%M"
+older = "%d.%m.%Y %H:%M"
+
+[transfer]
+uploading_file = "Завантаження файлу \"{filename}\""
+uploading_image = "Завантаження зображення \"{filename}\""
+downloading = "Звантаження файлу \"{filename}\""
+uploaded_file = "Файл \"{filename}\" завантажено"
+uploaded_image = "Зображення \"{filename}\" завантажено"
+downloaded = "Файл \"{filename}\" звантажено"
+failed_file = "Не вдалося передати файл \"{filename}\""
+failed_image = "Не вдалося передати зображення \"{filename}\""
+unknown_file = "Невідомо"
+
+[pane]
+unread = "Нових: {count}"
+
+[sidebar]
+online = "У мережі"
+offline = "Не в мережі"
+channels = "Канали"
+voice = "Голос"
+
+[sidebar.roles]
+user = "Користувачі"
+moderator = "Модератори"
+owner = "Власники"
+
+[device]
+tui = "tui"
+desktop = "комп'ютер"
+phone = "телефон"
+
+[palette]
+mentions = "Згадки"
+commands = "Команди"
+parameters = "Параметри"
+
+[help]
+title = "Команди:"
+
+[info]
+aliases = "Псевдоніми"
+shortcut = "Комбінація клавіш"
+description = "Опис"
+none = "Немає"
+
+[hearts]
+not_loaded = "Повідомлення #{message_id} не завантажено."
+none = "Ніхто не поставив сердечко #{message_id}."
+title = "Сердечка на #{message_id} ({count}):"
+
+[mute]
+muted = "Звук вимкнено."
+unmuted = "Звук увімкнено."
+muted_id = "ID {id}: звук вимкнено."
+unmuted_id = "ID {id}: звук увімкнено."
+
+[upload]
+read_failed = "Не вдалося прочитати файл!"
+unreadable_image = "Не вдалося прочитати це зображення!"
+avatar_too_large = "Аватар завеликий навіть після обрізання! (ліміт {limit}MB)"
+avatar_write_failed = "Не вдалося записати обрізаний аватар!"
+not_found = "Файл не знайдено!"
+image_too_large = "Зображення завелике! (ліміт {limit}MB)"
+not_image = "Це не зображення!"
+
+[screen]
+swapped_to = "Тепер транслюється {monitor}."
+swapped = "Транслюваний монітор змінено."
+unknown_monitor = "невідомий"
+window = "WHY2 Трансляція екрана"
+window_fps = "WHY2 Трансляція екрана ({fps} FPS)"
+
+[screen.error]
+no_monitor = "немає монітора з назвою '{selection}' - доступні: {available}"
+enumerate = "не вдалося отримати список моніторів ({error})"
+no_monitors = "монітори не знайдено"
+encoder = "не вдалося створити кодувальник H.264 ({error})"
+resolution = "непідтримувана роздільна здатність захоплення {width}x{height} (має бути парною)"
+encode = "помилка кодування H.264 ({error})"
+no_outputs = "композитор не повідомив жодного виходу"
+no_output = "композитор не знає виходу з назвою '{name}'"
+wayland = "захоплення екрана у Wayland недоступне ({error})"
+wayland_capture = "не вдалося захопити {output} ({error}) - ваш композитор має підтримувати ext-image-copy-capture-v1 або wlr-screencopy-v1"
+recorder_unavailable = "системний запис екрана недоступний ({error})"
+recorder_start = "не вдалося запустити системний запис екрана ({error})"
+recorder_silent = "системний запис екрана запустився, але не видав жодного кадру"
+recorder_timeout = "системний запис екрана не відповів вчасно"
+recorder_probe = "перевірка системного запису екрана аварійно завершилася"
+recorder_stopped = "системний запис екрана перестав видавати кадри"
+crashed = "захоплення екрана аварійно завершилося"
+
+[settings]
+restart_note = "{keys}: зміни наберуть чинності після перезапуску сервера."
+restarting = "Перезапуск сервера..."
+save = "Зберегти"
+restart = "Перезапустити сервер"
+avatar = "Аватар"
+default_device = "Системний за замовчуванням"
+restart_description = "Перезапускає сервер — усіх клієнтів буде відключено, а всю конфігурацію прочитано заново."
+save_first = "спершу збережіть зміни"
+press_again_confirm = "натисніть ще раз для підтвердження"
+save_profile_description = "Надіслати опис на сервер."
+save_description = "Надіслати змінені рядки на сервер."
+restart_required = "потрібен перезапуск"
+press_again = "натисніть ще раз"
+on = "увімк"
+off = "вимк"
+empty = "порожньо"
+
+[settings.section]
+audio = "Звук"
+interface = "Інтерфейс"
+privacy = "Приватність"
+
+[settings.row]
+input_device = "Пристрій введення"
+output_device = "Пристрій виведення"
+input_volume = "Гучність введення"
+output_volume = "Гучність виведення"
+screen_volume = "Гучність трансляції екрана"
+noise_suppression = "Шумозаглушення"
+automatic_gain = "Автопідсилення"
+theme = "Тема"
+disable_colors = "Кольори повідомлень"
+disable_logo = "Логотип на тлі"
+auto_show_images = "Показувати зображення автоматично"
+render_math = "Відображення формул"
+show_id = "Показувати ID клієнтів"
+show_message_ids = "Показувати ID повідомлень"
+show_timestamps = "Показувати час"
+message_stripes = "Смуги повідомлень"
+share_device = "Повідомляти пристрій"
+typing_indicator = "Індикатор набору"
+language = "Мова"
+
+[settings.title]
+client = "Налаштування"
+server = "Налаштування сервера"
+own_profile = "Ваш профіль"
+profile = "Профіль {username}"
+saving = "{name} · збереження…"
+unsaved = "{name} · не збережено"
+
+[profile]
+bio = "Опис"
+pronouns = "Займенники"
+website = "Сайт"
+status = "Статус"
+bad_website = "Адреса сайту має починатися з http:// або https://"
+empty_field = "{field}: порожньо."
+
+[profile.avatar]
+removed = "Ваш аватар буде видалено під час збереження."
+uploaded = "{path} буде завантажено під час збереження."
+help = "Введіть шлях до зображення (до {limit}MB), центр якого буде обрізано до квадрата, або очистьте поле, щоб видалити аватар."
+set = "задано"
+none = "немає"
+remove = "видалити"
+
+[profile.empty]
+bio = "Немає опису."
+pronouns = "Займенники не вказано."
+website = "Немає сайту."
+status = "Немає статусу."
+
+[hint.settings]
+picker = "↑↓ вибір │ ⏎ застосувати │ Esc назад"
+avatar = "↑↓ вибір │ Tab доповнити │ ⏎ залишити │ Esc скасувати"
+edit = "введіть значення │ ⏎ залишити │ Esc скасувати"
+client = "↑↓ переміщення │ ←→ змінити │ ⏎ вибрати │ Esc закрити"
+server = "↑↓ переміщення │ ←→ змінити │ ⏎ редагувати │ ^S зберегти │ Esc закрити"
+own_profile = "↑↓ переміщення │ ⏎ редагувати │ ^S зберегти │ Esc закрити"
+profile_link = "↑↓ переміщення │ ⏎ відкрити посилання │ Esc закрити"
+profile = "↑↓ переміщення │ Esc закрити"
+
+[hint.tofu]
+confirm = "введіть слово │ ⏎ підтвердити │ ← назад │ Esc відхилити"
+warn = "←→ вибір │ ⏎ підтвердити │ Esc відхилити"
+
+[hint.login]
+cancel = "Esc скасувати"
+quit = "Esc вийти"
+connect = "⏎ підключитися │ Esc вийти"
+continue = "⏎ продовжити │ Esc вийти"
+
+[hint.account]
+passwd = "↑↓ поле │ ⏎ далі │ Esc скасувати"
+delete = "⏎ видалити │ Esc скасувати"
+confirm = "⏎ підтвердити │ Esc скасувати"
+
+[status]
+mic_off = "мікрофон вимк"
+mic_on = "мікрофон увімк"
+settings = "Ctrl+, налаштування"
+
+[tui]
+input_failed = "Не вдалося прочитати введення терміналу."
+opening = "Відкриття {url}"
+
+[tui.copied]
+one = "Скопійовано {count} рядок у буфер обміну"
+few = "Скопійовано {count} рядки у буфер обміну"
+many = "Скопійовано {count} рядків у буфер обміну"
+
+[arg]
+id = "ID"
+user = "КОРИСТУВАЧ"
+message = "ПОВІДОМЛЕННЯ"
+role = "РОЛЬ"
+command = "КОМАНДА"
+name = "НАЗВА"
+path = "ШЛЯХ"
+user_id = "ID КОРИСТУВАЧА"
+file_id = "ID ФАЙЛУ"
+monitor = "МОНІТОР"
+color = "КОЛІР"
+action = "ДІЯ"
+
+[command.help]
+description = "Виводить усі доступні команди"
+
+[command.info]
+args.command = "Потрібна команда"
+description = "Показує відомості про команду"
+
+[command.voice]
+description = "Вмикає/вимикає голосовий чат"
+
+[command.mute]
+args.id = "ID користувача"
+description = "Вимикає звук користувачу/вам або вмикає його"
+
+[command.channel]
+args.name = "Назва каналу"
+description = "Переходить до каналу, або до лобі, якщо НАЗВУ не вказано"
+
+[command.upload]
+args.path = "Шлях до файлу"
+description = "Завантажує файл на сервер"
+
+[command.download]
+args.user_id = "ID того, хто завантажив"
+args.file_id = "ID файлу"
+description = "Звантажує файл із сервера"
+
+[command.image]
+args.path = "Шлях до зображення"
+description = "Завантажує постійне зображення"
+
+[command.screen]
+args.monitor = "Номер або назва монітора для трансляції"
+description = "Вмикає/вимикає трансляцію екрана або змінює монітор під час неї"
+
+[command.attach]
+args.id = "ID користувача, що транслює"
+description = "Підключається до трансляції екрана."
+
+[command.deattach]
+description = "Відключається від трансляції екрана."
+
+[command.list]
+description = "Показує підключених користувачів та їхні ID"
+
+[command.files]
+description = "Показує доступні файли та їхні ID"
+
+[command.screens]
+description = "Показує всіх клієнтів, що транслюють екран."
+
+[command.pm]
+args.id = "ID користувача"
+args.message = "Текст повідомлення"
+description = "Надсилає особисте повідомлення"
+
+[command.heart]
+args.id = "ID повідомлення"
+description = "Ставить або прибирає сердечко на повідомленні."
+
+[command.hearts]
+args.id = "ID повідомлення"
+description = "Показує, хто поставив сердечко повідомленню."
+
+[command.reply]
+args.id = "ID повідомлення"
+args.message = "Текст повідомлення"
+description = "Відповідає на повідомлення"
+
+[command.re]
+args.message = "Текст повідомлення"
+description = "Відповідає на останнє особисте повідомлення"
+
+[command.delete]
+args.id = "ID повідомлення"
+description = "Видаляє повідомлення з історії"
+
+[command.edit]
+args.id = "ID повідомлення"
+args.message = "Новий текст повідомлення"
+description = "Редагує ваше повідомлення в історії"
+
+[command.settings]
+description = "Відкриває налаштування звуку та інтерфейсу"
+
+[command.profile]
+args.user = "Ім'я користувача або ID, порожньо для власного"
+description = "Відкриває профіль користувача"
+
+[command.ucolor]
+args.color = "Потрібний колір"
+description = "Задає колір імені користувача"
+
+[command.color]
+args.color = "Потрібний колір"
+description = "Задає колір повідомлень"
+
+[command.server]
+args.action = "Дія модерації"
+description = "Дії модерації"
+
+[command.server.mute]
+args.id = "Користувач"
+description = "Вимикає звук користувачу на боці сервера"
+
+[command.server.kick]
+args.id = "Користувач"
+description = "Відключає користувача від сервера"
+
+[command.server.ban]
+args.user = "Ім'я користувача або ID"
+description = "Банить користувача на сервері"
+
+[command.server.banip]
+args.id = "Користувач"
+description = "Банить IP користувача на сервері"
+
+[command.server.banlist]
+description = "Виводить усі бани"
+
+[command.server.pardon]
+args.id = "ID забаненого користувача"
+description = "Знімає бан з користувача"
+
+[command.server.pardonip]
+args.id = "ID забаненої адреси"
+description = "Знімає бан за IP"
+
+[command.server.say]
+args.message = "Повідомлення для розсилки"
+description = "Розсилає повідомлення від імені сервера"
+
+[command.server.role]
+args.user = "Ім'я користувача або ID"
+args.role = "Роль, що надається"
+description = "Задає роль користувача на сервері"
+
+[command.server.settings]
+description = "Відкриває конфігурацію сервера"
+
+[command.account]
+args.action = "Дія з обліковим записом"
+description = "Дії з обліковим записом"
+
+[command.account.delete]
+description = "Видаляє ваш обліковий запис"
+
+[command.account.passwd]
+description = "Змінює ваш пароль"
+
+[command.logout]
+description = "Відключається від сервера та повертає на екран входу"
+
+[command.exit]
+description = "Відключається від сервера"

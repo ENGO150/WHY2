@@ -1,0 +1,558 @@
+# This is part of WHY2
+# Copyright (C) 2022-2026 Václav Šmejkal
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+[meta]
+name = "简体中文 [AI]"
+plurals = "other"
+
+[keys]
+ctrl = "Ctrl+{key}"
+
+[login]
+registration_disabled = "注册已关闭。"
+username_rules = "a-Z, 0-9；{min}-{max} 个字符"
+username_rejected = "用户名被拒绝！"
+password_rejected = "密码被拒绝！请输入至少 {min} 个字符。"
+reconnecting = "连接已断开，正在重新连接…（{attempt}/{attempts}）"
+connecting = "正在连接…"
+exchanging_keys = "正在交换密钥…"
+waiting = "正在等待服务器…"
+socks5 = "通过 SOCKS5 {address}"
+unsigned_keys = "服务器身份未对其交换密钥签名。"
+timed_out = "连接超时。"
+
+[login.title]
+connect = "连接"
+identify = "身份"
+register = "注册"
+login = "登录"
+
+[login.label]
+address = "服务器地址"
+username = "用户名"
+password = "密码"
+
+[login.missing]
+address = "请输入服务器地址。"
+username = "请输入用户名。"
+password = "请输入密码。"
+
+[tofu]
+challenge = "yes"
+accepted = "已接受并保存 {host} 的服务器身份。正在重新连接..."
+server = "服务器"
+pinned = "已固定"
+new_key = "新密钥"
+key = "密钥"
+type_to_replace = "输入 '{word}' 以用此密钥替换已固定的密钥："
+type_to_confirm = "输入 '{word}' 以继续。"
+reject = "拒绝"
+replace = "替换已固定的密钥"
+trust = "信任并保存"
+
+[tofu.title]
+confirm = "确认新的服务器密钥"
+changed = "服务器身份已更改"
+unknown = "未知的服务器身份"
+
+[tofu.warning]
+confirm = "替换已固定的密钥会丢弃唯一能发现中间人拦截的东西。请仅在通过此服务器无法触及的渠道与运营者核对指纹后再这样做。"
+changed = "服务器出示的身份密钥与为此地址固定的不同。要么是运营者更换了服务器密钥，要么有人正在你和服务器之间进行拦截。"
+unknown = "此地址尚未固定任何身份密钥。仅当下方指纹与服务器运营者公布的指纹一致时才接受。"
+
+[account]
+mismatch = "两次输入的密码不一致。"
+delete_warning = "此操作无法撤销。再次按 ⏎ 删除你的账户。"
+
+[account.title]
+passwd = "修改密码"
+delete = "删除账户"
+
+[account.label]
+current = "当前密码"
+new = "新密码"
+confirm = "确认新密码"
+
+[account.missing]
+current = "请输入当前密码。"
+new = "请输入新密码。"
+confirm = "请确认新密码。"
+
+[event]
+first_user = "你是第一个注册的用户，已被授予所有者角色。"
+login_ok = "登录成功。按 Ctrl+H 查看帮助。"
+connected = "已成功连接到 {server_name}。"
+image_failed = "{username} 发送了一张无法显示的图片（{filename}）。"
+reconnect_failed = "重新连接服务器失败。"
+joined = "{username} 已连接。"
+left = "{username} 已断开连接。"
+muted = "你已被管理员禁言。"
+voice_enabled = "语音已开启。"
+device_failed = "切换音频设备失败 - 仍在使用之前的设备。"
+voice_handshake_failed = "服务器始终没有响应语音握手 - UDP 是否能通过？"
+voice_disabled = "语音已关闭。"
+role = "你现在的角色是 {role}。"
+history = "消息历史（{count}）："
+server_settings_saved = "服务器设置已保存。"
+password_changed = "密码已修改。"
+password_refused = "当前密码错误，或新密码不符合要求。"
+account_deleted = "账户已删除。"
+wrong_password = "密码错误。"
+profile_saved = "个人资料已保存。"
+color_set = "颜色设置成功。"
+uploaded = "{username} 上传了文件 \"{filename}\"。"
+upload_limit = "已达到同时上传数量上限！"
+incompatible_version = "版本不兼容！（{version}/{server_version}）"
+version_mismatch = "版本不一致 - 部分功能可能无法使用（{client_version}/{server_version}）"
+spam_warning = "慢一点！你发送消息太快了。"
+socks5_voice = "使用 SOCKS5 时无法开启语音聊天。"
+disabled_feature = "服务器已禁用你请求的功能。"
+version_failed = "获取版本信息失败，此版本可能不安全！"
+quit = "已与服务器断开连接。"
+logged_out = "已登出。"
+server_quit = "服务器已终止通信。"
+
+[event.tofu_skip]
+title = "安全警告：未知的服务器身份"
+body = "由于 ToFU 验证已关闭，无法验证服务器的身份密钥。如果你不认识下方的身份密钥，请立即断开连接！"
+
+[event.unsafe_version]
+other = "此版本可能不安全！你落后了 {count} 个版本！（{current_version}/{newest_version}）"
+
+[event.bans]
+none = "没有封禁。"
+title = "封禁（{count}）："
+users = "用户"
+addresses = "地址"
+
+[event.list]
+title = "在线客户端（{count}）："
+
+[event.files]
+none = "没有可用的文件。"
+title = "可用文件（{count}）："
+
+[event.screens]
+none = "没有可用的屏幕共享。"
+title = "正在共享屏幕的客户端（{count}）："
+
+[event.screen]
+started = "已开始屏幕共享。"
+stopped = "已停止屏幕共享。"
+failed = "屏幕共享失败：{reason}。"
+attach = "已加入 {username} 的屏幕共享。"
+deattach = "已退出 {username} 的屏幕共享。"
+peer_started = "{username} 开始了屏幕共享。"
+peer_stopped = "{username} 停止了屏幕共享。"
+attached = "{username} 加入了你的屏幕共享。"
+deattached = "{username} 退出了你的屏幕共享。"
+
+[invalid]
+usage = "用法无效！按 Ctrl+H 查看帮助。"
+command = "命令无效！按 Ctrl+H 查看帮助。"
+action = "操作无效！按 Ctrl+H 查看帮助。"
+role = "角色无效！按 Ctrl+H 查看帮助。"
+color = "颜色无效！请重新输入命令并选择提供的颜色之一。"
+
+[typing]
+one = "{one} 正在输入…"
+two = "{one} 和 {two} 正在输入…"
+
+[typing.many]
+other = "{count} 人正在输入…"
+
+[message]
+pm = "私信"
+image = "{username} 发送了一张图片（{filename}）"
+show = "显示"
+loading = "加载中..."
+unavailable = "不可用"
+edited = "已编辑"
+
+[time]
+today = "%H:%M"
+older = "%Y-%m-%d %H:%M"
+
+[transfer]
+uploading_file = "正在上传文件 \"{filename}\""
+uploading_image = "正在上传图片 \"{filename}\""
+downloading = "正在下载文件 \"{filename}\""
+uploaded_file = "已上传文件 \"{filename}\""
+uploaded_image = "已上传图片 \"{filename}\""
+downloaded = "已下载文件 \"{filename}\""
+failed_file = "文件 \"{filename}\" 传输失败"
+failed_image = "图片 \"{filename}\" 传输失败"
+unknown_file = "未知"
+
+[pane]
+unread = "{count} 条新消息"
+
+[sidebar]
+online = "在线"
+offline = "离线"
+channels = "频道"
+voice = "语音"
+
+[sidebar.roles]
+user = "用户"
+moderator = "管理员"
+owner = "所有者"
+
+[device]
+tui = "tui"
+desktop = "桌面"
+phone = "手机"
+
+[palette]
+mentions = "提及"
+commands = "命令"
+parameters = "参数"
+
+[help]
+title = "命令："
+
+[info]
+aliases = "别名"
+shortcut = "快捷键"
+description = "说明"
+none = "无"
+
+[hearts]
+not_loaded = "消息 #{message_id} 未加载。"
+none = "还没有人给 #{message_id} 点爱心。"
+title = "#{message_id} 的爱心（{count}）："
+
+[mute]
+muted = "已静音。"
+unmuted = "已取消静音。"
+muted_id = "已静音 ID {id}。"
+unmuted_id = "已取消静音 ID {id}。"
+
+[upload]
+read_failed = "读取文件失败！"
+unreadable_image = "无法读取该图片！"
+avatar_too_large = "头像即使裁剪后也太大了！（上限为 {limit}MB）"
+avatar_write_failed = "写入裁剪后的头像失败！"
+not_found = "未找到文件！"
+image_too_large = "图片太大了！（上限为 {limit}MB）"
+not_image = "这不是图片！"
+
+[screen]
+swapped_to = "现在正在共享 {monitor}。"
+swapped = "已切换共享的显示器。"
+unknown_monitor = "未知"
+window = "WHY2 屏幕共享"
+window_fps = "WHY2 屏幕共享（{fps} FPS）"
+
+[screen.error]
+no_monitor = "没有名为 '{selection}' 的显示器 - 可用：{available}"
+enumerate = "枚举显示器失败（{error}）"
+no_monitors = "未找到显示器"
+encoder = "创建 H.264 编码器失败（{error}）"
+resolution = "不支持的捕获分辨率 {width}x{height}（必须为偶数）"
+encode = "H.264 编码失败（{error}）"
+no_outputs = "合成器未报告任何输出"
+no_output = "合成器不认识名为 '{name}' 的输出"
+wayland = "Wayland 屏幕捕获不可用（{error}）"
+wayland_capture = "捕获 {output} 失败（{error}）- 你的合成器必须支持 ext-image-copy-capture-v1 或 wlr-screencopy-v1"
+recorder_unavailable = "系统屏幕录制不可用（{error}）"
+recorder_start = "启动系统屏幕录制失败（{error}）"
+recorder_silent = "系统屏幕录制已启动，但没有输出任何画面"
+recorder_timeout = "系统屏幕录制未及时响应"
+recorder_probe = "系统屏幕录制探测已崩溃"
+recorder_stopped = "系统屏幕录制已停止输出画面"
+crashed = "屏幕捕获已崩溃"
+
+[settings]
+restart_note = "{keys} 将在服务器重启后生效。"
+restarting = "正在重启服务器..."
+save = "保存"
+restart = "重启服务器"
+avatar = "头像"
+default_device = "系统默认"
+restart_description = "重启服务器 — 所有客户端都会断开连接，并重新读取全部配置。"
+save_first = "请先保存更改"
+press_again_confirm = "再按一次以确认"
+save_profile_description = "将简介发送到服务器。"
+save_description = "将修改过的行发送到服务器。"
+restart_required = "需要重启"
+press_again = "再按一次"
+on = "开"
+off = "关"
+empty = "空"
+
+[settings.section]
+audio = "音频"
+interface = "界面"
+privacy = "隐私"
+
+[settings.row]
+input_device = "输入设备"
+output_device = "输出设备"
+input_volume = "输入音量"
+output_volume = "输出音量"
+screen_volume = "屏幕共享音量"
+noise_suppression = "降噪"
+automatic_gain = "自动增益"
+theme = "主题"
+disable_colors = "消息颜色"
+disable_logo = "背景标志"
+auto_show_images = "自动显示图片"
+render_math = "数学公式渲染"
+show_id = "显示客户端 ID"
+show_message_ids = "显示消息 ID"
+show_timestamps = "显示时间"
+message_stripes = "消息条纹"
+share_device = "共享设备类型"
+typing_indicator = "输入提示"
+language = "语言"
+
+[settings.title]
+client = "设置"
+server = "服务器设置"
+own_profile = "你的个人资料"
+profile = "{username} 的个人资料"
+saving = "{name} · 保存中…"
+unsaved = "{name} · 未保存"
+
+[profile]
+bio = "简介"
+pronouns = "代词"
+website = "网站"
+status = "状态"
+bad_website = "网站必须以 http:// 或 https:// 开头"
+empty_field = "{field}：空。"
+
+[profile.avatar]
+removed = "保存时将移除你的头像。"
+uploaded = "保存时将上传 {path}。"
+help = "输入图片路径（最大 {limit}MB），其中心将被裁剪为正方形；清空则移除你的头像。"
+set = "已设置"
+none = "无"
+remove = "移除"
+
+[profile.empty]
+bio = "没有简介。"
+pronouns = "没有代词。"
+website = "没有网站。"
+status = "没有状态。"
+
+[hint.settings]
+picker = "↑↓ 选择 │ ⏎ 应用 │ Esc 返回"
+avatar = "↑↓ 选择 │ Tab 补全 │ ⏎ 保留 │ Esc 取消"
+edit = "输入值 │ ⏎ 保留 │ Esc 取消"
+client = "↑↓ 移动 │ ←→ 更改 │ ⏎ 选择 │ Esc 关闭"
+server = "↑↓ 移动 │ ←→ 更改 │ ⏎ 编辑 │ ^S 保存 │ Esc 关闭"
+own_profile = "↑↓ 移动 │ ⏎ 编辑 │ ^S 保存 │ Esc 关闭"
+profile_link = "↑↓ 移动 │ ⏎ 打开链接 │ Esc 关闭"
+profile = "↑↓ 移动 │ Esc 关闭"
+
+[hint.tofu]
+confirm = "输入该单词 │ ⏎ 确认 │ ← 返回 │ Esc 拒绝"
+warn = "←→ 选择 │ ⏎ 确认 │ Esc 拒绝"
+
+[hint.login]
+cancel = "Esc 取消"
+quit = "Esc 退出"
+connect = "⏎ 连接 │ Esc 退出"
+continue = "⏎ 继续 │ Esc 退出"
+
+[hint.account]
+passwd = "↑↓ 字段 │ ⏎ 下一步 │ Esc 取消"
+delete = "⏎ 删除 │ Esc 取消"
+confirm = "⏎ 确认 │ Esc 取消"
+
+[status]
+mic_off = "麦克风关"
+mic_on = "麦克风开"
+settings = "Ctrl+, 设置"
+
+[tui]
+input_failed = "读取终端输入失败。"
+opening = "正在打开 {url}"
+
+[tui.copied]
+other = "已复制 {count} 行到剪贴板"
+
+[arg]
+id = "ID"
+user = "用户"
+message = "消息"
+role = "角色"
+command = "命令"
+name = "名称"
+path = "路径"
+user_id = "用户ID"
+file_id = "文件ID"
+monitor = "显示器"
+color = "颜色"
+action = "操作"
+
+[command.help]
+description = "列出所有可用命令"
+
+[command.info]
+args.command = "目标命令"
+description = "显示命令信息"
+
+[command.voice]
+description = "开启/关闭语音聊天"
+
+[command.mute]
+args.id = "目标用户的 ID"
+description = "静音或取消静音某个用户/你自己"
+
+[command.channel]
+args.name = "频道名称"
+description = "切换到频道；省略名称则回到大厅"
+
+[command.upload]
+args.path = "目标文件路径"
+description = "上传文件到服务器"
+
+[command.download]
+args.user_id = "上传者的 ID"
+args.file_id = "目标文件的 ID"
+description = "从服务器下载文件"
+
+[command.image]
+args.path = "目标图片路径"
+description = "上传一张持久保存的图片"
+
+[command.screen]
+args.monitor = "要共享的显示器的序号或名称"
+description = "开启/关闭屏幕共享，或在共享时切换显示器"
+
+[command.attach]
+args.id = "共享屏幕的用户的 ID"
+description = "加入屏幕共享。"
+
+[command.deattach]
+description = "退出屏幕共享。"
+
+[command.list]
+description = "显示已连接的用户及其 ID"
+
+[command.files]
+description = "显示可用文件及其 ID"
+
+[command.screens]
+description = "显示所有正在共享屏幕的客户端。"
+
+[command.pm]
+args.id = "目标用户的 ID"
+args.message = "消息内容"
+description = "发送私信"
+
+[command.heart]
+args.id = "消息 ID"
+description = "给消息点上或取消爱心。"
+
+[command.hearts]
+args.id = "消息 ID"
+description = "列出给消息点爱心的人。"
+
+[command.reply]
+args.id = "消息 ID"
+args.message = "消息内容"
+description = "回复一条消息"
+
+[command.re]
+args.message = "消息内容"
+description = "回复最近一条私信"
+
+[command.delete]
+args.id = "消息 ID"
+description = "从历史中删除一条消息"
+
+[command.edit]
+args.id = "消息 ID"
+args.message = "新的消息内容"
+description = "编辑你在历史中的消息"
+
+[command.settings]
+description = "打开音频和界面设置"
+
+[command.profile]
+args.user = "用户名或 ID，留空则为你自己"
+description = "打开用户个人资料"
+
+[command.ucolor]
+args.color = "目标颜色"
+description = "设置用户名颜色"
+
+[command.color]
+args.color = "目标颜色"
+description = "设置消息颜色"
+
+[command.server]
+args.action = "管理操作"
+description = "管理操作"
+
+[command.server.mute]
+args.id = "目标用户"
+description = "在服务器端禁言用户"
+
+[command.server.kick]
+args.id = "目标用户"
+description = "将用户从服务器断开"
+
+[command.server.ban]
+args.user = "目标用户的用户名或 ID"
+description = "封禁用户"
+
+[command.server.banip]
+args.id = "目标用户"
+description = "封禁用户的 IP"
+
+[command.server.banlist]
+description = "列出所有封禁"
+
+[command.server.pardon]
+args.id = "被封禁用户的 ID"
+description = "解除用户封禁"
+
+[command.server.pardonip]
+args.id = "被封禁地址的 ID"
+description = "解除 IP 封禁"
+
+[command.server.say]
+args.message = "要广播的消息"
+description = "以服务器身份广播消息"
+
+[command.server.role]
+args.user = "目标用户的用户名或 ID"
+args.role = "要授予的角色"
+description = "设置用户在服务器上的角色"
+
+[command.server.settings]
+description = "打开服务器配置"
+
+[command.account]
+args.action = "账户操作"
+description = "账户操作"
+
+[command.account.delete]
+description = "删除你的账户"
+
+[command.account.passwd]
+description = "修改你的密码"
+
+[command.logout]
+description = "断开与服务器的连接并返回登录界面"
+
+[command.exit]
+description = "断开与服务器的连接"

@@ -1,0 +1,563 @@
+# This is part of WHY2
+# Copyright (C) 2022-2026 Václav Šmejkal
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+[meta]
+name = "Polski [AI]"
+plurals = "polish"
+
+[keys]
+ctrl = "Ctrl+{key}"
+
+[login]
+registration_disabled = "Rejestracja jest wyłączona."
+username_rules = "a-Z, 0-9; {min}-{max} znaków"
+username_rejected = "Nazwa użytkownika odrzucona!"
+password_rejected = "Hasło odrzucone! Wpisz co najmniej {min} znaków."
+reconnecting = "Utracono połączenie, ponowne łączenie… ({attempt}/{attempts})"
+connecting = "Łączenie…"
+exchanging_keys = "Wymiana kluczy…"
+waiting = "Oczekiwanie na serwer…"
+socks5 = "Przez SOCKS5 {address}"
+unsigned_keys = "Tożsamość serwera nie podpisała swoich kluczy wymiany."
+timed_out = "Przekroczono limit czasu połączenia."
+
+[login.title]
+connect = "Połącz"
+identify = "Identyfikacja"
+register = "Rejestracja"
+login = "Logowanie"
+
+[login.label]
+address = "Adres serwera"
+username = "Nazwa użytkownika"
+password = "Hasło"
+
+[login.missing]
+address = "Wpisz adres serwera."
+username = "Wpisz nazwę użytkownika."
+password = "Wpisz hasło."
+
+[tofu]
+challenge = "tak"
+accepted = "Tożsamość serwera {host} zaakceptowana i zapisana. Ponowne łączenie..."
+server = "Serwer"
+pinned = "Przypięty"
+new_key = "Nowy klucz"
+key = "Klucz"
+type_to_replace = "Wpisz '{word}', aby zastąpić przypięty klucz tym:"
+type_to_confirm = "Wpisz '{word}', aby kontynuować."
+reject = "Odrzuć"
+replace = "Zastąp przypięty klucz"
+trust = "Zaufaj i zapisz"
+
+[tofu.title]
+confirm = "Potwierdź nowy klucz serwera"
+changed = "Tożsamość serwera się zmieniła"
+unknown = "Nieznana tożsamość serwera"
+
+[tofu.warning]
+confirm = "Zastąpienie przypiętego klucza odrzuca jedyną rzecz, która wykryłaby przechwycenie. Zrób to tylko po sprawdzeniu odcisku z operatorem kanałem, do którego ten serwer nie ma dostępu."
+changed = "Serwer przedstawia inny klucz tożsamości niż ten przypięty dla tego adresu. Albo operator wymienił klucze serwera, albo ktoś stoi pomiędzy tobą a serwerem."
+unknown = "Ten adres nie ma jeszcze przypiętego klucza tożsamości. Zaakceptuj go tylko wtedy, gdy poniższy odcisk zgadza się z tym opublikowanym przez operatora serwera."
+
+[account]
+mismatch = "Hasła nie są zgodne."
+delete_warning = "Tej operacji nie można cofnąć. Naciśnij ⏎ ponownie, aby usunąć konto."
+
+[account.title]
+passwd = "Zmień hasło"
+delete = "Usuń konto"
+
+[account.label]
+current = "Obecne hasło"
+new = "Nowe hasło"
+confirm = "Potwierdź nowe hasło"
+
+[account.missing]
+current = "Wpisz obecne hasło."
+new = "Wpisz nowe hasło."
+confirm = "Potwierdź nowe hasło."
+
+[event]
+first_user = "Jesteś pierwszym zarejestrowanym użytkownikiem, przyznano ci rolę właściciela."
+login_ok = "Zalogowano pomyślnie. Naciśnij Ctrl+H, aby uzyskać pomoc."
+connected = "Połączono z {server_name}."
+image_failed = "{username} wysłał(a) obraz, którego nie udało się wyświetlić ({filename})."
+reconnect_failed = "Ponowne połączenie z serwerem nie powiodło się."
+joined = "{username} połączył(a) się."
+left = "{username} rozłączył(a) się."
+muted = "Moderator cię wyciszył."
+voice_enabled = "Głos włączony."
+device_failed = "Zmiana urządzenia audio nie powiodła się - nadal używane jest poprzednie."
+voice_handshake_failed = "Serwer nie odpowiedział na nawiązanie połączenia głosowego - czy UDP przechodzi?"
+voice_disabled = "Głos wyłączony."
+role = "Twoja rola to teraz {role}."
+history = "Historia wiadomości ({count}):"
+server_settings_saved = "Ustawienia serwera zapisane."
+password_changed = "Hasło zmienione."
+password_refused = "Błędne obecne hasło lub nowe nie spełnia wymagań."
+account_deleted = "Konto usunięte."
+wrong_password = "Błędne hasło."
+profile_saved = "Profil zapisany."
+color_set = "Kolor ustawiony."
+uploaded = "{username} przesłał(a) plik \"{filename}\"."
+upload_limit = "Osiągnięto maksymalną liczbę jednoczesnych przesyłań!"
+incompatible_version = "Niezgodna wersja! ({version}/{server_version})"
+version_mismatch = "Niezgodność wersji - niektóre funkcje mogą nie działać ({client_version}/{server_version})"
+spam_warning = "Zwolnij! Wysyłasz wiadomości zbyt szybko."
+socks5_voice = "Czatu głosowego nie można włączyć podczas używania SOCKS5."
+disabled_feature = "Serwer wyłączył żądaną funkcję."
+version_failed = "Pobranie wersji nie powiodło się, to wydanie może być niebezpieczne!"
+quit = "Rozłączono z serwerem."
+logged_out = "Wylogowano."
+server_quit = "Serwer zakończył komunikację."
+
+[event.tofu_skip]
+title = "OSTRZEŻENIE BEZPIECZEŃSTWA: NIEZNANA TOŻSAMOŚĆ SERWERA"
+body = "Klucza tożsamości serwera nie można zweryfikować, ponieważ weryfikacja ToFU jest wyłączona. Jeśli nie rozpoznajesz poniższego klucza tożsamości, natychmiast się rozłącz!"
+
+[event.unsafe_version]
+one = "To wydanie może być niebezpieczne! Jesteś {count} wersję do tyłu! ({current_version}/{newest_version})"
+few = "To wydanie może być niebezpieczne! Jesteś {count} wersje do tyłu! ({current_version}/{newest_version})"
+many = "To wydanie może być niebezpieczne! Jesteś {count} wersji do tyłu! ({current_version}/{newest_version})"
+
+[event.bans]
+none = "Brak banów."
+title = "Bany ({count}):"
+users = "użytkownicy"
+addresses = "adresy"
+
+[event.list]
+title = "Połączeni klienci ({count}):"
+
+[event.files]
+none = "Brak dostępnych plików."
+title = "Dostępne pliki ({count}):"
+
+[event.screens]
+none = "Brak dostępnych udostępnień ekranu."
+title = "Klienci udostępniający ekran ({count}):"
+
+[event.screen]
+started = "Rozpoczęto udostępnianie ekranu."
+stopped = "Zakończono udostępnianie ekranu."
+failed = "Udostępnianie ekranu nie powiodło się: {reason}."
+attach = "Dołączono do udostępniania ekranu {username}."
+deattach = "Odłączono od udostępniania ekranu {username}."
+peer_started = "{username} zaczął/zaczęła udostępniać ekran."
+peer_stopped = "{username} przestał(a) udostępniać ekran."
+attached = "{username} dołączył(a) do twojego udostępniania ekranu."
+deattached = "{username} odłączył(a) się od twojego udostępniania ekranu."
+
+[invalid]
+usage = "Nieprawidłowe użycie! Naciśnij Ctrl+H, aby uzyskać pomoc."
+command = "Nieprawidłowe polecenie! Naciśnij Ctrl+H, aby uzyskać pomoc."
+action = "Nieprawidłowa akcja! Naciśnij Ctrl+H, aby uzyskać pomoc."
+role = "Nieprawidłowa rola! Naciśnij Ctrl+H, aby uzyskać pomoc."
+color = "Nieprawidłowy kolor! Wpisz polecenie ponownie i wybierz jeden z proponowanych kolorów."
+
+[typing]
+one = "{one} pisze…"
+two = "{one} i {two} piszą…"
+
+[typing.many]
+few = "{count} osoby piszą…"
+many = "{count} osób pisze…"
+
+[message]
+pm = "PW"
+image = "{username} wysłał(a) obraz ({filename})"
+show = "pokaż"
+loading = "ładowanie..."
+unavailable = "niedostępny"
+edited = "edytowano"
+
+[time]
+today = "%H:%M"
+older = "%d.%m.%Y %H:%M"
+
+[transfer]
+uploading_file = "Przesyłanie pliku \"{filename}\""
+uploading_image = "Przesyłanie obrazu \"{filename}\""
+downloading = "Pobieranie pliku \"{filename}\""
+uploaded_file = "Przesłano plik \"{filename}\""
+uploaded_image = "Przesłano obraz \"{filename}\""
+downloaded = "Pobrano plik \"{filename}\""
+failed_file = "Przesyłanie pliku \"{filename}\" nie powiodło się"
+failed_image = "Przesyłanie obrazu \"{filename}\" nie powiodło się"
+unknown_file = "Nieznany"
+
+[pane]
+unread = "Nowe: {count}"
+
+[sidebar]
+online = "Online"
+offline = "Offline"
+channels = "Kanały"
+voice = "Głos"
+
+[sidebar.roles]
+user = "Użytkownicy"
+moderator = "Moderatorzy"
+owner = "Właściciele"
+
+[device]
+tui = "tui"
+desktop = "komputer"
+phone = "telefon"
+
+[palette]
+mentions = "Wzmianki"
+commands = "Polecenia"
+parameters = "Parametry"
+
+[help]
+title = "Polecenia:"
+
+[info]
+aliases = "Aliasy"
+shortcut = "Skrót"
+description = "Opis"
+none = "Brak"
+
+[hearts]
+not_loaded = "Wiadomość #{message_id} nie jest załadowana."
+none = "Nikt nie dał serduszka #{message_id}."
+title = "Serduszka przy #{message_id} ({count}):"
+
+[mute]
+muted = "Wyciszono."
+unmuted = "Wyłączono wyciszenie."
+muted_id = "Wyciszono ID {id}."
+unmuted_id = "Wyłączono wyciszenie ID {id}."
+
+[upload]
+read_failed = "Odczyt pliku nie powiódł się!"
+unreadable_image = "Nie udało się odczytać tego obrazu!"
+avatar_too_large = "Awatar jest za duży nawet po przycięciu! (limit to {limit}MB)"
+avatar_write_failed = "Zapis przyciętego awatara nie powiódł się!"
+not_found = "Nie znaleziono pliku!"
+image_too_large = "Obraz jest za duży! (limit to {limit}MB)"
+not_image = "To nie jest obraz!"
+
+[screen]
+swapped_to = "Teraz udostępniany jest {monitor}."
+swapped = "Zmieniono udostępniany monitor."
+unknown_monitor = "nieznany"
+window = "WHY2 Udostępnianie ekranu"
+window_fps = "WHY2 Udostępnianie ekranu ({fps} FPS)"
+
+[screen.error]
+no_monitor = "brak monitora o nazwie '{selection}' - dostępne: {available}"
+enumerate = "nie udało się wyliczyć monitorów ({error})"
+no_monitors = "nie znaleziono monitorów"
+encoder = "nie udało się utworzyć kodera H.264 ({error})"
+resolution = "nieobsługiwana rozdzielczość przechwytywania {width}x{height} (musi być parzysta)"
+encode = "kodowanie H.264 nie powiodło się ({error})"
+no_outputs = "kompozytor nie zgłosił żadnych wyjść"
+no_output = "kompozytor nie zna wyjścia o nazwie '{name}'"
+wayland = "przechwytywanie ekranu w Wayland jest niedostępne ({error})"
+wayland_capture = "przechwytywanie {output} nie powiodło się ({error}) - twój kompozytor musi obsługiwać ext-image-copy-capture-v1 lub wlr-screencopy-v1"
+recorder_unavailable = "systemowy rejestrator ekranu jest niedostępny ({error})"
+recorder_start = "uruchomienie systemowego rejestratora ekranu nie powiodło się ({error})"
+recorder_silent = "systemowy rejestrator ekranu uruchomił się, ale nie dostarczył klatek"
+recorder_timeout = "systemowy rejestrator ekranu nie odpowiedział na czas"
+recorder_probe = "test systemowego rejestratora ekranu uległ awarii"
+recorder_stopped = "systemowy rejestrator ekranu przestał dostarczać klatki"
+crashed = "przechwytywanie ekranu uległo awarii"
+
+[settings]
+restart_note = "{keys} zacznie działać po restarcie serwera."
+restarting = "Restartowanie serwera..."
+save = "Zapisz"
+restart = "Zrestartuj serwer"
+avatar = "Awatar"
+default_device = "Domyślne systemowe"
+restart_description = "Restartuje serwer — wszyscy klienci zostaną rozłączeni, a cała konfiguracja zostanie wczytana ponownie."
+save_first = "najpierw zapisz zmiany"
+press_again_confirm = "naciśnij ponownie, aby potwierdzić"
+save_profile_description = "Wyślij opis na serwer."
+save_description = "Wyślij zmienione wiersze na serwer."
+restart_required = "wymagany restart"
+press_again = "naciśnij ponownie"
+on = "wł."
+off = "wył."
+empty = "puste"
+
+[settings.section]
+audio = "Dźwięk"
+interface = "Interfejs"
+privacy = "Prywatność"
+
+[settings.row]
+input_device = "Urządzenie wejściowe"
+output_device = "Urządzenie wyjściowe"
+input_volume = "Głośność wejścia"
+output_volume = "Głośność wyjścia"
+screen_volume = "Głośność udostępniania ekranu"
+noise_suppression = "Tłumienie szumów"
+automatic_gain = "Automatyczne wzmocnienie"
+theme = "Motyw"
+disable_colors = "Kolory wiadomości"
+disable_logo = "Logo w tle"
+auto_show_images = "Automatycznie pokazuj obrazy"
+render_math = "Renderowanie matematyki"
+show_id = "Pokazuj ID klientów"
+show_message_ids = "Pokazuj ID wiadomości"
+show_timestamps = "Pokazuj znaczniki czasu"
+message_stripes = "Paski wiadomości"
+share_device = "Udostępniaj urządzenie"
+typing_indicator = "Wskaźnik pisania"
+language = "Język"
+
+[settings.title]
+client = "Ustawienia"
+server = "Ustawienia serwera"
+own_profile = "Twój profil"
+profile = "Profil {username}"
+saving = "{name} · zapisywanie…"
+unsaved = "{name} · niezapisane"
+
+[profile]
+bio = "Opis"
+pronouns = "Zaimki"
+website = "Strona internetowa"
+status = "Status"
+bad_website = "Strona internetowa musi zaczynać się od http:// lub https://"
+empty_field = "{field}: puste."
+
+[profile.avatar]
+removed = "Twój awatar zostanie usunięty po zapisaniu."
+uploaded = "{path} zostanie przesłany po zapisaniu."
+help = "Wpisz ścieżkę do obrazu (do {limit}MB), którego środek zostanie przycięty do kwadratu, lub wyczyść ją, aby usunąć awatar."
+set = "ustawiony"
+none = "brak"
+remove = "usuń"
+
+[profile.empty]
+bio = "Brak opisu."
+pronouns = "Brak zaimków."
+website = "Brak strony internetowej."
+status = "Brak statusu."
+
+[hint.settings]
+picker = "↑↓ wybierz │ ⏎ zastosuj │ Esc wstecz"
+avatar = "↑↓ wybierz │ Tab uzupełnij │ ⏎ zachowaj │ Esc anuluj"
+edit = "wpisz wartość │ ⏎ zachowaj │ Esc anuluj"
+client = "↑↓ ruch │ ←→ zmień │ ⏎ wybierz │ Esc zamknij"
+server = "↑↓ ruch │ ←→ zmień │ ⏎ edytuj │ ^S zapisz │ Esc zamknij"
+own_profile = "↑↓ ruch │ ⏎ edytuj │ ^S zapisz │ Esc zamknij"
+profile_link = "↑↓ ruch │ ⏎ otwórz link │ Esc zamknij"
+profile = "↑↓ ruch │ Esc zamknij"
+
+[hint.tofu]
+confirm = "wpisz słowo │ ⏎ potwierdź │ ← wstecz │ Esc odrzuć"
+warn = "←→ wybierz │ ⏎ potwierdź │ Esc odrzuć"
+
+[hint.login]
+cancel = "Esc anuluj"
+quit = "Esc wyjdź"
+connect = "⏎ połącz │ Esc wyjdź"
+continue = "⏎ dalej │ Esc wyjdź"
+
+[hint.account]
+passwd = "↑↓ pole │ ⏎ dalej │ Esc anuluj"
+delete = "⏎ usuń │ Esc anuluj"
+confirm = "⏎ potwierdź │ Esc anuluj"
+
+[status]
+mic_off = "mikrofon wył."
+mic_on = "mikrofon wł."
+settings = "Ctrl+, ustawienia"
+
+[tui]
+input_failed = "Odczyt wejścia terminala nie powiódł się."
+opening = "Otwieranie {url}"
+
+[tui.copied]
+one = "Skopiowano {count} wiersz do schowka"
+few = "Skopiowano {count} wiersze do schowka"
+many = "Skopiowano {count} wierszy do schowka"
+
+[arg]
+id = "ID"
+user = "UŻYTKOWNIK"
+message = "WIADOMOŚĆ"
+role = "ROLA"
+command = "POLECENIE"
+name = "NAZWA"
+path = "ŚCIEŻKA"
+user_id = "ID UŻYTKOWNIKA"
+file_id = "ID PLIKU"
+monitor = "MONITOR"
+color = "KOLOR"
+action = "AKCJA"
+
+[command.help]
+description = "Wyświetla wszystkie dostępne polecenia"
+
+[command.info]
+args.command = "Wybrane polecenie"
+description = "Pokazuje informacje o poleceniu"
+
+[command.voice]
+description = "Włącza/wyłącza czat głosowy"
+
+[command.mute]
+args.id = "ID wybranego użytkownika"
+description = "Wycisza użytkownika/ciebie lub wyłącza wyciszenie"
+
+[command.channel]
+args.name = "Nazwa kanału"
+description = "Przełącza na kanał lub do lobby, jeśli pominięto NAZWA"
+
+[command.upload]
+args.path = "Ścieżka do pliku"
+description = "Przesyła plik na serwer"
+
+[command.download]
+args.user_id = "ID przesyłającego"
+args.file_id = "ID pliku"
+description = "Pobiera plik z serwera"
+
+[command.image]
+args.path = "Ścieżka do obrazu"
+description = "Przesyła trwały obraz"
+
+[command.screen]
+args.monitor = "Indeks lub nazwa monitora do udostępnienia"
+description = "Włącza/wyłącza udostępnianie ekranu lub zmienia monitor w jego trakcie"
+
+[command.attach]
+args.id = "ID udostępniającego użytkownika"
+description = "Dołącza do udostępniania ekranu."
+
+[command.deattach]
+description = "Odłącza od udostępniania ekranu."
+
+[command.list]
+description = "Pokazuje połączonych użytkowników i ich ID"
+
+[command.files]
+description = "Pokazuje dostępne pliki i ich ID"
+
+[command.screens]
+description = "Pokazuje wszystkich klientów udostępniających ekran."
+
+[command.pm]
+args.id = "ID wybranego użytkownika"
+args.message = "Treść wiadomości"
+description = "Wysyła prywatną wiadomość"
+
+[command.heart]
+args.id = "ID wiadomości"
+description = "Dodaje lub usuwa serduszko przy wiadomości."
+
+[command.hearts]
+args.id = "ID wiadomości"
+description = "Pokazuje, kto dał serduszko wiadomości."
+
+[command.reply]
+args.id = "ID wiadomości"
+args.message = "Treść wiadomości"
+description = "Odpowiada na wiadomość"
+
+[command.re]
+args.message = "Treść wiadomości"
+description = "Odpowiada na ostatnią prywatną wiadomość"
+
+[command.delete]
+args.id = "ID wiadomości"
+description = "Usuwa wiadomość z historii"
+
+[command.edit]
+args.id = "ID wiadomości"
+args.message = "Nowa treść wiadomości"
+description = "Edytuje twoją wiadomość w historii"
+
+[command.settings]
+description = "Otwiera ustawienia dźwięku i interfejsu"
+
+[command.profile]
+args.user = "Nazwa użytkownika lub ID, puste dla własnego"
+description = "Otwiera profil użytkownika"
+
+[command.ucolor]
+args.color = "Wybrany kolor"
+description = "Ustawia kolor nazwy użytkownika"
+
+[command.color]
+args.color = "Wybrany kolor"
+description = "Ustawia kolor wiadomości"
+
+[command.server]
+args.action = "Akcja moderacyjna"
+description = "Akcje moderacyjne"
+
+[command.server.mute]
+args.id = "Wybrany użytkownik"
+description = "Wycisza użytkownika po stronie serwera"
+
+[command.server.kick]
+args.id = "Wybrany użytkownik"
+description = "Rozłącza użytkownika z serwerem"
+
+[command.server.ban]
+args.user = "Nazwa użytkownika lub ID wybranego użytkownika"
+description = "Banuje użytkownika na serwerze"
+
+[command.server.banip]
+args.id = "Wybrany użytkownik"
+description = "Banuje IP użytkownika na serwerze"
+
+[command.server.banlist]
+description = "Wyświetla wszystkie bany"
+
+[command.server.pardon]
+args.id = "ID zbanowanego użytkownika"
+description = "Usuwa bana użytkownika"
+
+[command.server.pardonip]
+args.id = "ID zbanowanego adresu"
+description = "Usuwa bana IP"
+
+[command.server.say]
+args.message = "Wiadomość do rozgłoszenia"
+description = "Rozgłasza wiadomość jako serwer"
+
+[command.server.role]
+args.user = "Nazwa użytkownika lub ID wybranego użytkownika"
+args.role = "Rola do nadania"
+description = "Ustawia rolę użytkownika na serwerze"
+
+[command.server.settings]
+description = "Otwiera konfigurację serwera"
+
+[command.account]
+args.action = "Akcja konta"
+description = "Akcje konta"
+
+[command.account.delete]
+description = "Usuwa twoje konto"
+
+[command.account.passwd]
+description = "Zmienia twoje hasło"
+
+[command.logout]
+description = "Rozłącza z serwerem i wraca do ekranu logowania"
+
+[command.exit]
+description = "Rozłącza z serwerem"

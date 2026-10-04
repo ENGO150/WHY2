@@ -1,0 +1,558 @@
+# This is part of WHY2
+# Copyright (C) 2022-2026 Václav Šmejkal
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+[meta]
+name = "Türkçe [AI]"
+plurals = "other"
+
+[keys]
+ctrl = "Ctrl+{key}"
+
+[login]
+registration_disabled = "Kayıt devre dışı."
+username_rules = "a-Z, 0-9; {min}-{max} karakter"
+username_rejected = "Kullanıcı adı reddedildi!"
+password_rejected = "Parola reddedildi! En az {min} karakter girin."
+reconnecting = "Bağlantı koptu, yeniden bağlanılıyor… ({attempt}/{attempts})"
+connecting = "Bağlanılıyor…"
+exchanging_keys = "Anahtarlar değiş tokuş ediliyor…"
+waiting = "Sunucu bekleniyor…"
+socks5 = "SOCKS5 üzerinden {address}"
+unsigned_keys = "Sunucu kimliği değişim anahtarlarını imzalamadı."
+timed_out = "Bağlantı zaman aşımına uğradı."
+
+[login.title]
+connect = "Bağlan"
+identify = "Kimlik"
+register = "Kayıt ol"
+login = "Giriş yap"
+
+[login.label]
+address = "Sunucu adresi"
+username = "Kullanıcı adı"
+password = "Parola"
+
+[login.missing]
+address = "Bir sunucu adresi girin."
+username = "Bir kullanıcı adı girin."
+password = "Bir parola girin."
+
+[tofu]
+challenge = "evet"
+accepted = "{host} için sunucu kimliği kabul edildi ve kaydedildi. Yeniden bağlanılıyor..."
+server = "Sunucu"
+pinned = "Sabitlenmiş"
+new_key = "Yeni anahtar"
+key = "Anahtar"
+type_to_replace = "Sabitlenmiş anahtarı bununla değiştirmek için '{word}' yazın:"
+type_to_confirm = "Devam etmek için '{word}' yazın."
+reject = "Reddet"
+replace = "Sabitlenmiş anahtarı değiştir"
+trust = "Güven ve kaydet"
+
+[tofu.title]
+confirm = "Yeni sunucu anahtarını onaylayın"
+changed = "Sunucu kimliği değişti"
+unknown = "Bilinmeyen sunucu kimliği"
+
+[tofu.warning]
+confirm = "Sabitlenmiş bir anahtarı değiştirmek, araya girmeyi fark edebilecek tek şeyi çöpe atar. Bunu yalnızca parmak izini operatörle bu sunucunun erişemeyeceği bir kanal üzerinden doğruladıktan sonra yapın."
+changed = "Sunucu, bu adres için sabitlenmiş olandan farklı bir kimlik anahtarı sunuyor. Ya operatör sunucunun anahtarlarını değiştirdi ya da biri sizinle sunucu arasına girdi."
+unknown = "Bu adres için henüz sabitlenmiş bir kimlik anahtarı yok. Yalnızca aşağıdaki parmak izi sunucu operatörünün yayımladığıyla eşleşiyorsa kabul edin."
+
+[account]
+mismatch = "Parolalar eşleşmiyor."
+delete_warning = "Bu işlem geri alınamaz. Hesabınızı silmek için ⏎ tuşuna tekrar basın."
+
+[account.title]
+passwd = "Parolayı değiştir"
+delete = "Hesabı sil"
+
+[account.label]
+current = "Mevcut parola"
+new = "Yeni parola"
+confirm = "Yeni parolayı onayla"
+
+[account.missing]
+current = "Mevcut parolayı girin."
+new = "Yeni parolayı girin."
+confirm = "Yeni parolayı onaylayın."
+
+[event]
+first_user = "Kayıt olan ilk kullanıcısınız, size sahip rolü verildi."
+login_ok = "Giriş başarılı. Yardım için Ctrl+H tuşuna basın."
+connected = "{server_name} sunucusuna bağlanıldı."
+image_failed = "{username} görüntülenemeyen bir resim gönderdi ({filename})."
+reconnect_failed = "Sunucuya yeniden bağlanılamadı."
+joined = "{username} bağlandı."
+left = "{username} ayrıldı."
+muted = "Bir moderatör tarafından susturuldunuz."
+voice_enabled = "Ses açıldı."
+device_failed = "Ses aygıtı değiştirilemedi - önceki aygıt kullanılmaya devam ediyor."
+voice_handshake_failed = "Sunucu ses el sıkışmasına hiç yanıt vermedi - UDP geçiyor mu?"
+voice_disabled = "Ses kapatıldı."
+role = "Rolünüz artık {role}."
+history = "Mesaj geçmişi ({count}):"
+server_settings_saved = "Sunucu ayarları kaydedildi."
+password_changed = "Parola değiştirildi."
+password_refused = "Mevcut parola yanlış ya da yeni parola gereksinimleri karşılamıyor."
+account_deleted = "Hesap silindi."
+wrong_password = "Yanlış parola."
+profile_saved = "Profil kaydedildi."
+color_set = "Renk ayarlandı."
+uploaded = "{username} \"{filename}\" dosyasını yükledi."
+upload_limit = "Eşzamanlı yükleme sınırına ulaşıldı!"
+incompatible_version = "Uyumsuz sürüm! ({version}/{server_version})"
+version_mismatch = "Sürümler uyuşmuyor - bazı özellikler çalışmayabilir ({client_version}/{server_version})"
+spam_warning = "Yavaşla! Çok hızlı mesaj gönderiyorsun."
+socks5_voice = "SOCKS5 kullanılırken sesli sohbet açılamaz."
+disabled_feature = "Sunucu istediğiniz özelliği devre dışı bıraktı."
+version_failed = "Sürüm bilgisi alınamadı, bu sürüm güvenli olmayabilir!"
+quit = "Sunucuyla bağlantı kesildi."
+logged_out = "Çıkış yapıldı."
+server_quit = "Sunucu iletişimi sonlandırdı."
+
+[event.tofu_skip]
+title = "GÜVENLİK UYARISI: BİLİNMEYEN SUNUCU KİMLİĞİ"
+body = "ToFU doğrulaması kapalı olduğu için sunucunun kimlik anahtarı doğrulanamıyor. Aşağıdaki kimlik anahtarını tanımıyorsanız hemen bağlantıyı kesin!"
+
+[event.unsafe_version]
+other = "Bu sürüm güvenli olmayabilir! {count} sürüm gerisindesiniz! ({current_version}/{newest_version})"
+
+[event.bans]
+none = "Yasak yok."
+title = "Yasaklar ({count}):"
+users = "kullanıcılar"
+addresses = "adresler"
+
+[event.list]
+title = "Bağlı istemciler ({count}):"
+
+[event.files]
+none = "Kullanılabilir dosya yok."
+title = "Kullanılabilir dosyalar ({count}):"
+
+[event.screens]
+none = "Kullanılabilir ekran paylaşımı yok."
+title = "Ekran paylaşan istemciler ({count}):"
+
+[event.screen]
+started = "Ekran paylaşımı başlatıldı."
+stopped = "Ekran paylaşımı durduruldu."
+failed = "Ekran paylaşımı başarısız oldu: {reason}."
+attach = "{username} kullanıcısının ekran paylaşımına katılındı."
+deattach = "{username} kullanıcısının ekran paylaşımından ayrılındı."
+peer_started = "{username} ekran paylaşmaya başladı."
+peer_stopped = "{username} ekran paylaşmayı bıraktı."
+attached = "{username} ekran paylaşımınıza katıldı."
+deattached = "{username} ekran paylaşımınızdan ayrıldı."
+
+[invalid]
+usage = "Geçersiz kullanım! Yardım için Ctrl+H tuşuna basın."
+command = "Geçersiz komut! Yardım için Ctrl+H tuşuna basın."
+action = "Geçersiz işlem! Yardım için Ctrl+H tuşuna basın."
+role = "Geçersiz rol! Yardım için Ctrl+H tuşuna basın."
+color = "Geçersiz renk! Komutu tekrar yazın ve sunulan renklerden birini seçin."
+
+[typing]
+one = "{one} yazıyor…"
+two = "{one} ve {two} yazıyor…"
+
+[typing.many]
+other = "{count} kişi yazıyor…"
+
+[message]
+pm = "ÖM"
+image = "{username} bir resim gönderdi ({filename})"
+show = "göster"
+loading = "yükleniyor..."
+unavailable = "kullanılamıyor"
+edited = "düzenlendi"
+
+[time]
+today = "%H:%M"
+older = "%d.%m.%Y %H:%M"
+
+[transfer]
+uploading_file = "\"{filename}\" dosyası yükleniyor"
+uploading_image = "\"{filename}\" resmi yükleniyor"
+downloading = "\"{filename}\" dosyası indiriliyor"
+uploaded_file = "\"{filename}\" dosyası yüklendi"
+uploaded_image = "\"{filename}\" resmi yüklendi"
+downloaded = "\"{filename}\" dosyası indirildi"
+failed_file = "\"{filename}\" dosyasının aktarımı başarısız oldu"
+failed_image = "\"{filename}\" resminin aktarımı başarısız oldu"
+unknown_file = "Bilinmiyor"
+
+[pane]
+unread = "{count} yeni"
+
+[sidebar]
+online = "Çevrimiçi"
+offline = "Çevrimdışı"
+channels = "Kanallar"
+voice = "Ses"
+
+[sidebar.roles]
+user = "Kullanıcılar"
+moderator = "Moderatörler"
+owner = "Sahipler"
+
+[device]
+tui = "tui"
+desktop = "masaüstü"
+phone = "telefon"
+
+[palette]
+mentions = "Bahsetmeler"
+commands = "Komutlar"
+parameters = "Parametreler"
+
+[help]
+title = "Komutlar:"
+
+[info]
+aliases = "Takma adlar"
+shortcut = "Kısayol"
+description = "Açıklama"
+none = "Yok"
+
+[hearts]
+not_loaded = "#{message_id} mesajı yüklenmedi."
+none = "#{message_id} mesajına kimse kalp bırakmadı."
+title = "#{message_id} mesajındaki kalpler ({count}):"
+
+[mute]
+muted = "Susturuldu."
+unmuted = "Susturma kaldırıldı."
+muted_id = "ID {id} susturuldu."
+unmuted_id = "ID {id} için susturma kaldırıldı."
+
+[upload]
+read_failed = "Dosya okunamadı!"
+unreadable_image = "O resim okunamadı!"
+avatar_too_large = "Avatar kırpıldıktan sonra bile çok büyük! (sınır {limit}MB)"
+avatar_write_failed = "Kırpılmış avatar kaydedilemedi!"
+not_found = "Dosya bulunamadı!"
+image_too_large = "Resim çok büyük! (sınır {limit}MB)"
+not_image = "Bu bir resim değil!"
+
+[screen]
+swapped_to = "Şimdi {monitor} paylaşılıyor."
+swapped = "Paylaşılan monitör değiştirildi."
+unknown_monitor = "bilinmiyor"
+window = "WHY2 Ekran Paylaşımı"
+window_fps = "WHY2 Ekran Paylaşımı ({fps} FPS)"
+
+[screen.error]
+no_monitor = "'{selection}' adlı monitör yok - kullanılabilir: {available}"
+enumerate = "monitörler listelenemedi ({error})"
+no_monitors = "monitör bulunamadı"
+encoder = "H.264 kodlayıcı oluşturulamadı ({error})"
+resolution = "desteklenmeyen yakalama çözünürlüğü {width}x{height} (çift olmalı)"
+encode = "H.264 kodlama başarısız oldu ({error})"
+no_outputs = "birleştirici hiçbir çıkış bildirmedi"
+no_output = "birleştirici '{name}' adlı bir çıkış tanımıyor"
+wayland = "Wayland ekran yakalama kullanılamıyor ({error})"
+wayland_capture = "{output} yakalanamadı ({error}) - birleştiriciniz ext-image-copy-capture-v1 veya wlr-screencopy-v1 desteklemeli"
+recorder_unavailable = "işletim sisteminin ekran kaydedicisi kullanılamıyor ({error})"
+recorder_start = "işletim sisteminin ekran kaydedicisi başlatılamadı ({error})"
+recorder_silent = "işletim sisteminin ekran kaydedicisi başladı ama kare vermedi"
+recorder_timeout = "işletim sisteminin ekran kaydedicisi zamanında yanıt vermedi"
+recorder_probe = "işletim sisteminin ekran kaydedicisi testi çöktü"
+recorder_stopped = "işletim sisteminin ekran kaydedicisi kare vermeyi bıraktı"
+crashed = "ekran yakalama çöktü"
+
+[settings]
+restart_note = "{keys} sunucu yeniden başlatıldığında etkinleşir."
+restarting = "Sunucu yeniden başlatılıyor..."
+save = "Kaydet"
+restart = "Sunucuyu yeniden başlat"
+avatar = "Avatar"
+default_device = "Sistem varsayılanı"
+restart_description = "Sunucuyu yeniden başlatır — tüm istemcilerin bağlantısı kesilir ve tüm yapılandırma yeniden okunur."
+save_first = "önce değişikliklerinizi kaydedin"
+press_again_confirm = "onaylamak için tekrar basın"
+save_profile_description = "Açıklamayı sunucuya gönder."
+save_description = "Düzenlenen satırları sunucuya gönder."
+restart_required = "yeniden başlatma gerekli"
+press_again = "tekrar basın"
+on = "açık"
+off = "kapalı"
+empty = "boş"
+
+[settings.section]
+audio = "Ses"
+interface = "Arayüz"
+privacy = "Gizlilik"
+
+[settings.row]
+input_device = "Giriş aygıtı"
+output_device = "Çıkış aygıtı"
+input_volume = "Giriş ses düzeyi"
+output_volume = "Çıkış ses düzeyi"
+screen_volume = "Ekran paylaşımı ses düzeyi"
+noise_suppression = "Gürültü bastırma"
+automatic_gain = "Otomatik kazanç"
+theme = "Tema"
+disable_colors = "Mesaj renkleri"
+disable_logo = "Arka plan logosu"
+auto_show_images = "Resimleri otomatik göster"
+render_math = "Matematik gösterimi"
+show_id = "İstemci kimliklerini göster"
+show_message_ids = "Mesaj kimliklerini göster"
+show_timestamps = "Zaman damgalarını göster"
+message_stripes = "Mesaj şeritleri"
+share_device = "Aygıtı paylaş"
+typing_indicator = "Yazıyor göstergesi"
+language = "Dil"
+
+[settings.title]
+client = "Ayarlar"
+server = "Sunucu ayarları"
+own_profile = "Profiliniz"
+profile = "{username} profili"
+saving = "{name} · kaydediliyor…"
+unsaved = "{name} · kaydedilmedi"
+
+[profile]
+bio = "Açıklama"
+pronouns = "Zamirler"
+website = "Web sitesi"
+status = "Durum"
+bad_website = "Web sitesi http:// veya https:// ile başlamalıdır"
+empty_field = "{field}: boş."
+
+[profile.avatar]
+removed = "Avatarınız kaydedildiğinde kaldırılacak."
+uploaded = "{path} kaydedildiğinde yüklenecek."
+help = "Ortası kare olarak kırpılacak bir resmin yolunu yazın (en fazla {limit}MB) ya da avatarınızı kaldırmak için temizleyin."
+set = "ayarlı"
+none = "yok"
+remove = "kaldır"
+
+[profile.empty]
+bio = "Açıklama yok."
+pronouns = "Zamir yok."
+website = "Web sitesi yok."
+status = "Durum yok."
+
+[hint.settings]
+picker = "↑↓ seç │ ⏎ uygula │ Esc geri"
+avatar = "↑↓ seç │ Tab tamamla │ ⏎ tut │ Esc iptal"
+edit = "bir değer yazın │ ⏎ tut │ Esc iptal"
+client = "↑↓ gezin │ ←→ değiştir │ ⏎ seç │ Esc kapat"
+server = "↑↓ gezin │ ←→ değiştir │ ⏎ düzenle │ ^S kaydet │ Esc kapat"
+own_profile = "↑↓ gezin │ ⏎ düzenle │ ^S kaydet │ Esc kapat"
+profile_link = "↑↓ gezin │ ⏎ bağlantıyı aç │ Esc kapat"
+profile = "↑↓ gezin │ Esc kapat"
+
+[hint.tofu]
+confirm = "kelimeyi yazın │ ⏎ onayla │ ← geri │ Esc reddet"
+warn = "←→ seç │ ⏎ onayla │ Esc reddet"
+
+[hint.login]
+cancel = "Esc iptal"
+quit = "Esc çık"
+connect = "⏎ bağlan │ Esc çık"
+continue = "⏎ devam │ Esc çık"
+
+[hint.account]
+passwd = "↑↓ alan │ ⏎ sonraki │ Esc iptal"
+delete = "⏎ sil │ Esc iptal"
+confirm = "⏎ onayla │ Esc iptal"
+
+[status]
+mic_off = "mikrofon kapalı"
+mic_on = "mikrofon açık"
+settings = "Ctrl+, ayarlar"
+
+[tui]
+input_failed = "Terminal girdisi okunamadı."
+opening = "{url} açılıyor"
+
+[tui.copied]
+other = "{count} satır panoya kopyalandı"
+
+[arg]
+id = "ID"
+user = "KULLANICI"
+message = "MESAJ"
+role = "ROL"
+command = "KOMUT"
+name = "AD"
+path = "YOL"
+user_id = "KULLANICI ID"
+file_id = "DOSYA ID"
+monitor = "MONİTÖR"
+color = "RENK"
+action = "İŞLEM"
+
+[command.help]
+description = "Kullanılabilir tüm komutları listeler"
+
+[command.info]
+args.command = "Hedef komut"
+description = "Komut bilgisini gösterir"
+
+[command.voice]
+description = "Sesli sohbeti açar veya kapatır"
+
+[command.mute]
+args.id = "Hedef kullanıcının ID'si"
+description = "Bir kullanıcıyı/kendinizi susturur veya susturmayı kaldırır"
+
+[command.channel]
+args.name = "Kanal adı"
+description = "Bir kanala geçer, AD verilmezse lobiye döner"
+
+[command.upload]
+args.path = "Hedef dosyanın yolu"
+description = "Sunucuya dosya yükler"
+
+[command.download]
+args.user_id = "Yükleyenin ID'si"
+args.file_id = "Hedef dosyanın ID'si"
+description = "Sunucudan dosya indirir"
+
+[command.image]
+args.path = "Hedef resmin yolu"
+description = "Kalıcı bir resim yükler"
+
+[command.screen]
+args.monitor = "Paylaşılacak monitörün sırası veya adı"
+description = "Ekran paylaşımını açar/kapatır ya da paylaşım sırasında monitörü değiştirir"
+
+[command.attach]
+args.id = "Ekran paylaşan kullanıcının ID'si"
+description = "Bir ekran paylaşımına katılır."
+
+[command.deattach]
+description = "Ekran paylaşımından ayrılır."
+
+[command.list]
+description = "Bağlı kullanıcıları ve ID'lerini gösterir"
+
+[command.files]
+description = "Kullanılabilir dosyaları ve ID'lerini gösterir"
+
+[command.screens]
+description = "Ekran paylaşan tüm istemcileri gösterir."
+
+[command.pm]
+args.id = "Hedef kullanıcının ID'si"
+args.message = "Mesaj içeriği"
+description = "Özel mesaj gönderir"
+
+[command.heart]
+args.id = "Mesajın ID'si"
+description = "Bir mesaja kalp bırakır veya kaldırır."
+
+[command.hearts]
+args.id = "Mesajın ID'si"
+description = "Bir mesaja kimin kalp bıraktığını listeler."
+
+[command.reply]
+args.id = "Mesajın ID'si"
+args.message = "Mesaj içeriği"
+description = "Bir mesajı yanıtlar"
+
+[command.re]
+args.message = "Mesaj içeriği"
+description = "Son özel mesajı yanıtlar"
+
+[command.delete]
+args.id = "Mesajın ID'si"
+description = "Geçmişten bir mesajı siler"
+
+[command.edit]
+args.id = "Mesajın ID'si"
+args.message = "Yeni mesaj içeriği"
+description = "Geçmişteki mesajınızı düzenler"
+
+[command.settings]
+description = "Ses ve arayüz ayarlarını açar"
+
+[command.profile]
+args.user = "Kullanıcı adı veya ID, kendiniz için boş"
+description = "Bir kullanıcı profilini açar"
+
+[command.ucolor]
+args.color = "Hedef renk"
+description = "Kullanıcı adı rengini ayarlar"
+
+[command.color]
+args.color = "Hedef renk"
+description = "Mesaj rengini ayarlar"
+
+[command.server]
+args.action = "Moderasyon işlemi"
+description = "Moderasyon işlemleri"
+
+[command.server.mute]
+args.id = "Hedef kullanıcı"
+description = "Bir kullanıcıyı sunucu tarafında susturur"
+
+[command.server.kick]
+args.id = "Hedef kullanıcı"
+description = "Bir kullanıcının sunucuyla bağlantısını keser"
+
+[command.server.ban]
+args.user = "Hedef kullanıcının adı veya ID'si"
+description = "Bir kullanıcıyı sunucudan yasaklar"
+
+[command.server.banip]
+args.id = "Hedef kullanıcı"
+description = "Bir kullanıcının IP'sini sunucudan yasaklar"
+
+[command.server.banlist]
+description = "Tüm yasakları listeler"
+
+[command.server.pardon]
+args.id = "Yasaklı kullanıcının ID'si"
+description = "Bir kullanıcı yasağını kaldırır"
+
+[command.server.pardonip]
+args.id = "Yasaklı adresin ID'si"
+description = "Bir IP yasağını kaldırır"
+
+[command.server.say]
+args.message = "Yayınlanacak mesaj"
+description = "Sunucu olarak mesaj yayınlar"
+
+[command.server.role]
+args.user = "Hedef kullanıcının adı veya ID'si"
+args.role = "Verilecek rol"
+description = "Bir kullanıcının sunucudaki rolünü ayarlar"
+
+[command.server.settings]
+description = "Sunucu yapılandırmasını açar"
+
+[command.account]
+args.action = "Hesap işlemi"
+description = "Hesap işlemleri"
+
+[command.account.delete]
+description = "Hesabınızı siler"
+
+[command.account.passwd]
+description = "Parolanızı değiştirir"
+
+[command.logout]
+description = "Sunucuyla bağlantıyı keser ve giriş ekranına döner"
+
+[command.exit]
+description = "Sunucuyla bağlantıyı keser"

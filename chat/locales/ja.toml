@@ -1,0 +1,558 @@
+# This is part of WHY2
+# Copyright (C) 2022-2026 Václav Šmejkal
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+[meta]
+name = "日本語 [AI]"
+plurals = "other"
+
+[keys]
+ctrl = "Ctrl+{key}"
+
+[login]
+registration_disabled = "登録は無効になっています。"
+username_rules = "a-Z, 0-9; {min}〜{max} 文字"
+username_rejected = "ユーザー名が拒否されました！"
+password_rejected = "パスワードが拒否されました！{min} 文字以上入力してください。"
+reconnecting = "接続が切れました。再接続中…（{attempt}/{attempts}）"
+connecting = "接続中…"
+exchanging_keys = "鍵を交換中…"
+waiting = "サーバーを待っています…"
+socks5 = "SOCKS5 経由 {address}"
+unsigned_keys = "サーバーの ID が交換鍵に署名していません。"
+timed_out = "接続がタイムアウトしました。"
+
+[login.title]
+connect = "接続"
+identify = "本人確認"
+register = "登録"
+login = "ログイン"
+
+[login.label]
+address = "サーバーアドレス"
+username = "ユーザー名"
+password = "パスワード"
+
+[login.missing]
+address = "サーバーのアドレスを入力してください。"
+username = "ユーザー名を入力してください。"
+password = "パスワードを入力してください。"
+
+[tofu]
+challenge = "yes"
+accepted = "{host} のサーバー ID を承認して保存しました。再接続中..."
+server = "サーバー"
+pinned = "固定済み"
+new_key = "新しい鍵"
+key = "鍵"
+type_to_replace = "固定済みの鍵をこの鍵に置き換えるには '{word}' と入力してください："
+type_to_confirm = "続行するには '{word}' と入力してください。"
+reject = "拒否"
+replace = "固定済みの鍵を置き換える"
+trust = "信頼して保存"
+
+[tofu.title]
+confirm = "新しいサーバー鍵の確認"
+changed = "サーバー ID が変更されました"
+unknown = "不明なサーバー ID"
+
+[tofu.warning]
+confirm = "固定済みの鍵を置き換えると、盗聴を検知できる唯一の手段を捨てることになります。このサーバーが関与できない経路で運営者とフィンガープリントを照合してから行ってください。"
+changed = "サーバーが、このアドレスに固定された鍵とは異なる ID 鍵を提示しています。運営者がサーバーの鍵を交換したか、誰かがあなたとサーバーの間に割り込んでいます。"
+unknown = "このアドレスにはまだ ID 鍵が固定されていません。下のフィンガープリントがサーバー運営者の公開しているものと一致する場合にのみ承認してください。"
+
+[account]
+mismatch = "パスワードが一致しません。"
+delete_warning = "この操作は取り消せません。もう一度 ⏎ を押すとアカウントが削除されます。"
+
+[account.title]
+passwd = "パスワードの変更"
+delete = "アカウントの削除"
+
+[account.label]
+current = "現在のパスワード"
+new = "新しいパスワード"
+confirm = "新しいパスワード（確認）"
+
+[account.missing]
+current = "現在のパスワードを入力してください。"
+new = "新しいパスワードを入力してください。"
+confirm = "新しいパスワードを確認してください。"
+
+[event]
+first_user = "あなたは最初の登録ユーザーです。オーナーのロールが付与されました。"
+login_ok = "ログインしました。Ctrl+H でヘルプを表示します。"
+connected = "{server_name} に接続しました。"
+image_failed = "{username} が表示できない画像を送信しました（{filename}）。"
+reconnect_failed = "サーバーへの再接続に失敗しました。"
+joined = "{username} が接続しました。"
+left = "{username} が切断しました。"
+muted = "モデレーターによってミュートされました。"
+voice_enabled = "ボイスを有効にしました。"
+device_failed = "オーディオデバイスの切り替えに失敗しました - 以前のデバイスを引き続き使用します。"
+voice_handshake_failed = "サーバーがボイスのハンドシェイクに応答しませんでした - UDP は通っていますか？"
+voice_disabled = "ボイスを無効にしました。"
+role = "あなたのロールは {role} になりました。"
+history = "メッセージ履歴（{count}）："
+server_settings_saved = "サーバー設定を保存しました。"
+password_changed = "パスワードを変更しました。"
+password_refused = "現在のパスワードが違うか、新しいパスワードが要件を満たしていません。"
+account_deleted = "アカウントを削除しました。"
+wrong_password = "パスワードが違います。"
+profile_saved = "プロフィールを保存しました。"
+color_set = "色を設定しました。"
+uploaded = "{username} がファイル \"{filename}\" をアップロードしました。"
+upload_limit = "同時アップロード数の上限に達しました！"
+incompatible_version = "互換性のないバージョンです！（{version}/{server_version}）"
+version_mismatch = "バージョンが一致しません - 一部の機能が動作しない可能性があります（{client_version}/{server_version}）"
+spam_warning = "落ち着いて！メッセージの送信が速すぎます。"
+socks5_voice = "SOCKS5 使用中はボイスチャットを有効にできません。"
+disabled_feature = "要求された機能はサーバーで無効になっています。"
+version_failed = "バージョン情報の取得に失敗しました。このリリースは安全でない可能性があります！"
+quit = "サーバーから切断しました。"
+logged_out = "ログアウトしました。"
+server_quit = "サーバーが通信を終了しました。"
+
+[event.tofu_skip]
+title = "セキュリティ警告：不明なサーバー ID"
+body = "ToFU 検証が無効なため、サーバーの ID 鍵を検証できません。下の ID 鍵に見覚えがない場合は、すぐに切断してください！"
+
+[event.unsafe_version]
+other = "このリリースは安全でない可能性があります！{count} バージョン遅れています！（{current_version}/{newest_version}）"
+
+[event.bans]
+none = "BAN はありません。"
+title = "BAN（{count}）："
+users = "ユーザー"
+addresses = "アドレス"
+
+[event.list]
+title = "オンラインのクライアント（{count}）："
+
+[event.files]
+none = "利用可能なファイルはありません。"
+title = "利用可能なファイル（{count}）："
+
+[event.screens]
+none = "利用可能な画面共有はありません。"
+title = "画面共有中のクライアント（{count}）："
+
+[event.screen]
+started = "画面共有を開始しました。"
+stopped = "画面共有を停止しました。"
+failed = "画面共有に失敗しました：{reason}。"
+attach = "{username} の画面共有に参加しました。"
+deattach = "{username} の画面共有から離れました。"
+peer_started = "{username} が画面共有を開始しました。"
+peer_stopped = "{username} が画面共有を停止しました。"
+attached = "{username} があなたの画面共有に参加しました。"
+deattached = "{username} があなたの画面共有から離れました。"
+
+[invalid]
+usage = "使い方が正しくありません！Ctrl+H でヘルプを表示します。"
+command = "無効なコマンドです！Ctrl+H でヘルプを表示します。"
+action = "無効な操作です！Ctrl+H でヘルプを表示します。"
+role = "無効なロールです！Ctrl+H でヘルプを表示します。"
+color = "無効な色です！もう一度コマンドを入力し、候補の色から選んでください。"
+
+[typing]
+one = "{one} が入力中…"
+two = "{one} と {two} が入力中…"
+
+[typing.many]
+other = "{count} 人が入力中…"
+
+[message]
+pm = "DM"
+image = "{username} が画像を送信しました（{filename}）"
+show = "表示"
+loading = "読み込み中..."
+unavailable = "利用不可"
+edited = "編集済み"
+
+[time]
+today = "%H:%M"
+older = "%Y/%m/%d %H:%M"
+
+[transfer]
+uploading_file = "ファイル \"{filename}\" をアップロード中"
+uploading_image = "画像 \"{filename}\" をアップロード中"
+downloading = "ファイル \"{filename}\" をダウンロード中"
+uploaded_file = "ファイル \"{filename}\" をアップロードしました"
+uploaded_image = "画像 \"{filename}\" をアップロードしました"
+downloaded = "ファイル \"{filename}\" をダウンロードしました"
+failed_file = "ファイル \"{filename}\" の転送に失敗しました"
+failed_image = "画像 \"{filename}\" の転送に失敗しました"
+unknown_file = "不明"
+
+[pane]
+unread = "新着 {count} 件"
+
+[sidebar]
+online = "オンライン"
+offline = "オフライン"
+channels = "チャンネル"
+voice = "ボイス"
+
+[sidebar.roles]
+user = "ユーザー"
+moderator = "モデレーター"
+owner = "オーナー"
+
+[device]
+tui = "tui"
+desktop = "デスクトップ"
+phone = "スマホ"
+
+[palette]
+mentions = "メンション"
+commands = "コマンド"
+parameters = "パラメーター"
+
+[help]
+title = "コマンド："
+
+[info]
+aliases = "エイリアス"
+shortcut = "ショートカット"
+description = "説明"
+none = "なし"
+
+[hearts]
+not_loaded = "メッセージ #{message_id} は読み込まれていません。"
+none = "#{message_id} にハートを付けた人はいません。"
+title = "#{message_id} へのハート（{count}）："
+
+[mute]
+muted = "ミュートしました。"
+unmuted = "ミュートを解除しました。"
+muted_id = "ID {id} をミュートしました。"
+unmuted_id = "ID {id} のミュートを解除しました。"
+
+[upload]
+read_failed = "ファイルの読み込みに失敗しました！"
+unreadable_image = "その画像を読み込めませんでした！"
+avatar_too_large = "切り抜いてもアバターが大きすぎます！（上限は {limit}MB）"
+avatar_write_failed = "切り抜いたアバターの書き込みに失敗しました！"
+not_found = "ファイルが見つかりません！"
+image_too_large = "画像が大きすぎます！（上限は {limit}MB）"
+not_image = "画像ではありません！"
+
+[screen]
+swapped_to = "{monitor} を共有中です。"
+swapped = "共有するモニターを切り替えました。"
+unknown_monitor = "不明"
+window = "WHY2 画面共有"
+window_fps = "WHY2 画面共有（{fps} FPS）"
+
+[screen.error]
+no_monitor = "'{selection}' という名前のモニターはありません - 利用可能：{available}"
+enumerate = "モニターの列挙に失敗しました（{error}）"
+no_monitors = "モニターが見つかりません"
+encoder = "H.264 エンコーダーの作成に失敗しました（{error}）"
+resolution = "対応していないキャプチャ解像度 {width}x{height}（偶数である必要があります）"
+encode = "H.264 エンコードに失敗しました（{error}）"
+no_outputs = "コンポジターが出力を報告しませんでした"
+no_output = "コンポジターは '{name}' という出力を知りません"
+wayland = "Wayland の画面キャプチャは利用できません（{error}）"
+wayland_capture = "{output} のキャプチャに失敗しました（{error}）- コンポジターが ext-image-copy-capture-v1 または wlr-screencopy-v1 に対応している必要があります"
+recorder_unavailable = "OS の画面録画は利用できません（{error}）"
+recorder_start = "OS の画面録画の開始に失敗しました（{error}）"
+recorder_silent = "OS の画面録画は開始しましたが、フレームを出力しませんでした"
+recorder_timeout = "OS の画面録画が時間内に応答しませんでした"
+recorder_probe = "OS の画面録画のプローブが異常終了しました"
+recorder_stopped = "OS の画面録画がフレームの出力を停止しました"
+crashed = "画面キャプチャがクラッシュしました"
+
+[settings]
+restart_note = "{keys} はサーバーの再起動後に反映されます。"
+restarting = "サーバーを再起動しています..."
+save = "保存"
+restart = "サーバーを再起動"
+avatar = "アバター"
+default_device = "システムの既定"
+restart_description = "サーバーを再起動します — すべてのクライアントが切断され、設定全体が再読み込みされます。"
+save_first = "先に変更を保存してください"
+press_again_confirm = "もう一度押して確定"
+save_profile_description = "説明をサーバーに送信します。"
+save_description = "編集した行をサーバーに送信します。"
+restart_required = "再起動が必要"
+press_again = "もう一度押す"
+on = "オン"
+off = "オフ"
+empty = "空"
+
+[settings.section]
+audio = "オーディオ"
+interface = "インターフェース"
+privacy = "プライバシー"
+
+[settings.row]
+input_device = "入力デバイス"
+output_device = "出力デバイス"
+input_volume = "入力音量"
+output_volume = "出力音量"
+screen_volume = "画面共有の音量"
+noise_suppression = "ノイズ抑制"
+automatic_gain = "自動ゲイン"
+theme = "テーマ"
+disable_colors = "メッセージの色"
+disable_logo = "背景のロゴ"
+auto_show_images = "画像を自動表示"
+render_math = "数式の描画"
+show_id = "クライアント ID を表示"
+show_message_ids = "メッセージ ID を表示"
+show_timestamps = "時刻を表示"
+message_stripes = "メッセージの縞模様"
+share_device = "デバイスを共有"
+typing_indicator = "入力中の表示"
+language = "言語"
+
+[settings.title]
+client = "設定"
+server = "サーバー設定"
+own_profile = "あなたのプロフィール"
+profile = "{username} のプロフィール"
+saving = "{name} · 保存中…"
+unsaved = "{name} · 未保存"
+
+[profile]
+bio = "説明"
+pronouns = "代名詞"
+website = "ウェブサイト"
+status = "ステータス"
+bad_website = "ウェブサイトは http:// または https:// で始まる必要があります"
+empty_field = "{field}：未設定。"
+
+[profile.avatar]
+removed = "保存時にアバターが削除されます。"
+uploaded = "保存時に {path} がアップロードされます。"
+help = "画像のパス（{limit}MB まで）を入力すると中央が正方形に切り抜かれます。空にするとアバターを削除します。"
+set = "設定済み"
+none = "なし"
+remove = "削除"
+
+[profile.empty]
+bio = "説明はありません。"
+pronouns = "代名詞はありません。"
+website = "ウェブサイトはありません。"
+status = "ステータスはありません。"
+
+[hint.settings]
+picker = "↑↓ 選択 │ ⏎ 適用 │ Esc 戻る"
+avatar = "↑↓ 選択 │ Tab 補完 │ ⏎ 決定 │ Esc キャンセル"
+edit = "値を入力 │ ⏎ 決定 │ Esc キャンセル"
+client = "↑↓ 移動 │ ←→ 変更 │ ⏎ 選択 │ Esc 閉じる"
+server = "↑↓ 移動 │ ←→ 変更 │ ⏎ 編集 │ ^S 保存 │ Esc 閉じる"
+own_profile = "↑↓ 移動 │ ⏎ 編集 │ ^S 保存 │ Esc 閉じる"
+profile_link = "↑↓ 移動 │ ⏎ リンクを開く │ Esc 閉じる"
+profile = "↑↓ 移動 │ Esc 閉じる"
+
+[hint.tofu]
+confirm = "単語を入力 │ ⏎ 確定 │ ← 戻る │ Esc 拒否"
+warn = "←→ 選択 │ ⏎ 確定 │ Esc 拒否"
+
+[hint.login]
+cancel = "Esc キャンセル"
+quit = "Esc 終了"
+connect = "⏎ 接続 │ Esc 終了"
+continue = "⏎ 続行 │ Esc 終了"
+
+[hint.account]
+passwd = "↑↓ 項目 │ ⏎ 次へ │ Esc キャンセル"
+delete = "⏎ 削除 │ Esc キャンセル"
+confirm = "⏎ 確定 │ Esc キャンセル"
+
+[status]
+mic_off = "マイク オフ"
+mic_on = "マイク オン"
+settings = "Ctrl+, 設定"
+
+[tui]
+input_failed = "端末の入力の読み込みに失敗しました。"
+opening = "{url} を開いています"
+
+[tui.copied]
+other = "{count} 行をクリップボードにコピーしました"
+
+[arg]
+id = "ID"
+user = "ユーザー"
+message = "メッセージ"
+role = "ロール"
+command = "コマンド"
+name = "名前"
+path = "パス"
+user_id = "ユーザーID"
+file_id = "ファイルID"
+monitor = "モニター"
+color = "色"
+action = "操作"
+
+[command.help]
+description = "利用可能なコマンドをすべて表示します"
+
+[command.info]
+args.command = "対象のコマンド"
+description = "コマンドの情報を表示します"
+
+[command.voice]
+description = "ボイスチャットのオン/オフを切り替えます"
+
+[command.mute]
+args.id = "対象ユーザーの ID"
+description = "ユーザー/自分のミュートを切り替えます"
+
+[command.channel]
+args.name = "チャンネル名"
+description = "チャンネルに移動します。名前を省略するとロビーに戻ります"
+
+[command.upload]
+args.path = "対象ファイルのパス"
+description = "ファイルをサーバーにアップロードします"
+
+[command.download]
+args.user_id = "アップロードした人の ID"
+args.file_id = "対象ファイルの ID"
+description = "ファイルをサーバーからダウンロードします"
+
+[command.image]
+args.path = "対象画像のパス"
+description = "保存される画像をアップロードします"
+
+[command.screen]
+args.monitor = "共有するモニターの番号または名前"
+description = "画面共有を切り替えます。共有中はモニターを切り替えます"
+
+[command.attach]
+args.id = "画面共有中のユーザーの ID"
+description = "画面共有に参加します。"
+
+[command.deattach]
+description = "画面共有から離れます。"
+
+[command.list]
+description = "接続中のユーザーとその ID を表示します"
+
+[command.files]
+description = "利用可能なファイルとその ID を表示します"
+
+[command.screens]
+description = "画面共有中のクライアントをすべて表示します。"
+
+[command.pm]
+args.id = "対象ユーザーの ID"
+args.message = "メッセージの内容"
+description = "ダイレクトメッセージを送信します"
+
+[command.heart]
+args.id = "メッセージの ID"
+description = "メッセージのハートを付け外しします。"
+
+[command.hearts]
+args.id = "メッセージの ID"
+description = "メッセージにハートを付けた人を表示します。"
+
+[command.reply]
+args.id = "メッセージの ID"
+args.message = "メッセージの内容"
+description = "メッセージに返信します"
+
+[command.re]
+args.message = "メッセージの内容"
+description = "最後のダイレクトメッセージに返信します"
+
+[command.delete]
+args.id = "メッセージの ID"
+description = "履歴からメッセージを削除します"
+
+[command.edit]
+args.id = "メッセージの ID"
+args.message = "新しいメッセージの内容"
+description = "履歴にある自分のメッセージを編集します"
+
+[command.settings]
+description = "オーディオとインターフェースの設定を開きます"
+
+[command.profile]
+args.user = "ユーザー名または ID。空なら自分"
+description = "ユーザーのプロフィールを開きます"
+
+[command.ucolor]
+args.color = "対象の色"
+description = "ユーザー名の色を設定します"
+
+[command.color]
+args.color = "対象の色"
+description = "メッセージの色を設定します"
+
+[command.server]
+args.action = "モデレーション操作"
+description = "モデレーション操作"
+
+[command.server.mute]
+args.id = "対象ユーザー"
+description = "サーバー側でユーザーをミュートします"
+
+[command.server.kick]
+args.id = "対象ユーザー"
+description = "ユーザーをサーバーから切断します"
+
+[command.server.ban]
+args.user = "対象ユーザーのユーザー名または ID"
+description = "ユーザーをサーバーから BAN します"
+
+[command.server.banip]
+args.id = "対象ユーザー"
+description = "ユーザーの IP をサーバーから BAN します"
+
+[command.server.banlist]
+description = "すべての BAN を表示します"
+
+[command.server.pardon]
+args.id = "BAN されたユーザーの ID"
+description = "ユーザーの BAN を解除します"
+
+[command.server.pardonip]
+args.id = "BAN されたアドレスの ID"
+description = "IP の BAN を解除します"
+
+[command.server.say]
+args.message = "配信するメッセージ"
+description = "サーバーとしてメッセージを配信します"
+
+[command.server.role]
+args.user = "対象ユーザーのユーザー名または ID"
+args.role = "付与するロール"
+description = "サーバー上のユーザーのロールを設定します"
+
+[command.server.settings]
+description = "サーバーの設定を開きます"
+
+[command.account]
+args.action = "アカウント操作"
+description = "アカウント操作"
+
+[command.account.delete]
+description = "アカウントを削除します"
+
+[command.account.passwd]
+description = "パスワードを変更します"
+
+[command.logout]
+description = "サーバーから切断し、ログイン画面に戻ります"
+
+[command.exit]
+description = "サーバーから切断します"
