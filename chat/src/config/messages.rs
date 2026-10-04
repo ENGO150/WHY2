@@ -119,6 +119,7 @@ impl History
         dropped.into_iter()
             .filter(|hash| !self.records.iter().any(|message| message.image.as_ref() == Some(hash)))
             .filter(|hash| !super::users::names_avatar(hash))
+            .filter(|hash| super::server_icon().as_ref() != Some(hash))
             .collect()
     }
 }
@@ -310,7 +311,7 @@ pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
 
 pub fn stored(hash: &[u8; 32]) -> bool //IS THIS PICTURE ONE THE SERVER KEEPS AT ALL?
 {
-    has_image(hash) || super::users::names_avatar(hash)
+    has_image(hash) || super::users::names_avatar(hash) || super::server_icon().as_ref() == Some(hash)
 }
 
 //DELETE EVERY PICTURE THE HISTORY DOES NOT NAME
@@ -329,6 +330,7 @@ pub fn sweep_images()
 
     //A PROFILE OWNS ITS PICTURE THE WAY AN ENTRY OWNS ITS OWN
     kept.extend(super::users::avatars().iter().map(|hash| misc::hex(hash)));
+    kept.extend(super::server_icon().map(|hash| misc::hex(&hash)));
 
     let mut swept = 0;
 

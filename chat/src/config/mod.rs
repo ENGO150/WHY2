@@ -286,3 +286,21 @@ pub fn client_write_int(key: &str, value: i64) //WRITE INTEGER TO client.toml
 {
     config_write_value(consts::CLIENT_CONFIG, key, value.into());
 }
+
+#[cfg(feature = "server")]
+pub fn server_icon() -> Option<[u8; 32]> //RETURN THE SERVER'S PICTURE
+{
+    misc::unhex(fs::read_to_string(config_path(consts::SERVER_ICON_FILE)).ok()?.trim())
+}
+
+#[cfg(feature = "server")]
+pub fn set_server_icon(hash: Option<&[u8; 32]>) //STORE THE SERVER'S PICTURE
+{
+    let path = config_path(consts::SERVER_ICON_FILE);
+
+    match hash
+    {
+        Some(hash) => fs::write(path, misc::hex(hash)).expect("Saving server icon failed"),
+        None => { let _ = fs::remove_file(path); },
+    }
+}

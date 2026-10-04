@@ -111,7 +111,8 @@ fn invalid_usage(app: &mut App, key: Option<&'static str>) //PUSH 'INVALID' MESS
 }
 
 //MODERATION ACTIONS - /server <action> [target]
-async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, parameters: Option<String>)
+async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, tx: &Sender<ClientEvent>,
+    parameters: Option<String>)
 {
     let Some(info) = command::COMMAND_LIST.iter().find(|info| info.command == Command::Server) else { return };
 
@@ -133,7 +134,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
     if !sub.available(app.role) { return invalid_usage(app, Some("invalid.action")); }
 
     //AN ACTION THAT TAKES A PARAMETER NEEDS ONE
-    if !sub.args.is_empty() && tail.is_empty() { return invalid_usage(app, None); }
+    if sub.args.iter().any(|arg| arg.required) && tail.is_empty() { return invalid_usage(app, None); }
 
     //SOME ACTIONS TAKE AN ID, THE REST TAKE TEXT
     let id = match sub.takes_id()
@@ -229,6 +230,18 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
         {
             network::send(&mut *write_stream.lock().await, PacketCode::ServerSettingsRequest,
                 options::get_keys().as_ref()).await;
+        },
+
+        //UPLOADED LIKE AN AVATAR, OR DROPPED WITHOUT A PATH
+        Subcommand::Icon => match tail.is_empty()
+        {
+            true => network::send(&mut *write_stream.lock().await, PacketCode::ServerIconSave { hash: None },
+                options::get_keys().as_ref()).await,
+
+            false => if let Err(error) = upload(write_stream, tail, Upload::Icon, Some(tx.clone()))
+            {
+                app.push_styled(error, theme::error());
+            },
         },
 
         //ACCOUNT ACTIONS
@@ -440,6 +453,7 @@ pub enum Upload
     File,
     Image,
     Avatar,
+    Icon,
 }
 
 //CHECK A FILE, THEN HASH IT AND ASK THE SERVER FOR AN UPLOAD
@@ -456,7 +470,7 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
         //HASH IT, OR CUT IT FIRST (BLOCKING I/O + CPU)
         let prepared = task::spawn_blocking(move || match kind
         {
-            Upload::Avatar => cut_avatar(file),
+            Upload::Avatar | Upload::Icon => cut_avatar(file),
             _ => hash_file(file).map(|hash| (hash, path)).ok_or_else(|| t!("upload.read_failed").to_owned()),
         }).await.expect("Hashing file failed");
 
@@ -479,6 +493,7 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
         let request = match kind
         {
             Upload::Avatar => PacketCode::AvatarRequest { hash: Some(hash) },
+            Upload::Icon => PacketCode::ServerIconSave { hash: Some(hash) },
             Upload::Image => PacketCode::ImageRequest { hash, filename },
             Upload::File => PacketCode::UploadRequest { hash },
         };
@@ -564,7 +579,7 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
 }
 
 //HANDLE ONE SUBMITTED LINE
-pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, input: String)
+pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, tx: &Sender<ClientEvent>, input: String)
 {
     let input = if options::get_asking_password() { input } else { input.trim().to_string() };
 
@@ -732,7 +747,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         //ENUMERATE THE DEVICES ONCE, OFF THE DRAW PATH
                         Command::Settings => app.settings.open(audio_devices().await),
 
-                        Command::Server => server_command(app, write_stream, parameters).await,
+                        Command::Server => server_command(app, write_stream, tx, parameters).await,
 
                         Command::Account => account_command(app, parameters),
 

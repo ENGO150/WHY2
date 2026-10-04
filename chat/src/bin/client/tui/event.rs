@@ -524,6 +524,16 @@ impl App
                 self.dirty = true;
             },
 
+            //THE SERVER'S PICTURE, NOT DRAWN YET - ONLY OUR OWN SAVE SAYS ANYTHING
+            ClientEvent::ServerIcon(hash, save) => if save
+            {
+                self.push_styled(match hash
+                {
+                    Some(_) => t!("event.server_icon_set"),
+                    None => t!("event.server_icon_removed"),
+                }, theme::ok());
+            },
+
             //THE ANSWER TO A /color
             ClientEvent::Colors(None) => self.push_styled(t!("event.color_set"), theme::ok()),
 

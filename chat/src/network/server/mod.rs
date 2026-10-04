@@ -273,12 +273,17 @@ where
 
 pub fn send_to_all(code: PacketCode) //SEND PACKET TO ALL CLIENTS
 {
+    send_to_all_but(code, None);
+}
+
+pub fn send_to_all_but(code: PacketCode, except: Option<usize>) //SEND PACKET TO ALL CLIENTS, ONE EXCLUDED
+{
     //COLLECT EACH CLIENT
     let entries: Vec<Connection> = CONNECTIONS.iter().filter_map(|entry|
     {
         match entry.value()
         {
-            Connection::Authenticated { .. } =>
+            Connection::Authenticated { id, .. } if except != Some(*id) =>
             {
                 //FOUND, COLLECT
                 Some(entry.value().clone())
@@ -696,6 +701,14 @@ pub async fn notify(id: usize, code: PacketCode) //SEND PACKET TO THE CLIENT WIT
     {
         network::send(&mut *write_stream.lock().await, code, keys.as_ref()).await;
     }
+}
+
+pub async fn icon_changed(id: usize) //TELL EVERYBODY THE SERVER'S PICTURE, AND id THAT IT WAS SAVED
+{
+    let hash = config::server_icon();
+
+    send_to_all_but(PacketCode::ServerIcon { hash, save: false }, Some(id));
+    notify(id, PacketCode::ServerIcon { hash, save: true }).await;
 }
 
 pub async fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLIENTS
@@ -2068,6 +2081,97 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                     own: true,
                     save: true,
                 }, Some(&keys)).await;
+            },
+
+            //THE SERVER'S PICTURE
+            PacketCode::ServerIconRequest =>
+            {
+                network::send(&mut *streams.1.lock().await, PacketCode::ServerIcon
+                {
+                    hash: config::server_icon(),
+                    save: false,
+                }, Some(&keys)).await;
+            },
+
+            //THE SERVER'S PICTURE, SET OR DROPPED
+            PacketCode::ServerIconSave { hash } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < Role::Owner
+                {
+                    log::warn!("Refused (permissions): {peer_addr}");
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                match hash
+                {
+                    //A PICTURE THE SERVER ALREADY KEEPS COSTS NO UPLOAD
+                    Some(hash) if config::messages::stored(&hash) =>
+                    {
+                        let size = file::image_size(&hash).await.unwrap_or_default();
+
+                        if size > consts::MAX_AVATAR_SIZE as u64
+                        {
+                            log::warn!("Server icon refused ({size} bytes over the {} ceiling): {peer_addr}",
+                                consts::MAX_AVATAR_SIZE);
+
+                            network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                            continue;
+                        }
+
+                        //CUT LIKE AN AVATAR
+                        if !file::read_image(&hash).await.is_some_and(|image| misc::is_avatar(&image))
+                        {
+                            log::warn!("Server icon refused (not a square of at most {}px): {peer_addr}",
+                                consts::AVATAR_DIMENSION);
+
+                            network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                            continue;
+                        }
+
+                        config::set_server_icon(Some(&hash));
+                        config::messages::sweep_images();
+
+                        log::info!("Server icon set (already stored): {peer_addr}");
+
+                        network::send(&mut *streams.1.lock().await, PacketCode::ImageDuplicate { hash }, Some(&keys)).await;
+                    },
+
+                    //ANYTHING ELSE IS AN UPLOAD, AND THE ICON IS WRITTEN WHEN IT LANDS
+                    Some(hash) =>
+                    {
+                        //PREVENT TOKEN SPAM
+                        let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count();
+                        if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
+                        {
+                            log::warn!("Upload refused ({active_count} already running): {peer_addr}");
+
+                            network::send(&mut *streams.1.lock().await, PacketCode::UploadLimit, Some(&keys)).await;
+                            continue;
+                        }
+
+                        let uid = rand::random::<u64>();
+                        let token = open_connection(id, ConnectionType::Icon { uid });
+
+                        log::info!("Upload request (icon): {peer_addr}");
+
+                        network::send(&mut *streams.1.lock().await, PacketCode::Image { hash, token, uid }, Some(&keys)).await;
+                        continue;
+                    },
+
+                    //DROPPED, AND SO IS THE FILE IF NOTHING ELSE NAMES IT
+                    None =>
+                    {
+                        config::set_server_icon(None);
+                        config::messages::sweep_images();
+
+                        log::info!("Server icon dropped: {peer_addr}");
+                    },
+                }
+
+                icon_changed(id).await;
             },
 
             //BAN LIST

@@ -216,7 +216,7 @@ pub async fn download
     //A PICTURE IS ALSO PUSHED TO SOMEBODY ELSE, AND A KEPT ONE IS SMALLER STILL
     let ceiling = match kind
     {
-        UploadKind::Avatar => consts::MAX_AVATAR_SIZE,
+        UploadKind::Avatar | UploadKind::Icon => consts::MAX_AVATAR_SIZE,
         _ => consts::MAX_IMAGE_SIZE,
     };
 
@@ -336,9 +336,9 @@ pub async fn download
             }
 
             //AN AVATAR IS A SQUARE, CUT BY THE CLIENT
-            if kind == UploadKind::Avatar && !misc::is_avatar(&data)
+            if matches!(kind, UploadKind::Avatar | UploadKind::Icon) && !misc::is_avatar(&data)
             {
-                log::warn!("Avatar rejected (not a square of at most {}px): {peer_addr}", consts::AVATAR_DIMENSION);
+                log::warn!("Upload rejected ({}, not a square of at most {}px): {peer_addr}", kind.name(), consts::AVATAR_DIMENSION);
                 server::notify(id, PacketCode::InvalidUsage).await;
                 return;
             }
@@ -477,9 +477,15 @@ pub async fn download
                 own: true,
                 save: true,
             }).await;
-        }
-        //AN IMAGE IS SHOWN, NOT ANNOUNCED
-        else if persistent
+        } else if kind == UploadKind::Icon //THE SERVER'S PICTURE, KEPT LIKE AN AVATAR
+        {
+            config::set_server_icon(Some(&final_hash));
+            config::messages::sweep_images();
+
+            log::info!("Server icon set: {peer_addr}");
+
+            server::icon_changed(id).await;
+        } else if persistent //AN IMAGE IS SHOWN, NOT ANNOUNCED
         {
             if let Some(data) = image
             {

@@ -77,6 +77,10 @@ pub enum ConnectionType //TYPES OF TCP CHANNEL
     {
         uid: u64,
     },
+    Icon
+    {
+        uid: u64,
+    },
     FileDownload
     {
         uid: u64,

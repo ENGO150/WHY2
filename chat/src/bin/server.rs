@@ -255,12 +255,13 @@ async fn main()
                             match conn_type
                             {
                                 ConnectionType::FileUpload { uid } | ConnectionType::Image { uid }
-                                    | ConnectionType::Avatar { uid } =>
+                                    | ConnectionType::Avatar { uid } | ConnectionType::Icon { uid } =>
                                 {
                                     let kind = match conn_type
                                     {
                                         ConnectionType::Image { .. } => UploadKind::Image,
                                         ConnectionType::Avatar { .. } => UploadKind::Avatar,
+                                        ConnectionType::Icon { .. } => UploadKind::Icon,
                                         _ => UploadKind::File,
                                     };
 

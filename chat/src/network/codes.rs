@@ -292,6 +292,13 @@ pub enum PacketCode //CONTROL CODES
         color: u8,
     },
 
+    //SERVER -> CLIENT | THE SERVER'S PICTURE
+    ServerIcon
+    {
+        hash: Option<[u8; 32]>,
+        save: bool, //FALSE = READ ANSWER OR SOMEBODY ELSE'S CHANGE, TRUE = SAVE ACK
+    },
+
     //SERVER -> CLIENT | ONE USER'S PROFILE
     Profile
     {
@@ -335,6 +342,7 @@ pub enum PacketCode //CONTROL CODES
     VoiceRequest,                                      //CLIENT -> SERVER | ESTABLISH VOICE CONNECTION
     ServerBansRequest,                                 //CLIENT -> SERVER | READ server_bans.toml
     ServerSettingsRequest,                             //CLIENT -> SERVER | READ server.toml
+    ServerIconRequest,                                 //CLIENT -> SERVER | READ THE SERVER'S PICTURE
     Files { users: Vec<UserFile> },                    //SERVER -> CLIENT | LIST UPLOADED FILES
     Screens { users: Vec<UserScreen> },                //SERVER -> CLIENT | LIST SCREENSHARES
     Deattach { username: String },                     //SERVER -> CLIENT | DEATTACH CLIENT SCREENSHARE
@@ -354,6 +362,7 @@ pub enum PacketCode //CONTROL CODES
     ServerPardonIp { id: usize },                        //CLIENT -> SERVER | LIFT AN IP BAN
     ServerSay { message: String },                       //CLIENT <> SERVER | SAY AS SERVER
     ServerSettingsSave { settings: Vec<ServerSetting> }, //CLIENT -> SERVER | WRITE server.toml
+    ServerIconSave { hash: Option<[u8; 32]> },           //CLIENT -> SERVER | SET THE SERVER'S PICTURE | None = DROP IT
 
     AccountPasswd { valid: bool }, //SERVER -> CLIENT | PASSWORD CHANGE ACK (FALSE = INVALID PASSWORD)
     AccountDelete { valid: bool }, //SERVER -> CLIENT | ACCOUNT DELETION ACK (FALSE = INVALID PASSWORD)
@@ -416,6 +425,9 @@ impl PacketCode
             Self::ServerSettingsRequest { .. } => "ServerSettingsRequest",
             Self::ServerSettingsSave { .. }    => "ServerSettingsSave",
             Self::ServerSettings { .. }        => "ServerSettings",
+            Self::ServerIconRequest { .. }     => "ServerIconRequest",
+            Self::ServerIconSave { .. }        => "ServerIconSave",
+            Self::ServerIcon { .. }            => "ServerIcon",
             Self::AccountPasswdRequest { .. }  => "AccountPasswdRequest",
             Self::AccountPasswd { .. }         => "AccountPasswd",
             Self::AccountDeleteRequest { .. }  => "AccountDeleteRequest",

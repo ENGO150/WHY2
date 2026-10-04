@@ -57,7 +57,7 @@ use crate::
 };
 
 //ENUMS
-//WHAT AN UPLOAD IS FOR - A FILESHARE, A CHAT PICTURE OR A PROFILE PICTURE
+//WHAT AN UPLOAD IS FOR - A FILESHARE, A CHAT PICTURE, A PROFILE PICTURE OR THE SERVER'S
 #[cfg(feature = "server")]
 #[derive(Clone, Copy, PartialEq)]
 pub enum UploadKind
@@ -65,6 +65,7 @@ pub enum UploadKind
     File,
     Image,
     Avatar,
+    Icon,
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
@@ -105,6 +106,7 @@ impl UploadKind
             Self::File => "file",
             Self::Image => "image",
             Self::Avatar => "avatar",
+            Self::Icon => "icon",
         }
     }
 }

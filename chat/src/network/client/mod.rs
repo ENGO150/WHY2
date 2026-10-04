@@ -162,6 +162,7 @@ pub enum ClientEvent
     AccountDeleted(bool),                                        //AN ACCOUNT DELETION ANSWERED
     Profile(String, UserProfile, bool, bool),                    //A PROFILE (WHOSE, IT, OURS, A SAVE ACK)
     Colors(Option<MessageColors>),                               //A /color LANDED ON THE SERVER OR INIT COLORS
+    ServerIcon(Option<[u8; 32]>, bool),                          //THE SERVER'S PICTURE (HASH, A SAVE ACK)
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
     Upload(u64, String, u64),                                    //UPLOADING FILE (UID, NAME, SIZE)
     Image(u64, String, u64),                                     //UPLOADING IMAGE (UID, NAME, SIZE)
@@ -171,7 +172,7 @@ pub enum ClientEvent
     ImageOffer(String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
     ImageParked(String, String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE IN ANOTHER CHANNEL (CHANNEL FIRST)
     ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
-    AvatarFailed(String),                                        //CUTTING OUR AVATAR FAILED
+    AvatarFailed(String),                                        //CUTTING OUR AVATAR OR SERVER ICON FAILED
     ImageFailed(String, String, u64, Option<u8>),                //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
     Uploaded(String, String),                                    //USER UPLOADED FILE
     UploadDone(u64, String),                                     //OUR OWN UPLOAD IS ON THE WIRE
@@ -570,6 +571,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::Profile { username, profile, own, save } =>
             {
                 tx.send(ClientEvent::Profile(username, profile, own, save)).await.unwrap();
+            },
+
+            //THE SERVER'S PICTURE, ASKED FOR OR CHANGED
+            PacketCode::ServerIcon { hash, save } =>
+            {
+                tx.send(ClientEvent::ServerIcon(hash, save)).await.unwrap();
             },
 
             //THE BAN LIST, ASKED FOR OR JUST LIFTED

@@ -923,6 +923,15 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
       them — the avatar is further right, so within the row it is written last. The mark alternates between
       one and two cursor saves (`App::avatar_marks`), because a pane GIF rewrites its row every frame and the
       same mark twice would read as unchanged.
+- **The server icon is an avatar the server owns** (`/server icon [PATH]`, owner only; no path drops it).
+  It is cut by the same `cut_avatar`, checked by the same `is_avatar` and `MAX_AVATAR_SIZE`, stored in
+  `server_images/` like any picture, and fetched back through `ImageDataRequest` and the cache — only the
+  owner differs: the hash lives in `server_icon` in the config root (`config::server_icon`), not in a
+  profile, and `messages::stored`, `orphans` and `sweep_images` keep it for that reason.
+  - **It is asked for, not drawn.** Nothing sends it at login — the TUI has no use for it, so `Accept`
+    does not carry it; a client that wants it (WHY2-Desktop, as `ClientEvent::ServerIcon`) sends
+    `ServerIconRequest`. A change goes to every client as `ServerIcon { save: false }` (the setter gets
+    `save: true`, which is all the TUI shows). It is a hash only, so nobody downloads the picture unasked.
 - **`config/mod.rs`** — TOML config for client (`client.toml`) and server (`server.toml`), plus
   server user store (`server_users.toml`), server ban list (`server_bans.toml`) and server keypair
   storage (`server_keys/{private,public}`), all under `WHY2_CONFIG_DIR`

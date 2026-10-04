@@ -324,7 +324,7 @@ pub async fn run
                     let answer = login::take_input(app);
                     let write_stream = write_stream.clone();
 
-                    crate::submit(app, &write_stream, answer).await;
+                    crate::submit(app, &write_stream, tx, answer).await;
                 }
 
                 //THE PICTURES THAT SCROLLED INTO VIEW
@@ -574,7 +574,7 @@ async fn handle_key
                 {
                     let answer = login::take_input(app);
 
-                    crate::submit(app, write_stream, answer).await;
+                    crate::submit(app, write_stream, tx, answer).await;
                 }
             },
 
@@ -732,7 +732,7 @@ async fn handle_key
                     app.palette.dismiss();
 
                     let command = info.command.to_string();
-                    crate::submit(app, write_stream, command).await;
+                    crate::submit(app, write_stream, tx, command).await;
                 }
             },
 
@@ -791,7 +791,7 @@ async fn handle_key
             app.palette.dismiss();
 
             let input = app.input.take();
-            crate::submit(app, write_stream, input).await;
+            crate::submit(app, write_stream, tx, input).await;
         },
 
         _ => {},
