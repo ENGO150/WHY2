@@ -39,6 +39,7 @@ use tokio::
 
 use crate::
 {
+    t,
     config,
     options,
     network::client::handshake,
@@ -150,8 +151,7 @@ impl Reconnect
     //WHAT THE BOX SAYS WHILE IT IS DIALLING ITSELF BACK
     pub fn status(&self) -> Option<String>
     {
-        self.retrying.then(|| format!("Connection lost, reconnecting… ({}/{})",
-            consts::RECONNECT_ATTEMPTS - self.left, consts::RECONNECT_ATTEMPTS))
+        self.retrying.then(|| t!("login.reconnecting", attempt = consts::RECONNECT_ATTEMPTS - self.left, attempts = consts::RECONNECT_ATTEMPTS))
     }
 
     //WHETHER THE WAIT IS UP
@@ -242,10 +242,10 @@ impl Login
     {
         match self.stage
         {
-            Stage::Address => " Connect ",
-            Stage::Username => " Identify ",
-            Stage::Password { register: true } => " Register ",
-            Stage::Password { register: false } => " Log in ",
+            Stage::Address => t!("login.title.connect"),
+            Stage::Username => t!("login.title.identify"),
+            Stage::Password { register: true } => t!("login.title.register"),
+            Stage::Password { register: false } => t!("login.title.login"),
         }
     }
 
@@ -253,9 +253,9 @@ impl Login
     {
         match self.stage
         {
-            Stage::Address => "Server address",
-            Stage::Username => "Username",
-            Stage::Password { .. } => "Password",
+            Stage::Address => t!("login.label.address"),
+            Stage::Username => t!("login.label.username"),
+            Stage::Password { .. } => t!("login.label.password"),
         }
     }
 
@@ -264,9 +264,9 @@ impl Login
     {
         match (self.stage, self.connected)
         {
-            (Stage::Address, false) => "Connecting…",
-            (Stage::Address, true) => "Exchanging keys…", //THE SOCKET IS UP, THE HANDSHAKE IS NOT DONE
-            _ => "Waiting for the server…",
+            (Stage::Address, false) => t!("login.connecting"),
+            (Stage::Address, true) => t!("login.exchanging_keys"), //THE SOCKET IS UP, THE HANDSHAKE IS NOT DONE
+            _ => t!("login.waiting"),
         }
     }
 
@@ -305,7 +305,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Action
         {
             if login.address().is_empty()
             {
-                login.error = Some(String::from("Enter the address of a server."));
+                login.error = Some(t!("login.missing.address").to_owned());
             } else { return Action::Connect; }
         },
 
@@ -314,7 +314,11 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Action
         {
             if login.input.text().is_empty()
             {
-                login.error = Some(format!("Enter a {}.", login.label().to_lowercase()));
+                login.error = Some(match login.stage
+                {
+                    Stage::Username => t!("login.missing.username"),
+                    _ => t!("login.missing.password"),
+                }.to_owned());
             } else { return Action::Submit; }
         },
     }

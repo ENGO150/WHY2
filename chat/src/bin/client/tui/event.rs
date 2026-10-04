@@ -20,6 +20,8 @@ use ratatui::text::{ Line, Span };
 
 use crate::
 {
+    t,
+    tn,
     options,
     network::
     {
@@ -63,14 +65,14 @@ impl App
 
             ClientEvent::FirstUser =>
             {
-                self.push_styled("You are the first user to register, owner role has been granted to you.", theme::notice());
+                self.push_styled(t!("event.first_user"), theme::notice());
             },
 
             ClientEvent::Authenticated(role) =>
             {
                 self.login = None; //THE BOX HAS ASKED FOR EVERYTHING IT WAS GOING TO ASK FOR
                 self.role = role;
-                self.push_styled("Login successful. Press Ctrl+H for help.", theme::ok());
+                self.push_styled(t!("event.login_ok"), theme::ok());
 
                 //THESE ANSWERS ARE WORTH REPLAYING NOW
                 self.reconnect.accepted();
@@ -78,7 +80,7 @@ impl App
 
             ClientEvent::Connected(server_name) =>
             {
-                self.push_styled(format!("Successfully connected to {server_name}."), theme::ok());
+                self.push_styled(t!("event.connected", server_name), theme::ok());
                 self.server_name = server_name;
             },
 
@@ -138,7 +140,7 @@ impl App
             ClientEvent::ImageRequest(hash) => self.image_requests.push(hash),
 
             ClientEvent::ImageFailed(username, filename, ..) => self.push_styled(
-                format!("{username} sent an image that could not be displayed ({filename})."), theme::error()),
+                t!("event.image_failed", username, filename), theme::error()),
 
             ClientEvent::PrivateMessageSent(to, id, msg, colors) => self.push_private(true, to, id, msg, colors),
 
@@ -154,16 +156,15 @@ impl App
             ClientEvent::TofuError => self.quit(1, None),
 
             //BACK TO THE ADDRESS, THE KEY IS PINNED NOW
-            ClientEvent::ReconnectFailed => self.disconnected("Reconnecting to the server failed."),
+            ClientEvent::ReconnectFailed => self.disconnected(t!("event.reconnect_failed")),
 
             //THERE WAS NO PROMPT, SO THE REASON GOES BACK
             ClientEvent::HandshakeFailed(reason) => self.disconnected(reason),
 
             ClientEvent::TofuSkip(hash) =>
             {
-                self.push_styled("SECURITY WARNING: UNKNOWN SERVER IDENTITY", theme::error());
-                self.push_styled("The server's identity key cannot be verified due to disabled ToFU \
-                    verification. If you don't recognize the identity key below, disconnect immediately!", theme::notice());
+                self.push_styled(t!("event.tofu_skip.title"), theme::error());
+                self.push_styled(t!("event.tofu_skip.body"), theme::notice());
                 self.push_styled(hash, theme::notice());
             },
 
@@ -199,7 +200,7 @@ impl App
                 self.push(Line::from(vec!
                 [
                     Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
-                    Span::styled(format!("{uname} connected."), theme::ok()),
+                    Span::styled(t!("event.joined", username = &uname), theme::ok()),
                 ]));
 
                 self.offline.remove(&uname); //THEY ARE HERE NOW
@@ -226,7 +227,7 @@ impl App
                 self.push(Line::from(vec!
                 [
                     Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
-                    Span::styled(format!("{uname} disconnected."), theme::dim()),
+                    Span::styled(t!("event.left", username = &uname), theme::dim()),
                 ]));
 
                 //Leave NAMES THE USER, SO DROP THEM HERE
@@ -249,7 +250,7 @@ impl App
 
             ClientEvent::Muted =>
             {
-                self.push_styled("You have been muted by moderator.", theme::notice());
+                self.push_styled(t!("event.muted"), theme::notice());
             },
 
             ClientEvent::Deleted(message_id) => self.delete_message(message_id),
@@ -263,23 +264,22 @@ impl App
                 //A REFUSED SAVE LEAVES THE BOX EDITABLE
                 self.settings.saving = false;
 
-                self.push_styled("Invalid usage! Press Ctrl+H for help.", theme::error());
+                self.push_styled(t!("invalid.usage"), theme::error());
             },
 
             ClientEvent::UnsafeVersion(newer_versions, current_version, newest_version) =>
             {
-                self.push_styled(format!("This release could be unsafe! You are {newer_versions} \
-                    versions behind! ({current_version}/{newest_version})"), theme::notice());
+                self.push_styled(tn!("event.unsafe_version", newer_versions, current_version, newest_version), theme::notice());
             },
 
             ClientEvent::Username(disabled_registration, min_uname, max_uname) =>
             {
                 let hint = if disabled_registration
                 {
-                    String::from("Registration is disabled.")
+                    t!("login.registration_disabled").to_owned()
                 } else
                 {
-                    format!("a-Z, 0-9; {min_uname}-{max_uname} characters")
+                    t!("login.username_rules", min = min_uname, max = max_uname)
                 };
 
                 if let Some(login) = self.login.as_mut() { login.ask(Stage::Username, Some(hint)); }
@@ -292,12 +292,12 @@ impl App
             {
                 self.voice_enabled = true;
                 self.rebuild_voice();
-                self.push_styled("Voice enabled.", theme::ok());
+                self.push_styled(t!("event.voice_enabled"), theme::ok());
             },
 
             ClientEvent::VoiceDeviceFailed =>
             {
-                self.push_styled("Switching the audio device failed - the previous one is still in use.", theme::error());
+                self.push_styled(t!("event.device_failed"), theme::error());
 
                 //THE CONFIG POINTS AT THE DEVICE THAT PLAYS
                 #[cfg(feature = "client_voice")]
@@ -306,7 +306,7 @@ impl App
 
             ClientEvent::VoiceHandshakeFailed =>
             {
-                self.push_styled("The server never answered the voice handshake - is UDP getting through?", theme::error());
+                self.push_styled(t!("event.voice_handshake_failed"), theme::error());
             },
 
             ClientEvent::VoiceDisabled =>
@@ -315,7 +315,7 @@ impl App
                 self.voice_enabled = false;
                 self.voice_activity.clear();
                 self.rebuild_voice();
-                self.push_styled("Voice disabled.", theme::dim());
+                self.push_styled(t!("event.voice_disabled"), theme::dim());
             },
 
             //SERVER MESSAGE
@@ -342,7 +342,7 @@ impl App
                 if username == self.username
                 {
                     self.role = role;
-                    self.push_styled(format!("You are now {role}."), theme::notice());
+                    self.push_styled(t!("event.role", role), theme::notice());
                 }
             },
 
@@ -389,7 +389,7 @@ impl App
 
                     false =>
                     {
-                        self.push_styled(format!("Message history ({kept}):"), theme::title());
+                        self.push_styled(t!("event.history", count = kept), theme::title());
                         self.start_history(entries, start, more);
                     },
                 }
@@ -417,7 +417,7 @@ impl App
                     {
                         if self.settings.open && self.settings.server() { self.settings.stored(settings); }
 
-                        self.push_styled("Server settings saved.", theme::ok());
+                        self.push_styled(t!("event.server_settings_saved"), theme::ok());
                     },
 
                     false => self.settings.open_server(settings),
@@ -436,12 +436,12 @@ impl App
                         //A RECONNECT REPLAYS THE NEW ONE
                         if let Some(form) = self.account.take() { self.reconnect.passwd(form.new_password()); }
 
-                        self.push_styled("Password changed.", theme::ok());
+                        self.push_styled(t!("event.password_changed"), theme::ok());
                     },
 
                     false =>
                     {
-                        let message = String::from("Wrong current password, or the new one does not meet the requirements.");
+                        let message = t!("event.password_refused").to_owned();
 
                         match self.account.as_mut()
                         {
@@ -463,12 +463,12 @@ impl App
                     true =>
                     {
                         self.account = None;
-                        self.disconnect_reason = Some(String::from("Account deleted."));
+                        self.disconnect_reason = Some(t!("event.account_deleted").to_owned());
                     },
 
                     false =>
                     {
-                        let message = String::from("Wrong password.");
+                        let message = t!("event.wrong_password").to_owned();
 
                         match self.account.as_mut()
                         {
@@ -494,7 +494,7 @@ impl App
                             self.settings.stored_profile(username, profile);
                         }
 
-                        self.push_styled("Profile saved.", theme::ok());
+                        self.push_styled(t!("event.profile_saved"), theme::ok());
                     },
 
                     false => self.settings.open_profile(username, profile, own),
@@ -518,20 +518,20 @@ impl App
             },
 
             //THE ANSWER TO A /color
-            ClientEvent::Colors => self.push_styled("Color set successfully.", theme::ok()),
+            ClientEvent::Colors => self.push_styled(t!("event.color_set"), theme::ok()),
 
             //THE BAN LIST
             ClientEvent::ServerBans(users, ips) =>
             {
                 if users.is_empty() && ips.is_empty()
                 {
-                    self.push_styled("No bans.", theme::dim());
+                    self.push_styled(t!("event.bans.none"), theme::dim());
                 } else
                 {
-                    self.push_styled(format!("Bans ({}):", users.len() + ips.len()), theme::title());
+                    self.push_styled(t!("event.bans.title", count = users.len() + ips.len()), theme::title());
 
                     //TWO SECTIONS, EACH NUMBERED FROM ZERO
-                    let sections = [("users", users), ("addresses", ips)];
+                    let sections = [(t!("event.bans.users"), users), (t!("event.bans.addresses"), ips)];
                     let last_section = sections.iter().filter(|(_, bans)| !bans.is_empty()).count().saturating_sub(1);
 
                     let mut section_index = 0;
@@ -593,7 +593,7 @@ impl App
                     let width = id_width(self.online.iter().map(|user| user.id));
                     let last = self.online.len().saturating_sub(1);
 
-                    self.push_styled(format!("Online clients ({}):", self.online.len()), theme::title());
+                    self.push_styled(t!("event.list.title", count = self.online.len()), theme::title());
 
                     let rows = self.online.iter().enumerate().map(|(index, user)|
                     {
@@ -649,7 +649,7 @@ impl App
                 self.push(Line::from(vec!
                 [
                     Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
-                    Span::raw(format!("{username} uploaded file \"{filename}\".")),
+                    Span::raw(t!("event.uploaded", username, filename)),
                 ]));
             },
 
@@ -672,10 +672,10 @@ impl App
             {
                 if users.is_empty()
                 {
-                    self.push_styled("No available files.", theme::dim());
+                    self.push_styled(t!("event.files.none"), theme::dim());
                 } else
                 {
-                    self.push_styled(format!("Available files ({}):", users.len()), theme::title());
+                    self.push_styled(t!("event.files.title", count = users.len()), theme::title());
 
                     //THE OWNER IS THE BRANCH, THEIR FILES HANG OFF IT
                     let width = id_width(users.iter().map(|user| user.id));
@@ -715,10 +715,10 @@ impl App
 
                 if users.is_empty()
                 {
-                    self.push_styled("No available screenshares.", theme::dim());
+                    self.push_styled(t!("event.screens.none"), theme::dim());
                 } else
                 {
-                    self.push_styled(format!("Screensharing clients ({}):", users.len()), theme::title());
+                    self.push_styled(t!("event.screens.title", count = users.len()), theme::title());
 
                     let width = id_width(users.iter().map(|user| user.id));
                     let last = users.len() - 1;
@@ -737,27 +737,27 @@ impl App
 
             ClientEvent::UploadLimit =>
             {
-                self.push_styled("Maximum concurrent uploads reached!", theme::error());
+                self.push_styled(t!("event.upload_limit"), theme::error());
             },
 
             ClientEvent::Screen(enabled) =>
             {
-                self.push_styled(format!("{} screen sharing.", if enabled { "Started" } else { "Stopped" }), theme::ok());
+                self.push_styled(if enabled { t!("event.screen.started") } else { t!("event.screen.stopped") }, theme::ok());
             },
 
             ClientEvent::ScreenFailed(reason) =>
             {
-                self.push_styled(format!("Screen sharing failed: {reason}."), theme::error());
+                self.push_styled(t!("event.screen.failed", reason), theme::error());
             },
 
             ClientEvent::Attach(username) =>
             {
-                self.push_text(format!("Attached {username}'s screen sharing."));
+                self.push_text(t!("event.screen.attach", username));
             },
 
             ClientEvent::Deattach(username) =>
             {
-                self.push_text(format!("Deattached {username}'s screen sharing."));
+                self.push_text(t!("event.screen.deattach", username));
             },
 
             //BROADCAST TO EVERYBODY, US INCLUDED
@@ -766,7 +766,7 @@ impl App
                 self.push(Line::from(vec!
                 [
                     Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
-                    Span::styled(format!("{username} started screen sharing."), theme::notice()),
+                    Span::styled(t!("event.screen.peer_started", username), theme::notice()),
                 ]));
             },
 
@@ -775,7 +775,7 @@ impl App
                 self.push(Line::from(vec!
                 [
                     Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
-                    Span::styled(format!("{username} stopped screen sharing."), theme::dim()),
+                    Span::styled(t!("event.screen.peer_stopped", username), theme::dim()),
                 ]));
             },
 
@@ -783,24 +783,23 @@ impl App
 
             ClientEvent::Attached(username) =>
             {
-                self.push_text(format!("{username} attached your screen sharing."));
+                self.push_text(t!("event.screen.attached", username));
             },
 
             ClientEvent::Deattached(username) =>
             {
-                self.push_text(format!("{username} deattached your screen sharing."));
+                self.push_text(t!("event.screen.deattached", username));
             },
 
             ClientEvent::IncompatibleVersion(version, server_version) =>
             {
                 //THE BOX IS STILL UP, SO THE HISTORY IS NOT WHERE THIS IS READ
-                self.disconnect_reason = Some(format!("Incompatible version! ({version}/{server_version})"));
+                self.disconnect_reason = Some(t!("event.incompatible_version", version, server_version));
             },
 
             ClientEvent::VersionMismatch(client_version, server_version) =>
             {
-                self.push_styled(format!("Version mismatch - some features may not work \
-                    ({client_version}/{server_version})"), theme::notice());
+                self.push_styled(t!("event.version_mismatch", client_version, server_version), theme::notice());
             },
 
             //Login::ask KEEPS THE ERROR ON SCREEN
@@ -808,8 +807,8 @@ impl App
             {
                 match self.login.as_mut()
                 {
-                    Some(login) => login.error = Some(String::from("Username rejected!")),
-                    None => self.push_styled("Username rejected!", theme::error()),
+                    Some(login) => login.error = Some(t!("login.username_rejected").to_owned()),
+                    None => self.push_styled(t!("login.username_rejected"), theme::error()),
                 }
 
                 //A REPLAYED ANSWER THE SERVER REFUSES IS NOT ONE TO REPLAY AGAIN
@@ -819,7 +818,7 @@ impl App
 
             ClientEvent::PasswordRejected(min_pass) =>
             {
-                let message = format!("Password rejected! Enter at least {min_pass} characters.");
+                let message = t!("login.password_rejected", min = min_pass);
 
                 match self.login.as_mut()
                 {
@@ -832,22 +831,22 @@ impl App
 
             ClientEvent::SpamWarning =>
             {
-                self.push_styled("Slow down! You're sending messages too quickly.", theme::notice());
+                self.push_styled(t!("event.spam_warning"), theme::notice());
             },
 
             ClientEvent::Socks5Voice =>
             {
-                self.push_styled("Voice chat cannot be enabled while using SOCKS5.", theme::error());
+                self.push_styled(t!("event.socks5_voice"), theme::error());
             },
 
             ClientEvent::DisabledFeature =>
             {
-                self.push_styled("Server has disabled the feature you requested.", theme::error());
+                self.push_styled(t!("event.disabled_feature"), theme::error());
             },
 
             ClientEvent::VersionFailed =>
             {
-                self.push_styled("Fetching versions failed, this release could be unsafe!", theme::notice());
+                self.push_styled(t!("event.version_failed"), theme::notice());
             },
 
             //BACK TO THE CONNECT BOX UNLESS WE ASKED TO LEAVE
@@ -855,17 +854,17 @@ impl App
             {
                 if self.leaving
                 {
-                    self.quit(0, Some(String::from("Disconnected from the server.")));
+                    self.quit(0, Some(t!("event.quit").to_owned()));
                 } else if self.logging_out
                 {
-                    self.disconnected("Logged out.");
+                    self.disconnected(t!("event.logged_out"));
                 } else
                 {
                     //A SERVER THAT SAID SO IS NOT ONE TO DIAL BACK
                     if said { self.reconnect.forget(); }
 
                     let reason = self.disconnect_reason.take();
-                    self.disconnected(reason.unwrap_or_else(|| String::from("Server quit communication.")));
+                    self.disconnected(reason.unwrap_or_else(|| t!("event.server_quit").to_owned()));
                 }
             },
 

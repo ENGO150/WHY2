@@ -39,6 +39,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::
 {
     colors,
+    i18n,
     options,
     role::Role,
     command::
@@ -50,6 +51,8 @@ use crate::
         SubcommandInfo,
     },
 };
+
+use crate::t;
 
 use super::
 {
@@ -108,7 +111,7 @@ impl Entry
 
     pub fn description(&self) -> &'static str
     {
-        self.sub.map_or(self.info.description, |sub| sub.description)
+        i18n::text(self.sub.map_or(self.info.description, |sub| sub.description))
     }
 
     //ONLY WHOLE COMMANDS CARRY A SHORTCUT
@@ -117,7 +120,7 @@ impl Entry
         match self.sub
         {
             Some(_) => String::new(),
-            None => self.info.shortcut.map(|s| format!("Ctrl+{}", s.to_ascii_uppercase())).unwrap_or_default(),
+            None => self.info.shortcut.map(|s| t!("keys.ctrl", key = s.to_ascii_uppercase())).unwrap_or_default(),
         }
     }
 
@@ -212,7 +215,7 @@ impl Values
 
     pub fn title(&self) -> &'static str
     {
-        self.arg.map_or("Mentions", |arg| arg.name)
+        self.arg.map_or(t!("palette.mentions"), |arg| i18n::text(arg.name))
     }
 }
 
@@ -615,10 +618,10 @@ pub fn format_arg(arg: &command::CommandArg) -> String //<REQUIRED> / [OPTIONAL]
 {
     if arg.required
     {
-        format!("<{}>", arg.name.to_lowercase())
+        format!("<{}>", i18n::text(arg.name).to_lowercase())
     } else
     {
-        format!("[{}]", arg.name.to_lowercase())
+        format!("[{}]", i18n::text(arg.name).to_lowercase())
     }
 }
 

@@ -56,6 +56,7 @@ use winit::event_loop::EventLoopProxy;
 
 use crate::
 {
+    t,
     crypto,
     options as chat_options,
     network::
@@ -166,7 +167,7 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
     let reason = match capture.await
     {
         Ok(Err(reason)) => Some(reason),
-        Err(_) => Some("screen capture crashed".to_owned()), //PANICKED OR CANCELLED
+        Err(_) => Some(t!("screen.error.crashed").to_owned()), //PANICKED OR CANCELLED
         Ok(Ok(())) => None,
     };
 

@@ -41,6 +41,7 @@ use tokio_socks::tcp::Socks5Stream;
 
 use crate::
 {
+    t,
     crypto::kex,
     options,
     config::
@@ -107,7 +108,7 @@ pub async fn key_exchange
     //THE STATIC KEY SIGNS THE EPHEMERAL ONES
     if !kex::verify_offer(&options::get_obfuscation_key(), &offer.static_ecc, &offer.eph_ecc, &offer.pq, &offer.sig)
     {
-        tx.send(ClientEvent::HandshakeFailed(String::from("Server identity did not sign its exchange keys."))).await.ok();
+        tx.send(ClientEvent::HandshakeFailed(t!("login.unsigned_keys").to_owned())).await.ok();
 
         return Handshake::Failed;
     }
@@ -218,7 +219,7 @@ pub async fn connect(connecting_addr: String) -> Result<(OwnedReadHalf, OwnedWri
     };
 
     time::timeout(Duration::from_millis(consts::CONNECT_TIMEOUT), dial).await
-        .unwrap_or_else(|_| Err(Error::new(ErrorKind::TimedOut, "Connection timed out.")))
+        .unwrap_or_else(|_| Err(Error::new(ErrorKind::TimedOut, t!("login.timed_out"))))
         .and_then(|s|
         {
             //SET TCP_NODELAY

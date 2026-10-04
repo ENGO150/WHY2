@@ -27,6 +27,8 @@ use crossterm::event::
 
 use why2_chat::
 {
+    t,
+    i18n,
     config,
     misc,
     role::Role,
@@ -223,53 +225,53 @@ impl Settings
 
         #[cfg(feature = "client_voice")]
         {
-            rows.push(Row::Header(String::from("Audio")));
+            rows.push(Row::Header(t!("settings.section.audio").to_owned()));
 
-            rows.push(Row::Item(Item::client("Input device", "input_device",
+            rows.push(Row::Item(Item::client(t!("settings.row.input_device"), "input_device",
                 Value::Device { id: config::read_config::<String>("input_device"), input: true })));
 
-            rows.push(Row::Item(Item::client("Output device", "output_device",
+            rows.push(Row::Item(Item::client(t!("settings.row.output_device"), "output_device",
                 Value::Device { id: config::read_config::<String>("output_device"), input: false })));
 
-            rows.push(Row::Item(Item::client("Input volume", "input_volume",
+            rows.push(Row::Item(Item::client(t!("settings.row.input_volume"), "input_volume",
                 Value::Volume(voice_options::clamp_volume(config::read_config::<u32>("input_volume"))))));
 
-            rows.push(Row::Item(Item::client("Output volume", "output_volume",
+            rows.push(Row::Item(Item::client(t!("settings.row.output_volume"), "output_volume",
                 Value::Volume(voice_options::clamp_volume(config::read_config::<u32>("output_volume"))))));
 
             #[cfg(feature = "client_screen")]
-            rows.push(Row::Item(Item::client("Screen share volume", "screen_volume",
+            rows.push(Row::Item(Item::client(t!("settings.row.screen_volume"), "screen_volume",
                 Value::Volume(voice_options::clamp_volume(config::read_config::<u32>("screen_volume"))))));
 
-            rows.push(Row::Item(Item::client("Noise suppression", "noise_suppression",
+            rows.push(Row::Item(Item::client(t!("settings.row.noise_suppression"), "noise_suppression",
                 toggle_value("noise_suppression", false))));
 
-            rows.push(Row::Item(Item::client("Automatic gain", "automatic_gain",
+            rows.push(Row::Item(Item::client(t!("settings.row.automatic_gain"), "automatic_gain",
                 toggle_value("automatic_gain", false))));
         }
 
-        rows.push(Row::Header(String::from("Interface")));
+        rows.push(Row::Header(t!("settings.section.interface").to_owned()));
 
-        rows.push(Row::Item(Item::client("Theme", "theme",
+        rows.push(Row::Item(Item::client(t!("settings.row.theme"), "theme",
             Value::Theme(theme::palette_index(&config::read_config::<String>("theme"))))));
 
-        rows.push(Row::Item(Item::client("Message colors", "disable_colors", toggle_value("disable_colors", true))));
-        rows.push(Row::Item(Item::client("Background logo", "disable_logo", toggle_value("disable_logo", true))));
-        rows.push(Row::Item(Item::client("Show images automatically", "auto_show_images",
+        rows.push(Row::Item(Item::client(t!("settings.row.disable_colors"), "disable_colors", toggle_value("disable_colors", true))));
+        rows.push(Row::Item(Item::client(t!("settings.row.disable_logo"), "disable_logo", toggle_value("disable_logo", true))));
+        rows.push(Row::Item(Item::client(t!("settings.row.auto_show_images"), "auto_show_images",
             toggle_value("auto_show_images", false))));
 
-        rows.push(Row::Item(Item::client("Math rendering", "render_math", toggle_value("render_math", false))));
+        rows.push(Row::Item(Item::client(t!("settings.row.render_math"), "render_math", toggle_value("render_math", false))));
 
-        rows.push(Row::Item(Item::client("Show client IDs", "show_id", toggle_value("show_id", false))));
-        rows.push(Row::Item(Item::client("Show message IDs", "show_message_ids", toggle_value("show_message_ids", false))));
-        rows.push(Row::Item(Item::client("Show timestamps", "show_timestamps", toggle_value("show_timestamps", false))));
-        rows.push(Row::Item(Item::client("Message stripes", "message_stripes", toggle_value("message_stripes", false))));
+        rows.push(Row::Item(Item::client(t!("settings.row.show_id"), "show_id", toggle_value("show_id", false))));
+        rows.push(Row::Item(Item::client(t!("settings.row.show_message_ids"), "show_message_ids", toggle_value("show_message_ids", false))));
+        rows.push(Row::Item(Item::client(t!("settings.row.show_timestamps"), "show_timestamps", toggle_value("show_timestamps", false))));
+        rows.push(Row::Item(Item::client(t!("settings.row.message_stripes"), "message_stripes", toggle_value("message_stripes", false))));
 
-        rows.push(Row::Header(String::from("Privacy")));
+        rows.push(Row::Header(t!("settings.section.privacy").to_owned()));
 
-        rows.push(Row::Item(Item::client("Share device", "share_device", toggle_value("share_device", false))));
+        rows.push(Row::Item(Item::client(t!("settings.row.share_device"), "share_device", toggle_value("share_device", false))));
 
-        rows.push(Row::Item(Item::client("Typing indicator", "typing_indicator",
+        rows.push(Row::Item(Item::client(t!("settings.row.typing_indicator"), "typing_indicator",
             toggle_value("typing_indicator", false))));
 
         self.rows = rows;
@@ -347,7 +349,7 @@ impl Settings
         {
             true => vec![Row::Item(Item
             {
-                label: String::from(consts::AVATAR_LABEL),
+                label: t!("settings.avatar").to_owned(),
                 key: String::from(consts::AVATAR_KEY),
                 value: Value::Avatar(None),
                 hint: String::new(),
@@ -465,15 +467,15 @@ impl Settings
     {
         let name = match self.mode
         {
-            Mode::Client => return String::from(" Settings "),
-            Mode::Server => String::from("Server settings"),
-            Mode::Profile { own: true } => String::from("Your profile"),
-            Mode::Profile { own: false } => format!("{}'s profile", self.subject),
+            Mode::Client => return t!("settings.title.client").to_owned(),
+            Mode::Server => t!("settings.title.server").to_owned(),
+            Mode::Profile { own: true } => t!("settings.title.own_profile").to_owned(),
+            Mode::Profile { own: false } => t!("settings.title.profile", username = self.subject),
         };
 
-        if self.saving { return format!(" {name} · saving… "); }
+        if self.saving { return t!("settings.title.saving", name); }
 
-        if self.unsaved() { format!(" {name} · unsaved ") } else { format!(" {name} ") }
+        if self.unsaved() { t!("settings.title.unsaved", name) } else { name }
     }
 
     pub fn unsaved(&self) -> bool //A ROW HAS BEEN EDITED AND NOT SENT BACK YET
@@ -585,7 +587,7 @@ impl Settings
     #[cfg(feature = "client_voice")]
     pub fn device_label(&self, id: &str, input: bool) -> String
     {
-        if id.is_empty() { return String::from(consts::DEFAULT_DEVICE); }
+        if id.is_empty() { return t!("settings.default_device").to_owned(); }
 
         let devices = if input { &self.devices.input } else { &self.devices.output };
 
@@ -611,11 +613,7 @@ impl Settings
 //WHAT A PROFILE FIELD IS CALLED IN THE BOX
 fn field_label(key: &str) -> String
 {
-    match key
-    {
-        "bio" => String::from("Description"),
-        other => other[..1].to_uppercase() + &other[1..],
-    }
+    i18n::get(&format!("profile.{key}")).map(str::to_owned).unwrap_or_else(|| key[..1].to_uppercase() + &key[1..])
 }
 
 //READ A BOOLEAN AS THE ROW SHOWS IT
@@ -801,7 +799,7 @@ fn commit_edit(app: &mut App) //KEEP WHAT WAS TYPED, IF THE ROW CAN HOLD IT
     if selected_key(&app.settings) == Some("website") && !edit.trim().is_empty()
         && !misc::is_web_url(edit.trim())
     {
-        app.notify("A website has to start with http:// or https://");
+        app.notify(t!("profile.bad_website"));
         return;
     }
 
@@ -984,7 +982,7 @@ fn activate(app: &mut App)
         if let Some(url) = app.settings.link().map(str::to_owned)
         {
             super::open_link(&url);
-            app.notify(format!("Opening {url}"));
+            app.notify(t!("tui.opening", url));
         }
 
         return;
@@ -1018,7 +1016,7 @@ fn activate(app: &mut App)
 
             app.settings.picker = Some(Picker
             {
-                title: if input { " Input device " } else { " Output device " },
+                title: if input { t!("settings.row.input_device") } else { t!("settings.row.output_device") },
                 selected: entries.iter().position(|entry| entry.id == id).unwrap_or(0),
                 entries,
                 row: _row,
@@ -1201,7 +1199,7 @@ fn device_entries(app: &App, input: bool) -> Vec<DeviceEntry>
 {
     let devices = if input { &app.settings.devices.input } else { &app.settings.devices.output };
 
-    let mut entries = vec![DeviceEntry { id: String::new(), label: String::from(consts::DEFAULT_DEVICE) }];
+    let mut entries = vec![DeviceEntry { id: String::new(), label: t!("settings.default_device").to_owned() }];
     entries.extend(devices.iter().cloned());
 
     //A CONFIGURED BUT UNPLUGGED DEVICE KEEPS ITS ROW

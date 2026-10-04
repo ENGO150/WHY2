@@ -52,6 +52,8 @@ use ratatui_image::
 
 use crate::
 {
+    t,
+    tn,
     config,
     misc,
     role::Role,
@@ -1568,9 +1570,9 @@ impl App
         match names.as_slice()
         {
             [] => None,
-            [one] => Some(format!("{one} is typing…")),
-            [one, two] => Some(format!("{one} and {two} are typing…")),
-            _ => Some(format!("{} people are typing…", names.len())),
+            [one] => Some(t!("typing.one", one)),
+            [one, two] => Some(t!("typing.two", one, two)),
+            _ => Some(tn!("typing.many", names.len())),
         }
     }
 

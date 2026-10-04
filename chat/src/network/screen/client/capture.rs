@@ -58,15 +58,19 @@ use openh264::
     },
 };
 
-use crate::network::screen::
+use crate::
 {
-    consts,
-    client::{ gpu::GpuConverter, options },
+    t,
+    network::screen::
+    {
+        consts,
+        client::{ gpu::GpuConverter, options },
+    },
 };
 
 fn monitor_name(monitor: &Monitor) -> String
 {
-    monitor.name().unwrap_or_else(|_| "unknown".to_owned())
+    monitor.name().unwrap_or_else(|_| t!("screen.unknown_monitor").to_owned())
 }
 
 fn monitor_list(monitors: &[Monitor]) -> String //THE MONITORS AS THE USER MAY NAME THEM
@@ -89,14 +93,14 @@ fn select_monitor(monitors: Vec<Monitor>, selection: &str) -> Result<Monitor, St
     monitors.iter()
         .find(|monitor| monitor_name(monitor).eq_ignore_ascii_case(selection))
         .cloned()
-        .ok_or_else(|| format!("no monitor called '{selection}' - available: {}", monitor_list(&monitors)))
+        .ok_or_else(|| t!("screen.error.no_monitor", selection, available = monitor_list(&monitors)))
 }
 
 fn get_target_monitor() -> Result<Monitor, String> //THE MONITOR TO SHARE
 {
-    let monitors = Monitor::all().map_err(|e| format!("failed to enumerate monitors ({e})"))?;
+    let monitors = Monitor::all().map_err(|error| t!("screen.error.enumerate", error))?;
 
-    if monitors.is_empty() { return Err("no monitors found".to_owned()); }
+    if monitors.is_empty() { return Err(t!("screen.error.no_monitors").to_owned()); }
 
     match options::get_monitor()
     {
@@ -112,7 +116,7 @@ fn get_target_monitor() -> Result<Monitor, String> //THE MONITOR TO SHARE
 //THE NAME selection RESOLVES TO
 pub fn resolve_monitor(selection: &str) -> Result<String, String>
 {
-    let monitors = Monitor::all().map_err(|e| format!("failed to enumerate monitors ({e})"))?;
+    let monitors = Monitor::all().map_err(|error| t!("screen.error.enumerate", error))?;
 
     select_monitor(monitors, selection).map(|monitor| monitor_name(&monitor))
 }
@@ -282,7 +286,7 @@ fn create_encoder(fps: f32) -> Result<Encoder, String>
         .background_detection(false);
 
     Encoder::with_api_config(OpenH264API::from_source(), config)
-        .map_err(|e| format!("failed to create H.264 encoder ({e})"))
+        .map_err(|error| t!("screen.error.encoder", error))
 }
 
 struct YuvScratch //REUSABLE I420 SCRATCH BUFFER
@@ -366,7 +370,7 @@ impl FrameEncoder
         //I420 CONVERSION PANICS ON ODD DIMENSIONS
         if width % 2 != 0 || height % 2 != 0
         {
-            return Err(format!("unsupported capture resolution {width}x{height} (must be even)"));
+            return Err(t!("screen.error.resolution", width, height));
         }
 
         //A RESIZE NEEDS A FRESH ENCODER
@@ -393,7 +397,7 @@ impl FrameEncoder
                 Ok(frame) =>
                 {
                     let bitstream = self.encoder.encode(frame)
-                        .map_err(|e| format!("H.264 encode failed ({e})"))?;
+                        .map_err(|error| t!("screen.error.encode", error))?;
 
                     Some(bitstream.to_vec())
                 },
@@ -410,7 +414,7 @@ impl FrameEncoder
                 let yuv = scratch.fill(width, height, rgba);
 
                 let bitstream = self.encoder.encode(yuv)
-                    .map_err(|e| format!("H.264 encode failed ({e})"))?;
+                    .map_err(|error| t!("screen.error.encode", error))?;
 
                 Some(bitstream.to_vec())
             },
@@ -432,7 +436,7 @@ impl FrameEncoder
                 let yuv = scratch.fill(width, height, rgba);
 
                 let bitstream = self.encoder.encode(yuv)
-                    .map_err(|e| format!("H.264 encode failed ({e})"))?;
+                    .map_err(|error| t!("screen.error.encode", error))?;
 
                 bitstream.to_vec()
             },
@@ -529,7 +533,7 @@ fn select_output(wayshot: &libwayshot::WayshotConnection) -> Result<libwayshot::
 {
     let outputs = wayshot.get_all_outputs();
 
-    if outputs.is_empty() { return Err("compositor reported no outputs".to_owned()); }
+    if outputs.is_empty() { return Err(t!("screen.error.no_outputs").to_owned()); }
 
     //FIND THE PICKED OUTPUT, FAILING IF IT IS GONE
     let picked = options::get_monitor().is_some();
@@ -539,7 +543,7 @@ fn select_output(wayshot: &libwayshot::WayshotConnection) -> Result<libwayshot::
         Ok(name) => match outputs.iter().find(|o| o.name == name)
         {
             Some(output) => return Ok(output.clone()),
-            None if picked => return Err(format!("the compositor knows no output called '{name}'")),
+            None if picked => return Err(t!("screen.error.no_output", name)),
             None => {},
         },
 
@@ -577,7 +581,7 @@ fn capture_loop_wayshot
     let generation = options::monitor_generation();
 
     let mut wayshot = libwayshot::WayshotConnection::new()
-        .map_err(|e| format!("wayland screen capture is unavailable ({e})"))?;
+        .map_err(|error| t!("screen.error.wayland", error))?;
 
     let mut target_output = select_output(&wayshot)?;
 
@@ -585,8 +589,7 @@ fn capture_loop_wayshot
 
     //PROBE ONCE SO A BAD COMPOSITOR REPORTS AN ERROR
     let first_image = wayshot.screenshot_single_output(&target_output, true)
-        .map_err(|e| format!("capturing {} failed ({e}) - your compositor must support \
-            ext-image-copy-capture-v1 or wlr-screencopy-v1", target_output.name))?
+        .map_err(|error| t!("screen.error.wayland_capture", output = target_output.name, error))?
         .into_rgba8();
 
     //ENCODE AND SEND FIRST FRAME
@@ -752,14 +755,14 @@ fn open_recorder() -> Result<RecorderSession, String> //THE BLOCKING HALF OF THE
     let monitor = get_target_monitor()?;
 
     let (recorder, frames) = monitor.video_recorder()
-        .map_err(|e| format!("the OS screen recorder is unavailable ({e})"))?;
+        .map_err(|error| t!("screen.error.recorder_unavailable", error))?;
 
     recorder.start()
-        .map_err(|e| format!("starting the OS screen recorder failed ({e})"))?;
+        .map_err(|error| t!("screen.error.recorder_start", error))?;
 
     //DEMAND AN ACTUAL FRAME
     let first = frames.recv_timeout(consts::RECORDER_FIRST_FRAME)
-        .map_err(|_| "the OS screen recorder started but delivered no frames".to_owned())?;
+        .map_err(|_| t!("screen.error.recorder_silent").to_owned())?;
 
     Ok(RecorderSession { recorder, frames, first })
 }
@@ -795,8 +798,8 @@ fn start_recorder() -> Result<RecorderSession, String> //PROBE THE OS-NATIVE REC
     match probe_rx.recv_timeout(probe_timeout())
     {
         Ok(result) => result,
-        Err(RecvTimeoutError::Timeout) => Err("the OS screen recorder did not answer in time".to_owned()),
-        Err(RecvTimeoutError::Disconnected) => Err("the OS screen recorder probe died".to_owned()),
+        Err(RecvTimeoutError::Timeout) => Err(t!("screen.error.recorder_timeout").to_owned()),
+        Err(RecvTimeoutError::Disconnected) => Err(t!("screen.error.recorder_probe").to_owned()),
     }
 }
 
@@ -853,7 +856,7 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
             None => match latest.take(consts::RECORDER_POLL_INTERVAL)
             {
                 Some(frame) => frame,
-                None if latest.ended.load(Ordering::Relaxed) => break Err("the OS screen recorder stopped delivering frames".to_owned()),
+                None if latest.ended.load(Ordering::Relaxed) => break Err(t!("screen.error.recorder_stopped").to_owned()),
                 None => continue,
             },
         };

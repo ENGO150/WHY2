@@ -23,11 +23,14 @@ use crossterm::event::
     KeyModifiers,
 };
 
-use crate::network::client::TofuRequest;
+use crate::
+{
+    t,
+    network::client::TofuRequest,
+};
 
 use super::
 {
-    consts,
     theme,
     state::App,
 };
@@ -79,9 +82,9 @@ impl Prompt
     {
         match (self.mismatch, &self.stage)
         {
-            (_, Stage::Confirm)  => " Confirm the new server key ",
-            (true, Stage::Warn)  => " Server identity changed ",
-            (false, Stage::Warn) => " Unknown server identity ",
+            (_, Stage::Confirm)  => t!("tofu.title.confirm"),
+            (true, Stage::Warn)  => t!("tofu.title.changed"),
+            (false, Stage::Warn) => t!("tofu.title.unknown"),
         }
     }
 
@@ -146,11 +149,11 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
         {
             //LETTERS ONLY, NO LONGER THAN THE WORD
             KeyCode::Char(character)
-                if character.is_ascii_alphabetic()
-                    && prompt.typed.chars().count() < consts::CHALLENGE.chars().count()
+                if character.is_alphabetic()
+                    && prompt.typed.chars().count() < t!("tofu.challenge").chars().count()
                     && !key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
             {
-                prompt.typed.push(character.to_ascii_lowercase());
+                prompt.typed.extend(character.to_lowercase());
                 prompt.wrong = false;
             },
 
@@ -171,7 +174,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
 
             KeyCode::Enter =>
             {
-                if prompt.typed == consts::CHALLENGE { answer(app, true); } else { prompt.wrong = true; }
+                if prompt.typed == t!("tofu.challenge") { answer(app, true); } else { prompt.wrong = true; }
             },
 
             _ => {},
@@ -191,8 +194,7 @@ fn answer(app: &mut App, accept: bool)
 
     if accept
     {
-        app.push_styled(format!("Server identity for {} accepted and saved. Reconnecting...", prompt.host),
-            theme::ok());
+        app.push_styled(t!("tofu.accepted", host = prompt.host), theme::ok());
     }
 
     app.dirty = true;

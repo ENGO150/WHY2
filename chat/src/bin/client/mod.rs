@@ -64,6 +64,9 @@ use tui::settings::DeviceEntry;
 
 use why2_chat::
 {
+    t,
+    tn,
+    i18n,
     config,
     consts,
     misc,
@@ -102,9 +105,9 @@ use why2_chat::network::screen::client::
 };
 
 //HANDLER FNS
-fn invalid_usage(app: &mut App, subject: Option<&str>) //PUSH 'INVALID' MESSAGE
+fn invalid_usage(app: &mut App, key: Option<&'static str>) //PUSH 'INVALID' MESSAGE
 {
-    app.push_styled(format!("Invalid {}! Press Ctrl+H for help.", subject.unwrap_or("usage")), theme::error());
+    app.push_styled(i18n::text(key.unwrap_or("invalid.usage")), theme::error());
 }
 
 //MODERATION ACTIONS - /server <action> [target]
@@ -113,7 +116,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
     let Some(info) = command::COMMAND_LIST.iter().find(|info| info.command == Command::Server) else { return };
 
     //A COMMAND OUR ROLE MAY NOT RUN IS NO COMMAND
-    if !info.available(app.role) { return invalid_usage(app, Some("command")); }
+    if !info.available(app.role) { return invalid_usage(app, Some("invalid.command")); }
 
     let Some(parameters) = parameters else { return invalid_usage(app, None) };
 
@@ -124,10 +127,10 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
         None => (parameters.as_str(), ""),
     };
 
-    let Some(sub) = info.action(action) else { return invalid_usage(app, Some("action")) };
+    let Some(sub) = info.action(action) else { return invalid_usage(app, Some("invalid.action")) };
 
     //AN ACTION ABOVE OUR ROLE IS UNKNOWN
-    if !sub.available(app.role) { return invalid_usage(app, Some("action")); }
+    if !sub.available(app.role) { return invalid_usage(app, Some("invalid.action")); }
 
     //AN ACTION THAT TAKES A PARAMETER NEEDS ONE
     if !sub.args.is_empty() && tail.is_empty() { return invalid_usage(app, None); }
@@ -213,7 +216,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
         {
             let Some((target, role)) = tail.split_once(char::is_whitespace) else { return invalid_usage(app, None) };
 
-            let Ok(role) = role.trim().parse::<Role>() else { return invalid_usage(app, Some("role")) };
+            let Ok(role) = role.trim().parse::<Role>() else { return invalid_usage(app, Some("invalid.role")) };
 
             network::send(&mut *write_stream.lock().await, PacketCode::ServerRoleRequest
             {
@@ -229,7 +232,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
         },
 
         //ACCOUNT ACTIONS
-        Subcommand::Delete | Subcommand::Passwd => invalid_usage(app, Some("action")),
+        Subcommand::Delete | Subcommand::Passwd => invalid_usage(app, Some("invalid.action")),
     }
 }
 
@@ -238,7 +241,7 @@ fn account_command(app: &mut App, parameters: Option<String>)
 {
     let Some(info) = command::COMMAND_LIST.iter().find(|info| info.command == Command::Account) else { return };
 
-    let Some(sub) = parameters.as_deref().and_then(|p| info.action(p)) else { return invalid_usage(app, Some("action")) };
+    let Some(sub) = parameters.as_deref().and_then(|p| info.action(p)) else { return invalid_usage(app, Some("invalid.action")) };
 
     app.account = Some(Account::new(match sub.subcommand
     {
@@ -253,17 +256,17 @@ fn hearts(app: &mut App, parameters: Option<String>) //LIST WHO HEARTED A MESSAG
 
     let Some(hearts) = app.hearts_of(message_id) else
     {
-        app.push_styled(format!("Message #{message_id} is not loaded."), theme::error());
+        app.push_styled(t!("hearts.not_loaded", message_id), theme::error());
         return;
     };
 
     if hearts.is_empty()
     {
-        app.push_styled(format!("Nobody hearted #{message_id}."), theme::notice());
+        app.push_styled(t!("hearts.none", message_id), theme::notice());
         return;
     }
 
-    app.push_styled(format!("Hearts on #{message_id} ({}):", hearts.len()), theme::title());
+    app.push_styled(t!("hearts.title", message_id, count = hearts.len()), theme::title());
 
     let last = hearts.len() - 1;
 
@@ -287,15 +290,15 @@ fn mute(app: &mut App, parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
     } else { None };
 
     //INFO LOG
-    app.push_styled(format!
-    (
-        "Sucessfully {}muted{}.",
-        if options::toggle_mute(id) { "" } else { "un" },
-        if let Some(id) = id
-        {
-            format!(" ID {id}")
-        } else { String::new() }
-    ), theme::ok());
+    let message = match (options::toggle_mute(id), id)
+    {
+        (true, Some(id)) => t!("mute.muted_id", id),
+        (false, Some(id)) => t!("mute.unmuted_id", id),
+        (true, None) => t!("mute.muted").to_owned(),
+        (false, None) => t!("mute.unmuted").to_owned(),
+    };
+
+    app.push_styled(message, theme::ok());
 }
 
 //A TYPED NAME TO THE CODE THE WIRE CARRIES
@@ -332,8 +335,7 @@ async fn color_handler
     //CHECK FOR COLOR VALIDITY
     let Some(code) = to_color(&parameters) else
     {
-        return app.push_styled("Invalid color! Type the command again and pick one of the offered colors.",
-            theme::error());
+        return app.push_styled(t!("invalid.color"), theme::error());
     };
 
     network::send(&mut *write_stream.lock().await, PacketCode::Colors { username, color: code },
@@ -455,7 +457,7 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
         let prepared = task::spawn_blocking(move || match kind
         {
             Upload::Avatar => cut_avatar(file),
-            _ => hash_file(file).map(|hash| (hash, path)).ok_or_else(|| String::from("Reading the file failed!")),
+            _ => hash_file(file).map(|hash| (hash, path)).ok_or_else(|| t!("upload.read_failed").to_owned()),
         }).await.expect("Hashing file failed");
 
         let (hash, path) = match prepared
@@ -509,19 +511,19 @@ fn hash_file(mut file: File) -> Option<[u8; 32]>
 fn cut_avatar(mut file: File) -> Result<([u8; 32], PathBuf), String>
 {
     let mut data = Vec::new();
-    file.read_to_end(&mut data).map_err(|_| String::from("Reading the file failed!"))?;
+    file.read_to_end(&mut data).map_err(|_| t!("upload.read_failed").to_owned())?;
 
-    let (avatar, extension) = client_image::make_avatar(&data).ok_or_else(|| String::from("That image could not be read!"))?;
+    let (avatar, extension) = client_image::make_avatar(&data).ok_or_else(|| t!("upload.unreadable_image").to_owned())?;
 
     if avatar.len() > consts::MAX_AVATAR_SIZE
     {
-        return Err(format!("Avatar is too large even cut down! (limit is {}MB)", consts::MAX_AVATAR_SIZE / consts::MEGABYTE));
+        return Err(t!("upload.avatar_too_large", limit = consts::MAX_AVATAR_SIZE / consts::MEGABYTE));
     }
 
     let hash: [u8; 32] = Sha256::digest(&avatar).into();
     let path = misc::avatar_temp(&hash, extension);
 
-    std::fs::write(&path, &avatar).map_err(|_| String::from("Writing the cut avatar failed!"))?;
+    std::fs::write(&path, &avatar).map_err(|_| t!("upload.avatar_write_failed").to_owned())?;
 
     Ok((hash, path))
 }
@@ -533,11 +535,11 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
     let path = palette::expand_home(path.trim());
 
     //TRY TO OPEN FILE
-    let Ok(mut file) = File::open(&path) else { return Err(String::from("File not found!")) };
+    let Ok(mut file) = File::open(&path) else { return Err(t!("upload.not_found").to_owned()) };
 
     if !path.is_file() || path.file_name().and_then(|n| n.to_str()).is_none()
     {
-        return Err(String::from("File not found!"));
+        return Err(t!("upload.not_found").to_owned());
     }
 
     if kind == Upload::File { return Ok((file, path)); }
@@ -553,10 +555,10 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
     //REFUSE AN OVERSIZED IMAGE HERE
     if path.metadata().map(|m| m.len()).unwrap_or(0) > consts::MAX_IMAGE_SIZE as u64
     {
-        return Err(format!("Image is too large! (limit is {}MB)", consts::MAX_IMAGE_SIZE / consts::MEGABYTE));
+        return Err(t!("upload.image_too_large", limit = consts::MAX_IMAGE_SIZE / consts::MEGABYTE));
     }
 
-    if !misc::is_image(&header) { return Err(String::from("Not an image!")); }
+    if !misc::is_image(&header) { return Err(t!("upload.not_image").to_owned()); }
 
     Ok((file, path))
 }
@@ -633,7 +635,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
                             let last = commands.len().saturating_sub(1);
 
-                            app.push_styled("Commands:", theme::title());
+                            app.push_styled(t!("help.title"), theme::title());
 
                             for (index, entry) in commands.into_iter().enumerate() //ITERATE OVER ALL COMMANDS WE MAY RUN
                             {
@@ -690,11 +692,12 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
                                     let fields =
                                     [
-                                        ("Aliases", if triggers.len() > 1 { triggers[1..].join(", ") } else { String::from("None") }),
-                                        ("Shortcut", if shortcut.is_empty() { String::from("None") } else { shortcut }),
-                                        ("Description", entry.description().to_string()),
+                                        (t!("info.aliases"), if triggers.len() > 1 { triggers[1..].join(", ") } else { t!("info.none").to_owned() }),
+                                        (t!("info.shortcut"), if shortcut.is_empty() { t!("info.none").to_owned() } else { shortcut }),
+                                        (t!("info.description"), entry.description().to_string()),
                                     ];
 
+                                    let label_width = fields.iter().map(|(label, _)| label.width()).max().unwrap_or(0) + 2;
                                     let last = fields.len() - 1;
 
                                     for (index, (label, value)) in fields.into_iter().enumerate()
@@ -702,7 +705,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                                         app.push(Line::from(vec!
                                         [
                                             Span::styled(tui::branch(index == last), theme::border()),
-                                            Span::styled(format!("{label:<12}"), theme::dim()),
+                                            Span::styled(format!("{label:<label_width$}"), theme::dim()),
                                             Span::raw(value),
                                         ]));
                                     }
@@ -745,12 +748,12 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         #[cfg(feature = "client_screen")]
                         Command::Screen => app.push_styled(match screen::capture::current_monitor()
                         {
-                            Some(monitor) => format!("Sharing {monitor} now."),
-                            None => String::from("Swapped the shared monitor."),
+                            Some(monitor) => t!("screen.swapped_to", monitor),
+                            None => t!("screen.swapped").to_owned(),
                         }, theme::ok()),
 
                         //INVALID COMMAND
-                        Command::Invalid => invalid_usage(app, Some("command")),
+                        Command::Invalid => invalid_usage(app, Some("invalid.command")),
 
                         //NON IMPLEMENTED COMMAND
                         _ => panic!("Invalid command")

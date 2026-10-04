@@ -60,14 +60,9 @@ pub const MAX_PICKER_ROWS: usize      = 8;                         //VISIBLE DEV
 pub const MAX_PATHS: usize            = 256;                       //DIRECTORY ENTRIES OFFERED FOR ONE PATH
 pub const MENTION_EVERYONE: &str      = "everyone";                //THE MENTION THAT REACHES EVERYBODY
 
-pub const AVATAR_LABEL: &str         = "Avatar";                  //THE AVATAR ROW IN AN OWN PROFILE
-pub const AVATAR_KEY: &str           = "avatar";                  //AND THE KEY IT GOES BY
-pub const SAVE_LABEL: &str            = "Save";                    //THE BUTTON THE SERVER ROWS ARE SENT BACK WITH
-pub const RESTART_LABEL: &str         = "Restart server";          //AND THE ONE THAT PUTS THE STARTUP-ONLY ONES IN USE
-pub const CHALLENGE: &str             = "yes";                     //WHAT TOFU'S SECOND STAGE WANTS TYPED OUT
-
-#[cfg(feature = "client_voice")]
-pub const DEFAULT_DEVICE: &str        = "System default";          //SHOWN FOR AN EMPTY input_device/output_device
+pub const AVATAR_KEY: &str           = "avatar";                  //THE AVATAR ROW'S KEY
+pub const SAVE_LABEL: &str            = "settings.save";           //THE BUTTON THE SERVER ROWS ARE SENT BACK WITH (TRANSLATION KEY)
+pub const RESTART_LABEL: &str         = "settings.restart";        //AND THE ONE THAT PUTS THE STARTUP-ONLY ONES IN USE
 
 #[cfg(feature = "client_voice")]
 pub const VOLUME_STEP: u32            = 5;                         //WHAT ONE KEYPRESS MOVES A VOLUME ROW BY
@@ -89,7 +84,6 @@ pub const QUOTE: &str                 = "▏ ";                      //AND A BLO
 pub const RULE: char                  = '─';
 pub const REPLY: &str                 = "╭─ ";                     //WHAT A REPLY'S QUOTE OPENS WITH
 pub const HEART: &str                 = "♥";                       //A MESSAGE'S HEART COUNT
-pub const EDITED: &str                = "(edited)";                //A REWORDED MESSAGE'S MARK
 
 pub const INDENT: &str                = "  ";                      //DISPLAY MATH IS SET IN FROM THE PANE, THE WAY A BLOCK IS
 pub const MAX_DEPTH: usize            = 32;                        //A BRACE THIS DEEP IS A BRACE

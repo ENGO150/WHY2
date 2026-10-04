@@ -45,6 +45,8 @@ use ratatui_image::{ CropOptions, FontSize, Resize, ResizeEncodeRender };
 
 use crate::
 {
+    t,
+    i18n,
     config,
     options,
     role::Role,
@@ -227,7 +229,7 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
     //SCROLLED AWAY - ADVERTISE THE BACKLOG
     if app.scroll.is_some() && app.unread > 0
     {
-        block = block.title_bottom(Line::from(Span::styled(format!(" ↓ {} new ", app.unread), theme::notice())).right_aligned());
+        block = block.title_bottom(Line::from(Span::styled(format!(" ↓ {} ", t!("pane.unread", count = app.unread)), theme::notice())).right_aligned());
     }
 
     //TOAST ON THE SAME BORDER
@@ -582,7 +584,7 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::border())
-        .title(Span::styled(" Online ", theme::title()))
+        .title(Span::styled(format!(" {} ", t!("sidebar.online")), theme::title()))
         .title_top(Line::from(Span::styled(format!(" {} ", app.online.len()), theme::title())).right_aligned());
 
     let inner = block.inner(area);
@@ -654,7 +656,8 @@ fn section_label(role: Role) -> String //owner -> Owners
 {
     let name = role.name();
 
-    format!("{}{}s", name[..1].to_uppercase(), &name[1..])
+    i18n::get(&format!("sidebar.roles.{name}")).map(str::to_owned)
+        .unwrap_or_else(|| format!("{}{}s", name[..1].to_uppercase(), &name[1..]))
 }
 
 fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
@@ -662,7 +665,7 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::border())
-        .title(Span::styled(" Offline ", theme::title()))
+        .title(Span::styled(format!(" {} ", t!("sidebar.offline")), theme::title()))
         .title_top(Line::from(Span::styled(format!(" {} ", app.offline.len()), theme::title())).right_aligned());
 
     let inner = block.inner(area);
@@ -690,7 +693,7 @@ fn draw_channels(frame: &mut Frame, app: &App, area: Rect)
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::border())
-        .title(Span::styled(" Channels ", theme::title()))
+        .title(Span::styled(format!(" {} ", t!("sidebar.channels")), theme::title()))
         .title_top(Line::from(Span::styled(format!(" {} ", app.channels.len()), theme::title())).right_aligned());
 
     let inner = block.inner(area);
@@ -718,7 +721,7 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::border())
-        .title(Span::styled(" Voice ", theme::title()))
+        .title(Span::styled(format!(" {} ", t!("sidebar.voice")), theme::title()))
         .title_top(Line::from(Span::styled(format!(" {} ", app.voice.len()), theme::title())).right_aligned());
 
     let inner = block.inner(area);
@@ -815,13 +818,13 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect) -> Rect
     {
         PaletteMode::Hidden => return Rect::ZERO,
 
-        PaletteMode::Menu(matches, selected) => (matches.len(), *selected, String::from(" Commands ")),
+        PaletteMode::Menu(matches, selected) => (matches.len(), *selected, format!(" {} ", t!("palette.commands"))),
 
         //PARAMETER VALUE LIST
         PaletteMode::Values(values) =>
             (values.matches.len(), values.selected, format!(" {} ", capitalize(values.title()))),
 
-        PaletteMode::Signature(..) => (1, 0, String::from(" Parameters ")),
+        PaletteMode::Signature(..) => (1, 0, format!(" {} ", t!("palette.parameters"))),
     };
 
     let rows = total.min(consts::MAX_ROWS);
@@ -924,7 +927,7 @@ fn entry_lines(app: &App, rows: usize, first: usize, width: usize) -> Vec<Line<'
         let mut spans = vec![Span::styled(if Some(row) == selected { "▌" } else { " " }, theme::accent())];
 
         //SHOW THE ACTIVE PARAMETER'S DESCRIPTION
-        let description = active.and_then(|i| entry.args().get(i)).map_or(entry.description(), |arg| arg.description);
+        let description = active.and_then(|i| entry.args().get(i)).map_or(entry.description(), |arg| i18n::text(arg.description));
 
         spans.extend(entry.spans(*active));
         spans.push(Span::raw(" ".repeat(signature_width - entry.width() + 2)));
@@ -969,8 +972,8 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect, font: Font
     //BOTH MODES SHARE THE BOX
     let (title, total, selected) = match &state.picker
     {
-        Some(picker) => (picker.title.to_string(), picker.entries.len(), picker.selected),
-        None => (state.title(), state.rows.len(), state.selected),
+        Some(picker) => (format!(" {} ", picker.title), picker.entries.len(), picker.selected),
+        None => (format!(" {} ", state.title()), state.rows.len(), state.selected),
     };
 
     //WRAP THE SELECTED KEY'S COMMENT
@@ -1083,24 +1086,25 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect, font: Font
 
     let hint = match (state.picker.is_some(), state.edit.is_some())
     {
-        (true, _) => " ↑↓ select │ ⏎ apply │ Esc back ",
-        (_, true) if state.editing_avatar() => " ↑↓ select │ Tab complete │ ⏎ keep │ Esc cancel ",
-        (_, true) => " type a value │ ⏎ keep │ Esc cancel ",
+        (true, _) => t!("hint.settings.picker"),
+        (_, true) if state.editing_avatar() => t!("hint.settings.avatar"),
+        (_, true) => t!("hint.settings.edit"),
 
         _ => match state.mode
         {
-            Mode::Client => " ↑↓ move │ ←→ change │ ⏎ select │ Esc close ",
-            Mode::Server => " ↑↓ move │ ←→ change │ ⏎ edit │ ^S save │ Esc close ",
-            Mode::Profile { own: true } => " ↑↓ move │ ⏎ edit │ ^S save │ Esc close ",
+            Mode::Client => t!("hint.settings.client"),
+            Mode::Server => t!("hint.settings.server"),
+            Mode::Profile { own: true } => t!("hint.settings.own_profile"),
 
             //THE ONE THING A PROFILE THAT IS NOT OURS STILL DOES
             Mode::Profile { own: false } => match state.link().is_some()
             {
-                true => " ↑↓ move │ ⏎ open link │ Esc close ",
-                false => " ↑↓ move │ Esc close ",
+                true => t!("hint.settings.profile_link"),
+                false => t!("hint.settings.profile"),
             },
         },
     };
+    let hint = format!(" {hint} ");
 
     let mut block = Block::bordered()
         .border_type(BorderType::Rounded)
@@ -1157,17 +1161,15 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
 
     let warning = match (confirming, prompt.mismatch)
     {
-        (true, _) => "Replacing a pinned key throws away the only thing that would \
-            catch an interception. Do it only after checking the fingerprint with \
-            the operator over a channel this server cannot touch.",
-
-        (false, true) => "The server is presenting a different identity key than the one \
-            pinned for this address. Either the operator replaced the server's \
-            keys, or somebody is sitting between you and it.",
-
-        (false, false) => "This address has no pinned identity key yet. Accept it only if the \
-            fingerprint below matches the one the server's operator published.",
+        (true, _) => t!("tofu.warning.confirm"),
+        (false, true) => t!("tofu.warning.changed"),
+        (false, false) => t!("tofu.warning.unknown"),
     };
+
+    //THE LABEL COLUMN FITS THE LONGEST LABEL
+    let labels = [t!("tofu.server"), t!("tofu.pinned"), t!("tofu.new_key"), t!("tofu.key")];
+    let label_width = labels.iter().map(|label| label.width()).max().unwrap_or(0) + 2;
+    let column = |label: &str| format!("{label:<label_width$}");
 
     //WRAP THE BODY
     let mut lines = state::wrap_line(&Line::from(Span::styled(warning, theme::notice())), inner_width);
@@ -1175,7 +1177,7 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
     lines.push(Line::default());
     lines.push(Line::from(vec!
     [
-        Span::styled("Server   ", theme::dim()),
+        Span::styled(column(t!("tofu.server")), theme::dim()),
         Span::raw(prompt.host.clone()),
     ]));
 
@@ -1184,18 +1186,18 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
     {
         lines.push(Line::from(vec!
         [
-            Span::styled(if index == 0 { "Pinned   " } else { "         " }, theme::dim()),
+            Span::styled(column(if index == 0 { t!("tofu.pinned") } else { "" }), theme::dim()),
             Span::styled(row, theme::dim()),
         ]));
     }
 
-    let label = if prompt.mismatch { "New key  " } else { "Key      " };
+    let label = if prompt.mismatch { t!("tofu.new_key") } else { t!("tofu.key") };
 
     for (index, row) in prompt.fingerprint().into_iter().enumerate()
     {
         lines.push(Line::from(vec!
         [
-            Span::styled(if index == 0 { label } else { "         " }, theme::dim()),
+            Span::styled(column(if index == 0 { label } else { "" }), theme::dim()),
             Span::styled(row, theme::accent()),
         ]));
     }
@@ -1206,30 +1208,27 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
     {
         let typed = prompt.typed.chars().count();
 
-        lines.append(&mut state::wrap_line(&Line::from(Span::styled(format!
-        (
-            "Type '{}' to replace the pinned key with this one:",
-            consts::CHALLENGE,
-        ), theme::text())), inner_width));
+        lines.append(&mut state::wrap_line(&Line::from(Span::styled(t!("tofu.type_to_replace", word = t!("tofu.challenge")),
+            theme::text())), inner_width));
 
         lines.push(Line::from(vec!
         [
             Span::styled(prompt.typed.clone(), theme::accent()),
-            Span::styled("_".repeat(consts::CHALLENGE.chars().count().saturating_sub(typed)), theme::dim()),
+            Span::styled("_".repeat(t!("tofu.challenge").chars().count().saturating_sub(typed)), theme::dim()),
         ]).centered());
 
         if prompt.wrong
         {
-            lines.push(Line::from(Span::styled(format!("Type '{}' to go through with it.", consts::CHALLENGE),
+            lines.push(Line::from(Span::styled(t!("tofu.type_to_confirm", word = t!("tofu.challenge")),
                 theme::error())).centered());
         }
     } else
     {
         lines.push(Line::from(vec!
         [
-            button(" Reject ", !prompt.accept, theme::error()),
+            button(t!("tofu.reject"), !prompt.accept, theme::error()),
             Span::raw("  "),
-            button(if prompt.mismatch { " Replace pinned key " } else { " Trust & save " }, prompt.accept, theme::ok()),
+            button(if prompt.mismatch { t!("tofu.replace") } else { t!("tofu.trust") }, prompt.accept, theme::ok()),
         ]).centered());
     }
 
@@ -1250,11 +1249,11 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::error())
-        .title(Span::styled(prompt.title(), theme::error()))
-        .title_bottom(Line::from(Span::styled(if confirming
+        .title(Span::styled(format!(" {} ", prompt.title()), theme::error()))
+        .title_bottom(Line::from(Span::styled(format!(" {} ", if confirming
         {
-            " type the word │ ⏎ confirm │ ← back │ Esc reject "
-        } else { " ←→ choose │ ⏎ confirm │ Esc reject " }, theme::dim())).centered());
+            t!("hint.tofu.confirm")
+        } else { t!("hint.tofu.warn") }), theme::dim())).centered());
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -1288,16 +1287,16 @@ fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rec
     //THE PROXY BELONGS TO THE ADDRESS STEP
     if login.stage == LoginStage::Address && options::socks5_enabled()
     {
-        notes.push(Line::from(Span::styled(format!("Through SOCKS5 {}",
-            config::read_config::<String>("socks5_addr")), theme::dim())));
+        notes.push(Line::from(Span::styled(t!("login.socks5", address = config::read_config::<String>("socks5_addr")),
+            theme::dim())));
     }
 
     let footer = match (login.stage, login.busy, login.cancellable())
     {
-        (_, true, true) => " Esc cancel ",
-        (_, true, false) => " Esc quit ",
-        (LoginStage::Address, false, _) => " ⏎ connect │ Esc quit ",
-        (_, false, _) => " ⏎ continue │ Esc quit ",
+        (_, true, true) => t!("hint.login.cancel"),
+        (_, true, false) => t!("hint.login.quit"),
+        (LoginStage::Address, false, _) => t!("hint.login.connect"),
+        (_, false, _) => t!("hint.login.continue"),
     };
 
     draw_form(frame, area, login.title(), &[(login.label(), &login.input)], login.masked(), notes, footer, (!login.busy).then_some(0))
@@ -1307,8 +1306,8 @@ fn draw_account(frame: &mut Frame, form: &Account, area: Rect) -> Rect
 {
     let status = match (form.busy, form.armed, form.error.as_deref())
     {
-        (true, ..) => Line::from(Span::styled("Waiting for the server…", theme::accent())),
-        (false, true, _) => Line::from(Span::styled("This cannot be undone. Press ⏎ again to delete your account.", theme::error())),
+        (true, ..) => Line::from(Span::styled(t!("login.waiting"), theme::accent())),
+        (false, true, _) => Line::from(Span::styled(t!("account.delete_warning"), theme::error())),
         (false, false, Some(error)) => Line::from(Span::styled(error.to_string(), theme::error())),
         (false, false, None) => Line::default(),
     };
@@ -1316,12 +1315,12 @@ fn draw_account(frame: &mut Frame, form: &Account, area: Rect) -> Rect
     let footer = match (form.busy, form.kind, form.armed)
     {
         (true, ..) => "",
-        (false, Kind::Passwd, _) => " ↑↓ field │ ⏎ next │ Esc cancel ",
-        (false, Kind::Delete, false) => " ⏎ delete │ Esc cancel ",
-        (false, Kind::Delete, true) => " ⏎ confirm │ Esc cancel ",
+        (false, Kind::Passwd, _) => t!("hint.account.passwd"),
+        (false, Kind::Delete, false) => t!("hint.account.delete"),
+        (false, Kind::Delete, true) => t!("hint.account.confirm"),
     };
 
-    let fields: Vec<(&str, &InputBuffer)> = form.kind.labels().iter().copied().zip(form.fields.iter()).collect();
+    let fields: Vec<(&str, &InputBuffer)> = form.kind.labels().into_iter().zip(form.fields.iter()).collect();
 
     draw_form(frame, area, form.kind.title(), &fields, true, vec![status], footer, (!form.busy).then_some(form.focus))
 }
@@ -1332,11 +1331,11 @@ fn draw_form
 (
     frame: &mut Frame,
     area: Rect,
-    title: &'static str,
+    title: &str,
     fields: &[(&str, &InputBuffer)],
     masked: bool,
     notes: Vec<Line<'static>>,
-    footer: &'static str,
+    footer: &str,
     focus: Option<usize>,
 ) -> Rect
 {
@@ -1393,8 +1392,8 @@ fn draw_form
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::border_active())
-        .title(Span::styled(title, theme::title()))
-        .title_bottom(Line::from(Span::styled(footer, theme::dim())).centered());
+        .title(Span::styled(format!(" {title} "), theme::title()))
+        .title_bottom(Line::from(Span::styled(if footer.is_empty() { String::new() } else { format!(" {footer} ") }, theme::dim())).centered());
 
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
@@ -1422,8 +1421,10 @@ fn draw_form
     popup
 }
 
-fn button(label: &'static str, selected: bool, style: Style) -> Span<'static>
+fn button(label: &str, selected: bool, style: Style) -> Span<'static>
 {
+    let label = format!(" {label} ");
+
     if selected { Span::styled(label, style.patch(theme::selected())) } else { Span::styled(label, theme::dim()) }
 }
 
@@ -1459,31 +1460,31 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
         //SAY WHAT A BUTTON DOES, OR WHY IT WILL NOT
         Row::Action(label) if **label == *consts::RESTART_LABEL =>
         {
-            spans.push(Span::styled("Restart the server \u{2014} every client is disconnected and the whole config is read again.", theme::dim()));
+            spans.push(Span::styled(t!("settings.restart_description"), theme::dim()));
 
-            if state.unsaved() { spans.push(Span::styled(" \u{b7} save your changes first", theme::notice())); }
-            else if state.confirm { spans.push(Span::styled(" \u{b7} press again to confirm", theme::error())); }
+            if state.unsaved() { spans.push(Span::styled(format!(" \u{b7} {}", t!("settings.save_first")), theme::notice())); }
+            else if state.confirm { spans.push(Span::styled(format!(" \u{b7} {}", t!("settings.press_again_confirm")), theme::error())); }
         },
 
         Row::Action(_) if state.profile() =>
-            spans.push(Span::styled("Send the description to the server.", theme::dim())),
+            spans.push(Span::styled(t!("settings.save_profile_description"), theme::dim())),
 
-        Row::Action(_) => spans.push(Span::styled("Send the edited rows to the server.", theme::dim())),
+        Row::Action(_) => spans.push(Span::styled(t!("settings.save_description"), theme::dim())),
 
         //A FIELD IS PROSE OR A LINK, SO THE FOOT IS WHERE IT IS READ
         Row::Item(item) if state.profile() => match &item.value
         {
             Value::Avatar(Some(path)) if path.is_empty() =>
-                spans.push(Span::styled("Your avatar is removed on save.", theme::notice())),
+                spans.push(Span::styled(t!("profile.avatar.removed"), theme::notice())),
 
-            Value::Avatar(Some(path)) => spans.push(Span::styled(format!("{path} is uploaded on save."), theme::text())),
+            Value::Avatar(Some(path)) => spans.push(Span::styled(t!("profile.avatar.uploaded", path), theme::text())),
 
-            Value::Avatar(None) => spans.push(Span::styled(format!(
-                "Type a path to an image (up to {}MB) to have its centre cut to a square, or clear it to remove your avatar.",
-                chat_consts::MAX_IMAGE_SIZE / chat_consts::MEGABYTE), theme::dim())),
+            Value::Avatar(None) => spans.push(Span::styled(t!("profile.avatar.help",
+                limit = chat_consts::MAX_IMAGE_SIZE / chat_consts::MEGABYTE), theme::dim())),
 
             Value::Text(text) if text.is_empty() =>
-                spans.push(Span::styled(format!("No {}.", item.label.to_lowercase()), theme::dim())),
+                spans.push(Span::styled(i18n::get(&format!("profile.empty.{}", item.key)).map(str::to_owned)
+                    .unwrap_or_else(|| t!("profile.empty_field", field = item.label.to_lowercase())), theme::dim())),
 
             Value::Text(text) => spans.push(Span::styled(text.clone(), theme::text())),
 
@@ -1497,7 +1498,7 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
             //MARK A STARTUP-ONLY KEY
             if item.restart
             {
-                let note = match spans.is_empty() { true => "restart required", false => " \u{b7} restart required" };
+                let note = match spans.is_empty() { true => t!("settings.restart_required").to_owned(), false => format!(" \u{b7} {}", t!("settings.restart_required")) };
 
                 spans.push(Span::styled(note, theme::notice()));
             }
@@ -1536,9 +1537,10 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
                 (_, false, false) => theme::dim(),
             };
 
+            let label = i18n::text(label);
             let text = match armed
             {
-                true => format!("[ {label} \u{b7} press again ]"),
+                true => format!("[ {label} \u{b7} {} ]", t!("settings.press_again")),
                 false => format!("[ {label} ]"),
             };
             let padding = width.saturating_sub(text.width() + 1) / 2;
@@ -1590,17 +1592,17 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
 {
     match value
     {
-        Value::Toggle { on: true, .. } => vec![Span::styled("● on", theme::ok())],
-        Value::Toggle { on: false, .. } => vec![Span::styled("○ off", theme::dim())],
+        Value::Toggle { on: true, .. } => vec![Span::styled(format!("● {}", t!("settings.on")), theme::ok())],
+        Value::Toggle { on: false, .. } => vec![Span::styled(format!("○ {}", t!("settings.off")), theme::dim())],
 
         Value::Number(number) => vec![Span::styled(number.to_string(), theme::text())],
 
-        Value::Text(text) if text.is_empty() => vec![Span::styled("(empty)", theme::dim())],
+        Value::Text(text) if text.is_empty() => vec![Span::styled(format!("({})", t!("settings.empty")), theme::dim())],
         Value::Text(text) => vec![Span::styled(truncate(text, _width), theme::text())],
 
-        Value::Avatar(None) if _state.avatar.is_some() => vec![Span::styled("set", theme::text())],
-        Value::Avatar(None) => vec![Span::styled("(none)", theme::dim())],
-        Value::Avatar(Some(path)) if path.is_empty() => vec![Span::styled("remove", theme::notice())],
+        Value::Avatar(None) if _state.avatar.is_some() => vec![Span::styled(t!("profile.avatar.set"), theme::text())],
+        Value::Avatar(None) => vec![Span::styled(format!("({})", t!("profile.avatar.none")), theme::dim())],
+        Value::Avatar(Some(path)) if path.is_empty() => vec![Span::styled(t!("profile.avatar.remove"), theme::notice())],
         Value::Avatar(Some(path)) => vec![Span::styled(truncate(path, _width), theme::text())],
 
         Value::Theme(index) => vec![Span::styled(format!("◂ {} ▸", theme::PALETTES[*index].name), theme::accent())],
@@ -1624,7 +1626,7 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
         {
             if id.is_empty()
             {
-                vec![Span::styled(consts::DEFAULT_DEVICE, theme::dim())]
+                vec![Span::styled(t!("settings.default_device"), theme::dim())]
             } else
             {
                 vec![Span::styled(truncate(&_state.device_label(id, *input), _width), theme::accent())]
@@ -1639,7 +1641,7 @@ fn picker_line(entry: &DeviceEntry, selected: bool, width: usize) -> Line<'stati
     //ENTRY 0 IS THE SYSTEM DEFAULT
     let (text, style) = if entry.id.is_empty()
     {
-        (String::from(consts::DEFAULT_DEVICE), theme::dim())
+        (t!("settings.default_device").to_owned(), theme::dim())
     } else
     {
         (truncate(&entry.label, width.saturating_sub(3)), theme::text())
@@ -1688,10 +1690,10 @@ fn right_status(_app: &App) -> String
         //0% IS OFF
         let off = options::is_muted(None) || voice_options::get_input_volume() == 0;
 
-        parts.push(String::from(if off { "mic off" } else { "mic on" }));
+        parts.push(String::from(if off { t!("status.mic_off") } else { t!("status.mic_on") }));
     }
 
-    parts.push(String::from("Ctrl+, settings"));
+    parts.push(t!("status.settings").to_owned());
 
     format!(" {} ", parts.join(" │ "))
 }

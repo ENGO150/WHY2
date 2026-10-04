@@ -94,6 +94,8 @@ use tokio_stream::StreamExt;
 
 use crate::
 {
+    t,
+    tn,
     config,
     options,
     network::
@@ -179,9 +181,9 @@ pub fn device_label(device: &Device) -> &'static str
 {
     match device
     {
-        Device::TUI => "tui",
-        Device::Desktop => "desktop",
-        Device::Phone => "phone",
+        Device::TUI => t!("device.tui"),
+        Device::Desktop => t!("device.desktop"),
+        Device::Phone => t!("device.phone"),
     }
 }
 
@@ -301,7 +303,7 @@ pub async fn run
                 match event
                 {
                     Some(Ok(event)) => handle_terminal_event(app, event, write_stream.as_ref(), tx, &connect_tx, terminal).await,
-                    Some(Err(_)) => app.quit(1, Some(String::from("Reading terminal input failed."))),
+                    Some(Err(_)) => app.quit(1, Some(t!("tui.input_failed").to_owned())),
                     None => app.quit(0, None),
                 }
             },
@@ -484,7 +486,7 @@ async fn handle_terminal_event
                             let lines = text.lines().count();
 
                             copy_to_clipboard(&text);
-                            app.notify(format!("Copied {lines} line{} to the clipboard", if lines == 1 { "" } else { "s" }));
+                            app.notify(tn!("tui.copied", lines));
                         }
                     } else
                     {
@@ -493,7 +495,7 @@ async fn handle_terminal_event
                         //A CLICK ON A URL HANDS IT TO THE BROWSER
                         if let Some(url) = app.link_at(mouse.column, mouse.row)
                         {
-                            app.notify(format!("Opening {url}"));
+                            app.notify(t!("tui.opening", url));
                             open_link(&url);
                         }
                         //A CLICK ON A CAPTION FETCHES THE PICTURE
@@ -633,7 +635,7 @@ async fn handle_key
                     //STORED IS NOT IN USE FOR THESE
                     if let Some(keys) = app.settings.restart_note.take()
                     {
-                        app.push_styled(format!("{keys} takes effect when the server is restarted."), theme::notice());
+                        app.push_styled(t!("settings.restart_note", keys), theme::notice());
                     }
                 },
 
@@ -691,7 +693,7 @@ async fn handle_key
             network::send(&mut *write_stream.lock().await,
                 PacketCode::ServerRestart, options::get_keys().as_ref()).await;
 
-            app.push_styled(String::from("Restarting the server..."), theme::notice());
+            app.push_styled(t!("settings.restarting"), theme::notice());
         }
 
         return;

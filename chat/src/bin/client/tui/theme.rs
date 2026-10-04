@@ -40,7 +40,13 @@ use ratatui::
     },
 };
 
-use crate::{ colors, config };
+use crate::
+{
+    t,
+    i18n,
+    colors,
+    config,
+};
 
 use super::
 {
@@ -157,7 +163,7 @@ impl Theme
             {
                 let prefix = vec!
                 [
-                    Span::styled(if *sent { "PM → " } else { "PM ← " }, accent()),
+                    Span::styled(format!("{} {} ", t!("message.pm"), if *sent { "→" } else { "←" }), accent()),
                     self.name(username.clone(), colors.username_color),
                     Span::styled(format!(" ({id}): "), dim()),
                 ];
@@ -170,23 +176,26 @@ impl Theme
             //ONLY THE CAPTION; THE PICTURE IS DRAWN UNDER IT
             Entry::Image { username, filename, timestamp, username_color, picture, .. } =>
             {
+                let (before, after) = i18n::split(t!("message.image"), "username");
+
                 let mut spans = vec!
                 [
                     self.timestamp(*timestamp),
+                    Span::styled(i18n::format(before, &[("filename", filename)]), dim()),
                     //THE SENDER'S COLOR, ELSE THE CHROME'S ACCENT
                     match username_color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
                     {
                         Some(color) => Span::styled(username.clone(), Style::new().fg(ansi(Color::from_crossterm(color))).add_modifier(Modifier::BOLD)),
                         None => Span::styled(username.clone(), accent().add_modifier(Modifier::BOLD)),
                     },
-                    Span::styled(format!(" sent an image ({filename})"), dim()),
+                    Span::styled(i18n::format(after, &[("filename", filename)]), dim()),
                 ];
 
                 match picture
                 {
-                    Picture::Absent => spans.push(Span::styled(" [ show ]", accent())),
-                    Picture::Waiting | Picture::Deferred => spans.push(Span::styled(" [ loading... ]", dim())),
-                    Picture::Gone => spans.push(Span::styled(" [ unavailable ]", error())),
+                    Picture::Absent => spans.push(Span::styled(format!(" [ {} ]", t!("message.show")), accent())),
+                    Picture::Waiting | Picture::Deferred => spans.push(Span::styled(format!(" [ {} ]", t!("message.loading")), dim())),
+                    Picture::Gone => spans.push(Span::styled(format!(" [ {} ]", t!("message.unavailable")), error())),
                     Picture::Ready(..) => {},
                 }
 
@@ -210,8 +219,11 @@ impl Theme
 
             Some(Entry::Image { username, filename, username_color, .. }) =>
             {
+                let (before, after) = i18n::split(t!("message.image"), "username");
+
+                spans.push(Span::styled(i18n::format(before, &[("filename", filename)]), dim()));
                 spans.push(self.colorize(username.clone(), *username_color));
-                spans.push(Span::styled(format!(" sent an image ({filename})"), dim()));
+                spans.push(Span::styled(i18n::format(after, &[("filename", filename)]), dim()));
             },
 
             //NOT IN THE PANE
@@ -242,11 +254,11 @@ impl Theme
         //OLDER THAN TODAY GETS THE DATE
         let format = match time.date_naive() == Local::now().date_naive()
         {
-            true => "%H:%M ",
-            false => "%Y-%m-%d %H:%M ",
+            true => t!("time.today"),
+            false => t!("time.older"),
         };
 
-        Span::styled(time.format(format).to_string(), dim())
+        Span::styled(format!("{} ", time.format(format)), dim())
     }
 
     //EDITED, HEARTS AND MESSAGE ID, RIGHT-ALIGNED ON THE LAST ROW
@@ -254,7 +266,7 @@ impl Theme
     {
         let mut tag: Vec<Span<'static>> = Vec::new();
 
-        if edited { tag.push(Span::styled(consts::EDITED, dim())); }
+        if edited { tag.push(Span::styled(format!("({})", t!("message.edited")), dim())); }
 
         if !hearts.is_empty()
         {
@@ -333,15 +345,16 @@ fn progress(transfer: &Transfer, width: u16) -> Vec<Span<'static>>
 {
     let Transfer { upload, image, filename, done, total, outcome, .. } = transfer;
 
-    let kind = if *image { "image" } else { "file" };
-
-    let (label, style) = match (outcome, upload)
+    let (label, style) = match (outcome, upload, image)
     {
-        (None, true) => (format!("Uploading {kind} \"{filename}\""), dim()),
-        (None, false) => (format!("Downloading {kind} \"{filename}\""), dim()),
-        (Some(true), true) => (format!("Uploaded {kind} \"{filename}\""), ok()),
-        (Some(true), false) => (format!("Downloaded {kind} \"{filename}\""), ok()),
-        (Some(false), _) => (format!("Transferring {kind} \"{filename}\" failed"), error()),
+        (None, true, false) => (t!("transfer.uploading_file", filename), dim()),
+        (None, true, true) => (t!("transfer.uploading_image", filename), dim()),
+        (None, false, _) => (t!("transfer.downloading", filename), dim()),
+        (Some(true), true, false) => (t!("transfer.uploaded_file", filename), ok()),
+        (Some(true), true, true) => (t!("transfer.uploaded_image", filename), ok()),
+        (Some(true), false, _) => (t!("transfer.downloaded", filename), ok()),
+        (Some(false), _, false) => (t!("transfer.failed_file", filename), error()),
+        (Some(false), _, true) => (t!("transfer.failed_image", filename), error()),
     };
 
     let percent = state::percent(*done, *total);

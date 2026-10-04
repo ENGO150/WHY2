@@ -25,6 +25,8 @@ use crossterm::event::
 
 use zeroize::Zeroizing;
 
+use crate::t;
+
 use super::
 {
     input::InputBuffer,
@@ -62,12 +64,23 @@ pub struct Account //AN ACCOUNT FORM
 //IMPLEMENTATIONS
 impl Kind
 {
-    pub fn labels(&self) -> &'static [&'static str]
+    pub fn labels(&self) -> Vec<&'static str>
     {
         match self
         {
-            Kind::Passwd => &[ "Current password", "New password", "Confirm new password" ],
-            Kind::Delete => &[ "Current password" ],
+            Kind::Passwd => vec![t!("account.label.current"), t!("account.label.new"), t!("account.label.confirm")],
+            Kind::Delete => vec![t!("account.label.current")],
+        }
+    }
+
+    //WHAT AN EMPTY FIELD ASKS FOR
+    fn missing(field: usize) -> &'static str
+    {
+        match field
+        {
+            0 => t!("account.missing.current"),
+            1 => t!("account.missing.new"),
+            _ => t!("account.missing.confirm"),
         }
     }
 
@@ -75,8 +88,8 @@ impl Kind
     {
         match self
         {
-            Kind::Passwd => " Change password ",
-            Kind::Delete => " Delete account ",
+            Kind::Passwd => t!("account.title.passwd"),
+            Kind::Delete => t!("account.title.delete"),
         }
     }
 }
@@ -129,7 +142,7 @@ impl Account
         if let Some(empty) = self.fields.iter().position(InputBuffer::is_empty)
         {
             self.focus = empty;
-            self.error = Some(format!("Enter the {}.", self.kind.labels()[empty].to_lowercase()));
+            self.error = Some(Kind::missing(empty).to_owned());
 
             return;
         }
@@ -145,7 +158,7 @@ impl Account
                 {
                     self.fields[2].clear();
                     self.focus = 2;
-                    self.error = Some(String::from("Passwords do not match."));
+                    self.error = Some(t!("account.mismatch").to_owned());
 
                     return;
                 }

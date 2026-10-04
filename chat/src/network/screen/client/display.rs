@@ -45,10 +45,14 @@ use winit::
 
 use openh264::decoder::Decoder;
 
-use crate::network::screen::
+use crate::
 {
-    consts,
-    client::{ ScreenShareRequest, UserEvent, video::VideoSurface },
+    t,
+    network::screen::
+    {
+        consts,
+        client::{ ScreenShareRequest, UserEvent, video::VideoSurface },
+    },
 };
 
 //PRIVATE
@@ -150,7 +154,7 @@ impl ScreenShareApp
         }
 
         let attrs = WindowAttributes::default()
-            .with_title("WHY2 ScreenShare")
+            .with_title(t!("screen.window"))
             .with_inner_size(PhysicalSize::new(consts::WINIT_SIZE.0, consts::WINIT_SIZE.1));
 
         let Ok(window) = event_loop.create_window(attrs) else { return; };
@@ -261,7 +265,7 @@ impl ApplicationHandler<UserEvent> for ScreenShareApp
                 session.frame_count += 1;
                 if session.last_fps_time.elapsed() >= Duration::from_secs(1)
                 {
-                    session.window.set_title(&format!("WHY2 Screenshare ({} FPS)", session.frame_count));
+                    session.window.set_title(&t!("screen.window_fps", fps = session.frame_count));
                     session.frame_count = 0;
                     session.last_fps_time = Instant::now();
                 }

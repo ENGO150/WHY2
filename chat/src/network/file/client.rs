@@ -37,6 +37,7 @@ use sha2::{ Sha256, Digest };
 
 use crate::
 {
+    t,
     misc,
     config,
     options,
@@ -71,7 +72,7 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
     //GET FILE PATH
     let path = client::ACTIVE_UPLOADS.lock().unwrap().remove(&file_hash).unwrap(); //(CRASHES IF SERVER REQUESTS FILE THAT ISN'T FOR UPLOAD)
     let filename = path.clone().file_name().and_then(|n| n.to_str()
-        .map(|s| s.to_string())).unwrap_or_else(|| String::from("Unknown")); //GET FILENAME FOR CONSOLE LOG
+        .map(|s| s.to_string())).unwrap_or_else(|| t!("transfer.unknown_file").to_owned()); //GET FILENAME FOR CONSOLE LOG
 
     let size = fs::metadata(&path).await.unwrap().len();
 

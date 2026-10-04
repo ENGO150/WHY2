@@ -116,7 +116,7 @@ pub enum ArgValues
 //STRUCTS
 pub struct CommandArg //COMMAND PARAMETER
 {
-    pub name: &'static str,
+    pub name: &'static str,        //TRANSLATION KEYS
     pub description: &'static str,
     pub required: bool,
     pub values: ArgValues, //WHAT MAY BE TYPED HERE, WHEN THAT IS A KNOWN, SHORT LIST
@@ -153,13 +153,13 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "Target user",
+                name: "arg.id",
+                description: "command.server.mute.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Mutes a user server-side",
+        description: "command.server.mute.description",
     },
 
     SubcommandInfo
@@ -171,13 +171,13 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "Target user",
+                name: "arg.id",
+                description: "command.server.kick.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Disconnects a user from the server",
+        description: "command.server.kick.description",
     },
 
     SubcommandInfo
@@ -189,13 +189,13 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "USER",
-                description: "Username or ID of target user",
+                name: "arg.user",
+                description: "command.server.ban.args.user",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Bans a user from the server",
+        description: "command.server.ban.description",
     },
 
     SubcommandInfo
@@ -207,13 +207,13 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "Target user",
+                name: "arg.id",
+                description: "command.server.banip.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Bans a user's IP from the server",
+        description: "command.server.banip.description",
     },
 
     SubcommandInfo
@@ -222,7 +222,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         triggers: &[ "BANLIST", "BANS", "BANNED", "DISABLED", "BLOCKED" ],
         minimal_role: Role::Owner,
         args: &[],
-        description: "Lists every ban",
+        description: "command.server.banlist.description",
     },
 
     SubcommandInfo
@@ -234,13 +234,13 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "Banned user ID",
+                name: "arg.id",
+                description: "command.server.pardon.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Removes a user ban",
+        description: "command.server.pardon.description",
     },
 
     SubcommandInfo
@@ -252,13 +252,13 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "Banned address ID",
+                name: "arg.id",
+                description: "command.server.pardonip.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Removes an IP ban",
+        description: "command.server.pardonip.description",
     },
 
     SubcommandInfo
@@ -270,13 +270,13 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "MESSAGE",
-                description: "Message to broadcast",
+                name: "arg.message",
+                description: "command.server.say.args.message",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Broadcasts message as server",
+        description: "command.server.say.description",
     },
 
     SubcommandInfo
@@ -288,21 +288,21 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "USER",
-                description: "Username or ID of target user",
+                name: "arg.user",
+                description: "command.server.role.args.user",
                 required: true,
                 values: ArgValues::Free,
             },
 
             CommandArg
             {
-                name: "ROLE",
-                description: "Role to grant",
+                name: "arg.role",
+                description: "command.server.role.args.role",
                 required: true,
                 values: ArgValues::Roles,
             },
         ],
-        description: "Sets a user's role on the server",
+        description: "command.server.role.description",
     },
 
     SubcommandInfo
@@ -311,7 +311,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         triggers: &[ "SETTINGS", "CONFIG", "SETUP" ],
         minimal_role: Role::Owner,
         args: &[],
-        description: "Opens the server configuration",
+        description: "command.server.settings.description",
     },
 ];
 
@@ -323,7 +323,7 @@ pub const ACCOUNT_SUBCOMMANDS: &[SubcommandInfo] =
         triggers: &[ "DELETE", "REMOVE", "CLOSE" ],
         minimal_role: Role::User,
         args: &[],
-        description: "Deletes your account",
+        description: "command.account.delete.description",
     },
 
     SubcommandInfo
@@ -332,7 +332,7 @@ pub const ACCOUNT_SUBCOMMANDS: &[SubcommandInfo] =
         triggers: &[ "PASSWD", "PASSWORD", "CHANGEPASS" ],
         minimal_role: Role::User,
         args: &[],
-        description: "Changes your password",
+        description: "command.account.passwd.description",
     },
 ];
 
@@ -346,7 +346,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         minimal_role: Role::User,
         subcommands: &[],
         args: &[],
-        description: "Prints all available commands",
+        description: "command.help.description",
     },
 
     CommandInfo
@@ -360,13 +360,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "COMMAND",
-                description: "Target command",
+                name: "arg.command",
+                description: "command.info.args.command",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Shows command info",
+        description: "command.info.description",
     },
 
     #[cfg(feature = "client_voice")]
@@ -378,7 +378,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         minimal_role: Role::User,
         subcommands: &[],
         args: &[],
-        description: "Toggles voice chat",
+        description: "command.voice.description",
     },
 
     #[cfg(feature = "client_voice")]
@@ -393,13 +393,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "ID of target user",
+                name: "arg.id",
+                description: "command.mute.args.id",
                 required: false,
                 values: ArgValues::Free,
             },
         ],
-        description: "Toggle-mutes user/yourself",
+        description: "command.mute.description",
     },
 
     CommandInfo
@@ -413,13 +413,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "NAME",
-                description: "Name of channel",
+                name: "arg.name",
+                description: "command.channel.args.name",
                 required: false,
                 values: ArgValues::Free,
             },
         ],
-        description: "Switches to channel/lobby if NAME is omitted",
+        description: "command.channel.description",
     },
 
     CommandInfo
@@ -433,13 +433,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "PATH",
-                description: "Path of target file",
+                name: "arg.path",
+                description: "command.upload.args.path",
                 required: true,
                 values: ArgValues::Paths,
             },
         ],
-        description: "Uploads file to server",
+        description: "command.upload.description",
     },
 
     CommandInfo
@@ -453,20 +453,20 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "USER ID",
-                description: "ID of uploader",
+                name: "arg.user_id",
+                description: "command.download.args.user_id",
                 required: true,
                 values: ArgValues::Free,
             },
             CommandArg
             {
-                name: "FILE ID",
-                description: "ID of target file",
+                name: "arg.file_id",
+                description: "command.download.args.file_id",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Downloads file from server",
+        description: "command.download.description",
     },
 
     CommandInfo
@@ -480,13 +480,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "PATH",
-                description: "Path of target image",
+                name: "arg.path",
+                description: "command.image.args.path",
                 required: true,
                 values: ArgValues::Images,
             },
         ],
-        description: "Uploads a persistent image",
+        description: "command.image.description",
     },
 
     #[cfg(feature = "client_screen")]
@@ -501,13 +501,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "MONITOR",
-                description: "Index or name of the monitor to share",
+                name: "arg.monitor",
+                description: "command.screen.args.monitor",
                 required: false,
                 values: ArgValues::Monitors,
             },
         ],
-        description: "Toggles screensharing, or swaps the shared monitor while it runs",
+        description: "command.screen.description",
     },
 
     #[cfg(feature = "client_screen")]
@@ -522,13 +522,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "ID of screensharing user",
+                name: "arg.id",
+                description: "command.attach.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Attaches client screenshare.",
+        description: "command.attach.description",
     },
 
     #[cfg(feature = "client_screen")]
@@ -540,7 +540,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         minimal_role: Role::User,
         subcommands: &[],
         args: &[],
-        description: "Dettaches client screenshare.",
+        description: "command.deattach.description",
     },
 
     CommandInfo
@@ -551,7 +551,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         minimal_role: Role::User,
         subcommands: &[],
         args: &[],
-        description: "Shows connected users and their IDs",
+        description: "command.list.description",
     },
 
     CommandInfo
@@ -562,7 +562,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         minimal_role: Role::User,
         subcommands: &[],
         args: &[],
-        description: "Shows available files and their IDs",
+        description: "command.files.description",
     },
 
     #[cfg(feature = "client_screen")]
@@ -574,7 +574,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         minimal_role: Role::User,
         subcommands: &[],
         args: &[],
-        description: "Shows all screensharing clients.",
+        description: "command.screens.description",
     },
 
     CommandInfo
@@ -588,20 +588,20 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "ID of target user",
+                name: "arg.id",
+                description: "command.pm.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
             CommandArg
             {
-                name: "MESSAGE",
-                description: "Message content",
+                name: "arg.message",
+                description: "command.pm.args.message",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Sends private message",
+        description: "command.pm.description",
     },
 
     CommandInfo
@@ -615,13 +615,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "ID of the message",
+                name: "arg.id",
+                description: "command.heart.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Toggles heart reaction on a message.",
+        description: "command.heart.description",
     },
 
     CommandInfo
@@ -635,13 +635,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "ID of the message",
+                name: "arg.id",
+                description: "command.hearts.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Lists who hearted a message.",
+        description: "command.hearts.description",
     },
 
     CommandInfo
@@ -655,20 +655,20 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "ID of the message",
+                name: "arg.id",
+                description: "command.reply.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
             CommandArg
             {
-                name: "MESSAGE",
-                description: "Message content",
+                name: "arg.message",
+                description: "command.reply.args.message",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Responds to message",
+        description: "command.reply.description",
     },
 
     CommandInfo
@@ -682,13 +682,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "MESSAGE",
-                description: "Message content",
+                name: "arg.message",
+                description: "command.re.args.message",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Responds to last private message",
+        description: "command.re.description",
     },
 
     CommandInfo
@@ -702,13 +702,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "ID of the message",
+                name: "arg.id",
+                description: "command.delete.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Deletes a message from the history",
+        description: "command.delete.description",
     },
 
     CommandInfo
@@ -722,20 +722,20 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "ID",
-                description: "ID of the message",
+                name: "arg.id",
+                description: "command.edit.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
             CommandArg
             {
-                name: "MESSAGE",
-                description: "New message content",
+                name: "arg.message",
+                description: "command.edit.args.message",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Edits your message in the history",
+        description: "command.edit.description",
     },
 
     CommandInfo
@@ -746,7 +746,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         minimal_role: Role::User,
         subcommands: &[],
         args: &[],
-        description: "Opens audio and interface settings",
+        description: "command.settings.description",
     },
 
     CommandInfo
@@ -760,13 +760,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "USER",
-                description: "Username or ID, nobody for your own",
+                name: "arg.user",
+                description: "command.profile.args.user",
                 required: false,
                 values: ArgValues::Free,
             },
         ],
-        description: "Opens a user profile",
+        description: "command.profile.description",
     },
 
     CommandInfo
@@ -780,13 +780,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "COLOR",
-                description: "Target color",
+                name: "arg.color",
+                description: "command.ucolor.args.color",
                 required: true,
                 values: ArgValues::Colors,
             },
         ],
-        description: "Sets color of username",
+        description: "command.ucolor.description",
     },
 
     CommandInfo
@@ -800,13 +800,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "COLOR",
-                description: "Target color",
+                name: "arg.color",
+                description: "command.color.args.color",
                 required: true,
                 values: ArgValues::Colors,
             },
         ],
-        description: "Sets color of message",
+        description: "command.color.description",
     },
 
     CommandInfo
@@ -820,13 +820,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "ACTION",
-                description: "Moderation action",
+                name: "arg.action",
+                description: "command.server.args.action",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Moderation actions",
+        description: "command.server.description",
     },
 
     CommandInfo
@@ -840,13 +840,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "ACTION",
-                description: "Account action",
+                name: "arg.action",
+                description: "command.account.args.action",
                 required: true,
                 values: ArgValues::Free,
             },
         ],
-        description: "Account actions",
+        description: "command.account.description",
     },
 
     CommandInfo
@@ -857,7 +857,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         minimal_role: Role::User,
         subcommands: &[],
         args: &[],
-        description: "Disconnects from the server and returns to the login screen",
+        description: "command.logout.description",
     },
 
     CommandInfo
@@ -868,7 +868,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
         minimal_role: Role::User,
         subcommands: &[],
         args: &[],
-        description: "Disconnects from the server",
+        description: "command.exit.description",
     },
 ];
 
