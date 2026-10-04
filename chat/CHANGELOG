@@ -1,6 +1,24 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.3.0:
+- d485d407: draw server icon in sidebar
+- 2ce03fb0: implement server icons
+- ae39e182: add server icon command
+- b4eb0ea3: split PacketCode::Colors on ColorRequest & Color
+- ab1cd528: tell client their colors in Accept packet
+- 2f3914fe: add machine-translated locales
+- 6de78bed: add polish plural rule
+- ec89c616: shorten czech time format
+- 84ba89e5: add language selection into settings
+- 90e6661f: add language entry to locales
+- cb669219: fix czech locale typos
+- a9df4bfa: add czech translation
+- 191c8518: implement i18n across client code
+- 53b4f8a1: add i18n handler
+- dee85ce3: add english locale file
+- d9b1875d: add language field to client config
+
 v2.2.7:
 - 922f28b3: upgrade chat dependencies
 - 3b30f96c: display role change notification only on target user
