@@ -635,6 +635,13 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   cannot hold a bitrate without it. Slices plus `num_threads` cut the average encode by a third and
   were left out: they did not lower the worst case, and they take cores from whatever is being
   shared.
+  **`H264_BITRATE` is 8 Mbps, and it is a ceiling, not a rate.** On the same game frames 4 Mbps was
+  visibly blocky in motion (35.3 dB) and 8 Mbps measured 38.7 dB, with all 30 frames still coming out
+  and the encode only ~2 ms slower (16 ms average, 21 ms worst case) — rate control spends more bits,
+  it does not do more work. A desktop never reaches it: scrolling text sat at ~3 Mbps under every cap
+  from 4 to 16, so the higher ceiling only costs bandwidth while the picture is moving. What bounds it
+  from above is `SOCKET_BUFFER`: a 128 KB window carries 1 MB per round trip, so 8 Mbps still fits a
+  ~128 ms RTT path, and every step past it shrinks the paths a share can cross without shedding.
 - **`network/screen/client/video.rs` + `yuv_to_rgba.wgsl`** — the viewer half, a `wgpu` surface
   that replaced `pixels` (which is no longer a dependency). The decoder's Y/U/V planes are uploaded
   as three `R8Unorm` textures — **1.5 bytes per pixel instead of the 4 the old RGBA path pushed**,
