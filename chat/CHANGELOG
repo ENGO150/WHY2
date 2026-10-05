@@ -1,6 +1,16 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.3.1:
+- 3ecb2c5b: fall back to the portal where wayland has no screencopy
+- 6e189645: draw the cursor into portal screen shares
+- 6e6f5fa9: accept a portal stream once it is streaming, not on its first frame
+- 0d4d5b82: increase H264_BITRATE to 8 Mbps
+- 922aafbf: read wayshot frames from a reused memfd
+- aa7b8cc2: capture wayland through our own screencast portal recorder
+- bf3c8058: encode screen shares in camera mode
+- 2d9d2c9b: convert screen capture on the cpu with openh264's simd path
+
 v2.3.0:
 - d485d407: draw server icon in sidebar
 - 2ce03fb0: implement server icons

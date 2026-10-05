@@ -6054,7 +6054,7 @@ dependencies = [
 
 [[package]]
 name = "why2-chat"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "argon2",
  "audiopus",
