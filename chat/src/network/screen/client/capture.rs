@@ -892,7 +892,10 @@ fn open_portal(fps: u32) -> Result<RecorderSession, String>
     let recorder = PortalRecorder::start(latest.clone(), fps)
         .map_err(|error| t!("screen.error.recorder_unavailable", error))?;
 
-    first_frame(Recorder::Portal(recorder), latest)
+    //A STREAMING PORTAL IS PROOF ENOUGH
+    let first = latest.try_take();
+
+    Ok(RecorderSession { recorder: Recorder::Portal(recorder), latest, first })
 }
 
 fn open_recorder(fps: u32) -> Result<RecorderSession, String> //THE BLOCKING HALF OF THE PROBE

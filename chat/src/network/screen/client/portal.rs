@@ -20,7 +20,7 @@ use std::
 {
     collections::HashMap,
     io::Cursor,
-    sync::{ Arc, mpsc },
+    sync::{ Arc, mpsc::{ self, RecvTimeoutError } },
     thread::{ self, JoinHandle },
 };
 
@@ -53,7 +53,11 @@ use zbus::
     zvariant::{ OwnedFd, OwnedObjectPath, OwnedValue, Value },
 };
 
-use crate::network::screen::client::capture::{ CapturedFrame, LatestFrame, PixelOrder, pack_rows };
+use crate::network::screen::
+{
+    consts,
+    client::capture::{ CapturedFrame, LatestFrame, PixelOrder, pack_rows },
+};
 
 //CONSTANTS
 const DESTINATION: &str = "org.freedesktop.portal.Desktop";
@@ -225,10 +229,20 @@ fn run_stream
 
     let _listener = stream
         .add_local_listener_with_user_data(VideoInfoRaw::default())
-        .state_changed(move |_, _, _, state|
+        .state_changed(move |_, _, _, state| match state
         {
+            //NEGOTIATED, FRAMES MAY ONLY COME ON DAMAGE
+            StreamState::Streaming => { ready.send(Ok(())).ok(); },
+
             //A DEAD STREAM ENDS THE SHARE
-            if matches!(state, StreamState::Error(_) | StreamState::Unconnected) { failed.end(); }
+            StreamState::Error(reason) =>
+            {
+                ready.send(Err(reason)).ok();
+                failed.end();
+            },
+
+            StreamState::Unconnected => failed.end(),
+            _ => {},
         })
         .param_changed(|_, format, id, param|
         {
@@ -287,8 +301,6 @@ fn run_stream
         let main_loop = main_loop.clone();
         move |_| main_loop.quit()
     });
-
-    ready.send(Ok(())).ok();
 
     main_loop.run();
 
@@ -374,11 +386,12 @@ impl PortalRecorder
 
         let recorder = Self { connection, session, quit: quit_tx, thread: Some(thread) };
 
-        match ready_rx.recv()
+        match ready_rx.recv_timeout(consts::RECORDER_FIRST_FRAME)
         {
             Ok(Ok(())) => Ok(recorder),
             Ok(Err(reason)) => Err(reason),
-            Err(_) => Err("the PipeWire thread died".to_owned()),
+            Err(RecvTimeoutError::Timeout) => Err("the stream never started".to_owned()),
+            Err(RecvTimeoutError::Disconnected) => Err("the PipeWire thread died".to_owned()),
         }
     }
 }
