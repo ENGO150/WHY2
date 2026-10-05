@@ -447,7 +447,19 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     `WAYLAND_LEAK_BUDGET`. Sizing by bytes rather than by a frame count is deliberate — a 4K share
     strands memory four times faster than a 1080p one and has to recycle four times as often.
     Unlike the failure-driven reconnect beside it, this one forces no keyframe and clears no
-    `last_image`: nothing was missed and the picture has not moved.
+    `last_raw`: nothing was missed and the picture has not moved.
+  - **The wayshot path reads the compositor's bytes itself instead of asking libwayshot for an
+    image** (`ShmCapture`). `screenshot_single_output` costs ~6 ms of CPU a frame before the encoder
+    sees anything: a fresh memfd, an in-place BGRA→RGBA swizzle, and then an `RgbaImage` built with
+    `put_pixel` one pixel at a time, a division and a modulo each. `ShmCapture` keeps one memfd (sized
+    from the probe frame plus `SHM_ROW_SLACK` a row, which costs nothing until written — memfd pages
+    are only allocated when touched), hands it to `capture_output_frame_shm_fd`, maps it once and
+    copies the rows out as the compositor laid them — `Xrgb8888` is `PixelOrder::Bgra` in memory and
+    goes to the encoder unswizzled. Measured A/B on the same content (Hyprland, 1080p, 24 fps of
+    change), the whole share went from ~41% of a core to ~26%. Anything it does not recognise — a
+    rotated output, a 10-bit format, a frame larger than the file — returns `None` and the loop drops
+    to libwayshot's own path for the rest of that share. The leak budget above still applies: the
+    frame objects are libwayshot's either way.
   - **Which monitor is shared is a client-local choice**, not part of the protocol: `/screen [MONITOR]`
     (a 1-based index or a monitor name) stores it in `screen::client::options::set_monitor` and
     `capture::get_target_monitor` resolves it; the `Screen` packet still only toggles the share, and the

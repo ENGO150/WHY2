@@ -35,6 +35,11 @@ use std::
 #[cfg(not(target_os = "macos"))]
 use std::sync::mpsc;
 
+#[cfg(target_os = "linux")]
+use std::fs::File;
+
+#[cfg(target_os = "linux")]
+use memmap2::Mmap;
 
 use std::sync::mpsc::RecvTimeoutError;
 
@@ -504,6 +509,77 @@ fn reconnect_wayshot(name: &str) -> Option<(libwayshot::WayshotConnection, libwa
     Some((connection, output))
 }
 
+//WL_SHM FORMAT CODES
+#[cfg(target_os = "linux")]
+const SHM_ARGB8888: u32 = 0;
+#[cfg(target_os = "linux")]
+const SHM_XRGB8888: u32 = 1;
+#[cfg(target_os = "linux")]
+const SHM_ABGR8888: u32 = 0x34324241;
+#[cfg(target_os = "linux")]
+const SHM_XBGR8888: u32 = 0x34324258;
+
+#[cfg(target_os = "linux")]
+struct ShmCapture //ONE REUSED BUFFER THE COMPOSITOR COPIES INTO
+{
+    file: File,
+    len: u64,
+    map: Option<Mmap>,
+}
+
+#[cfg(target_os = "linux")]
+impl ShmCapture
+{
+    fn new(bytes: u64) -> Option<Self>
+    {
+        let fd = rustix::fs::memfd_create("why2-capture", rustix::fs::MemfdFlags::CLOEXEC).ok()?;
+        let file = File::from(fd);
+
+        file.set_len(bytes).ok()?;
+
+        Some(Self { file, len: bytes, map: None })
+    }
+
+    //ONE FRAME INTO pixels, OR None WHERE ONLY libwayshot CAN READ IT
+    fn grab
+    (
+        &mut self,
+        wayshot: &libwayshot::WayshotConnection,
+        output: &libwayshot::OutputInfo,
+        pixels: &mut Vec<u8>,
+    ) -> Result<Option<(u32, u32, PixelOrder)>, libwayshot::Error>
+    {
+        if output.transform != libwayshot::reexport::Transform::Normal { return Ok(None); }
+
+        let (format, guard) = wayshot.capture_output_frame_shm_fd(&output.wl_output, 1, &self.file, None)?;
+
+        let order = match u32::from(format.format)
+        {
+            SHM_XRGB8888 | SHM_ARGB8888 => PixelOrder::Bgra,
+            SHM_XBGR8888 | SHM_ABGR8888 => PixelOrder::Rgba,
+            _ => return Ok(None),
+        };
+
+        if format.byte_size() > self.len { return Ok(None); }
+
+        if self.map.is_none()
+        {
+            //SAFETY: OUR OWN MEMFD
+            self.map = Some(unsafe { Mmap::map(&self.file) }?);
+        }
+
+        let Some(map) = &self.map else { return Ok(None) };
+
+        let (width, height) = (format.size.width, format.size.height);
+
+        if !pack_rows(map, width as usize, height as usize, format.stride as usize, pixels) { return Ok(None); }
+
+        drop(guard);
+
+        Ok(Some((width, height, order)))
+    }
+}
+
 //COPY width x height PIXELS OUT OF ROWS stride BYTES APART
 pub fn pack_rows(source: &[u8], width: usize, height: usize, stride: usize, pixels: &mut Vec<u8>) -> bool
 {
@@ -554,8 +630,13 @@ fn capture_loop_wayshot
         encoder.dispatch(&frame_tx, compressed);
     }
 
-    //PREVIOUS FRAME, KEPT BY MOVE (SEE capture_loop_xcap)
-    let mut last_image = Some(first_image);
+    //ROOM FOR THE PICTURE PLUS ANY ROW PADDING
+    let reserve = first_image.height() as u64 * (first_image.width() as u64 * 4 + consts::SHM_ROW_SLACK);
+    let mut shm = ShmCapture::new(reserve);
+
+    //PREVIOUS FRAME, AND THE BUFFER THE NEXT ONE GOES INTO
+    let mut last_raw = Some(first_image.into_raw());
+    let mut pixels = Vec::new();
 
     let mut last_encode_time = Instant::now();
 
@@ -574,28 +655,49 @@ fn capture_loop_wayshot
             return Ok(());
         }
 
-        match wayshot.screenshot_single_output(&target_output, true)
+        let grabbed = match shm.as_mut().map(|shm| shm.grab(&wayshot, &target_output, &mut pixels))
         {
-            Ok(image) =>
+            Some(Ok(Some(frame))) => Ok(frame),
+            Some(Err(error)) => Err(error),
+
+            //libwayshot's OWN CONVERSION FROM HERE ON
+            _ =>
+            {
+                shm = None;
+
+                wayshot.screenshot_single_output(&target_output, true).map(|image|
+                {
+                    let image = image.into_rgba8();
+                    let (width, height) = image.dimensions();
+
+                    pixels = image.into_raw();
+
+                    (width, height, PixelOrder::Rgba)
+                })
+            },
+        };
+
+        match grabbed
+        {
+            Ok((width, height, order)) =>
             {
                 failures = 0;
 
-                let image = image.into_rgba8();
-
-                stranded += image.as_raw().len() as u64;
+                stranded += pixels.len() as u64;
 
                 let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
 
-                let changed = last_image.as_ref().is_none_or(|previous| previous.as_raw() != image.as_raw());
+                let changed = last_raw.as_ref().is_none_or(|previous| previous != &pixels);
 
                 if force_encode || changed
                 {
-                    if let Some(compressed) = encoder.encode(image.width(), image.height(), image.as_raw(), PixelOrder::Rgba)?
+                    if let Some(compressed) = encoder.encode(width, height, &pixels, order)?
                     {
                         encoder.dispatch(&frame_tx, compressed);
                     }
 
-                    last_image = Some(image);
+                    //SWAP RATHER THAN REALLOCATE
+                    pixels = last_raw.replace(std::mem::take(&mut pixels)).unwrap_or_default();
                     last_encode_time = Instant::now();
                 }
 
@@ -626,7 +728,7 @@ fn capture_loop_wayshot
 
                         //FORCE A KEYFRAME - FRAMES WERE MISSED
                         encoder.force_intra_frame();
-                        last_image = None;
+                        last_raw = None;
                     }
 
                     stranded = 0;

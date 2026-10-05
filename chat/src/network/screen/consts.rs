@@ -31,6 +31,7 @@ pub const FRAME_POLL_INTERVAL: Duration   = Duration::from_millis(1000 / TARGET_
 pub const WINIT_SIZE: (u32, u32)          = (1920, 1080);                                    //DEFAULT WINIT WINDOW SIZE
 pub const WAYLAND_RECONNECT_FAILURES: u32 = 3;                                               //CONSECUTIVE CAPTURE FAILURES BEFORE RECONNECTING
 pub const WAYLAND_LEAK_BUDGET: u64        = 128 * 1024 * 1024;                               //COMPOSITOR MEMORY A SHARE MAY STRAND
+pub const SHM_ROW_SLACK: u64              = 256;                                             //ROW PADDING THE CAPTURE BUFFER ALLOWS FOR
 
 pub const MULTIPLEX_CHANNEL_BOUND: usize  = 2;                                               //NETWORK BUFFER (VIDEO/AUDIO HANDOFF)
 pub const CAPTURE_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 4;                     //CAPTURE BUFFER (~160ms)

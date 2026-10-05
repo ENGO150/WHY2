@@ -305,7 +305,8 @@ Moderation lives under `/server` and is offered by rank:
 - **Async Runtime**: `tokio`, `dashmap`
 - **Voice**: `audiopus` (Opus codec), `nnnoiseless` (noise reduction), `ringbuf`
 - **Audio I/O**: `cpal` (cross-platform audio)
-- **Screen Share**: `xcap` / `libwayshot` / `pipewire` (capture), `openh264` (codec), `wgpu` (playback), `winit` (viewer window)
+- **Screen Share**: `xcap` / `libwayshot` / `pipewire` (capture), `openh264` (codec), `wgpu`
+  (playback), `winit` (viewer window)
 - **Networking**: `tokio-socks` (SOCKS5 proxy support), `socket2`
 - **Serialization**: `wincode` (binary encoding), `toml_edit` (config)
 - **UI**: `ratatui` + `crossterm` (terminal interface)
