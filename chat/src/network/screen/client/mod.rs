@@ -20,7 +20,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod audio;
 pub mod capture;
 pub mod display;
-pub mod gpu;
 pub mod options;
 pub mod video;
 

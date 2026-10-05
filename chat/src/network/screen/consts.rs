@@ -46,7 +46,6 @@ pub const RECORDER_POLL_INTERVAL: Duration = Duration::from_millis(100);  //HOW 
 pub const BACKEND_OVERRIDE_VAR: &str       = "WHY2_CAPTURE_BACKEND";      //PINS A CAPTURE BACKEND ("recorder" / "legacy")
 pub const PROBE_TIMEOUT_VAR: &str          = "WHY2_CAPTURE_PROBE_TIMEOUT"; //OVERRIDES THE PROBE TIMEOUT, IN SECONDS
 pub const RECORDER_PROBE_TIMEOUT: Duration = Duration::from_secs(30);     //HOW LONG THE RECORDER PROBE MAY BLOCK BEFORE WE FALL BACK
-pub const CONVERTER_OVERRIDE_VAR: &str     = "WHY2_CAPTURE_CONVERTER"; //PINS THE RGBA -> I420 PATH ("gpu" / "cpu")
 pub const MONITOR_LIST_TTL: Duration       = Duration::from_secs(5);      //HOW LONG THE PALETTE'S MONITOR LIST IS REUSED
 pub const RECORDER_FIRST_FRAME: Duration  = Duration::from_secs(5);   //NO FRAME IN THIS LONG MEANS A BROKEN RECORDER
 

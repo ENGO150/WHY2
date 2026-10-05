@@ -44,7 +44,7 @@ use xcap::{ Frame, Monitor, VideoRecorder };
 use openh264::
 {
     OpenH264API,
-    formats::{ RgbaSliceU8, YUVBuffer },
+    formats::{ BgraSliceU8, RgbaSliceU8, YUVBuffer },
     encoder::
     {
         Encoder,
@@ -64,7 +64,7 @@ use crate::
     network::screen::
     {
         consts,
-        client::{ gpu::GpuConverter, options },
+        client::options,
     },
 };
 
@@ -303,7 +303,7 @@ impl YuvScratch
         Self { buffer: YUVBuffer::new(0, 0), width: 0, height: 0 }
     }
 
-    fn fill(&mut self, width: u32, height: u32, rgba: &[u8]) -> &YUVBuffer
+    fn fill(&mut self, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> &YUVBuffer
     {
         //RESIZE ONLY ON A REAL RESOLUTION CHANGE
         if self.width != width || self.height != height
@@ -313,42 +313,23 @@ impl YuvScratch
             self.height = height;
         }
 
-        self.buffer.read_rgb(RgbaSliceU8::new(rgba, (width as usize, height as usize)));
+        let dimensions = (width as usize, height as usize);
+
+        //SIMD WHERE THE CPU HAS IT
+        match order
+        {
+            PixelOrder::Rgba => self.buffer.read_rgba8(RgbaSliceU8::new(pixels, dimensions)),
+            PixelOrder::Bgra => self.buffer.read_bgra8(BgraSliceU8::new(pixels, dimensions)),
+        }
 
         &self.buffer
-    }
-}
-
-enum Converter //RGBA -> I420, ON THE GPU WHERE THAT IS POSSIBLE
-{
-    Gpu(Box<GpuConverter>),
-    Cpu(YuvScratch),
-}
-
-impl Converter
-{
-    fn select() -> Self
-    {
-        //AN EXPLICIT "cpu" PINS THE OLD PATH
-        if env::var(consts::CONVERTER_OVERRIDE_VAR).unwrap_or_default().eq_ignore_ascii_case("cpu")
-        {
-            return Converter::Cpu(YuvScratch::new());
-        }
-
-        match GpuConverter::new()
-        {
-            Ok(converter) => Converter::Gpu(Box::new(converter)),
-
-            //NO ADAPTER OR DRIVER - USE THE CPU PATH
-            Err(_) => Converter::Cpu(YuvScratch::new()),
-        }
     }
 }
 
 struct FrameEncoder
 {
     encoder: Encoder,
-    converter: Converter,
+    scratch: YuvScratch,
     fps: f32,
     dimensions: Option<(u32, u32)>,
 }
@@ -357,7 +338,7 @@ impl FrameEncoder
 {
     fn new(fps: f32) -> Result<Self, String>
     {
-        Ok(Self { encoder: create_encoder(fps)?, converter: Converter::select(), fps, dimensions: None })
+        Ok(Self { encoder: create_encoder(fps)?, scratch: YuvScratch::new(), fps, dimensions: None })
     }
 
     fn force_intra_frame(&mut self)
@@ -365,13 +346,19 @@ impl FrameEncoder
         self.encoder.force_intra_frame();
     }
 
-    fn encode(&mut self, width: u32, height: u32, rgba: &[u8]) -> Result<Option<Vec<u8>>, String>
+    fn encode(&mut self, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> Result<Option<Vec<u8>>, String>
     {
         //I420 CONVERSION PANICS ON ODD DIMENSIONS
         if width % 2 != 0 || height % 2 != 0
         {
             return Err(t!("screen.error.resolution", width, height));
         }
+
+        //EXACTLY ONE PICTURE OF PIXELS
+        let Some(pixels) = pixels.get(..width as usize * height as usize * 4) else
+        {
+            return Err(t!("screen.error.resolution", width, height));
+        };
 
         //A RESIZE NEEDS A FRESH ENCODER
         if self.dimensions.is_some_and(|previous| previous != (width, height))
@@ -381,66 +368,11 @@ impl FrameEncoder
 
         self.dimensions = Some((width, height));
 
-        //A GPU THAT FAILS DROPS BACK TO THE CPU FOR GOOD
-        if let Converter::Gpu(_) = &self.converter
-            && !GpuConverter::supports(width, height)
-        {
-            self.converter = Converter::Cpu(YuvScratch::new());
-        }
+        let yuv = self.scratch.fill(width, height, pixels, order);
 
-        let mut fallback = None;
-
-        let bitstream = match &mut self.converter
-        {
-            Converter::Gpu(converter) => match converter.convert(width, height, rgba)
-            {
-                Ok(frame) =>
-                {
-                    let bitstream = self.encoder.encode(frame)
-                        .map_err(|error| t!("screen.error.encode", error))?;
-
-                    Some(bitstream.to_vec())
-                },
-
-                Err(reason) =>
-                {
-                    fallback = Some(reason);
-                    None
-                },
-            },
-
-            Converter::Cpu(scratch) =>
-            {
-                let yuv = scratch.fill(width, height, rgba);
-
-                let bitstream = self.encoder.encode(yuv)
-                    .map_err(|error| t!("screen.error.encode", error))?;
-
-                Some(bitstream.to_vec())
-            },
-        };
-
-        //SWITCH TO THE CPU AND REDO THE FRAME
-        let data = match bitstream
-        {
-            Some(result) => result,
-
-            None =>
-            {
-                debug_assert!(fallback.is_some(), "the GPU path only yields None after refusing a frame");
-
-                self.converter = Converter::Cpu(YuvScratch::new());
-
-                let Converter::Cpu(scratch) = &mut self.converter else { unreachable!() };
-
-                let yuv = scratch.fill(width, height, rgba);
-
-                let bitstream = self.encoder.encode(yuv)
-                    .map_err(|error| t!("screen.error.encode", error))?;
-
-                bitstream.to_vec()
-            },
-        };
+        let data = self.encoder.encode(yuv)
+            .map_err(|error| t!("screen.error.encode", error))?
+            .to_vec();
 
         //SKIP EMPTY FRAMES
         if data.is_empty()
@@ -512,7 +444,7 @@ fn capture_loop_xcap
 
             if force_encode || changed
             {
-                if let Some(compressed) = encoder.encode(image.width(), image.height(), image.as_raw())?
+                if let Some(compressed) = encoder.encode(image.width(), image.height(), image.as_raw(), PixelOrder::Rgba)?
                 {
                     encoder.dispatch(&frame_tx, compressed);
                 }
@@ -593,7 +525,7 @@ fn capture_loop_wayshot
         .into_rgba8();
 
     //ENCODE AND SEND FIRST FRAME
-    if let Some(compressed) = encoder.encode(first_image.width(), first_image.height(), first_image.as_raw())?
+    if let Some(compressed) = encoder.encode(first_image.width(), first_image.height(), first_image.as_raw(), PixelOrder::Rgba)?
     {
         encoder.dispatch(&frame_tx, compressed);
     }
@@ -634,7 +566,7 @@ fn capture_loop_wayshot
 
                 if force_encode || changed
                 {
-                    if let Some(compressed) = encoder.encode(image.width(), image.height(), image.as_raw())?
+                    if let Some(compressed) = encoder.encode(image.width(), image.height(), image.as_raw(), PixelOrder::Rgba)?
                     {
                         encoder.dispatch(&frame_tx, compressed);
                     }
@@ -683,6 +615,14 @@ fn capture_loop_wayshot
     }
 
     Ok(())
+}
+
+//ENUMS
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PixelOrder //BYTE ORDER OF A CAPTURED PIXEL
+{
+    Rgba,
+    Bgra,
 }
 
 //STRUCTS
@@ -876,7 +816,7 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
             continue;
         }
 
-        if let Some(compressed) = encoder.encode(frame.width, frame.height, &frame.raw)?
+        if let Some(compressed) = encoder.encode(frame.width, frame.height, &frame.raw, PixelOrder::Rgba)?
         {
             encoder.dispatch(&frame_tx, compressed);
         }

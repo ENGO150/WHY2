@@ -98,20 +98,11 @@ cargo bench --bench comprehensive
 ```
 
 There is currently no automated test suite for the `chat` crate; CI only builds it
-(`cargo build --release` + the server feature combo above). The one exception is the screen
-capture colour conversion, which is checked against openh264's own CPU conversion:
-
-```bash
-cargo test -p why2-chat --features client_screen --lib gpu:: --release
-```
-
-That test **passes trivially on a machine with no GPU** — `GpuConverter::new()` returning `Err` is
-the case the CPU fallback exists for, so it returns rather than failing. Do not "fix" it into a
-hard failure.
+(`cargo build --release` + the server feature combo above).
 
 There is deliberately **no standing benchmark for the capture pipeline** — the per-stage
-instrumentation and the headless comparator that produced the GPU-conversion numbers were
-development scaffolding and were removed once the work landed. Anything measuring capture cost
+instrumentation, the headless comparator and the converter and encoder benchmarks that produced
+the numbers below were development scaffolding and were removed once the work landed. Anything measuring capture cost
 again has to bring its own harness, and should compare whole-process CPU rather than per-stage
 wall time: a push backend moves acquisition onto its own thread, so stage timings alone flatter it.
 
@@ -579,21 +570,18 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
       least backpressured them; now nothing does, so a share sized for a link nobody has is simply
       shed at the server, per viewer, forever. This is the same missing feedback signal the bitrate
       gap above needs.
-- **`network/screen/client/gpu.rs` + `rgba_to_i420.wgsl`** — RGBA → I420 on the GPU via a `wgpu`
-  compute shader. This is not decoration: measured on the capture pipeline, the colour conversion
-  was **the single most expensive stage, larger than acquisition and the H.264 encode together**
-  (~17 ms/frame at 1600x900), because openh264 implements `RGB8Source` only for packed 24-bit RGB
-  — an RGBA screen grab falls into the per-pixel scalar `write_yuv_by_pixel`. The shader cuts that
-  to ~1.4 ms and roughly halves whole-process CPU.
-  - The shader reproduces openh264's **own** BT.601 limited-range integer coefficients so the
-    stream's colours do not shift with the backend. The two agree to within 1 LSB of luma and 2 of
-    chroma (the CPU path is float and averages chroma without rounding) — hence the test asserts a
-    tolerance, not equality.
-  - It packs four samples per `u32` in both planes, so it requires `width % 8 == 0 && height % 2
-    == 0`; `GpuConverter::supports` guards that and anything else uses the CPU path.
-  - **Every failure degrades rather than breaks**: no adapter, a rejected shader, an unsupported
-    resolution or a mid-session device loss all switch `Converter` to the CPU permanently and keep
-    the share alive. `WHY2_CAPTURE_CONVERTER=cpu` pins the CPU path.
+- **RGBA → I420 runs on the CPU, through openh264's own SIMD path** (`YuvScratch::fill`,
+  `read_rgba8`/`read_bgra8`). The conversion was once the single most expensive stage of the share
+  (~25 ms a frame at 1080p) because it went through `read_rgb`, openh264's per-pixel float
+  `write_yuv_by_pixel`; openh264 0.9.8 has an AVX2 path for packed RGBA and BGRA (and an integer
+  scalar one elsewhere) that `read_rgb` never reaches. Measured at 1080p on an i5-12400F: **0.78 ms**
+  AVX2, ~2.4 ms scalar.
+  **There is no GPU converter any more, and that is deliberate.** A `wgpu` compute shader did this
+  while the CPU path was the float one, and it lost on every count once it was not: 1.64 ms on an
+  *idle* GPU, for planes bit-identical to `read_rgba8`'s, and every frame was an 8 MB upload, a
+  dispatch on the same queue as whatever is drawing the screen and a blocking readback — so sharing
+  a GPU-bound game put our work in line behind the game's and the game's behind ours. Bringing one
+  back would have to beat 0.78 ms of CPU *under that load*, not on an idle card.
 - **`network/screen/client/video.rs` + `yuv_to_rgba.wgsl`** — the viewer half, a `wgpu` surface
   that replaced `pixels` (which is no longer a dependency). The decoder's Y/U/V planes are uploaded
   as three `R8Unorm` textures — **1.5 bytes per pixel instead of the 4 the old RGBA path pushed**,
@@ -1127,8 +1115,8 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   as by the module that owns the behaviour, and as file-local consts they were being reached for
   across modules (`palette::MAX_ROWS`) which is a const module with extra steps.
   What deliberately stays out is anything that is not a knob: `theme.rs`'s palette, `math.rs`'s
-  symbol tables, `command.rs`'s command list, and the `include_str!`s (`draw.rs`'s logo, the two
-  `.wgsl` shaders, `gpu.rs`'s `WORKGROUP`, which must match a literal in the shader beside it).
+  symbol tables, `command.rs`'s command list, and the `include_str!`s (`draw.rs`'s logo and the
+  viewer's `.wgsl` shader).
 
   **Every word the client shows lives in `chat/locales/en.toml`, not in the source** (`i18n.rs`,
   `client_base`). Code asks for it by key — `t!("event.joined", username)` fills `{username}` and

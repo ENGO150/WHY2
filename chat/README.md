@@ -35,7 +35,7 @@ WHY2 Chat is a reference implementation demonstrating the WHY2 encryption system
   - Per-user mute and a live voice roster of the channel
 - **Screen Sharing**: H.264 screen share with audio, multiple viewers per sharer
   - Monitor selection (`/screen <index|name>`), swappable while the share runs
-  - GPU colour conversion and GPU-side playback (`wgpu`), with CPU fallbacks
+  - SIMD colour conversion on capture and GPU-side playback (`wgpu`)
   - Echo cancellation keeps your own voice output out of the shared audio
 - **File Transfer**: upload files to the server and download them by ID
 - **Private Messages**: direct user-to-user encrypted messaging
@@ -190,7 +190,6 @@ link time.
 |----------|--------|
 | `WHY2_CAPTURE_BACKEND` | Pins the screen capture backend (`recorder` / `legacy`) |
 | `WHY2_CAPTURE_PROBE_TIMEOUT` | Overrides the recorder probe deadline, in seconds |
-| `WHY2_CAPTURE_CONVERTER` | Pins the RGBA → I420 path (`gpu` / `cpu`) |
 
 ### Important Commands
 
@@ -306,8 +305,7 @@ Moderation lives under `/server` and is offered by rank:
 - **Async Runtime**: `tokio`, `dashmap`
 - **Voice**: `audiopus` (Opus codec), `nnnoiseless` (noise reduction), `ringbuf`
 - **Audio I/O**: `cpal` (cross-platform audio)
-- **Screen Share**: `xcap` / `libwayshot` (capture), `openh264` (codec), `wgpu` (colour conversion
-  and playback), `winit` (viewer window)
+- **Screen Share**: `xcap` / `libwayshot` (capture), `openh264` (codec), `wgpu` (playback), `winit` (viewer window)
 - **Networking**: `tokio-socks` (SOCKS5 proxy support), `socket2`
 - **Serialization**: `wincode` (binary encoding), `toml_edit` (config)
 - **UI**: `ratatui` + `crossterm` (terminal interface)
