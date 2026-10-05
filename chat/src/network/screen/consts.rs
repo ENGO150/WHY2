@@ -48,5 +48,6 @@ pub const PROBE_TIMEOUT_VAR: &str          = "WHY2_CAPTURE_PROBE_TIMEOUT"; //OVE
 pub const RECORDER_PROBE_TIMEOUT: Duration = Duration::from_secs(30);     //HOW LONG THE RECORDER PROBE MAY BLOCK BEFORE WE FALL BACK
 pub const MONITOR_LIST_TTL: Duration       = Duration::from_secs(5);      //HOW LONG THE PALETTE'S MONITOR LIST IS REUSED
 pub const RECORDER_FIRST_FRAME: Duration  = Duration::from_secs(5);   //NO FRAME IN THIS LONG MEANS A BROKEN RECORDER
+pub const SPARE_FRAMES: usize             = 2;                         //CAPTURE BUFFERS KEPT FOR REUSE
 
 pub const MUTED_FRAME_INTERVAL: Duration  = Duration::from_millis(100); //FRAME DURATION OF THE MUTED PLACEHOLDER (10 FPS)

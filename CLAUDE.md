@@ -473,6 +473,35 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - On Wayland a picked monitor also **pins the polling path**: the recorder there is an
     xdg-desktop-portal request whose picker chooses the output itself, so upgrading to it would throw
     the selection away and ask again.
+  - **On Wayland the recorder is ours, not xcap's** (`client/portal.rs`, `PortalRecorder`). xcap's
+    never worked on Hyprland at all: its `select_sources` subscribes to the portal's `Response` and
+    never waits for it, so `Start` arrives before the picker is answered and fails with `Sources not
+    selected`, and every share quietly stayed on the polling path. `request` subscribes first, calls,
+    then blocks on the answer. It also never says how many frames it wants.
+    xdg-desktop-portal-hyprland reads `maxFramerate` out of the negotiated format and captures at
+    exactly that rate; without the property the negotiation fixates on the portal's own default — the
+    monitor's refresh rate, clamped to its `screencopy:max_fps` (120). Every one of those frames is an
+    SHM screencopy, a GPU→CPU readback inside the compositor's render loop, so it would have stalled
+    the compositor up to 120 times a second for the 30 we encode. Our format
+    offers `maxFramerate` as a range topping out at the share's own fps; SPA's range intersection
+    keeps a default that lies inside the result, so the portal's 120 loses to our 30. A compositor
+    whose portal ignores the property is no worse off than before.
+    It also does what xcap's could not: it passes `BGRx` through as `PixelOrder::Bgra` instead of
+    swizzling every pixel on PipeWire's thread, connects through `OpenPipeWireRemote` rather than the
+    default daemon, copies out of the buffer into a recycled `Vec` (`LatestFrame::buffer`, at most
+    `SPARE_FRAMES` kept) rather than allocating 8 MB a frame, honours the chunk's stride, and
+    **ends the stream and closes the portal session** on stop — xcap's left its PipeWire thread and its
+    session running for the life of the process, one per share. X11, Windows and macOS still go
+    through xcap; the session type decides in `open_recorder`.
+  - **A frame that arrives early waits for its slot rather than being dropped** (`run_recorder`). The
+    FPS budget used to `continue` past any frame inside `min_interval` of the last encode, which was
+    harmless while xcap's Wayland recorder delivered 120 a second; against a source that delivers
+    exactly the share's rate it throws away every frame that lands a millisecond early and halves the
+    share. It now sleeps until the frame is due and then takes whatever is newest. **The slots are
+    scheduled off each other, not off the encode** (`due += min_interval`): timing the next slot from
+    when the last encode *finished* adds the encode to every period — 33 ms + ~12 ms is 22 fps, which is
+    exactly what a 30 fps source measured until it was fixed. A slot more than a whole interval late
+    restarts the schedule from now rather than bursting to catch up.
   - **The recorder is drained on a thread of its own, and that is not buffering for its own sake.**
     xcap delivers frames over a `sync_channel(0)` — a rendezvous — so its capture thread sits blocked
     in `send` for the whole of our colour conversion, GPU readback and H.264 encode, and the frame
@@ -482,7 +511,7 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     a **whole extra `to_owned()` clone** and a scalar per-pixel BGRA→RGBA swizzle for every single
     frame — which is why a Windows share ran at a visibly lower rate than a Linux one on the same
     hardware. `drain_frames` moves the `Receiver` onto its own thread and keeps the newest frame in
-    a one-slot `LatestFrame` (a `Mutex<Option<Frame>>` and a `Condvar`), so the next grab overlaps
+    a one-slot `LatestFrame` (a `Mutex<Option<CapturedFrame>>` and a `Condvar`), so the next grab overlaps
     the encode instead of queueing behind it. Keeping only the newest is the same shedding rule the
     rest of the path runs on — an unread frame is already stale — so the slot replaces the old
     `try_recv` drain rather than adding a queue. **Known ceiling:** this makes the period

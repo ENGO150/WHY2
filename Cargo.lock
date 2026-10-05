@@ -6075,6 +6075,7 @@ dependencies = [
  "nnnoiseless",
  "openh264",
  "p521",
+ "pipewire",
  "pollster",
  "rand 0.10.3",
  "ratatui",
@@ -6097,6 +6098,7 @@ dependencies = [
  "winit",
  "winresource",
  "xcap",
+ "zbus",
  "zeroize",
 ]
 

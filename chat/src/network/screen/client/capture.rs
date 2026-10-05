@@ -35,6 +35,7 @@ use std::
 #[cfg(not(target_os = "macos"))]
 use std::sync::mpsc;
 
+
 use std::sync::mpsc::RecvTimeoutError;
 
 use tokio::sync::mpsc::Sender;
@@ -67,6 +68,9 @@ use crate::
         client::options,
     },
 };
+
+#[cfg(target_os = "linux")]
+use crate::network::screen::client::portal::PortalRecorder;
 
 fn monitor_name(monitor: &Monitor) -> String
 {
@@ -225,7 +229,7 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
 
     //SOME OBJECTIVE-C BULLSHIT ON MAC
     #[cfg(target_os = "macos")]
-    return match open_recorder()
+    return match open_recorder(fps)
     {
         Ok(session) => run_recorder(session, frame_tx, running, fps),
         Err(_) => legacy_capture_loop(frame_tx, running, fps),
@@ -239,7 +243,7 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
 
         thread::spawn(move ||
         {
-            let session = open_recorder();
+            let session = open_recorder(fps);
 
             //THE FLAG GOES UP BEFORE THE SEND
             if session.is_ok() { UPGRADING.store(true, Ordering::Relaxed); }
@@ -500,6 +504,26 @@ fn reconnect_wayshot(name: &str) -> Option<(libwayshot::WayshotConnection, libwa
     Some((connection, output))
 }
 
+//COPY width x height PIXELS OUT OF ROWS stride BYTES APART
+pub fn pack_rows(source: &[u8], width: usize, height: usize, stride: usize, pixels: &mut Vec<u8>) -> bool
+{
+    let row = width * 4;
+
+    if width == 0 || height == 0 || stride < row || source.len() < stride * (height - 1) + row { return false; }
+
+    pixels.clear();
+
+    if stride == row
+    {
+        pixels.extend_from_slice(&source[..row * height]);
+    } else
+    {
+        for line in source.chunks(stride).take(height) { pixels.extend_from_slice(&line[..row]); }
+    }
+
+    true
+}
+
 #[cfg(target_os = "linux")]
 fn capture_loop_wayshot
 (
@@ -625,10 +649,27 @@ pub enum PixelOrder //BYTE ORDER OF A CAPTURED PIXEL
     Bgra,
 }
 
-//STRUCTS
-struct LatestFrame //ONE-SLOT FRAME HANDOFF
+enum Recorder //WHO IS DELIVERING THE FRAMES
 {
-    slot: Mutex<Option<Frame>>,
+    Xcap(VideoRecorder),
+
+    #[cfg(target_os = "linux")]
+    Portal(PortalRecorder),
+}
+
+//STRUCTS
+pub struct CapturedFrame //ONE PICTURE, TIGHTLY PACKED
+{
+    pub width: u32,
+    pub height: u32,
+    pub order: PixelOrder,
+    pub data: Vec<u8>,
+}
+
+pub struct LatestFrame //ONE-SLOT FRAME HANDOFF
+{
+    slot: Mutex<Option<CapturedFrame>>,
+    spare: Mutex<Vec<Vec<u8>>>, //BUFFERS TO REUSE
     ready: Condvar,
     draining: AtomicBool, //THE LOOP STILL WANTS FRAMES
     ended: AtomicBool,    //THE RECORDER STOPPED DELIVERING
@@ -641,19 +682,52 @@ impl LatestFrame
         Self
         {
             slot: Mutex::new(None),
+            spare: Mutex::new(Vec::new()),
             ready: Condvar::new(),
             draining: AtomicBool::new(true),
             ended: AtomicBool::new(false),
         }
     }
 
-    fn take(&self, timeout: Duration) -> Option<Frame> //THE NEWEST FRAME, OR NOTHING
+    fn take(&self, timeout: Duration) -> Option<CapturedFrame> //THE NEWEST FRAME, OR NOTHING
     {
         let (mut slot, _) = self.ready
             .wait_timeout_while(self.slot.lock().unwrap(), timeout, |slot| slot.is_none())
             .unwrap();
 
         slot.take()
+    }
+
+    fn try_take(&self) -> Option<CapturedFrame>
+    {
+        self.slot.lock().unwrap().take()
+    }
+
+    pub fn put(&self, frame: CapturedFrame) //REPLACE THE WAITING FRAME
+    {
+        let stale = self.slot.lock().unwrap().replace(frame);
+
+        self.ready.notify_one();
+
+        if let Some(stale) = stale { self.recycle(stale.data); }
+    }
+
+    pub fn buffer(&self) -> Vec<u8> //A USED BUFFER, OR A NEW ONE
+    {
+        self.spare.lock().unwrap().pop().unwrap_or_default()
+    }
+
+    pub fn recycle(&self, data: Vec<u8>)
+    {
+        let mut spare = self.spare.lock().unwrap();
+
+        if spare.len() < consts::SPARE_FRAMES { spare.push(data); }
+    }
+
+    pub fn end(&self)
+    {
+        self.ended.store(true, Ordering::Relaxed);
+        self.ready.notify_one();
     }
 }
 
@@ -667,31 +741,66 @@ fn drain_frames(frames: Receiver<Frame>, latest: Arc<LatestFrame>)
             match frames.recv_timeout(consts::RECORDER_POLL_INTERVAL)
             {
                 //KEEP ONLY THE NEWEST
-                Ok(frame) =>
+                Ok(frame) => latest.put(CapturedFrame
                 {
-                    *latest.slot.lock().unwrap() = Some(frame);
-                    latest.ready.notify_one();
-                },
+                    width: frame.width,
+                    height: frame.height,
+                    order: PixelOrder::Rgba,
+                    data: frame.raw,
+                }),
 
                 Err(RecvTimeoutError::Timeout) => {},
                 Err(RecvTimeoutError::Disconnected) => break,
             }
         }
 
-        latest.ended.store(true, Ordering::Relaxed);
-        latest.ready.notify_one();
+        latest.end();
     });
 }
 
-struct RecorderSession //A STARTED OS-NATIVE RECORDER, ITS FRAME CHANNEL
+struct RecorderSession //A STARTED OS-NATIVE RECORDER AND ITS FRAMES
 {
-    recorder: VideoRecorder,
-    frames: Receiver<Frame>,
-    first: Frame,
+    recorder: Recorder,
+    latest: Arc<LatestFrame>,
+    first: Option<CapturedFrame>,
 }
 
-fn open_recorder() -> Result<RecorderSession, String> //THE BLOCKING HALF OF THE PROBE
+impl Drop for RecorderSession
 {
+    fn drop(&mut self)
+    {
+        self.latest.draining.store(false, Ordering::Relaxed);
+
+        match &mut self.recorder
+        {
+            Recorder::Xcap(recorder) => { recorder.stop().ok(); },
+
+            #[cfg(target_os = "linux")]
+            Recorder::Portal(recorder) => recorder.stop(),
+        }
+    }
+}
+
+//THE PORTAL, ASKED FOR NO MORE FRAMES THAN WE ENCODE
+#[cfg(target_os = "linux")]
+fn open_portal(fps: u32) -> Result<RecorderSession, String>
+{
+    let latest = Arc::new(LatestFrame::new());
+
+    let recorder = PortalRecorder::start(latest.clone(), fps)
+        .map_err(|error| t!("screen.error.recorder_unavailable", error))?;
+
+    first_frame(Recorder::Portal(recorder), latest)
+}
+
+fn open_recorder(fps: u32) -> Result<RecorderSession, String> //THE BLOCKING HALF OF THE PROBE
+{
+    #[cfg(target_os = "linux")]
+    if wayland() { return open_portal(fps); }
+
+    #[cfg(not(target_os = "linux"))]
+    let _ = fps;
+
     let monitor = get_target_monitor()?;
 
     let (recorder, frames) = monitor.video_recorder()
@@ -700,11 +809,22 @@ fn open_recorder() -> Result<RecorderSession, String> //THE BLOCKING HALF OF THE
     recorder.start()
         .map_err(|error| t!("screen.error.recorder_start", error))?;
 
-    //DEMAND AN ACTUAL FRAME
-    let first = frames.recv_timeout(consts::RECORDER_FIRST_FRAME)
-        .map_err(|_| t!("screen.error.recorder_silent").to_owned())?;
+    let latest = Arc::new(LatestFrame::new());
 
-    Ok(RecorderSession { recorder, frames, first })
+    drain_frames(frames, latest.clone());
+
+    first_frame(Recorder::Xcap(recorder), latest)
+}
+
+fn first_frame(recorder: Recorder, latest: Arc<LatestFrame>) -> Result<RecorderSession, String>
+{
+    let mut session = RecorderSession { recorder, latest, first: None };
+
+    //DEMAND AN ACTUAL FRAME
+    session.first = Some(session.latest.take(consts::RECORDER_FIRST_FRAME)
+        .ok_or_else(|| t!("screen.error.recorder_silent").to_owned())?);
+
+    Ok(session)
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -718,13 +838,13 @@ fn probe_timeout() -> Duration
 
 //A macOS SESSION CANNOT CROSS A THREAD
 #[cfg(target_os = "macos")]
-fn start_recorder() -> Result<RecorderSession, String>
+fn start_recorder(fps: u32) -> Result<RecorderSession, String>
 {
-    open_recorder()
+    open_recorder(fps)
 }
 
 #[cfg(not(target_os = "macos"))]
-fn start_recorder() -> Result<RecorderSession, String> //PROBE THE OS-NATIVE RECORDER, BOUNDED
+fn start_recorder(fps: u32) -> Result<RecorderSession, String> //PROBE THE OS-NATIVE RECORDER, BOUNDED
 {
     //THE PROBE CAN BLOCK, SO IT GETS ITS OWN THREAD
     let (probe_tx, probe_rx) = mpsc::channel();
@@ -732,7 +852,7 @@ fn start_recorder() -> Result<RecorderSession, String> //PROBE THE OS-NATIVE REC
     thread::spawn(move ||
     {
         //DROP A LATE SESSION, RELEASING THE PORTAL
-        probe_tx.send(open_recorder()).ok();
+        probe_tx.send(open_recorder(fps)).ok();
     });
 
     match probe_rx.recv_timeout(probe_timeout())
@@ -745,17 +865,13 @@ fn start_recorder() -> Result<RecorderSession, String> //PROBE THE OS-NATIVE REC
 
 fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
 (
-    session: RecorderSession,
+    mut session: RecorderSession,
     frame_tx: Sender<Vec<u8>>,
     running: Arc<AtomicBool>,
     fps: u32,
 ) -> Result<(), String>
 {
-    let RecorderSession { recorder, frames, first } = session;
-
-    let latest = Arc::new(LatestFrame::new());
-
-    drain_frames(frames, latest.clone());
+    let latest = session.latest.clone();
 
     let mut encoder = FrameEncoder::new(fps as f32)?;
 
@@ -763,74 +879,79 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
 
     let mut last_encode_time = Instant::now();
 
-    //DO NOT HOLD THE FIRST FRAME FOR THE FPS BUDGET
-    let mut last_dispatch = Instant::now() - min_interval;
+    //WHEN THE NEXT SLOT OPENS, FIRST ONE NOW
+    let mut due = Instant::now();
 
     //THE PREVIOUS FRAME'S BYTES
     let mut last_raw: Option<Vec<u8>> = None;
 
     //SEND THE FRAME THE PROBE ALREADY PAID FOR
-    let mut pending = Some(first);
+    let mut pending = session.first.take();
 
     let generation = options::monitor_generation();
 
-    let outcome = loop
+    loop
     {
-        if !running.load(Ordering::Relaxed) { break Ok(()); }
+        if !running.load(Ordering::Relaxed) { return Ok(()); }
 
         //HAND THE RECORDER BACK ON A MONITOR SWITCH
-        if switched(generation) { break Ok(()); }
+        if switched(generation) { return Ok(()); }
 
         //EXIT ON DISABLED SCREEN
         if !options::get_use_screen()
         {
             running.store(false, Ordering::Relaxed);
-            break Ok(());
+            return Ok(());
         }
 
         //THE TIMEOUT IS ONLY THERE TO OBSERVE running
-        let frame = match pending.take()
+        let mut frame = match pending.take()
         {
             Some(frame) => frame,
 
             None => match latest.take(consts::RECORDER_POLL_INTERVAL)
             {
                 Some(frame) => frame,
-                None if latest.ended.load(Ordering::Relaxed) => break Err(t!("screen.error.recorder_stopped").to_owned()),
+                None if latest.ended.load(Ordering::Relaxed) => return Err(t!("screen.error.recorder_stopped").to_owned()),
                 None => continue,
             },
         };
 
         let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
 
-        //FPS BUDGET
-        if !force_encode && last_dispatch.elapsed() < min_interval
+        //EARLY FRAMES WAIT FOR THEIR SLOT
+        if !force_encode && let Some(wait) = due.checked_duration_since(Instant::now())
         {
-            continue;
+            thread::sleep(wait);
+
+            //PREFER WHATEVER CAME IN MEANWHILE
+            if let Some(newer) = latest.try_take()
+            {
+                latest.recycle(std::mem::replace(&mut frame, newer).data);
+            }
         }
 
-        let changed = last_raw.as_ref().is_none_or(|previous| previous != &frame.raw);
+        let changed = last_raw.as_ref().is_none_or(|previous| previous != &frame.data);
 
         if !(force_encode || changed)
         {
+            latest.recycle(frame.data);
             continue;
         }
 
-        if let Some(compressed) = encoder.encode(frame.width, frame.height, &frame.raw, PixelOrder::Rgba)?
+        if let Some(compressed) = encoder.encode(frame.width, frame.height, &frame.data, frame.order)?
         {
             encoder.dispatch(&frame_tx, compressed);
         }
 
-        last_dispatch = Instant::now();
-        last_encode_time = last_dispatch;
-        last_raw = Some(frame.raw);
-    };
+        //SLOTS FOLLOW SLOTS, NOT ENCODES
+        let now = Instant::now();
 
-    latest.draining.store(false, Ordering::Relaxed);
+        due = if now > due + min_interval { now } else { due + min_interval };
+        last_encode_time = now;
 
-    recorder.stop().ok();
-
-    outcome
+        if let Some(previous) = last_raw.replace(frame.data) { latest.recycle(previous); }
+    }
 }
 
 fn capture_loop_recorder //OS-NATIVE STREAMING CAPTURE, WITHOUT THE FALLBACK CHAIN
@@ -840,5 +961,5 @@ fn capture_loop_recorder //OS-NATIVE STREAMING CAPTURE, WITHOUT THE FALLBACK CHA
     fps: u32,
 ) -> Result<(), String>
 {
-    run_recorder(start_recorder()?, frame_tx, running, fps)
+    run_recorder(start_recorder(fps)?, frame_tx, running, fps)
 }

@@ -23,6 +23,9 @@ pub mod display;
 pub mod options;
 pub mod video;
 
+#[cfg(target_os = "linux")]
+pub mod portal;
+
 use std::
 {
     sync::
