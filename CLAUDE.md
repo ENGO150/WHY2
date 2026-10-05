@@ -434,9 +434,18 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - **The probe still demands an actual frame**, because a recorder that *starts* is not a
     recorder that *works*: xcap's X11 recorder reports success and then delivers nothing, which
     without `RECORDER_FIRST_FRAME` would be a permanently blank share that no fallback could
-    rescue, since nothing would have failed. `RECORDER_PROBE_TIMEOUT` now only applies where the
+    rescue, since nothing would have failed. **The portal is the exception**: it is ready once its
+    PipeWire stream reaches `Streaming`, frame or none. KWin and mutter only send a frame on damage, so
+    a still desktop delivered nothing inside `RECORDER_FIRST_FRAME` and the probe threw away the only
+    backend those compositors have — neither offers screencopy, so the share died on the polling path's
+    error instead. A negotiated stream from a real portal is not xcap's silent X11 recorder.
+    The portal also asks for `cursor_mode` embedded where it is offered, matching the polling path
+    (which overlays the cursor) and giving a damage-driven compositor something to send when the
+    pointer moves. `RECORDER_PROBE_TIMEOUT` now only applies where the
     polling path could not start at all and the recorder is the last backend left rather than an
-    upgrade — that is the one case worth blocking for.
+    upgrade — that is the one case worth blocking for. When both fail, the error names both
+    (`screen.error.no_backend`): the polling path's alone blamed the compositor's screencopy support on
+    a desktop where the portal was the one that was meant to work.
   - **The wayshot path recycles its Wayland connection on a memory budget**, and this is not
     optional tidiness. `libwayshot` binds a fresh `wl_shm` per capture and never releases it, so
     the compositor holds one full-screen buffer for every frame taken — measured against Hyprland
@@ -484,7 +493,8 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     arm — its default arm panics on a command it does not know how to handle locally.
   - On Wayland a picked monitor also **pins the polling path**: the recorder there is an
     xdg-desktop-portal request whose picker chooses the output itself, so upgrading to it would throw
-    the selection away and ask again.
+    the selection away and ask again. Only where the polling path runs, though — a compositor without
+    screencopy (KWin, mutter) falls through to the portal, whose picker is then the only way to choose.
   - **On Wayland the recorder is ours, not xcap's** (`client/portal.rs`, `PortalRecorder`). xcap's
     never worked on Hyprland at all: its `select_sources` subscribes to the portal's `Response` and
     never waits for it, so `Start` arrives before the picker is answered and fails with `Sources not
