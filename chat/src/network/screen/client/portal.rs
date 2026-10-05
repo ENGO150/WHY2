@@ -65,6 +65,7 @@ const DESKTOP: &str = "/org/freedesktop/portal/desktop";
 const SCREENCAST: &str = "org.freedesktop.portal.ScreenCast";
 
 const SOURCE_MONITOR: u32 = 1;
+const CURSOR_EMBEDDED: u32 = 2;
 const MAX_DIMENSION: u32 = 16384;
 
 //STRUCTS
@@ -349,12 +350,20 @@ impl PortalRecorder
         //ONE MONITOR
         let select_token = token();
 
-        request(&connection, &portal, "SelectSources", &select_token, &(&session, HashMap::from(
+        let mut sources = HashMap::from(
         [
             ("handle_token", Value::from(select_token.as_str())),
             ("types", Value::from(SOURCE_MONITOR)),
             ("multiple", Value::from(false)),
-        ])))?;
+        ]);
+
+        //DRAW THE CURSOR INTO THE PICTURE
+        if portal.get_property::<u32>("AvailableCursorModes").is_ok_and(|modes| modes & CURSOR_EMBEDDED != 0)
+        {
+            sources.insert("cursor_mode", Value::from(CURSOR_EMBEDDED));
+        }
+
+        request(&connection, &portal, "SelectSources", &select_token, &(&session, sources))?;
 
         //THE PICKER
         let start_token = token();
