@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::time::Duration;
 
-pub const H264_BITRATE: u32               = 4_000_000;                                       //H.264 ENCODER TARGET BITRATE (4 Mbps)
+pub const H264_BITRATE: u32               = 8_000_000;                                       //H.264 ENCODER TARGET BITRATE (8 Mbps)
 
 pub const BUFFER_SIZE: u32                = 960;                                             //CPAL BUFFER SIZE
 pub const MAX_PACKET_SIZE: usize          = 4000;                                            //MAX OPUS PACKET SIZE
