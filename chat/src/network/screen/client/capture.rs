@@ -225,11 +225,13 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
         _ => {},
     }
 
-    //ON WAYLAND A PICKED MONITOR PINS THE POLLING PATH
+    //ON WAYLAND A PICKED MONITOR PINS THE POLLING PATH, WHERE THERE IS ONE
     #[cfg(target_os = "linux")]
     if wayland() && options::get_monitor().is_some()
     {
-        return legacy_capture_loop(frame_tx, running, fps);
+        let outcome = legacy_capture_loop(frame_tx.clone(), running.clone(), fps);
+
+        if outcome.is_ok() || !running.load(Ordering::Relaxed) { return outcome; }
     }
 
     //SOME OBJECTIVE-C BULLSHIT ON MAC
@@ -276,6 +278,11 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
         {
             //TAKE A PROVEN RECORDER EVEN AFTER A POLLING ERROR
             Some(Ok(session)) if running.load(Ordering::Relaxed) => run_recorder(session, frame_tx, running, fps),
+
+            //NEITHER BACKEND RAN
+            Some(Err(recorder)) => outcome.map_err(|polling| t!("screen.error.no_backend", recorder, polling)),
+            None => outcome.map_err(|polling| t!("screen.error.no_backend", recorder = t!("screen.error.recorder_timeout"), polling)),
+
             _ => outcome,
         }
     }

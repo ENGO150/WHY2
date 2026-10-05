@@ -276,6 +276,7 @@ recorder_silent = "OS 화면 녹화가 시작되었지만 프레임을 전달하
 recorder_timeout = "OS 화면 녹화가 제때 응답하지 않았습니다"
 recorder_probe = "OS 화면 녹화 점검이 비정상 종료되었습니다"
 recorder_stopped = "OS 화면 녹화가 프레임 전달을 멈췄습니다"
+no_backend = "{recorder}; 대체 캡처도 실패했습니다: {polling}"
 crashed = "화면 캡처가 비정상 종료되었습니다"
 
 [settings]

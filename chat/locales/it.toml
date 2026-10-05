@@ -277,6 +277,7 @@ recorder_silent = "il registratore dello schermo del sistema si è avviato ma no
 recorder_timeout = "il registratore dello schermo del sistema non ha risposto in tempo"
 recorder_probe = "il test del registratore dello schermo del sistema si è interrotto"
 recorder_stopped = "il registratore dello schermo del sistema ha smesso di fornire fotogrammi"
+no_backend = "{recorder}; anche la cattura di riserva non è riuscita: {polling}"
 crashed = "la cattura dello schermo si è bloccata"
 
 [settings]

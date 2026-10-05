@@ -276,6 +276,7 @@ recorder_silent = "işletim sisteminin ekran kaydedicisi başladı ama kare verm
 recorder_timeout = "işletim sisteminin ekran kaydedicisi zamanında yanıt vermedi"
 recorder_probe = "işletim sisteminin ekran kaydedicisi testi çöktü"
 recorder_stopped = "işletim sisteminin ekran kaydedicisi kare vermeyi bıraktı"
+no_backend = "{recorder}; yedek yakalama da başarısız oldu: {polling}"
 crashed = "ekran yakalama çöktü"
 
 [settings]

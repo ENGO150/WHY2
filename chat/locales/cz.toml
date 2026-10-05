@@ -280,6 +280,7 @@ recorder_timeout = "nahrávání obrazovky OS neodpovědělo včas"
 recorder_probe = "sonda nahrávání obrazovky OS spadla"
 recorder_stopped = "nahrávání obrazovky OS přestalo vracet snímky"
 crashed = "zachytávání obrazovky spadlo"
+no_backend = "{recorder}; záložní zachytávání selhalo také: {polling}"
 
 [settings]
 restart_note = "Změna {keys} se projeví až po restartu serveru."

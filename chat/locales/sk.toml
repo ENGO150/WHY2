@@ -279,6 +279,7 @@ recorder_silent = "nahrávanie obrazovky OS sa spustilo, ale nevrátilo žiadne 
 recorder_timeout = "nahrávanie obrazovky OS neodpovedalo včas"
 recorder_probe = "test nahrávania obrazovky OS spadol"
 recorder_stopped = "nahrávanie obrazovky OS prestalo vracať snímky"
+no_backend = "{recorder}; záložné zachytávanie zlyhalo tiež: {polling}"
 crashed = "zachytávanie obrazovky spadlo"
 
 [settings]

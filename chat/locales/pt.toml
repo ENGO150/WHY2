@@ -277,6 +277,7 @@ recorder_silent = "o gravador de tela do sistema iniciou mas não entregou quadr
 recorder_timeout = "o gravador de tela do sistema não respondeu a tempo"
 recorder_probe = "o teste do gravador de tela do sistema travou"
 recorder_stopped = "o gravador de tela do sistema parou de entregar quadros"
+no_backend = "{recorder}; a captura alternativa também falhou: {polling}"
 crashed = "a captura de tela travou"
 
 [settings]

@@ -279,6 +279,7 @@ recorder_silent = "systemowy rejestrator ekranu uruchomił się, ale nie dostarc
 recorder_timeout = "systemowy rejestrator ekranu nie odpowiedział na czas"
 recorder_probe = "test systemowego rejestratora ekranu uległ awarii"
 recorder_stopped = "systemowy rejestrator ekranu przestał dostarczać klatki"
+no_backend = "{recorder}; zapasowe przechwytywanie również nie powiodło się: {polling}"
 crashed = "przechwytywanie ekranu uległo awarii"
 
 [settings]

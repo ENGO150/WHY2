@@ -277,6 +277,7 @@ recorder_silent = "die Bildschirmaufnahme des Betriebssystems lief an, lieferte 
 recorder_timeout = "die Bildschirmaufnahme des Betriebssystems hat nicht rechtzeitig geantwortet"
 recorder_probe = "der Test der Bildschirmaufnahme des Betriebssystems ist abgestürzt"
 recorder_stopped = "die Bildschirmaufnahme des Betriebssystems liefert keine Bilder mehr"
+no_backend = "{recorder}; die Ersatzaufnahme ist ebenfalls fehlgeschlagen: {polling}"
 crashed = "Bildschirmaufnahme abgestürzt"
 
 [settings]

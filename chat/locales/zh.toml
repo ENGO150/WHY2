@@ -276,6 +276,7 @@ recorder_silent = "系统屏幕录制已启动，但没有输出任何画面"
 recorder_timeout = "系统屏幕录制未及时响应"
 recorder_probe = "系统屏幕录制探测已崩溃"
 recorder_stopped = "系统屏幕录制已停止输出画面"
+no_backend = "{recorder}；备用捕获也失败了：{polling}"
 crashed = "屏幕捕获已崩溃"
 
 [settings]

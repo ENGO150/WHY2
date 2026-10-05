@@ -277,6 +277,7 @@ recorder_silent = "l'enregistreur d'écran du système a démarré mais n'a four
 recorder_timeout = "l'enregistreur d'écran du système n'a pas répondu à temps"
 recorder_probe = "le test de l'enregistreur d'écran du système a planté"
 recorder_stopped = "l'enregistreur d'écran du système ne fournit plus d'images"
+no_backend = "{recorder} ; la capture de secours a également échoué : {polling}"
 crashed = "la capture d'écran a planté"
 
 [settings]

@@ -277,6 +277,7 @@ recorder_silent = "la grabadora de pantalla del sistema se inició pero no entre
 recorder_timeout = "la grabadora de pantalla del sistema no respondió a tiempo"
 recorder_probe = "la prueba de la grabadora de pantalla del sistema falló"
 recorder_stopped = "la grabadora de pantalla del sistema dejó de entregar fotogramas"
+no_backend = "{recorder}; la captura alternativa también falló: {polling}"
 crashed = "la captura de pantalla se bloqueó"
 
 [settings]

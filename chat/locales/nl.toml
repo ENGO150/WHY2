@@ -277,6 +277,7 @@ recorder_silent = "de schermrecorder van het systeem startte maar leverde geen b
 recorder_timeout = "de schermrecorder van het systeem antwoordde niet op tijd"
 recorder_probe = "de test van de schermrecorder van het systeem is gecrasht"
 recorder_stopped = "de schermrecorder van het systeem levert geen beelden meer"
+no_backend = "{recorder}; de alternatieve opname is ook mislukt: {polling}"
 crashed = "schermopname gecrasht"
 
 [settings]

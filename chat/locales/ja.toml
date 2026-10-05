@@ -276,6 +276,7 @@ recorder_silent = "OS の画面録画は開始しましたが、フレームを�
 recorder_timeout = "OS の画面録画が時間内に応答しませんでした"
 recorder_probe = "OS の画面録画のプローブが異常終了しました"
 recorder_stopped = "OS の画面録画がフレームの出力を停止しました"
+no_backend = "{recorder}。代替のキャプチャも失敗しました: {polling}"
 crashed = "画面キャプチャがクラッシュしました"
 
 [settings]
