@@ -280,7 +280,7 @@ fn create_encoder(fps: f32) -> Result<Encoder, String>
         .bitrate(BitRate::from_bps(consts::H264_BITRATE))
         .intra_frame_period(IntraFramePeriod::from_num_frames((fps * 2.0) as u32))
         .complexity(Complexity::Low)
-        .usage_type(UsageType::ScreenContentRealTime)
+        .usage_type(UsageType::CameraVideoRealTime)
         .skip_frames(true)
         .adaptive_quantization(false)
         .background_detection(false);

@@ -582,6 +582,18 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   dispatch on the same queue as whatever is drawing the screen and a blocking readback — so sharing
   a GPU-bound game put our work in line behind the game's and the game's behind ours. Bringing one
   back would have to beat 0.78 ms of CPU *under that load*, not on an idle card.
+- **The encoder runs in openh264's camera mode, not its screen-content mode** (`create_encoder`,
+  `UsageType::CameraVideoRealTime`). Screen-content mode is built for desktops, and on a game it
+  falls apart: measured on 90 real frames of a game at 1600x900 and 4 Mbps, its rate control blew
+  the budget and fell back on `skip_frames`, so **11 of every 30 frames came out** and what the viewer
+  saw averaged 27.8 dB PSNR, with encodes spiking to 61 ms. Camera mode on the same frames put out all
+  30 at 35.3 dB, at the same 4 Mbps and a 17 ms worst case. It is not worse on a desktop either: on
+  scrolling text it measured 49.1 dB against 41.7 and encoded faster. What it costs there is
+  bandwidth — ~3 Mbps where screen mode spent ~0.7 — but that is still inside `H264_BITRATE`, the
+  rate every share is already allowed to reach. `skip_frames` stays on, since openh264's rate control
+  cannot hold a bitrate without it. Slices plus `num_threads` cut the average encode by a third and
+  were left out: they did not lower the worst case, and they take cores from whatever is being
+  shared.
 - **`network/screen/client/video.rs` + `yuv_to_rgba.wgsl`** — the viewer half, a `wgpu` surface
   that replaced `pixels` (which is no longer a dependency). The decoder's Y/U/V planes are uploaded
   as three `R8Unorm` textures — **1.5 bytes per pixel instead of the 4 the old RGBA path pushed**,
