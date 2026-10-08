@@ -1,6 +1,19 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.3.2:
+- 5b60de82: upgrade dependencies
+- c31939d4: implement screen w/o audio on client
+- ef06f79d: add screen sound translations
+- 1d49d5a3: add sound parameter to Screen command
+- 69e3d703: add event.screen.muted & event.screen.unmuted to locales
+- 3cfa4f07: wire screenshare muting on client
+- b75edbd2: simplify server screenshare muting
+- 003d6070: send MuteScreen ack to client
+- 17eae3b8: implement screenshare muting on server
+- 0752ae4c: add command.mutescreen.description to locales
+- cfadb09f: add MuteScreen command & code
+
 v2.3.1:
 - 3ecb2c5b: fall back to the portal where wayland has no screencopy
 - 6e189645: draw the cursor into portal screen shares
