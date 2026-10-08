@@ -153,6 +153,7 @@ title = "화면 공유 중인 클라이언트 ({count}):"
 
 [event.screen]
 started = "화면 공유를 시작했습니다."
+started_silent = "소리 없이 화면 공유를 시작했습니다."
 stopped = "화면 공유를 중지했습니다."
 failed = "화면 공유 실패: {reason}."
 attach = "{username}님의 화면 공유에 참여했습니다."
@@ -257,6 +258,8 @@ not_image = "이미지가 아닙니다!"
 [screen]
 swapped_to = "이제 {monitor}을(를) 공유합니다."
 swapped = "공유 모니터를 바꿨습니다."
+sound_on = "이제 소리를 공유합니다."
+sound_off = "소리 공유를 멈췄습니다."
 unknown_monitor = "알 수 없음"
 window = "WHY2 화면 공유"
 window_fps = "WHY2 화면 공유 ({fps} FPS)"
@@ -403,6 +406,7 @@ path = "경로"
 user_id = "사용자ID"
 file_id = "파일ID"
 monitor = "모니터"
+sound = "소리"
 color = "색상"
 action = "작업"
 
@@ -439,7 +443,8 @@ description = "영구 이미지를 업로드합니다"
 
 [command.screen]
 args.monitor = "공유할 모니터의 번호 또는 이름"
-description = "화면 공유를 전환하거나, 공유 중에는 모니터를 바꿉니다"
+args.sound = "소리 공유 여부 (true/false)"
+description = "화면 공유를 전환하거나, 공유 중에는 모니터나 소리를 바꿉니다"
 
 [command.attach]
 args.id = "화면 공유 중인 사용자의 ID"

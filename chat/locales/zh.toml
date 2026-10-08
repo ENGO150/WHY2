@@ -153,6 +153,7 @@ title = "正在共享屏幕的客户端（{count}）："
 
 [event.screen]
 started = "已开始屏幕共享。"
+started_silent = "已开始无声屏幕共享。"
 stopped = "已停止屏幕共享。"
 failed = "屏幕共享失败：{reason}。"
 attach = "已加入 {username} 的屏幕共享。"
@@ -257,6 +258,8 @@ not_image = "这不是图片！"
 [screen]
 swapped_to = "现在正在共享 {monitor}。"
 swapped = "已切换共享的显示器。"
+sound_on = "现在正在共享声音。"
+sound_off = "已停止共享声音。"
 unknown_monitor = "未知"
 window = "WHY2 屏幕共享"
 window_fps = "WHY2 屏幕共享（{fps} FPS）"
@@ -403,6 +406,7 @@ path = "路径"
 user_id = "用户ID"
 file_id = "文件ID"
 monitor = "显示器"
+sound = "声音"
 color = "颜色"
 action = "操作"
 
@@ -439,7 +443,8 @@ description = "上传一张持久保存的图片"
 
 [command.screen]
 args.monitor = "要共享的显示器的序号或名称"
-description = "开启/关闭屏幕共享，或在共享时切换显示器"
+args.sound = "是否共享声音 (true/false)"
+description = "开启/关闭屏幕共享，或在共享时切换显示器或声音"
 
 [command.attach]
 args.id = "共享屏幕的用户的 ID"

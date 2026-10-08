@@ -154,6 +154,7 @@ title = "Clientes compartiendo pantalla ({count}):"
 
 [event.screen]
 started = "Pantalla compartida iniciada."
+started_silent = "Pantalla compartida iniciada sin sonido."
 stopped = "Pantalla compartida detenida."
 failed = "Falló la pantalla compartida: {reason}."
 attach = "Conectado a la pantalla compartida de {username}."
@@ -258,6 +259,8 @@ not_image = "¡No es una imagen!"
 [screen]
 swapped_to = "Ahora se comparte {monitor}."
 swapped = "Se cambió el monitor compartido."
+sound_on = "Ahora se comparte el sonido."
+sound_off = "Se dejó de compartir el sonido."
 unknown_monitor = "desconocido"
 window = "WHY2 Pantalla compartida"
 window_fps = "WHY2 Pantalla compartida ({fps} FPS)"
@@ -405,6 +408,7 @@ path = "RUTA"
 user_id = "ID DE USUARIO"
 file_id = "ID DE ARCHIVO"
 monitor = "MONITOR"
+sound = "SONIDO"
 color = "COLOR"
 action = "ACCIÓN"
 
@@ -441,7 +445,8 @@ description = "Sube una imagen persistente"
 
 [command.screen]
 args.monitor = "Índice o nombre del monitor a compartir"
-description = "Activa o desactiva la pantalla compartida, o cambia el monitor mientras está activa"
+args.sound = "Si se comparte el sonido (true/false)"
+description = "Activa o desactiva la pantalla compartida, o cambia el monitor o el sonido mientras está activa"
 
 [command.attach]
 args.id = "ID del usuario que comparte"

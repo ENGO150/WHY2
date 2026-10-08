@@ -167,6 +167,7 @@ title = "Screensharing clients ({count}):"
 
 [event.screen]
 started = "Started screen sharing."
+started_silent = "Started screen sharing without sound."
 stopped = "Stopped screen sharing."
 failed = "Screen sharing failed: {reason}."
 attach = "Attached {username}'s screen sharing."
@@ -271,6 +272,8 @@ not_image = "Not an image!"
 [screen]
 swapped_to = "Sharing {monitor} now."
 swapped = "Swapped the shared monitor."
+sound_on = "Sharing the sound now."
+sound_off = "Stopped sharing the sound."
 unknown_monitor = "unknown"
 window = "WHY2 ScreenShare"
 window_fps = "WHY2 Screenshare ({fps} FPS)"
@@ -418,6 +421,7 @@ path = "PATH"
 user_id = "USER ID"
 file_id = "FILE ID"
 monitor = "MONITOR"
+sound = "SOUND"
 color = "COLOR"
 action = "ACTION"
 
@@ -454,7 +458,8 @@ description = "Uploads a persistent image"
 
 [command.screen]
 args.monitor = "Index or name of the monitor to share"
-description = "Toggles screensharing, or swaps the shared monitor while it runs"
+args.sound = "Whether to share sound (true/false)"
+description = "Toggles screensharing, or changes the monitor or sound while it runs"
 
 [command.attach]
 args.id = "ID of screensharing user"

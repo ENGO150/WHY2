@@ -154,6 +154,7 @@ title = "Clients mit Bildschirmfreigabe ({count}):"
 
 [event.screen]
 started = "Bildschirmfreigabe gestartet."
+started_silent = "Bildschirmfreigabe ohne Ton gestartet."
 stopped = "Bildschirmfreigabe beendet."
 failed = "Bildschirmfreigabe fehlgeschlagen: {reason}."
 attach = "Mit der Bildschirmfreigabe von {username} verbunden."
@@ -258,6 +259,8 @@ not_image = "Kein Bild!"
 [screen]
 swapped_to = "Jetzt wird {monitor} freigegeben."
 swapped = "Freigegebener Monitor gewechselt."
+sound_on = "Der Ton wird jetzt freigegeben."
+sound_off = "Der Ton wird nicht mehr freigegeben."
 unknown_monitor = "unbekannt"
 window = "WHY2 Bildschirmfreigabe"
 window_fps = "WHY2 Bildschirmfreigabe ({fps} FPS)"
@@ -405,6 +408,7 @@ path = "PFAD"
 user_id = "BENUTZER-ID"
 file_id = "DATEI-ID"
 monitor = "MONITOR"
+sound = "TON"
 color = "FARBE"
 action = "AKTION"
 
@@ -441,7 +445,8 @@ description = "Lädt ein dauerhaftes Bild hoch"
 
 [command.screen]
 args.monitor = "Index oder Name des freizugebenden Monitors"
-description = "Schaltet die Bildschirmfreigabe um, oder wechselt währenddessen den Monitor"
+args.sound = "Ob der Ton freigegeben wird (true/false)"
+description = "Schaltet die Bildschirmfreigabe um, oder wechselt währenddessen Monitor oder Ton"
 
 [command.attach]
 args.id = "ID des freigebenden Benutzers"

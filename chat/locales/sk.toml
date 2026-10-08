@@ -155,6 +155,7 @@ title = "Používatelia zdieľajúci obrazovku ({count}):"
 
 [event.screen]
 started = "Zdieľanie obrazovky bolo zapnuté."
+started_silent = "Zdieľanie obrazovky bolo zapnuté bez zvuku."
 stopped = "Zdieľanie obrazovky bolo vypnuté."
 failed = "Zdieľanie obrazovky zlyhalo: {reason}."
 attach = "Pripojené k zdieľaniu obrazovky používateľa {username}."
@@ -260,6 +261,8 @@ not_image = "Toto nie je obrázok!"
 [screen]
 swapped_to = "Teraz sa zdieľa {monitor}."
 swapped = "Zdieľaný monitor bol zmenený."
+sound_on = "Zvuk sa teraz zdieľa."
+sound_off = "Zvuk sa prestal zdieľať."
 unknown_monitor = "neznámy"
 window = "WHY2 Zdieľanie obrazovky"
 window_fps = "WHY2 Zdieľanie obrazovky ({fps} FPS)"
@@ -408,6 +411,7 @@ path = "CESTA"
 user_id = "ID POUŽÍVATEĽA"
 file_id = "ID SÚBORU"
 monitor = "MONITOR"
+sound = "ZVUK"
 color = "FARBA"
 action = "AKCIA"
 
@@ -444,7 +448,8 @@ description = "Nahrá trvalý obrázok"
 
 [command.screen]
 args.monitor = "Index alebo názov monitora na zdieľanie"
-description = "Zapne/vypne zdieľanie obrazovky, alebo počas neho zmení zdieľaný monitor"
+args.sound = "Či zdieľať zvuk (true/false)"
+description = "Zapne/vypne zdieľanie obrazovky, alebo počas neho zmení monitor či zvuk"
 
 [command.attach]
 args.id = "ID zdieľajúceho používateľa"

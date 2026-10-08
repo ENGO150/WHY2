@@ -154,6 +154,7 @@ title = "Clients die hun scherm delen ({count}):"
 
 [event.screen]
 started = "Schermdeling gestart."
+started_silent = "Scherm delen gestart zonder geluid."
 stopped = "Schermdeling gestopt."
 failed = "Schermdeling mislukt: {reason}."
 attach = "Aangesloten op de schermdeling van {username}."
@@ -258,6 +259,8 @@ not_image = "Geen afbeelding!"
 [screen]
 swapped_to = "Nu wordt {monitor} gedeeld."
 swapped = "Gedeelde monitor gewisseld."
+sound_on = "Het geluid wordt nu gedeeld."
+sound_off = "Het geluid wordt niet meer gedeeld."
 unknown_monitor = "onbekend"
 window = "WHY2 Scherm delen"
 window_fps = "WHY2 Scherm delen ({fps} FPS)"
@@ -405,6 +408,7 @@ path = "PAD"
 user_id = "GEBRUIKERS-ID"
 file_id = "BESTANDS-ID"
 monitor = "MONITOR"
+sound = "GELUID"
 color = "KLEUR"
 action = "ACTIE"
 
@@ -441,7 +445,8 @@ description = "Uploadt een blijvende afbeelding"
 
 [command.screen]
 args.monitor = "Index of naam van de te delen monitor"
-description = "Zet scherm delen aan of uit, of wisselt tijdens het delen van monitor"
+args.sound = "Of het geluid gedeeld wordt (true/false)"
+description = "Zet scherm delen aan of uit, of wisselt tijdens het delen van monitor of geluid"
 
 [command.attach]
 args.id = "ID van de delende gebruiker"

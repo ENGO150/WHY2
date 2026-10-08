@@ -154,6 +154,7 @@ title = "Clientes compartilhando a tela ({count}):"
 
 [event.screen]
 started = "Compartilhamento de tela iniciado."
+started_silent = "Compartilhamento de tela iniciado sem som."
 stopped = "Compartilhamento de tela encerrado."
 failed = "O compartilhamento de tela falhou: {reason}."
 attach = "Conectado ao compartilhamento de tela de {username}."
@@ -258,6 +259,8 @@ not_image = "Não é uma imagem!"
 [screen]
 swapped_to = "Compartilhando {monitor} agora."
 swapped = "Monitor compartilhado trocado."
+sound_on = "O som agora está sendo compartilhado."
+sound_off = "O som deixou de ser compartilhado."
 unknown_monitor = "desconhecido"
 window = "WHY2 Compartilhamento de tela"
 window_fps = "WHY2 Compartilhamento de tela ({fps} FPS)"
@@ -405,6 +408,7 @@ path = "CAMINHO"
 user_id = "ID DO USUÁRIO"
 file_id = "ID DO ARQUIVO"
 monitor = "MONITOR"
+sound = "SOM"
 color = "COR"
 action = "AÇÃO"
 
@@ -441,7 +445,8 @@ description = "Envia uma imagem persistente"
 
 [command.screen]
 args.monitor = "Índice ou nome do monitor a compartilhar"
-description = "Liga ou desliga o compartilhamento de tela, ou troca o monitor durante ele"
+args.sound = "Se o som é compartilhado (true/false)"
+description = "Liga ou desliga o compartilhamento de tela, ou troca o monitor ou o som durante ele"
 
 [command.attach]
 args.id = "ID do usuário que compartilha"

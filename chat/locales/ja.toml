@@ -153,6 +153,7 @@ title = "画面共有中のクライアント（{count}）："
 
 [event.screen]
 started = "画面共有を開始しました。"
+started_silent = "音声なしで画面共有を開始しました。"
 stopped = "画面共有を停止しました。"
 failed = "画面共有に失敗しました：{reason}。"
 attach = "{username} の画面共有に参加しました。"
@@ -257,6 +258,8 @@ not_image = "画像ではありません！"
 [screen]
 swapped_to = "{monitor} を共有中です。"
 swapped = "共有するモニターを切り替えました。"
+sound_on = "音声の共有を開始しました。"
+sound_off = "音声の共有を停止しました。"
 unknown_monitor = "不明"
 window = "WHY2 画面共有"
 window_fps = "WHY2 画面共有（{fps} FPS）"
@@ -403,6 +406,7 @@ path = "パス"
 user_id = "ユーザーID"
 file_id = "ファイルID"
 monitor = "モニター"
+sound = "音声"
 color = "色"
 action = "操作"
 
@@ -439,7 +443,8 @@ description = "保存される画像をアップロードします"
 
 [command.screen]
 args.monitor = "共有するモニターの番号または名前"
-description = "画面共有を切り替えます。共有中はモニターを切り替えます"
+args.sound = "音声を共有するか (true/false)"
+description = "画面共有を切り替えます。共有中はモニターや音声を切り替えます"
 
 [command.attach]
 args.id = "画面共有中のユーザーの ID"

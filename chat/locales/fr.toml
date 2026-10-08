@@ -154,6 +154,7 @@ title = "Clients partageant leur écran ({count}) :"
 
 [event.screen]
 started = "Partage d'écran démarré."
+started_silent = "Partage d'écran démarré sans son."
 stopped = "Partage d'écran arrêté."
 failed = "Le partage d'écran a échoué : {reason}."
 attach = "Rattaché au partage d'écran de {username}."
@@ -258,6 +259,8 @@ not_image = "Ce n'est pas une image !"
 [screen]
 swapped_to = "Partage de {monitor} en cours."
 swapped = "Écran partagé changé."
+sound_on = "Le son est maintenant partagé."
+sound_off = "Le son n'est plus partagé."
 unknown_monitor = "inconnu"
 window = "WHY2 Partage d'écran"
 window_fps = "WHY2 Partage d'écran ({fps} FPS)"
@@ -405,6 +408,7 @@ path = "CHEMIN"
 user_id = "ID UTILISATEUR"
 file_id = "ID FICHIER"
 monitor = "ÉCRAN"
+sound = "SON"
 color = "COULEUR"
 action = "ACTION"
 
@@ -441,7 +445,8 @@ description = "Envoie une image persistante"
 
 [command.screen]
 args.monitor = "Index ou nom de l'écran à partager"
-description = "Active ou désactive le partage d'écran, ou change d'écran pendant le partage"
+args.sound = "Partager le son ou non (true/false)"
+description = "Active ou désactive le partage d'écran, ou change d'écran ou de son pendant le partage"
 
 [command.attach]
 args.id = "ID de l'utilisateur qui partage"

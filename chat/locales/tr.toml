@@ -153,6 +153,7 @@ title = "Ekran paylaşan istemciler ({count}):"
 
 [event.screen]
 started = "Ekran paylaşımı başlatıldı."
+started_silent = "Ekran paylaşımı sessiz başlatıldı."
 stopped = "Ekran paylaşımı durduruldu."
 failed = "Ekran paylaşımı başarısız oldu: {reason}."
 attach = "{username} kullanıcısının ekran paylaşımına katılındı."
@@ -257,6 +258,8 @@ not_image = "Bu bir resim değil!"
 [screen]
 swapped_to = "Şimdi {monitor} paylaşılıyor."
 swapped = "Paylaşılan monitör değiştirildi."
+sound_on = "Ses artık paylaşılıyor."
+sound_off = "Ses paylaşımı durduruldu."
 unknown_monitor = "bilinmiyor"
 window = "WHY2 Ekran Paylaşımı"
 window_fps = "WHY2 Ekran Paylaşımı ({fps} FPS)"
@@ -403,6 +406,7 @@ path = "YOL"
 user_id = "KULLANICI ID"
 file_id = "DOSYA ID"
 monitor = "MONİTÖR"
+sound = "SES"
 color = "RENK"
 action = "İŞLEM"
 
@@ -439,7 +443,8 @@ description = "Kalıcı bir resim yükler"
 
 [command.screen]
 args.monitor = "Paylaşılacak monitörün sırası veya adı"
-description = "Ekran paylaşımını açar/kapatır ya da paylaşım sırasında monitörü değiştirir"
+args.sound = "Sesin paylaşılıp paylaşılmayacağı (true/false)"
+description = "Ekran paylaşımını açar/kapatır ya da paylaşım sırasında monitörü veya sesi değiştirir"
 
 [command.attach]
 args.id = "Ekran paylaşan kullanıcının ID'si"

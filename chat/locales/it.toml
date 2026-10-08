@@ -154,6 +154,7 @@ title = "Client che condividono lo schermo ({count}):"
 
 [event.screen]
 started = "Condivisione schermo avviata."
+started_silent = "Condivisione schermo avviata senza audio."
 stopped = "Condivisione schermo interrotta."
 failed = "Condivisione schermo non riuscita: {reason}."
 attach = "Collegato alla condivisione schermo di {username}."
@@ -258,6 +259,8 @@ not_image = "Non è un'immagine!"
 [screen]
 swapped_to = "Ora condivido {monitor}."
 swapped = "Monitor condiviso cambiato."
+sound_on = "Ora l'audio è condiviso."
+sound_off = "L'audio non è più condiviso."
 unknown_monitor = "sconosciuto"
 window = "WHY2 Condivisione schermo"
 window_fps = "WHY2 Condivisione schermo ({fps} FPS)"
@@ -405,6 +408,7 @@ path = "PERCORSO"
 user_id = "ID UTENTE"
 file_id = "ID FILE"
 monitor = "MONITOR"
+sound = "AUDIO"
 color = "COLORE"
 action = "AZIONE"
 
@@ -441,7 +445,8 @@ description = "Carica un'immagine persistente"
 
 [command.screen]
 args.monitor = "Indice o nome del monitor da condividere"
-description = "Attiva o disattiva la condivisione schermo, o cambia il monitor mentre è attiva"
+args.sound = "Se condividere l'audio (true/false)"
+description = "Attiva o disattiva la condivisione schermo, o cambia il monitor o l'audio mentre è attiva"
 
 [command.attach]
 args.id = "ID dell'utente che condivide"
