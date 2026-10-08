@@ -1476,20 +1476,24 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             //MUTE ATTACHED SCREEN
             PacketCode::MuteScreenRequest =>
             {
-                //CHECK FOR ATTACHED SCREEN
-                if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr) &&
-                    conn.attached_screen().is_some()
+                //TOGGLE MUTE IF ATTACHED (DROP THE GUARD)
+                let muted = CONNECTIONS.get_mut(&peer_addr)
+                    .filter(|conn| conn.attached_screen().is_some())
+                    .map(|mut conn| conn.toggle_mute_screen());
+
+                match muted
                 {
-                    //TOGGLE MUTE
-                    network::send(&mut *streams.1.lock().await, PacketCode::MuteScreen
+                    Some(muted) =>
                     {
-                        muted: conn.toggle_mute_screen(),
-                    }, Some(&keys)).await;
-                } else
-                {
-                    //NOT ATTACHED
-                    log::warn!("Screenshare mute refused (not attached): {peer_addr}");
-                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                        network::send(&mut *streams.1.lock().await, PacketCode::MuteScreen { muted }, Some(&keys)).await;
+                    },
+
+                    None =>
+                    {
+                        //NOT ATTACHED
+                        log::warn!("Screenshare mute refused (not attached): {peer_addr}");
+                        network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    },
                 }
             },
 
