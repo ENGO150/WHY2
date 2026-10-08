@@ -448,6 +448,9 @@ description = "Si collega a una condivisione schermo."
 [command.deattach]
 description = "Si scollega da una condivisione schermo."
 
+[command.mutescreen]
+description = "Silenzia la condivisione schermo a cui sei collegato."
+
 [command.list]
 description = "Mostra gli utenti connessi e i loro ID"
 

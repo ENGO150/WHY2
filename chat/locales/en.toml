@@ -461,6 +461,9 @@ description = "Attaches client screenshare."
 [command.deattach]
 description = "Dettaches client screenshare."
 
+[command.mutescreen]
+description = "Mutes the attached screen share."
+
 [command.list]
 description = "Shows connected users and their IDs"
 

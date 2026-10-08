@@ -446,6 +446,9 @@ description = "画面共有に参加します。"
 [command.deattach]
 description = "画面共有から離れます。"
 
+[command.mutescreen]
+description = "接続中の画面共有をミュートします。"
+
 [command.list]
 description = "接続中のユーザーとその ID を表示します"
 

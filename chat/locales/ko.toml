@@ -446,6 +446,9 @@ description = "화면 공유에 참여합니다."
 [command.deattach]
 description = "화면 공유에서 나옵니다."
 
+[command.mutescreen]
+description = "보고 있는 화면 공유를 음소거합니다."
+
 [command.list]
 description = "접속한 사용자와 ID를 표시합니다"
 

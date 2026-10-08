@@ -448,6 +448,9 @@ description = "Sluit aan op een schermdeling."
 [command.deattach]
 description = "Koppelt los van een schermdeling."
 
+[command.mutescreen]
+description = "Dempt de schermdeling waar je naar kijkt."
+
 [command.list]
 description = "Toont verbonden gebruikers en hun ID's"
 

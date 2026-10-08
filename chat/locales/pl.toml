@@ -451,6 +451,9 @@ description = "Dołącza do udostępniania ekranu."
 [command.deattach]
 description = "Odłącza od udostępniania ekranu."
 
+[command.mutescreen]
+description = "Wycisza podłączone udostępnianie ekranu."
+
 [command.list]
 description = "Pokazuje połączonych użytkowników i ich ID"
 

@@ -451,6 +451,9 @@ description = "Připojí se ke sdílení obrazovky."
 [command.deattach]
 description = "Odpojí se od sdílení obrazovky."
 
+[command.mutescreen]
+description = "Ztlumí připojené sdílení obrazovky."
+
 [command.list]
 description = "Zobrazí připojené uživatele a jejich ID"
 

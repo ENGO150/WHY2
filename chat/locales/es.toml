@@ -448,6 +448,9 @@ description = "Se conecta a una pantalla compartida."
 [command.deattach]
 description = "Se desconecta de una pantalla compartida."
 
+[command.mutescreen]
+description = "Silencia la pantalla compartida a la que estás conectado."
+
 [command.list]
 description = "Muestra los usuarios conectados y sus IDs"
 

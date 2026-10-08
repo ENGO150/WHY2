@@ -448,6 +448,9 @@ description = "Se rattache à un partage d'écran."
 [command.deattach]
 description = "Se détache d'un partage d'écran."
 
+[command.mutescreen]
+description = "Coupe le son du partage d'écran auquel vous êtes attaché."
+
 [command.list]
 description = "Affiche les utilisateurs connectés et leurs ID"
 

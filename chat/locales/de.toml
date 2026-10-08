@@ -448,6 +448,9 @@ description = "Verbindet sich mit einer Bildschirmfreigabe."
 [command.deattach]
 description = "Trennt sich von einer Bildschirmfreigabe."
 
+[command.mutescreen]
+description = "Schaltet die angeschaute Bildschirmfreigabe stumm."
+
 [command.list]
 description = "Zeigt verbundene Benutzer und ihre IDs"
 

@@ -451,6 +451,9 @@ description = "Подключается к трансляции экрана."
 [command.deattach]
 description = "Отключается от трансляции экрана."
 
+[command.mutescreen]
+description = "Отключает звук подключённой трансляции экрана."
+
 [command.list]
 description = "Показывает подключённых пользователей и их ID"
 

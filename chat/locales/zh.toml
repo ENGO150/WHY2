@@ -446,6 +446,9 @@ description = "加入屏幕共享。"
 [command.deattach]
 description = "退出屏幕共享。"
 
+[command.mutescreen]
+description = "将正在观看的屏幕共享静音。"
+
 [command.list]
 description = "显示已连接的用户及其 ID"
 

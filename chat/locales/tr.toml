@@ -446,6 +446,9 @@ description = "Bir ekran paylaşımına katılır."
 [command.deattach]
 description = "Ekran paylaşımından ayrılır."
 
+[command.mutescreen]
+description = "Bağlı olduğunuz ekran paylaşımını sessize alır."
+
 [command.list]
 description = "Bağlı kullanıcıları ve ID'lerini gösterir"
 
