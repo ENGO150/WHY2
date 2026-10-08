@@ -158,6 +158,8 @@ stopped = "Pantalla compartida detenida."
 failed = "Falló la pantalla compartida: {reason}."
 attach = "Conectado a la pantalla compartida de {username}."
 deattach = "Desconectado de la pantalla compartida de {username}."
+muted = "Pantalla compartida conectada silenciada."
+unmuted = "Pantalla compartida conectada con sonido de nuevo."
 peer_started = "{username} empezó a compartir pantalla."
 peer_stopped = "{username} dejó de compartir pantalla."
 attached = "{username} se conectó a tu pantalla compartida."
@@ -449,7 +451,7 @@ description = "Se conecta a una pantalla compartida."
 description = "Se desconecta de una pantalla compartida."
 
 [command.mutescreen]
-description = "Silencia la pantalla compartida a la que estás conectado."
+description = "Silencia o quita el silencio a la pantalla compartida a la que estás conectado."
 
 [command.list]
 description = "Muestra los usuarios conectados y sus IDs"

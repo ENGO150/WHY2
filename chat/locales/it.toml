@@ -158,6 +158,8 @@ stopped = "Condivisione schermo interrotta."
 failed = "Condivisione schermo non riuscita: {reason}."
 attach = "Collegato alla condivisione schermo di {username}."
 deattach = "Scollegato dalla condivisione schermo di {username}."
+muted = "Condivisione schermo collegata silenziata."
+unmuted = "Audio della condivisione schermo collegata riattivato."
 peer_started = "{username} ha iniziato a condividere lo schermo."
 peer_stopped = "{username} ha smesso di condividere lo schermo."
 attached = "{username} si è collegato alla tua condivisione schermo."
@@ -449,7 +451,7 @@ description = "Si collega a una condivisione schermo."
 description = "Si scollega da una condivisione schermo."
 
 [command.mutescreen]
-description = "Silenzia la condivisione schermo a cui sei collegato."
+description = "Silenzia o riattiva la condivisione schermo a cui sei collegato."
 
 [command.list]
 description = "Mostra gli utenti connessi e i loro ID"

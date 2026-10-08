@@ -157,6 +157,8 @@ stopped = "Ekran paylaşımı durduruldu."
 failed = "Ekran paylaşımı başarısız oldu: {reason}."
 attach = "{username} kullanıcısının ekran paylaşımına katılındı."
 deattach = "{username} kullanıcısının ekran paylaşımından ayrılındı."
+muted = "Bağlı ekran paylaşımı sessize alındı."
+unmuted = "Bağlı ekran paylaşımının sesi açıldı."
 peer_started = "{username} ekran paylaşmaya başladı."
 peer_stopped = "{username} ekran paylaşmayı bıraktı."
 attached = "{username} ekran paylaşımınıza katıldı."
@@ -447,7 +449,7 @@ description = "Bir ekran paylaşımına katılır."
 description = "Ekran paylaşımından ayrılır."
 
 [command.mutescreen]
-description = "Bağlı olduğunuz ekran paylaşımını sessize alır."
+description = "Bağlı olduğunuz ekran paylaşımını sessize alır veya sesini açar."
 
 [command.list]
 description = "Bağlı kullanıcıları ve ID'lerini gösterir"

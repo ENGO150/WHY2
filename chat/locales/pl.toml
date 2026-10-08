@@ -159,6 +159,8 @@ stopped = "Zakończono udostępnianie ekranu."
 failed = "Udostępnianie ekranu nie powiodło się: {reason}."
 attach = "Dołączono do udostępniania ekranu {username}."
 deattach = "Odłączono od udostępniania ekranu {username}."
+muted = "Wyciszono podłączone udostępnianie ekranu."
+unmuted = "Wyłączono wyciszenie podłączonego udostępniania ekranu."
 peer_started = "{username} zaczął/zaczęła udostępniać ekran."
 peer_stopped = "{username} przestał(a) udostępniać ekran."
 attached = "{username} dołączył(a) do twojego udostępniania ekranu."
@@ -452,7 +454,7 @@ description = "Dołącza do udostępniania ekranu."
 description = "Odłącza od udostępniania ekranu."
 
 [command.mutescreen]
-description = "Wycisza podłączone udostępnianie ekranu."
+description = "Wycisza podłączone udostępnianie ekranu lub wyłącza wyciszenie."
 
 [command.list]
 description = "Pokazuje połączonych użytkowników i ich ID"

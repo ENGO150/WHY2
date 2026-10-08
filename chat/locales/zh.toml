@@ -157,6 +157,8 @@ stopped = "已停止屏幕共享。"
 failed = "屏幕共享失败：{reason}。"
 attach = "已加入 {username} 的屏幕共享。"
 deattach = "已退出 {username} 的屏幕共享。"
+muted = "已将正在观看的屏幕共享静音。"
+unmuted = "已取消正在观看的屏幕共享的静音。"
 peer_started = "{username} 开始了屏幕共享。"
 peer_stopped = "{username} 停止了屏幕共享。"
 attached = "{username} 加入了你的屏幕共享。"
@@ -447,7 +449,7 @@ description = "加入屏幕共享。"
 description = "退出屏幕共享。"
 
 [command.mutescreen]
-description = "将正在观看的屏幕共享静音。"
+description = "静音或取消静音正在观看的屏幕共享。"
 
 [command.list]
 description = "显示已连接的用户及其 ID"

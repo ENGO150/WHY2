@@ -158,6 +158,8 @@ stopped = "Bildschirmfreigabe beendet."
 failed = "Bildschirmfreigabe fehlgeschlagen: {reason}."
 attach = "Mit der Bildschirmfreigabe von {username} verbunden."
 deattach = "Von der Bildschirmfreigabe von {username} getrennt."
+muted = "Angeschaute Bildschirmfreigabe stummgeschaltet."
+unmuted = "Stummschaltung der angeschauten Bildschirmfreigabe aufgehoben."
 peer_started = "{username} hat eine Bildschirmfreigabe gestartet."
 peer_stopped = "{username} hat die Bildschirmfreigabe beendet."
 attached = "{username} schaut deine Bildschirmfreigabe an."
@@ -449,7 +451,7 @@ description = "Verbindet sich mit einer Bildschirmfreigabe."
 description = "Trennt sich von einer Bildschirmfreigabe."
 
 [command.mutescreen]
-description = "Schaltet die angeschaute Bildschirmfreigabe stumm."
+description = "Schaltet die angeschaute Bildschirmfreigabe stumm oder hebt es auf."
 
 [command.list]
 description = "Zeigt verbundene Benutzer und ihre IDs"

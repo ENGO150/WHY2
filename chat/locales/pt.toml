@@ -158,6 +158,8 @@ stopped = "Compartilhamento de tela encerrado."
 failed = "O compartilhamento de tela falhou: {reason}."
 attach = "Conectado ao compartilhamento de tela de {username}."
 deattach = "Desconectado do compartilhamento de tela de {username}."
+muted = "Compartilhamento de tela conectado silenciado."
+unmuted = "Som do compartilhamento de tela conectado reativado."
 peer_started = "{username} começou a compartilhar a tela."
 peer_stopped = "{username} parou de compartilhar a tela."
 attached = "{username} se conectou ao seu compartilhamento de tela."
@@ -449,7 +451,7 @@ description = "Conecta-se a um compartilhamento de tela."
 description = "Desconecta-se de um compartilhamento de tela."
 
 [command.mutescreen]
-description = "Silencia o compartilhamento de tela ao qual você está conectado."
+description = "Silencia ou remove o silêncio do compartilhamento de tela ao qual você está conectado."
 
 [command.list]
 description = "Mostra os usuários conectados e seus IDs"

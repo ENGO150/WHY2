@@ -171,6 +171,8 @@ stopped = "Stopped screen sharing."
 failed = "Screen sharing failed: {reason}."
 attach = "Attached {username}'s screen sharing."
 deattach = "Deattached {username}'s screen sharing."
+muted = "Muted the attached screen sharing."
+unmuted = "Unmuted the attached screen sharing."
 peer_started = "{username} started screen sharing."
 peer_stopped = "{username} stopped screen sharing."
 attached = "{username} attached your screen sharing."
@@ -462,7 +464,7 @@ description = "Attaches client screenshare."
 description = "Dettaches client screenshare."
 
 [command.mutescreen]
-description = "Mutes the attached screen share."
+description = "Toggle-mutes the attached screen share."
 
 [command.list]
 description = "Shows connected users and their IDs"

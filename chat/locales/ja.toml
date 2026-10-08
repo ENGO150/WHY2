@@ -157,6 +157,8 @@ stopped = "画面共有を停止しました。"
 failed = "画面共有に失敗しました：{reason}。"
 attach = "{username} の画面共有に参加しました。"
 deattach = "{username} の画面共有から離れました。"
+muted = "接続中の画面共有をミュートしました。"
+unmuted = "接続中の画面共有のミュートを解除しました。"
 peer_started = "{username} が画面共有を開始しました。"
 peer_stopped = "{username} が画面共有を停止しました。"
 attached = "{username} があなたの画面共有に参加しました。"
@@ -447,7 +449,7 @@ description = "画面共有に参加します。"
 description = "画面共有から離れます。"
 
 [command.mutescreen]
-description = "接続中の画面共有をミュートします。"
+description = "接続中の画面共有のミュートを切り替えます。"
 
 [command.list]
 description = "接続中のユーザーとその ID を表示します"

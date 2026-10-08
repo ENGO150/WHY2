@@ -159,6 +159,8 @@ stopped = "Sdílení obrazovky bylo vypnuto."
 failed = "Sdílení obrazovky selhalo: {reason}."
 attach = "Připojeno ke sdílení obrazovky uživatele {username}."
 deattach = "Odpojeno od sdílení obrazovky uživatele {username}."
+muted = "Ztlumeno připojené sdílení obrazovky."
+unmuted = "Zrušeno ztlumení připojeného sdílení obrazovky."
 peer_started = "{username} začal/a sdílet obrazovku."
 peer_stopped = "{username} přestal/a sdílet obrazovku."
 attached = "{username} se připojil/a k Vašemu sdílení obrazovky."
@@ -452,7 +454,7 @@ description = "Připojí se ke sdílení obrazovky."
 description = "Odpojí se od sdílení obrazovky."
 
 [command.mutescreen]
-description = "Ztlumí připojené sdílení obrazovky."
+description = "Ztlumí připojené sdílení obrazovky, nebo ztlumení zruší."
 
 [command.list]
 description = "Zobrazí připojené uživatele a jejich ID"

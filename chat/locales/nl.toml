@@ -158,6 +158,8 @@ stopped = "Schermdeling gestopt."
 failed = "Schermdeling mislukt: {reason}."
 attach = "Aangesloten op de schermdeling van {username}."
 deattach = "Losgekoppeld van de schermdeling van {username}."
+muted = "Schermdeling waar je naar kijkt gedempt."
+unmuted = "Demping van de schermdeling waar je naar kijkt opgeheven."
 peer_started = "{username} is begonnen met scherm delen."
 peer_stopped = "{username} is gestopt met scherm delen."
 attached = "{username} kijkt mee met je schermdeling."
@@ -449,7 +451,7 @@ description = "Sluit aan op een schermdeling."
 description = "Koppelt los van een schermdeling."
 
 [command.mutescreen]
-description = "Dempt de schermdeling waar je naar kijkt."
+description = "Dempt de schermdeling waar je naar kijkt of heft het op."
 
 [command.list]
 description = "Toont verbonden gebruikers en hun ID's"

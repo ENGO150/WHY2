@@ -158,6 +158,8 @@ stopped = "Partage d'écran arrêté."
 failed = "Le partage d'écran a échoué : {reason}."
 attach = "Rattaché au partage d'écran de {username}."
 deattach = "Détaché du partage d'écran de {username}."
+muted = "Son du partage d'écran attaché coupé."
+unmuted = "Son du partage d'écran attaché rétabli."
 peer_started = "{username} a commencé à partager son écran."
 peer_stopped = "{username} a arrêté de partager son écran."
 attached = "{username} s'est rattaché à votre partage d'écran."
@@ -449,7 +451,7 @@ description = "Se rattache à un partage d'écran."
 description = "Se détache d'un partage d'écran."
 
 [command.mutescreen]
-description = "Coupe le son du partage d'écran auquel vous êtes attaché."
+description = "Coupe ou rétablit le son du partage d'écran auquel vous êtes attaché."
 
 [command.list]
 description = "Affiche les utilisateurs connectés et leurs ID"
