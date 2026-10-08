@@ -769,7 +769,18 @@ impl App
 
             ClientEvent::Screen(enabled) =>
             {
-                self.push_styled(if enabled { t!("event.screen.started") } else { t!("event.screen.stopped") }, theme::ok());
+                //A SHARE WITHOUT SOUND SAYS SO
+                #[cfg(feature = "client_screen")]
+                let silent = !crate::network::screen::client::options::get_share_audio();
+                #[cfg(not(feature = "client_screen"))]
+                let silent = false;
+
+                self.push_styled(match enabled
+                {
+                    true if silent => t!("event.screen.started_silent"),
+                    true => t!("event.screen.started"),
+                    false => t!("event.screen.stopped"),
+                }, theme::ok());
             },
 
             ClientEvent::ScreenFailed(reason) =>

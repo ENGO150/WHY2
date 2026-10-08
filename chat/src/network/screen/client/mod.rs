@@ -157,6 +157,9 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
                     None => break,
                 };
 
+                //SOUND NOT SHARED
+                if !options::get_share_audio() { continue; }
+
                 screen::send_frame(&mut write_stream,
                     ScreenPacketCode::Audio { data: audio_frame.data }, &mut rex_stream, Some(&mut seq)).await;
             }

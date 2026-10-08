@@ -759,13 +759,26 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         #[cfg(feature = "client_voice")]
                         Command::Mute => mute(app, parameters),
 
-                        //A SWAP SENT NOTHING - ONLY THE MONITOR CHANGED
+                        //A SWAP OR SOUND CHANGE SENT NOTHING
                         #[cfg(feature = "client_screen")]
-                        Command::Screen => app.push_styled(match screen::capture::current_monitor()
+                        Command::Screen =>
                         {
-                            Some(monitor) => t!("screen.swapped_to", monitor),
-                            None => t!("screen.swapped").to_owned(),
-                        }, theme::ok()),
+                            let (monitor, sound) = command::screen_parameters(parameters.as_deref());
+
+                            if monitor.is_some()
+                            {
+                                app.push_styled(match screen::capture::current_monitor()
+                                {
+                                    Some(monitor) => t!("screen.swapped_to", monitor),
+                                    None => t!("screen.swapped").to_owned(),
+                                }, theme::ok());
+                            }
+
+                            if let Some(sound) = sound
+                            {
+                                app.push_styled(if sound { t!("screen.sound_on") } else { t!("screen.sound_off") }, theme::ok());
+                            }
+                        },
 
                         //INVALID COMMAND
                         Command::Invalid => invalid_usage(app, Some("invalid.command")),

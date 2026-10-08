@@ -609,6 +609,8 @@ fn vocabulary(values: ArgValues, typed: &str) -> Vec<String>
         //THE ROLES, OFFERED BY NAME
         ArgValues::Roles => Role::ALL.iter().map(Role::to_string).collect(),
 
+        ArgValues::Bools => vec![ "true".to_string(), "false".to_string() ],
+
         ArgValues::Free => Vec::new(),
     }
 }

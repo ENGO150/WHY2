@@ -37,6 +37,7 @@ use crate::
 //OPTIONS
 static USE_SCREEN: AtomicBool = AtomicBool::new(false);
 static ATTACH_SCREEN: AtomicBool = AtomicBool::new(false);
+static SHARE_AUDIO: AtomicBool = AtomicBool::new(true);
 
 //WHICH MONITOR /screen SHARES, BY NAME
 static MONITOR: RwLock<Option<String>> = RwLock::new(None);
@@ -67,6 +68,17 @@ pub fn get_attach_screen() -> bool
 pub fn set_attach_screen(attach: bool)
 {
     ATTACH_SCREEN.store(attach, Ordering::Relaxed)
+}
+
+//SHARE AUDIO
+pub fn get_share_audio() -> bool
+{
+    SHARE_AUDIO.load(Ordering::Relaxed)
+}
+
+pub fn set_share_audio(share_audio: bool)
+{
+    SHARE_AUDIO.store(share_audio, Ordering::Relaxed)
 }
 
 //MONITOR
