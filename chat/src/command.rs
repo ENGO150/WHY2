@@ -113,6 +113,7 @@ pub enum ArgValues
     Images,   //THE SAME AS Paths BUT DECODABLE PICTURES ONLY
     Monitors, //A MONITOR OF THIS MACHINE, AS THE DISPLAY SERVER NAMES IT
     Roles,    //A SERVER ROLE, BY THE NAME BOTH SIDES KNOW IT BY (role::Role)
+    Bools,    //true OR false
 }
 
 //STRUCTS
@@ -525,6 +526,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 description: "command.screen.args.monitor",
                 required: false,
                 values: ArgValues::Monitors,
+            },
+            CommandArg
+            {
+                name: "arg.sound",
+                description: "command.screen.args.sound",
+                required: false,
+                values: ArgValues::Bools,
             },
         ],
         description: "command.screen.description",
@@ -1052,30 +1060,44 @@ impl Command
             Command::Screen =>
             {
                 let sharing = screen_options::get_use_screen();
-
-                let Some(selection) = parameters.map(str::trim).filter(|m| !m.is_empty()) else
-                {
-                    //NO MONITOR NAMED: TOGGLE THE SHARE
-                    if !sharing { screen_options::set_monitor(None); }
-
-                    return Some(Ok(PacketCode::ScreenRequest));
-                };
+                let (selection, sound) = screen_parameters(parameters);
 
                 //RESOLVE BEFORE STORING, SO AN UNKNOWN ONE FAILS
-                let Ok(monitor) = screen_capture::resolve_monitor(selection) else { return Some(Err(())) };
-
-                //NAMING THE CAPTURED MONITOR ENDS THE SHARE
-                if sharing && screen_capture::current_monitor().is_some_and(|current| current == monitor)
+                let monitor = match selection.map(screen_capture::resolve_monitor)
                 {
+                    Some(Ok(monitor)) => Some(monitor),
+                    Some(Err(_)) => return Some(Err(())),
+                    None => None,
+                };
+
+                //A NEW SHARE, WITH SOUND UNLESS TOLD OTHERWISE
+                if !sharing
+                {
+                    screen_options::set_monitor(monitor);
+                    screen_options::set_share_audio(sound.unwrap_or(true));
+
                     return Some(Ok(PacketCode::ScreenRequest));
                 }
 
-                screen_options::set_monitor(Some(monitor));
+                //SOUND NAMED: CHANGE THE RUNNING SHARE, SENDING NOTHING
+                if let Some(sound) = sound
+                {
+                    screen_options::set_share_audio(sound);
+                    if monitor.is_some() { screen_options::set_monitor(monitor); }
+
+                    return None;
+                }
+
+                //NO MONITOR, OR THE CAPTURED ONE, ENDS THE SHARE
+                let Some(monitor) = monitor.filter(|monitor| screen_capture::current_monitor().is_none_or(|current| current != *monitor)) else
+                {
+                    return Some(Ok(PacketCode::ScreenRequest));
+                };
 
                 //SWAP THE RUNNING CAPTURE OVER, SENDING NOTHING
-                if sharing { return None; }
+                screen_options::set_monitor(Some(monitor));
 
-                Some(Ok(PacketCode::ScreenRequest))
+                None
             },
 
             #[cfg(feature = "client_screen")] Command::Deattach => Some(Ok(PacketCode::DeattachRequest)),
@@ -1102,6 +1124,25 @@ impl Display for Command
             .unwrap_or_default(); //HANDLE INVALID
 
         write!(f, "{}{}", COMMAND_PREFIX, name)
+    }
+}
+
+#[cfg(feature = "client_screen")]
+pub fn screen_parameters(parameters: Option<&str>) -> (Option<&str>, Option<bool>) //MONITOR AND SOUND OF /screen
+{
+    let Some(parameters) = parameters.map(str::trim).filter(|p| !p.is_empty()) else { return (None, None) };
+
+    //SOUND IS THE LAST WORD
+    let (monitor, last) = match parameters.rsplit_once(char::is_whitespace)
+    {
+        Some((monitor, last)) => (Some(monitor.trim_end()), last),
+        None => (None, parameters),
+    };
+
+    match last.to_ascii_lowercase().parse::<bool>()
+    {
+        Ok(sound) => (monitor, Some(sound)),
+        Err(_) => (Some(parameters), None),
     }
 }
 
