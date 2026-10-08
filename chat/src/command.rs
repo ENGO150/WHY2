@@ -51,36 +51,37 @@ use crate::network::screen::client::
 #[derive(Clone, PartialEq)]
 pub enum Command
 {
-    Exit,                                       //DISCONNECT FROM SERVER
-    Logout,                                     //DISCONNECT FROM SERVER, BACK TO THE CONNECT BOX
-    #[cfg(feature = "client_voice")] Voice,     //ENABLE VOICE CHAT
-    #[cfg(feature = "client_voice")] Mute,      //TOGGLE-MUTE USER/YOURSELF
-    Channel,                                    //SWITCH CHANNEL
-    Help,                                       //PRINT COMMANDS
-    Info,                                       //COMMAND INFO
-    List,                                       //LIST USERS
-    Files,                                      //LIST FILES
-    #[cfg(feature = "client_screen")] Screens,  //LIST SCREENSHARES
-    Upload,                                     //UPLOAD FILE TO SERVER
-    Download,                                   //DOWNLOAD FILE FROM SERVER
-    Image,                                      //PERSISTENT IMAGE UPLOAD
-    #[cfg(feature = "client_screen")] Screen,   //TOGGLE SCREEN SHARING
-    #[cfg(feature = "client_screen")] Attach,   //ATTACH SCREEN SHARE
-    #[cfg(feature = "client_screen")] Deattach, //DEATTACH SCREEN SHARE
-    Delete,                                     //DELETE A STORED MESSAGE
-    Edit,                                       //REWORD A STORED MESSAGE
-    PrivateMessage,                             //ONE TO ONE MESSAGE
-    Heart,                                      //TOGGLE MESSAGE HEART REACTION
-    Hearts,                                     //LIST WHO HEARTED A MESSAGE
-    Reply,                                      //REPLY TO MESSAGE
-    Re,                                         //REPLY TO PRIVATE MESSAGE
-    Settings,                                   //OPEN THE SETTINGS OVERLAY
-    Profile,                                    //OPEN A USER PROFILE
-    Server,                                     //MODERATION ACTIONS (TAKES A SUBCOMMAND)
-    Account,                                    //ACCOUNT ACTIONS (TAKES A SUBCOMMAND)
-    UsernameColor,                              //SET COLOR OF USERNAME
-    MessageColor,                               //SET COLOR OF MESSAGE
-    Invalid,                                    //INVALID COMMAND
+    Exit,                                         //DISCONNECT FROM SERVER
+    Logout,                                       //DISCONNECT FROM SERVER, BACK TO THE CONNECT BOX
+    #[cfg(feature = "client_voice")] Voice,       //ENABLE VOICE CHAT
+    #[cfg(feature = "client_voice")] Mute,        //TOGGLE-MUTE USER/YOURSELF
+    Channel,                                      //SWITCH CHANNEL
+    Help,                                         //PRINT COMMANDS
+    Info,                                         //COMMAND INFO
+    List,                                         //LIST USERS
+    Files,                                        //LIST FILES
+    #[cfg(feature = "client_screen")] Screens,    //LIST SCREENSHARES
+    Upload,                                       //UPLOAD FILE TO SERVER
+    Download,                                     //DOWNLOAD FILE FROM SERVER
+    Image,                                        //PERSISTENT IMAGE UPLOAD
+    #[cfg(feature = "client_screen")] Screen,     //TOGGLE SCREEN SHARING
+    #[cfg(feature = "client_screen")] Attach,     //ATTACH SCREEN SHARE
+    #[cfg(feature = "client_screen")] Deattach,   //DEATTACH SCREEN SHARE
+    #[cfg(feature = "client_screen")] MuteScreen, //MUTE SCREEN SHARE
+    Delete,                                       //DELETE A STORED MESSAGE
+    Edit,                                         //REWORD A STORED MESSAGE
+    PrivateMessage,                               //ONE TO ONE MESSAGE
+    Heart,                                        //TOGGLE MESSAGE HEART REACTION
+    Hearts,                                       //LIST WHO HEARTED A MESSAGE
+    Reply,                                        //REPLY TO MESSAGE
+    Re,                                           //REPLY TO PRIVATE MESSAGE
+    Settings,                                     //OPEN THE SETTINGS OVERLAY
+    Profile,                                      //OPEN A USER PROFILE
+    Server,                                       //MODERATION ACTIONS (TAKES A SUBCOMMAND)
+    Account,                                      //ACCOUNT ACTIONS (TAKES A SUBCOMMAND)
+    UsernameColor,                                //SET COLOR OF USERNAME
+    MessageColor,                                 //SET COLOR OF MESSAGE
+    Invalid,                                      //INVALID COMMAND
 }
 
 //ONE ACTION OF A COMMAND (/server mute <id>)
@@ -560,6 +561,18 @@ pub const COMMAND_LIST: &[CommandInfo] =
         subcommands: &[],
         args: &[],
         description: "command.deattach.description",
+    },
+
+    #[cfg(feature = "client_screen")]
+    CommandInfo
+    {
+        command: Command::MuteScreen,
+        triggers: &[ "MUTESCREEN", "SILENCESTREAM" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args: &[],
+        description: "command.mutescreen.description",
     },
 
     CommandInfo
@@ -1067,6 +1080,7 @@ impl Command
 
             #[cfg(feature = "client_screen")] Command::Deattach => Some(Ok(PacketCode::DeattachRequest)),
             #[cfg(feature = "client_screen")] Command::Screens => Some(Ok(PacketCode::ScreensRequest)),
+            #[cfg(feature = "client_screen")] Command::MuteScreen => Some(Ok(PacketCode::MuteScreen)),
 
             //SAME PACKET AS /exit
             Command::Exit | Command::Logout => Some(Ok(PacketCode::Disconnect)),
