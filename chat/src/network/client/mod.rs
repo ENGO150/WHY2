@@ -189,6 +189,7 @@ pub enum ClientEvent
     Deattach(String),                                            //DEATTACHED SCREENSHARE
     Attached(String),                                            //SOMEBODY ATTACHED OUR SCREENSHARE
     Deattached(String),                                          //SOMEBODY DEATTACHED OUR SCREENSHARE
+    MuteScreen(bool),                                            //TOGGLED ATTACHED SCREENSHARE MUTE
     Screenshare(String),                                         //SOMEBODY STARTED SCREENSHARING
     ScreenshareEnd(String),                                      //SOMEBODY STOPPED SCREENSHARING
     IncompatibleVersion(String, String),                         //INCOMPATIBLE SERVER VERSION
@@ -787,6 +788,13 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 screen_options::set_attach_screen(false);
 
                 tx.send(ClientEvent::Deattach(username)).await.unwrap();
+            },
+
+            //ATTACHED SCREENSHARE MUTE ACK
+            #[cfg(feature = "client_screen")]
+            PacketCode::MuteScreen { muted } =>
+            {
+                tx.send(ClientEvent::MuteScreen(muted)).await.unwrap();
             },
 
             //SOMEBODY STARTED SCREENSHARING

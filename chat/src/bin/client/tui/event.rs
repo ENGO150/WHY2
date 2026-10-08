@@ -787,6 +787,11 @@ impl App
                 self.push_text(t!("event.screen.deattach", username));
             },
 
+            ClientEvent::MuteScreen(muted) =>
+            {
+                self.push_text(if muted { t!("event.screen.muted") } else { t!("event.screen.unmuted") });
+            },
+
             //BROADCAST TO EVERYBODY, US INCLUDED
             ClientEvent::Screenshare(username) if username != self.username =>
             {
