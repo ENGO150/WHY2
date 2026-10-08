@@ -337,7 +337,8 @@ pub enum PacketCode //CONTROL CODES
     TypingRequest,                                     //CLIENT -> SERVER | WE ARE WRITING A MESSAGE
     ScreensRequest,                                    //CLIENT -> SERVER | REQUEST SCREENSHARE LIST
     DeattachRequest,                                   //CLIENT -> SERVER | DEATTACH CLIENT SCREENSHARE
-    MuteScreen,                                        //CLIENT -> SERVER | MUTE SCREEN SHARE
+    MuteScreenRequest,                                 //CLIENT -> SERVER | MUTE SCREEN SHARE
+    MuteScreen { muted: bool },                        //SERVER -> CLIENT | MUTE SCREEN SHARE ACK
     ScreenRequest,                                     //CLIENT -> SERVER | TOGGLE SCREENSHARE
     AttachRequest { id: usize },                       //CLIENT -> SERVER | ATTACH CLIENT SCREENSHARE
     VoiceRequest,                                      //CLIENT -> SERVER | ESTABLISH VOICE CONNECTION
@@ -466,6 +467,7 @@ impl PacketCode
             Self::Screen { .. }                => "Screen",
             Self::Screenshare { .. }           => "Screenshare",
             Self::ScreenshareEnd { .. }        => "ScreenshareEnd",
+            Self::MuteScreenRequest { .. }     => "MuteScreenRequest",
             Self::MuteScreen { .. }            => "MuteScreen",
             Self::VoiceRequest { .. }          => "VoiceRequest",
             Self::Voice { .. }                 => "Voice",

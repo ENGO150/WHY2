@@ -585,7 +585,7 @@ impl Connection
     }
 
     //TOGGLE MUTE ATTACHED SCREENSHARE
-    pub fn toggle_mute_screen(&mut self)
+    pub fn toggle_mute_screen(&mut self) -> bool
     {
         match self
         {
@@ -593,11 +593,15 @@ impl Connection
             {
                 if let Some(attached_screen) = attached_screen
                 {
-                    attached_screen.muted = !attached_screen.muted;
+                    let new_mute = !attached_screen.muted;
+                    attached_screen.muted = new_mute;
+
+                    return new_mute;
                 }
             },
             _ => {},
         }
+        false
     }
 
     //UNSET ATTACHED SCREENSHARE

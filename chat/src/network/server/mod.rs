@@ -1474,14 +1474,17 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
             },
 
             //MUTE ATTACHED SCREEN
-            PacketCode::MuteScreen =>
+            PacketCode::MuteScreenRequest =>
             {
                 //CHECK FOR ATTACHED SCREEN
                 if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr) &&
                     conn.attached_screen().is_some()
                 {
                     //TOGGLE MUTE
-                    conn.toggle_mute_screen();
+                    network::send(&mut *streams.1.lock().await, PacketCode::MuteScreen
+                    {
+                        muted: conn.toggle_mute_screen(),
+                    }, Some(&keys)).await;
                 } else
                 {
                     //NOT ATTACHED

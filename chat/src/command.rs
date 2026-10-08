@@ -1080,7 +1080,7 @@ impl Command
 
             #[cfg(feature = "client_screen")] Command::Deattach => Some(Ok(PacketCode::DeattachRequest)),
             #[cfg(feature = "client_screen")] Command::Screens => Some(Ok(PacketCode::ScreensRequest)),
-            #[cfg(feature = "client_screen")] Command::MuteScreen => Some(Ok(PacketCode::MuteScreen)),
+            #[cfg(feature = "client_screen")] Command::MuteScreen => Some(Ok(PacketCode::MuteScreenRequest)),
 
             //SAME PACKET AS /exit
             Command::Exit | Command::Logout => Some(Ok(PacketCode::Disconnect)),
