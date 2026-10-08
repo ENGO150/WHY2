@@ -86,6 +86,7 @@ struct Viewer //ONE ATTACHED CLIENT, AND THE TASK THAT WRITES TO IT
     tx: Sender<ScreenPacketCode>, //HANDOFF TO THAT TASK
     task: AbortHandle,            //THE TASK ITSELF
     needs_key: bool,              //SHED: WAITING FOR THE NEXT IDR
+    muted: bool,                  //VIEWER MUTED THE SHARE AUDIO
 }
 
 //IMPLEMENTATIONS
@@ -185,7 +186,7 @@ fn spawn_viewer //ONE TASK PER VIEWER, SO A SLOW ONE BLOCKS ONLY ITSELF
     }).abort_handle();
 
     //A JUST-ATTACHED VIEWER STARTS LIKE A SHED ONE
-    Some(Viewer { token, tx, task, needs_key: true })
+    Some(Viewer { token, tx, task, needs_key: true, muted: false })
 }
 
 fn muted_frame(started: &Instant) -> Option<usize> //INDEX OF THE PLACEHOLDER FRAME DUE RIGHT NOW
@@ -371,7 +372,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         }
 
         //COLLECT WHO IS STILL ATTACHED TO US
-        let entries: Vec<(usize, [u8; 32])> = server::CONNECTIONS.iter().filter_map(|entry|
+        let entries: Vec<(usize, [u8; 32], bool)> = server::CONNECTIONS.iter().filter_map(|entry|
         {
             match entry.value()
             {
@@ -380,7 +381,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
                     //FILTER ATTACHED CLIENTS
                     if let Some(attached_screen) = attached_screen && attached_screen.target_id == id
                     {
-                        Some((*client_id, attached_screen.token))
+                        Some((*client_id, attached_screen.token, attached_screen.muted))
                     } else { None }
                 },
                 _ => None,
@@ -388,7 +389,20 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         }).collect();
 
         //RETIRE WHOEVER LEFT, ABORTING THEIR TASK
-        viewers.retain(|client_id, viewer| entries.iter().any(|(e, token)| e == client_id && *token == viewer.token));
+        viewers.retain(|client_id, viewer|
+        {
+            match entries.iter().find(|(e, token, _)| e == client_id && *token == viewer.token)
+            {
+                Some((_, _, muted)) =>
+                {
+                    //REFRESH MUTE
+                    viewer.muted = *muted;
+
+                    true
+                },
+                None => false,
+            }
+        });
 
         //FORWARD PACKET
         let keyframe = matches!(&read, ScreenPacketCode::Video { data } if is_keyframe(data));
@@ -397,6 +411,9 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         {
             //PREVENT FEEDBACK
             if *client_id == id && matches!(read, ScreenPacketCode::Audio { .. }) { continue; }
+
+            //SKIP USERS WHO MUTED THE STREAM
+            if viewer.muted && matches!(read, ScreenPacketCode::Audio { .. }) { continue; }
 
             //A VIEWER THAT MISSED A FRAME WAITS FOR AN IDR
             if viewer.needs_key && matches!(read, ScreenPacketCode::Video { .. })

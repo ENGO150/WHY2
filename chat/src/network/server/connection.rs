@@ -60,6 +60,7 @@ pub struct Attach //SCREEN ATTACHMENT
     pub stream: Arc<Mutex<OwnedWriteHalf>>, //RECEIVE STREAM
     pub target_id: usize,                   //ID OF SCREENSHARER
     pub token: [u8; 32],                    //TOKEN FOR REXSTREAM
+    pub muted: bool,                        //SHARE AUDIO MUTED
 }
 
 //ENUMS
@@ -577,7 +578,24 @@ impl Connection
                 target_id,
                 stream,
                 token,
+                muted: false,
             }),
+            _ => {},
+        }
+    }
+
+    //TOGGLE MUTE ATTACHED SCREENSHARE
+    pub fn toggle_mute_screen(&mut self)
+    {
+        match self
+        {
+            Self::Authenticated { attached_screen, .. } =>
+            {
+                if let Some(attached_screen) = attached_screen
+                {
+                    attached_screen.muted = !attached_screen.muted;
+                }
+            },
             _ => {},
         }
     }
