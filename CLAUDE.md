@@ -65,6 +65,8 @@ must not.
 Building the full client (default features, includes voice + screen share) requires system
 packages: on Debian/Ubuntu, `pkg-config libasound2-dev libopus-dev libpipewire-0.3-dev
 libegl-dev clang libclang-dev libgbm-dev nasm cmake`. The server build has no such requirement.
+The GPU video encoder adds nothing to that list: Vulkan is loaded at runtime, and Media Foundation and
+VideoToolbox are part of their OS.
 
 ## Test commands
 
@@ -546,8 +548,9 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     wrong is one env var away from the old behaviour.
 - **The share's latency is bounded by shedding, not by buffering, and every queue on the path has to
   agree with that.** The pipeline already drops rather than waits where it matters —
-  `FrameEncoder::dispatch` tail-drops a frame the network channel cannot hold and forces an IDR so
-  the next one stands alone — but that only fires once a send actually blocks, and the two places it
+  `FrameEncoder::submit` does not encode a frame while the network channel is full, so the frame
+  the encoder never saw breaks no reference chain (`dispatch`'s tail-drop and forced IDR is only the
+  fallback now) — but that only fires once a send actually blocks, and the two places it
   could not fire were what a full-motion share (a video, not a desktop) turned into seconds of delay:
   - **The kernel send queue hid the backlog.** Linux autotunes `tcp_wmem` to 4 MB, so at
     `H264_BITRATE` the socket swallows megabytes before `write_all` ever stalls, and every one of
@@ -568,11 +571,29 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     through it, decoding only the newest frame. `AUDIO_BACKLOG_TARGET` is deliberately not zero: the
     queue is also the jitter buffer, and draining it flat would trade the latency for a gap on every
     late packet — the channel's own bound is the ceiling this replaces, not the depth it should sit at.
-  - **Known gap: the bitrate does not adapt.** A chronically saturated link now sheds frames instead
-    of queueing them, which is right, but the honest fix is for the encoder to lower its rate rather
-    than for `dispatch` to drop and force an IDR — an IDR is several times a P-frame, so a link that
-    is only just too slow pays for the drop twice. That needs a feedback signal the protocol does not
-    carry yet.
+  - **The bitrate adapts to the sharer's own uplink** (`client/rate.rs`, `RateControl`). Dropping an
+    encoded frame and forcing an IDR was a death spiral on a link slower than the share: an IDR is
+    several times a P-frame, so it took longer to send, the next frames found the channel full, and
+    they forced IDRs of their own — measured over a ~3.5 Mbps WireGuard link, every frame on the wire
+    was a 120–170 KB IDR at ~3 fps, and the server's per-viewer queue held ~2.4 s of them. The send
+    loop reports the bytes it wrote and how long `write_all` blocked (`rate::record`), and on Linux
+    the queue a new frame joins (`rate::probe`: `TCP_INFO`'s unsent bytes at the current target plus
+    `tcpi_rtt` over `tcpi_min_rtt`, the minimum over a window so an IDR draining is not a queue).
+    A window blocked for most of its length, or queueing past `RATE_DELAY`, backs off to
+    `RATE_BACKOFF` of what went through; the episode's first window caps the ceiling at the target and
+    a blocked one at what drained, and growth returns under that ceiling quickly and creeps past it
+    (`RATE_CREEP`), only while the target is actually being spent (`RATE_USED`). Every backend takes
+    the new target mid-stream (`Backend::set_bitrate`), and `Budget` follows it. **openh264 needs its
+    ceiling moved with the target, on layer 0**: its frame-skip check (`CheckFrameSkipBasedMaxbr`) reads
+    the layer's `iMaxSpatialBitrate`, which is fixed at the bitrate the encoder opened with, and
+    `ENCODER_OPTION_MAX_BITRATE` on `SPATIAL_LAYER_ALL` never reaches it. Raising the target alone made
+    openh264 skip in runs — measured at 1600x900, a ramp from 2.5 Mbps came out at 3–29 fps a second
+    instead of 30, which was a software share's spiky ~17 fps. `Software` also passes real timestamps
+    (`encode_at`): its rate control is defined in time, and a zero timestamp is read as one frame
+    interval after the last call however long ago that was. The bitrate lives in a
+    static so a backend or monitor switch keeps it; `rate::start` resets it per share.
+    **Known gap:** this only sees the sharer's leg. A viewer whose download is slower than the sharer's
+    upload is still shed at the server, since nothing carries that back to the sharer.
   - **A slow viewer is shed on its own socket, not paid for by everybody else.** `screen::server`'s
     loop used to `send_frame` to each viewer inline, so the share ran at the slowest link on the
     server: one viewer stalling in `write_all` held the read of the sharer's *next* frame, and every
@@ -584,8 +605,9 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
       encoder and no way to ask the sharer for a keyframe, so a dropped frame cannot be made good —
       it can only be *not compounded*: `needs_key` holds that viewer's last picture and skips video
       until `is_keyframe` sees a NAL the decoder can stand up on its own (type 5, or the SPS the
-      encoder repeats in front of one), which the encoder's `intra_frame_period` guarantees within
-      `FORCED_INTRA_INTERVAL`. Forwarding the P-frames instead would put frames on the wire whose
+      encoder repeats in front of one), which `FrameEncoder::submit` guarantees by time
+      (`KEYFRAME_INTERVAL`) — the encoders' own interval counts frames, and a still or throttled share
+      encodes so few of them that it once left an IDR minutes away. Forwarding the P-frames instead would put frames on the wire whose
       references that viewer never received, and its decoder drops those anyway (`display.rs`) —
       the freeze is the same picture without the bandwidth.
       Audio is shed by itself and needs none of this: a 20 ms frame is self-contained, so the queue
@@ -633,7 +655,52 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   dispatch on the same queue as whatever is drawing the screen and a blocking readback — so sharing
   a GPU-bound game put our work in line behind the game's and the game's behind ours. Bringing one
   back would have to beat 0.78 ms of CPU *under that load*, not on an idle card.
-- **The encoder runs in openh264's camera mode, not its screen-content mode** (`create_encoder`,
+- **The share is encoded on the GPU where there is one, and openh264 is the fallback**
+  (`network/screen/client/encoder/`). `encoder::open` tries the platform's hardware encoder first —
+  Vulkan Video on Linux (`vulkan.rs`, through `ash`), a hardware Media Foundation transform on Windows
+  (`media_foundation.rs`), VideoToolbox on macOS (`video_toolbox.rs`) — and `FrameEncoder` (capture.rs)
+  drops to `encoder::Software` the moment one fails to open *or* fails mid-share, forcing a keyframe on
+  the way, and does not try the GPU again for the rest of that capture. Every backend takes the same
+  I420 `Planes` from `YuvScratch` (the 0.78 ms conversion above stays on the CPU; the GPU backends
+  interleave it into NV12 as they copy it into their own buffer) and hands back one Annex B access unit.
+  - **The wire does not change, and that is the whole constraint on the GPU side.** The viewer decodes
+    with openh264, whose decoder is documented as **Constrained Baseline only**, so every backend asks
+    for Constrained Baseline (Baseline where an API has no separate name for it): no CABAC, no B-frames,
+    no 8x8 transform. That gives back most of a hardware encoder's compression edge, but a GPU-encoded
+    share is decodable by every client already in the field and the server needs nothing. Every IDR
+    carries its SPS and PPS in front of it — `server.rs`'s `is_keyframe` and the attach-time keyframe
+    cache depend on that — so the Vulkan backend prepends the sets the driver wrote, VideoToolbox's are
+    taken off the format description, and Media Foundation's go through `ParameterSets::complete`,
+    which only adds them to an IDR that arrived without.
+  - **What it buys is CPU.** Measured on an RX 6650 XT (RADV) at 1080p30: ~0.8 ms of the capture
+    thread's CPU a frame against ~10 ms for openh264, ~3 ms wall per encode, and ~2 dB more PSNR at the
+    same 8 Mbps; on a live 1600x900 desktop the whole capture process went from ~9% of a core to ~5%.
+    The CPU time left is the colour conversion and the copy, not the encode.
+  - **Linux uses Vulkan Video rather than VAAPI**, and not for taste: VAAPI has no encoder on NVIDIA at
+    all, and a Mesa built without `vaapi` (Gentoo's default USE) has none on AMD either, while RADV, ANV
+    and NVIDIA's driver all expose `VK_KHR_video_encode_h264`. The driver also writes the SPS/PPS
+    (`vkGetEncodedVideoSessionParametersKHR`) and the slice headers, so no bitstream writer lives here.
+    `ash` loads `libvulkan` at runtime, so this adds no build dependency; a machine without a usable
+    loader or encoder simply falls back. The session is one reference deep — two DPB layers
+    ping-ponged, POC type 2, `max_num_ref_frames = 1` — which is all a low-latency P-only stream needs.
+    Uploads go through a staging buffer on a transfer-capable queue and a semaphore into the encode
+    queue, since an encode queue is not guaranteed to copy. RADV reports `maxLevelIdc` as 1.0 for this
+    profile, so a reported 1.0 is read as "unreported" rather than as a limit (`level`).
+  - **A GPU encoder holds the bitrate by skipping frames, like openh264 does** (`encoder::Budget`). The
+    hardware rate controls keep every frame and overshoot on content that 8 Mbps cannot carry — 17 Mbps
+    on full-motion 4K — where openh264 drops frames instead; `Budget` is a one-second token bucket that
+    skips a frame (never a forced keyframe) while it is overdrawn, which keeps `H264_BITRATE` the
+    ceiling `SOCKET_BUFFER` is sized for. A skipped frame is not encoded at all, so the reference chain
+    is never broken.
+  - **Media Foundation's hardware MFTs are asynchronous**, so `run_async` drives them off their event
+    queue (`METransformNeedInput`/`HaveOutput`, polled with a timeout so a stalled MFT falls back
+    instead of hanging the capture) and queues an early output so one call still returns one access
+    unit. VideoToolbox is flushed with `complete_frames` after every frame, which keeps it synchronous.
+  - **Only the Linux backend has been run on hardware.** The Windows and macOS backends were
+    type-checked against their targets (`-Zbuild-std` with mingw for Windows; the macOS module in a
+    scratch crate, since the full client needs the SDK) but not executed — a failure there costs the
+    GPU, never the share, because of the fallback.
+- **The software encoder runs in openh264's camera mode, not its screen-content mode** (`encoder::Software`,
   `UsageType::CameraVideoRealTime`). Screen-content mode is built for desktops, and on a game it
   falls apart: measured on 90 real frames of a game at 1600x900 and 4 Mbps, its rate control blew
   the budget and fell back on `skip_frames`, so **11 of every 30 frames came out** and what the viewer
