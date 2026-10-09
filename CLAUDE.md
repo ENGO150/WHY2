@@ -592,8 +592,24 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     (`encode_at`): its rate control is defined in time, and a zero timestamp is read as one frame
     interval after the last call however long ago that was. The bitrate lives in a
     static so a backend or monitor switch keeps it; `rate::start` resets it per share.
-    **Known gap:** this only sees the sharer's leg. A viewer whose download is slower than the sharer's
-    upload is still shed at the server, since nothing carries that back to the sharer.
+    **The viewers' legs are reported back by the server** (`ScreenPacketCode::Feedback`), because a
+    viewer whose download is slower than the sharer's upload is invisible from the sharer's socket:
+    measured over WireGuard, the sharer pushed 6 Mbps without a single send blocking while a 3.5 Mbps
+    server→viewer leg queued ~2 s behind it. Each viewer task measures the backlog a frame joins
+    before it writes it (`Backlog`: how long the frame sat in that viewer's queue plus `tcpi_rtt` over
+    `tcpi_min_rtt`, and the socket's unsent bytes, each the minimum per interval), and a reporter task
+    per share (`feedback`) sends the worst viewer's figures every `FEEDBACK_INTERVAL`, with `shed` set
+    if any viewer had a frame dropped. The sharer reads them on the share socket's otherwise unused
+    read half (`rate::report`), turns the unsent bytes into time at its own target, and the controller
+    takes the larger of its own delay and the server's, and treats `shed` like a full link.
+    - **The report runs on its own REX stream** (`crypto::init_reverse_stream`, the token hashed under
+      its own label): the upload's stream is keyed by the same token, and two directions on one
+      keystream would be CTR keystream reuse.
+    - **It is compatible both ways.** `Feedback` is the last variant, so the existing ones keep their
+      encoding; an older sharer never reads that direction, and the reporter is its own task so a
+      sharer that never drains it costs nothing but that task blocking; an older server simply never
+      sends one. A non-Linux server reports queueing in its own viewer queue only (`tcp_backlog` is
+      `None` there).
   - **A slow viewer is shed on its own socket, not paid for by everybody else.** `screen::server`'s
     loop used to `send_frame` to each viewer inline, so the share ran at the slowest link on the
     server: one viewer stalling in `write_all` held the read of the sharer's *next* frame, and every
@@ -639,10 +655,10 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
       either way — the viewer detached, or re-attached under a new token, which is a new stream. The
       loop's `retain` therefore matches on the *token* as well as the id: a re-attachment is a
       different `Viewer` for the same client, and the new one arrives through `pending`.
-    - **Known gap: the sharer is no longer told when a viewer cannot keep up.** Forwarding inline at
-      least backpressured them; now nothing does, so a share sized for a link nobody has is simply
-      shed at the server, per viewer, forever. This is the same missing feedback signal the bitrate
-      gap above needs.
+    - **The sharer is told when a viewer cannot keep up**, through the server's backlog report (above),
+      rather than through backpressure as when forwarding was inline — the share slows down for the
+      slowest viewer instead of being shed for it. Shedding remains for what the report cannot fix in
+      time.
 - **RGBA → I420 runs on the CPU, through openh264's own SIMD path** (`YuvScratch::fill`,
   `read_rgba8`/`read_bgra8`). The conversion was once the single most expensive stage of the share
   (~25 ms a frame at 1080p) because it went through `read_rgb`, openh264's per-pixel float
