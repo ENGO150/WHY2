@@ -19,6 +19,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::time::Duration;
 
 pub const H264_BITRATE: u32               = 8_000_000;                                       //H.264 ENCODER TARGET BITRATE (8 Mbps)
+pub const START_BITRATE: u32              = 2_500_000;                                       //WHERE A SHARE'S BITRATE STARTS
+pub const MIN_BITRATE: u32                = 500_000;                                         //LOWEST BITRATE THE LINK MAY PUSH US TO
+pub const RATE_WINDOW: Duration           = Duration::from_millis(500);                      //HOW OFTEN THE BITRATE IS RECONSIDERED
+pub const RATE_HOLD: Duration             = Duration::from_secs(2);                          //NO GROWTH THIS LONG AFTER A BACKOFF
+pub const RATE_SATURATED: f64             = 0.6;                                             //SHARE OF A WINDOW SPENT WRITING THAT MEANS A FULL LINK
+pub const RATE_IDLE: f64                  = 0.2;                                             //SHARE OF A WINDOW SPENT WRITING THAT MEANS ROOM
+pub const RATE_USED: f64                  = 0.5;                                             //SHARE OF THE TARGET SENT BEFORE IT MAY GROW
+pub const RATE_BACKOFF: f64               = 0.8;                                             //TARGET AFTER A FULL WINDOW, OF WHAT WENT THROUGH
+pub const RATE_GROWTH: f64                = 1.06;                                            //TARGET GROWTH PER IDLE WINDOW
+pub const RATE_CREEP: f64                 = 1.02;                                            //TARGET GROWTH PER IDLE WINDOW NEAR THE LAST FULL LINK
+pub const RATE_DELAY: Duration            = Duration::from_millis(100);                      //QUEUEING THAT COUNTS AS A FULL LINK
+pub const RATE_NEAR: f64                  = 0.9;                                             //SHARE OF THE LAST FULL LINK WHERE GROWTH SLOWS
 
 pub const BUFFER_SIZE: u32                = 960;                                             //CPAL BUFFER SIZE
 pub const MAX_PACKET_SIZE: usize          = 4000;                                            //MAX OPUS PACKET SIZE
@@ -43,6 +55,7 @@ pub const VIEWER_CHANNEL_BOUND: usize     = MULTIPLEX_CHANNEL_BOUND * 4;        
 pub const SOCKET_BUFFER: usize            = 128 * 1024;                                      //KERNEL QUEUE A SCREEN SHARE SOCKET MAY HOLD
 
 pub const FORCED_INTRA_INTERVAL: Duration  = Duration::from_secs(2);      //MAX GAP BETWEEN ENCODED FRAMES
+pub const KEYFRAME_INTERVAL: Duration      = Duration::from_secs(2);      //MAX GAP BETWEEN KEYFRAMES
 pub const RECORDER_POLL_INTERVAL: Duration = Duration::from_millis(100);  //HOW OFTEN THE RECORDER LOOP RECHECKS `running` WHILE IDLE
 pub const BACKEND_OVERRIDE_VAR: &str       = "WHY2_CAPTURE_BACKEND";      //PINS A CAPTURE BACKEND ("recorder" / "legacy")
 pub const PROBE_TIMEOUT_VAR: &str          = "WHY2_CAPTURE_PROBE_TIMEOUT"; //OVERRIDES THE PROBE TIMEOUT, IN SECONDS

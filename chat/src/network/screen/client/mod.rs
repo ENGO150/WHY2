@@ -20,7 +20,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod audio;
 pub mod capture;
 pub mod display;
+pub mod encoder;
 pub mod options;
+pub mod rate;
 pub mod video;
 
 #[cfg(target_os = "linux")]
@@ -28,6 +30,7 @@ pub mod portal;
 
 use std::
 {
+    time::Instant,
     sync::
     {
         Arc,
@@ -115,6 +118,9 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
 
     let running = Arc::new(AtomicBool::new(true));
 
+    //FRESH BITRATE ESTIMATE
+    rate::start();
+
     //SPAWN CAPTURE TASKS (BLOCKING CPU LOOP)
     let running_capture = running.clone();
     let running_audio = running.clone();
@@ -144,8 +150,11 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
                     None => break,
                 };
 
+                let (bytes, started) = (compressed_frame.len(), Instant::now());
+                rate::probe(write_stream.as_ref());
                 screen::send_frame(&mut write_stream,
                     ScreenPacketCode::Video { data: compressed_frame }, &mut rex_stream, Some(&mut seq)).await;
+                rate::record(bytes, started.elapsed());
             },
 
             //AUDIO FRAME
@@ -160,8 +169,10 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
                 //SOUND NOT SHARED
                 if !options::get_share_audio() { continue; }
 
+                let (bytes, started) = (audio_frame.data.len(), Instant::now());
                 screen::send_frame(&mut write_stream,
                     ScreenPacketCode::Audio { data: audio_frame.data }, &mut rex_stream, Some(&mut seq)).await;
+                rate::record(bytes, started.elapsed());
             }
         }
     }

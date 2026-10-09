@@ -47,21 +47,12 @@ use tokio::sync::mpsc::Sender;
 
 use xcap::{ Frame, Monitor, VideoRecorder };
 
-use openh264::
+use openh264::formats::
 {
-    OpenH264API,
-    formats::{ BgraSliceU8, RgbaSliceU8, YUVBuffer },
-    encoder::
-    {
-        Encoder,
-        EncoderConfig,
-        BitRate,
-        FrameRate,
-        IntraFramePeriod,
-        Complexity,
-        UsageType,
-        RateControlMode,
-    },
+    BgraSliceU8,
+    RgbaSliceU8,
+    YUVBuffer,
+    YUVSource,
 };
 
 use crate::
@@ -70,7 +61,18 @@ use crate::
     network::screen::
     {
         consts,
-        client::options,
+        client::
+        {
+            options,
+            rate::RateControl,
+            encoder::
+            {
+                self,
+                Backend,
+                Planes,
+                Settings,
+            },
+        },
     },
 };
 
@@ -288,23 +290,6 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
     }
 }
 
-fn create_encoder(fps: f32) -> Result<Encoder, String>
-{
-    let config = EncoderConfig::new()
-        .max_frame_rate(FrameRate::from_hz(fps))
-        .rate_control_mode(RateControlMode::Bitrate)
-        .bitrate(BitRate::from_bps(consts::H264_BITRATE))
-        .intra_frame_period(IntraFramePeriod::from_num_frames((fps * 2.0) as u32))
-        .complexity(Complexity::Low)
-        .usage_type(UsageType::CameraVideoRealTime)
-        .skip_frames(true)
-        .adaptive_quantization(false)
-        .background_detection(false);
-
-    Encoder::with_api_config(OpenH264API::from_source(), config)
-        .map_err(|error| t!("screen.error.encoder", error))
-}
-
 struct YuvScratch //REUSABLE I420 SCRATCH BUFFER
 {
     buffer: YUVBuffer,
@@ -319,7 +304,7 @@ impl YuvScratch
         Self { buffer: YUVBuffer::new(0, 0), width: 0, height: 0 }
     }
 
-    fn fill(&mut self, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> &YUVBuffer
+    fn fill(&mut self, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> Planes<'_>
     {
         //RESIZE ONLY ON A REAL RESOLUTION CHANGE
         if self.width != width || self.height != height
@@ -338,28 +323,65 @@ impl YuvScratch
             PixelOrder::Bgra => self.buffer.read_bgra8(BgraSliceU8::new(pixels, dimensions)),
         }
 
-        &self.buffer
+        Planes { width, height, y: self.buffer.y(), u: self.buffer.u(), v: self.buffer.v() }
     }
 }
 
 struct FrameEncoder
 {
-    encoder: Encoder,
+    encoder: Option<Box<dyn Backend>>,
     scratch: YuvScratch,
-    fps: f32,
+    fps: u32,
     dimensions: Option<(u32, u32)>,
+    hardware: bool, //GPU ENCODER STILL WORTH TRYING
+    keyframe: bool, //THE NEXT FRAME MUST STAND ALONE
+    rate: RateControl,
+    last_keyframe: Instant,
 }
 
 impl FrameEncoder
 {
-    fn new(fps: f32) -> Result<Self, String>
+    fn new(fps: u32) -> Self
     {
-        Ok(Self { encoder: create_encoder(fps)?, scratch: YuvScratch::new(), fps, dimensions: None })
+        Self
+        {
+            encoder: None,
+            scratch: YuvScratch::new(),
+            fps,
+            dimensions: None,
+            hardware: true,
+            keyframe: false,
+            rate: RateControl::new(),
+            last_keyframe: Instant::now(),
+        }
+    }
+
+    //ENCODE AND SEND, FALSE IF NOTHING WENT
+    fn submit(&mut self, frame_tx: &Sender<Vec<u8>>, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> Result<bool, String>
+    {
+        if let Some(bitrate) = self.rate.update() && let Some(backend) = self.encoder.as_mut()
+        {
+            backend.set_bitrate(bitrate);
+        }
+
+        //NETWORK BEHIND - SKIP BEFORE THE ENCODER SEES IT
+        if frame_tx.capacity() == 0 { return Ok(false); }
+
+        if self.last_keyframe.elapsed() >= consts::KEYFRAME_INTERVAL { self.force_intra_frame(); }
+
+        let Some(frame) = self.encode(width, height, pixels, order)? else { return Ok(false) };
+
+        if encoder::nal_units(&frame).any(|unit| unit.first().is_some_and(|header| header & 0x1f == 5))
+        {
+            self.last_keyframe = Instant::now();
+        }
+
+        Ok(self.dispatch(frame_tx, frame))
     }
 
     fn force_intra_frame(&mut self)
     {
-        self.encoder.force_intra_frame();
+        self.keyframe = true;
     }
 
     fn encode(&mut self, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> Result<Option<Vec<u8>>, String>
@@ -377,35 +399,55 @@ impl FrameEncoder
         };
 
         //A RESIZE NEEDS A FRESH ENCODER
-        if self.dimensions.is_some_and(|previous| previous != (width, height))
+        if self.dimensions != Some((width, height))
         {
-            self.encoder = create_encoder(self.fps)?;
+            self.encoder = None;
+            self.dimensions = Some((width, height));
         }
 
-        self.dimensions = Some((width, height));
+        let planes = self.scratch.fill(width, height, pixels, order);
 
-        let yuv = self.scratch.fill(width, height, pixels, order);
-
-        let data = self.encoder.encode(yuv)
-            .map_err(|error| t!("screen.error.encode", error))?
-            .to_vec();
-
-        //SKIP EMPTY FRAMES
-        if data.is_empty()
+        loop
         {
-            return Ok(None);
-        }
+            if self.encoder.is_none()
+            {
+                self.encoder = Some(encoder::open(Settings::new(width, height, self.fps, self.rate.bitrate()), &mut self.hardware)
+                    .map_err(|error| t!("screen.error.encoder", error))?);
+            }
 
-        Ok(Some(data))
+            let Some(backend) = self.encoder.as_mut() else { continue };
+
+            let keyframe = std::mem::take(&mut self.keyframe);
+
+            match backend.encode(&planes, keyframe)
+            {
+                //SKIP EMPTY FRAMES
+                Ok(data) => return Ok((!data.is_empty()).then_some(data)),
+
+                //FALL BACK TO openh264
+                Err(_) if backend.hardware() =>
+                {
+                    self.encoder = None;
+                    self.hardware = false;
+                    self.keyframe = true;
+                },
+
+                Err(error) => return Err(t!("screen.error.encode", error)),
+            }
+        }
     }
 
-    fn dispatch(&mut self, frame_tx: &Sender<Vec<u8>>, frame: Vec<u8>) //HAND A FRAME TO THE NETWORK TASK
+    fn dispatch(&mut self, frame_tx: &Sender<Vec<u8>>, frame: Vec<u8>) -> bool //HAND A FRAME TO THE NETWORK TASK
     {
         //THIS FRAME IS GONE, SO THE NEXT CANNOT PREDICT IT
         if frame_tx.try_send(frame).is_err()
         {
             self.force_intra_frame();
+
+            return false;
         }
+
+        true
     }
 }
 
@@ -436,7 +478,7 @@ fn capture_loop_xcap
 
     let generation = options::monitor_generation();
 
-    let mut encoder = FrameEncoder::new(fps as f32)?;
+    let mut encoder = FrameEncoder::new(fps);
 
     //PREVIOUS FRAME, KEPT BY MOVE
     let mut last_image: Option<xcap::image::RgbaImage> = None;
@@ -458,13 +500,8 @@ fn capture_loop_xcap
             //CHEAP WHEN THE SCREEN MOVED - memcmp EARLY-EXITS
             let changed = last_image.as_ref().is_none_or(|previous| previous.as_raw() != image.as_raw());
 
-            if force_encode || changed
+            if (force_encode || changed) && encoder.submit(&frame_tx, image.width(), image.height(), image.as_raw(), PixelOrder::Rgba)?
             {
-                if let Some(compressed) = encoder.encode(image.width(), image.height(), image.as_raw(), PixelOrder::Rgba)?
-                {
-                    encoder.dispatch(&frame_tx, compressed);
-                }
-
                 last_image = Some(image);
                 last_encode_time = Instant::now();
             }
@@ -624,7 +661,7 @@ fn capture_loop_wayshot
 
     let mut target_output = select_output(&wayshot)?;
 
-    let mut encoder = FrameEncoder::new(fps as f32)?;
+    let mut encoder = FrameEncoder::new(fps);
 
     //PROBE ONCE SO A BAD COMPOSITOR REPORTS AN ERROR
     let first_image = wayshot.screenshot_single_output(&target_output, true)
@@ -632,10 +669,7 @@ fn capture_loop_wayshot
         .into_rgba8();
 
     //ENCODE AND SEND FIRST FRAME
-    if let Some(compressed) = encoder.encode(first_image.width(), first_image.height(), first_image.as_raw(), PixelOrder::Rgba)?
-    {
-        encoder.dispatch(&frame_tx, compressed);
-    }
+    encoder.submit(&frame_tx, first_image.width(), first_image.height(), first_image.as_raw(), PixelOrder::Rgba)?;
 
     //ROOM FOR THE PICTURE PLUS ANY ROW PADDING
     let reserve = first_image.height() as u64 * (first_image.width() as u64 * 4 + consts::SHM_ROW_SLACK);
@@ -696,13 +730,8 @@ fn capture_loop_wayshot
 
                 let changed = last_raw.as_ref().is_none_or(|previous| previous != &pixels);
 
-                if force_encode || changed
+                if (force_encode || changed) && encoder.submit(&frame_tx, width, height, &pixels, order)?
                 {
-                    if let Some(compressed) = encoder.encode(width, height, &pixels, order)?
-                    {
-                        encoder.dispatch(&frame_tx, compressed);
-                    }
-
                     //SWAP RATHER THAN REALLOCATE
                     pixels = last_raw.replace(std::mem::take(&mut pixels)).unwrap_or_default();
                     last_encode_time = Instant::now();
@@ -985,7 +1014,7 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
 {
     let latest = session.latest.clone();
 
-    let mut encoder = FrameEncoder::new(fps as f32)?;
+    let mut encoder = FrameEncoder::new(fps);
 
     let min_interval = Duration::from_secs_f64(1.0 / fps as f64);
 
@@ -1051,9 +1080,11 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
             continue;
         }
 
-        if let Some(compressed) = encoder.encode(frame.width, frame.height, &frame.data, frame.order)?
+        //NOT SENT - THE NEXT FRAME TRIES AGAIN
+        if !encoder.submit(&frame_tx, frame.width, frame.height, &frame.data, frame.order)?
         {
-            encoder.dispatch(&frame_tx, compressed);
+            latest.recycle(frame.data);
+            continue;
         }
 
         //SLOTS FOLLOW SLOTS, NOT ENCODES
