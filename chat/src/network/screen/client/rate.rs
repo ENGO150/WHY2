@@ -21,29 +21,28 @@ use std::
     time::{ Duration, Instant },
     sync::atomic::
     {
+        AtomicBool,
         AtomicU32,
         AtomicU64,
         Ordering,
     },
 };
 
-#[cfg(target_os = "linux")]
-use std::
-{
-    mem,
-    os::fd::AsRawFd,
-};
-
-#[cfg(target_os = "linux")]
 use tokio::net::TcpStream;
 
-use crate::network::screen::consts;
+use crate::network::screen::
+{
+    self,
+    consts,
+};
 
 //SHARED WITH THE NETWORK TASK
 static SENT: AtomicU64 = AtomicU64::new(0);         //BYTES WRITTEN THIS WINDOW
 static BUSY: AtomicU64 = AtomicU64::new(0);         //MICROSECONDS SPENT WRITING
 static BITRATE: AtomicU32 = AtomicU32::new(0);      //CURRENT TARGET
 static DELAY: AtomicU64 = AtomicU64::new(u64::MAX); //LEAST QUEUEING SEEN, MICROSECONDS
+static REMOTE: AtomicU64 = AtomicU64::new(u64::MAX); //LEAST QUEUEING THE SERVER REPORTED, MICROSECONDS
+static SHED: AtomicBool = AtomicBool::new(false);    //THE SERVER DROPPED A VIEWER BEHIND
 
 //STRUCTS
 pub struct RateControl //FITS THE BITRATE TO THE LINK
@@ -75,15 +74,16 @@ impl RateControl
 
         let sent = SENT.swap(0, Ordering::Relaxed) as f64 * 8.0;
         let busy = Duration::from_micros(BUSY.swap(0, Ordering::Relaxed)).as_secs_f64() / elapsed.as_secs_f64();
-        let delay = match DELAY.swap(u64::MAX, Ordering::Relaxed) { u64::MAX => Duration::ZERO, micros => Duration::from_micros(micros) };
+        let delay = Duration::from_micros(take_min(&DELAY).max(take_min(&REMOTE)));
+        let shed = SHED.swap(false, Ordering::Relaxed);
 
         let current = f64::from(self.bitrate());
         let throughput = sent / elapsed.as_secs_f64();
 
         let carried = throughput.min(current);
 
-        //LINK FULL, OR A QUEUE BUILDING
-        let next = if busy >= consts::RATE_SATURATED || delay >= consts::RATE_DELAY
+        //LINK FULL, A QUEUE BUILDING, OR A VIEWER LEFT BEHIND
+        let next = if busy >= consts::RATE_SATURATED || delay >= consts::RATE_DELAY || shed
         {
             //AT MOST WHAT WE ASKED FOR, AT MOST WHAT A FULL LINK DRAINED
             if !self.congested { self.ceiling = current; }
@@ -126,6 +126,8 @@ pub fn start() //A NEW SHARE
     SENT.store(0, Ordering::Relaxed);
     BUSY.store(0, Ordering::Relaxed);
     DELAY.store(u64::MAX, Ordering::Relaxed);
+    REMOTE.store(u64::MAX, Ordering::Relaxed);
+    SHED.store(false, Ordering::Relaxed);
     BITRATE.store(consts::START_BITRATE, Ordering::Relaxed);
 }
 
@@ -135,28 +137,30 @@ pub fn record(bytes: usize, busy: Duration) //ONE SOCKET WRITE
     BUSY.fetch_add(busy.as_micros() as u64, Ordering::Relaxed);
 }
 
-#[cfg(target_os = "linux")]
 pub fn probe(stream: &TcpStream) //THE QUEUE A NEW FRAME JOINS
 {
-    //SAFETY: tcp_info IS PLAIN DATA
-    let mut info: libc::tcp_info = unsafe { mem::zeroed() };
-    let mut length = mem::size_of::<libc::tcp_info>() as libc::socklen_t;
+    let Some((unsent, inflated)) = screen::tcp_backlog(stream) else { return };
 
-    //SAFETY: LIVE SOCKET, info IS length BYTES
-    let status = unsafe
-    {
-        libc::getsockopt(stream.as_raw_fd(), libc::IPPROTO_TCP, libc::TCP_INFO, (&raw mut info).cast(), &mut length)
-    };
-
-    if status != 0 || (length as usize) < mem::size_of::<libc::tcp_info>() { return; }
-
-    //UNSENT BYTES AT THE CURRENT TARGET, PLUS RTT ABOVE THE PATH'S BEST
-    let bitrate = u64::from(BITRATE.load(Ordering::Relaxed).max(1));
-    let unsent = u64::from(info.tcpi_notsent_bytes) * 8_000_000 / bitrate;
-    let inflated = u64::from(info.tcpi_rtt.saturating_sub(info.tcpi_min_rtt));
-
-    DELAY.fetch_min(unsent + inflated, Ordering::Relaxed);
+    DELAY.fetch_min(at_target(unsent) + inflated.as_micros() as u64, Ordering::Relaxed);
 }
 
-#[cfg(not(target_os = "linux"))]
-pub fn probe(_stream: &tokio::net::TcpStream) {}
+pub fn report(delay: u32, unsent: u32, shed: bool) //THE SERVER'S WORD ON ITS VIEWERS
+{
+    REMOTE.fetch_min(u64::from(delay) + at_target(u64::from(unsent)), Ordering::Relaxed);
+
+    if shed { SHED.store(true, Ordering::Relaxed); }
+}
+
+fn at_target(bytes: u64) -> u64 //MICROSECONDS TO SEND bytes AT THE CURRENT TARGET
+{
+    bytes * 8_000_000 / u64::from(BITRATE.load(Ordering::Relaxed).max(1))
+}
+
+fn take_min(slot: &AtomicU64) -> u64 //A WINDOW'S MINIMUM, ZERO IF NOTHING CAME
+{
+    match slot.swap(u64::MAX, Ordering::Relaxed)
+    {
+        u64::MAX => 0,
+        micros => micros,
+    }
+}

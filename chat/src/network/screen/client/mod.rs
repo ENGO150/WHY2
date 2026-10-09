@@ -103,7 +103,7 @@ pub static SCREEN_FRAME_SINK: RwLock<Option<UnboundedSender<Vec<u8>>>> = RwLock:
 pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
-    let (_read_stream, mut write_stream) = handshake::connect(chat_options::get_server_address()).await
+    let (mut read_stream, mut write_stream) = handshake::connect(chat_options::get_server_address()).await
         .expect("Screen upload connection failed");
 
     //KEEP THE UPLOAD'S BACKLOG VISIBLE TO THE ENCODER
@@ -130,8 +130,26 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
     //LOCAL SEQ COUNTER
     let mut seq = 0usize;
 
-    //INIT REX STREAM
-    let mut rex_stream = crypto::init_rex_stream(chat_options::get_keys().as_ref().unwrap(), &token).unwrap();
+    //INIT REX STREAMS, ONE EACH WAY
+    let keys = chat_options::get_keys().unwrap();
+    let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
+    let mut reverse_stream = crypto::init_reverse_stream(&keys, &token).unwrap();
+
+    //THE READER NEEDS THE WRITE HALF BESIDE IT
+    let write_stream = Arc::new(Mutex::new(write_stream));
+    let reader_write = write_stream.clone();
+
+    //THE SERVER'S WORD ON ITS VIEWERS
+    let reader = tokio::spawn(async move
+    {
+        let mut streams = (&mut read_stream, reader_write);
+        let mut seq = 0usize;
+
+        while let Some(code) = screen::receive_frame(&mut streams, &mut reverse_stream, &mut seq).await
+        {
+            if let ScreenPacketCode::Feedback { delay, unsent, shed } = code { rate::report(delay, unsent, shed); }
+        }
+    }).abort_handle();
 
     //LOOP SENDING FRAMES
     loop
@@ -150,8 +168,10 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
                     None => break,
                 };
 
+                let mut write_stream = write_stream.lock().await;
+
                 let (bytes, started) = (compressed_frame.len(), Instant::now());
-                rate::probe(write_stream.as_ref());
+                rate::probe((*write_stream).as_ref());
                 screen::send_frame(&mut write_stream,
                     ScreenPacketCode::Video { data: compressed_frame }, &mut rex_stream, Some(&mut seq)).await;
                 rate::record(bytes, started.elapsed());
@@ -170,7 +190,7 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
                 if !options::get_share_audio() { continue; }
 
                 let (bytes, started) = (audio_frame.data.len(), Instant::now());
-                screen::send_frame(&mut write_stream,
+                screen::send_frame(&mut *write_stream.lock().await,
                     ScreenPacketCode::Audio { data: audio_frame.data }, &mut rex_stream, Some(&mut seq)).await;
                 rate::record(bytes, started.elapsed());
             }
@@ -179,6 +199,7 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
 
     //STOP THE CAPTURE LOOP AND REPORT WHY
     running.store(false, Ordering::Relaxed);
+    reader.abort();
 
     let reason = match capture.await
     {
@@ -281,6 +302,9 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
                     //ONE TCP STREAM, SO DROP RATHER THAN WAIT
                     audio_tx.try_send(AudioFrame { data }).ok();
                 },
+
+                //ONLY A SHARER IS REPORTED TO
+                ScreenPacketCode::Feedback { .. } => {},
             }
         }
     });
