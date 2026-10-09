@@ -3423,6 +3423,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-video-toolbox"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05bf9a3c14831a7d9641b0d81d87dd913ee238a012b2fde27db5a84b56f5df3e"
+dependencies = [
+ "bitflags 2.13.2",
+ "objc2-core-foundation",
+ "objc2-core-media",
+ "objc2-core-video",
+]
+
+[[package]]
 name = "ogg"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6057,6 +6069,7 @@ name = "why2-chat"
 version = "2.3.2"
 dependencies = [
  "argon2",
+ "ash",
  "audiopus",
  "base64 0.23.1",
  "chrono",
@@ -6069,11 +6082,16 @@ dependencies = [
  "hmac",
  "image",
  "lewton",
+ "libc",
  "libwayshot",
  "log",
  "memmap2",
  "ml-kem",
  "nnnoiseless",
+ "objc2-core-foundation",
+ "objc2-core-media",
+ "objc2-core-video",
+ "objc2-video-toolbox",
  "openh264",
  "p521",
  "pipewire",
@@ -6097,6 +6115,7 @@ dependencies = [
  "wgpu",
  "why2",
  "wincode",
+ "windows 0.62.2",
  "winit",
  "winresource",
  "xcap",
