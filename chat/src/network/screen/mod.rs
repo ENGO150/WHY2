@@ -25,6 +25,15 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
+use std::time::Duration;
+
+#[cfg(target_os = "linux")]
+use std::
+{
+    mem,
+    os::fd::AsRawFd,
+};
+
 use tokio::net::
 {
     TcpStream,
@@ -51,6 +60,7 @@ pub enum ScreenPacketCode
 {
     Video { data: Vec<u8> }, //VIDEO DATA
     Audio { data: Vec<u8> }, //AUDIO DATA
+    Feedback { delay: u32, unsent: u32, shed: bool }, //WORST VIEWER'S BACKLOG (MICROSECONDS, BYTES)
 }
 
 //STRUCTS
@@ -70,6 +80,30 @@ impl SequencedPacket for ScreenPacket
 
 //FUNCTIONS
 //UTILS
+#[cfg(target_os = "linux")]
+pub fn tcp_backlog(stream: &TcpStream) -> Option<(u64, Duration)> //UNSENT BYTES AND RTT OVER THE PATH'S BEST
+{
+    //SAFETY: tcp_info IS PLAIN DATA
+    let mut info: libc::tcp_info = unsafe { mem::zeroed() };
+    let mut length = mem::size_of::<libc::tcp_info>() as libc::socklen_t;
+
+    //SAFETY: LIVE SOCKET, info IS length BYTES
+    let status = unsafe
+    {
+        libc::getsockopt(stream.as_raw_fd(), libc::IPPROTO_TCP, libc::TCP_INFO, (&raw mut info).cast(), &mut length)
+    };
+
+    if status != 0 || (length as usize) < mem::size_of::<libc::tcp_info>() { return None; }
+
+    Some((u64::from(info.tcpi_notsent_bytes), Duration::from_micros(u64::from(info.tcpi_rtt.saturating_sub(info.tcpi_min_rtt)))))
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn tcp_backlog(_stream: &TcpStream) -> Option<(u64, Duration)>
+{
+    None
+}
+
 pub fn cap_socket_buffers(stream: &TcpStream) //BOUND THE KERNEL QUEUE THIS SOCKET MAY HIDE
 {
     //CAP THE AUTOTUNED BUFFERS THAT HIDE BACKLOG

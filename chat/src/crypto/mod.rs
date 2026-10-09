@@ -270,6 +270,15 @@ pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, k
     Some(Zeroizing::new(i64_to_bytes(&decrypted_packet.output)))
 }
 
+pub fn init_reverse_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketStream> //THE SAME SOCKET, THE OTHER DIRECTION
+{
+    let mut hasher = Sha256::new();
+    hasher.update(b"WHY2-REVERSE-STREAM");
+    hasher.update(token);
+
+    init_rex_stream(keys, &hasher.finalize().into())
+}
+
 pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketStream>
 {
     let key_grid = Grid::from_key(&keys.0).ok()?;

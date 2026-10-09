@@ -171,6 +171,7 @@ client = [
 
 server = [
     "chat",
+    "dep:libc",
     "dep:argon2",
     "dep:log",
     "dep:simple_logger",

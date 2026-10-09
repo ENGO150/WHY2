@@ -18,13 +18,19 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
-    time::Instant,
+    time::{ Duration, Instant },
     collections::HashMap,
     sync::
     {
         Arc,
         LazyLock,
         Mutex as MutexSync,
+        atomic::
+        {
+            AtomicBool,
+            AtomicU64,
+            Ordering,
+        },
     },
 };
 
@@ -32,6 +38,7 @@ use dashmap::DashMap;
 
 use tokio::
 {
+    time,
     task::AbortHandle,
     net::tcp::OwnedWriteHalf,
     sync::
@@ -72,21 +79,31 @@ static SHARES: LazyLock<DashMap<usize, Arc<Share>>> = LazyLock::new(|| DashMap::
 struct ScreenTransferGuard
 {
     id: usize,
+    feedback: AbortHandle, //THE TASK REPORTING BACK TO THE SHARER
 }
 
 struct Share //WHAT A SHARE LEAVES WHERE AN ATTACHING VIEWER CAN REACH IT
 {
     keyframe: MutexSync<Option<Vec<u8>>>,     //THE LAST PICTURE THAT STANDS ON ITS OWN
     pending: MutexSync<Vec<(usize, Viewer)>>, //VIEWERS BUILT AT THE ATTACH, WAITING TO BE PICKED UP
+    stats: MutexSync<Vec<Arc<Backlog>>>,      //EVERY SERVED VIEWER'S BACKLOG
+}
+
+struct Backlog //WHAT ONE VIEWER IS BEHIND BY, LEAST SINCE THE LAST REPORT
+{
+    delay: AtomicU64,  //MICROSECONDS QUEUED HERE PLUS RTT OVER THE PATH'S BEST
+    unsent: AtomicU64, //BYTES THE SOCKET HAS NOT SENT
+    shed: AtomicBool,  //A FRAME WAS DROPPED FOR IT
 }
 
 struct Viewer //ONE ATTACHED CLIENT, AND THE TASK THAT WRITES TO IT
 {
-    token: [u8; 32],              //THE ATTACHMENT THIS TASK WAS BUILT FOR
-    tx: Sender<ScreenPacketCode>, //HANDOFF TO THAT TASK
-    task: AbortHandle,            //THE TASK ITSELF
-    needs_key: bool,              //SHED: WAITING FOR THE NEXT IDR
-    muted: bool,                  //VIEWER MUTED THE SHARE AUDIO
+    token: [u8; 32],                         //THE ATTACHMENT THIS TASK WAS BUILT FOR
+    tx: Sender<(Instant, ScreenPacketCode)>, //HANDOFF TO THAT TASK, WITH WHEN IT WAS QUEUED
+    stats: Arc<Backlog>,                     //WHAT THAT TASK MEASURES
+    task: AbortHandle,                       //THE TASK ITSELF
+    needs_key: bool,                         //SHED: WAITING FOR THE NEXT IDR
+    muted: bool,                             //VIEWER MUTED THE SHARE AUDIO
 }
 
 //IMPLEMENTATIONS
@@ -96,6 +113,8 @@ impl Drop for ScreenTransferGuard
     {
         //NOTHING MAY ATTACH TO A SHARE THAT IS OVER
         SHARES.remove(&self.id);
+
+        self.feedback.abort();
 
         if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&self.id))
         {
@@ -111,6 +130,23 @@ impl Drop for Viewer
     {
         //THE TASK MAY BE PARKED IN write_all
         self.task.abort();
+    }
+}
+
+impl Backlog
+{
+    fn new() -> Self
+    {
+        Self { delay: AtomicU64::new(u64::MAX), unsent: AtomicU64::new(u64::MAX), shed: AtomicBool::new(false) }
+    }
+
+    fn take(&self) -> (Option<(u64, u64)>, bool) //THE INTERVAL'S MINIMUM, AND WHETHER IT WAS SHED
+    {
+        let delay = self.delay.swap(u64::MAX, Ordering::Relaxed);
+        let unsent = self.unsent.swap(u64::MAX, Ordering::Relaxed);
+        let shed = self.shed.swap(false, Ordering::Relaxed);
+
+        ((delay != u64::MAX).then_some((delay, unsent)), shed)
     }
 }
 
@@ -173,20 +209,31 @@ fn spawn_viewer //ONE TASK PER VIEWER, SO A SLOW ONE BLOCKS ONLY ITSELF
 {
     //THE REX STREAM AND SEQUENCE ARE PER VIEWER
     let mut rex_stream = crypto::init_rex_stream(keys, &token)?;
-    let (tx, mut rx) = mpsc::channel(screen::consts::VIEWER_CHANNEL_BOUND);
+    let (tx, mut rx) = mpsc::channel::<(Instant, ScreenPacketCode)>(screen::consts::VIEWER_CHANNEL_BOUND);
+
+    let stats = Arc::new(Backlog::new());
+    let measured = stats.clone();
 
     let task = tokio::spawn(async move
     {
         let mut seq = 0usize;
 
-        while let Some(code) = rx.recv().await
+        while let Some((queued, code)) = rx.recv().await
         {
-            screen::send_frame(&mut *stream.lock().await, code, &mut rex_stream, Some(&mut seq)).await;
+            let mut stream = stream.lock().await;
+
+            //THE BACKLOG THIS FRAME JOINS
+            let (unsent, inflated) = screen::tcp_backlog(stream.as_ref()).unwrap_or((0, Duration::ZERO));
+
+            measured.delay.fetch_min((queued.elapsed() + inflated).as_micros() as u64, Ordering::Relaxed);
+            measured.unsent.fetch_min(unsent, Ordering::Relaxed);
+
+            screen::send_frame(&mut stream, code, &mut rex_stream, Some(&mut seq)).await;
         }
     }).abort_handle();
 
     //A JUST-ATTACHED VIEWER STARTS LIKE A SHED ONE
-    Some(Viewer { token, tx, task, needs_key: true, muted: false })
+    Some(Viewer { token, tx, stats, task, needs_key: true, muted: false })
 }
 
 fn muted_frame(started: &Instant) -> Option<usize> //INDEX OF THE PLACEHOLDER FRAME DUE RIGHT NOW
@@ -227,6 +274,46 @@ async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
     network::send(&mut *write_stream.lock().await, PacketCode::Screen { token: None }, keys.as_ref()).await;
 }
 
+async fn feedback //TELL THE SHARER HOW FAR BEHIND ITS VIEWERS ARE
+(
+    share: Arc<Share>,
+    stream: Arc<Mutex<OwnedWriteHalf>>,
+    mut rex_stream: crypto::RexPacketStream,
+)
+{
+    let mut seq = 0usize;
+    let mut interval = time::interval(screen::consts::FEEDBACK_INTERVAL);
+
+    loop
+    {
+        interval.tick().await;
+
+        let stats = share.stats.lock().map(|stats| stats.clone()).unwrap_or_default();
+
+        //THE WORST VIEWER
+        let mut worst: Option<(u64, u64)> = None;
+        let mut shed = false;
+
+        for (backlog, dropped) in stats.iter().map(|stats| stats.take())
+        {
+            shed |= dropped;
+
+            if let Some((delay, unsent)) = backlog
+            {
+                worst = Some(worst.map_or((delay, unsent), |(d, u)| (d.max(delay), u.max(unsent))));
+            }
+        }
+
+        //NOTHING TO SAY
+        if worst.is_none() && !shed { continue; }
+
+        let (delay, unsent) = worst.unwrap_or_default();
+        let code = ScreenPacketCode::Feedback { delay: delay.min(u64::from(u32::MAX)) as u32, unsent: unsent.min(u64::from(u32::MAX)) as u32, shed };
+
+        screen::send_frame(&mut *stream.lock().await, code, &mut rex_stream, Some(&mut seq)).await;
+    }
+}
+
 //PUBLIC
 pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
 (
@@ -245,7 +332,7 @@ pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
     //OPEN ON THE SHARE'S LAST KEYFRAME
     if let Some(frame) = share.keyframe.lock().ok().and_then(|frame| frame.clone())
     {
-        let _ = viewer.tx.try_send(ScreenPacketCode::Video { data: frame });
+        let _ = viewer.tx.try_send((Instant::now(), ScreenPacketCode::Video { data: frame }));
     }
 
     //PICKED UP BY THE SHARE LOOP ON ITS NEXT FRAME
@@ -294,17 +381,15 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
 
     log::info!("Screen share started: {owner}");
 
-    //DISCONNECT GUARD
-    let _guard = ScreenTransferGuard { id };
-
     //LOCAL SEQ
     let mut seq = 0usize;
 
     //ONE ENTRY PER ATTACHED VIEWER
     let mut viewers = HashMap::<usize, Viewer>::new();
 
-    //INIT REX STREAM
+    //INIT REX STREAMS, ONE EACH WAY
     let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
+    let reverse_stream = crypto::init_reverse_stream(&keys, &token).unwrap();
 
     //PLACEHOLDER PLAYBACK STATE
     let started = Instant::now();
@@ -315,7 +400,14 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
     {
         keyframe: MutexSync::new(None),
         pending: MutexSync::new(Vec::new()),
+        stats: MutexSync::new(Vec::new()),
     });
+
+    //REPORT BACK ON THE SAME SOCKET
+    let reporter = tokio::spawn(feedback(share.clone(), streams.1.clone(), reverse_stream)).abort_handle();
+
+    //DISCONNECT GUARD
+    let _guard = ScreenTransferGuard { id, feedback: reporter };
 
     SHARES.insert(id, share.clone());
 
@@ -338,6 +430,9 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         //SILENCE MUTED USERS, SEND THE PLACEHOLDER
         let read = match (muted, read)
         {
+            //ONLY THE SERVER REPORTS
+            (_, ScreenPacketCode::Feedback { .. }) => continue,
+
             //NOT MUTED, FORWARD WHATEVER CAME IN
             (false, read) =>
             {
@@ -404,6 +499,12 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             }
         });
 
+        //WHAT THE REPORTER READS
+        if let Ok(mut stats) = share.stats.lock()
+        {
+            *stats = viewers.values().map(|viewer| viewer.stats.clone()).collect();
+        }
+
         //FORWARD PACKET
         let keyframe = matches!(&read, ScreenPacketCode::Video { data } if is_keyframe(data));
 
@@ -426,7 +527,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             }
 
             //A FULL QUEUE MEANS SHED THE FRAME
-            if viewer.tx.try_send(read.clone()).is_err()
+            if viewer.tx.try_send((Instant::now(), read.clone())).is_err()
             {
                 //ONLY THE FIRST SHED FRAME OF A RUN IS LOGGED
                 if matches!(read, ScreenPacketCode::Video { .. })
@@ -434,6 +535,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
                     if !viewer.needs_key { log::warn!("Screen viewer shed (link too slow): share of {owner}"); }
 
                     viewer.needs_key = true;
+                    viewer.stats.shed.store(true, Ordering::Relaxed);
                 }
             }
         }

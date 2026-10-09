@@ -30,6 +30,7 @@ pub const RATE_BACKOFF: f64               = 0.8;                                
 pub const RATE_GROWTH: f64                = 1.06;                                            //TARGET GROWTH PER IDLE WINDOW
 pub const RATE_CREEP: f64                 = 1.02;                                            //TARGET GROWTH PER IDLE WINDOW NEAR THE LAST FULL LINK
 pub const RATE_DELAY: Duration            = Duration::from_millis(100);                      //QUEUEING THAT COUNTS AS A FULL LINK
+pub const FEEDBACK_INTERVAL: Duration     = Duration::from_millis(250);                      //HOW OFTEN THE SERVER REPORTS ITS VIEWERS' BACKLOG
 pub const RATE_NEAR: f64                  = 0.9;                                             //SHARE OF THE LAST FULL LINK WHERE GROWTH SLOWS
 
 pub const BUFFER_SIZE: u32                = 960;                                             //CPAL BUFFER SIZE
