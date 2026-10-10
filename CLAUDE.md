@@ -411,6 +411,83 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
     disk read, a whole `RexStream` decrypt and `MAX_IMAGE_SIZE` back on the wire for nothing. A miss
     comes back as `ClientEvent::ImageRequest` and joins `App::image_requests`, which the redraw tick
     sends — the event loop owns the write half and the sequence counter, so the fetch task cannot.
+- **Voice messages are the chat pictures' machinery carrying a different payload** (`/record`,
+  `/play`, `client_voice` on the client; always on in the server). A recorded clip is uploaded,
+  sealed into `server_images/`, kept by the history, pushed whole to every client on first broadcast,
+  cached by content under the server's fingerprint and fetched back through `ImageDataRequest` — every
+  one of those steps is the existing image path, so everything said above about sealing, caching,
+  channels and `persistent_messages` holds for a clip unchanged. What differs is only the shape:
+  - **The clip is `network/voice/message.rs`'s `Clip`**: `MAGIC` (`WHY2VOX\x01`) plus a
+    wincode `{ channels, frames: Vec<Vec<u8>> }`, one Opus packet per 20 ms frame. It lives in the
+    voice module rather than the client because the server has to read it too, and it is the
+    reason no container library was pulled in — Ogg would buy nothing a length-prefixed list of
+    packets does not already give. `Clip::decode` is the validation as well as the parse: 1–2
+    channels, at least one frame, at most `MESSAGE_MAX_FRAMES`, every packet non-empty and within
+    Opus's own 1275-byte ceiling.
+  - **The server parses the container and decodes no audio**, the same line it draws for pictures
+    (`is_avatar` reads a header, never pixels). `file/server.rs` checks `is_clip` on the first chunk,
+    and once the upload is whole and its hash checks out runs `Clip::decode` over the plaintext it
+    already keeps for persistent kinds — a malformed clip is refused before it is renamed into
+    place. That parse is also where the **duration comes from**: `VoiceNote { hash, duration }` is
+    the server's measurement, never the client's claim, and it is what the history keeps and what
+    every client draws. The ceiling is `MAX_VOICE_MESSAGE_SIZE` (6 MB), comfortably above what the
+    recorder can produce (`MESSAGE_BITRATE` × 5 minutes ≈ 3.6 MB plus framing).
+  - **It is its own packet and its own history field rather than an image with a flag**
+    (`VoiceMessageRequest` / `VoiceMessageUpload` / `VoiceMessage`, `Record::voice`,
+    `StoredMessage::voice`). Reusing `image` would have made every picture check say yes to a clip:
+    `stored()` is what `/image`'s dedup, the avatar's and the icon's consult, so a clip's hash would
+    have been accepted as a picture and broadcast to decoders that would fail on it. So `stored()`
+    stays pictures only, `messages::voice(hash)` answers for clips, and the two meet only where both
+    belong: the `ImageDataRequest` fetch arm serves either, and `Record::stored()` (the one file a
+    record names, picture or clip) is what `orphans`, `delete`, trimming and `sweep_images` keep or
+    drop. `/edit` refuses a clip like it refuses a picture. A repeat of a clip already kept costs no
+    upload — `ImageDuplicate` is reused as the "nothing to send" answer, since all the client does
+    with it is drop the parked file.
+  - **Recording deliberately bypasses the voice chat's processing** — no denoiser, no VAD, no AGC —
+    because a message may be music or a room rather than a voice, and every one of those stages is
+    tuned to throw such things away. Only the microphone volume slider applies, since that is the
+    user's level, not processing. It is 48 kHz stereo Opus in `Application::Audio` at
+    `MESSAGE_BITRATE` with constrained VBR, so the size bound above holds.
+  - **The capture is tapped from the call when there is one** (`message::feed`, called at the top of
+    `build_input_stream`'s callback, before the mute check and the VAD). A raw ALSA PCM is exclusive,
+    so opening a second capture beside a running call would fail exactly when there is no sound
+    server; with no call, `open_input` opens the configured `input_device` itself, on a blocking
+    thread. Each `Recording` records which of the two it is fed by and ignores the other, and a
+    generation stops an input that finished opening after the recording ended from being kept.
+    Leaving voice mid-recording ends the recording the next tick and sends what there is.
+  - **Encoding happens in the capture callback**, as `transmit_audio` already does for voice:
+    resample to 48 kHz stereo, encode whole frames, check the frame and byte limits. The callback
+    takes the `RECORDING` lock with `try_lock` only, so a tick that happens to hold it costs one
+    buffer of audio, never a blocked realtime thread.
+  - **Playback opens its own output stream on the configured `output_device`** and decodes in the
+    output callback one packet at a time (`Playhead`), so a five-minute clip is a few kilobytes of
+    state rather than ~58 MB of decoded floats. One clip plays at a time; `PLAY_GENERATION` makes a
+    later `/play` or a stop win over an open still in flight. A clip not in the cache is fetched like
+    a history picture: `play` parks the hash in `AWAITED` and raises `ClientEvent::ImageRequest`, so
+    it joins the capped fetch queue, and `listen_server`'s `ImageData` arm checks `AWAITED` before
+    the image path, files the bytes and starts playback; `ClientEvent::VoiceData` frees the fetch
+    slot (and marks the line `[ unavailable ]` on an empty answer). **Known gap:** like the attached
+    share's audio, this stream is not in the AEC reference, so a clip played while sharing leaks into
+    the share.
+  - **Push-to-talk is `Ctrl+R` held, and a tap is a toggle** (`tui/voice_message.rs`). A terminal
+    only reports a key being *released* under the kitty keyboard protocol, so `TerminalGuard` adds
+    `REPORT_EVENT_TYPES` to the flags it already pushes (client_voice only) and `App::key_release`
+    says whether that took. With releases, a release sends unless the key was down for less than
+    `KEY_TAP`, which turns it into a toggle — the next press sends. Without them, the only evidence
+    of a held key is the terminal's auto-repeat: presses closer than `KEY_REPEAT_GAP` are repeats
+    (the gap has to cover the *initial* repeat delay, up to ~660 ms on X), and once repeats have been
+    seen their stopping for `KEY_RELEASE_GAP` is the release, checked from the redraw tick. A tap with
+    no repeats is a toggle there too. `/record` is the same toggle typed, `Esc` discards, and the
+    recorder hitting either limit sends on its own. Under `MESSAGE_MIN_FRAMES` (300 ms) nothing is
+    sent — that is what an accidental tap produces.
+  - **The line is `Entry::Voice`, and its button is the playback state** (`state::Playback`, set by
+    `App::set_playback` across the parked panes too, followed from the tick by `sync_playing`, which
+    polls `message::playing()` and only bumps the generation when the shown second changes). A click
+    anywhere on the entry toggles it (`App::voice_at`, by the wrap cache's entry starts), and
+    `/play ID` finds it by message id in the pane or the parked lobby, which is why a voice message
+    scrolled out past `HISTORY_LIMIT` cannot be played by id. A client built without `client_voice`
+    still shows the line, minus the button.
+
 - **`network/client/` / `network/server/`** — connection-level logic (handshake, auth, message
   dispatch) for each side, each a `mod.rs` holding the listen loop and the packet match beside the
   pieces it is built out of: the client's key exchange, TOFU verdict and dial in `client/handshake.rs`
@@ -1135,7 +1212,13 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - **The in-memory `HISTORY` is the working set**, and the file is the copy of it that survives a
     restart: it is read once, on first touch, and only ever written after that. A missing, truncated,
     tampered, unrecognisable file, or one written under another server's keys, all load as an empty
-    history rather than refusing to start. An older format is unreadable like any other.
+    history rather than refusing to start. The one format before the current one (`MAGIC_V5`, from
+    before voice messages) is **migrated on load** — `RecordV5` is the old `Record` field for field and
+    `From` fills in `voice: None`; the file is rewritten in the new format by the next save, not at
+    load. Anything older is unreadable like any other. A format change that adds a field to `Record`
+    therefore needs the same treatment again: freeze the current struct as `RecordVn`, bump `MAGIC`,
+    and add an arm to `load` — wincode has no optional trailing fields, so the old bytes do not parse
+    as the new struct and would otherwise be thrown away (to `.old`).
   - **A message can name the message it replies to** (`reply: Option<u64>`, a message id, on
     `MessageRequest`, `Record`, `StoredMessage`, `PacketCode::Message` and `ClientEvent::Message`), set by
     `/reply ID MESSAGE` (`/re` is still the private-message answer). The server refuses a reply naming a
