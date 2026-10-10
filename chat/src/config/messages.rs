@@ -37,6 +37,7 @@ use crate::
     {
         MessageColors,
         StoredMessage,
+        VoiceNote,
     },
 };
 
@@ -48,10 +49,24 @@ struct Record //ONE MESSAGE RECORD
     username: String,
     text: String,
     image: Option<[u8; 32]>,
-    timestamp: Option<u64>, //UNIX SECONDS
-    reply: Option<u64>,     //ID OF THE MESSAGE REPLIED TO
-    hearts: Vec<String>,    //USERNAMES THAT HEARTED IT
-    edited: bool,           //CHANGED SINCE SENT
+    timestamp: Option<u64>,   //UNIX SECONDS
+    reply: Option<u64>,       //ID OF THE MESSAGE REPLIED TO
+    hearts: Vec<String>,      //USERNAMES THAT HEARTED IT
+    edited: bool,             //CHANGED SINCE SENT
+    voice: Option<VoiceNote>, //THE CLIP OF A VOICE MESSAGE
+}
+
+#[derive(SchemaRead)]
+struct RecordV5 //ONE MESSAGE RECORD, BEFORE VOICE MESSAGES
+{
+    id: u64,
+    username: String,
+    text: String,
+    image: Option<[u8; 32]>,
+    timestamp: Option<u64>,
+    reply: Option<u64>,
+    hearts: Vec<String>,
+    edited: bool,
 }
 
 struct History //THE RECORDS AND THE NEXT ID
@@ -70,13 +85,41 @@ pub struct Page
 }
 
 //CONSTS
-const MAGIC: &[u8; 8] = b"WHY2MSG\x05"; //FORMAT MARKER
+const MAGIC: &[u8; 8] = b"WHY2MSG\x06";    //FORMAT MARKER
+const MAGIC_V5: &[u8; 8] = b"WHY2MSG\x05"; //THE ONE BEFORE VOICE MESSAGES
 
 //GLOBAL VARIABLES
 static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History::new())); //MESSAGE HISTORY
 static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                                       //AT-REST KEYS
 
 //IMPLEMENTATIONS
+impl From<RecordV5> for Record
+{
+    fn from(old: RecordV5) -> Self
+    {
+        Self
+        {
+            id: old.id,
+            username: old.username,
+            text: old.text,
+            image: old.image,
+            timestamp: old.timestamp,
+            reply: old.reply,
+            hearts: old.hearts,
+            edited: old.edited,
+            voice: None,
+        }
+    }
+}
+
+impl Record
+{
+    fn stored(&self) -> Option<[u8; 32]> //THE FILE IN server_images/ IT NAMES
+    {
+        self.image.or(self.voice.as_ref().map(|voice| voice.hash))
+    }
+}
+
 impl History
 {
     fn new() -> Self //LOAD AND CONTINUE THE IDS
@@ -117,7 +160,7 @@ impl History
     fn orphans(&self, dropped: Vec<[u8; 32]>) -> Vec<[u8; 32]> //DROPPED PICTURES NOTHING NAMES
     {
         dropped.into_iter()
-            .filter(|hash| !self.records.iter().any(|message| message.image.as_ref() == Some(hash)))
+            .filter(|hash| !self.records.iter().any(|message| message.stored().as_ref() == Some(hash)))
             .filter(|hash| !super::users::names_avatar(hash))
             .filter(|hash| super::server_icon().as_ref() != Some(hash))
             .collect()
@@ -148,6 +191,21 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
         log::error!("Message history failed verification, it is being ignored");
         return Vec::new();
     };
+
+    //MIGRATE THE OLDER FORMAT
+    if let Some(records) = plaintext.strip_prefix(MAGIC_V5)
+    {
+        return match wincode::config::deserialize::<Vec<RecordV5>, _>(records, consts::PACKET_CONFIG)
+        {
+            Ok(history) =>
+            {
+                log::info!("Migrated {} stored messages from an older format", history.len());
+                history.into_iter().map(Record::from).collect()
+            },
+
+            Err(_) => unreadable(),
+        };
+    }
 
     //NO MARKER IS UNREADABLE
     let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };
@@ -187,15 +245,21 @@ pub fn next_id() -> u64 //ID FOR A MESSAGE THAT IS NOT KEPT
 
 pub fn store(username: &str, text: &str, timestamp: Option<u64>, reply: Option<u64>) -> u64 //APPEND MESSAGE
 {
-    push(username, text, None, timestamp, reply)
+    push(username, text, None, None, timestamp, reply)
 }
 
 pub fn store_image(username: &str, filename: &str, hash: &[u8; 32], timestamp: Option<u64>) -> u64
 {
-    push(username, filename, Some(*hash), timestamp, None)
+    push(username, filename, Some(*hash), None, timestamp, None)
 }
 
-fn push(username: &str, text: &str, image: Option<[u8; 32]>, timestamp: Option<u64>, reply: Option<u64>) -> u64 //APPEND ONE ENTRY AND REWRITE THE FILE
+pub fn store_voice(username: &str, voice: &VoiceNote, timestamp: Option<u64>) -> u64
+{
+    push(username, "", None, Some(voice.clone()), timestamp, None)
+}
+
+//APPEND ONE ENTRY AND REWRITE THE FILE
+fn push(username: &str, text: &str, image: Option<[u8; 32]>, voice: Option<VoiceNote>, timestamp: Option<u64>, reply: Option<u64>) -> u64
 {
     let limit: usize = super::read_config("max_persistent_messages");
 
@@ -215,11 +279,12 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>, timestamp: Option<u
         reply,
         hearts: Vec::new(),
         edited: false,
+        voice,
     });
 
     //KEEP THE LAST limit MESSAGES
     let over = guard.records.len().saturating_sub(limit);
-    let dropped: Vec<[u8; 32]> = guard.records.drain(..over).filter_map(|message| message.image).collect();
+    let dropped: Vec<[u8; 32]> = guard.records.drain(..over).filter_map(|message| message.stored()).collect();
 
     //A PICTURE ANOTHER ENTRY - OR A PROFILE - STILL NAMES STAYS
     let orphans = guard.orphans(dropped);
@@ -257,7 +322,7 @@ pub fn delete(id: u64) -> bool //REMOVE MESSAGE id AND REWRITE THE FILE
 
     let Some(index) = guard.find(id) else { return false };
 
-    let dropped: Vec<[u8; 32]> = guard.records.remove(index).image.into_iter().collect();
+    let dropped: Vec<[u8; 32]> = guard.records.remove(index).stored().into_iter().collect();
     let orphans = guard.orphans(dropped);
 
     guard.save();
@@ -294,7 +359,7 @@ pub fn edit(id: u64, username: &str, text: &str) -> bool //REWORD OWN TEXT MESSA
     let Some(index) = guard.find(id) else { return false };
     let record = &mut guard.records[index];
 
-    if record.username != username || record.image.is_some() { return false; }
+    if record.username != username || record.stored().is_some() { return false; }
 
     record.text = text.to_string();
     record.edited = true;
@@ -307,6 +372,11 @@ pub fn edit(id: u64, username: &str, text: &str) -> bool //REWORD OWN TEXT MESSA
 pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
 {
     HISTORY.lock().unwrap().records.iter().any(|message| message.image.as_ref() == Some(hash))
+}
+
+pub fn voice(hash: &[u8; 32]) -> Option<VoiceNote> //THE STORED VOICE MESSAGE WITH THIS CLIP
+{
+    HISTORY.lock().unwrap().records.iter().find_map(|message| message.voice.as_ref().filter(|voice| voice.hash == *hash)).cloned()
 }
 
 pub fn stored(hash: &[u8; 32]) -> bool //IS THIS PICTURE ONE THE SERVER KEEPS AT ALL?
@@ -325,7 +395,7 @@ pub fn sweep_images()
     if files.is_empty() { return; }
 
     let mut kept: HashSet<String> = HISTORY.lock().unwrap().records.iter()
-        .filter_map(|message| message.image.as_ref().map(|hash| misc::hex(hash)))
+        .filter_map(|message| message.stored().map(|hash| misc::hex(&hash)))
         .collect();
 
     //A PROFILE OWNS ITS PICTURE THE WAY AN ENTRY OWNS ITS OWN
@@ -382,12 +452,14 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
         let stored = looked_up.entry(message.username.clone())
             .or_insert_with(|| super::users::colors(&message.username));
 
+        let media = message.stored().is_some();
+
         StoredMessage
         {
             message_id: message.id,
             username: message.username,
             text: message.text,
-            colors: match message.image.is_some()
+            colors: match media
             {
                 true => MessageColors { username_color: stored.username_color, message_color: None },
                 false => stored.clone(),
@@ -397,6 +469,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
             reply: message.reply,
             hearts: message.hearts,
             edited: message.edited,
+            voice: message.voice,
         }
     }).collect();
 
