@@ -65,6 +65,12 @@ pub const MAX_PACKET_BURST: f32     = MAX_PACKET_RATE / 2.0;                    
 pub const SEND_CHANNEL_BOUND: usize = 8;                                        //AUDIO CALLBACK -> NETWORK TASK BUFFER
 pub const VOLUME_MAX: u32           = 200;                                      //LOUDEST VOLUME SETTING (PERCENT)
 
+pub const MESSAGE_BITRATE: i32      = 96_000;                                   //VOICE MESSAGE OPUS BITRATE
+pub const MESSAGE_CHANNELS: u8      = 2;                                        //VOICE MESSAGES ARE RECORDED IN STEREO
+pub const MESSAGE_MAX_FRAMES: usize = (300 * 1000 / FRAME_MS) as usize;         //LONGEST VOICE MESSAGE (5 MINUTES)
+pub const MESSAGE_MIN_FRAMES: usize = (300 / FRAME_MS) as usize;                //SHORTEST ONE WORTH SENDING (300ms)
+pub const MESSAGE_MAX_PACKET: usize = 1275;                                     //BIGGEST OPUS PACKET OF ONE FRAME
+
 pub const AEC_REFERENCE_CAPACITY: usize   = (SAMPLE_RATE * 2) as usize;         //REFERENCE RING
 pub const AEC_SEARCH_RANGE: usize         = (SAMPLE_RATE * 3 / 10) as usize;    //FURTHEST THE PLAYBACK MAY LAG THE CAPTURE
 pub const AEC_WINDOW: usize               = 4096;                               //SAMPLES EACH LAG IS SCORED OVER (~85ms)

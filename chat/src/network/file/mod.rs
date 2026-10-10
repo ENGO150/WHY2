@@ -57,8 +57,7 @@ use crate::
 };
 
 //ENUMS
-//WHAT AN UPLOAD IS FOR - A FILESHARE, A CHAT PICTURE, A PROFILE PICTURE OR THE SERVER'S
-#[cfg(feature = "server")]
+//WHAT AN UPLOAD IS FOR - A FILESHARE, A CHAT PICTURE, A PROFILE PICTURE, THE SERVER'S OR A CLIP
 #[derive(Clone, Copy, PartialEq)]
 pub enum UploadKind
 {
@@ -66,6 +65,7 @@ pub enum UploadKind
     Image,
     Avatar,
     Icon,
+    Voice,
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone)]
@@ -93,7 +93,6 @@ pub struct FilePacket //FILE CHUNK
 }
 
 //IMPLEMENTATIONS
-#[cfg(feature = "server")]
 impl UploadKind
 {
     //A PICTURE IS NAMED AFTER ITS CONTENT AND SEALED UNDER ITS HASH
@@ -107,6 +106,7 @@ impl UploadKind
             Self::Image => "image",
             Self::Avatar => "avatar",
             Self::Icon => "icon",
+            Self::Voice => "voice",
         }
     }
 }

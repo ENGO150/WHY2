@@ -63,12 +63,13 @@ use crate::
     network::
     {
         self,
-        file::client as file,
+        file::{ client as file, UploadKind },
         codes::
         {
             PacketCode,
             MessageColors,
             StoredMessage,
+            VoiceNote,
             UserFile,
             OnlineUser,
             OfflineUser,
@@ -86,6 +87,7 @@ use crate::network::voice::client::
 {
     self as voice_client,
     options as voice_options,
+    message as voice_message,
 };
 
 #[cfg(feature = "client_screen")]
@@ -174,6 +176,9 @@ pub enum ClientEvent
     ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
     AvatarFailed(String),                                        //CUTTING OUR AVATAR OR SERVER ICON FAILED
     ImageFailed(String, String, u64, Option<u8>),                //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
+    VoiceMessage(String, u64, Option<u64>, VoiceNote, Option<u8>, Option<Option<String>>), //SOMEBODY'S VOICE MESSAGE AND ITS CHANNEL
+    VoiceData([u8; 32], bool),                                   //A VOICE MESSAGE THAT WAS ASKED FOR (FALSE = NOT COMING)
+    VoiceMessageFailed(String),                                  //RECORDING OR PLAYING A VOICE MESSAGE FAILED
     Uploaded(String, String),                                    //USER UPLOADED FILE
     UploadDone(u64, String),                                     //OUR OWN UPLOAD IS ON THE WIRE
     Download(u64, String, u64),                                  //DOWNLOADING FILE (UID, NAME, SIZE)
@@ -599,19 +604,26 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //UPLOAD APPROVAL
-            PacketCode::Upload { hash, token, uid } | PacketCode::Image { hash, token, uid, .. } =>
+            PacketCode::Upload { hash, token, uid } | PacketCode::Image { hash, token, uid, .. }
+                | PacketCode::VoiceMessageUpload { hash, token, uid } =>
             {
+                let kind = match read
+                {
+                    PacketCode::Image { .. } => UploadKind::Image,
+                    PacketCode::VoiceMessageUpload { .. } => UploadKind::Voice,
+                    _ => UploadKind::File,
+                };
+
                 //SPAWN UPLOAD TASK
                 let file_tx = tx.clone(); //CLONE TX
-                tokio::spawn(file::upload(token, uid, hash,
-                    file_tx, matches!(read, PacketCode::Image { .. })));
+                tokio::spawn(file::upload(token, uid, hash, file_tx, kind));
                 continue;
             },
 
             //DUPLICATE IMAGE
             PacketCode::ImageDuplicate { hash } =>
             {
-                if let Some(path) = ACTIVE_UPLOADS.lock().unwrap().remove(&hash) { misc::drop_avatar_temp(&path); }
+                if let Some(path) = ACTIVE_UPLOADS.lock().unwrap().remove(&hash) { misc::drop_upload_temp(&path); }
                 continue;
             },
 
@@ -629,6 +641,31 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::ImageData { hash, data } =>
             {
                 let image_tx = tx.clone();
+
+                //A CLIP ASKED FOR TO PLAY
+                #[cfg(feature = "client_voice")]
+                if let Some(generation) = voice_message::awaited(&hash)
+                {
+                    tokio::spawn(async move
+                    {
+                        let data = Arc::new(data);
+                        let digest = task::spawn_blocking
+                        ({
+                            let data = data.clone();
+                            move || crypto::sha256(&data)
+                        }).await.expect("Hashing voice message panicked");
+
+                        let valid = digest == hash && !data.is_empty();
+                        image_tx.send(ClientEvent::VoiceData(hash, valid)).await.unwrap();
+
+                        if !valid { return; }
+
+                        cache::store(&hash, &data).await;
+                        voice_message::play_data(hash, Arc::unwrap_or_clone(data), generation, image_tx).await;
+                    });
+
+                    continue;
+                }
 
                 tokio::spawn(async move
                 {
@@ -715,6 +752,31 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                         Some(image) => ClientEvent::ImageDisplay(username, filename, message_id, timestamp, image, username_color),
                         None => ClientEvent::ImageFailed(username, filename, message_id, username_color),
                     }).await.unwrap();
+                });
+
+                continue;
+            },
+
+            //SOMEBODY'S VOICE MESSAGE, CACHED IF IT CAME WHOLE
+            PacketCode::VoiceMessage { username, message_id, voice, data, username_color, channel, timestamp } =>
+            {
+                let voice_tx = tx.clone();
+
+                tokio::spawn(async move
+                {
+                    if let Some(data) = data
+                    {
+                        let data = Arc::new(data);
+                        let digest = task::spawn_blocking
+                        ({
+                            let data = data.clone();
+                            move || crypto::sha256(&data)
+                        }).await.expect("Hashing voice message panicked");
+
+                        if digest == voice.hash { cache::store(&digest, &data).await; }
+                    }
+
+                    voice_tx.send(ClientEvent::VoiceMessage(username, message_id, timestamp, voice, username_color, channel)).await.unwrap();
                 });
 
                 continue;

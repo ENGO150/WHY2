@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod sfx;
 pub mod aec;
 pub mod options;
+pub mod message;
 
 use std::
 {
@@ -451,6 +452,9 @@ fn build_input_stream(device: &Device, config: StreamConfig, current_generation:
     let agc_gain_cb = agc_gain.clone();
     device.build_input_stream(config, move |data: &[f32], _: &_|
     {
+        //FEED A VOICE MESSAGE
+        if AUDIO_GENERATION.load(Ordering::Relaxed) == current_generation { message::feed(data, input_channels, input_source_rate, true); }
+
         //CHECK FOR MUTING (0% MICROPHONE IS OFF)
         if chat_options::is_muted(None) || options::get_input_volume() == 0
         {

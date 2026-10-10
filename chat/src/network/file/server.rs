@@ -70,7 +70,12 @@ use crate::
     {
         self,
         EncryptionMode,
-        codes::PacketCode,
+        voice::message::{ self as voice_message, Clip },
+        codes::
+        {
+            PacketCode,
+            VoiceNote,
+        },
         server::
         {
             self,
@@ -126,7 +131,7 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
     pub filename: String,       //FILENAME
     pub client_id: usize,       //ID OF SENDER
     pub path: PathBuf,          //WHERE THE UPLOAD IS BEING BUILT
-    pub image: Option<Vec<u8>>, //THE PLAINTEXT, KEPT ONLY FOR AN IMAGE
+    pub image: Option<Vec<u8>>, //THE PLAINTEXT, KEPT ONLY FOR AN IMAGE OR A CLIP
     pub stream: RexStream,
 
     //THE DISK TAG BEING BUILT, FOR AN IMAGE ONLY
@@ -217,6 +222,7 @@ pub async fn download
     let ceiling = match kind
     {
         UploadKind::Avatar | UploadKind::Icon => consts::MAX_AVATAR_SIZE,
+        UploadKind::Voice => consts::MAX_VOICE_MESSAGE_SIZE,
         _ => consts::MAX_IMAGE_SIZE,
     };
 
@@ -328,7 +334,16 @@ pub async fn download
         {
             checked = true;
 
-            if !misc::is_image(&data)
+            //CHECK FOR A CLIP
+            if kind == UploadKind::Voice
+            {
+                if !voice_message::is_clip(&data)
+                {
+                    log::warn!("Voice message rejected (not a clip): {peer_addr}");
+                    server::notify(id, PacketCode::InvalidUsage).await;
+                    return;
+                }
+            } else if !misc::is_image(&data)
             {
                 log::warn!("Image rejected (not an image): {peer_addr}");
                 server::notify(id, PacketCode::InvalidUsage).await;
@@ -435,6 +450,23 @@ pub async fn download
             return;
         }
 
+        //PARSE THE CLIP
+        let voice = match kind
+        {
+            UploadKind::Voice => match image.as_deref().and_then(Clip::decode)
+            {
+                Some(clip) => Some(VoiceNote { hash: final_hash, duration: clip.duration() }),
+                None =>
+                {
+                    log::warn!("Voice message rejected (malformed clip): {peer_addr}");
+                    server::notify(id, PacketCode::InvalidUsage).await;
+                    return;
+                },
+            },
+
+            _ => None,
+        };
+
         //GET FILE PATHS
         let current_path = target_dir.join(uid.to_string());
 
@@ -485,6 +517,38 @@ pub async fn download
             log::info!("Server icon set: {peer_addr}");
 
             server::icon_changed(id).await;
+        } else if let Some(voice) = voice //A VOICE MESSAGE
+        {
+            if let Some(data) = image
+            {
+                let channel = server::CONNECTIONS.iter()
+                    .find(|conn| conn.id() == Some(&id))
+                    .and_then(|conn| conn.channel().clone());
+
+                let kept = channel.is_none() && config::read_config::<bool>("persistent_messages");
+
+                let timestamp = config::messages::timestamp();
+                let message_id = match kept
+                {
+                    true => config::messages::store_voice(&username, &voice, timestamp),
+                    false => config::messages::next_id(),
+                };
+
+                //DELETE A CLIP NOTHING KEPT
+                if !kept && insert { let _ = fs::remove_file(&new_path).await; }
+
+                //A FRESH CLIP GOES OUT WHOLE
+                server::send_to_all(PacketCode::VoiceMessage
+                {
+                    username: username.clone(),
+                    message_id,
+                    voice,
+                    data: Some(data),
+                    username_color: config::users::colors(&username).username_color,
+                    channel: Some(channel.clone()),
+                    timestamp,
+                });
+            }
         } else if persistent //AN IMAGE IS SHOWN, NOT ANNOUNCED
         {
             if let Some(data) = image

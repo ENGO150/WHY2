@@ -82,6 +82,10 @@ pub enum ConnectionType //TYPES OF TCP CHANNEL
     {
         uid: u64,
     },
+    Voice
+    {
+        uid: u64,
+    },
     FileDownload
     {
         uid: u64,

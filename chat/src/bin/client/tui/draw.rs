@@ -247,6 +247,13 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
         block = block.title_bottom(Span::styled(format!(" {typing} "), theme::dim()));
     }
 
+    //AND A VOICE MESSAGE BEING RECORDED
+    #[cfg(feature = "client_voice")]
+    if let Some(status) = super::voice_message::status(app)
+    {
+        block = block.title_bottom(Span::styled(format!(" {status} "), theme::error()));
+    }
+
     let inner = block.inner(area);
     frame.render_widget(block, area);
 

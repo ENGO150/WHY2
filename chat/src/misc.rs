@@ -262,10 +262,16 @@ pub fn avatar_temp(hash: &[u8; 32], extension: &str) -> PathBuf //WHERE A CUT AV
 }
 
 #[cfg(feature = "client_base")]
-pub fn drop_avatar_temp(path: &Path) //REMOVE ONE, IF THAT IS WHAT path IS
+pub fn voice_temp(hash: &[u8; 32]) -> PathBuf //TEMP FILE OF A RECORDED CLIP
 {
-    let ours = path.parent() == Some(env::temp_dir().as_path()) && path.file_name()
-        .and_then(|name| name.to_str()).is_some_and(|name| name.starts_with(consts::AVATAR_TEMP_PREFIX));
+    env::temp_dir().join(format!("{}{}", consts::VOICE_TEMP_PREFIX, hex(hash)))
+}
+
+#[cfg(feature = "client_base")]
+pub fn drop_upload_temp(path: &Path) //REMOVE ONE, IF THAT IS WHAT path IS
+{
+    let ours = path.parent() == Some(env::temp_dir().as_path()) && path.file_name().and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with(consts::AVATAR_TEMP_PREFIX) || name.starts_with(consts::VOICE_TEMP_PREFIX));
 
     if ours { let _ = fs::remove_file(path); }
 }

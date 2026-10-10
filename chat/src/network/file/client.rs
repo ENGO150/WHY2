@@ -57,11 +57,12 @@ use crate::
             self,
             FilePacket,
             FilePacketCode,
+            UploadKind,
         },
     },
 };
 
-pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientEvent>, persistent: bool)
+pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientEvent>, kind: UploadKind)
 {
     //INIT FILE CONNECTION
     let (_read_stream, mut write_stream) = handshake::connect(options::get_server_address()).await.expect("File connection failed");
@@ -77,13 +78,12 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
     let size = fs::metadata(&path).await.unwrap().len();
 
     //LOG
-    tx.send(if persistent
+    match kind
     {
-        ClientEvent::Image(uid, filename.clone(), size)
-    } else
-    {
-        ClientEvent::Upload(uid, filename.clone(), size)
-    }).await.unwrap();
+        UploadKind::File => tx.send(ClientEvent::Upload(uid, filename.clone(), size)).await.unwrap(),
+        UploadKind::Voice => {},
+        _ => tx.send(ClientEvent::Image(uid, filename.clone(), size)).await.unwrap(),
+    }
 
     //LOCAL SEQ COUNTER
     let mut seq = 0usize;
@@ -112,7 +112,7 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
         progress.try_send(ClientEvent::TransferProgress(uid, sent)).ok(); //A DROPPED TICK COSTS NOTHING
     }).await;
 
-    misc::drop_avatar_temp(&path);
+    misc::drop_upload_temp(&path);
 
     //DONE
     tx.send(ClientEvent::UploadDone(uid, filename)).await.unwrap();

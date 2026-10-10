@@ -65,6 +65,7 @@ use crate::
             MessageColors,
             OnlineUser,
             Device,
+            VoiceNote,
         },
         client::
         {
@@ -76,7 +77,11 @@ use crate::
 };
 
 #[cfg(feature = "client_voice")]
-use crate::network::voice::client::options as voice_options;
+use crate::network::voice::client::
+{
+    options as voice_options,
+    message as voice_message,
+};
 
 #[cfg(feature = "client_screen")]
 use crate::network::screen::client::options as screen_options;
@@ -150,6 +155,18 @@ pub enum Entry //ONE ROW OF HISTORY
         picture: Picture,
         hearts: Vec<String>,
     },
+
+    //A VOICE MESSAGE AND ITS BUTTON
+    Voice
+    {
+        username: String,
+        message_id: u64,
+        timestamp: Option<u64>,
+        username_color: Option<u8>,
+        voice: VoiceNote,
+        playback: Playback,
+        hearts: Vec<String>,
+    },
 }
 
 impl Entry
@@ -158,8 +175,8 @@ impl Entry
     {
         match self
         {
-            Entry::Message { message_id, .. } | Entry::History { message_id, .. } | Entry::Image { message_id, .. } =>
-                Some(*message_id),
+            Entry::Message { message_id, .. } | Entry::History { message_id, .. } | Entry::Image { message_id, .. }
+                | Entry::Voice { message_id, .. } => Some(*message_id),
             _ => None,
         }
     }
@@ -168,7 +185,8 @@ impl Entry
     {
         match self
         {
-            Entry::Message { username, .. } | Entry::History { username, .. } | Entry::Image { username, .. } => Some(username),
+            Entry::Message { username, .. } | Entry::History { username, .. } | Entry::Image { username, .. }
+                | Entry::Voice { username, .. } => Some(username),
             _ => None,
         }
     }
@@ -177,14 +195,16 @@ impl Entry
     {
         match self
         {
-            Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. } => hearts,
+            Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. }
+                | Entry::Voice { hearts, .. } => hearts,
             _ => &[],
         }
     }
 
     fn set_hearts(&mut self, new: Vec<String>) //REPLACE WHO HEARTED IT
     {
-        if let Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. } = self { *hearts = new; }
+        if let Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. }
+            | Entry::Voice { hearts, .. } = self { *hearts = new; }
     }
 
     pub fn edited(&self) -> bool //CHANGED SINCE SENT
@@ -212,7 +232,7 @@ impl Entry
 
     pub fn striped(&self) -> bool //WHETHER IT TAKES PART IN THE STRIPES
     {
-        matches!(self, Entry::Message { .. } | Entry::History { .. } | Entry::Private { .. } | Entry::Image { .. })
+        matches!(self, Entry::Message { .. } | Entry::History { .. } | Entry::Private { .. } | Entry::Image { .. } | Entry::Voice { .. })
     }
 }
 
@@ -224,6 +244,16 @@ pub enum Picture
     Waiting,           //ASKED FOR, NOT HERE YET
     Gone,              //THE SERVER DOES NOT HAVE IT ANY MORE
     Ready(Box<Fitted>),
+}
+
+//WHERE A VOICE MESSAGE'S PLAYBACK IS
+#[derive(Clone, Copy, PartialEq)]
+pub enum Playback
+{
+    Idle,          //NOT PLAYING
+    Loading,       //ASKED FOR, NOT STARTED YET
+    Playing(u32),  //SECONDS IN
+    Gone,          //THE SERVER DOES NOT HAVE IT ANY MORE
 }
 
 //STRUCTS
@@ -272,6 +302,17 @@ pub struct Selection
     pub anchor: (u16, u16), //(ROW IN THE WRAPPED VIEW, COLUMN INSIDE THE PANE)
     pub cursor: (u16, u16),
     pub dragged: bool,      //A DRAG EVER ARRIVED
+}
+
+//PUSH-TO-TALK STATE
+#[cfg(feature = "client_voice")]
+#[derive(Clone, Copy)]
+pub struct Recording
+{
+    pub started: Instant,
+    pub pressed: Instant, //LAST PRESS OF THE KEY, REPEATS INCLUDED
+    pub held: bool,       //KEY HELD DOWN
+    pub shown: u32,       //SECONDS ON SCREEN
 }
 
 //STRUCTS
@@ -326,6 +367,12 @@ pub struct App
 
     //A TOAST IN THE CHROME, WHICH EXPIRES
     pub notice: Option<(String, Instant)>,
+
+    //VOICE MESSAGES
+    pub playing: Option<([u8; 32], u32)>, //WHICH CLIP IS PLAYING, AND HOW MANY SECONDS IN
+    pub key_release: bool,                //THE TERMINAL REPORTS KEYS BEING LET GO
+    #[cfg(feature = "client_voice")]
+    pub recording: Option<Recording>,
 
     //WHO IS WRITING IN OUR CHANNEL, AND WHEN THEY LAST SAID SO
     pub typing_users: BTreeMap<String, Instant>,
@@ -435,6 +482,10 @@ impl App
             pane_offset: 0,
             selection: None,
             notice: None,
+            playing: None,
+            key_release: false,
+            #[cfg(feature = "client_voice")]
+            recording: None,
             typing_users: BTreeMap::new(),
             typing: false,
             typing_sent: None,
@@ -844,6 +895,113 @@ impl App
         hash: [u8; 32], picture: Picture, username_color: Option<u8>)
     {
         self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new() });
+    }
+
+    //A VOICE MESSAGE, HERE OR IN ITS OWN CHANNEL'S PANE
+    pub fn push_voice(&mut self, channel: Option<String>, username: String, message_id: u64, timestamp: Option<u64>,
+        voice: VoiceNote, username_color: Option<u8>)
+    {
+        let entry = Entry::Voice { username, message_id, timestamp, username_color, voice, playback: Playback::Idle, hearts: Vec::new() };
+
+        match channel
+        {
+            Some(channel) if channel != self.channel => self.park_entry(channel, entry),
+            _ => self.push_entry(entry),
+        }
+    }
+
+    //THE CLIP OF A LOADED VOICE MESSAGE
+    pub fn voice_of(&self, message_id: u64) -> Result<[u8; 32], String>
+    {
+        let entry = self.messages.iter().chain(self.panes.get("").into_iter().flatten())
+            .find(|entry| entry.message_id() == Some(message_id))
+            .ok_or_else(|| t!("voice_message.not_loaded", message_id))?;
+
+        match entry
+        {
+            Entry::Voice { voice, .. } => Ok(voice.hash),
+            _ => Err(t!("voice_message.not_voice", message_id)),
+        }
+    }
+
+    //WHICH VOICE MESSAGE IS UNDER THE POINTER
+    pub fn voice_at(&mut self, column: u16, row: u16) -> Option<usize>
+    {
+        let pane = self.pane;
+
+        if column < pane.x || column >= pane.x + pane.width { return None; }
+        if row < pane.y || row >= pane.y + pane.height { return None; }
+
+        let (row, _) = self.pane_cell(column, row);
+
+        self.rewrap(pane.width);
+
+        let starts = &self.wrapped.as_ref()?.4;
+        let entry = starts.partition_point(|start| *start <= row).checked_sub(1)?;
+
+        matches!(self.messages.get(entry), Some(Entry::Voice { .. })).then_some(entry)
+    }
+
+    //CLIP OF A VOICE ENTRY, AND IF IT PLAYS
+    pub fn voice_entry(&self, entry: usize) -> Option<([u8; 32], bool)>
+    {
+        match self.messages.get(entry)?
+        {
+            Entry::Voice { voice, playback, .. } => Some((voice.hash, matches!(playback, Playback::Playing(_) | Playback::Loading))),
+            _ => None,
+        }
+    }
+
+    //SET EVERY ENTRY OF ONE CLIP
+    pub fn set_playback(&mut self, hash: &[u8; 32], playback: Playback)
+    {
+        let mut changed = false;
+
+        //PARKED PANES TOO
+        for entry in self.messages.iter_mut().chain(self.panes.values_mut().flatten())
+        {
+            if let Entry::Voice { voice, playback: slot, .. } = entry && voice.hash == *hash && *slot != playback
+            {
+                *slot = playback;
+                changed = true;
+            }
+        }
+
+        if changed
+        {
+            self.generation += 1;
+            self.dirty = true;
+        }
+    }
+
+    //A PLAY THAT NEVER STARTED
+    pub fn stop_loading(&mut self)
+    {
+        let loading: Vec<[u8; 32]> = self.messages.iter().filter_map(|entry| match entry
+        {
+            Entry::Voice { voice, playback: Playback::Loading, .. } => Some(voice.hash),
+            _ => None,
+        }).collect();
+
+        for hash in loading { self.set_playback(&hash, Playback::Idle); }
+    }
+
+    //FOLLOW WHAT THE PLAYER IS DOING
+    pub fn sync_playing(&mut self, now: Option<([u8; 32], u32)>)
+    {
+        let now = now.map(|(hash, ms)| (hash, ms / 1000));
+
+        if now == self.playing { return; }
+
+        //RESET THE ONE THAT STOPPED
+        if let Some((hash, _)) = self.playing.filter(|(hash, _)| now.is_none_or(|(playing, _)| playing != *hash))
+        {
+            self.set_playback(&hash, Playback::Idle);
+        }
+
+        if let Some((hash, seconds)) = now { self.set_playback(&hash, Playback::Playing(seconds)); }
+
+        self.playing = now;
     }
 
     //A CLICKED CAPTION
@@ -1325,6 +1483,10 @@ impl App
         self.typing_users.clear();
         self.typing = false;
         self.typing_sent = None;
+
+        self.playing = None;
+        #[cfg(feature = "client_voice")]
+        { self.recording = None; }
 
         self.list_requested = false;
         #[cfg(feature = "client_screen")]
@@ -2065,7 +2227,11 @@ fn reset_session()
     client::ACTIVE_UPLOADS.lock().unwrap().clear();
 
     #[cfg(feature = "client_voice")]
-    voice_options::set_use_voice(false);
+    {
+        voice_options::set_use_voice(false);
+        voice_message::cancel_recording();
+        voice_message::stop();
+    }
 
     #[cfg(feature = "client_screen")]
     {

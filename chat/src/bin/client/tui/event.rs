@@ -145,6 +145,24 @@ impl App
             ClientEvent::ImageFailed(username, filename, ..) => self.push_styled(
                 t!("event.image_failed", username, filename), theme::error()),
 
+            //A VOICE MESSAGE, FILED BY CHANNEL
+            ClientEvent::VoiceMessage(username, message_id, timestamp, voice, username_color, channel) =>
+                self.push_voice(channel.map(Option::unwrap_or_default), username, message_id, timestamp, voice, username_color),
+
+            //A CLIP ASKED FOR TO PLAY
+            ClientEvent::VoiceData(hash, valid) =>
+            {
+                self.fetched(&hash);
+
+                if !valid { self.set_playback(&hash, state::Playback::Gone); }
+            },
+
+            ClientEvent::VoiceMessageFailed(reason) =>
+            {
+                self.stop_loading();
+                self.push_styled(reason, theme::error());
+            },
+
             ClientEvent::PrivateMessageSent(to, id, msg, colors) => self.push_private(true, to, id, msg, colors),
 
             ClientEvent::PrivateMessageRecv(from, id, msg, colors) => self.push_private(false, from, id, msg, colors),
@@ -355,9 +373,20 @@ impl App
                 //A PICTURE IS LOADED WHEN IT IS LOOKED AT
                 let auto_show = client_image::auto_show_images();
 
-                let entries = messages.into_iter().map(|message| match message.image
+                let entries = messages.into_iter().map(|message| match (message.image, message.voice)
                 {
-                    Some(hash) => state::Entry::Image
+                    (_, Some(voice)) => state::Entry::Voice
+                    {
+                        username: message.username,
+                        message_id: message.message_id,
+                        timestamp: message.timestamp,
+                        username_color: message.colors.username_color,
+                        voice,
+                        playback: state::Playback::Idle,
+                        hearts: message.hearts,
+                    },
+
+                    (Some(hash), None) => state::Entry::Image
                     {
                         username: message.username,
                         filename: message.text,
@@ -373,7 +402,7 @@ impl App
                         hearts: message.hearts,
                     },
 
-                    None => state::Entry::History
+                    (None, None) => state::Entry::History
                     {
                         username: message.username,
                         message_id: message.message_id,

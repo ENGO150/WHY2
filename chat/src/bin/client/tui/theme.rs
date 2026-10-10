@@ -52,7 +52,14 @@ use super::
 {
     consts,
     markup,
-    state::{ self, Entry, Picture, Transfer },
+    state::
+    {
+        self,
+        Entry,
+        Picture,
+        Playback,
+        Transfer,
+    },
 };
 
 //STRUCTS
@@ -182,12 +189,7 @@ impl Theme
                 [
                     self.timestamp(*timestamp),
                     Span::styled(i18n::format(before, &[("filename", filename)]), dim()),
-                    //THE SENDER'S COLOR, ELSE THE CHROME'S ACCENT
-                    match username_color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
-                    {
-                        Some(color) => Span::styled(username.clone(), Style::new().fg(ansi(Color::from_crossterm(color))).add_modifier(Modifier::BOLD)),
-                        None => Span::styled(username.clone(), accent().add_modifier(Modifier::BOLD)),
-                    },
+                    self.sender(username, *username_color),
                     Span::styled(i18n::format(after, &[("filename", filename)]), dim()),
                 ];
 
@@ -201,6 +203,45 @@ impl Theme
 
                 state::wrap_line(&Line::from(spans), width)
             },
+
+            //THE CAPTION AND ITS BUTTON
+            Entry::Voice { username, timestamp, username_color, voice, playback, .. } =>
+            {
+                let duration = clock(voice.duration / 1000);
+                let (before, after) = i18n::split(t!("message.voice"), "username");
+
+                let mut spans = vec!
+                [
+                    self.timestamp(*timestamp),
+                    Span::styled(i18n::format(before, &[("duration", &duration)]), dim()),
+                    self.sender(username, *username_color),
+                    Span::styled(i18n::format(after, &[("duration", &duration)]), dim()),
+                ];
+
+                //PLAY BUTTON
+                if cfg!(feature = "client_voice")
+                {
+                    spans.push(match playback
+                    {
+                        Playback::Idle => Span::styled(format!(" [ ▶ {} ]", t!("message.play")), accent()),
+                        Playback::Loading => Span::styled(format!(" [ {} ]", t!("message.loading")), dim()),
+                        Playback::Playing(seconds) => Span::styled(format!(" [ ■ {} ] {}", t!("message.stop"), clock(*seconds)), accent()),
+                        Playback::Gone => Span::styled(format!(" [ {} ]", t!("message.unavailable")), error()),
+                    });
+                }
+
+                state::wrap_line(&Line::from(spans), width)
+            },
+        }
+    }
+
+    //SENDER NAME, COLORED
+    fn sender(&self, username: &str, color: Option<u8>) -> Span<'static>
+    {
+        match color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
+        {
+            Some(color) => Span::styled(username.to_owned(), Style::new().fg(ansi(Color::from_crossterm(color))).add_modifier(Modifier::BOLD)),
+            None => Span::styled(username.to_owned(), accent().add_modifier(Modifier::BOLD)),
         }
     }
 
@@ -224,6 +265,16 @@ impl Theme
                 spans.push(Span::styled(i18n::format(before, &[("filename", filename)]), dim()));
                 spans.push(self.colorize(username.clone(), *username_color));
                 spans.push(Span::styled(i18n::format(after, &[("filename", filename)]), dim()));
+            },
+
+            Some(Entry::Voice { username, username_color, voice, .. }) =>
+            {
+                let duration = clock(voice.duration / 1000);
+                let (before, after) = i18n::split(t!("message.voice"), "username");
+
+                spans.push(Span::styled(i18n::format(before, &[("duration", &duration)]), dim()));
+                spans.push(self.colorize(username.clone(), *username_color));
+                spans.push(Span::styled(i18n::format(after, &[("duration", &duration)]), dim()));
             },
 
             //NOT IN THE PANE
@@ -384,6 +435,12 @@ fn progress(transfer: &Transfer, width: u16) -> Vec<Span<'static>>
 }
 
 //BYTES AS SOMETHING READABLE
+//SECONDS AS M:SS
+fn clock(seconds: u32) -> String
+{
+    format!("{}:{:02}", seconds / 60, seconds % 60)
+}
+
 fn size(bytes: u64) -> String
 {
     const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];

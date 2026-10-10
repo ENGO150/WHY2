@@ -299,7 +299,7 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>, voice: Option<Voice
 
 fn remove_images(orphans: Vec<[u8; 32]>) //DELETE PICTURES NOTHING NAMES
 {
-    if !orphans.is_empty() { log::info!("Dropping {} stored images with no history entry left", orphans.len()); }
+    if !orphans.is_empty() { log::info!("Dropping {} stored files with no history entry left", orphans.len()); }
 
     for hash in orphans { let _ = fs::remove_file(misc::get_image_dir().join(misc::hex(&hash))); }
 }
@@ -412,7 +412,7 @@ pub fn sweep_images()
         if !named && fs::remove_file(&file).is_ok() { swept += 1; }
     }
 
-    if swept > 0 { log::info!("Swept {swept} stored images nothing names any more"); }
+    if swept > 0 { log::info!("Swept {swept} stored files nothing names any more"); }
 }
 
 //THE NEWEST MESSAGES BEFORE before, OLDEST FIRST

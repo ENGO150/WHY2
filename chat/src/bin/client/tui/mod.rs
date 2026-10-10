@@ -31,6 +31,9 @@ pub mod state;
 pub mod theme;
 pub mod tofu;
 
+#[cfg(feature = "client_voice")]
+pub mod voice_message;
+
 use std::
 {
     sync::Arc,
@@ -146,10 +149,22 @@ impl TerminalGuard
         let enhanced = terminal::supports_keyboard_enhancement().unwrap_or(false);
         if enhanced
         {
-            crossterm::execute!(io::stdout(), PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES))?;
+            #[allow(unused_mut)]
+            let mut flags = KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES;
+
+            //REPORT KEY RELEASES
+            #[cfg(feature = "client_voice")]
+            { flags |= KeyboardEnhancementFlags::REPORT_EVENT_TYPES; }
+
+            crossterm::execute!(io::stdout(), PushKeyboardEnhancementFlags(flags))?;
         }
 
         Ok(Self { mouse, enhanced })
+    }
+
+    pub fn releases(&self) -> bool //WHETHER KEYS BEING LET GO ARE REPORTED
+    {
+        self.enhanced && cfg!(feature = "client_voice")
     }
 }
 
@@ -313,6 +328,10 @@ pub async fn run
                 //THE TICK IS THE ANIMATIONS' CLOCK
                 app.advance_animations();
 
+                //AND THE VOICE MESSAGES'
+                #[cfg(feature = "client_voice")]
+                voice_message::tick(app, write_stream.as_ref(), tx);
+
                 //A DROPPED SESSION DIALS ITSELF BACK
                 if app.reconnect.take_due() { login::connect(app, &connect_tx); }
 
@@ -450,7 +469,14 @@ async fn handle_terminal_event
     {
         Event::Key(key) =>
         {
-            if key.kind == KeyEventKind::Release { return; }
+            if key.kind == KeyEventKind::Release
+            {
+                //PUSH-TO-TALK RELEASE
+                #[cfg(feature = "client_voice")]
+                if record_shortcut(key.code) { voice_message::release(app, write_stream, tx); }
+
+                return;
+            }
 
             let revision = app.input.revision();
 
@@ -500,6 +526,16 @@ async fn handle_terminal_event
                     } else
                     {
                         app.clear_selection();
+
+                        //A CLICK ON A VOICE MESSAGE PLAYS IT
+                        #[cfg(feature = "client_voice")]
+                        if let Some(entry) = app.voice_at(mouse.column, mouse.row)
+                        {
+                            voice_message::click(app, entry, tx);
+                            app.dirty = true;
+
+                            return;
+                        }
 
                         //A CLICK ON A URL HANDS IT TO THE BROWSER
                         if let Some(url) = app.link_at(mouse.column, mouse.row)
@@ -731,6 +767,10 @@ async fn handle_key
             KeyCode::Char('n') => app.palette.next(),
             KeyCode::Char('p') => app.palette.previous(),
 
+            //PUSH-TO-TALK
+            #[cfg(feature = "client_voice")]
+            code if record_shortcut(code) => voice_message::press(app, key.kind, write_stream, tx),
+
             //COMMAND SHORTCUTS
             KeyCode::Char(c) =>
             {
@@ -786,6 +826,10 @@ async fn handle_key
 
         KeyCode::Esc =>
         {
+            //DISCARD A RECORDING
+            #[cfg(feature = "client_voice")]
+            if app.recording.is_some() { return voice_message::cancel(app); }
+
             app.palette.dismiss();
             app.clear_selection();
         },
@@ -851,6 +895,16 @@ fn settings_shortcut(code: KeyCode) -> bool //Ctrl+<SHORTCUT OF /settings>
     command::COMMAND_LIST.iter()
         .find(|info| info.command == Command::Settings)
         .is_some_and(|info| info.shortcut == Some(c))
+}
+
+#[cfg(feature = "client_voice")]
+fn record_shortcut(code: KeyCode) -> bool //<SHORTCUT OF /record>
+{
+    let KeyCode::Char(c) = code else { return false };
+
+    command::COMMAND_LIST.iter()
+        .find(|info| info.command == Command::Record)
+        .is_some_and(|info| info.shortcut == Some(c.to_ascii_lowercase()))
 }
 
 fn message_viewport(terminal: &Tui) -> u16 //ROWS OF ACTUAL MESSAGE TEXT, FOR SCROLL CLAMPING

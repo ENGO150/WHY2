@@ -1319,6 +1319,62 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 network::send(&mut *streams.1.lock().await, packet, Some(&keys)).await;
             },
 
+            //NEW VOICE MESSAGE
+            PacketCode::VoiceMessageRequest { hash } =>
+            {
+                //SILENCE MUTED USERS
+                if CONNECTIONS.get(&peer_addr).is_some_and(|conn| *conn.muted())
+                {
+                    network::send(&mut *streams.1.lock().await, PacketCode::Muted, Some(&keys)).await;
+                    continue;
+                }
+
+                //CLIP ALREADY STORED
+                if let Some(voice) = config::messages::voice(&hash)
+                {
+                    let timestamp = config::messages::timestamp();
+
+                    let message_id = match channel.is_none() && config::read_config::<bool>("persistent_messages")
+                    {
+                        true => config::messages::store_voice(&username, &voice, timestamp),
+                        false => config::messages::next_id(),
+                    };
+
+                    send_to_all(PacketCode::VoiceMessage
+                    {
+                        username: username.clone(),
+                        message_id,
+                        voice,
+                        data: None,
+                        username_color: config::users::colors(&username).username_color,
+                        channel: Some(channel.clone()),
+                        timestamp,
+                    });
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::ImageDuplicate { hash }, Some(&keys)).await;
+
+                    log::info!("Voice message already stored, upload skipped: {peer_addr}");
+                    continue;
+                }
+
+                //PREVENT TOKEN SPAM
+                let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count();
+                if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
+                {
+                    log::warn!("Upload refused ({active_count} already running): {peer_addr}");
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::UploadLimit, Some(&keys)).await;
+                    continue;
+                }
+
+                let uid = rand::random::<u64>();
+                let token = open_connection(id, ConnectionType::Voice { uid });
+
+                log::info!("Upload request (voice): {peer_addr}");
+
+                network::send(&mut *streams.1.lock().await, PacketCode::VoiceMessageUpload { hash, token, uid }, Some(&keys)).await;
+            },
+
             //DOWNLOAD
             PacketCode::DownloadRequest { id: owner_id, file_id } =>
             {
@@ -1556,7 +1612,8 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 if let Some(mut conn) = CONNECTIONS.get_mut(&peer_addr)
                     && let Some(last) = conn.last_image_mut() { *last = Instant::now(); }
 
-                let image = match config::messages::stored(&hash)
+                //A PICTURE OR A CLIP
+                let image = match config::messages::stored(&hash) || config::messages::voice(&hash).is_some()
                 {
                     true => file::read_image(&hash).await,
                     false => None,

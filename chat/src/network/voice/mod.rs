@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //MODULES
 pub mod consts;
+pub mod message;
 
 #[cfg(feature = "client_base")]
 pub mod client;

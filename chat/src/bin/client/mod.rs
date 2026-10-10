@@ -433,6 +433,9 @@ async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>
     let guard = TerminalGuard::enter().expect("Entering the alternate screen failed");
     let mut terminal = tui::init().expect("Creating the terminal backend failed");
 
+    //KEY RELEASES FOR PUSH-TO-TALK
+    app.key_release = guard.releases();
+
     //ASK THE TERMINAL WHAT IT CAN DRAW
     app.init_picker();
 
@@ -502,6 +505,30 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
     });
 
     Ok(())
+}
+
+//UPLOAD A RECORDED CLIP
+#[cfg(feature = "client_voice")]
+pub fn send_voice(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, clip: Vec<u8>, tx: Sender<ClientEvent>)
+{
+    let write_stream = write_stream.clone();
+    let keys = options::get_keys();
+
+    tokio::spawn(async move
+    {
+        let hash: [u8; 32] = Sha256::digest(&clip).into();
+        let path = misc::voice_temp(&hash);
+
+        if tokio::fs::write(&path, &clip).await.is_err()
+        {
+            tx.send(ClientEvent::VoiceMessageFailed(t!("upload.read_failed").to_owned())).await.ok();
+            return;
+        }
+
+        client::ACTIVE_UPLOADS.lock().unwrap().insert(hash, path);
+
+        network::send(&mut *write_stream.lock().await, PacketCode::VoiceMessageRequest { hash }, keys.as_ref()).await;
+    });
 }
 
 //SHA256 OF A WHOLE FILE
@@ -758,6 +785,22 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
                         #[cfg(feature = "client_voice")]
                         Command::Mute => mute(app, parameters),
+
+                        #[cfg(feature = "client_voice")]
+                        Command::Record => tui::voice_message::toggle(app, write_stream, tx),
+
+                        //NO ID STOPS WHATEVER PLAYS
+                        #[cfg(feature = "client_voice")]
+                        Command::Play => match parameters.map(|p| p.parse::<u64>())
+                        {
+                            None => tui::voice_message::stop(app),
+                            Some(Ok(message_id)) => match app.voice_of(message_id)
+                            {
+                                Ok(hash) => tui::voice_message::play(app, hash, tx),
+                                Err(error) => app.push_styled(error, theme::error()),
+                            },
+                            Some(Err(_)) => invalid_usage(app, None),
+                        },
 
                         //A SWAP OR SOUND CHANGE SENT NOTHING
                         #[cfg(feature = "client_screen")]

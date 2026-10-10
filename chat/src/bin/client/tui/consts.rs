@@ -69,6 +69,14 @@ pub const RESTART_LABEL: &str         = "settings.restart";        //AND THE ONE
 #[cfg(feature = "client_voice")]
 pub const VOLUME_STEP: u32            = 5;                         //WHAT ONE KEYPRESS MOVES A VOLUME ROW BY
 
+//VOICE MESSAGES
+#[cfg(feature = "client_voice")]
+pub const KEY_TAP: Duration           = Duration::from_millis(400); //SHORTER PRESS IS A TAP
+#[cfg(feature = "client_voice")]
+pub const KEY_REPEAT_GAP: Duration    = Duration::from_millis(700); //CLOSER PRESSES ARE KEY REPEATS
+#[cfg(feature = "client_voice")]
+pub const KEY_RELEASE_GAP: Duration   = Duration::from_millis(250); //NO REPEATS THIS LONG IS A RELEASE
+
 //MARKUP
 pub const GUTTER: u16                 = 2;                         //A CODE BLOCK'S BAR AND THE SPACE AFTER IT
 pub const TAB: usize                  = 4;                         //A TAB IS EXPANDED, SINCE A CELL GRID HAS NO TAB STOPS

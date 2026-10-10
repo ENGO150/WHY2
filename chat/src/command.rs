@@ -55,6 +55,8 @@ pub enum Command
     Logout,                                       //DISCONNECT FROM SERVER, BACK TO THE CONNECT BOX
     #[cfg(feature = "client_voice")] Voice,       //ENABLE VOICE CHAT
     #[cfg(feature = "client_voice")] Mute,        //TOGGLE-MUTE USER/YOURSELF
+    #[cfg(feature = "client_voice")] Record,      //RECORD A VOICE MESSAGE
+    #[cfg(feature = "client_voice")] Play,        //PLAY A VOICE MESSAGE
     Channel,                                      //SWITCH CHANNEL
     Help,                                         //PRINT COMMANDS
     Info,                                         //COMMAND INFO
@@ -421,6 +423,39 @@ pub const COMMAND_LIST: &[CommandInfo] =
             },
         ],
         description: "command.mute.description",
+    },
+
+    #[cfg(feature = "client_voice")]
+    CommandInfo
+    {
+        command: Command::Record,
+        triggers: &[ "RECORD", "REC", "VOICEMESSAGE", "VM" ],
+        shortcut: Some('r'),
+        minimal_role: Role::User,
+        subcommands: &[],
+        args: &[],
+        description: "command.record.description",
+    },
+
+    #[cfg(feature = "client_voice")]
+    CommandInfo
+    {
+        command: Command::Play,
+        triggers: &[ "PLAY", "LISTEN" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args:
+        &[
+            CommandArg
+            {
+                name: "arg.id",
+                description: "command.play.args.id",
+                required: false,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "command.play.description",
     },
 
     CommandInfo

@@ -219,6 +219,26 @@ pub enum PacketCode //CONTROL CODES
         timestamp: Option<u64>, //UNIX SECONDS
     },
 
+    //SERVER -> CLIENT | A VOICE MESSAGE, AS IT WAS RECORDED
+    VoiceMessage
+    {
+        username: String,
+        message_id: u64,
+        voice: VoiceNote,
+        data: Option<Vec<u8>>,
+        username_color: Option<u8>,
+        channel: Option<Option<String>>,
+        timestamp: Option<u64>, //UNIX SECONDS
+    },
+
+    //SERVER -> CLIENT | VOICE MESSAGE UPLOAD APPROVAL
+    VoiceMessageUpload
+    {
+        hash: [u8; 32],
+        token: [u8; 32],
+        uid: u64,
+    },
+
     //SERVER -> CLIENT | ASK FOR A STORED PICTURE
     ImageData
     {
@@ -332,6 +352,7 @@ pub enum PacketCode //CONTROL CODES
     Download { token: [u8; 32] },                      //SERVER -> CLIENT | DOWNLOAD FILE FROM SERVER
     ImageDuplicate { hash: [u8; 32] },                 //SERVER -> CLIENT | IMAGE ALREADY UPLOADED
     ImageDataRequest { hash: [u8; 32] },               //CLIENT -> SERVER | ASK FOR A STORED PICTURE
+    VoiceMessageRequest { hash: [u8; 32] },            //CLIENT -> SERVER | REQUEST VOICE MESSAGE UPLOAD
     FilesRequest,                                      //CLIENT -> SERVER | REQUEST FILE LIST
     ListRequest,                                       //CLIENT -> SERVER | REQUEST CONNECTED USERS
     TypingRequest,                                     //CLIENT -> SERVER | WE ARE WRITING A MESSAGE
@@ -417,6 +438,9 @@ impl PacketCode
             Self::ImageDisplay { .. }          => "ImageDisplay",
             Self::ImageDataRequest { .. }      => "ImageDataRequest",
             Self::ImageData { .. }             => "ImageData",
+            Self::VoiceMessageRequest { .. }   => "VoiceMessageRequest",
+            Self::VoiceMessageUpload { .. }    => "VoiceMessageUpload",
+            Self::VoiceMessage { .. }          => "VoiceMessage",
             Self::Uploaded { .. }              => "Uploaded",
             Self::AttachRequest { .. }         => "AttachRequest",
             Self::Attach { .. }                => "Attach",
@@ -563,13 +587,22 @@ pub struct StoredMessage
 {
     pub message_id: u64,
     pub username: String,
-    pub text: String,            //THE MESSAGE - OR THE FILENAME, WHEN THIS LINE IS AN IMAGE
+    pub text: String,             //THE MESSAGE - OR THE FILENAME, WHEN THIS LINE IS AN IMAGE
     pub colors: MessageColors,
-    pub image: Option<[u8; 32]>, //CONTENT HASH OF THE PICTURE
-    pub timestamp: Option<u64>,  //UNIX SECONDS
-    pub reply: Option<u64>,      //ID OF THE MESSAGE REPLIED TO
-    pub hearts: Vec<String>,     //USERNAMES THAT HEARTED IT
-    pub edited: bool,            //CHANGED SINCE SENT
+    pub image: Option<[u8; 32]>,  //CONTENT HASH OF THE PICTURE
+    pub timestamp: Option<u64>,   //UNIX SECONDS
+    pub reply: Option<u64>,       //ID OF THE MESSAGE REPLIED TO
+    pub hearts: Vec<String>,      //USERNAMES THAT HEARTED IT
+    pub edited: bool,             //CHANGED SINCE SENT
+    pub voice: Option<VoiceNote>, //THE CLIP, WHEN THIS LINE IS A VOICE MESSAGE
+}
+
+//ONE STORED VOICE MESSAGE
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub struct VoiceNote
+{
+    pub hash: [u8; 32], //CONTENT HASH OF THE CLIP
+    pub duration: u32,  //LENGTH IN MS
 }
 
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
