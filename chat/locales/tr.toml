@@ -186,6 +186,9 @@ show = "göster"
 loading = "yükleniyor..."
 unavailable = "kullanılamıyor"
 edited = "düzenlendi"
+voice = "{username} bir sesli mesaj gönderdi ({duration})"
+play = "oynat"
+stop = "durdur"
 
 [time]
 today = "%H:%M"
@@ -245,6 +248,21 @@ muted = "Susturuldu."
 unmuted = "Susturma kaldırıldı."
 muted_id = "ID {id} susturuldu."
 unmuted_id = "ID {id} için susturma kaldırıldı."
+
+[voice_message]
+recording = "● Kaydediliyor {duration}"
+hold = "göndermek için Ctrl+R'yi bırakın"
+toggle = "göndermek için Ctrl+R"
+cancel = "atmak için Esc"
+discarded = "Sesli mesaj atıldı."
+too_short = "Sesli mesaj çok kısa, hiçbir şey gönderilmedi."
+full = "Sesli mesaj sınırına ulaşıldı, gönderiliyor."
+busy = "Zaten bir sesli mesaj kaydediliyor."
+record_failed = "Kayıt başarısız - kullanılabilir mikrofon yok."
+play_failed = "Sesli mesaj oynatılamadı - kullanılabilir çıkış aygıtı yok."
+unreadable = "Bu sesli mesaj okunamadı."
+not_loaded = "#{message_id} numaralı sesli mesaj yüklenmedi."
+not_voice = "#{message_id} numaralı mesaj bir sesli mesaj değil."
 
 [upload]
 read_failed = "Dosya okunamadı!"
@@ -423,6 +441,13 @@ description = "Sesli sohbeti açar veya kapatır"
 [command.mute]
 args.id = "Hedef kullanıcının ID'si"
 description = "Bir kullanıcıyı/kendinizi susturur veya susturmayı kaldırır"
+
+[command.record]
+description = "Sesli mesaj kaydeder - konuşmak için kısayolu basılı tutun ya da başlatmak için bir kez, göndermek için tekrar basın"
+
+[command.play]
+args.id = "Sesli mesajın ID'si"
+description = "Sesli mesajı oynatır, ID verilmezse oynatmayı durdurur"
 
 [command.channel]
 args.name = "Kanal adı"

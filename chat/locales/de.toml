@@ -187,6 +187,9 @@ show = "anzeigen"
 loading = "lädt..."
 unavailable = "nicht verfügbar"
 edited = "bearbeitet"
+voice = "{username} hat eine Sprachnachricht gesendet ({duration})"
+play = "abspielen"
+stop = "stoppen"
 
 [time]
 today = "%H:%M"
@@ -246,6 +249,21 @@ muted = "Erfolgreich stummgeschaltet."
 unmuted = "Stummschaltung erfolgreich aufgehoben."
 muted_id = "ID {id} erfolgreich stummgeschaltet."
 unmuted_id = "Stummschaltung von ID {id} erfolgreich aufgehoben."
+
+[voice_message]
+recording = "● Aufnahme {duration}"
+hold = "Strg+R loslassen zum Senden"
+toggle = "Strg+R zum Senden"
+cancel = "Esc zum Verwerfen"
+discarded = "Sprachnachricht verworfen."
+too_short = "Sprachnachricht zu kurz, es wurde nichts gesendet."
+full = "Limit der Sprachnachricht erreicht, sie wird gesendet."
+busy = "Es wird bereits eine Sprachnachricht aufgenommen."
+record_failed = "Aufnahme fehlgeschlagen - kein nutzbares Mikrofon."
+play_failed = "Abspielen der Sprachnachricht fehlgeschlagen - kein nutzbares Ausgabegerät."
+unreadable = "Diese Sprachnachricht konnte nicht gelesen werden."
+not_loaded = "Sprachnachricht #{message_id} ist nicht geladen."
+not_voice = "Nachricht #{message_id} ist keine Sprachnachricht."
 
 [upload]
 read_failed = "Lesen der Datei fehlgeschlagen!"
@@ -425,6 +443,13 @@ description = "Schaltet den Sprachchat ein/aus"
 [command.mute]
 args.id = "ID des Zielbenutzers"
 description = "Schaltet einen Benutzer/dich stumm oder hebt es auf"
+
+[command.record]
+description = "Nimmt eine Sprachnachricht auf - Tastenkürzel halten zum Sprechen, oder antippen zum Starten und erneut zum Senden"
+
+[command.play]
+args.id = "ID der Sprachnachricht"
+description = "Spielt eine Sprachnachricht ab oder stoppt die Wiedergabe, wenn ID fehlt"
 
 [command.channel]
 args.name = "Name des Kanals"

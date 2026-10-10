@@ -189,6 +189,9 @@ show = "zobrazit"
 loading = "načítání..."
 unavailable = "nedostupný"
 edited = "upraveno"
+voice = "{username} nahrál/a hlasovou zprávu ({duration})"
+play = "přehrát"
+stop = "zastavit"
 
 [time]
 today = "%H:%M"
@@ -248,6 +251,21 @@ muted = "Úspěšně umlčeno."
 unmuted = "Umlčení úspěšně zrušeno."
 muted_id = "Uživatel s ID {id} byl úspěšně umlčen."
 unmuted_id = "Umlčení uživatele s ID {id} bylo úspěšně zrušeno."
+
+[voice_message]
+recording = "● Nahrávání {duration}"
+hold = "pusťte Ctrl+R pro odeslání"
+toggle = "Ctrl+R pro odeslání"
+cancel = "Esc pro zahození"
+discarded = "Hlasová zpráva zahozena."
+too_short = "Hlasová zpráva je příliš krátká, nic nebylo odesláno."
+full = "Dosažen limit délky hlasové zprávy, odesílá se."
+busy = "Hlasová zpráva se již nahrává."
+record_failed = "Nahrávání selhalo - žádný použitelný vstup."
+play_failed = "Přehrání hlasové zprávy selhalo - žádné použitelné výstupní zařízení."
+unreadable = "Hlasovou zprávu nelze přehrát."
+not_loaded = "Hlasová zpráva #{message_id} není načtena."
+not_voice = "Zpráva #{message_id} není hlasová zpráva."
 
 [upload]
 read_failed = "Čtení souboru selhalo!"
@@ -428,6 +446,13 @@ description = "Zapne/vypne hlasovou komunikaci"
 [command.mute]
 args.id = "ID zvoleného uživatele"
 description = "Umlčí uživatele/Vás, nebo umlčení zruší"
+
+[command.record]
+description = "Nahraje hlasovou zprávu - podržte zkratku pro mluvení, nebo ji stiskněte pro začátek a poté pro odeslání"
+
+[command.play]
+args.id = "ID hlasové zprávy"
+description = "Přehraje hlasovou zprávu, nebo zastaví přehrávání, pokud je ID vynecháno"
 
 [command.channel]
 args.name = "Jméno kanálu"

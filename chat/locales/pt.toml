@@ -187,6 +187,9 @@ show = "mostrar"
 loading = "carregando..."
 unavailable = "indisponível"
 edited = "editada"
+voice = "{username} enviou uma mensagem de voz ({duration})"
+play = "reproduzir"
+stop = "parar"
 
 [time]
 today = "%H:%M"
@@ -246,6 +249,21 @@ muted = "Silenciado."
 unmuted = "Silêncio removido."
 muted_id = "ID {id} silenciado."
 unmuted_id = "Silêncio removido do ID {id}."
+
+[voice_message]
+recording = "● Gravando {duration}"
+hold = "solte Ctrl+R para enviar"
+toggle = "Ctrl+R para enviar"
+cancel = "Esc para descartar"
+discarded = "Mensagem de voz descartada."
+too_short = "Mensagem de voz curta demais, nada foi enviado."
+full = "Limite da mensagem de voz atingido, enviando."
+busy = "Uma mensagem de voz já está sendo gravada."
+record_failed = "A gravação falhou - nenhum microfone utilizável."
+play_failed = "Falha ao reproduzir a mensagem de voz - nenhum dispositivo de saída utilizável."
+unreadable = "Não foi possível ler essa mensagem de voz."
+not_loaded = "A mensagem de voz #{message_id} não está carregada."
+not_voice = "A mensagem #{message_id} não é uma mensagem de voz."
 
 [upload]
 read_failed = "Falha ao ler o arquivo!"
@@ -425,6 +443,13 @@ description = "Liga ou desliga o chat de voz"
 [command.mute]
 args.id = "ID do usuário alvo"
 description = "Silencia ou remove o silêncio de um usuário/você"
+
+[command.record]
+description = "Grava uma mensagem de voz - segure o atalho para falar, ou toque nele para começar e de novo para enviar"
+
+[command.play]
+args.id = "ID da mensagem de voz"
+description = "Reproduz uma mensagem de voz, ou para a reprodução se ID for omitido"
 
 [command.channel]
 args.name = "Nome do canal"

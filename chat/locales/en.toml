@@ -200,6 +200,9 @@ show = "show"
 loading = "loading..."
 unavailable = "unavailable"
 edited = "edited"
+voice = "{username} sent a voice message ({duration})"
+play = "play"
+stop = "stop"
 
 [time]
 today = "%H:%M"
@@ -259,6 +262,21 @@ muted = "Successfully muted."
 unmuted = "Successfully unmuted."
 muted_id = "Successfully muted ID {id}."
 unmuted_id = "Successfully unmuted ID {id}."
+
+[voice_message]
+recording = "● Recording {duration}"
+hold = "release Ctrl+R to send"
+toggle = "Ctrl+R to send"
+cancel = "Esc to discard"
+discarded = "Voice message discarded."
+too_short = "Voice message too short, nothing was sent."
+full = "Voice message limit reached, sending it."
+busy = "A voice message is already being recorded."
+record_failed = "Recording failed - no usable microphone."
+play_failed = "Playing the voice message failed - no usable output device."
+unreadable = "That voice message could not be read."
+not_loaded = "Voice message #{message_id} is not loaded."
+not_voice = "Message #{message_id} is not a voice message."
 
 [upload]
 read_failed = "Reading the file failed!"
@@ -438,6 +456,13 @@ description = "Toggles voice chat"
 [command.mute]
 args.id = "ID of target user"
 description = "Toggle-mutes user/yourself"
+
+[command.record]
+description = "Records a voice message - hold the shortcut to talk, or tap it to start and again to send"
+
+[command.play]
+args.id = "ID of the voice message"
+description = "Plays a voice message, or stops playback if ID is omitted"
 
 [command.channel]
 args.name = "Name of channel"

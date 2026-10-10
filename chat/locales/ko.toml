@@ -186,6 +186,9 @@ show = "보기"
 loading = "불러오는 중..."
 unavailable = "사용 불가"
 edited = "수정됨"
+voice = "{username}님이 음성 메시지를 보냈습니다 ({duration})"
+play = "재생"
+stop = "정지"
 
 [time]
 today = "%H:%M"
@@ -245,6 +248,21 @@ muted = "음소거했습니다."
 unmuted = "음소거를 해제했습니다."
 muted_id = "ID {id}을(를) 음소거했습니다."
 unmuted_id = "ID {id}의 음소거를 해제했습니다."
+
+[voice_message]
+recording = "● 녹음 중 {duration}"
+hold = "Ctrl+R을 놓으면 전송"
+toggle = "Ctrl+R로 전송"
+cancel = "Esc로 취소"
+discarded = "음성 메시지를 취소했습니다."
+too_short = "음성 메시지가 너무 짧아 아무것도 전송되지 않았습니다."
+full = "음성 메시지 한도에 도달하여 전송합니다."
+busy = "이미 음성 메시지를 녹음하고 있습니다."
+record_failed = "녹음 실패 - 사용할 수 있는 마이크가 없습니다."
+play_failed = "음성 메시지 재생 실패 - 사용할 수 있는 출력 장치가 없습니다."
+unreadable = "해당 음성 메시지를 읽을 수 없습니다."
+not_loaded = "음성 메시지 #{message_id}이(가) 로드되지 않았습니다."
+not_voice = "메시지 #{message_id}은(는) 음성 메시지가 아닙니다."
 
 [upload]
 read_failed = "파일을 읽지 못했습니다!"
@@ -423,6 +441,13 @@ description = "음성 채팅을 켜거나 끕니다"
 [command.mute]
 args.id = "대상 사용자의 ID"
 description = "사용자/자신의 음소거를 전환합니다"
+
+[command.record]
+description = "음성 메시지를 녹음합니다 - 단축키를 누른 채로 말하거나, 한 번 눌러 시작하고 다시 눌러 전송합니다"
+
+[command.play]
+args.id = "음성 메시지 ID"
+description = "음성 메시지를 재생하거나, ID를 생략하면 재생을 멈춥니다"
 
 [command.channel]
 args.name = "채널 이름"

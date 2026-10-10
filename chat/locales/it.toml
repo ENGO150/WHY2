@@ -187,6 +187,9 @@ show = "mostra"
 loading = "caricamento..."
 unavailable = "non disponibile"
 edited = "modificato"
+voice = "{username} ha inviato un messaggio vocale ({duration})"
+play = "riproduci"
+stop = "ferma"
 
 [time]
 today = "%H:%M"
@@ -246,6 +249,21 @@ muted = "Silenziato."
 unmuted = "Audio riattivato."
 muted_id = "ID {id} silenziato."
 unmuted_id = "Audio riattivato per l'ID {id}."
+
+[voice_message]
+recording = "● Registrazione {duration}"
+hold = "rilascia Ctrl+R per inviare"
+toggle = "Ctrl+R per inviare"
+cancel = "Esc per scartare"
+discarded = "Messaggio vocale scartato."
+too_short = "Messaggio vocale troppo corto, non è stato inviato nulla."
+full = "Limite del messaggio vocale raggiunto, invio in corso."
+busy = "Un messaggio vocale è già in registrazione."
+record_failed = "Registrazione non riuscita - nessun microfono utilizzabile."
+play_failed = "Riproduzione del messaggio vocale non riuscita - nessun dispositivo di uscita utilizzabile."
+unreadable = "Impossibile leggere quel messaggio vocale."
+not_loaded = "Il messaggio vocale #{message_id} non è caricato."
+not_voice = "Il messaggio #{message_id} non è un messaggio vocale."
 
 [upload]
 read_failed = "Lettura del file non riuscita!"
@@ -425,6 +443,13 @@ description = "Attiva o disattiva la chat vocale"
 [command.mute]
 args.id = "ID dell'utente"
 description = "Silenzia o riattiva un utente/te stesso"
+
+[command.record]
+description = "Registra un messaggio vocale - tieni premuta la scorciatoia per parlare, oppure premila per iniziare e di nuovo per inviare"
+
+[command.play]
+args.id = "ID del messaggio vocale"
+description = "Riproduce un messaggio vocale, o ferma la riproduzione se ID è omesso"
 
 [command.channel]
 args.name = "Nome del canale"

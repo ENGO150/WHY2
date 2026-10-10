@@ -186,6 +186,9 @@ show = "显示"
 loading = "加载中..."
 unavailable = "不可用"
 edited = "已编辑"
+voice = "{username} 发送了一条语音消息（{duration}）"
+play = "播放"
+stop = "停止"
 
 [time]
 today = "%H:%M"
@@ -245,6 +248,21 @@ muted = "已静音。"
 unmuted = "已取消静音。"
 muted_id = "已静音 ID {id}。"
 unmuted_id = "已取消静音 ID {id}。"
+
+[voice_message]
+recording = "● 正在录音 {duration}"
+hold = "松开 Ctrl+R 发送"
+toggle = "Ctrl+R 发送"
+cancel = "Esc 丢弃"
+discarded = "语音消息已丢弃。"
+too_short = "语音消息太短，未发送任何内容。"
+full = "已达到语音消息上限，正在发送。"
+busy = "已有语音消息正在录制。"
+record_failed = "录音失败 - 没有可用的麦克风。"
+play_failed = "播放语音消息失败 - 没有可用的输出设备。"
+unreadable = "无法读取该语音消息。"
+not_loaded = "语音消息 #{message_id} 未加载。"
+not_voice = "消息 #{message_id} 不是语音消息。"
 
 [upload]
 read_failed = "读取文件失败！"
@@ -423,6 +441,13 @@ description = "开启/关闭语音聊天"
 [command.mute]
 args.id = "目标用户的 ID"
 description = "静音或取消静音某个用户/你自己"
+
+[command.record]
+description = "录制语音消息 - 按住快捷键说话，或按一下开始、再按一下发送"
+
+[command.play]
+args.id = "语音消息的 ID"
+description = "播放语音消息，若省略 ID 则停止播放"
 
 [command.channel]
 args.name = "频道名称"

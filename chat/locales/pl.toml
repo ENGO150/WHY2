@@ -189,6 +189,9 @@ show = "pokaż"
 loading = "ładowanie..."
 unavailable = "niedostępny"
 edited = "edytowano"
+voice = "{username} wysłał(a) wiadomość głosową ({duration})"
+play = "odtwórz"
+stop = "zatrzymaj"
 
 [time]
 today = "%H:%M"
@@ -248,6 +251,21 @@ muted = "Wyciszono."
 unmuted = "Wyłączono wyciszenie."
 muted_id = "Wyciszono ID {id}."
 unmuted_id = "Wyłączono wyciszenie ID {id}."
+
+[voice_message]
+recording = "● Nagrywanie {duration}"
+hold = "puść Ctrl+R, aby wysłać"
+toggle = "Ctrl+R, aby wysłać"
+cancel = "Esc, aby odrzucić"
+discarded = "Wiadomość głosowa odrzucona."
+too_short = "Wiadomość głosowa jest za krótka, nic nie wysłano."
+full = "Osiągnięto limit wiadomości głosowej, wysyłanie."
+busy = "Wiadomość głosowa jest już nagrywana."
+record_failed = "Nagrywanie nie powiodło się - brak użytecznego mikrofonu."
+play_failed = "Odtwarzanie wiadomości głosowej nie powiodło się - brak użytecznego urządzenia wyjściowego."
+unreadable = "Nie udało się odczytać tej wiadomości głosowej."
+not_loaded = "Wiadomość głosowa #{message_id} nie jest wczytana."
+not_voice = "Wiadomość #{message_id} nie jest wiadomością głosową."
 
 [upload]
 read_failed = "Odczyt pliku nie powiódł się!"
@@ -428,6 +446,13 @@ description = "Włącza/wyłącza czat głosowy"
 [command.mute]
 args.id = "ID wybranego użytkownika"
 description = "Wycisza użytkownika/ciebie lub wyłącza wyciszenie"
+
+[command.record]
+description = "Nagrywa wiadomość głosową - przytrzymaj skrót, aby mówić, lub naciśnij go, aby zacząć, i ponownie, aby wysłać"
+
+[command.play]
+args.id = "ID wiadomości głosowej"
+description = "Odtwarza wiadomość głosową lub zatrzymuje odtwarzanie, jeśli pominięto ID"
 
 [command.channel]
 args.name = "Nazwa kanału"

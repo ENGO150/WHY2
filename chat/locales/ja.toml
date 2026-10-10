@@ -186,6 +186,9 @@ show = "表示"
 loading = "読み込み中..."
 unavailable = "利用不可"
 edited = "編集済み"
+voice = "{username}がボイスメッセージを送信しました ({duration})"
+play = "再生"
+stop = "停止"
 
 [time]
 today = "%H:%M"
@@ -245,6 +248,21 @@ muted = "ミュートしました。"
 unmuted = "ミュートを解除しました。"
 muted_id = "ID {id} をミュートしました。"
 unmuted_id = "ID {id} のミュートを解除しました。"
+
+[voice_message]
+recording = "● 録音中 {duration}"
+hold = "Ctrl+Rを離して送信"
+toggle = "Ctrl+Rで送信"
+cancel = "Escで破棄"
+discarded = "ボイスメッセージを破棄しました。"
+too_short = "ボイスメッセージが短すぎるため、送信されませんでした。"
+full = "ボイスメッセージの上限に達したため、送信します。"
+busy = "すでにボイスメッセージを録音中です。"
+record_failed = "録音に失敗しました - 使用できるマイクがありません。"
+play_failed = "ボイスメッセージの再生に失敗しました - 使用できる出力デバイスがありません。"
+unreadable = "そのボイスメッセージを読み込めませんでした。"
+not_loaded = "ボイスメッセージ #{message_id} は読み込まれていません。"
+not_voice = "メッセージ #{message_id} はボイスメッセージではありません。"
 
 [upload]
 read_failed = "ファイルの読み込みに失敗しました！"
@@ -423,6 +441,13 @@ description = "ボイスチャットのオン/オフを切り替えます"
 [command.mute]
 args.id = "対象ユーザーの ID"
 description = "ユーザー/自分のミュートを切り替えます"
+
+[command.record]
+description = "ボイスメッセージを録音します - ショートカットを押し続けて話すか、一度押して開始し、もう一度押して送信します"
+
+[command.play]
+args.id = "ボイスメッセージのID"
+description = "ボイスメッセージを再生します。IDを省略すると再生を停止します"
 
 [command.channel]
 args.name = "チャンネル名"

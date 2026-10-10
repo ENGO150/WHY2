@@ -187,6 +187,9 @@ show = "tonen"
 loading = "laden..."
 unavailable = "niet beschikbaar"
 edited = "bewerkt"
+voice = "{username} heeft een spraakbericht gestuurd ({duration})"
+play = "afspelen"
+stop = "stoppen"
 
 [time]
 today = "%H:%M"
@@ -246,6 +249,21 @@ muted = "Gedempt."
 unmuted = "Demping opgeheven."
 muted_id = "ID {id} gedempt."
 unmuted_id = "Demping van ID {id} opgeheven."
+
+[voice_message]
+recording = "● Opnemen {duration}"
+hold = "laat Ctrl+R los om te versturen"
+toggle = "Ctrl+R om te versturen"
+cancel = "Esc om te verwerpen"
+discarded = "Spraakbericht verworpen."
+too_short = "Spraakbericht te kort, er is niets verstuurd."
+full = "Limiet van het spraakbericht bereikt, het wordt verstuurd."
+busy = "Er wordt al een spraakbericht opgenomen."
+record_failed = "Opnemen mislukt - geen bruikbare microfoon."
+play_failed = "Afspelen van het spraakbericht mislukt - geen bruikbaar uitvoerapparaat."
+unreadable = "Dat spraakbericht kon niet worden gelezen."
+not_loaded = "Spraakbericht #{message_id} is niet geladen."
+not_voice = "Bericht #{message_id} is geen spraakbericht."
 
 [upload]
 read_failed = "Lezen van het bestand mislukt!"
@@ -425,6 +443,13 @@ description = "Zet spraakchat aan of uit"
 [command.mute]
 args.id = "ID van de doelgebruiker"
 description = "Dempt een gebruiker/jezelf of heft het op"
+
+[command.record]
+description = "Neemt een spraakbericht op - houd de sneltoets ingedrukt om te praten, of tik erop om te beginnen en nogmaals om te versturen"
+
+[command.play]
+args.id = "ID van het spraakbericht"
+description = "Speelt een spraakbericht af, of stopt het afspelen als ID ontbreekt"
 
 [command.channel]
 args.name = "Naam van het kanaal"

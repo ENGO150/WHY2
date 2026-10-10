@@ -187,6 +187,9 @@ show = "afficher"
 loading = "chargement..."
 unavailable = "indisponible"
 edited = "modifié"
+voice = "{username} a envoyé un message vocal ({duration})"
+play = "lire"
+stop = "arrêter"
 
 [time]
 today = "%H:%M"
@@ -246,6 +249,21 @@ muted = "Rendu muet."
 unmuted = "Son rétabli."
 muted_id = "ID {id} rendu muet."
 unmuted_id = "Son rétabli pour l'ID {id}."
+
+[voice_message]
+recording = "● Enregistrement {duration}"
+hold = "relâchez Ctrl+R pour envoyer"
+toggle = "Ctrl+R pour envoyer"
+cancel = "Esc pour abandonner"
+discarded = "Message vocal abandonné."
+too_short = "Message vocal trop court, rien n'a été envoyé."
+full = "Limite du message vocal atteinte, envoi en cours."
+busy = "Un message vocal est déjà en cours d'enregistrement."
+record_failed = "L'enregistrement a échoué - aucun microphone utilisable."
+play_failed = "La lecture du message vocal a échoué - aucun périphérique de sortie utilisable."
+unreadable = "Ce message vocal n'a pas pu être lu."
+not_loaded = "Le message vocal #{message_id} n'est pas chargé."
+not_voice = "Le message #{message_id} n'est pas un message vocal."
 
 [upload]
 read_failed = "La lecture du fichier a échoué !"
@@ -425,6 +443,13 @@ description = "Active ou désactive le chat vocal"
 [command.mute]
 args.id = "ID de l'utilisateur ciblé"
 description = "Rend muet un utilisateur/vous-même, ou rétablit le son"
+
+[command.record]
+description = "Enregistre un message vocal - maintenez le raccourci pour parler, ou appuyez une fois pour commencer et à nouveau pour envoyer"
+
+[command.play]
+args.id = "ID du message vocal"
+description = "Lit un message vocal, ou arrête la lecture si ID est omis"
 
 [command.channel]
 args.name = "Nom du salon"
