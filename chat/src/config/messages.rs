@@ -56,19 +56,6 @@ struct Record //ONE MESSAGE RECORD
     voice: Option<VoiceNote>, //THE CLIP OF A VOICE MESSAGE
 }
 
-#[derive(SchemaRead)]
-struct RecordV5 //ONE MESSAGE RECORD, BEFORE VOICE MESSAGES
-{
-    id: u64,
-    username: String,
-    text: String,
-    image: Option<[u8; 32]>,
-    timestamp: Option<u64>,
-    reply: Option<u64>,
-    hearts: Vec<String>,
-    edited: bool,
-}
-
 struct History //THE RECORDS AND THE NEXT ID
 {
     next: u64,            //NEXT MESSAGE ID
@@ -85,33 +72,13 @@ pub struct Page
 }
 
 //CONSTS
-const MAGIC: &[u8; 8] = b"WHY2MSG\x06";    //FORMAT MARKER
-const MAGIC_V5: &[u8; 8] = b"WHY2MSG\x05"; //THE ONE BEFORE VOICE MESSAGES
+const MAGIC: &[u8; 8] = b"WHY2MSG\x06"; //FORMAT MARKER
 
 //GLOBAL VARIABLES
 static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History::new())); //MESSAGE HISTORY
 static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                                       //AT-REST KEYS
 
 //IMPLEMENTATIONS
-impl From<RecordV5> for Record
-{
-    fn from(old: RecordV5) -> Self
-    {
-        Self
-        {
-            id: old.id,
-            username: old.username,
-            text: old.text,
-            image: old.image,
-            timestamp: old.timestamp,
-            reply: old.reply,
-            hearts: old.hearts,
-            edited: old.edited,
-            voice: None,
-        }
-    }
-}
-
 impl Record
 {
     fn stored(&self) -> Option<[u8; 32]> //THE FILE IN server_images/ IT NAMES
@@ -191,21 +158,6 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
         log::error!("Message history failed verification, it is being ignored");
         return Vec::new();
     };
-
-    //MIGRATE THE OLDER FORMAT
-    if let Some(records) = plaintext.strip_prefix(MAGIC_V5)
-    {
-        return match wincode::config::deserialize::<Vec<RecordV5>, _>(records, consts::PACKET_CONFIG)
-        {
-            Ok(history) =>
-            {
-                log::info!("Migrated {} stored messages from an older format", history.len());
-                history.into_iter().map(Record::from).collect()
-            },
-
-            Err(_) => unreadable(),
-        };
-    }
 
     //NO MARKER IS UNREADABLE
     let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };

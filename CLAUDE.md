@@ -1212,13 +1212,11 @@ to `consts::DEFAULT_GRID_WIDTH`/`HEIGHT` rather than hardcoding 8.
   - **The in-memory `HISTORY` is the working set**, and the file is the copy of it that survives a
     restart: it is read once, on first touch, and only ever written after that. A missing, truncated,
     tampered, unrecognisable file, or one written under another server's keys, all load as an empty
-    history rather than refusing to start. The one format before the current one (`MAGIC_V5`, from
-    before voice messages) is **migrated on load** — `RecordV5` is the old `Record` field for field and
-    `From` fills in `voice: None`; the file is rewritten in the new format by the next save, not at
-    load. Anything older is unreadable like any other. A format change that adds a field to `Record`
-    therefore needs the same treatment again: freeze the current struct as `RecordVn`, bump `MAGIC`,
-    and add an arm to `load` — wincode has no optional trailing fields, so the old bytes do not parse
-    as the new struct and would otherwise be thrown away (to `.old`).
+    history rather than refusing to start. An older format is unreadable like any other — wincode has
+    no optional trailing fields, so a field added to `Record` makes every existing file unparseable
+    (it goes to `.old`). Keeping one across a format change means freezing the old struct as
+    `RecordVn` beside its `MAGIC` and converting it in `load`; the v5 → v6 step (voice messages) was
+    done that way and removed once it had run.
   - **A message can name the message it replies to** (`reply: Option<u64>`, a message id, on
     `MessageRequest`, `Record`, `StoredMessage`, `PacketCode::Message` and `ClientEvent::Message`), set by
     `/reply ID MESSAGE` (`/re` is still the private-message answer). The server refuses a reply naming a
