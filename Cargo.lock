@@ -6090,7 +6090,7 @@ dependencies = [
 
 [[package]]
 name = "why2-chat"
-version = "2.3.2"
+version = "2.4.0"
 dependencies = [
  "argon2",
  "ash",

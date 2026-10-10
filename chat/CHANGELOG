@@ -1,6 +1,16 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.4.0:
+- 3610d96e: upgrade chat dependencies
+- d2e63cb7: implement voice messages
+- 5ae4327b: add voice message locales
+- afad7c6b: add voice message field to message history records
+- 0bd172ee: back the share's bitrate off on the server's viewer reports
+- 0bc76f87: report viewer backlog from the server to the sharer
+- 0a6ab670: encode screen share on the gpu and adapt its bitrate to the link
+- b2071a18: add hardware h264 encoder backends
+
 v2.3.2:
 - 5b60de82: upgrade dependencies
 - c31939d4: implement screen w/o audio on client
