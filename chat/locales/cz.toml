@@ -189,6 +189,7 @@ show = "zobrazit"
 loading = "načítání..."
 unavailable = "nedostupný"
 edited = "upraveno"
+pinned = "připnuto"
 voice = "{username} nahrál/a hlasovou zprávu ({duration})"
 play = "přehrát"
 stop = "zastavit"
@@ -245,6 +246,11 @@ none = "Žádné"
 not_loaded = "Zpráva #{message_id} není načtená."
 none = "Nikdo nelajkoval #{message_id}."
 title = "Lajky na #{message_id} ({count}):"
+
+[pins]
+none = "Nic není připnuté."
+title = "Připnuté zprávy ({count}):"
+voice = "hlasová zpráva"
 
 [mute]
 muted = "Úspěšně umlčeno."
@@ -507,6 +513,13 @@ description = "Přidá/odebere lajk u zprávy"
 [command.hearts]
 args.id = "ID zprávy"
 description = "Zobrazí uživatele lajkující zprávu"
+
+[command.pin]
+args.id = "ID zprávy"
+description = "Připne/odepne zprávu."
+
+[command.pins]
+description = "Zobrazí připnuté zprávy."
 
 [command.reply]
 args.id = "ID zprávy"

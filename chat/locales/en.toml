@@ -200,6 +200,7 @@ show = "show"
 loading = "loading..."
 unavailable = "unavailable"
 edited = "edited"
+pinned = "pinned"
 voice = "{username} sent a voice message ({duration})"
 play = "play"
 stop = "stop"
@@ -256,6 +257,11 @@ none = "None"
 not_loaded = "Message #{message_id} is not loaded."
 none = "Nobody hearted #{message_id}."
 title = "Hearts on #{message_id} ({count}):"
+
+[pins]
+none = "Nothing is pinned."
+title = "Pinned messages ({count}):"
+voice = "voice message"
 
 [mute]
 muted = "Successfully muted."
@@ -517,6 +523,13 @@ description = "Toggles heart reaction on a message."
 [command.hearts]
 args.id = "ID of the message"
 description = "Lists who hearted a message."
+
+[command.pin]
+args.id = "ID of the message"
+description = "Pins or unpins a message."
+
+[command.pins]
+description = "Lists pinned messages."
 
 [command.reply]
 args.id = "ID of the message"
