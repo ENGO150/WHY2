@@ -187,6 +187,7 @@ show = "tonen"
 loading = "laden..."
 unavailable = "niet beschikbaar"
 edited = "bewerkt"
+pinned = "vastgepind"
 voice = "{username} heeft een spraakbericht gestuurd ({duration})"
 play = "afspelen"
 stop = "stoppen"
@@ -243,6 +244,11 @@ none = "Geen"
 not_loaded = "Bericht #{message_id} is niet geladen."
 none = "Niemand heeft #{message_id} een hartje gegeven."
 title = "Hartjes op #{message_id} ({count}):"
+
+[pins]
+none = "Er is niets vastgepind."
+title = "Vastgepinde berichten ({count}):"
+voice = "spraakbericht"
 
 [mute]
 muted = "Gedempt."
@@ -504,6 +510,13 @@ description = "Geeft een bericht een hartje of haalt het weg."
 [command.hearts]
 args.id = "ID van het bericht"
 description = "Toont wie een bericht een hartje gaf."
+
+[command.pin]
+args.id = "ID van het bericht"
+description = "Pint een bericht vast of maakt het los."
+
+[command.pins]
+description = "Toont vastgepinde berichten."
 
 [command.reply]
 args.id = "ID van het bericht"

@@ -186,6 +186,7 @@ show = "göster"
 loading = "yükleniyor..."
 unavailable = "kullanılamıyor"
 edited = "düzenlendi"
+pinned = "sabitlendi"
 voice = "{username} bir sesli mesaj gönderdi ({duration})"
 play = "oynat"
 stop = "durdur"
@@ -242,6 +243,11 @@ none = "Yok"
 not_loaded = "#{message_id} mesajı yüklenmedi."
 none = "#{message_id} mesajına kimse kalp bırakmadı."
 title = "#{message_id} mesajındaki kalpler ({count}):"
+
+[pins]
+none = "Sabitlenmiş bir şey yok."
+title = "Sabitlenmiş mesajlar ({count}):"
+voice = "sesli mesaj"
 
 [mute]
 muted = "Susturuldu."
@@ -502,6 +508,13 @@ description = "Bir mesaja kalp bırakır veya kaldırır."
 [command.hearts]
 args.id = "Mesajın ID'si"
 description = "Bir mesaja kimin kalp bıraktığını listeler."
+
+[command.pin]
+args.id = "Mesajın ID'si"
+description = "Bir mesajı sabitler veya sabitlemeyi kaldırır."
+
+[command.pins]
+description = "Sabitlenmiş mesajları listeler."
 
 [command.reply]
 args.id = "Mesajın ID'si"

@@ -187,6 +187,7 @@ show = "anzeigen"
 loading = "lädt..."
 unavailable = "nicht verfügbar"
 edited = "bearbeitet"
+pinned = "angeheftet"
 voice = "{username} hat eine Sprachnachricht gesendet ({duration})"
 play = "abspielen"
 stop = "stoppen"
@@ -243,6 +244,11 @@ none = "Keine"
 not_loaded = "Nachricht #{message_id} ist nicht geladen."
 none = "Niemand hat #{message_id} ein Herz gegeben."
 title = "Herzen für #{message_id} ({count}):"
+
+[pins]
+none = "Nichts ist angeheftet."
+title = "Angeheftete Nachrichten ({count}):"
+voice = "Sprachnachricht"
 
 [mute]
 muted = "Erfolgreich stummgeschaltet."
@@ -504,6 +510,13 @@ description = "Setzt oder entfernt ein Herz an einer Nachricht."
 [command.hearts]
 args.id = "ID der Nachricht"
 description = "Zeigt, wer einer Nachricht ein Herz gegeben hat."
+
+[command.pin]
+args.id = "ID der Nachricht"
+description = "Heftet eine Nachricht an oder löst sie."
+
+[command.pins]
+description = "Zeigt angeheftete Nachrichten."
 
 [command.reply]
 args.id = "ID der Nachricht"

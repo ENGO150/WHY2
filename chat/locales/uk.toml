@@ -189,6 +189,7 @@ show = "показати"
 loading = "завантаження..."
 unavailable = "недоступно"
 edited = "змінено"
+pinned = "закріплено"
 voice = "{username} надіслав(ла) голосове повідомлення ({duration})"
 play = "відтворити"
 stop = "зупинити"
@@ -245,6 +246,11 @@ none = "Немає"
 not_loaded = "Повідомлення #{message_id} не завантажено."
 none = "Ніхто не поставив сердечко #{message_id}."
 title = "Сердечка на #{message_id} ({count}):"
+
+[pins]
+none = "Нічого не закріплено."
+title = "Закріплені повідомлення ({count}):"
+voice = "голосове повідомлення"
 
 [mute]
 muted = "Звук вимкнено."
@@ -507,6 +513,13 @@ description = "Ставить або прибирає сердечко на по
 [command.hearts]
 args.id = "ID повідомлення"
 description = "Показує, хто поставив сердечко повідомленню."
+
+[command.pin]
+args.id = "ID повідомлення"
+description = "Закріплює або відкріплює повідомлення."
+
+[command.pins]
+description = "Показує закріплені повідомлення."
 
 [command.reply]
 args.id = "ID повідомлення"

@@ -189,6 +189,7 @@ show = "pokaż"
 loading = "ładowanie..."
 unavailable = "niedostępny"
 edited = "edytowano"
+pinned = "przypięto"
 voice = "{username} wysłał(a) wiadomość głosową ({duration})"
 play = "odtwórz"
 stop = "zatrzymaj"
@@ -245,6 +246,11 @@ none = "Brak"
 not_loaded = "Wiadomość #{message_id} nie jest załadowana."
 none = "Nikt nie dał serduszka #{message_id}."
 title = "Serduszka przy #{message_id} ({count}):"
+
+[pins]
+none = "Nic nie jest przypięte."
+title = "Przypięte wiadomości ({count}):"
+voice = "wiadomość głosowa"
 
 [mute]
 muted = "Wyciszono."
@@ -507,6 +513,13 @@ description = "Dodaje lub usuwa serduszko przy wiadomości."
 [command.hearts]
 args.id = "ID wiadomości"
 description = "Pokazuje, kto dał serduszko wiadomości."
+
+[command.pin]
+args.id = "ID wiadomości"
+description = "Przypina lub odpina wiadomość."
+
+[command.pins]
+description = "Wyświetla przypięte wiadomości."
 
 [command.reply]
 args.id = "ID wiadomości"

@@ -187,6 +187,7 @@ show = "afficher"
 loading = "chargement..."
 unavailable = "indisponible"
 edited = "modifié"
+pinned = "épinglé"
 voice = "{username} a envoyé un message vocal ({duration})"
 play = "lire"
 stop = "arrêter"
@@ -243,6 +244,11 @@ none = "Aucun"
 not_loaded = "Le message #{message_id} n'est pas chargé."
 none = "Personne n'a mis de cœur à #{message_id}."
 title = "Cœurs sur #{message_id} ({count}) :"
+
+[pins]
+none = "Rien n'est épinglé."
+title = "Messages épinglés ({count}) :"
+voice = "message vocal"
 
 [mute]
 muted = "Rendu muet."
@@ -504,6 +510,13 @@ description = "Met ou retire un cœur sur un message."
 [command.hearts]
 args.id = "ID du message"
 description = "Affiche qui a mis un cœur à un message."
+
+[command.pin]
+args.id = "ID du message"
+description = "Épingle ou désépingle un message."
+
+[command.pins]
+description = "Affiche les messages épinglés."
 
 [command.reply]
 args.id = "ID du message"

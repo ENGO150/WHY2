@@ -186,6 +186,7 @@ show = "보기"
 loading = "불러오는 중..."
 unavailable = "사용 불가"
 edited = "수정됨"
+pinned = "고정됨"
 voice = "{username}님이 음성 메시지를 보냈습니다 ({duration})"
 play = "재생"
 stop = "정지"
@@ -242,6 +243,11 @@ none = "없음"
 not_loaded = "메시지 #{message_id}이(가) 로드되지 않았습니다."
 none = "아무도 #{message_id}에 하트를 누르지 않았습니다."
 title = "#{message_id}의 하트 ({count}):"
+
+[pins]
+none = "고정된 메시지가 없습니다."
+title = "고정된 메시지 ({count}):"
+voice = "음성 메시지"
 
 [mute]
 muted = "음소거했습니다."
@@ -502,6 +508,13 @@ description = "메시지에 하트를 누르거나 취소합니다."
 [command.hearts]
 args.id = "메시지 ID"
 description = "메시지에 하트를 누른 사람을 표시합니다."
+
+[command.pin]
+args.id = "메시지 ID"
+description = "메시지를 고정하거나 고정 해제합니다."
+
+[command.pins]
+description = "고정된 메시지를 표시합니다."
 
 [command.reply]
 args.id = "메시지 ID"

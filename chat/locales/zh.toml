@@ -186,6 +186,7 @@ show = "显示"
 loading = "加载中..."
 unavailable = "不可用"
 edited = "已编辑"
+pinned = "已置顶"
 voice = "{username} 发送了一条语音消息（{duration}）"
 play = "播放"
 stop = "停止"
@@ -242,6 +243,11 @@ none = "无"
 not_loaded = "消息 #{message_id} 未加载。"
 none = "还没有人给 #{message_id} 点爱心。"
 title = "#{message_id} 的爱心（{count}）："
+
+[pins]
+none = "没有置顶的消息。"
+title = "置顶消息（{count}）："
+voice = "语音消息"
 
 [mute]
 muted = "已静音。"
@@ -502,6 +508,13 @@ description = "给消息点上或取消爱心。"
 [command.hearts]
 args.id = "消息 ID"
 description = "列出给消息点爱心的人。"
+
+[command.pin]
+args.id = "消息 ID"
+description = "置顶或取消置顶一条消息。"
+
+[command.pins]
+description = "列出置顶消息。"
 
 [command.reply]
 args.id = "消息 ID"

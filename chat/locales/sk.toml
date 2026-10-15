@@ -189,6 +189,7 @@ show = "zobraziť"
 loading = "načítava sa..."
 unavailable = "nedostupný"
 edited = "upravené"
+pinned = "pripnuté"
 voice = "{username} poslal/a hlasovú správu ({duration})"
 play = "prehrať"
 stop = "zastaviť"
@@ -245,6 +246,11 @@ none = "Žiadne"
 not_loaded = "Správa #{message_id} nie je načítaná."
 none = "Nikto nedal srdiečko #{message_id}."
 title = "Srdiečka na #{message_id} ({count}):"
+
+[pins]
+none = "Nič nie je pripnuté."
+title = "Pripnuté správy ({count}):"
+voice = "hlasová správa"
 
 [mute]
 muted = "Úspešne umlčané."
@@ -507,6 +513,13 @@ description = "Pridá/odoberie srdiečko správe."
 [command.hearts]
 args.id = "ID správy"
 description = "Zobrazí, kto dal správe srdiečko."
+
+[command.pin]
+args.id = "ID správy"
+description = "Pripne alebo odopne správu."
+
+[command.pins]
+description = "Zobrazí pripnuté správy."
 
 [command.reply]
 args.id = "ID správy"

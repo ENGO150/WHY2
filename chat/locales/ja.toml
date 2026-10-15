@@ -186,6 +186,7 @@ show = "表示"
 loading = "読み込み中..."
 unavailable = "利用不可"
 edited = "編集済み"
+pinned = "ピン留め済み"
 voice = "{username}がボイスメッセージを送信しました ({duration})"
 play = "再生"
 stop = "停止"
@@ -242,6 +243,11 @@ none = "なし"
 not_loaded = "メッセージ #{message_id} は読み込まれていません。"
 none = "#{message_id} にハートを付けた人はいません。"
 title = "#{message_id} へのハート（{count}）："
+
+[pins]
+none = "ピン留めされたメッセージはありません。"
+title = "ピン留めされたメッセージ（{count}）："
+voice = "ボイスメッセージ"
 
 [mute]
 muted = "ミュートしました。"
@@ -502,6 +508,13 @@ description = "メッセージのハートを付け外しします。"
 [command.hearts]
 args.id = "メッセージの ID"
 description = "メッセージにハートを付けた人を表示します。"
+
+[command.pin]
+args.id = "メッセージの ID"
+description = "メッセージをピン留め/解除します。"
+
+[command.pins]
+description = "ピン留めされたメッセージを表示します。"
 
 [command.reply]
 args.id = "メッセージの ID"

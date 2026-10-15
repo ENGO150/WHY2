@@ -187,6 +187,7 @@ show = "mostrar"
 loading = "cargando..."
 unavailable = "no disponible"
 edited = "editado"
+pinned = "fijado"
 voice = "{username} envió un mensaje de voz ({duration})"
 play = "reproducir"
 stop = "detener"
@@ -243,6 +244,11 @@ none = "Ninguno"
 not_loaded = "El mensaje #{message_id} no está cargado."
 none = "Nadie ha dado corazón a #{message_id}."
 title = "Corazones en #{message_id} ({count}):"
+
+[pins]
+none = "No hay nada fijado."
+title = "Mensajes fijados ({count}):"
+voice = "mensaje de voz"
 
 [mute]
 muted = "Silenciado correctamente."
@@ -504,6 +510,13 @@ description = "Pone o quita un corazón en un mensaje."
 [command.hearts]
 args.id = "ID del mensaje"
 description = "Muestra quién dio corazón a un mensaje."
+
+[command.pin]
+args.id = "ID del mensaje"
+description = "Fija o desfija un mensaje."
+
+[command.pins]
+description = "Muestra los mensajes fijados."
 
 [command.reply]
 args.id = "ID del mensaje"

@@ -189,6 +189,7 @@ show = "показать"
 loading = "загрузка..."
 unavailable = "недоступно"
 edited = "изменено"
+pinned = "закреплено"
 voice = "{username} отправил(а) голосовое сообщение ({duration})"
 play = "воспроизвести"
 stop = "остановить"
@@ -245,6 +246,11 @@ none = "Нет"
 not_loaded = "Сообщение #{message_id} не загружено."
 none = "Никто не поставил сердечко #{message_id}."
 title = "Сердечки на #{message_id} ({count}):"
+
+[pins]
+none = "Ничего не закреплено."
+title = "Закреплённые сообщения ({count}):"
+voice = "голосовое сообщение"
 
 [mute]
 muted = "Звук заглушён."
@@ -507,6 +513,13 @@ description = "Ставит или убирает сердечко на сооб
 [command.hearts]
 args.id = "ID сообщения"
 description = "Показывает, кто поставил сердечко сообщению."
+
+[command.pin]
+args.id = "ID сообщения"
+description = "Закрепляет или открепляет сообщение."
+
+[command.pins]
+description = "Показывает закреплённые сообщения."
 
 [command.reply]
 args.id = "ID сообщения"
