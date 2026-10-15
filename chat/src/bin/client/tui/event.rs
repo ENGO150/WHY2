@@ -94,7 +94,7 @@ impl App
                 match channel.map(Option::unwrap_or_default)
                 {
                     Some(channel) if channel != self.channel =>
-                        self.park_entry(channel, state::Entry::Message { username, id, message_id, timestamp, text: message, colors, reply, hearts: Vec::new(), edited: false }),
+                        self.park_entry(channel, state::Entry::Message { username, id, message_id, timestamp, text: message, colors, reply, hearts: Vec::new(), edited: false, pinned: false }),
 
                     _ =>
                     {
@@ -135,7 +135,7 @@ impl App
                 match channel == self.channel
                 {
                     true => self.push_caption(username, filename, message_id, timestamp, hash, picture, username_color),
-                    false => self.park_entry(channel, state::Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new() }),
+                    false => self.park_entry(channel, state::Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new(), pinned: false }),
                 }
             },
 
@@ -280,6 +280,8 @@ impl App
 
             ClientEvent::Edited(message_id, text) => self.edit_message(message_id, text),
 
+            ClientEvent::Pinned(message_id, pinned) => self.set_pinned(message_id, pinned),
+
             ClientEvent::InvalidUsage =>
             {
                 //A REFUSED SAVE LEAVES THE BOX EDITABLE
@@ -384,6 +386,7 @@ impl App
                         voice,
                         playback: state::Playback::Idle,
                         hearts: message.hearts,
+                        pinned: message.pinned,
                     },
 
                     (Some(hash), None) => state::Entry::Image
@@ -400,6 +403,7 @@ impl App
                             false => state::Picture::Absent,
                         },
                         hearts: message.hearts,
+                        pinned: message.pinned,
                     },
 
                     (None, None) => state::Entry::History
@@ -412,6 +416,7 @@ impl App
                         reply: message.reply,
                         hearts: message.hearts,
                         edited: message.edited,
+                        pinned: message.pinned,
                     },
                 }).collect();
 
@@ -785,6 +790,38 @@ impl App
 
                         spans.extend(id_column(user.id, width));
                         spans.push(Span::raw(user.username));
+
+                        self.push(Line::from(spans));
+                    }
+                }
+            },
+
+            ClientEvent::Pins(messages) =>
+            {
+                if messages.is_empty()
+                {
+                    self.push_styled(t!("pins.none"), theme::dim());
+                } else
+                {
+                    self.push_styled(t!("pins.title", count = messages.len()), theme::title());
+
+                    let width = messages.iter().map(|message| message.message_id.to_string().len() + 1).max().unwrap_or(1);
+                    let last = messages.len() - 1;
+
+                    for (index, message) in messages.into_iter().enumerate()
+                    {
+                        let mut spans = vec![Span::styled(super::branch(index == last), theme::border())];
+
+                        spans.push(Span::styled(format!("{:>width$}  ", format!("#{}", message.message_id)), theme::dim()));
+                        spans.push(self.theme.colorize(message.username, message.colors.username_color));
+                        spans.push(Span::raw(": "));
+
+                        //A PICTURE IS ITS FILENAME, A CLIP IS NAMED
+                        spans.push(match message.voice
+                        {
+                            Some(_) => Span::styled(t!("pins.voice"), theme::dim()),
+                            None => self.theme.colorize(message.text.replace('\n', " "), message.colors.message_color),
+                        });
 
                         self.push(Line::from(spans));
                     }

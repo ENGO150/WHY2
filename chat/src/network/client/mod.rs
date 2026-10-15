@@ -150,6 +150,8 @@ pub enum ClientEvent
     Deleted(u64),                                                //A MESSAGE WAS DELETED (MESSAGE ID)
     Hearts(u64, Vec<String>),                                    //A MESSAGE'S HEARTS CHANGED (MESSAGE ID, WHO)
     Edited(u64, String),                                         //A MESSAGE WAS REWORDED (MESSAGE ID, TEXT)
+    Pinned(u64, bool),                                           //A MESSAGE WAS PINNED OR UNPINNED (MESSAGE ID, PINNED)
+    Pins(Vec<StoredMessage>),                                    //EVERY PINNED MESSAGE
     VersionFailed,                                               //FETCHING VERSIONS FAILED
     VersionMismatch(String, String),                             //MISMATCH GIT HASH
     UnsafeVersion(usize, Version, String),                       //OLD VERSION
@@ -933,6 +935,18 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::Heart { message_id, hearts } =>
             {
                 tx.send(ClientEvent::Hearts(message_id, hearts)).await.unwrap();
+            },
+
+            //A MESSAGE WAS PINNED OR UNPINNED
+            PacketCode::Pinned { message_id, pinned } =>
+            {
+                tx.send(ClientEvent::Pinned(message_id, pinned)).await.unwrap();
+            },
+
+            //THE PINNED MESSAGES
+            PacketCode::Pins { messages } =>
+            {
+                tx.send(ClientEvent::Pins(messages)).await.unwrap();
             },
 
             //CLIENT MESSED SOME COMMAND UP

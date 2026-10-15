@@ -115,6 +115,7 @@ pub enum Entry //ONE ROW OF HISTORY
         reply: Option<u64>,     //THE MESSAGE IT ANSWERS
         hearts: Vec<String>,    //WHO HEARTED IT
         edited: bool,           //CHANGED SINCE SENT
+        pinned: bool,           //PINNED BY A MODERATOR
     },
 
     //A REPLAYED MESSAGE, WITHOUT A CLIENT ID
@@ -128,6 +129,7 @@ pub enum Entry //ONE ROW OF HISTORY
         reply: Option<u64>,
         hearts: Vec<String>,
         edited: bool,
+        pinned: bool,
     },
 
     //A PRIVATE MESSAGE, STORED UNRENDERED
@@ -154,6 +156,7 @@ pub enum Entry //ONE ROW OF HISTORY
         hash: Option<[u8; 32]>,     //WHAT TO ASK THE SERVER FOR
         picture: Picture,
         hearts: Vec<String>,
+        pinned: bool,
     },
 
     //A VOICE MESSAGE AND ITS BUTTON
@@ -166,6 +169,7 @@ pub enum Entry //ONE ROW OF HISTORY
         voice: VoiceNote,
         playback: Playback,
         hearts: Vec<String>,
+        pinned: bool,
     },
 }
 
@@ -205,6 +209,18 @@ impl Entry
     {
         if let Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. }
             | Entry::Voice { hearts, .. } = self { *hearts = new; }
+    }
+
+    pub fn pinned(&self) -> bool //PINNED BY A MODERATOR
+    {
+        matches!(self, Entry::Message { pinned: true, .. } | Entry::History { pinned: true, .. } | Entry::Image { pinned: true, .. }
+            | Entry::Voice { pinned: true, .. })
+    }
+
+    fn set_pinned(&mut self, new: bool) //PIN OR UNPIN IT
+    {
+        if let Entry::Message { pinned, .. } | Entry::History { pinned, .. } | Entry::Image { pinned, .. }
+            | Entry::Voice { pinned, .. } = self { *pinned = new; }
     }
 
     pub fn edited(&self) -> bool //CHANGED SINCE SENT
@@ -569,7 +585,7 @@ impl App
     pub fn push_message(&mut self, username: String, id: usize, message_id: u64, timestamp: Option<u64>, text: String,
         colors: MessageColors, reply: Option<u64>)
     {
-        self.push_entry(Entry::Message { username, id, message_id, timestamp, text, colors, reply, hearts: Vec::new(), edited: false });
+        self.push_entry(Entry::Message { username, id, message_id, timestamp, text, colors, reply, hearts: Vec::new(), edited: false, pinned: false });
     }
 
     //STORE AN ENTRY IN ANOTHER CHANNEL'S PARKED PANE
@@ -675,6 +691,12 @@ impl App
     pub fn set_hearts(&mut self, message_id: u64, hearts: Vec<String>)
     {
         self.update_message(message_id, |entry| entry.set_hearts(hearts));
+    }
+
+    //A MESSAGE WAS PINNED OR UNPINNED
+    pub fn set_pinned(&mut self, message_id: u64, pinned: bool)
+    {
+        self.update_message(message_id, |entry| entry.set_pinned(pinned));
     }
 
     //A MESSAGE WAS REWORDED
@@ -843,7 +865,7 @@ impl App
     {
         let picture = self.fit(image);
 
-        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: None, picture, hearts: Vec::new() });
+        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: None, picture, hearts: Vec::new(), pinned: false });
     }
 
     //A TRANSFER STARTING
@@ -894,14 +916,14 @@ impl App
     pub fn push_caption(&mut self, username: String, filename: String, message_id: u64, timestamp: Option<u64>,
         hash: [u8; 32], picture: Picture, username_color: Option<u8>)
     {
-        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new() });
+        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new(), pinned: false });
     }
 
     //A VOICE MESSAGE, HERE OR IN ITS OWN CHANNEL'S PANE
     pub fn push_voice(&mut self, channel: Option<String>, username: String, message_id: u64, timestamp: Option<u64>,
         voice: VoiceNote, username_color: Option<u8>)
     {
-        let entry = Entry::Voice { username, message_id, timestamp, username_color, voice, playback: Playback::Idle, hearts: Vec::new() };
+        let entry = Entry::Voice { username, message_id, timestamp, username_color, voice, playback: Playback::Idle, hearts: Vec::new(), pinned: false };
 
         match channel
         {

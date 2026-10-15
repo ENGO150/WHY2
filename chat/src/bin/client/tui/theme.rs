@@ -130,7 +130,7 @@ impl Theme
 
         lines.extend(match entry.message_id()
         {
-            Some(message_id) => self.trailer(rows, message_id, entry.hearts(), entry.edited(), me, width),
+            Some(message_id) => self.trailer(rows, entry, message_id, me, width),
             None => rows,
         });
 
@@ -312,12 +312,19 @@ impl Theme
         Span::styled(format!("{} ", time.format(format)), dim())
     }
 
-    //EDITED, HEARTS AND MESSAGE ID, RIGHT-ALIGNED ON THE LAST ROW
-    fn trailer(&self, mut lines: Vec<Line<'static>>, message_id: u64, hearts: &[String], edited: bool, me: &str, width: u16) -> Vec<Line<'static>>
+    //PINNED, EDITED, HEARTS AND MESSAGE ID, RIGHT-ALIGNED ON THE LAST ROW
+    fn trailer(&self, mut lines: Vec<Line<'static>>, entry: &Entry, message_id: u64, me: &str, width: u16) -> Vec<Line<'static>>
     {
         let mut tag: Vec<Span<'static>> = Vec::new();
+        let hearts = entry.hearts();
 
-        if edited { tag.push(Span::styled(format!("({})", t!("message.edited")), dim())); }
+        if entry.pinned() { tag.push(Span::styled(format!("({})", t!("message.pinned")), accent())); }
+
+        if entry.edited()
+        {
+            if !tag.is_empty() { tag.push(Span::raw(" ")); }
+            tag.push(Span::styled(format!("({})", t!("message.edited")), dim()));
+        }
 
         if !hearts.is_empty()
         {
