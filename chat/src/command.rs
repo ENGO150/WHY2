@@ -75,6 +75,8 @@ pub enum Command
     PrivateMessage,                               //ONE TO ONE MESSAGE
     Heart,                                        //TOGGLE MESSAGE HEART REACTION
     Hearts,                                       //LIST WHO HEARTED A MESSAGE
+    Pin,                                          //TOGGLE A MESSAGE'S PIN
+    Pins,                                         //LIST PINNED MESSAGES
     Reply,                                        //REPLY TO MESSAGE
     Re,                                           //REPLY TO PRIVATE MESSAGE
     Settings,                                     //OPEN THE SETTINGS OVERLAY
@@ -721,6 +723,37 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
+        command: Command::Pin,
+        triggers: &[ "PIN", "UNPIN", "HIGHLIGHT" ],
+        shortcut: None,
+        minimal_role: Role::Moderator,
+        subcommands: &[],
+        args:
+        &[
+            CommandArg
+            {
+                name: "arg.id",
+                description: "command.pin.args.id",
+                required: true,
+                values: ArgValues::Free,
+            },
+        ],
+        description: "command.pin.description",
+    },
+
+    CommandInfo
+    {
+        command: Command::Pins,
+        triggers: &[ "PINS", "PINNED", "HIGHLIGHTED" ],
+        shortcut: None,
+        minimal_role: Role::User,
+        subcommands: &[],
+        args: &[],
+        description: "command.pins.description",
+    },
+
+    CommandInfo
+    {
         command: Command::Reply,
         triggers: &[ "REPLY", "RESPOND" ],
         shortcut: None,
@@ -1011,6 +1044,14 @@ impl Command
                 Some(message_id) => Ok(PacketCode::HeartRequest { message_id }),
                 None => Err(()),
             }),
+
+            Command::Pin => Some(match parameters.and_then(|p| p.parse::<u64>().ok())
+            {
+                Some(message_id) => Ok(PacketCode::PinRequest { message_id }),
+                None => Err(()),
+            }),
+
+            Command::Pins => Some(Ok(PacketCode::PinsRequest)),
 
             Command::Reply =>
             {
