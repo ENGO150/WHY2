@@ -1783,6 +1783,39 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
                 send_to_all(PacketCode::Heart { message_id, hearts });
             },
 
+            //TOGGLE A MESSAGE'S PIN
+            PacketCode::PinRequest { message_id } =>
+            {
+                //VERIFY PERMISSIONS
+                if role < Role::Moderator
+                {
+                    log::warn!("Pin refused (permissions): {peer_addr}");
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                }
+
+                //NO SUCH MESSAGE, OR TOO MANY PINS
+                let Some(pinned) = config::messages::pin(message_id) else
+                {
+                    log::warn!("Pin refused (no such message, or pin limit): {peer_addr}");
+
+                    network::send(&mut *streams.1.lock().await, PacketCode::InvalidUsage, Some(&keys)).await;
+                    continue;
+                };
+
+                log::info!("Message {}: {peer_addr}", if pinned { "pinned" } else { "unpinned" });
+
+                //EVERY CLIENT HOLDS A LOBBY PANE
+                send_to_all(PacketCode::Pinned { message_id, pinned });
+            },
+
+            //LIST PINNED MESSAGES
+            PacketCode::PinsRequest =>
+            {
+                network::send(&mut *streams.1.lock().await, PacketCode::Pins { messages: config::messages::pinned() }, Some(&keys)).await;
+            },
+
             //MUTE USER
             PacketCode::ServerMute { id } =>
             {
