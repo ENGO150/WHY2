@@ -54,6 +54,21 @@ struct Record //ONE MESSAGE RECORD
     hearts: Vec<String>,      //USERNAMES THAT HEARTED IT
     edited: bool,             //CHANGED SINCE SENT
     voice: Option<VoiceNote>, //THE CLIP OF A VOICE MESSAGE
+    pinned: bool,             //PINNED BY A MODERATOR
+}
+
+#[derive(SchemaRead)]
+struct VoiceRecord //A RECORD BEFORE PINS (remove with next version bump)
+{
+    id: u64,
+    username: String,
+    text: String,
+    image: Option<[u8; 32]>,
+    timestamp: Option<u64>,
+    reply: Option<u64>,
+    hearts: Vec<String>,
+    edited: bool,
+    voice: Option<VoiceNote>,
 }
 
 struct History //THE RECORDS AND THE NEXT ID
@@ -72,13 +87,34 @@ pub struct Page
 }
 
 //CONSTS
-const MAGIC: &[u8; 8] = b"WHY2MSG\x06"; //FORMAT MARKER
+const MAGIC: &[u8; 8] = b"WHY2MSG\x07"; //FORMAT MARKER
+const MAGIC_V6: &[u8; 8] = b"WHY2MSG\x06"; //MARKER BEFORE PINS (remove with next version bump)
 
 //GLOBAL VARIABLES
 static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History::new())); //MESSAGE HISTORY
 static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                                       //AT-REST KEYS
 
 //IMPLEMENTATIONS
+impl From<VoiceRecord> for Record //NOT PINNED (remove with next version bump)
+{
+    fn from(message: VoiceRecord) -> Self
+    {
+        Self
+        {
+            id: message.id,
+            username: message.username,
+            text: message.text,
+            image: message.image,
+            timestamp: message.timestamp,
+            reply: message.reply,
+            hearts: message.hearts,
+            edited: message.edited,
+            voice: message.voice,
+            pinned: false,
+        }
+    }
+}
+
 impl Record
 {
     fn stored(&self) -> Option<[u8; 32]> //THE FILE IN server_images/ IT NAMES
@@ -159,6 +195,13 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
         return Vec::new();
     };
 
+    //AN OLDER MARKER IS AN OLDER FORMAT
+    if let Some(records) = plaintext.strip_prefix(MAGIC_V6)
+    {
+        return migrate(wincode::config::deserialize::<Vec<VoiceRecord>, _>(records, consts::PACKET_CONFIG)
+            .map(|history| history.into_iter().map(Record::from).collect()));
+    }
+
     //NO MARKER IS UNREADABLE
     let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };
 
@@ -181,6 +224,14 @@ fn unreadable() -> Vec<Record> //KEEP A COPY, START EMPTY
 
     log::error!("Message history could not be read, it is being ignored (copy kept as {backup})");
     Vec::new()
+}
+
+fn migrate<E>(history: Result<Vec<Record>, E>) -> Vec<Record> //LOAD AN OLDER FORMAT (remove with next version bump)
+{
+    let Ok(history) = history else { return unreadable() };
+
+    log::info!("Migrated {} stored messages from an older format", history.len());
+    history
 }
 
 //PUBLIC
@@ -232,6 +283,7 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>, voice: Option<Voice
         hearts: Vec::new(),
         edited: false,
         voice,
+        pinned: false,
     });
 
     //KEEP THE LAST limit MESSAGES
@@ -321,6 +373,33 @@ pub fn edit(id: u64, username: &str, text: &str) -> bool //REWORD OWN TEXT MESSA
     true
 }
 
+pub fn pin(id: u64) -> Option<bool> //TOGGLE A PIN, THE NEW STATE
+{
+    let limit: usize = super::read_config("max_pinned_messages");
+
+    let mut guard = HISTORY.lock().unwrap();
+
+    let index = guard.find(id)?;
+
+    //NO PIN PAST THE LIMIT
+    if !guard.records[index].pinned && guard.records.iter().filter(|message| message.pinned).count() >= limit { return None; }
+
+    let record = &mut guard.records[index];
+    record.pinned = !record.pinned;
+
+    let pinned = record.pinned;
+    guard.save();
+
+    Some(pinned)
+}
+
+pub fn pinned() -> Vec<StoredMessage> //EVERY PINNED MESSAGE, OLDEST FIRST
+{
+    let records: Vec<Record> = HISTORY.lock().unwrap().records.iter().filter(|message| message.pinned).cloned().collect();
+
+    wire(records)
+}
+
 pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
 {
     HISTORY.lock().unwrap().records.iter().any(|message| message.image.as_ref() == Some(hash))
@@ -395,10 +474,16 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
         (history.records[from..to].to_vec(), start, from > 0, history.records.len() as u64)
     };
 
+    Page { messages: wire(records), start, more, kept }
+}
+
+//RECORDS AS THE WIRE CARRIES THEM
+fn wire(records: Vec<Record>) -> Vec<StoredMessage>
+{
     let mut looked_up: HashMap<String, MessageColors> = HashMap::new();
     let timestamps = super::read_config::<bool>("message_timestamps");
 
-    let messages = records.into_iter().map(|message|
+    records.into_iter().map(|message|
     {
         //WHAT server_users.toml HOLDS FOR THEM NOW
         let stored = looked_up.entry(message.username.clone())
@@ -422,8 +507,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
             hearts: message.hearts,
             edited: message.edited,
             voice: message.voice,
+            pinned: message.pinned,
         }
-    }).collect();
-
-    Page { messages, start, more, kept }
+    }).collect()
 }

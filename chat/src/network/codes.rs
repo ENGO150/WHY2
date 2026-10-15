@@ -595,6 +595,7 @@ pub struct StoredMessage
     pub hearts: Vec<String>,      //USERNAMES THAT HEARTED IT
     pub edited: bool,             //CHANGED SINCE SENT
     pub voice: Option<VoiceNote>, //THE CLIP, WHEN THIS LINE IS A VOICE MESSAGE
+    pub pinned: bool,             //PINNED BY A MODERATOR
 }
 
 //ONE STORED VOICE MESSAGE
