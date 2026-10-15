@@ -161,6 +161,19 @@ pub enum PacketCode //CONTROL CODES
         text: String,
     },
 
+    //SERVER -> CLIENT | A MESSAGE WAS PINNED OR UNPINNED
+    Pinned
+    {
+        message_id: u64,
+        pinned: bool,
+    },
+
+    //SERVER -> CLIENT | EVERY PINNED MESSAGE
+    Pins
+    {
+        messages: Vec<StoredMessage>,
+    },
+
     //SERVER -> CLIENT | HEART REACTION
     Heart
     {
@@ -343,6 +356,7 @@ pub enum PacketCode //CONTROL CODES
     Deleted { message_id: u64 },                       //SERVER -> CLIENT | A MESSAGE WAS DELETED
     Re { message: String },                            //CLIENT -> SERVER | REPLY TO LAST PM
     HeartRequest { message_id: u64 },                  //CLIENT -> SERVER | REQUEST HEART REACTION TO MESSAGE
+    PinRequest { message_id: u64 },                    //CLIENT -> SERVER | TOGGLE A MESSAGE'S PIN
     Channel { channel: Option<String> },               //SERVER <> CLIENT | CHANNEL CHANGE
     ChannelCreated { name: String },                   //SERVER -> CLIENT | CHANNEL CREATED
     ChannelDestroyed { name: String },                 //SERVER -> CLIENT | CHANNEL ABANDONED
@@ -355,6 +369,7 @@ pub enum PacketCode //CONTROL CODES
     VoiceMessageRequest { hash: [u8; 32] },            //CLIENT -> SERVER | REQUEST VOICE MESSAGE UPLOAD
     FilesRequest,                                      //CLIENT -> SERVER | REQUEST FILE LIST
     ListRequest,                                       //CLIENT -> SERVER | REQUEST CONNECTED USERS
+    PinsRequest,                                       //CLIENT -> SERVER | REQUEST PINNED MESSAGES
     TypingRequest,                                     //CLIENT -> SERVER | WE ARE WRITING A MESSAGE
     ScreensRequest,                                    //CLIENT -> SERVER | REQUEST SCREENSHARE LIST
     DeattachRequest,                                   //CLIENT -> SERVER | DEATTACH CLIENT SCREENSHARE
@@ -426,6 +441,10 @@ impl PacketCode
             Self::Edited { .. }                => "Edited",
             Self::HeartRequest { .. }          => "HeartRequest",
             Self::Heart { .. }                 => "Heart",
+            Self::PinRequest { .. }            => "PinRequest",
+            Self::Pinned { .. }                => "Pinned",
+            Self::PinsRequest { .. }           => "PinsRequest",
+            Self::Pins { .. }                  => "Pins",
             Self::VoiceJoin { .. }             => "VoiceJoin",
             Self::VoiceLeave { .. }            => "VoiceLeave",
             Self::UploadRequest { .. }         => "UploadRequest",
