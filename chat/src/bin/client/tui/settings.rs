@@ -16,6 +16,29 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Settings Overlay
+//!
+//! One modal box in three modes ([`Mode`]):
+//!
+//! - **Client** — `client.toml` and the audio devices. Every row writes straight through to the
+//!   file and to the atomics the running audio callbacks read; there is no save step.
+//! - **Server** — `server.toml`, as the server sent it. Nothing here names a server key: rows
+//!   are built from whatever the server sends, with its section headings and comments. Edits are
+//!   held, marked, until Save, and a startup-only key is marked as needing a restart; a second
+//!   button restarts the server, refused while anything is unsaved and confirmed by a second
+//!   press.
+//! - **Profile** — somebody's profile: ours to edit and save, or theirs to read (where Enter on a
+//!   website opens it).
+//!
+//! The selected row's description — a server key's comment, a profile field's full text — is
+//! wrapped in the foot of the box, sized for the longest so the box does not jump around. The
+//! overlay never touches the socket: a save is handed to the event loop through
+//! [`Settings::take_save`] and friends.
+//!
+//! # Inverted Keys
+//! A row whose config key is phrased negatively (`disable_colors`) carries `invert`, applied in
+//! exactly one place per direction ([`toggle_value`] reading, `toggle` writing).
+
 use ratatui::layout::Rect;
 
 use crossterm::event::
@@ -53,119 +76,180 @@ use super::
 };
 
 //ENUMS
+/// What the box is showing.
 pub enum Mode //WHAT THE BOX IS SHOWING
 {
+    /// `client.toml`, written through on every edit.
     Client,                  //client.toml, WRITTEN THROUGH ON EVERY EDIT
+    /// `server.toml`, held until Save.
     Server,                  //server.toml, HELD UNTIL Save
+    /// A user profile; `own` means ours, and so editable.
     Profile { own: bool },   //A USER PROFILE | own = OURS, SO EDITABLE
 }
 
+/// The value of one row.
 pub enum Value
 {
     //A CONFIG KEY, invert FOR A NEGATIVE ONE
+    /// A boolean key; `invert` for a key phrased negatively.
     Toggle { on: bool, invert: bool },
 
     //THE TWO SERVER-ONLY DATATYPES, EDITED BY TYPING
+    /// An integer (server rows), edited by typing.
     Number(i64),
+    /// A string (server rows and profile fields), edited by typing.
     Text(String),
 
     //A PATH TO UPLOAD | None = UNTOUCHED, EMPTY = DROP IT
+    /// The avatar path to upload: `None` is untouched, empty drops the avatar.
     Avatar(Option<String>),
 
+    /// A palette, by index into [`PALETTES`](super::theme::PALETTES).
     Theme(usize), //INDEX INTO theme::PALETTES
+    /// A language, by locale code.
     Language(String), //A LOCALE CODE
 
+    /// A volume, in percent.
     #[cfg(feature = "client_voice")]
     Volume(u32), //PERCENT
 
     //THE cpal DEVICE ID; THE LABEL IS DISPLAY ONLY
+    /// An audio device by cpal id; empty is the system default.
     #[cfg(feature = "client_voice")]
     Device { id: String, input: bool }, //EMPTY ID = SYSTEM DEFAULT
 }
 
+/// One row of the box.
 pub enum Row
 {
+    /// A section heading.
     Header(String),
+    /// A setting.
     Item(Item),
+    /// A button.
     Action(&'static str), //A BUTTON - THE SERVER ROWS ARE THE ONLY THING THAT NEEDS ONE
 }
 
 //STRUCTS
+/// One setting row.
 pub struct Item
 {
+    /// The label shown.
     pub label: String,
+    /// The config key the row owns.
     pub key: String, //THE CONFIG KEY THIS ROW OWNS - client.toml's OR THE SERVER'S
+    /// Its value.
     pub value: Value,
+    /// The comment the server sent along; empty on a client row.
     pub hint: String,   //THE COMMENT THE SERVER SENT ALONG (EMPTY ON A CLIENT ROW)
+    /// Whether it was edited and not saved yet.
     pub changed: bool,  //EDITED AND NOT SAVED YET
+    /// Whether it is only read at startup.
     pub restart: bool,  //STORED ON SAVE, BUT ONLY READ AT STARTUP
 }
 
 //ONE DEVICE AS THE PICKER SHOWS IT
+/// One audio device, as the picker shows it.
 #[derive(Clone, Default)]
 pub struct DeviceEntry
 {
+    /// The cpal device id.
     pub id: String,
+    /// The description shown.
     pub label: String,
 }
 
+/// The device list opened on top of the rows.
 pub struct Picker //DEVICE LIST OPENED ON TOP OF THE SETTINGS ROWS
 {
+    /// The list's title.
     pub title: &'static str,
+    /// The devices; the first is always the system default.
     pub entries: Vec<DeviceEntry>, //ENTRY 0 IS ALWAYS THE SYSTEM DEFAULT
+    /// The selected entry.
     pub selected: usize,
+    /// The row that opened it.
     pub row: usize,    //THE SETTINGS ROW THAT OPENED IT
+    /// The first visible entry.
     pub offset: usize, //FIRST VISIBLE ENTRY
 }
 
+/// The audio devices, enumerated once when the box is opened.
 #[derive(Default)]
 pub struct Devices //WHAT cpal REPORTED, ENUMERATED ONCE WHEN /settings IS TYPED
 {
+    /// Capture devices.
     #[cfg(feature = "client_voice")]
     pub input: Vec<DeviceEntry>,
 
+    /// Playback devices.
     #[cfg(feature = "client_voice")]
     pub output: Vec<DeviceEntry>,
 }
 
+/// The settings overlay, in any of its modes.
 pub struct Settings //THE /settings OVERLAY, IN ANY OF ITS MODES
 {
+    /// Whether the box is up.
     pub open: bool,
+    /// Its rows.
     pub rows: Vec<Row>,
+    /// The selected row.
     pub selected: usize,
+    /// The device picker, if open.
     pub picker: Option<Picker>,
 
     //WHERE THE VIEW STANDS, WRITTEN BY THE DRAW PATH
+    /// The first visible row, written by the draw path.
     pub offset: usize,
+    /// Rows the last frame fit, for paging.
     pub page: usize, //ROWS THE LAST FRAME FIT
 
+    /// What the box is showing.
     pub mode: Mode,
+    /// Whose profile it is, in profile mode.
     pub subject: String,      //WHOSE PROFILE, IN Profile MODE
+    /// Their role.
     pub role: Role,           //AND THEIR RANK
 
     //THE PICTURE A PROFILE NAMES, THE ONE THAT IS BUILT, AND WHERE THE BOX PUT IT
+    /// The avatar the profile names.
     pub avatar: Option<[u8; 32]>,
+    /// The avatar, decoded and fitted.
     pub picture: Option<Box<Fitted>>,
+    /// Which hash the fitted avatar is.
     pub picture_of: Option<[u8; 32]>,
+    /// Where the draw path put the avatar.
     pub picture_area: Rect,
 
     //THE MODES THAT SAVE IN ONE GO
+    /// What is being typed into the selected row.
     pub edit: Option<String>, //WHAT IS BEING TYPED INTO THE SELECTED ROW
+    /// Paths offered for the avatar row.
     pub paths: Vec<String>,   //PATHS OFFERED FOR THE AVATAR ROW
+    /// The selected path.
     pub path: usize,          //THE ONE SELECTED
+    /// Whether a save is in flight.
     pub saving: bool,         //A SAVE IS ON THE WIRE
 
+    /// Server rows waiting for the event loop to send.
     save: Option<Vec<ServerSetting>>, //ROWS THE EVENT LOOP STILL HAS TO PUT ON THE WIRE
+    /// A profile waiting for the event loop to send.
     profile: Option<UserProfile>,     //AND THE PROFILE, THE SAME WAY
+    /// An avatar path waiting for the event loop to upload.
     avatar_save: Option<String>,      //AND THE AVATAR
 
     //THE STARTUP-ONLY KEYS IN THAT SAVE
+    /// The startup-only keys in the last save.
     pub restart_note: Option<String>,
 
     //ONE PRESS ARMS THE RESTART, THE NEXT FIRES IT
+    /// Whether the restart button is armed.
     pub confirm: bool,
+    /// Whether a confirmed restart waits for the event loop.
     restart: bool, //ARMED, CONFIRMED
 
+    /// The enumerated audio devices.
     #[cfg(feature = "client_voice")]
     devices: Devices,
 }
@@ -178,6 +262,7 @@ impl Default for Settings
 
 impl Item
 {
+    /// Creates a client row backed by `client.toml`.
     fn client(label: &str, key: &str, value: Value) -> Self //A ROW BACKED BY client.toml
     {
         Self { label: label.to_string(), key: key.to_string(), value, hint: String::new(), changed: false, restart: false }
@@ -186,6 +271,7 @@ impl Item
 
 impl Settings
 {
+    /// Creates a closed overlay.
     pub fn new() -> Self
     {
         Self
@@ -220,6 +306,7 @@ impl Settings
     }
 
     //OPEN THE OVERLAY, READING THE CONFIG ONCE
+    /// Opens the client settings, reading the config once.
     pub fn open(&mut self, devices: Devices)
     {
         let mut rows: Vec<Row> = Vec::new();
@@ -299,6 +386,7 @@ impl Settings
     }
 
     //REBUILD THE CLIENT ROWS IN THE CURRENT LANGUAGE
+    /// Rebuilds the client rows in the current language, keeping the selection.
     pub fn relabel(&mut self)
     {
         let (selected, offset) = (self.selected, self.offset);
@@ -315,6 +403,7 @@ impl Settings
     }
 
     //THE SERVER'S OWN CONFIG ROWS
+    /// Opens the server's configuration rows.
     pub fn open_server(&mut self, settings: Vec<ServerSetting>)
     {
         let mut rows: Vec<Row> = Vec::new();
@@ -362,6 +451,7 @@ impl Settings
     }
 
     //SOMEBODY'S PROFILE - OURS TO EDIT, OR THEIRS TO READ
+    /// Opens a profile: ours to edit, or somebody else's to read.
     pub fn open_profile(&mut self, username: String, mut profile: UserProfile, own: bool)
     {
         //THE AVATAR IS TYPED AS A PATH
@@ -418,6 +508,7 @@ impl Settings
         self.land(0, 1);
     }
 
+    /// Closes the box, discarding anything unsaved.
     pub fn close(&mut self)
     {
         self.open = false;
@@ -436,6 +527,7 @@ impl Settings
     }
 
     //ROWS THE PICTURE CLAIMS AT THE TOP OF THE BOX, THE LINE OF AIR UNDER IT INCLUDED
+    /// Returns the rows the avatar claims at the top of the box, the gap under it included.
     pub fn picture_rows(&self) -> u16
     {
         match self.picture.is_some()
@@ -446,12 +538,14 @@ impl Settings
     }
 
     //THE AVATAR ROW IS BEING TYPED INTO
+    /// Returns whether the avatar row is being typed into.
     pub fn editing_avatar(&self) -> bool
     {
         self.edit.is_some() && matches!(self.rows.get(self.selected), Some(Row::Item(item)) if item.key == consts::AVATAR_KEY)
     }
 
     //RE-READ THE PATHS BESIDE WHAT IS TYPED
+    /// Rereads the paths beside what is typed into the avatar row.
     fn refresh_paths(&mut self)
     {
         self.paths = match (self.editing_avatar(), self.edit.as_deref())
@@ -463,16 +557,21 @@ impl Settings
         self.path = 0;
     }
 
+    /// Returns whether the box shows the server's configuration.
     pub fn server(&self) -> bool { matches!(self.mode, Mode::Server) } //server.toml's ROWS
 
+    /// Returns whether the box shows a profile.
     pub fn profile(&self) -> bool { matches!(self.mode, Mode::Profile { .. }) } //SOMEBODY'S PROFILE
 
+    /// Returns whether the box shows somebody else's profile.
     pub fn readonly(&self) -> bool { matches!(self.mode, Mode::Profile { own: false }) } //A PROFILE THAT IS NOT OURS
 
     //A MODE WHOSE ROWS ARE HELD UNTIL Save
+    /// Returns whether edits are held until Save.
     pub fn deferred(&self) -> bool { matches!(self.mode, Mode::Server | Mode::Profile { own: true }) }
 
     //THE SELECTED ROW'S LINK, WHEN IT IS ONE
+    /// Returns the selected row's website, in somebody else's profile.
     pub fn link(&self) -> Option<&str>
     {
         if !self.profile() { return None; }
@@ -483,6 +582,7 @@ impl Settings
         (item.key == "website" && misc::is_web_url(text)).then_some(text.as_str())
     }
 
+    /// Returns the box's title.
     pub fn title(&self) -> String //WHAT THE BOX CALLS ITSELF
     {
         let name = match self.mode
@@ -498,24 +598,30 @@ impl Settings
         if self.unsaved() { t!("settings.title.unsaved", name) } else { name }
     }
 
+    /// Returns whether a row was edited and not saved.
     pub fn unsaved(&self) -> bool //A ROW HAS BEEN EDITED AND NOT SENT BACK YET
     {
         self.rows.iter().any(|row| matches!(row, Row::Item(item) if item.changed))
     }
 
     //THE ROWS THE EVENT LOOP STILL HAS TO SEND
+    /// Takes the server rows waiting to be sent.
     pub fn take_save(&mut self) -> Option<Vec<ServerSetting>> { self.save.take() }
 
     //AND THE PROFILE THE SAME
+    /// Takes the profile waiting to be sent.
     pub fn take_profile_save(&mut self) -> Option<UserProfile> { self.profile.take() }
 
     //AND THE AVATAR
+    /// Takes the avatar path waiting to be uploaded.
     pub fn take_avatar_save(&mut self) -> Option<String> { self.avatar_save.take() }
 
     //AND A CONFIRMED RESTART
+    /// Takes a confirmed restart.
     pub fn take_restart(&mut self) -> bool { std::mem::take(&mut self.restart) }
 
     //TAKE THE SAVED CONFIG, KEEPING THE SELECTION
+    /// Takes the server's acknowledged configuration, keeping the selection.
     pub fn stored(&mut self, settings: Vec<ServerSetting>)
     {
         let selected = self.selected;
@@ -530,6 +636,7 @@ impl Settings
     }
 
     //TAKE THE SAVED PROFILE, KEEPING THE SELECTION
+    /// Takes the server's acknowledged profile, keeping the selection.
     pub fn stored_profile(&mut self, username: String, profile: UserProfile)
     {
         let selected = self.selected;
@@ -539,6 +646,7 @@ impl Settings
     }
 
     //MOVE THE SELECTION, SKIPPING HEADERS
+    /// Moves the selection, skipping headings.
     fn step(&mut self, delta: isize)
     {
         if self.rows.is_empty() { return; }
@@ -561,6 +669,7 @@ impl Settings
     }
 
     //PageUp/PageDown MOVE BY WHAT THE FRAME FIT
+    /// Moves the selection by a page.
     fn page_move(&mut self, direction: isize)
     {
         if self.rows.is_empty() { return; }
@@ -575,6 +684,7 @@ impl Settings
     }
 
     //LAND ON index, OR THE NEAREST NON-HEADING ROW
+    /// Selects `index`, or the nearest row that is not a heading in `direction`.
     fn land(&mut self, index: usize, direction: isize)
     {
         if self.rows.is_empty() { return; }
@@ -591,12 +701,14 @@ impl Settings
     }
 
     //Home/End GO TO THE ENDS OF THE LIST
+    /// Selects the first row.
     fn first_row(&mut self)
     {
         self.offset = 0;
         self.land(0, 1);
     }
 
+    /// Selects the last row.
     fn last_row(&mut self)
     {
         self.offset = self.rows.len();
@@ -604,6 +716,7 @@ impl Settings
     }
 
     //WHAT A STORED DEVICE ID IS CALLED
+    /// Returns what a stored device id is called.
     #[cfg(feature = "client_voice")]
     pub fn device_label(&self, id: &str, input: bool) -> String
     {
@@ -615,6 +728,7 @@ impl Settings
     }
 
     //RE-READ THE DEVICE ROWS OUT OF THE CONFIG
+    /// Rereads the device rows from the config, after a failed switch put the old devices back.
     #[cfg(feature = "client_voice")]
     pub fn refresh_devices(&mut self)
     {
@@ -631,12 +745,14 @@ impl Settings
 }
 
 //WHAT A PROFILE FIELD IS CALLED IN THE BOX
+/// Returns what a profile field is called in the box.
 fn field_label(key: &str) -> String
 {
     i18n::get(&format!("profile.{key}")).map(str::to_owned).unwrap_or_else(|| key[..1].to_uppercase() + &key[1..])
 }
 
 //READ A BOOLEAN AS THE ROW SHOWS IT
+/// Reads a boolean key as the row shows it, applying the inversion.
 fn toggle_value(key: &str, invert: bool) -> Value
 {
     let stored = config::read_config::<bool>(key);
@@ -647,6 +763,7 @@ fn toggle_value(key: &str, invert: bool) -> Value
 //FUNCTIONS
 //PUBLIC
 //ONE KEYPRESS WHILE THE OVERLAY IS UP
+/// Handles a key while the box is up.
 pub fn handle_key(app: &mut App, key: KeyEvent)
 {
     //THE DEVICE PICKER OWNS THE KEYBOARD
@@ -696,6 +813,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
 }
 
 //MOUSE WHEEL - MOVES WHICHEVER LIST IS IN FRONT
+/// Scrolls whichever list is in front.
 pub fn scroll(app: &mut App, delta: isize)
 {
     if app.settings.edit.is_some() { return; } //A ROW BEING TYPED INTO IS NOT SCROLLED AWAY FROM
@@ -713,6 +831,7 @@ pub fn scroll(app: &mut App, delta: isize)
 }
 
 //PRIVATE
+/// Handles a key while the device picker is open.
 fn handle_picker_key(app: &mut App, key: KeyEvent)
 {
     //CLOSING THE PICKER TAKES IT OUT OF App
@@ -766,6 +885,7 @@ fn handle_picker_key(app: &mut App, key: KeyEvent)
 }
 
 //TYPING INTO A Number/Text ROW
+/// Handles a key while a row is being typed into.
 fn handle_edit_key(app: &mut App, key: KeyEvent)
 {
     let count = app.settings.paths.len();
@@ -811,6 +931,8 @@ fn handle_edit_key(app: &mut App, key: KeyEvent)
     if app.settings.edit.is_none() { app.settings.paths.clear(); }
 }
 
+/// Keeps what was typed, if the row can hold it: a number must parse, and a website must be
+/// `http` or `https`.
 fn commit_edit(app: &mut App) //KEEP WHAT WAS TYPED, IF THE ROW CAN HOLD IT
 {
     let Some(edit) = app.settings.edit.take() else { return };
@@ -873,6 +995,7 @@ fn commit_edit(app: &mut App) //KEEP WHAT WAS TYPED, IF THE ROW CAN HOLD IT
 }
 
 //THE CONFIG KEY THE SELECTED ROW OWNS
+/// Returns the config key of the selected row.
 fn selected_key(settings: &Settings) -> Option<&str>
 {
     match settings.rows.get(settings.selected)?
@@ -883,6 +1006,7 @@ fn selected_key(settings: &Settings) -> Option<&str>
 }
 
 //WHAT THE SELECTED ROW HOLDS, COPIED OUT
+/// What the selected row holds, copied out.
 enum Selected
 {
     Toggle(bool),
@@ -899,6 +1023,7 @@ enum Selected
     Device(String, bool),
 }
 
+/// Returns what the selected row holds.
 fn selected(app: &App) -> Option<Selected>
 {
     match app.settings.rows.get(app.settings.selected)?
@@ -925,6 +1050,7 @@ fn selected(app: &App) -> Option<Selected>
 }
 
 //LEFT/RIGHT: SLIDE, FLIP, STEP OR CYCLE A ROW
+/// Slides, flips, steps or cycles the selected row (Left and Right).
 fn adjust(app: &mut App, direction: i32)
 {
     if app.settings.readonly() { return; }
@@ -1013,6 +1139,7 @@ fn adjust(app: &mut App, direction: i32)
 }
 
 //ENTER/SPACE: FLIP, TYPE, PRESS OR OPEN A ROW
+/// Flips, types into, presses or opens the selected row (Enter and Space).
 fn activate(app: &mut App)
 {
     //A PROFILE THAT IS NOT OURS CHANGES NOTHING, BUT ITS LINK STILL OPENS
@@ -1068,6 +1195,7 @@ fn activate(app: &mut App)
 }
 
 //ARM THE RESTART, THEN FIRE IT
+/// Arms the restart, then fires it; refused while anything is unsaved.
 fn restart(app: &mut App)
 {
     if !app.settings.server() || app.settings.saving || app.settings.unsaved() { return; }
@@ -1086,6 +1214,7 @@ fn restart(app: &mut App)
 }
 
 //HAND THE EDITED ROWS TO THE EVENT LOOP
+/// Hands the edited server rows to the event loop.
 fn save(app: &mut App)
 {
     if app.settings.profile() { return save_profile(app); }
@@ -1134,6 +1263,7 @@ fn save(app: &mut App)
 }
 
 //HAND THE EDITED FIELDS TO THE EVENT LOOP
+/// Hands the edited profile fields and avatar to the event loop.
 fn save_profile(app: &mut App)
 {
     if !app.settings.unsaved() { return; }
@@ -1167,6 +1297,7 @@ fn save_profile(app: &mut App)
     if fields { app.settings.profile = Some(profile); }
 }
 
+/// Flips the selected toggle, writing it through.
 fn toggle(app: &mut App)
 {
     let deferred = app.settings.deferred();
@@ -1211,6 +1342,7 @@ fn toggle(app: &mut App)
     }
 }
 
+/// Stores a device choice and signals the voice session to rebuild its streams.
 #[cfg(feature = "client_voice")]
 fn set_device(app: &mut App, row: usize, chosen: String)
 {
@@ -1229,10 +1361,12 @@ fn set_device(app: &mut App, row: usize, chosen: String)
     voice_options::mark_devices_changed();
 }
 
+/// Stores a device choice; nothing to do without voice.
 #[cfg(not(feature = "client_voice"))]
 fn set_device(_app: &mut App, _row: usize, _chosen: String) {}
 
 //THE SYSTEM DEFAULT PLUS EVERY REPORTED DEVICE
+/// Returns the system default plus every reported device.
 #[cfg(feature = "client_voice")]
 fn device_entries(app: &App, input: bool) -> Vec<DeviceEntry>
 {
@@ -1251,6 +1385,7 @@ fn device_entries(app: &App, input: bool) -> Vec<DeviceEntry>
     entries
 }
 
+/// Applies a volume to the running audio streams.
 #[cfg(feature = "client_voice")]
 fn apply_volume(key: &str, percent: u32) //LIVE-UPDATE THE RUNNING AUDIO STREAMS
 {

@@ -16,6 +16,28 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # TeX Math
+//!
+//! Lays out a subset of TeX in terminal cells. A terminal has one font size and a fixed grid, so
+//! what is rendered is the part of the notation the grid can carry.
+//!
+//! # Layout
+//! A [`Block`] is a rectangle of cells plus the row the next block lines up with. Every
+//! construct — a fraction over its rule, a root under its bar, an operator with its limits, a
+//! `\left(` stretched to what it holds — is a combination of blocks, and nothing is placed by
+//! counting rows from the top, so nested constructs stay aligned.
+//!
+//! # Display and Inline
+//! Display math (`$$…$$`, [`display`]) owns its rows and is laid out in two dimensions. Inline
+//! math ([`inline`]) must fit on the row it was typed on, so it is set linearly: scripts become
+//! Unicode superscripts and subscripts where they exist and `^(…)` where they do not, and a
+//! fraction becomes `a/b`. A display wider than the pane falls back to the linear form, wrapped.
+//!
+//! # Robustness
+//! An unknown command costs only its backslash (`\foobar` sets as `foobar`), so unsupported
+//! environments come out as the words they were written with. The parser's depth is bounded
+//! ([`MAX_DEPTH`](super::consts::MAX_DEPTH)), since the source is off the network.
+
 //TeX MATH, LAID OUT IN CELLS
 
 use std::iter;
@@ -30,39 +52,56 @@ use super::{ consts, markup, theme };
 
 //STRUCTS
 //A RECTANGLE OF CELLS PLUS ITS BASELINE ROW
+/// A rectangle of cells and the row it lines up on.
 #[derive(Clone)]
 pub struct Block
 {
+    /// The rows, as text.
     rows: Vec<String>,
+    /// Index of the baseline row.
     baseline: usize,
 }
 
 //ENUMS
+/// One parsed math construct.
 enum Node
 {
+    /// A symbol or a run of text.
     Sym(String),
+    /// A group.
     List(Vec<Node>),
+    /// A fraction: numerator, denominator.
     Frac(Box<Node>, Box<Node>),
+    /// A root and its degree.
     Sqrt(Box<Node>, Option<String>),           //ROOT AND ITS DEGREE
+    /// A `\left … \right` pair, stretched to what it holds.
     Delim(char, char, Box<Node>),              //\left .. \right, STRETCHED TO WHAT IS BETWEEN THEM
+    /// A base with a superscript and a subscript.
     Script { base: Box<Node>, sup: Option<Box<Node>>, sub: Option<Box<Node>> },
+    /// An operator whose scripts go over and under it.
     Big(String),                               //AN OPERATOR WHOSE SCRIPTS GO OVER AND UNDER IT
 }
 
 //IMPLEMENTATIONS
 impl Block
 {
+    /// Returns a one-row block.
     fn text(text: &str) -> Self
     {
         Self { rows: vec![text.to_owned()], baseline: 0 }
     }
 
+    /// Returns an empty block.
     fn empty() -> Self { Self::text("") }
 
+    /// Returns the block's width in cells.
     fn width(&self) -> usize { self.rows.iter().map(|row| markup::text_width(row)).max().unwrap_or(0) }
+    /// Returns the block's height in rows.
     fn height(&self) -> usize { self.rows.len() }
+    /// Returns whether the block is one row.
     fn is_flat(&self) -> bool { self.rows.len() == 1 }
 
+    /// Returns every row padded to the same width.
     fn pad(&self, width: usize) -> Vec<String> //EVERY ROW OUT TO THE SAME WIDTH, SO COLUMNS STAY COLUMNS
     {
         self.rows.iter().map(|row|
@@ -75,6 +114,7 @@ impl Block
         }).collect()
     }
 
+    /// Returns the block centred in a wider box.
     fn centre(&self, width: usize) -> Self //CENTRED IN A WIDER BOX
     {
         let left = (width - self.width().min(width)) / 2;
@@ -88,6 +128,7 @@ impl Block
     }
 
     //SIDE BY SIDE ON A SHARED BASELINE
+    /// Places another block to the right, on a shared baseline.
     fn beside(self, other: Self) -> Self
     {
         if self.rows.iter().all(String::is_empty) && self.rows.len() == 1 { return other; }
@@ -108,6 +149,7 @@ impl Block
         }
     }
 
+    /// Adds blank rows above and below.
     fn stretch(&self, above: usize, below: usize) -> Self //BLANK ROWS ONTO EITHER END
     {
         let width = self.width();
@@ -121,6 +163,7 @@ impl Block
     }
 
     //STACKED, THE MIDDLE PIECE'S ROW AS BASELINE
+    /// Stacks blocks above and below a middle one, whose baseline the result keeps.
     fn stack(above: Vec<Self>, middle: Self, below: Vec<Self>) -> Self
     {
         let width = above.iter().chain(iter::once(&middle)).chain(below.iter())
@@ -142,6 +185,7 @@ impl Block
 
 //FUNCTIONS
 //INLINE MATH, SET LINEARLY
+/// Sets inline math linearly, on one row.
 pub fn inline(source: &str, style: Style) -> Vec<Span<'static>>
 {
     let nodes = parse(source);
@@ -157,6 +201,8 @@ pub fn inline(source: &str, style: Style) -> Vec<Span<'static>>
 }
 
 //DISPLAY MATH, IN TWO DIMENSIONS
+/// Lays display math out in two dimensions, indented; too wide for the pane, it is set linearly
+/// and wrapped instead.
 pub fn display(source: &str, width: u16) -> Vec<Line<'static>>
 {
     let nodes = parse(source);
@@ -173,6 +219,7 @@ pub fn display(source: &str, width: u16) -> Vec<Line<'static>>
         .collect()
 }
 
+/// Returns the math style, keeping the message's color where it has one.
 fn math_style(style: Style) -> Style //MATH KEEPS THE MESSAGE'S COLOUR WHERE IT HAS ONE
 {
     match style.fg
@@ -183,11 +230,13 @@ fn math_style(style: Style) -> Style //MATH KEEPS THE MESSAGE'S COLOUR WHERE IT 
 }
 
 //LAYOUT
+/// Lays a list of nodes out side by side.
 fn layout(nodes: &[Node], display: bool) -> Block
 {
     nodes.iter().fold(Block::empty(), |block, node| block.beside(one(node, display)))
 }
 
+/// Lays one node out.
 fn one(node: &Node, display: bool) -> Block
 {
     match node
@@ -248,6 +297,7 @@ fn one(node: &Node, display: bool) -> Block
 }
 
 //A SCRIPT AS A SUPERSCRIPT, A RAISED ROW, OR ^(..)
+/// Lays out scripts: as Unicode superscripts or subscripts, raised and lowered rows, or `^(…)`.
 fn scripts(sup: Option<&Node>, sub: Option<&Node>, display: bool) -> Block
 {
     let sup = sup.map(|node| (one(node, false), linear_one(node)));
@@ -293,6 +343,7 @@ fn scripts(sup: Option<&Node>, sub: Option<&Node>, display: bool) -> Block
 }
 
 //A BRACKET AS TALL AS WHAT IT HOLDS
+/// Wraps a block in brackets as tall as it is.
 fn delimited(open: char, close: char, inner: Block) -> Block
 {
     if inner.is_flat() || open == '.' && close == '.'
@@ -308,6 +359,7 @@ fn delimited(open: char, close: char, inner: Block) -> Block
     left.beside(inner).beside(right)
 }
 
+/// Returns a bracket stretched to a height, one row per glyph.
 fn stretch_delim(delim: char, height: usize) -> Vec<String>
 {
     let pieces = match delim
@@ -331,11 +383,13 @@ fn stretch_delim(delim: char, height: usize) -> Vec<String>
 }
 
 //THE ONE-ROW FALLBACK
+/// Sets nodes on one row.
 fn linear(nodes: &[Node]) -> String
 {
     nodes.iter().map(linear_one).collect()
 }
 
+/// Sets one node on one row.
 fn linear_one(node: &Node) -> String
 {
     match node
@@ -372,6 +426,7 @@ fn linear_one(node: &Node) -> String
 }
 
 //a/b NEEDS NO BRACKETS, (a + b)/2 DOES
+/// Sets a node for a linear fraction, bracketed unless it is a single term.
 fn bracketed(node: &Node) -> String
 {
     let text = linear_one(node);
@@ -384,18 +439,21 @@ fn bracketed(node: &Node) -> String
 }
 
 //SCRIPTS, ALL OR NOTHING
+/// Returns text as Unicode superscripts, if every character has one.
 fn superscript(text: &str) -> Option<String>
 {
     map_chars(text, "0123456789+-=()abcdefghijklmnoprstuvwxyz",
         "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖʳˢᵗᵘᵛʷˣʸᶻ")
 }
 
+/// Returns text as Unicode subscripts, if every character has one.
 fn subscript(text: &str) -> Option<String>
 {
     map_chars(text, "0123456789+-=()aehijklmnoprstuvx",
         "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ")
 }
 
+/// Maps every character through a table, if every one is in it.
 fn map_chars(text: &str, from: &str, to: &str) -> Option<String>
 {
     if text.is_empty() { return None; }
@@ -405,15 +463,20 @@ fn map_chars(text: &str, from: &str, to: &str) -> Option<String>
 }
 
 //THE PARSER; AN UNKNOWN WORD IS SET AS ITSELF
+/// The math parser.
 struct Parser
 {
+    /// The source.
     chars: Vec<char>,
+    /// Cursor position.
     pos: usize,
+    /// Current nesting depth, bounded by [`MAX_DEPTH`](super::consts::MAX_DEPTH).
     depth: usize, //NOTHING BOUNDS A MESSAGE'S NESTING BUT THIS
 }
 
 impl Parser
 {
+    /// Parses nodes until the end, or the closing brace of a group.
     fn list(&mut self, group: bool) -> Vec<Node>
     {
         let mut out = Vec::new();
@@ -438,6 +501,7 @@ impl Parser
         out
     }
 
+    /// Parses one atom with any scripts after it.
     fn atom(&mut self) -> Node
     {
         let base = self.primary();
@@ -464,6 +528,7 @@ impl Parser
         }
     }
 
+    /// Parses one primary: a group, a command or a symbol.
     fn primary(&mut self) -> Node
     {
         match self.chars.get(self.pos).copied()
@@ -497,6 +562,7 @@ impl Parser
         }
     }
 
+    /// Parses a command after its backslash.
     fn command(&mut self) -> Node
     {
         let Some(name) = self.command_here() else
@@ -564,6 +630,7 @@ impl Parser
         }
     }
 
+    /// Parses a command argument: a braced group, or the single thing after it.
     fn argument(&mut self) -> Node //{...}, OR THE SINGLE THING AFTER IT
     {
         self.skip_spaces();
@@ -571,6 +638,7 @@ impl Parser
         self.primary()
     }
 
+    /// Returns a braced argument's content, unparsed.
     fn raw_argument(&mut self) -> String //THE BRACES' CONTENT, UNPARSED
     {
         self.skip_spaces();
@@ -604,6 +672,7 @@ impl Parser
         self.chars[start..self.pos.saturating_sub(1)].iter().collect()
     }
 
+    /// Parses an optional `[…]` argument, such as a root's degree.
     fn optional(&mut self) -> Option<String> //\sqrt[3]{..}
     {
         if self.chars.get(self.pos) != Some(&'[') { return None; }
@@ -616,6 +685,7 @@ impl Parser
         Some(self.chars[start..end].iter().collect())
     }
 
+    /// Parses a delimiter after `\left` or `\right`.
     fn delimiter(&mut self) -> char
     {
         self.skip_spaces();
@@ -644,6 +714,7 @@ impl Parser
         }
     }
 
+    /// Returns the command starting at the cursor, without consuming it.
     fn command_here(&self) -> Option<String> //THE COMMAND STARTING AT THE CURSOR, WITHOUT CONSUMING IT
     {
         if self.chars.get(self.pos) != Some(&'\\') { return None; }
@@ -657,27 +728,32 @@ impl Parser
         }
     }
 
+    /// Skips whitespace.
     fn skip_spaces(&mut self)
     {
         while self.chars.get(self.pos).is_some_and(|c| *c == ' ') { self.pos += 1; }
     }
 
+    /// Consumes `c` if it is next.
     fn eat(&mut self, c: char)
     {
         if self.chars.get(self.pos) == Some(&c) { self.pos += 1; }
     }
 }
 
+/// Parses math source into nodes.
 fn parse(source: &str) -> Vec<Node>
 {
     Parser { chars: source.chars().collect(), pos: 0, depth: 0 }.list(false)
 }
 
+/// Maps letters through an alphabet table, leaving the rest.
 fn alphabet(text: &str, table: &[(char, char)]) -> String
 {
     text.chars().map(|c| table.iter().find(|(from, _)| *from == c).map(|(_, to)| *to).unwrap_or(c)).collect()
 }
 
+/// Returns the glyph a symbol command names.
 fn symbol(name: &str) -> Option<String>
 {
     SYMBOLS.iter().find(|(command, _)| *command == name).map(|(_, sym)| (*sym).to_owned())
@@ -685,19 +761,23 @@ fn symbol(name: &str) -> Option<String>
 
 //CONSTS
 //OPERATORS WHOSE SCRIPTS ARE LIMITS
+/// Operators whose scripts are limits, set over and under them.
 const BIG: [&str; 15] = ["sum", "prod", "coprod", "bigcup", "bigcap", "bigoplus", "bigotimes", "bigvee",
     "bigwedge", "lim", "limsup", "liminf", "max", "min", "sup"];
 
+/// Blackboard bold capitals (`\mathbb`).
 const BLACKBOARD: &[(char, char)] = &[('A', '𝔸'), ('B', '𝔹'), ('C', 'ℂ'), ('D', '𝔻'), ('E', '𝔼'),
     ('F', '𝔽'), ('G', '𝔾'), ('H', 'ℍ'), ('I', '𝕀'), ('J', '𝕁'), ('K', '𝕂'), ('L', '𝕃'), ('M', '𝕄'),
     ('N', 'ℕ'), ('O', '𝕆'), ('P', 'ℙ'), ('Q', 'ℚ'), ('R', 'ℝ'), ('S', '𝕊'), ('T', '𝕋'), ('U', '𝕌'),
     ('V', '𝕍'), ('W', '𝕎'), ('X', '𝕏'), ('Y', '𝕐'), ('Z', 'ℤ')];
 
+/// Script capitals (`\mathcal`).
 const SCRIPT_CAPS: &[(char, char)] = &[('A', '𝒜'), ('B', 'ℬ'), ('C', '𝒞'), ('D', '𝒟'), ('E', 'ℰ'),
     ('F', 'ℱ'), ('G', '𝒢'), ('H', 'ℋ'), ('I', 'ℐ'), ('J', '𝒥'), ('K', '𝒦'), ('L', 'ℒ'), ('M', 'ℳ'),
     ('N', '𝒩'), ('O', '𝒪'), ('P', '𝒫'), ('Q', '𝒬'), ('R', 'ℛ'), ('S', '𝒮'), ('T', '𝒯'), ('U', '𝒰'),
     ('V', '𝒱'), ('W', '𝒲'), ('X', '𝒳'), ('Y', '𝒴'), ('Z', '𝒵')];
 
+/// Symbol commands and the glyphs they set as.
 const SYMBOLS: &[(&str, &str)] =
 &[
     //GREEK

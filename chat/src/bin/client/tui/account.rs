@@ -16,6 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Account Form
+//!
+//! The overlay behind `/account passwd` and `/account delete`: a small form of password fields,
+//! checked locally and then handed to the event loop to send. Deleting asks twice.
+
 
 use crossterm::event::
 {
@@ -35,35 +40,51 @@ use super::
 };
 
 //ENUMS
+/// Which form it is.
 #[derive(Clone, Copy, PartialEq)] //WHAT THE FORM DOES
 pub enum Kind
 {
+    /// Change the password.
     Passwd,
+    /// Delete the account.
     Delete,
 }
 
+/// A finished form for the event loop to send.
 pub enum Request //A FINISHED FORM FOR THE LOOP TO SEND
 {
+    /// A password change: the current and the new password.
     Passwd(String, String), //CURRENT, NEW
+    /// An account deletion: the current password.
     Delete(String),         //CURRENT
 }
 
 //STRUCTS
+/// An account form.
 pub struct Account //AN ACCOUNT FORM
 {
+    /// Which form it is.
     pub kind: Kind,
+    /// The password fields.
     pub fields: Vec<InputBuffer>,
+    /// Which field has the caret.
     pub focus: usize,
+    /// Whether the form is waiting for the server.
     pub busy: bool,            //WAITING FOR THE SERVER
+    /// Whether a deletion was asked once and waits for a second Enter.
     pub armed: bool,           //DELETION ASKED ONCE, WAITING FOR THE SECOND ⏎
+    /// Why the last attempt did not work.
     pub error: Option<String>, //WHY THE LAST ONE DID NOT WORK
+    /// The new password, kept for the reconnect.
     new: Zeroizing<String>,    //THE PASSWORD SENT, FOR THE RECONNECT
+    /// Whether a finished form waits for the event loop.
     request: bool,             //A FINISHED FORM FOR THE LOOP TO SEND
 }
 
 //IMPLEMENTATIONS
 impl Kind
 {
+    /// Returns the field labels.
     pub fn labels(&self) -> Vec<&'static str>
     {
         match self
@@ -74,6 +95,7 @@ impl Kind
     }
 
     //WHAT AN EMPTY FIELD ASKS FOR
+    /// Returns the message for an empty field.
     fn missing(field: usize) -> &'static str
     {
         match field
@@ -84,6 +106,7 @@ impl Kind
         }
     }
 
+    /// Returns the form's title.
     pub fn title(&self) -> &'static str
     {
         match self
@@ -96,6 +119,7 @@ impl Kind
 
 impl Account
 {
+    /// Opens an empty form.
     pub fn new(kind: Kind) -> Self
     {
         Self
@@ -112,6 +136,7 @@ impl Account
     }
 
     //THE REQUEST TO SEND, ONCE
+    /// Takes the finished form, once.
     pub fn take_request(&mut self) -> Option<Request>
     {
         if !self.request { return None; }
@@ -126,9 +151,11 @@ impl Account
     }
 
     //THE NEW PASSWORD, FOR THE RECONNECT
+    /// Returns the new password, for the reconnect.
     pub fn new_password(&self) -> &str { &self.new }
 
     //START OVER WITH AN ERROR
+    /// Clears the form after a refusal, showing why.
     pub fn rejected(&mut self, error: String)
     {
         *self = Self::new(self.kind);
@@ -136,6 +163,8 @@ impl Account
     }
 
     //CHECK THE FORM, QUEUE IT
+    /// Checks the form and queues it: empty fields and a mismatched confirmation are refused here,
+    /// and a deletion is armed before it is sent.
     fn submit(&mut self)
     {
         //AN EMPTY FIELD TAKES THE CARET
@@ -184,6 +213,7 @@ impl Account
 
 //FUNCTIONS
 //PUBLIC
+/// Handles a key while the form is up.
 pub fn handle_key(app: &mut App, key: KeyEvent)
 {
     let Some(form) = app.account.as_mut() else { return };
@@ -214,6 +244,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
     }
 }
 
+/// Pastes text into the focused field.
 pub fn insert_str(app: &mut App, text: &str) //A PASTE INTO THE FOCUSED FIELD
 {
     if let Some(form) = app.account.as_mut() && !form.busy

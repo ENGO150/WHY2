@@ -16,7 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Chat Colors
+//!
+//! The 16 named colors a username or a message can be painted in.
+//!
+//! The wire carries a color as its index into [`COLORS`]; storage and the user interface use
+//! the name, so a stored color survives a reordering of the table.
+
 //CONSTS
+/// The color names, in wire order.
 pub const COLORS: [&str; 16] = //COLOR CODES
 [
     "black",
@@ -37,14 +45,30 @@ pub const COLORS: [&str; 16] = //COLOR CODES
     "white",
 ];
 
+/// Name stored for "no color".
 pub const NONE: &str = "none"; //NO COLOR
 
 //FUNCTIONS
+/// Returns the name of a wire color code.
+///
+/// # Parameters
+/// - `code`: The wire color code, or `None` for no color.
+///
+/// # Returns
+/// The color name, or [`NONE`] when `code` is `None` or out of range.
 pub fn name(code: Option<u8>) -> &'static str //COLOR TO CODE
 {
     code.and_then(|code| COLORS.get(code as usize)).copied().unwrap_or(NONE)
 }
 
+/// Returns the wire code of a color name, matched case-insensitively.
+///
+/// # Parameters
+/// - `name`: A color name from [`COLORS`].
+///
+/// # Returns
+/// - `Some(code)` for a known name.
+/// - `None` otherwise.
 pub fn code(name: &str) -> Option<u8> //CODE TO COLOR
 {
     COLORS.iter().position(|color| color.eq_ignore_ascii_case(name)).map(|index| index as u8)

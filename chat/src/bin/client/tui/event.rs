@@ -16,6 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Applying Client Events
+//!
+//! [`App::apply`] turns each [`ClientEvent`] from the network layer into a change of UI state.
+//! It never touches the terminal: it appends entries, updates rosters and overlays, and sets
+//! [`App::dirty`] for the next tick to draw.
+//!
+//! Events that change nothing in the history — the login prompts, an `Authenticated` — set
+//! `dirty` themselves, since nothing else would.
+
 use ratatui::text::{ Line, Span };
 
 use crate::
@@ -42,6 +51,7 @@ use super::
 impl App
 {
     //TRANSLATE ONE EVENT INTO STATE, NEVER DRAWING
+    /// Applies one event to the UI state.
     pub fn apply(&mut self, event: ClientEvent)
     {
         match event
@@ -1013,6 +1023,8 @@ impl App
         }
     }
 
+    /// Ends the client: the loop stops, the terminal is restored, and `message` is printed on the
+    /// normal screen before exiting with `code`.
     pub fn quit(&mut self, code: i32, message: Option<String>)
     {
         self.should_quit = true;
@@ -1024,11 +1036,13 @@ impl App
 
 //PRIVATE
 //EVERY LIST BLOCK IS A TREE: BRANCH, ID, NAME
+/// Returns the width of the id column of a block-command list.
 fn id_width(ids: impl Iterator<Item = usize>) -> usize
 {
     ids.map(|id| id.to_string().len()).max().unwrap_or(1)
 }
 
+/// Returns a right-aligned, dimmed id column.
 fn id_column(id: usize, width: usize) -> Vec<Span<'static>>
 {
     vec![Span::styled(format!("{id:>width$}  "), theme::dim())]

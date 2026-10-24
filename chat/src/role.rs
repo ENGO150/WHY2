@@ -16,6 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Server Roles
+//!
+//! [`Role`] is a user's rank on a server. The variants are declared lowest first and derive
+//! [`Ord`] from that order, so every permission check is a plain comparison
+//! (`role >= Role::Moderator`).
+//!
+//! The variants, their names and [`Role::ALL`] are generated together by the `roles!` macro,
+//! so adding a rank is one line and the three cannot drift apart.
+
 use std::
 {
     result,
@@ -31,11 +40,19 @@ use std::
 use wincode::{ SchemaWrite, SchemaRead };
 
 //MACROS
+/// Generates [`Role`], its names and [`Role::ALL`] from one list.
 macro_rules! roles
 {
     ($($variant:ident => $name:literal,)+) =>
     {
         //THE ORDER IS THE PERMISSION CHECK
+        /// A user's rank on the server, ordered lowest first.
+        ///
+        /// - `User` — what registering gets you.
+        /// - `Moderator` — may mute and kick.
+        /// - `Owner` — may ban, edit the server configuration and hand out ranks.
+        ///
+        /// A role crosses the wire as itself and is typed, stored and shown by [`Role::name`].
         #[derive(SchemaWrite, SchemaRead, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
         pub enum Role
         {
@@ -44,8 +61,10 @@ macro_rules! roles
 
         impl Role
         {
+            /// Every rank, lowest first.
             pub const ALL: &'static [Role] = &[$(Role::$variant),+]; //EVERY RANK, LOWEST FIRST
 
+            /// Returns the name this rank is typed, stored and shown by.
             pub fn name(&self) -> &'static str //THE NAME THIS RANK IS TYPED, STORED AND SHOWN BY
             {
                 match self

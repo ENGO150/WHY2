@@ -16,6 +16,33 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Lobby Message History
+//!
+//! The persistent history of the lobby, kept as the last `max_persistent_messages` messages
+//! when `persistent_messages` is on. Channels have no history: a channel only exists while
+//! somebody is in it.
+//!
+//! # Storage
+//! `server_messages.bin` is the one file under the configuration directory that is not TOML:
+//! it is a format marker followed by a `wincode`-encoded `Vec<Record>`, sealed as a whole with
+//! [`crypto::encrypt_packet`] under [`crypto::history_keys`]. Every write uses a fresh nonce,
+//! since the file is replaced rather than appended to.
+//!
+//! The in-memory history is the working set; the file is only read once, on first touch. A
+//! missing, tampered or unrecognisable file loads as an empty history (an unparsable one is
+//! first copied to `server_messages.bin.old`), so a bad file never stops the server from
+//! starting.
+//!
+//! # Records and Colors
+//! A record stores who said what, not how it looked: colors are looked up per sender when
+//! a page is built, so a replay is painted the way its sender looks **now**.
+//!
+//! # Message Ids
+//! Every message gets an id from one counter shared by the lobby and every channel, taken under
+//! the history lock so the stored ids rise in record order. That ordering is what lets
+//! [`page`] binary-search by id, and why a page cursor stays valid while messages are added,
+//! trimmed or deleted around it.
+
 use std::
 {
     fs,
@@ -42,12 +69,17 @@ use crate::
 };
 
 //STRUCTS
+/// One stored message, as kept on disk.
 #[derive(SchemaWrite, SchemaRead, Clone)]
 struct Record //ONE MESSAGE RECORD
 {
+    /// Server-assigned message id.
     id: u64,
+    /// Author's username.
     username: String,
+    /// Message text, or the filename of a picture.
     text: String,
+    /// Hash of the stored picture, if this is one.
     image: Option<[u8; 32]>,
     timestamp: Option<u64>,   //UNIX SECONDS
     reply: Option<u64>,       //ID OF THE MESSAGE REPLIED TO
@@ -57,6 +89,7 @@ struct Record //ONE MESSAGE RECORD
     pinned: bool,             //PINNED BY A MODERATOR
 }
 
+/// A [`Record`] in the format before pins, kept to migrate older files.
 #[derive(SchemaRead)]
 struct VoiceRecord //A RECORD BEFORE PINS (remove with next version bump)
 {
@@ -71,6 +104,7 @@ struct VoiceRecord //A RECORD BEFORE PINS (remove with next version bump)
     voice: Option<VoiceNote>,
 }
 
+/// The stored records and the next message id.
 struct History //THE RECORDS AND THE NEXT ID
 {
     next: u64,            //NEXT MESSAGE ID
@@ -78,20 +112,29 @@ struct History //THE RECORDS AND THE NEXT ID
 }
 
 //ONE PAGE OF THE HISTORY
+/// One page of the history, oldest message first.
 pub struct Page
 {
+    /// The messages, with their senders' current colors.
     pub messages: Vec<StoredMessage>,
+    /// Id of the first message on the page; the cursor for the next older page.
     pub start: u64, //ID OF THE FIRST ONE
+    /// Whether older messages remain.
     pub more: bool, //OLDER ONES LEFT
+    /// Total number of messages kept.
     pub kept: u64,  //MESSAGES KEPT
 }
 
 //CONSTS
+/// Marker at the start of the current file format.
 const MAGIC: &[u8; 8] = b"WHY2MSG\x07"; //FORMAT MARKER
+/// Marker of the format before pins.
 const MAGIC_V6: &[u8; 8] = b"WHY2MSG\x06"; //MARKER BEFORE PINS (remove with next version bump)
 
 //GLOBAL VARIABLES
+/// The in-memory history, loaded from disk on first touch.
 static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History::new())); //MESSAGE HISTORY
+/// At-rest keys of the history file.
 static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                                       //AT-REST KEYS
 
 //IMPLEMENTATIONS
@@ -117,6 +160,7 @@ impl From<VoiceRecord> for Record //NOT PINNED (remove with next version bump)
 
 impl Record
 {
+    /// Returns the hash of the file in `server_images/` this record names, picture or voice clip.
     fn stored(&self) -> Option<[u8; 32]> //THE FILE IN server_images/ IT NAMES
     {
         self.image.or(self.voice.as_ref().map(|voice| voice.hash))
@@ -125,6 +169,7 @@ impl Record
 
 impl History
 {
+    /// Loads the history from disk and continues its id sequence.
     fn new() -> Self //LOAD AND CONTINUE THE IDS
     {
         let records = load();
@@ -133,6 +178,7 @@ impl History
         Self { next, records }
     }
 
+    /// Hands out the next message id.
     fn take_id(&mut self) -> u64 //HAND OUT THE NEXT ID
     {
         let id = self.next;
@@ -140,17 +186,23 @@ impl History
         id
     }
 
+    /// Returns the index of the first record whose id is at or after `id`.
     fn position(&self, id: u64) -> usize //INDEX OF THE FIRST RECORD AT OR AFTER id
     {
         self.records.partition_point(|message| message.id < id)
     }
 
+    /// Returns the index of record `id`, if kept.
     fn find(&self, id: u64) -> Option<usize> //INDEX OF RECORD id, IF KEPT
     {
         let index = self.position(id);
         self.records.get(index).is_some_and(|message| message.id == id).then_some(index)
     }
 
+    /// Seals the whole history and writes it to disk.
+    ///
+    /// # Panics
+    /// If encoding or writing fails.
     fn save(&self) //ENCRYPT-THEN-MAC THE WHOLE HISTORY
     {
         let mut bytes = MAGIC.to_vec();
@@ -160,6 +212,8 @@ impl History
         fs::write(path(), sealed).expect("Saving message history failed");
     }
 
+    /// Filters dropped files down to those nothing else names — no record, no avatar and not the
+    /// server icon.
     fn orphans(&self, dropped: Vec<[u8; 32]>) -> Vec<[u8; 32]> //DROPPED PICTURES NOTHING NAMES
     {
         dropped.into_iter()
@@ -172,11 +226,16 @@ impl History
 
 //FUNCTIONS
 //PRIVATE
+/// Returns the path of the history file.
 fn path() -> String //WHERE THE HISTORY IS KEPT
 {
     super::config_path(consts::SERVER_MESSAGES_FILE)
 }
 
+/// Reads and verifies the history file, migrating an older format.
+///
+/// # Returns
+/// The stored records, or an empty history if the file is missing or unreadable.
 fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
 {
     //NO FILE IS AN EMPTY HISTORY
@@ -217,6 +276,7 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
     }
 }
 
+/// Keeps a copy of an unreadable history file and starts empty.
 fn unreadable() -> Vec<Record> //KEEP A COPY, START EMPTY
 {
     let backup = format!("{}.old", path());
@@ -226,6 +286,7 @@ fn unreadable() -> Vec<Record> //KEEP A COPY, START EMPTY
     Vec::new()
 }
 
+/// Accepts records decoded from an older format.
 fn migrate<E>(history: Result<Vec<Record>, E>) -> Vec<Record> //LOAD AN OLDER FORMAT (remove with next version bump)
 {
     let Ok(history) = history else { return unreadable() };
@@ -235,33 +296,54 @@ fn migrate<E>(history: Result<Vec<Record>, E>) -> Vec<Record> //LOAD AN OLDER FO
 }
 
 //PUBLIC
+/// Returns the current Unix time if `message_timestamps` is on, else `None`.
 pub fn timestamp() -> Option<u64> //NOW, IF TIMESTAMPS ARE ON
 {
     super::read_config::<bool>("message_timestamps")
         .then(|| SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |time| time.as_secs()))
 }
 
+/// Takes a message id for a message that is not stored (a channel message, or with the history
+/// off).
 pub fn next_id() -> u64 //ID FOR A MESSAGE THAT IS NOT KEPT
 {
     HISTORY.lock().unwrap().take_id()
 }
 
+/// Stores a text message.
+///
+/// # Parameters
+/// - `username`: The author.
+/// - `text`: The message text.
+/// - `timestamp`: When it was sent, if timestamps are on.
+/// - `reply`: The id of the message it replies to.
+///
+/// # Returns
+/// The message id, which is assigned even if nothing is kept.
 pub fn store(username: &str, text: &str, timestamp: Option<u64>, reply: Option<u64>) -> u64 //APPEND MESSAGE
 {
     push(username, text, None, None, timestamp, reply)
 }
 
+/// Stores a picture message; returns its id.
 pub fn store_image(username: &str, filename: &str, hash: &[u8; 32], timestamp: Option<u64>) -> u64
 {
     push(username, filename, Some(*hash), None, timestamp, None)
 }
 
+/// Stores a voice message; returns its id.
 pub fn store_voice(username: &str, voice: &VoiceNote, timestamp: Option<u64>) -> u64
 {
     push(username, "", None, Some(voice.clone()), timestamp, None)
 }
 
 //APPEND ONE ENTRY AND REWRITE THE FILE
+/// Appends one record, trims the history to its limit and rewrites the file.
+///
+/// Files named only by trimmed records are deleted once the lock is released.
+///
+/// # Returns
+/// The message id.
 fn push(username: &str, text: &str, image: Option<[u8; 32]>, voice: Option<VoiceNote>, timestamp: Option<u64>, reply: Option<u64>) -> u64
 {
     let limit: usize = super::read_config("max_persistent_messages");
@@ -301,6 +383,7 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>, voice: Option<Voice
     id
 }
 
+/// Deletes stored files by hash.
 fn remove_images(orphans: Vec<[u8; 32]>) //DELETE PICTURES NOTHING NAMES
 {
     if !orphans.is_empty() { log::info!("Dropping {} stored files with no history entry left", orphans.len()); }
@@ -308,11 +391,13 @@ fn remove_images(orphans: Vec<[u8; 32]>) //DELETE PICTURES NOTHING NAMES
     for hash in orphans { let _ = fs::remove_file(misc::get_image_dir().join(misc::hex(&hash))); }
 }
 
+/// Returns whether message `id` is in the history.
 pub fn exists(id: u64) -> bool //IS MESSAGE id IN THE HISTORY?
 {
     HISTORY.lock().unwrap().find(id).is_some()
 }
 
+/// Returns the author of message `id`, if kept.
 pub fn author(id: u64) -> Option<String> //WHO SAID MESSAGE id
 {
     let history = HISTORY.lock().unwrap();
@@ -320,6 +405,12 @@ pub fn author(id: u64) -> Option<String> //WHO SAID MESSAGE id
     history.find(id).map(|index| history.records[index].username.clone())
 }
 
+/// Removes message `id`, deleting its file if nothing else names it.
+///
+/// Authorization is the caller's job.
+///
+/// # Returns
+/// `true` if the message existed.
 pub fn delete(id: u64) -> bool //REMOVE MESSAGE id AND REWRITE THE FILE
 {
     let mut guard = HISTORY.lock().unwrap();
@@ -337,6 +428,10 @@ pub fn delete(id: u64) -> bool //REMOVE MESSAGE id AND REWRITE THE FILE
     true
 }
 
+/// Toggles `username`'s heart on message `id`.
+///
+/// # Returns
+/// The new set of usernames that hearted it, or `None` if the message is not kept.
 pub fn heart(id: u64, username: &str) -> Option<Vec<String>> //TOGGLE A HEART, THE NEW SET
 {
     let mut guard = HISTORY.lock().unwrap();
@@ -356,6 +451,10 @@ pub fn heart(id: u64, username: &str) -> Option<Vec<String>> //TOGGLE A HEART, T
     Some(hearts)
 }
 
+/// Rewords message `id`, if it is a text message written by `username`.
+///
+/// # Returns
+/// `true` if the message was edited.
 pub fn edit(id: u64, username: &str, text: &str) -> bool //REWORD OWN TEXT MESSAGE id
 {
     let mut guard = HISTORY.lock().unwrap();
@@ -373,6 +472,11 @@ pub fn edit(id: u64, username: &str, text: &str) -> bool //REWORD OWN TEXT MESSA
     true
 }
 
+/// Toggles the pin on message `id`.
+///
+/// # Returns
+/// - `Some(pinned)` with the new state.
+/// - `None` if the message is not kept, or pinning it would exceed `max_pinned_messages`.
 pub fn pin(id: u64) -> Option<bool> //TOGGLE A PIN, THE NEW STATE
 {
     let limit: usize = super::read_config("max_pinned_messages");
@@ -393,6 +497,7 @@ pub fn pin(id: u64) -> Option<bool> //TOGGLE A PIN, THE NEW STATE
     Some(pinned)
 }
 
+/// Returns every pinned message, oldest first.
 pub fn pinned() -> Vec<StoredMessage> //EVERY PINNED MESSAGE, OLDEST FIRST
 {
     let records: Vec<Record> = HISTORY.lock().unwrap().records.iter().filter(|message| message.pinned).cloned().collect();
@@ -400,22 +505,27 @@ pub fn pinned() -> Vec<StoredMessage> //EVERY PINNED MESSAGE, OLDEST FIRST
     wire(records)
 }
 
+/// Returns whether any record names this picture.
 pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
 {
     HISTORY.lock().unwrap().records.iter().any(|message| message.image.as_ref() == Some(hash))
 }
 
+/// Returns the stored voice message whose clip has this hash.
 pub fn voice(hash: &[u8; 32]) -> Option<VoiceNote> //THE STORED VOICE MESSAGE WITH THIS CLIP
 {
     HISTORY.lock().unwrap().records.iter().find_map(|message| message.voice.as_ref().filter(|voice| voice.hash == *hash)).cloned()
 }
 
+/// Returns whether the server keeps this file at all: as a history picture, an avatar or the
+/// server icon.
 pub fn stored(hash: &[u8; 32]) -> bool //IS THIS PICTURE ONE THE SERVER KEEPS AT ALL?
 {
     has_image(hash) || super::users::names_avatar(hash) || super::server_icon().as_ref() == Some(hash)
 }
 
 //DELETE EVERY PICTURE THE HISTORY DOES NOT NAME
+/// Deletes every file in `server_images/` that nothing names any more.
 pub fn sweep_images()
 {
     let Ok(directory) = fs::read_dir(misc::get_image_dir()) else { return }; //NO DIRECTORY, NOTHING TO SWEEP
@@ -447,6 +557,13 @@ pub fn sweep_images()
 }
 
 //THE NEWEST MESSAGES BEFORE before, OLDEST FIRST
+/// Returns one page of the history, oldest first.
+///
+/// # Parameters
+/// - `before`: Return messages older than this id; `None` for the newest.
+/// - `count`: The most messages on the page.
+/// - `budget`: The approximate byte budget of the page; at least one message is always
+///   returned so the cursor moves.
 pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
 {
     let (records, start, more, kept) =
@@ -478,6 +595,10 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
 }
 
 //RECORDS AS THE WIRE CARRIES THEM
+/// Converts records into wire messages, attaching each sender's current colors.
+///
+/// A picture or voice line keeps only the username color, and stored timestamps are hidden
+/// while `message_timestamps` is off.
 fn wire(records: Vec<Record>) -> Vec<StoredMessage>
 {
     let mut looked_up: HashMap<String, MessageColors> = HashMap::new();

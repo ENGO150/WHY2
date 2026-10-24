@@ -16,6 +16,34 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Screen Sharing — Server Side
+//!
+//! Relays a sharer's stream to its viewers ([`screen`](fn@screen)), with one task and one bounded queue per
+//! viewer so the share runs at the sharer's rate rather than the slowest viewer's.
+//!
+//! # Shedding a Slow Viewer
+//! The share loop `try_send`s each frame to every viewer and never waits on one. A viewer whose
+//! queue is full loses that frame and is marked as needing a keyframe: its video is skipped until
+//! an access unit that stands on its own arrives, since the server cannot ask the sharer for one and
+//! forwarding P-frames against a missing reference would only put undecodable frames on the
+//! wire. Audio frames are self-contained and are simply dropped.
+//!
+//! # Attaching
+//! A viewer is built where it attaches ([`attach`]), not on the next frame, and opens on the
+//! share's last keyframe, kept in the share's entry of the share table. It then waits for the next IDR
+//! like a shed viewer, since the frames between went to somebody else. Without this, a viewer of
+//! a still desktop would see nothing until the next forced keyframe.
+//!
+//! # Feedback
+//! Each viewer task measures the backlog a frame joins before writing it, and a reporter task
+//! sends the sharer the worst viewer's figures every
+//! [`FEEDBACK_INTERVAL`](screen::consts::FEEDBACK_INTERVAL) on a reverse stream of the upload
+//! socket, so the sharer can slow down for a viewer whose downlink is slower than its uplink.
+//!
+//! # Muted Shares
+//! While the sharer is muted by a moderator, viewers are sent a looping placeholder animation
+//! (all IDRs) instead of the share.
+
 use std::
 {
     time::{ Duration, Instant },
@@ -70,39 +98,60 @@ use crate::
 //STATICS
 //A MUTED SHARER'S PLACEHOLDER, ANNEX-B H.264
 //ffmpeg -i assets/muted.gif -an -vf "pad=220:216:0:0:color=black,format=yuv420p" -c:v libx264 -profile:v baseline -preset veryslow -crf 20 -x264-params keyint=1:min-keyint=1:scenecut=0:repeat-headers=1 -f h264 assets/muted.h264
+/// The placeholder shown for a muted sharer, one Annex B access unit per frame.
 static MUTED_ANIMATION: LazyLock<Vec<Vec<u8>>> = LazyLock::new(|| split_access_units(include_bytes!("./assets/muted.h264")));
 
 //EVERY RUNNING SHARE, REACHABLE FROM AN ATTACH
+/// Every running share, by sharer id, where an attach can reach it.
 static SHARES: LazyLock<DashMap<usize, Arc<Share>>> = LazyLock::new(|| DashMap::new());
 
 //STRUCTS
+/// Tears a share down when its task ends: unlists it, stops its reporter and clears the
+/// connection's screen stream.
 struct ScreenTransferGuard
 {
+    /// The sharer's session id.
     id: usize,
+    /// The task reporting backlog to the sharer.
     feedback: AbortHandle, //THE TASK REPORTING BACK TO THE SHARER
 }
 
+/// What a running share leaves where an attaching viewer can reach it.
 struct Share //WHAT A SHARE LEAVES WHERE AN ATTACHING VIEWER CAN REACH IT
 {
+    /// The last access unit that stands on its own.
     keyframe: MutexSync<Option<Vec<u8>>>,     //THE LAST PICTURE THAT STANDS ON ITS OWN
+    /// Viewers built at their attach, waiting for the share loop to adopt them.
     pending: MutexSync<Vec<(usize, Viewer)>>, //VIEWERS BUILT AT THE ATTACH, WAITING TO BE PICKED UP
+    /// Every served viewer's backlog figures.
     stats: MutexSync<Vec<Arc<Backlog>>>,      //EVERY SERVED VIEWER'S BACKLOG
 }
 
+/// What one viewer is behind by, as the minimum since the last report.
 struct Backlog //WHAT ONE VIEWER IS BEHIND BY, LEAST SINCE THE LAST REPORT
 {
+    /// Microseconds a frame sat in this viewer's queue, plus RTT above the path's minimum.
     delay: AtomicU64,  //MICROSECONDS QUEUED HERE PLUS RTT OVER THE PATH'S BEST
+    /// Bytes the viewer's socket has not sent.
     unsent: AtomicU64, //BYTES THE SOCKET HAS NOT SENT
+    /// Whether a frame was dropped for this viewer.
     shed: AtomicBool,  //A FRAME WAS DROPPED FOR IT
 }
 
+/// One attached viewer and the task that writes to it. Dropping it aborts the task.
 struct Viewer //ONE ATTACHED CLIENT, AND THE TASK THAT WRITES TO IT
 {
+    /// The attachment the task was built for.
     token: [u8; 32],                         //THE ATTACHMENT THIS TASK WAS BUILT FOR
+    /// Handoff to the task, with when each frame was queued.
     tx: Sender<(Instant, ScreenPacketCode)>, //HANDOFF TO THAT TASK, WITH WHEN IT WAS QUEUED
+    /// What the task measures.
     stats: Arc<Backlog>,                     //WHAT THAT TASK MEASURES
+    /// The task.
     task: AbortHandle,                       //THE TASK ITSELF
+    /// Whether video is skipped until the next keyframe.
     needs_key: bool,                         //SHED: WAITING FOR THE NEXT IDR
+    /// Whether the viewer muted the share's audio.
     muted: bool,                             //VIEWER MUTED THE SHARE AUDIO
 }
 
@@ -135,11 +184,16 @@ impl Drop for Viewer
 
 impl Backlog
 {
+    /// Creates empty backlog figures.
     fn new() -> Self
     {
         Self { delay: AtomicU64::new(u64::MAX), unsent: AtomicU64::new(u64::MAX), shed: AtomicBool::new(false) }
     }
 
+    /// Takes the interval's figures and resets them.
+    ///
+    /// # Returns
+    /// `(Some((delay, unsent)) if anything was measured, whether a frame was shed)`.
     fn take(&self) -> (Option<(u64, u64)>, bool) //THE INTERVAL'S MINIMUM, AND WHETHER IT WAS SHED
     {
         let delay = self.delay.swap(u64::MAX, Ordering::Relaxed);
@@ -151,6 +205,7 @@ impl Backlog
 }
 
 //FUNCTIONS
+/// Cuts an Annex B stream into one buffer per access unit, splitting at each SPS.
 fn split_access_units(bitstream: &[u8]) -> Vec<Vec<u8>> //CUT AN ANNEX-B STREAM INTO ONE BUFFER PER FRAME
 {
     let mut units = Vec::new();
@@ -184,6 +239,8 @@ fn split_access_units(bitstream: &[u8]) -> Vec<Vec<u8>> //CUT AN ANNEX-B STREAM 
     units
 }
 
+/// Returns whether an access unit can be decoded on its own: it contains an IDR slice (NAL
+/// type 5) or an SPS (type 7), which the encoders only emit in front of one.
 fn is_keyframe(bitstream: &[u8]) -> bool //DOES THIS ACCESS UNIT STAND ON ITS OWN?
 {
     //ONLY AN IDR (5), OR AN SPS (7) IN FRONT OF ONE
@@ -200,6 +257,12 @@ fn is_keyframe(bitstream: &[u8]) -> bool //DOES THIS ACCESS UNIT STAND ON ITS OW
     false
 }
 
+/// Spawns the task that writes to one viewer, with its own packet stream and sequence counter.
+///
+/// The viewer starts needing a keyframe.
+///
+/// # Returns
+/// `None` if the packet stream could not be keyed.
 fn spawn_viewer //ONE TASK PER VIEWER, SO A SLOW ONE BLOCKS ONLY ITSELF
 (
     stream: Arc<Mutex<OwnedWriteHalf>>,
@@ -236,6 +299,7 @@ fn spawn_viewer //ONE TASK PER VIEWER, SO A SLOW ONE BLOCKS ONLY ITSELF
     Some(Viewer { token, tx, stats, task, needs_key: true, muted: false })
 }
 
+/// Returns the index of the placeholder frame due now, played off the wall clock.
 fn muted_frame(started: &Instant) -> Option<usize> //INDEX OF THE PLACEHOLDER FRAME DUE RIGHT NOW
 {
     //PLAY THE ANIMATION OFF THE WALL CLOCK
@@ -245,6 +309,7 @@ fn muted_frame(started: &Instant) -> Option<usize> //INDEX OF THE PLACEHOLDER FR
     Some((started.elapsed().as_millis() / screen::consts::MUTED_FRAME_INTERVAL.as_millis()) as usize % frames)
 }
 
+/// Ends a share whose upload socket closed: detaches every viewer and tells the sharer.
 async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
 {
     //TAKE THE SHARE STATE WITHOUT ABORTING
@@ -274,6 +339,9 @@ async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
     network::send(&mut *write_stream.lock().await, PacketCode::Screen { token: None }, keys.as_ref()).await;
 }
 
+/// Reports the worst viewer's backlog to the sharer every
+/// [`FEEDBACK_INTERVAL`](screen::consts::FEEDBACK_INTERVAL), skipping intervals with nothing to
+/// say.
 async fn feedback //TELL THE SHARER HOW FAR BEHIND ITS VIEWERS ARE
 (
     share: Arc<Share>,
@@ -315,6 +383,20 @@ async fn feedback //TELL THE SHARER HOW FAR BEHIND ITS VIEWERS ARE
 }
 
 //PUBLIC
+/// Attaches a viewer to a running share.
+///
+/// The viewer is built here, sent the share's last keyframe, and left for the share loop to
+/// adopt on its next frame.
+///
+/// # Parameters
+/// - `sharer_id`: The sharer's session id.
+/// - `client_id`: The viewer's session id.
+/// - `keys`: The viewer's session keys.
+/// - `stream`: The viewer socket's write half.
+/// - `token`: The attachment's token.
+///
+/// # Returns
+/// `false` if the share is not running or the viewer could not be built.
 pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
 (
     sharer_id: usize,
@@ -348,6 +430,14 @@ pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
     }
 }
 
+/// Receives one client's screen share and relays it to its viewers until the upload socket
+/// closes.
+///
+/// # Parameters
+/// - `token`: The share's token.
+/// - `id`: The sharer's session id.
+/// - `streams`: The upload socket's halves.
+/// - `task`: This task's abort handle, registered on the connection.
 pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task: AbortHandle)
 {
     //GET CLIENT KEYS

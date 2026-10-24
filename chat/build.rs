@@ -108,8 +108,11 @@ fn main()
         panic!("Do not enable `chat` directly - use `client` or `server`.");
     }
 
-    //USE OF SERVER AND CLIENT FEATURES COMBINED
-    if client_feature && server_feature
+    //RERUN WHEN THE DOCS SWITCH FLIPS
+    println!("cargo:rerun-if-env-changed=DOCS_RS");
+
+    //USE OF SERVER AND CLIENT FEATURES COMBINED (DOCS EXCEPTED)
+    if client_feature && server_feature && env::var("DOCS_RS").is_err()
     {
         panic!
         (

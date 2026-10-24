@@ -16,6 +16,27 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # UI State
+//!
+//! [`App`] is the whole state of the terminal UI: the message pane and its parked panes, the
+//! sidebar's rosters, the overlays, pictures and their loading, the selection, and the session's
+//! lifecycle. Everything else in the TUI reads or mutates it; only [`draw`](super::draw) turns it
+//! into a frame.
+//!
+//! # The Message Pane
+//! Entries are stored unrendered ([`Entry`]) and wrapped on demand into rows, cached per pane
+//! width and per *generation* — anything that changes how entries render bumps the generation.
+//! The scroll offset is in wrapped rows, `None` meaning stuck to the bottom. The pane being read
+//! is [`App::messages`]; every other channel's scrollback is parked in [`App::panes`] and keeps
+//! filling while we are away.
+//!
+//! # Pictures
+//! A picture is an animation of one or more frames ([`Fitted`]). Its rows are reserved at wrap
+//! time from its dimensions alone; it is only fitted to the pane and handed to the terminal while
+//! within reach of the view ([`App::load_visible`]), and put down again when it leaves. Pictures
+//! not yet loaded are fetched from the cache or the server as they come within reach, a few at a
+//! time ([`App::take_image_requests`]).
+
 use std::
 {
     mem,
@@ -99,11 +120,14 @@ use super::
 };
 
 //ENUMS
+/// One entry of the message pane.
 pub enum Entry //ONE ROW OF HISTORY
 {
+    /// Already styled text: the client's own output, notices, block commands.
     Line(Line<'static>), //ALREADY STYLED - CLIENT OUTPUT, NOTICES, BLOCK COMMANDS
 
     //A CHAT MESSAGE, STORED UNRENDERED
+    /// A live chat message.
     Message
     {
         username: String,
@@ -119,6 +143,7 @@ pub enum Entry //ONE ROW OF HISTORY
     },
 
     //A REPLAYED MESSAGE, WITHOUT A CLIENT ID
+    /// A replayed history message, which has no session id.
     History
     {
         username: String,
@@ -133,8 +158,10 @@ pub enum Entry //ONE ROW OF HISTORY
     },
 
     //A PRIVATE MESSAGE, STORED UNRENDERED
+    /// A private message.
     Private
     {
+        /// `true` if we sent it to `username`, `false` if it came from them.
         sent: bool, //TO username, ELSE FROM
         username: String,
         id: usize,
@@ -143,9 +170,11 @@ pub enum Entry //ONE ROW OF HISTORY
     },
 
     //A TRANSFER AND HOW FAR IT HAS GOT
+    /// A file transfer and its progress.
     Transfer(Transfer),
 
     //A PICTURE AND ITS CAPTION
+    /// A picture and its caption.
     Image
     {
         username: String,
@@ -153,13 +182,16 @@ pub enum Entry //ONE ROW OF HISTORY
         message_id: u64,
         timestamp: Option<u64>,
         username_color: Option<u8>, //THE SENDER'S, LIKE A MESSAGE'S
+        /// What to ask the server for.
         hash: Option<[u8; 32]>,     //WHAT TO ASK THE SERVER FOR
+        /// Its loading state.
         picture: Picture,
         hearts: Vec<String>,
         pinned: bool,
     },
 
     //A VOICE MESSAGE AND ITS BUTTON
+    /// A voice message and its play button.
     Voice
     {
         username: String,
@@ -175,6 +207,7 @@ pub enum Entry //ONE ROW OF HISTORY
 
 impl Entry
 {
+    /// Returns the server's message id, if this is a message.
     pub fn message_id(&self) -> Option<u64> //THE SERVER'S ID, IF IT IS A MESSAGE
     {
         match self
@@ -185,6 +218,7 @@ impl Entry
         }
     }
 
+    /// Returns the author, if this is a message.
     pub fn username(&self) -> Option<&str> //WHO SAID IT, IF IT IS A MESSAGE
     {
         match self
@@ -195,6 +229,7 @@ impl Entry
         }
     }
 
+    /// Returns who hearted it.
     pub fn hearts(&self) -> &[String] //WHO HEARTED IT
     {
         match self
@@ -205,29 +240,34 @@ impl Entry
         }
     }
 
+    /// Replaces who hearted it.
     fn set_hearts(&mut self, new: Vec<String>) //REPLACE WHO HEARTED IT
     {
         if let Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. }
             | Entry::Voice { hearts, .. } = self { *hearts = new; }
     }
 
+    /// Returns whether a moderator pinned it.
     pub fn pinned(&self) -> bool //PINNED BY A MODERATOR
     {
         matches!(self, Entry::Message { pinned: true, .. } | Entry::History { pinned: true, .. } | Entry::Image { pinned: true, .. }
             | Entry::Voice { pinned: true, .. })
     }
 
+    /// Pins or unpins it.
     fn set_pinned(&mut self, new: bool) //PIN OR UNPIN IT
     {
         if let Entry::Message { pinned, .. } | Entry::History { pinned, .. } | Entry::Image { pinned, .. }
             | Entry::Voice { pinned, .. } = self { *pinned = new; }
     }
 
+    /// Returns whether it was edited since it was sent.
     pub fn edited(&self) -> bool //CHANGED SINCE SENT
     {
         matches!(self, Entry::Message { edited: true, .. } | Entry::History { edited: true, .. })
     }
 
+    /// Rewords it and marks it edited.
     fn set_text(&mut self, new: String) //REWORD IT
     {
         if let Entry::Message { text, edited, .. } | Entry::History { text, edited, .. } = self
@@ -237,6 +277,7 @@ impl Entry
         }
     }
 
+    /// Returns the message it replies to.
     pub fn reply(&self) -> Option<u64> //THE MESSAGE IT ANSWERS
     {
         match self
@@ -246,6 +287,7 @@ impl Entry
         }
     }
 
+    /// Returns whether it takes part in the alternating stripes (somebody's message, not our output).
     pub fn striped(&self) -> bool //WHETHER IT TAKES PART IN THE STRIPES
     {
         matches!(self, Entry::Message { .. } | Entry::History { .. } | Entry::Private { .. } | Entry::Image { .. } | Entry::Voice { .. })
@@ -253,195 +295,310 @@ impl Entry
 }
 
 //WHAT THERE IS TO DRAW UNDER A CAPTION
+/// What there is to draw under a picture's caption.
 pub enum Picture
 {
+    /// Not asked for; drawn as a `[ show ]` button.
     Absent,            //NOT ASKED FOR YET
+    /// Loaded once it comes within reach.
     Deferred,          //LOADED ONCE IT IS ON SCREEN
+    /// Asked for, not here yet.
     Waiting,           //ASKED FOR, NOT HERE YET
+    /// The server does not have it any more.
     Gone,              //THE SERVER DOES NOT HAVE IT ANY MORE
+    /// Decoded and ready.
     Ready(Box<Fitted>),
 }
 
 //WHERE A VOICE MESSAGE'S PLAYBACK IS
+/// Where a voice message's playback is.
 #[derive(Clone, Copy, PartialEq)]
 pub enum Playback
 {
+    /// Not playing.
     Idle,          //NOT PLAYING
+    /// Requested, not started yet.
     Loading,       //ASKED FOR, NOT STARTED YET
+    /// Playing, this many seconds in.
     Playing(u32),  //SECONDS IN
+    /// The server does not have it any more.
     Gone,          //THE SERVER DOES NOT HAVE IT ANY MORE
 }
 
 //STRUCTS
+/// A file transfer, in or out.
 pub struct Transfer //A FILE ON ITS WAY, IN OR OUT
 {
+    /// The transfer id progress reports name.
     pub uid: u64,              //WHAT A PROGRESS TICK NAMES
+    /// Whether it is an upload.
     pub upload: bool,          //WHICH WAY IT GOES
+    /// Whether it is a picture.
     pub image: bool,           //WHAT TO CALL IT
+    /// The file's name.
     pub filename: String,
+    /// Bytes done.
     pub done: u64,
+    /// Bytes in total.
     pub total: u64,
+    /// `None` while it runs, then whether it succeeded.
     pub outcome: Option<bool>, //None WHILE IT RUNS
 }
 
+/// A decoded picture at the size the pane draws it.
 pub struct Fitted //A PICTURE AT THE SIZE THE PANE DRAWS IT AT
 {
+    /// Every frame, kept to fit again at a new pane width.
     pub frames: Animation,                  //THE PICTURE ITSELF, KEPT TO FIT AGAIN AT A NEW PANE WIDTH
+    /// Which frame the protocol holds.
     pub current: usize,                     //WHICH FRAME `protocol` HOLDS - A STILL HAS ONLY THE ONE
+    /// When the next frame is due.
     pub next: Instant,                      //WHEN THE FRAME AFTER IT IS DUE
+    /// Rows it reserves at the current width.
     pub rows: u16,                          //ROWS IT RESERVES AT THAT WIDTH
+    /// The width the protocol was fitted to.
     pub fitted: u16,                        //THE WIDTH `protocol` WAS FITTED TO
+    /// The terminal protocol; `None` while the picture is out of reach.
     pub protocol: Option<StatefulProtocol>, //None WHILE THE PICTURE IS OFF SCREEN
+    /// What is kept of an unloaded protocol, so the terminal's id for the picture survives.
     pub unloaded: Option<Unloaded>,         //THE TERMINAL'S ID FOR IT, KEPT WHILE IT IS
 }
 
 //WHAT AN UNLOADED PICTURE KEEPS OF ITS PROTOCOL
+/// What an unloaded picture keeps of its protocol: rebuilding with the same type replaces the
+/// picture terminal-side instead of leaving the old one behind.
 pub struct Unloaded
 {
+    /// The protocol type, carrying the terminal's id.
     pub kind: StatefulProtocolType,
+    /// The background it was built with.
     pub background: Option<Rgba<u8>>,
 }
 
+/// Where one picture sits in the wrapped view.
 #[derive(Clone, Copy)]
 pub struct Placement //WHERE ONE IMAGE SITS IN THE WRAPPED VIEW
 {
+    /// Index of its entry in [`App::messages`].
     pub entry: usize,  //WHICH App::messages ENTRY IT BELONGS TO
+    /// First row of its caption.
     pub caption: u16,  //FIRST ROW OF THE CAPTION
+    /// First reserved row, where the caption ends.
     pub row: u16,      //FIRST RESERVED ROW (WHERE THE CAPTION ENDS)
+    /// Reserved rows; 0 while there is no picture.
     pub height: u16,   //RESERVED ROWS - 0 WHILE THERE IS NO PICTURE
 }
 
 //A DRAG, IN WRAPPED-VIEW ROWS
+/// A drag selection, in wrapped-view coordinates so it scrolls with the text.
 #[derive(Clone, Copy)]
 pub struct Selection
 {
+    /// Where it started: (wrapped row, pane column).
     pub anchor: (u16, u16), //(ROW IN THE WRAPPED VIEW, COLUMN INSIDE THE PANE)
+    /// Where it is now.
     pub cursor: (u16, u16),
+    /// Whether a drag ever arrived; a press alone is a click.
     pub dragged: bool,      //A DRAG EVER ARRIVED
 }
 
 //PUSH-TO-TALK STATE
+/// Push-to-talk state.
 #[cfg(feature = "client_voice")]
 #[derive(Clone, Copy)]
 pub struct Recording
 {
+    /// When the recording started.
     pub started: Instant,
+    /// Last press of the key, repeats included.
     pub pressed: Instant, //LAST PRESS OF THE KEY, REPEATS INCLUDED
+    /// Whether the key is held down.
     pub held: bool,       //KEY HELD DOWN
+    /// Seconds shown on screen.
     pub shown: u32,       //SECONDS ON SCREEN
 }
 
 //STRUCTS
+/// The whole state of the terminal UI.
 pub struct App
 {
     //MESSAGE PANE
+    /// The pane being read: the channel we are in.
     pub messages: VecDeque<Entry>, //THE PANE BEING LOOKED AT - THE CHANNEL WE ARE STANDING IN
+    /// Which channel that is; empty for the lobby.
     pub channel: String,           //WHICH CHANNEL THAT IS ("" = THE LOBBY)
+    /// Every other channel's scrollback, parked while we are away.
     pub panes: HashMap<String, VecDeque<Entry>>, //THE OTHER CHANNELS' SCROLLBACK, PARKED WHILE WE ARE AWAY
+    /// Scroll offset in wrapped rows; `None` is stuck to the bottom.
     pub scroll: Option<u16>, //None = STUCK TO THE BOTTOM
+    /// Messages that arrived while scrolled away.
     pub unread: usize,       //MESSAGES ARRIVED WHILE SCROLLED AWAY
 
     //SIDEBAR
+    /// Our username.
     pub username: String, //OUR OWN USERNAME (options::get_server_username IS THE SERVER'S NAME)
+    /// Our role.
     pub role: Role,       //OUR OWN ROLE
+    /// Our username color.
     pub color: Option<u8>, //OUR OWN USERNAME COLOR
+    /// Who is connected.
     pub online: Vec<OnlineUser>,
+    /// Registered users nobody is connected as, with their colors.
     pub offline: BTreeMap<String, Option<u8>>, //REGISTERED USERS NOBODY IS CONNECTED AS, AND THEIR COLORS
+    /// Whether the server discloses offline users at all.
     pub offline_listed: bool, //WHETHER THE SERVER SENDS THEM AT ALL
+    /// What each user joined on, by username.
     pub devices: HashMap<String, Device>, //WHAT EACH USER JOINED ON, KEYED BY USERNAME
+    /// Named channels that currently exist.
     pub channels: BTreeSet<String>, //NAMED CHANNELS THE SERVER CURRENTLY HOLDS
+    /// What the voice panel draws, built from the roster and the activity.
     pub voice: Vec<VoiceUser>, //WHAT THE VOICE PANEL DRAWS
+    /// Who the server says is in voice in our channel, ourselves excluded.
     pub voice_roster: BTreeMap<usize, String>, //WHO THE SERVER SAYS IS IN VOICE IN OUR CHANNEL (US EXCLUDED)
+    /// Who the local voice session is hearing, and their ping.
     pub voice_activity: Vec<VoiceUser>, //WHO WE ARE ACTUALLY HEARING
+    /// Whether we are in voice.
     pub voice_enabled: bool,
 
     //CONNECTION (SHOWN IN THE MESSAGE PANE TITLE)
+    /// The server address as typed.
     pub address: String,     //AS THE USER TYPED IT - NO IMPLICIT PORT
+    /// The server's name, once it has introduced itself.
     pub server_name: String, //THE SERVER'S OWN NAME, ONCE IT HAS INTRODUCED ITSELF
 
     //THE SERVER'S PICTURE, THE ONE THAT IS BUILT, AND WHERE THE SIDEBAR PUT IT
+    /// Hash of the server icon.
     pub server_icon: Option<[u8; 32]>,
+    /// The server icon, decoded.
     pub icon: Option<Box<Fitted>>,
+    /// Which hash the decoded icon is.
     icon_of: Option<[u8; 32]>,
+    /// Where the sidebar put the icon.
     pub icon_area: Rect,
+    /// Whether the tick should ask for the icon.
     pub icon_request: bool, //THE TICK ASKS FOR IT
 
     //INPUT
+    /// The input line.
     pub input: InputBuffer,
+    /// The slash-command palette.
     pub palette: Palette,
+    /// The settings overlay.
     pub settings: Settings, //SETTINGS OVERLAY (CLOSED UNLESS THE USER OPENED IT)
+    /// The connect box, while not logged in.
     pub login: Option<Login>, //CONNECT BOX
+    /// The server identity prompt.
     pub tofu: Option<Prompt>, //SERVER IDENTITY PROMPT
+    /// The account form.
     pub account: Option<Account>, //ACCOUNT FORM
+    /// Cached config-driven styling.
     pub theme: Theme,
+    /// What the terminal can draw, and its cell size.
     pub picker: Picker, //WHAT THE TERMINAL CAN DRAW, AND HOW BIG ITS CELLS ARE
 
     //WHERE THE MESSAGE PANE WAS LAST DRAWN
+    /// Where the message pane was last drawn.
     pub pane: Rect,
+    /// Its scroll offset when it was drawn.
     pub pane_offset: u16,
+    /// The drag selection, kept until the next press.
     pub selection: Option<Selection>, //A DRAG-SELECTED RUN OF THE PANE, KEPT UNTIL THE NEXT PRESS
 
     //A TOAST IN THE CHROME, WHICH EXPIRES
+    /// A toast in the pane's border, and when it was raised.
     pub notice: Option<(String, Instant)>,
 
     //VOICE MESSAGES
+    /// Which clip is playing, and how many seconds in.
     pub playing: Option<([u8; 32], u32)>, //WHICH CLIP IS PLAYING, AND HOW MANY SECONDS IN
+    /// Whether the terminal reports key releases.
     pub key_release: bool,                //THE TERMINAL REPORTS KEYS BEING LET GO
+    /// Push-to-talk state.
     #[cfg(feature = "client_voice")]
     pub recording: Option<Recording>,
 
     //WHO IS WRITING IN OUR CHANNEL, AND WHEN THEY LAST SAID SO
+    /// Who is typing in our channel, and when they last said so.
     pub typing_users: BTreeMap<String, Instant>,
+    /// Whether the input changed since the last tick.
     typing: bool,                   //THE LINE CHANGED SINCE THE LAST TICK
+    /// When we last told the server we are typing.
     typing_sent: Option<Instant>,   //WHEN WE LAST TOLD THE SERVER
 
     //REQUEST BOOKKEEPING
+    /// Whether the next user list should be printed.
     pub list_requested: bool,
+    /// Whether the next screen share list should be printed.
     #[cfg(feature = "client_screen")]
     pub screens_requested: bool,
 
     //PICTURES TO ASK THE SERVER FOR
+    /// Pictures to request from the server.
     pub image_requests: Vec<[u8; 32]>,
 
     //PICTURES THAT SCROLLED INTO VIEW, TO LOAD OUT OF THE CACHE
+    /// Pictures that came within reach, to load from the cache.
     pub image_loads: Vec<[u8; 32]>,
 
     //PICTURES ASKED OF THE SERVER, NOT ANSWERED YET
+    /// Pictures requested and not yet answered.
     image_fetching: Vec<[u8; 32]>,
 
     //LOBBY HISTORY PAGING
+    /// Where the first replayed entry sits in the lobby pane.
     history_anchor: Option<usize>,    //WHERE THE FIRST REPLAYED ENTRY SITS IN THE LOBBY PANE
+    /// The cursor of the next older page, while there are older ones.
     history_cursor: Option<u64>,      //ITS SERVER INDEX, WHILE OLDER ONES ARE LEFT
+    /// Whether a page is in flight.
     history_pending: bool,            //A PAGE WAS ASKED FOR
+    /// The page the tick should request.
     pub history_request: Option<u64>, //THE PAGE THE TICK ASKS FOR
 
     //LIFECYCLE
+    /// Whether the user asked to quit.
     pub leaving: bool,      //THE USER ASKED TO LEAVE
+    /// Whether the user asked to log out.
     pub logging_out: bool,  //THE USER ASKED TO LOG OUT
+    /// Why the server is about to drop us.
     pub disconnect_reason: Option<String>, //WHY THE SERVER IS ABOUT TO DROP US
+    /// The automatic reconnect after a drop the user did not ask for.
     pub reconnect: Reconnect, //DIALS ITSELF BACK AFTER A DROP THE USER DID NOT ASK FOR
+    /// Whether the event loop should drop the dead write half.
     pub drop_stream: bool,  //THE LOOP OWNS THE WRITE HALF
+    /// Whether the event loop should stop.
     pub should_quit: bool,
+    /// The process exit code.
     pub exit_code: i32,
+    /// Printed on the normal screen after the terminal is restored.
     pub quit_message: Option<String>, //PRINTED ON THE NORMAL SCREEN AFTER TEARDOWN
+    /// Whether the next tick should draw.
     pub dirty: bool,
 
     //WHAT THE LAST FRAME DREW OVER THE PANE
+    /// Rects of the boxes the last frame drew over the pane.
     overlays: Vec<Rect>,
+    /// Each picture row the last frame drew, and its first cell.
     picture_rows: Vec<(u16, String)>, //AND EACH PICTURE ROW'S FIRST CELL
+    /// How many times each avatar row was marked, alternating so a re-send is never a no-op.
     pub avatar_marks: Vec<(u16, usize)>, //HOW MANY TIMES EACH AVATAR ROW WAS MARKED
 
     //WRAP CACHE
+    /// Bumped whenever entries need rewrapping.
     generation: u64,
+    /// The wrap cache: width, generation, rows, picture placements, entry first rows, row tints.
     wrapped: Option<(u16, u64, Vec<Line<'static>>, Vec<Placement>, Vec<u16>, Vec<Option<Style>>)>,
+    /// Parity of the striped entries trimmed off the top.
     stripe: bool, //PARITY OF THE MESSAGES TRIMMED OFF THE TOP
+    /// Background of the striped entries.
     pub stripe_bg: Color,
+    /// The terminal's background, as it reported it.
     terminal_bg: Option<(u8, u8, u8)>, //AS THE TERMINAL REPORTED IT
 }
 
 //IMPLEMENTATIONS
 impl Selection
 {
+    /// Returns the two ends in reading order.
     pub fn ordered(&self) -> ((u16, u16), (u16, u16)) //THE TWO ENDS IN READING ORDER
     {
         if self.cursor < self.anchor { (self.cursor, self.anchor) } else { (self.anchor, self.cursor) }
@@ -455,6 +612,7 @@ impl Default for App
 
 impl App
 {
+    /// Creates the initial state, with the connect box up.
     pub fn new() -> Self
     {
         Self
@@ -533,6 +691,7 @@ impl App
     }
 
     //BUILD THE PANEL FROM ROSTER + LOCAL SESSION
+    /// Rebuilds the voice panel from the roster and the local session's activity.
     pub fn rebuild_voice(&mut self)
     {
         let mut users: Vec<VoiceUser> = Vec::with_capacity(self.voice_roster.len() + 1);
@@ -576,12 +735,14 @@ impl App
     }
 
     //OUTPUT
+    /// Appends a styled line to the pane.
     pub fn push(&mut self, line: Line<'static>)
     {
         self.push_entry(Entry::Line(line));
     }
 
     //STORE A CHAT MESSAGE UNRENDERED
+    /// Appends a chat message to the pane, clearing its author's typing notice.
     pub fn push_message(&mut self, username: String, id: usize, message_id: u64, timestamp: Option<u64>, text: String,
         colors: MessageColors, reply: Option<u64>)
     {
@@ -589,6 +750,7 @@ impl App
     }
 
     //STORE AN ENTRY IN ANOTHER CHANNEL'S PARKED PANE
+    /// Appends an entry to another channel's parked pane, creating it if needed.
     pub fn park_entry(&mut self, channel: String, entry: Entry)
     {
         let lobby = channel.is_empty();
@@ -610,12 +772,14 @@ impl App
     }
 
     //STORE A PRIVATE MESSAGE UNRENDERED
+    /// Appends a private message to the pane.
     pub fn push_private(&mut self, sent: bool, username: String, id: usize, text: String, colors: MessageColors)
     {
         self.push_entry(Entry::Private { sent, username, id, text, colors });
     }
 
     //THE NEWEST PAGE OF THE LOBBY'S HISTORY
+    /// Puts the newest page of lobby history under its heading.
     pub fn start_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
     {
         self.history_anchor = Some(self.messages.len());
@@ -625,6 +789,8 @@ impl App
     }
 
     //AN OLDER PAGE, ABOVE WHAT IS ALREADY THERE
+    /// Inserts an older page of lobby history above what is there, keeping the view on what it was
+    /// showing.
     pub fn prepend_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
     {
         self.history_pending = false;
@@ -662,6 +828,7 @@ impl App
     }
 
     //DROP A DELETED MESSAGE FROM WHICHEVER PANE HOLDS IT
+    /// Removes a deleted message from whichever pane holds it.
     pub fn delete_message(&mut self, message_id: u64)
     {
         let lobby = self.channel.is_empty();
@@ -680,6 +847,7 @@ impl App
     }
 
     //WHO HEARTED A LOADED MESSAGE
+    /// Returns who hearted a message, if it is loaded.
     pub fn hearts_of(&self, message_id: u64) -> Option<Vec<String>>
     {
         self.messages.iter().chain(self.panes.get("").into_iter().flatten())
@@ -688,24 +856,29 @@ impl App
     }
 
     //A MESSAGE'S HEARTS CHANGED
+    /// Updates a message's hearts.
     pub fn set_hearts(&mut self, message_id: u64, hearts: Vec<String>)
     {
         self.update_message(message_id, |entry| entry.set_hearts(hearts));
     }
 
     //A MESSAGE WAS PINNED OR UNPINNED
+    /// Updates a message's pin.
     pub fn set_pinned(&mut self, message_id: u64, pinned: bool)
     {
         self.update_message(message_id, |entry| entry.set_pinned(pinned));
     }
 
     //A MESSAGE WAS REWORDED
+    /// Rewords a message.
     pub fn edit_message(&mut self, message_id: u64, text: String)
     {
         self.update_message(message_id, |entry| entry.set_text(text));
     }
 
     //CHANGE A MESSAGE IN PLACE, WHICHEVER PANE HOLDS IT
+    /// Changes a message in place in whichever pane holds it, keeping the scroll and selection on
+    /// the same text.
     fn update_message(&mut self, message_id: u64, change: impl FnOnce(&mut Entry))
     {
         let Some(index) = self.messages.iter().position(|entry| entry.message_id() == Some(message_id)) else
@@ -748,6 +921,8 @@ impl App
     }
 
     //REMOVE AN ENTRY OF THE PANE BEING LOOKED AT
+    /// Removes an entry from the pane being read, moving the scroll, selection and history anchor up
+    /// by the rows it took.
     fn remove_entry(&mut self, index: usize, lobby: bool)
     {
         self.rewrap(self.pane.width);
@@ -780,12 +955,14 @@ impl App
         }
     }
 
+    /// Moves the history anchor up when an entry above it goes.
     fn shift_anchor(&mut self, index: usize) //THE REPLAYED ENTRIES MOVE UP WITH IT
     {
         if let Some(anchor) = self.history_anchor.as_mut() && index < *anchor { *anchor -= 1; }
     }
 
     //ROWS THE PANE WRAPS TO AT ITS LAST WIDTH
+    /// Returns the rows the pane wraps to at its last width.
     fn wrapped_rows(&mut self) -> u16
     {
         self.rewrap(self.pane.width);
@@ -793,6 +970,11 @@ impl App
     }
 
     //THE QUEUED FETCHES STILL WORTH MAKING, A FEW AT A TIME
+    /// Returns the queued fetches still worth making, up to
+    /// [`MAX_IMAGE_FETCHES`](consts::MAX_IMAGE_FETCHES) in flight.
+    ///
+    /// A request whose caption has left reach is dropped and its caption goes back to
+    /// [`Picture::Deferred`].
     pub fn take_image_requests(&mut self) -> Vec<[u8; 32]>
     {
         if self.image_requests.is_empty() { return Vec::new(); }
@@ -843,12 +1025,14 @@ impl App
     }
 
     //A FETCH CAME BACK
+    /// Frees the fetch slot of an answered request.
     pub fn fetched(&mut self, hash: &[u8; 32])
     {
         if let Some(index) = self.image_fetching.iter().position(|h| h == hash) { self.image_fetching.swap_remove(index); }
     }
 
     //ENTRIES WHOSE CAPTION IS WITHIN REACH
+    /// Returns the entries whose caption is within reach.
     fn on_screen(&mut self) -> Vec<usize>
     {
         let (offset, height) = (self.pane_offset, self.pane.height);
@@ -860,6 +1044,7 @@ impl App
     }
 
     //A PICTURE THAT CAME WITH ITS BYTES
+    /// Appends a decoded picture to the pane.
     pub fn push_image(&mut self, username: String, filename: String, message_id: u64, timestamp: Option<u64>,
         image: Animation, username_color: Option<u8>)
     {
@@ -869,12 +1054,14 @@ impl App
     }
 
     //A TRANSFER STARTING
+    /// Appends a transfer to the pane.
     pub fn push_transfer(&mut self, uid: u64, filename: String, total: u64, upload: bool, image: bool)
     {
         self.push_entry(Entry::Transfer(Transfer { uid, upload, image, filename, done: 0, total, outcome: None }));
     }
 
     //MOVE A TRANSFER'S BAR ALONG
+    /// Moves a transfer's progress along.
     pub fn update_transfer(&mut self, uid: u64, done: u64)
     {
         let Some(transfer) = self.transfer(uid) else { return };
@@ -891,6 +1078,7 @@ impl App
     }
 
     //A TRANSFER THAT ENDED, WELL OR NOT
+    /// Marks a transfer finished.
     pub fn finish_transfer(&mut self, uid: u64, ok: bool)
     {
         let Some(transfer) = self.transfer(uid) else { return };
@@ -903,6 +1091,7 @@ impl App
     }
 
     //THE NEWEST ROW THAT TICK NAMES
+    /// Returns the newest transfer with this id.
     fn transfer(&mut self, uid: u64) -> Option<&mut Transfer>
     {
         self.messages.iter_mut().rev().find_map(|entry| match entry
@@ -913,6 +1102,7 @@ impl App
     }
 
     //A CAPTION WITHOUT ITS PICTURE
+    /// Appends a picture's caption without the picture.
     pub fn push_caption(&mut self, username: String, filename: String, message_id: u64, timestamp: Option<u64>,
         hash: [u8; 32], picture: Picture, username_color: Option<u8>)
     {
@@ -920,6 +1110,7 @@ impl App
     }
 
     //A VOICE MESSAGE, HERE OR IN ITS OWN CHANNEL'S PANE
+    /// Appends a voice message to the pane, or to its channel's parked pane.
     pub fn push_voice(&mut self, channel: Option<String>, username: String, message_id: u64, timestamp: Option<u64>,
         voice: VoiceNote, username_color: Option<u8>)
     {
@@ -933,6 +1124,10 @@ impl App
     }
 
     //THE CLIP OF A LOADED VOICE MESSAGE
+    /// Returns the clip of a loaded voice message.
+    ///
+    /// # Returns
+    /// `Err` with a message for the user if it is not in the pane or the parked lobby.
     pub fn voice_of(&self, message_id: u64) -> Result<[u8; 32], String>
     {
         let entry = self.messages.iter().chain(self.panes.get("").into_iter().flatten())
@@ -947,6 +1142,7 @@ impl App
     }
 
     //WHICH VOICE MESSAGE IS UNDER THE POINTER
+    /// Returns the voice message entry under a pane cell.
     pub fn voice_at(&mut self, column: u16, row: u16) -> Option<usize>
     {
         let pane = self.pane;
@@ -965,6 +1161,7 @@ impl App
     }
 
     //CLIP OF A VOICE ENTRY, AND IF IT PLAYS
+    /// Returns a voice entry's clip and whether it is playing.
     pub fn voice_entry(&self, entry: usize) -> Option<([u8; 32], bool)>
     {
         match self.messages.get(entry)?
@@ -975,6 +1172,7 @@ impl App
     }
 
     //SET EVERY ENTRY OF ONE CLIP
+    /// Sets the playback state of every entry of one clip, in every pane.
     pub fn set_playback(&mut self, hash: &[u8; 32], playback: Playback)
     {
         let mut changed = false;
@@ -997,6 +1195,7 @@ impl App
     }
 
     //A PLAY THAT NEVER STARTED
+    /// Clears the loading state of a play that never started.
     pub fn stop_loading(&mut self)
     {
         let loading: Vec<[u8; 32]> = self.messages.iter().filter_map(|entry| match entry
@@ -1009,6 +1208,7 @@ impl App
     }
 
     //FOLLOW WHAT THE PLAYER IS DOING
+    /// Follows the player, bumping the generation only when the shown second changes.
     pub fn sync_playing(&mut self, now: Option<([u8; 32], u32)>)
     {
         let now = now.map(|(hash, ms)| (hash, ms / 1000));
@@ -1027,6 +1227,7 @@ impl App
     }
 
     //A CLICKED CAPTION
+    /// Handles a click on a caption: marks it waiting and returns the hash to fetch.
     pub fn request_image(&mut self, entry: usize) -> Option<[u8; 32]>
     {
         let Some(Entry::Image { hash, picture, .. }) = self.messages.get_mut(entry) else { return None };
@@ -1042,6 +1243,9 @@ impl App
     }
 
     //FILL THE OLDEST LINE STILL WAITING
+    /// Fills the waiting or offered captions of a picture; `None` marks waiting ones unavailable.
+    ///
+    /// A deferred caption is not filled: it has not asked yet.
     pub fn deliver_image(&mut self, hash: [u8; 32], image: Option<Animation>)
     {
         let (picture, asked) = match image
@@ -1070,12 +1274,14 @@ impl App
     }
 
     //CUT EVERY FRAME DOWN TO IMAGE_ROWS
+    /// Fits a picture to [`IMAGE_ROWS`](consts::IMAGE_ROWS).
     fn fit(&self, image: Animation) -> Picture
     {
         Picture::Ready(self.fit_rows(image, consts::IMAGE_ROWS))
     }
 
     //THE SAME, TO WHATEVER ROW BUDGET THE PICTURE IS DRAWN UNDER
+    /// Fits a picture to a row budget, reserving its rows without building a protocol.
     fn fit_rows(&self, image: Animation, rows: u16) -> Box<Fitted>
     {
         let font = self.picker.font_size();
@@ -1108,6 +1314,7 @@ impl App
     }
 
     //THE PROFILE PICTURE THE BOX ASKED FOR
+    /// Takes the profile picture the profile box asked for.
     pub fn deliver_avatar(&mut self, hash: [u8; 32], image: Option<Animation>)
     {
         let Some(image) = image else { return };
@@ -1118,6 +1325,7 @@ impl App
     }
 
     //WHETHER A PICTURE THAT CAME BACK IS THE ONE THE PROFILE BOX IS WAITING FOR
+    /// Returns whether the profile box is waiting for this picture.
     pub fn wants_avatar(&self, hash: &[u8; 32]) -> bool
     {
         self.settings.open && self.settings.avatar.as_ref() == Some(hash)
@@ -1125,12 +1333,14 @@ impl App
     }
 
     //BUILD THE PROFILE PICTURE AT THE SIZE THE BOX RESERVED FOR IT
+    /// Builds the profile picture at the size the box reserved.
     pub fn load_avatar(&mut self, width: u16)
     {
         if let Some(ready) = self.settings.picture.as_mut() { load_fitted(&self.picker, ready, width, consts::AVATAR_ROWS); }
     }
 
     //AND STEP IT, WHICH THE PANE'S CLOCK DOES NOT REACH
+    /// Steps an animated profile picture.
     fn advance_avatar(&mut self)
     {
         if !self.settings.open { return; }
@@ -1144,6 +1354,7 @@ impl App
     }
 
     //THE SERVER'S PICTURE, NAMED OR DROPPED
+    /// Sets or drops the server icon, queueing its load.
     pub fn set_server_icon(&mut self, hash: Option<[u8; 32]>)
     {
         self.server_icon = hash;
@@ -1161,11 +1372,13 @@ impl App
     }
 
     //WHETHER A PICTURE THAT CAME BACK IS THE SERVER'S
+    /// Returns whether this picture is the server icon.
     pub fn wants_icon(&self, hash: &[u8; 32]) -> bool
     {
         self.server_icon.as_ref() == Some(hash) && self.icon_of.as_ref() != Some(hash)
     }
 
+    /// Takes the decoded server icon.
     pub fn deliver_icon(&mut self, hash: [u8; 32], image: Option<Animation>)
     {
         let Some(image) = image else { return };
@@ -1176,6 +1389,7 @@ impl App
     }
 
     //BUILD THE SERVER'S PICTURE AT THE SIZE THE SIDEBAR RESERVED FOR IT
+    /// Builds the server icon at the size the sidebar reserved.
     pub fn load_icon(&mut self)
     {
         let width = self.icon_area.width;
@@ -1186,6 +1400,7 @@ impl App
     }
 
     //AND STEP IT WHILE IT IS ON SCREEN
+    /// Steps an animated server icon while it is on screen.
     fn advance_icon(&mut self)
     {
         if self.icon_area.width == 0 { return; }
@@ -1199,6 +1414,7 @@ impl App
     }
 
     //STEP EVERY ANIMATION THAT IS DUE
+    /// Steps every on-screen animation that is due, skipping frames that came due late.
     pub fn advance_animations(&mut self)
     {
         self.advance_avatar();
@@ -1252,6 +1468,10 @@ impl App
     }
 
     //BUILD THE PICTURES WITHIN REACH AND PUT THE REST DOWN
+    /// Loads what is within reach of the view and unloads what is not: builds pictures, queues their
+    /// loads, and asks for an older history page when the top comes near.
+    ///
+    /// Called with the geometry the pane was just drawn with.
     pub fn load_visible(&mut self, width: u16, offset: u16, height: u16)
     {
         let font = self.picker.font_size();
@@ -1316,6 +1536,7 @@ impl App
     }
 
     //THE QUERY WANTS STDIO TO ITSELF
+    /// Queries the terminal's graphics support, cell size and background.
     pub fn init_picker(&mut self)
     {
         let options = QueryStdioOptions { terminal_background_color_osc: true, ..Default::default() };
@@ -1335,6 +1556,7 @@ impl App
         self.generation += 1;
     }
 
+    /// Appends an entry, trimming the pane to [`HISTORY_LIMIT`](consts::HISTORY_LIMIT).
     fn push_entry(&mut self, entry: Entry)
     {
         self.messages.push_back(entry);
@@ -1357,17 +1579,20 @@ impl App
         if self.scroll.is_some() { self.unread += 1; }
     }
 
+    /// Appends unstyled text.
     pub fn push_text(&mut self, text: impl Into<String>)
     {
         self.push(Line::from(Span::raw(text.into())));
     }
 
+    /// Appends styled text.
     pub fn push_styled(&mut self, text: impl Into<String>, style: Style)
     {
         self.push(Line::from(Span::styled(text.into(), style)));
     }
 
     //CLEAR THE PANE BEING LOOKED AT
+    /// Clears the pane being read.
     pub fn clear_messages(&mut self)
     {
         self.messages.clear();
@@ -1388,6 +1613,7 @@ impl App
     }
 
     //PARK THE OLD PANE, PUT BACK THE NEW ONE
+    /// Switches channel: parks the current pane and restores the new one's.
     pub fn switch_channel(&mut self, channel: String)
     {
         if channel == self.channel { return; }
@@ -1417,6 +1643,7 @@ impl App
     }
 
     //HIGHEST ROLE FIRST, US FIRST IN OURS, THE REST BY ID
+    /// Sorts the roster: highest role first, ourselves first in ours, the rest by id.
     pub fn sort_online(&mut self)
     {
         let me = self.username.clone();
@@ -1425,18 +1652,21 @@ impl App
     }
 
     //THE ROSTER SPLIT BY ROLE
+    /// Returns the roster split by role.
     pub fn online_sections(&self) -> impl Iterator<Item = &[OnlineUser]>
     {
         self.online.chunk_by(|a, b| a.role == b.role)
     }
 
     //DROP THE SCROLLBACK OF AN EMPTY CHANNEL
+    /// Drops the parked panes of channels that no longer exist.
     pub fn prune_panes(&mut self)
     {
         self.panes.retain(|channel, _| channel.is_empty() || self.channels.contains(channel));
     }
 
     //RE-READ THE STYLING AND REPAINT THE HISTORY
+    /// Rereads the config-driven styling and rewraps everything.
     pub fn reload_theme(&mut self)
     {
         self.theme.reload();
@@ -1449,6 +1679,7 @@ impl App
     }
 
     //PUT A REPLAYED ANSWER IN THE FIELD FOR THE TICK TO SEND
+    /// Puts a remembered login answer in the field for the tick to send, during a reconnect.
     pub fn answer_step(&mut self, stage: Stage)
     {
         let Some(answer) = self.reconnect.answer(stage) else { return };
@@ -1459,6 +1690,8 @@ impl App
     }
 
     //THROW THE SESSION AWAY, BRING BACK THE BOX
+    /// Ends the session: brings back the connect box with the reason, clears every session view and
+    /// arms the reconnect when the drop was not asked for.
     pub fn disconnected(&mut self, reason: impl Into<String>)
     {
         //CARRY THE DIAL COUNTER OVER
@@ -1532,6 +1765,7 @@ impl App
     }
 
     //SCROLLING
+    /// Scrolls up, clamped to the top.
     pub fn scroll_up(&mut self, amount: u16, viewport: u16)
     {
         let total = self.wrapped_len();
@@ -1542,6 +1776,7 @@ impl App
         self.dirty = true;
     }
 
+    /// Scrolls down; reaching the bottom sticks to it.
     pub fn scroll_down(&mut self, amount: u16, viewport: u16)
     {
         let total = self.wrapped_len();
@@ -1557,6 +1792,7 @@ impl App
         self.dirty = true;
     }
 
+    /// Sticks to the bottom.
     pub fn stick_to_bottom(&mut self)
     {
         self.scroll = None;
@@ -1565,12 +1801,14 @@ impl App
     }
 
     //THE BACKGROUND OF A WRAPPED ROW, IF ANY
+    /// Returns the background of a wrapped row: a mention or a stripe.
     pub fn tint(&self, row: u16) -> Option<Style>
     {
         self.wrapped.as_ref().and_then(|wrapped| wrapped.5.get(row as usize).copied().flatten())
     }
 
     //RECOMPUTE THE PALETTE FROM THE INPUT
+    /// Recomputes the palette from the input line.
     pub fn refresh_palette(&mut self)
     {
         let mut users = self.online.iter().map(|user| user.username.clone())
@@ -1585,6 +1823,7 @@ impl App
     }
 
     //WRAPPED VIEW (CACHED PER WIDTH + GENERATION)
+    /// Returns the wrapped rows at a width.
     pub fn wrapped_lines(&mut self, width: u16) -> &[Line<'static>]
     {
         self.rewrap(width);
@@ -1593,6 +1832,7 @@ impl App
     }
 
     //WHICH IMAGE'S CAPTION IS UNDER THE POINTER
+    /// Returns the picture entry whose caption is under a pane cell.
     pub fn image_at(&mut self, column: u16, row: u16) -> Option<usize>
     {
         let pane = self.pane;
@@ -1608,6 +1848,7 @@ impl App
     }
 
     //AND WHICH URL IS, IF THE CELL IS ON ONE
+    /// Returns the web link under a pane cell, if the word there is one.
     pub fn link_at(&mut self, column: u16, row: u16) -> Option<String>
     {
         let pane = self.pane;
@@ -1623,6 +1864,10 @@ impl App
 
     //SELECTION
     //A PRESS STARTS ONE; A DRAG MAKES IT A SELECTION
+    /// Starts a possible selection at a pane cell.
+    ///
+    /// # Returns
+    /// `true` if the cell is in the pane.
     pub fn selection_start(&mut self, column: u16, row: u16) -> bool
     {
         let pane = self.pane;
@@ -1639,6 +1884,7 @@ impl App
     }
 
     //A DRAG PAST AN EDGE SCROLLS THE PANE
+    /// Extends the selection to a pane cell, scrolling when it is past an edge.
     pub fn selection_extend(&mut self, column: u16, row: u16)
     {
         let pane = self.pane;
@@ -1676,12 +1922,14 @@ impl App
 
     //TOAST
     //A TOAST IN THE PANE'S BOTTOM BORDER
+    /// Raises a toast in the pane's bottom border.
     pub fn notify(&mut self, text: impl Into<String>)
     {
         self.notice = Some((text.into(), Instant::now()));
         self.dirty = true;
     }
 
+    /// Returns the toast, if it is up.
     pub fn notice(&self) -> Option<&str>
     {
         self.notice.as_ref()
@@ -1690,6 +1938,7 @@ impl App
     }
 
     //TAKE THE BOXES OF THIS FRAME, HANDING BACK THE LAST FRAME'S
+    /// Stores the boxes drawn this frame and returns last frame's.
     pub fn overlays_drawn(&mut self, overlays: &[Rect]) -> Vec<Rect>
     {
         let previous = std::mem::take(&mut self.overlays);
@@ -1700,12 +1949,14 @@ impl App
     }
 
     //WHETHER THE LAST FRAME SENT THIS ROW
+    /// Returns whether the last frame sent this picture row with this first cell.
     pub fn picture_row_sent(&self, y: u16, symbol: &str) -> bool
     {
         self.picture_rows.iter().any(|(row, sent)| *row == y && sent == symbol)
     }
 
     //TAKE THIS FRAME'S PICTURE ROWS, HANDING BACK THE ONES THAT CHANGED
+    /// Stores this frame's picture rows and returns those whose first cell changed.
     pub fn picture_rows_drawn(&mut self, rows: Vec<(u16, String)>) -> Vec<u16>
     {
         let changed = rows.iter()
@@ -1718,6 +1969,7 @@ impl App
     }
 
     //DROP THE TOAST ONCE IT IS OLD
+    /// Drops the toast once it has expired.
     pub fn expire_notice(&mut self)
     {
         if self.notice.is_some() && self.notice().is_none()
@@ -1729,6 +1981,7 @@ impl App
 
     //TYPING
     //THE LINE CHANGED - WE ARE WRITING A MESSAGE
+    /// Notes that the input changed; an empty line or a command resets the typing state.
     pub fn typed(&mut self)
     {
         let text = self.input.text();
@@ -1747,6 +2000,8 @@ impl App
     }
 
     //WHETHER THE TICK OWES THE SERVER A TypingRequest
+    /// Returns whether the tick owes the server a typing notice, at most one per
+    /// [`TYPING_INTERVAL`](why2_chat::consts::TYPING_INTERVAL).
     pub fn take_typing(&mut self) -> bool
     {
         if !mem::take(&mut self.typing) { return false; }
@@ -1760,6 +2015,7 @@ impl App
     }
 
     //SOMEBODY IN OUR CHANNEL IS WRITING
+    /// Records that somebody is typing.
     pub fn set_typing(&mut self, username: String)
     {
         if !config::read_config::<bool>("typing_indicator") { return; }
@@ -1769,12 +2025,14 @@ impl App
     }
 
     //A MESSAGE IS THE PROOF THEY STOPPED
+    /// Forgets that somebody is typing.
     pub fn stopped_typing(&mut self, username: &str)
     {
         if self.typing_users.remove(username).is_some() { self.dirty = true; }
     }
 
     //DROP WHOEVER HAS NOT RESTATED IT
+    /// Drops typing notices older than [`TYPING_TIMEOUT`](why2_chat::consts::TYPING_TIMEOUT).
     pub fn expire_typing(&mut self)
     {
         let before = self.typing_users.len();
@@ -1785,6 +2043,7 @@ impl App
     }
 
     //WHAT THE PANE'S BORDER SAYS ABOUT IT
+    /// Returns what the pane's border says about who is typing.
     pub fn typing_line(&self) -> Option<String>
     {
         let names: Vec<&str> = self.typing_users.keys().map(String::as_str).collect();
@@ -1798,12 +2057,14 @@ impl App
         }
     }
 
+    /// Clears the selection.
     pub fn clear_selection(&mut self)
     {
         if self.selection.take().is_some() { self.dirty = true; }
     }
 
     //WHICH COLUMNS OF A ROW ARE SELECTED
+    /// Returns which columns of a wrapped row are selected.
     pub fn selection_columns(&self, row: u16) -> Option<(u16, u16)>
     {
         let selection = self.selection?;
@@ -1823,6 +2084,7 @@ impl App
     }
 
     //THE SELECTED TEXT
+    /// Returns the selected text, sliced out of the same wrapped rows that are highlighted.
     pub fn selection_text(&mut self) -> Option<String>
     {
         let selection = self.selection?;
@@ -1857,6 +2119,7 @@ impl App
     }
 
     //A TERMINAL CELL AS A WRAPPED-VIEW PLACE
+    /// Converts a terminal cell to a (wrapped row, pane column) place.
     fn pane_cell(&self, column: u16, row: u16) -> (u16, u16)
     {
         let pane = self.pane;
@@ -1868,6 +2131,7 @@ impl App
     }
 
     //WHERE THE PICTURES SIT IN THE WRAPPED VIEW
+    /// Returns where the pictures sit in the wrapped view at a width.
     pub fn placements(&mut self, width: u16) -> Vec<Placement>
     {
         self.rewrap(width);
@@ -1875,6 +2139,7 @@ impl App
         self.wrapped.as_ref().unwrap().3.clone()
     }
 
+    /// Rewraps the pane at a width: rows, picture placements, entry starts and row tints.
     fn rewrap(&mut self, width: u16)
     {
         let stale = match &self.wrapped
@@ -1965,6 +2230,7 @@ impl App
         self.wrapped = Some((width, self.generation, lines, placements, starts, tints));
     }
 
+    /// Returns the number of wrapped rows.
     fn wrapped_len(&self) -> u16
     {
         self.wrapped.as_ref().map(|(_, _, lines, ..)| lines.len() as u16).unwrap_or(0)
@@ -1973,6 +2239,7 @@ impl App
 
 //FUNCTIONS
 //HOW FAR ALONG, IN WHOLE PERCENT
+/// Returns how far along a transfer is, in whole percent.
 pub fn percent(done: u64, total: u64) -> u64
 {
     match total
@@ -1984,6 +2251,8 @@ pub fn percent(done: u64, total: u64) -> u64
 
 //THE SIZE A PICTURE IS DRAWN AT, NEVER LARGER THAN IT IS
 //ON SCREEN OR WITHIN PRELOAD_SCREENS OF IT
+/// Returns whether a picture is on screen or within
+/// [`PRELOAD_SCREENS`](consts::PRELOAD_SCREENS) of it.
 fn in_reach(placement: &Placement, offset: u16, height: u16) -> bool
 {
     let margin = height.saturating_mul(consts::PRELOAD_SCREENS);
@@ -1992,6 +2261,15 @@ fn in_reach(placement: &Placement, offset: u16, height: u16) -> bool
         && placement.row + placement.height > offset.saturating_sub(margin)
 }
 
+/// Returns the pixel size a picture is drawn at: fitted into the pane width and the row budget,
+/// never enlarged.
+///
+/// For a $w \times h$ picture and an available area of $W$ pixels (pane columns times cell width)
+/// by $H$ pixels (rows times cell height), the picture is scaled by
+///
+/// $$ s = \min\left(1,\ \frac{W}{w},\ \frac{H}{h}\right) $$
+///
+/// each side rounded and at least one pixel.
 fn fit_size(width: u32, height: u32, pane: u16, rows: u16, font: FontSize) -> (u32, u32)
 {
     let available_width = pane.max(1) as u32 * font.width as u32;
@@ -2005,6 +2283,7 @@ fn fit_size(width: u32, height: u32, pane: u16, rows: u16, font: FontSize) -> (u
 }
 
 //THE CELLS A PICTURE CLAIMS AT THAT SIZE
+/// Returns the cells a picture claims at its drawn size.
 pub fn picture_cells(image: &DynamicImage, pane: u16, rows: u16, font: FontSize) -> (u16, u16)
 {
     let (width, height) = fit_size(image.width(), image.height(), pane, rows, font);
@@ -2014,6 +2293,7 @@ pub fn picture_cells(image: &DynamicImage, pane: u16, rows: u16, font: FontSize)
 }
 
 //BUILD A PICTURE'S PROTOCOL AT width, UNLESS IT ALREADY IS
+/// Builds a picture's protocol at a width, reusing its terminal id, unless it already is.
 fn load_fitted(picker: &Picker, ready: &mut Fitted, width: u16, rows: u16)
 {
     if ready.fitted == width && ready.protocol.is_some() { return; }
@@ -2034,6 +2314,10 @@ fn load_fitted(picker: &Picker, ready: &mut Fitted, width: u16, rows: u16)
 }
 
 //STEP A PICTURE'S ANIMATION IF A FRAME IS DUE
+/// Steps a picture's animation if a frame is due.
+///
+/// # Returns
+/// `true` if the frame changed.
 fn step_fitted(ready: &mut Fitted, rows: u16, font: FontSize) -> bool
 {
     let now = Instant::now();
@@ -2063,6 +2347,7 @@ fn step_fitted(ready: &mut Fitted, rows: u16, font: FontSize) -> bool
 }
 
 //SHRINK A PICTURE INTO THE PANE, NEVER GROW IT
+/// Shrinks a picture into the pane, never enlarging it.
 fn fit_image(image: &DynamicImage, width: u16, rows: u16, font: FontSize) -> DynamicImage
 {
     let (fit_width, fit_height) = fit_size(image.width(), image.height(), width, rows, font);
@@ -2075,6 +2360,7 @@ fn fit_image(image: &DynamicImage, width: u16, rows: u16, font: FontSize) -> Dyn
 }
 
 //ONE WRAPPED LINE BETWEEN TWO CELL COLUMNS
+/// Returns the whitespace-delimited word over a cell of a wrapped row.
 fn word_at(line: &Line<'static>, column: usize) -> Option<String> //THE WHITESPACE-DELIMITED WORD OVER A CELL
 {
     let mut word = String::new();
@@ -2105,6 +2391,7 @@ fn word_at(line: &Line<'static>, column: usize) -> Option<String> //THE WHITESPA
 }
 
 //A WEB LINK, WITHOUT WHAT PUNCTUATION IS ONLY LEANING ON IT
+/// Returns a word as an `http`/`https` link, trimming the punctuation a link only leans on.
 fn url(word: &str) -> Option<String>
 {
     let mut word = word.trim_start_matches(['(', '[', '<']);
@@ -2121,6 +2408,7 @@ fn url(word: &str) -> Option<String>
     (misc::is_web_url(word) && word.len() <= consts::MAX_URL).then(|| word.to_owned())
 }
 
+/// Returns the text between two cell columns of a wrapped row; a wide glyph is taken whole.
 fn slice_cells(line: &Line<'static>, from: usize, to: usize) -> String
 {
     let mut out = String::new();
@@ -2143,6 +2431,9 @@ fn slice_cells(line: &Line<'static>, from: usize, to: usize) -> String
     out
 }
 
+/// Word-wraps one logical line to a width, keeping span styles.
+///
+/// A word longer than the width is broken where it runs out of cells.
 pub fn wrap_line(line: &Line<'static>, width: u16) -> Vec<Line<'static>> //WORD-WRAP ONE LOGICAL LINE, KEEPING SPAN STYLES
 {
     let width = width.max(1) as usize;
@@ -2200,6 +2491,7 @@ pub fn wrap_line(line: &Line<'static>, width: u16) -> Vec<Line<'static>> //WORD-
     out
 }
 
+/// Splits text into alternating runs of whitespace and words.
 fn split_words(text: &str) -> Vec<&str> //SPLIT INTO RUNS OF WHITESPACE AND WORDS
 {
     let mut out = Vec::new();
@@ -2229,12 +2521,15 @@ fn split_words(text: &str) -> Vec<&str> //SPLIT INTO RUNS OF WHITESPACE AND WORD
     out
 }
 
+/// Returns the display width of text, in cells.
 fn text_width(text: &str) -> usize
 {
     text.chars().map(|c| c.width().unwrap_or(0)).sum()
 }
 
 //SESSION STATE THAT LIVES OUTSIDE App
+/// Resets the session state that lives outside [`App`]: sequence numbers, login state, channel,
+/// pending uploads, and the voice and screen flags.
 fn reset_session()
 {
     options::set_seq(0);

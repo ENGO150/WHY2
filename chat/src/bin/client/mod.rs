@@ -16,6 +16,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # WHY2 Client
+//!
+//! The terminal client binary, `why2`.
+//!
+//! The client is a single full-screen TUI ([`tui`]): it enters the alternate screen before
+//! anything else happens, and connecting, logging in and chatting all happen inside it. Nothing
+//! prints outside the TUI; the only write to the normal screen is the quit message, after the
+//! terminal has been restored.
+//!
+//! With screen sharing compiled in, the main thread runs the winit event loop for the viewer
+//! window and the client runs in a task beside it; otherwise the client runs on the main thread.
+//!
+//! This module also holds what a submitted line turns into ([`submit`]): commands handled
+//! locally, commands sent to the server, uploads, and chat messages.
+
 #![cfg(feature = "client_base")]
 
 //MODULES
@@ -105,12 +120,15 @@ use why2_chat::network::screen::client::
 };
 
 //HANDLER FNS
+/// Reports invalid usage, with a specific message key or the generic one.
 fn invalid_usage(app: &mut App, key: Option<&'static str>) //PUSH 'INVALID' MESSAGE
 {
     app.push_styled(i18n::text(key.unwrap_or("invalid.usage")), theme::error());
 }
 
 //MODERATION ACTIONS - /server <action> [target]
+/// Runs `/server <action> [target]`, checking the role, the action and its parameter before
+/// sending the request.
 async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, tx: &Sender<ClientEvent>,
     parameters: Option<String>)
 {
@@ -250,6 +268,7 @@ async fn server_command(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteH
 }
 
 //ACCOUNT ACTIONS - /account <action>
+/// Runs `/account <action>` by opening the account box for it.
 fn account_command(app: &mut App, parameters: Option<String>)
 {
     let Some(info) = command::COMMAND_LIST.iter().find(|info| info.command == Command::Account) else { return };
@@ -263,6 +282,7 @@ fn account_command(app: &mut App, parameters: Option<String>)
     }));
 }
 
+/// Lists who hearted a message in the pane, from the hearts the client already holds.
 fn hearts(app: &mut App, parameters: Option<String>) //LIST WHO HEARTED A MESSAGE
 {
     let Some(message_id) = parameters.and_then(|p| p.parse::<u64>().ok()) else { return invalid_usage(app, None) };
@@ -289,6 +309,7 @@ fn hearts(app: &mut App, parameters: Option<String>) //LIST WHO HEARTED A MESSAG
     }
 }
 
+/// Toggles the mute of a peer by id, or of the local microphone.
 #[cfg(feature = "client_voice")]
 fn mute(app: &mut App, parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
 {
@@ -315,6 +336,7 @@ fn mute(app: &mut App, parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
 }
 
 //A TYPED NAME TO THE CODE THE WIRE CARRIES
+/// Resolves a typed color name (`dark red`, `darkred`, `dark_red`) to its wire code.
 fn to_color(color: &str) -> Option<u8>
 {
     //FORMAT COLOR STRING
@@ -328,12 +350,20 @@ fn to_color(color: &str) -> Option<u8>
 }
 
 //WHAT WE TELL THE SERVER WE ARE RUNNING
+/// Returns the device we tell the server we run on, if `share_device` is on.
 fn share_device() -> Option<Device>
 {
     if config::read_config::<bool>("share_device") { Some(Device::TUI) } else { None }
 }
 
 //HANDLE COLOR CHANGE: CHECK IT AND ASK THE SERVER
+/// Checks a typed color and asks the server to store it.
+///
+/// # Parameters
+/// - `app`: The UI state, for error messages.
+/// - `write_stream`: The main connection.
+/// - `username`: `true` for the username color, `false` for the message color.
+/// - `parameters`: The typed color.
 async fn color_handler
 (
     app: &mut App,
@@ -356,6 +386,7 @@ async fn color_handler
 }
 
 //EVERY DEVICE THE VOICE CLIENT COULD OPEN (BLOCKING)
+/// Lists every audio device the voice client could open, on a blocking thread.
 async fn audio_devices() -> Devices
 {
     #[cfg(not(feature = "client_voice"))]
@@ -378,12 +409,15 @@ async fn audio_devices() -> Devices
     }
 }
 
+/// Converts a voice device into a settings overlay entry.
 #[cfg(feature = "client_voice")]
 fn device_entry(device: voice::AudioDevice) -> DeviceEntry
 {
     DeviceEntry { id: device.id, label: device.label }
 }
 
+/// Starts the client: the panic hook, the configuration, the version check, then the TUI (and the
+/// viewer's event loop when screen sharing is compiled in).
 #[tokio::main]
 async fn main()
 {
@@ -419,6 +453,7 @@ async fn main()
     }
 }
 
+/// Runs the TUI until it quits, then restores the terminal, prints the quit message and exits.
 async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>)
 {
     //CHECK IF SOCKS5 IS ENABLED
@@ -450,16 +485,35 @@ async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>
 }
 
 //WHAT AN UPLOAD IS FOR
+/// What an upload is for, from the client's side.
 #[derive(Clone, Copy, PartialEq)]
 pub enum Upload
 {
+    /// A fileshare.
     File,
+    /// A chat picture.
     Image,
+    /// Our avatar.
     Avatar,
+    /// The server icon.
     Icon,
 }
 
 //CHECK A FILE, THEN HASH IT AND ASK THE SERVER FOR AN UPLOAD
+/// Checks a file and asks the server to upload it.
+///
+/// The file is hashed — or, for an avatar or icon, cut to a square first — on a blocking thread,
+/// parked in [`ACTIVE_UPLOADS`](client::ACTIVE_UPLOADS) under its hash, and requested with the
+/// packet for its kind.
+///
+/// # Parameters
+/// - `write_stream`: The main connection.
+/// - `path`: The file, `~` expanded.
+/// - `kind`: What it is for.
+/// - `tx`: Where an avatar failure is reported.
+///
+/// # Returns
+/// `Err` with a message for the user if the file fails [`check_upload`].
 pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: Upload, tx: Option<Sender<ClientEvent>>)
     -> Result<(), String>
 {
@@ -508,6 +562,7 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
 }
 
 //UPLOAD A RECORDED CLIP
+/// Parks a recorded clip in the temp directory and asks the server to upload it.
 #[cfg(feature = "client_voice")]
 pub fn send_voice(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, clip: Vec<u8>, tx: Sender<ClientEvent>)
 {
@@ -532,6 +587,7 @@ pub fn send_voice(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, clip: Vec<u8>,
 }
 
 //SHA256 OF A WHOLE FILE
+/// Returns the SHA-256 of a whole file, or `None` on a read error.
 fn hash_file(mut file: File) -> Option<[u8; 32]>
 {
     let mut hasher = Sha256::new();
@@ -550,6 +606,10 @@ fn hash_file(mut file: File) -> Option<[u8; 32]>
 }
 
 //CUT AN AVATAR TO ITS SQUARE AND PARK IT FOR THE UPLOAD
+/// Cuts a picture into an avatar and parks it in the temp directory for upload.
+///
+/// # Returns
+/// The avatar's hash and temp path, or `Err` with a message for the user.
 fn cut_avatar(mut file: File) -> Result<([u8; 32], PathBuf), String>
 {
     let mut data = Vec::new();
@@ -571,6 +631,13 @@ fn cut_avatar(mut file: File) -> Result<([u8; 32], PathBuf), String>
 }
 
 //OPEN A FILE AND REFUSE WHAT THE SERVER WOULD
+/// Opens a file to upload and refuses what the server would.
+///
+/// A fileshare only has to exist; a picture must also be under
+/// [`MAX_IMAGE_SIZE`](consts::MAX_IMAGE_SIZE) and have a recognised image header.
+///
+/// # Returns
+/// The open file (rewound) and its path, or `Err` with a message for the user.
 pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
 {
     //THE PALETTE OFFERS ~ PATHS, SO ONE HAS TO OPEN
@@ -606,6 +673,13 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
 }
 
 //HANDLE ONE SUBMITTED LINE
+/// Handles one submitted line: a login answer, a local or server command, or a chat message.
+///
+/// # Parameters
+/// - `app`: The UI state.
+/// - `write_stream`: The main connection.
+/// - `tx`: The UI event channel.
+/// - `input`: The line; trimmed unless it is a password.
 pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, tx: &Sender<ClientEvent>, input: String)
 {
     let input = if options::get_asking_password() { input } else { input.trim().to_string() };

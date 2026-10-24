@@ -16,6 +16,48 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Hybrid Key Exchange
+//!
+//! The handshake that turns a fresh TCP connection into a pair of [`SharedKeys`](crate::consts::SharedKeys),
+//! plus the management of the long-lived keys stored on disk.
+//!
+//! # Protocol
+//! The server holds a static P-521 identity that **only ever signs**. For every connection:
+//!
+//! 1. The client sends a fresh nonce.
+//! 2. The server generates an ephemeral P-521 pair and an ephemeral ML-KEM-768 pair, and signs
+//!    `KEX_CONTEXT || nonce || eph_ecc || pq` with its identity (`create_offer`).
+//! 3. The client checks the signature against the pinned identity ([`verify_offer`]),
+//!    encapsulates to the ML-KEM key ([`encapsulate_pq`]) and answers with its own ephemeral
+//!    P-521 key and the ciphertext.
+//! 4. Both sides combine the ECDH secret and the ML-KEM secret with HKDF
+//!    ([`derive_shared_secret`]) and expand the result into the grid key and the HMAC key.
+//!
+//! With $n$ the client's nonce, $E\_s$ and $E\_c$ the server's and the client's ephemeral P-521
+//! keys, $P$ the ephemeral ML-KEM-768 encapsulation key and $\Vert$ concatenation, the offer is
+//! signed as
+//!
+//! $$ \sigma = \mathrm{Sign}\_{sk}\left(\texttt{WHY2-KEX-V1} \Vert n \Vert E\_s \Vert P\right) $$
+//!
+//! and the session keys are derived from the two shared secrets $z\_{ec} = \mathrm{ECDH}(e\_s, E\_c)$
+//! and $z\_{pq} = \mathrm{Decaps}(d\_P, c)$ as
+//!
+//! $$ S = \mathrm{HKDF\text{-}Expand}\left(\mathrm{PRK}\_0,\ z\_{ec} \Vert z\_{pq} \Vert \texttt{WHY2-HYBRID},\ 64\right) \qquad \mathrm{PRK}\_0 = \mathrm{HKDF\text{-}Extract}(\varnothing, \varnothing) $$
+//!
+//! $$ K = \mathrm{HKDF}(\varnothing,\ S,\ \texttt{WHY2-encryption}) \qquad K\_m = \mathrm{HKDF}(\varnothing,\ S,\ \texttt{WHY2-mac}) $$
+//!
+//! where $K$ is $16WH$ bytes (the grid key) and $K\_m$ is 32 bytes (the HMAC key).
+//!
+//! An attacker has to break **both** P-521 and ML-KEM-768 to recover a session key, and since
+//! every key that encrypts is ephemeral, a later compromise of the identity does not expose
+//! past sessions.
+//!
+//! # At-Rest Keys
+//! The history, picture store and image cache keys (`history_key`, `image_key`,
+//! `cache_key`) are random 32-byte files in the configuration root, created on first use
+//! with mode `0600`. They are deliberately not derived from the identity, so the identity can
+//! be rotated without losing stored data, and deleting a key file discards what it protected.
+
 
 use p521::
 {
@@ -123,6 +165,10 @@ use ml_kem::
 };
 
 //STRUCTS
+/// The server's ephemeral half of one exchange.
+///
+/// It is consumed by the exchange: the ML-KEM half decapsulates the client's ciphertext
+/// ([`decapsulate_pq`]) and the ECC half performs the agreement ([`Ephemeral::into_ecc`]).
 #[cfg(feature = "server")] //THE SERVER'S HALF OF ONE EXCHANGE
 pub struct Ephemeral
 {
@@ -130,17 +176,23 @@ pub struct Ephemeral
     pq: DecapsulationKey768,
 }
 
+/// A signed server offer: the identity, the ephemeral keys and the signature over them.
 #[cfg(feature = "server")]
 pub struct Offer
 {
+    /// The server's static identity key.
     pub static_ecc: PublicKey,
+    /// The ephemeral ECDH key of this exchange.
     pub eph_ecc: PublicKey,
+    /// The ephemeral ML-KEM-768 encapsulation key of this exchange.
     pub pq: EncapsulationKey768,
+    /// Signature by `static_ecc` over the transcript.
     pub sig: Signature,
 }
 
 //FUNCTIONS
 //PRIVATE
+/// Builds the transcript the identity signs: `KEX_CONTEXT || nonce || eph_ecc || pq`.
 fn transcript(nonce: &[u8; 32], eph_ecc: &PublicKey, pq: &EncapsulationKey768) -> Vec<u8> //WHAT THE STATIC KEY SIGNS
 {
     let eph_bytes = public_bytes(eph_ecc);
@@ -159,6 +211,7 @@ fn transcript(nonce: &[u8; 32], eph_ecc: &PublicKey, pq: &EncapsulationKey768) -
     message
 }
 
+/// Expands the combined secret into the session's grid key and HMAC key.
 fn derive_encryption_keys(shared_secret: &[u8]) -> consts_chat::SharedKeys //GENERATE ENCRYPTION KEY AND MAC FROM SHARED SYM KEY
 {
     let hkdf = Hkdf::<Sha256>::new(None, shared_secret);
@@ -180,6 +233,13 @@ fn derive_encryption_keys(shared_secret: &[u8]) -> consts_chat::SharedKeys //GEN
     }).collect()), mac)
 }
 
+/// Loads a 32-byte at-rest key from the configuration root, creating it if missing or truncated.
+///
+/// # Parameters
+/// - `filename`: The key file, relative to the configuration root.
+///
+/// # Panics
+/// If the system RNG fails or the file cannot be written.
 #[cfg(feature = "chat")]
 fn media_key(filename: &str) -> Zeroizing<[u8; 32]>
 {
@@ -202,11 +262,16 @@ fn media_key(filename: &str) -> Zeroizing<[u8; 32]>
 }
 
 //PUBLIC
+/// Encodes a P-521 public key as an uncompressed SEC1 point.
 pub fn public_bytes(key: &PublicKey) -> [u8; consts_chat::ECC_PUBKEY_SIZE]
 {
     key.to_sec1_point(false).as_bytes().try_into().expect("Unexpected SEC1 point length")
 }
 
+/// Generates an ephemeral P-521 keypair.
+///
+/// # Returns
+/// `(private, public)`.
 pub fn generate_ephemeral_keys() -> (SecretKey, PublicKey) //CREATE EPHEMERAL ECC KEYS
 {
     let private = SecretKey::generate();
@@ -215,6 +280,10 @@ pub fn generate_ephemeral_keys() -> (SecretKey, PublicKey) //CREATE EPHEMERAL EC
     (private, public)
 }
 
+/// Generates a P-521 identity encoded as PEM.
+///
+/// # Returns
+/// `(private PKCS#8 PEM, public SPKI PEM)`.
 #[cfg(feature = "server")]
 fn generate_pem_keys() -> (Zeroizing<String>, String) //CREATE ECC KEYS IN THE ON-DISK PEM FORMAT
 {
@@ -229,6 +298,10 @@ fn generate_pem_keys() -> (Zeroizing<String>, String) //CREATE ECC KEYS IN THE O
 }
 
 //THE FILE IS 0600 WHEREVER IT LANDS
+/// Writes a secret to disk, readable by the owner only (`0600` on Unix).
+///
+/// # Panics
+/// If the file cannot be opened or written.
 #[cfg(feature = "chat")]
 fn write_secure_key(path: String, data: &[u8]) //WRITE A SECRET TO DISK, READABLE BY NOBODY ELSE
 {
@@ -248,6 +321,11 @@ fn write_secure_key(path: String, data: &[u8]) //WRITE A SECRET TO DISK, READABL
         .unwrap_or_else(|_| panic!("Failed to write key to {}", path));
 }
 
+/// Creates the server identity if it does not exist, or tightens the permissions of an
+/// existing one (`0700` directory, `0600` files).
+///
+/// # Panics
+/// If the key directory cannot be created.
 #[cfg(feature = "server")]
 pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
 {
@@ -305,6 +383,13 @@ pub fn generate_server_keys() //CREATE STATIC SERVER ECC KEYS
     }
 }
 
+/// Reads the server identity off disk.
+///
+/// # Returns
+/// `(private PEM, public PEM)`.
+///
+/// # Panics
+/// If either key file cannot be read.
 #[cfg(feature = "server")]
 pub fn get_server_keys() -> (Zeroizing<String>, String) //GET SERVER ECC KEYS (ON-DISK PEM)
 {
@@ -316,24 +401,37 @@ pub fn get_server_keys() -> (Zeroizing<String>, String) //GET SERVER ECC KEYS (O
     (Zeroizing::new(sk), pk)
 }
 
+/// Returns the message history's at-rest key, creating it on first use.
 #[cfg(feature = "server")]
 pub fn history_key() -> Zeroizing<[u8; 32]> //THE MESSAGE HISTORY'S AT-REST KEY, CREATED ON FIRST USE
 {
     media_key(consts_chat::SERVER_HISTORY_KEY)
 }
 
+/// Returns the persistent picture store's at-rest key, creating it on first use.
 #[cfg(feature = "server")]
 pub fn image_key() -> Zeroizing<[u8; 32]> //PERSISTENT IMAGE KEY FILE
 {
     media_key(consts_chat::SERVER_IMAGE_KEY)
 }
 
+/// Returns the client image cache's at-rest key, creating it on first use.
 #[cfg(feature = "client_base")]
 pub fn cache_key() -> Zeroizing<[u8; 32]> //CACHED IMAGE AT-REST KEY FILE
 {
     media_key(consts_chat::CLIENT_CACHE_KEY)
 }
 
+/// Generates and signs a fresh ephemeral offer for one handshake.
+///
+/// # Parameters
+/// - `nonce`: The client's handshake nonce, bound into the signed transcript.
+///
+/// # Returns
+/// The server's secret half, kept for the rest of the exchange, and the offer to send.
+///
+/// # Panics
+/// If the identity cannot be read or parsed.
 #[cfg(feature = "server")]
 pub fn create_offer(nonce: &[u8; 32]) -> (Ephemeral, Box<schema::Offer>) //SIGN A FRESH EPHEMERAL PAIR WITH THE STATIC IDENTITY
 {
@@ -355,6 +453,16 @@ pub fn create_offer(nonce: &[u8; 32]) -> (Ephemeral, Box<schema::Offer>) //SIGN 
     )
 }
 
+/// Verifies a server offer against an identity.
+///
+/// # Parameters
+/// - `nonce`: The nonce this client sent.
+/// - `static_ecc`: The identity the offer claims; the caller checks it against the pinned key.
+/// - `eph_ecc`, `pq`: The ephemeral keys offered.
+/// - `sig`: The signature over the transcript.
+///
+/// # Returns
+/// `true` if `sig` is a valid signature by `static_ecc` over this exchange.
 pub fn verify_offer //VERIFY AN OFFER AGAINST THE PINNED IDENTITY
 (
     nonce: &[u8; 32],
@@ -369,6 +477,15 @@ pub fn verify_offer //VERIFY AN OFFER AGAINST THE PINNED IDENTITY
     verifying.verify(&transcript(nonce, eph_ecc, pq), sig).is_ok()
 }
 
+/// Combines the ECDH and ML-KEM secrets into the session keys.
+///
+/// # Parameters
+/// - `local_key`: This side's ephemeral ECDH private key.
+/// - `peer_pkey`: The peer's ephemeral ECDH public key.
+/// - `pq_secret`: The ML-KEM shared secret.
+///
+/// # Returns
+/// The session's grid key and HMAC key.
 pub fn derive_shared_secret //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPTION & MAC KEY
 (
     local_key: SecretKey,
@@ -392,6 +509,10 @@ pub fn derive_shared_secret //DERIVE SHARED SYMKEY USING ECDH AND DERIVE ENCRYPT
     derive_encryption_keys(&combined)
 }
 
+/// Encapsulates a fresh shared secret to the server's ML-KEM key.
+///
+/// # Returns
+/// `(ciphertext to send, shared secret)`.
 pub fn encapsulate_pq(peer_ek: &EncapsulationKey768) -> (Ciphertext<MlKem768>, Zeroizing<Vec<u8>>)
 {
     //ENCAPSULATE
@@ -400,6 +521,7 @@ pub fn encapsulate_pq(peer_ek: &EncapsulationKey768) -> (Ciphertext<MlKem768>, Z
     (ct, Zeroizing::new(ss.as_slice().to_vec()))
 }
 
+/// Recovers the ML-KEM shared secret from the client's ciphertext.
 #[cfg(feature = "server")]
 pub fn decapsulate_pq(ephemeral: &Ephemeral, ciphertext: &Ciphertext<MlKem768>) -> Zeroizing<Vec<u8>>
 {
@@ -410,5 +532,6 @@ pub fn decapsulate_pq(ephemeral: &Ephemeral, ciphertext: &Ciphertext<MlKem768>) 
 impl Ephemeral
 {
     //THE AGREEMENT CONSUMES THE ECC HALF
+    /// Consumes the exchange, returning the ECDH private key.
     pub fn into_ecc(self) -> SecretKey { self.ecc }
 }

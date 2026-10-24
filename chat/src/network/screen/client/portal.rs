@@ -16,6 +16,27 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Wayland Screen Cast Recorder
+//!
+//! Our own xdg-desktop-portal recorder, replacing xcap's on Wayland (Linux only).
+//!
+//! # Why Not xcap's
+//! xcap's portal client subscribes to the `Response` signal without waiting for it, so `Start`
+//! races the picker and fails on compositors like Hyprland. This recorder subscribes first,
+//! calls, then blocks for the answer.
+//!
+//! # Frame Rate
+//! The stream's format offers `maxFramerate` as a range topping out at the share's own rate.
+//! Without it, portals such as xdg-desktop-portal-hyprland capture at the monitor's refresh rate,
+//! and every one of those frames is a GPU readback inside the compositor's render loop.
+//!
+//! # Frames
+//! `BGRx` is passed through as [`PixelOrder::Bgra`] rather than swizzled, the buffer's stride is
+//! honoured, and frames are copied into recycled buffers of the [`LatestFrame`] handoff. The
+//! portal asks for the cursor embedded where offered, which also gives a damage-driven
+//! compositor something to send when the pointer moves. Stopping ends the PipeWire stream and
+//! closes the portal session.
+
 use std::
 {
     collections::HashMap,
@@ -60,20 +81,31 @@ use crate::network::screen::
 };
 
 //CONSTANTS
+/// Bus name of the desktop portal.
 const DESTINATION: &str = "org.freedesktop.portal.Desktop";
+/// Object path of the desktop portal.
 const DESKTOP: &str = "/org/freedesktop/portal/desktop";
+/// The screen cast portal interface.
 const SCREENCAST: &str = "org.freedesktop.portal.ScreenCast";
 
+/// Screen cast source type for a monitor.
 const SOURCE_MONITOR: u32 = 1;
+/// Cursor mode that embeds the cursor in the picture.
 const CURSOR_EMBEDDED: u32 = 2;
+/// Largest frame dimension offered in the format.
 const MAX_DIMENSION: u32 = 16384;
 
 //STRUCTS
+/// A screen cast session and the thread reading its PipeWire stream. Dropping it stops both.
 pub struct PortalRecorder //A SCREEN CAST SESSION AND THE THREAD READING IT
 {
+    /// The D-Bus session connection.
     connection: Connection,
+    /// The portal session's object path.
     session: OwnedObjectPath,
+    /// Tells the stream thread to quit.
     quit: channel::Sender<()>,
+    /// The stream thread.
     thread: Option<JoinHandle<()>>,
 }
 
@@ -85,11 +117,13 @@ impl Drop for PortalRecorder
     }
 }
 
+/// Returns a fresh portal handle token.
 fn token() -> String
 {
     format!("why2_{}", rand::random::<u32>())
 }
 
+/// Returns our D-Bus unique name as portal request paths spell it.
 fn sender(connection: &Connection) -> Result<String, String> //THE CALLER'S NAME AS PORTAL PATHS SPELL IT
 {
     connection.unique_name()
@@ -98,6 +132,10 @@ fn sender(connection: &Connection) -> Result<String, String> //THE CALLER'S NAME
 }
 
 //CALL A PORTAL METHOD AND WAIT FOR ITS RESPONSE
+/// Calls a portal method and waits for its `Response` signal.
+///
+/// # Returns
+/// The response's results, or `Err` if the call failed or the user cancelled.
 fn request<B>(connection: &Connection, portal: &Proxy, method: &str, token: &str, body: &B) -> Result<HashMap<String, OwnedValue>, String>
 where
     B: zbus::export::serde::Serialize + zbus::zvariant::DynamicType,
@@ -126,6 +164,7 @@ where
 }
 
 //THE PIPEWIRE NODE OF THE FIRST STREAM
+/// Returns the PipeWire node of the first stream in a `Start` response.
 fn stream_node(results: &HashMap<String, OwnedValue>) -> Result<u32, String>
 {
     let streams = results.get("streams").ok_or_else(|| "the portal named no stream".to_owned())?;
@@ -138,6 +177,7 @@ fn stream_node(results: &HashMap<String, OwnedValue>) -> Result<u32, String>
     streams.first().map(|(node, _)| *node).ok_or_else(|| "the portal named no stream".to_owned())
 }
 
+/// Builds the SPA format parameters: the pixel formats we accept and a frame rate capped at `fps`.
 fn format_params(fps: u32) -> Result<Vec<u8>, String> //WHAT WE ACCEPT, CAPPED AT OUR FRAME RATE
 {
     let object = pod::object!(
@@ -191,6 +231,7 @@ fn format_params(fps: u32) -> Result<Vec<u8>, String> //WHAT WE ACCEPT, CAPPED A
         .map_err(|error| format!("{error:?}"))
 }
 
+/// Maps a PipeWire video format to the pixel order it is in memory, for the formats we accept.
 fn pixel_order(format: VideoFormat) -> Option<PixelOrder>
 {
     match format
@@ -202,6 +243,9 @@ fn pixel_order(format: VideoFormat) -> Option<PixelOrder>
 }
 
 //READ THE STREAM UNTIL TOLD TO QUIT
+/// Connects to the portal's PipeWire remote and copies frames into `latest` until told to quit.
+///
+/// `ready` is answered once the stream reaches `Streaming`, or with the error that stopped it.
 fn run_stream
 (
     fd: std::os::fd::OwnedFd,
@@ -312,6 +356,7 @@ fn run_stream
 
 impl PortalRecorder
 {
+    /// Ends the stream and closes the portal session.
     pub fn stop(&mut self) //END THE STREAM AND THE SESSION
     {
         let Some(thread) = self.thread.take() else { return };
@@ -326,6 +371,17 @@ impl PortalRecorder
         }
     }
 
+    /// Asks the portal for a monitor to cast and starts reading it.
+    ///
+    /// Blocks while the picker is up.
+    ///
+    /// # Parameters
+    /// - `latest`: Where frames go.
+    /// - `fps`: The share's frame rate, offered as the stream's ceiling.
+    ///
+    /// # Returns
+    /// `Err` with a description if the portal is unavailable, the user cancelled, or the stream never
+    /// started.
     pub fn start(latest: Arc<LatestFrame>, fps: u32) -> Result<Self, String> //ASK THE PORTAL FOR A MONITOR, BLOCKING ON THE PICKER
     {
         let connection = Connection::session().map_err(|error| error.to_string())?;

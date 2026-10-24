@@ -16,6 +16,50 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Voice Chat — Client Side
+//!
+//! The client's voice session: audio capture and playback through `cpal`, the capture
+//! processing chain, the per-peer jitter buffers, and the UDP loop ([`listen_server_voice`]).
+//!
+//! # Capture
+//! The input callback runs, in order: the voice message tap, the mute check, resampling to
+//! [`SAMPLE_RATE`](consts::SAMPLE_RATE) mono, RNNoise denoising, the noise gate (with pre-roll
+//! and hold), automatic gain control with a soft limiter, the microphone volume, and Opus
+//! encoding. The callback never touches the network: encoded frames are `try_send`-ed to a task
+//! that does.
+//!
+//! The gate's noise floor falls quickly and rises slowly, and only learns from frames below the
+//! opening threshold, so somebody who joins mid-sentence cannot teach it that their voice is the
+//! room. With $r$ the frame's RMS and $f$ the floor, while the gate is closed:
+//!
+//! $$ f \leftarrow \begin{cases} f + 0.05 (r - f) & r \lt f \\\\ f + 0.005 (r - f) & f \le r \lt \theta\_{open} \\\\ f & \text{otherwise} \end{cases} \qquad \theta\_{open} = \max(3.5f,\ 0.0008) \qquad \theta\_{close} = \max(2f,\ 0.0004) $$
+//!
+//! The gate opens on $r \gt \theta\_{open}$ and closes once $r \lt \theta\_{close}$ has outlasted the
+//! hold.
+//!
+//! # Playback
+//! Each peer has an Opus decoder and a ring buffer (a [`PeerData`] fed by the network task and a
+//! `RemoteStream` drained by the output callback). The output callback mixes every peer,
+//! resampling to the device rate and playing slightly fast while a buffer is deeper than
+//! [`JITTER_TARGET`](consts::JITTER_TARGET); a buffer past [`JITTER_MAX`](consts::JITTER_MAX)
+//! is shed back to the target. The final mix is handed to [`aec`] as the echo reference.
+//!
+//! # Devices
+//! Devices are enumerated and opened from the same hosts ([`list_devices`]) — on Linux the ALSA
+//! host first, for latency, then the sound server's — and stored by cpal device id. Changing a
+//! device rebuilds both streams within the running session, keeping the UDP socket and the peers;
+//! a device that will not open puts the previous pair back.
+//!
+//! # Generations
+//! Every session bumps a generation counter that the callbacks check, so a stream left over from
+//! a previous session goes quiet instead of feeding the new one.
+//!
+//! # Submodules
+//! - [`aec`] — keeps our own playback out of shared screen audio.
+//! - [`message`] — recording and playback of voice messages.
+//! - [`options`] — volumes and processing switches the callbacks read.
+//! - [`sfx`] — join and leave sounds.
+
 //MODULES
 pub mod sfx;
 pub mod aec;
@@ -119,54 +163,82 @@ use crate::
 use cpal::HostId;
 
 //STRUCTS
+/// The running input and output streams, and the device ids they were built from.
 struct LocalStream
 {
+    /// The capture stream; dropping it stops capture.
     _input: Stream,
+    /// The playback stream; dropping it stops playback.
     _output: Stream,
 
     //THE PAIR THIS WAS BUILT FROM (EMPTY = DEFAULT)
+    /// Input device id the pair was built from; empty for the default.
     input_id: String,
+    /// Output device id the pair was built from; empty for the default.
     output_id: String,
 }
 
 //ONE DEVICE AS /settings SHOWS IT
+/// One audio device, as a device picker lists it.
 #[derive(Clone)]
 pub struct AudioDevice
 {
+    /// cpal's host-qualified device id; what `client.toml` stores.
     pub id: String,
+    /// Human-readable description, for display only.
     pub label: String,
 }
 
+/// Tears down the streams when a voice session ends, unless a newer session already owns them.
 struct StreamGuard
 {
+    /// The session this guard belongs to.
     generation: usize,
 }
 
+/// The playback half of one peer, drained by the output callback.
 struct RemoteStream
 {
+    /// Reader of the peer's jitter buffer.
     consumer: HeapCons<f32>,   //RINGBUFFER READER
+    /// Fractional position between two samples.
     resample_pos: f32,         //POSITION IN BETWEEN SAMPLES
+    /// Resampler step, catch-up included.
     step: f32,                 //RESAMPLER STEP, CATCH-UP INCLUDED
+    /// Sample being interpolated from.
     current_sample: f32,       //CURRENT SAMPLE FOR INTERPOLATION
+    /// Sample being interpolated to.
     next_sample: f32,          //NEXT SAMPLE FOR INTERPOLATION
+    /// Samples the peer stays marked active.
     activity_hold: usize,      //ACTIVITY TIMER
+    /// Countdown of the peer's highlight in the voice panel.
     display_hold: usize,       //ACTIVITY WINDOW TIMER
+    /// The peer's username.
     username: String,          //USERNAME
+    /// Recent round-trip times.
     latencies: VecDeque<u128>, //HISTORY OF LATENCIES
+    /// Average round-trip time, as displayed.
     avg_latency: u128,         //AVERAGE LATENCY TO DISPLAY
 }
 
+/// The receiving half of one peer, fed by the network task.
 pub struct PeerData
 {
+    /// The peer's Opus decoder.
     decoder: Decoder,        //DECODER
+    /// Writer of the peer's jitter buffer.
     producer: HeapProd<f32>, //RINGBUFFER WRITER
 }
 
 //GLOBAL VARIABLES
+/// The running streams of the current session.
 static LOCAL_STREAMS: Mutex<Option<LocalStream>> = Mutex::new(None);
+/// Every peer we are receiving, by session id.
 static CONSUMERS: Mutex<BTreeMap<usize, (RemoteStream, PeerData)>> = Mutex::new(BTreeMap::new()); //OTHER CLIENTS
 
+/// Countdown of our own highlight in the voice panel.
 static LOCAL_DISPLAY_HOLD: AtomicUsize = AtomicUsize::new(0);
+/// Id of the current voice session; see the module documentation.
 static AUDIO_GENERATION: AtomicUsize = AtomicUsize::new(0);
 
 //IMPLEMENTATIONS
@@ -189,12 +261,21 @@ impl Drop for StreamGuard
 }
 
 //PRIVATE
+/// Returns cpal's host-qualified id of a device.
 fn device_id(device: &Device) -> String //THE HOST-QUALIFIED cpal ID
 {
     device.id().map(|id| id.to_string()).unwrap_or_default()
 }
 
 //WHETHER A DEVICE IS WORTH OFFERING IN /settings
+/// Returns whether a device is worth offering.
+///
+/// On Linux this drops ALSA's `null` and raw PCMs, and the raw cards too once a sound server is
+/// running (it holds them, so ALSA can only report them busy).
+///
+/// # Parameters
+/// - `id`: The device id.
+/// - `cards`: Whether raw `plughw:` cards are usable (no sound server).
 fn is_usable(id: &str, cards: bool) -> bool
 {
     #[cfg(target_os = "linux")]
@@ -217,6 +298,7 @@ fn is_usable(id: &str, cards: bool) -> bool
 }
 
 //EVERY HOST WE OPEN DEVICES IN, BEST LATENCY FIRST
+/// Returns every host devices are opened in, best latency first.
 fn audio_hosts() -> Vec<Host>
 {
     let primary = audio_host();
@@ -229,6 +311,12 @@ fn audio_hosts() -> Vec<Host>
 }
 
 //EVERY DEVICE WE COULD OPEN (BLOCKING, GAGGED)
+/// Lists every input and output device that could be opened.
+///
+/// Blocks on device enumeration, with stderr gagged; call it from a blocking task.
+///
+/// # Returns
+/// `(inputs, outputs)`, sorted by description within each host.
 pub fn list_devices() -> (Vec<AudioDevice>, Vec<AudioDevice>) //(INPUT, OUTPUT)
 {
     let _stderr_gag = Gag::stderr().ok();
@@ -249,6 +337,7 @@ pub fn list_devices() -> (Vec<AudioDevice>, Vec<AudioDevice>) //(INPUT, OUTPUT)
     (collect(true), collect(false))
 }
 
+/// Appends a host's usable devices to `out`, skipping duplicates.
 fn collect_devices(host: &Host, input: bool, cards: bool, out: &mut Vec<AudioDevice>)
 {
     let Ok(devices) = (if input { host.input_devices() } else { host.output_devices() }) else { return };
@@ -271,6 +360,7 @@ fn collect_devices(host: &Host, input: bool, cards: bool, out: &mut Vec<AudioDev
 }
 
 //THE DEVICE wanted NAMES, OR THE SYSTEM DEFAULT
+/// Finds a device by id (or, for an old config, by description); an empty id is the default.
 fn pick_device(wanted: &str, input: bool) -> Option<Device>
 {
     let hosts = audio_hosts();
@@ -293,11 +383,23 @@ fn pick_device(wanted: &str, input: bool) -> Option<Device>
         .cloned()
 }
 
+/// Returns the input and output device ids in `client.toml`.
 fn configured_ids() -> (String, String) //THE PAIR client.toml CURRENTLY POINTS AT
 {
     (config::read_config::<String>("input_device"), config::read_config::<String>("output_device"))
 }
 
+/// Picks a stream configuration for a device.
+///
+/// Prefers [`SAMPLE_RATE`](consts::SAMPLE_RATE) and a period of
+/// [`DEVICE_BUFFER`](consts::DEVICE_BUFFER), testing each candidate by building a throwaway
+/// stream, and falls back to the device default.
+///
+/// # Parameters
+/// - `device`: The device.
+/// - `supported_configs`: The device's supported configuration ranges.
+/// - `default_config`: The device's default configuration.
+/// - `is_input_stream`: Whether this is a capture stream.
 pub fn configure_device
 (
     device: &Device,
@@ -341,6 +443,7 @@ pub fn configure_device
     config
 }
 
+/// Applies the microphone volume to a frame, encodes it and hands it to the network task.
 fn transmit_audio(encoder: &Encoder, frame: &mut [f32], buffer: &mut [u8], tx: &Sender<Vec<u8>>)
 {
     //MICROPHONE VOLUME (/settings), AFTER THE AGC
@@ -362,6 +465,18 @@ fn transmit_audio(encoder: &Encoder, frame: &mut [f32], buffer: &mut [u8], tx: &
 }
 
 //NORMALIZE ONE FRAME IN PLACE (STATEFUL, IN ORDER)
+/// Normalises one frame in place with automatic gain control and a soft-knee limiter.
+///
+/// The speech envelope is only tracked while `is_speech`; the gain slews down fast and up
+/// slowly. Does nothing when AGC is off.
+///
+/// With $r$ the frame's RMS, envelope $E$ and gain $G$:
+///
+/// $$ E \leftarrow E + a(r - E) \quad a = \begin{cases} 0.25 & r \gt E \\\\ 0.02 & r \le E \end{cases} \qquad G^{\ast} = \operatorname{clamp}\left(\frac{0.12}{E},\ 0.05,\ 40\right) \qquad G \leftarrow G + s(G^{\ast} - G) \quad s = \begin{cases} 0.3 & G^{\ast} \lt G \\\\ 0.02 & G^{\ast} \ge G \end{cases} $$
+///
+/// and every sample $v = Gx$ goes through a soft knee at $k = 0.7$:
+///
+/// $$ y = \begin{cases} v & \lvert v \rvert \le k \\\\ \operatorname{sgn}(v) \left(k + (1 - k) \tanh \dfrac{\lvert v \rvert - k}{1 - k}\right) & \lvert v \rvert \gt k \end{cases} $$
 fn apply_agc(frame: &mut [f32], rms: f32, is_speech: bool, envelope: &mut f32, gain: &mut f32)
 {
     if !options::automatic_gain() { return; } //TURNED OFF IN /settings
@@ -397,6 +512,7 @@ fn apply_agc(frame: &mut [f32], rms: f32, is_speech: bool, envelope: &mut f32, g
     }
 }
 
+/// Returns the host voice uses: ALSA on Linux, the default elsewhere.
 fn audio_host() -> Host //THE HOST THE VOICE CLIENT TALKS TO
 {
     #[cfg(target_os = "linux")]
@@ -411,6 +527,10 @@ fn audio_host() -> Host //THE HOST THE VOICE CLIENT TALKS TO
 }
 
 //CAPTURE SIDE - VAD, AGC AND RESAMPLER ARE BUILT HERE
+/// Builds the capture stream: the processing chain described in the module documentation.
+///
+/// # Returns
+/// `None` if the device refused the stream.
 fn build_input_stream(device: &Device, config: StreamConfig, current_generation: usize, packet_tx: Sender<Vec<u8>>) -> Option<Stream>
 {
     //PREPARE OPUS ENCODER
@@ -625,6 +745,10 @@ fn build_input_stream(device: &Device, config: StreamConfig, current_generation:
 }
 
 //PLAYBACK SIDE - THE PEERS LIVE IN CONSUMERS
+/// Builds the playback stream that mixes every peer and feeds the echo reference.
+///
+/// # Returns
+/// `None` if the device refused the stream.
 fn build_output_stream(device: &Device, config: StreamConfig, current_generation: usize) -> Option<Stream>
 {
     //OUTPUT RESAMPLING
@@ -735,6 +859,15 @@ fn build_output_stream(device: &Device, config: StreamConfig, current_generation
 }
 
 //BOTH STREAMS, PLAYING. wanted OVERRIDES THE CONFIG
+/// Opens and starts both streams.
+///
+/// # Parameters
+/// - `current_generation`: The session the streams belong to.
+/// - `packet_tx`: Where encoded frames go.
+/// - `wanted`: `(input, output)` device ids to use instead of the configured ones.
+///
+/// # Returns
+/// `None` if either device is missing or refuses its stream.
 fn build_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>, wanted: Option<(String, String)>) -> Option<LocalStream>
 {
     let (wanted_input, wanted_output) = wanted.unwrap_or_else(configured_ids);
@@ -772,6 +905,13 @@ fn build_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>, wanted:
 }
 
 //SWAP IN A NEW PAIR, LEAVING THE UDP SESSION ALONE
+/// Replaces the running streams after a device change, keeping the UDP session.
+///
+/// The old pair is dropped first, since an ALSA PCM is exclusive. If the new pair fails, the old
+/// devices are reopened and the configuration is pointed back at them.
+///
+/// # Returns
+/// `true` if the new devices are running.
 fn replace_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> bool
 {
     //THE OLD PAIR STOPS FIRST - AN ALSA PCM IS EXCLUSIVE
@@ -802,6 +942,22 @@ fn replace_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> bo
 }
 
 //PUBLIC
+/// Runs a voice session until the client leaves voice.
+///
+/// Binds a UDP socket, repeats the `Hello` handshake with `token` until acknowledged (reporting
+/// [`ClientEvent::VoiceHandshakeFailed`] after [`HELLO_TIMEOUT`](consts::HELLO_TIMEOUT)), starts
+/// the audio streams and then receives audio and latency probes, while side tasks send captured
+/// frames, probe latency, report activity and apply device changes.
+///
+/// # Parameters
+/// - `id`: Our session id.
+/// - `username`: Our username, for the voice panel.
+/// - `tx`: The UI event channel.
+/// - `write_stream`: The main connection, for leaving voice on failure.
+/// - `token`: The voice token from the server.
+///
+/// # Panics
+/// If the UDP socket cannot be bound or connected.
 pub async fn listen_server_voice //SERVER -> CLIENT
 (
     id: usize,
@@ -1076,6 +1232,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     }
 }
 
+/// Stops receiving a peer, playing the leave sound.
 pub fn remove_consumer(id: &usize)
 {
     if CONSUMERS.lock().unwrap().remove(id).is_some()
@@ -1085,6 +1242,7 @@ pub fn remove_consumer(id: &usize)
     }
 }
 
+/// Drops every peer, playing the join sound for our own arrival.
 pub fn remove_all_consumers()
 {
     CONSUMERS.lock().unwrap().clear();
@@ -1093,6 +1251,7 @@ pub fn remove_all_consumers()
     sfx::queue_effect(SoundEffect::Join);
 }
 
+/// Starts receiving a peer, playing the join sound.
 pub fn add_consumer(id: usize, username: String)
 {
     //OPUS DECODER
@@ -1131,6 +1290,7 @@ pub fn add_consumer(id: usize, username: String)
     sfx::queue_effect(SoundEffect::Join);
 }
 
+/// Reports the voice panel's rows (ourselves first, then peers by id) to the UI.
 async fn display_active_speakers(local_username: &str, tx: &Sender<ClientEvent>)
 {
     //ALL USERS

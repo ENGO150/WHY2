@@ -16,6 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Server Identity Pinning (TOFU)
+//!
+//! The client remembers the fingerprint of every server identity it has accepted, keyed by
+//! host, in `server_keys.toml`. The first connection to a host asks the user; every later one
+//! must present the same identity.
+
 use std::fmt::Write;
 
 use crate::
@@ -25,13 +31,18 @@ use crate::
 };
 
 //ENUMS
+/// The outcome of checking a server identity against the pinned one.
 pub enum TofuCode //POSSIBLE KEY VERIFICATION RESULTS
 {
+    /// The identity matches the pinned fingerprint.
     Valid, //KEY MATCHES LOCAL CONFIG
+    /// No identity is pinned for this host: `(fingerprint, host)`.
     Unknown(String, String), //KEY NOT FOUND IN CONFIG
+    /// The identity differs from the pinned fingerprint.
     Mismatch, //KEY DIFFERS
 }
 
+/// Returns the fingerprint of a server identity: the lowercase hex SHA-256 of its public key.
 pub fn hash(pubkey: &[u8]) -> String //HASH SERVER IDENTITY KEY
 {
     //HASH PUBKEY
@@ -47,6 +58,11 @@ pub fn hash(pubkey: &[u8]) -> String //HASH SERVER IDENTITY KEY
     pubkey_string
 }
 
+/// Checks a server identity against the one pinned for `host`.
+///
+/// # Parameters
+/// - `host`: The address the client dialed.
+/// - `pubkey`: The server's identity public key.
 pub fn check(host: &str, pubkey: &[u8]) -> TofuCode //CHECK PUBKEY VALIDITY (TOFU)
 {
     let pubkey_string = hash(pubkey);
@@ -67,6 +83,7 @@ pub fn check(host: &str, pubkey: &[u8]) -> TofuCode //CHECK PUBKEY VALIDITY (TOF
     TofuCode::Unknown(pubkey_string, host.to_string())
 }
 
+/// Returns the fingerprint pinned for `host`, if any.
 pub fn pinned(host: &str) -> Option<String> //THE FINGERPRINT CURRENTLY PINNED FOR host, IF ANY
 {
     if super::with_cached(&super::config_path(consts::SERVER_KEYS_CONFIG), |keys| keys.get(host).is_none()) { return None; }
@@ -74,6 +91,7 @@ pub fn pinned(host: &str) -> Option<String> //THE FINGERPRINT CURRENTLY PINNED F
     Some(super::config_read::<String>(consts::SERVER_KEYS_CONFIG, host))
 }
 
+/// Pins a fingerprint for `host`, replacing any previous one.
 pub fn save(host: &str, pubkey_hash: &str) //SAVE KEY
 {
     //WRITE

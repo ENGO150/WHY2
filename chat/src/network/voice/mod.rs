@@ -16,6 +16,30 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Voice Chat
+//!
+//! Voice runs over UDP on the same port as the TCP server, as Opus frames of
+//! [`FRAME_MS`](consts::FRAME_MS) each.
+//!
+//! # Wire Format
+//! Each datagram is a `wincode`-encoded [`VoicePacket`] sealed with
+//! [`crypto::encrypt_packet`] under the session keys, on a smaller
+//! [`GRID_WIDTH`](consts::GRID_WIDTH)×[`GRID_HEIGHT`](consts::GRID_HEIGHT) grid to keep the
+//! per-packet overhead down. A datagram from the client is prefixed with the sender's session
+//! id (8 bytes, big-endian) in the clear, which is how the server picks the keys to decrypt it
+//! with; the decrypted packet must then name the same id.
+//!
+//! # Session
+//! Joining voice is approved over TCP, which hands out a token. The client repeats a
+//! [`Hello`](VoicePacketCode::Hello) carrying the token until it gets a
+//! [`HelloAck`](VoicePacketCode::HelloAck), which binds its UDP address to the session; audio
+//! then flows both ways, and the server fans each packet out to the sender's channel.
+//!
+//! # Submodules
+//! - [`consts`] — codec, processing and limit constants.
+//! - [`message`] — the voice message container.
+//! - `client` / `server` — each side of a voice session.
+
 //MODULES
 pub mod consts;
 pub mod message;
@@ -51,47 +75,78 @@ use crate::network::voice::client::options;
 #[cfg(not(feature = "server"))]
 use crate::options as chat_options;
 
+/// What a voice packet says.
 #[derive(SchemaRead, SchemaWrite)]
 pub enum VoicePacketCode
 {
     //INIT PACKET - CLAIMS THE VOICE SLOT
+    /// *Client → server.* Claims the voice session; repeated until acknowledged.
     Hello
     {
+        /// The token handed out over the authenticated TCP connection.
         token: [u8; 32], //TOKEN HANDED OUT OVER THE AUTHENTICATED TCP CHANNEL
     },
 
     //Hello ACCEPTED - THE CLIENT REPEATS UNTIL THIS
+    /// *Server → client.* The [`Hello`](VoicePacketCode::Hello) was accepted.
     HelloAck,
 
     //AUDIO TRANSMIT
+    /// *Both ways.* One Opus frame.
     Audio
     {
+        /// The encoded frame.
         data: Vec<u8>,            //DATA
+        /// The speaker's username, filled in by the server.
         username: Option<String>, //CLIENT USERNAME
     },
 
     //Pingu without you is just Ping
+    /// *Both ways.* A latency probe; the server forwards it to the sender's channel.
     Ping
     {
+        /// The prober's local clock.
         timestamp: u128, //LOCAL TIMESTAMP
     },
 
     //Chinese cousin of Pingu
+    /// *Both ways.* A probe answered; the server forwards it to `target_id` alone.
     Pong
     {
+        /// Session id of the client that sent the probe.
         target_id: usize, //REMOTE CLIENT ID
+        /// The timestamp the probe carried.
         timestamp: u128,  //REMOTE TIMESTAMP
     },
 }
 
+/// One voice datagram.
 #[derive(SchemaRead, SchemaWrite)]
 pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
 {
+    /// Session id of the client the packet is from (or about).
     pub id: usize,               //LOCAL CLIENT ID
+    /// The payload.
     pub code: VoicePacketCode,   //CODE
+    /// Sequence number, strictly increasing per direction.
     pub seq: usize,              //SEQUENCE NUMBER
 }
 
+/// Seals and sends one voice packet.
+///
+/// The sequence number is assigned here: from the recipient's voice connection on the server,
+/// from the session counter on the client.
+///
+/// # Parameters
+/// - `socket`: The UDP socket.
+/// - `id`: The session id the packet is from or about.
+/// - `code`: The payload.
+/// - `addr`: The recipient's address (server only).
+/// - `recipient_id`: The recipient's session id (server only).
+/// - `keys`: The session keys.
+///
+/// # Returns
+/// The number of bytes sent, or the socket error.
 pub async fn send //SEND DATA TO UDP
 (
     socket: &UdpSocket,
@@ -157,6 +212,14 @@ pub async fn send //SEND DATA TO UDP
     }
 }
 
+/// Receives the next valid voice packet.
+///
+/// A datagram that is too short, names an unknown session, fails verification or does not
+/// decode is skipped. On the client the wait is polled so it notices voice being turned off.
+///
+/// # Returns
+/// - `Some((packet, sender address))`.
+/// - `None` once the client has left voice.
 pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //RECEIVE UDP PACKET & DECODE
 {
     let mut buffer = [0u8; 2048];

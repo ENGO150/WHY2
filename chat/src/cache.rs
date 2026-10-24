@@ -16,6 +16,28 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Client Image Cache
+//!
+//! Every picture (and voice clip) the client has seen, stored by content hash so a replayed or
+//! reposted one needs no transfer at all.
+//!
+//! # Scoping
+//! The cache is split per server, by the fingerprint of its identity
+//! ([`options::get_fingerprint`]). Over one shared cache a server could name any hash and watch
+//! whether the client fetches it — an oracle over every picture seen anywhere. Keying on the
+//! identity rather than the address also keeps a server's pictures when it moves.
+//!
+//! # At-Rest Protection
+//! Each file is a [`RexStream`] ciphertext followed by an HMAC-SHA256 tag, under keys derived
+//! from `fingerprint || hash` ([`crypto::cache_keys`]). The tag proves three things at once:
+//! that this client wrote the file, that it is whole, and that it is the picture its name
+//! promises. A file that fails to verify is deleted, so a half-written or tampered file is
+//! refilled on the next fetch instead of poisoning that hash forever.
+//!
+//! # Bound
+//! The cache is capped at [`MAX_IMAGE_CACHE`](consts::MAX_IMAGE_CACHE). A write that exceeds
+//! it evicts the least recently used files, by modification time; every hit touches its file.
+
 use std::
 {
     fs::FileTimes,
@@ -41,6 +63,7 @@ use crate::
 
 //PRIVATE
 //RESOLVE WHICH SERVER'S CACHE A HASH BELONGS TO
+/// Returns the server fingerprint and cache path for a hash, or `None` before a handshake.
 fn scope(hash: &[u8; 32]) -> Option<(String, PathBuf)>
 {
     let fingerprint = options::get_fingerprint();
@@ -53,6 +76,8 @@ fn scope(hash: &[u8; 32]) -> Option<(String, PathBuf)>
 }
 
 //DROP THE OLDEST FILES UNTIL THE CACHE FITS
+/// Deletes the oldest files in a cache directory until it fits
+/// [`MAX_IMAGE_CACHE`](consts::MAX_IMAGE_CACHE).
 async fn evict(directory: &PathBuf)
 {
     let Ok(mut entries) = fs::read_dir(directory).await else { return };
@@ -84,6 +109,7 @@ async fn evict(directory: &PathBuf)
 }
 
 //SEAL ONE PICTURE FOR DISK: ENCRYPT-THEN-MAC
+/// Encrypts and authenticates one picture for disk: `ciphertext || tag`.
 fn seal(fingerprint: &str, hash: &[u8; 32], data: &[u8]) -> Option<Vec<u8>>
 {
     let (key, nonce, mac_key) = crypto::cache_keys(fingerprint, hash);
@@ -105,6 +131,17 @@ fn seal(fingerprint: &str, hash: &[u8; 32], data: &[u8]) -> Option<Vec<u8>>
 
 //PUBLIC
 //READ ONE CACHED PICTURE BACK, VERIFYING IT
+/// Reads one cached picture back, verifying it.
+///
+/// A file that does not verify is deleted. A hit refreshes the file's modification time for the
+/// eviction order.
+///
+/// # Parameters
+/// - `hash`: The SHA-256 of the picture.
+///
+/// # Returns
+/// - `Some(bytes)` with the original picture.
+/// - `None` on a miss, before a handshake, or if the file failed verification.
 pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
 {
     let (fingerprint, path) = scope(hash)?;
@@ -139,6 +176,14 @@ pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
 }
 
 //SEAL AND STORE THE BYTES OFF THE WIRE
+/// Seals and stores a picture under its hash, then evicts if the cache is over its bound.
+///
+/// An existing file is never overwritten, since its name is its content. Failures are silent:
+/// a picture that did not make it into the cache is simply fetched again.
+///
+/// # Parameters
+/// - `hash`: The SHA-256 of `data`; the caller is responsible for having verified it.
+/// - `data`: The picture bytes.
 pub async fn store(hash: &[u8; 32], data: &[u8])
 {
     let Some((fingerprint, path)) = scope(hash) else { return };

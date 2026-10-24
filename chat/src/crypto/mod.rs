@@ -16,6 +16,50 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Packet and At-Rest Cryptography
+//!
+//! Glue between the raw [`why2`] primitives and the chat protocol. Nothing outside this module
+//! touches a cipher directly.
+//!
+//! # Overview
+//! Three kinds of data are protected here, each with its own construction:
+//!
+//! 1. **Packets on the main connection** — [`encrypt_packet`] / [`decrypt_packet`]: one-shot
+//!    REX encryption under the session keys, authenticated with
+//!    [`AuthenticatedData`] (encrypt-then-MAC).
+//! 2. **Packets on auxiliary sockets** (files, screen shares) — [`RexPacketStream`]: a
+//!    [`RexStream`] wrapped in encrypt-then-MAC, with a packet counter bound into every tag so
+//!    a replayed, dropped or reordered frame fails to verify instead of decrypting to garbage.
+//! 3. **Files at rest** (the server's picture store, the client's cache, the history) —
+//!    per-file keys derived from a store's master key and a trailing tag from [`disk_tag`].
+//!
+//! # Key Derivation
+//! Every derived key is HKDF-SHA256 under a distinct label, so no two uses ever share a
+//! keystream:
+//!
+//! - A session key of the wrong size is stretched to the grid's key size.
+//! - A stream's nonce and MAC key are derived from its transfer token;
+//!   the reverse direction of the same
+//!   socket hashes the token under its own label ([`init_reverse_stream`]).
+//! - A file's key, nonce and MAC key are derived from a per-purpose master key salted with the
+//!   file's content hash (`image_keys`, `cache_keys`).
+//!
+//! Writing $\mathrm{HKDF}(s, k, l)$ for HKDF-SHA256 with salt $s$, input key material $k$ and
+//! label $l$, $\Vert$ for concatenation, $K$ and $K\_m$ for the session's grid key and HMAC key,
+//! and $\tau$ for a transfer token:
+//!
+//! $$ K^{\prime} = \mathrm{HKDF}(\varnothing,\ K,\ \texttt{WHY2-DERIVED-KEY-}W\texttt{x}H) $$
+//!
+//! $$ N\_\tau = \mathrm{HKDF}(\varnothing,\ \tau,\ \texttt{WHY2-STREAM-NONCE}) \qquad K\_\tau = \mathrm{HKDF}(\tau,\ K\_m,\ \texttt{WHY2-STREAM-MAC}) $$
+//!
+//! $$ \tau^{\prime} = \mathrm{SHA256}(\texttt{WHY2-REVERSE-STREAM} \Vert \tau) $$
+//!
+//! and for a file named by its hash $h$, in a store with master key $M$ (the server's image
+//! key, or the client's cache key), salted with $s = h$ on the server and
+//! $s = \mathrm{fp} \Vert h$ in the client's cache:
+//!
+//! $$ K\_f = \mathrm{HKDF}(s,\ M,\ \texttt{WHY2-IMAGE-KEY}) \qquad N\_f = \mathrm{HKDF}(s,\ M,\ \texttt{WHY2-IMAGE-NONCE}) \qquad K\_{f,m} = \mathrm{HKDF}(s,\ M,\ \texttt{WHY2-DISK-MAC}) $$
+
 //MODULES
 #[cfg(feature = "server")]
 pub mod password;
@@ -56,6 +100,23 @@ use crate::consts::
 };
 
 //STRUCTS
+/// An authenticated stream cipher: encrypt-then-MAC over a [`RexStream`].
+///
+/// Each [`seal`](Self::seal)ed packet is framed as `[32-byte tag][ciphertext]`, where the tag is
+/// HMAC-SHA256 over `counter || len || ciphertext` under a stream-specific key. Binding the
+/// counter is what makes this a stream rather than a bag of individually valid packets: the
+/// receiver's counter must match the sender's, so replay and reordering are rejected.
+///
+/// For the $i$-th packet in either direction, with ciphertext $C\_i$ of $\ell\_i$ bytes and the
+/// stream's MAC key $K\_\tau$ (see the module documentation):
+///
+/// $$ T\_i = \mathrm{HMAC}\_{K\_\tau}\left(\mathrm{be64}(i) \Vert \mathrm{be64}(\ell\_i) \Vert C\_i\right) $$
+///
+/// and the packet is $T\_i \Vert C\_i$.
+///
+/// # Cryptographic Safety
+/// Both ends must process packets in the same order, and a failed [`open`](Self::open) means the
+/// peer is not who it was; the caller ends the transfer.
 pub struct RexPacketStream //AUTHENTICATED STREAM CIPHER (ENCRYPT-THEN-MAC OVER A RexStream)
 {
     stream: RexStream,             //CTR MODE STREAM
@@ -67,6 +128,7 @@ pub struct RexPacketStream //AUTHENTICATED STREAM CIPHER (ENCRYPT-THEN-MAC OVER 
 impl RexPacketStream
 {
     //PRIVATE
+    /// Primes an HMAC over `counter || len || ciphertext` at the current counter.
     fn mac(&self, ciphertext: &[u8]) -> Hmac<Sha256> //PRIME MAC OVER counter || len || ciphertext
     {
         let mut mac = <Hmac<Sha256>>::new_from_slice(self.mac_key.as_ref()).expect("Invalid MAC key");
@@ -79,6 +141,16 @@ impl RexPacketStream
     }
 
     //PUBLIC
+    /// Encrypts and authenticates one packet, advancing the counter.
+    ///
+    /// # Parameters
+    /// - `plaintext`: The packet bytes to protect.
+    ///
+    /// # Returns
+    /// The framed packet, `[tag][ciphertext]`; the ciphertext is the length of `plaintext`.
+    ///
+    /// # Panics
+    /// If the underlying [`RexStream`] fails, which only happens on invalid grid dimensions.
     pub fn seal(&mut self, plaintext: &[u8]) -> Vec<u8> //ENCRYPT AND AUTHENTICATE ([TAG][CIPHERTEXT])
     {
         //CONVERT PLAINTEXT TO i64
@@ -108,6 +180,17 @@ impl RexPacketStream
         output
     }
 
+    /// Verifies and decrypts one packet, advancing the counter.
+    ///
+    /// The tag is verified in constant time **before** the stream is advanced, so a forged packet
+    /// leaves the stream state untouched.
+    ///
+    /// # Parameters
+    /// - `data`: A framed packet, `[tag][ciphertext]`.
+    ///
+    /// # Returns
+    /// - `Some(plaintext)` if the tag verifies at the current counter.
+    /// - `None` if the packet is too short, forged, replayed or out of order.
     pub fn open(&mut self, data: &[u8]) -> Option<Zeroizing<Vec<u8>>> //VERIFY AND DECRYPT
     {
         //SPLIT OFF THE TAG
@@ -139,6 +222,13 @@ impl RexPacketStream
 
 //FUNCTIONS
 //PRIVATE
+/// Stretches a session key to the `W`×`H` grid's key size with HKDF.
+///
+/// # Type Parameters
+/// - `W`, `H`: The target grid dimensions.
+///
+/// # Returns
+/// A key of `W * H * 2` cells.
 fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) -> Zeroizing<Vec<i64>> //DERIVE VALID KEYDIM USING HKDF
 {
     //CONVERT KEY TO BYTES
@@ -170,6 +260,7 @@ fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) ->
     Zeroizing::new(derived_key)
 }
 
+/// Derives a stream nonce grid from a transfer context (its token).
 fn derive_stream_nonce(context: &[u8]) -> Zeroizing<Vec<i64>>
 {
     let hkdf = Hkdf::<Sha256>::new(None, context);
@@ -180,6 +271,7 @@ fn derive_stream_nonce(context: &[u8]) -> Zeroizing<Vec<i64>>
     Zeroizing::new(okm.chunks_exact(8).map(|c| i64::from_be_bytes(c.try_into().unwrap())).collect())
 }
 
+/// Derives a stream-specific MAC key from the session HMAC key, salted with the transfer context.
 fn derive_stream_mac_key(hmac_key: &[u8], context: &[u8]) -> Zeroizing<[u8; 32]> //STREAM SPECIFIC MAC KEY
 {
     let hkdf = Hkdf::<Sha256>::new(Some(context), hmac_key);
@@ -191,6 +283,7 @@ fn derive_stream_mac_key(hmac_key: &[u8], context: &[u8]) -> Zeroizing<[u8; 32]>
 }
 
 //CRATE PUBLIC
+/// Packs bytes into big-endian `i64` cells, zero-padding the last one.
 pub(crate) fn bytes_to_i64(bytes: &[u8]) -> Vec<i64>
 {
     bytes.chunks(8).map(|chunk|
@@ -201,12 +294,14 @@ pub(crate) fn bytes_to_i64(bytes: &[u8]) -> Vec<i64>
     }).collect()
 }
 
+/// Unpacks big-endian `i64` cells into bytes.
 pub(crate) fn i64_to_bytes(vals: &[i64]) -> Vec<u8>
 {
     vals.iter().flat_map(|v| v.to_be_bytes()).collect()
 }
 
 //PUBLIC
+/// Returns the SHA-256 digest of `data`.
 pub fn sha256(data: &[u8]) -> [u8; 32] //SHA-256 OF A BYTE STRING
 {
     //SHA256
@@ -217,6 +312,20 @@ pub fn sha256(data: &[u8]) -> [u8; 32] //SHA-256 OF A BYTE STRING
     hasher.finalize().into()
 }
 
+/// Encrypts and authenticates one packet under the session keys.
+///
+/// # Type Parameters
+/// - `W`, `H`: The grid dimensions to encrypt with.
+///
+/// # Parameters
+/// - `packet_bytes`: The serialized packet.
+/// - `keys`: The session keys; a grid key of the wrong size is stretched with HKDF.
+///
+/// # Returns
+/// The serialized [`AuthenticatedData`].
+///
+/// # Panics
+/// If encryption fails or the HMAC key is not 32 bytes.
 pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: &[u8], keys: &SharedKeys) -> Vec<u8>
 {
     //CONVERT packet_bytes to BINARY
@@ -239,6 +348,19 @@ pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: &[u8], keys:
     AuthenticatedData::authenticate(encrypted_data, keys.1.as_slice().try_into().unwrap()).into()
 }
 
+/// Verifies and decrypts one packet under the session keys.
+///
+/// # Type Parameters
+/// - `W`, `H`: The grid dimensions the packet was encrypted with.
+///
+/// # Parameters
+/// - `decoded_packet`: The serialized [`AuthenticatedData`].
+/// - `keys`: The session keys.
+///
+/// # Returns
+/// - `Some(plaintext)` if the packet parses and its tag verifies.
+/// - `None` otherwise. The plaintext is padded to whole grids; the caller's decoder ignores the
+///   padding.
 pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, keys: &SharedKeys) -> Option<Zeroizing<Vec<u8>>>
 {
     //DESERIALIZE
@@ -270,6 +392,17 @@ pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, k
     Some(Zeroizing::new(i64_to_bytes(&decrypted_packet.output)))
 }
 
+/// Opens the stream for the reverse direction of an auxiliary socket.
+///
+/// The token is hashed under its own label first, so the two directions never share a keystream.
+///
+/// # Parameters
+/// - `keys`: The session keys.
+/// - `token`: The transfer token the forward stream was opened with.
+///
+/// # Returns
+/// - `Some(stream)` on success.
+/// - `None` if the keys do not form a valid grid.
 pub fn init_reverse_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketStream> //THE SAME SOCKET, THE OTHER DIRECTION
 {
     let mut hasher = Sha256::new();
@@ -279,6 +412,15 @@ pub fn init_reverse_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPac
     init_rex_stream(keys, &hasher.finalize().into())
 }
 
+/// Opens an authenticated packet stream for an auxiliary socket.
+///
+/// # Parameters
+/// - `keys`: The session keys.
+/// - `token`: The transfer token; it seeds the nonce and the stream's MAC key.
+///
+/// # Returns
+/// - `Some(stream)` on success.
+/// - `None` if the keys do not form a valid grid.
 pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketStream>
 {
     let key_grid = Grid::from_key(&keys.0).ok()?;
@@ -298,6 +440,11 @@ pub fn init_rex_stream(keys: &SharedKeys, token: &[u8; 32]) -> Option<RexPacketS
 }
 
 //AT-REST KEYS FOR ONE FILE
+/// Derives the at-rest grid key, nonce and MAC key of one file.
+///
+/// # Parameters
+/// - `salt`: What makes the keys unique to the file (its content hash, plus any scope).
+/// - `ikm`: The master key of the store the file belongs to.
 #[cfg(feature = "chat")]
 fn disk_keys(salt: &[u8], ikm: &[u8]) -> DiskKeys
 {
@@ -324,12 +471,24 @@ fn disk_keys(salt: &[u8], ikm: &[u8]) -> DiskKeys
     (Zeroizing::new(to_i64(&key_bytes)), to_i64(&nonce_bytes), mac_bytes)
 }
 
+/// Returns the at-rest keys of one stored server picture or voice message.
+///
+/// # Parameters
+/// - `hash`: The SHA-256 the file is named after.
 #[cfg(feature = "server")]
 pub fn image_keys(hash: &[u8; 32]) -> DiskKeys //AT-REST KEYS FOR ONE IMAGE
 {
     disk_keys(hash, kex::image_key().as_ref())
 }
 
+/// Returns the at-rest keys of one cached picture.
+///
+/// Salting with the server fingerprint as well as the hash means two servers' copies of the
+/// same picture share no keystream, and a file moved between scopes fails to verify.
+///
+/// # Parameters
+/// - `fingerprint`: The fingerprint of the server the picture came from.
+/// - `hash`: The SHA-256 the file is named after.
 #[cfg(feature = "client_base")]
 pub fn cache_keys(fingerprint: &str, hash: &[u8; 32]) -> DiskKeys
 {
@@ -341,12 +500,21 @@ pub fn cache_keys(fingerprint: &str, hash: &[u8; 32]) -> DiskKeys
     disk_keys(&salt, kex::cache_key().as_ref())
 }
 
+/// Opens an HMAC over a file's ciphertext, to be fed as the file is written.
 #[cfg(feature = "chat")]
 pub fn disk_mac(mac_key: &[u8; 32]) -> Hmac<Sha256> //OPEN A MAC OVER A FILE'S CIPHERTEXT
 {
     <Hmac<Sha256>>::new_from_slice(mac_key).expect("Invalid MAC key")
 }
 
+/// Binds the ciphertext length into a file MAC and finishes it.
+///
+/// The length goes after the ciphertext, since the ciphertext is fed as it is written:
+///
+/// $$ T = \mathrm{HMAC}\_{K\_{f,m}}\left(C \Vert \mathrm{be64}(\ell)\right) $$
+///
+/// # Returns
+/// The 32-byte tag appended to the file.
 #[cfg(feature = "chat")]
 pub fn disk_tag(mut mac: Hmac<Sha256>, length: u64) -> [u8; 32] //BIND THE LENGTH AND FINISH IT
 {
@@ -355,6 +523,7 @@ pub fn disk_tag(mut mac: Hmac<Sha256>, length: u64) -> [u8; 32] //BIND THE LENGT
     mac.finalize().into_bytes().into()
 }
 
+/// Computes the trailing tag of a whole ciphertext in one call.
 #[cfg(feature = "chat")]
 pub fn disk_seal(mac_key: &[u8; 32], ciphertext: &[u8]) -> [u8; 32]
 {
@@ -364,6 +533,15 @@ pub fn disk_seal(mac_key: &[u8; 32], ciphertext: &[u8]) -> [u8; 32]
     disk_tag(mac, ciphertext.len() as u64)
 }
 
+/// Verifies a sealed file's trailing tag.
+///
+/// # Parameters
+/// - `mac_key`: The file's MAC key.
+/// - `sealed`: The file, `ciphertext || tag`.
+///
+/// # Returns
+/// - `Some(ciphertext)` if the tag verifies.
+/// - `None` if the file is too short or has been tampered with.
 #[cfg(feature = "chat")]
 pub fn disk_open<'a>(mac_key: &[u8; 32], sealed: &'a [u8]) -> Option<&'a [u8]>
 {
@@ -380,6 +558,7 @@ pub fn disk_open<'a>(mac_key: &[u8; 32], sealed: &'a [u8]) -> Option<&'a [u8]>
     Some(ciphertext)
 }
 
+/// Returns the at-rest keys of the message history.
 #[cfg(feature = "server")]
 pub fn history_keys() -> SharedKeys //AT-REST KEYS FOR THE MESSAGE HISTORY
 {

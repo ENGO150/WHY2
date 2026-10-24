@@ -16,6 +16,27 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Configuration Store
+//!
+//! TOML configuration for the client and the server, under the WHY2 configuration directory
+//! ([`misc::get_why2_dir`]):
+//!
+//! - `client.toml` / `server.toml` — the user-facing settings ([`read_config`]).
+//! - `server_users.toml` — accounts (`users`).
+//! - `server_bans.toml` — bans (`bans`).
+//! - `server_keys.toml` — the client's pinned server identities (`keys`).
+//! - `server_messages.bin` — the lobby history, the one non-TOML file (`messages`).
+//!
+//! # Caching
+//! Every file is parsed once and kept in a process-wide cache keyed by path. A read checks the
+//! file's modification time and length and reparses only when they changed, so an edit made by
+//! hand is still picked up, while our own writes update the stamp and cost no reparse.
+//!
+//! # Migration
+//! A key missing from an existing file is not an error: [`read_config`] rebuilds the file from
+//! the built-in default, keeping every value the old file had, and reads again. A new setting
+//! therefore appears in users' files the first time it is read.
+
 //MODULES
 #[cfg(feature = "server")]
 pub mod users;
@@ -56,21 +77,27 @@ use crate::{ consts, misc };
 
 //PRIVATE
 //STRUCTS
+/// A parsed configuration file and the stamp of the file it was parsed from.
 struct Cached //A PARSED CONFIG AND THE FILE IT CAME FROM
 {
+    /// The parsed document.
     doc: DocumentMut,
+    /// Modification time and length at the time of parsing.
     stamp: Option<(SystemTime, u64)>,
 }
 
 //GLOBAL VARIABLES
+/// Every parsed configuration file, keyed by path.
 static CONFIG_CACHE: LazyLock<Mutex<HashMap<String, Cached>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 //FUNCTIONS
+/// Returns the full path of a file in the configuration directory.
 fn config_path(filename: &str) -> String //GET CONFIGURATION PATH
 {
     misc::get_why2_dir() + filename
 }
 
+/// Returns the built-in default configuration: `client.toml` or `server.toml`, by feature.
 fn get_config() -> &'static str //GET CONFIG FROM BINARY
 {
     //TODO: FIGURE OUT A BETTER WAY TO USE CONSTANTS
@@ -85,12 +112,19 @@ fn get_config() -> &'static str //GET CONFIG FROM BINARY
     }
 }
 
+/// Returns a file's modification time and length, used to detect changes.
 fn stamp(path: &str) -> Option<(SystemTime, u64)> //FILE FINGERPRINT
 {
     let metadata = fs::metadata(path).ok()?;
     Some((metadata.modified().ok()?, metadata.len()))
 }
 
+/// Returns the cached document for `path`, reparsing it if the file changed.
+///
+/// An unreadable stamp keeps whatever is already cached.
+///
+/// # Panics
+/// If the file has to be read and cannot be, or does not parse.
 fn load<'a>(cache: &'a mut HashMap<String, Cached>, path: &str) -> &'a mut Cached //CACHE path, REPARSING A FILE THAT CHANGED
 {
     let current = stamp(path); //TAKEN BEFORE THE READ, SO A RACE COSTS A REPARSE AND NOT A MISS
@@ -111,12 +145,17 @@ fn load<'a>(cache: &'a mut HashMap<String, Cached>, path: &str) -> &'a mut Cache
     cache.get_mut(path).expect("Config cache missing")
 }
 
+/// Runs `f` over the cached document for `path`.
 fn with_cached<F: FnOnce(&DocumentMut) -> R, R>(path: &str, f: F) -> R //READ THE CACHED DOCUMENT IN PLACE
 {
     let mut cache = CONFIG_CACHE.lock().unwrap();
     f(&load(&mut cache, path).doc)
 }
 
+/// Runs `f` over the cached document for `path` and writes the result back to disk.
+///
+/// # Panics
+/// If the file cannot be written.
 fn with_cached_mut<F: FnOnce(&mut DocumentMut)>(path: &str, f: F)
 {
     let mut cache = CONFIG_CACHE.lock().unwrap();
@@ -128,6 +167,18 @@ fn with_cached_mut<F: FnOnce(&mut DocumentMut)>(path: &str, f: F)
     cached.stamp = stamp(path); //OUR OWN WRITE IS NOT A CHANGE
 }
 
+/// Reads one key from a configuration file, migrating the file if the key is missing.
+///
+/// # Type Parameters
+/// - `T`: The type the value is parsed into.
+///
+/// # Parameters
+/// - `filename`: The file, relative to the configuration directory.
+/// - `key`: The top-level key.
+///
+/// # Panics
+/// If the value has an unsupported datatype, does not parse as `T`, or the key is missing from
+/// the built-in default as well.
 fn config_read<T: FromStr>(filename: &str, key: &str) -> T //READ CONFIG
 where
     T::Err: Debug,
@@ -172,6 +223,7 @@ where
     config_read(filename, key)
 }
 
+/// Assigns one key, keeping the comments that decorate the old value.
 fn set_value(table: &mut Table, key: &str, value: Value) //ASSIGN ONE KEY, KEEPING THE COMMENTS AROUND IT
 {
     if let Some(item) = table.get_mut(key)
@@ -189,6 +241,7 @@ fn set_value(table: &mut Table, key: &str, value: Value) //ASSIGN ONE KEY, KEEPI
     }
 }
 
+/// Writes a typed value to a configuration file.
 #[cfg(feature = "client_base")]
 fn config_write_value(filename: &str, key: &str, value: Value) //WRITE TYPED VALUE TO CONFIG
 {
@@ -196,6 +249,7 @@ fn config_write_value(filename: &str, key: &str, value: Value) //WRITE TYPED VAL
     with_cached_mut(&config_path(filename), |doc| set_value(doc.as_table_mut(), key, value));
 }
 
+/// Writes a string value to a configuration file.
 #[cfg(feature = "client_base")]
 fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
 {
@@ -203,6 +257,13 @@ fn config_write(filename: &str, key: &str, value: &str) //WRITE TO CONFIG
 }
 
 //PUBLIC
+/// Creates the configuration directory and every file the client or the server needs, if missing.
+///
+/// The main configuration file is written from the built-in default; the runtime files
+/// (accounts, bans, pinned keys) start empty.
+///
+/// # Panics
+/// If a file cannot be created or written.
 pub fn init_config() //INITIALIZE CONFIG FILES
 {
     misc::check_directory(); //CREATE USER CONFIG DIRECTORY IF MISSING
@@ -254,6 +315,16 @@ pub fn init_config() //INITIALIZE CONFIG FILES
     }
 }
 
+/// Reads a key from the main configuration file (`client.toml` or `server.toml`, by feature).
+///
+/// Reads are cached (see the module documentation), so calling this at every point of use is
+/// cheap and always sees the latest saved value.
+///
+/// # Type Parameters
+/// - `T`: The type the value is parsed into.
+///
+/// # Panics
+/// If the value does not parse as `T`, or the key is missing from the built-in default.
 pub fn read_config<T: FromStr>(key: &str) -> T //RETURN key FROM TOML CONFIG
 where
     T::Err: Debug,
@@ -269,30 +340,38 @@ where
     }
 }
 
+/// Writes a string value to `client.toml`.
 #[cfg(feature = "client_base")]
 pub fn client_write(key: &str, value: &str) //WRITE TO client.toml
 {
     config_write(consts::CLIENT_CONFIG, key, value);
 }
 
+/// Writes a boolean value to `client.toml`.
 #[cfg(feature = "client_base")]
 pub fn client_write_bool(key: &str, value: bool) //WRITE BOOLEAN TO client.toml
 {
     config_write_value(consts::CLIENT_CONFIG, key, value.into());
 }
 
+/// Writes an integer value to `client.toml`.
 #[cfg(feature = "client_base")]
 pub fn client_write_int(key: &str, value: i64) //WRITE INTEGER TO client.toml
 {
     config_write_value(consts::CLIENT_CONFIG, key, value.into());
 }
 
+/// Returns the hash of the server icon, if one is set.
 #[cfg(feature = "server")]
 pub fn server_icon() -> Option<[u8; 32]> //RETURN THE SERVER'S PICTURE
 {
     misc::unhex(fs::read_to_string(config_path(consts::SERVER_ICON_FILE)).ok()?.trim())
 }
 
+/// Sets or clears the server icon.
+///
+/// # Parameters
+/// - `hash`: The stored picture to use, or `None` to drop the icon.
 #[cfg(feature = "server")]
 pub fn set_server_icon(hash: Option<&[u8; 32]>) //STORE THE SERVER'S PICTURE
 {

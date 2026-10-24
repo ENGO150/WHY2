@@ -16,6 +16,51 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Screen Capture
+//!
+//! The capture pipeline: picking a backend, grabbing frames, converting them to I420 and
+//! encoding them. It is the one blocking CPU loop in the client and runs in `spawn_blocking`.
+//!
+//! # Backends
+//! The backend is chosen at run time, never assumed:
+//!
+//! - **Recorder** — the OS-native streaming recorder: our own xdg-desktop-portal + PipeWire
+//!   recorder on Wayland ([`PortalRecorder`]), and xcap's on X11 (a polling thread), Windows (DXGI
+//!   Desktop Duplication) and macOS (`AVCaptureScreenInput`).
+//! - **Polling** — the legacy path: libwayshot screencopy on Wayland,
+//!   xcap screenshots elsewhere.
+//!
+//! # The Probe Never Gates the Share
+//! The polling path starts immediately and the recorder is probed beside it on its own thread;
+//! the recorder takes over only once it has proven itself (`UPGRADING`), at the cost of one
+//! keyframe. Waiting for the probe first was wrong: on Wayland it is a portal request that blocks
+//! until somebody answers the picker. A recorder must deliver an actual frame within
+//! [`RECORDER_FIRST_FRAME`](consts::RECORDER_FIRST_FRAME) to count — except the portal, which is
+//! accepted once its stream negotiates, since damage-driven compositors send nothing for a still
+//! desktop. Only when the polling path cannot start at all does the probe block, for up to
+//! [`RECORDER_PROBE_TIMEOUT`](consts::RECORDER_PROBE_TIMEOUT).
+//!
+//! `WHY2_CAPTURE_BACKEND` (`recorder` / `legacy`) pins a backend and
+//! `WHY2_CAPTURE_PROBE_TIMEOUT` overrides the probe deadline.
+//!
+//! # Wayland Polling
+//! libwayshot leaks a compositor-side buffer per capture until the client disconnects, so the
+//! wayshot loop counts the bytes it has stranded and reconnects past
+//! [`WAYLAND_LEAK_BUDGET`](consts::WAYLAND_LEAK_BUDGET). It also reads the compositor's buffer
+//! itself through one reused memfd instead of letting libwayshot build an image
+//! pixel by pixel.
+//!
+//! # Monitor Switching
+//! [`capture_loop`] restarts the backend whenever the monitor pick changes mid-share, keeping the
+//! socket, the token and the audio; the viewer pays one keyframe.
+//!
+//! # Encoding
+//! The frame encoder converts each frame with openh264's SIMD RGBA/BGRA → I420 path and hands it to
+//! a GPU encoder where one opens, falling back to software for the rest of the capture the moment
+//! one fails. A frame is not encoded at all while the network channel is full, so a skipped frame
+//! never breaks the reference chain, and a keyframe is forced at least every
+//! [`KEYFRAME_INTERVAL`](consts::KEYFRAME_INTERVAL).
+
 use std::
 {
     env,
@@ -79,11 +124,13 @@ use crate::
 #[cfg(target_os = "linux")]
 use crate::network::screen::client::portal::PortalRecorder;
 
+/// Returns a monitor's name, or a placeholder.
 fn monitor_name(monitor: &Monitor) -> String
 {
     monitor.name().unwrap_or_else(|_| t!("screen.unknown_monitor").to_owned())
 }
 
+/// Lists the monitors as the user may name them: `1 (DP-1), 2 (HDMI-A-1)`.
 fn monitor_list(monitors: &[Monitor]) -> String //THE MONITORS AS THE USER MAY NAME THEM
 {
     monitors.iter().enumerate()
@@ -93,6 +140,10 @@ fn monitor_list(monitors: &[Monitor]) -> String //THE MONITORS AS THE USER MAY N
 }
 
 //THE MONITOR ASKED FOR, BY 1-BASED INDEX OR NAME
+/// Selects a monitor by 1-based index or by name (case-insensitive).
+///
+/// # Returns
+/// `Err` naming the available monitors if none matches.
 fn select_monitor(monitors: Vec<Monitor>, selection: &str) -> Result<Monitor, String>
 {
     if let Ok(index) = selection.parse::<usize>()
@@ -107,6 +158,7 @@ fn select_monitor(monitors: Vec<Monitor>, selection: &str) -> Result<Monitor, St
         .ok_or_else(|| t!("screen.error.no_monitor", selection, available = monitor_list(&monitors)))
 }
 
+/// Returns the monitor to share: the picked one, or the primary.
 fn get_target_monitor() -> Result<Monitor, String> //THE MONITOR TO SHARE
 {
     let monitors = Monitor::all().map_err(|error| t!("screen.error.enumerate", error))?;
@@ -125,6 +177,10 @@ fn get_target_monitor() -> Result<Monitor, String> //THE MONITOR TO SHARE
 }
 
 //THE NAME selection RESOLVES TO
+/// Resolves a monitor selection (index or name) to the monitor's name.
+///
+/// # Returns
+/// `Err` with a message for the user if no monitor matches.
 pub fn resolve_monitor(selection: &str) -> Result<String, String>
 {
     let monitors = Monitor::all().map_err(|error| t!("screen.error.enumerate", error))?;
@@ -132,12 +188,14 @@ pub fn resolve_monitor(selection: &str) -> Result<String, String>
     select_monitor(monitors, selection).map(|monitor| monitor_name(&monitor))
 }
 
+/// Returns the name of the monitor a share would capture right now.
 pub fn current_monitor() -> Option<String> //WHAT A SHARE WOULD CAPTURE RIGHT NOW, BY NAME
 {
     get_target_monitor().ok().map(|monitor| monitor_name(&monitor))
 }
 
 //THE NAMES THE PALETTE OFFERS, CACHED
+/// Returns every monitor's name, cached for [`MONITOR_LIST_TTL`](consts::MONITOR_LIST_TTL).
 pub fn monitor_names() -> Vec<String>
 {
     static CACHE: RwLock<Option<(Instant, Vec<String>)>> = RwLock::new(None);
@@ -157,19 +215,23 @@ pub fn monitor_names() -> Vec<String>
 }
 
 //SET ONCE THE OS-NATIVE RECORDER HAS PROVEN ITSELF
+/// Set once the OS-native recorder has proven itself; tells the polling loop to stand down.
 static UPGRADING: AtomicBool = AtomicBool::new(false);
 
+/// Returns whether the polling loop should stand down for the recorder.
 fn upgrading() -> bool
 {
     UPGRADING.load(Ordering::Relaxed)
 }
 
+/// Returns whether the session is Wayland.
 #[cfg(target_os = "linux")]
 fn wayland() -> bool
 {
     env::var("WAYLAND_DISPLAY").is_ok() || env::var("XDG_SESSION_TYPE").unwrap_or_default() == "wayland"
 }
 
+/// Runs the polling path: libwayshot on Wayland, xcap elsewhere.
 fn legacy_capture_loop //THE PRE-RECORDER POLLING PATH, KEPT AS THE LAST FALLBACK
 (
     frame_tx: Sender<Vec<u8>>,
@@ -186,6 +248,15 @@ fn legacy_capture_loop //THE PRE-RECORDER POLLING PATH, KEPT AS THE LAST FALLBAC
     capture_loop_xcap(get_target_monitor()?, frame_tx, running, fps)
 }
 
+/// Captures and encodes until the share ends, restarting the backend on a monitor switch.
+///
+/// # Parameters
+/// - `frame_tx`: Where encoded access units go.
+/// - `running`: Cleared when the share ends.
+/// - `fps`: The target frame rate.
+///
+/// # Returns
+/// `Err` with a message for the user if capture failed.
 pub fn capture_loop //CAPTURE LOOP
 (
     frame_tx: Sender<Vec<u8>>,
@@ -207,11 +278,13 @@ pub fn capture_loop //CAPTURE LOOP
     }
 }
 
+/// Returns whether the monitor was picked again since `generation`.
 fn switched(generation: usize) -> bool //THE MONITOR WAS PICKED AGAIN WHILE WE WERE CAPTURING
 {
     options::monitor_generation() != generation
 }
 
+/// Picks a backend (see the module documentation) and captures on it until it stops.
 fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
 (
     frame_tx: Sender<Vec<u8>>,
@@ -290,20 +363,26 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
     }
 }
 
+/// A reusable I420 buffer.
 struct YuvScratch //REUSABLE I420 SCRATCH BUFFER
 {
+    /// The planes.
     buffer: YUVBuffer,
+    /// Width the buffer is sized for.
     width: u32,
+    /// Height the buffer is sized for.
     height: u32,
 }
 
 impl YuvScratch
 {
+    /// Creates an empty buffer.
     fn new() -> Self
     {
         Self { buffer: YUVBuffer::new(0, 0), width: 0, height: 0 }
     }
 
+    /// Converts one RGBA or BGRA picture to I420, reallocating only on a resolution change.
     fn fill(&mut self, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> Planes<'_>
     {
         //RESIZE ONLY ON A REAL RESOLUTION CHANGE
@@ -327,20 +406,30 @@ impl YuvScratch
     }
 }
 
+/// Converts, encodes and dispatches frames, choosing and replacing the encoder backend.
 struct FrameEncoder
 {
+    /// The open encoder, if any.
     encoder: Option<Box<dyn Backend>>,
+    /// The I420 conversion buffer.
     scratch: YuvScratch,
+    /// The target frame rate.
     fps: u32,
+    /// The dimensions the encoder was opened for.
     dimensions: Option<(u32, u32)>,
+    /// Whether a GPU encoder is still worth trying.
     hardware: bool, //GPU ENCODER STILL WORTH TRYING
+    /// Whether the next frame must be a keyframe.
     keyframe: bool, //THE NEXT FRAME MUST STAND ALONE
+    /// The bitrate controller.
     rate: RateControl,
+    /// When the last keyframe was produced.
     last_keyframe: Instant,
 }
 
 impl FrameEncoder
 {
+    /// Creates an encoder for a frame rate; the backend opens on the first frame.
     fn new(fps: u32) -> Self
     {
         Self
@@ -357,6 +446,15 @@ impl FrameEncoder
     }
 
     //ENCODE AND SEND, FALSE IF NOTHING WENT
+    /// Encodes one frame and hands it to the network task.
+    ///
+    /// Applies a new bitrate target first, skips the frame outright while the network channel is
+    /// full, and forces a keyframe when [`KEYFRAME_INTERVAL`](consts::KEYFRAME_INTERVAL) has passed.
+    ///
+    /// # Returns
+    /// - `Ok(true)` if a frame was sent.
+    /// - `Ok(false)` if nothing went.
+    /// - `Err` with a message for the user if encoding failed.
     fn submit(&mut self, frame_tx: &Sender<Vec<u8>>, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> Result<bool, String>
     {
         if let Some(bitrate) = self.rate.update() && let Some(backend) = self.encoder.as_mut()
@@ -379,11 +477,17 @@ impl FrameEncoder
         Ok(self.dispatch(frame_tx, frame))
     }
 
+    /// Makes the next frame a keyframe.
     fn force_intra_frame(&mut self)
     {
         self.keyframe = true;
     }
 
+    /// Converts and encodes one frame, reopening the encoder on a resize and falling back from the
+    /// GPU to software on a failure.
+    ///
+    /// # Returns
+    /// The access unit, `None` for an empty one, or `Err` on odd dimensions or a software failure.
     fn encode(&mut self, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> Result<Option<Vec<u8>>, String>
     {
         //I420 CONVERSION PANICS ON ODD DIMENSIONS
@@ -437,6 +541,7 @@ impl FrameEncoder
         }
     }
 
+    /// Hands an access unit to the network task; a full channel drops it and forces a keyframe.
     fn dispatch(&mut self, frame_tx: &Sender<Vec<u8>>, frame: Vec<u8>) -> bool //HAND A FRAME TO THE NETWORK TASK
     {
         //THIS FRAME IS GONE, SO THE NEXT CANNOT PREDICT IT
@@ -451,6 +556,7 @@ impl FrameEncoder
     }
 }
 
+/// Sleeps until the next frame slot.
 fn sleep_until_next_tick(next_tick: &mut Instant, target_interval: Duration)
 {
     let now = Instant::now();
@@ -465,6 +571,7 @@ fn sleep_until_next_tick(next_tick: &mut Instant, target_interval: Duration)
     *next_tick += target_interval;
 }
 
+/// Polls xcap screenshots of one monitor at the target rate.
 fn capture_loop_xcap
 (
     monitor: Monitor,
@@ -513,6 +620,8 @@ fn capture_loop_xcap
     Ok(())
 }
 
+/// Picks the Wayland output to share: the picked monitor, else the primary, else the one at the
+/// layout origin.
 #[cfg(target_os = "linux")]
 fn select_output(wayshot: &libwayshot::WayshotConnection) -> Result<libwayshot::output::OutputInfo, String> //PICK THE OUTPUT TO SHARE
 {
@@ -544,6 +653,7 @@ fn select_output(wayshot: &libwayshot::WayshotConnection) -> Result<libwayshot::
 }
 
 //A FRESH CONNECTION ONTO THE SAME OUTPUT
+/// Opens a fresh Wayland connection onto the output named `name`.
 #[cfg(target_os = "linux")]
 fn reconnect_wayshot(name: &str) -> Option<(libwayshot::WayshotConnection, libwayshot::output::OutputInfo)>
 {
@@ -554,26 +664,35 @@ fn reconnect_wayshot(name: &str) -> Option<(libwayshot::WayshotConnection, libwa
 }
 
 //WL_SHM FORMAT CODES
+/// `wl_shm` format code of ARGB8888.
 #[cfg(target_os = "linux")]
 const SHM_ARGB8888: u32 = 0;
+/// `wl_shm` format code of XRGB8888.
 #[cfg(target_os = "linux")]
 const SHM_XRGB8888: u32 = 1;
+/// `wl_shm` format code of ABGR8888.
 #[cfg(target_os = "linux")]
 const SHM_ABGR8888: u32 = 0x34324241;
+/// `wl_shm` format code of XBGR8888.
 #[cfg(target_os = "linux")]
 const SHM_XBGR8888: u32 = 0x34324258;
 
+/// One reused memfd the compositor copies frames into.
 #[cfg(target_os = "linux")]
 struct ShmCapture //ONE REUSED BUFFER THE COMPOSITOR COPIES INTO
 {
+    /// The memfd.
     file: File,
+    /// Its size.
     len: u64,
+    /// Its mapping, created on first use.
     map: Option<Mmap>,
 }
 
 #[cfg(target_os = "linux")]
 impl ShmCapture
 {
+    /// Creates a memfd of `bytes`; pages are only allocated when written.
     fn new(bytes: u64) -> Option<Self>
     {
         let fd = rustix::fs::memfd_create("why2-capture", rustix::fs::MemfdFlags::CLOEXEC).ok()?;
@@ -585,6 +704,13 @@ impl ShmCapture
     }
 
     //ONE FRAME INTO pixels, OR None WHERE ONLY libwayshot CAN READ IT
+    /// Captures one frame into `pixels`, tightly packed.
+    ///
+    /// # Returns
+    /// - `Ok(Some((width, height, order)))` on success.
+    /// - `Ok(None)` for a frame only libwayshot can read (a rotated output, an unknown format, a
+    ///   frame larger than the buffer).
+    /// - `Err` if the compositor refused the capture.
     fn grab
     (
         &mut self,
@@ -625,6 +751,10 @@ impl ShmCapture
 }
 
 //COPY width x height PIXELS OUT OF ROWS stride BYTES APART
+/// Copies `width`×`height` RGBA pixels out of rows `stride` bytes apart into `pixels`.
+///
+/// # Returns
+/// `false` if the dimensions do not fit the source.
 pub fn pack_rows(source: &[u8], width: usize, height: usize, stride: usize, pixels: &mut Vec<u8>) -> bool
 {
     let row = width * 4;
@@ -644,6 +774,8 @@ pub fn pack_rows(source: &[u8], width: usize, height: usize, stride: usize, pixe
     true
 }
 
+/// Captures the Wayland output with libwayshot screencopy, recycling the connection on a memory
+/// budget.
 #[cfg(target_os = "linux")]
 fn capture_loop_wayshot
 (
@@ -780,41 +912,62 @@ fn capture_loop_wayshot
 }
 
 //ENUMS
+/// The byte order of a captured pixel.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PixelOrder //BYTE ORDER OF A CAPTURED PIXEL
 {
+    /// Red, green, blue, alpha.
     Rgba,
+    /// Blue, green, red, alpha.
     Bgra,
 }
 
+/// The recorder delivering the frames.
 enum Recorder //WHO IS DELIVERING THE FRAMES
 {
+    /// xcap's recorder.
     Xcap(VideoRecorder),
 
+    /// Our xdg-desktop-portal recorder.
     #[cfg(target_os = "linux")]
     Portal(PortalRecorder),
 }
 
 //STRUCTS
+/// One captured picture, tightly packed, four bytes per pixel.
 pub struct CapturedFrame //ONE PICTURE, TIGHTLY PACKED
 {
+    /// Width in pixels.
     pub width: u32,
+    /// Height in pixels.
     pub height: u32,
+    /// Byte order of each pixel.
     pub order: PixelOrder,
+    /// The pixels.
     pub data: Vec<u8>,
 }
 
+/// A one-slot handoff from a recorder to the encode loop.
+///
+/// Only the newest frame is kept, so the recorder never waits on the encoder and capture overlaps
+/// encoding. Pixel buffers are recycled, at most [`SPARE_FRAMES`](consts::SPARE_FRAMES) of them.
 pub struct LatestFrame //ONE-SLOT FRAME HANDOFF
 {
+    /// The waiting frame.
     slot: Mutex<Option<CapturedFrame>>,
+    /// Buffers kept for reuse.
     spare: Mutex<Vec<Vec<u8>>>, //BUFFERS TO REUSE
+    /// Signals a frame was put.
     ready: Condvar,
+    /// Whether the encode loop still wants frames.
     draining: AtomicBool, //THE LOOP STILL WANTS FRAMES
+    /// Whether the recorder stopped delivering.
     ended: AtomicBool,    //THE RECORDER STOPPED DELIVERING
 }
 
 impl LatestFrame
 {
+    /// Creates an empty handoff.
     fn new() -> Self
     {
         Self
@@ -827,6 +980,7 @@ impl LatestFrame
         }
     }
 
+    /// Waits up to `timeout` for a frame and takes it.
     fn take(&self, timeout: Duration) -> Option<CapturedFrame> //THE NEWEST FRAME, OR NOTHING
     {
         let (mut slot, _) = self.ready
@@ -836,11 +990,13 @@ impl LatestFrame
         slot.take()
     }
 
+    /// Takes the waiting frame, if any.
     fn try_take(&self) -> Option<CapturedFrame>
     {
         self.slot.lock().unwrap().take()
     }
 
+    /// Puts a frame, replacing (and recycling) one still waiting.
     pub fn put(&self, frame: CapturedFrame) //REPLACE THE WAITING FRAME
     {
         let stale = self.slot.lock().unwrap().replace(frame);
@@ -850,11 +1006,13 @@ impl LatestFrame
         if let Some(stale) = stale { self.recycle(stale.data); }
     }
 
+    /// Returns a recycled buffer, or a new one.
     pub fn buffer(&self) -> Vec<u8> //A USED BUFFER, OR A NEW ONE
     {
         self.spare.lock().unwrap().pop().unwrap_or_default()
     }
 
+    /// Returns a buffer for reuse.
     pub fn recycle(&self, data: Vec<u8>)
     {
         let mut spare = self.spare.lock().unwrap();
@@ -862,6 +1020,7 @@ impl LatestFrame
         if spare.len() < consts::SPARE_FRAMES { spare.push(data); }
     }
 
+    /// Marks the recorder as stopped and wakes the encode loop.
     pub fn end(&self)
     {
         self.ended.store(true, Ordering::Relaxed);
@@ -870,6 +1029,10 @@ impl LatestFrame
 }
 
 //DRAIN THE RECORDER ALONGSIDE THE ENCODE
+/// Moves xcap's frames into the handoff on a thread of their own, keeping only the newest.
+///
+/// xcap delivers over a rendezvous channel, so without this its capture thread would block for
+/// the whole of every encode.
 fn drain_frames(frames: Receiver<Frame>, latest: Arc<LatestFrame>)
 {
     thread::spawn(move ||
@@ -896,10 +1059,14 @@ fn drain_frames(frames: Receiver<Frame>, latest: Arc<LatestFrame>)
     });
 }
 
+/// A started recorder and its frames. Dropping it stops the recorder.
 struct RecorderSession //A STARTED OS-NATIVE RECORDER AND ITS FRAMES
 {
+    /// The recorder.
     recorder: Recorder,
+    /// Its frame handoff.
     latest: Arc<LatestFrame>,
+    /// The frame that proved it works, if any.
     first: Option<CapturedFrame>,
 }
 
@@ -920,6 +1087,7 @@ impl Drop for RecorderSession
 }
 
 //THE PORTAL, ASKED FOR NO MORE FRAMES THAN WE ENCODE
+/// Starts the portal recorder at the share's frame rate.
 #[cfg(target_os = "linux")]
 fn open_portal(fps: u32) -> Result<RecorderSession, String>
 {
@@ -934,6 +1102,7 @@ fn open_portal(fps: u32) -> Result<RecorderSession, String>
     Ok(RecorderSession { recorder: Recorder::Portal(recorder), latest, first })
 }
 
+/// Starts the platform's recorder. Blocking.
 fn open_recorder(fps: u32) -> Result<RecorderSession, String> //THE BLOCKING HALF OF THE PROBE
 {
     #[cfg(target_os = "linux")]
@@ -957,6 +1126,10 @@ fn open_recorder(fps: u32) -> Result<RecorderSession, String> //THE BLOCKING HAL
     first_frame(Recorder::Xcap(recorder), latest)
 }
 
+/// Waits for a recorder's first frame.
+///
+/// # Returns
+/// `Err` if none arrives within [`RECORDER_FIRST_FRAME`](consts::RECORDER_FIRST_FRAME).
 fn first_frame(recorder: Recorder, latest: Arc<LatestFrame>) -> Result<RecorderSession, String>
 {
     let mut session = RecorderSession { recorder, latest, first: None };
@@ -968,6 +1141,7 @@ fn first_frame(recorder: Recorder, latest: Arc<LatestFrame>) -> Result<RecorderS
     Ok(session)
 }
 
+/// Returns the probe deadline, from `WHY2_CAPTURE_PROBE_TIMEOUT` or the default.
 #[cfg(not(target_os = "macos"))]
 fn probe_timeout() -> Duration
 {
@@ -978,12 +1152,14 @@ fn probe_timeout() -> Duration
 }
 
 //A macOS SESSION CANNOT CROSS A THREAD
+/// Starts the recorder on this thread; a macOS session cannot cross threads.
 #[cfg(target_os = "macos")]
 fn start_recorder(fps: u32) -> Result<RecorderSession, String>
 {
     open_recorder(fps)
 }
 
+/// Starts the recorder on its own thread, bounded by the probe deadline.
 #[cfg(not(target_os = "macos"))]
 fn start_recorder(fps: u32) -> Result<RecorderSession, String> //PROBE THE OS-NATIVE RECORDER, BOUNDED
 {
@@ -1004,6 +1180,12 @@ fn start_recorder(fps: u32) -> Result<RecorderSession, String> //PROBE THE OS-NA
     }
 }
 
+/// Encodes frames from a recorder until the share ends, the recorder stops, or the monitor
+/// changes.
+///
+/// A frame that arrives before its slot waits for it rather than being dropped, and slots are
+/// scheduled off each other rather than off the end of the encode, so the encode time is not
+/// added to every period. A slot more than an interval late restarts the schedule.
 fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
 (
     mut session: RecorderSession,
@@ -1097,6 +1279,7 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
     }
 }
 
+/// Captures on the recorder alone, with no fallback.
 fn capture_loop_recorder //OS-NATIVE STREAMING CAPTURE, WITHOUT THE FALLBACK CHAIN
 (
     frame_tx: Sender<Vec<u8>>,

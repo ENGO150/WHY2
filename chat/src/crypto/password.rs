@@ -16,6 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Password Hashing
+//!
+//! Argon2 hashing of account passwords, stored as PHC strings in `server_users.toml`.
+//! This is CPU-heavy; async callers run it in `spawn_blocking`.
+
 use argon2::
 {
     Argon2,
@@ -23,12 +28,20 @@ use argon2::
     PasswordVerifier,
 };
 
+/// Hashes a password with Argon2 (default parameters, random salt).
+///
+/// # Returns
+/// The PHC-format hash string.
 pub fn hash_password(password: &str) -> String //HASH PASSWORD USING ARGON2
 {
     //HASH
     Argon2::default().hash_password(password.as_bytes()).unwrap().to_string()
 }
 
+/// Verifies a password against a stored Argon2 PHC string.
+///
+/// # Returns
+/// `true` if the password matches; `false` on a mismatch or an unparsable hash.
 pub fn compare_password_hash(hashed: &str, password: &str) -> bool //COMPARE ARGON2 HASH WITH UNHASHED PASSWORD
 {
     //COMPARE (PARSES THE PHC STRING ITSELF)

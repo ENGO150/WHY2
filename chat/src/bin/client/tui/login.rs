@@ -16,6 +16,24 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Connect Box
+//!
+//! Getting in happens inside the TUI: one box that asks three times — the address, the username
+//! and the password — relabelling the same field.
+//!
+//! Only the address step is driven by the client: [`connect`] dials in a task so the frame keeps
+//! drawing, and numbers the attempt so a cancelled dial's late result is dropped. The server
+//! drives the other two steps by asking for them; an answered step is handed to
+//! [`submit`](crate::submit) like any other line.
+//!
+//! # Reconnect
+//! A session the user did not end dials itself back ([`Reconnect`]). The username and password
+//! are remembered as they are typed and only kept once the server accepts them, so what is
+//! replayed is a pair that demonstrably worked. Each reconnect is bounded by
+//! [`RECONNECT_ATTEMPTS`](consts::RECONNECT_ATTEMPTS), may replay two answers and no more, and is
+//! given up as soon as the answer stops being ours to give (a logout, a cancel, a registration
+//! prompt, a rejected username).
+
 use std::
 {
     io::Error,
@@ -54,47 +72,73 @@ use super::
 
 //TYPES
 //ONE FINISHED DIAL ATTEMPT, NUMBERED
+/// One finished dial attempt: its number and its result.
 pub type ConnectResult = (u64, Result<(OwnedReadHalf, OwnedWriteHalf), Error>);
 
 //ENUMS
+/// What the event loop has to do after a key in the connect box.
 pub enum Action //WHAT THE LOOP HAS TO DO AFTER A KEYSTROKE
 {
+    /// Nothing.
     None,
+    /// Dial the typed address.
     Connect,
+    /// Send the answered username or password.
     Submit, //AN ANSWERED IDENTITY STEP
+    /// Quit the client.
     Quit,
 }
 
+/// Which of its three questions the box is asking.
 #[derive(Clone, Copy, PartialEq)] //WHICH OF THE THREE THINGS THE BOX IS ASKING FOR
 pub enum Stage
 {
+    /// The server address.
     Address,
+    /// The username.
     Username,
+    /// The password, for an existing account or a new one.
     Password { register: bool },
 }
 
 //STRUCTS
+/// The connect box.
 pub struct Login //THE CONNECT PROMPT
 {
+    /// The field.
     pub input: InputBuffer,
+    /// What it is asking for.
     pub stage: Stage,
+    /// Whether a dial or an answer is in flight.
     pub busy: bool,            //A DIAL, OR AN ANSWER THE SERVER HAS NOT REPLIED TO YET
+    /// Whether the socket is open.
     pub connected: bool,       //THE SOCKET IS OPEN
+    /// Why the last attempt did not work.
     pub error: Option<String>, //WHY THE LAST ONE DID NOT WORK
+    /// The server's rules for the step on screen.
     pub hint: Option<String>,  //THE SERVER'S RULES FOR THE STEP ON SCREEN
+    /// Number of the newest dial; only its result is accepted.
     attempt: u64,              //ONLY THE NEWEST ATTEMPT'S RESULT IS ACCEPTED
 }
 
 //WHAT AN AUTOMATIC RE-DIAL NEEDS AFTER A DROPPED SESSION
+/// The automatic re-dial after a dropped session.
 #[derive(Default)]
 pub struct Reconnect
 {
+    /// The username and password that got us in, once they did.
     credentials: Option<(String, Zeroizing<String>)>, //WHAT GOT US IN, ONCE IT ACTUALLY DID
+    /// The answers of the steps in flight.
     typed: (String, Zeroizing<String>),               //THE ANSWERS OF THE STEPS IN FLIGHT
+    /// When to dial again.
     due: Option<Instant>,                             //WHEN TO DIAL AGAIN
+    /// Dials left before giving up.
     left: u32,                                        //ATTEMPTS BEFORE IT GIVES UP AND WAITS FOR A KEY
+    /// Answers this dial may still replay.
     answers: u32,                                     //REPLIES THIS DIAL MAY STILL REPLAY - USERNAME AND PASSWORD
+    /// Whether the box is busy because of a reconnect rather than the user.
     retrying: bool,                                   //THE BOX IS BUSY BECAUSE OF US, NOT BECAUSE OF A KEYPRESS
+    /// Whether an answer is in the field for the tick to send.
     pub submit: bool,                                 //AN ANSWER IS IN THE FIELD FOR THE TICK TO SEND
 }
 
@@ -102,6 +146,7 @@ pub struct Reconnect
 impl Reconnect
 {
     //KEEP WHAT WAS TYPED AT EACH STEP
+    /// Remembers what was typed at a step.
     pub fn remember(&mut self, stage: Stage, text: &str)
     {
         match stage
@@ -113,12 +158,14 @@ impl Reconnect
     }
 
     //A CHANGED PASSWORD REPLACES THE ONE WE WOULD REPLAY
+    /// Replaces the remembered password after a password change.
     pub fn passwd(&mut self, password: &str)
     {
         if let Some((_, stored)) = self.credentials.as_mut() { *stored = Zeroizing::new(password.to_owned()); }
     }
 
     //THE PAIR WORKED, SO IT IS WORTH REPLAYING
+    /// Keeps the typed pair, now that the server accepted it, and refills the attempts.
     pub fn accepted(&mut self)
     {
         self.credentials = Some(self.typed.clone());
@@ -128,9 +175,14 @@ impl Reconnect
     }
 
     //THE USER ASKED TO LEAVE, OR CANCELLED THE DIAL
+    /// Forgets everything; nothing will be replayed.
     pub fn forget(&mut self) { *self = Self::default(); }
 
     //SCHEDULE A DIAL, IF THERE IS ANYTHING TO LOG BACK IN WITH
+    /// Schedules a dial, if there is anything to log back in with and tries are left.
+    ///
+    /// # Returns
+    /// `true` if a dial was scheduled.
     pub fn arm(&mut self) -> bool
     {
         if self.credentials.is_none() || self.left == 0
@@ -149,12 +201,14 @@ impl Reconnect
     }
 
     //WHAT THE BOX SAYS WHILE IT IS DIALLING ITSELF BACK
+    /// Returns what the box says while reconnecting.
     pub fn status(&self) -> Option<String>
     {
         self.retrying.then(|| t!("login.reconnecting", attempt = consts::RECONNECT_ATTEMPTS - self.left, attempts = consts::RECONNECT_ATTEMPTS))
     }
 
     //WHETHER THE WAIT IS UP
+    /// Returns whether the scheduled dial is due, clearing it if so.
     pub fn take_due(&mut self) -> bool
     {
         if self.due.is_none_or(|due| Instant::now() < due) { return false; }
@@ -165,6 +219,7 @@ impl Reconnect
     }
 
     //THE ANSWER THE SERVER'S NEXT STEP WANTS
+    /// Returns the remembered answer for the server's next step, during a reconnect only.
     pub fn answer(&mut self, stage: Stage) -> Option<String>
     {
         //ONLY A DIAL WE STARTED REPLAYS ANYTHING - A DIAL THE USER TYPED IS THEIRS TO ANSWER
@@ -194,6 +249,7 @@ impl Default for Login
 
 impl Login
 {
+    /// Opens the box at the address step, prefilled and dialing on its own with `auto_connect`.
     pub fn new() -> Self
     {
         let mut input = InputBuffer::new();
@@ -206,6 +262,7 @@ impl Login
     }
 
     //COME BACK AT THE ADDRESS STEP AFTER A DROP
+    /// Reopens the box at the address step after a drop, keeping the attempt counter.
     pub fn again(address: &str, attempt: u64, error: String) -> Self
     {
         let mut input = InputBuffer::new();
@@ -214,13 +271,17 @@ impl Login
         Self { input, stage: Stage::Address, busy: false, connected: false, error: Some(error), hint: None, attempt }
     }
 
+    /// Returns the typed address.
     pub fn address(&self) -> String { self.input.text().trim().to_owned() }
 
+    /// Returns the number of the newest dial.
     pub fn attempt(&self) -> u64 { self.attempt }
 
     //THE ATTEMPT A RESULT HAS TO BELONG TO
+    /// Returns whether a dial result belongs to the attempt the box is waiting for.
     pub fn accepts(&self, attempt: u64) -> bool { self.busy && attempt == self.attempt }
 
+    /// Shows a failed dial.
     pub fn failed(&mut self, error: &Error)
     {
         self.busy = false;
@@ -228,6 +289,7 @@ impl Login
     }
 
     //ASK THE NEXT STEP, KEEPING THE ERROR
+    /// Asks for the next step, keeping the error from the last one.
     pub fn ask(&mut self, stage: Stage, hint: Option<String>)
     {
         self.stage = stage;
@@ -236,8 +298,10 @@ impl Login
         self.input = InputBuffer::new();
     }
 
+    /// Returns whether the field is a password.
     pub fn masked(&self) -> bool { matches!(self.stage, Stage::Password { .. }) }
 
+    /// Returns the box's title.
     pub fn title(&self) -> &'static str
     {
         match self.stage
@@ -249,6 +313,7 @@ impl Login
         }
     }
 
+    /// Returns the field's label.
     pub fn label(&self) -> &'static str
     {
         match self.stage
@@ -260,6 +325,7 @@ impl Login
     }
 
     //THE STATUS ROW WHILE SOMETHING IS IN FLIGHT
+    /// Returns the status row while something is in flight.
     pub fn waiting(&self) -> &'static str
     {
         match (self.stage, self.connected)
@@ -271,11 +337,13 @@ impl Login
     }
 
     //ESC ABANDONS A DIAL, THEN LEAVES THE CLIENT
+    /// Returns whether Esc cancels a dial rather than quitting.
     pub fn cancellable(&self) -> bool { self.busy && !self.connected && self.stage == Stage::Address }
 }
 
 //FUNCTIONS
 //PUBLIC
+/// Handles a key while the box is up.
 pub fn handle_key(app: &mut App, key: KeyEvent) -> Action
 {
     let Some(login) = app.login.as_mut() else { return Action::None };
@@ -327,6 +395,10 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Action
 }
 
 //EDIT A ONE-LINE FIELD, TRUE IF THE KEY WAS TAKEN
+/// Edits a one-line field.
+///
+/// # Returns
+/// `true` if the key was taken.
 pub fn edit(input: &mut InputBuffer, key: KeyEvent) -> bool
 {
     if key.modifiers.contains(KeyModifiers::CONTROL)
@@ -363,6 +435,7 @@ pub fn edit(input: &mut InputBuffer, key: KeyEvent) -> bool
     true
 }
 
+/// Pastes text into the box's field, without newlines.
 pub fn insert_str(app: &mut App, text: &str) //A PASTE INTO WHICHEVER FIELD IS UP
 {
     if let Some(login) = app.login.as_mut() && !login.busy
@@ -372,6 +445,7 @@ pub fn insert_str(app: &mut App, text: &str) //A PASTE INTO WHICHEVER FIELD IS U
 }
 
 //TAKE THE ANSWERED STEP OFF THE FIELD, GO BUSY
+/// Takes the answered step off the field, marks the box busy and remembers the answer.
 pub fn take_input(app: &mut App) -> String
 {
     let Some(login) = app.login.as_mut() else { return String::new() };
@@ -392,6 +466,7 @@ pub fn take_input(app: &mut App) -> String
 }
 
 //DIAL IN A TASK, SO THE FRAME KEEPS DRAWING
+/// Dials the typed address in a task, adding the default port if none is given.
 pub fn connect(app: &mut App, results: &Sender<ConnectResult>)
 {
     let Some(login) = app.login.as_mut() else { return };

@@ -16,6 +16,26 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Screen Share Audio
+//!
+//! The share's sound in both directions: capturing what this machine plays, and playing what a
+//! watched share sends.
+//!
+//! # Capture
+//! On Linux the share records the default output's monitor source, on Windows the WASAPI
+//! loopback of the default output; macOS shares no audio. The capture is resampled to 48 kHz
+//! stereo, has our own voice playback removed by the [`aec`]
+//! canceller, and is encoded to Opus. The capture callback drops a chunk when its queue is full
+//! and tells the canceller, so the two stay aligned.
+//!
+//! # Playback
+//! Video and audio share one TCP stream, and the sharer's sound card and ours run at the same
+//! rate forever, so any backlog would never drain on its own — and would hold back the picture
+//! too. Playback therefore throws a backlog away rather than playing through it, keeping only
+//! [`AUDIO_BACKLOG_TARGET`](screen_consts::AUDIO_BACKLOG_TARGET) frames as a jitter buffer. The
+//! volume is the share's own ([`get_screen_gain`](options::get_screen_gain)), separate from the
+//! voice output.
+
 use std::
 {
     time::Duration,
@@ -76,12 +96,22 @@ use crate::network::
 };
 
 //STRUCTS
+/// One encoded Opus frame of share audio.
 pub struct AudioFrame
 {
+    /// The Opus packet.
     pub data: Vec<u8>,
 }
 
 //FUNCTIONS
+/// Captures, cancels and encodes the share's audio until `running` is cleared.
+///
+/// # Parameters
+/// - `tx`: Where encoded frames go.
+/// - `running`: Cleared when the share ends.
+///
+/// # Panics
+/// If there is no usable audio device or the encoder cannot be created.
 pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) //CAPTURE AUDIO
 {
     if cfg!(target_os = "macos")
@@ -256,6 +286,14 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
     }
 }
 
+/// Decodes and plays a watched share's audio until `running` is cleared, shedding any backlog.
+///
+/// # Parameters
+/// - `rx`: Encoded frames from the network reader.
+/// - `running`: Cleared when the attachment ends.
+///
+/// # Panics
+/// If there is no output device or the decoder cannot be created.
 pub async fn spawn_audio_playback(mut rx: Receiver<AudioFrame>, running: Arc<AtomicBool>)
 {
     let host = cpal::default_host();

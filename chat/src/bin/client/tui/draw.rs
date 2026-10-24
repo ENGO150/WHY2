@@ -16,6 +16,30 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Drawing
+//!
+//! Renders [`App`] into a frame: the message pane, the sidebar, the input line, and whichever
+//! overlays are up. Nothing here changes what the UI means; it only reads state (and records
+//! where things were drawn, for the mouse and the picture code to use).
+//!
+//! # Pictures Go On Last
+//! A terminal graphics picture is not cells: ratatui-image writes one escape into the first cell
+//! of each row of a picture, which draws that whole row, and marks the rest of the row skipped.
+//! The cell diff cannot see either half of that, so [`draw_pictures`] runs after every overlay
+//! and handles both:
+//!
+//! - a box drawn over a picture would erase placeholder cells the diff never puts back, and a
+//!   picture redrawn while a box is up would write its whole row straight across the box. So
+//!   the box's cells are copied out first ([`overlay_cells`]) and written back over the picture
+//!   afterwards, and a picture always shows everywhere the box is not;
+//! - when a box closes or changes shape, the rows it covered are made to read differently
+//!   ([`replace_rows`]) so the diff sends them again and clears its old glyphs — and the next
+//!   frame is drawn too, since the frame after the change is the one that clears them.
+//!
+//! # Scrollbars
+//! Anything that scrolls draws [`draw_scrollbar`] over its own right border, only when there is
+//! more than fits, with the thumb placed by hand so that being at either end is unambiguous.
+
 use ratatui::
 {
     Frame,
@@ -95,19 +119,27 @@ use super::
 };
 
 //PROJECT LOGO WATERMARK
+/// The watermark logo drawn behind the message pane.
 const LOGO: &str = include_str!("./assets/rexlogo");
 
 //ENUMS
+/// Sidebar sections, in the order they are stacked.
 enum Panel //SIDEBAR SECTIONS, IN THE ORDER THEY ARE STACKED
 {
+    /// The server icon.
     Icon,
+    /// Who is connected.
     Online,
+    /// Registered users who are not.
     Offline,
+    /// Named channels.
     Channels,
+    /// The voice roster.
     Voice,
 }
 
 //PUBLIC
+/// Draws one frame.
 pub fn draw(frame: &mut Frame, app: &mut App)
 {
     let area = frame.area();
@@ -182,6 +214,8 @@ pub fn draw(frame: &mut Frame, app: &mut App)
 }
 
 //THE PROFILE PICTURE, INSIDE THE SETTINGS BOX
+/// Draws the profile picture inside the settings box, after the pane's pictures, re-sending the
+/// rows a pane picture rewrote.
 fn draw_avatar(frame: &mut Frame, app: &mut App, rewritten: &[u16])
 {
     let area = app.settings.picture_area;
@@ -213,6 +247,8 @@ fn draw_avatar(frame: &mut Frame, app: &mut App, rewritten: &[u16])
 }
 
 //PRIVATE
+/// Draws the message pane: its title, the wrapped rows with their tints and selection, the
+/// watermark, and the bottom border's toast, typing line and unread count.
 fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 {
     //TITLE: WHY2 ── NAME ── ADDRESS ── SOCKS5
@@ -309,6 +345,10 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 }
 
 //PICTURES GO ON LAST, AND A BOX IS PUT BACK OVER WHATEVER ROW ONE CLAIMS
+/// Hands the pictures to the terminal and puts the overlays back over them.
+///
+/// # Returns
+/// The terminal rows whose first picture cell changed since the last frame.
 fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect]) -> Vec<u16>
 {
     let inner = app.pane;
@@ -419,6 +459,7 @@ fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect]) -> Vec<u16
 }
 
 //THE CELLS A BOX HAS INSIDE area, COPIED OUT
+/// Copies out the cells overlays have inside an area.
 fn overlay_cells(frame: &mut Frame, area: Rect, overlays: &[Rect]) -> Vec<(u16, u16, Cell)>
 {
     let mut cells = Vec::new();
@@ -437,6 +478,7 @@ fn overlay_cells(frame: &mut Frame, area: Rect, overlays: &[Rect]) -> Vec<(u16, 
 }
 
 //ONE CELL CARRIES A WHOLE ROW OF A PICTURE, AND THE DIFF WRITES IT AGAIN ONLY IF IT READS DIFFERENTLY
+/// Makes the picture rows a box no longer covers read differently, so the diff sends them again.
 fn replace_rows(frame: &mut Frame, area: Rect, overlays: &[Rect])
 {
     for y in area.y..area.y + area.height
@@ -454,6 +496,7 @@ fn replace_rows(frame: &mut Frame, area: Rect, overlays: &[Rect])
 }
 
 //MAKE EACH ROW'S FIRST CELL DIFFER FROM THE LAST FRAME'S
+/// Makes every row's first cell differ from the last frame's.
 fn resend_rows(frame: &mut Frame, app: &App, area: Rect, overlays: &[Rect])
 {
     for y in area.y..area.y + area.height
@@ -472,6 +515,7 @@ fn resend_rows(frame: &mut Frame, app: &App, area: Rect, overlays: &[Rect])
 }
 
 //MAKE ONE PICTURE ROW'S FIRST CELL READ DIFFERENTLY
+/// Makes one picture row's first cell read differently, by repeating a cursor save.
 fn mark(frame: &mut Frame, x: u16, y: u16, times: usize)
 {
     let Some(cell) = frame.buffer_mut().cell_mut((x, y)) else { return };
@@ -482,6 +526,8 @@ fn mark(frame: &mut Frame, x: u16, y: u16, times: usize)
 }
 
 //FIRST VISIBLE ROW OF A SCROLLING LIST
+/// Returns the first visible row of a scrolling list, keeping the selection
+/// [`SCROLL_GAP`](consts::SCROLL_GAP) rows from the edges.
 fn window(offset: usize, selected: usize, total: usize, visible: usize) -> usize
 {
     let max = total.saturating_sub(visible);
@@ -499,6 +545,13 @@ fn window(offset: usize, selected: usize, total: usize, visible: usize) -> usize
 }
 
 //SCROLLBAR DOWN A BOX'S RIGHT BORDER
+/// Draws a scrollbar down a box's right border, if the list does not fit.
+///
+/// # Parameters
+/// - `area`: The box, borders included.
+/// - `total`: Rows in the list.
+/// - `visible`: Rows that fit.
+/// - `first`: The first visible row.
 fn draw_scrollbar(frame: &mut Frame, area: Rect, total: usize, visible: usize, first: usize)
 {
     if total <= visible || visible == 0 || area.width == 0 || area.height < 3 { return; }
@@ -534,6 +587,7 @@ fn draw_scrollbar(frame: &mut Frame, area: Rect, total: usize, visible: usize, f
 }
 
 //DRAW THE LOGO ON FREE CELLS ONLY
+/// Draws the watermark logo on free cells only; under text only its background shows.
 fn draw_logo(frame: &mut Frame, area: Rect, stripe: Color)
 {
     let rows = LOGO.lines().collect::<Vec<&str>>();
@@ -570,6 +624,10 @@ fn draw_logo(frame: &mut Frame, area: Rect, stripe: Color)
     }
 }
 
+/// Draws the sidebar's sections, dropping those that do not fit.
+///
+/// # Returns
+/// Where the server icon goes, or [`Rect::ZERO`].
 fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) -> Rect
 {
     let limit = area.height.saturating_sub(3).max(3);
@@ -630,6 +688,10 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) -> Rect
 }
 
 //THE SERVER'S PICTURE, UNDER ITS NAME - THE PICTURE ITSELF GOES ON LAST
+/// Draws the server icon's box, titled with the server's name.
+///
+/// # Returns
+/// Where the picture goes; the picture itself is drawn by [`draw_pictures`].
 fn draw_icon(frame: &mut Frame, app: &App, area: Rect) -> Rect
 {
     let mut block = Block::bordered()
@@ -659,6 +721,7 @@ fn draw_icon(frame: &mut Frame, app: &App, area: Rect) -> Rect
     }
 }
 
+/// Draws the online users, grouped by role.
 fn draw_online(frame: &mut Frame, app: &App, area: Rect)
 {
     let block = Block::bordered()
@@ -732,11 +795,13 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
+/// Returns the rows the online list needs: users plus section headings.
 fn online_rows(app: &App) -> u16 //USERS PLUS SECTION HEADERS
 {
     (app.online.len() + app.online_sections().count()) as u16
 }
 
+/// Returns a role's section heading, pluralised.
 fn section_label(role: Role) -> String //owner -> Owners
 {
     let name = role.name();
@@ -745,6 +810,7 @@ fn section_label(role: Role) -> String //owner -> Owners
         .unwrap_or_else(|| format!("{}{}s", name[..1].to_uppercase(), &name[1..]))
 }
 
+/// Draws the offline users.
 fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
 {
     let block = Block::bordered()
@@ -773,6 +839,7 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
+/// Draws the named channels.
 fn draw_channels(frame: &mut Frame, app: &App, area: Rect)
 {
     let block = Block::bordered()
@@ -801,6 +868,7 @@ fn draw_channels(frame: &mut Frame, app: &App, area: Rect)
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
+/// Draws the voice panel.
 fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
 {
     let block = Block::bordered()
@@ -850,6 +918,7 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
+/// Draws the input line, its caret, and the right-hand status.
 fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>>, cursor: (u16, u16))
 {
     //STATUS LINE - THE INPUT BLOCK'S BOTTOM BORDER
@@ -896,6 +965,10 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect, lines: Vec<Line<'static>
     ));
 }
 
+/// Draws the command palette above the input line.
+///
+/// # Returns
+/// The popup's rect, or [`Rect::ZERO`] if nothing was drawn.
 fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect) -> Rect
 {
     //ROW COUNT, VISIBLE ROWS AND LABELS
@@ -958,6 +1031,7 @@ fn draw_palette(frame: &mut Frame, app: &mut App, area: Rect) -> Rect
 }
 
 //ONE COLORED ROW PER ACCEPTED VALUE
+/// Returns one row per accepted value, with color swatches for a color parameter.
 fn value_lines(values: &Values, rows: usize, first: usize) -> Vec<Line<'static>>
 {
     values.matches.iter().skip(first).take(rows).enumerate().map(|(row, value)|
@@ -982,6 +1056,7 @@ fn value_lines(values: &Values, rows: usize, first: usize) -> Vec<Line<'static>>
 }
 
 //ONE ROW PER COMMAND, OR THE PARAMETER HINT
+/// Returns one row per command, or the parameter hint.
 fn entry_lines(app: &App, rows: usize, first: usize, width: usize) -> Vec<Line<'static>>
 {
     //ROWS, PLUS WHICH ONE IS SELECTED
@@ -1035,6 +1110,7 @@ fn entry_lines(app: &App, rows: usize, first: usize, width: usize) -> Vec<Line<'
 }
 
 //"COLOR" -> "Color"
+/// Capitalises the first letter of a name.
 fn capitalize(name: &str) -> String
 {
     let mut chars = name.chars();
@@ -1047,6 +1123,11 @@ fn capitalize(name: &str) -> String
 }
 
 //THE /settings OVERLAY
+/// Draws the settings overlay: the rows, the device picker, the description foot and the
+/// buttons.
+///
+/// # Returns
+/// The box's rect, or [`Rect::ZERO`] if the terminal had no room for it.
 fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect, font: FontSize) -> Rect
 {
     let width = consts::SETTINGS_WIDTH.min(area.width.saturating_sub(2)).max(1);
@@ -1235,6 +1316,10 @@ fn draw_settings(frame: &mut Frame, state: &mut Settings, area: Rect, font: Font
 }
 
 //SERVER IDENTITY PROMPT
+/// Draws the server identity prompt.
+///
+/// # Returns
+/// The box's rect.
 fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
 {
     let width = consts::TOFU_WIDTH.min(area.width.saturating_sub(2)).max(1);
@@ -1356,6 +1441,10 @@ fn draw_tofu(frame: &mut Frame, prompt: &Prompt, area: Rect) -> Rect
     popup
 }
 
+/// Draws the connect box.
+///
+/// # Returns
+/// The box's rect.
 fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rect) -> Rect
 {
     //STATUS ROW
@@ -1387,6 +1476,10 @@ fn draw_login(frame: &mut Frame, login: &Login, reconnect: &Reconnect, area: Rec
     draw_form(frame, area, login.title(), &[(login.label(), &login.input)], login.masked(), notes, footer, (!login.busy).then_some(0))
 }
 
+/// Draws the account form.
+///
+/// # Returns
+/// The box's rect.
 fn draw_account(frame: &mut Frame, form: &Account, area: Rect) -> Rect
 {
     let status = match (form.busy, form.armed, form.error.as_deref())
@@ -1411,6 +1504,10 @@ fn draw_account(frame: &mut Frame, form: &Account, area: Rect) -> Rect
 }
 
 //A CENTRED BOX WITH LABELLED FIELDS AND A STATUS UNDER THEM
+/// Draws a centred box of labelled input fields with notes and a footer under them.
+///
+/// # Returns
+/// The box's rect.
 #[allow(clippy::too_many_arguments)]
 fn draw_form
 (
@@ -1506,6 +1603,7 @@ fn draw_form
     popup
 }
 
+/// Returns a button, highlighted when selected.
 fn button(label: &str, selected: bool, style: Style) -> Span<'static>
 {
     let label = format!(" {label} ");
@@ -1514,6 +1612,7 @@ fn button(label: &str, selected: bool, style: Style) -> Span<'static>
 }
 
 //WRAP THE SELECTED ROW'S DESCRIPTION
+/// Wraps the selected row's description for the foot of the settings box.
 fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'static>>
 {
     let mut spans = Vec::new();
@@ -1595,6 +1694,7 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
     state::wrap_line(&Line::from(spans), width)
 }
 
+/// Returns one settings row: label, value, and its changed and restart marks.
 fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usize, width: usize) -> Line<'static>
 {
     let item = match row
@@ -1673,6 +1773,7 @@ fn settings_line(_state: &Settings, row: &Row, selected: bool, label_width: usiz
     if selected { line.style(theme::selected()) } else { line }
 }
 
+/// Returns the spans of a row's value.
 fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'static>>
 {
     match value
@@ -1721,6 +1822,7 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
     }
 }
 
+/// Returns one row of the device picker.
 #[cfg(feature = "client_voice")]
 fn picker_line(entry: &DeviceEntry, selected: bool, width: usize) -> Line<'static>
 {
@@ -1742,9 +1844,11 @@ fn picker_line(entry: &DeviceEntry, selected: bool, width: usize) -> Line<'stati
     if selected { line.style(theme::selected()) } else { line }
 }
 
+/// Returns an empty picker row; there are no devices without voice.
 #[cfg(not(feature = "client_voice"))]
 fn picker_line(_entry: &DeviceEntry, _selected: bool, _width: usize) -> Line<'static> { Line::default() }
 
+/// Fits text into a width, with an ellipsis.
 fn truncate(text: &str, width: usize) -> String //FIT text INTO width CELLS, ELLIPSIS AND ALL
 {
     if text.width() <= width { return text.to_string(); }
@@ -1766,6 +1870,7 @@ fn truncate(text: &str, width: usize) -> String //FIT text INTO width CELLS, ELL
     out
 }
 
+/// Returns the right-hand status of the input line.
 fn right_status(_app: &App) -> String
 {
     let mut parts: Vec<String> = Vec::new();
@@ -1785,6 +1890,7 @@ fn right_status(_app: &App) -> String
 }
 
 //THE CHANNEL'S VOICE ROSTER
+/// Returns whether the voice panel has anybody to show.
 fn voice_visible(app: &App) -> bool
 {
     !app.voice.is_empty()

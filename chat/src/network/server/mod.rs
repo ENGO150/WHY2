@@ -16,6 +16,39 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Server Connection
+//!
+//! The server's side of the main connection: [`listen_client`] runs one client's whole session,
+//! from the handshake through login to the packet loop, and the helpers around it broadcast to
+//! other clients and tear connections down.
+//!
+//! # Session Lifecycle
+//! 1. **Handshake** — the connection is registered as
+//!    [`NonAuthenticated`](connection::Connection::NonAuthenticated) and a key exchange runs
+//!    (`handshake::key_exchange`).
+//! 2. **Login** — the server sends its rules, checks the client's version and walks it through
+//!    the username and password prompts, refusing banned names and addresses and a username
+//!    that is already connected.
+//! 3. **Session** — once authenticated the connection becomes
+//!    [`Authenticated`](connection::Connection::Authenticated), the client is pushed the history,
+//!    the user list and the voice roster unasked, and every packet is dispatched until the
+//!    connection ends.
+//!
+//! # Shared State
+//! [`CONNECTIONS`] holds every connection by peer address. Nothing may hold a guard on it across
+//! an `.await`: the pattern throughout is to collect what is needed into locals, drop the guard,
+//! then await.
+//!
+//! # Broadcasting
+//! [`send_to_all`] sends to every authenticated client with no channel filter; a packet whose
+//! meaning depends on a channel names it and the client files it. Each recipient's copy is sent
+//! from its own task, so a slow client delays nobody else. [`send_to_others`] does filter by
+//! channel, for notices only worth anything to those present (the typing indicator).
+//!
+//! # Logging
+//! A log line identifies a client by its address only. An auxiliary connection is logged as the
+//! main connection that asked for it ([`log_addr`]).
+
 //MODULES
 pub mod connection;
 pub mod handshake;
@@ -94,11 +127,16 @@ use crate::
 };
 
 //LISTS
+/// Tokens minted for auxiliary connections, awaiting their socket: `token → (client id, kind,
+/// minted at)`.
 pub static PENDING_TOKENS: LazyLock<DashMap<[u8; 32], (usize, ConnectionType, Instant)>> = LazyLock::new(|| DashMap::new());
+/// Every connection, by peer address.
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
+/// Every user's shared files, by username.
 pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
 
 //PRIVATE
+/// Resolves a username, or the id of a live session, to a username.
 fn resolve_user(target: &str) -> Option<String> //A USERNAME, OR THE ID OF A SESSION THEY HAVE OPEN
 {
     if users::contains(target) { return Some(target.to_string()); }
@@ -107,6 +145,7 @@ fn resolve_user(target: &str) -> Option<String> //A USERNAME, OR THE ID OF A SES
     CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&id)).and_then(|entry| entry.username().cloned())
 }
 
+/// Returns the address of the authenticated session `username` has open, if any.
 fn session_of(username: &str) -> Option<SocketAddr> //THE SESSION username HAS OPEN
 {
     CONNECTIONS.iter()
@@ -114,11 +153,14 @@ fn session_of(username: &str) -> Option<SocketAddr> //THE SESSION username HAS O
         .map(|entry| *entry.key())
 }
 
+/// Strips control characters from profile text and trims it.
 fn clean(text: &str) -> String //WHAT A CLIENT MAY PUT IN A PROFILE
 {
     text.chars().filter(|character| !character.is_control()).collect::<String>().trim().to_string()
 }
 
+/// Sends the user list: everybody connected, plus the offline accounts if
+/// `show_offline_users` is on.
 async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &SocketAddr, keys: &SharedKeys) //SEND LIST OF USERS
 {
     let mut users = Vec::new();
@@ -176,6 +218,7 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
     }, Some(&keys)).await;
 }
 
+/// Sends the whole ban list.
 async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys) //SEND THE WHOLE BAN LIST
 {
     network::send(&mut *write_stream.lock().await, PacketCode::ServerBans
@@ -185,6 +228,13 @@ async fn send_bans(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys)
     }, Some(keys)).await;
 }
 
+/// Sends one page of the lobby history, if `persistent_messages` is on.
+///
+/// # Parameters
+/// - `write_stream`: The client's write half.
+/// - `keys`: The client's session keys.
+/// - `before`: The page cursor, or `None` for the newest page (sent at login, and skipped when
+///   nothing is stored).
 async fn send_history(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKeys, before: Option<u64>) //SEND A PAGE OF THE STORED LOBBY MESSAGES
 {
     if !config::read_config::<bool>("persistent_messages") { return; }
@@ -207,6 +257,7 @@ async fn send_history(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKe
     }, Some(keys)).await;
 }
 
+/// Removes every connection from one address.
 async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTIONS BY IP
 {
     let addrs: Vec<SocketAddr> = CONNECTIONS.iter()
@@ -219,11 +270,16 @@ async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //RE
     }
 }
 
+/// Checks a new password against `min_password_length`.
 fn validate_password(password: &str) -> bool //CHECK PASSWORD LENGTH (AND POSSIBLY STRENGTH IN THE FUTURE)
 {
     password.len() >= config::read_config("min_password_length")
 }
 
+/// Verifies a login password on a blocking thread.
+///
+/// # Returns
+/// `false` for an unknown user as well as for a wrong password.
 async fn verify_password(username: &str, password: Zeroizing<String>) -> bool
 {
     if let Some(hashed) = config::users::password(username)
@@ -238,6 +294,9 @@ async fn verify_password(username: &str, password: Zeroizing<String>) -> bool
 
 //PUBLIC
 //A CLIENT'S MAIN ADDRESS (NEVER UNDER A GUARD)
+/// Returns the main-connection address of client `id`, for logging an auxiliary connection.
+///
+/// Walks [`CONNECTIONS`], so it must never be called while a guard on that map is held.
 pub fn log_addr(id: &usize) -> String
 {
     CONNECTIONS.iter().find(|conn| conn.id() == Some(id))
@@ -245,6 +304,13 @@ pub fn log_addr(id: &usize) -> String
         .unwrap_or_else(|| String::from("<gone>"))
 }
 
+/// Spawns a task that is handed its own [`AbortHandle`].
+///
+/// The handle is passed through a oneshot before the task body runs, so a task can register
+/// itself (for example on its [`Connection`]) without racing its own abort.
+///
+/// # Returns
+/// The task's abort handle.
 pub fn spawn_with_abort<F, Fut>(f: F) -> AbortHandle //SPAWN TASK WHICH KNOWS ITS OWN AbortHandle
 where
     F: FnOnce(AbortHandle) -> Fut + Send + 'static,
@@ -271,11 +337,19 @@ where
     task
 }
 
+/// Sends a packet to every authenticated client.
 pub fn send_to_all(code: PacketCode) //SEND PACKET TO ALL CLIENTS
 {
     send_to_all_but(code, None);
 }
 
+/// Sends a packet to every authenticated client except one.
+///
+/// Each copy is encrypted under its recipient's keys and sent from a task of its own.
+///
+/// # Parameters
+/// - `code`: The packet.
+/// - `except`: The session id to skip.
 pub fn send_to_all_but(code: PacketCode, except: Option<usize>) //SEND PACKET TO ALL CLIENTS, ONE EXCLUDED
 {
     //COLLECT EACH CLIENT
@@ -305,6 +379,12 @@ pub fn send_to_all_but(code: PacketCode, except: Option<usize>) //SEND PACKET TO
     }
 }
 
+/// Sends a packet to every authenticated client in one channel except the sender.
+///
+/// # Parameters
+/// - `code`: The packet.
+/// - `channel`: The channel; `None` is the lobby.
+/// - `except`: The sender's session id.
 pub fn send_to_others(code: PacketCode, channel: Option<&str>, except: usize) //SEND PACKET TO A CHANNEL, SENDER EXCLUDED
 {
     //COLLECT EACH OTHER CLIENT IN SAME CHANNEL
@@ -334,6 +414,16 @@ pub fn send_to_others(code: PacketCode, channel: Option<&str>, except: usize) //
     }
 }
 
+/// Removes a connection and everything attached to it, then aborts its task.
+///
+/// Aborts its uploads and screen share, detaches its viewers, leaves voice, broadcasts its
+/// [`Leave`](PacketCode::Leave) and announces an abandoned channel. The connection's own task is
+/// aborted **last**, since this is frequently called by the very task it aborts.
+///
+/// # Parameters
+/// - `peer_addr`: The connection's address.
+/// - `grace`: Whether to tell the client first ([`Disconnect`](PacketCode::Disconnect)).
+/// - `info`: A short reason for the log.
 pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTION BY PEER ADDRESS
 {
     //REMOVE CONNECTION
@@ -424,6 +514,7 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
     connection.task().abort();
 }
 
+/// Returns whether a session with this username is connected.
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
 {
     CONNECTIONS.iter().any(|conn|
@@ -432,6 +523,7 @@ fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CON
     })
 }
 
+/// Returns the smallest session id not in use.
 fn get_latest_id() -> usize
 {
     //GET HashSet OF IDS
@@ -458,6 +550,7 @@ fn get_latest_id() -> usize
     unreachable!("what the fuck");
 }
 
+/// Stores the agreed keys on a connection after a key exchange.
 fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
 {
     //UPDATE CONNECTION
@@ -518,6 +611,11 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
     });
 }
 
+/// Promotes a connection to [`Authenticated`](Connection::Authenticated) and gives it a shared
+/// file list.
+///
+/// The rate limits start fresh: the message gap and image and typing timers start satisfied, and
+/// the packet bucket full.
 fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<Device>, role: Role, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
     //UPDATE CONNECTION
@@ -559,6 +657,9 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<D
     log::info!("Authenticate connection: {peer_addr} (id {id}, role {role})");
 }
 
+/// Moves a client to a channel, announcing a channel that was created or abandoned.
+///
+/// The connection's rate-limit state is carried across, so switching channels cannot reset it.
 fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOVE CLIENT TO CHANNEL
 {
     let mut old_channel = None; //PREVIOUS CHANNEL
@@ -637,6 +738,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
     }
 }
 
+/// Sends client `id` the voice roster of its channel, itself excluded.
 async fn send_voice_clients(stream: &mut OwnedWriteHalf, keys: &SharedKeys, id: usize)
 {
     //FIND CHANNEL
@@ -678,6 +780,7 @@ async fn send_voice_clients(stream: &mut OwnedWriteHalf, keys: &SharedKeys, id: 
     network::send(stream, PacketCode::VoiceClients { clients }, Some(keys)).await;
 }
 
+/// Mints a one-time token for an auxiliary connection of client `id`.
 fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW TOKEN
 {
     //GENERATE RANDOM TOKEN
@@ -691,6 +794,7 @@ fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW T
 }
 
 //PUBLIC
+/// Sends a packet to the client with session id `id`, if connected.
 pub async fn notify(id: usize, code: PacketCode) //SEND PACKET TO THE CLIENT WITH id
 {
     //COLLECT INTO LOCALS - NO GUARD ACROSS THE await
@@ -703,6 +807,7 @@ pub async fn notify(id: usize, code: PacketCode) //SEND PACKET TO THE CLIENT WIT
     }
 }
 
+/// Broadcasts the current server icon, acknowledging the change to client `id`.
 pub async fn icon_changed(id: usize) //TELL EVERYBODY THE SERVER'S PICTURE, AND id THAT IT WAS SAVED
 {
     let hash = config::server_icon();
@@ -711,6 +816,11 @@ pub async fn icon_changed(id: usize) //TELL EVERYBODY THE SERVER'S PICTURE, AND 
     notify(id, PacketCode::ServerIcon { hash, save: true }).await;
 }
 
+/// Detaches every viewer from a screen share and tells them.
+///
+/// # Parameters
+/// - `sharer_id`: The sharer's session id.
+/// - `sharer_uname`: The sharer's username, as shown to the viewers.
 pub async fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLIENTS
 {
     let mut to_notify = Vec::new();
@@ -729,6 +839,16 @@ pub async fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL AT
     }
 }
 
+/// Runs one client's session, from the handshake to the end of the connection.
+///
+/// See the module documentation for the lifecycle. Every exit path removes the connection.
+///
+/// # Parameters
+/// - `streams`: The connection's halves.
+/// - `peer_addr`: The client's address.
+/// - `obfuscation_key`: The 32 bytes the client opened with; obfuscates the handshake and is
+///   signed into the server's offer as its nonce.
+/// - `task`: This task's abort handle, stored on the connection.
 pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 (
     streams: &mut Streams<'_>,
@@ -2496,6 +2616,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     }
 }
 
+/// Gracefully disconnects every client.
 pub async fn disconnect_all() //DISCONNECT ALL CLIENTS
 {
     //ITERATE OVER ALL ADDRESSES, REMOVE CONNECTIONS
@@ -2508,6 +2629,8 @@ pub async fn disconnect_all() //DISCONNECT ALL CLIENTS
     }
 }
 
+/// Disconnects every connection that has been inactive too long: no chat message for
+/// `communication_time` seconds, or no login within `max_auth_time`.
 pub async fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
 {
     let now = Instant::now();
@@ -2527,6 +2650,8 @@ pub async fn disconnect_inactive() //DISCONNECT ALL INACTIVE CLIENTS
     }
 }
 
+/// Sends a keepalive to every authenticated client, first disconnecting any that did not answer
+/// the previous one.
 pub async fn send_keepalive() //SEND KEEPALIVE PACKET TO ALL CLIENTS
 {
     //COLLECT ALL CLIENT ADDRESSES

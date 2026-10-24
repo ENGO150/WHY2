@@ -16,6 +16,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Key Exchange Wire Formats
+//!
+//! `wincode` schemas for the key exchange messages, which carry types from `p521` and `ml-kem`
+//! that have no `wincode` encoding of their own.
+//!
+//! Every field has a fixed size — SEC1 uncompressed points, fixed-width `r || s` signatures
+//! (never DER), raw ML-KEM keys and ciphertexts — so an offer and a reply always encode to the
+//! same length, and a value that does not parse as what it claims to be (a point off the curve,
+//! a malformed key) fails at decode time with [`ReadError::InvalidValue`].
+
 use core::mem::MaybeUninit;
 
 use wincode::
@@ -51,30 +61,48 @@ use ml_kem::
 use crate::consts;
 
 //STRUCTS
+/// The server's half of a key exchange, carried by
+/// [`PacketCode::KeyExchangeOffer`](crate::network::codes::PacketCode::KeyExchangeOffer).
 #[derive(Clone)]
 pub struct Offer //THE SERVER'S HALF OF THE EXCHANGE
 {
+    /// The server's static identity key.
     pub static_ecc: PublicKey,
+    /// The ephemeral ECDH key of this exchange.
     pub eph_ecc: PublicKey,
+    /// The ephemeral ML-KEM-768 encapsulation key of this exchange.
     pub pq: EncapsulationKey768,
+    /// Signature by `static_ecc` over the transcript (see [`crate::crypto::kex`]).
     pub sig: Signature,
 }
 
+/// The client's half of a key exchange, carried by
+/// [`PacketCode::KeyExchangeReply`](crate::network::codes::PacketCode::KeyExchangeReply).
+///
+/// It is unsigned: the client is authenticated afterwards, by its password.
 #[derive(Clone)]
 pub struct Reply //THE CLIENT'S HALF (UNSIGNED)
 {
+    /// The client's ephemeral ECDH key.
     pub eph_ecc: PublicKey,
+    /// The ML-KEM-768 ciphertext encapsulated to the server's key.
     pub pq: Ciphertext<MlKem768>,
 }
 
 //FIELD ADAPTERS
+/// Schema for a P-521 public key as a SEC1 uncompressed point.
 struct Sec1Key;      //NIST P-521 PUBLIC KEY, SEC1 UNCOMPRESSED
+/// Schema for an ECDSA/P-521 signature as fixed-width `r || s`.
 struct EcdsaSig;     //ECDSA/P-521 SIGNATURE, FIXED-SIZE (r || s), NEVER DER
+/// Schema for an ML-KEM-768 encapsulation key.
 struct PqKey;        //ML-KEM-768 ENCAPSULATION KEY
+/// Schema for an ML-KEM-768 ciphertext.
 struct PqCiphertext; //ML-KEM-768 CIPHERTEXT
 
 //PACKET ADAPTERS
+/// Schema for a boxed [`Offer`], used as `#[wincode(with = "BoxedOffer")]`.
 pub struct BoxedOffer;
+/// Schema for a boxed [`Reply`], used as `#[wincode(with = "BoxedReply")]`.
 pub struct BoxedReply;
 
 //IMPLEMENTATIONS

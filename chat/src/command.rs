@@ -16,6 +16,25 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Slash Commands
+//!
+//! The table of in-chat commands (`/pm`, `/channel`, `/voice`, ...) and the translation of a
+//! typed command into the packet it sends.
+//!
+//! # Command Table
+//! [`COMMAND_LIST`] is the single source of truth: parsing ([`get_command`]), a front end's
+//! command completion, `/help` and `/info` all read it. Each [`CommandInfo`] lists the words that
+//! trigger it, the lowest [`Role`] it is offered to, its parameters and, for a command that is
+//! a doorway to several actions (`/server`, `/account`), its [`SubcommandInfo`]s.
+//!
+//! Descriptions and parameter names are translation keys, resolved where they are drawn; the
+//! triggers themselves are never translated.
+//!
+//! # Local and Remote Commands
+//! [`Command::build_message`] turns a command into a [`PacketCode`] when it is something the
+//! server handles. Commands that are handled entirely on the client (`/help`, `/settings`, ...)
+//! return `None` and are left to the front end.
+
 use std::
 {
     result,
@@ -48,107 +67,185 @@ use crate::network::screen::client::
 };
 
 //ENUMS
+/// A slash command, identified by what it does rather than by how it was typed.
 #[derive(Clone, PartialEq)]
 pub enum Command
 {
+    /// Disconnects and quits the client.
     Exit,                                         //DISCONNECT FROM SERVER
+    /// Disconnects and returns to the login prompt.
     Logout,                                       //DISCONNECT FROM SERVER, BACK TO THE CONNECT BOX
+    /// Joins or leaves voice chat.
     #[cfg(feature = "client_voice")] Voice,       //ENABLE VOICE CHAT
+    /// Toggles the mute of a user, or of the local microphone.
     #[cfg(feature = "client_voice")] Mute,        //TOGGLE-MUTE USER/YOURSELF
+    /// Starts or stops recording a voice message.
     #[cfg(feature = "client_voice")] Record,      //RECORD A VOICE MESSAGE
+    /// Plays a voice message.
     #[cfg(feature = "client_voice")] Play,        //PLAY A VOICE MESSAGE
+    /// Switches channel; without a name, returns to the lobby.
     Channel,                                      //SWITCH CHANNEL
+    /// Lists the commands.
     Help,                                         //PRINT COMMANDS
+    /// Describes one command.
     Info,                                         //COMMAND INFO
+    /// Lists the connected users.
     List,                                         //LIST USERS
+    /// Lists the files shared on the server.
     Files,                                        //LIST FILES
+    /// Lists the running screen shares.
     #[cfg(feature = "client_screen")] Screens,    //LIST SCREENSHARES
+    /// Shares a file with other users.
     Upload,                                       //UPLOAD FILE TO SERVER
+    /// Downloads a shared file.
     Download,                                     //DOWNLOAD FILE FROM SERVER
+    /// Posts a picture to the chat.
     Image,                                        //PERSISTENT IMAGE UPLOAD
+    /// Starts, stops or switches the monitor of a screen share.
     #[cfg(feature = "client_screen")] Screen,     //TOGGLE SCREEN SHARING
+    /// Watches somebody's screen share.
     #[cfg(feature = "client_screen")] Attach,     //ATTACH SCREEN SHARE
+    /// Stops watching a screen share.
     #[cfg(feature = "client_screen")] Deattach,   //DEATTACH SCREEN SHARE
+    /// Toggles the sound of a watched screen share.
     #[cfg(feature = "client_screen")] MuteScreen, //MUTE SCREEN SHARE
+    /// Deletes a stored message.
     Delete,                                       //DELETE A STORED MESSAGE
+    /// Rewords a stored message.
     Edit,                                         //REWORD A STORED MESSAGE
+    /// Sends a private message.
     PrivateMessage,                               //ONE TO ONE MESSAGE
+    /// Toggles a heart on a message.
     Heart,                                        //TOGGLE MESSAGE HEART REACTION
+    /// Lists who hearted a message.
     Hearts,                                       //LIST WHO HEARTED A MESSAGE
+    /// Toggles the pin on a message.
     Pin,                                          //TOGGLE A MESSAGE'S PIN
+    /// Lists the pinned messages.
     Pins,                                         //LIST PINNED MESSAGES
+    /// Replies to a message.
     Reply,                                        //REPLY TO MESSAGE
+    /// Answers the last private message.
     Re,                                           //REPLY TO PRIVATE MESSAGE
+    /// Opens the client settings.
     Settings,                                     //OPEN THE SETTINGS OVERLAY
+    /// Opens a user profile.
     Profile,                                      //OPEN A USER PROFILE
+    /// Moderation actions; takes a [`Subcommand`].
     Server,                                       //MODERATION ACTIONS (TAKES A SUBCOMMAND)
+    /// Account actions; takes a [`Subcommand`].
     Account,                                      //ACCOUNT ACTIONS (TAKES A SUBCOMMAND)
+    /// Sets the username color.
     UsernameColor,                                //SET COLOR OF USERNAME
+    /// Sets the message color.
     MessageColor,                                 //SET COLOR OF MESSAGE
+    /// A command that matched no trigger.
     Invalid,                                      //INVALID COMMAND
 }
 
 //ONE ACTION OF A COMMAND (/server mute <id>)
+/// One action of a doorway command, such as `/server mute <id>`.
 #[derive(Clone, PartialEq)]
 pub enum Subcommand
 {
+    /// Mutes a user server-side.
     Mute,     //MUTE A USER SERVER-SIDE
+    /// Disconnects a user.
     Kick,     //DISCONNECT A USER
+    /// Bans an account.
     Ban,      //BAN A USER
+    /// Bans a connected user's address.
     BanIp,    //IP BAN A USER
+    /// Lists every ban.
     Bans,     //LIST EVERY BAN
+    /// Lifts a username ban.
     Pardon,   //LIFT A USERNAME BAN
+    /// Lifts an address ban.
     PardonIp, //LIFT AN IP BAN
+    /// Says something as the server.
     Say,      //SAY AS SERVER
+    /// Sets a user's role.
     Role,     //SET A USER'S ROLE
+    /// Opens the server configuration.
     Settings, //SERVER CONFIGURATION
+    /// Sets or drops the server icon.
     Icon,     //SERVER PICTURE
+    /// Deletes one's own account.
     Delete,   //DELETE OWN ACCOUNT
+    /// Changes one's own password.
     Passwd,   //CHANGE OWN PASSWORD
 }
 
 //A PARAMETER THE PALETTE CAN OFFER ANSWERS FOR
+/// The kind of value a parameter takes, which decides what completion can offer for it.
 #[derive(Clone, Copy, PartialEq)]
 pub enum ArgValues
 {
+    /// Anything — a name, a message, an id; nothing is offered.
     Free,     //ANYTHING - A NAME, A MESSAGE, AN ID
+    /// A color name.
     Colors,   //A crossterm COLOR NAME
+    /// A file or directory path, completed off the disk.
     Paths,    //A FILE OR DIRECTORY BESIDE THE ONE BEING TYPED
+    /// A path, offering decodable pictures only.
     Images,   //THE SAME AS Paths BUT DECODABLE PICTURES ONLY
+    /// A monitor of this machine, as the display server names it.
     Monitors, //A MONITOR OF THIS MACHINE, AS THE DISPLAY SERVER NAMES IT
+    /// A server [`Role`], by name.
     Roles,    //A SERVER ROLE, BY THE NAME BOTH SIDES KNOW IT BY (role::Role)
+    /// `true` or `false`.
     Bools,    //true OR false
 }
 
 //STRUCTS
+/// One parameter of a command.
 pub struct CommandArg //COMMAND PARAMETER
 {
+    /// Translation key of the parameter's name.
     pub name: &'static str,        //TRANSLATION KEYS
+    /// Translation key of the parameter's description.
     pub description: &'static str,
+    /// Whether the parameter must be given.
     pub required: bool,
+    /// What may be typed for it.
     pub values: ArgValues, //WHAT MAY BE TYPED HERE, WHEN THAT IS A KNOWN, SHORT LIST
 }
 
+/// One action of a doorway command.
 pub struct SubcommandInfo //SUBCOMMAND INFO
 {
+    /// The action.
     pub subcommand: Subcommand,
+    /// Words that trigger it, uppercase.
     pub triggers: &'static [&'static str],
+    /// Lowest role it is offered to.
     pub minimal_role: Role,
+    /// Its parameters.
     pub args: &'static [CommandArg],
+    /// Translation key of its description.
     pub description: &'static str,
 }
 
+/// One slash command.
 pub struct CommandInfo //COMMAND INFO
 {
+    /// The command.
     pub command: Command,
+    /// Words that trigger it, uppercase; the first is its canonical name.
     pub triggers: &'static [&'static str],
+    /// Ctrl+key shortcut that runs it, if any.
     pub shortcut: Option<char>,
+    /// Lowest role it is offered to.
     pub minimal_role: Role,
+    /// Its actions; empty unless the command is a doorway.
     pub subcommands: &'static [SubcommandInfo], //EMPTY UNLESS THE COMMAND IS A DOORWAY TO ACTIONS
+    /// Its parameters.
     pub args: &'static [CommandArg],
+    /// Translation key of its description.
     pub description: &'static str,
 }
 
+/// The actions of `/server`.
 pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
 &[
     SubcommandInfo
@@ -340,6 +437,7 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
     },
 ];
 
+/// The actions of `/account`.
 pub const ACCOUNT_SUBCOMMANDS: &[SubcommandInfo] =
 &[
     SubcommandInfo
@@ -361,6 +459,7 @@ pub const ACCOUNT_SUBCOMMANDS: &[SubcommandInfo] =
     },
 ];
 
+/// Every slash command, in the order `/help` lists them.
 pub const COMMAND_LIST: &[CommandInfo] =
 &[
     CommandInfo
@@ -981,23 +1080,29 @@ pub const COMMAND_LIST: &[CommandInfo] =
 ];
 
 //CONSTS
+/// Prefix that marks input as a command.
 pub const COMMAND_PREFIX: &str = "/"; //PREFIX FOR COMMANDS
 
 //IMPLEMENTATIONS
 impl CommandInfo
 {
     //WHETHER role IS OFFERED THE COMMAND
+    /// Returns whether `role` is offered this command.
+    ///
+    /// A doorway command is hidden when the role may run none of its actions.
     pub fn available(&self, role: Role) -> bool
     {
         //HIDE A DOORWAY COMMAND WITH NO ACTIONS LEFT
         role >= self.minimal_role && (self.subcommands.is_empty() || self.actions(role).next().is_some())
     }
 
+    /// Returns the actions `role` may run.
     pub fn actions(&self, role: Role) -> impl Iterator<Item = &'static SubcommandInfo> //ACTIONS role MAY RUN
     {
         self.subcommands.iter().filter(move |sub| sub.available(role))
     }
 
+    /// Finds an action by trigger, case-insensitively. The role is not checked.
     pub fn action(&self, word: &str) -> Option<&'static SubcommandInfo> //ACTION BY TRIGGER (ROLE IS NOT CHECKED HERE)
     {
         self.subcommands.iter().find(|sub| sub.triggers.iter().any(|t| t.eq_ignore_ascii_case(word)))
@@ -1006,9 +1111,11 @@ impl CommandInfo
 
 impl SubcommandInfo
 {
+    /// Returns whether `role` may run this action.
     pub fn available(&self, role: Role) -> bool { role >= self.minimal_role }
 
     //WHETHER THE WHOLE PARAMETER IS A TARGET ID
+    /// Returns whether the action's whole parameter is a target session id.
     pub fn takes_id(&self) -> bool
     {
         matches!(self.subcommand, Subcommand::Mute
@@ -1022,6 +1129,19 @@ impl SubcommandInfo
 impl Command
 {
     //GET CODE MATCHING TO COMMAND
+    /// Builds the packet this command sends.
+    ///
+    /// `/screen` is resolved here as well, since whether it sends anything depends on the running
+    /// share: naming the monitor already captured, or none, toggles the share, while naming
+    /// another monitor, or only the sound, changes the running share locally and sends nothing.
+    ///
+    /// # Parameters
+    /// - `parameters`: Everything typed after the command word.
+    ///
+    /// # Returns
+    /// - `Some(Ok(packet))` for a command the server handles.
+    /// - `Some(Err(()))` if the parameters are invalid.
+    /// - `None` for a command handled locally, or a `/screen` change that sends nothing.
     pub fn build_message(&self, parameters: Option<&str>) -> Option<result::Result<PacketCode, ()>>
     {
         match self
@@ -1203,6 +1323,12 @@ impl Display for Command
     }
 }
 
+/// Splits the parameters of `/screen` into a monitor and a sound switch.
+///
+/// The sound switch is a trailing `true`/`false`; everything before it is the monitor.
+///
+/// # Returns
+/// `(monitor, sound)`, either of which may be absent.
 #[cfg(feature = "client_screen")]
 pub fn screen_parameters(parameters: Option<&str>) -> (Option<&str>, Option<bool>) //MONITOR AND SOUND OF /screen
 {
@@ -1222,6 +1348,12 @@ pub fn screen_parameters(parameters: Option<&str>) -> (Option<&str>, Option<bool
     }
 }
 
+/// Parses a line of input into a command and its parameters.
+///
+/// # Returns
+/// - `(None, None)` if the input does not start with [`COMMAND_PREFIX`].
+/// - `(Some(Command::Invalid), None)` for an unknown command word.
+/// - `(Some(command), parameters)` otherwise, the parameters trimmed.
 pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMAND + PARAMETERS FROM STRING
 {
     //input DOESN'T START WITH PREFIX, NO COMMAND
@@ -1247,6 +1379,12 @@ pub fn get_command(input: &str) -> (Option<Command>, Option<String>) //GET COMMA
     (Some(Command::Invalid), None)
 }
 
+/// Builds and sends the packet for a command, if it has one.
+///
+/// # Returns
+/// - `Some(true)` if a packet was sent.
+/// - `Some(false)` if the parameters were invalid.
+/// - `None` if the command sends nothing.
 pub async fn send_command_code(write_stream: &mut OwnedWriteHalf, command: &Command, parameters: &Option<String>) -> Option<bool> //SEND CODE FROM COMMAND IF POSSIBLE
 {
     //CODE COMMAND

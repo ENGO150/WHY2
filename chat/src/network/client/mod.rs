@@ -16,6 +16,29 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Client Connection
+//!
+//! The client's side of the main connection: [`listen_server`] runs the handshake and then
+//! reads packets for the rest of the session, translating each into a [`ClientEvent`] for the
+//! UI.
+//!
+//! # Events, Not Output
+//! Nothing here prints or draws. Every packet that matters to the user becomes a
+//! [`ClientEvent`] on an `mpsc` channel, which is the whole interface between the protocol and
+//! a front end — every front end consumes the same events. A front end
+//! never needs to see a [`PacketCode`].
+//!
+//! # Pictures
+//! An [`ImageDisplay`](PacketCode::ImageDisplay) is resolved here as far as the protocol can
+//! take it: bytes that arrived are hashed and cached, then decoded off the async runtime when
+//! `auto_show_images` is on, or offered to be requested on demand when it is off; a picture without bytes is
+//! looked up in the cache before the UI is asked to fetch it. A picture for another channel is
+//! cached but never decoded.
+//!
+//! # Submodules
+//! - [`handshake`] — dialing and the key exchange.
+//! - [`image`] — bounded picture decoding and avatar cutting.
+
 //MODULES
 pub mod image;
 pub mod handshake;
@@ -98,120 +121,241 @@ use crate::network::screen::client::
 };
 
 //STRUCTS
+/// A trust-on-first-use decision put to the user.
 pub struct TofuRequest
 {
+    /// The host the key is pinned against.
     pub host: String,           //WHAT THE KEY IS PINNED AGAINST
+    /// Fingerprint of the server's identity key.
     pub hash: String,           //SHA256 OF THE SERVER'S PUBLIC KEYS
+    /// Whether a different key is pinned for this host.
     pub mismatch: bool,         //A KEY IS PINNED FOR host AND DIFFERS
+    /// The fingerprint on record, if any.
     pub pinned: Option<String>, //THE FINGERPRINT ON RECORD
+    /// Where the user's answer goes: `true` to trust and pin the key. Dropping it refuses.
     pub reply: oneshot::Sender<bool>,
 }
 
+/// One row of the voice panel.
 pub struct VoiceUser
 {
+    /// The user's session id.
     pub id: usize,             //ID OF USER
+    /// The username to show.
     pub username: String,      //USERNAME TO DISPLAY
+    /// Whether they are speaking right now.
     pub is_speaking: bool,     //TAKE A WILD GUESS
+    /// Their round-trip time in milliseconds, if we are receiving them.
     pub latency: Option<u128>, //USER'S PING
+    /// Whether this row is us.
     pub is_local: bool,        //AM I THE USER?
 }
 
 //ENUMS
+/// Everything the protocol has to tell a front end.
+///
+/// Variants with tuple fields document them in order.
 pub enum ClientEvent
 {
+    /// The server asks for a password to register.
     Register,                                                    //REGISTER PROMPT
+    /// The server asks for the password of an existing account.
     Login,                                                       //LOGIN PROMPT
+    /// We registered first and became the owner.
     FirstUser,                                                   //FIRST USER
+    /// Login succeeded, with our role.
     Authenticated(Role),                                         //LOGIN SUCCESSFUL, ROLE
+    /// The connection is up: the server's display name.
     Connected(String),                                           //SUCCESSFUL CONNECTION MESSAGE
+    /// A chat message: text, username, sender id, message id, colors, channel (as in
+    /// [`PacketCode::Message`]), timestamp and the id it replies to.
     Message(String, String, usize, u64, MessageColors, Option<Option<String>>, Option<u64>, Option<u64>), //RECEIVED MESSAGE, ITS CHANNEL, WHEN, WHAT IT REPLIES TO
+    /// A private message we sent: text, recipient id, recipient username, colors.
     PrivateMessageSent(String, usize, String, MessageColors),    //SENT PM
+    /// A private message we received: text, sender id, sender username, colors.
     PrivateMessageRecv(String, usize, String, MessageColors),    //RECEIVED PM
+    /// The user refused the server's identity.
     TofuError,                                                   //TOFU VERIFICATION REJECTED BY THE USER
+    /// The server's identity needs a decision from the user.
     TofuPrompt(TofuRequest),                                     //TOFU DECISION ASKED OF THE USER
+    /// Identity verification is disabled in this build: the server's fingerprint.
     TofuSkip(String),                                            //TOFU VERIFICATION SKIPPED
+    /// Dialing again after pinning a key failed.
     ReconnectFailed,                                             //RECONNECTING AFTER PINNING THE KEY FAILED
+    /// The key exchange failed, with the reason.
     HandshakeFailed(String),                                     //THE KEY EXCHANGE DID NOT ADD UP
+    /// The local voice session's activity: who is speaking, and their ping.
     VoiceActivity(Vec<VoiceUser>),                               //VOICE OVERLAY
+    /// Our channel's whole voice roster, as `(id, username)`, ourselves excluded.
     VoiceRoster(Vec<(usize, String)>),                           //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
+    /// Somebody joined voice in our channel: id, username.
     VoiceJoin(usize, String),                                    //SOMEBODY JOINED VOICE IN OUR CHANNEL
+    /// Somebody left voice in our channel: id.
     VoiceLeave(usize),                                           //SOMEBODY LEFT VOICE IN OUR CHANNEL
+    /// A user connected: username, username color, id, device, role.
     Join(String, Option<u8>, usize, Option<Device>, Role),       //CLIENT CONNECTED
+    /// A user disconnected: username, id, and whether their account still exists.
     Leave(String, usize, bool),                                  //CLIENT DISCONNECTED (ACCOUNT STILL EXISTS)
+    /// A message said as the server.
     ServerSay(String),                                           //SERVER MESSAGE
+    /// A role was set: the role, and the username it was set on.
     Role(Role, String),                                          //A ROLE WAS SET (THE ROLE, AND WHO ON)
+    /// A page of lobby history: messages, start, more, kept, and whether it answers a request for
+    /// an older page.
     History(Vec<StoredMessage>, u64, bool, u64, bool),           //A PAGE OF STORED MESSAGES (START, MORE, KEPT, OLDER)
+    /// We switched channel; `None` is the lobby.
     ChannelChanged(Option<String>),                              //WE SWITCHED CHANNEL
+    /// A channel was created.
     ChannelCreated(String),                                      //CHANNEL CREATED
+    /// A channel was abandoned.
     ChannelDestroyed(String),                                    //CHANNEL ABANDONED
+    /// Somebody in our channel is typing.
     Typing(String),                                              //SOMEBODY IN OUR CHANNEL IS WRITING
+    /// We are muted.
     Muted,                                                       //HAHA
+    /// A command had invalid parameters or was not permitted.
     InvalidUsage,                                                //INVALID COMMAND USAGE
+    /// A message was deleted: message id.
     Deleted(u64),                                                //A MESSAGE WAS DELETED (MESSAGE ID)
+    /// A message's hearts changed: message id, who hearted it.
     Hearts(u64, Vec<String>),                                    //A MESSAGE'S HEARTS CHANGED (MESSAGE ID, WHO)
+    /// A message was reworded: message id, new text.
     Edited(u64, String),                                         //A MESSAGE WAS REWORDED (MESSAGE ID, TEXT)
+    /// A message was pinned or unpinned: message id, pinned.
     Pinned(u64, bool),                                           //A MESSAGE WAS PINNED OR UNPINNED (MESSAGE ID, PINNED)
+    /// Every pinned message.
     Pins(Vec<StoredMessage>),                                    //EVERY PINNED MESSAGE
+    /// The version check could not reach crates.io.
     VersionFailed,                                               //FETCHING VERSIONS FAILED
+    /// The server was built from a different commit: ours, theirs.
     VersionMismatch(String, String),                             //MISMATCH GIT HASH
+    /// This build is outdated: versions behind, ours, the newest.
     UnsafeVersion(usize, Version, String),                       //OLD VERSION
+    /// The server asks for a username: whether the last one was rejected, then the maximum and
+    /// minimum length.
     Username(bool, u64, u64),                                    //USERNAME PROMPT
+    /// We joined voice.
     VoiceEnabled,                                                //VOICE CHAT ENABLED
+    /// Switching audio devices failed; the previous ones are back.
     VoiceDeviceFailed,                                           //REBUILDING THE AUDIO STREAMS FAILED
+    /// The server never answered the voice handshake.
     VoiceHandshakeFailed,                                        //THE SERVER NEVER ANSWERED THE UDP HANDSHAKE
+    /// We left voice.
     VoiceDisabled,                                               //VOICE CHAT DISABLED
+    /// The user list: connected, and offline if the server discloses them.
     List(Vec<OnlineUser>, Option<Vec<OfflineUser>>),             //LIST OF USERS, CONNECTED AND NOT
+    /// Every key of `server.toml`, and whether this acknowledges a save.
     ServerSettings(Vec<ServerSetting>, bool),                    //server.toml AS THE SERVER HOLDS IT
+    /// A password change was answered; `false` means the old password was wrong.
     Passwd(bool),                                                //A PASSWORD CHANGE ANSWERED
+    /// An account deletion was answered; `false` means the password was wrong.
     AccountDeleted(bool),                                        //AN ACCOUNT DELETION ANSWERED
+    /// A profile: username, profile, whether it is ours, whether this acknowledges a save.
     Profile(String, UserProfile, bool, bool),                    //A PROFILE (WHOSE, IT, OURS, A SAVE ACK)
+    /// A color change landed on the server.
     Colors(Option<MessageColors>),                               //A /color LANDED ON THE SERVER OR INIT COLORS
+    /// The server icon, and whether this acknowledges our own change.
     ServerIcon(Option<[u8; 32]>, bool),                          //THE SERVER'S PICTURE (HASH, A SAVE ACK)
+    /// The ban list: usernames, addresses.
     ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
+    /// Our file upload started: upload id, name, size.
     Upload(u64, String, u64),                                    //UPLOADING FILE (UID, NAME, SIZE)
+    /// Our picture upload started: upload id, name, size.
     Image(u64, String, u64),                                     //UPLOADING IMAGE (UID, NAME, SIZE)
+    /// A picture, decoded and ready to draw: username, filename, message id, timestamp, frames,
+    /// username color.
     ImageDisplay(String, String, u64, Option<u64>, Animation, Option<u8>), //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
+    /// A picture that was asked for, by hash; `None` means it is not coming.
     ImageData([u8; 32], Option<Animation>),                      //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
+    /// A picture on its way from the server: username, filename, message id, timestamp, hash,
+    /// username color.
     ImagePending(String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
+    /// A picture waiting to be asked for (`auto_show_images` off): username, filename, message id,
+    /// timestamp, hash, username color.
     ImageOffer(String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
+    /// A picture posted in another channel: channel, username, filename, message id, timestamp,
+    /// hash, username color.
     ImageParked(String, String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE IN ANOTHER CHANNEL (CHANNEL FIRST)
+    /// A picture the cache could not answer; the front end should request it from the server.
     ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
+    /// Cutting our avatar or the server icon failed, with the reason.
     AvatarFailed(String),                                        //CUTTING OUR AVATAR OR SERVER ICON FAILED
+    /// A picture that would not decode: username, filename, message id, username color.
     ImageFailed(String, String, u64, Option<u8>),                //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
+    /// A voice message: username, message id, timestamp, clip, username color, channel.
     VoiceMessage(String, u64, Option<u64>, VoiceNote, Option<u8>, Option<Option<String>>), //SOMEBODY'S VOICE MESSAGE AND ITS CHANNEL
+    /// A voice clip that was asked for arrived, by hash; `false` means it is not coming.
     VoiceData([u8; 32], bool),                                   //A VOICE MESSAGE THAT WAS ASKED FOR (FALSE = NOT COMING)
+    /// Recording or playing a voice message failed, with the reason.
     VoiceMessageFailed(String),                                  //RECORDING OR PLAYING A VOICE MESSAGE FAILED
+    /// A user shared a file: filename, username.
     Uploaded(String, String),                                    //USER UPLOADED FILE
+    /// Our upload is complete: upload id, name.
     UploadDone(u64, String),                                     //OUR OWN UPLOAD IS ON THE WIRE
+    /// A download started: transfer id, name, size.
     Download(u64, String, u64),                                  //DOWNLOADING FILE (UID, NAME, SIZE)
+    /// A download completed and verified: transfer id, name.
     Downloaded(u64, String),                                     //DOWNLOADED FILE
+    /// A download failed verification: transfer id, name.
     DownloadFailed(u64, String),                                 //DOWNLOADING FAILED
+    /// How far a transfer has got: transfer id, bytes.
     TransferProgress(u64, u64),                                  //HOW FAR A TRANSFER HAS GOT (UID, BYTES)
+    /// The shared files.
     Files(Vec<UserFile>),                                        //FILE LIST
+    /// The running screen shares.
     Screens(Vec<UserScreen>),                                    //SCREENSHARE LIST
+    /// We have too many uploads in flight.
     UploadLimit,                                                 //MAX CONCURRENT UPLOADS REACHED
+    /// Our screen share started (`true`) or stopped.
     Screen(bool),                                                //TOGGLED SCREENSHARE
+    /// Screen capture failed, with the reason.
     ScreenFailed(String),                                        //SCREEN CAPTURE FAILED
+    /// We started watching a share: the sharer's username.
     Attach(String),                                              //ATTACHED SCREENSHARE
+    /// We stopped watching a share: the sharer's username.
     Deattach(String),                                            //DEATTACHED SCREENSHARE
+    /// Somebody started watching our share.
     Attached(String),                                            //SOMEBODY ATTACHED OUR SCREENSHARE
+    /// Somebody stopped watching our share.
     Deattached(String),                                          //SOMEBODY DEATTACHED OUR SCREENSHARE
+    /// The watched share's sound was muted (`true`) or unmuted.
     MuteScreen(bool),                                            //TOGGLED ATTACHED SCREENSHARE MUTE
+    /// Somebody started sharing their screen.
     Screenshare(String),                                         //SOMEBODY STARTED SCREENSHARING
+    /// Somebody stopped sharing their screen.
     ScreenshareEnd(String),                                      //SOMEBODY STOPPED SCREENSHARING
+    /// The server runs an incompatible version: ours, theirs.
     IncompatibleVersion(String, String),                         //INCOMPATIBLE SERVER VERSION
+    /// The server rejected our username.
     UsernameRejected,                                            //USERNAME REJECTED BY SERVER
+    /// The server rejected our password; the minimum length.
     PasswordRejected(u64),                                       //PASSWORD REJECTED BY SERVER
+    /// We are sending messages too fast.
     SpamWarning,                                                 //SPAM WARNING
+    /// Voice is unavailable over SOCKS5.
     Socks5Voice,                                                 //DISABLED VOICE ON SOCKS5
+    /// The requested feature is disabled on this server.
     DisabledFeature,                                             //DISABLED FEATURE
+    /// The session ended; `true` if the server ended it gracefully.
     Quit(bool),                                                  //SERVER QUIT COMMUNICATION
 }
 
 //LISTS
+/// Files waiting for an upload approval, by SHA-256.
 pub static ACTIVE_UPLOADS: Mutex<BTreeMap<[u8; 32], PathBuf>> = Mutex::new(BTreeMap::new()); //ACTIVE UPLOADS
 //FUNCTIONS
 //PUBLIC
+/// Runs the client side of a session: the handshake, then every packet until the connection
+/// ends.
+///
+/// The handshake is repeated on a fresh connection when the user has just pinned the server's
+/// key. Afterwards, each packet is either answered directly (keepalives, version checks,
+/// rekeys) or turned into [`ClientEvent`]s. A lost connection ends with
+/// [`ClientEvent::Quit`].
+///
+/// # Parameters
+/// - `streams`: The main connection.
+/// - `tx`: The UI event channel.
 pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) //SERVER -> CLIENT COMMUNICATION
 {
     //SET GLOBAL CLIENT ENCRYPTION & MAC KEY

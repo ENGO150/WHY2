@@ -16,6 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Remote Server Settings
+//!
+//! Reads and writes `server.toml` on behalf of a client editing it remotely.
+//!
+//! Nothing here names a setting: every key is read straight out of the file, together with the
+//! `#` heading above it and its trailing comment, so a key added to the default configuration
+//! shows up in the client with no code change. Writes accept only keys the file already has,
+//! with the datatype they already have.
+
 use toml_edit::
 {
     Item,
@@ -34,6 +43,8 @@ use crate::
 };
 
 //THE HEADING A KEY SITS UNDER
+/// Returns the last `#` heading in a key's leading decoration, if the block was not interrupted
+/// by a blank line.
 fn heading(prefix: &str) -> Option<String>
 {
     let mut heading = None;
@@ -50,6 +61,11 @@ fn heading(prefix: &str) -> Option<String>
 }
 
 //EVERY KEY OF server.toml AS THE CLIENT EDITS IT
+/// Returns every key of `server.toml` as the client edits it.
+///
+/// Each entry carries its value, the section heading it sits under, its trailing comment as a
+/// description, and whether it only applies after a restart
+/// ([`SERVER_RESTART_SETTINGS`](consts::SERVER_RESTART_SETTINGS)).
 pub fn all() -> Vec<ServerSetting>
 {
     super::with_cached(&super::config_path(consts::SERVER_CONFIG), |data|
@@ -98,6 +114,13 @@ pub fn all() -> Vec<ServerSetting>
 }
 
 //STORE THE CLIENT'S ROWS, DROPPING UNKNOWN ONES
+/// Stores the client's edited settings.
+///
+/// A key the file does not have, or a value of a different datatype than the current one, is
+/// dropped. All accepted values are written in a single pass.
+///
+/// # Returns
+/// The number of settings that were stored.
 pub fn write(settings: &[ServerSetting]) -> usize
 {
     let accepted: Vec<(&str, Value)> = super::with_cached(&super::config_path(consts::SERVER_CONFIG),

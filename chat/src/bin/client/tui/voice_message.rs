@@ -16,6 +16,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Push-to-Talk
+//!
+//! Recording and playing voice messages from the keyboard and the mouse.
+//!
+//! `Ctrl+R` held records and sends on release; a tap toggles instead. A terminal only reports key
+//! releases under the kitty keyboard protocol ([`App::key_release`]). With releases, a release
+//! sends unless the key was down for less than [`KEY_TAP`](consts::KEY_TAP), which makes it a
+//! toggle. Without them, presses closer than [`KEY_REPEAT_GAP`](consts::KEY_REPEAT_GAP) are the
+//! terminal's auto-repeat, and repeats stopping for
+//! [`KEY_RELEASE_GAP`](consts::KEY_RELEASE_GAP) is the release, noticed by [`tick`]. `/record`
+//! is the same toggle, typed, and `Esc` discards.
+
 use std::
 {
     sync::Arc,
@@ -57,6 +69,7 @@ use super::
 
 //FUNCTIONS
 //PRIVATE
+/// Starts a recording, reporting a failure to start.
 fn start(app: &mut App, tx: &Sender<ClientEvent>)
 {
     if !message::start_recording(tx.clone())
@@ -72,6 +85,7 @@ fn start(app: &mut App, tx: &Sender<ClientEvent>)
     app.dirty = true;
 }
 
+/// Ends the recording and uploads it, unless it was too short to send.
 fn send(app: &mut App, write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>, tx: &Sender<ClientEvent>)
 {
     app.recording = None;
@@ -88,6 +102,7 @@ fn send(app: &mut App, write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>, t
 
 //PUBLIC
 //THE RECORD SHORTCUT WENT DOWN, OR REPEATED
+/// Handles a press (or repeat) of the record key.
 pub fn press(app: &mut App, kind: KeyEventKind, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, tx: &Sender<ClientEvent>)
 {
     let now = Instant::now();
@@ -108,6 +123,7 @@ pub fn press(app: &mut App, kind: KeyEventKind, write_stream: &Arc<MutexAsync<Ow
 }
 
 //THE RECORD SHORTCUT WAS LET GO
+/// Handles a release of the record key.
 pub fn release(app: &mut App, write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>, tx: &Sender<ClientEvent>)
 {
     let Some(recording) = app.recording.as_mut().filter(|recording| recording.held) else { return };
@@ -125,6 +141,7 @@ pub fn release(app: &mut App, write_stream: Option<&Arc<MutexAsync<OwnedWriteHal
 }
 
 //START OR SEND (/record)
+/// Toggles recording, as `/record` does.
 pub fn toggle(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, tx: &Sender<ClientEvent>)
 {
     match app.recording
@@ -139,6 +156,7 @@ pub fn toggle(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, tx:
     }
 }
 
+/// Discards the recording.
 pub fn cancel(app: &mut App) //THROW THE RECORDING AWAY
 {
     message::cancel_recording();
@@ -148,6 +166,8 @@ pub fn cancel(app: &mut App) //THROW THE RECORDING AWAY
 }
 
 //ONCE PER REDRAW TICK
+/// Follows the player and the recorder once per redraw tick: sends a recording that hit its
+/// limit, or whose key repeats stopped, and updates the shown duration.
 pub fn tick(app: &mut App, write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>, tx: &Sender<ClientEvent>)
 {
     app.sync_playing(message::playing());
@@ -185,6 +205,7 @@ pub fn tick(app: &mut App, write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>
 }
 
 //WHAT THE PANE'S BORDER SAYS WHILE RECORDING
+/// Returns what the pane's border says while recording.
 pub fn status(app: &App) -> Option<String>
 {
     let recording = app.recording?;
@@ -196,6 +217,7 @@ pub fn status(app: &App) -> Option<String>
 }
 
 //PLAY ONE CLIP, STOPPING WHATEVER PLAYS
+/// Plays a clip, stopping whatever is playing.
 pub fn play(app: &mut App, hash: [u8; 32], tx: &Sender<ClientEvent>)
 {
     app.stop_loading();
@@ -204,6 +226,7 @@ pub fn play(app: &mut App, hash: [u8; 32], tx: &Sender<ClientEvent>)
     message::play(hash, tx.clone());
 }
 
+/// Stops playback.
 pub fn stop(app: &mut App) //STOP PLAYBACK
 {
     message::stop();
@@ -213,6 +236,7 @@ pub fn stop(app: &mut App) //STOP PLAYBACK
 }
 
 //A CLICKED BUTTON
+/// Toggles playback of a clicked voice message.
 pub fn click(app: &mut App, entry: usize, tx: &Sender<ClientEvent>)
 {
     let Some((hash, active)) = app.voice_entry(entry) else { return };

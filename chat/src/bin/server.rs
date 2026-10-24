@@ -16,6 +16,27 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # WHY2 Server
+//!
+//! The headless server binary, `why2-server`.
+//!
+//! # Startup
+//! The configuration is created first, since the log level lives in it, then the logger. The
+//! server then checks for a newer release, creates its identity if it has none, sweeps stored
+//! pictures nothing names any more, and binds TCP — and UDP on the same port when voice is
+//! enabled — retrying while a previous process may still hold the port.
+//!
+//! # Accepting
+//! Every TCP connection opens with 32 bytes, read in the connection's own task under a timeout.
+//! If they match a token minted over a main connection, the socket is that auxiliary connection
+//! (an upload, a download, a screen share or a viewer) and is handed to its handler. Otherwise
+//! they are the client's handshake nonce and the socket becomes a new main connection, subject to
+//! the ban list, the handshake budget, `max_clients` and the per-address limit.
+//!
+//! # Background Tasks
+//! A watchdog drops inactive connections, expires unused tokens and sends keepalives; the voice
+//! listener serves UDP; Ctrl+C disconnects everybody gracefully before exiting.
+
 #![cfg(feature = "server")]
 
 use std::
@@ -63,6 +84,16 @@ use why2_chat::
 
 //FUNCTIONS
 //BIND, RETRYING WHILE THE PORT IS STILL HELD
+/// Binds a socket, retrying for up to [`BIND_ATTEMPTS`](consts::BIND_ATTEMPTS) while the port is
+/// still held (a restart that spawned its replacement beside the old process).
+///
+/// # Parameters
+/// - `what`: The protocol, for the log.
+/// - `address`: The address, for the log.
+/// - `bind`: The bind attempt.
+///
+/// # Returns
+/// The bound socket; exits the process if every attempt failed.
 async fn bind<T>(what: &str, address: &str, bind: impl AsyncFn() -> Result<T>) -> T
 {
     let mut last = None;
@@ -86,12 +117,14 @@ async fn bind<T>(what: &str, address: &str, bind: impl AsyncFn() -> Result<T>) -
     process::exit(1);
 }
 
+/// Disconnects every client and exits.
 async fn quit() //DISCONNECT ALL USERS
 {
     log::info!("Exiting ({} connections open)...", server::CONNECTIONS.len());
     server::disconnect_all().await; //DISCONNECT ALL USERS
 }
 
+/// Runs the server.
 #[tokio::main]
 async fn main()
 {

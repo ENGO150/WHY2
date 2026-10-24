@@ -16,6 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # File Transfer — Client Side
+//!
+//! Runs approved uploads and downloads, each on its own auxiliary socket, and reports their
+//! progress to the UI as [`ClientEvent`]s.
+
 use std::
 {
     sync::Arc,
@@ -62,6 +67,21 @@ use crate::
     },
 };
 
+/// Uploads a file the server approved.
+///
+/// The path is taken from [`ACTIVE_UPLOADS`](client::ACTIVE_UPLOADS), where the request that
+/// asked for the upload parked it under its hash. A cut avatar or recorded clip is removed from
+/// the temp directory once sent.
+///
+/// # Parameters
+/// - `token`: The transfer token from the approval.
+/// - `uid`: The upload id from the approval.
+/// - `file_hash`: SHA-256 of the file, which names it in `ACTIVE_UPLOADS`.
+/// - `tx`: The UI event channel.
+/// - `kind`: What the upload is for; decides what is reported.
+///
+/// # Panics
+/// If the socket cannot be opened, the hash was never requested, or the file cannot be read.
 pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientEvent>, kind: UploadKind)
 {
     //INIT FILE CONNECTION
@@ -118,6 +138,19 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
     tx.send(ClientEvent::UploadDone(uid, filename)).await.unwrap();
 }
 
+/// Downloads a file the server approved into the `download_directory`.
+///
+/// The file name is reduced to its last component, so a server cannot write outside the
+/// download directory. The download is reported as
+/// [`Downloaded`](ClientEvent::Downloaded) or [`DownloadFailed`](ClientEvent::DownloadFailed)
+/// by whether its SHA-256 matches the metadata.
+///
+/// # Parameters
+/// - `token`: The transfer token from the approval.
+/// - `tx`: The UI event channel.
+///
+/// # Panics
+/// If the socket cannot be opened, or the download directory or file cannot be created.
 pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION

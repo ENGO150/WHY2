@@ -16,6 +16,24 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Media Foundation Encoder
+//!
+//! H.264 encoding through a hardware Media Foundation transform (Windows).
+//!
+//! Hardware MFTs are asynchronous: they announce through their event queue when they want input
+//! (`METransformNeedInput`) and when output is ready (`METransformHaveOutput`). [`run_async`]
+//! drives them off that queue, polling with a timeout so a stalled transform falls back to
+//! software instead of hanging the capture, and queues an early output so one call still returns
+//! one access unit. A transform that turns out synchronous is driven directly.
+//!
+//! Parameter sets are put in front of an IDR that arrives without them
+//! ([`ParameterSets::complete`]), and frames over the bitrate are skipped by a [`Budget`].
+//!
+//! This backend has been type-checked against its target but not run on hardware; a failure
+//! costs the GPU, never the share.
+//!
+//! [`run_async`]: MediaFoundationEncoder::run_async
+
 use std::
 {
     collections::VecDeque,
@@ -50,13 +68,18 @@ use crate::network::screen::client::encoder::
     Settings,
 };
 
+/// Longest wait for an event from an asynchronous transform.
 const EVENT_TIMEOUT: Duration = Duration::from_secs(1); //ASYNC MFT STALL LIMIT
+/// Event queue poll interval.
 const EVENT_POLL: Duration = Duration::from_millis(1);
+/// Media Foundation time units per second (100 ns).
 const TICKS_PER_SECOND: i64 = 10_000_000;              //100ns UNITS
 
 //STRUCTS
+/// Holds COM and Media Foundation open; dropping it shuts both down.
 struct Startup //MEDIA FOUNDATION AND COM
 {
+    /// Whether this call initialised COM, and so must uninitialise it.
     com: bool,
 }
 
@@ -74,27 +97,47 @@ impl Drop for Startup
     }
 }
 
+/// H.264 through a hardware Media Foundation transform.
 pub struct MediaFoundationEncoder //H.264 THROUGH A HARDWARE MFT
 {
+    /// The transform.
     transform: MediaFoundation::IMFTransform,
+    /// What it was activated from; shut down on drop.
     activate: MediaFoundation::IMFActivate,
+    /// Its event queue, if it is asynchronous.
     events: Option<MediaFoundation::IMFMediaEventGenerator>,
+    /// Its codec API, for rate and keyframe control.
     codec: Option<MediaFoundation::ICodecAPI>,
+    /// Its output stream requirements.
     output_info: MediaFoundation::MFT_OUTPUT_STREAM_INFO,
+    /// Input requests not yet answered.
     inputs: u32,                 //PENDING INPUT REQUESTS
+    /// Access units produced ahead of being asked for.
     pending: VecDeque<Vec<u8>>,  //QUEUED OUTPUT
+    /// The last SPS and PPS seen.
     sets: ParameterSets,
+    /// Skips frames over the bitrate.
     budget: Budget,
+    /// Picture width.
     width: u32,
+    /// Picture height.
     height: u32,
+    /// Where sample timestamps count from.
     started: Instant,
+    /// Duration of one frame, in 100 ns units.
     duration: i64,
+    /// Timestamp of the last sample, kept strictly increasing.
     last_time: i64,
+    /// Keeps COM and Media Foundation open.
     _startup: Startup,
 }
 
 impl MediaFoundationEncoder
 {
+    /// Opens the first hardware H.264 encoder transform that accepts the stream.
+    ///
+    /// # Returns
+    /// `Err` with a description if none does.
     pub fn new(settings: Settings) -> Result<Self, String>
     {
         let startup = start()?;
@@ -155,6 +198,7 @@ impl MediaFoundationEncoder
         Err(last)
     }
 
+    /// Copies a picture into a new NV12 sample with a timestamp.
     fn sample(&mut self, planes: &Planes) -> Result<MediaFoundation::IMFSample, String> //NV12 INTO A SAMPLE
     {
         let (width, height) = (self.width as usize, self.height as usize);
@@ -188,6 +232,8 @@ impl MediaFoundationEncoder
         }
     }
 
+    /// Returns the next event of an asynchronous transform, polling up to
+    /// [`EVENT_TIMEOUT`].
     fn next_event(&self, events: &MediaFoundation::IMFMediaEventGenerator) -> Result<MediaFoundation::MF_EVENT_TYPE, String> //NEXT EVENT
     {
         let deadline = Instant::now() + EVENT_TIMEOUT;
@@ -210,6 +256,7 @@ impl MediaFoundationEncoder
         }
     }
 
+    /// Collects one access unit, if the transform has one ready.
     fn output(&mut self) -> Result<Option<Vec<u8>>, String> //ONE ACCESS UNIT, IF READY
     {
         let provides = self.output_info.dwFlags
@@ -280,6 +327,8 @@ impl MediaFoundationEncoder
         }
     }
 
+    /// Feeds one sample to an asynchronous transform: waits for an input request, feeds it, then
+    /// waits for output or the next request.
     fn run_async(&mut self, events: &MediaFoundation::IMFMediaEventGenerator, sample: &MediaFoundation::IMFSample) -> Result<(), String>
     {
         //WAIT FOR AN INPUT REQUEST
@@ -319,6 +368,7 @@ impl MediaFoundationEncoder
         }
     }
 
+    /// Feeds one sample to a synchronous transform and collects its output.
     fn run_sync(&mut self, sample: &MediaFoundation::IMFSample) -> Result<(), String>
     {
         //SAFETY: LIVE TRANSFORM
@@ -332,6 +382,7 @@ impl MediaFoundationEncoder
         Ok(())
     }
 
+    /// Sets a codec property, best effort.
     fn set(&self, key: &windows::core::GUID, value: u32) //BEST-EFFORT SETTING
     {
         if let Some(codec) = &self.codec
@@ -398,6 +449,7 @@ impl Drop for MediaFoundationEncoder
 }
 
 //FUNCTIONS
+/// Initialises COM and Media Foundation.
 fn start() -> Result<Startup, String> //COM, THEN MEDIA FOUNDATION
 {
     //SAFETY: PAIRED IN Drop
@@ -415,6 +467,7 @@ fn start() -> Result<Startup, String> //COM, THEN MEDIA FOUNDATION
     }
 }
 
+/// Activates and configures one transform.
 fn open(activate: MediaFoundation::IMFActivate, settings: Settings) -> Result<MediaFoundationEncoder, String> //ONE MFT, SET UP
 {
     //SAFETY: LIVE INTERFACES
@@ -473,9 +526,15 @@ fn open(activate: MediaFoundation::IMFActivate, settings: Settings) -> Result<Me
     }
 }
 
+/// A configured transform's event queue and codec API, each if it has one.
 type Configured = (Option<MediaFoundation::IMFMediaEventGenerator>, Option<MediaFoundation::ICodecAPI>);
 
 //SAFETY: LIVE TRANSFORM
+/// Sets a transform's output and input types and its low-latency, Constrained Baseline and rate
+/// control properties.
+///
+/// # Safety
+/// `transform` must be a live transform.
 unsafe fn configure(transform: &MediaFoundation::IMFTransform, settings: Settings) -> Result<Configured, String>
 {
     unsafe
@@ -555,6 +614,7 @@ unsafe fn configure(transform: &MediaFoundation::IMFTransform, settings: Setting
     }
 }
 
+/// Returns a `VT_UI4` variant.
 fn variant(value: u32) -> Variant::VARIANT //A VT_UI4
 {
     let mut variant = Variant::VARIANT::default();
@@ -570,6 +630,7 @@ fn variant(value: u32) -> Variant::VARIANT //A VT_UI4
     variant
 }
 
+/// Returns a `VT_BOOL` variant.
 fn variant_bool(value: bool) -> Variant::VARIANT //A VT_BOOL
 {
     let mut variant = Variant::VARIANT::default();

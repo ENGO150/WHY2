@@ -16,6 +16,31 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # File Transfer — Server Side
+//!
+//! Receives uploads and serves downloads on auxiliary sockets. Function names are from the
+//! server's point of view: [`download`] takes a client's upload in, and [`upload`] sends a
+//! shared file out.
+//!
+//! # Upload Pipeline
+//! An upload is checked as early as possible and only named once it is verified:
+//!
+//! 1. The metadata is checked against the client's parallel-upload limit, the kind's size
+//!    ceiling and `max_upload_size`.
+//! 2. The first chunk of a persistent upload must be an image (or a voice clip), and an avatar
+//!    or icon must be a square no larger than [`AVATAR_DIMENSION`](consts::AVATAR_DIMENSION);
+//!    nothing is decoded.
+//! 3. Each chunk is encrypted with the file's at-rest [`RexStream`] and written to a temp name;
+//!    for a persistent upload the HMAC is fed the ciphertext as written, and the tag is appended
+//!    once the last chunk is in.
+//! 4. The SHA-256 of the plaintext must match the metadata, and a voice clip must parse.
+//! 5. Only then is the file renamed into place: under its hash for a persistent upload, under
+//!    its sanitised name for a fileshare.
+//!
+//! A persistent picture or clip is then stored in the history (lobby only, with
+//! `persistent_messages` on) and broadcast whole; an avatar or icon is answered with the
+//! updated profile or icon instead.
+
 use std::
 {
     sync::Arc,
@@ -93,9 +118,15 @@ use crate::
 
 //PRIVATE
 //STRUCTS
+/// Cleans up a transfer when its task ends, for whatever reason.
+///
+/// Removes the transfer's stream from the connection and deletes the partial file of an
+/// unfinished upload.
 struct FileTransferGuard
 {
+    /// The client's session id.
     id: usize,
+    /// The upload id.
     uid: u64,
 }
 
@@ -121,26 +152,51 @@ impl Drop for FileTransferGuard
 }
 
 //PUBLIC
+/// An upload in progress.
 pub struct ActiveFileshare //ACTIVE FILE UPLOAD
 {
+    /// The file being written.
     pub file: Arc<Mutex<File>>, //TARGET FILE (SERVER-SIDE)
+    /// Expected size, from the metadata.
     pub size: u64,              //EXPECTED FILE SIZE
+    /// Bytes written so far.
     pub current_size: u64,      //CURRENT SIZE
+    /// Expected SHA-256, from the metadata.
     pub hash: [u8; 32],         //SHA256 HASH OF FINAL FILE
+    /// SHA-256 of the plaintext received so far.
     pub hasher: Sha256,         //HASHER
+    /// The uploaded file's name.
     pub filename: String,       //FILENAME
+    /// Session id of the uploader.
     pub client_id: usize,       //ID OF SENDER
+    /// The temp path the upload is being built at.
     pub path: PathBuf,          //WHERE THE UPLOAD IS BEING BUILT
+    /// The plaintext, kept only for a persistent upload, which is broadcast or parsed afterwards.
     pub image: Option<Vec<u8>>, //THE PLAINTEXT, KEPT ONLY FOR AN IMAGE OR A CLIP
+    /// The at-rest stream the file is encrypted with.
     pub stream: RexStream,
 
     //THE DISK TAG BEING BUILT, FOR AN IMAGE ONLY
+    /// The at-rest tag being built, for a persistent upload only.
     pub mac: Option<Hmac<Sha256>>,
 }
 
 //LISTS
+/// Every upload in progress, by upload id.
 pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock::new(|| DashMap::new()); //LIST FOR ACTIVE FILE UPLOADS
 
+/// Receives a client's upload on an auxiliary socket.
+///
+/// See the module documentation for the pipeline. Every rejection ends the transfer; a drop guard
+/// removes the partial file.
+///
+/// # Parameters
+/// - `token`: The transfer token the socket presented.
+/// - `id`: The uploader's session id.
+/// - `streams`: The transfer socket's halves.
+/// - `uid`: The upload id.
+/// - `task`: The abort handle of this transfer's task, registered on the connection.
+/// - `kind`: What the upload is for.
 pub async fn download
 (
     token: [u8; 32],
@@ -613,6 +669,15 @@ pub async fn download
     }
 }
 
+/// Sends a shared file to a client on an auxiliary socket.
+///
+/// # Parameters
+/// - `token`: The transfer token the socket presented.
+/// - `id`: The downloader's session id.
+/// - `write_stream`: The transfer socket's write half.
+/// - `file`: The shared file, with its at-rest key and nonce.
+/// - `uid`: The transfer id.
+/// - `task`: The abort handle of this transfer's task, registered on the connection.
 pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf, file: AvailableFile, uid: u64, task: AbortHandle)
 {
     //GET CLIENT INFO
@@ -681,6 +746,7 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
 }
 
 //THE PLAINTEXT SIZE OF A STORED PICTURE, TAG TAKEN OFF
+/// Returns the plaintext size of a stored picture or clip, without reading it.
 pub async fn image_size(hash: &[u8; 32]) -> Option<u64>
 {
     let sealed = fs::metadata(misc::get_image_dir().join(misc::hex(hash))).await.ok()?.len();
@@ -689,6 +755,14 @@ pub async fn image_size(hash: &[u8; 32]) -> Option<u64>
 }
 
 //READ ONE STORED IMAGE BACK OFF DISK
+/// Reads one stored picture or clip back off disk, verifying it.
+///
+/// The file is decrypted in [`UPLOAD_CHUNK_SIZE`](consts::UPLOAD_CHUNK_SIZE) chunks, finalizing
+/// the stream after each, to mirror how it was written.
+///
+/// # Returns
+/// - `Some(bytes)` with the original file.
+/// - `None` if it is missing or fails verification.
 pub async fn read_image(hash: &[u8; 32]) -> Option<Vec<u8>>
 {
     let sealed = match fs::read(misc::get_image_dir().join(misc::hex(hash))).await

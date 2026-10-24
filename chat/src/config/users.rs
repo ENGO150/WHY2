@@ -16,6 +16,29 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Account Store
+//!
+//! Registered accounts in `server_users.toml`, one table per username:
+//!
+//! ```toml
+//! [alice]
+//! password = "$argon2id$..."
+//! role = "owner"
+//! username_color = "red"
+//! message_color = "none"
+//!
+//! [alice.profile]
+//! bio = ""
+//! pronouns = ""
+//! website = ""
+//! status = ""
+//! avatar = ""
+//! ```
+//!
+//! The profile lives in its own subtable so that nothing reading or writing a profile can reach
+//! the password hash. A missing key reads as empty, so entries that predate a field need no
+//! migration.
+
 use toml_edit::
 {
     Item,
@@ -36,23 +59,30 @@ use crate::
     },
 };
 
+/// The color keys, username color first.
 const COLOR_KEYS: [&str; 2] = ["username_color", "message_color"]; //THE COLORS AS server_users.toml SPELLS THEM
+/// The subtable a profile sits in.
 const PROFILE_TABLE: &str = "profile";        //THE SUBTABLE A PROFILE SITS IN, APART FROM THE CREDENTIALS
+/// The typed profile fields, in [`UserProfile::KEYS`] order.
 const PROFILE_KEYS: [&str; 4] = UserProfile::KEYS; //THE PROFILE AS server_users.toml SPELLS IT
+/// The profile key holding the avatar's hash.
 const AVATAR_KEY: &str = "avatar";            //THE PICTURE'S HASH, WHICH IS NOT A TYPED FIELD
 
+/// Reads one top-level string field of an account.
 fn user_field(username: &str, key: &str) -> Option<String> //READ ONE FIELD OF username
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(username)?
         .as_table_like()?.get(key)?.as_str().map(str::to_string))
 }
 
+/// Reads one profile field of an account.
 fn profile_field(username: &str, key: &str) -> Option<String> //READ ONE PROFILE FIELD OF username
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(username)?
         .as_table_like()?.get(PROFILE_TABLE)?.as_table_like()?.get(key)?.as_str().map(str::to_string))
 }
 
+/// Writes one top-level field of an account, creating the entry if missing.
 fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD OF username TO server_users.toml
 {
     super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
@@ -70,6 +100,7 @@ fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD O
     });
 }
 
+/// Writes one profile field of an account, creating the entry and profile if missing.
 fn write_profile_field(username: &str, key: &str, value: Value) //WRITE ONE PROFILE FIELD TO server_users.toml
 {
     super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
@@ -95,27 +126,32 @@ fn write_profile_field(username: &str, key: &str, value: Value) //WRITE ONE PROF
     });
 }
 
+/// Returns the number of registered accounts.
 pub fn len() -> usize //COUNT USERS
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.len())
 }
 
+/// Returns every registered username.
 pub fn all() -> Vec<String> //RETURN EVERY REGISTERED USERNAME
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.iter()
         .map(|(username, _)| username.to_string()).collect())
 }
 
+/// Returns the password hash of an account.
 pub fn password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF username
 {
     user_field(username, "password")
 }
 
+/// Returns the role of an account; `None` for an unknown user or an unrecognised role.
 pub fn role(username: &str) -> Option<Role> //RETURN ROLE OF username
 {
     user_field(username, "role")?.parse().ok()
 }
 
+/// Returns the chat colors of an account; a missing or unknown color reads as none.
 pub fn colors(username: &str) -> MessageColors //RETURN COLORS OF username
 {
     let mut codes = COLOR_KEYS.iter().map(|key| user_field(username, key).as_deref().and_then(colors::code));
@@ -127,6 +163,7 @@ pub fn colors(username: &str) -> MessageColors //RETURN COLORS OF username
     }
 }
 
+/// Returns the full profile of an account, avatar and role included.
 pub fn profile(username: &str) -> UserProfile //RETURN PROFILE OF username
 {
     let mut fields = PROFILE_KEYS.iter().map(|key| profile_field(username, key).unwrap_or_default());
@@ -142,27 +179,32 @@ pub fn profile(username: &str) -> UserProfile //RETURN PROFILE OF username
     }
 }
 
+/// Returns the avatar hash of an account, if one is set.
 pub fn avatar(username: &str) -> Option<[u8; 32]> //RETURN username's PICTURE
 {
     misc::unhex(&profile_field(username, AVATAR_KEY)?)
 }
 
+/// Sets or clears the avatar of an account.
 pub fn set_avatar(username: &str, hash: Option<&[u8; 32]>) //STORE username's PICTURE
 {
     write_profile_field(username, AVATAR_KEY, hash.map(|hash| misc::hex(hash)).unwrap_or_default().into());
 }
 
+/// Returns whether any account uses `hash` as its avatar.
 pub fn names_avatar(hash: &[u8; 32]) -> bool //DOES ANY ACCOUNT NAME THIS PICTURE?
 {
     all().iter().any(|username| avatar(username).as_ref() == Some(hash))
 }
 
+/// Returns every avatar hash any account uses.
 pub fn avatars() -> Vec<[u8; 32]> //EVERY PICTURE THE ACCOUNTS NAME
 {
     all().iter().filter_map(|username| avatar(username)).collect()
 }
 
 //STORE username's TYPED FIELDS - THE PICTURE IS SET BY AN UPLOAD, NOT BY A SAVE
+/// Stores the typed profile fields of an account; the avatar and role are left untouched.
 pub fn set_profile(username: &str, profile: &UserProfile)
 {
     for (key, value) in PROFILE_KEYS.iter().zip(profile.fields())
@@ -172,6 +214,12 @@ pub fn set_profile(username: &str, profile: &UserProfile)
 }
 
 //STORE ONE OF username's COLORS, BY NAME
+/// Stores one of an account's colors, by name.
+///
+/// # Parameters
+/// - `username`: The account.
+/// - `username_color`: `true` for the username color, `false` for the message color.
+/// - `code`: The wire color code; an unknown code is stored as `"none"`.
 pub fn set_color(username: &str, username_color: bool, code: u8)
 {
     let key = COLOR_KEYS[usize::from(!username_color)];
@@ -179,16 +227,24 @@ pub fn set_color(username: &str, username_color: bool, code: u8)
     write_user_field(username, key, colors::name(Some(code)).into());
 }
 
+/// Stores a new role for an account.
 pub fn set_role(username: &str, role: Role) //STORE A NEW ROLE FOR username
 {
     write_user_field(username, "role", role.name().into());
 }
 
+/// Stores a new password hash for an account.
 pub fn set_password(username: &str, hash: &str) //SET USER PASSWORD
 {
     write_user_field(username, "password", hash.into());
 }
 
+/// Registers a new account with empty colors and profile.
+///
+/// The first account on a server becomes its [`Role::Owner`].
+///
+/// # Returns
+/// `true` if this was the first account.
 pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON FIRST USER
 {
     let first_user = len() == 0; //SELF-EXPLANATORY, INNIT?
@@ -204,11 +260,13 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
     first_user
 }
 
+/// Deletes an account.
 pub fn remove(username: &str) //DELETE username's ENTRY
 {
     super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc| { doc.as_table_mut().remove(username); });
 }
 
+/// Returns whether an account with this username exists.
 pub fn contains(key: &str) -> bool //CHECK IF server_users.toml contains
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(key).is_some())

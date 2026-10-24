@@ -16,6 +16,34 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Message Markup
+//!
+//! Renders what somebody typed into rows: Discord-style code (inline backticks and blocks
+//! fenced with three), `$…$` and `$$…$$` math, emphasis (`*italic*`, `**bold**`,
+//! `__underline__`, `~~strikethrough~~`, `_italic_`), `[text](url)` links, and the line-level
+//! markdown — headings, quotes, lists and rules.
+//!
+//! # The Parser Never Consumes What It Cannot Close
+//! An unterminated fence is backticks somebody typed, not a block that swallows the rest of the
+//! message. Emphasis only opens once its close has been found, and a delimiter that was searched
+//! for and not found is not searched for again, so a message of nothing but delimiters stays
+//! linear. A backslash takes the markup off the next character.
+//!
+//! # One Pass
+//! Emphasis, links, code and math are delimiters of the same pass, so a run inside code is never
+//! seen, while emphasis may still span a code span (the close search skips code and math as
+//! units). Emphasis is a stack of modifiers, so it composes with the sender's color and with
+//! headings instead of replacing them.
+//!
+//! # Line Markers
+//! Headings, quotes, lists and rules are only markers at the head of a row, which only
+//! [`render`] knows; a marker also owns the rows its line wraps onto, repeating a quote bar or a
+//! list indent in front of each.
+//!
+//! # Blocks
+//! A fenced block is rows, not text: it is padded to the pane so it reads as a box, and broken
+//! where it runs out of cells rather than at a space.
+
 use std::mem;
 
 use ratatui::
@@ -35,38 +63,65 @@ use super::
 };
 
 //STRUCTS
+/// An open emphasis run and where its close was found.
 struct Emphasis //AN OPEN RUN AND WHERE IT WAS FOUND TO CLOSE
 {
+    /// The run's length.
     run: usize,
+    /// Index of its close.
     end: usize,
+    /// The modifier it applies.
     modifier: Modifier,
 }
 
+/// A row's line marker, taken off the front of the row.
 struct Marker<'a> //WHAT A ROW OPENS WITH ONCE ITS LINE MARKER IS OFF
 {
+    /// The marker, as drawn.
     spans: Vec<Span<'static>>,   //THE MARKER, AS IT IS DRAWN
+    /// What the rows its line wraps onto open with.
     hanging: Vec<Span<'static>>, //WHAT ITS WRAPPED ROWS OPEN WITH
+    /// The row's style; a heading restyles the whole row.
     style: Style,                //A HEADING RESTYLES THE WHOLE ROW
+    /// The row's text after the marker.
     rest: &'a str,
 }
 
 //ENUMS
 //WHAT A MESSAGE IS MADE OF, MARKUP OFF
+/// One piece of a parsed message.
 enum Segment
 {
+    /// Plain text.
     Text(String),
+    /// A character a backslash took the markup off; never read as a line marker.
     Raw(String),                                  //A CHARACTER THE BACKSLASH TOOK THE MARKUP OFF
+    /// Inline code.
     Code(String),                                 //INLINE `code`
+    /// A fenced code block, with its language if it named one.
     Block { lang: Option<String>, body: String }, //FENCED ```code```
+    /// Inline math.
     Math(String),                                 //INLINE $math$
+    /// Display math.
     Display(String),                              //$$math$$
+    /// A link.
     Link { text: String, url: String },           //[text](url)
+    /// An emphasis opens.
     Open(Modifier),                               //EMPHASIS OPENS
+    /// An emphasis closes.
     Close(Modifier),                              //AND CLOSES
 }
 
 //FUNCTIONS
 //ONE MESSAGE, AS THE ROWS IT DRAWS AS
+/// Renders a message into the rows it draws as.
+///
+/// # Parameters
+/// - `prefix`: Spans in front of the first row (timestamp, sender).
+/// - `text`: What was typed.
+/// - `style`: The message's style, from the sender's color.
+/// - `width`: The pane width.
+/// - `math`: Whether math is rendered; with it off, dollars are text.
 pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, math: bool)
     -> Vec<Line<'static>>
 {
@@ -202,11 +257,13 @@ pub fn render(prefix: Vec<Span<'static>>, text: &str, style: Style, width: u16, 
     out
 }
 
+/// Returns every emphasis modifier the text is inside of.
 fn active(stack: &[Modifier]) -> Modifier //EVERY EMPHASIS THE TEXT IS INSIDE OF
 {
     stack.iter().fold(Modifier::empty(), |all, modifier| all | *modifier)
 }
 
+/// Word-wraps the row being built into `out`, with a marker's hanging prefix on its wrapped rows.
 fn flush(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &mut bool, width: u16,
     hanging: &[Span<'static>])
 {
@@ -235,6 +292,7 @@ fn flush(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &
     *open = false;
 }
 
+/// Ends the row being built.
 fn close(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &mut bool, width: u16,
     hanging: &[Span<'static>])
 {
@@ -246,6 +304,7 @@ fn close(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, open: &
 }
 
 //A FENCED BLOCK, PADDED AND NEVER WORD-WRAPPED
+/// Renders a fenced block: padded to the pane, hard-broken, never word-wrapped.
 fn block(out: &mut Vec<Line<'static>>, lang: Option<&str>, body: &str, width: u16)
 {
     let inner = width.saturating_sub(consts::GUTTER).max(1) as usize;
@@ -265,11 +324,13 @@ fn block(out: &mut Vec<Line<'static>>, lang: Option<&str>, body: &str, width: u1
     }
 }
 
+/// Returns one row of a block.
 fn row(content: String, style: Style) -> Line<'static>
 {
     Line::from(vec![Span::styled("▏ ", theme::code_bar()), Span::styled(content, style)])
 }
 
+/// Pads text with spaces to a display width.
 fn pad(text: &str, width: usize) -> String
 {
     let mut out = text.to_owned();
@@ -279,6 +340,7 @@ fn pad(text: &str, width: usize) -> String
     out
 }
 
+/// Expands tabs to [`TAB`](super::consts::TAB) spaces.
 fn expand_tabs(line: &str) -> String
 {
     let mut out = String::new();
@@ -296,6 +358,7 @@ fn expand_tabs(line: &str) -> String
     out
 }
 
+/// Hard-breaks one source line every `width` cells.
 fn split_cells(text: &str, width: usize) -> Vec<String> //HARD-BREAK ONE SOURCE LINE EVERY width CELLS
 {
     let mut out = Vec::new();
@@ -320,12 +383,14 @@ fn split_cells(text: &str, width: usize) -> Vec<String> //HARD-BREAK ONE SOURCE 
     out
 }
 
+/// Returns the display width of text, in cells.
 pub fn text_width(text: &str) -> usize
 {
     text.chars().map(|c| c.width().unwrap_or(0)).sum()
 }
 
 //THE LINE-LEVEL MARKDOWN, TAKEN OFF THE FRONT OF A ROW
+/// Takes a line marker (heading, quote, list, rule) off the front of a row.
 fn marker(part: &str, style: Style) -> Option<Marker<'_>>
 {
     let spaces = part.len() - part.trim_start_matches(' ').len();
@@ -386,6 +451,7 @@ fn marker(part: &str, style: Style) -> Option<Marker<'_>>
     None
 }
 
+/// Returns a heading's style, keeping the message's color where it has one.
 fn heading(style: Style, level: usize) -> Style //A HEADING KEEPS THE MESSAGE'S COLOUR WHERE IT HAS ONE
 {
     let style = match style.fg
@@ -401,6 +467,7 @@ fn heading(style: Style, level: usize) -> Style //A HEADING KEEPS THE MESSAGE'S 
     }
 }
 
+/// Returns whether a row is a horizontal rule: three or more of one marker and nothing else.
 fn is_rule(text: &str) -> bool //THREE OR MORE OF THE SAME MARKER, AND NOTHING ELSE
 {
     let text = text.trim();
@@ -410,6 +477,7 @@ fn is_rule(text: &str) -> bool //THREE OR MORE OF THE SAME MARKER, AND NOTHING E
         && text.chars().all(|c| c == first)
 }
 
+/// Returns a rule filling what is left of the row.
 fn rule(current: &[Span<'static>], width: u16) -> Span<'static> //FILLING WHAT IS LEFT OF THE ROW
 {
     let used: usize = current.iter().map(|span| text_width(&span.content)).sum();
@@ -418,6 +486,7 @@ fn rule(current: &[Span<'static>], width: u16) -> Span<'static> //FILLING WHAT I
 }
 
 //THE PARSER; IT NEVER CONSUMES AN UNCLOSED RUN
+/// Parses a message into segments.
 fn parse(text: &str, math: bool) -> Vec<Segment>
 {
     let chars: Vec<char> = text.chars().collect();
@@ -469,6 +538,7 @@ fn parse(text: &str, math: bool) -> Vec<Segment>
 }
 
 //THREE BACKTICKS OPEN A FENCE, ONE OR TWO INLINE
+/// Parses backticks: three open a fence, one or two inline code.
 fn backtick(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String,
     missing: &mut [bool; consts::MARKUP_KINDS]) -> Option<usize>
 {
@@ -508,6 +578,7 @@ fn backtick(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String,
 }
 
 //DISCORD'S RULE: A LONE FIRST WORD IS THE LANGUAGE
+/// Splits a fence's language off its body: a lone first word is the language.
 fn fence(inner: &str) -> Segment
 {
     let (lang, body) = match inner.split_once('\n')
@@ -519,6 +590,7 @@ fn fence(inner: &str) -> Segment
     Segment::Block { lang, body: body.strip_suffix('\n').unwrap_or(body).to_owned() }
 }
 
+/// Returns whether a word can be a fence's language.
 fn is_language(word: &str) -> bool
 {
     let word = word.trim();
@@ -528,6 +600,7 @@ fn is_language(word: &str) -> bool
 }
 
 //MATH, WITH THE GUARDS THAT KEEP PRICES OUT OF IT
+/// Parses a dollar: display or inline math, with guards that keep prices out of it.
 fn dollar(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String,
     missing: &mut [bool; consts::MARKUP_KINDS]) -> Option<usize>
 {
@@ -553,6 +626,7 @@ fn dollar(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String,
 }
 
 //A LINK, WHOSE TARGET HAS TO BE ONE WORD
+/// Parses `[text](url)`, whose target has to be one word.
 fn link(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String,
     missing: &mut [bool; consts::MARKUP_KINDS]) -> Option<usize>
 {
@@ -577,6 +651,7 @@ fn link(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String,
 }
 
 //EMPHASIS; A RUN ONLY OPENS IF ITS CLOSE IS ALREADY IN SIGHT
+/// Parses an emphasis delimiter run, opening only when its close is already in sight.
 fn emphasis(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String, stack: &mut Vec<Emphasis>,
     missing: &mut [bool; consts::MARKUP_KINDS], math: bool) -> Option<usize>
 {
@@ -614,6 +689,7 @@ fn emphasis(chars: &[char], i: usize, out: &mut Vec<Segment>, buf: &mut String, 
     Some(start)
 }
 
+/// Returns what a run of `c` of a length means.
 fn modifier(c: char, run: usize) -> Option<Modifier> //WHAT A RUN OF THAT LENGTH MEANS
 {
     match (c, run)
@@ -629,6 +705,7 @@ fn modifier(c: char, run: usize) -> Option<Modifier> //WHAT A RUN OF THAT LENGTH
     }
 }
 
+/// Returns a delimiter's slot in the not-found table.
 fn kind(c: char) -> usize //ITS SLOT IN THE MISSING TABLE
 {
     match c
@@ -640,6 +717,7 @@ fn kind(c: char) -> usize //ITS SLOT IN THE MISSING TABLE
     }
 }
 
+/// Returns the first `needle` at or after `from`.
 fn find(chars: &[char], from: usize, needle: &[char]) -> Option<usize> //FIRST needle AT OR AFTER from
 {
     (from..chars.len().saturating_sub(needle.len() - 1))
@@ -647,6 +725,7 @@ fn find(chars: &[char], from: usize, needle: &[char]) -> Option<usize> //FIRST n
 }
 
 //THE SAME, PAST BACKSLASHES
+/// Returns the first `needle` at or after `from` that is not escaped.
 fn find_escaped(chars: &[char], from: usize, needle: &[char]) -> Option<usize>
 {
     let mut i = from;
@@ -663,6 +742,7 @@ fn find_escaped(chars: &[char], from: usize, needle: &[char]) -> Option<usize>
 }
 
 //AND THE RUN THAT COULD CLOSE AN EMPHASIS, PAST CODE AND MATH
+/// Returns the run that could close an emphasis, skipping code and math spans.
 fn find_run(chars: &[char], from: usize, needle: char, run: usize, math: bool) -> Option<usize>
 {
     let mut i = from;
@@ -684,6 +764,7 @@ fn find_run(chars: &[char], from: usize, needle: char, run: usize, math: bool) -
     None
 }
 
+/// Returns how far a code or math span starting at `i` reaches.
 fn span(chars: &[char], i: usize, math: bool) -> Option<usize> //HOW FAR A CODE OR MATH SPAN AT i REACHES
 {
     let delim = match chars[i]
@@ -698,6 +779,7 @@ fn span(chars: &[char], i: usize, math: bool) -> Option<usize> //HOW FAR A CODE 
     find(chars, i + run, &vec![delim; run]).map(|end| end + run)
 }
 
+/// Records a failed search so it is not repeated.
 fn seen(found: Option<usize>, missing: &mut bool) -> Option<usize> //A SEARCH THAT FAILED IS NOT REPEATED
 {
     *missing = found.is_none();
@@ -705,6 +787,7 @@ fn seen(found: Option<usize>, missing: &mut bool) -> Option<usize> //A SEARCH TH
     found
 }
 
+/// Moves buffered text into a text segment.
 fn flush_text(out: &mut Vec<Segment>, buf: &mut String)
 {
     if !buf.is_empty() { out.push(Segment::Text(mem::take(buf))); }

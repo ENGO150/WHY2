@@ -16,19 +16,36 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Input Line
+//!
+//! [`InputBuffer`] is the single source of truth for the input line: a multi-line buffer with
+//! readline-style editing, sent-line history, and soft-wrapped rendering.
+//!
+//! History recall is prefix-locked: with text typed, Up only recalls lines that start with it
+//! (and never a command), and the line being typed is parked while paging and restored after.
+
 use ratatui::text::{ Line, Span };
 
 use unicode_width::UnicodeWidthChar;
 
 //STRUCTS
+/// A multi-line input buffer with editing, history and rendering.
 pub struct InputBuffer //MULTI-LINE INPUT BUFFER
 {
+    /// The text, as characters so the cursor is a character index.
     chars: Vec<char>,
+    /// Cursor position, in characters.
     cursor: usize,
+    /// Sent lines, oldest first.
     history: Vec<String>,
+    /// Position while paging history.
     history_pos: usize,
+    /// The line being typed, parked while paging history.
     stash: Option<String>, //IN-PROGRESS LINE PARKED WHILE PAGING HISTORY
+    /// The prefix the history search is locked to.
     prefix: Option<String>, //PREFIX THE SEARCH IS LOCKED TO (NEVER A COMMAND)
+    /// Bumped by every edit of the text (not by cursor motion or history recall), so the typing
+    /// indicator can tell an edit from navigation.
     revision: u64,          //BUMPED BY EVERY EDIT OF THE LINE
 }
 
@@ -40,18 +57,24 @@ impl Default for InputBuffer
 
 impl InputBuffer
 {
+    /// Creates an empty buffer.
     pub fn new() -> Self
     {
         Self { chars: Vec::new(), cursor: 0, history: Vec::new(), history_pos: 0, stash: None, prefix: None, revision: 0 }
     }
 
     //QUERIES
+    /// Returns whether the buffer is empty.
     pub fn is_empty(&self) -> bool { self.chars.is_empty() }
+    /// Returns the text.
     pub fn text(&self) -> String { self.chars.iter().collect() }
+    /// Returns the cursor position, in characters.
     pub fn cursor(&self) -> usize { self.cursor }
+    /// Returns the edit revision.
     pub fn revision(&self) -> u64 { self.revision }
 
     //EDITING
+    /// Inserts a character at the cursor.
     pub fn insert(&mut self, c: char)
     {
         self.chars.insert(self.cursor, c);
@@ -60,11 +83,13 @@ impl InputBuffer
         self.revision += 1;
     }
 
+    /// Inserts text at the cursor.
     pub fn insert_str(&mut self, text: &str)
     {
         for c in text.chars() { self.insert(c); }
     }
 
+    /// Deletes the character before the cursor.
     pub fn backspace(&mut self)
     {
         if self.cursor > 0
@@ -76,6 +101,7 @@ impl InputBuffer
         }
     }
 
+    /// Deletes the character under the cursor.
     pub fn delete(&mut self)
     {
         if self.cursor < self.chars.len()
@@ -86,6 +112,7 @@ impl InputBuffer
         }
     }
 
+    /// Deletes the word before the cursor (Ctrl+W).
     pub fn delete_word(&mut self) //CTRL+W
     {
         let start = self.word_start();
@@ -95,6 +122,7 @@ impl InputBuffer
         self.revision += 1;
     }
 
+    /// Deletes from the start of the line to the cursor (Ctrl+U).
     pub fn kill_to_start(&mut self) //CTRL+U
     {
         let start = self.line_start();
@@ -104,6 +132,7 @@ impl InputBuffer
         self.revision += 1;
     }
 
+    /// Deletes from the cursor to the end of the line (Ctrl+K).
     pub fn kill_to_end(&mut self) //CTRL+K
     {
         let end = self.line_end();
@@ -113,13 +142,19 @@ impl InputBuffer
     }
 
     //MOTION
+    /// Moves the cursor one character left.
     pub fn left(&mut self) { self.cursor = self.cursor.saturating_sub(1); }
+    /// Moves the cursor one character right.
     pub fn right(&mut self) { if self.cursor < self.chars.len() { self.cursor += 1; } }
+    /// Moves the cursor to the start of its line.
     pub fn home(&mut self) { self.cursor = self.line_start(); }
+    /// Moves the cursor to the end of its line.
     pub fn end(&mut self) { self.cursor = self.line_end(); }
 
+    /// Moves the cursor to the start of the previous word.
     pub fn word_left(&mut self) { self.cursor = self.word_start(); }
 
+    /// Moves the cursor past the next word.
     pub fn word_right(&mut self)
     {
         let len = self.chars.len();
@@ -133,6 +168,7 @@ impl InputBuffer
 
     //VERTICAL MOTION
     //UP/DOWN STEP LINES IN A MULTI-LINE BUFFER
+    /// Moves up a line in a multi-line buffer, or back through history.
     pub fn up(&mut self)
     {
         if !self.is_multiline() { return self.history_up(); }
@@ -147,6 +183,7 @@ impl InputBuffer
         self.cursor = (previous + column).min(start - 1);
     }
 
+    /// Moves down a line in a multi-line buffer, or forward through history.
     pub fn down(&mut self)
     {
         if !self.is_multiline() { return self.history_down(); }
@@ -163,6 +200,7 @@ impl InputBuffer
     }
 
     //HISTORY
+    /// Recalls the previous matching history line, parking the current one first.
     fn history_up(&mut self)
     {
         if self.history.is_empty() || self.history_pos == 0 { return; }
@@ -183,6 +221,7 @@ impl InputBuffer
         self.set(&self.history[found].clone());
     }
 
+    /// Recalls the next matching history line, or restores the parked one.
     fn history_down(&mut self)
     {
         if self.history_pos >= self.history.len() { return; }
@@ -211,6 +250,7 @@ impl InputBuffer
         self.set(&new);
     }
 
+    /// Records a sent line, skipping an immediate repeat.
     pub fn push_history(&mut self, input: &str)
     {
         if self.history.last().map(String::as_str) != Some(input)
@@ -223,6 +263,7 @@ impl InputBuffer
         self.prefix = None;
     }
 
+    /// Ends a history search.
     pub fn reset_history_position(&mut self)
     {
         self.history_pos = self.history.len();
@@ -231,6 +272,7 @@ impl InputBuffer
     }
 
     //LIFECYCLE
+    /// Clears the text.
     pub fn clear(&mut self)
     {
         self.chars.clear();
@@ -239,6 +281,7 @@ impl InputBuffer
         self.revision += 1;
     }
 
+    /// Returns the text and clears the buffer.
     pub fn take(&mut self) -> String //COLLECT AND CLEAR
     {
         let read = self.text();
@@ -251,6 +294,14 @@ impl InputBuffer
 
     //RENDERING
     //WRAP TO width, RETURNING LINES AND THE CURSOR
+    /// Wraps the text to a width.
+    ///
+    /// # Parameters
+    /// - `width`: The width to wrap to.
+    /// - `mask`: Whether to draw every character as a mask (a password).
+    ///
+    /// # Returns
+    /// The wrapped lines and the cursor's (column, row).
     pub fn render(&self, width: u16, mask: bool) -> (Vec<Line<'static>>, (u16, u16))
     {
         let width = width.max(1) as usize;
@@ -295,30 +346,36 @@ impl InputBuffer
     }
 
     //PRIVATE
+    /// Returns whether the text spans several lines.
     fn is_multiline(&self) -> bool { self.chars.contains(&'\n') }
 
+    /// Returns whether a history line is a candidate for the running search.
     fn matches(&self, entry: &str) -> bool //IS THIS ENTRY A CANDIDATE FOR THE RUNNING SEARCH?
     {
         self.prefix.as_ref().is_none_or(|p| entry.starts_with(p.as_str()))
     }
 
+    /// Replaces the text, cursor at the end.
     fn set(&mut self, text: &str)
     {
         self.chars = text.chars().collect();
         self.cursor = self.chars.len();
     }
 
+    /// Returns the index of the start of the cursor's line.
     fn line_start(&self) -> usize
     {
         self.chars[..self.cursor].iter().rposition(|c| *c == '\n').map(|i| i + 1).unwrap_or(0)
     }
 
+    /// Returns the index of the end of the cursor's line.
     fn line_end(&self) -> usize
     {
         self.chars[self.cursor..].iter().position(|c| *c == '\n')
             .map(|i| self.cursor + i).unwrap_or(self.chars.len())
     }
 
+    /// Returns the index of the start of the word before the cursor.
     fn word_start(&self) -> usize
     {
         let mut i = self.cursor;

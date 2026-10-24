@@ -16,6 +16,24 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Picture Decoding
+//!
+//! Bounded decoding of chat pictures, and the client-side cutting of avatars.
+//!
+//! # Bounds
+//! A picture's size on the wire bounds nothing about what it decodes to — a 292 KB PNG can
+//! unpack to 400 MB — and pictures are pushed to every client in a channel unasked. Every
+//! decode is therefore limited to [`MAX_IMAGE_DIMENSION`](consts::MAX_IMAGE_DIMENSION)
+//! per side and [`MAX_IMAGE_ALLOC`](consts::MAX_IMAGE_ALLOC) per frame. An animation is bounded
+//! again as a whole, by [`MAX_ANIMATION_FRAMES`](consts::MAX_ANIMATION_FRAMES) and
+//! [`MAX_ANIMATION_ALLOC`](consts::MAX_ANIMATION_ALLOC); running out of budget truncates the
+//! animation rather than failing it.
+//!
+//! # Frames
+//! A decoded picture is always an [`Animation`]: a still is one frame. Animated GIF, WebP and
+//! APNG are decoded frame by frame; everything else, and an animated format with a single
+//! frame, decodes as one.
+
 use std::
 {
     sync::Arc,
@@ -59,19 +77,24 @@ use crate::
 };
 
 //STRUCTS
+/// One frame of a decoded picture.
 #[derive(Clone)]
 pub struct ImageFrame
 {
+    /// The frame's pixels.
     pub image: DynamicImage,
+    /// How long the frame is shown before the next one; zero for a still.
     pub delay: Duration, //HOW LONG IT IS HELD BEFORE THE NEXT ONE
 }
 
 //TYPES
+/// A decoded picture: one frame for a still, several for an animation.
 pub type Animation = Vec<ImageFrame>; //A DECODED PICTURE
 
 //FUNCTIONS
 //PRIVATE
 //DECODE LIMITS - THE WIRE SIZE BOUNDS NOTHING HERE
+/// Returns the per-picture decode limits.
 fn decode_limits() -> Limits
 {
     let mut limits = Limits::default();
@@ -83,6 +106,7 @@ fn decode_limits() -> Limits
     limits
 }
 
+/// Decodes the frames of a GIF.
 fn gif_frames(data: &[u8]) -> Option<Animation>
 {
     let mut decoder = GifDecoder::new(Cursor::new(data)).ok()?;
@@ -92,6 +116,7 @@ fn gif_frames(data: &[u8]) -> Option<Animation>
     collect_frames(decoder.into_frames())
 }
 
+/// Decodes the frames of an animated WebP; `None` for a still one.
 fn webp_frames(data: &[u8]) -> Option<Animation>
 {
     let mut decoder = WebPDecoder::new(Cursor::new(data)).ok()?;
@@ -103,6 +128,7 @@ fn webp_frames(data: &[u8]) -> Option<Animation>
     collect_frames(decoder.into_frames())
 }
 
+/// Decodes the frames of an APNG; `None` for a plain PNG.
 fn apng_frames(data: &[u8]) -> Option<Animation>
 {
     let mut decoder = PngDecoder::new(Cursor::new(data)).ok()?;
@@ -115,6 +141,15 @@ fn apng_frames(data: &[u8]) -> Option<Animation>
 }
 
 //THE FRAMES OF ONE ANIMATION, UNDER BOTH BUDGETS
+/// Collects the frames of an animation under the frame-count and memory budgets.
+///
+/// A frame that fails to decode, or one past a budget, ends the animation with what was already
+/// decoded. A delay shorter than [`MIN_FRAME_DELAY`](consts::MIN_FRAME_DELAY) is replaced with
+/// [`DEFAULT_FRAME_DELAY`](consts::DEFAULT_FRAME_DELAY).
+///
+/// # Returns
+/// - `Some(frames)` with at least one frame.
+/// - `None` if not a single frame decoded.
 fn collect_frames(frames: Frames<'_>) -> Option<Animation>
 {
     let mut animation: Animation = Vec::new();
@@ -156,11 +191,22 @@ fn collect_frames(frames: Frames<'_>) -> Option<Animation>
 
 //PUBLIC
 //WHETHER A PICTURE IS DRAWN AS IT ARRIVES
+/// Returns whether pictures are decoded and shown as they arrive (`auto_show_images`).
 pub fn auto_show_images() -> bool
 {
     config::read_config::<bool>("auto_show_images")
 }
 
+/// Decodes a picture within the decode limits.
+///
+/// This is CPU-heavy; async callers run it in `spawn_blocking`.
+///
+/// # Parameters
+/// - `data`: The encoded picture.
+///
+/// # Returns
+/// - `Some(frames)` — every frame of an animation, or the single frame of a still.
+/// - `None` if the format is unknown, the picture is over a limit, or it does not decode.
 pub fn decode_image(data: &[u8]) -> Option<Animation>
 {
     let mut reader = ImageReader::new(Cursor::new(data)).with_guessed_format().ok()?;
@@ -183,6 +229,16 @@ pub fn decode_image(data: &[u8]) -> Option<Animation>
 }
 
 //CUT A PICTURE TO THE CENTRED SQUARE AN AVATAR IS, AS A PNG OR AN ANIMATED GIF
+/// Cuts a picture into an avatar: the centred square, scaled down to at most
+/// [`AVATAR_DIMENSION`](consts::AVATAR_DIMENSION) (or
+/// [`ANIMATED_AVATAR_DIMENSION`](consts::ANIMATED_AVATAR_DIMENSION) for an animation).
+///
+/// The result is always a PNG or an animated GIF — the only formats the server's header check
+/// ([`is_avatar`](crate::misc::is_avatar)) accepts.
+///
+/// # Returns
+/// - `Some((bytes, extension))` with the encoded avatar and `"png"` or `"gif"`.
+/// - `None` if the picture does not decode or encode.
 pub fn make_avatar(data: &[u8]) -> Option<(Vec<u8>, &'static str)>
 {
     let frames = decode_image(data)?;
@@ -224,12 +280,27 @@ pub fn make_avatar(data: &[u8]) -> Option<(Vec<u8>, &'static str)>
     }
 }
 
+/// Hashes and decodes a picture on a blocking thread.
+///
+/// # Returns
+/// The picture's SHA-256 and its decoded frames, if it decodes.
+///
+/// # Panics
+/// If the blocking task panics.
 pub async fn digest_and_decode(data: Arc<Vec<u8>>) -> ([u8; 32], Option<Animation>)
 {
     task::spawn_blocking(move || (crypto::sha256(&data), decode_image(&data)))
         .await.expect("Decoding image panicked")
 }
 
+/// Loads a picture from the cache, or asks for it to be fetched from the server.
+///
+/// Spawns a task that answers with [`ClientEvent::ImageData`] on a cache hit, or
+/// [`ClientEvent::ImageRequest`] on a miss, which the UI turns into a server request.
+///
+/// # Parameters
+/// - `hash`: The picture's SHA-256.
+/// - `tx`: The UI event channel.
 pub fn fetch_image(hash: [u8; 32], tx: Sender<ClientEvent>)
 {
     tokio::spawn(async move

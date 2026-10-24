@@ -16,6 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Server Identity Prompt
+//!
+//! The modal overlay that asks the user to trust a server identity the client has not pinned,
+//! or one that differs from the pinned one.
+//!
+//! Refusing is always one key away and trusting never is: the prompt opens on the safe button,
+//! and a changed identity — the louder of the two warnings — is asked twice, the second time by
+//! typing a word out.
+
 use crossterm::event::
 {
     KeyCode,
@@ -37,24 +46,36 @@ use super::
 
 //ENUMS
 //A MISMATCH IS ASKED TWICE
+/// How far through the prompt the user is.
 #[derive(PartialEq)]
 pub enum Stage
 {
+    /// The warning, with Reject and Trust.
     Warn,    //THE WARNING PLUS Reject/Trust
+    /// The type-it-out confirmation, for a changed identity only.
     Confirm, //TYPE-IT-OUT CHALLENGE, MISMATCH ONLY
 }
 
 //STRUCTS
 //THE SERVER IDENTITY PROMPT, A MODAL OVERLAY
+/// The server identity prompt.
 pub struct Prompt
 {
+    /// The host the identity is pinned against.
     pub host: String,
+    /// The identity's fingerprint.
     pub hash: String,
+    /// The fingerprint on record, if any.
     pub pinned: Option<String>, //THE FINGERPRINT ON RECORD
+    /// Whether a different identity is pinned.
     pub mismatch: bool,         //A PINNED KEY DIFFERS - THE LOUDER OF THE TWO WARNINGS
+    /// Whether the Trust button is selected; starts on Reject.
     pub accept: bool,           //SELECTED BUTTON, STARTING ON THE SAFE ONE
+    /// How far through the prompt the user is.
     pub stage: Stage,
+    /// What has been typed into the confirmation.
     pub typed: String,          //WHAT HAS BEEN TYPED INTO THE CHALLENGE SO FAR
+    /// Whether the last confirmation did not match.
     pub wrong: bool,            //THE LAST ⏎ ON THE CHALLENGE DID NOT MATCH
     request: TofuRequest,
 }
@@ -62,6 +83,7 @@ pub struct Prompt
 //IMPLEMENTATIONS
 impl Prompt
 {
+    /// Opens the prompt for a request from the handshake.
     pub fn new(request: TofuRequest) -> Self
     {
         Self
@@ -78,6 +100,7 @@ impl Prompt
         }
     }
 
+    /// Returns the prompt's title.
     pub fn title(&self) -> &'static str
     {
         match (self.mismatch, &self.stage)
@@ -89,16 +112,19 @@ impl Prompt
     }
 
     //THE 64 HEX CHARS, GROUPED IN EIGHTS
+    /// Returns the fingerprint, in groups of eight hex digits.
     pub fn fingerprint(&self) -> Vec<String>
     {
         Self::group(&self.hash)
     }
 
+    /// Returns the pinned fingerprint, in groups of eight hex digits.
     pub fn pinned_fingerprint(&self) -> Vec<String>
     {
         self.pinned.as_deref().map(Self::group).unwrap_or_default()
     }
 
+    /// Splits a hash into groups of eight characters.
     fn group(hash: &str) -> Vec<String>
     {
         let groups = hash.as_bytes()
@@ -112,6 +138,7 @@ impl Prompt
 
 //FUNCTIONS
 //PUBLIC
+/// Handles a key while the prompt is up.
 pub fn handle_key(app: &mut App, key: KeyEvent)
 {
     let Some(prompt) = app.tofu.as_mut() else { return };
@@ -185,6 +212,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent)
 }
 
 //PRIVATE
+/// Answers the handshake and closes the prompt.
 fn answer(app: &mut App, accept: bool)
 {
     let Some(prompt) = app.tofu.take() else { return };

@@ -16,6 +16,27 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Voice Chat — Server Side
+//!
+//! One UDP socket serves every client on the server ([`listen_client_voice`]). A voice session
+//! is opened over TCP ([`open_connection`]), which issues a token; the session's UDP address is
+//! unknown until a [`Hello`](VoicePacketCode::Hello) carrying that token arrives and binds it.
+//!
+//! # Policing
+//! Everything runs on the one shared loop, so nothing may wait there — a sleep would stall
+//! every call on the server. A bound session therefore:
+//!
+//! - only moves to a new address on a fresh `Hello` or a port change on the same IP (a NAT
+//!   rebinding); anything else from a foreign address is ignored;
+//! - must raise its sequence number on every packet;
+//! - is rate-limited by a token bucket at [`MAX_PACKET_RATE`](consts::MAX_PACKET_RATE) /
+//!   [`MAX_PACKET_BURST`](consts::MAX_PACKET_BURST), where an overdrawn packet is **dropped**
+//!   rather than delayed. This bounds amplification: each audio packet is fanned out to the
+//!   whole channel.
+//!
+//! Audio from a muted user is dropped, and audio that is not a structurally valid Opus packet
+//! is dropped before it is fanned out.
+
 use std::
 {
     sync::LazyLock,
@@ -49,50 +70,77 @@ use crate::
     },
 };
 
+/// A bound voice session.
 pub struct Connection
 {
+    /// The client's UDP address.
     addr: SocketAddr,          //ADDRESS OF CONNECTION
+    /// The client's session id on the main connection.
     id: usize,                 //ID ON TEXT CHAT
+    /// Last sequence number received.
     seq: usize,                //SEQUENCE NUMBER
+    /// Last sequence number sent.
     server_seq: usize,         //SERVER SEQUENCE NUMBER
+    /// Packets since the main connection's activity timer was last reset.
     packet_accumulator: usize, //PACKET ACCUMULATOR
+    /// Tokens left in the packet-rate bucket.
     credit: f32,               //PACKET RATE TOKENS LEFT
+    /// When the bucket was last topped up.
     refill: Instant,           //WHEN credit WAS LAST TOPPED UP
+    /// Whether the last packet was already over the rate; only the first drop of a run is logged.
     throttled: bool,           //THE LAST PACKET WAS ALREADY OVER THE RATE
 }
 
 //LISTS
 //CONNECTION (NONE UNTIL Hello), USERNAME, TOKEN
+/// Every voice session, by session id: the bound connection (`None` until a valid `Hello`),
+/// the username and the token.
 pub static CONNECTIONS: LazyLock<DashMap<usize, (Option<Connection>, String, [u8; 32])>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
 
 //IMPLEMENTATIONS
 impl Connection
 {
     //GET PEER ADDRESS
+    /// Returns the client's UDP address.
     pub fn peer_addr(&self) -> &SocketAddr
     {
         &self.addr
     }
 
     //GET SEQ
+    /// Returns the last sequence number received.
     pub fn seq(&self) -> &usize
     {
         &self.seq
     }
 
     //GET SERVER SEQ
+    /// Returns the last sequence number sent.
     pub fn server_seq(&self) -> &usize
     {
         &self.server_seq
     }
 
     //GET SERVER SEQ AS MUTABLE
+    /// Returns the last sequence number sent, for setting.
     pub fn server_seq_mut(&mut self) -> &mut usize
     {
         &mut self.server_seq
     }
 
     //PAY FOR ONE PACKET OUT OF THE RATE BUCKET
+    /// Pays for one packet out of the rate bucket.
+    ///
+    /// The same bucket as the main connection's, at $r =$ [`MAX_PACKET_RATE`](consts::MAX_PACKET_RATE)
+    /// and $b =$ [`MAX_PACKET_BURST`](consts::MAX_PACKET_BURST):
+    ///
+    /// $$ c \leftarrow \min(c + r\Delta t,\ b) - 1 $$
+    ///
+    /// with the packet accepted iff $c \ge 0$. A dropped packet still pays, so a flood keeps the
+    /// bucket overdrawn for as long as it lasts.
+    ///
+    /// # Returns
+    /// `true` if there was credit; `false` means the packet is dropped.
     fn take_credit(&mut self) -> bool
     {
         //TOP UP FOR THE ELAPSED TIME, THEN PAY
@@ -106,6 +154,10 @@ impl Connection
 
 //HELPER FUNCTIONS
 //PRIVATE
+/// Reads an Opus frame length (one or two bytes).
+///
+/// # Returns
+/// `(length, bytes the length took)`; `(0, 0)` if it is truncated.
 fn parse_opus_len(bytes: &[u8]) -> (usize, usize)
 {
     if bytes.is_empty() { return (0, 0); }
@@ -123,6 +175,7 @@ fn parse_opus_len(bytes: &[u8]) -> (usize, usize)
     }
 }
 
+/// Checks that a packet is structurally a valid Opus packet, by its TOC byte's framing code.
 fn validate_opus_packet(packet: &[u8]) -> bool
 {
     if packet.is_empty() { return false; }
@@ -150,12 +203,14 @@ fn validate_opus_packet(packet: &[u8]) -> bool
     }
 }
 
+/// Compares two tokens in constant time.
 fn tokens_match(a: &[u8; 32], b: &[u8; 32]) -> bool //COMPARE WITHOUT LEAKING WHERE THEY DIVERGE
 {
     a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 //PUBLIC
+/// Opens a voice session for a client and returns the token its `Hello` must carry.
 pub fn open_connection(id: usize, username: String) -> [u8; 32] //OPEN A VOICE SLOT AND HAND OUT ITS TOKEN
 {
     //GENERATE RANDOM TOKEN
@@ -168,6 +223,7 @@ pub fn open_connection(id: usize, username: String) -> [u8; 32] //OPEN A VOICE S
     token
 }
 
+/// Returns the session keys of client `id`.
 pub fn find_key(id: &usize) -> Option<SharedKeys>
 {
     server::CONNECTIONS.iter()
@@ -175,6 +231,7 @@ pub fn find_key(id: &usize) -> Option<SharedKeys>
         .map(|c| c.keys().unwrap().clone())
 }
 
+/// Returns the channel of client `id`; the outer `None` means the client is gone.
 pub fn find_channel(id: &usize) -> Option<Option<String>>
 {
     server::CONNECTIONS.iter()
@@ -182,6 +239,7 @@ pub fn find_channel(id: &usize) -> Option<Option<String>>
         .map(|c| c.channel().clone())
 }
 
+/// Closes a voice session.
 pub fn remove_connection(id: &usize) //REMOVE CONNECTION
 {
     //KEY THE LINE BY THE TCP CONNECTION
@@ -192,6 +250,8 @@ pub fn remove_connection(id: &usize) //REMOVE CONNECTION
     }
 }
 
+/// Resets the main connection's inactivity timer, so a user talking in voice is not dropped for
+/// not typing.
 pub fn reset_last_activity(id: &usize)
 {
     if let Some(mut conn) = server::CONNECTIONS.iter_mut()
@@ -203,6 +263,14 @@ pub fn reset_last_activity(id: &usize)
 }
 
 //MAIN FUNCTION
+/// Serves voice for the whole server, forever.
+///
+/// Binds sessions on a valid `Hello`, polices every packet (see the module documentation), fans
+/// audio and latency probes out to the sender's channel, and forwards probe answers to the
+/// client that sent the probe.
+///
+/// # Parameters
+/// - `socket`: The server's UDP socket.
 pub async fn listen_client_voice(socket: UdpSocket)
 {
     //LOOP RECEIVING

@@ -16,6 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Screen Share Viewer Window
+//!
+//! The winit application that shows watched shares, one window per watched share.
+//!
+//! Every received access unit is decoded, since H.264 frames reference each other, but only the
+//! newest decoded frame of a batch is uploaded and drawn. The window's title shows the frame
+//! rate. A window the user closes detaches on the server; a session whose attachment ended is
+//! kept briefly so its last frame is not torn down mid-draw.
+
 use std::
 {
     collections::HashMap,
@@ -57,23 +66,38 @@ use crate::
 
 //PRIVATE
 //STRUCTS
+/// One watched share and its window.
 struct Session
 {
+    /// The window.
     window: Arc<Window>,
+    /// The renderer painting it.
     surface: VideoSurface,
+    /// Encoded frames from the network reader.
     frame_rx: Receiver<Vec<u8>>,
+    /// The H.264 decoder.
     decoder: Decoder,
+    /// Whether a new frame is waiting to be drawn.
     frame_dirty: bool,
+    /// Cleared when the attachment ends.
     running: Arc<AtomicBool>,
+    /// Signals the user closed the window.
     deattach: UnboundedSender<()>,
+    /// Frames shown since the title was last updated.
     frame_count: u32,
+    /// When the title was last updated.
     last_fps_time: Instant,
+    /// When the session was found ended; it is dropped shortly after.
     close_requested_at: Option<Instant>,
 }
 
 //IMPLEMENTATIONS
 impl Session
 {
+    /// Decodes every waiting frame and uploads the newest.
+    ///
+    /// # Returns
+    /// `true` if any frame was waiting.
     fn process_pending_frames(&mut self) -> bool
     {
         let mut pending: Vec<Vec<u8>> = Vec::new();
@@ -103,6 +127,7 @@ impl Session
         true
     }
 
+    /// Resizes the surface to the window and draws.
     fn redraw(&mut self)
     {
         let size = self.window.inner_size();
@@ -114,14 +139,17 @@ impl Session
 
 //PUBLIC
 //STRUCTS
+/// The winit application holding every open viewer window.
 pub struct ScreenShareApp //DISPATCHER
 {
+    /// Open sessions, by window.
     sessions: HashMap<WindowId, Session>,
 }
 
 //IMPLEMENTATIONS
 impl ScreenShareApp
 {
+    /// Creates an application with no windows.
     pub fn new() -> Self
     {
         Self
@@ -130,6 +158,7 @@ impl ScreenShareApp
         }
     }
 
+    /// Opens a window for a new viewer session.
     fn create_session(&mut self, event_loop: &ActiveEventLoop, request: ScreenShareRequest)
     {
         //CHECK IF ANOTHER ATTACH IS ALIVE

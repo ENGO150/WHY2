@@ -16,6 +16,23 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Vulkan Video Encoder
+//!
+//! H.264 encoding on the GPU through `VK_KHR_video_encode_h264` (Linux).
+//!
+//! Vulkan Video rather than VAAPI, because VAAPI has no encoder on NVIDIA at all and none on AMD
+//! in a Mesa built without it, while RADV, ANV and NVIDIA's driver all expose Vulkan encode. The
+//! driver writes the parameter sets and slice headers, so no bitstream writer lives here, and
+//! `ash` loads `libvulkan` at run time, so this adds no build dependency.
+//!
+//! # Session
+//! The stream is Constrained Baseline and P-only, one reference deep: two DPB layers
+//! ping-ponged, POC type 2, `max_num_ref_frames = 1`. Each IDR is prefixed with the SPS and PPS
+//! the driver wrote. Frames are uploaded through a persistently mapped staging buffer on a
+//! transfer-capable queue, with a semaphore into the encode queue, since an encode queue is not
+//! guaranteed to copy. The encoder's own rate control is fed the target, and frames over it are
+//! skipped by a [`Budget`].
+
 use std::
 {
     ffi::{ CStr, c_void },
@@ -46,16 +63,25 @@ use crate::network::screen::client::encoder::
     Settings,
 };
 
+/// Name of the H.264 encode video standard.
 const H264_ENCODE_STD: &CStr = c"VK_STD_vulkan_video_codec_h264_encode";
+/// Version of the H.264 encode video standard (1.0.0).
 const H264_ENCODE_STD_VERSION: u32 = 1 << 22; //1.0.0
+/// DPB layers: the current picture and its reference.
 const DPB_SLOTS: u32 = 2;                     //CURRENT PICTURE AND REFERENCE
+/// Reference index meaning "none".
 const NO_REFERENCE: u8 = 0xff;
+/// Frame number wrap (`log2_max_frame_num_minus4 = 4`).
 const MAX_FRAME_NUM: u32 = 256;               //log2_max_frame_num_minus4 = 4
+/// Bitstream buffer headroom over one raw picture.
 const BITSTREAM_SLACK: u64 = 1 << 16;
+/// Query result meaning the encode completed.
 const STATUS_COMPLETE: i32 = 1;
+/// How long to wait for an encode, in nanoseconds.
 const FENCE_TIMEOUT: u64 = 1_000_000_000;     //ONE SECOND
 
 //LEVEL, MAX MBs PER FRAME, PER SECOND
+/// H.264 levels with their maximum macroblocks per frame and per second.
 const LEVELS: [(native::StdVideoH264LevelIdc, u64, u64); 8] =
 [
     (native::StdVideoH264LevelIdc_STD_VIDEO_H264_LEVEL_IDC_4_1, 8_192, 245_760),
@@ -69,15 +95,20 @@ const LEVELS: [(native::StdVideoH264LevelIdc, u64, u64); 8] =
 ];
 
 //STRUCTS
+/// The Constrained Baseline encode profile chain, boxed so its `p_next` pointers stay valid.
 struct Profile //CONSTRAINED BASELINE, BOXED
 {
+    /// Usage hints: streaming desktop content, low latency.
     usage: vk::VideoEncodeUsageInfoKHR<'static>,
+    /// The H.264 profile.
     h264: vk::VideoEncodeH264ProfileInfoKHR<'static>,
+    /// The video profile.
     info: vk::VideoProfileInfoKHR<'static>,
 }
 
 impl Profile
 {
+    /// Builds the profile chain.
     fn new() -> Box<Self>
     {
         let mut profile = Box::new(Self
@@ -103,42 +134,66 @@ impl Profile
         profile
     }
 
+    /// Returns the profile as a profile list.
     fn list(&self) -> vk::VideoProfileListInfoKHR<'_>
     {
         vk::VideoProfileListInfoKHR::default().profiles(slice::from_ref(&self.info))
     }
 }
 
+/// A GPU that can encode, and the capabilities that shape the session.
 struct Candidate //A USABLE GPU
 {
+    /// The physical device.
     physical: vk::PhysicalDevice,
+    /// Queue family that encodes.
     encode_family: u32,
+    /// Queue family that copies.
     upload_family: u32,
+    /// Whether the encode queue reports result status.
     status: bool,
+    /// Required alignment of bitstream buffer sizes.
     size_alignment: u64,
+    /// Picture size granularity.
     granularity: vk::Extent2D,
+    /// Smallest coded size.
     min_extent: vk::Extent2D,
+    /// Largest coded size.
     max_extent: vk::Extent2D,
+    /// Supported rate control modes.
     rate_modes: vk::VideoEncodeRateControlModeFlagsKHR,
+    /// Largest supported bitrate.
     max_bitrate: u64,
+    /// Supported encode feedback.
     feedback: vk::VideoEncodeFeedbackFlagsKHR,
+    /// Highest supported level; 1.0 means unreported.
     max_level: native::StdVideoH264LevelIdc,
 }
 
+/// An image, its memory and its view.
 #[derive(Default)]
 struct Picture //IMAGE, MEMORY, VIEW
 {
+    /// The image.
     image: vk::Image,
+    /// Its memory.
     memory: vk::DeviceMemory,
+    /// Its view.
     view: vk::ImageView,
 }
 
+/// A persistently mapped buffer.
 struct Mapped //PERSISTENTLY MAPPED BUFFER
 {
+    /// The buffer.
     buffer: vk::Buffer,
+    /// Its memory.
     memory: vk::DeviceMemory,
+    /// Where it is mapped.
     pointer: *mut u8,
+    /// Its size.
     size: u64,
+    /// Whether its memory is host-coherent.
     coherent: bool,
 }
 
@@ -150,60 +205,109 @@ impl Default for Mapped
     }
 }
 
+/// The picture the next frame references.
 #[derive(Clone, Copy)]
 struct Reference //THE LAST PICTURE
 {
+    /// Its DPB layer.
     slot: u32,
+    /// Its frame number.
     frame_num: u32,
+    /// Its picture order count.
     poc: i32,
+    /// Whether it was an IDR.
     idr: bool,
 }
 
+/// H.264 through Vulkan Video.
 pub struct VulkanEncoder //H.264 THROUGH VULKAN VIDEO
 {
+    /// The Vulkan loader.
     entry: Entry,
+    /// The instance.
     instance: Instance,
+    /// The device.
     device: Device,
+    /// Video queue functions.
     video: khr::video_queue::Device,
+    /// Video encode queue functions.
     video_encode: khr::video_encode_queue::Device,
+    /// The GPU's memory types.
     memory_properties: vk::PhysicalDeviceMemoryProperties,
+    /// The encode profile.
     profile: Box<Profile>,
+    /// Queue that uploads.
     upload_queue: vk::Queue,
+    /// Queue that encodes.
     encode_queue: vk::Queue,
+    /// The queue families in use.
     families: Vec<u32>,
+    /// Command pool for uploads.
     upload_pool: vk::CommandPool,
+    /// Command pool for encodes.
     encode_pool: vk::CommandPool,
+    /// Upload command buffer.
     upload_commands: vk::CommandBuffer,
+    /// Encode command buffer.
     encode_commands: vk::CommandBuffer,
+    /// Signalled when an upload finishes.
     uploaded: vk::Semaphore,
+    /// Signalled when an encode finishes.
     encoded: vk::Fence,
+    /// The video session.
     session: vk::VideoSessionKHR,
+    /// Memory bound to the session.
     session_memory: Vec<vk::DeviceMemory>,
+    /// The session's SPS and PPS.
     parameters: vk::VideoSessionParametersKHR,
+    /// The source picture the encoder reads.
     source: Picture,
+    /// The two-layer DPB.
     dpb: Picture,
+    /// Staging buffer the picture is uploaded through.
     staging: Mapped,
+    /// Buffer the encoder writes into.
     bitstream: Mapped,
+    /// Query pool for the bitstream offset and size.
     feedback: vk::QueryPool,
+    /// Whether encodes report result status.
     status: bool,
+    /// The SPS and PPS, Annex B, put in front of every IDR.
     headers: Vec<u8>,
+    /// The coded size (the picture rounded up to the granularity).
     coded: vk::Extent2D,
+    /// The rate control mode in use.
     rate_mode: vk::VideoEncodeRateControlModeFlagsKHR,
+    /// The target bitrate.
     bitrate: u64,
+    /// The bitrate the session holds.
     applied: u64, //WHAT THE SESSION HOLDS
+    /// Largest bitrate the GPU supports.
     max_bitrate: u64,
+    /// The frame rate.
     fps: u32,
+    /// Frames between scheduled IDRs.
     period: u32,
+    /// Whether the next encode must reset the session's state.
     reset: bool,
+    /// Whether the DPB layers have been initialised.
     dpb_ready: bool,
+    /// The picture the next frame references.
     reference: Option<Reference>,
+    /// Frames since the last IDR.
     since_idr: u32,
+    /// `idr_pic_id` of the next IDR.
     idr_pic_id: u16,
+    /// Skips frames over the bitrate.
     budget: Budget,
 }
 
 impl VulkanEncoder
 {
+    /// Opens a Vulkan Video encoder on the first GPU that can encode the stream.
+    ///
+    /// # Returns
+    /// `Err` with a description if there is no loader, no capable GPU, or setup fails.
     pub fn new(settings: Settings) -> Result<Self, String>
     {
         //SAFETY: SYSTEM VULKAN LOADER
@@ -307,6 +411,7 @@ impl VulkanEncoder
         Ok(encoder)
     }
 
+    /// Creates every Vulkan object the encoder needs.
     fn build(&mut self, settings: Settings, candidate: &Candidate) -> Result<(), String>
     {
         let coded = self.coded;
@@ -346,6 +451,7 @@ impl VulkanEncoder
         Ok(())
     }
 
+    /// Creates the command pools, buffers and synchronisation.
     fn create_commands(&mut self, candidate: &Candidate) -> Result<(), String>
     {
         let device = &self.device;
@@ -373,6 +479,7 @@ impl VulkanEncoder
         Ok(())
     }
 
+    /// Creates the video session and binds its memory.
     fn create_session(&mut self, physical: vk::PhysicalDevice, family: u32, allocated: vk::Extent2D) -> Result<(), String>
     {
         let format = self.video_format(physical, vk::ImageUsageFlags::VIDEO_ENCODE_SRC_KHR)?.format;
@@ -428,6 +535,7 @@ impl VulkanEncoder
         Ok(())
     }
 
+    /// Creates the session parameters (SPS and PPS) and reads back the driver's encoding of them.
     fn create_parameters(&mut self, settings: Settings, level: native::StdVideoH264LevelIdc) -> Result<(), String>
     {
         let coded = self.coded;
@@ -535,6 +643,7 @@ impl VulkanEncoder
         Ok(())
     }
 
+    /// Creates the source picture and the DPB.
     fn create_pictures(&mut self, physical: vk::PhysicalDevice, family: u32, allocated: vk::Extent2D) -> Result<(), String>
     {
         let source_format = self.video_format(physical, vk::ImageUsageFlags::VIDEO_ENCODE_SRC_KHR | vk::ImageUsageFlags::TRANSFER_DST)?;
@@ -566,6 +675,7 @@ impl VulkanEncoder
         Ok(())
     }
 
+    /// Creates one picture usable by the session.
     fn create_picture
     (
         &self,
@@ -635,6 +745,7 @@ impl VulkanEncoder
         Ok(picture)
     }
 
+    /// Creates the staging and bitstream buffers.
     fn create_buffers(&mut self, candidate: &Candidate) -> Result<(), String>
     {
         let pixels = u64::from(self.coded.width) * u64::from(self.coded.height);
@@ -662,6 +773,7 @@ impl VulkanEncoder
         Ok(())
     }
 
+    /// Creates one persistently mapped buffer.
     fn create_mapped
     (
         &self,
@@ -714,6 +826,7 @@ impl VulkanEncoder
         Ok(mapped)
     }
 
+    /// Creates the query pool for encode feedback.
     fn create_feedback(&mut self) -> Result<(), String>
     {
         let mut feedback = vk::QueryPoolVideoEncodeFeedbackCreateInfoKHR::default()
@@ -734,6 +847,7 @@ impl VulkanEncoder
         Ok(())
     }
 
+    /// Picks the image format the encoder accepts for a usage.
     fn video_format(&self, physical: vk::PhysicalDevice, usage: vk::ImageUsageFlags) -> Result<vk::VideoFormatPropertiesKHR<'static>, String>
     {
         let video = khr::video_queue::Instance::new(&self.entry, &self.instance);
@@ -766,6 +880,7 @@ impl VulkanEncoder
             .ok_or_else(|| "the encoder takes no NV12".to_owned())
     }
 
+    /// Allocates device memory, preferring the given properties.
     fn allocate(&self, needs: vk::MemoryRequirements, required: vk::MemoryPropertyFlags, preferred: vk::MemoryPropertyFlags) -> Result<vk::DeviceMemory, String>
     {
         let index = memory_type(&self.memory_properties, needs.memory_type_bits, required, preferred)
@@ -776,6 +891,7 @@ impl VulkanEncoder
             .map_err(|error| error.to_string())
     }
 
+    /// Destroys a picture.
     fn destroy_picture(&self, picture: &Picture)
     {
         //SAFETY: NULLS SKIPPED
@@ -787,6 +903,7 @@ impl VulkanEncoder
         }
     }
 
+    /// Destroys a mapped buffer.
     fn destroy_mapped(&self, mapped: &Mapped)
     {
         //SAFETY: NULLS SKIPPED
@@ -797,6 +914,8 @@ impl VulkanEncoder
         }
     }
 
+    /// Copies a picture into the staging buffer as NV12 and records its upload into the source
+    /// picture.
     fn upload(&mut self, planes: &Planes) -> Result<(), String>
     {
         let coded = (self.coded.width as usize, self.coded.height as usize);
@@ -860,6 +979,7 @@ impl VulkanEncoder
         Ok(())
     }
 
+    /// Returns the H.264 rate control info.
     fn h264_rate(&self, controlled: bool) -> vk::VideoEncodeH264RateControlInfoKHR<'static>
     {
         vk::VideoEncodeH264RateControlInfoKHR::default()
@@ -869,6 +989,7 @@ impl VulkanEncoder
             .temporal_layer_count(u32::from(controlled))
     }
 
+    /// Returns the rate control info for the session's mode.
     fn rate<'a>(&self, layers: &'a [vk::VideoEncodeRateControlLayerInfoKHR<'a>]) -> vk::VideoEncodeRateControlInfoKHR<'a>
     {
         let controlled = !layers.is_empty();
@@ -880,6 +1001,7 @@ impl VulkanEncoder
             .initial_virtual_buffer_size_in_ms(if controlled { 500 } else { 0 })
     }
 
+    /// Returns the bytes of the last encode, read back from the bitstream buffer.
     fn collect(&self) -> Result<Vec<u8>, String> //LAST ENCODE'S BYTES
     {
         let (offset, written) = if self.status
@@ -1251,6 +1373,7 @@ impl Drop for VulkanEncoder
 }
 
 //FUNCTIONS
+/// Returns the first GPU that can encode the stream, discrete cards first.
 fn select(entry: &Entry, instance: &Instance, profile: &Profile) -> Result<Candidate, String> //FIRST GPU THAT CAN ENCODE
 {
     let video = khr::video_queue::Instance::new(entry, instance);
@@ -1276,6 +1399,7 @@ fn select(entry: &Entry, instance: &Instance, profile: &Profile) -> Result<Candi
     Err(last)
 }
 
+/// Checks a GPU's version, extensions, queues and encode capabilities.
 fn candidate(instance: &Instance, video: &khr::video_queue::Instance, physical: vk::PhysicalDevice, profile: &Profile) -> Result<Candidate, String>
 {
     //SAFETY: OUR PHYSICAL DEVICE
@@ -1375,6 +1499,7 @@ fn candidate(instance: &Instance, video: &khr::video_queue::Instance, physical: 
     })
 }
 
+/// Creates the logical device with the encode and upload queues.
 fn create_device(instance: &Instance, candidate: &Candidate) -> Result<Device, String>
 {
     let priorities = [1.0f32];
@@ -1399,6 +1524,15 @@ fn create_device(instance: &Instance, candidate: &Candidate) -> Result<Device, S
     unsafe { instance.create_device(candidate.physical, &info, None) }.map_err(|error| error.to_string())
 }
 
+/// Returns the lowest H.264 level that fits a coded size and frame rate.
+///
+/// For a coded size $W \times H$ at $f$ frames a second, that is the lowest level whose limits
+/// admit
+///
+/// $$ M = \left\lfloor \frac{W}{16} \right\rfloor \left\lfloor \frac{H}{16} \right\rfloor \le \mathrm{MaxFS} \qquad M f \le \mathrm{MaxMBPS} $$
+///
+/// and it is refused if above the GPU's reported maximum (unless that maximum is 1.0, which
+/// RADV reports for "unreported").
 fn level(coded: vk::Extent2D, fps: u32, max: native::StdVideoH264LevelIdc) -> Result<native::StdVideoH264LevelIdc, String> //LOWEST FITTING LEVEL
 {
     let macroblocks = u64::from(coded.width / 16) * u64::from(coded.height / 16);
@@ -1410,6 +1544,7 @@ fn level(coded: vk::Extent2D, fps: u32, max: native::StdVideoH264LevelIdc) -> Re
         .ok_or_else(|| format!("{}x{} needs a level the encoder lacks", coded.width, coded.height))
 }
 
+/// Returns one rate control layer at a bitrate.
 fn rate_layer<'a>(bitrate: u64, fps: u32) -> vk::VideoEncodeRateControlLayerInfoKHR<'a> //ONE RATE CONTROL LAYER
 {
     vk::VideoEncodeRateControlLayerInfoKHR::default()
@@ -1419,6 +1554,7 @@ fn rate_layer<'a>(bitrate: u64, fps: u32) -> vk::VideoEncodeRateControlLayerInfo
         .frame_rate_denominator(1)
 }
 
+/// Returns the colour subresource range over `layers` layers.
 fn color_range(layers: u32) -> vk::ImageSubresourceRange
 {
     vk::ImageSubresourceRange::default()
@@ -1427,6 +1563,8 @@ fn color_range(layers: u32) -> vk::ImageSubresourceRange
         .layer_count(layers)
 }
 
+/// Finds a memory type with the required properties, preferring one that also has the preferred
+/// ones.
 fn memory_type
 (
     properties: &vk::PhysicalDeviceMemoryProperties,

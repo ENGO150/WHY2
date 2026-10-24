@@ -16,6 +16,29 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Translations
+//!
+//! Every word the client shows comes from a locale file rather than from the source. Code asks
+//! for text by key through the [`t!`](crate::t) and [`tn!`](crate::tn) macros.
+//!
+//! # Locales
+//! A locale is a TOML file whose nested tables are flattened into dotted keys
+//! (`[event] joined = "..."` becomes `event.joined`). English is built in and is the fallback
+//! for every key. The `language` setting selects another, read from
+//! `<config dir>/locales/<code>.toml` first and from the built-in table second.
+//!
+//! Each locale is parsed once and leaked, so text can be handed out as `&'static str`, and the
+//! language can be switched at run time ([`set_language`]).
+//!
+//! # Plurals
+//! The `meta.plurals` key of a locale names its plural rule (`one-other`, `other`, `one-few-other`, `one-few-many` or `polish`); a plural key is
+//! a table of forms (`one`, `few`, `many`, `other`) and falls back to `other`.
+//!
+//! # Placeholders
+//! `{name}` in a string is filled from the macro's arguments, and `{{`/`}}` are literal braces.
+//! A placeholder always stands for a whole value inside a whole sentence, never a fragment
+//! glued into one, because other languages inflect around it.
+
 use std::
 {
     fs,
@@ -48,13 +71,17 @@ use crate::
 };
 
 //STRUCTS
+/// One language's text, flattened to dotted keys.
 struct Locale //ONE LANGUAGE'S TEXT, FLATTENED TO DOTTED KEYS
 {
+    /// Text by dotted key.
     text: HashMap<String, String>,
+    /// The plural rule this language uses.
     plurals: String,
 }
 
 //CONSTS
+/// The built-in English locale, also the fallback.
 const ENGLISH: &str = include_str!("../locales/en.toml");
 const CZECH: &str = include_str!("../locales/cz.toml"); //i spent a fucking hour translating it
 const GERMAN: &str = include_str!("../locales/de.toml");
@@ -72,6 +99,7 @@ const CHINESE: &str = include_str!("../locales/zh.toml");
 const JAPANESE: &str = include_str!("../locales/ja.toml");
 const KOREAN: &str = include_str!("../locales/ko.toml");
 
+/// Languages built into the crate, by code.
 const BUILTIN: &[(&str, &str)] = //LANGUAGES SHIPPED IN THE BINARY
 &[
     ("en", ENGLISH),
@@ -93,16 +121,29 @@ const BUILTIN: &[(&str, &str)] = //LANGUAGES SHIPPED IN THE BINARY
 ];
 
 //GLOBAL VARIABLES
+/// The English locale, used for any key the active one lacks.
 static FALLBACK: LazyLock<Locale> = LazyLock::new(|| parse(ENGLISH).expect("Parsing the English locale failed"));
 
+/// Every language loaded so far, by code; `None` for one that failed to load.
 static LOADED: LazyLock<Mutex<HashMap<String, Option<&'static Locale>>>> = LazyLock::new(Default::default); //EVERY LANGUAGE READ SO FAR
 
+/// The active language.
 static ACTIVE: LazyLock<RwLock<Option<&'static Locale>>> = LazyLock::new(||
 {
     RwLock::new(load(config::read_config::<String>("language").trim()))
 });
 
 //MACROS
+/// Returns translated text for a key, with `{name}` placeholders filled.
+///
+/// With a key alone it returns `&'static str`; with arguments it returns a `String`. An
+/// argument is either a variable whose name matches the placeholder or `name = value`.
+///
+/// ```ignore
+/// let title = t!("tui.title");
+/// let line = t!("event.joined", username);
+/// let line = t!("event.joined", username = user.name);
+/// ```
 #[macro_export]
 macro_rules! t //TRANSLATED TEXT, {name} PLACEHOLDERS FILLED
 {
@@ -118,6 +159,13 @@ macro_rules! t //TRANSLATED TEXT, {name} PLACEHOLDERS FILLED
     };
 }
 
+/// Returns the plural form of a key for a count, bound to the `{count}` placeholder.
+///
+/// Further placeholders are passed as in [`t!`](crate::t).
+///
+/// ```ignore
+/// let line = tn!("tui.copied", lines);
+/// ```
 #[macro_export]
 macro_rules! tn //PLURAL TEXT, THE COUNT IS {count}
 {
@@ -132,11 +180,15 @@ macro_rules! tn //PLURAL TEXT, THE COUNT IS {count}
 
 //FUNCTIONS
 //PRIVATE
+/// Returns the directory user-supplied locales are read from.
 fn locales_dir() -> String
 {
     format!("{}{}", misc::get_why2_dir(), consts::LOCALES_DIR)
 }
 
+/// Loads a language by code, parsing it once.
+///
+/// A file in the configuration directory wins over a built-in locale of the same code.
 fn load(code: &str) -> Option<&'static Locale> //A LANGUAGE BY CODE, PARSED ONCE
 {
     *LOADED.lock().unwrap().entry(code.to_owned()).or_insert_with(||
@@ -148,11 +200,13 @@ fn load(code: &str) -> Option<&'static Locale> //A LANGUAGE BY CODE, PARSED ONCE
     })
 }
 
+/// Returns the active language, if it loaded.
 fn active() -> Option<&'static Locale>
 {
     *ACTIVE.read().unwrap()
 }
 
+/// Parses a locale file, taking its plural rule out of `meta.plurals`.
 fn parse(content: &str) -> Option<Locale>
 {
     let document = content.parse::<DocumentMut>().ok()?;
@@ -165,6 +219,7 @@ fn parse(content: &str) -> Option<Locale>
     Some(Locale { text, plurals })
 }
 
+/// Flattens nested tables into dotted keys.
 fn flatten(table: &Table, prefix: &str, out: &mut HashMap<String, String>) //NESTED TABLES TO DOTTED KEYS
 {
     for (key, item) in table
@@ -180,6 +235,15 @@ fn flatten(table: &Table, prefix: &str, out: &mut HashMap<String, String>) //NES
     }
 }
 
+/// Returns which plural form a count takes under a rule.
+///
+/// | Rule            | Languages                          |
+/// |-----------------|------------------------------------|
+/// | `one-other`     | the default (English and most)     |
+/// | `other`         | no plural (Chinese, Japanese, ...) |
+/// | `one-few-other` | Czech, Slovak                      |
+/// | `one-few-many`  | Russian, Ukrainian                 |
+/// | `polish`        | Polish                             |
 fn category(rule: &str, count: u64) -> &'static str //WHICH PLURAL FORM A COUNT TAKES
 {
     match rule
@@ -214,11 +278,13 @@ fn category(rule: &str, count: u64) -> &'static str //WHICH PLURAL FORM A COUNT 
     }
 }
 
+/// Returns the text of `key` in one locale.
 fn lookup(locale: &'static Locale, key: &str) -> Option<&'static str>
 {
     locale.text.get(key).map(String::as_str)
 }
 
+/// Returns the plural form of `key` for `count` in one locale, falling back to `other`.
 fn plural_in(locale: &'static Locale, key: &str, count: u64) -> Option<&'static str>
 {
     lookup(locale, &format!("{key}.{}", category(&locale.plurals, count)))
@@ -226,6 +292,7 @@ fn plural_in(locale: &'static Locale, key: &str, count: u64) -> Option<&'static 
 }
 
 //PUBLIC
+/// Returns the code of every language that loads, built-in ones first.
 pub fn languages() -> Vec<String> //EVERY LANGUAGE THAT LOADS, BUILT-IN FIRST
 {
     let mut codes: Vec<String> = BUILTIN.iter().map(|(code, _)| (*code).to_owned()).collect();
@@ -249,26 +316,31 @@ pub fn languages() -> Vec<String> //EVERY LANGUAGE THAT LOADS, BUILT-IN FIRST
     codes
 }
 
+/// Returns what a language calls itself (its `meta.name`), or the code if it has none.
 pub fn language_name(code: &str) -> &str //WHAT A LANGUAGE CALLS ITSELF
 {
     load(code).and_then(|locale| lookup(locale, "meta.name")).unwrap_or(code)
 }
 
+/// Switches the active language; an unknown code falls back to English for every key.
 pub fn set_language(code: &str) //SWITCH THE ACTIVE LANGUAGE
 {
     *ACTIVE.write().unwrap() = load(code);
 }
 
+/// Returns the text for a key from the active language or English, if either has it.
 pub fn get(key: &str) -> Option<&'static str> //TEXT FOR key, IF ANY LOCALE HAS IT
 {
     active().and_then(|locale| lookup(locale, key)).or_else(|| lookup(&FALLBACK, key))
 }
 
+/// Returns the text for a key, or the key itself if no locale has it.
 pub fn text(key: &'static str) -> &'static str //TEXT FOR key, OR THE KEY ITSELF
 {
     get(key).unwrap_or(key)
 }
 
+/// Returns the plural form of a key for a count, or the key itself if no locale has it.
 pub fn plural(key: &'static str, count: u64) -> &'static str //THE FORM OF key FOR count
 {
     active().and_then(|locale| plural_in(locale, key, count))
@@ -276,6 +348,13 @@ pub fn plural(key: &'static str, count: u64) -> &'static str //THE FORM OF key F
         .unwrap_or(key)
 }
 
+/// Fills `{name}` placeholders in a template.
+///
+/// Unknown placeholders are left as written, and doubled braces are literal.
+///
+/// # Parameters
+/// - `template`: The text to fill.
+/// - `args`: `(name, value)` pairs.
 pub fn format(template: &str, args: &[(&str, &dyn Display)]) -> String //FILL {name} PLACEHOLDERS
 {
     let mut out = String::with_capacity(template.len());
@@ -311,6 +390,13 @@ pub fn format(template: &str, args: &[(&str, &dyn Display)]) -> String //FILL {n
     out
 }
 
+/// Splits a template around the `{name}` placeholder.
+///
+/// Used to style a value inside a translated sentence without assuming where in the sentence
+/// it falls.
+///
+/// # Returns
+/// The text before and after the placeholder; `(template, "")` if it is absent.
 pub fn split<'a>(template: &'a str, name: &str) -> (&'a str, &'a str) //THE TEXT EITHER SIDE OF {name}
 {
     template.split_once(&format!("{{{name}}}")).unwrap_or((template, ""))

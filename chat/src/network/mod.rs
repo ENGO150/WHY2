@@ -16,6 +16,46 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Network Layer
+//!
+//! The packet-level plumbing shared by the client and the server, and the protocol extensions
+//! built on it.
+//!
+//! # Framing
+//! Every packet on a TCP socket is a 4-byte big-endian length followed by that many bytes of
+//! protected payload. The payload is a `wincode`-encoded [`Packet`] (or another
+//! [`SequencedPacket`] on the auxiliary sockets) after one of three transforms, chosen by
+//! [`EncryptionMode`]:
+//!
+//! | Mode                       | Used for                        | Transform                                        |
+//! |----------------------------|---------------------------------|--------------------------------------------------|
+//! | `OneShot(Some(keys))`      | the main connection             | [`crypto::encrypt_packet`] (encrypt-then-MAC)    |
+//! | `Stream(stream)`           | file and screen sockets         | [`RexPacketStream::seal`] (counter-bound EtM)    |
+//! | `OneShot(None)`            | the handshake, before any keys  | XOR obfuscation only — **not** encryption        |
+//!
+//! [`send_tcp`] and [`read_tcp`] never touch a cipher themselves; they hand the payload to
+//! [`crypto`].
+//!
+//! # Sequence Numbers
+//! Every packet carries a sequence number that must strictly increase per direction. A packet
+//! that does not is dropped by the client and ends the connection on the server, which rejects
+//! replayed and reordered packets on top of what the MAC already guarantees.
+//!
+//! # Server-Side Policing
+//! On the server, [`receive`] is the funnel every authenticated packet passes through, so it is
+//! also where the per-connection limits are enforced: the packet size ceiling, the message
+//! length and minimum message gap (`min_message_delay`, with `SpamWarning`s), and the
+//! token-bucket packet rate, which throttles an overdrawn client by delaying its own read loop
+//! rather than refusing it.
+//!
+//! # Submodules
+//! - [`codes`] — the [`PacketCode`] enum: every message of the protocol.
+//! - [`schema`] — `wincode` schemas for foreign types carried in packets.
+//! - [`file`](mod@file) — file and picture transfer on auxiliary sockets.
+//! - [`voice`] — voice chat over UDP.
+//! - [`screen`] — screen sharing on auxiliary sockets.
+//! - `client` / `server` — the connection logic of each side.
+
 //MODULES
 #[cfg(feature = "server")]
 pub mod server;
@@ -79,30 +119,42 @@ use tokio::time;
 use crate::config;
 
 //TRAITS
+/// A packet type that carries a sequence number.
 pub trait SequencedPacket: SchemaWrite<PacketConfig, Src = Self>
 {
+    /// Returns the packet's sequence number.
     fn seq(&self) -> usize;
+    /// Sets the packet's sequence number.
     fn set_seq(&mut self, seq: usize);
 }
 
 //ENUMS
+/// How a packet's payload is protected on the wire.
 pub enum EncryptionMode<'a> //MODE OF ENCRYPTION
 {
+    /// One-shot authenticated encryption under the session keys, or XOR obfuscation when `None`.
     OneShot(Option<&'a SharedKeys>), //ONE-SHOT ENCRYPTION
+    /// Counter-bound encrypt-then-MAC stream, for auxiliary sockets.
     Stream(&'a mut RexPacketStream), //STREAM ENCRYPTION (AUTHENTICATED)
 }
 
 //STRUCTS
+/// A packet on the main connection.
 #[derive(SchemaWrite, SchemaRead, Clone)]
 pub struct Packet //MESSAGE PACKET (WHAT IS BEING SENT)
 {
+    /// What the packet says.
     pub code: PacketCode, //CONTROL CODE
+    /// Sequence number, strictly increasing per direction.
     pub seq: usize,       //SEQUENCE NUMBER
 }
 
+/// The verified, decrypted payload of one TCP read.
 pub struct ReadResult //RESULT OF TCP READ
 {
+    /// Address of the peer the packet came from.
     #[cfg(feature = "server")] pub peer_addr: SocketAddr,
+    /// The decrypted, still serialized packet.
     pub data: Zeroizing<Vec<u8>>,
 }
 
@@ -115,6 +167,7 @@ impl SequencedPacket for Packet
 
 //FUNCTIONS
 //PRIVATE
+/// XORs bytes with a repeating 32-byte key; obfuscation, not encryption.
 fn obfuscate_data(data: &[u8], obfuscation_key: [u8; 32]) -> Vec<u8> //XOR BYTES (USED FOR OBFUSCATION)
 {
     let mut result = Vec::with_capacity(data.len());
@@ -129,6 +182,20 @@ fn obfuscate_data(data: &[u8], obfuscation_key: [u8; 32]) -> Vec<u8> //XOR BYTES
 
 //PUBLIC
 //HANDLERS
+/// Serializes, protects, frames and writes one packet.
+///
+/// The packet's sequence number is assigned here: from `seq` if given, else from the session's
+/// global counter (the client's session state, or the server's connection entry). A write
+/// error is ignored; the read side notices the dead socket.
+///
+/// # Parameters
+/// - `write_stream`: The socket to write to.
+/// - `packet`: The packet; its sequence number is overwritten.
+/// - `encryption_mode`: How to protect the payload.
+/// - `seq`: A local sequence counter to use instead of the global one (auxiliary sockets).
+///
+/// # Panics
+/// If the packet cannot be serialized.
 pub async fn send_tcp //SEND packet TO stream
 (
     write_stream: &mut OwnedWriteHalf,
@@ -234,6 +301,22 @@ pub async fn send_tcp //SEND packet TO stream
     }
 }
 
+/// Reads, unframes and verifies one packet.
+///
+/// On the server, the length is checked against the connection's limit before anything is
+/// allocated — [`MAX_AUXILIARY_PACKET_SIZE`](chat_consts::MAX_AUXILIARY_PACKET_SIZE) on side
+/// channels, `max_packet_size` with spam protection on, and
+/// [`MAX_PACKET_CEILING`](chat_consts::MAX_PACKET_CEILING) otherwise. A closed socket or an
+/// oversized packet removes the connection.
+///
+/// # Parameters
+/// - `streams`: The connection's read half and shared write half.
+/// - `encryption_mode`: How the payload is protected.
+/// - `auxiliary`: Whether this is a file or screen side channel (server only).
+///
+/// # Returns
+/// - `Some(ReadResult)` with the plaintext payload.
+/// - `None` if the socket closed, the packet was too large, or it failed verification.
 pub async fn read_tcp
 (
     streams: &mut Streams<'_>,
@@ -386,6 +469,12 @@ pub async fn read_tcp
 }
 
 //UTILS
+/// Sends a [`PacketCode`] on the main connection with the global sequence counter.
+///
+/// # Parameters
+/// - `write_stream`: The connection's write half.
+/// - `code`: What to send.
+/// - `keys`: The session keys, or `None` to obfuscate only (before the handshake).
 pub async fn send //SEND packet TO stream
 (
     write_stream: &mut OwnedWriteHalf,
@@ -406,6 +495,22 @@ pub async fn send //SEND packet TO stream
     ).await;
 }
 
+/// Receives and decodes one [`PacketCode`] on the main connection.
+///
+/// On the server this also enforces the connection's policies: control characters are
+/// stripped from typed text, the sequence number is checked, and the message length, message
+/// gap and packet rate limits are applied (see the module documentation). A violation that
+/// ends the session removes the connection and returns `None`.
+///
+/// # Parameters
+/// - `streams`: The connection's read half and shared write half.
+/// - `keys`: The session keys, or `None` before the handshake.
+/// - `seq`: A local sequence counter to use instead of the global one.
+///
+/// # Returns
+/// - `Some(code)` for a valid packet.
+/// - `None` if the read failed, the packet did not decode, its sequence number did not
+///   increase, or the connection was ended for a policy violation.
 pub async fn receive
 (
     streams: &mut Streams<'_>,

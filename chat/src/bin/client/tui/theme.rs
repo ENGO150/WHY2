@@ -16,6 +16,31 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Theme
+//!
+//! Colors, styles and the rendering of pane entries into rows.
+//!
+//! # Palettes
+//! Every chrome color is a fixed `Color::Rgb`, never a named ANSI color or an indexed one, which
+//! the user's terminal scheme would fill in differently; every truecolor terminal therefore draws
+//! the client identically. The palette is switchable ([`PALETTES`], the `theme` setting), so the
+//! colors are read through accessors ([`text`], [`accent`], ...) rather than consts. Each palette
+//! paints its own background, since its foregrounds are only readable on it. User colors (`/color`)
+//! are the one place scheme-relative colors survive — fixed too under a palette that carries an
+//! `ansi` table.
+//!
+//! # Rendering
+//! [`Theme::render`] turns one [`Entry`] into the rows it occupies at a width: the timestamp, the
+//! sender in their color, the markup-rendered text ([`markup`]), a reply's quote
+//! row, and a right-aligned trailer of pin, edit mark, hearts and message id. The settings that
+//! change how entries look are cached in [`Theme`], so changing one rewraps the pane through
+//! [`App::reload_theme`](super::state::App::reload_theme).
+//!
+//! # Stripes
+//! Alternate messages get a background a little off the terminal's own ([`stripe`]): a shade has
+//! to be relative to the background it sits on, so it is the one color derived from the user's
+//! scheme rather than fixed.
+
 use std::sync::atomic::
 {
     AtomicUsize,
@@ -63,43 +88,72 @@ use super::
 };
 
 //STRUCTS
+/// Cached config-driven styling.
 pub struct Theme //CACHED CONFIG-DRIVEN STYLING
 {
+    /// Whether user colors are ignored.
     pub disable_colors: bool,
+    /// Whether the pane's watermark logo is hidden.
     pub disable_logo: bool,
+    /// Whether session ids are shown beside usernames.
     pub show_id: bool,
+    /// Whether message ids are shown.
     pub show_message_ids: bool,
+    /// Whether timestamps are shown.
     pub show_timestamps: bool,
+    /// Whether alternate messages are striped.
     pub message_stripes: bool,
+    /// Whether TeX math is rendered.
     pub render_math: bool,
 }
 
+/// One color theme.
 pub struct Palette //ONE COLOUR THEME
 {
+    /// The id stored in `client.toml`.
     pub id: &'static str, //AS STORED IN client.toml
+    /// The display name.
     pub name: &'static str,
+    /// The background it paints; `None` keeps the terminal's.
     pub background: Option<(u8, u8, u8)>, //None = THE TERMINAL'S
+    /// Base text.
     pub text: Color,
+    /// Borders and secondary text.
     pub muted: Color,
+    /// Titles, active borders and links.
     pub accent: Color,
+    /// Notices, headings and math.
     pub highlight: Color,
+    /// Errors.
     pub error: Color,
+    /// A heart we gave.
     pub heart: Color,
+    /// Success and inline code.
     pub ok: Color,
+    /// The watermark logo.
     pub logo: Color,
+    /// Code background.
     pub code_bg: Color,
+    /// Selected list rows.
     pub selected: Color,
+    /// Background of a message that mentions us.
     pub mention: Color,
+    /// Background of the drag selection.
     pub selection: Color,
+    /// A required parameter.
     pub arg_required: Color,
+    /// An optional parameter.
     pub arg_optional: Color,
+    /// The parameter being typed.
     pub arg_active: Color,
+    /// The 16 user colors, fixed; `None` leaves them to the terminal.
     pub ansi: Option<[Color; 16]>, //None = THE TERMINAL'S
 }
 
 //IMPLEMENTATIONS
 impl Theme
 {
+    /// Reads the styling settings and selects the configured palette.
     pub fn load() -> Self
     {
         ACTIVE.store(palette_index(&config::read_config::<String>("theme")), Ordering::Relaxed);
@@ -116,12 +170,20 @@ impl Theme
         }
     }
 
+    /// Rereads the styling settings; call after writing `client.toml`.
     pub fn reload(&mut self) //RE-READ AFTER A config::client_write
     {
         *self = Self::load();
     }
 
     //STYLE AND WRAP ONE HISTORY ENTRY
+    /// Renders one entry into the rows it occupies.
+    ///
+    /// # Parameters
+    /// - `entry`: The entry.
+    /// - `width`: The pane width.
+    /// - `target`: The entry a reply quotes, if it is in the pane.
+    /// - `me`: Our username, for tinting replies to us and hearts we gave.
     pub fn render(&self, entry: &Entry, width: u16, target: Option<&Entry>, me: &str) -> Vec<Line<'static>>
     {
         let mut lines: Vec<Line<'static>> = entry.reply().map(|reply| self.reply_row(reply, target, width)).into_iter().collect();
@@ -137,6 +199,7 @@ impl Theme
         lines
     }
 
+    /// Renders an entry's body.
     fn render_entry(&self, entry: &Entry, width: u16) -> Vec<Line<'static>>
     {
         match entry
@@ -236,6 +299,7 @@ impl Theme
     }
 
     //SENDER NAME, COLORED
+    /// Returns the sender's name in their color.
     fn sender(&self, username: &str, color: Option<u8>) -> Span<'static>
     {
         match color.filter(|_| !self.disable_colors).and_then(colors::u8_to_color)
@@ -246,6 +310,7 @@ impl Theme
     }
 
     //ONE ROW NAMING THE MESSAGE A REPLY ANSWERS
+    /// Returns the one-row quote naming the message a reply answers, cut to the width.
     fn reply_row(&self, reply: u64, target: Option<&Entry>, width: u16) -> Line<'static>
     {
         let mut spans = vec![Span::styled(consts::REPLY, border())];
@@ -295,6 +360,7 @@ impl Theme
         row
     }
 
+    /// Returns the send-time prefix in local time, with the date only when it is not today.
     fn timestamp(&self, timestamp: Option<u64>) -> Span<'static> //SEND TIME PREFIX, LOCAL
     {
         let Some(time) = timestamp.filter(|_| self.show_timestamps)
@@ -313,6 +379,8 @@ impl Theme
     }
 
     //PINNED, EDITED, HEARTS AND MESSAGE ID, RIGHT-ALIGNED ON THE LAST ROW
+    /// Appends the right-aligned trailer to the last row, or on a row of its own when there is no
+    /// room.
     fn trailer(&self, mut lines: Vec<Line<'static>>, entry: &Entry, message_id: u64, me: &str, width: u16) -> Vec<Line<'static>>
     {
         let mut tag: Vec<Span<'static>> = Vec::new();
@@ -364,16 +432,19 @@ impl Theme
         lines
     }
 
+    /// Returns a sender's name, bold, in their color.
     fn name(&self, username: String, color: Option<u8>) -> Span<'static> //A SENDER'S NAME, BOLD
     {
         Span::styled(username, self.style(color).add_modifier(Modifier::BOLD))
     }
 
+    /// Returns text in a user color, unless colors are disabled.
     pub fn colorize(&self, text: String, color: Option<u8>) -> Span<'static> //COLORIZE text IF PASSED COLOR
     {
         Span::styled(text, self.style(color))
     }
 
+    /// Returns the style of a user color, unless colors are disabled.
     pub fn style(&self, color: Option<u8>) -> Style //THE USER'S OWN COLOUR, WHERE THEY HAVE ONE
     {
         match color.and_then(colors::u8_to_color)
@@ -386,6 +457,8 @@ impl Theme
 
 //FUNCTIONS
 //THE BACKGROUND, A LITTLE LIGHTER
+/// Returns the stripe background: the terminal's background moved a little towards white, or
+/// towards black on a light background; a fixed color when the terminal does not say.
 pub fn stripe(terminal: Option<(u8, u8, u8)>) -> Color
 {
     let Some((r, g, b)) = palette().background.or(terminal) else { return STRIPE_FALLBACK };
@@ -399,6 +472,7 @@ pub fn stripe(terminal: Option<(u8, u8, u8)>) -> Color
 }
 
 //A TRANSFER'S ROW - WHAT IT IS, ITS BAR, AND WHAT IT HAS MOVED
+/// Returns a transfer's row: what it is, its progress bar and how much has moved.
 fn progress(transfer: &Transfer, width: u16) -> Vec<Span<'static>>
 {
     let Transfer { upload, image, filename, done, total, outcome, .. } = transfer;
@@ -443,11 +517,13 @@ fn progress(transfer: &Transfer, width: u16) -> Vec<Span<'static>>
 
 //BYTES AS SOMETHING READABLE
 //SECONDS AS M:SS
+/// Formats seconds as `m:ss`.
 fn clock(seconds: u32) -> String
 {
     format!("{}:{:02}", seconds / 60, seconds % 60)
 }
 
+/// Formats a byte count with a unit.
 fn size(bytes: u64) -> String
 {
     const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
@@ -469,53 +545,85 @@ fn size(bytes: u64) -> String
 }
 
 //ACCESSORS FOR THE ACTIVE PALETTE
+/// The base foreground.
 pub fn text() -> Style { Style::new().fg(palette().text) }                     //THE BASE FOREGROUND
+/// The base foreground on the palette's background.
 pub fn base() -> Style { background().map_or(text(), |bg| text().bg(bg)) }     //THE BASE, WITH THE PALETTE'S BACKGROUND
+/// A border.
 pub fn border() -> Style { Style::new().fg(palette().muted) }
+/// An active border.
 pub fn border_active() -> Style { Style::new().fg(palette().accent) }
+/// A title.
 pub fn title() -> Style { Style::new().fg(palette().accent).add_modifier(Modifier::BOLD) }
+/// Secondary text.
 pub fn dim() -> Style { Style::new().fg(palette().muted) }
+/// Accented text.
 pub fn accent() -> Style { Style::new().fg(palette().accent) }
+/// A notice.
 pub fn notice() -> Style { Style::new().fg(palette().highlight) }
+/// An error.
 pub fn error() -> Style { Style::new().fg(palette().error) }
+/// A heart we gave.
 pub fn heart() -> Style { Style::new().fg(palette().heart) }                   //A HEART WE GAVE
+/// Success.
 pub fn ok() -> Style { Style::new().fg(palette().ok) }
+/// Somebody speaking in the voice panel.
 pub fn speaking() -> Style { ok().add_modifier(Modifier::BOLD) }
 
+/// The watermark logo on a free cell.
 pub fn logo() -> Style { Style::new().fg(palette().logo) }                     //ON A FREE CELL THE GLYPH ITSELF IS DRAWN...
+/// The watermark logo under text, as a background.
 pub fn logo_under() -> Style { Style::new().bg(palette().logo) }               //...UNDER TEXT ONLY THE BACKGROUND IS
 
 //CODE, AS A BOX PADDED TO THE PANE
+/// Inline code.
 pub fn code() -> Style { Style::new().fg(palette().ok).bg(palette().code_bg) } //INLINE `code`
+/// A code block.
 pub fn code_block() -> Style { Style::new().fg(palette().text).bg(palette().code_bg) }
+/// A code block's left bar.
 pub fn code_bar() -> Style { Style::new().fg(palette().accent).bg(palette().code_bg) } //THE BLOCK'S LEFT EDGE
+/// A code block's language label.
 pub fn code_lang() -> Style { Style::new().fg(palette().muted).bg(palette().code_bg).add_modifier(Modifier::ITALIC) }
 
 //MARKDOWN
+/// A heading the message gave no color.
 pub fn heading() -> Style { Style::new().fg(palette().highlight) }             //A HEADING THE MESSAGE GAVE NO COLOUR
+/// A blockquote's edge.
 pub fn quote() -> Style { Style::new().fg(palette().accent) }                  //A BLOCKQUOTE'S EDGE
+/// A list marker.
 pub fn bullet() -> Style { Style::new().fg(palette().accent) }                 //AND A LIST MARKER
+/// A horizontal rule.
 pub fn rule() -> Style { Style::new().fg(palette().muted) }
+/// A link.
 pub fn link() -> Style { Style::new().fg(palette().accent).add_modifier(Modifier::UNDERLINED) }
 
+/// Math the message gave no color.
 pub fn math() -> Style { Style::new().fg(palette().highlight) }                //MATH THE MESSAGE GAVE NO COLOUR
 
+/// A selected list row.
 pub fn selected() -> Style { Style::new().bg(palette().selected) }
+/// A message that mentions us, as a background.
 pub fn mention() -> Style { Style::new().bg(palette().mention) }               //A MESSAGE THAT MENTIONS US, A BACKGROUND ONLY
+/// The drag selection, as a background.
 pub fn selection() -> Style { Style::new().bg(palette().selection) }           //THE DRAG SELECTION, A BACKGROUND ONLY
 
+/// A required parameter.
 pub fn arg_required() -> Style { Style::new().fg(palette().arg_required) }
+/// An optional parameter.
 pub fn arg_optional() -> Style { Style::new().fg(palette().arg_optional) }
+/// The parameter being typed.
 pub fn arg_active() -> Style                                                   //THE PARAMETER BEING TYPED
 {
     Style::new().fg(palette().arg_active).add_modifier(Modifier::BOLD).add_modifier(Modifier::UNDERLINED)
 }
 
+/// Returns the palette's background, if it paints one.
 pub fn background() -> Option<Color> //THE PALETTE'S OWN BACKGROUND, IF IT PAINTS ONE
 {
     palette().background.map(|(r, g, b)| Color::Rgb(r, g, b))
 }
 
+/// Returns a user color as the palette fixes it, lifted if it would vanish into the background.
 pub fn ansi(color: Color) -> Color //A NAMED COLOR, AS THE PALETTE FIXES IT
 {
     let index = match color
@@ -543,6 +651,12 @@ pub fn ansi(color: Color) -> Color //A NAMED COLOR, AS THE PALETTE FIXES IT
     visible(palette().ansi.map_or(color, |ansi| ansi[index]))
 }
 
+/// Lifts a color too close to the background towards the text.
+///
+/// A color $c$ whose luma is within 40 of the background's is replaced by a point between the
+/// background $b$ and the text color $t$:
+///
+/// $$ c^{\prime} = b + 0.45 (t - b) \quad \text{if}\ \lvert Y(c) - Y(b) \rvert \lt 40 $$
 fn visible(color: Color) -> Color //LIFT A COLOR THAT VANISHES INTO THE BACKGROUND
 {
     let Some((r, g, b)) = palette().background else { return color };
@@ -564,43 +678,55 @@ fn visible(color: Color) -> Color //LIFT A COLOR THAT VANISHES INTO THE BACKGROU
     Color::Rgb(toward(r, tr), toward(g, tg), toward(b, tb))
 }
 
+/// Returns the luma of a color, with the BT.601 weights in integer arithmetic:
+/// $Y = \lfloor (299R + 587G + 114B) / 1000 \rfloor$.
 fn luma(r: u8, g: u8, b: u8) -> u32
 {
     (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000
 }
 
+/// Returns the active palette.
 pub fn palette() -> &'static Palette
 {
     &PALETTES[ACTIVE.load(Ordering::Relaxed)]
 }
 
+/// Returns the index of a palette by id; an unknown id is the default.
 pub fn palette_index(id: &str) -> usize //A STORED ID, UNKNOWN IS THE DEFAULT
 {
     PALETTES.iter().position(|palette| palette.id.eq_ignore_ascii_case(id.trim())).unwrap_or(0)
 }
 
 //CONSTS
+/// Builds a color from `0xRRGGBB`.
 const fn rgb(hex: u32) -> Color
 {
     Color::Rgb((hex >> 16) as u8, (hex >> 8) as u8, hex as u8)
 }
 
+/// Builds a background from `0xRRGGBB`.
 const fn bg(hex: u32) -> Option<(u8, u8, u8)>
 {
     Some(((hex >> 16) as u8, (hex >> 8) as u8, hex as u8))
 }
 
+/// Index of the active palette.
 static ACTIVE: AtomicUsize = AtomicUsize::new(0);
 
 //EVERY OTHER MESSAGE, A BACKGROUND ONLY
+/// Stripe background when the terminal does not report its own.
 const STRIPE_FALLBACK: Color = Color::Rgb(0x1B, 0x1F, 0x24);                   //FAINT SLATE, WHEN THE TERMINAL WILL NOT SAY
+/// How far the stripe moves off the background.
 const STRIPE_LIFT: f32 = 0.07;                                                  //HOW FAR OFF THE BACKGROUND
 
 //A USER COLOR TOO CLOSE TO THE BACKGROUND
+/// Luma distance below which a user color is lifted.
 const MIN_CONTRAST: u32 = 40;                                                   //LUMA DISTANCE BELOW WHICH IT IS LIFTED
+/// How far a lifted color moves towards the text.
 const CONTRAST_LIFT: f32 = 0.45;                                                //HOW FAR TOWARDS THE TEXT
 
 //THE BUILT-IN PALETTES, THE FIRST IS THE DEFAULT
+/// The built-in palettes; the first is the default.
 pub const PALETTES: &[Palette] = &
 [
     Palette

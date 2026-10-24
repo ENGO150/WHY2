@@ -16,6 +16,29 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Voice Messages — Recording and Playback
+//!
+//! Records voice messages into a [`Clip`] and plays them back.
+//!
+//! # Recording
+//! A recording is 48 kHz stereo Opus at [`MESSAGE_BITRATE`](consts::MESSAGE_BITRATE), with none
+//! of the voice chat's processing (no denoiser, gate or AGC) — a message may be music or a room,
+//! which that processing is built to throw away. Only the microphone volume applies.
+//!
+//! While in a call, the recording is fed from the call's own capture callback ([`feed`]), since
+//! a raw ALSA PCM is exclusive and a second capture would fail. Otherwise it opens the configured
+//! input device itself. Frames are encoded inside the capture callback, which takes the lock with
+//! `try_lock` only, so contention costs one buffer, never a blocked realtime thread. The
+//! recording stops itself at [`MESSAGE_MAX_FRAMES`](consts::MESSAGE_MAX_FRAMES) or the size
+//! ceiling, and anything shorter than [`MESSAGE_MIN_FRAMES`](consts::MESSAGE_MIN_FRAMES) is not
+//! sent.
+//!
+//! # Playback
+//! One clip plays at a time, on its own output stream, decoded one packet at a time in the
+//! output callback, so even a five-minute clip is a few kilobytes of state. A clip missing from
+//! the cache is requested from the server and started when it arrives ([`awaited`]); a play
+//! generation makes a later play or a stop win over a start still in flight.
+
 use std::sync::
 {
     Arc,
@@ -71,54 +94,85 @@ use crate::
 };
 
 //STRUCTS
+/// A voice message being recorded.
 struct Recording //A VOICE MESSAGE BEING RECORDED
 {
+    /// The stereo Opus encoder.
     encoder: Encoder,
+    /// Opus packets so far.
     frames: Vec<Vec<u8>>, //OPUS PACKETS SO FAR
+    /// What the packets will take on the wire.
     size: usize,          //WHAT THEY WILL TAKE ON THE WIRE
+    /// Resampled stereo audio not yet a whole frame.
     pending: Vec<f32>,    //RESAMPLED STEREO, NOT A WHOLE FRAME YET
+    /// Fractional resampler position.
     position: f32,        //RESAMPLER POSITION
+    /// Whether the recording is fed by the call's capture.
     voice: bool,          //FED BY THE VOICE CALL'S CAPTURE
+    /// Whether a frame or size limit was hit.
     full: bool,           //A LIMIT WAS HIT
+    /// The recording's generation, so a capture opened late can tell it is stale.
     generation: usize,
 }
 
+/// A voice message being played.
 struct Player //A VOICE MESSAGE BEING PLAYED
 {
+    /// The clip's hash.
     hash: [u8; 32],
+    /// How far playback has got.
     progress: Arc<Progress>,
+    /// The output stream; dropping it stops playback.
     _stream: Stream,
 }
 
+/// How far a playback has got, shared with its output callback.
 struct Progress //WHERE THE PLAYBACK IS
 {
+    /// Frames decoded.
     frames: AtomicUsize, //FRAMES DECODED
+    /// Whether the clip ran out.
     done: AtomicBool,    //RAN OUT OF FRAMES
 }
 
+/// Decodes a clip packet by packet as the output callback asks.
 struct Playhead //DECODES A CLIP AS THE DEVICE ASKS
 {
+    /// The clip's Opus packets.
     frames: Vec<Vec<u8>>,
+    /// The clip's channel count.
     channels: usize,
+    /// The Opus decoder.
     decoder: Decoder,
+    /// Next packet to decode.
     next: usize,      //NEXT PACKET
+    /// Decoded, interleaved samples.
     buffer: Vec<f32>, //DECODED, INTERLEAVED
+    /// Read position in the buffer.
     read: usize,      //READ POSITION IN buffer
+    /// How far playback has got.
     progress: Arc<Progress>,
 }
 
 //GLOBAL VARIABLES
+/// The recording in progress.
 static RECORDING: Mutex<Option<Recording>> = Mutex::new(None);
+/// The capture opened for a recording made outside a call.
 static OWN_INPUT: Mutex<Option<Stream>> = Mutex::new(None); //OUR OWN CAPTURE
+/// Generation of the latest recording.
 static RECORD_GENERATION: AtomicUsize = AtomicUsize::new(0);
 
+/// The clip being played.
 static PLAYER: Mutex<Option<Player>> = Mutex::new(None);
+/// Generation of the latest play or stop.
 static PLAY_GENERATION: AtomicUsize = AtomicUsize::new(0);
+/// Clips requested from the server for playback, with the generation that asked.
 static AWAITED: Mutex<Vec<([u8; 32], usize)>> = Mutex::new(Vec::new()); //CLIPS ASKED OF THE SERVER TO PLAY
 
 //IMPLEMENTATIONS
 impl Recording
 {
+    /// Resamples captured audio to 48 kHz stereo and encodes every whole frame.
     fn feed(&mut self, data: &[f32], channels: usize, rate: f32) //RESAMPLE AND ENCODE
     {
         if channels == 0 { return; }
@@ -161,6 +215,7 @@ impl Recording
         }
     }
 
+    /// Encodes one stereo frame, marking the recording full at a frame or size limit.
     fn encode(&mut self, frame: &[f32]) //ENCODE ONE FRAME
     {
         let mut buffer = [0u8; consts::MESSAGE_MAX_PACKET];
@@ -178,6 +233,10 @@ impl Recording
 
 impl Playhead
 {
+    /// Returns the next stereo sample, decoding the next packet when the buffer runs out.
+    ///
+    /// # Returns
+    /// `None` once the clip has ended.
     fn next(&mut self) -> Option<(f32, f32)> //NEXT STEREO SAMPLE
     {
         while self.read >= self.buffer.len()
@@ -207,6 +266,7 @@ impl Playhead
 
 //FUNCTIONS
 //PRIVATE
+/// Creates the recording's stereo encoder.
 fn stereo() -> Option<Encoder> //THE RECORDING'S ENCODER
 {
     let mut encoder = Encoder::new
@@ -222,6 +282,12 @@ fn stereo() -> Option<Encoder> //THE RECORDING'S ENCODER
     Some(encoder)
 }
 
+/// Opens a capture of our own for a recording made outside a call. Blocking.
+///
+/// The stream is kept only if the recording that asked for it is still the current one.
+///
+/// # Returns
+/// `true` if the capture opened.
 fn open_input(generation: usize) -> bool //CAPTURE OF OUR OWN (BLOCKING)
 {
     let _stderr_gag = Gag::stderr().ok();
@@ -246,6 +312,10 @@ fn open_input(generation: usize) -> bool //CAPTURE OF OUR OWN (BLOCKING)
     true
 }
 
+/// Opens an output stream and starts playing a clip. Blocking.
+///
+/// # Returns
+/// `Err` with the translation key of the failure.
 fn open_output(hash: [u8; 32], data: &[u8], generation: usize) -> Result<(), &'static str> //START PLAYING (BLOCKING)
 {
     let clip = Clip::decode(data).ok_or("voice_message.unreadable")?;
@@ -338,6 +408,13 @@ fn open_output(hash: [u8; 32], data: &[u8], generation: usize) -> Result<(), &'s
 
 //PUBLIC
 //RECORDING
+/// Starts recording a voice message.
+///
+/// A failure to open the input outside a call is reported later as
+/// [`ClientEvent::VoiceMessageFailed`].
+///
+/// # Returns
+/// `false` if a recording is already running or the encoder could not be created.
 pub fn start_recording(tx: Sender<ClientEvent>) -> bool //BEGIN RECORDING
 {
     let mut guard = RECORDING.lock().unwrap();
@@ -384,6 +461,14 @@ pub fn start_recording(tx: Sender<ClientEvent>) -> bool //BEGIN RECORDING
     true
 }
 
+/// Feeds raw captured audio to the recording.
+///
+/// # Parameters
+/// - `data`: Interleaved samples.
+/// - `channels`: The capture's channel count.
+/// - `rate`: The capture's sample rate.
+/// - `voice`: Whether this comes from the call's capture; a recording only takes the source it
+///   was started with.
 pub fn feed(data: &[f32], channels: usize, rate: f32, voice: bool) //RAW CAPTURE IN
 {
     let Ok(mut guard) = RECORDING.try_lock() else { return };
@@ -394,6 +479,11 @@ pub fn feed(data: &[f32], channels: usize, rate: f32, voice: bool) //RAW CAPTURE
     }
 }
 
+/// Returns the recording's state.
+///
+/// # Returns
+/// `(milliseconds recorded, whether it must end now)` — at a limit, or because the call it was
+/// tapping ended — or `None` if nothing is recording.
 pub fn recording() -> Option<(u32, bool)> //(MS RECORDED, OUT OF ROOM)
 {
     let guard = RECORDING.lock().unwrap();
@@ -405,6 +495,11 @@ pub fn recording() -> Option<(u32, bool)> //(MS RECORDED, OUT OF ROOM)
     Some((recording.frames.len() as u32 * consts::FRAME_MS, recording.full || ended))
 }
 
+/// Ends the recording and returns the encoded clip.
+///
+/// # Returns
+/// The clip, or `None` if nothing was recording or it is shorter than
+/// [`MESSAGE_MIN_FRAMES`](consts::MESSAGE_MIN_FRAMES).
 pub fn finish_recording() -> Option<Vec<u8>> //THE CLIP, None IF TOO SHORT
 {
     //STOP THE CAPTURE FIRST
@@ -428,6 +523,7 @@ pub fn finish_recording() -> Option<Vec<u8>> //THE CLIP, None IF TOO SHORT
     }.encode())
 }
 
+/// Discards the recording.
 pub fn cancel_recording() //THROW IT AWAY
 {
     let stream = OWN_INPUT.lock().unwrap().take();
@@ -437,6 +533,10 @@ pub fn cancel_recording() //THROW IT AWAY
 }
 
 //PLAYBACK
+/// Plays a clip from the cache, or requests it from the server.
+///
+/// A cache miss parks the hash and raises [`ClientEvent::ImageRequest`]; the answer is routed
+/// back here through [`awaited`] and [`play_data`].
 pub fn play(hash: [u8; 32], tx: Sender<ClientEvent>) //OUT OF THE CACHE, ELSE ASK THE SERVER
 {
     let generation = PLAY_GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
@@ -459,6 +559,13 @@ pub fn play(hash: [u8; 32], tx: Sender<ClientEvent>) //OUT OF THE CACHE, ELSE AS
     });
 }
 
+/// Plays a clip already in hand, reporting a failure as [`ClientEvent::VoiceMessageFailed`].
+///
+/// # Parameters
+/// - `hash`: The clip's hash.
+/// - `data`: The encoded clip.
+/// - `generation`: The play generation that asked; a stale one does not start.
+/// - `tx`: The UI event channel.
 pub async fn play_data(hash: [u8; 32], data: Vec<u8>, generation: usize, tx: Sender<ClientEvent>) //A CLIP IN HAND
 {
     let result = task::spawn_blocking(move || open_output(hash, &data, generation)).await.unwrap_or(Err("voice_message.play_failed"));
@@ -469,6 +576,10 @@ pub async fn play_data(hash: [u8; 32], data: Vec<u8>, generation: usize, tx: Sen
     }
 }
 
+/// Takes a hash off the list of clips awaited for playback.
+///
+/// # Returns
+/// The play generation that asked for it, or `None` if nobody did.
 pub fn awaited(hash: &[u8; 32]) -> Option<usize> //ITS PLAY GENERATION, IF ASKED FOR
 {
     let mut awaited = AWAITED.lock().unwrap();
@@ -477,12 +588,17 @@ pub fn awaited(hash: &[u8; 32]) -> Option<usize> //ITS PLAY GENERATION, IF ASKED
     Some(awaited.swap_remove(index).1)
 }
 
+/// Stops playback, including a start still in flight.
 pub fn stop() //STOP WHATEVER IS PLAYING
 {
     PLAY_GENERATION.fetch_add(1, Ordering::Relaxed);
     PLAYER.lock().unwrap().take();
 }
 
+/// Returns what is playing.
+///
+/// # Returns
+/// `(clip hash, milliseconds played)`, or `None` if nothing is (a finished clip is cleared here).
 pub fn playing() -> Option<([u8; 32], u32)> //(CLIP, MS PLAYED)
 {
     let mut guard = PLAYER.lock().unwrap();

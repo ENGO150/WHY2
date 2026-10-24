@@ -16,6 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Miscellaneous Helpers
+//!
+//! Paths, the version check, image header sniffing, hex encoding and the server's self-restart.
+
 use std::
 {
     fs,
@@ -46,22 +50,35 @@ use std::
 };
 
 //PRIVATE
+/// Expands `{HOME}` in a directory template.
 fn get_dir(dir: &str) -> String
 {
     dir.replace("{HOME}", dirs::home_dir().expect("Could not determine home directory").to_str().expect("Invalid home directory"))
 }
 
 //PUBLIC
+/// Returns the compiled package version.
 pub fn get_version<'a>() -> &'a str //GET COMPILED PACKAGE VERSION
 {
     env!("CARGO_PKG_VERSION")
 }
 
+/// Returns the protocol identifier, `WHY2/<version>`.
 pub fn get_identifier() -> String //GET IDENTIFIER OF PACKAGE VERSION [WHY2/VERSION]
 {
     format!("WHY2/{}", get_version())
 }
 
+/// Fetches a URL with a [`FETCH_TIMEOUT`](consts::FETCH_TIMEOUT) and the WHY2 `User-Agent`.
+///
+/// This call blocks; async callers run it in `spawn_blocking`.
+///
+/// # Parameters
+/// - `url`: The URL to fetch.
+///
+/// # Returns
+/// - `Ok(String)` with the response body.
+/// - `Err(Error)` on a network, HTTP or decoding failure.
 pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
 {
     //CREATE CUSTOM CLIENT (WITH TIMEOUT)
@@ -78,6 +95,16 @@ pub fn fetch_data(url: &str) -> Result<String, Error> //FETCH DATA USING REQWEST
         .read_to_string()
 }
 
+/// Checks crates.io for a newer release and reports how many versions behind this build is.
+///
+/// The client reports through `tx` (`ClientEvent::VersionFailed` or
+/// `ClientEvent::UnsafeVersion`); the server logs a warning.
+///
+/// # Parameters
+/// - `tx`: The client's event channel (client builds only).
+///
+/// # Panics
+/// If crates.io answers with metadata that does not parse.
 pub async fn check_version(#[cfg(feature = "client_base")] tx: &Sender<ClientEvent>) //CHECK FOR LATEST WHY2 VERSION
 {
     //FETCH METADATA (CUSTOM User-Agent, BLOCKING)
@@ -140,11 +167,16 @@ pub async fn check_version(#[cfg(feature = "client_base")] tx: &Sender<ClientEve
     }
 }
 
+/// Returns the path of the WHY2 configuration directory.
 pub fn get_why2_dir() -> String //RETURN PATH TO WHY2 CONFIG DIRECTORY
 {
     get_dir(consts::CONFIG_DIR)
 }
 
+/// Creates the WHY2 configuration directory if it does not exist.
+///
+/// # Panics
+/// If the directory cannot be created.
 pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
 {
     let config = get_why2_dir();
@@ -157,6 +189,14 @@ pub fn check_directory() //CREATE WHY2 CONFIG DIRECTORY
 }
 
 //A PNG'S OR GIF'S SIZE, READ OFF ITS HEADER
+/// Reads the dimensions of a PNG or GIF off its header.
+///
+/// # Parameters
+/// - `header`: The first bytes of the file (at least 24 for PNG, 10 for GIF).
+///
+/// # Returns
+/// - `Some((width, height))` for a recognised PNG or GIF.
+/// - `None` otherwise.
 pub fn image_dimensions(header: &[u8]) -> Option<(u32, u32)>
 {
     let be = |at: usize| u32::from_be_bytes(header[at..at + 4].try_into().unwrap());
@@ -176,12 +216,17 @@ pub fn image_dimensions(header: &[u8]) -> Option<(u32, u32)>
 }
 
 //A SQUARE PNG OR GIF NO BIGGER THAN AN AVATAR IS CUT TO
+/// Checks that a header describes a valid avatar: a square PNG or GIF no larger than
+/// [`AVATAR_DIMENSION`](consts::AVATAR_DIMENSION).
+///
+/// The server checks this off the header alone and never decodes the picture.
 pub fn is_avatar(header: &[u8]) -> bool
 {
     matches!(image_dimensions(header), Some((width, height))
         if width == height && width > 0 && width <= consts::AVATAR_DIMENSION)
 }
 
+/// Checks whether a header starts with the magic bytes of a supported image format.
 pub fn is_image(header: &[u8]) -> bool //CHECK FOR SUPPORTED IMAGE
 {
     const MAGIC: [&[u8]; 10] =
@@ -206,6 +251,7 @@ pub fn is_image(header: &[u8]) -> bool //CHECK FOR SUPPORTED IMAGE
         header[2].is_ascii_whitespace())
 }
 
+/// Checks that a URL is `http` or `https`, the only schemes safe to hand a system opener.
 #[cfg(feature = "chat")]
 pub fn is_web_url(url: &str) -> bool //A LINK SAFE TO HAND A SYSTEM OPENER
 {
@@ -215,18 +261,25 @@ pub fn is_web_url(url: &str) -> bool //A LINK SAFE TO HAND A SYSTEM OPENER
     scheme(7, "http://") || scheme(8, "https://")
 }
 
+/// Returns the server's temp directory for one user's uploads.
 #[cfg(feature = "server")]
 pub fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOAD
 {
     env::temp_dir().join(consts::UPLOADS_DIR).join(username)
 }
 
+/// Returns the directory holding the server's sealed persistent pictures.
 #[cfg(feature = "server")]
 pub fn get_image_dir() -> PathBuf //DIRECTORY FOR PERSISTENT IMAGES
 {
     PathBuf::from(get_why2_dir() + consts::SERVER_IMAGES_DIR)
 }
 
+/// Decodes a 64-character hex string into a 32-byte hash.
+///
+/// # Returns
+/// - `Some(hash)` for exactly 64 hex digits.
+/// - `None` otherwise.
 #[cfg(feature = "chat")]
 pub fn unhex(text: &str) -> Option<[u8; 32]> //A 32-BYTE HASH BACK OUT OF HEX
 {
@@ -242,6 +295,7 @@ pub fn unhex(text: &str) -> Option<[u8; 32]> //A 32-BYTE HASH BACK OUT OF HEX
     Some(bytes)
 }
 
+/// Encodes bytes as lowercase hex.
 #[cfg(feature = "chat")]
 pub fn hex(bytes: &[u8]) -> String //BYTES AS LOWERCASE HEX
 {
@@ -255,18 +309,22 @@ pub fn hex(bytes: &[u8]) -> String //BYTES AS LOWERCASE HEX
     string
 }
 
+/// Returns the temp path a cut avatar waits at for its upload.
 #[cfg(feature = "client_base")]
 pub fn avatar_temp(hash: &[u8; 32], extension: &str) -> PathBuf //WHERE A CUT AVATAR WAITS FOR ITS UPLOAD
 {
     env::temp_dir().join(format!("{}{}.{extension}", consts::AVATAR_TEMP_PREFIX, hex(hash)))
 }
 
+/// Returns the temp path a recorded voice message waits at for its upload.
 #[cfg(feature = "client_base")]
 pub fn voice_temp(hash: &[u8; 32]) -> PathBuf //TEMP FILE OF A RECORDED CLIP
 {
     env::temp_dir().join(format!("{}{}", consts::VOICE_TEMP_PREFIX, hex(hash)))
 }
 
+/// Removes `path` if it is one of the client's own avatar or voice temp files, and does
+/// nothing otherwise.
 #[cfg(feature = "client_base")]
 pub fn drop_upload_temp(path: &Path) //REMOVE ONE, IF THAT IS WHAT path IS
 {
@@ -276,12 +334,20 @@ pub fn drop_upload_temp(path: &Path) //REMOVE ONE, IF THAT IS WHAT path IS
     if ours { let _ = fs::remove_file(path); }
 }
 
+/// Returns the image cache directory scoped to one server fingerprint.
 #[cfg(feature = "client_base")]
 pub fn get_image_cache_dir(fingerprint: &str) -> PathBuf //DIRECTORY FOR ONE SERVER'S CACHED IMAGES
 {
     PathBuf::from(get_why2_dir() + consts::CLIENT_IMAGES_DIR).join(fingerprint)
 }
 
+/// Restarts the server process with the same arguments.
+///
+/// On Unix the process image is replaced with `exec`, keeping the PID; elsewhere the
+/// replacement is spawned and this process exits.
+///
+/// # Returns
+/// Never; the process is replaced or exits with status 1 on failure.
 #[cfg(feature = "server")]
 pub fn restart() -> !
 {

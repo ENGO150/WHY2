@@ -16,6 +16,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Server Handshake
+//!
+//! The server's half of the key exchange, the welcome and version steps of login, and the
+//! budget that bounds how many sockets may be mid-handshake at once.
+//!
+//! # Handshake Budget
+//! A socket that has not identified itself yet costs a signature, an ML-KEM keypair and a task.
+//! [`HandshakeSlot`] caps them globally, at (`max_clients` + `max_unauth_clients`) ×
+//! [`MAX_HANDSHAKES_PER_IP`](consts::MAX_HANDSHAKES_PER_IP), and per address at
+//! [`MAX_HANDSHAKES_PER_IP`](consts::MAX_HANDSHAKES_PER_IP), so one peer cannot take the whole
+//! budget. Both limits are read live.
+
 use std::
 {
     time::Duration,
@@ -51,23 +63,34 @@ use crate::
 };
 
 //STRUCTS
+/// A reservation in the handshake budget, held by a socket until it identifies itself.
+///
+/// Dropping it releases the slot.
 pub struct HandshakeSlot //RESERVATION HELD BY AN UNIDENTIFIED SOCKET
 {
+    /// The peer the slot was taken for.
     ip: IpAddr, //PEER THE SLOT WAS TAKEN FOR
 }
 
 //HANDSHAKE BUDGET
+/// Returns the global handshake budget.
 fn max_handshakes() -> usize
 {
     (config::read_config::<usize>("max_clients") + config::read_config::<usize>("max_unauth_clients")) * consts::MAX_HANDSHAKES_PER_IP
 }
+/// Sockets currently holding a slot.
 static HANDSHAKES: AtomicUsize = AtomicUsize::new(0);
+/// Slots held per peer address.
 static HANDSHAKES_PER_IP: LazyLock<DashMap<IpAddr, usize>> = LazyLock::new(|| DashMap::new());
 
 //IMPLEMENTATIONS
 impl HandshakeSlot
 {
     //TAKE A SLOT, None IF THE BUDGET IS FULL
+    /// Takes a slot for a peer.
+    ///
+    /// # Returns
+    /// `None` if the global or the per-address budget is full.
     pub fn reserve(ip: IpAddr) -> Option<Self>
     {
         let budget = max_handshakes();
@@ -114,6 +137,12 @@ impl Drop for HandshakeSlot
 }
 
 //PRIVATE
+/// Reads packets from a client that has not proven anything yet, until one matches.
+///
+/// Each read has a two-second timeout, and more than three unexpected packets give up.
+///
+/// # Returns
+/// The matching packet, or `None` on a timeout, a closed socket or too many strays.
 async fn untrusted_read<F>(streams: &mut Streams<'_>, is_match: F, keys: Option<&SharedKeys>) -> Option<PacketCode>
 where
     F: Fn(&PacketCode) -> bool
@@ -142,6 +171,19 @@ where
     Some(message)
 }
 
+/// Performs the server's half of a key exchange, for a new session or a rekey.
+///
+/// A rekey is announced with [`PacketCode::Rekey`] under the current keys, and the offer is sent
+/// under them too; a new session's offer is only obfuscated. On success the new keys are stored
+/// on the connection and written to `keys`; on failure `keys` is left untouched, which the
+/// caller checks.
+///
+/// # Parameters
+/// - `streams`: The connection.
+/// - `peer_addr`: The client's address.
+/// - `nonce`: The client's opening bytes, signed into the offer.
+/// - `keys`: Receives the new session keys.
+/// - `rekey_trigger`: The current keys during a rekey, `None` for a new session.
 pub(super) async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
 (
     streams: &mut Streams<'_>,
@@ -198,6 +240,7 @@ pub(super) async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
     *keys = new_keys;
 }
 
+/// Sends the server's name and login rules.
 pub(super) async fn send_welcome_packet(write_stream: &mut OwnedWriteHalf, keys: &SharedKeys) //send welcome packet you idiot
 {
     //SEND
@@ -212,6 +255,10 @@ pub(super) async fn send_welcome_packet(write_stream: &mut OwnedWriteHalf, keys:
     }, Some(keys)).await;
 }
 
+/// Exchanges versions with the client.
+///
+/// # Returns
+/// The client's version, or `None` if it did not answer.
 pub(super) async fn ask_version(streams: &mut Streams<'_>, keys: &SharedKeys) -> Option<String> //ASK CLIENT FOR VERSION
 {
     log::debug!("Asking for client version");

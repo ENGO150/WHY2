@@ -16,6 +16,40 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Screen Share Renderer
+//!
+//! A `wgpu` renderer that draws decoded I420 frames, used by the viewer window
+//! ([`VideoSurface`]) and, without a window, by tests ([`YuvRenderer::headless`]).
+//!
+//! # Pipeline
+//! The decoder's three planes are uploaded as `R8Unorm` textures — 1.5 bytes per pixel and no
+//! CPU colour conversion — and one fragment shader (`yuv_to_rgba.wgsl`) does the BT.601
+//! conversion, the chroma upsampling and the scale to the window in a single draw. The picture
+//! is letterboxed, never stretched.
+//!
+//! The planes are limited range (luma in $16..235$, chroma in $16..240$), so each sample
+//! $Y, U, V \in [0, 1]$ is first expanded and then converted, the result clamped to $[0, 1]$:
+//!
+//! $$ Y^{\prime} = \frac{255}{219}\left(Y - \frac{16}{255}\right) \qquad C\_b = \frac{255}{224}\left(U - \frac{128}{255}\right) \qquad C\_r = \frac{255}{224}\left(V - \frac{128}{255}\right) $$
+//!
+//! $$ \begin{pmatrix} R \\\\ G \\\\ B \end{pmatrix} = \begin{pmatrix} 1 & 0 & 1.402 \\\\ 1 & -0.344136 & -0.714136 \\\\ 1 & 1.772 & 0 \end{pmatrix} \begin{pmatrix} Y^{\prime} \\\\ C\_b \\\\ C\_r \end{pmatrix} $$
+//!
+//! # Strides
+//! Planes are allocated at the decoder's stride, not its width, and the shader trims the
+//! padding. The sampled span reaches the **centre** of the last real texel; spanning to its edge
+//! would let the linear sampler mix in half a texel of padding, which shows as a smear down the
+//! right-hand column. For a plane $w$ texels wide allocated at stride $S$, the picture's
+//! horizontal coordinate $t \in [0, 1]$ samples the plane at
+//!
+//! $$ u = \frac{0.5}{S} + t \cdot \frac{w - 1}{S} $$
+//!
+//! which runs from the centre of the first texel to the centre of the last.
+//!
+//! # Colour
+//! The shader's output is already display-referred sRGB (BT.601 video is gamma-encoded), so it is
+//! never written through an sRGB view: an sRGB surface is presented through its linear twin. Writing through the sRGB view would encode it twice and wash every
+//! shadow out.
+
 use std::
 {
     borrow::Cow,
@@ -82,51 +116,76 @@ use wgpu::
 };
 
 //CONSTANTS
+/// The YUV to RGB shader.
 const SHADER: &str = include_str!("yuv_to_rgba.wgsl");
 
 //STRUCTS
+/// One texture per I420 plane, allocated at the stride, and the bind group over them.
 struct Planes //ONE TEXTURE PER I420 PLANE, AT THE STRIDE
 {
+    /// Picture width.
     width: u32,
+    /// Picture height.
     height: u32,
+    /// Luma and chroma strides.
     strides: (u32, u32),
 
+    /// The Y plane.
     luma: Texture,
+    /// The U plane.
     chroma_u: Texture,
+    /// The V plane.
     chroma_v: Texture,
 
+    /// The bind group over the planes, sampler and geometry.
     bind_group: BindGroup,
 }
 
+/// Draws I420 frames into any render target; needs no window.
 pub struct YuvRenderer //THE PART THAT NEEDS NO WINDOW
 {
+    /// The GPU device.
     device: Device,
+    /// The device's queue.
     queue: Queue,
+    /// The YUV to RGB pipeline.
     pipeline: RenderPipeline,
+    /// Layout of the frame bind group.
     layout: BindGroupLayout,
+    /// The linear sampler.
     sampler: Sampler,
+    /// Uniform buffer with the letterbox scale and the plane spans.
     geometry: Buffer,
 
+    /// The current planes, rebuilt when the frame's size or strides change.
     planes: Option<Planes>,
 }
 
 //THE FORMAT THE PICTURE IS WRITTEN THROUGH
+/// Returns the format to write the picture through: the surface's format without its sRGB
+/// suffix.
 fn present_format(surface: TextureFormat) -> TextureFormat
 {
     surface.remove_srgb_suffix()
 }
 
+/// A window and the renderer that paints it.
 pub struct VideoSurface //A WINDOW AND THE RENDERER THAT PAINTS IT
 {
+    /// The window's surface.
     surface: Surface<'static>,
+    /// The surface configuration, kept for resizes.
     configuration: SurfaceConfiguration,
     //THE FORMAT WE WRITE THROUGH
+    /// The format frames are written through.
     view_format: TextureFormat,
+    /// The renderer.
     renderer: YuvRenderer,
 }
 
 //FUNCTIONS
 //PRIVATE
+/// Creates one plane texture.
 fn plane_texture(device: &Device, label: &str, width: u32, height: u32) -> Texture
 {
     device.create_texture(&TextureDescriptor
@@ -142,6 +201,7 @@ fn plane_texture(device: &Device, label: &str, width: u32, height: u32) -> Textu
     })
 }
 
+/// Uploads one plane, `stride` bytes per row.
 fn upload_plane(queue: &Queue, texture: &Texture, data: &[u8], stride: u32, height: u32)
 {
     //write_texture STAGES, SO THE PITCH NEEDS NO ALIGN
@@ -168,6 +228,10 @@ fn upload_plane(queue: &Queue, texture: &Texture, data: &[u8], stride: u32, heig
 //IMPLEMENTATIONS
 impl YuvRenderer
 {
+    /// Builds the pipeline for a render target format.
+    ///
+    /// # Returns
+    /// `Err` with a description if the shader or pipeline fails validation.
     fn build(device: Device, queue: Queue, format: TextureFormat) -> Result<Self, String>
     {
         let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
@@ -238,6 +302,13 @@ impl YuvRenderer
         Ok(Self { device, queue, pipeline, layout, sampler, geometry, planes: None })
     }
 
+    /// Creates a renderer on the best available GPU, with no window.
+    ///
+    /// # Parameters
+    /// - `format`: The format of the targets it will draw into.
+    ///
+    /// # Returns
+    /// `Err` with a description if no adapter or device is available.
     pub fn headless(format: TextureFormat) -> Result<Self, String>
     {
         let instance = Instance::new(InstanceDescriptor::new_without_display_handle_from_env());
@@ -259,6 +330,7 @@ impl YuvRenderer
         Self::build(device, queue, format)
     }
 
+    /// Rebuilds the planes if the frame's size or strides changed.
     fn prepare(&mut self, width: u32, height: u32, strides: (u32, u32))
     {
         if self.planes.as_ref().is_some_and(|planes|
@@ -292,6 +364,7 @@ impl YuvRenderer
         self.planes = Some(Planes { width, height, strides, luma, chroma_u, chroma_v, bind_group });
     }
 
+    /// Uploads one decoded frame.
     pub fn upload(&mut self, frame: &impl YUVSource) //HAND ONE DECODED FRAME TO THE GPU
     {
         let (width, height) = frame.dimensions();
@@ -311,6 +384,11 @@ impl YuvRenderer
         upload_plane(&self.queue, &planes.chroma_v, frame.v(), strides.1, height / 2);
     }
 
+    /// Writes the letterbox scale and plane spans for a target size.
+    ///
+    /// With frame aspect $a\_f = w/h$ and target aspect $a\_t$, the picture is scaled by
+    /// $(a\_f / a\_t,\ 1)$ when the target is wider than the frame and by $(1,\ a\_t / a\_f)$
+    /// otherwise.
     fn write_geometry(&self, target: (u32, u32))
     {
         let Some(planes) = &self.planes else { return; };
@@ -345,6 +423,11 @@ impl YuvRenderer
         self.queue.write_buffer(&self.geometry, 0, &data);
     }
 
+    /// Draws the current frame, letterboxed, into `view`; does nothing before the first upload.
+    ///
+    /// # Parameters
+    /// - `view`: The render target.
+    /// - `target`: Its size in pixels.
     pub fn draw(&self, view: &TextureView, target: (u32, u32))
     {
         let Some(planes) = &self.planes else { return; };
@@ -389,6 +472,16 @@ impl YuvRenderer
 
 impl VideoSurface
 {
+    /// Creates a renderer for a window.
+    ///
+    /// Prefers mailbox presentation, since a live share should never queue frames.
+    ///
+    /// # Parameters
+    /// - `window`: The window to draw into.
+    /// - `width`, `height`: Its initial size.
+    ///
+    /// # Returns
+    /// `Err` with a description if the surface, adapter, device or pipeline cannot be created.
     pub fn new(window: Arc<Window>, width: u32, height: u32) -> Result<Self, String>
     {
         let instance = Instance::new(InstanceDescriptor::new_without_display_handle_from_env());
@@ -444,11 +537,13 @@ impl VideoSurface
         Ok(Self { surface, configuration, view_format, renderer })
     }
 
+    /// Uploads one decoded frame.
     pub fn upload(&mut self, frame: &impl YUVSource)
     {
         self.renderer.upload(frame);
     }
 
+    /// Resizes the surface; a zero or unchanged size is ignored.
     pub fn resize(&mut self, width: u32, height: u32)
     {
         if width == 0 || height == 0 { return; }
@@ -460,6 +555,7 @@ impl VideoSurface
         self.surface.configure(&self.renderer.device, &self.configuration);
     }
 
+    /// Draws and presents the current frame, skipping it if the surface is momentarily unavailable.
     pub fn render(&mut self)
     {
         let frame = match self.surface.get_current_texture()

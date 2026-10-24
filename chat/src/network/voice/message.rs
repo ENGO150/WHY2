@@ -16,6 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Voice Message Container
+//!
+//! A recorded voice message is a [`Clip`]: a format marker followed by a `wincode`-encoded list
+//! of Opus packets, one per [`FRAME_MS`](consts::FRAME_MS) frame. It lives here rather than in
+//! the client because the server parses it too — to validate an upload and to measure its
+//! duration — without decoding any audio.
+
 use wincode::{ SchemaRead, SchemaWrite };
 
 use crate::
@@ -25,19 +32,24 @@ use crate::
 };
 
 //CONSTS
+/// Marker at the start of every clip.
 const MAGIC: &[u8; 8] = b"WHY2VOX\x01"; //FORMAT MARKER
 
 //STRUCTS
+/// One recorded voice message.
 #[derive(SchemaRead, SchemaWrite)]
 pub struct Clip //ONE RECORDED VOICE MESSAGE
 {
+    /// Channel count, 1 or 2.
     pub channels: u8,         //1 OR 2
+    /// Opus packets, one per frame.
     pub frames: Vec<Vec<u8>>, //OPUS PACKETS, ONE PER FRAME
 }
 
 //IMPLEMENTATIONS
 impl Clip
 {
+    /// Encodes the clip with its marker.
     pub fn encode(&self) -> Vec<u8> //MARKER + WINCODE
     {
         let mut bytes = MAGIC.to_vec();
@@ -46,6 +58,14 @@ impl Clip
         bytes
     }
 
+    /// Parses and validates a clip.
+    ///
+    /// A valid clip has 1 or 2 channels and between one and
+    /// [`MESSAGE_MAX_FRAMES`](consts::MESSAGE_MAX_FRAMES) frames, each a non-empty packet within
+    /// Opus's [`MESSAGE_MAX_PACKET`](consts::MESSAGE_MAX_PACKET) ceiling.
+    ///
+    /// # Returns
+    /// `None` if the marker is missing, the clip does not decode, or it is out of bounds.
     pub fn decode(bytes: &[u8]) -> Option<Self> //PARSE AND CHECK THE BOUNDS
     {
         let clip = wincode::config::deserialize::<Self, _>(bytes.strip_prefix(MAGIC)?, chat_consts::PACKET_CONFIG).ok()?;
@@ -58,6 +78,7 @@ impl Clip
         valid.then_some(clip)
     }
 
+    /// Returns the clip's length in milliseconds.
     pub fn duration(&self) -> u32 //LENGTH IN MS
     {
         self.frames.len() as u32 * consts::FRAME_MS
@@ -65,6 +86,7 @@ impl Clip
 }
 
 //FUNCTIONS
+/// Checks whether a file starts with the clip marker.
 pub fn is_clip(header: &[u8]) -> bool //CHECK FOR A VOICE MESSAGE
 {
     header.starts_with(MAGIC)

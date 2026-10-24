@@ -16,6 +16,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # VideoToolbox Encoder
+//!
+//! H.264 encoding through a VideoToolbox compression session (macOS).
+//!
+//! The session is asked for Baseline in real time with no frame reordering, and is flushed after
+//! every frame so one call returns one access unit. Its output is AVCC; it is converted to
+//! Annex B, with the SPS and PPS taken off the format description and put in front of every
+//! keyframe. Frames over the bitrate are skipped by a [`Budget`].
+//!
+//! This backend has been type-checked against its target but not run on hardware; a failure
+//! costs the GPU, never the share.
+
 use std::
 {
     ffi::c_void,
@@ -71,26 +83,39 @@ use crate::network::screen::client::encoder::
     Settings,
 };
 
+/// Timestamp scale: microseconds.
 const MICROSECONDS: i32 = 1_000_000; //TIMESTAMP SCALE
 
 //STRUCTS
+/// What the session's output callback produced since the last frame.
 #[derive(Default)]
 struct Output //CALLBACK RESULTS
 {
+    /// Each frame's Annex B bytes, or the status it failed with.
     frames: Mutex<Vec<Result<Vec<u8>, i32>>>,
 }
 
+/// H.264 through VideoToolbox.
 pub struct VideoToolboxEncoder //H.264 THROUGH VIDEOTOOLBOX
 {
+    /// The compression session.
     session: CFRetained<VTCompressionSession>,
+    /// Where the output callback writes; boxed, since the session holds a pointer to it.
     output: Box<Output>,
+    /// Skips frames over the bitrate.
     budget: Budget,
+    /// Where timestamps count from.
     started: Instant,
+    /// Timestamp of the last frame, kept strictly increasing.
     last_time: i64,
 }
 
 impl VideoToolboxEncoder
 {
+    /// Opens a real-time Baseline compression session.
+    ///
+    /// # Returns
+    /// `Err` with a description if the session cannot be created or configured.
     pub fn new(settings: Settings) -> Result<Self, String>
     {
         let output = Box::new(Output::default());
@@ -173,6 +198,7 @@ impl VideoToolboxEncoder
         }
     }
 
+    /// Sets one session property.
     fn set(&self, key: &CFString, value: &CFType) -> Result<(), String> //ONE SESSION PROPERTY
     {
         //SAFETY: LIVE SESSION
@@ -181,6 +207,7 @@ impl VideoToolboxEncoder
         if status == 0 { Ok(()) } else { Err(format!("the encoder refused a setting ({status})")) }
     }
 
+    /// Takes an NV12 buffer from the session's pool and copies a picture into it.
     fn picture(&self, planes: &Planes) -> Result<CFRetained<CVPixelBuffer>, String> //NV12 FROM THE POOL
     {
         //SAFETY: LOCKED WHILE WRITTEN
@@ -292,6 +319,10 @@ impl Drop for VideoToolboxEncoder
 }
 
 //FUNCTIONS
+/// The session's output callback: converts one encoded frame and queues it on the [`Output`].
+///
+/// # Safety
+/// Called by VideoToolbox, with `refcon` pointing at the session's [`Output`].
 unsafe extern "C-unwind" fn compressed //ONE ENCODED FRAME
 (
     refcon: *mut c_void,
@@ -316,6 +347,10 @@ unsafe extern "C-unwind" fn compressed //ONE ENCODED FRAME
 }
 
 //SAFETY: LIVE SAMPLE BUFFER
+/// Converts an AVCC sample to Annex B, prefixing the parameter sets on a keyframe.
+///
+/// # Safety
+/// `sample` must be a live sample buffer.
 unsafe fn annex_b(sample: &CMSampleBuffer) -> Vec<u8> //AVCC INTO ANNEX B
 {
     unsafe
@@ -359,6 +394,11 @@ unsafe fn annex_b(sample: &CMSampleBuffer) -> Vec<u8> //AVCC INTO ANNEX B
 }
 
 //SAFETY: LIVE FORMAT DESCRIPTION
+/// Returns the SPS and PPS of a format description in Annex B, and the size of the AVCC length
+/// prefix.
+///
+/// # Safety
+/// `format` must be a live format description.
 unsafe fn parameter_sets(format: &CMFormatDescription) -> (Vec<u8>, usize) //SPS, PPS AND PREFIX SIZE
 {
     let mut sets = Vec::new();

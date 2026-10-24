@@ -16,6 +16,43 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+//! # Terminal UI
+//!
+//! The client's full-screen interface, built on `ratatui` over crossterm.
+//!
+//! # One Event Loop
+//! Everything the client shows goes through [`run`], a single `tokio::select!` over four sources:
+//!
+//! - terminal input (keys, mouse, resize);
+//! - [`ClientEvent`]s from the network layer;
+//! - finished dial attempts from the connect box;
+//! - a redraw tick every [`REDRAW_INTERVAL`](consts::REDRAW_INTERVAL).
+//!
+//! Handling a [`ClientEvent`] is pure state mutation on [`App`] (see [`event`]); it never touches
+//! the terminal. The tick draws only when [`App::dirty`] is set, which keeps a flood of events —
+//! one per voice packet — from repainting hundreds of times a second. The tick is also where
+//! queued work is sent (image fetches, history pages, typing notices), since the loop owns the
+//! connection's write half and sequence counter.
+//!
+//! # Rules for New Code
+//! - Never print once the TUI is up: send a [`ClientEvent`] or push to [`App`] instead.
+//! - C libraries that write to stderr corrupt the frame; their calls stay gagged.
+//! - [`install_panic_hook`] runs first in `main`: a panic outside the main thread would otherwise
+//!   leave the alternate screen up.
+//! - Fatal events quit through [`App::quit`], so the terminal is restored before anything is
+//!   printed.
+//!
+//! # Modules
+//! - [`state`] — [`App`], the whole UI state, and the message pane's wrapping.
+//! - [`event`] — applying [`ClientEvent`]s to [`App`].
+//! - [`draw`] — rendering a frame.
+//! - [`input`] — the input line.
+//! - [`palette`] — the slash-command popup.
+//! - [`login`] / [`tofu`] / [`account`] / [`settings`] — the overlays.
+//! - [`markup`] / [`math`] — rendering what people type.
+//! - [`theme`] — colors and styles.
+//! - `voice_message` — push-to-talk recording.
+
 //MODULES
 pub mod account;
 pub mod consts;
@@ -124,18 +161,30 @@ use account::{ Account, Request };
 pub use state::App;
 
 //TYPES
+/// The terminal the UI draws to.
 pub type Tui = Terminal<CrosstermBackend<Stdout>>;
 
 //STRUCTS
+/// Puts the terminal into the UI's mode, and restores it on drop.
+///
+/// Enters raw mode and the alternate screen, captures the mouse if `mouse_capture` is on, and
+/// pushes the kitty keyboard flags where supported (for Shift+Enter, and key releases for
+/// push-to-talk).
 pub struct TerminalGuard //RESTORES THE TERMINAL ON DROP
 {
+    /// Whether the mouse is captured.
     mouse: bool,
+    /// Whether kitty keyboard flags were pushed.
     enhanced: bool,
 }
 
 //IMPLEMENTATIONS
 impl TerminalGuard
 {
+    /// Enters the UI's terminal mode.
+    ///
+    /// # Returns
+    /// The guard, or the terminal error.
     pub fn enter() -> Result<Self>
     {
         let mouse = config::read_config::<bool>("mouse_capture");
@@ -162,6 +211,7 @@ impl TerminalGuard
         Ok(Self { mouse, enhanced })
     }
 
+    /// Returns whether the terminal reports key releases.
     pub fn releases(&self) -> bool //WHETHER KEYS BEING LET GO ARE REPORTED
     {
         self.enhanced && cfg!(feature = "client_voice")
@@ -186,12 +236,14 @@ impl Drop for TerminalGuard
 //FUNCTIONS
 //PUBLIC
 //THE BRANCH GLYPHS FOR BLOCK-COMMAND LISTS
+/// Returns the branch glyph opening a row of block-command output.
 pub fn branch(last: bool) -> &'static str
 {
     if last { "╰─ " } else { "├─ " }
 }
 
 //HOW A SHARED DEVICE IS NAMED IN THE USER LISTS
+/// Returns how a user's device is named in the user lists.
 pub fn device_label(device: &Device) -> &'static str
 {
     match device
@@ -202,6 +254,7 @@ pub fn device_label(device: &Device) -> &'static str
     }
 }
 
+/// Installs a panic hook that restores the terminal before the default hook prints.
 pub fn install_panic_hook() //MANDATORY: THE RELEASE PROFILE USES panic = "abort"
 {
     let previous = std::panic::take_hook();
@@ -213,6 +266,7 @@ pub fn install_panic_hook() //MANDATORY: THE RELEASE PROFILE USES panic = "abort
     }));
 }
 
+/// Restores the terminal, best effort; safe to call more than once.
 pub fn restore_terminal() //BEST-EFFORT, IDEMPOTENT
 {
     let mut stdout = io::stdout();
@@ -225,12 +279,14 @@ pub fn restore_terminal() //BEST-EFFORT, IDEMPOTENT
 }
 
 //NOTHING DRAGS WHILE AN OVERLAY IS UP
+/// Returns whether the message pane may be selected (no overlay is up).
 fn selectable(app: &App) -> bool
 {
     app.tofu.is_none() && app.login.is_none() && app.account.is_none() && !app.settings.open
 }
 
 //COPY WITH OSC 52, WHICH WORKS OVER SSH
+/// Copies text to the clipboard with OSC 52, which also works over SSH.
 fn copy_to_clipboard(text: &str)
 {
     let mut stdout = io::stdout();
@@ -240,6 +296,7 @@ fn copy_to_clipboard(text: &str)
 }
 
 //HAND A LINK TO WHATEVER THE SYSTEM OPENS ONE WITH
+/// Opens a link with the system's opener, with its output discarded.
 fn open_link(url: &str)
 {
     let (program, args): (&str, &[&str]) = match std::env::consts::OS
@@ -259,6 +316,7 @@ fn open_link(url: &str)
         .spawn();
 }
 
+/// Creates the terminal backend.
 pub fn init() -> Result<Tui>
 {
     //NO Terminal::clear() - IT QUERIES THE CURSOR
@@ -266,6 +324,13 @@ pub fn init() -> Result<Tui>
 }
 
 //THE SINGLE EVENT LOOP AND EVERY TERMINAL WRITE
+/// Runs the UI until it quits.
+///
+/// # Parameters
+/// - `terminal`: The terminal.
+/// - `app`: The UI state.
+/// - `rx`: Events from the network layer.
+/// - `tx`: The sender for those events, handed to the tasks this loop starts.
 pub async fn run
 (
     terminal: &mut Tui,
@@ -408,6 +473,9 @@ pub async fn run
 }
 
 //PRIVATE
+/// Takes a finished dial: starts the session on success, or puts the error in the connect box.
+///
+/// A result for an attempt the box no longer waits for is dropped.
 fn connected
 (
     app: &mut App,
@@ -455,6 +523,7 @@ fn connected
     //THE BOX STAYS UP UNTIL Authenticated
 }
 
+/// Handles one terminal event: keys, mouse (scroll, selection, clicks) and resizes.
 async fn handle_terminal_event
 (
     app: &mut App,
@@ -581,6 +650,8 @@ async fn handle_terminal_event
     }
 }
 
+/// Handles one key, routing it to whichever overlay owns the keyboard, the palette or the input
+/// line.
 async fn handle_key
 (
     app: &mut App,
@@ -852,6 +923,13 @@ async fn handle_key
 }
 
 //WRITE THE HIGHLIGHTED ROW ONTO THE LINE
+/// Writes the palette's highlighted row onto the input line.
+///
+/// # Parameters
+/// - `force`: Complete even if the row is already typed out.
+///
+/// # Returns
+/// `true` if anything was completed.
 fn complete_selection(app: &mut App, force: bool) -> bool
 {
     if let Some(values) = app.palette.values()
@@ -877,6 +955,7 @@ fn complete_selection(app: &mut App, force: bool) -> bool
     true
 }
 
+/// Replaces the input line with a command name, leaving a space when it takes arguments.
 fn complete(app: &mut App, entry: palette::Entry)
 {
     app.input.clear();
@@ -888,6 +967,7 @@ fn complete(app: &mut App, entry: palette::Entry)
     app.refresh_palette();
 }
 
+/// Returns whether a key is the settings shortcut.
 fn settings_shortcut(code: KeyCode) -> bool //Ctrl+<SHORTCUT OF /settings>
 {
     let KeyCode::Char(c) = code else { return false };
@@ -897,6 +977,7 @@ fn settings_shortcut(code: KeyCode) -> bool //Ctrl+<SHORTCUT OF /settings>
         .is_some_and(|info| info.shortcut == Some(c))
 }
 
+/// Returns whether a key is the record shortcut.
 #[cfg(feature = "client_voice")]
 fn record_shortcut(code: KeyCode) -> bool //<SHORTCUT OF /record>
 {
@@ -907,6 +988,7 @@ fn record_shortcut(code: KeyCode) -> bool //<SHORTCUT OF /record>
         .is_some_and(|info| info.shortcut == Some(c.to_ascii_lowercase()))
 }
 
+/// Returns the rows the message pane shows, for clamping the scroll.
 fn message_viewport(terminal: &Tui) -> u16 //ROWS OF ACTUAL MESSAGE TEXT, FOR SCROLL CLAMPING
 {
     terminal.size().map(|s| s.height.saturating_sub(5)).unwrap_or(1).max(1)
