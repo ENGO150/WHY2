@@ -70,7 +70,6 @@ use why2::
     encrypter,
     decrypter,
     grid::Grid,
-    types::EncryptedData,
     auth::{ AuthenticatedData, AuthenticatedPacket },
 };
 
@@ -322,7 +321,7 @@ pub fn sha256(data: &[u8]) -> [u8; 32] //SHA-256 OF A BYTE STRING
 /// - `keys`: The session keys; a grid key of the wrong size is stretched with HKDF.
 ///
 /// # Returns
-/// The serialized [`AuthenticatedData`].
+/// The serialized authenticated packet: MAC, nonce, and ciphertext.
 ///
 /// # Panics
 /// If encryption fails or the HMAC key is not 32 bytes.
@@ -366,28 +365,21 @@ pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, k
     //DESERIALIZE
     let auth_packet: AuthenticatedPacket<W, H> = decoded_packet.as_slice().try_into().ok()?;
 
-    //VERIFY HMAC
-    if !auth_packet.verify(keys.1.as_slice().try_into().ok()?)
-    {
-        return None;
-    }
-
     //GET VALID KEY
-    let key = if keys.0.len() == W * H * 2
+    let key_grid = if keys.0.len() == W * H * 2
     {
-        &keys.0
+        Grid::from_key(&keys.0).ok()?
     } else
     {
-        &get_correct_key::<W, H>(&keys.0)
+        let derived = get_correct_key::<W, H>(&keys.0);
+        Grid::from_key(&derived).ok()?
     };
 
+    //VERIFY HMAC AND ATTACH THE KEY
+    let encrypted_data = auth_packet.open(keys.1.as_slice().try_into().ok()?, key_grid)?;
+
     //DECRYPT
-    let decrypted_packet = decrypter::decrypt(EncryptedData
-    {
-        output: auth_packet.output,
-        key: Grid::from_key(&key).ok()?,
-        nonce: auth_packet.nonce,
-    }).ok()?;
+    let decrypted_packet = decrypter::decrypt(encrypted_data).ok()?;
 
     Some(Zeroizing::new(i64_to_bytes(&decrypted_packet.output)))
 }
