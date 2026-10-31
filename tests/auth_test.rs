@@ -19,7 +19,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use why2::
 {
     encrypter,
-    auth::AuthenticatedData,
+    decrypter,
+    auth::{ AuthenticatedData, AuthenticatedPacket },
 };
 
 #[test]
@@ -56,4 +57,73 @@ fn test_auth_tamper_resistance()
     //ATTACK MAC TAG
     auth_data.mac[0] = auth_data.mac[0].wrapping_add(1);
     assert!(!auth_data.verify(&mac_key), "Verifying invalid data (MAC tag) succeeded!");
+}
+
+#[test]
+fn test_authenticated_packet_roundtrip()
+{
+    let message = "authenticated packet\0with NUL";
+    let mac_key = [7u8; 32];
+
+    let encrypted = encrypter::encrypt_string::<8, 8>(message, None)
+        .expect("Encryption failed");
+    let key = encrypted.key.clone();
+
+    let auth_data = AuthenticatedData::authenticate(encrypted, &mac_key);
+    let bytes: Vec<u8> = auth_data.into();
+
+    //THE KEY MUST NOT BE PART OF THE SERIALIZED PACKET
+    let key_bytes: Vec<u8> = key.iter()
+        .flat_map(|row| row.iter())
+        .flat_map(|value| value.to_be_bytes())
+        .collect();
+    assert!(
+        !bytes.windows(key_bytes.len()).any(|window| window == key_bytes.as_slice()),
+        "serialized packet leaked the key"
+    );
+
+    let packet = AuthenticatedPacket::<8, 8>::try_from(bytes.as_slice())
+        .expect("Packet parsing failed");
+    assert!(packet.verify(&mac_key));
+
+    //A WRONG MAC MUST NOT OPEN THE PACKET
+    assert!(packet.clone().open(&[0u8; 32], key.clone()).is_none());
+
+    //THE CORRECT MAC ATTACHES THE SEPARATELY STORED KEY
+    let encrypted = packet.open(&mac_key, key).expect("Packet did not open");
+    let decrypted = decrypter::decrypt_string(encrypted).expect("Decryption failed");
+
+    assert_eq!(message, &*decrypted);
+}
+
+#[test]
+fn test_authenticated_packet_rejects_tampering()
+{
+    let message = "tamper detection";
+    let mac_key = [9u8; 32];
+
+    let encrypted = encrypter::encrypt_string::<8, 8>(message, None)
+        .expect("Encryption failed");
+    let auth_data = AuthenticatedData::authenticate(encrypted, &mac_key);
+    let bytes: Vec<u8> = auth_data.into();
+
+    //CIPHERTEXT STARTS AFTER THE 32-BYTE MAC AND ONE 8x8 NONCE GRID
+    let ciphertext_start = 32 + 8 * 8 * 8;
+    let mut tampered_ciphertext = bytes.clone();
+    tampered_ciphertext[ciphertext_start] ^= 1;
+    let packet = AuthenticatedPacket::<8, 8>::try_from(tampered_ciphertext.as_slice())
+        .expect("Packet parsing failed");
+    assert!(!packet.verify(&mac_key), "tampered ciphertext must fail");
+
+    //TAMPERING THE NONCE MUST ALSO FAIL
+    let mut tampered_nonce = bytes.clone();
+    tampered_nonce[32] ^= 1;
+    let packet = AuthenticatedPacket::<8, 8>::try_from(tampered_nonce.as_slice())
+        .expect("Packet parsing failed");
+    assert!(!packet.verify(&mac_key), "tampered nonce must fail");
+
+    //REPLAY IS NOT PREVENTED BY THE PACKET API; THE DOCUMENTATION SAYS SO
+    let replayed = AuthenticatedPacket::<8, 8>::try_from(bytes.as_slice())
+        .expect("Packet parsing failed");
+    assert!(replayed.verify(&mac_key), "replayed packet must still verify");
 }
