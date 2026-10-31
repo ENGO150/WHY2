@@ -54,10 +54,13 @@ use crate::
 /// # Parameters
 /// - `input`: An [`EncryptedData`] struct containing the encrypted grids and key grid.
 ///
-/// - Ok([`DecryptedData`]) struct containing:
+/// # Returns
+/// [`DecryptedData`] containing:
 ///   - `output`: A vector of decrypted `i64` values
 ///   - `key`: The original key [`Grid`] flattened into a vector
-/// - Err(String) if [`Grid`] area is 1
+///
+/// # Errors
+/// Returns [`GridError`] if round-key generation fails.
 #[must_use]
 pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<DecryptedData, GridError>
 {

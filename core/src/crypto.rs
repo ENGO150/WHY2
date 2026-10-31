@@ -178,7 +178,10 @@ pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, 
 /// Generates a random nonce for CTR mode.
 ///
 /// This creates a single Grid filled with cryptographically secure random values
-/// using system entropy. The nonce must be unique for each encryption session.
+/// using system entropy. The nonce must not be reused under the same key, and its
+/// counter range must not overlap another message's range. A fresh random nonce
+/// makes accidental overlap negligible; sequential or structured nonces need an
+/// explicit disjoint-range scheme.
 ///
 /// # Returns
 /// A Grid suitable for use as a CTR nonce.
@@ -187,7 +190,8 @@ pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, 
 /// Returns an error if the Grid dimensions are invalid (should never happen in practice).
 ///
 /// # Notes
-/// - The nonce does not need to be secret, but must be strictly unique per message.
+/// - The nonce does not need to be secret, but it must be unique per message and its
+///   counter range must be disjoint under the key.
 /// - The nonce will be transmitted alongside the ciphertext.
 pub fn generate_nonce<const W: usize, const H: usize>() -> Result<Grid<W, H>, GridError>
 {
@@ -234,10 +238,13 @@ pub(crate) fn derive_round_shifts<const W: usize, const H: usize>(round_keys: &[
 /// 2. **Initial Whitening**: $B \leftarrow B \oplus K_0$
 /// 3. **Round Operations**: For each round $r$ and key $K_r$ (from 1 to $N - 1$):
 ///    * **Key Addition**: $B \leftarrow B \oplus K_r$
-///    * **Nonlinear Mixing**: $B \leftarrow \text{Subcell}(B, r)$
+///    * **Nonlinear Mixing**: $B \leftarrow \text{Subcell}(B, r - 1)$
 ///    * **Row Permutation**: $B \leftarrow \text{ShiftRows}(B, K_r)$
 ///    * **Column Diffusion**: $B \leftarrow \text{MixColumns}(B, K_r)$
 /// 4. **Final Whitening**: $B \leftarrow B \oplus K_N$
+///
+/// The public round tweak passed to `Subcell` is zero-based: the round keyed with $K_r$
+/// uses tweak $r - 1$.
 ///
 /// # Panics
 /// Panics if `round_keys` holds fewer than two keys: the schedule must carry at least the two
@@ -251,7 +258,7 @@ pub(crate) fn derive_round_shifts<const W: usize, const H: usize>(round_keys: &[
 ///   **disjoint counter ranges** $[n,\ n + B)$ — merely distinct nonces are not enough.
 /// - `round_keys`: A sequence of round keys derived from the master key.
 /// - `counter_offset`: An optional offset for the block counter. Essential for stream processing
-///   to prevent nonce reuse across consecutive data chunks. Defaults to `0` if `None`.
+///   to prevent keystream reuse across consecutive data chunks. Defaults to `0` if `None`.
 pub fn apply_ctr<const W: usize, const H: usize>
 (
     grids: &mut [Grid<W, H>],

@@ -77,8 +77,9 @@ use crate::
 ///
 /// # Cryptographic Safety
 /// This structure enforces strict block counter continuity across consecutive updates.
-/// To maintain semantic security, a unique `nonce` must be paired with the master key
-/// for every separate stream lifecycle to prevent keystream reuse.
+/// To maintain semantic security, pair the master key with a `nonce` whose counter range
+/// `[nonce, nonce + blocks)` is disjoint from every other stream under that key. A merely
+/// different nonce is not enough: overlapping ranges share keystream.
 pub struct RexStream
 <
     const W: usize = { consts::DEFAULT_GRID_WIDTH },
@@ -102,8 +103,10 @@ impl<const W: usize, const H: usize> RexStream<W, H>
     ///
     /// # Parameters
     /// - `key_grid`: A reference to the master [`Grid`] used as the base symmetric key.
-    /// - `nonce`: A unique counter initialization [`Grid`] (Initialization Vector).
-    ///            Must be distinct for every message encrypted under the same key.
+    /// - `nonce`: The initial counter [`Grid`] (Initialization Vector). Its counter range
+    ///   `[nonce, nonce + blocks)` must be disjoint from every other stream under
+    ///   the same key. Distinct nonces whose ranges overlap share keystream, so
+    ///   `nonce` alone being different is not sufficient.
     ///
     /// # Returns
     /// - `Ok(Self)` containing the initialized stream state machine.
@@ -148,7 +151,9 @@ impl<const W: usize, const H: usize> RexStream<W, H>
     /// # State Management
     /// This method automatically handles the CTR mode block counter. The internal counter
     /// is incremented strictly by the number of *full grids* processed during this specific
-    /// invocation, ensuring cryptographic safety and preventing nonce reuse across batches.
+    /// invocation, preventing keystream reuse between batches of this stream. It does not make
+    /// a nonce safe to reuse in another stream; see [`RexStream::new`] for the disjoint-range
+    /// requirement.
     pub fn update(&mut self, mut data: &[i64]) -> Result<Vec<i64>, GridError>
     {
         let grid_area = W * H;

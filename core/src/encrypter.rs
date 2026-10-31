@@ -49,7 +49,7 @@ use crate::
 /// # Parameters
 /// - `input`: A slice of `i64` values representing the data.
 /// - `key`: An optional symmetric key. If `None`, a secure key is generated automatically.
-///          If provided, it must be exactly $2 \times W \times H$ elements long.
+///   If provided, it must be exactly $2 \times W \times H$ elements long.
 ///
 /// # Returns
 /// An [`EncryptedData`] struct containing:
@@ -113,7 +113,7 @@ pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]
 /// # Parameters
 /// - `input`: A string slice to encrypt.
 /// - `key`: An optional symmetric key. If `None`, a secure key is generated automatically.
-///          If provided, it must be exactly $2 \times W \times H$ elements long.
+///   If provided, it must be exactly $2 \times W \times H$ elements long.
 #[must_use]
 pub fn encrypt_string<const W: usize, const H: usize>(input: &str, key: Option<&[i64]>) -> Result<EncryptedData<W, H>, GridError>
 {
