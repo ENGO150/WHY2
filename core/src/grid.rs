@@ -445,12 +445,11 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Parameters
     /// - `vec`: A slice of signed 64-bit integers representing the raw key.
-    ///   Must contain at least $2 \times W \times H$ elements.
+    ///   Must contain exactly $2 \times W \times H$ elements.
     ///
     /// # Returns
     /// - Ok(`Grid`) with mixed key values if input is valid.
-    /// - Err([`GridError::InvalidKeyLength`]) if `vec.len() < 2 × W × H`.
-    /// - Err([`GridError::InvalidDimensions`]) if grid dimensions are invalid.
+    /// - Err([`GridError::InvalidKeyLength`]) if `vec.len() != 2 × W × H`.
     #[must_use]
     pub fn from_key(vec: &[i64]) -> result::Result<Self, GridError>
     {
@@ -458,7 +457,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
         let grid_area = W * H;
 
         //CHECK INVALID KEY LENGTH
-        if vec.len() < grid_area * 2
+        if vec.len() != grid_area * 2
         {
             return Err(GridError::InvalidKeyLength
             {
