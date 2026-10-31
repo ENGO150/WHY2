@@ -103,9 +103,9 @@ pub struct AuthenticatedData
 
 /// Receiver-side packet parsed from bytes: MAC tag, nonce and ciphertext, **without a key**.
 ///
-/// The only way to turn it into [`EncryptedData`] is [`open`](Self::open), which verifies the
-/// tag first and takes the key as an explicit argument. There is no dummy key to decrypt with
-/// by accident.
+/// The fields are private, so the only way to turn it into [`EncryptedData`] is
+/// [`open`](Self::open), which verifies the tag first and takes the key as an explicit
+/// argument. There is no dummy key to decrypt with by accident.
 #[derive(Zeroize, Clone)]
 pub struct AuthenticatedPacket
 <
@@ -113,11 +113,11 @@ pub struct AuthenticatedPacket
     const H: usize = { consts::DEFAULT_GRID_HEIGHT },
 >
 {
-    pub mac: [u8; 32],
-    pub nonce: Grid<W, H>,
+    mac: [u8; 32],
+    nonce: Grid<W, H>,
 
     #[zeroize(skip)]
-    pub output: Vec<Grid<W, H>>,
+    output: Vec<Grid<W, H>>,
 }
 
 //IMPLEMENTATIONS
