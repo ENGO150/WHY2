@@ -152,17 +152,13 @@ pub enum GridError
         actual_len: usize,
     },
 
-    /// Indicates that decryption produced an invalid Unicode scalar value.
+    /// Indicates that decryption produced an invalid string.
     ///
-    /// This typically happens when the provided key is incorrect, resulting in
-    /// random garbage data that does not represent valid text.
-    ///
-    /// # Fields
-    /// - `value`: The invalid Unicode scalar value.
-    InvalidUnicode
-    {
-        value: u32,
-    },
+    /// This happens when the provided key is wrong, the data was modified, or the
+    /// end-of-string terminator is missing. The decrypted value is deliberately **not**
+    /// carried by this error: under CTR malleability an error that echoes plaintext is a
+    /// plaintext disclosure oracle.
+    InvalidUnicode,
 }
 
 //MACROS
@@ -1297,9 +1293,9 @@ impl Display for GridError
                 write!(f, "Invalid key length: expected length {expected_len}, got {actual_len}")
             },
 
-            GridError::InvalidUnicode { value } =>
+            GridError::InvalidUnicode =>
             {
-                write!(f, "Invalid unicode scalar value: {value:#X} (possible wrong key)")
+                write!(f, "Invalid decrypted string (possible wrong key or corrupted data)")
             },
         }
     }
