@@ -70,7 +70,9 @@ pub struct EncryptedData //DATA FOR REX ENCRYPTER
 /// - `key`: The original key used for decryption, stored as a flat vector.
 ///
 /// # Notes
-/// - Padding is removed before populating `output`.
+/// - The output is **not** unpadded: it always consists of whole grids, zero-padded to a
+///   multiple of $W \times H$ cells, and the original length is not stored. Use
+///   [`RexStream`](crate::stream::RexStream) or store the length separately.
 /// - The key is flattened for portability and auditability.
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct DecryptedData //DATA FOR REX DECRYPTER

@@ -35,7 +35,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! ## Key Characteristics
 //!
-//! - **Configurable Block Sizes**: From 4×4 to 16×16 grids (1024-16384 bits per block)
+//! - **Configurable Block Sizes**: Width $\geq 2$, height 4, 8 or 16 (default 8×8 = 4096 bits)
 //! - **Cache-Timing Resistant**: ARX-based design eliminates table lookups
 //! - **SIMD-Optimized**: Vectorized operations selected at run time (AVX2), so a portable
 //!   build still uses them
