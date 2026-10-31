@@ -70,6 +70,34 @@ test-why2-auth:
     - development
   script:
     - cargo test -p why2 test_auth_tamper_resistance --verbose --release -- --nocapture
+    - cargo test -p why2 test_authenticated_packet_roundtrip --verbose --release -- --nocapture
+    - cargo test -p why2 test_authenticated_packet_rejects_tampering --verbose --release -- --nocapture
+
+# Test WHY2 Regressions
+test-why2-regression:
+  stage: test
+  image: rust:latest
+  only:
+    - development
+  script:
+    - cargo test -p why2 test_shift_schedule_known_answer --verbose --release -- --nocapture
+    - cargo test -p why2 test_shift_schedule_matches_round_keys --verbose --release -- --nocapture
+    - cargo test -p why2 test_string_terminator_roundtrip --verbose --release -- --nocapture
+    - cargo test -p why2 test_string_wire_format_and_missing_terminator --verbose --release -- --nocapture
+    - cargo test -p why2 test_binary_lengths_roundtrip --verbose --release -- --nocapture
+    - cargo test -p why2 test_nonce_ranges_must_be_disjoint --verbose --release -- --nocapture
+    - cargo test -p why2 test_from_key_strict_length --verbose --release -- --nocapture
+    - cargo test -p why2 test_dimension_contract --verbose --release -- --nocapture
+    - cargo test -p why2 test_grid_drop_zeroizes --verbose --release -- --nocapture
+
+# Test WHY2 Without Constant-Time
+test-why2-no-constant-time:
+  stage: test
+  image: rust:latest
+  only:
+    - development
+  script:
+    - cargo test -p why2 --no-default-features --release -- --nocapture
 
 # Test WHY2 Entropy
 test-why2-entropy:
