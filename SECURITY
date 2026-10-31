@@ -23,7 +23,8 @@ secure implementation practices.
 A) Core Algorithm Design
    - Cipher Type: Symmetric block cipher with configurable grid dimensions
    - Block Structure: 2D matrix of 64-bit signed integers (i64)
-   - Default Size: 8×8 grid (4096-bit blocks), customizable to 2×2 through 16×16+
+   - Default Size: 8×8 grid (4096-bit blocks), customizable in width (minimum 2)
+     and height (4, 8, or 16)
 
    Round Structure: whitening key, 15 keyed rounds, whitening key (ROUND_KEYS = 17)
    - The trailing whitening key matters: without it the permutation would end on the

@@ -399,12 +399,14 @@ impl<const W: usize, const H: usize> Grid<W, H>
     ///
     /// # Notes
     /// - This method does not perform any encryption or transformation.
-    /// - Valid area is defined by $W > 0$ and $H \in \lbrace4, 8, 16\rbrace$
+    /// - Valid area is defined by $W \geq 2$ and $H \in \lbrace4, 8, 16\rbrace$.
+    ///   Width 1 is rejected: `shift_rows` has no effect when $W = 1$, so its diffusion
+    ///   is weaker than the supported dimensions and has not been analyzed.
     #[inline]
     #[must_use]
     pub fn new() -> result::Result<Self, GridError>
     {
-        if W > 0 && (H == 4 || H == 8 || H == 16)
+        if W >= 2 && (H == 4 || H == 8 || H == 16)
         {
             Ok(Self([[0i64; W]; H]))
         } else
@@ -450,6 +452,7 @@ impl<const W: usize, const H: usize> Grid<W, H>
     /// # Returns
     /// - Ok(`Grid`) with mixed key values if input is valid.
     /// - Err([`GridError::InvalidKeyLength`]) if `vec.len() != 2 × W × H`.
+    /// - Err([`GridError::InvalidDimensions`]) if the grid dimensions are invalid.
     #[must_use]
     pub fn from_key(vec: &[i64]) -> result::Result<Self, GridError>
     {
@@ -1273,9 +1276,9 @@ impl Display for GridError
         {
             GridError::InvalidDimensions { width, height } =>
             {
-                if *width == 0
+                if *width < 2
                 {
-                    write!(f, "Invalid dimensions: expected width larger than 0")
+                    write!(f, "Invalid dimensions: expected width at least 2, got {width}")
                 } else
                 {
                     write!(f, "Invalid dimensions: expected height is 4, 8 or 16, got {height}")
