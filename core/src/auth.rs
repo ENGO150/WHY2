@@ -54,6 +54,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! - **Constant-Time Verification**: Tag comparison uses constant-time operations to prevent timing attacks.
 //! - **Independent Keys**: It is strongly recommended to use different keys for encryption and authentication (or derive them via HKDF).
 //! - **Order of Operations**: Verification MUST occur **before** decryption. If verification fails, the data is discarded immediately.
+//! - **No Replay Protection**: A valid packet stays valid forever. The nonce binds the packet to a value but gives no freshness; track accepted counters/nonces, use timestamps or challenge-response at the protocol level.
 
 use sha2::Sha256;
 use hmac::
@@ -73,25 +74,22 @@ use crate::
 };
 
 //STRUCTS
-/// Authenticated encryption data containing both MAC tag and encrypted data.
+/// Sender-side authenticated data: the MAC tag together with the full [`EncryptedData`].
 ///
-/// This structure represents the output of the authentication process,
-/// combining a 32-byte HMAC-SHA256 tag with the original [`EncryptedData`].
+/// Created by [`authenticate`](Self::authenticate) and serialized with `Vec::<u8>::from`.
+/// The serialization contains **no key**. The receiving side parses the bytes into an
+/// [`AuthenticatedPacket`], which cannot be decrypted without supplying the key explicitly.
 ///
 /// # Layout
-/// When serialized to bytes, the format is:
 /// ```text
-/// [32-byte HMAC-SHA256 tag][serialized encrypted grids]
+/// [32-byte HMAC-SHA256 tag][nonce grid][ciphertext grids]
 /// ```
 ///
-/// # Fields
-/// - `mac`: The 32-byte HMAC-SHA256 authentication tag.
-/// - `encrypted_data`: The original [`EncryptedData`] containing encrypted grids, nonce, and key.
-///
 /// # Notes
-/// - The MAC is computed over the serialized grids (nonce + ciphertext).
-/// - The nonce is included in the authenticated data to ensure freshness.
-/// - This structure preserves the original grid structure for easy decryption.
+/// - The MAC is computed over the serialized nonce and ciphertext grids.
+/// - The MAC provides integrity and authenticity, **not freshness**: a recorded packet
+///   verifies again when replayed. Replay protection (accepted-counter state, timestamps or
+///   challenge-response) must be provided by the protocol.
 #[derive(Zeroize, Clone)]
 pub struct AuthenticatedData
 <
@@ -103,92 +101,92 @@ pub struct AuthenticatedData
     pub encrypted_data: EncryptedData<W, H>,
 }
 
+/// Receiver-side packet parsed from bytes: MAC tag, nonce and ciphertext, **without a key**.
+///
+/// The only way to turn it into [`EncryptedData`] is [`open`](Self::open), which verifies the
+/// tag first and takes the key as an explicit argument. There is no dummy key to decrypt with
+/// by accident.
+#[derive(Zeroize, Clone)]
+pub struct AuthenticatedPacket
+<
+    const W: usize = { consts::DEFAULT_GRID_WIDTH },
+    const H: usize = { consts::DEFAULT_GRID_HEIGHT },
+>
+{
+    pub mac: [u8; 32],
+    pub nonce: Grid<W, H>,
+
+    #[zeroize(skip)]
+    pub output: Vec<Grid<W, H>>,
+}
+
 //IMPLEMENTATIONS
 impl<const W: usize, const H: usize> AuthenticatedData<W, H>
 {
-    /// Computes HMAC-SHA256 authentication tag for encrypted data.
+    /// Computes the HMAC-SHA256 tag over `nonce || ciphertext` and returns it together with
+    /// the original [`EncryptedData`].
     ///
-    /// This function serializes the encrypted grids into big-endian bytes,
-    /// computes an HMAC-SHA256 tag using the provided MAC key, and returns
-    /// an [`AuthenticatedData`] structure containing both the tag and the original
-    /// [`EncryptedData`].
+    /// $$ \text{tag} = \text{HMAC-SHA256}(K_{\text{mac}}, \text{nonce} \mathbin\| G_0 \mathbin\| \cdots \mathbin\| G_n) $$
     ///
-    /// # Algorithm
-    /// The authentication process follows these steps:
-    ///
-    /// 1. **Serialization**: Convert encrypted grids to bytes:
-    ///    $ C = \text{nonce} \mathbin\| G_0 \mathbin\| G_1 \mathbin\| \cdots \mathbin\| G_n $
-    ///    where each grid cell is encoded as big-endian `i64`.
-    ///
-    /// 2. **MAC Computation**: Calculate HMAC-SHA256:
-    ///    $ \text{tag} = \text{HMAC-SHA256}(K_{\text{mac}}, C) $
-    ///
-    /// 3. **Package Construction**: Return structure with tag and original data:
-    ///    $ \text{output} = (\text{tag}, \text{EncryptedData}) $
-    ///
-    /// # Parameters
-    /// - `encrypted_data`: The [`EncryptedData`] structure containing:
-    ///   - `output`: Vector of encrypted [`Grid`]s
-    ///   - `nonce`: The CTR mode initialization vector
-    ///   - `key`: The encryption key (not used in MAC computation)
-    /// - `mac_key`: A 32-byte key for HMAC-SHA256 computation.
-    ///
-    /// # Returns
-    /// An [`AuthenticatedData`] structure containing:
-    /// - `mac`: The 32-byte HMAC-SHA256 tag
-    /// - `encrypted_data`: The original [`EncryptedData`]
+    /// Each grid cell is encoded as a big-endian `i64`.
     ///
     /// # Security Notes
-    /// - The MAC key must be derived independently from the encryption key.
-    /// - The nonce is included in the authenticated data to prevent replay attacks.
-    /// - Use HKDF or similar KDF to derive separate encryption and MAC keys.
+    /// - The MAC key must be derived independently from the encryption key (e.g. via HKDF).
+    /// - The nonce is authenticated so it cannot be swapped. This does **not** prevent replay.
+    /// - The MAC carries no version or context binding; use a unique MAC key per protocol.
     #[must_use]
     pub fn authenticate(encrypted_data: EncryptedData<W, H>, mac_key: &[u8; 32]) -> Self //CREATE HMAC
     {
         Self
         {
-            mac: compute_mac(&encrypted_data, mac_key).finalize().into_bytes().into(), //USE HANDLER FOR COMPUTING HMAC
+            mac: compute_mac(&encrypted_data.nonce, &encrypted_data.output, mac_key).finalize().into_bytes().into(),
             encrypted_data,
         }
     }
 
-    /// Verifies the integrity and authenticity of the encrypted data.
+    /// Verifies the stored tag in constant time (`verify_slice`).
     ///
-    /// This function re-computes the HMAC-SHA256 tag over the stored encrypted grids
-    /// and compares it with the attached authentication tag (`self.mac`).
-    ///
-    /// # Algorithm
-    /// The verification process mirrors the authentication steps to ensure consistency:
-    ///
-    /// 1. **Re-serialization**: The internal nonce and ciphertext grids are serialized
-    ///    into bytes using the exact same order as during authentication (Big-Endian).
-    ///
-    /// 2. **MAC Re-computation**: Calculate the expected tag using the provided key:
-    ///    $$ T' = \text{HMAC-SHA256}(K_{\text{mac}}, C) $$
-    ///
-    /// 3. **Constant-Time Comparison**: Compare the calculated tag with the stored `self.mac`:
-    ///    $$ \text{valid} \iff T' \stackrel{?}{=} T $$
-    ///
-    /// where $T$ is the stored tag and $T'$ is the recomputed tag.
-    ///
-    /// # Parameters
-    /// - `mac_key`: The 32-byte key used for HMAC-SHA256 computation.
-    ///   Must be the same key used to generate the authentication tag.
-    ///
-    /// # Returns
-    /// - `true`: If the computed tag matches `self.mac` (data is authentic).
-    /// - `false`: If the tags do not match (integrity check failed).
-    ///
-    /// # Security Notes
-    /// - This function uses **constant-time comparison** (`verify_slice`) to prevent
-    ///   timing side-channel attacks.
-    /// - If this function returns `false`, the `encrypted_data` MUST be discarded
-    ///   and NOT treated as valid ciphertext.
+    /// If this returns `false`, the data MUST be discarded.
     #[must_use]
     pub fn verify(&self, mac_key: &[u8; 32]) -> bool
     {
-        //USE HANDLER FOR COMPUTING HMAC
-        compute_mac(&self.encrypted_data, mac_key).verify_slice(&self.mac).is_ok()
+        compute_mac(&self.encrypted_data.nonce, &self.encrypted_data.output, mac_key).verify_slice(&self.mac).is_ok()
+    }
+}
+
+impl<const W: usize, const H: usize> AuthenticatedPacket<W, H>
+{
+    /// Verifies the stored tag in constant time (`verify_slice`).
+    #[must_use]
+    pub fn verify(&self, mac_key: &[u8; 32]) -> bool
+    {
+        compute_mac(&self.nonce, &self.output, mac_key).verify_slice(&self.mac).is_ok()
+    }
+
+    /// Verifies the packet and, only if the tag is valid, attaches `key` and returns
+    /// [`EncryptedData`] ready for decryption.
+    ///
+    /// # Parameters
+    /// - `mac_key`: The 32-byte HMAC key.
+    /// - `key`: The master key [`Grid`], transmitted separately from the packet.
+    ///
+    /// # Returns
+    /// - `Some(EncryptedData)` if the tag is valid.
+    /// - `None` if verification failed; nothing is decrypted.
+    #[must_use]
+    pub fn open(self, mac_key: &[u8; 32], key: Grid<W, H>) -> Option<EncryptedData<W, H>>
+    {
+        if !self.verify(mac_key)
+        {
+            return None;
+        }
+
+        Some(EncryptedData
+        {
+            output: self.output,
+            key,
+            nonce: self.nonce,
+        })
     }
 }
 
@@ -227,7 +225,7 @@ impl<const W: usize, const H: usize> From<AuthenticatedData<W, H>> for Vec<u8> /
     }
 }
 
-impl<const W: usize, const H: usize> TryFrom<&[u8]> for AuthenticatedData<W, H>
+impl<const W: usize, const H: usize> TryFrom<&[u8]> for AuthenticatedPacket<W, H>
 {
     type Error = GridError;
 
@@ -256,24 +254,20 @@ impl<const W: usize, const H: usize> TryFrom<&[u8]> for AuthenticatedData<W, H>
         Ok(Self
         {
             mac,
-            encrypted_data: EncryptedData
-            {
-                output: grids,
-                nonce,
-                key: Grid::new()?, //USE DUMMY KEY
-            },
+            nonce,
+            output: grids,
         })
     }
 }
 
 //PRIVATE FUNCTIONS
-fn compute_mac<const W: usize, const H: usize>(encrypted_data: &EncryptedData<W, H>, mac_key: &[u8; 32]) -> Hmac<Sha256>
+fn compute_mac<const W: usize, const H: usize>(nonce: &Grid<W, H>, output: &[Grid<W, H>], mac_key: &[u8; 32]) -> Hmac<Sha256>
 {
     //INITIALIZE HMAC
     let mut mac = Hmac::<Sha256>::new_from_slice(mac_key).expect("HMAC initialization failed");
 
     //FEED NONCE
-    for row in encrypted_data.nonce.iter()
+    for row in nonce.iter()
     {
         for val in row
         {
@@ -282,7 +276,7 @@ fn compute_mac<const W: usize, const H: usize>(encrypted_data: &EncryptedData<W,
     }
 
     //FEED GRIDS
-    for grid in &encrypted_data.output
+    for grid in output
     {
         for row in grid.iter()
         {
