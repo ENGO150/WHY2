@@ -154,6 +154,8 @@ pub fn generate_key<const W: usize, const H: usize>() -> Zeroizing<Vec<i64>>
 /// - The CSPRNG is initialized once using the `master_key` hash.
 /// - All keys are generated from a single stream, acting as a KDF-Expand phase.
 /// - This method ensures reproducible round key generation without external randomness.
+/// - The 32-byte SHA-256 seed caps the schedule's entropy at 256 bits, regardless of the
+///   master grid's size.
 pub fn generate_round_keys<const W: usize, const H: usize>(master_key: &Grid<W, H>) -> Result<Zeroizing<Vec<Grid<W, H>>>, GridError>
 {
     let mut keys = Zeroizing::new(Vec::with_capacity(consts::ROUND_KEYS));

@@ -61,6 +61,10 @@ use crate::
 ///
 /// # Errors
 /// Returns [`GridError`] if round-key generation fails.
+///
+/// # Security Notes
+/// - Verify an authenticator before calling this. The returned plaintext is unauthenticated,
+///   and decryption errors must not be exposed to untrusted callers.
 #[must_use]
 pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<DecryptedData, GridError>
 {

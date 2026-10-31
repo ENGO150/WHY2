@@ -65,6 +65,12 @@ use crate::
 /// $$ C_i = P_i \oplus E_K(\text{Nonce} + i) $$
 ///
 /// where $E_K$ denotes the WHY2 block cipher keyed with $K$, and $i$ is the block counter.
+///
+/// # Security Notes
+/// - The result is **not authenticated**. CTR ciphertext is malleable; authenticate it
+///   through the `auth` module (enabled by default) and verify before decrypting.
+/// - [`EncryptedData`] carries the key for the same-process round trip. Never serialize or
+///   transmit it as-is; keep the key separate.
 #[must_use]
 pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]>) -> Result<EncryptedData<W, H>, GridError>
 {
