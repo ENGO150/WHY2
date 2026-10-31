@@ -71,7 +71,7 @@ use why2::
     decrypter,
     grid::Grid,
     types::EncryptedData,
-    auth::AuthenticatedData,
+    auth::{ AuthenticatedData, AuthenticatedPacket },
 };
 
 use zeroize::Zeroizing;
@@ -354,7 +354,7 @@ pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: &[u8], keys:
 /// - `W`, `H`: The grid dimensions the packet was encrypted with.
 ///
 /// # Parameters
-/// - `decoded_packet`: The serialized [`AuthenticatedData`].
+/// - `decoded_packet`: The serialized [`AuthenticatedPacket`].
 /// - `keys`: The session keys.
 ///
 /// # Returns
@@ -364,7 +364,7 @@ pub fn encrypt_packet<const W: usize, const H: usize>(packet_bytes: &[u8], keys:
 pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, keys: &SharedKeys) -> Option<Zeroizing<Vec<u8>>>
 {
     //DESERIALIZE
-    let auth_packet: AuthenticatedData<W, H> = decoded_packet.as_slice().try_into().ok()?;
+    let auth_packet: AuthenticatedPacket<W, H> = decoded_packet.as_slice().try_into().ok()?;
 
     //VERIFY HMAC
     if !auth_packet.verify(keys.1.as_slice().try_into().ok()?)
@@ -384,9 +384,9 @@ pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, k
     //DECRYPT
     let decrypted_packet = decrypter::decrypt(EncryptedData
     {
-        output: auth_packet.encrypted_data.output,
+        output: auth_packet.output,
         key: Grid::from_key(&key).ok()?,
-        nonce: auth_packet.encrypted_data.nonce,
+        nonce: auth_packet.nonce,
     }).ok()?;
 
     Some(Zeroizing::new(i64_to_bytes(&decrypted_packet.output)))
