@@ -83,24 +83,16 @@ pub fn decrypt<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Re
     })
 }
 
-/// Decrypts a WHY2-encrypted data and reconstructs the original string.
+/// Decrypts a WHY2-encrypted string.
 ///
-/// This function performs full decryption using [`decrypt`],
-/// then interprets each `i64` value as two concatenated `u32` characters. The first 4 bytes
-/// represent the high character, and the next 4 bytes represent the low character. If the low
-/// character is zero, it is omitted.
+/// Reads two 32-bit units per decrypted `i64` (big-endian, high unit first) until it reaches
+/// the `u32::MAX` terminator written by [`encrypt_string`](crate::encrypter::encrypt_string).
+/// Everything after the terminator is grid padding and is ignored.
 ///
-/// # Parameters
-/// - `input`: An [`EncryptedData`] struct containing encrypted grids and key.
-///
-/// # Returns
-/// - Ok(`String`) reconstructed from the decrypted values.
-/// - Err(`String`) if Grid area is 1
-///
-/// # Notes
-/// - Uses CTR mode for decryption (same as encryption).
-/// - Uses big-endian decoding for each `i64` value.
-/// - Each decrypted value contributes up to two Unicode scalar values.
+/// # Errors
+/// [`GridError::InvalidUnicode`] if a unit is not a valid `char` or the terminator is missing.
+/// The error deliberately carries no decrypted data. Verify an authenticator **before**
+/// calling this function and do not expose the error to untrusted parties.
 #[must_use]
 pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>) -> Result<Zeroizing<String>, GridError>
 {
@@ -108,18 +100,29 @@ pub fn decrypt_string<const W: usize, const H: usize>(input: EncryptedData<W, H>
     let decrypted = decrypt(input)?;
 
     let mut output = Zeroizing::new(String::with_capacity(decrypted.output.len() * 2));
+    let mut terminated = false;
 
-    for n in decrypted.output.iter()
+    'cells: for n in decrypted.output.iter()
     {
-        let buf = n.to_be_bytes();
+        let n = *n as u64;
 
-        //FIRST 4 BYTES = HIGH CHAR, FOLLOWING 4 BYTES = LOW CHAR
-        let hi = u32::from_be_bytes(buf[0..4].try_into().unwrap()); //HIGH
-        let lo = u32::from_be_bytes(buf[4..8].try_into().unwrap()); //LOW
+        for unit in [(n >> 32) as u32, n as u32]
+        {
+            //TERMINATOR, THE REST IS PADDING
+            if unit == u32::MAX
+            {
+                terminated = true;
+                break 'cells;
+            }
 
-        //PUSH CHARS TO STRING
-        if hi != 0 { output.push(char::from_u32(hi).ok_or(GridError::InvalidUnicode { value: hi })?); }
-        if lo != 0 { output.push(char::from_u32(lo).ok_or(GridError::InvalidUnicode { value: lo })?); }
+            output.push(char::from_u32(unit).ok_or(GridError::InvalidUnicode)?);
+        }
+    }
+
+    //NO TERMINATOR = WRONG KEY OR CORRUPTED DATA
+    if !terminated
+    {
+        return Err(GridError::InvalidUnicode);
     }
 
     Ok(output)

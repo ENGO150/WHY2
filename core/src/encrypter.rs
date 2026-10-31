@@ -104,8 +104,11 @@ pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]
 
 /// Encrypts a string.
 ///
-/// This function encodes the input string into `i64` values by packing two `char`s
-/// into each 64-bit integer.
+/// Every `char` becomes one 32-bit unit, two units are packed into each `i64`. The units are
+/// followed by the terminator `u32::MAX`, which is never a valid `char`, and the final cell is
+/// padded with zero. [`decrypt_string`](crate::decrypter::decrypt_string) stops at the
+/// terminator, so embedded and trailing NUL characters survive the round trip and the grid
+/// padding is ignored.
 ///
 /// # Parameters
 /// - `input`: A string slice to encrypt.
@@ -114,26 +117,20 @@ pub fn encrypt<const W: usize, const H: usize>(input: &[i64], key: Option<&[i64]
 #[must_use]
 pub fn encrypt_string<const W: usize, const H: usize>(input: &str, key: Option<&[i64]>) -> Result<EncryptedData<W, H>, GridError>
 {
-    //CONVERT input TO Vec<i64>
-    let mut chars = Zeroizing::new(input.chars().collect::<Vec<char>>());
+    //CODE POINTS + TERMINATOR (u32::MAX IS NEVER A VALID char)
+    let mut units = Zeroizing::new(input.chars().map(|c| c as u32).collect::<Vec<u32>>());
+    units.push(u32::MAX);
 
-    //INSERT PADDING
-    if chars.len() % 2 != 0
+    //PAD TO WHOLE i64 CELLS
+    if units.len() % 2 != 0
     {
-        chars.push('\0');
+        units.push(0);
     }
 
-    //CONVERT
-    let vec_input = Zeroizing::new(chars.chunks(2).map(|pair|
-    {
-        //FILL BUFFER
-        let mut buf = [0u8; 8];
-        buf[..4].copy_from_slice(&(pair[0] as u32).to_be_bytes());
-        buf[4..].copy_from_slice(&(pair[1] as u32).to_be_bytes());
-
-        //APPEND
-        i64::from_be_bytes(buf)
-    }).collect::<Vec<i64>>());
+    //PACK TWO UNITS PER CELL (BIG-ENDIAN: FIRST UNIT = HIGH HALF)
+    let vec_input = Zeroizing::new(units.chunks(2)
+        .map(|pair| (((pair[0] as u64) << 32) | pair[1] as u64) as i64)
+        .collect::<Vec<i64>>());
 
     //ENCRYPT Vec<i64> AND RETURN
     encrypt(&vec_input, key)
