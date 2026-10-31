@@ -86,7 +86,7 @@ pub struct RexStream
 >
 {
     round_keys: Zeroizing<Vec<Grid<W, H>>>,
-    round_shifts: Vec<[usize; H]>,
+    round_shifts: Zeroizing::<Vec<[usize; H]>>,
     nonce: Grid<W, H>,
     block_counter: u64,
     buffer: Zeroizing<Vec<i64>>,
@@ -113,9 +113,8 @@ impl<const W: usize, const H: usize> RexStream<W, H>
         let round_keys = crypto::generate_round_keys(key_grid)?;
 
         //THE ROW SHIFTS DEPEND ONLY ON THE ROUND KEYS, SO THEY ARE DERIVED ONCE PER STREAM
-        //RATHER THAN ONCE PER CHUNK. A STREAM DRIVEN A PACKET AT A TIME SPENDS MOST OF ITS
-        //TIME IN PER-CALL SETUP OTHERWISE.
-        let round_shifts = round_keys.iter().map(|k| k.precalculate_shifts()).collect();
+        //RATHER THAN ONCE PER CHUNK
+        let round_shifts = crypto::derive_round_shifts(&round_keys);
 
         Ok(Self
         {
