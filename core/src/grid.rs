@@ -66,7 +66,7 @@ use std::
     },
 };
 
-use zeroize::Zeroize;
+use zeroize::{ Zeroize, ZeroizeOnDrop };
 
 use wide::i64x4;
 use rayon::prelude::{ ParallelSlice, ParallelIterator };
@@ -94,8 +94,7 @@ use subtle::
 /// WHY2 requires that the same grid dimensions ($W \times H$) be used consistently
 /// throughout encryption and decryption. Mixing grid sizes within a single session or
 /// across rounds is unsupported and may lead to incorrect results or undefined behavior.
-#[derive(Clone, Debug, Zeroize)]
-#[zeroize(drop)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 pub struct Grid //GRID FOR REX DATA
 <
     const W: usize = { consts::DEFAULT_GRID_WIDTH },
