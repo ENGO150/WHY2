@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::mem::ManuallyDrop;
+use std::mem::MaybeUninit;
 
 use sha2::{ Digest, Sha256 };
 
@@ -33,7 +33,8 @@ use why2::
 ///
 /// The digest covers the ciphertext produced by `apply_ctr` with a fixed key, nonce and
 /// counter offset. A change to the shift schedule changes the keystream and therefore
-/// this digest.
+/// this digest. The key-to-shift pairing itself is checked independently in
+/// [`test_shift_schedule_matches_round_keys`].
 #[test]
 fn test_shift_schedule_known_answer()
 {
@@ -99,6 +100,52 @@ fn test_shift_schedule_known_answer()
     assert_eq!(streamed, expected, "RexStream and apply_ctr must share the shift schedule");
 }
 
+/// Checks the key-to-shift pairing directly, without the implementation's derivation.
+#[test]
+fn test_shift_schedule_matches_round_keys()
+{
+    const W: usize = 5;
+    const H: usize = 4;
+
+    //TWO WHITENING KEYS AND TWO KEYED ROUNDS
+    let keys: Vec<Grid<W, H>> = (0..4u64).map(|seed|
+    {
+        let raw: Vec<i64> = (0..2 * W * H)
+            .map(|i| (i as i64).wrapping_mul(0x0101_0101_0101_0101).wrapping_add(seed as i64))
+            .collect();
+
+        Grid::from_key(&raw).expect("valid round key")
+    }).collect();
+
+    //ADJACENT SHIFTS MUST DIFFER FOR THE TEST TO MEAN ANYTHING
+    assert_ne!(keys[0].precalculate_shifts(), keys[1].precalculate_shifts());
+    assert_ne!(keys[1].precalculate_shifts(), keys[2].precalculate_shifts());
+
+    let nonce_data = vec![0x5555_5555_5555_5555i64; 2 * W * H];
+    let nonce = Grid::<W, H>::from_key(&nonce_data).expect("valid nonce");
+
+    //MANUAL KEYSTREAM: EACH ROUND USES THE SHIFTS OF ITS OWN KEY
+    let mut manual = nonce.clone();
+    manual.increment(11);
+    manual ^= &keys[0];
+
+    for (round, key) in keys[1..keys.len() - 1].iter().enumerate()
+    {
+        manual ^= key;
+        manual.subcell(round);
+        manual.shift_rows(&key.precalculate_shifts());
+        manual.mix_columns();
+    }
+
+    manual ^= &keys[keys.len() - 1];
+
+    //ZERO PLAINTEXT EXPOSES THE KEYSTREAM
+    let mut grids = vec![Grid::<W, H>::new().expect("valid grid")];
+    crypto::apply_ctr(&mut grids, &nonce, &keys, Some(11));
+
+    assert_eq!(grids[0], manual);
+}
+
 #[test]
 fn test_string_terminator_roundtrip()
 {
@@ -150,6 +197,54 @@ fn test_string_wire_format_and_missing_terminator()
 }
 
 #[test]
+fn test_binary_lengths_roundtrip()
+{
+    const W: usize = 4;
+    const H: usize = 4;
+
+    for len in 0..=2 * W * H
+    {
+        let input: Vec<i64> = (0..len).map(|i| i as i64 + 1).collect();
+        let encrypted = encrypter::encrypt::<W, H>(&input, None).expect("encryption");
+        let decrypted = decrypter::decrypt(encrypted).expect("decryption");
+
+        //WHOLE GRIDS, ZERO PADDED
+        let blocks = len.div_ceil(W * H);
+        assert_eq!(decrypted.output.len(), blocks * W * H, "length {len}");
+        assert_eq!(&decrypted.output[..len], &input[..], "prefix at length {len}");
+        assert!(decrypted.output[len..].iter().all(|value| *value == 0), "padding at length {len}");
+    }
+}
+
+#[test]
+fn test_nonce_ranges_must_be_disjoint()
+{
+    const W: usize = 4;
+    const H: usize = 4;
+
+    let key_data: Vec<i64> = (0..2 * W * H)
+        .map(|i| (i as i64).wrapping_mul(0x0101_0101_0101_0101))
+        .collect();
+    let master = Grid::<W, H>::from_key(&key_data).expect("valid master key");
+    let round_keys = crypto::generate_round_keys(&master).expect("round keys");
+
+    let nonce_data = vec![0x1234_5678_9abc_def0i64; 2 * W * H];
+    let nonce = Grid::<W, H>::from_key(&nonce_data).expect("valid nonce");
+    let mut next = nonce.clone();
+    next.increment(1);
+
+    let mut first = vec![Grid::<W, H>::new().expect("valid grid"); 2];
+    crypto::apply_ctr(&mut first, &nonce, &round_keys, None);
+
+    let mut second = vec![Grid::<W, H>::new().expect("valid grid")];
+    crypto::apply_ctr(&mut second, &next, &round_keys, None);
+
+    //OVERLAPPING RANGES SHARE A KEYSTREAM BLOCK
+    assert_eq!(first[1], second[0]);
+    assert_ne!(first[0], second[0]);
+}
+
+#[test]
 fn test_from_key_strict_length()
 {
     let exact = vec![0i64; 2 * 8 * 8];
@@ -182,8 +277,15 @@ fn test_dimension_contract()
 #[test]
 fn test_grid_drop_zeroizes()
 {
-    //KEEP THE ALLOCATION ALIVE SO THE DROPPED STORAGE CAN BE INSPECTED
-    let mut grid = ManuallyDrop::new(Grid::<8, 8>::new().expect("valid grid"));
+    //KEEP THE STORAGE ALIVE SO THE DROPPED CELLS CAN BE INSPECTED
+    let mut slot = MaybeUninit::<Grid<8, 8>>::uninit();
+    slot.write(Grid::<8, 8>::new().expect("valid grid"));
+
+    let grid = unsafe
+    {
+        slot.assume_init_mut()
+    };
+
     for row in 0..8
     {
         for column in 0..8
@@ -192,15 +294,16 @@ fn test_grid_drop_zeroizes()
         }
     }
 
-    let pointer = &grid[0][0] as *const i64;
-
-    //SAFETY: test-only; the allocation is still alive inside ManuallyDrop.
+    //RUN THE DROP GLUE WITHOUT FREEING THE STORAGE
     unsafe
     {
-        std::ptr::drop_in_place(&mut *grid);
+        slot.assume_init_drop();
     }
 
-    //SAFETY: reading the dropped but still allocated storage to verify zeroization.
-    let words = unsafe { std::slice::from_raw_parts(pointer, 64) };
+    //SAFETY: LIVE STORAGE, AND THE DROP WROTE ZEROES INTO IT
+    let words = unsafe
+    {
+        std::slice::from_raw_parts(slot.as_ptr() as *const i64, 64)
+    };
     assert!(words.iter().all(|word| *word == 0), "Grid drop must zeroize its cells");
 }
