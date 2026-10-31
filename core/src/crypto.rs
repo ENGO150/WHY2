@@ -194,6 +194,23 @@ pub fn generate_nonce<const W: usize, const H: usize>() -> Result<Grid<W, H>, Gr
     Grid::from_key(&generate_key::<W, H>())
 }
 
+/// Derives the row shifts for the keyed rounds.
+///
+/// Entry `i` belongs to the round keyed with `round_keys[i + 1]`: the whitening keys at both
+/// ends of the schedule drive no row shift. The result is wrapped in [`Zeroizing`] because the
+/// shifts are a function of secret key material.
+///
+/// # Panics
+/// Panics if `round_keys` holds fewer than two keys.
+pub(crate) fn derive_round_shifts<const W: usize, const H: usize>(round_keys: &[Grid<W, H>]) -> Zeroizing<Vec<[usize; H]>>
+{
+    assert!(round_keys.len() >= 2, "round key schedule must hold at least the two whitening keys");
+
+    Zeroizing::new(round_keys[1..round_keys.len() - 1].iter()
+        .map(Grid::precalculate_shifts)
+        .collect())
+}
+
 /// Applies CTR (Counter) mode encryption/decryption in parallel.
 ///
 /// This function transforms the input `grids` in-place by XORing them with a generated
@@ -229,7 +246,9 @@ pub fn generate_nonce<const W: usize, const H: usize>() -> Result<Grid<W, H>, Gr
 ///
 /// # Parameters
 /// - `grids`: A mutable slice of [`Grid`]s representing the plaintext or ciphertext.
-/// - `nonce`: The initial counter [`Grid`] (IV).
+/// - `nonce`: The initial counter [`Grid`] (IV). The keystream block for block $i$ is
+///   $E_K(\text{Nonce} + \text{offset} + i)$, so two messages under one key must use
+///   **disjoint counter ranges** $[n,\ n + B)$ — merely distinct nonces are not enough.
 /// - `round_keys`: A sequence of round keys derived from the master key.
 /// - `counter_offset`: An optional offset for the block counter. Essential for stream processing
 ///   to prevent nonce reuse across consecutive data chunks. Defaults to `0` if `None`.
@@ -241,10 +260,8 @@ pub fn apply_ctr<const W: usize, const H: usize>
     counter_offset: Option<u64>,
 )
 {
-    //PRECALCULATE SHIFTS
-    let round_shifts: Vec<[usize; H]> = round_keys.iter()
-        .map(|k| k.precalculate_shifts())
-        .collect();
+    //PRECALCULATE SHIFTS (ONE PER KEYED ROUND)
+    let round_shifts = derive_round_shifts(round_keys);
 
     apply_ctr_with_shifts(grids, nonce, round_keys, &round_shifts, counter_offset);
 }
