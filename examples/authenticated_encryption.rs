@@ -28,7 +28,7 @@ use why2::
     encrypter,
     decrypter,
     crypto,
-    auth::AuthenticatedData,
+    auth::{ AuthenticatedData, AuthenticatedPacket },
     grid::Grid,
 };
 
@@ -63,16 +63,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     //STEP 5: ATTACK SIMULATION (MAN-IN-THE-MIDDLE)
     //ATTEMPT TO TAMPER WITH DATA (FLIP A BIT IN CIPHERTEXT)
-    //PACKET STRUCTURE: [MAC (32)][NONCE (64)][CIPHERTEXT...]
-    let tamper_index = 32 + 64 + 5;
+    //PACKET STRUCTURE: [MAC (32)][NONCE (8×8×8 = 512)][CIPHERTEXT...]
+    let tamper_index = 32 + 8 * 8 * 8 + 5;
     network_packet[tamper_index] ^= 0xFF;
     println!("⚠️  ATTACKER: Modified byte at index {}!", tamper_index);
 
     println!("\n[Receiver] Verifying...");
 
     //STEP 6: DESERIALIZE
-    //TRY TO PARSE RAW BYTES INTO AuthenticatedData
-    let received_package = AuthenticatedData::<8, 8>::try_from(network_packet.as_slice())?;
+    //TRY TO PARSE RAW BYTES INTO A KEYLESS AuthenticatedPacket
+    let received_package = AuthenticatedPacket::<8, 8>::try_from(network_packet.as_slice())?;
 
     //STEP 7: VERIFY INTEGRITY
     if received_package.verify(&mac_key)
@@ -88,17 +88,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     //REPAIR THE PACKET
     network_packet[tamper_index] ^= 0xFF;
-    let valid_package = AuthenticatedData::<8, 8>::try_from(network_packet.as_slice())?;
+    let valid_package = AuthenticatedPacket::<8, 8>::try_from(network_packet.as_slice())?;
 
     if valid_package.verify(&mac_key)
     {
         println!("✓ Integrity verified. Proceeding to decrypt.");
 
-        //EXTRACT INNER EncryptedData
-        let mut inner_data = valid_package.encrypted_data;
-
-        //ADD KEY
-        inner_data.key = Grid::from_key(&enc_key)?;
+        //VERIFY AGAIN AND ATTACH THE SEPARATELY STORED KEY
+        let inner_data = valid_package
+            .open(&mac_key, Grid::from_key(&enc_key)?)
+            .ok_or_else(|| std::io::Error::other("packet did not verify"))?;
 
         //DECRYPT
         let decrypted = decrypter::decrypt_string(inner_data)?;

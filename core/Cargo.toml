@@ -76,6 +76,7 @@ path = "../examples/file_encryption.rs"
 [[example]]
 name = "authenticated_encryption"
 path = "../examples/authenticated_encryption.rs"
+required-features = ["auth"]
 
 [[test]]
 name = "why2_integration"
