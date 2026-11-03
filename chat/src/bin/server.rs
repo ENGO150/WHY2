@@ -23,8 +23,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! # Startup
 //! The configuration is created first, since the log level lives in it, then the logger. The
 //! server then checks for a newer release, creates its identity if it has none, sweeps stored
-//! pictures nothing names any more, and binds TCP — and UDP on the same port when voice is
-//! enabled — retrying while a previous process may still hold the port.
+//! pictures nothing names any more, rewrites the ones written by the previous release, and binds
+//! TCP — and UDP on the same port when voice is enabled — retrying while a previous process may
+//! still hold the port.
 //!
 //! # Accepting
 //! Every TCP connection opens with 32 bytes, read in the connection's own task under a timeout.
@@ -150,6 +151,7 @@ async fn main()
     misc::check_version().await; //CHECK WHY2 VERSION
     kex::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
     config::messages::sweep_images(); //DROP THE PICTURES NOTHING NAMES ANY MORE
+    file::migrate_images().await; //REWRITE THE PICTURES AND CLIPS FROM THE PREVIOUS RELEASE
 
     //CHECK IF VOICE IS ENABLED
     if config::read_config("enable_voice_chat")

@@ -28,11 +28,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! identity rather than the address also keeps a server's pictures when it moves.
 //!
 //! # At-Rest Protection
-//! Each file is a [`RexStream`] ciphertext followed by an HMAC-SHA256 tag, under keys derived
-//! from `fingerprint || hash` ([`crypto::cache_keys`]). The tag proves three things at once:
-//! that this client wrote the file, that it is whole, and that it is the picture its name
-//! promises. A file that fails to verify is deleted, so a half-written or tampered file is
-//! refilled on the next fetch instead of poisoning that hash forever.
+//! Each file is a [`RexStream`](why2::stream::RexStream) ciphertext followed by an HMAC-SHA256
+//! tag, under keys derived from `fingerprint || hash` ([`crypto::cache_keys`]). The tag proves
+//! three things at once: that this client wrote the file, that it is whole, and that it is the
+//! picture its name promises. A file that fails to verify is deleted, so a half-written or
+//! tampered file is refilled on the next fetch instead of poisoning that hash forever.
+//!
+//! # Encryption Migration
+//! A cache file written by the previous release (core 1.5.2/1.5.3) still verifies with the same
+//! HMAC key, but decrypts to garbage with the current keystream. [`load`] tries the current
+//! encryption first, then the frozen previous-release one, and rewrites an old file once. A file
+//! that decrypts to neither is deleted and fetched again.
 //!
 //! # Bound
 //! The cache is capped at [`MAX_IMAGE_CACHE`](consts::MAX_IMAGE_CACHE). A write that exceeds
@@ -46,12 +52,6 @@ use std::
 };
 
 use tokio::fs;
-
-use why2::
-{
-    grid::Grid,
-    stream::RexStream,
-};
 
 use crate::
 {
@@ -108,19 +108,41 @@ async fn evict(directory: &PathBuf)
     }
 }
 
+//DECRYPT ONE CACHE FILE, TRYING THE CURRENT AND THEN THE PREVIOUS-RELEASE KEYSTREAM
+/// Decrypts one cache file and checks it against its name.
+///
+/// The file name is the SHA-256 of the plaintext, so the hash is what tells the current
+/// encryption apart from the previous release's: both verify with the same HMAC key.
+///
+/// # Returns
+/// The plaintext and whether it needed the frozen keystream.
+fn decrypt(fingerprint: &str, hash: &[u8; 32], sealed: &[u8]) -> Option<(Vec<u8>, bool)>
+{
+    let (key, nonce, mac_key) = crypto::cache_keys(fingerprint, hash);
+
+    let ciphertext = crypto::disk_open(&mac_key, sealed)?;
+    let chunk_size = ciphertext.len().max(1);
+
+    //CURRENT ENCRYPTION FIRST
+    if let Some(plaintext) = crypto::apply_file_cipher(&key, &nonce, ciphertext, chunk_size)
+        && crypto::sha256(&plaintext) == *hash
+    {
+        return Some((plaintext, false));
+    }
+
+    //PREVIOUS RELEASE ENCRYPTION
+    let plaintext = crypto::apply_file_cipher_legacy(&key, &nonce, ciphertext, chunk_size)?;
+
+    (crypto::sha256(&plaintext) == *hash).then_some((plaintext, true))
+}
+
 //SEAL ONE PICTURE FOR DISK: ENCRYPT-THEN-MAC
 /// Encrypts and authenticates one picture for disk: `ciphertext || tag`.
 fn seal(fingerprint: &str, hash: &[u8; 32], data: &[u8]) -> Option<Vec<u8>>
 {
     let (key, nonce, mac_key) = crypto::cache_keys(fingerprint, hash);
 
-    let mut disk_stream: RexStream = RexStream::new(&Grid::from_key(&key).ok()?, Grid::from_flat(&nonce).ok()?).ok()?;
-
-    let mut sealed = disk_stream.update(&crypto::bytes_to_i64(data)).ok()?;
-    sealed.extend(disk_stream.finalize().ok()?);
-
-    let mut bytes = crypto::i64_to_bytes(&sealed);
-    bytes.truncate(data.len());
+    let mut bytes = crypto::apply_file_cipher(&key, &nonce, data, data.len().max(1))?;
 
     //AUTHENTICATE
     let tag = crypto::disk_seal(&mac_key, &bytes);
@@ -148,23 +170,20 @@ pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
 
     let sealed = fs::read(&path).await.ok()?;
 
-    let (key, nonce, mac_key) = crypto::cache_keys(&fingerprint, hash);
-
     //DELETE A FILE THAT DOES NOT VERIFY
-    let Some(ciphertext) = crypto::disk_open(&mac_key, &sealed) else
+    let Some((image, legacy)) = decrypt(&fingerprint, hash, &sealed) else
     {
         let _ = fs::remove_file(&path).await;
 
         return None;
     };
 
-    let mut disk_stream: RexStream = RexStream::new(&Grid::from_key(&key).ok()?, Grid::from_flat(&nonce).ok()?).ok()?;
-
-    let mut decrypted = disk_stream.update(&crypto::bytes_to_i64(ciphertext)).ok()?;
-    decrypted.extend(disk_stream.finalize().ok()?);
-
-    let mut image = crypto::i64_to_bytes(&decrypted);
-    image.truncate(ciphertext.len());
+    //A FILE FROM THE PREVIOUS RELEASE IS REWRITTEN WITH THE CURRENT ENCRYPTION
+    if legacy
+        && let Some(bytes) = seal(&fingerprint, hash, &image)
+    {
+        let _ = fs::write(&path, &bytes).await;
+    }
 
     //TOUCH THE FILE FOR THE EVICTION ORDER
     if let Ok(file) = std::fs::File::options().write(true).open(&path)
