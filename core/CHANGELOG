@@ -1,6 +1,24 @@
 WHY2 (Core) Changelog
 =====================
 
+v1.6.0:
+- 151abe99: add security notes to core rustdocs
+- 22a49874: update auth example
+- 938c45f7: fix core rustdoc inaccuracies
+- 6958ef4d: make AuthenticatedPacket fields private
+- bae87d95: limit Grid width to W >= 2
+- f5c268b2: fix rustdoc inacurracies
+- 499b99ef: remove dummy key from auth module
+- 344b106b: update string encrypt/decrypt API
+- d4928e23: zeroize RexStream::round_shifts
+- 8d339bff: add derive_round_shifts helper fn
+- 772a323c: force strict 2A key length for Grid::from_key
+- 7ea02836: remove value field from GridError::InvalidUnicode
+- 3b6384ab: implement ZeroizeOnDrop for Grid
+- 5b60de82: upgrade dependencies
+- 0d16de1c: fix pre-release versions in CHANGELOGs
+- 5cb93b30: use why2 v1.5.3 on chat
+
 v1.5.3:
 - 8f370812: upgrade dependencies
 
