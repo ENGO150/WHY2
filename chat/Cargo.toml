@@ -46,14 +46,14 @@ doc = false
 why2 = { workspace = true }
 sha2 = { workspace = true }
 zeroize = { workspace = true }
-tokio = { version = "1.53.2", default-features = false, features = ["rt-multi-thread", "macros", "net", "io-util", "fs", "sync", "time", "signal"], optional = true }
+tokio = { version = "1.54.1", default-features = false, features = ["rt-multi-thread", "macros", "net", "io-util", "fs", "sync", "time", "signal"], optional = true }
 hmac = { version = "0.13.0", optional = true }
-serde_json = { version = "1.0.151", optional = true }
-wincode = { version = "0.6.2", features = ["derive"], optional = true }
+serde_json = { version = "1.0.154", optional = true }
+wincode = { version = "0.6.3", features = ["derive"], optional = true }
 dirs = { version = "7.0.0", optional = true }
 p521 = { version = "0.14.0", features = ["ecdh", "ecdsa", "pkcs8", "getrandom"], optional = true }
-ml-kem = { version = "0.3.2", features = ["getrandom"], optional = true }
-ureq = { version = "3.4.2", default-features = false, features = ["rustls"], optional = true }
+ml-kem = { version = "0.3.4", features = ["getrandom"], optional = true }
+ureq = { version = "3.5.1", default-features = false, features = ["rustls"], optional = true }
 semver = { version = "1.0.28", optional = true }
 toml_edit = { version = "0.25.17", optional = true }
 hkdf = { version = "0.13.0", optional = true }
@@ -66,7 +66,7 @@ socket2 = { version = "0.6.5", optional = true }
 crossterm = { version = "0.29.0", optional = true, features = ["event-stream"] }
 tokio-stream = { version = "0.1.19", optional = true }
 ratatui = { version = "0.30.2", optional = true, default-features = false, features = ["crossterm_0_29", "std", "layout-cache", "underline-color"] }
-unicode-width = { version = "0.2.2", optional = true }
+unicode-width = { version = "0.2.3", optional = true }
 chrono = { version = "0.4.45", optional = true, default-features = false, features = ["clock"] }
 base64 = { version = "0.23.1", optional = true }
 ratatui-image = { version = "11.1.0", optional = true, default-features = false, features = ["crossterm"] }
@@ -76,7 +76,7 @@ image = { version = "0.25.10", optional = true, default-features = false, featur
 
 # VOICE CHAT (CLIENT)
 cpal = { version = "0.18.2", optional = true, features = ["pulseaudio"] }
-ringbuf = { version = "0.5.3", optional = true }
+ringbuf = { version = "0.6.0", optional = true }
 audiopus = { version = "0.2.0", optional = true }
 gag = { version = "1.0.0", optional = true }
 nnnoiseless = { version = "0.5.2", default-features = false, optional = true }
@@ -87,11 +87,11 @@ winit = { version = "0.30.13", optional = true }
 xcap = { version = "0.9.8", default-features = false, optional = true }
 wgpu = { version = "30.0.1", optional = true }
 pollster = { version = "1.0.1", optional = true }
-openh264 = { version = "0.9.8", optional = true }
+openh264 = { version = "0.9.9", optional = true }
 
 # CHAT (SERVER SPECIFIC)
 argon2 = { version = "0.6.0", optional = true }
-log = { version = "0.4.34", optional = true }
+log = { version = "0.4.35", optional = true }
 simple_logger = { version = "5.2.0", optional = true }
 
 [features]
@@ -179,7 +179,7 @@ features = ["client", "server"]
 rustdoc-args = ["--html-in-header", "docs-header.html"]
 
 [build-dependencies]
-winresource = "0.1.31"
+winresource = "0.1.34"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-core-foundation = { version = "0.3.2", optional = true, default-features = false, features = ["std", "CFBase", "CFDictionary", "CFNumber", "CFString"] }
@@ -199,8 +199,8 @@ windows = { version = "0.62.2", optional = true, features = [
 [target.'cfg(target_os = "linux")'.dependencies]
 libwayshot = { version = "0.9.0", default-features = false, optional = true }
 pipewire = { version = "0.10.1", optional = true }
-zbus = { version = "5.19.0", optional = true }
-rustix = { version = "1.1.5", features = ["fs"], optional = true }
-memmap2 = { version = "0.9.11", optional = true }
+zbus = { version = "6.2.1", optional = true }
+rustix = { version = "1.1.6", features = ["fs"], optional = true }
+memmap2 = { version = "0.9.12", optional = true }
 ash = { version = "0.38.0", default-features = false, features = ["loaded", "std"], optional = true }
-libc = { version = "0.2.190", optional = true }
+libc = { version = "0.2.191", optional = true }

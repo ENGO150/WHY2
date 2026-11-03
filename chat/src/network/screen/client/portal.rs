@@ -70,8 +70,8 @@ use pipewire::
 
 use zbus::
 {
-    blocking::{ Connection, Proxy },
-    zvariant::{ OwnedFd, OwnedObjectPath, OwnedValue, Value },
+    Connection, DynamicType, OwnedFd, OwnedObjectPath, OwnedVariant, Proxy, Variant,
+    export::{ futures_core::Stream, serde::Serialize },
 };
 
 use crate::network::screen::
@@ -136,23 +136,24 @@ fn sender(connection: &Connection) -> Result<String, String> //THE CALLER'S NAME
 ///
 /// # Returns
 /// The response's results, or `Err` if the call failed or the user cancelled.
-fn request<B>(connection: &Connection, portal: &Proxy, method: &str, token: &str, body: &B) -> Result<HashMap<String, OwnedValue>, String>
+fn request<B>(connection: &Connection, portal: &Proxy, method: &str, token: &str, body: &B) -> Result<HashMap<String, OwnedVariant>, String>
 where
-    B: zbus::export::serde::Serialize + zbus::zvariant::DynamicType,
+    B: Serialize + DynamicType,
 {
     let path = format!("{DESKTOP}/request/{}/{token}", sender(connection)?);
 
-    let request = Proxy::new(connection, DESTINATION, path, "org.freedesktop.portal.Request")
+    let request = zbus::block_on(Proxy::new(connection, DESTINATION, path, "org.freedesktop.portal.Request"))
         .map_err(|error| error.to_string())?;
 
     //SUBSCRIBE BEFORE THE CALL
-    let mut responses = request.receive_signal("Response").map_err(|error| error.to_string())?;
+    let mut responses = zbus::block_on(request.receive_signal("Response")).map_err(|error| error.to_string())?;
 
-    portal.call_method(method, body).map_err(|error| error.to_string())?;
+    zbus::block_on(portal.call_method(method, body)).map_err(|error| error.to_string())?;
 
-    let message = responses.next().ok_or_else(|| format!("{method} got no response"))?;
+    let message = zbus::block_on(std::future::poll_fn(|cx| std::pin::Pin::new(&mut responses).poll_next(cx)))
+        .ok_or_else(|| format!("{method} got no response"))?;
 
-    let (code, results): (u32, HashMap<String, OwnedValue>) = message.body().deserialize()
+    let (code, results): (u32, HashMap<String, OwnedVariant>) = message.body().deserialize()
         .map_err(|error| error.to_string())?;
 
     match code
@@ -165,14 +166,14 @@ where
 
 //THE PIPEWIRE NODE OF THE FIRST STREAM
 /// Returns the PipeWire node of the first stream in a `Start` response.
-fn stream_node(results: &HashMap<String, OwnedValue>) -> Result<u32, String>
+fn stream_node(results: &HashMap<String, OwnedVariant>) -> Result<u32, String>
 {
     let streams = results.get("streams").ok_or_else(|| "the portal named no stream".to_owned())?;
 
-    let streams: Vec<(u32, HashMap<String, OwnedValue>)> = streams.try_clone()
+    let streams: Vec<(u32, HashMap<String, OwnedVariant>)> = streams.try_clone()
         .map_err(|error| error.to_string())?
         .try_into()
-        .map_err(|error: zbus::zvariant::Error| error.to_string())?;
+        .map_err(|error: zbus::Error| error.to_string())?;
 
     streams.first().map(|(node, _)| *node).ok_or_else(|| "the portal named no stream".to_owned())
 }
@@ -365,9 +366,9 @@ impl PortalRecorder
         thread.join().ok();
 
         //END THE SESSION ON THE PORTAL'S SIDE
-        if let Ok(session) = Proxy::new(&self.connection, DESTINATION, self.session.as_str(), "org.freedesktop.portal.Session")
+        if let Ok(session) = zbus::block_on(Proxy::new(&self.connection, DESTINATION, self.session.as_str(), "org.freedesktop.portal.Session"))
         {
-            session.call_method("Close", &()).ok();
+            zbus::block_on(session.call_method("Close", &())).ok();
         }
     }
 
@@ -384,9 +385,9 @@ impl PortalRecorder
     /// started.
     pub fn start(latest: Arc<LatestFrame>, fps: u32) -> Result<Self, String> //ASK THE PORTAL FOR A MONITOR, BLOCKING ON THE PICKER
     {
-        let connection = Connection::session().map_err(|error| error.to_string())?;
+        let connection = zbus::block_on(Connection::session()).map_err(|error| error.to_string())?;
 
-        let portal = Proxy::new(&connection, DESTINATION, DESKTOP, SCREENCAST)
+        let portal = zbus::block_on(Proxy::new(&connection, DESTINATION, DESKTOP, SCREENCAST))
             .map_err(|error| error.to_string())?;
 
         //CREATE A SESSION
@@ -395,8 +396,8 @@ impl PortalRecorder
 
         request(&connection, &portal, "CreateSession", &create_token, &(HashMap::from(
         [
-            ("handle_token", Value::from(create_token.as_str())),
-            ("session_handle_token", Value::from(session_token.as_str())),
+            ("handle_token", Variant::from(create_token.as_str())),
+            ("session_handle_token", Variant::from(session_token.as_str())),
         ]),))?;
 
         //THE PATH FOLLOWS FROM THE TOKEN
@@ -408,15 +409,15 @@ impl PortalRecorder
 
         let mut sources = HashMap::from(
         [
-            ("handle_token", Value::from(select_token.as_str())),
-            ("types", Value::from(SOURCE_MONITOR)),
-            ("multiple", Value::from(false)),
+            ("handle_token", Variant::from(select_token.as_str())),
+            ("types", Variant::from(SOURCE_MONITOR)),
+            ("multiple", Variant::from(false)),
         ]);
 
         //DRAW THE CURSOR INTO THE PICTURE
-        if portal.get_property::<u32>("AvailableCursorModes").is_ok_and(|modes| modes & CURSOR_EMBEDDED != 0)
+        if zbus::block_on(portal.get_property::<u32>("AvailableCursorModes")).is_ok_and(|modes| modes & CURSOR_EMBEDDED != 0)
         {
-            sources.insert("cursor_mode", Value::from(CURSOR_EMBEDDED));
+            sources.insert("cursor_mode", Variant::from(CURSOR_EMBEDDED));
         }
 
         request(&connection, &portal, "SelectSources", &select_token, &(&session, sources))?;
@@ -426,12 +427,12 @@ impl PortalRecorder
 
         let started = request(&connection, &portal, "Start", &start_token, &(&session, "", HashMap::from(
         [
-            ("handle_token", Value::from(start_token.as_str())),
+            ("handle_token", Variant::from(start_token.as_str())),
         ])))?;
 
         let node = stream_node(&started)?;
 
-        let fd: OwnedFd = portal.call("OpenPipeWireRemote", &(&session, HashMap::<&str, Value>::new()))
+        let fd: OwnedFd = zbus::block_on(portal.call("OpenPipeWireRemote", &(&session, HashMap::<&str, Variant>::new())))
             .map_err(|error| error.to_string())?;
 
         let fd: std::os::fd::OwnedFd = fd.into();
