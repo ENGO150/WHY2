@@ -37,8 +37,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! On the server, a persistent upload (see [`UploadKind::persistent`]) is sealed into
 //! `server_images/` and read back in the same chunks it was written in: the at-rest
 //! `RexStream` is finalized per chunk, so a reader that breaks the file anywhere else falls off
-//! the keystream. Files written by the previous release are rewritten at startup by
-//! [`server::migrate_images`].
+//! the keystream.
 
 //MODULES
 #[cfg(feature = "client_base")]

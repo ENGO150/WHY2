@@ -33,15 +33,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! 3. **Files at rest** (the server's picture store, the client's cache, the history) —
 //!    per-file keys derived from a store's master key and a trailing tag from [`disk_tag`].
 //!
-//! # Encryption Migration
-//! The previous release (why2-chat 2.4.0, core 1.5.2/1.5.3) drew the `shift_rows` shifts from a
-//! different round key, and therefore used a different CTR keystream. The HMAC and file layout
-//! did not change, so a file from that release still verifies but decrypts to garbage. `legacy`
-//! freezes the previous keystream; `apply_file_cipher_legacy` and `decrypt_packet_legacy` read
-//! such files once so the history, picture store and cache can be rewritten with the current
-//! encryption. Older releases are not migrated. The migration code is removed with the next
-//! version bump.
-//!
 //! # Key Derivation
 //! Every derived key is HKDF-SHA256 under a distinct label, so no two uses ever share a
 //! keystream:
@@ -73,9 +64,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #[cfg(feature = "server")]
 pub mod password;
 pub mod kex;
-
-#[cfg(feature = "chat")]
-pub(crate) mod legacy;
 
 use why2::
 {
@@ -271,20 +259,6 @@ fn get_correct_key<const W: usize, const H: usize>(key: &Zeroizing<Vec<i64>>) ->
     Zeroizing::new(derived_key)
 }
 
-/// Returns the grid key a packet was encrypted with, stretching it if the caller's key has the
-/// wrong size.
-fn packet_key<const W: usize, const H: usize>(keys: &SharedKeys) -> Option<Grid<W, H>>
-{
-    if keys.0.len() == W * H * 2
-    {
-        Grid::from_key(&keys.0).ok()
-    } else
-    {
-        let derived = get_correct_key::<W, H>(&keys.0);
-        Grid::from_key(&derived).ok()
-    }
-}
-
 /// Derives a stream nonce grid from a transfer context (its token).
 fn derive_stream_nonce(context: &[u8]) -> Zeroizing<Vec<i64>>
 {
@@ -392,7 +366,14 @@ pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, k
     let auth_packet: AuthenticatedPacket<W, H> = decoded_packet.as_slice().try_into().ok()?;
 
     //GET VALID KEY
-    let key_grid = packet_key::<W, H>(keys)?;
+    let key_grid = if keys.0.len() == W * H * 2
+    {
+        Grid::from_key(&keys.0).ok()?
+    } else
+    {
+        let derived = get_correct_key::<W, H>(&keys.0);
+        Grid::from_key(&derived).ok()?
+    };
 
     //VERIFY HMAC AND ATTACH THE KEY
     let encrypted_data = auth_packet.open(keys.1.as_slice().try_into().ok()?, key_grid)?;
@@ -401,34 +382,6 @@ pub fn decrypt_packet<const W: usize, const H: usize>(decoded_packet: Vec<u8>, k
     let decrypted_packet = decrypter::decrypt(encrypted_data).ok()?;
 
     Some(Zeroizing::new(i64_to_bytes(&decrypted_packet.output)))
-}
-
-/// Verifies and decrypts one packet written by the previous release.
-///
-/// The packet layout and HMAC are unchanged; only the CTR keystream differs. This exists solely
-/// so [`messages`](crate::config::messages) can read a history file from that release once and
-/// re-save it under the current encryption.
-#[cfg(feature = "server")]
-pub(crate) fn decrypt_packet_legacy<const W: usize, const H: usize>(decoded_packet: Vec<u8>, keys: &SharedKeys) -> Option<Zeroizing<Vec<u8>>>
-{
-    //DESERIALIZE
-    let auth_packet: AuthenticatedPacket<W, H> = decoded_packet.as_slice().try_into().ok()?;
-
-    //GET VALID KEY
-    let key_grid = packet_key::<W, H>(keys)?;
-
-    //VERIFY HMAC AND ATTACH THE KEY
-    let encrypted_data = auth_packet.open(keys.1.as_slice().try_into().ok()?, key_grid)?;
-
-    //DECRYPT WITH THE FROZEN PREVIOUS-RELEASE KEYSTREAM
-    let round_keys = why2::crypto::generate_round_keys(&encrypted_data.key).ok()?;
-    let mut output = encrypted_data.output;
-
-    legacy::apply_ctr(&mut output, &encrypted_data.nonce, &round_keys, 0);
-
-    let decrypted = Zeroizing::new(output.iter().flat_map(Grid::to_flat).collect::<Vec<i64>>());
-
-    Some(Zeroizing::new(i64_to_bytes(&decrypted)))
 }
 
 /// Opens the stream for the reverse direction of an auxiliary socket.
@@ -595,72 +548,6 @@ pub fn disk_open<'a>(mac_key: &[u8; 32], sealed: &'a [u8]) -> Option<&'a [u8]>
     mac.verify_slice(tag).ok()?;
 
     Some(ciphertext)
-}
-
-/// Applies the current at-rest stream cipher to a whole file in fixed-size chunks.
-///
-/// The server's picture store was written one upload packet at a time, and its stream was
-/// finalized after every chunk, which advances the block counter by an extra block for the
-/// partial tail. Decryption must therefore break the file exactly where the upload did. The
-/// client cache was written in one call, so it passes the whole file as a single chunk. CTR is
-/// symmetric, so this both encrypts and decrypts.
-///
-/// # Parameters
-/// - `key`: The file's grid key.
-/// - `nonce`: The file's initial counter grid.
-/// - `data`: The plaintext or ciphertext.
-/// - `chunk_size`: The size of one write, in bytes.
-#[cfg(feature = "chat")]
-pub(crate) fn apply_file_cipher(key: &[i64], nonce: &[i64], data: &[u8], chunk_size: usize) -> Option<Vec<u8>>
-{
-    let mut stream: RexStream = RexStream::new(&Grid::from_key(key).ok()?, Grid::from_flat(nonce).ok()?).ok()?;
-    let mut output = Vec::with_capacity(data.len());
-
-    for chunk in data.chunks(chunk_size.max(1))
-    {
-        let mut transformed = stream.update(&bytes_to_i64(chunk)).ok()?;
-        transformed.extend(stream.finalize().ok()?);
-
-        let mut bytes = i64_to_bytes(&transformed);
-        bytes.truncate(chunk.len());
-
-        output.extend_from_slice(&bytes);
-    }
-
-    Some(output)
-}
-
-/// Applies the frozen previous-release at-rest stream cipher to a whole file.
-///
-/// This mirrors [`apply_file_cipher`] chunk for chunk, but with the previous release's round
-/// shifts. It exists only for the one-time migration of that release's files.
-#[cfg(feature = "chat")]
-pub(crate) fn apply_file_cipher_legacy(key: &[i64], nonce: &[i64], data: &[u8], chunk_size: usize) -> Option<Vec<u8>>
-{
-    let key: Grid = Grid::from_key(key).ok()?;
-    let nonce: Grid = Grid::from_flat(nonce).ok()?;
-    let round_keys = why2::crypto::generate_round_keys(&key).ok()?;
-    let grid_area = consts::DEFAULT_GRID_WIDTH * consts::DEFAULT_GRID_HEIGHT;
-
-    let mut output = Vec::with_capacity(data.len());
-    let mut counter = 0u64;
-
-    for chunk in data.chunks(chunk_size.max(1))
-    {
-        //ONE GRID PER FULL BLOCK AND ONE FOR THE PARTIAL TAIL, AS update + finalize DID
-        let mut grids: Vec<Grid> = bytes_to_i64(chunk).chunks(grid_area)
-            .map(Grid::from_flat).collect::<Result<Vec<_>, _>>().ok()?;
-
-        legacy::apply_ctr(&mut grids, &nonce, &round_keys, counter);
-        counter = counter.wrapping_add(grids.len() as u64);
-
-        let mut bytes = i64_to_bytes(&grids.iter().flat_map(Grid::to_flat).collect::<Vec<_>>());
-        bytes.truncate(chunk.len());
-
-        output.extend_from_slice(&bytes);
-    }
-
-    Some(output)
 }
 
 /// Returns the at-rest keys of the message history.

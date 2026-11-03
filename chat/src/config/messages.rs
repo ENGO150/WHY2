@@ -33,13 +33,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! first copied to `server_messages.bin.old`), so a bad file never stops the server from
 //! starting.
 //!
-//! # Encryption Migration
-//! The previous release (chat 2.4.0, core 1.5.2/1.5.3) wrote the history with the old round
-//! shifts. `load` tries the current encryption first, then the frozen previous-release keystream,
-//! and rewrites a file from that release with the current encryption immediately. Older formats
-//! are not migrated: an unreadable file is copied to `server_messages.bin.old` and the server
-//! starts empty.
-//!
 //! # Records and Colors
 //! A record stores who said what, not how it looked: colors are looked up per sender when
 //! a page is built, so a replay is painted the way its sender looks **now**.
@@ -177,19 +170,12 @@ impl Record
 impl History
 {
     /// Loads the history from disk and continues its id sequence.
-    ///
-    /// A history read from the previous release's format or encryption is written back
-    /// immediately, so the migration runs once rather than on every start.
     fn new() -> Self //LOAD AND CONTINUE THE IDS
     {
-        let (records, migrated) = load();
+        let records = load();
         let next = records.last().map_or(0, |message| message.id + 1);
 
-        let history = Self { next, records };
-
-        if migrated { history.save(); }
-
-        history
+        Self { next, records }
     }
 
     /// Hands out the next message id.
@@ -246,76 +232,48 @@ fn path() -> String //WHERE THE HISTORY IS KEPT
     super::config_path(consts::SERVER_MESSAGES_FILE)
 }
 
-/// Reads and verifies the history file, migrating the previous release's format or encryption.
+/// Reads and verifies the history file, migrating an older format.
 ///
 /// # Returns
-/// The stored records and whether they came from a previous-release file that must be rewritten,
-/// or an empty history if the file is missing or unreadable.
-fn load() -> (Vec<Record>, bool) //READ THE HISTORY OFF DISK
+/// The stored records, or an empty history if the file is missing or unreadable.
+fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
 {
     //NO FILE IS AN EMPTY HISTORY
     let Ok(bytes) = fs::read(path()) else
     {
         log::info!("No message history on disk, starting empty");
-        return (Vec::new(), false);
+        return Vec::new();
     };
 
-    //CURRENT ENCRYPTION FIRST
-    if let Some((records, migrated)) = decode(&bytes, &KEYS)
+    //A HISTORY THAT WILL NOT VERIFY IS DROPPED
+    let Some(plaintext) = crypto::decrypt_packet::
+        <{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(bytes, &KEYS)
+    else
     {
-        match migrated
-        {
-            true => log::info!("Migrated {} stored messages to the current format", records.len()),
-            false => log::info!("Loaded {} stored messages", records.len()),
-        }
+        log::error!("Message history failed verification, it is being ignored");
+        return Vec::new();
+    };
 
-        return (records, migrated);
-    }
-
-    (unreadable(), false)
-}
-
-/// Decrypts a history file with `keys`, trying the current and then the previous keystream.
-///
-/// # Returns
-/// The records and whether anything about the file was older than the current format.
-fn decode(bytes: &[u8], keys: &SharedKeys) -> Option<(Vec<Record>, bool)> //DECRYPT WITH ONE KEY
-{
-    //CURRENT ENCRYPTION (AN OLD FILE VERIFIES HERE TOO, BUT ITS PLAINTEXT WILL NOT PARSE)
-    if let Some(plaintext) = crypto::decrypt_packet::
-        <{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(bytes.to_vec(), keys)
-        && let Some(parsed) = parse(&plaintext)
-    {
-        return Some(parsed);
-    }
-
-    //PREVIOUS RELEASE ENCRYPTION
-    let plaintext = crypto::decrypt_packet_legacy::
-        <{ why2_consts::DEFAULT_GRID_WIDTH }, { why2_consts::DEFAULT_GRID_HEIGHT }>(bytes.to_vec(), keys)?;
-    let (records, _) = parse(&plaintext)?;
-
-    Some((records, true))
-}
-
-/// Parses plaintext history, accepting the record format from before pins.
-///
-/// # Returns
-/// The records and whether an older record format was converted.
-fn parse(plaintext: &[u8]) -> Option<(Vec<Record>, bool)> //PARSE ONE DECRYPTED HISTORY
-{
     //AN OLDER MARKER IS AN OLDER FORMAT
     if let Some(records) = plaintext.strip_prefix(MAGIC_V6)
     {
-        let history = wincode::config::deserialize::<Vec<VoiceRecord>, _>(records, consts::PACKET_CONFIG).ok()?;
-
-        return Some((history.into_iter().map(Record::from).collect(), true));
+        return migrate(wincode::config::deserialize::<Vec<VoiceRecord>, _>(records, consts::PACKET_CONFIG)
+            .map(|history| history.into_iter().map(Record::from).collect()));
     }
 
     //NO MARKER IS UNREADABLE
-    let records = plaintext.strip_prefix(MAGIC)?;
-    let history = wincode::config::deserialize::<Vec<Record>, _>(records, consts::PACKET_CONFIG).ok()?;
+    let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };
 
-    Some((history, false))
+    match wincode::config::deserialize::<Vec<Record>, _>(records, consts::PACKET_CONFIG)
+    {
+        Ok(history) =>
+        {
+            log::info!("Loaded {} stored messages", history.len());
+            history
+        },
+
+        Err(_) => unreadable(),
+    }
 }
 
 /// Keeps a copy of an unreadable history file and starts empty.
@@ -324,8 +282,17 @@ fn unreadable() -> Vec<Record> //KEEP A COPY, START EMPTY
     let backup = format!("{}.old", path());
     let _ = fs::copy(path(), &backup);
 
-    log::error!("Message history could not be decrypted or parsed, it is being ignored (copy kept as {backup})");
+    log::error!("Message history could not be read, it is being ignored (copy kept as {backup})");
     Vec::new()
+}
+
+/// Accepts records decoded from an older format.
+fn migrate<E>(history: Result<Vec<Record>, E>) -> Vec<Record> //LOAD AN OLDER FORMAT (remove with next version bump)
+{
+    let Ok(history) = history else { return unreadable() };
+
+    log::info!("Migrated {} stored messages from an older format", history.len());
+    history
 }
 
 //PUBLIC

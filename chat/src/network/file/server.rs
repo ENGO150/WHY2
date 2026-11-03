@@ -40,13 +40,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! A persistent picture or clip is then stored in the history (lobby only, with
 //! `persistent_messages` on) and broadcast whole; an avatar or icon is answered with the
 //! updated profile or icon instead.
-//!
-//! # Encryption Migration
-//! Files written by the previous release (core 1.5.2/1.5.3) still verify with the same HMAC key,
-//! but decrypt to garbage with the current keystream. [`migrate_images`] runs once at startup and
-//! rewrites every stored picture, avatar, server icon and voice message it identifies with the
-//! current encryption. The file name is the SHA-256 of its plaintext, so that is what confirms an
-//! old file. Files in formats this server no longer recognises are left untouched.
 
 use std::
 {
@@ -64,11 +57,7 @@ use tokio::
 {
     sync::Mutex,
     task::AbortHandle,
-    io::
-    {
-        AsyncReadExt,
-        AsyncWriteExt,
-    },
+    io::AsyncWriteExt,
     net::tcp::OwnedWriteHalf,
     fs::
     {
@@ -794,191 +783,21 @@ pub async fn read_image(hash: &[u8; 32]) -> Option<Vec<u8>>
         return None;
     };
 
+    let mut disk_stream: RexStream = RexStream::new(&Grid::from_key(&key).ok()?, Grid::from_flat(&nonce).ok()?).ok()?;
+
     //THE READ HAS TO MIRROR THE WRITE CHUNK FOR CHUNK
-    crypto::apply_file_cipher(&key, &nonce, ciphertext, consts::UPLOAD_CHUNK_SIZE)
-}
+    let mut image = Vec::with_capacity(ciphertext.len());
 
-//REWRITE ONE STORED FILE FROM THE PREVIOUS-RELEASE KEYSTREAM
-/// Number of leading bytes [`migrate_image`] reads to tell the two encryptions apart. Every
-/// image and clip marker fits well inside it.
-const MIGRATION_PROBE_SIZE: u64 = 64;
-
-/// What the leading bytes of a stored file say about its encryption.
-#[derive(Clone, Copy)]
-enum StoredEncryption
-{
-    /// Only the current keystream yields a known image or clip marker.
-    Current,
-    /// Only the previous release's keystream does.
-    Legacy,
-    /// Both do, because a short marker matched by chance; the file has to be read whole.
-    Ambiguous,
-    /// Neither does: not a picture or clip this server wrote.
-    Unknown,
-}
-
-/// Probes the leading bytes of a stored file with both keystreams.
-///
-/// A valid file starts with an image or clip marker, so the keystream that produces one is the
-/// one it was written with. Short markers (`BM`, `#?`, `P1` and friends) can match by chance, so
-/// both matching is reported as [`StoredEncryption::Ambiguous`] rather than guessed.
-///
-/// # Parameters
-/// - `key`, `nonce`: The file's at-rest keys.
-/// - `probe`: The first ciphertext bytes of the file.
-fn probe_encryption(key: &[i64], nonce: &[i64], probe: &[u8]) -> StoredEncryption
-{
-    let marker = |plaintext: Option<Vec<u8>>|
-        plaintext.is_some_and(|bytes| misc::is_image(&bytes) || voice_message::is_clip(&bytes));
-
-    let current = marker(crypto::apply_file_cipher(key, nonce, probe, probe.len()));
-    let legacy = marker(crypto::apply_file_cipher_legacy(key, nonce, probe, probe.len()));
-
-    match (current, legacy)
+    for chunk in ciphertext.chunks(consts::UPLOAD_CHUNK_SIZE)
     {
-        (true, false) => StoredEncryption::Current,
-        (false, true) => StoredEncryption::Legacy,
-        (true, true) => StoredEncryption::Ambiguous,
-        (false, false) => StoredEncryption::Unknown,
-    }
-}
+        let mut decrypted = disk_stream.update(&crypto::bytes_to_i64(chunk)).ok()?;
+        decrypted.extend(disk_stream.finalize().ok()?);
 
-/// Migrates one stored picture or voice message from the previous release, if it is old.
-///
-/// The file name is the SHA-256 of the plaintext, so a successful decryption can be checked
-/// against it. That is what confirms a previous-release file before it is rewritten. A current
-/// file is recognised more cheaply: its leading bytes decrypt to a known image or clip marker,
-/// while the same bytes under the previous release's keystream are noise. Only a file that looks
-/// old, or whose short marker matches under both keystreams, is read whole.
-///
-/// # Returns
-/// `true` if the file was rewritten.
-async fn migrate_image(path: &Path, hash: &[u8; 32]) -> bool //REWRITE ONE PREVIOUS-RELEASE FILE
-{
-    let (key, nonce, mac_key) = crypto::image_keys(hash);
+        let mut bytes = crypto::i64_to_bytes(&decrypted);
+        bytes.truncate(chunk.len());
 
-    //READ ONLY THE MARKER FOR THE PROBE
-    let mut probe = Vec::with_capacity(MIGRATION_PROBE_SIZE as usize);
-
-    let read = match File::open(path).await
-    {
-        Ok(file) => file.take(MIGRATION_PROBE_SIZE).read_to_end(&mut probe).await,
-
-        Err(error) =>
-        {
-            log::warn!("Stored file unreadable during migration ({error}): {}", path.display());
-            return false;
-        }
-    };
-
-    if let Err(error) = read
-    {
-        log::warn!("Stored file unreadable during migration ({error}): {}", path.display());
-        return false;
+        image.extend_from_slice(&bytes);
     }
 
-    let encryption = probe_encryption(&key, &nonce, &probe);
-
-    //CURRENT (OR NOT OURS) - NOTHING TO DO
-    if matches!(encryption, StoredEncryption::Current | StoredEncryption::Unknown) { return false; }
-
-    //PREVIOUS RELEASE: READ THE WHOLE FILE, VERIFY IT AND REWRITE IT
-    let sealed = match fs::read(path).await
-    {
-        Ok(bytes) => bytes,
-
-        Err(error) =>
-        {
-            log::warn!("Stored file unreadable during migration ({error}): {}", path.display());
-            return false;
-        }
-    };
-
-    let Some(ciphertext) = crypto::disk_open(&mac_key, &sealed) else
-    {
-        log::warn!("Stored file failed verification during migration: {}", path.display());
-        return false;
-    };
-
-    //A SHORT MARKER MAY HAVE MATCHED UNDER BOTH KEYSTREAMS - THE HASH SETTLES IT
-    if matches!(encryption, StoredEncryption::Ambiguous)
-        && crypto::apply_file_cipher(&key, &nonce, ciphertext, consts::UPLOAD_CHUNK_SIZE)
-            .is_some_and(|plaintext| crypto::sha256(&plaintext) == *hash)
-    {
-        return false;
-    }
-
-    //PREVIOUS RELEASE ENCRYPTION
-    let Some(plaintext) = crypto::apply_file_cipher_legacy(&key, &nonce, ciphertext, consts::UPLOAD_CHUNK_SIZE) else
-    {
-        log::warn!("Stored file could not be decrypted during migration: {}", path.display());
-        return false;
-    };
-
-    if crypto::sha256(&plaintext) != *hash
-    {
-        log::warn!("Stored file is neither current nor from the previous release: {}", path.display());
-        return false;
-    }
-
-    //SEAL IT AGAIN WITH THE CURRENT ENCRYPTION
-    let Some(ciphertext) = crypto::apply_file_cipher(&key, &nonce, &plaintext, consts::UPLOAD_CHUNK_SIZE) else
-    {
-        log::warn!("Stored file could not be re-encrypted during migration: {}", path.display());
-        return false;
-    };
-
-    let mut rewritten = ciphertext;
-    let tag = crypto::disk_seal(&mac_key, &rewritten);
-    rewritten.extend_from_slice(&tag);
-
-    //REPLACE IT ONLY ONCE THE WHOLE FILE IS READY
-    let temporary = path.with_extension("migrating");
-
-    if let Err(error) = fs::write(&temporary, &rewritten).await
-    {
-        log::error!("Writing migrated file failed ({error}): {}", path.display());
-        let _ = fs::remove_file(&temporary).await;
-        return false;
-    }
-
-    if let Err(error) = fs::rename(&temporary, path).await
-    {
-        log::error!("Replacing migrated file failed ({error}): {}", path.display());
-        let _ = fs::remove_file(&temporary).await;
-        return false;
-    }
-
-    true
-}
-
-/// Rewrites every stored picture, avatar, server icon and voice message written by the previous
-/// release with the current encryption.
-///
-/// Runs at startup, after the orphan sweep and before clients are accepted. A file that is
-/// already current, or that cannot be identified, is left untouched.
-pub async fn migrate_images() //MIGRATE THE PERSISTENT PICTURE STORE
-{
-    let Ok(mut entries) = fs::read_dir(misc::get_image_dir()).await else { return };
-
-    let mut migrated = 0;
-
-    while let Ok(Some(entry)) = entries.next_entry().await
-    {
-        if !entry.file_type().await.map(|kind| kind.is_file()).unwrap_or(false) { continue; }
-
-        let path = entry.path();
-
-        let Some(hash) = path.file_name()
-            .and_then(OsStr::to_str)
-            .and_then(misc::unhex)
-        else { continue };
-
-        if migrate_image(&path, &hash).await { migrated += 1; }
-    }
-
-    if migrated > 0
-    {
-        log::info!("Migrated {migrated} stored images and voice messages to the current encryption");
-    }
+    Some(image)
 }
