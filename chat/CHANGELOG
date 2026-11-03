@@ -1,6 +1,22 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.4.1:
+- 194a9be3: migrate chat to REXv1.6.0
+- 3e9f4b82: implement AuthenticatedPacket on chat
+- a11c7b74: use AuthenticatedPacket on chat
+- 3218f75c: add rustdoc to chat
+- f535a1ee: add katex docs parser to chat
+- 85564463: change default socks5 port to 9050
+- c5e46ecc: add message pinning translations to remaining locales
+- d47bb705: add EN & CS message pinning translations
+- 6efbe2b0: implement pinned messages on client
+- 2370434d: add message pinning commands
+- bc6b5d6d: handle message pinning on server
+- 3531bf10: add pinned message PacketCodes
+- 42e9c3a7: add pinned message field to stored messages
+- 80131065: remove history migration code for voice messages
+
 v2.4.0:
 - 3610d96e: upgrade chat dependencies
 - d2e63cb7: implement voice messages
