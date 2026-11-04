@@ -18,11 +18,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! # Share Audio Echo Cancellation
 //!
-//! Keeps WHY2's own voice playback out of the audio a screen share captures.
+//! Keeps WHY2's own voice playback out of monitor-captured share audio.
 //!
-//! A share captures the output sink's monitor (or the WASAPI loopback) — the finished mix — so
-//! the voice channel is in it, and a viewer in that channel would hear themselves a second
-//! later. Nothing can leave one application out of a monitor, so the client subtracts itself.
+//! Linux normally captures each other application through PipeWire and never sees WHY2's nodes,
+//! so this canceller runs on Windows (WASAPI loopback) and on the Linux monitor fallback. There
+//! the share captures the output sink's monitor — the finished mix — so the voice channel is in
+//! it, and a viewer in that channel would hear themselves a second later. Nothing can leave one
+//! application out of a monitor, so the client subtracts itself.
 //!
 //! # Not Acoustic Echo Cancellation
 //! There is no microphone and no room: our contribution appears in the monitor as exactly the

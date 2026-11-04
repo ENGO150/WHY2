@@ -256,6 +256,13 @@ Capture (`network/screen/client/capture.rs`, the only blocking CPU loop in the c
 - Frames wait for their slot rather than being dropped, and slots are scheduled off each other
   (`due += min_interval`). A drain thread keeps only the newest frame so capture overlaps encode.
 - Env: `WHY2_CAPTURE_BACKEND` (`recorder`/`legacy`), `WHY2_CAPTURE_PROBE_TIMEOUT`.
+- Share audio is captured per application on Linux: `screen/client/audio_pipewire.rs` links every
+  other `Stream/Output/Audio` node into one capture stream and skips our own by PipeWire client
+  (`client.id` resolving to this process; cpal's `cpal-pulseaudio-{pid}` and `PipeWire ALSA
+  [{exe}]` names cover the node before that id arrives), so the call's playback — an ALSA client,
+  not a Pulse one — is never in the share. If PipeWire is unavailable (or the sandbox forbids
+  linking) it falls back to the default output's cpal monitor with the AEC; Windows always uses
+  the WASAPI loopback + AEC. `WHY2_SHARE_AUDIO` (`pipewire`/`monitor`) pins the path.
 
 Latency is bounded by shedding, not buffering:
 
@@ -295,14 +302,15 @@ padding in the shader. Never write through an sRGB view (double gamma). Letterbo
 
 - VAD noise floor falls fast and rises slowly (`NOISE_FLOOR_RISE`), and only from frames below the
   current open threshold, so joining mid-sentence cannot teach the gate that speech is noise.
-- AEC (`voice/client/aec.rs`) subtracts WHY2's own playback from the captured monitor mix. It is
-  a fixed digital delay plus gain, not acoustic cancellation. Use coarse-to-fine correlation
-  (`AEC_SEARCH_DECIMATION`) and accept peaks by `AEC_PEAK_SIGMA`, not absolute correlation.
-  Gate NLMS adaptation by `AEC_ADAPT_RATIO`; keep `AEC_STEP` tiny; roll back to the best weights
-  (`AEC_ROLLBACK_*`) instead of resetting. Align dropped capture chunks with `skip_reference`;
-  track reference-ring underruns as drift and slide the offset. Failures pass audio through
-  untouched. Known gaps: attached-share playback and voice-message playback are not in the
-  reference.
+- AEC (`voice/client/aec.rs`) subtracts WHY2's own playback from the captured monitor mix on
+  Windows and on the Linux fallback; Linux normally captures per application through PipeWire and
+  never sees our nodes. It is a fixed digital delay plus gain, not acoustic cancellation. Use
+  coarse-to-fine correlation (`AEC_SEARCH_DECIMATION`) and accept peaks by `AEC_PEAK_SIGMA`, not
+  absolute correlation. Gate NLMS adaptation by `AEC_ADAPT_RATIO`; keep `AEC_STEP` tiny; roll
+  back to the best weights (`AEC_ROLLBACK_*`) instead of resetting. Align dropped capture chunks
+  with `skip_reference`; track reference-ring underruns as drift and slide the offset. Failures
+  pass audio through untouched. Known gaps: attached-share playback and voice-message playback
+  are not in the reference (the Linux PipeWire path excludes them with the rest of the process).
 
 ### Crypto, roles, accounts
 

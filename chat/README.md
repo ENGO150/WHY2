@@ -36,7 +36,7 @@ WHY2 Chat is a reference implementation demonstrating the WHY2 encryption system
 - **Screen Sharing**: H.264 screen share with audio, multiple viewers per sharer
   - Monitor selection (`/screen <index|name>`), swappable while the share runs
   - SIMD colour conversion on capture and GPU-side playback (`wgpu`)
-  - Echo cancellation keeps your own voice output out of the shared audio
+  - Per-application capture keeps WHY2's own audio out of the share (Linux); Windows uses echo cancellation
 - **File Transfer**: upload files to the server and download them by ID
 - **Private Messages**: direct user-to-user encrypted messaging
 - **Multi-Channel Support**: organize conversations into separate channels

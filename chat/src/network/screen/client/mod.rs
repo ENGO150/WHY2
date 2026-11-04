@@ -26,6 +26,9 @@ pub mod rate;
 pub mod video;
 
 #[cfg(target_os = "linux")]
+pub mod audio_pipewire;
+
+#[cfg(target_os = "linux")]
 pub mod portal;
 
 use std::

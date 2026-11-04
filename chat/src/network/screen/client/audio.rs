@@ -22,11 +22,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! watched share sends.
 //!
 //! # Capture
-//! On Linux the share records the default output's monitor source, on Windows the WASAPI
-//! loopback of the default output; macOS shares no audio. The capture is resampled to 48 kHz
-//! stereo, has our own voice playback removed by the [`aec`]
-//! canceller, and is encoded to Opus. The capture callback drops a chunk when its queue is full
-//! and tells the canceller, so the two stay aligned.
+//! On Linux the share captures the playback streams of every other application through a
+//! dedicated PipeWire client (the `audio_pipewire` module), leaving WHY2's own output out of the
+//! mix. If PipeWire is unavailable or the sandbox forbids linking, it falls back to the default
+//! output's monitor source. On Windows the share records the WASAPI loopback of the default
+//! output; macOS shares no audio. The monitor fallback is resampled to 48 kHz stereo, has our own
+//! voice playback removed by the [`aec`] canceller, and is encoded to Opus. Its capture callback
+//! drops a chunk when its queue is full and tells the canceller, so the two stay aligned.
 //!
 //! # Playback
 //! Video and audio share one TCP stream, and the sharer's sound card and ours run at the same
@@ -104,14 +106,14 @@ pub struct AudioFrame
 }
 
 //FUNCTIONS
-/// Captures, cancels and encodes the share's audio until `running` is cleared.
+/// Captures and encodes the share's audio until `running` is cleared.
 ///
 /// # Parameters
 /// - `tx`: Where encoded frames go.
 /// - `running`: Cleared when the share ends.
 ///
 /// # Panics
-/// If there is no usable audio device or the encoder cannot be created.
+/// If the fallback has no usable audio device or the encoder cannot be created.
 pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool>) //CAPTURE AUDIO
 {
     if cfg!(target_os = "macos")
@@ -123,6 +125,42 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
         return;
     }
 
+    //CAPTURE OTHER APPLICATIONS, NOT THE MIX
+    #[cfg(target_os = "linux")]
+    {
+        if use_pipewire()
+        {
+            let (chunk_tx, chunk_rx) = mpsc::channel::<Vec<f32>>(screen_consts::CAPTURE_CHANNEL_BOUND);
+
+            if let Ok(capture) = super::audio_pipewire::start(chunk_tx).await
+            {
+                encode_capture(chunk_rx, tx, running, None).await;
+                drop(capture);
+                return;
+            }
+        }
+    }
+
+    capture_monitor(tx, running).await;
+}
+
+/// Returns whether the PipeWire backend should be tried.
+#[cfg(target_os = "linux")]
+fn use_pipewire() -> bool
+{
+    match std::env::var(screen_consts::AUDIO_BACKEND_VAR).ok().as_deref()
+    {
+        Some("monitor") => false,
+        Some("pipewire") => true,
+
+        //SANDBOXES MAY DENY LINKS
+        _ => !std::path::Path::new("/.flatpak-info").exists() && std::env::var_os("SNAP").is_none(),
+    }
+}
+
+/// Captures the default output's monitor (Windows: loopback) with cpal.
+async fn capture_monitor(tx: Sender<AudioFrame>, running: Arc<AtomicBool>)
+{
     let host = cpal::default_host();
 
     let device = if cfg!(target_os = "linux")
@@ -162,22 +200,13 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
 
     config.buffer_size = BufferSize::Fixed(screen_consts::BUFFER_SIZE);
 
-    let encoder = Encoder::new
-    (
-        <SampleRate as TryFrom<i32>>::try_from(consts::SAMPLE_RATE as i32).unwrap(),
-        Channels::Stereo,
-        Application::LowDelay,
-    ).unwrap();
-
-    let (chunk_tx, mut chunk_rx) = mpsc::channel::<Vec<f32>>(screen_consts::CAPTURE_CHANNEL_BOUND);
+    let (chunk_tx, chunk_rx) = mpsc::channel::<Vec<f32>>(screen_consts::CAPTURE_CHANNEL_BOUND);
 
     let input_channels = config.channels as usize;
     let input_source_rate = config.sample_rate as f32;
     let input_target_rate = consts::SAMPLE_RATE as f32;
     let input_resample_step = input_source_rate / input_target_rate;
     let mut input_resample_pos = 0.;
-
-    let mut input_accum: Vec<f32> = Vec::with_capacity(screen_consts::FRAME_SAMPLES * 2);
 
     let stream = device.build_input_stream(config.clone(), move |data: &[f32], _: &InputCallbackInfo|
     {
@@ -232,9 +261,21 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
     stream.play().unwrap();
 
     //TAKE OUR OWN VOICE PLAYBACK OUT OF THE LOOPBACK
-    let mut canceller = aec::start();
+    encode_capture(chunk_rx, tx, running, aec::start()).await;
+}
+
+/// Encodes captured 48 kHz stereo chunks until the source closes or the share ends.
+async fn encode_capture(mut chunk_rx: Receiver<Vec<f32>>, tx: Sender<AudioFrame>, running: Arc<AtomicBool>, mut canceller: Option<aec::Canceller>)
+{
+    let encoder = Encoder::new
+    (
+        <SampleRate as TryFrom<i32>>::try_from(consts::SAMPLE_RATE as i32).unwrap(),
+        Channels::Stereo,
+        Application::LowDelay,
+    ).unwrap();
 
     let mut out = vec![0u8; screen_consts::MAX_PACKET_SIZE];
+    let mut input_accum: Vec<f32> = Vec::with_capacity(screen_consts::FRAME_SAMPLES * 2);
 
     while running.load(Ordering::Relaxed)
     {
@@ -253,6 +294,9 @@ pub async fn spawn_audio_capture(tx: Sender<AudioFrame>, running: Arc<AtomicBool
 
                 input_accum.extend_from_slice(&chunk);
             },
+
+            //THE CAPTURE SOURCE CLOSED
+            Ok(None) => return,
 
             _ =>
             {

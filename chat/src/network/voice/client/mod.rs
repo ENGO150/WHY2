@@ -55,7 +55,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! a previous session goes quiet instead of feeding the new one.
 //!
 //! # Submodules
-//! - [`aec`] — keeps our own playback out of shared screen audio.
+//! - [`aec`] — keeps our own playback out of monitor-captured screen audio (Windows and the
+//!   Linux fallback; Linux normally excludes the process in the PipeWire capture).
 //! - [`message`] — recording and playback of voice messages.
 //! - [`options`] — volumes and processing switches the callbacks read.
 //! - [`sfx`] — join and leave sounds.

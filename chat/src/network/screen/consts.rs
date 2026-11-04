@@ -37,6 +37,8 @@ pub const BUFFER_SIZE: u32                = 960;                                
 pub const MAX_PACKET_SIZE: usize          = 4000;                                            //MAX OPUS PACKET SIZE
 
 pub const FRAME_SAMPLES: usize            = 1920;                                            //OPUS FRAME SAMPLES
+pub const PIPEWIRE_SETUP_TIMEOUT: Duration = Duration::from_secs(2);                         //HOW LONG PIPE CAPTURE SETUP MAY TAKE BEFORE FALLBACK
+pub const PIPEWIRE_NODE_LATENCY: &str     = "960/48000";                                     //PIPE CAPTURE QUANTUM
 
 pub const TARGET_FPS: u32                 = 30;                                              //TARGET FPS
 pub const FRAME_POLL_INTERVAL: Duration   = Duration::from_millis(1000 / TARGET_FPS as u64); //~30 FPS POLL
@@ -58,6 +60,7 @@ pub const SOCKET_BUFFER: usize            = 128 * 1024;                         
 pub const FORCED_INTRA_INTERVAL: Duration  = Duration::from_secs(2);      //MAX GAP BETWEEN ENCODED FRAMES
 pub const KEYFRAME_INTERVAL: Duration      = Duration::from_secs(2);      //MAX GAP BETWEEN KEYFRAMES
 pub const RECORDER_POLL_INTERVAL: Duration = Duration::from_millis(100);  //HOW OFTEN THE RECORDER LOOP RECHECKS `running` WHILE IDLE
+pub const AUDIO_BACKEND_VAR: &str          = "WHY2_SHARE_AUDIO";          //PINS SHARE AUDIO CAPTURE ("pipewire" / "monitor")
 pub const BACKEND_OVERRIDE_VAR: &str       = "WHY2_CAPTURE_BACKEND";      //PINS A CAPTURE BACKEND ("recorder" / "legacy")
 pub const PROBE_TIMEOUT_VAR: &str          = "WHY2_CAPTURE_PROBE_TIMEOUT"; //OVERRIDES THE PROBE TIMEOUT, IN SECONDS
 pub const RECORDER_PROBE_TIMEOUT: Duration = Duration::from_secs(30);     //HOW LONG THE RECORDER PROBE MAY BLOCK BEFORE WE FALL BACK
