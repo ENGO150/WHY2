@@ -185,14 +185,18 @@ fn obfuscate_data(data: &[u8], obfuscation_key: [u8; 32]) -> Vec<u8> //XOR BYTES
 /// Serializes, protects, frames and writes one packet.
 ///
 /// The packet's sequence number is assigned here: from `seq` if given, else from the session's
-/// global counter (the client's session state, or the server's connection entry). A write
-/// error is ignored; the read side notices the dead socket.
+/// global counter (the client's session state, or the server's connection entry). Main-connection
+/// callers ignore the write error; the read side notices the dead socket. Auxiliary sockets that
+/// must act on a failure ([`screen::send_frame`](screen::send_frame)) propagate it.
 ///
 /// # Parameters
 /// - `write_stream`: The socket to write to.
 /// - `packet`: The packet; its sequence number is overwritten.
 /// - `encryption_mode`: How to protect the payload.
 /// - `seq`: A local sequence counter to use instead of the global one (auxiliary sockets).
+///
+/// # Returns
+/// The write's result.
 ///
 /// # Panics
 /// If the packet cannot be serialized.
@@ -202,7 +206,7 @@ pub async fn send_tcp //SEND packet TO stream
     mut packet: impl SequencedPacket,
     encryption_mode: EncryptionMode<'_>,
     seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
-)
+) -> std::io::Result<()>
 {
     //ADD SEQUENCE NUMBER TO packet (FROM CLIENT)
     #[cfg(feature = "client_base")]
@@ -295,10 +299,8 @@ pub async fn send_tcp //SEND packet TO stream
     transmission_packet.append(&mut final_bytes);
 
     //SEND
-    if write_stream.write_all(&transmission_packet).await.is_ok()
-    {
-        write_stream.flush().await.ok();
-    }
+    write_stream.write_all(&transmission_packet).await?;
+    write_stream.flush().await
 }
 
 /// Reads, unframes and verifies one packet.
@@ -482,7 +484,7 @@ pub async fn send //SEND packet TO stream
     keys: Option<&SharedKeys>,
 )
 {
-    send_tcp
+    let _ = send_tcp
     (
         write_stream,
         Packet

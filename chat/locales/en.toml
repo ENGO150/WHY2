@@ -320,6 +320,7 @@ recorder_timeout = "the OS screen recorder did not answer in time"
 recorder_probe = "the OS screen recorder probe died"
 recorder_stopped = "the OS screen recorder stopped delivering frames"
 crashed = "screen capture crashed"
+connection = "the screen share connection failed"
 no_backend = "{recorder}; the fallback capture failed too: {polling}"
 
 [settings]

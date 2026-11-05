@@ -25,7 +25,11 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
-use std::time::Duration;
+use std::
+{
+    io,
+    time::Duration,
+};
 
 #[cfg(target_os = "linux")]
 use std::
@@ -60,7 +64,7 @@ pub enum ScreenPacketCode
 {
     Video { data: Vec<u8> }, //VIDEO DATA
     Audio { data: Vec<u8> }, //AUDIO DATA
-    Feedback { delay: u32, unsent: u32, shed: bool }, //WORST VIEWER'S BACKLOG (MICROSECONDS, BYTES)
+    Feedback { delay: u32, unsent: u32, shed: bool }, //VIEWER BACKLOG (MICROSECONDS; BYTES, OR THE VIEWER'S QUEUE DEPTH)
 }
 
 //STRUCTS
@@ -78,10 +82,31 @@ impl SequencedPacket for ScreenPacket
     fn set_seq(&mut self, seq: usize) { self.seq = seq; }
 }
 
+//STRUCTS
+/// What one TCP socket reports about its queue and its delivery rate.
+#[derive(Clone, Copy, Default)]
+pub struct TcpStats //ONE SOCKET'S QUEUE AND DELIVERY FIGURES
+{
+    /// Bytes written to the socket that have not been sent yet.
+    pub unsent: u64,          //BYTES NOT SENT YET
+    /// Round-trip time above the path's best.
+    pub inflated: Duration,   //RTT OVER THE PATH'S MINIMUM
+    /// Bytes the peer has acknowledged, cumulative.
+    pub acked: u64,           //BYTES ACKNOWLEDGED
+    /// The kernel's delivery-rate estimate, in bytes per second.
+    pub delivery_rate: u64,   //BYTES PER SECOND
+    /// Retransmitted segments, cumulative.
+    pub retrans: u32,         //RETRANSMITTED SEGMENTS
+}
+
 //FUNCTIONS
 //UTILS
+/// Returns a socket's queue and delivery figures.
+///
+/// # Returns
+/// `None` where the platform has no `tcp_info` or the kernel reports too little of it.
 #[cfg(target_os = "linux")]
-pub fn tcp_backlog(stream: &TcpStream) -> Option<(u64, Duration)> //UNSENT BYTES AND RTT OVER THE PATH'S BEST
+pub fn tcp_stats(stream: &TcpStream) -> Option<TcpStats>
 {
     //SAFETY: tcp_info IS PLAIN DATA
     let mut info: libc::tcp_info = unsafe { mem::zeroed() };
@@ -93,25 +118,101 @@ pub fn tcp_backlog(stream: &TcpStream) -> Option<(u64, Duration)> //UNSENT BYTES
         libc::getsockopt(stream.as_raw_fd(), libc::IPPROTO_TCP, libc::TCP_INFO, (&raw mut info).cast(), &mut length)
     };
 
-    if status != 0 || (length as usize) < mem::size_of::<libc::tcp_info>() { return None; }
+    //THE KERNEL MAY KNOW FEWER FIELDS THAN libc DOES
+    let known = length as usize;
 
-    Some((u64::from(info.tcpi_notsent_bytes), Duration::from_micros(u64::from(info.tcpi_rtt.saturating_sub(info.tcpi_min_rtt)))))
+    if status != 0 || known < mem::offset_of!(libc::tcp_info, tcpi_notsent_bytes) + mem::size_of::<u32>() { return None; }
+
+    let acked = if known >= mem::offset_of!(libc::tcp_info, tcpi_bytes_acked) + mem::size_of::<u64>() { info.tcpi_bytes_acked } else { 0 };
+    let delivery_rate = if known >= mem::offset_of!(libc::tcp_info, tcpi_delivery_rate) + mem::size_of::<u64>() { info.tcpi_delivery_rate } else { 0 };
+
+    Some(TcpStats
+    {
+        unsent: u64::from(info.tcpi_notsent_bytes),
+        inflated: Duration::from_micros(u64::from(info.tcpi_rtt.saturating_sub(info.tcpi_min_rtt))),
+        acked,
+        delivery_rate,
+        retrans: info.tcpi_total_retrans,
+    })
 }
 
 #[cfg(not(target_os = "linux"))]
-pub fn tcp_backlog(_stream: &TcpStream) -> Option<(u64, Duration)>
+pub fn tcp_stats(_stream: &TcpStream) -> Option<TcpStats>
 {
     None
 }
 
-pub fn cap_socket_buffers(stream: &TcpStream) //BOUND THE KERNEL QUEUE THIS SOCKET MAY HIDE
+/// Returns the unsent bytes and RTT inflation of a socket.
+pub fn tcp_backlog(stream: &TcpStream) -> Option<(u64, Duration)> //UNSENT BYTES AND RTT OVER THE PATH'S BEST
 {
+    tcp_stats(stream).map(|stats| (stats.unsent, stats.inflated))
+}
+
+/// Bounds the kernel queue a screen socket may hide.
+///
+/// The budget is [`SOCKET_QUEUE_MS`](consts::SOCKET_QUEUE_MS) of `bitrate`, clamped to
+/// [`SOCKET_BUFFER_MIN`](consts::SOCKET_BUFFER_MIN)..[`SOCKET_BUFFER_MAX`](consts::SOCKET_BUFFER_MAX).
+/// Linux doubles what is requested, so half is asked for there.
+pub fn cap_socket_buffers(stream: &TcpStream, bitrate: u32)
+{
+    let budget = (u64::from(bitrate) / 8 * consts::SOCKET_QUEUE_MS / 1000) as usize;
+    let budget = budget.clamp(consts::SOCKET_BUFFER_MIN, consts::SOCKET_BUFFER_MAX);
+
+    //LINUX DOUBLES BOTH BUFFERS
+    #[cfg(target_os = "linux")]
+    let request = (budget / 2).max(consts::SOCKET_BUFFER_MIN / 2);
+
+    #[cfg(not(target_os = "linux"))]
+    let request = budget;
+
     //CAP THE AUTOTUNED BUFFERS THAT HIDE BACKLOG
     let socket = socket2::SockRef::from(stream);
 
     //BEST EFFORT
-    socket.set_send_buffer_size(consts::SOCKET_BUFFER).ok();
-    socket.set_recv_buffer_size(consts::SOCKET_BUFFER).ok();
+    socket.set_send_buffer_size(request).ok();
+    socket.set_recv_buffer_size(request).ok();
+
+    //KEEP THE UNSENT QUEUE SHORT WHERE THE KERNEL OFFERS IT
+    #[cfg(target_os = "linux")]
+    {
+        let value = request.min(i32::MAX as usize) as libc::c_int;
+
+        //SAFETY: LIVE SOCKET, value IS ONE INCH
+        unsafe
+        {
+            libc::setsockopt(stream.as_raw_fd(), libc::IPPROTO_TCP, libc::TCP_NOTSENT_LOWAT,
+                (&raw const value).cast(), mem::size_of::<libc::c_int>() as libc::socklen_t);
+        }
+    }
+}
+
+/// Returns whether an access unit can be decoded on its own: it contains an IDR slice (NAL
+/// type 5) or an SPS (type 7), which the encoders only emit in front of one.
+pub fn is_keyframe(bitstream: &[u8]) -> bool //DOES THIS ACCESS UNIT STAND ON ITS OWN?
+{
+    //ONLY AN IDR (5), OR AN SPS (7) IN FRONT OF ONE
+    let mut index = 0;
+    while index + 3 < bitstream.len()
+    {
+        if bitstream[index..index + 3] != [0, 0, 1] { index += 1; continue; }
+
+        if matches!(bitstream[index + 3] & 0x1f, 5 | 7) { return true; }
+
+        index += 3;
+    }
+
+    false
+}
+
+/// Returns whether `WHY2_SCREEN_STATS` asked for the once-a-second diagnostic lines.
+pub fn stats_enabled() -> bool
+{
+    static ENABLED: std::sync::LazyLock<bool> = std::sync::LazyLock::new(||
+    {
+        std::env::var(consts::STATS_VAR).is_ok_and(|value| value != "0")
+    });
+
+    *ENABLED
 }
 
 pub async fn send_frame //SEND frame TO stream
@@ -120,7 +221,7 @@ pub async fn send_frame //SEND frame TO stream
     code: ScreenPacketCode,
     rex_stream: &mut RexPacketStream,
     seq: Option<&mut usize>, //LOCAL/GLOBAL SEQ COUNTER
-)
+) -> io::Result<()>
 {
     network::send_tcp
     (
@@ -132,7 +233,7 @@ pub async fn send_frame //SEND frame TO stream
         },
         EncryptionMode::Stream(rex_stream),
         seq,
-    ).await;
+    ).await
 }
 
 pub async fn receive_frame

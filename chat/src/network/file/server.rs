@@ -721,7 +721,7 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
     let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
 
     //SEND FIRST PACKET (METADATA)
-    network::send_tcp(&mut write_stream, FilePacket
+    let _ = network::send_tcp(&mut write_stream, FilePacket
     {
         uid,
         code: FilePacketCode::Metadata
