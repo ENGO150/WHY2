@@ -1,6 +1,18 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.4.2:
+- a2534e2d: upgrade chat dependencies
+- 3782efd9: remove WHY2_SCREEN_STATS debug envvar
+- 88b94499: add czech screenshare connection fail translation
+- bdd26dbd: add missing screen share connection translations
+- 7fcf5f30: merge branch 'screen-latency-fix' into development
+- e831ccc6: redesign READMEs
+- 360a1208: keep screen share latency bounded across stalls
+- d3846d5c: capture share audio per application on linux
+- aae42c87: upgrade dependencies & fix chat zbus breaking changes
+- 94e7313a: remove chat REXv1.6.0 migration code
+
 v2.4.1:
 - 194a9be3: migrate chat to REXv1.6.0
 - 3e9f4b82: implement AuthenticatedPacket on chat
