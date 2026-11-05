@@ -307,6 +307,7 @@ recorder_probe = "işletim sisteminin ekran kaydedicisi testi çöktü"
 recorder_stopped = "işletim sisteminin ekran kaydedicisi kare vermeyi bıraktı"
 no_backend = "{recorder}; yedek yakalama da başarısız oldu: {polling}"
 crashed = "ekran yakalama çöktü"
+connection = "ekran paylaşımı bağlantısı başarısız oldu"
 
 [settings]
 restart_note = "{keys} sunucu yeniden başlatıldığında etkinleşir."

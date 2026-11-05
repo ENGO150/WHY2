@@ -308,6 +308,7 @@ recorder_probe = "la prueba de la grabadora de pantalla del sistema falló"
 recorder_stopped = "la grabadora de pantalla del sistema dejó de entregar fotogramas"
 no_backend = "{recorder}; la captura alternativa también falló: {polling}"
 crashed = "la captura de pantalla se bloqueó"
+connection = "falló la conexión para compartir la pantalla"
 
 [settings]
 restart_note = "{keys} surtirá efecto cuando se reinicie el servidor."

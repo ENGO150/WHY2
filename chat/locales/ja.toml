@@ -307,6 +307,7 @@ recorder_probe = "OS の画面録画のプローブが異常終了しました"
 recorder_stopped = "OS の画面録画がフレームの出力を停止しました"
 no_backend = "{recorder}。代替のキャプチャも失敗しました: {polling}"
 crashed = "画面キャプチャがクラッシュしました"
+connection = "画面共有の接続に失敗しました"
 
 [settings]
 restart_note = "{keys} はサーバーの再起動後に反映されます。"

@@ -308,6 +308,7 @@ recorder_probe = "il test del registratore dello schermo del sistema si è inter
 recorder_stopped = "il registratore dello schermo del sistema ha smesso di fornire fotogrammi"
 no_backend = "{recorder}; anche la cattura di riserva non è riuscita: {polling}"
 crashed = "la cattura dello schermo si è bloccata"
+connection = "la connessione della condivisione dello schermo non è riuscita"
 
 [settings]
 restart_note = "{keys} avrà effetto al riavvio del server."

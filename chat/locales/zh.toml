@@ -307,6 +307,7 @@ recorder_probe = "系统屏幕录制探测已崩溃"
 recorder_stopped = "系统屏幕录制已停止输出画面"
 no_backend = "{recorder}；备用捕获也失败了：{polling}"
 crashed = "屏幕捕获已崩溃"
+connection = "屏幕共享连接失败"
 
 [settings]
 restart_note = "{keys} 将在服务器重启后生效。"

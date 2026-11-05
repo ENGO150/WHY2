@@ -310,6 +310,7 @@ recorder_probe = "test nahrávania obrazovky OS spadol"
 recorder_stopped = "nahrávanie obrazovky OS prestalo vracať snímky"
 no_backend = "{recorder}; záložné zachytávanie zlyhalo tiež: {polling}"
 crashed = "zachytávanie obrazovky spadlo"
+connection = "spojenie zdieľania obrazovky zlyhalo"
 
 [settings]
 restart_note = "Zmena {keys} sa prejaví až po reštarte servera."

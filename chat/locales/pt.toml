@@ -308,6 +308,7 @@ recorder_probe = "o teste do gravador de tela do sistema travou"
 recorder_stopped = "o gravador de tela do sistema parou de entregar quadros"
 no_backend = "{recorder}; a captura alternativa também falhou: {polling}"
 crashed = "a captura de tela travou"
+connection = "a conexão do compartilhamento de tela falhou"
 
 [settings]
 restart_note = "{keys} terá efeito quando o servidor for reiniciado."

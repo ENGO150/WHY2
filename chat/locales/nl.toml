@@ -308,6 +308,7 @@ recorder_probe = "de test van de schermrecorder van het systeem is gecrasht"
 recorder_stopped = "de schermrecorder van het systeem levert geen beelden meer"
 no_backend = "{recorder}; de alternatieve opname is ook mislukt: {polling}"
 crashed = "schermopname gecrasht"
+connection = "de verbinding voor het delen van het scherm is mislukt"
 
 [settings]
 restart_note = "{keys} wordt actief wanneer de server opnieuw wordt gestart."

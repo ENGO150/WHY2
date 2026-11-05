@@ -308,6 +308,7 @@ recorder_probe = "der Test der Bildschirmaufnahme des Betriebssystems ist abgest
 recorder_stopped = "die Bildschirmaufnahme des Betriebssystems liefert keine Bilder mehr"
 no_backend = "{recorder}; die Ersatzaufnahme ist ebenfalls fehlgeschlagen: {polling}"
 crashed = "Bildschirmaufnahme abgestürzt"
+connection = "die Verbindung der Bildschirmfreigabe ist fehlgeschlagen"
 
 [settings]
 restart_note = "{keys} wird erst nach einem Neustart des Servers wirksam."

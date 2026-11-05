@@ -310,6 +310,7 @@ recorder_probe = "test systemowego rejestratora ekranu uległ awarii"
 recorder_stopped = "systemowy rejestrator ekranu przestał dostarczać klatki"
 no_backend = "{recorder}; zapasowe przechwytywanie również nie powiodło się: {polling}"
 crashed = "przechwytywanie ekranu uległo awarii"
+connection = "połączenie udostępniania ekranu nie powiodło się"
 
 [settings]
 restart_note = "{keys} zacznie działać po restarcie serwera."
