@@ -25,7 +25,7 @@ repository.workspace = true
 description = "Lightweight, fast, secure, and easy to use encryption system."
 keywords = ["encryption", "security", "cryptography"]
 categories = ["cryptography"]
-readme = "../README.md"
+readme = "./README.md"
 
 [dependencies]
 rand = "0.10.3"
