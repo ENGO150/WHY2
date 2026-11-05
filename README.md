@@ -1,76 +1,73 @@
 # WHY2
-[![Build Status]][pipelines] [![Codacy Badge]][gitlab] [![Latest Version]][crates.io] [![Docs Status]][docs]
 
-[Build Status]: https://git.satan.red/ENGO150/WHY2/badges/development/pipeline.svg
-[pipelines]: https://git.satan.red/ENGO150/WHY2/-/pipelines
-[Latest Version]: https://img.shields.io/crates/v/why2
-[crates.io]: https://crates.io/crates/why2
-[Docs Status]: https://img.shields.io/docsrs/why2
-[docs]: https://docs.rs/why2
-[Codacy Badge]: https://app.codacy.com/project/badge/Grade/80836146f6fa4567b734e7b5ed452f2d
-[gitlab]: https://git.satan.red/ENGO150/WHY2
+A Rust workspace containing a terminal chat client and server, built on the REX cipher.
 
-**Lightweight, fast, secure, and easy to use encryption system.**
+[![build](https://img.shields.io/gitlab/pipeline-status/ENGO150/WHY2?branch=stable&style=flat-square&gitlab_url=https%3A%2F%2Fgit.satan.red)](https://git.satan.red/ENGO150/WHY2/-/pipelines)
+[![why2-chat](https://img.shields.io/crates/v/why2-chat?label=why2-chat&style=flat-square)](https://crates.io/crates/why2-chat)
+[![why2](https://img.shields.io/crates/v/why2?label=why2&style=flat-square)](https://crates.io/crates/why2)
+[![license](https://img.shields.io/badge/license-GPLv3-blue?style=flat-square)](https://git.satan.red/ENGO150/WHY2/-/blob/stable/LICENSE)
 
----
+[Features](#features) · [Quick start](#quick-start) · [Security](#security) · [Links](#links)
 
-## Code Example
-```rust
-use why2::{ encrypter, decrypter };
+| Crate | Description |
+|:---|:---|
+| [`why2-chat`](https://git.satan.red/ENGO150/WHY2/-/blob/stable/chat/README.md) | Terminal client and headless server |
+| [`why2`](https://git.satan.red/ENGO150/WHY2/-/blob/stable/core/README.md) | REX encryption cipher, usable on its own |
 
-fn main()
-{
-    let input = String::from("Hello world!");
+## Features
 
-    // Encrypt input using 8x8 Grid, with random key
-    let encrypted = encrypter::encrypt_string::<8, 8>(&input, None)
-                        .expect("Encryption failed");
+- **Text:** channels, private messages, replies, reactions, pins and edits.
+- **Voice:** Opus channels with noise suppression, voice activity detection and voice messages.
+- **Screen sharing:** H.264 with audio, multiple viewers and monitor switching.
+- **Files:** uploads, downloads, inline images, avatars and a server icon.
+- **Server:** roles, moderation, bans and optional encrypted history.
+- **Client:** full-screen TUI, themes, translations and in-app settings.
+- **Network:** SOCKS5 proxy support for the TCP session.
 
-    // Print encrypted Grids
-    for grid in &encrypted.output
-    {
-        println!("{}", grid);
-    }
+## Quick start
 
-    // Decrypt
-    let decrypted = decrypter::decrypt_string(encrypted)
-                        .expect("Decryption failed");
+From the repository root:
 
-    // Compare input & output
-    assert_eq!(input, *decrypted);
-}
+**Server**
+
+```bash
+cargo build --bin why2-server --no-default-features --features server,windows_resources --release
+./target/release/why2-server
 ```
 
-## Cargo Features
+**Client**
 
-- **`constant-time`** (default) — constant-time conditional operations via `subtle`. Disabling it
-  is faster, and opens timing side-channels.
-- **`auth`** (default) — authenticated encryption (encrypt-then-MAC with HMAC-SHA256) via
-  `AuthenticatedData`.
+```bash
+cargo build --bin why2 --release
+./target/release/why2
+```
 
-## Beyond One-Shot Encryption
+On Linux, a full client also needs the audio and video packages listed in the
+[chat README](https://git.satan.red/ENGO150/WHY2/-/blob/stable/chat/README.md#build).
 
-`why2::stream::RexStream` runs the same CTR-mode cipher incrementally, for data that arrives in
-chunks (sockets, large files) and should not be buffered whole. `why2-chat`, the reference chat
-application in this repository, is built on both APIs — see the [chat README](https://git.satan.red/ENGO150/WHY2/-/blob/stable/chat/README.md).
+**Docker**
+
+```bash
+docker compose -f chat/docker-compose.yml up -d
+```
+
+The first account to register becomes the owner. Open TCP and UDP port `1204`.
+
+## Security
+
+- Messages, voice, files and screen streams are encrypted and authenticated.
+- The handshake is hybrid P-521 + ML-KEM-768 with TOFU pinning; sessions rekey every 10 minutes.
+- The server decrypts messages to route and store them. This is not end-to-end encryption.
+- REX is experimental and has not been formally audited.
 
 ## Links
 
-- [API Documentation](https://docs.rs/why2)
-- [Examples Directory](https://git.satan.red/ENGO150/WHY2/-/tree/stable/examples)
-- [Security Policy](https://git.satan.red/ENGO150/WHY2/-/blob/stable/SECURITY)
-- [Contributing Guidelines](https://git.satan.red/ENGO150/WHY2/-/blob/stable/CONTRIBUTING)
+- [Chat README](https://git.satan.red/ENGO150/WHY2/-/blob/stable/chat/README.md)
+- [Downloads](https://why2.satan.red/download)
+- [Cipher documentation](https://docs.rs/why2)
+- [Security policy](https://git.satan.red/ENGO150/WHY2/-/blob/stable/SECURITY)
+- [Contributing](https://git.satan.red/ENGO150/WHY2/-/blob/stable/CONTRIBUTING)
 
-## Getting Help
-For help, DM me directly on [Discord](https://discord.com/users/634385503956893737) :)
+## License
 
-## Security Notice
-
-WHY2 is an **experimental symmetric encryption algorithm**. While it employs
-proven cryptographic techniques (SPN structure, ARX operations, MDS mixing),
-it has **not been formally audited or peer-reviewed**.
-
-#### License
-<sup>
-WHY2 is licensed under the GNU GPLv3. You are free to use, modify, and redistribute it under the terms of the license. See <a href="https://www.gnu.org/licenses/" target="_blank">https://www.gnu.org/licenses/</a> for details.
-</sup>
+GPLv3. See [LICENSE](https://git.satan.red/ENGO150/WHY2/-/blob/stable/LICENSE).
