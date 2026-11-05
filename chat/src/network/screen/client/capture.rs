@@ -465,16 +465,12 @@ impl FrameEncoder
         //NETWORK BEHIND - SKIP BEFORE THE ENCODER SEES IT
         if frame_tx.capacity() == 0
         {
-            rate::note_dropped();
-
             return Ok(false);
         }
 
         if self.last_keyframe.elapsed() >= consts::KEYFRAME_INTERVAL { self.force_intra_frame(); }
 
         let Some(frame) = self.encode(width, height, pixels, order)? else { return Ok(false) };
-
-        rate::note_encoded();
 
         if encoder::nal_units(&frame).any(|unit| unit.first().is_some_and(|header| header & 0x1f == 5))
         {
@@ -554,7 +550,6 @@ impl FrameEncoder
         //THIS FRAME IS GONE, SO THE NEXT CANNOT PREDICT IT
         if frame_tx.try_send(frame).is_err()
         {
-            rate::note_dropped();
             rate::request_keyframe();
 
             return false;

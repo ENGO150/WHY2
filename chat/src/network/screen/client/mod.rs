@@ -103,11 +103,6 @@ pub struct ViewerReports
     needs_key: AtomicBool,  //WAITING FOR AN IDR
     max_age: AtomicU64,     //OLDEST RECEIVE-TO-DISPLAY AGE SINCE THE LAST REPORT, MICROSECONDS
     depth: AtomicU32,       //FRAMES WAITING TO BE DECODED
-    stat_age: AtomicU64,    //OLDEST AGE THIS INTERVAL, MICROSECONDS
-    stat_decode: AtomicU64, //LONGEST DECODE THIS INTERVAL, MICROSECONDS
-    stat_frames: AtomicU64, //FRAMES DISPLAYED THIS INTERVAL
-    stat_dropped: AtomicU64, //FRAMES DROPPED THIS INTERVAL
-    stat_requests: AtomicU64, //KEYFRAMES REQUESTED THIS INTERVAL
 }
 
 pub struct ScreenShareRequest
@@ -142,7 +137,6 @@ impl ViewerReports
     pub fn request_keyframe(&self) //ASK FOR A FRESH PICTURE
     {
         self.needs_key.store(true, Ordering::Relaxed);
-        self.stat_requests.fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn keyframe_seen(&self) //A FRESH PICTURE ARRIVED
@@ -155,27 +149,11 @@ impl ViewerReports
         let micros = age.as_micros() as u64;
 
         self.max_age.fetch_max(micros, Ordering::Relaxed);
-        self.stat_age.fetch_max(micros, Ordering::Relaxed);
-    }
-
-    pub fn note_decode(&self, time: Duration)
-    {
-        self.stat_decode.fetch_max(time.as_micros() as u64, Ordering::Relaxed);
     }
 
     pub fn note_depth(&self, depth: usize)
     {
         self.depth.store(depth.min(u32::MAX as usize) as u32, Ordering::Relaxed);
-    }
-
-    pub fn note_frame(&self)
-    {
-        self.stat_frames.fetch_add(1, Ordering::Relaxed);
-    }
-
-    pub fn note_dropped(&self, count: usize)
-    {
-        self.stat_dropped.fetch_add(count as u64, Ordering::Relaxed);
     }
 
     /// Takes the figures the sharer is told, keeping the keyframe request until it is served.
@@ -184,20 +162,6 @@ impl ViewerReports
         let age = self.max_age.swap(0, Ordering::Relaxed).min(u64::from(u32::MAX)) as u32;
 
         (age, self.depth.load(Ordering::Relaxed), self.needs_key.load(Ordering::Relaxed))
-    }
-
-    pub fn stats_report(&self) -> String //ONE INTERVAL'S COUNTERS
-    {
-        format!
-        (
-            "screen view: age={}ms decode={}ms depth={} frames={} dropped={} key_requests={}",
-            self.stat_age.swap(0, Ordering::Relaxed) / 1000,
-            self.stat_decode.swap(0, Ordering::Relaxed) / 1000,
-            self.depth.load(Ordering::Relaxed),
-            self.stat_frames.swap(0, Ordering::Relaxed),
-            self.stat_dropped.swap(0, Ordering::Relaxed),
-            self.stat_requests.swap(0, Ordering::Relaxed),
-        )
     }
 }
 
@@ -270,7 +234,6 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
     let mut awaiting_key = false;
     let mut capped = rate::bitrate();
     let mut tick = time::interval(consts::DRAIN_POLL_INTERVAL);
-    let mut stats_at = Instant::now();
     let mut write_failed = false;
 
     //LOOP SENDING FRAMES
@@ -327,7 +290,6 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
                 {
                     rate::set_draining(true);
                     rate::request_keyframe();
-                    rate::note_dropped();
 
                     awaiting_key = true;
 
@@ -337,8 +299,6 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
                 //RECOVERY WAITS FOR AN IDR
                 if awaiting_key && !keyframe
                 {
-                    rate::note_dropped();
-
                     continue;
                 }
 
@@ -407,7 +367,6 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
                 }
 
                 rate::record(bytes, busy);
-                rate::note_sent(keyframe);
 
                 awaiting_key = false;
             },
@@ -440,12 +399,6 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
                     awaiting_key = true;
                 }
 
-                if rate::stats_enabled() && stats_at.elapsed() >= Duration::from_secs(1)
-                {
-                    eprintln!("{}", rate::stats_report());
-
-                    stats_at = Instant::now();
-                }
             }
         }
     }
@@ -520,7 +473,6 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
 
         let mut seq = 0usize;
         let mut interval = time::interval(consts::VIEWER_REPORT_INTERVAL);
-        let mut stats_at = Instant::now();
 
         loop
         {
@@ -539,19 +491,11 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
 
                 return;
             }
-
-            if screen::stats_enabled() && stats_at.elapsed() >= Duration::from_secs(1)
-            {
-                eprintln!("{}", report_reports.stats_report());
-
-                stats_at = Instant::now();
-            }
         }
     });
 
     //SPAWN NETWORK READER TASK
     let running_net = running.clone();
-    let network_reports = reports.clone();
     tokio::spawn(async move
     {
         let mut streams = (&mut read_stream, write_stream);
@@ -581,8 +525,6 @@ pub async fn attach(token: [u8; 32], main_stream: Arc<Mutex<OwnedWriteHalf>>)
                 ScreenPacketCode::Video { data } =>
                 {
                     let keyframe = screen::is_keyframe(&data);
-
-                    network_reports.note_frame();
 
                     //CLONED OUT OF THE LOCK - THE SINK MAY CHANGE
                     let sink = SCREEN_FRAME_SINK.read().unwrap().clone();

@@ -125,7 +125,6 @@ impl Session
         if keyframe_at.is_none() && pending[0].received.elapsed() >= consts::STALE_FRAME_AGE
         {
             self.awaiting_key = true;
-            self.reports.note_dropped(pending.len());
             self.reports.request_keyframe();
 
             return false;
@@ -134,7 +133,6 @@ impl Session
         //AFTER A GAP ONLY A KEYFRAME CAN RESUME THE PICTURE
         if self.awaiting_key && keyframe_at.is_none()
         {
-            self.reports.note_dropped(pending.len());
             self.reports.request_keyframe();
 
             return false;
@@ -142,17 +140,13 @@ impl Session
 
         //A KEYFRAME MAKES EVERYTHING BEFORE IT USELESS
         let start = keyframe_at.unwrap_or(0);
-        if start > 0 { self.reports.note_dropped(start); }
 
         let newest = pending.len() - 1;
         let mut uploaded = false;
-        let mut decode_time = Duration::ZERO;
 
         for (index, frame) in pending[start..].iter().enumerate()
         {
-            let began = Instant::now();
             let decoded = self.decoder.decode(&frame.data);
-            decode_time = decode_time.max(began.elapsed());
 
             match decoded
             {
@@ -179,15 +173,12 @@ impl Session
                 Err(_) =>
                 {
                     self.awaiting_key = true;
-                    self.reports.note_dropped(pending.len() - (start + index));
                     self.reports.request_keyframe();
 
                     break;
                 }
             }
         }
-
-        self.reports.note_decode(decode_time);
 
         if let Some(frame) = pending.last() { self.reports.note_age(frame.received.elapsed()); }
 

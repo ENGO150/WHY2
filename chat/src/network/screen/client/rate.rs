@@ -53,17 +53,6 @@ static FORCE_KEYFRAME: AtomicBool = AtomicBool::new(false); //THE NEXT FRAME MUS
 static DRAINING: AtomicBool = AtomicBool::new(false); //VIDEO IS HELD UNTIL THE LINK EMPTIES
 static FPS: AtomicU32 = AtomicU32::new(consts::TARGET_FPS); //CAPTURE STEPS THE LINK CAN CARRY
 
-//STATISTICS
-static STAT_FRAMES: AtomicU64 = AtomicU64::new(0);   //FRAMES WRITTEN
-static STAT_ENCODED: AtomicU64 = AtomicU64::new(0);  //FRAMES ENCODED
-static STAT_KEYFRAMES: AtomicU64 = AtomicU64::new(0); //KEYFRAMES WRITTEN
-static STAT_DROPPED: AtomicU64 = AtomicU64::new(0);  //FRAMES DROPPED
-static STAT_BYTES: AtomicU64 = AtomicU64::new(0);    //BYTES WRITTEN
-static STAT_ACKED: AtomicU64 = AtomicU64::new(0);    //BYTES ACKNOWLEDGED
-static STAT_RETRANS: AtomicU64 = AtomicU64::new(0);  //RETRANSMITTED SEGMENTS
-static STAT_STALLS: AtomicU64 = AtomicU64::new(0);   //BLOCKING WRITES OVER THE THRESHOLD
-static STAT_KEY_REQUESTED: AtomicU64 = AtomicU64::new(0); //KEYFRAMES ASKED FOR
-
 //STRUCTS
 pub struct RateControl //FITS THE BITRATE TO THE LINK
 {
@@ -197,26 +186,18 @@ pub fn start() //A NEW SHARE
     DRAINING.store(false, Ordering::Relaxed);
     FPS.store(consts::TARGET_FPS, Ordering::Relaxed);
     BITRATE.store(consts::START_BITRATE, Ordering::Relaxed);
-
-    for counter in [&STAT_FRAMES, &STAT_ENCODED, &STAT_KEYFRAMES, &STAT_DROPPED, &STAT_BYTES,
-        &STAT_ACKED, &STAT_RETRANS, &STAT_STALLS, &STAT_KEY_REQUESTED]
-    {
-        counter.store(0, Ordering::Relaxed);
-    }
 }
 
 pub fn record(bytes: usize, busy: Duration) //ONE SOCKET WRITE
 {
     SENT.fetch_add(bytes as u64, Ordering::Relaxed);
     BUSY.fetch_add(busy.as_micros() as u64, Ordering::Relaxed);
-    STAT_BYTES.fetch_add(bytes as u64, Ordering::Relaxed);
 
     //ONE BLOCKING WRITE IS ENOUGH
     if busy >= consts::RATE_STALL
     {
         STALL.fetch_max(busy.as_micros() as u64, Ordering::Relaxed);
         LAST_STALL.store(busy.as_micros() as u64, Ordering::Relaxed);
-        STAT_STALLS.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -253,11 +234,9 @@ pub fn probe(stream: &TcpStream) -> Option<Duration> //THE QUEUE A NEW FRAME JOI
 
     let acked = stats.acked.saturating_sub(LAST_ACKED.swap(stats.acked, Ordering::Relaxed));
     ACKED.fetch_add(acked, Ordering::Relaxed);
-    STAT_ACKED.fetch_add(acked, Ordering::Relaxed);
 
     let retrans = u64::from(stats.retrans).saturating_sub(LAST_RETRANS.swap(u64::from(stats.retrans), Ordering::Relaxed));
     RETRANS.fetch_add(retrans, Ordering::Relaxed);
-    STAT_RETRANS.fetch_add(retrans, Ordering::Relaxed);
 
     Some(Duration::from_micros(delay))
 }
@@ -273,7 +252,6 @@ pub fn report(delay: u32, unsent: u32, shed: bool) //THE SERVER'S WORD ON ITS VI
 pub fn request_keyframe() //THE NEXT FRAME MUST STAND ALONE
 {
     FORCE_KEYFRAME.store(true, Ordering::Relaxed);
-    STAT_KEY_REQUESTED.fetch_add(1, Ordering::Relaxed);
 }
 
 pub fn take_keyframe_request() -> bool //CONSUMES A PENDING REQUEST
@@ -299,51 +277,6 @@ pub fn bitrate() -> u32 //THE CURRENT TARGET
 pub fn fps() -> u32 //THE RATE CAPTURE SHOULD RUN AT
 {
     FPS.load(Ordering::Relaxed).max(1)
-}
-
-pub fn note_encoded()
-{
-    STAT_ENCODED.fetch_add(1, Ordering::Relaxed);
-}
-
-pub fn note_sent(keyframe: bool)
-{
-    STAT_FRAMES.fetch_add(1, Ordering::Relaxed);
-
-    if keyframe { STAT_KEYFRAMES.fetch_add(1, Ordering::Relaxed); }
-}
-
-pub fn note_dropped()
-{
-    STAT_DROPPED.fetch_add(1, Ordering::Relaxed);
-}
-
-pub fn stats_enabled() -> bool
-{
-    screen::stats_enabled()
-}
-
-pub fn stats_report() -> String //ONE INTERVAL'S COUNTERS
-{
-    let frames = STAT_FRAMES.swap(0, Ordering::Relaxed);
-    let encoded = STAT_ENCODED.swap(0, Ordering::Relaxed);
-    let keyframes = STAT_KEYFRAMES.swap(0, Ordering::Relaxed);
-    let dropped = STAT_DROPPED.swap(0, Ordering::Relaxed);
-    let bytes = STAT_BYTES.swap(0, Ordering::Relaxed);
-    let acked = STAT_ACKED.swap(0, Ordering::Relaxed);
-    let retrans = STAT_RETRANS.swap(0, Ordering::Relaxed);
-    let stalls = STAT_STALLS.swap(0, Ordering::Relaxed);
-    let requests = STAT_KEY_REQUESTED.swap(0, Ordering::Relaxed);
-
-    format!
-    (
-        "screen share: target={}kbps fps={} encoded={encoded} sent={frames} keyframes={keyframes} dropped={dropped} \
-         bytes={}KB acked={}KB retrans={retrans} stalls={stalls} key_requests={requests}",
-        BITRATE.load(Ordering::Relaxed) / 1000,
-        fps(),
-        bytes / 1024,
-        acked / 1024,
-    )
 }
 
 fn at_target(bytes: u64) -> u64 //MICROSECONDS TO SEND bytes AT THE CURRENT TARGET

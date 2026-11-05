@@ -130,12 +130,6 @@ struct Share //WHAT A SHARE LEAVES WHERE AN ATTACHING VIEWER CAN REACH IT
     stats: MutexSync<Vec<Arc<Backlog>>>,      //EVERY SERVED VIEWER'S BACKLOG
     /// Whether anybody asked the sharer for a keyframe.
     key_requested: AtomicBool,                //SOMEBODY NEEDS AN IDR
-    /// Frames relayed, for the diagnostic line.
-    frames: AtomicU64,
-    /// Keyframes relayed, for the diagnostic line.
-    keyframes: AtomicU64,
-    /// Frames dropped for a viewer, for the diagnostic line.
-    shed: AtomicU64,
 }
 
 /// What one viewer is behind by, as the worst case since the last report.
@@ -333,12 +327,6 @@ impl ViewerQueue
         }
 
         self.video.lock().unwrap().take().map(|(queued, data, _)| Queued::Video { queued, data })
-    }
-
-    /// Returns how many packets are waiting.
-    fn depth(&self) -> usize
-    {
-        self.audio.lock().unwrap().len() + usize::from(self.video.lock().unwrap().is_some())
     }
 
     /// Stops the writer task at its next wakeup.
@@ -727,9 +715,6 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         pending: MutexSync::new(Vec::new()),
         stats: MutexSync::new(Vec::new()),
         key_requested: AtomicBool::new(false),
-        frames: AtomicU64::new(0),
-        keyframes: AtomicU64::new(0),
-        shed: AtomicU64::new(0),
     });
 
     //REPORT BACK ON THE SAME SOCKET
@@ -739,8 +724,6 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
     let _guard = ScreenTransferGuard { id, feedback: reporter };
 
     SHARES.insert(id, share.clone());
-
-    let mut stats_at = Instant::now();
 
     //LOOP READING
     loop
@@ -868,12 +851,8 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
                         viewer.needs_key = true;
                         viewer.stats.shed.store(true, Ordering::Relaxed);
                         share.key_requested.store(true, Ordering::Relaxed);
-                        share.shed.fetch_add(1, Ordering::Relaxed);
                     }
                 }
-
-                share.frames.fetch_add(1, Ordering::Relaxed);
-                if keyframe { share.keyframes.fetch_add(1, Ordering::Relaxed); }
 
                 //KEEP THE LAST KEYFRAME FOR THE NEXT ATTACH
                 if keyframe
@@ -897,19 +876,6 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             },
 
             ScreenPacketCode::Feedback { .. } => {},
-        }
-
-        if screen::stats_enabled() && stats_at.elapsed() >= Duration::from_secs(1)
-        {
-            let frames = share.frames.swap(0, Ordering::Relaxed);
-            let keyframes = share.keyframes.swap(0, Ordering::Relaxed);
-            let shed = share.shed.swap(0, Ordering::Relaxed);
-            let depths: Vec<usize> = viewers.values().map(|viewer| viewer.queue.depth()).collect();
-
-            log::info!("Screen stats: {} viewers, {frames} frames/s, {keyframes} keyframes/s, {shed} shed, queues {depths:?}: share of {owner}",
-                viewers.len());
-
-            stats_at = Instant::now();
         }
     }
 

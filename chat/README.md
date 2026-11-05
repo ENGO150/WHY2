@@ -88,7 +88,6 @@ docker compose -f chat/docker-compose.yml up -d
 | `WHY2_CAPTURE_BACKEND` | run | Pins screen capture, `recorder` or `legacy` |
 | `WHY2_CAPTURE_PROBE_TIMEOUT` | run | Recorder probe deadline, in seconds |
 | `WHY2_SHARE_AUDIO` | run | Pins share audio, `pipewire` or `monitor` |
-| `WHY2_SCREEN_STATS` | run | Prints screen statistics once a second |
 
 `server_ip`, `server_port`, `enable_voice_chat`, `server_username` and `log_level` are read at
 startup only.

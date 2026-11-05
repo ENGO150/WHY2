@@ -47,7 +47,6 @@ pub const STALE_FRAME_AGE: Duration       = Duration::from_millis(150);         
 pub const VIEWER_REPORT_INTERVAL: Duration = Duration::from_millis(250);                     //HOW OFTEN A VIEWER REPORTS ITS STATE
 pub const VIEWER_AUDIO_BOUND: usize       = 8;                                               //AUDIO PACKETS A VIEWER QUEUE KEEPS
 pub const VIDEO_CHANNEL_BOUND: usize      = 1;                                               //VIDEO FRAMES WAITING AT THE HANDSOFF
-pub const STATS_VAR: &str                 = "WHY2_SCREEN_STATS";                           //PRINTS SCREEN STATS ONCE A SECOND
 
 pub const SOCKET_QUEUE_MS: u64            = 100;                                             //QUEUE A SCREEN SOCKET MAY HOLD, IN MILLISECONDS OF TARGET
 pub const SOCKET_BUFFER_MIN: usize        = 32 * 1024;                                       //SMALLEST SOCKET BUFFER A SHARE ASKS FOR

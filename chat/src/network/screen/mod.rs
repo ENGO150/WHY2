@@ -204,17 +204,6 @@ pub fn is_keyframe(bitstream: &[u8]) -> bool //DOES THIS ACCESS UNIT STAND ON IT
     false
 }
 
-/// Returns whether `WHY2_SCREEN_STATS` asked for the once-a-second diagnostic lines.
-pub fn stats_enabled() -> bool
-{
-    static ENABLED: std::sync::LazyLock<bool> = std::sync::LazyLock::new(||
-    {
-        std::env::var(consts::STATS_VAR).is_ok_and(|value| value != "0")
-    });
-
-    *ENABLED
-}
-
 pub async fn send_frame //SEND frame TO stream
 (
     write_stream: &mut OwnedWriteHalf,
