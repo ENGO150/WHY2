@@ -20,8 +20,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! The winit application that shows watched shares, one window per watched share.
 //!
-//! Every received access unit is decoded, since H.264 frames reference each other, but only the
-//! newest decoded frame of a batch is uploaded and drawn. The window's title shows the frame
+//! A batch is decoded from its newest keyframe, since H.264 frames reference each other, but only
+//! the newest decoded frame of the batch is uploaded and drawn. A backlog with no keyframe older
+//! than [`STALE_FRAME_AGE`](consts::STALE_FRAME_AGE) is dropped whole and a fresh one asked for,
+//! rather than decoded into a picture that is already late. The window's title shows the frame
 //! rate. A window the user closes detaches on the server; a session whose attachment ended is
 //! kept briefly so its last frame is not torn down mid-draw.
 
@@ -60,7 +62,7 @@ use crate::
     network::screen::
     {
         consts,
-        client::{ ScreenShareRequest, UserEvent, video::VideoSurface },
+        client::{ ScreenShareRequest, UserEvent, ViewerReports, VideoFrame, video::VideoSurface },
     },
 };
 
@@ -74,9 +76,13 @@ struct Session
     /// The renderer painting it.
     surface: VideoSurface,
     /// Encoded frames from the network reader.
-    frame_rx: Receiver<Vec<u8>>,
+    frame_rx: Receiver<VideoFrame>,
+    /// What the sharer is told about this window.
+    reports: Arc<ViewerReports>,
     /// The H.264 decoder.
     decoder: Decoder,
+    /// Whether a gap was dropped, so only a keyframe can resume.
+    awaiting_key: bool,
     /// Whether a new frame is waiting to be drawn.
     frame_dirty: bool,
     /// Cleared when the attachment ends.
@@ -94,37 +100,100 @@ struct Session
 //IMPLEMENTATIONS
 impl Session
 {
-    /// Decodes every waiting frame and uploads the newest.
+    /// Decodes the newest run of frames and uploads the newest picture.
+    ///
+    /// A backlog older than [`STALE_FRAME_AGE`](consts::STALE_FRAME_AGE) with no keyframe in it
+    /// is dropped whole, keeping the last picture and asking for a new keyframe.
     ///
     /// # Returns
-    /// `true` if any frame was waiting.
+    /// `true` if a picture was uploaded.
     fn process_pending_frames(&mut self) -> bool
     {
-        let mut pending: Vec<Vec<u8>> = Vec::new();
-        while let Ok(compressed) = self.frame_rx.try_recv()
+        let mut pending: Vec<VideoFrame> = Vec::new();
+        while let Ok(frame) = self.frame_rx.try_recv()
         {
-            pending.push(compressed);
+            pending.push(frame);
         }
 
         if pending.is_empty() { return false; }
 
-        let newest = pending.len() - 1;
+        self.reports.note_depth(pending.len());
 
-        for (index, compressed) in pending.iter().enumerate()
+        let keyframe_at = pending.iter().rposition(|frame| frame.keyframe);
+
+        //AN OLD BACKLOG IS NOT WORTH DECODING WITHOUT A FRESH START
+        if keyframe_at.is_none() && pending[0].received.elapsed() >= consts::STALE_FRAME_AGE
         {
-            //DECODE EVERY FRAME - H.264 IS PREDICTED
-            let Ok(Some(yuv)) = self.decoder.decode(compressed) else { continue; };
+            self.awaiting_key = true;
+            self.reports.note_dropped(pending.len());
+            self.reports.request_keyframe();
 
-            //ONLY THE NEWEST FRAME IS UPLOADED
-            if index != newest { continue; }
-
-            //THE PLANES GO UP AS THEY ARE
-            self.surface.upload(&yuv);
-
-            self.frame_dirty = true;
+            return false;
         }
 
-        true
+        //AFTER A GAP ONLY A KEYFRAME CAN RESUME THE PICTURE
+        if self.awaiting_key && keyframe_at.is_none()
+        {
+            self.reports.note_dropped(pending.len());
+            self.reports.request_keyframe();
+
+            return false;
+        }
+
+        //A KEYFRAME MAKES EVERYTHING BEFORE IT USELESS
+        let start = keyframe_at.unwrap_or(0);
+        if start > 0 { self.reports.note_dropped(start); }
+
+        let newest = pending.len() - 1;
+        let mut uploaded = false;
+        let mut decode_time = Duration::ZERO;
+
+        for (index, frame) in pending[start..].iter().enumerate()
+        {
+            let began = Instant::now();
+            let decoded = self.decoder.decode(&frame.data);
+            decode_time = decode_time.max(began.elapsed());
+
+            match decoded
+            {
+                Ok(Some(yuv)) =>
+                {
+                    if frame.keyframe
+                    {
+                        self.awaiting_key = false;
+                        self.reports.keyframe_seen();
+                    }
+
+                    //ONLY THE NEWEST FRAME IS UPLOADED
+                    if start + index != newest { continue; }
+
+                    //THE PLANES GO UP AS THEY ARE
+                    self.surface.upload(&yuv);
+
+                    uploaded = true;
+                },
+
+                Ok(None) => {},
+
+                //THE REFERENCES ARE GONE
+                Err(_) =>
+                {
+                    self.awaiting_key = true;
+                    self.reports.note_dropped(pending.len() - (start + index));
+                    self.reports.request_keyframe();
+
+                    break;
+                }
+            }
+        }
+
+        self.reports.note_decode(decode_time);
+
+        if let Some(frame) = pending.last() { self.reports.note_age(frame.received.elapsed()); }
+
+        self.frame_dirty = uploaded;
+
+        uploaded
     }
 
     /// Resizes the surface to the window and draws.
@@ -168,9 +237,11 @@ impl ScreenShareApp
 
             //RESET
             session.frame_rx = request.rx;
+            session.reports = request.reports;
             session.running = request.running;
             session.deattach = request.deattach;
             session.decoder = Decoder::new().expect("Failed to create H.264 decoder");
+            session.awaiting_key = false;
             session.frame_dirty = false;
             session.frame_count = 0;
             session.last_fps_time = Instant::now();
@@ -202,7 +273,9 @@ impl ScreenShareApp
             window,
             surface,
             frame_rx: request.rx,
+            reports: request.reports,
             decoder: Decoder::new().expect("Failed to create H.264 decoder"),
+            awaiting_key: false,
             frame_dirty: false,
             running: request.running,
             deattach: request.deattach,

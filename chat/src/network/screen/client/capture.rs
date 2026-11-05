@@ -109,7 +109,7 @@ use crate::
         client::
         {
             options,
-            rate::RateControl,
+            rate::{ self, RateControl },
             encoder::
             {
                 self,
@@ -463,11 +463,18 @@ impl FrameEncoder
         }
 
         //NETWORK BEHIND - SKIP BEFORE THE ENCODER SEES IT
-        if frame_tx.capacity() == 0 { return Ok(false); }
+        if frame_tx.capacity() == 0
+        {
+            rate::note_dropped();
+
+            return Ok(false);
+        }
 
         if self.last_keyframe.elapsed() >= consts::KEYFRAME_INTERVAL { self.force_intra_frame(); }
 
         let Some(frame) = self.encode(width, height, pixels, order)? else { return Ok(false) };
+
+        rate::note_encoded();
 
         if encoder::nal_units(&frame).any(|unit| unit.first().is_some_and(|header| header & 0x1f == 5))
         {
@@ -541,19 +548,26 @@ impl FrameEncoder
         }
     }
 
-    /// Hands an access unit to the network task; a full channel drops it and forces a keyframe.
+    /// Hands an access unit to the network task; a full channel drops it and marks the chain broken.
     fn dispatch(&mut self, frame_tx: &Sender<Vec<u8>>, frame: Vec<u8>) -> bool //HAND A FRAME TO THE NETWORK TASK
     {
         //THIS FRAME IS GONE, SO THE NEXT CANNOT PREDICT IT
         if frame_tx.try_send(frame).is_err()
         {
-            self.force_intra_frame();
+            rate::note_dropped();
+            rate::request_keyframe();
 
             return false;
         }
 
         true
     }
+}
+
+/// Returns one capture slot at the current frame rate.
+fn frame_interval() -> Duration
+{
+    Duration::from_secs_f64(1.0 / f64::from(rate::fps()))
 }
 
 /// Sleeps until the next frame slot.
@@ -580,8 +594,7 @@ fn capture_loop_xcap
     fps: u32,
 ) -> Result<(), String>
 {
-    let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
-    let mut next_tick = Instant::now() + target_interval;
+    let mut next_tick = Instant::now() + frame_interval();
 
     let generation = options::monitor_generation();
 
@@ -600,21 +613,35 @@ fn capture_loop_xcap
             return Ok(());
         }
 
+        //LET THE LINK DRAIN BEFORE ADDING MORE
+        if rate::draining()
+        {
+            sleep_until_next_tick(&mut next_tick, frame_interval());
+
+            continue;
+        }
+
+        let forced = rate::take_keyframe_request();
+        if forced { encoder.force_intra_frame(); }
+
         if let Ok(image) = monitor.capture_image()
         {
-            let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
+            let force_encode = forced || last_encode_time.elapsed() >= consts::FORCED_FRAME_INTERVAL;
 
             //CHEAP WHEN THE SCREEN MOVED - memcmp EARLY-EXITS
             let changed = last_image.as_ref().is_none_or(|previous| previous.as_raw() != image.as_raw());
 
-            if (force_encode || changed) && encoder.submit(&frame_tx, image.width(), image.height(), image.as_raw(), PixelOrder::Rgba)?
+            if force_encode || changed
             {
-                last_image = Some(image);
-                last_encode_time = Instant::now();
+                if encoder.submit(&frame_tx, image.width(), image.height(), image.as_raw(), PixelOrder::Rgba)?
+                {
+                    last_image = Some(image);
+                    last_encode_time = Instant::now();
+                } else if forced { rate::request_keyframe(); }
             }
-        }
+        } else if forced { rate::request_keyframe(); }
 
-        sleep_until_next_tick(&mut next_tick, target_interval);
+        sleep_until_next_tick(&mut next_tick, frame_interval());
     }
 
     Ok(())
@@ -784,8 +811,6 @@ fn capture_loop_wayshot
     fps: u32,
 ) -> Result<(), String>
 {
-    let target_interval = Duration::from_secs_f64(1.0 / fps as f64);
-
     let generation = options::monitor_generation();
 
     let mut wayshot = libwayshot::WayshotConnection::new()
@@ -814,7 +839,7 @@ fn capture_loop_wayshot
     let mut last_encode_time = Instant::now();
 
     let mut failures = 0u32;
-    let mut next_tick = Instant::now() + target_interval;
+    let mut next_tick = Instant::now() + frame_interval();
 
     //COUNT THE STRANDED BYTES AND RECONNECT
     let mut stranded = 0u64;
@@ -827,6 +852,17 @@ fn capture_loop_wayshot
             running.store(false, Ordering::Relaxed);
             return Ok(());
         }
+
+        //LET THE LINK DRAIN BEFORE ADDING MORE
+        if rate::draining()
+        {
+            sleep_until_next_tick(&mut next_tick, frame_interval());
+
+            continue;
+        }
+
+        let forced = rate::take_keyframe_request();
+        if forced { encoder.force_intra_frame(); }
 
         let grabbed = match shm.as_mut().map(|shm| shm.grab(&wayshot, &target_output, &mut pixels))
         {
@@ -858,15 +894,18 @@ fn capture_loop_wayshot
 
                 stranded += pixels.len() as u64;
 
-                let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
+                let force_encode = forced || last_encode_time.elapsed() >= consts::FORCED_FRAME_INTERVAL;
 
                 let changed = last_raw.as_ref().is_none_or(|previous| previous != &pixels);
 
-                if (force_encode || changed) && encoder.submit(&frame_tx, width, height, &pixels, order)?
+                if force_encode || changed
                 {
-                    //SWAP RATHER THAN REALLOCATE
-                    pixels = last_raw.replace(std::mem::take(&mut pixels)).unwrap_or_default();
-                    last_encode_time = Instant::now();
+                    if encoder.submit(&frame_tx, width, height, &pixels, order)?
+                    {
+                        //SWAP RATHER THAN REALLOCATE
+                        pixels = last_raw.replace(std::mem::take(&mut pixels)).unwrap_or_default();
+                        last_encode_time = Instant::now();
+                    } else if forced { rate::request_keyframe(); }
                 }
 
                 //NOTHING WAS MISSED
@@ -887,6 +926,8 @@ fn capture_loop_wayshot
             {
                 failures += 1;
 
+                if forced { rate::request_keyframe(); }
+
                 if failures >= consts::WAYLAND_RECONNECT_FAILURES
                 {
                     if let Some((connection, output)) = reconnect_wayshot(&target_output.name)
@@ -895,7 +936,7 @@ fn capture_loop_wayshot
                         target_output = output;
 
                         //FORCE A KEYFRAME - FRAMES WERE MISSED
-                        encoder.force_intra_frame();
+                        rate::request_keyframe();
                         last_raw = None;
                     }
 
@@ -905,7 +946,7 @@ fn capture_loop_wayshot
             },
         }
 
-        sleep_until_next_tick(&mut next_tick, target_interval);
+        sleep_until_next_tick(&mut next_tick, frame_interval());
     }
 
     Ok(())
@@ -1198,15 +1239,15 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
 
     let mut encoder = FrameEncoder::new(fps);
 
-    let min_interval = Duration::from_secs_f64(1.0 / fps as f64);
+    let mut min_interval = frame_interval();
 
     let mut last_encode_time = Instant::now();
 
     //WHEN THE NEXT SLOT OPENS, FIRST ONE NOW
     let mut due = Instant::now();
 
-    //THE PREVIOUS FRAME'S BYTES
-    let mut last_raw: Option<Vec<u8>> = None;
+    //THE FRAME LAST SENT, KEPT FOR A FORCED REPEAT
+    let mut last: Option<CapturedFrame> = None;
 
     //SEND THE FRAME THE PROBE ALREADY PAID FOR
     let mut pending = session.first.take();
@@ -1227,6 +1268,17 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
             return Ok(());
         }
 
+        //LET THE LINK DRAIN BEFORE ADDING MORE
+        if rate::draining()
+        {
+            thread::sleep(consts::RECORDER_POLL_INTERVAL);
+
+            continue;
+        }
+
+        let forced = rate::take_keyframe_request();
+        if forced { encoder.force_intra_frame(); }
+
         //THE TIMEOUT IS ONLY THERE TO OBSERVE running
         let mut frame = match pending.take()
         {
@@ -1236,11 +1288,33 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
             {
                 Some(frame) => frame,
                 None if latest.ended.load(Ordering::Relaxed) => return Err(t!("screen.error.recorder_stopped").to_owned()),
-                None => continue,
+
+                None =>
+                {
+                    //A STILL DESKTOP STILL ANSWERS A REQUEST
+                    match (forced, last.as_ref())
+                    {
+                        (true, Some(previous)) =>
+                        {
+                            if encoder.submit(&frame_tx, previous.width, previous.height, &previous.data, previous.order)?
+                            {
+                                last_encode_time = Instant::now();
+                                due = Instant::now() + min_interval;
+                            } else { rate::request_keyframe(); }
+                        },
+
+                        //NOTHING TO REPEAT YET
+                        (true, None) => rate::request_keyframe(),
+
+                        _ => {}
+                    }
+
+                    continue;
+                }
             },
         };
 
-        let force_encode = last_encode_time.elapsed() >= consts::FORCED_INTRA_INTERVAL;
+        let force_encode = forced || last_encode_time.elapsed() >= consts::FORCED_FRAME_INTERVAL;
 
         //EARLY FRAMES WAIT FOR THEIR SLOT
         if !force_encode && let Some(wait) = due.checked_duration_since(Instant::now())
@@ -1254,7 +1328,7 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
             }
         }
 
-        let changed = last_raw.as_ref().is_none_or(|previous| previous != &frame.data);
+        let changed = last.as_ref().is_none_or(|previous| previous.data != frame.data);
 
         if !(force_encode || changed)
         {
@@ -1266,6 +1340,9 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
         if !encoder.submit(&frame_tx, frame.width, frame.height, &frame.data, frame.order)?
         {
             latest.recycle(frame.data);
+
+            if forced { rate::request_keyframe(); }
+
             continue;
         }
 
@@ -1273,9 +1350,10 @@ fn run_recorder //EVENT-DRIVEN CAPTURE LOOP
         let now = Instant::now();
 
         due = if now > due + min_interval { now } else { due + min_interval };
+        min_interval = frame_interval();
         last_encode_time = now;
 
-        if let Some(previous) = last_raw.replace(frame.data) { latest.recycle(previous); }
+        if let Some(previous) = last.replace(frame) { latest.recycle(previous.data); }
     }
 }
 

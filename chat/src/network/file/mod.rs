@@ -219,7 +219,7 @@ pub async fn send_file //CHUNK FILE AND SEND TO STREAM
                 };
 
                 //SEND FILE CHUNK
-                network::send_tcp(&mut write_stream, FilePacket
+                let _ = network::send_tcp(&mut write_stream, FilePacket
                 {
                     uid,
                     code: FilePacketCode::Data { data: plaintext },

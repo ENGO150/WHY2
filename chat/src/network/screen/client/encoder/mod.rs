@@ -81,6 +81,8 @@ use openh264::
     },
 };
 
+use crate::network::screen::consts;
+
 //openh264 SetOption VALUES
 /// openh264 option: the target bitrate.
 const ENCODER_OPTION_BITRATE: c_int = 5;
@@ -125,10 +127,14 @@ pub struct Settings //WHAT EVERY BACKEND IS ASKED FOR
 
 impl Settings
 {
-    /// Creates settings with a keyframe every two seconds of frames.
+    /// Creates settings with a scheduled keyframe every
+    /// [`KEYFRAME_INTERVAL`](crate::network::screen::consts::KEYFRAME_INTERVAL).
     pub fn new(width: u32, height: u32, fps: u32, bitrate: u32) -> Self
     {
-        Self { width, height, fps, bitrate, keyframe_interval: fps * 2 }
+        let seconds = consts::KEYFRAME_INTERVAL.as_secs_f64();
+        let keyframe_interval = (seconds * f64::from(fps)).round().max(1.0) as u32;
+
+        Self { width, height, fps, bitrate, keyframe_interval }
     }
 }
 

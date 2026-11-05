@@ -18,27 +18,30 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! # Screen Sharing — Server Side
 //!
-//! Relays a sharer's stream to its viewers ([`screen`](fn@screen)), with one task and one bounded queue per
-//! viewer so the share runs at the sharer's rate rather than the slowest viewer's.
+//! Relays a sharer's stream to its viewers ([`screen`](fn@screen)), with one task and one
+//! one-slot video queue per viewer so the share runs at the sharer's rate rather than the slowest
+//! viewer's.
 //!
 //! # Shedding a Slow Viewer
-//! The share loop `try_send`s each frame to every viewer and never waits on one. A viewer whose
-//! queue is full loses that frame and is marked as needing a keyframe: its video is skipped until
-//! an access unit that stands on its own arrives, since the server cannot ask the sharer for one and
-//! forwarding P-frames against a missing reference would only put undecodable frames on the
-//! wire. Audio frames are self-contained and are simply dropped.
+//! The share loop never waits on a viewer. A delta frame that would replace a delta still waiting
+//! in that viewer's slot is dropped, and the viewer is marked as needing a keyframe: the replaced
+//! frame was the reference for it. A keyframe always preempts the slot, so the recovery picture
+//! itself can never be lost to a full queue. Audio has its own small queue with drop-oldest
+//! semantics, so it never waits behind a video frame.
 //!
 //! # Attaching
 //! A viewer is built where it attaches ([`attach`]), not on the next frame, and opens on the
-//! share's last keyframe, kept in the share's entry of the share table. It then waits for the next IDR
-//! like a shed viewer, since the frames between went to somebody else. Without this, a viewer of
-//! a still desktop would see nothing until the next forced keyframe.
+//! share's last keyframe, kept in the share's entry of the share table. It then waits for the next
+//! IDR like a shed viewer. Asking the sharer for one is the same path a shed viewer uses, so a
+//! fresh viewer gets a live picture without waiting for the scheduled keyframe.
 //!
 //! # Feedback
-//! Each viewer task measures the backlog a frame joins before writing it, and a reporter task
-//! sends the sharer the worst viewer's figures every
-//! [`FEEDBACK_INTERVAL`](screen::consts::FEEDBACK_INTERVAL) on a reverse stream of the upload
-//! socket, so the sharer can slow down for a viewer whose downlink is slower than its uplink.
+//! Each viewer task measures the backlog a frame joins before writing it, and each viewer reports
+//! its own receive-to-display age and keyframe needs back over the attach socket. A reporter task
+//! sends the sharer the worst figures every [`FEEDBACK_INTERVAL`](screen::consts::FEEDBACK_INTERVAL)
+//! on a reverse stream of the upload socket. A viewer that shed a frame, or asked for a keyframe,
+//! is folded in as `shed`; the sharer answers with an IDR rather than a slower target. One slow
+//! viewer among several does not move the global bitrate.
 //!
 //! # Muted Shares
 //! While the sharer is muted by a moderator, viewers are sent a looping placeholder animation
@@ -46,8 +49,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    collections::{ HashMap, VecDeque },
     time::{ Duration, Instant },
-    collections::HashMap,
     sync::
     {
         Arc,
@@ -68,11 +71,11 @@ use tokio::
 {
     time,
     task::AbortHandle,
-    net::tcp::OwnedWriteHalf,
+    net::tcp::{ OwnedReadHalf, OwnedWriteHalf },
     sync::
     {
         Mutex,
-        mpsc::{ self, Sender },
+        Notify,
     },
 };
 
@@ -125,34 +128,79 @@ struct Share //WHAT A SHARE LEAVES WHERE AN ATTACHING VIEWER CAN REACH IT
     pending: MutexSync<Vec<(usize, Viewer)>>, //VIEWERS BUILT AT THE ATTACH, WAITING TO BE PICKED UP
     /// Every served viewer's backlog figures.
     stats: MutexSync<Vec<Arc<Backlog>>>,      //EVERY SERVED VIEWER'S BACKLOG
+    /// Whether anybody asked the sharer for a keyframe.
+    key_requested: AtomicBool,                //SOMEBODY NEEDS AN IDR
+    /// Frames relayed, for the diagnostic line.
+    frames: AtomicU64,
+    /// Keyframes relayed, for the diagnostic line.
+    keyframes: AtomicU64,
+    /// Frames dropped for a viewer, for the diagnostic line.
+    shed: AtomicU64,
 }
 
-/// What one viewer is behind by, as the minimum since the last report.
-struct Backlog //WHAT ONE VIEWER IS BEHIND BY, LEAST SINCE THE LAST REPORT
+/// What one viewer is behind by, as the worst case since the last report.
+struct Backlog //WHAT ONE VIEWER IS BEHIND BY, WORST SINCE THE LAST REPORT
 {
     /// Microseconds a frame sat in this viewer's queue, plus RTT above the path's minimum.
-    delay: AtomicU64,  //MICROSECONDS QUEUED HERE PLUS RTT OVER THE PATH'S BEST
+    delay: AtomicU64,    //MICROSECONDS QUEUED HERE PLUS RTT OVER THE PATH'S BEST
     /// Bytes the viewer's socket has not sent.
-    unsent: AtomicU64, //BYTES THE SOCKET HAS NOT SENT
+    unsent: AtomicU64,   //BYTES THE SOCKET HAS NOT SENT
+    /// The viewer's own receive-to-display age, microseconds.
+    reported: AtomicU64, //WHAT THE VIEWER SAYS ITS PICTURE IS BEHIND BY
     /// Whether a frame was dropped for this viewer.
-    shed: AtomicBool,  //A FRAME WAS DROPPED FOR IT
+    shed: AtomicBool,    //A FRAME WAS DROPPED FOR IT
 }
 
-/// One attached viewer and the task that writes to it. Dropping it aborts the task.
-struct Viewer //ONE ATTACHED CLIENT, AND THE TASK THAT WRITES TO IT
+/// One packet waiting for a viewer's writer task.
+enum Queued //ONE PACKET WAITING FOR A VIEWER
 {
-    /// The attachment the task was built for.
-    token: [u8; 32],                         //THE ATTACHMENT THIS TASK WAS BUILT FOR
-    /// Handoff to the task, with when each frame was queued.
-    tx: Sender<(Instant, ScreenPacketCode)>, //HANDOFF TO THAT TASK, WITH WHEN IT WAS QUEUED
-    /// What the task measures.
-    stats: Arc<Backlog>,                     //WHAT THAT TASK MEASURES
-    /// The task.
-    task: AbortHandle,                       //THE TASK ITSELF
+    /// An access unit and when it was queued.
+    Video { queued: Instant, data: Vec<u8> },
+    /// One Opus packet and when it was queued.
+    Audio { queued: Instant, data: Vec<u8> },
+}
+
+/// What happened to a video frame offered to a viewer's queue.
+enum VideoPush //WHAT HAPPENED TO A VIDEO FRAME
+{
+    /// The frame is waiting in the slot.
+    Queued,
+    /// A keyframe is already on its way; the delta was dropped.
+    KeyframePending,
+    /// The replaced frame was a reference, so the chain is broken.
+    Shed,
+}
+
+/// A viewer's one-slot video slot and small audio queue.
+struct ViewerQueue //A VIEWER'S WAITING PACKETS
+{
+    /// The newest video frame, and whether it stands on its own.
+    video: MutexSync<Option<(Instant, Vec<u8>, bool)>>,
+    /// Audio packets and when they were queued, oldest first.
+    audio: MutexSync<VecDeque<(Instant, Vec<u8>)>>,
+    /// Wakes the writer task.
+    ready: Notify,
+    /// Set when the socket failed.
+    closed: AtomicBool,
+}
+
+/// One attached viewer and the tasks that talk to it. Dropping it aborts them.
+struct Viewer //ONE ATTACHED CLIENT, AND THE TASKS THAT TALK TO IT
+{
+    /// The attachment the tasks were built for.
+    token: [u8; 32],            //THE ATTACHMENT THESE TASKS WERE BUILT FOR
+    /// Handoff to the writer task.
+    queue: Arc<ViewerQueue>,    //HANDOFF TO THE WRITER
+    /// What the writer measures.
+    stats: Arc<Backlog>,        //WHAT THE WRITER MEASURES
+    /// The writer task.
+    task: AbortHandle,          //THE WRITER
+    /// The task reading the viewer's reports.
+    reader: AbortHandle,        //THE READER
     /// Whether video is skipped until the next keyframe.
-    needs_key: bool,                         //SHED: WAITING FOR THE NEXT IDR
+    needs_key: bool,            //SHED: WAITING FOR THE NEXT IDR
     /// Whether the viewer muted the share's audio.
-    muted: bool,                             //VIEWER MUTED THE SHARE AUDIO
+    muted: bool,                //VIEWER MUTED THE SHARE AUDIO
 }
 
 //IMPLEMENTATIONS
@@ -177,8 +225,9 @@ impl Drop for Viewer
 {
     fn drop(&mut self)
     {
-        //THE TASK MAY BE PARKED IN write_all
+        //A TASK MAY BE PARKED IN write_all
         self.task.abort();
+        self.reader.abort();
     }
 }
 
@@ -187,20 +236,122 @@ impl Backlog
     /// Creates empty backlog figures.
     fn new() -> Self
     {
-        Self { delay: AtomicU64::new(u64::MAX), unsent: AtomicU64::new(u64::MAX), shed: AtomicBool::new(false) }
+        Self
+        {
+            delay: AtomicU64::new(0),
+            unsent: AtomicU64::new(0),
+            reported: AtomicU64::new(0),
+            shed: AtomicBool::new(false),
+        }
     }
 
-    /// Takes the interval's figures and resets them.
-    ///
-    /// # Returns
-    /// `(Some((delay, unsent)) if anything was measured, whether a frame was shed)`.
-    fn take(&self) -> (Option<(u64, u64)>, bool) //THE INTERVAL'S MINIMUM, AND WHETHER IT WAS SHED
+    /// Records the backlog one frame joined.
+    fn observe(&self, queued: Duration, unsent: u64)
     {
-        let delay = self.delay.swap(u64::MAX, Ordering::Relaxed);
-        let unsent = self.unsent.swap(u64::MAX, Ordering::Relaxed);
+        self.delay.fetch_max(queued.as_micros() as u64, Ordering::Relaxed);
+        self.unsent.fetch_max(unsent, Ordering::Relaxed);
+    }
+
+    /// Records what the viewer says its picture is behind by.
+    fn report(&self, delay: u64)
+    {
+        self.reported.fetch_max(delay, Ordering::Relaxed);
+    }
+
+    /// Takes the interval's worst figures and resets them.
+    fn take(&self) -> (u64, u64, bool) //DELAY, UNSENT, AND WHETHER IT WAS SHED
+    {
+        let delay = self.delay.swap(0, Ordering::Relaxed).max(self.reported.swap(0, Ordering::Relaxed));
+        let unsent = self.unsent.swap(0, Ordering::Relaxed);
         let shed = self.shed.swap(false, Ordering::Relaxed);
 
-        ((delay != u64::MAX).then_some((delay, unsent)), shed)
+        (delay, unsent, shed)
+    }
+}
+
+impl ViewerQueue
+{
+    /// Creates an empty queue.
+    fn new() -> Self
+    {
+        Self
+        {
+            video: MutexSync::new(None),
+            audio: MutexSync::new(VecDeque::new()),
+            ready: Notify::new(),
+            closed: AtomicBool::new(false),
+        }
+    }
+
+    /// Offers one video frame, replacing what a newer frame made useless.
+    fn push_video(&self, data: Vec<u8>, keyframe: bool) -> VideoPush
+    {
+        let outcome =
+        {
+            let mut slot = self.video.lock().unwrap();
+            let held_keyframe = slot.as_ref().is_some_and(|(_, _, key)| *key);
+
+            match (keyframe, held_keyframe)
+            {
+                //A KEYFRAME IS ALWAYS WELCOME
+                (true, _) => { *slot = Some((Instant::now(), data, true)); VideoPush::Queued },
+
+                //KEEP THE KEYFRAME ALREADY ON ITS WAY
+                (false, true) => VideoPush::KeyframePending,
+
+                //THE WAITING DELTA WAS THIS FRAME'S REFERENCE
+                (false, false) if slot.is_some() => { *slot = None; VideoPush::Shed },
+
+                (false, false) => { *slot = Some((Instant::now(), data, false)); VideoPush::Queued }
+            }
+        };
+
+        if matches!(outcome, VideoPush::Queued) { self.ready.notify_one(); }
+
+        outcome
+    }
+
+    /// Queues one audio packet, dropping the oldest beyond the bound.
+    fn push_audio(&self, data: Vec<u8>)
+    {
+        let mut audio = self.audio.lock().unwrap();
+
+        if audio.len() >= screen::consts::VIEWER_AUDIO_BOUND { audio.pop_front(); }
+        audio.push_back((Instant::now(), data));
+
+        drop(audio);
+
+        self.ready.notify_one();
+    }
+
+    /// Takes the next packet to write, audio first.
+    fn next(&self) -> Option<Queued>
+    {
+        if let Some((queued, data)) = self.audio.lock().unwrap().pop_front()
+        {
+            return Some(Queued::Audio { queued, data });
+        }
+
+        self.video.lock().unwrap().take().map(|(queued, data, _)| Queued::Video { queued, data })
+    }
+
+    /// Returns how many packets are waiting.
+    fn depth(&self) -> usize
+    {
+        self.audio.lock().unwrap().len() + usize::from(self.video.lock().unwrap().is_some())
+    }
+
+    /// Stops the writer task at its next wakeup.
+    fn close(&self)
+    {
+        self.closed.store(true, Ordering::Relaxed);
+        self.ready.notify_one();
+    }
+
+    /// Returns whether the socket failed.
+    fn is_closed(&self) -> bool
+    {
+        self.closed.load(Ordering::Relaxed)
     }
 }
 
@@ -239,64 +390,120 @@ fn split_access_units(bitstream: &[u8]) -> Vec<Vec<u8>> //CUT AN ANNEX-B STREAM 
     units
 }
 
-/// Returns whether an access unit can be decoded on its own: it contains an IDR slice (NAL
-/// type 5) or an SPS (type 7), which the encoders only emit in front of one.
-fn is_keyframe(bitstream: &[u8]) -> bool //DOES THIS ACCESS UNIT STAND ON ITS OWN?
-{
-    //ONLY AN IDR (5), OR AN SPS (7) IN FRONT OF ONE
-    let mut index = 0;
-    while index + 3 < bitstream.len()
-    {
-        if bitstream[index..index + 3] != [0, 0, 1] { index += 1; continue; }
-
-        if matches!(bitstream[index + 3] & 0x1f, 5 | 7) { return true; }
-
-        index += 3;
-    }
-
-    false
-}
-
-/// Spawns the task that writes to one viewer, with its own packet stream and sequence counter.
+/// Spawns the tasks that write to one viewer and read its reports.
 ///
 /// The viewer starts needing a keyframe.
 ///
 /// # Returns
 /// `None` if the packet stream could not be keyed.
-fn spawn_viewer //ONE TASK PER VIEWER, SO A SLOW ONE BLOCKS ONLY ITSELF
+fn spawn_viewer //ONE WRITER AND ONE READER PER VIEWER
 (
     stream: Arc<Mutex<OwnedWriteHalf>>,
+    read_stream: OwnedReadHalf,
     keys: &SharedKeys,
     token: [u8; 32],
+    share: Arc<Share>,
 ) -> Option<Viewer>
 {
     //THE REX STREAM AND SEQUENCE ARE PER VIEWER
     let mut rex_stream = crypto::init_rex_stream(keys, &token)?;
-    let (tx, mut rx) = mpsc::channel::<(Instant, ScreenPacketCode)>(screen::consts::VIEWER_CHANNEL_BOUND);
-
+    let queue = Arc::new(ViewerQueue::new());
     let stats = Arc::new(Backlog::new());
-    let measured = stats.clone();
+
+    //WRITER
+    let writer_queue = queue.clone();
+    let writer_stats = stats.clone();
+    let writer_stream = stream.clone();
 
     let task = tokio::spawn(async move
     {
         let mut seq = 0usize;
+        let mut last_acked = 0u64;
+        let mut capped_at = Instant::now();
 
-        while let Some((queued, code)) = rx.recv().await
+        loop
         {
-            let mut stream = stream.lock().await;
+            while let Some(item) = writer_queue.next()
+            {
+                let mut stream = writer_stream.lock().await;
+                let tcp = screen::tcp_stats(stream.as_ref());
 
-            //THE BACKLOG THIS FRAME JOINS
-            let (unsent, inflated) = screen::tcp_backlog(stream.as_ref()).unwrap_or((0, Duration::ZERO));
+                let (unsent, inflated, acked) = tcp.map_or((0, Duration::ZERO, 0), |stats| (stats.unsent, stats.inflated, stats.acked));
 
-            measured.delay.fetch_min((queued.elapsed() + inflated).as_micros() as u64, Ordering::Relaxed);
-            measured.unsent.fetch_min(unsent, Ordering::Relaxed);
+                //THE BACKLOG THIS PACKET JOINS
+                let (queued_at, code) = match item
+                {
+                    Queued::Video { queued, data } => (queued, ScreenPacketCode::Video { data }),
+                    Queued::Audio { queued, data } => (queued, ScreenPacketCode::Audio { data }),
+                };
 
-            screen::send_frame(&mut stream, code, &mut rex_stream, Some(&mut seq)).await;
+                writer_stats.observe(queued_at.elapsed() + inflated, unsent);
+
+                if screen::send_frame(&mut stream, code, &mut rex_stream, Some(&mut seq)).await.is_err()
+                {
+                    writer_queue.close();
+
+                    return;
+                }
+
+                //BOUND THE BUFFERS TO WHAT THIS VIEWER DRAINS
+                let elapsed = capped_at.elapsed();
+
+                if elapsed >= Duration::from_secs(1)
+                {
+                    let goodput = acked.saturating_sub(last_acked) as f64 * 8.0 / elapsed.as_secs_f64();
+                    let target = (goodput as u32).clamp(screen::consts::MIN_BITRATE, screen::consts::H264_BITRATE);
+
+                    screen::cap_socket_buffers(stream.as_ref(), target);
+
+                    last_acked = acked;
+                    capped_at = Instant::now();
+                }
+            }
+
+            if writer_queue.is_closed() { return; }
+
+            writer_queue.ready.notified().await;
         }
     }).abort_handle();
 
+    //READER
+    let reader_stats = stats.clone();
+    let reader_queue = queue.clone();
+    let reader_keys = keys.clone();
+
+    let reader = tokio::spawn(async move
+    {
+        let Some(mut reverse_stream) = crypto::init_reverse_stream(&reader_keys, &token) else
+        {
+            reader_queue.close();
+
+            return;
+        };
+
+        let mut read_stream = read_stream;
+        let mut streams = (&mut read_stream, stream);
+        let mut seq = 0usize;
+
+        while let Some(code) = screen::receive_frame(&mut streams, &mut reverse_stream, &mut seq).await
+        {
+            if let ScreenPacketCode::Feedback { delay, shed, .. } = code
+            {
+                //A VIEWER'S WORD IS BOUNDED
+                let delay = u64::from(delay).min(screen::consts::MAX_REPORTED_DELAY.as_micros() as u64);
+
+                reader_stats.report(delay);
+
+                if shed { share.key_requested.store(true, Ordering::Relaxed); }
+            }
+        }
+
+        //THE VIEWER'S SOCKET WENT AWAY
+        reader_queue.close();
+    }).abort_handle();
+
     //A JUST-ATTACHED VIEWER STARTS LIKE A SHED ONE
-    Some(Viewer { token, tx, stats, task, needs_key: true, muted: false })
+    Some(Viewer { token, queue, stats, task, reader, needs_key: true, muted: false })
 }
 
 /// Returns the index of the placeholder frame due now, played off the wall clock.
@@ -357,28 +564,50 @@ async fn feedback //TELL THE SHARER HOW FAR BEHIND ITS VIEWERS ARE
         interval.tick().await;
 
         let stats = share.stats.lock().map(|stats| stats.clone()).unwrap_or_default();
+        let viewers = stats.len();
 
         //THE WORST VIEWER
-        let mut worst: Option<(u64, u64)> = None;
+        let mut worst = 0u64;
+        let mut unsent = 0u64;
+        let mut congested = 0usize;
         let mut shed = false;
 
-        for (backlog, dropped) in stats.iter().map(|stats| stats.take())
+        for (delay, un, dropped) in stats.iter().map(|stats| stats.take())
         {
             shed |= dropped;
 
-            if let Some((delay, unsent)) = backlog
-            {
-                worst = Some(worst.map_or((delay, unsent), |(d, u)| (d.max(delay), u.max(unsent))));
-            }
+            worst = worst.max(delay);
+            unsent = unsent.max(un);
+
+            if delay >= screen::consts::RATE_DELAY.as_micros() as u64 { congested += 1; }
         }
 
+        //ONE SLOW VIEWER MUST NOT DRAG EVERYBODY DOWN
+        if congested <= 1 && viewers > 1
+        {
+            worst = 0;
+            unsent = 0;
+        }
+
+        //A SHED OR ASKING VIEWER NEEDS A FRESH PICTURE
+        if shed { share.key_requested.store(true, Ordering::Relaxed); }
+
+        let key = share.key_requested.swap(false, Ordering::Relaxed);
+
         //NOTHING TO SAY
-        if worst.is_none() && !shed { continue; }
+        if worst == 0 && unsent == 0 && !key { continue; }
 
-        let (delay, unsent) = worst.unwrap_or_default();
-        let code = ScreenPacketCode::Feedback { delay: delay.min(u64::from(u32::MAX)) as u32, unsent: unsent.min(u64::from(u32::MAX)) as u32, shed };
+        let code = ScreenPacketCode::Feedback
+        {
+            delay: worst.min(u64::from(u32::MAX)) as u32,
+            unsent: unsent.min(u64::from(u32::MAX)) as u32,
+            shed: key,
+        };
 
-        screen::send_frame(&mut *stream.lock().await, code, &mut rex_stream, Some(&mut seq)).await;
+        if screen::send_frame(&mut *stream.lock().await, code, &mut rex_stream, Some(&mut seq)).await.is_err()
+        {
+            return;
+        }
     }
 }
 
@@ -386,12 +615,14 @@ async fn feedback //TELL THE SHARER HOW FAR BEHIND ITS VIEWERS ARE
 /// Attaches a viewer to a running share.
 ///
 /// The viewer is built here, sent the share's last keyframe, and left for the share loop to
-/// adopt on its next frame.
+/// adopt on its next frame. It also gets a live keyframe requested, so a still desktop does not
+/// leave it looking at an old picture.
 ///
 /// # Parameters
 /// - `sharer_id`: The sharer's session id.
 /// - `client_id`: The viewer's session id.
 /// - `keys`: The viewer's session keys.
+/// - `read_stream`: The viewer socket's read half, for its reports.
 /// - `stream`: The viewer socket's write half.
 /// - `token`: The attachment's token.
 ///
@@ -402,6 +633,7 @@ pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
     sharer_id: usize,
     client_id: usize,
     keys: &SharedKeys,
+    read_stream: OwnedReadHalf,
     stream: Arc<Mutex<OwnedWriteHalf>>,
     token: [u8; 32],
 ) -> bool
@@ -409,13 +641,16 @@ pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
     //THE SHARE IS OVER (OR NEVER STARTED)
     let Some(share) = SHARES.get(&sharer_id).map(|share| share.clone()) else { return false; };
 
-    let Some(viewer) = spawn_viewer(stream, keys, token) else { return false; };
+    let Some(viewer) = spawn_viewer(stream, read_stream, keys, token, share.clone()) else { return false; };
 
     //OPEN ON THE SHARE'S LAST KEYFRAME
     if let Some(frame) = share.keyframe.lock().ok().and_then(|frame| frame.clone())
     {
-        let _ = viewer.tx.try_send((Instant::now(), ScreenPacketCode::Video { data: frame }));
+        viewer.queue.push_video(frame, true);
     }
+
+    //A FRESH VIEWER NEEDS A LIVE PICTURE
+    share.key_requested.store(true, Ordering::Relaxed);
 
     //PICKED UP BY THE SHARE LOOP ON ITS NEXT FRAME
     match share.pending.lock()
@@ -491,6 +726,10 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         keyframe: MutexSync::new(None),
         pending: MutexSync::new(Vec::new()),
         stats: MutexSync::new(Vec::new()),
+        key_requested: AtomicBool::new(false),
+        frames: AtomicU64::new(0),
+        keyframes: AtomicU64::new(0),
+        shed: AtomicU64::new(0),
     });
 
     //REPORT BACK ON THE SAME SOCKET
@@ -500,6 +739,8 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
     let _guard = ScreenTransferGuard { id, feedback: reporter };
 
     SHARES.insert(id, share.clone());
+
+    let mut stats_at = Instant::now();
 
     //LOOP READING
     loop
@@ -573,9 +814,16 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
             }
         }).collect();
 
-        //RETIRE WHOEVER LEFT, ABORTING THEIR TASK
+        //RETIRE WHOEVER LEFT OR WHOSE SOCKET FAILED
         viewers.retain(|client_id, viewer|
         {
+            if viewer.queue.is_closed()
+            {
+                log::warn!("Screen viewer dropped (write failed): share of {owner}");
+
+                return false;
+            }
+
             match entries.iter().find(|(e, token, _)| e == client_id && *token == viewer.token)
             {
                 Some((_, _, muted)) =>
@@ -596,44 +844,72 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         }
 
         //FORWARD PACKET
-        let keyframe = matches!(&read, ScreenPacketCode::Video { data } if is_keyframe(data));
-
-        for (client_id, viewer) in viewers.iter_mut()
+        match read
         {
-            //PREVENT FEEDBACK
-            if *client_id == id && matches!(read, ScreenPacketCode::Audio { .. }) { continue; }
-
-            //SKIP USERS WHO MUTED THE STREAM
-            if viewer.muted && matches!(read, ScreenPacketCode::Audio { .. }) { continue; }
-
-            //A VIEWER THAT MISSED A FRAME WAITS FOR AN IDR
-            if viewer.needs_key && matches!(read, ScreenPacketCode::Video { .. })
+            ScreenPacketCode::Video { data } =>
             {
-                if !keyframe { continue; }
+                let keyframe = screen::is_keyframe(&data);
 
-                log::debug!("Screen viewer recovered on a keyframe: share of {owner}");
-
-                viewer.needs_key = false;
-            }
-
-            //A FULL QUEUE MEANS SHED THE FRAME
-            if viewer.tx.try_send((Instant::now(), read.clone())).is_err()
-            {
-                //ONLY THE FIRST SHED FRAME OF A RUN IS LOGGED
-                if matches!(read, ScreenPacketCode::Video { .. })
+                for viewer in viewers.values_mut()
                 {
-                    if !viewer.needs_key { log::warn!("Screen viewer shed (link too slow): share of {owner}"); }
+                    //A VIEWER THAT MISSED A FRAME WAITS FOR AN IDR
+                    if viewer.needs_key
+                    {
+                        if !keyframe { continue; }
 
-                    viewer.needs_key = true;
-                    viewer.stats.shed.store(true, Ordering::Relaxed);
+                        viewer.needs_key = false;
+                    }
+
+                    if let VideoPush::Shed = viewer.queue.push_video(data.clone(), keyframe)
+                    {
+                        //ONLY THE FIRST SHED FRAME OF A RUN IS LOGGED
+                        if !viewer.needs_key { log::warn!("Screen viewer shed (link too slow): share of {owner}"); }
+
+                        viewer.needs_key = true;
+                        viewer.stats.shed.store(true, Ordering::Relaxed);
+                        share.key_requested.store(true, Ordering::Relaxed);
+                        share.shed.fetch_add(1, Ordering::Relaxed);
+                    }
                 }
-            }
+
+                share.frames.fetch_add(1, Ordering::Relaxed);
+                if keyframe { share.keyframes.fetch_add(1, Ordering::Relaxed); }
+
+                //KEEP THE LAST KEYFRAME FOR THE NEXT ATTACH
+                if keyframe
+                {
+                    if let Ok(mut cached) = share.keyframe.lock() { *cached = Some(data); }
+                }
+            },
+
+            ScreenPacketCode::Audio { data } =>
+            {
+                for (client_id, viewer) in viewers.iter_mut()
+                {
+                    //PREVENT FEEDBACK
+                    if *client_id == id { continue; }
+
+                    //SKIP USERS WHO MUTED THE STREAM
+                    if viewer.muted { continue; }
+
+                    viewer.queue.push_audio(data.clone());
+                }
+            },
+
+            ScreenPacketCode::Feedback { .. } => {},
         }
 
-        //KEEP THE LAST KEYFRAME FOR THE NEXT ATTACH
-        if keyframe && let ScreenPacketCode::Video { data } = &read
+        if screen::stats_enabled() && stats_at.elapsed() >= Duration::from_secs(1)
         {
-            if let Ok(mut cached) = share.keyframe.lock() { *cached = Some(data.clone()); }
+            let frames = share.frames.swap(0, Ordering::Relaxed);
+            let keyframes = share.keyframes.swap(0, Ordering::Relaxed);
+            let shed = share.shed.swap(0, Ordering::Relaxed);
+            let depths: Vec<usize> = viewers.values().map(|viewer| viewer.queue.depth()).collect();
+
+            log::info!("Screen stats: {} viewers, {frames} frames/s, {keyframes} keyframes/s, {shed} shed, queues {depths:?}: share of {owner}",
+                viewers.len());
+
+            stats_at = Instant::now();
         }
     }
 

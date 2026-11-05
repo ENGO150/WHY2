@@ -21,17 +21,38 @@ use std::time::Duration;
 pub const H264_BITRATE: u32               = 8_000_000;                                       //H.264 ENCODER TARGET BITRATE (8 Mbps)
 pub const START_BITRATE: u32              = 2_500_000;                                       //WHERE A SHARE'S BITRATE STARTS
 pub const MIN_BITRATE: u32                = 500_000;                                         //LOWEST BITRATE THE LINK MAY PUSH US TO
-pub const RATE_WINDOW: Duration           = Duration::from_millis(500);                      //HOW OFTEN THE BITRATE IS RECONSIDERED
-pub const RATE_HOLD: Duration             = Duration::from_secs(2);                          //NO GROWTH THIS LONG AFTER A BACKOFF
+pub const RATE_WINDOW: Duration           = Duration::from_millis(200);                      //HOW OFTEN THE BITRATE IS RECONSIDERED
+pub const RATE_HOLD: Duration             = Duration::from_secs(1);                          //NO GROWTH THIS LONG AFTER A BACKOFF
 pub const RATE_SATURATED: f64             = 0.6;                                             //SHARE OF A WINDOW SPENT WRITING THAT MEANS A FULL LINK
 pub const RATE_IDLE: f64                  = 0.2;                                             //SHARE OF A WINDOW SPENT WRITING THAT MEANS ROOM
-pub const RATE_USED: f64                  = 0.5;                                             //SHARE OF THE TARGET SENT BEFORE IT MAY GROW
-pub const RATE_BACKOFF: f64               = 0.8;                                             //TARGET AFTER A FULL WINDOW, OF WHAT WENT THROUGH
+pub const RATE_USED: f64                  = 0.5;                                             //SHARE OF THE TARGET ACKNOWLEDGED BEFORE IT MAY GROW
+pub const RATE_BACKOFF: f64               = 0.8;                                             //SHARE OF ACKNOWLEDGED GOODPUT KEPT AFTER A CUT
+pub const RATE_CUT: f64                   = 0.6;                                             //SHARE OF THE TARGET KEPT AFTER A CUT
+pub const RATE_CUT_SEVERE: f64            = 0.5;                                             //SHARE OF ACKNOWLEDGED GOODPUT KEPT WHEN SEVERE
 pub const RATE_GROWTH: f64                = 1.06;                                            //TARGET GROWTH PER IDLE WINDOW
 pub const RATE_CREEP: f64                 = 1.02;                                            //TARGET GROWTH PER IDLE WINDOW NEAR THE LAST FULL LINK
 pub const RATE_DELAY: Duration            = Duration::from_millis(100);                      //QUEUEING THAT COUNTS AS A FULL LINK
+pub const RATE_HARD_DELAY: Duration       = Duration::from_millis(250);                      //QUEUEING THAT CALLS FOR A SEVERE CUT
+pub const RATE_STALL: Duration            = Duration::from_millis(45);                       //ONE BLOCKING WRITE THIS LONG MEANS CONGESTION
+pub const RATE_STALL_SEVERE: Duration     = Duration::from_millis(250);                      //ONE BLOCKING WRITE THIS LONG CALLS FOR A SEVERE CUT
+pub const MAX_REPORTED_DELAY: Duration    = Duration::from_secs(2);                         //THE MOST A VIEWER'S OWN REPORT MAY CLAIM
 pub const FEEDBACK_INTERVAL: Duration     = Duration::from_millis(250);                      //HOW OFTEN THE SERVER REPORTS ITS VIEWERS' BACKLOG
 pub const RATE_NEAR: f64                  = 0.9;                                             //SHARE OF THE LAST FULL LINK WHERE GROWTH SLOWS
+
+pub const DRAIN_TARGET: Duration          = Duration::from_millis(100);                      //QUEUED VIDEO A SHARE AIMS TO KEEP
+pub const DRAIN_HARD: Duration            = Duration::from_millis(250);                      //QUEUED VIDEO THAT STOPS THE SHARE
+pub const DRAIN_POLL_INTERVAL: Duration   = Duration::from_millis(50);                       //HOW OFTEN THE SHARE RECHECKS ITS QUEUE
+pub const PACING_BURST: Duration          = Duration::from_millis(150);                      //HOW MUCH A SHARE MAY SEND AT ONCE
+pub const STALE_FRAME_AGE: Duration       = Duration::from_millis(150);                      //A VIEWER DROPS A BACKLOG OLDER THAN THIS
+pub const VIEWER_REPORT_INTERVAL: Duration = Duration::from_millis(250);                     //HOW OFTEN A VIEWER REPORTS ITS STATE
+pub const VIEWER_AUDIO_BOUND: usize       = 8;                                               //AUDIO PACKETS A VIEWER QUEUE KEEPS
+pub const VIDEO_CHANNEL_BOUND: usize      = 1;                                               //VIDEO FRAMES WAITING AT THE HANDSOFF
+pub const STATS_VAR: &str                 = "WHY2_SCREEN_STATS";                           //PRINTS SCREEN STATS ONCE A SECOND
+
+pub const SOCKET_QUEUE_MS: u64            = 100;                                             //QUEUE A SCREEN SOCKET MAY HOLD, IN MILLISECONDS OF TARGET
+pub const SOCKET_BUFFER_MIN: usize        = 32 * 1024;                                       //SMALLEST SOCKET BUFFER A SHARE ASKS FOR
+pub const SOCKET_BUFFER_MAX: usize        = 128 * 1024;                                      //LARGEST SOCKET BUFFER A SHARE ASKS FOR
+pub const SOCKET_TARGET: u32              = H264_BITRATE;                                    //TARGET ASSUMED WHERE THE SHARE'S OWN IS UNKNOWN
 
 pub const BUFFER_SIZE: u32                = 960;                                             //CPAL BUFFER SIZE
 pub const MAX_PACKET_SIZE: usize          = 4000;                                            //MAX OPUS PACKET SIZE
@@ -53,12 +74,9 @@ pub const CAPTURE_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 4;        
 pub const PLAYBACK_CHANNEL_BOUND: usize   = MULTIPLEX_CHANNEL_BOUND + 1;                     //PLAYBACK BUFFER (~60ms)
 pub const NETWORK_CHANNEL_BOUND: usize    = MULTIPLEX_CHANNEL_BOUND * 8;                     //NETWORK RECEIVE BUFFER (~320ms)
 pub const AUDIO_BACKLOG_TARGET: usize     = MULTIPLEX_CHANNEL_BOUND * 2 + 1;                 //AUDIO FRAMES THE RECEIVE QUEUE IS SHED BACK DOWN TO
-pub const VIEWER_CHANNEL_BOUND: usize     = MULTIPLEX_CHANNEL_BOUND * 4;                     //SERVER-SIDE FORWARD QUEUE, PER VIEWER
 
-pub const SOCKET_BUFFER: usize            = 128 * 1024;                                      //KERNEL QUEUE A SCREEN SHARE SOCKET MAY HOLD
-
-pub const FORCED_INTRA_INTERVAL: Duration  = Duration::from_secs(2);      //MAX GAP BETWEEN ENCODED FRAMES
-pub const KEYFRAME_INTERVAL: Duration      = Duration::from_secs(2);      //MAX GAP BETWEEN KEYFRAMES
+pub const FORCED_FRAME_INTERVAL: Duration  = Duration::from_secs(2);      //MAX GAP BETWEEN ENCODED FRAMES
+pub const KEYFRAME_INTERVAL: Duration      = Duration::from_secs(8);      //MAX GAP BETWEEN SCHEDULED KEYFRAMES
 pub const RECORDER_POLL_INTERVAL: Duration = Duration::from_millis(100);  //HOW OFTEN THE RECORDER LOOP RECHECKS `running` WHILE IDLE
 pub const AUDIO_BACKEND_VAR: &str          = "WHY2_SHARE_AUDIO";          //PINS SHARE AUDIO CAPTURE ("pipewire" / "monitor")
 pub const BACKEND_OVERRIDE_VAR: &str       = "WHY2_CAPTURE_BACKEND";      //PINS A CAPTURE BACKEND ("recorder" / "legacy")

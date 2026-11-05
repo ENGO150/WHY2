@@ -112,7 +112,7 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
     let mut rex_stream = chat_crypto::init_rex_stream(options::get_keys().as_ref().unwrap(), &token).unwrap();
 
     //SEND FIRST PACKET (METADATA)
-    network::send_tcp(&mut write_stream, FilePacket
+    let _ = network::send_tcp(&mut write_stream, FilePacket
     {
         uid,
         code: FilePacketCode::Metadata

@@ -37,12 +37,32 @@ use crate::network::screen::
 };
 
 //SHARED WITH THE NETWORK TASK
-static SENT: AtomicU64 = AtomicU64::new(0);         //BYTES WRITTEN THIS WINDOW
-static BUSY: AtomicU64 = AtomicU64::new(0);         //MICROSECONDS SPENT WRITING
-static BITRATE: AtomicU32 = AtomicU32::new(0);      //CURRENT TARGET
-static DELAY: AtomicU64 = AtomicU64::new(u64::MAX); //LEAST QUEUEING SEEN, MICROSECONDS
-static REMOTE: AtomicU64 = AtomicU64::new(u64::MAX); //LEAST QUEUEING THE SERVER REPORTED, MICROSECONDS
-static SHED: AtomicBool = AtomicBool::new(false);    //THE SERVER DROPPED A VIEWER BEHIND
+static SENT: AtomicU64 = AtomicU64::new(0);          //BYTES WRITTEN THIS WINDOW
+static ACKED: AtomicU64 = AtomicU64::new(0);         //BYTES ACKNOWLEDGED THIS WINDOW
+static BUSY: AtomicU64 = AtomicU64::new(0);          //MICROSECONDS SPENT WRITING
+static BITRATE: AtomicU32 = AtomicU32::new(0);       //CURRENT TARGET
+static DELAY: AtomicU64 = AtomicU64::new(0);         //WORST QUEUEING SEEN, MICROSECONDS
+static REMOTE: AtomicU64 = AtomicU64::new(0);        //WORST QUEUEING THE SERVER REPORTED, MICROSECONDS
+static STALL: AtomicU64 = AtomicU64::new(0);         //WORST BLOCKING WRITE THIS WINDOW, MICROSECONDS
+static LAST_STALL: AtomicU64 = AtomicU64::new(0);    //LAST BLOCKING WRITE, WHERE tcp_info IS MISSING
+static ACKED_OK: AtomicBool = AtomicBool::new(false); //tcp_info COUNTED ACKNOWLEDGED BYTES
+static LAST_ACKED: AtomicU64 = AtomicU64::new(0);    //CUMULATIVE BYTES THE PEER HAD ACKNOWLEDGED
+static LAST_RETRANS: AtomicU64 = AtomicU64::new(0);  //CUMULATIVE RETRANSMITTED SEGMENTS
+static RETRANS: AtomicU64 = AtomicU64::new(0);       //RETRANSMITTED SEGMENTS THIS WINDOW
+static FORCE_KEYFRAME: AtomicBool = AtomicBool::new(false); //THE NEXT FRAME MUST STAND ALONE
+static DRAINING: AtomicBool = AtomicBool::new(false); //VIDEO IS HELD UNTIL THE LINK EMPTIES
+static FPS: AtomicU32 = AtomicU32::new(consts::TARGET_FPS); //CAPTURE STEPS THE LINK CAN CARRY
+
+//STATISTICS
+static STAT_FRAMES: AtomicU64 = AtomicU64::new(0);   //FRAMES WRITTEN
+static STAT_ENCODED: AtomicU64 = AtomicU64::new(0);  //FRAMES ENCODED
+static STAT_KEYFRAMES: AtomicU64 = AtomicU64::new(0); //KEYFRAMES WRITTEN
+static STAT_DROPPED: AtomicU64 = AtomicU64::new(0);  //FRAMES DROPPED
+static STAT_BYTES: AtomicU64 = AtomicU64::new(0);    //BYTES WRITTEN
+static STAT_ACKED: AtomicU64 = AtomicU64::new(0);    //BYTES ACKNOWLEDGED
+static STAT_RETRANS: AtomicU64 = AtomicU64::new(0);  //RETRANSMITTED SEGMENTS
+static STAT_STALLS: AtomicU64 = AtomicU64::new(0);   //BLOCKING WRITES OVER THE THRESHOLD
+static STAT_KEY_REQUESTED: AtomicU64 = AtomicU64::new(0); //KEYFRAMES ASKED FOR
 
 //STRUCTS
 pub struct RateControl //FITS THE BITRATE TO THE LINK
@@ -51,13 +71,14 @@ pub struct RateControl //FITS THE BITRATE TO THE LINK
     held: Instant,    //NO GROWTH BEFORE THIS
     ceiling: f64,     //WHAT THE LINK CARRIED WHEN IT LAST FILLED
     congested: bool,  //INSIDE A BACKOFF
+    delay_ewma: f64,  //THE TREND, WHERE THE WORST SAMPLE DECIDES THE CUT
 }
 
 impl RateControl
 {
     pub fn new() -> Self
     {
-        Self { window: Instant::now(), held: Instant::now(), ceiling: f64::INFINITY, congested: false }
+        Self { window: Instant::now(), held: Instant::now(), ceiling: f64::INFINITY, congested: false, delay_ewma: 0.0 }
     }
 
     pub fn bitrate(&self) -> u32
@@ -72,36 +93,51 @@ impl RateControl
 
         self.window = Instant::now();
 
-        let sent = SENT.swap(0, Ordering::Relaxed) as f64 * 8.0;
-        let busy = Duration::from_micros(BUSY.swap(0, Ordering::Relaxed)).as_secs_f64() / elapsed.as_secs_f64();
-        let delay = Duration::from_micros(take_min(&DELAY).max(take_min(&REMOTE)));
-        let shed = SHED.swap(false, Ordering::Relaxed);
+        let seconds = elapsed.as_secs_f64();
+        let sent = SENT.swap(0, Ordering::Relaxed) as f64 * 8.0 / seconds;
+        let acked = ACKED.swap(0, Ordering::Relaxed) as f64 * 8.0 / seconds;
+        RETRANS.swap(0, Ordering::Relaxed);
+        let busy = Duration::from_micros(BUSY.swap(0, Ordering::Relaxed)).as_secs_f64() / seconds;
+        let delay = Duration::from_micros(DELAY.swap(0, Ordering::Relaxed).max(REMOTE.swap(0, Ordering::Relaxed)));
+        let stall = Duration::from_micros(STALL.swap(0, Ordering::Relaxed));
+
+        //THE WORST SAMPLE DECIDES THE CUT, THE TREND DECIDES THE GROWTH
+        self.delay_ewma = self.delay_ewma * 0.7 + delay.as_secs_f64() * 0.3;
 
         let current = f64::from(self.bitrate());
-        let throughput = sent / elapsed.as_secs_f64();
 
-        let carried = throughput.min(current);
+        //WHAT THE LINK ACTUALLY DRAINED, NOT WHAT WAS HANDED TO IT
+        let throughput = if ACKED_OK.load(Ordering::Relaxed) { acked } else { sent };
 
-        //LINK FULL, A QUEUE BUILDING, OR A VIEWER LEFT BEHIND
-        let next = if busy >= consts::RATE_SATURATED || delay >= consts::RATE_DELAY || shed
+        //A QUEUE BUILDING, A BLOCKING WRITE, OR A FULL LINK
+        let heavy = busy >= consts::RATE_SATURATED || delay >= consts::RATE_DELAY || stall >= consts::RATE_STALL;
+        let severe = delay >= consts::RATE_HARD_DELAY || stall >= consts::RATE_STALL_SEVERE;
+
+        let next = if heavy
         {
             //AT MOST WHAT WE ASKED FOR, AT MOST WHAT A FULL LINK DRAINED
             if !self.congested { self.ceiling = current; }
-            if busy >= consts::RATE_SATURATED { self.ceiling = self.ceiling.min(throughput); }
+            if busy >= consts::RATE_SATURATED { self.ceiling = self.ceiling.min(throughput.max(f64::from(consts::MIN_BITRATE))); }
 
             self.congested = true;
             self.held = Instant::now() + consts::RATE_HOLD;
 
-            carried * consts::RATE_BACKOFF
-        } else if busy <= consts::RATE_IDLE && delay < consts::RATE_DELAY / 2 && Instant::now() >= self.held && throughput >= current * consts::RATE_USED
+            if severe
+            {
+                (throughput * consts::RATE_CUT_SEVERE).min(current * consts::RATE_CUT)
+            } else
+            {
+                (current * consts::RATE_CUT).min(throughput * consts::RATE_BACKOFF)
+            }
+        } else if busy <= consts::RATE_IDLE && self.delay_ewma < consts::RATE_DELAY.as_secs_f64() / 2.0 &&
+            stall < consts::RATE_STALL && Instant::now() >= self.held && throughput >= current * consts::RATE_USED
         {
             self.congested = false;
 
-            //BACK UP UNDER THE CEILING, THEN SLOWLY PAST IT
+            //BACK UP UNDER THE CEILING, THEN CREEP PAST IT
             if current < self.ceiling * consts::RATE_NEAR
             {
-                let resume = if self.ceiling.is_finite() { self.ceiling * consts::RATE_BACKOFF } else { 0.0 };
-                (current * consts::RATE_GROWTH).max(resume)
+                current * consts::RATE_GROWTH
             } else
             {
                 current * consts::RATE_CREEP
@@ -112,6 +148,11 @@ impl RateControl
         };
 
         let next = (next as u32).clamp(consts::MIN_BITRATE, consts::H264_BITRATE);
+
+        //FRAME RATE STEPS WITH THE TARGET
+        let fps = fps_next(next, FPS.load(Ordering::Relaxed));
+        if fps != FPS.load(Ordering::Relaxed) { FPS.store(fps, Ordering::Relaxed); }
+
         if next == self.bitrate() { return None; }
 
         BITRATE.store(next, Ordering::Relaxed);
@@ -121,34 +162,188 @@ impl RateControl
 }
 
 //FUNCTIONS
+/// Maps a target to the next capture rate, one step at a time.
+fn fps_next(bitrate: u32, current: u32) -> u32 //THE CAPTURE RATE A TARGET ALLOWS
+{
+    let down = |limit: u32| bitrate < limit;
+    let up = |limit: u32| bitrate > limit + limit / 10;
+
+    match current
+    {
+        30 if down(1_500_000) => 24,
+        24 if down(1_000_000) => 20,
+        24 if up(1_500_000) => 30,
+        20 if down(700_000) => 15,
+        20 if up(1_000_000) => 24,
+        15 if up(700_000) => 20,
+        _ => current,
+    }
+}
+
 pub fn start() //A NEW SHARE
 {
     SENT.store(0, Ordering::Relaxed);
+    ACKED.store(0, Ordering::Relaxed);
     BUSY.store(0, Ordering::Relaxed);
-    DELAY.store(u64::MAX, Ordering::Relaxed);
-    REMOTE.store(u64::MAX, Ordering::Relaxed);
-    SHED.store(false, Ordering::Relaxed);
+    DELAY.store(0, Ordering::Relaxed);
+    REMOTE.store(0, Ordering::Relaxed);
+    STALL.store(0, Ordering::Relaxed);
+    LAST_STALL.store(0, Ordering::Relaxed);
+    ACKED_OK.store(false, Ordering::Relaxed);
+    LAST_ACKED.store(0, Ordering::Relaxed);
+    LAST_RETRANS.store(0, Ordering::Relaxed);
+    RETRANS.store(0, Ordering::Relaxed);
+    FORCE_KEYFRAME.store(false, Ordering::Relaxed);
+    DRAINING.store(false, Ordering::Relaxed);
+    FPS.store(consts::TARGET_FPS, Ordering::Relaxed);
     BITRATE.store(consts::START_BITRATE, Ordering::Relaxed);
+
+    for counter in [&STAT_FRAMES, &STAT_ENCODED, &STAT_KEYFRAMES, &STAT_DROPPED, &STAT_BYTES,
+        &STAT_ACKED, &STAT_RETRANS, &STAT_STALLS, &STAT_KEY_REQUESTED]
+    {
+        counter.store(0, Ordering::Relaxed);
+    }
 }
 
 pub fn record(bytes: usize, busy: Duration) //ONE SOCKET WRITE
 {
     SENT.fetch_add(bytes as u64, Ordering::Relaxed);
     BUSY.fetch_add(busy.as_micros() as u64, Ordering::Relaxed);
+    STAT_BYTES.fetch_add(bytes as u64, Ordering::Relaxed);
+
+    //ONE BLOCKING WRITE IS ENOUGH
+    if busy >= consts::RATE_STALL
+    {
+        STALL.fetch_max(busy.as_micros() as u64, Ordering::Relaxed);
+        LAST_STALL.store(busy.as_micros() as u64, Ordering::Relaxed);
+        STAT_STALLS.fetch_add(1, Ordering::Relaxed);
+    }
 }
 
-pub fn probe(stream: &TcpStream) //THE QUEUE A NEW FRAME JOINS
+/// Takes the last blocking write, for platforms without `tcp_info`.
+pub fn take_stall() -> Option<Duration>
 {
-    let Some((unsent, inflated)) = screen::tcp_backlog(stream) else { return };
+    match LAST_STALL.swap(0, Ordering::Relaxed)
+    {
+        0 => None,
+        micros => Some(Duration::from_micros(micros)),
+    }
+}
 
-    DELAY.fetch_min(at_target(unsent) + inflated.as_micros() as u64, Ordering::Relaxed);
+/// Returns the queue a new frame would join, from `tcp_info` or the last blocking write.
+pub fn queue_estimate(stream: &TcpStream) -> Option<Duration>
+{
+    let queued = probe(stream);
+
+    match (queued, take_stall())
+    {
+        (Some(queued), Some(stall)) => Some(queued.max(stall)),
+        (queued, stall) => queued.or(stall),
+    }
+}
+
+pub fn probe(stream: &TcpStream) -> Option<Duration> //THE QUEUE A NEW FRAME JOINS
+{
+    let stats = screen::tcp_stats(stream)?;
+
+    ACKED_OK.store(true, Ordering::Relaxed);
+
+    let delay = at_target(stats.unsent) + stats.inflated.as_micros() as u64;
+    DELAY.fetch_max(delay, Ordering::Relaxed);
+
+    let acked = stats.acked.saturating_sub(LAST_ACKED.swap(stats.acked, Ordering::Relaxed));
+    ACKED.fetch_add(acked, Ordering::Relaxed);
+    STAT_ACKED.fetch_add(acked, Ordering::Relaxed);
+
+    let retrans = u64::from(stats.retrans).saturating_sub(LAST_RETRANS.swap(u64::from(stats.retrans), Ordering::Relaxed));
+    RETRANS.fetch_add(retrans, Ordering::Relaxed);
+    STAT_RETRANS.fetch_add(retrans, Ordering::Relaxed);
+
+    Some(Duration::from_micros(delay))
 }
 
 pub fn report(delay: u32, unsent: u32, shed: bool) //THE SERVER'S WORD ON ITS VIEWERS
 {
-    REMOTE.fetch_min(u64::from(delay) + at_target(u64::from(unsent)), Ordering::Relaxed);
+    REMOTE.fetch_max(u64::from(delay) + at_target(u64::from(unsent)), Ordering::Relaxed);
 
-    if shed { SHED.store(true, Ordering::Relaxed); }
+    //A SHED VIEWER NEEDS A FRESH PICTURE, NOT A SLOWER ONE
+    if shed { request_keyframe(); }
+}
+
+pub fn request_keyframe() //THE NEXT FRAME MUST STAND ALONE
+{
+    FORCE_KEYFRAME.store(true, Ordering::Relaxed);
+    STAT_KEY_REQUESTED.fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn take_keyframe_request() -> bool //CONSUMES A PENDING REQUEST
+{
+    FORCE_KEYFRAME.swap(false, Ordering::Relaxed)
+}
+
+pub fn set_draining(on: bool)
+{
+    DRAINING.store(on, Ordering::Relaxed);
+}
+
+pub fn draining() -> bool
+{
+    DRAINING.load(Ordering::Relaxed)
+}
+
+pub fn bitrate() -> u32 //THE CURRENT TARGET
+{
+    BITRATE.load(Ordering::Relaxed)
+}
+
+pub fn fps() -> u32 //THE RATE CAPTURE SHOULD RUN AT
+{
+    FPS.load(Ordering::Relaxed).max(1)
+}
+
+pub fn note_encoded()
+{
+    STAT_ENCODED.fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn note_sent(keyframe: bool)
+{
+    STAT_FRAMES.fetch_add(1, Ordering::Relaxed);
+
+    if keyframe { STAT_KEYFRAMES.fetch_add(1, Ordering::Relaxed); }
+}
+
+pub fn note_dropped()
+{
+    STAT_DROPPED.fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn stats_enabled() -> bool
+{
+    screen::stats_enabled()
+}
+
+pub fn stats_report() -> String //ONE INTERVAL'S COUNTERS
+{
+    let frames = STAT_FRAMES.swap(0, Ordering::Relaxed);
+    let encoded = STAT_ENCODED.swap(0, Ordering::Relaxed);
+    let keyframes = STAT_KEYFRAMES.swap(0, Ordering::Relaxed);
+    let dropped = STAT_DROPPED.swap(0, Ordering::Relaxed);
+    let bytes = STAT_BYTES.swap(0, Ordering::Relaxed);
+    let acked = STAT_ACKED.swap(0, Ordering::Relaxed);
+    let retrans = STAT_RETRANS.swap(0, Ordering::Relaxed);
+    let stalls = STAT_STALLS.swap(0, Ordering::Relaxed);
+    let requests = STAT_KEY_REQUESTED.swap(0, Ordering::Relaxed);
+
+    format!
+    (
+        "screen share: target={}kbps fps={} encoded={encoded} sent={frames} keyframes={keyframes} dropped={dropped} \
+         bytes={}KB acked={}KB retrans={retrans} stalls={stalls} key_requests={requests}",
+        BITRATE.load(Ordering::Relaxed) / 1000,
+        fps(),
+        bytes / 1024,
+        acked / 1024,
+    )
 }
 
 fn at_target(bytes: u64) -> u64 //MICROSECONDS TO SEND bytes AT THE CURRENT TARGET
@@ -156,11 +351,38 @@ fn at_target(bytes: u64) -> u64 //MICROSECONDS TO SEND bytes AT THE CURRENT TARG
     bytes * 8_000_000 / u64::from(BITRATE.load(Ordering::Relaxed).max(1))
 }
 
-fn take_min(slot: &AtomicU64) -> u64 //A WINDOW'S MINIMUM, ZERO IF NOTHING CAME
+//STRUCTS
+/// A token bucket that spaces frames at the current target.
+pub struct Pacer
 {
-    match slot.swap(u64::MAX, Ordering::Relaxed)
+    tokens: f64,
+    last: Instant,
+}
+
+impl Pacer
+{
+    pub fn new() -> Self
     {
-        u64::MAX => 0,
-        micros => micros,
+        Self { tokens: f64::INFINITY, last: Instant::now() }
+    }
+
+    /// Returns how long the stream should wait before sending `bytes`, bounded by
+    /// [`PACING_BURST`](consts::PACING_BURST).
+    pub fn delay(&mut self, bytes: usize) -> Duration //HOW LONG BEFORE THIS FRAME MAY GO
+    {
+        let now = Instant::now();
+        let rate = f64::from(BITRATE.load(Ordering::Relaxed).max(1));
+        let capacity = rate * consts::PACING_BURST.as_secs_f64() / 8.0;
+
+        self.tokens = (self.tokens + rate * now.duration_since(self.last).as_secs_f64() / 8.0).min(capacity);
+        self.last = now;
+        self.tokens -= bytes as f64;
+
+        if self.tokens >= 0.0 { return Duration::ZERO; }
+
+        let wait = Duration::from_secs_f64((-self.tokens) * 8.0 / rate);
+        self.tokens = self.tokens.max(-capacity);
+
+        wait.min(consts::PACING_BURST)
     }
 }

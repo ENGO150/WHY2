@@ -326,7 +326,7 @@ async fn main()
                                     log::info!("Auxiliary connection (screen share): {owner}");
 
                                     //A SHARE'S BACKLOG IS LATENCY, NOT CAPACITY
-                                    screen::cap_socket_buffers(&stream);
+                                    screen::cap_socket_buffers(&stream, screen::consts::SOCKET_TARGET);
 
                                     server::spawn_with_abort(move |task| async move
                                     {
@@ -339,10 +339,10 @@ async fn main()
                                 ConnectionType::Attach { id: sharer_id } =>
                                 {
                                     //A SHARE'S BACKLOG IS LATENCY, NOT CAPACITY
-                                    screen::cap_socket_buffers(&stream);
+                                    screen::cap_socket_buffers(&stream, screen::consts::SOCKET_TARGET);
 
-                                    //ONLY THE WRITE HALF IS USED FOR A VIEWER
-                                    let (_read_stream, write_stream) = stream.into_split();
+                                    //THE READ HALF CARRIES THE VIEWER'S REPORTS
+                                    let (read_stream, write_stream) = stream.into_split();
 
                                     let attached = if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
                                     {
@@ -357,8 +357,8 @@ async fn main()
                                     //THE GUARD IS GONE BY HERE
                                     match attached
                                     {
-                                        //BUILD THE VIEWER'S TASK HERE
-                                        Some((stream, keys)) => match screen_server::attach(sharer_id, id, &keys, stream, token)
+                                        //BUILD THE VIEWER'S TASKS HERE
+                                        Some((stream, keys)) => match screen_server::attach(sharer_id, id, &keys, read_stream, stream, token)
                                         {
                                             true => log::info!("Auxiliary connection (screen viewer): {owner} watching {}",
                                                 server::log_addr(&sharer_id)),
