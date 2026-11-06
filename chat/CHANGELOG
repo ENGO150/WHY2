@@ -1,6 +1,10 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.4.3:
+- 495e0856: fix command parameters helpers
+- 87337b17: improve screen share quality on constrained links
+
 v2.4.2:
 - a2534e2d: upgrade chat dependencies
 - 3782efd9: remove WHY2_SCREEN_STATS debug envvar
