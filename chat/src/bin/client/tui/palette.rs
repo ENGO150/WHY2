@@ -563,8 +563,13 @@ fn active_arg(args: &'static [CommandArg], tail: &str) -> Option<usize>
     //A TRAILING SPACE MEANS THE NEXT PARAMETER
     let index = if tail.ends_with(char::is_whitespace) { given } else { given.saturating_sub(1) };
 
-    //THE LAST PARAMETER SWALLOWS THE REST
-    Some(index.min(args.len() - 1))
+    //PAST THE LAST PARAMETER, ONLY FREE TEXT SWALLOWS MORE
+    if index >= args.len()
+    {
+        return args.last().filter(|arg| arg.values == ArgValues::Free).map(|_| args.len() - 1);
+    }
+
+    Some(index)
 }
 
 //THE HALF-TYPED VALUE THE CARET IS ON
