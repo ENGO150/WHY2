@@ -89,6 +89,8 @@ pub struct TcpStats //ONE SOCKET'S QUEUE AND DELIVERY FIGURES
 {
     /// Bytes written to the socket that have not been sent yet.
     pub unsent: u64,          //BYTES NOT SENT YET
+    /// The path's current round-trip time.
+    pub rtt: Duration,        //CURRENT ROUND-TRIP TIME
     /// Round-trip time above the path's best.
     pub inflated: Duration,   //RTT OVER THE PATH'S MINIMUM
     /// Bytes the peer has acknowledged, cumulative.
@@ -129,6 +131,7 @@ pub fn tcp_stats(stream: &TcpStream) -> Option<TcpStats>
     Some(TcpStats
     {
         unsent: u64::from(info.tcpi_notsent_bytes),
+        rtt: Duration::from_micros(u64::from(info.tcpi_rtt)),
         inflated: Duration::from_micros(u64::from(info.tcpi_rtt.saturating_sub(info.tcpi_min_rtt))),
         acked,
         delivery_rate,
@@ -148,17 +151,27 @@ pub fn tcp_backlog(stream: &TcpStream) -> Option<(u64, Duration)> //UNSENT BYTES
     tcp_stats(stream).map(|stats| (stats.unsent, stats.inflated))
 }
 
-/// Bounds the kernel queue a screen socket may hide.
+/// Sizes a screen socket's buffers for the path's bandwidth-delay product.
 ///
-/// The budget is [`SOCKET_QUEUE_MS`](consts::SOCKET_QUEUE_MS) of `bitrate`, clamped to
+/// A socket must hold the data already in flight (the BDP) plus a queue of
+/// [`SOCKET_QUEUE_MS`](consts::SOCKET_QUEUE_MS) at `bitrate`; a smaller buffer makes a long,
+/// fast path look congested, while a larger one only adds latency. The total is clamped to
 /// [`SOCKET_BUFFER_MIN`](consts::SOCKET_BUFFER_MIN)..[`SOCKET_BUFFER_MAX`](consts::SOCKET_BUFFER_MAX).
-/// Linux doubles what is requested, so half is asked for there.
+/// `TCP_NOTSENT_LOWAT` caps the unsent queue at the queue budget, so the kernel does not hide
+/// more than that in front of the wire.
 pub fn cap_socket_buffers(stream: &TcpStream, bitrate: u32)
 {
-    let budget = (u64::from(bitrate) / 8 * consts::SOCKET_QUEUE_MS / 1000) as usize;
-    let budget = budget.clamp(consts::SOCKET_BUFFER_MIN, consts::SOCKET_BUFFER_MAX);
+    //THE BDP USES THE PATH'S BASE RTT, NOT THE QUEUEING ON TOP OF IT
+    let rtt = tcp_stats(stream).map(|stats| stats.rtt.saturating_sub(stats.inflated))
+        .filter(|rtt| !rtt.is_zero())
+        .unwrap_or(consts::SOCKET_RTT_FALLBACK);
 
-    //LINUX DOUBLES BOTH BUFFERS
+    let bytes_per_second = u64::from(bitrate) / 8;
+    let in_flight = bytes_per_second.saturating_mul(rtt.as_micros() as u64) / 1_000_000;
+    let queue = bytes_per_second.saturating_mul(consts::SOCKET_QUEUE_MS) / 1000;
+    let budget = (in_flight + queue).clamp(consts::SOCKET_BUFFER_MIN as u64, consts::SOCKET_BUFFER_MAX as u64) as usize;
+
+    //LINUX DOUBLES WHAT SO_SNDBUF IS GIVEN, SO HALF BUYS THE WHOLE BUDGET
     #[cfg(target_os = "linux")]
     let request = (budget / 2).max(consts::SOCKET_BUFFER_MIN / 2);
 
@@ -172,10 +185,13 @@ pub fn cap_socket_buffers(stream: &TcpStream, bitrate: u32)
     socket.set_send_buffer_size(request).ok();
     socket.set_recv_buffer_size(request).ok();
 
-    //KEEP THE UNSENT QUEUE SHORT WHERE THE KERNEL OFFERS IT
+    //KEEP THE UNSENT QUEUE TO THE QUEUE BUDGET, NOT THE WHOLE BDP
     #[cfg(target_os = "linux")]
     {
-        let value = request.min(i32::MAX as usize) as libc::c_int;
+        let value = queue
+            .max(consts::SOCKET_NOTSENT_MIN as u64)
+            .min(budget as u64)
+            .min(i32::MAX as u64) as libc::c_int;
 
         //SAFETY: LIVE SOCKET, value IS ONE INCH
         unsafe

@@ -18,15 +18,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! # Screen Sharing — Server Side
 //!
-//! Relays a sharer's stream to its viewers ([`screen`](fn@screen)), with one task and one
-//! one-slot video queue per viewer so the share runs at the sharer's rate rather than the slowest
-//! viewer's.
+//! Relays a sharer's stream to its viewers ([`screen`](fn@screen)), with one task and a short
+//! video queue per viewer so the share runs at the sharer's rate rather than the slowest viewer's.
 //!
 //! # Shedding a Slow Viewer
-//! The share loop never waits on a viewer. A delta frame that would replace a delta still waiting
-//! in that viewer's slot is dropped, and the viewer is marked as needing a keyframe: the replaced
-//! frame was the reference for it. A keyframe always preempts the slot, so the recovery picture
-//! itself can never be lost to a full queue. Audio has its own small queue with drop-oldest
+//! The share loop never waits on a viewer. A delta frame that would overflow that viewer's queue
+//! is dropped, and the viewer is marked as needing a keyframe: the dropped frame was the
+//! reference for the next one. A keyframe clears the queue, since no older frame can be predicted
+//! from it, and preempts everything else. The queue keeps up to
+//! [`VIEWER_VIDEO_BOUND`](screen::consts::VIEWER_VIDEO_BOUND) frames, so a brief scheduling hiccup
+//! costs a little latency rather than a keyframe. Audio has its own small queue with drop-oldest
 //! semantics, so it never waits behind a video frame.
 //!
 //! # Attaching
@@ -130,6 +131,8 @@ struct Share //WHAT A SHARE LEAVES WHERE AN ATTACHING VIEWER CAN REACH IT
     stats: MutexSync<Vec<Arc<Backlog>>>,      //EVERY SERVED VIEWER'S BACKLOG
     /// Whether anybody asked the sharer for a keyframe.
     key_requested: AtomicBool,                //SOMEBODY NEEDS AN IDR
+    /// When the sharer was last asked, so a slow viewer cannot cause a keyframe storm.
+    last_key_request: MutexSync<Option<Instant>>, //THE LAST REQUEST SENT TO THE SHARER
 }
 
 /// What one viewer is behind by, as the worst case since the last report.
@@ -157,19 +160,17 @@ enum Queued //ONE PACKET WAITING FOR A VIEWER
 /// What happened to a video frame offered to a viewer's queue.
 enum VideoPush //WHAT HAPPENED TO A VIDEO FRAME
 {
-    /// The frame is waiting in the slot.
+    /// The frame is waiting in the queue.
     Queued,
-    /// A keyframe is already on its way; the delta was dropped.
-    KeyframePending,
-    /// The replaced frame was a reference, so the chain is broken.
+    /// The dropped frame was a reference, so the chain is broken.
     Shed,
 }
 
-/// A viewer's one-slot video slot and small audio queue.
+/// A viewer's short video queue and small audio queue.
 struct ViewerQueue //A VIEWER'S WAITING PACKETS
 {
-    /// The newest video frame, and whether it stands on its own.
-    video: MutexSync<Option<(Instant, Vec<u8>, bool)>>,
+    /// Video frames and whether each stands on its own, oldest first.
+    video: MutexSync<VecDeque<(Instant, Vec<u8>, bool)>>,
     /// Audio packets and when they were queued, oldest first.
     audio: MutexSync<VecDeque<(Instant, Vec<u8>)>>,
     /// Wakes the writer task.
@@ -225,6 +226,28 @@ impl Drop for Viewer
     }
 }
 
+impl Share
+{
+    /// Asks the sharer for a keyframe, at most once per
+    /// [`KEYFRAME_REQUEST_INTERVAL`](screen::consts::KEYFRAME_REQUEST_INTERVAL) unless forced.
+    fn request_keyframe(&self, force: bool)
+    {
+        if !force
+        {
+            let mut last = self.last_key_request.lock().unwrap();
+
+            if last.is_some_and(|last| last.elapsed() < screen::consts::KEYFRAME_REQUEST_INTERVAL) { return; }
+
+            *last = Some(Instant::now());
+        } else
+        {
+            *self.last_key_request.lock().unwrap() = Some(Instant::now());
+        }
+
+        self.key_requested.store(true, Ordering::Relaxed);
+    }
+}
+
 impl Backlog
 {
     /// Creates empty backlog figures.
@@ -270,33 +293,38 @@ impl ViewerQueue
     {
         Self
         {
-            video: MutexSync::new(None),
+            video: MutexSync::new(VecDeque::new()),
             audio: MutexSync::new(VecDeque::new()),
             ready: Notify::new(),
             closed: AtomicBool::new(false),
         }
     }
 
-    /// Offers one video frame, replacing what a newer frame made useless.
+    /// Offers one video frame, dropping older frames a keyframe makes useless.
     fn push_video(&self, data: Vec<u8>, keyframe: bool) -> VideoPush
     {
         let outcome =
         {
-            let mut slot = self.video.lock().unwrap();
-            let held_keyframe = slot.as_ref().is_some_and(|(_, _, key)| *key);
+            let mut queue = self.video.lock().unwrap();
 
-            match (keyframe, held_keyframe)
+            if keyframe
             {
-                //A KEYFRAME IS ALWAYS WELCOME
-                (true, _) => { *slot = Some((Instant::now(), data, true)); VideoPush::Queued },
+                //A KEYFRAME REPLACES EVERYTHING: NO OLDER FRAME CAN BE PREDICTED FROM IT
+                queue.clear();
+                queue.push_back((Instant::now(), data, true));
 
-                //KEEP THE KEYFRAME ALREADY ON ITS WAY
-                (false, true) => VideoPush::KeyframePending,
+                VideoPush::Queued
+            } else if queue.len() >= screen::consts::VIEWER_VIDEO_BOUND
+            {
+                //A FULL QUEUE IS A BROKEN CHAIN; KEEP A KEYFRAME ALREADY ON ITS WAY
+                if !queue.iter().any(|(_, _, key)| *key) { queue.clear(); }
 
-                //THE WAITING DELTA WAS THIS FRAME'S REFERENCE
-                (false, false) if slot.is_some() => { *slot = None; VideoPush::Shed },
+                VideoPush::Shed
+            } else
+            {
+                queue.push_back((Instant::now(), data, false));
 
-                (false, false) => { *slot = Some((Instant::now(), data, false)); VideoPush::Queued }
+                VideoPush::Queued
             }
         };
 
@@ -326,7 +354,7 @@ impl ViewerQueue
             return Some(Queued::Audio { queued, data });
         }
 
-        self.video.lock().unwrap().take().map(|(queued, data, _)| Queued::Video { queued, data })
+        self.video.lock().unwrap().pop_front().map(|(queued, data, _)| Queued::Video { queued, data })
     }
 
     /// Stops the writer task at its next wakeup.
@@ -482,7 +510,7 @@ fn spawn_viewer //ONE WRITER AND ONE READER PER VIEWER
 
                 reader_stats.report(delay);
 
-                if shed { share.key_requested.store(true, Ordering::Relaxed); }
+                if shed { share.request_keyframe(false); }
             }
         }
 
@@ -578,18 +606,21 @@ async fn feedback //TELL THE SHARER HOW FAR BEHIND ITS VIEWERS ARE
         }
 
         //A SHED OR ASKING VIEWER NEEDS A FRESH PICTURE
-        if shed { share.key_requested.store(true, Ordering::Relaxed); }
+        if shed { share.request_keyframe(false); }
 
         let key = share.key_requested.swap(false, Ordering::Relaxed);
 
+        //THE SHARER HEARS ABOUT BOTH, BUT ONLY ASKS FOR KEYFRAMES AT THE COOLDOWN'S PACE
+        let shed = shed || key;
+
         //NOTHING TO SAY
-        if worst == 0 && unsent == 0 && !key { continue; }
+        if worst == 0 && unsent == 0 && !shed { continue; }
 
         let code = ScreenPacketCode::Feedback
         {
             delay: worst.min(u64::from(u32::MAX)) as u32,
             unsent: unsent.min(u64::from(u32::MAX)) as u32,
-            shed: key,
+            shed,
         };
 
         if screen::send_frame(&mut *stream.lock().await, code, &mut rex_stream, Some(&mut seq)).await.is_err()
@@ -637,8 +668,8 @@ pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
         viewer.queue.push_video(frame, true);
     }
 
-    //A FRESH VIEWER NEEDS A LIVE PICTURE
-    share.key_requested.store(true, Ordering::Relaxed);
+    //A FRESH VIEWER NEEDS A LIVE PICTURE, EVEN IF A SLOW ONE ASKED RECENTLY
+    share.request_keyframe(true);
 
     //PICKED UP BY THE SHARE LOOP ON ITS NEXT FRAME
     match share.pending.lock()
@@ -715,6 +746,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         pending: MutexSync::new(Vec::new()),
         stats: MutexSync::new(Vec::new()),
         key_requested: AtomicBool::new(false),
+        last_key_request: MutexSync::new(None),
     });
 
     //REPORT BACK ON THE SAME SOCKET
@@ -850,7 +882,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
 
                         viewer.needs_key = true;
                         viewer.stats.shed.store(true, Ordering::Relaxed);
-                        share.key_requested.store(true, Ordering::Relaxed);
+                        share.request_keyframe(false);
                     }
                 }
 

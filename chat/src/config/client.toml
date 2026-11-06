@@ -37,6 +37,10 @@ noise_suppression = true # Remove background noise from the microphone
 automatic_gain = true # Normalize the microphone level automatically
 screen_volume = 100 # Volume of an attached screen share's audio in percent (0-200)
 
+# Screen sharing
+screen_max_width = 1280 # Largest width a shared picture is encoded at (0 = native)
+screen_max_height = 720 # Largest height a shared picture is encoded at (0 = native)
+
 # Colors
 disable_colors = false # Disable message colors
 

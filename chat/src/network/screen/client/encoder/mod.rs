@@ -37,8 +37,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! openh264 holds its bitrate by skipping frames; hardware rate controls instead keep every frame
 //! and overshoot on content the bitrate cannot carry. GPU backends therefore skip frames through
 //! a one-second token bucket ([`Budget`]), never skipping a keyframe, so
-//! [`H264_BITRATE`](crate::network::screen::consts::H264_BITRATE) stays a ceiling. Every backend
-//! takes a new target mid-stream ([`Backend::set_bitrate`]).
+//! [`H264_BITRATE`](crate::network::screen::consts::H264_BITRATE) stays a ceiling. The bucket may
+//! owe up to `BUDGET_DEBT` seconds, so one large keyframe does not freeze the frames after it.
+//! Every backend takes a new target mid-stream ([`Backend::set_bitrate`]).
 //!
 //! # The Software Encoder
 //! openh264 runs in camera mode rather than screen-content mode: on real game footage screen mode
@@ -92,6 +93,8 @@ const ENCODER_OPTION_MAX_BITRATE: c_int = 6;
 const SPATIAL_LAYER_0: c_int = 0;
 /// openh264's "every spatial layer".
 const SPATIAL_LAYER_ALL: c_int = 4;
+/// How many seconds of bitrate a hardware encoder may owe before it skips frames.
+const BUDGET_DEBT: f64 = 2.0;
 
 //STRUCTS
 /// One tightly packed I420 picture.
@@ -141,8 +144,10 @@ impl Settings
 /// A one-second token bucket that skips frames over the bitrate.
 ///
 /// With balance $\beta$ bits at target $R$ bits per second, each frame refills
-/// $\beta \leftarrow \min(\beta + R\Delta t,\ R)$ and may be encoded iff $\beta \ge 0$ or it is a
-/// keyframe; an encoded frame of $n$ bytes then pays $\beta \leftarrow \beta - 8n$.
+/// $\beta \leftarrow \min(\beta + R\Delta t,\ R)$ and may be encoded while
+/// $\beta \ge -R\,D$ or it is a keyframe, where $D$ is `BUDGET_DEBT` seconds; an encoded frame
+/// of $n$ bytes then pays $\beta \leftarrow \beta - 8n$. The debt lets a keyframe's cost be repaid
+/// over the following frames instead of skipping all of them at once.
 pub struct Budget //SKIPS FRAMES OVER THE BITRATE
 {
     /// Bits per second.
@@ -170,7 +175,7 @@ impl Budget
         self.balance = (self.balance + self.rate * (now - self.refilled).as_secs_f64()).min(self.rate);
         self.refilled = now;
 
-        keyframe || self.balance >= 0.0
+        keyframe || self.balance >= -self.rate * BUDGET_DEBT
     }
 
     /// Pays for an encoded frame.
@@ -179,11 +184,12 @@ impl Budget
         self.balance -= bytes as f64 * 8.0;
     }
 
-    /// Changes the bitrate, capping the balance at one second of it.
+    /// Changes the bitrate, keeping the balance within one second of credit and
+    /// `BUDGET_DEBT` seconds of debt.
     pub fn set_rate(&mut self, bitrate: u32)
     {
         self.rate = f64::from(bitrate);
-        self.balance = self.balance.min(self.rate);
+        self.balance = self.balance.clamp(-self.rate * BUDGET_DEBT, self.rate);
     }
 }
 

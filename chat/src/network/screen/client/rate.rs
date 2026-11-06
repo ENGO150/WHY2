@@ -45,21 +45,23 @@ static DELAY: AtomicU64 = AtomicU64::new(0);         //WORST QUEUEING SEEN, MICR
 static REMOTE: AtomicU64 = AtomicU64::new(0);        //WORST QUEUEING THE SERVER REPORTED, MICROSECONDS
 static STALL: AtomicU64 = AtomicU64::new(0);         //WORST BLOCKING WRITE THIS WINDOW, MICROSECONDS
 static LAST_STALL: AtomicU64 = AtomicU64::new(0);    //LAST BLOCKING WRITE, WHERE tcp_info IS MISSING
+static DELIVERY: AtomicU64 = AtomicU64::new(0);      //THE KERNEL'S DELIVERY RATE, BYTES PER SECOND
 static ACKED_OK: AtomicBool = AtomicBool::new(false); //tcp_info COUNTED ACKNOWLEDGED BYTES
 static LAST_ACKED: AtomicU64 = AtomicU64::new(0);    //CUMULATIVE BYTES THE PEER HAD ACKNOWLEDGED
 static LAST_RETRANS: AtomicU64 = AtomicU64::new(0);  //CUMULATIVE RETRANSMITTED SEGMENTS
 static RETRANS: AtomicU64 = AtomicU64::new(0);       //RETRANSMITTED SEGMENTS THIS WINDOW
+static SHED: AtomicBool = AtomicBool::new(false);    //THE SERVER DROPPED A FRAME THIS WINDOW
 static FORCE_KEYFRAME: AtomicBool = AtomicBool::new(false); //THE NEXT FRAME MUST STAND ALONE
 static DRAINING: AtomicBool = AtomicBool::new(false); //VIDEO IS HELD UNTIL THE LINK EMPTIES
-static FPS: AtomicU32 = AtomicU32::new(consts::TARGET_FPS); //CAPTURE STEPS THE LINK CAN CARRY
+static FPS: AtomicU32 = AtomicU32::new(consts::TARGET_FPS); //CAPTURE RATE; CONGESTION IS ABSORBED BY THE TARGET
 
 //STRUCTS
 pub struct RateControl //FITS THE BITRATE TO THE LINK
 {
     window: Instant,
     held: Instant,    //NO GROWTH BEFORE THIS
-    ceiling: f64,     //WHAT THE LINK CARRIED WHEN IT LAST FILLED
-    congested: bool,  //INSIDE A BACKOFF
+    hot: u32,         //CONSECUTIVE WINDOWS WITH A FULL LINK
+    shed: u32,        //CONSECUTIVE WINDOWS WHERE A VIEWER SHED A FRAME
     delay_ewma: f64,  //THE TREND, WHERE THE WORST SAMPLE DECIDES THE CUT
 }
 
@@ -67,7 +69,7 @@ impl RateControl
 {
     pub fn new() -> Self
     {
-        Self { window: Instant::now(), held: Instant::now(), ceiling: f64::INFINITY, congested: false, delay_ewma: 0.0 }
+        Self { window: Instant::now(), held: Instant::now(), hot: 0, shed: 0, delay_ewma: 0.0 }
     }
 
     pub fn bitrate(&self) -> u32
@@ -85,62 +87,76 @@ impl RateControl
         let seconds = elapsed.as_secs_f64();
         let sent = SENT.swap(0, Ordering::Relaxed) as f64 * 8.0 / seconds;
         let acked = ACKED.swap(0, Ordering::Relaxed) as f64 * 8.0 / seconds;
+        let delivery = DELIVERY.load(Ordering::Relaxed) as f64 * 8.0;
         RETRANS.swap(0, Ordering::Relaxed);
         let busy = Duration::from_micros(BUSY.swap(0, Ordering::Relaxed)).as_secs_f64() / seconds;
         let delay = Duration::from_micros(DELAY.swap(0, Ordering::Relaxed).max(REMOTE.swap(0, Ordering::Relaxed)));
         let stall = Duration::from_micros(STALL.swap(0, Ordering::Relaxed));
+        let shed = SHED.swap(false, Ordering::Relaxed);
+        let acked_ok = ACKED_OK.load(Ordering::Relaxed);
 
         //THE WORST SAMPLE DECIDES THE CUT, THE TREND DECIDES THE GROWTH
-        self.delay_ewma = self.delay_ewma * 0.7 + delay.as_secs_f64() * 0.3;
+        self.delay_ewma = self.delay_ewma * 0.6 + delay.as_secs_f64() * 0.4;
 
         let current = f64::from(self.bitrate());
 
-        //WHAT THE LINK ACTUALLY DRAINED, NOT WHAT WAS HANDED TO IT
-        let throughput = if ACKED_OK.load(Ordering::Relaxed) { acked } else { sent };
+        //WHAT THE LINK DRAINED, OR WHAT WE HANDED IT WHERE tcp_info IS MISSING
+        let delivered = if acked_ok { acked } else { sent };
 
-        //A QUEUE BUILDING, A BLOCKING WRITE, OR A FULL LINK
-        let heavy = busy >= consts::RATE_SATURATED || delay >= consts::RATE_DELAY || stall >= consts::RATE_STALL;
+        //A QUEUE THAT KEEPS BUILDING, A BLOCKING WRITE, OR (WITHOUT tcp_info) A WRITE-SATURATED WINDOW
+        let queueing = delay >= consts::RATE_DELAY;
+        let stalled = stall >= consts::RATE_STALL;
+        let busy_full = !acked_ok && busy >= consts::RATE_SATURATED;
+
         let severe = delay >= consts::RATE_HARD_DELAY || stall >= consts::RATE_STALL_SEVERE;
 
-        let next = if heavy
+        if queueing || stalled || busy_full { self.hot = self.hot.saturating_add(1); } else { self.hot = 0; }
+        if shed { self.shed = self.shed.saturating_add(1); } else { self.shed = 0; }
+
+        //ONE BAD WINDOW IS NOISE; TWO IN A ROW, A SEVERE SAMPLE, OR REPEATED SHEDDING IS CONGESTION.
+        //A SHED FRAME IS ALSO A KEYFRAME REQUEST, SO ONE IS ALREADY ALLOWED BEFORE A CUT.
+        let cut = severe || self.hot >= 2 || self.shed >= 2;
+
+        let next = if cut
         {
-            //AT MOST WHAT WE ASKED FOR, AT MOST WHAT A FULL LINK DRAINED
-            if !self.congested { self.ceiling = current; }
-            if busy >= consts::RATE_SATURATED { self.ceiling = self.ceiling.min(throughput.max(f64::from(consts::MIN_BITRATE))); }
+            //NEVER KEEP MORE THAN THE TARGET, AND TRUST THE KERNEL'S DELIVERY RATE ONLY
+            //ABOVE THREE QUARTERS OF IT; ONE STALE SAMPLE MUST NOT COLLAPSE THE TARGET.
+            let capacity = if delivery > 0.0 { delivery.max(current * 0.75) } else { current };
+            let keep = if severe { consts::RATE_CUT_SEVERE } else { consts::RATE_BACKOFF };
+            let cut_rate = if severe { consts::RATE_CUT_SEVERE } else { consts::RATE_CUT };
 
-            self.congested = true;
-            self.held = Instant::now() + consts::RATE_HOLD;
-
-            if severe
-            {
-                (throughput * consts::RATE_CUT_SEVERE).min(current * consts::RATE_CUT)
-            } else
-            {
-                (current * consts::RATE_CUT).min(throughput * consts::RATE_BACKOFF)
-            }
-        } else if busy <= consts::RATE_IDLE && self.delay_ewma < consts::RATE_DELAY.as_secs_f64() / 2.0 &&
-            stall < consts::RATE_STALL && Instant::now() >= self.held && throughput >= current * consts::RATE_USED
-        {
-            self.congested = false;
-
-            //BACK UP UNDER THE CEILING, THEN CREEP PAST IT
-            if current < self.ceiling * consts::RATE_NEAR
-            {
-                current * consts::RATE_GROWTH
-            } else
-            {
-                current * consts::RATE_CREEP
-            }
+            (current * cut_rate).min(capacity * keep)
         } else
         {
-            current
+            let now = Instant::now();
+
+            //THE LINK DRAINED WHAT WE ASKED OF IT, SO PROBE A LITTLE HIGHER
+            let healthy = self.hot == 0 && self.shed == 0 && stall < consts::RATE_STALL &&
+                self.delay_ewma < consts::RATE_DELAY.as_secs_f64() / 2.0 && now >= self.held;
+
+            if healthy && delivered >= current * consts::RATE_USED
+            {
+                if current < f64::from(consts::H264_BITRATE) * consts::RATE_NEAR
+                {
+                    current * consts::RATE_GROWTH
+                } else
+                {
+                    current * consts::RATE_CREEP
+                }
+            } else
+            {
+                current
+            }
         };
 
         let next = (next as u32).clamp(consts::MIN_BITRATE, consts::H264_BITRATE);
 
-        //FRAME RATE STEPS WITH THE TARGET
-        let fps = fps_next(next, FPS.load(Ordering::Relaxed));
-        if fps != FPS.load(Ordering::Relaxed) { FPS.store(fps, Ordering::Relaxed); }
+        if cut
+        {
+            self.held = Instant::now() + consts::RATE_HOLD;
+            self.hot = 0;
+            self.shed = 0;
+        }
 
         if next == self.bitrate() { return None; }
 
@@ -151,24 +167,6 @@ impl RateControl
 }
 
 //FUNCTIONS
-/// Maps a target to the next capture rate, one step at a time.
-fn fps_next(bitrate: u32, current: u32) -> u32 //THE CAPTURE RATE A TARGET ALLOWS
-{
-    let down = |limit: u32| bitrate < limit;
-    let up = |limit: u32| bitrate > limit + limit / 10;
-
-    match current
-    {
-        30 if down(1_500_000) => 24,
-        24 if down(1_000_000) => 20,
-        24 if up(1_500_000) => 30,
-        20 if down(700_000) => 15,
-        20 if up(1_000_000) => 24,
-        15 if up(700_000) => 20,
-        _ => current,
-    }
-}
-
 pub fn start() //A NEW SHARE
 {
     SENT.store(0, Ordering::Relaxed);
@@ -178,10 +176,12 @@ pub fn start() //A NEW SHARE
     REMOTE.store(0, Ordering::Relaxed);
     STALL.store(0, Ordering::Relaxed);
     LAST_STALL.store(0, Ordering::Relaxed);
+    DELIVERY.store(0, Ordering::Relaxed);
     ACKED_OK.store(false, Ordering::Relaxed);
     LAST_ACKED.store(0, Ordering::Relaxed);
     LAST_RETRANS.store(0, Ordering::Relaxed);
     RETRANS.store(0, Ordering::Relaxed);
+    SHED.store(false, Ordering::Relaxed);
     FORCE_KEYFRAME.store(false, Ordering::Relaxed);
     DRAINING.store(false, Ordering::Relaxed);
     FPS.store(consts::TARGET_FPS, Ordering::Relaxed);
@@ -229,6 +229,9 @@ pub fn probe(stream: &TcpStream) -> Option<Duration> //THE QUEUE A NEW FRAME JOI
 
     ACKED_OK.store(true, Ordering::Relaxed);
 
+    //THE KERNEL'S OWN CAPACITY ESTIMATE, FOR THE NEXT WINDOW
+    DELIVERY.store(stats.delivery_rate, Ordering::Relaxed);
+
     let delay = at_target(stats.unsent) + stats.inflated.as_micros() as u64;
     DELAY.fetch_max(delay, Ordering::Relaxed);
 
@@ -246,7 +249,11 @@ pub fn report(delay: u32, unsent: u32, shed: bool) //THE SERVER'S WORD ON ITS VI
     REMOTE.fetch_max(u64::from(delay) + at_target(u64::from(unsent)), Ordering::Relaxed);
 
     //A SHED VIEWER NEEDS A FRESH PICTURE, NOT A SLOWER ONE
-    if shed { request_keyframe(); }
+    if shed
+    {
+        SHED.store(true, Ordering::Relaxed);
+        request_keyframe();
+    }
 }
 
 pub fn request_keyframe() //THE NEXT FRAME MUST STAND ALONE

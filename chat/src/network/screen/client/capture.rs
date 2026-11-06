@@ -55,11 +55,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! socket, the token and the audio; the viewer pays one keyframe.
 //!
 //! # Encoding
-//! The frame encoder converts each frame with openh264's SIMD RGBA/BGRA → I420 path and hands it to
-//! a GPU encoder where one opens, falling back to software for the rest of the capture the moment
-//! one fails. A frame is not encoded at all while the network channel is full, so a skipped frame
-//! never breaks the reference chain, and a keyframe is forced at least every
-//! [`KEYFRAME_INTERVAL`](consts::KEYFRAME_INTERVAL).
+//! The frame encoder area-averages each frame down to at most `screen_max_width` ×
+//! `screen_max_height` (1280×720 by default) before converting it with openh264's SIMD RGBA/BGRA
+//! → I420 path, so the bitrate buys a 720p picture rather than a native-resolution one. It hands
+//! the picture to a GPU encoder where one opens, falling back to software for the rest of the
+//! capture the moment one fails. A frame is not encoded at all while the network channel is full,
+//! so a skipped frame never breaks the reference chain, and a keyframe is forced at least every
+//! [`KEYFRAME_INTERVAL`](consts::KEYFRAME_INTERVAL). Recovery keyframes are spaced by
+//! [`MIN_KEYFRAME_INTERVAL`](consts::MIN_KEYFRAME_INTERVAL) even when the network asks for them
+//! repeatedly.
 
 use std::
 {
@@ -363,11 +367,111 @@ fn capture_backend //PICK A BACKEND AND CAPTURE ON IT UNTIL IT STOPS
     }
 }
 
+/// Returns the largest even picture that fits within `max_width` × `max_height`.
+///
+/// A zero limit means no limit. The picture is never upscaled, and an odd size is reduced by one
+/// pixel because I420 needs even dimensions.
+pub fn target_size(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32)
+{
+    if width == 0 || height == 0 { return (0, 0); }
+
+    let even = |value: u32| value.max(2) & !1;
+
+    let max_width = if max_width == 0 { u32::MAX } else { max_width.max(2) };
+    let max_height = if max_height == 0 { u32::MAX } else { max_height.max(2) };
+
+    if width <= max_width && height <= max_height { return (even(width), even(height)); }
+
+    let scale = (f64::from(max_width) / f64::from(width)).min(f64::from(max_height) / f64::from(height));
+    let target_width = even(((f64::from(width) * scale).round() as u32).min(max_width));
+    let target_height = even(((f64::from(height) * scale).round() as u32).min(max_height));
+
+    (target_width, target_height)
+}
+
+/// An area-average downscaler that keeps its row and output buffers.
+struct Downscaler //AVERAGES A PICTURE DOWN WITHOUT ALIASING
+{
+    /// One row of channel sums.
+    row: Vec<u32>,
+    /// The scaled picture.
+    pixels: Vec<u8>,
+}
+
+impl Downscaler
+{
+    /// Creates an empty downscaler.
+    fn new() -> Self
+    {
+        Self { row: Vec::new(), pixels: Vec::new() }
+    }
+
+    /// Averages `source` down to `target_width` × `target_height`, preserving byte order.
+    fn scale(&mut self, source: &[u8], width: usize, height: usize, target_width: usize, target_height: usize) -> &[u8]
+    {
+        self.row.resize(width * 4, 0);
+        self.pixels.resize(target_width * target_height * 4, 0);
+
+        for target_y in 0..target_height
+        {
+            let top = target_y * height / target_height;
+            let bottom = (((target_y + 1) * height / target_height).max(top + 1)).min(height);
+
+            self.row.fill(0);
+
+            for source_y in top..bottom
+            {
+                let line = &source[source_y * width * 4..][..width * 4];
+
+                for (sum, pixel) in self.row.chunks_exact_mut(4).zip(line.chunks_exact(4))
+                {
+                    sum[0] += u32::from(pixel[0]);
+                    sum[1] += u32::from(pixel[1]);
+                    sum[2] += u32::from(pixel[2]);
+                    sum[3] += u32::from(pixel[3]);
+                }
+            }
+
+            let rows = (bottom - top) as u64;
+
+            for target_x in 0..target_width
+            {
+                let left = target_x * width / target_width;
+                let right = (((target_x + 1) * width / target_width).max(left + 1)).min(width);
+                let count = (right - left) as u64 * rows;
+
+                let mut sum = [0u64; 4];
+
+                for column in left..right
+                {
+                    let pixel = &self.row[column * 4..][..4];
+
+                    sum[0] += u64::from(pixel[0]);
+                    sum[1] += u64::from(pixel[1]);
+                    sum[2] += u64::from(pixel[2]);
+                    sum[3] += u64::from(pixel[3]);
+                }
+
+                let offset = (target_y * target_width + target_x) * 4;
+
+                self.pixels[offset] = (sum[0] / count) as u8;
+                self.pixels[offset + 1] = (sum[1] / count) as u8;
+                self.pixels[offset + 2] = (sum[2] / count) as u8;
+                self.pixels[offset + 3] = (sum[3] / count) as u8;
+            }
+        }
+
+        &self.pixels
+    }
+}
+
 /// A reusable I420 buffer.
 struct YuvScratch //REUSABLE I420 SCRATCH BUFFER
 {
     /// The planes.
     buffer: YUVBuffer,
+    /// The downscaler and its output.
+    scaler: Downscaler,
     /// Width the buffer is sized for.
     width: u32,
     /// Height the buffer is sized for.
@@ -379,21 +483,39 @@ impl YuvScratch
     /// Creates an empty buffer.
     fn new() -> Self
     {
-        Self { buffer: YUVBuffer::new(0, 0), width: 0, height: 0 }
+        Self { buffer: YUVBuffer::new(0, 0), scaler: Downscaler::new(), width: 0, height: 0 }
     }
 
-    /// Converts one RGBA or BGRA picture to I420, reallocating only on a resolution change.
-    fn fill(&mut self, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> Planes<'_>
+    /// Converts one RGBA or BGRA picture to I420 at `target_width` × `target_height`,
+    /// reallocating only on a target resolution change.
+    fn fill
+    (
+        &mut self,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+        order: PixelOrder,
+        target_width: u32,
+        target_height: u32,
+    ) -> Planes<'_>
     {
         //RESIZE ONLY ON A REAL RESOLUTION CHANGE
-        if self.width != width || self.height != height
+        if self.width != target_width || self.height != target_height
         {
-            self.buffer = YUVBuffer::new(width as usize, height as usize);
-            self.width = width;
-            self.height = height;
+            self.buffer = YUVBuffer::new(target_width as usize, target_height as usize);
+            self.width = target_width;
+            self.height = target_height;
         }
 
-        let dimensions = (width as usize, height as usize);
+        let pixels = if (target_width, target_height) != (width, height)
+        {
+            self.scaler.scale(pixels, width as usize, height as usize, target_width as usize, target_height as usize)
+        } else
+        {
+            pixels
+        };
+
+        let dimensions = (target_width as usize, target_height as usize);
 
         //SIMD WHERE THE CPU HAS IT
         match order
@@ -402,7 +524,7 @@ impl YuvScratch
             PixelOrder::Bgra => self.buffer.read_bgra8(BgraSliceU8::new(pixels, dimensions)),
         }
 
-        Planes { width, height, y: self.buffer.y(), u: self.buffer.u(), v: self.buffer.v() }
+        Planes { width: target_width, height: target_height, y: self.buffer.y(), u: self.buffer.u(), v: self.buffer.v() }
     }
 }
 
@@ -457,6 +579,15 @@ impl FrameEncoder
     /// - `Err` with a message for the user if encoding failed.
     fn submit(&mut self, frame_tx: &Sender<Vec<u8>>, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> Result<bool, String>
     {
+        //A NEW CAPTURE RATE NEEDS A FRESH ENCODER
+        let fps = rate::fps();
+        if fps != self.fps
+        {
+            self.fps = fps;
+            self.encoder = None;
+            self.keyframe = true;
+        }
+
         if let Some(bitrate) = self.rate.update() && let Some(backend) = self.encoder.as_mut()
         {
             backend.set_bitrate(bitrate);
@@ -475,6 +606,7 @@ impl FrameEncoder
         if encoder::nal_units(&frame).any(|unit| unit.first().is_some_and(|header| header & 0x1f == 5))
         {
             self.last_keyframe = Instant::now();
+            self.keyframe = false;
         }
 
         Ok(self.dispatch(frame_tx, frame))
@@ -489,12 +621,15 @@ impl FrameEncoder
     /// Converts and encodes one frame, reopening the encoder on a resize and falling back from the
     /// GPU to software on a failure.
     ///
+    /// The picture is area-averaged down to the configured maximum before conversion, so the
+    /// encoder and the wire see a 720p picture rather than the monitor's native resolution.
+    ///
     /// # Returns
-    /// The access unit, `None` for an empty one, or `Err` on odd dimensions or a software failure.
+    /// The access unit, `None` for an empty one, or `Err` on a malformed picture or a software
+    /// failure.
     fn encode(&mut self, width: u32, height: u32, pixels: &[u8], order: PixelOrder) -> Result<Option<Vec<u8>>, String>
     {
-        //I420 CONVERSION PANICS ON ODD DIMENSIONS
-        if width % 2 != 0 || height % 2 != 0
+        if width == 0 || height == 0
         {
             return Err(t!("screen.error.resolution", width, height));
         }
@@ -505,26 +640,32 @@ impl FrameEncoder
             return Err(t!("screen.error.resolution", width, height));
         };
 
+        //THE ENCODER ONLY EVER SEES THE DOWNSCALED PICTURE
+        let (target_width, target_height) = target_size(width, height,
+            options::get_screen_max_width(), options::get_screen_max_height());
+
         //A RESIZE NEEDS A FRESH ENCODER
-        if self.dimensions != Some((width, height))
+        if self.dimensions != Some((target_width, target_height))
         {
             self.encoder = None;
-            self.dimensions = Some((width, height));
+            self.dimensions = Some((target_width, target_height));
         }
 
-        let planes = self.scratch.fill(width, height, pixels, order);
+        let planes = self.scratch.fill(width, height, pixels, order, target_width, target_height);
 
         loop
         {
             if self.encoder.is_none()
             {
-                self.encoder = Some(encoder::open(Settings::new(width, height, self.fps, self.rate.bitrate()), &mut self.hardware)
+                self.encoder = Some(encoder::open(Settings::new(target_width, target_height, self.fps, self.rate.bitrate()), &mut self.hardware)
                     .map_err(|error| t!("screen.error.encoder", error))?);
             }
 
             let Some(backend) = self.encoder.as_mut() else { continue };
 
-            let keyframe = std::mem::take(&mut self.keyframe);
+            //NEVER PRODUCE KEYFRAMES BACK TO BACK
+            let keyframe = self.keyframe && self.last_keyframe.elapsed() >= consts::MIN_KEYFRAME_INTERVAL;
+            if keyframe { self.keyframe = false; }
 
             match backend.encode(&planes, keyframe)
             {

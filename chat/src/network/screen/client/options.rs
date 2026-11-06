@@ -61,6 +61,13 @@ static MONITOR_GENERATION: AtomicUsize = AtomicUsize::new(0);
 /// Playback volume of a watched share, in percent.
 static SCREEN_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(voice_options::clamp_volume(config::read_config::<u32>("screen_volume")) as usize));
 
+//THE LARGEST PICTURE A SHARE IS ENCODED AT
+/// Largest encoded share width; `0` means no limit.
+static SCREEN_MAX_WIDTH: LazyLock<u32> = LazyLock::new(|| config::read_config::<u32>("screen_max_width"));
+
+/// Largest encoded share height; `0` means no limit.
+static SCREEN_MAX_HEIGHT: LazyLock<u32> = LazyLock::new(|| config::read_config::<u32>("screen_max_height"));
+
 //USE SCREEN
 /// Returns whether we are sharing.
 pub fn get_use_screen() -> bool
@@ -142,4 +149,17 @@ pub fn set_screen_volume(percent: u32)
 pub fn get_screen_gain() -> f32 //THE SAME, AS A MULTIPLIER
 {
     get_screen_volume() as f32 / 100.
+}
+
+//SCREEN SIZE
+/// Returns the largest width a shared picture is encoded at; `0` means no limit.
+pub fn get_screen_max_width() -> u32 //LARGEST ENCODED SHARE WIDTH
+{
+    *SCREEN_MAX_WIDTH
+}
+
+/// Returns the largest height a shared picture is encoded at; `0` means no limit.
+pub fn get_screen_max_height() -> u32 //LARGEST ENCODED SHARE HEIGHT
+{
+    *SCREEN_MAX_HEIGHT
 }
