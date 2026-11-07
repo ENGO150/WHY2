@@ -523,33 +523,6 @@ fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CON
     })
 }
 
-/// Returns the smallest session id not in use.
-fn get_latest_id() -> usize
-{
-    //GET HashSet OF IDS
-    let ids: HashSet<usize> = CONNECTIONS.iter().filter_map(|conn|
-    {
-        if let Some(id) = conn.id()
-        {
-            Some(*id)
-        } else
-        {
-            None
-        }
-    }).collect();
-
-    //GET SMALLEST UNUSED ID
-    for i in 0..
-    {
-        if !ids.contains(&i) //ID FOUND, RETURN
-        {
-            return i;
-        }
-    }
-
-    unreachable!("what the fuck");
-}
-
 /// Stores the agreed keys on a connection after a key exchange.
 fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO NonAuthenticated CLIENT AFTER KEY EXCHANGE
 {
@@ -864,7 +837,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     {
         write_stream: streams.1.clone(),
         task,
-        peer_addr: peer_addr,
+        peer_addr,
         username: None,
         keys: None,
         obfuscation_key,
@@ -1047,7 +1020,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
         log::debug!("Login accepted: {peer_addr}");
     }
 
-    let id = get_latest_id(); //GENERATE ID FOR CLIENT
+    let id = config::users::id(&username).unwrap_or_default(); //CONSTANT USER ID
     let role = config::users::role(&username).unwrap_or_default(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
 
     let mut channel: Option<String> = None; //CURRENT CLIENT CHANNEL
