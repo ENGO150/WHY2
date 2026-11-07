@@ -187,7 +187,7 @@ fn obfuscate_data(data: &[u8], obfuscation_key: [u8; 32]) -> Vec<u8> //XOR BYTES
 /// The packet's sequence number is assigned here: from `seq` if given, else from the session's
 /// global counter (the client's session state, or the server's connection entry). Main-connection
 /// callers ignore the write error; the read side notices the dead socket. Auxiliary sockets that
-/// must act on a failure ([`screen::send_frame`](screen::send_frame)) propagate it.
+/// must act on a failure ([`screen::send_frame`]) propagate it.
 ///
 /// # Parameters
 /// - `write_stream`: The socket to write to.
