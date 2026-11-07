@@ -300,6 +300,8 @@ pub enum ClientEvent
     DownloadFailed(u64, String),                                 //DOWNLOADING FAILED
     /// How far a transfer has got: transfer id, bytes.
     TransferProgress(u64, u64),                                  //HOW FAR A TRANSFER HAS GOT (UID, BYTES)
+    /// User got banned.
+    Banned(String),                                              //BANNED
     /// The shared files.
     Files(Vec<UserFile>),                                        //FILE LIST
     /// The running screen shares.
@@ -780,6 +782,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 let file_tx = tx.clone(); //CLONE TX
                 tokio::spawn(file::download(token, file_tx));
                 continue;
+            },
+
+            //USER GOT BANNED
+            PacketCode::Banned { username } =>
+            {
+                tx.send(ClientEvent::Banned(username)).await.unwrap();
             },
 
             //SOMEBODY'S IMAGE

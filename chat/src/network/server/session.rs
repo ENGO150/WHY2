@@ -1314,6 +1314,9 @@ impl<'a, 's> ClientSession<'a, 's>
                 server::remove_connection(&addr, true, Some("ban")).await;
             }
 
+            //NOTIFY ALL USERS ABOUT THE BAN
+            server::send_to_all(PacketCode::Banned { username: target });
+
             server::send_bans(&self.streams.1, &self.keys).await;
         } else //USER NOT FOUND
         {

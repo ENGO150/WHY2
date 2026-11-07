@@ -506,6 +506,8 @@ pub enum PacketCode //CONTROL CODES
     UploadRequest { hash: [u8; 32] },                  //CLIENT -> SERVER | REQUEST FILE UPLOAD
     /// *Server → client.* A download was approved; the client connects with `token`.
     Download { token: [u8; 32] },                      //SERVER -> CLIENT | DOWNLOAD FILE FROM SERVER
+    /// *Server → client.* User was banned.
+    Banned { username: String },                       //SERVER -> CLIENT | USER WAS BANNED
     /// *Server → client.* The server already holds this picture, so nothing needs uploading.
     ImageDuplicate { hash: [u8; 32] },                 //SERVER -> CLIENT | IMAGE ALREADY UPLOADED
     /// *Client → server.* Fetches a stored picture or clip.
@@ -646,6 +648,7 @@ impl PacketCode
             Self::Upload { .. }                => "Upload",
             Self::DownloadRequest { .. }       => "DownloadRequest",
             Self::Download { .. }              => "Download",
+            Self::Banned { .. }                => "Banned",
             Self::ImageRequest { .. }          => "ImageRequest",
             Self::ImageDuplicate { .. }        => "ImageDuplicate",
             Self::Image { .. }                 => "Image",
