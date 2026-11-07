@@ -99,6 +99,7 @@ image_failed = "{username} envió una imagen que no se pudo mostrar ({filename})
 reconnect_failed = "No se pudo reconectar al servidor."
 joined = "{username} se ha conectado."
 left = "{username} se ha desconectado."
+banned = "{username} fue bloqueado."
 muted = "Un moderador te ha silenciado."
 voice_enabled = "Voz activada."
 device_failed = "No se pudo cambiar el dispositivo de audio - se sigue usando el anterior."

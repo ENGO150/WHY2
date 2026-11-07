@@ -99,6 +99,7 @@ image_failed = "{username} heeft een afbeelding gestuurd die niet kon worden wee
 reconnect_failed = "Opnieuw verbinden met de server is mislukt."
 joined = "{username} is verbonden."
 left = "{username} heeft de verbinding verbroken."
+banned = "{username} is verbannen."
 muted = "Je bent gedempt door een moderator."
 voice_enabled = "Spraak ingeschakeld."
 device_failed = "Wisselen van audioapparaat mislukt - het vorige wordt nog gebruikt."

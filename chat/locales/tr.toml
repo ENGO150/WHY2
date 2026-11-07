@@ -99,6 +99,7 @@ image_failed = "{username} görüntülenemeyen bir resim gönderdi ({filename}).
 reconnect_failed = "Sunucuya yeniden bağlanılamadı."
 joined = "{username} bağlandı."
 left = "{username} ayrıldı."
+banned = "{username} yasaklandı."
 muted = "Bir moderatör tarafından susturuldunuz."
 voice_enabled = "Ses açıldı."
 device_failed = "Ses aygıtı değiştirilemedi - önceki aygıt kullanılmaya devam ediyor."

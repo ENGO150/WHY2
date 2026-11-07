@@ -112,6 +112,7 @@ image_failed = "{username} sent an image that could not be displayed ({filename}
 reconnect_failed = "Reconnecting to the server failed."
 joined = "{username} connected."
 left = "{username} disconnected."
+banned = "{username} was banned."
 muted = "You have been muted by moderator."
 voice_enabled = "Voice enabled."
 device_failed = "Switching the audio device failed - the previous one is still in use."

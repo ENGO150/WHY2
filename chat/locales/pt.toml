@@ -99,6 +99,7 @@ image_failed = "{username} enviou uma imagem que não pôde ser exibida ({filena
 reconnect_failed = "Falha ao reconectar ao servidor."
 joined = "{username} se conectou."
 left = "{username} se desconectou."
+banned = "{username} foi banido."
 muted = "Você foi silenciado por um moderador."
 voice_enabled = "Voz ativada."
 device_failed = "Falha ao trocar o dispositivo de áudio - o anterior continua em uso."

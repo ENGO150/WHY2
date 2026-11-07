@@ -99,6 +99,7 @@ image_failed = "{username} 发送了一张无法显示的图片（{filename}）�
 reconnect_failed = "重新连接服务器失败。"
 joined = "{username} 已连接。"
 left = "{username} 已断开连接。"
+banned = "{username} 已被封禁。"
 muted = "你已被管理员禁言。"
 voice_enabled = "语音已开启。"
 device_failed = "切换音频设备失败 - 仍在使用之前的设备。"

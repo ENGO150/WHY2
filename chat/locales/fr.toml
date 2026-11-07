@@ -99,6 +99,7 @@ image_failed = "{username} a envoyé une image qui n'a pas pu être affichée ({
 reconnect_failed = "La reconnexion au serveur a échoué."
 joined = "{username} s'est connecté."
 left = "{username} s'est déconnecté."
+banned = "{username} a été banni."
 muted = "Vous avez été rendu muet par un modérateur."
 voice_enabled = "Vocal activé."
 device_failed = "Le changement de périphérique audio a échoué - le précédent reste utilisé."

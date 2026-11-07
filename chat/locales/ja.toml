@@ -99,6 +99,7 @@ image_failed = "{username} が表示できない画像を送信しました（{f
 reconnect_failed = "サーバーへの再接続に失敗しました。"
 joined = "{username} が接続しました。"
 left = "{username} が切断しました。"
+banned = "{username} が BAN されました。"
 muted = "モデレーターによってミュートされました。"
 voice_enabled = "ボイスを有効にしました。"
 device_failed = "オーディオデバイスの切り替えに失敗しました - 以前のデバイスを引き続き使用します。"

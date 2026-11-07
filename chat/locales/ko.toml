@@ -99,6 +99,7 @@ image_failed = "{username}님이 표시할 수 없는 이미지를 보냈습니�
 reconnect_failed = "서버에 다시 연결하지 못했습니다."
 joined = "{username}님이 접속했습니다."
 left = "{username}님이 나갔습니다."
+banned = "{username}님이 차단되었습니다."
 muted = "모더레이터가 당신을 음소거했습니다."
 voice_enabled = "음성이 켜졌습니다."
 device_failed = "오디오 장치를 바꾸지 못했습니다 - 이전 장치를 계속 사용합니다."

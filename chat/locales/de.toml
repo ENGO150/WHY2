@@ -99,6 +99,7 @@ image_failed = "{username} hat ein Bild gesendet, das nicht angezeigt werden kon
 reconnect_failed = "Die erneute Verbindung zum Server ist fehlgeschlagen."
 joined = "{username} hat sich verbunden."
 left = "{username} hat die Verbindung getrennt."
+banned = "{username} wurde gesperrt."
 muted = "Du wurdest von einem Moderator stummgeschaltet."
 voice_enabled = "Sprachchat aktiviert."
 device_failed = "Das Wechseln des Audiogeräts ist fehlgeschlagen - das vorherige wird weiter verwendet."
