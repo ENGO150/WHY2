@@ -182,13 +182,13 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
         }
     }
 
-    //GET OFFLINE USERS (IF ENABLED)
+    //GET NON-BANNED OFFLINE USERS (IF ENABLED)
     let offline = if config::read_config::<bool>("show_offline_users")
     {
         let connected: HashSet<&str> = users.iter().map(|user| user.username.as_str()).collect();
 
         Some(config::users::all().into_iter()
-            .filter(|username| !connected.contains(username.as_str()))
+            .filter(|username| !connected.contains(username.as_str()) && !config::bans::banned(username))
             .map(|username|
             {
                 //GET UNAME COLOR & ROLE
