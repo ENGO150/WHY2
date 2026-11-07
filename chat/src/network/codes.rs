@@ -907,7 +907,6 @@ pub struct OnlineUser //USER CONNECTED TO THE SERVER
     pub username: String,
     pub username_color: Option<u8>,
     pub id: usize,
-    /// The channel they are in; `None` is the lobby.
     pub channel: Option<String>,
     pub device: Option<Device>,
     pub role: Role,
@@ -919,6 +918,7 @@ pub struct OfflineUser //OFFLINE USER REGISTERED ON THE SERVER
 {
     pub username: String,
     pub username_color: Option<u8>,
+    pub id: usize,
     pub role: Role,
 }
 

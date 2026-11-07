@@ -206,6 +206,7 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
 
                 OfflineUser
                 {
+                    id: config::users::id(&username).unwrap_or_default(),
                     username,
                     username_color,
                     role,
