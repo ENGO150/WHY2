@@ -454,7 +454,7 @@ pub fn start_recording(tx: Sender<ClientEvent>) -> bool //BEGIN RECORDING
                 if guard.as_ref().is_some_and(|recording| recording.generation == generation) { *guard = None; }
             }
 
-            tx.send(ClientEvent::VoiceMessageFailed(t!("voice_message.record_failed").to_owned())).await.ok();
+            tx.send(ClientEvent::VoiceMessageFailed { reason: t!("voice_message.record_failed").to_owned() }).await.ok();
         });
     }
 
@@ -553,7 +553,7 @@ pub fn play(hash: [u8; 32], tx: Sender<ClientEvent>) //OUT OF THE CACHE, ELSE AS
             None =>
             {
                 AWAITED.lock().unwrap().push((hash, generation));
-                tx.send(ClientEvent::ImageRequest(hash)).await.ok();
+                tx.send(ClientEvent::ImageRequest { hash }).await.ok();
             },
         }
     });
@@ -572,7 +572,7 @@ pub async fn play_data(hash: [u8; 32], data: Vec<u8>, generation: usize, tx: Sen
 
     if let Err(key) = result
     {
-        tx.send(ClientEvent::VoiceMessageFailed(i18n::text(key).to_owned())).await.ok();
+        tx.send(ClientEvent::VoiceMessageFailed { reason: i18n::text(key).to_owned() }).await.ok();
     }
 }
 

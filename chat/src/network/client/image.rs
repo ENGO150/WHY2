@@ -315,8 +315,8 @@ pub fn fetch_image(hash: [u8; 32], tx: Sender<ClientEvent>)
 
         tx.send(match cached
         {
-            Some(image) => ClientEvent::ImageData(hash, Some(image)),
-            None => ClientEvent::ImageRequest(hash),
+            Some(image) => ClientEvent::ImageData { hash, image: Some(image) },
+            None => ClientEvent::ImageRequest { hash },
         }).await.unwrap();
     });
 }

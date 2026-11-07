@@ -100,9 +100,9 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
     //LOG
     match kind
     {
-        UploadKind::File => tx.send(ClientEvent::Upload(uid, filename.clone(), size)).await.unwrap(),
+        UploadKind::File => tx.send(ClientEvent::Upload { uid, filename: filename.clone(), size }).await.unwrap(),
         UploadKind::Voice => {},
-        _ => tx.send(ClientEvent::Image(uid, filename.clone(), size)).await.unwrap(),
+        _ => tx.send(ClientEvent::Image { uid, filename: filename.clone(), size }).await.unwrap(),
     }
 
     //LOCAL SEQ COUNTER
@@ -129,13 +129,13 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
 
     file::send_file(path.clone(), write_stream, uid, &mut rex_stream, Some(&mut seq), |sent|
     {
-        progress.try_send(ClientEvent::TransferProgress(uid, sent)).ok(); //A DROPPED TICK COSTS NOTHING
+        progress.try_send(ClientEvent::TransferProgress { uid, done: sent }).ok(); //A DROPPED TICK COSTS NOTHING
     }).await;
 
     misc::drop_upload_temp(&path);
 
     //DONE
-    tx.send(ClientEvent::UploadDone(uid, filename)).await.unwrap();
+    tx.send(ClientEvent::UploadDone { uid, filename }).await.unwrap();
 }
 
 /// Downloads a file the server approved into the `download_directory`.
@@ -191,7 +191,7 @@ pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     fs::create_dir_all(&download_dir).await.expect("Creating download directory failed");
 
     //LOG
-    tx.send(ClientEvent::Download(uid, filename.clone(), size)).await.unwrap();
+    tx.send(ClientEvent::Download { uid, filename: filename.clone(), size }).await.unwrap();
 
     //INIT COUNTERS
     let mut current_size = 0u64;
@@ -218,7 +218,7 @@ pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
             hasher.update(&data);
 
             //REPORT PROGRESS
-            tx.try_send(ClientEvent::TransferProgress(uid, current_size)).ok();
+            tx.try_send(ClientEvent::TransferProgress { uid, done: current_size }).ok();
 
             //CHECK IF DOWNLOADING FINISHED
             if current_size == size
@@ -231,10 +231,10 @@ pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
                 //CHECK HASHES
                 tx.send(if hash == final_hash
                 {
-                    ClientEvent::Downloaded(uid, filename)
+                    ClientEvent::Downloaded { uid, filename }
                 } else
                 {
-                    ClientEvent::DownloadFailed(uid, filename)
+                    ClientEvent::DownloadFailed { uid, filename }
                 }).await.unwrap();
 
                 return;

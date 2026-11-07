@@ -418,7 +418,7 @@ pub async fn screen(token: [u8; 32], events: Sender<ClientEvent>)
 
     if let Some(reason) = reason
     {
-        events.send(ClientEvent::ScreenFailed(reason)).await.ok();
+        events.send(ClientEvent::ScreenFailed { reason }).await.ok();
     }
 }
 

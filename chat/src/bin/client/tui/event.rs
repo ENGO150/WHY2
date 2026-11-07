@@ -78,7 +78,7 @@ impl App
                 self.push_styled(t!("event.first_user"), theme::notice());
             },
 
-            ClientEvent::Authenticated(role) =>
+            ClientEvent::Authenticated { role } =>
             {
                 self.login = None; //THE BOX HAS ASKED FOR EVERYTHING IT WAS GOING TO ASK FOR
                 self.role = role;
@@ -91,14 +91,24 @@ impl App
                 self.icon_request = true;
             },
 
-            ClientEvent::Connected(server_name) =>
+            ClientEvent::Connected { server_name } =>
             {
                 self.push_styled(t!("event.connected", server_name), theme::ok());
                 self.server_name = server_name;
             },
 
             //STORED UNRENDERED - App::theme MAKES THE LINE
-            ClientEvent::Message(message, username, id, message_id, colors, channel, timestamp, reply) =>
+            ClientEvent::Message
+            {
+                message,
+                username,
+                id,
+                message_id,
+                colors,
+                channel,
+                timestamp,
+                reply,
+            } =>
             {
                 //None = EVERY PANE, Some(None) = THE LOBBY
                 match channel.map(Option::unwrap_or_default)
@@ -115,25 +125,58 @@ impl App
                 }
             },
 
-            ClientEvent::Typing(username) => self.set_typing(username),
+            ClientEvent::Typing { username } => self.set_typing(username),
 
             //A PICTURE IS AN ENTRY OF ITS OWN
-            ClientEvent::ImageDisplay(username, filename, message_id, timestamp, image, color) =>
+            ClientEvent::ImageDisplay
+            {
+                username,
+                filename,
+                message_id,
+                timestamp,
+                image,
+                username_color: color,
+            } =>
                 self.push_image(username, filename, message_id, timestamp, image, color),
 
             //A PICTURE WE DO NOT HOLD: CAPTION IT NOW
-            ClientEvent::ImagePending(username, filename, message_id, timestamp, hash, color) =>
+            ClientEvent::ImagePending
+            {
+                username,
+                filename,
+                message_id,
+                timestamp,
+                hash,
+                username_color: color,
+            } =>
             {
                 self.push_caption(username, filename, message_id, timestamp, hash, state::Picture::Waiting, color);
                 self.image_requests.push(hash);
             },
 
             //THE SAME LINE WITH THE BUTTON ON IT
-            ClientEvent::ImageOffer(username, filename, message_id, timestamp, hash, color) =>
+            ClientEvent::ImageOffer
+            {
+                username,
+                filename,
+                message_id,
+                timestamp,
+                hash,
+                username_color: color,
+            } =>
                 self.push_caption(username, filename, message_id, timestamp, hash, state::Picture::Absent, color),
 
             //LOADED ONCE ITS PANE IS LOOKED AT
-            ClientEvent::ImageParked(channel, username, filename, message_id, timestamp, hash, username_color) =>
+            ClientEvent::ImageParked
+            {
+                channel,
+                username,
+                filename,
+                message_id,
+                timestamp,
+                hash,
+                username_color,
+            } =>
             {
                 let picture = match client_image::auto_show_images()
                 {
@@ -150,34 +193,42 @@ impl App
             },
 
             //A CLICK THE CACHE COULD NOT ANSWER
-            ClientEvent::ImageRequest(hash) => self.image_requests.push(hash),
+            ClientEvent::ImageRequest { hash } => self.image_requests.push(hash),
 
-            ClientEvent::ImageFailed(username, filename, ..) => self.push_styled(
+            ClientEvent::ImageFailed { username, filename, .. } => self.push_styled(
                 t!("event.image_failed", username, filename), theme::error()),
 
             //A VOICE MESSAGE, FILED BY CHANNEL
-            ClientEvent::VoiceMessage(username, message_id, timestamp, voice, username_color, channel) =>
+            ClientEvent::VoiceMessage
+            {
+                username,
+                message_id,
+                timestamp,
+                voice,
+                username_color,
+                channel,
+            } =>
                 self.push_voice(channel.map(Option::unwrap_or_default), username, message_id, timestamp, voice, username_color),
 
             //A CLIP ASKED FOR TO PLAY
-            ClientEvent::VoiceData(hash, valid) =>
+            ClientEvent::VoiceData { hash, valid } =>
             {
                 self.fetched(&hash);
 
                 if !valid { self.set_playback(&hash, state::Playback::Gone); }
             },
 
-            ClientEvent::VoiceMessageFailed(reason) =>
+            ClientEvent::VoiceMessageFailed { reason } =>
             {
                 self.stop_loading();
                 self.push_styled(reason, theme::error());
             },
 
-            ClientEvent::PrivateMessageSent(to, id, msg, colors) => self.push_private(true, to, id, msg, colors),
+            ClientEvent::PrivateMessageSent { message: msg, username: to, id, colors } => self.push_private(true, to, id, msg, colors),
 
-            ClientEvent::PrivateMessageRecv(from, id, msg, colors) => self.push_private(false, from, id, msg, colors),
+            ClientEvent::PrivateMessageRecv { message: msg, username: from, id, colors } => self.push_private(false, from, id, msg, colors),
 
-            ClientEvent::TofuPrompt(request) =>
+            ClientEvent::TofuPrompt { request } =>
             {
                 self.tofu = Some(Prompt::new(request));
                 self.dirty = true;
@@ -190,41 +241,41 @@ impl App
             ClientEvent::ReconnectFailed => self.disconnected(t!("event.reconnect_failed")),
 
             //THERE WAS NO PROMPT, SO THE REASON GOES BACK
-            ClientEvent::HandshakeFailed(reason) => self.disconnected(reason),
+            ClientEvent::HandshakeFailed { reason } => self.disconnected(reason),
 
-            ClientEvent::TofuSkip(hash) =>
+            ClientEvent::TofuSkip { hash } =>
             {
                 self.push_styled(t!("event.tofu_skip.title"), theme::error());
                 self.push_styled(t!("event.tofu_skip.body"), theme::notice());
                 self.push_styled(hash, theme::notice());
             },
 
-            ClientEvent::VoiceActivity(users) =>
+            ClientEvent::VoiceActivity { users } =>
             {
                 self.voice_activity = users;
                 self.rebuild_voice();
             },
 
             //THE WHOLE ROSTER - IT REPLACES WHAT WE HELD
-            ClientEvent::VoiceRoster(clients) =>
+            ClientEvent::VoiceRoster { clients } =>
             {
                 self.voice_roster = clients.into_iter().collect();
                 self.rebuild_voice();
             },
 
-            ClientEvent::VoiceJoin(id, username) =>
+            ClientEvent::VoiceJoin { id, username } =>
             {
                 self.voice_roster.insert(id, username);
                 self.rebuild_voice();
             },
 
-            ClientEvent::VoiceLeave(id) =>
+            ClientEvent::VoiceLeave { id } =>
             {
                 self.voice_roster.remove(&id);
                 self.rebuild_voice();
             },
 
-            ClientEvent::Join(uname, username_color, id, device, role) =>
+            ClientEvent::Join { username: uname, username_color, id, device, role } =>
             {
                 if let Some(device) = device.clone() { self.devices.insert(uname.clone(), device); }
 
@@ -254,7 +305,7 @@ impl App
                 }
             },
 
-            ClientEvent::Leave(uname, id, registered) =>
+            ClientEvent::Leave { username: uname, id, registered } =>
             {
                 self.push(Line::from(vec!
                 [
@@ -281,7 +332,7 @@ impl App
             },
 
             //A BAN DROPS THE ACCOUNT FROM THE ROSTER, WHEREVER IT IS
-            ClientEvent::Banned(username) =>
+            ClientEvent::Banned { username } =>
             {
                 self.push(Line::from(vec!
                 [
@@ -311,13 +362,13 @@ impl App
                 self.push_styled(t!("event.muted"), theme::notice());
             },
 
-            ClientEvent::Deleted(message_id) => self.delete_message(message_id),
+            ClientEvent::Deleted { message_id } => self.delete_message(message_id),
 
-            ClientEvent::Hearts(message_id, hearts) => self.set_hearts(message_id, hearts),
+            ClientEvent::Hearts { message_id, hearts } => self.set_hearts(message_id, hearts),
 
-            ClientEvent::Edited(message_id, text) => self.edit_message(message_id, text),
+            ClientEvent::Edited { message_id, text } => self.edit_message(message_id, text),
 
-            ClientEvent::Pinned(message_id, pinned) => self.set_pinned(message_id, pinned),
+            ClientEvent::Pinned { message_id, pinned } => self.set_pinned(message_id, pinned),
 
             ClientEvent::InvalidUsage =>
             {
@@ -327,12 +378,12 @@ impl App
                 self.push_styled(t!("invalid.usage"), theme::error());
             },
 
-            ClientEvent::UnsafeVersion(newer_versions, current_version, newest_version) =>
+            ClientEvent::UnsafeVersion { newer_versions, current_version, newest_version } =>
             {
                 self.push_styled(tn!("event.unsafe_version", newer_versions, current_version, newest_version), theme::notice());
             },
 
-            ClientEvent::Username(disabled_registration, min_uname, max_uname) =>
+            ClientEvent::Username { disabled_registration, min_uname, max_uname } =>
             {
                 let hint = if disabled_registration
                 {
@@ -379,7 +430,7 @@ impl App
             },
 
             //SERVER MESSAGE
-            ClientEvent::ServerSay(message) =>
+            ClientEvent::ServerSay { message } =>
             {
                 self.push(Line::from(vec!
                 [
@@ -389,7 +440,7 @@ impl App
             },
 
             //A ROLE WAS SET, ON US OR ON SOMEBODY ELSE
-            ClientEvent::Role(role, username) =>
+            ClientEvent::Role { role, username } =>
             {
                 //MOVE THEM TO THEIR NEW SECTION
                 self.online.iter_mut().filter(|user| user.username == username).for_each(|user| user.role = role);
@@ -407,7 +458,7 @@ impl App
             },
 
             //THE LOBBY'S STORED MESSAGES
-            ClientEvent::History(messages, start, more, kept, older) =>
+            ClientEvent::History { messages, start, more, kept, older } =>
             {
                 //A PICTURE IS LOADED WHEN IT IS LOOKED AT
                 let auto_show = client_image::auto_show_images();
@@ -470,7 +521,7 @@ impl App
             },
 
             //THE ANSWER TO A CLICKED CAPTION, THE PROFILE BOX OR THE SIDEBAR
-            ClientEvent::ImageData(hash, image) =>
+            ClientEvent::ImageData { hash, image } =>
             {
                 self.fetched(&hash);
 
@@ -484,7 +535,7 @@ impl App
             },
 
             //server.toml CAME BACK
-            ClientEvent::ServerSettings(settings, saved) =>
+            ClientEvent::ServerSettings { settings, saved } =>
             {
                 match saved
                 {
@@ -503,7 +554,7 @@ impl App
             },
 
             //A PASSWORD CHANGE CAME BACK
-            ClientEvent::Passwd(changed) =>
+            ClientEvent::Passwd { changed } =>
             {
                 match changed
                 {
@@ -531,7 +582,7 @@ impl App
             },
 
             //AN ACCOUNT DELETION CAME BACK
-            ClientEvent::AccountDeleted(deleted) =>
+            ClientEvent::AccountDeleted { deleted } =>
             {
                 match deleted
                 {
@@ -558,7 +609,7 @@ impl App
             },
 
             //A PROFILE CAME BACK
-            ClientEvent::Profile(username, profile, own, saved) =>
+            ClientEvent::Profile { username, profile, own, saved } =>
             {
                 match saved
                 {
@@ -587,21 +638,21 @@ impl App
             },
 
             //OUR AVATAR COULD NOT BE CUT, SO NOTHING WENT OUT
-            ClientEvent::AvatarFailed(error) =>
+            ClientEvent::AvatarFailed { error } =>
             {
                 self.settings.saving = false;
                 self.push_styled(error, theme::error());
             },
 
             //OUR COLORS AT LOGIN
-            ClientEvent::Colors(Some(colors)) =>
+            ClientEvent::Colors { colors: Some(colors) } =>
             {
                 self.color = colors.username_color;
                 self.dirty = true;
             },
 
             //THE SERVER'S PICTURE - ONLY OUR OWN SAVE SAYS ANYTHING
-            ClientEvent::ServerIcon(hash, save) =>
+            ClientEvent::ServerIcon { hash, save } =>
             {
                 if save
                 {
@@ -616,10 +667,10 @@ impl App
             },
 
             //THE ANSWER TO A /color
-            ClientEvent::Colors(None) => self.push_styled(t!("event.color_set"), theme::ok()),
+            ClientEvent::Colors { colors: None } => self.push_styled(t!("event.color_set"), theme::ok()),
 
             //THE BAN LIST
-            ClientEvent::ServerBans(users, ips) =>
+            ClientEvent::ServerBans { usernames: users, addresses: ips } =>
             {
                 if users.is_empty() && ips.is_empty()
                 {
@@ -664,7 +715,7 @@ impl App
                 }
             },
 
-            ClientEvent::List(users, registered) =>
+            ClientEvent::List { users, offline: registered } =>
             {
                 //ALWAYS REFRESH THE SIDEBAR; ECHO ONLY IF ASKED
                 self.online = users;
@@ -722,27 +773,27 @@ impl App
                 self.dirty = true;
             },
 
-            ClientEvent::Upload(uid, filename, size) =>
+            ClientEvent::Upload { uid, filename, size } =>
             {
                 self.push_transfer(uid, filename, size, true, false);
             },
 
-            ClientEvent::Image(uid, filename, size) =>
+            ClientEvent::Image { uid, filename, size } =>
             {
                 self.push_transfer(uid, filename, size, true, true);
             },
 
-            ClientEvent::UploadDone(uid, _) =>
+            ClientEvent::UploadDone { uid, .. } =>
             {
                 self.finish_transfer(uid, true);
             },
 
-            ClientEvent::TransferProgress(uid, done) =>
+            ClientEvent::TransferProgress { uid, done } =>
             {
                 self.update_transfer(uid, done);
             },
 
-            ClientEvent::Uploaded(username, filename) =>
+            ClientEvent::Uploaded { username, filename } =>
             {
                 self.push(Line::from(vec!
                 [
@@ -751,22 +802,22 @@ impl App
                 ]));
             },
 
-            ClientEvent::Download(uid, filename, size) =>
+            ClientEvent::Download { uid, filename, size } =>
             {
                 self.push_transfer(uid, filename, size, false, false);
             },
 
-            ClientEvent::Downloaded(uid, _) =>
+            ClientEvent::Downloaded { uid, .. } =>
             {
                 self.finish_transfer(uid, true);
             },
 
-            ClientEvent::DownloadFailed(uid, _) =>
+            ClientEvent::DownloadFailed { uid, .. } =>
             {
                 self.finish_transfer(uid, false);
             },
 
-            ClientEvent::Files(users) =>
+            ClientEvent::Files { users } =>
             {
                 if users.is_empty()
                 {
@@ -806,7 +857,7 @@ impl App
                 }
             },
 
-            ClientEvent::Screens(users) =>
+            ClientEvent::Screens { users } =>
             {
                 #[cfg(feature = "client_screen")]
                 { self.screens_requested = false; }
@@ -833,7 +884,7 @@ impl App
                 }
             },
 
-            ClientEvent::Pins(messages) =>
+            ClientEvent::Pins { messages } =>
             {
                 if messages.is_empty()
                 {
@@ -870,7 +921,7 @@ impl App
                 self.push_styled(t!("event.upload_limit"), theme::error());
             },
 
-            ClientEvent::Screen(enabled) =>
+            ClientEvent::Screen { enabled } =>
             {
                 //A SHARE WITHOUT SOUND SAYS SO
                 #[cfg(feature = "client_screen")]
@@ -886,28 +937,28 @@ impl App
                 }, theme::ok());
             },
 
-            ClientEvent::ScreenFailed(reason) =>
+            ClientEvent::ScreenFailed { reason } =>
             {
                 self.push_styled(t!("event.screen.failed", reason), theme::error());
             },
 
-            ClientEvent::Attach(username) =>
+            ClientEvent::Attach { username } =>
             {
                 self.push_text(t!("event.screen.attach", username));
             },
 
-            ClientEvent::Deattach(username) =>
+            ClientEvent::Deattach { username } =>
             {
                 self.push_text(t!("event.screen.deattach", username));
             },
 
-            ClientEvent::MuteScreen(muted) =>
+            ClientEvent::MuteScreen { muted } =>
             {
                 self.push_text(if muted { t!("event.screen.muted") } else { t!("event.screen.unmuted") });
             },
 
             //BROADCAST TO EVERYBODY, US INCLUDED
-            ClientEvent::Screenshare(username) if username != self.username =>
+            ClientEvent::Screenshare { username } if username != self.username =>
             {
                 self.push(Line::from(vec!
                 [
@@ -916,7 +967,7 @@ impl App
                 ]));
             },
 
-            ClientEvent::ScreenshareEnd(username) if username != self.username =>
+            ClientEvent::ScreenshareEnd { username } if username != self.username =>
             {
                 self.push(Line::from(vec!
                 [
@@ -925,25 +976,25 @@ impl App
                 ]));
             },
 
-            ClientEvent::Screenshare(_) | ClientEvent::ScreenshareEnd(_) => {},
+            ClientEvent::Screenshare { .. } | ClientEvent::ScreenshareEnd { .. } => {},
 
-            ClientEvent::Attached(username) =>
+            ClientEvent::Attached { username } =>
             {
                 self.push_text(t!("event.screen.attached", username));
             },
 
-            ClientEvent::Deattached(username) =>
+            ClientEvent::Deattached { username } =>
             {
                 self.push_text(t!("event.screen.deattached", username));
             },
 
-            ClientEvent::IncompatibleVersion(version, server_version) =>
+            ClientEvent::IncompatibleVersion { client_version: version, server_version } =>
             {
                 //THE BOX IS STILL UP, SO THE HISTORY IS NOT WHERE THIS IS READ
                 self.disconnect_reason = Some(t!("event.incompatible_version", version, server_version));
             },
 
-            ClientEvent::VersionMismatch(client_version, server_version) =>
+            ClientEvent::VersionMismatch { client_version, server_version } =>
             {
                 self.push_styled(t!("event.version_mismatch", client_version, server_version), theme::notice());
             },
@@ -962,7 +1013,7 @@ impl App
                 self.dirty = true;
             },
 
-            ClientEvent::PasswordRejected(min_pass) =>
+            ClientEvent::PasswordRejected { min_pass } =>
             {
                 let message = t!("login.password_rejected", min = min_pass);
 
@@ -996,7 +1047,7 @@ impl App
             },
 
             //BACK TO THE CONNECT BOX UNLESS WE ASKED TO LEAVE
-            ClientEvent::Quit(said) =>
+            ClientEvent::Quit { graceful: said } =>
             {
                 if self.leaving
                 {
@@ -1015,7 +1066,7 @@ impl App
             },
 
             //SIDEBAR-ONLY, NOTHING IS ASKED OF THE SERVER
-            ClientEvent::ChannelChanged(channel) =>
+            ClientEvent::ChannelChanged { channel } =>
             {
                 self.switch_channel(channel.clone().unwrap_or_default());
 
@@ -1035,13 +1086,13 @@ impl App
                 self.rebuild_voice();
             },
 
-            ClientEvent::ChannelCreated(name) =>
+            ClientEvent::ChannelCreated { channel: name } =>
             {
                 self.channels.insert(name);
                 self.dirty = true;
             },
 
-            ClientEvent::ChannelDestroyed(name) =>
+            ClientEvent::ChannelDestroyed { channel: name } =>
             {
                 self.channels.remove(&name);
                 self.panes.remove(&name);

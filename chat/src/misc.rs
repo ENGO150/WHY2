@@ -157,7 +157,7 @@ pub async fn check_version(#[cfg(feature = "client_base")] tx: &Sender<ClientEve
 
         #[cfg(feature = "client_base")]
         {
-            tx.send(ClientEvent::UnsafeVersion(newer_versions, current_version, newest_version.to_owned())).await.unwrap();
+            tx.send(ClientEvent::UnsafeVersion { newer_versions, current_version, newest_version: newest_version.to_owned() }).await.unwrap();
         }
 
         #[cfg(feature = "server")]

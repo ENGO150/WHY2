@@ -537,7 +537,7 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
             Ok(prepared) => prepared,
             Err(error) =>
             {
-                if let Some(tx) = tx { tx.send(ClientEvent::AvatarFailed(error)).await.ok(); }
+                if let Some(tx) = tx { tx.send(ClientEvent::AvatarFailed { error }).await.ok(); }
                 return;
             },
         };
@@ -577,7 +577,7 @@ pub fn send_voice(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, clip: Vec<u8>,
 
         if tokio::fs::write(&path, &clip).await.is_err()
         {
-            tx.send(ClientEvent::VoiceMessageFailed(t!("upload.read_failed").to_owned())).await.ok();
+            tx.send(ClientEvent::VoiceMessageFailed { reason: t!("upload.read_failed").to_owned() }).await.ok();
             return;
         }
 

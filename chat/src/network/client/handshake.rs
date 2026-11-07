@@ -119,7 +119,7 @@ pub async fn key_exchange
         let Some(received) = network::receive(streams, exchange_keys, None).await else
         {
             //THE SERVER WENT AWAY MID-HANDSHAKE
-            tx.send(ClientEvent::Quit(false)).await.ok();
+            tx.send(ClientEvent::Quit { graceful: false }).await.ok();
 
             return Handshake::Failed;
         };
@@ -137,7 +137,7 @@ pub async fn key_exchange
     //THE STATIC KEY SIGNS THE EPHEMERAL ONES
     if !kex::verify_offer(&options::get_obfuscation_key(), &offer.static_ecc, &offer.eph_ecc, &offer.pq, &offer.sig)
     {
-        tx.send(ClientEvent::HandshakeFailed(t!("login.unsigned_keys").to_owned())).await.ok();
+        tx.send(ClientEvent::HandshakeFailed { reason: t!("login.unsigned_keys").to_owned() }).await.ok();
 
         return Handshake::Failed;
     }
@@ -169,7 +169,7 @@ pub async fn key_exchange
     match verdict
     {
         //VERIFICATION DISABLED AT BUILD TIME
-        None => tx.send(ClientEvent::TofuSkip(hash)).await.unwrap(),
+        None => tx.send(ClientEvent::TofuSkip { hash }).await.unwrap(),
 
         Some(TofuCode::Valid) => {},
 
@@ -178,14 +178,17 @@ pub async fn key_exchange
             //ASK THE USER IN THE TUI
             let (reply, answer) = oneshot::channel();
 
-            tx.send(ClientEvent::TofuPrompt(TofuRequest
+            tx.send(ClientEvent::TofuPrompt
             {
-                host: host.clone(),
-                hash: hash.clone(),
-                mismatch: matches!(status, TofuCode::Mismatch),
-                pinned: keys::pinned(&host),
-                reply,
-            })).await.unwrap();
+                request: TofuRequest
+                {
+                    host: host.clone(),
+                    hash: hash.clone(),
+                    mismatch: matches!(status, TofuCode::Mismatch),
+                    pinned: keys::pinned(&host),
+                    reply,
+                },
+            }).await.unwrap();
 
             //A DROPPED SENDER COUNTS AS A REFUSAL
             if !answer.await.unwrap_or(false)

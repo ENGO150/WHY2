@@ -1080,7 +1080,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
             //QUIT ON /leave
             if !options::get_use_voice()
             {
-                tx.send(ClientEvent::VoiceActivity(Vec::new())).await.unwrap(); //CLEAR WINDOW
+                tx.send(ClientEvent::VoiceActivity { users: Vec::new() }).await.unwrap(); //CLEAR WINDOW
                 return;
             }
 
@@ -1331,5 +1331,5 @@ async fn display_active_speakers(local_username: &str, tx: &Sender<ClientEvent>)
     }
 
     //DISPLAY
-    tx.send(ClientEvent::VoiceActivity(users_to_display)).await.unwrap();
+    tx.send(ClientEvent::VoiceActivity { users: users_to_display }).await.unwrap();
 }

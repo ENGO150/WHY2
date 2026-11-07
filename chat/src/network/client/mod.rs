@@ -153,8 +153,6 @@ pub struct VoiceUser
 
 //ENUMS
 /// Everything the protocol has to tell a front end.
-///
-/// Variants with tuple fields document them in order.
 pub enum ClientEvent
 {
     /// The server asks for a password to register.
@@ -164,76 +162,255 @@ pub enum ClientEvent
     /// We registered first and became the owner.
     FirstUser,                                                   //FIRST USER
     /// Login succeeded, with our role.
-    Authenticated(Role),                                         //LOGIN SUCCESSFUL, ROLE
+    Authenticated
+    {
+        /// The role the server gave us.
+        role: Role,
+    },                                                           //LOGIN SUCCESSFUL, ROLE
     /// The connection is up: the server's display name.
-    Connected(String),                                           //SUCCESSFUL CONNECTION MESSAGE
-    /// A chat message: text, username, sender id, message id, colors, channel (as in
-    /// [`PacketCode::Message`]), timestamp and the id it replies to.
-    Message(String, String, usize, u64, MessageColors, Option<Option<String>>, Option<u64>, Option<u64>), //RECEIVED MESSAGE, ITS CHANNEL, WHEN, WHAT IT REPLIES TO
-    /// A private message we sent: text, recipient id, recipient username, colors.
-    PrivateMessageSent(String, usize, String, MessageColors),    //SENT PM
-    /// A private message we received: text, sender id, sender username, colors.
-    PrivateMessageRecv(String, usize, String, MessageColors),    //RECEIVED PM
+    Connected
+    {
+        /// The name the server goes by.
+        server_name: String,
+    },                                                           //SUCCESSFUL CONNECTION MESSAGE
+    /// A chat message.
+    Message
+    {
+        /// The message text.
+        message: String,
+        /// The sender's username.
+        username: String,
+        /// The sender's session id.
+        id: usize,
+        /// Server-assigned message id.
+        message_id: u64,
+        /// The sender's current colors.
+        colors: MessageColors,
+        /// Where it was said, as in [`PacketCode::Message`]; `None` is every pane.
+        channel: Option<Option<String>>,
+        /// When it was sent, in Unix seconds.
+        timestamp: Option<u64>,
+        /// The id of the message this replies to.
+        reply: Option<u64>,
+    },                                                           //RECEIVED MESSAGE, ITS CHANNEL, WHEN, WHAT IT REPLIES TO
+    /// A private message we sent.
+    PrivateMessageSent
+    {
+        /// The message text.
+        message: String,
+        /// The recipient's username.
+        username: String,
+        /// The recipient's session id.
+        id: usize,
+        /// The sender's current colors.
+        colors: MessageColors,
+    },                                                           //SENT PM
+    /// A private message we received.
+    PrivateMessageRecv
+    {
+        /// The message text.
+        message: String,
+        /// The sender's username.
+        username: String,
+        /// The sender's session id.
+        id: usize,
+        /// The sender's current colors.
+        colors: MessageColors,
+    },                                                           //RECEIVED PM
     /// The user refused the server's identity.
     TofuError,                                                   //TOFU VERIFICATION REJECTED BY THE USER
     /// The server's identity needs a decision from the user.
-    TofuPrompt(TofuRequest),                                     //TOFU DECISION ASKED OF THE USER
+    TofuPrompt
+    {
+        /// The decision to put to the user.
+        request: TofuRequest,
+    },                                                           //TOFU DECISION ASKED OF THE USER
     /// Identity verification is disabled in this build: the server's fingerprint.
-    TofuSkip(String),                                            //TOFU VERIFICATION SKIPPED
+    TofuSkip
+    {
+        /// The server's fingerprint.
+        hash: String,
+    },                                                           //TOFU VERIFICATION SKIPPED
     /// Dialing again after pinning a key failed.
     ReconnectFailed,                                             //RECONNECTING AFTER PINNING THE KEY FAILED
     /// The key exchange failed, with the reason.
-    HandshakeFailed(String),                                     //THE KEY EXCHANGE DID NOT ADD UP
+    HandshakeFailed
+    {
+        /// Why the exchange failed.
+        reason: String,
+    },                                                           //THE KEY EXCHANGE DID NOT ADD UP
     /// The local voice session's activity: who is speaking, and their ping.
-    VoiceActivity(Vec<VoiceUser>),                               //VOICE OVERLAY
+    VoiceActivity
+    {
+        /// One row per user in the voice session.
+        users: Vec<VoiceUser>,
+    },                                                           //VOICE OVERLAY
     /// Our channel's whole voice roster, as `(id, username)`, ourselves excluded.
-    VoiceRoster(Vec<(usize, String)>),                           //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
-    /// Somebody joined voice in our channel: id, username.
-    VoiceJoin(usize, String),                                    //SOMEBODY JOINED VOICE IN OUR CHANNEL
-    /// Somebody left voice in our channel: id.
-    VoiceLeave(usize),                                           //SOMEBODY LEFT VOICE IN OUR CHANNEL
-    /// A user connected: username, username color, id, device, role.
-    Join(String, Option<u8>, usize, Option<Device>, Role),       //CLIENT CONNECTED
-    /// A user disconnected: username, id, and whether their account still exists.
-    Leave(String, usize, bool),                                  //CLIENT DISCONNECTED (ACCOUNT STILL EXISTS)
+    VoiceRoster
+    {
+        /// The roster, as `(id, username)`.
+        clients: Vec<(usize, String)>,
+    },                                                           //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
+    /// Somebody joined voice in our channel.
+    VoiceJoin
+    {
+        /// The joiner's session id.
+        id: usize,
+        /// The joiner's username.
+        username: String,
+    },                                                           //SOMEBODY JOINED VOICE IN OUR CHANNEL
+    /// Somebody left voice in our channel.
+    VoiceLeave
+    {
+        /// The leaver's session id.
+        id: usize,
+    },                                                           //SOMEBODY LEFT VOICE IN OUR CHANNEL
+    /// A user connected.
+    Join
+    {
+        /// The user's username.
+        username: String,
+        /// The user's username color.
+        username_color: Option<u8>,
+        /// The user's session id.
+        id: usize,
+        /// The device the user is on.
+        device: Option<Device>,
+        /// The user's role.
+        role: Role,
+    },                                                           //CLIENT CONNECTED
+    /// A user disconnected.
+    Leave
+    {
+        /// The user's username.
+        username: String,
+        /// The user's session id.
+        id: usize,
+        /// Whether their account still exists.
+        registered: bool,
+    },                                                           //CLIENT DISCONNECTED (ACCOUNT STILL EXISTS)
     /// A message said as the server.
-    ServerSay(String),                                           //SERVER MESSAGE
-    /// A role was set: the role, and the username it was set on.
-    Role(Role, String),                                          //A ROLE WAS SET (THE ROLE, AND WHO ON)
-    /// A page of lobby history: messages, start, more, kept, and whether it answers a request for
-    /// an older page.
-    History(Vec<StoredMessage>, u64, bool, u64, bool),           //A PAGE OF STORED MESSAGES (START, MORE, KEPT, OLDER)
+    ServerSay
+    {
+        /// The message text.
+        message: String,
+    },                                                           //SERVER MESSAGE
+    /// A role was set.
+    Role
+    {
+        /// The new role.
+        role: Role,
+        /// The username it was set on.
+        username: String,
+    },                                                           //A ROLE WAS SET (THE ROLE, AND WHO ON)
+    /// A page of lobby history.
+    History
+    {
+        /// The stored messages.
+        messages: Vec<StoredMessage>,
+        /// The id the page starts at.
+        start: u64,
+        /// Whether more pages exist.
+        more: bool,
+        /// How many messages were kept.
+        kept: u64,
+        /// Whether this answers a request for an older page.
+        older: bool,
+    },                                                           //A PAGE OF STORED MESSAGES (START, MORE, KEPT, OLDER)
     /// We switched channel; `None` is the lobby.
-    ChannelChanged(Option<String>),                              //WE SWITCHED CHANNEL
+    ChannelChanged
+    {
+        /// The channel, or `None` for the lobby.
+        channel: Option<String>,
+    },                                                           //WE SWITCHED CHANNEL
     /// A channel was created.
-    ChannelCreated(String),                                      //CHANNEL CREATED
+    ChannelCreated
+    {
+        /// The channel's name.
+        channel: String,
+    },                                                           //CHANNEL CREATED
     /// A channel was abandoned.
-    ChannelDestroyed(String),                                    //CHANNEL ABANDONED
+    ChannelDestroyed
+    {
+        /// The channel's name.
+        channel: String,
+    },                                                           //CHANNEL ABANDONED
     /// Somebody in our channel is typing.
-    Typing(String),                                              //SOMEBODY IN OUR CHANNEL IS WRITING
+    Typing
+    {
+        /// Who is typing.
+        username: String,
+    },                                                           //SOMEBODY IN OUR CHANNEL IS WRITING
     /// We are muted.
     Muted,                                                       //HAHA
     /// A command had invalid parameters or was not permitted.
     InvalidUsage,                                                //INVALID COMMAND USAGE
-    /// A message was deleted: message id.
-    Deleted(u64),                                                //A MESSAGE WAS DELETED (MESSAGE ID)
-    /// A message's hearts changed: message id, who hearted it.
-    Hearts(u64, Vec<String>),                                    //A MESSAGE'S HEARTS CHANGED (MESSAGE ID, WHO)
-    /// A message was reworded: message id, new text.
-    Edited(u64, String),                                         //A MESSAGE WAS REWORDED (MESSAGE ID, TEXT)
-    /// A message was pinned or unpinned: message id, pinned.
-    Pinned(u64, bool),                                           //A MESSAGE WAS PINNED OR UNPINNED (MESSAGE ID, PINNED)
+    /// A message was deleted.
+    Deleted
+    {
+        /// The deleted message's id.
+        message_id: u64,
+    },                                                           //A MESSAGE WAS DELETED (MESSAGE ID)
+    /// A message's hearts changed.
+    Hearts
+    {
+        /// The message's id.
+        message_id: u64,
+        /// Who hearted it.
+        hearts: Vec<String>,
+    },                                                           //A MESSAGE'S HEARTS CHANGED (MESSAGE ID, WHO)
+    /// A message was reworded.
+    Edited
+    {
+        /// The message's id.
+        message_id: u64,
+        /// The new text.
+        text: String,
+    },                                                           //A MESSAGE WAS REWORDED (MESSAGE ID, TEXT)
+    /// A message was pinned or unpinned.
+    Pinned
+    {
+        /// The message's id.
+        message_id: u64,
+        /// Whether it is pinned.
+        pinned: bool,
+    },                                                           //A MESSAGE WAS PINNED OR UNPINNED (MESSAGE ID, PINNED)
     /// Every pinned message.
-    Pins(Vec<StoredMessage>),                                    //EVERY PINNED MESSAGE
+    Pins
+    {
+        /// The pinned messages.
+        messages: Vec<StoredMessage>,
+    },                                                           //EVERY PINNED MESSAGE
     /// The version check could not reach crates.io.
     VersionFailed,                                               //FETCHING VERSIONS FAILED
-    /// The server was built from a different commit: ours, theirs.
-    VersionMismatch(String, String),                             //MISMATCH GIT HASH
-    /// This build is outdated: versions behind, ours, the newest.
-    UnsafeVersion(usize, Version, String),                       //OLD VERSION
-    /// The server asks for a username: whether the last one was rejected, then the maximum and
-    /// minimum length.
-    Username(bool, u64, u64),                                    //USERNAME PROMPT
+    /// The server was built from a different commit.
+    VersionMismatch
+    {
+        /// Our commit hash.
+        client_version: String,
+        /// The server's commit hash.
+        server_version: String,
+    },                                                           //MISMATCH GIT HASH
+    /// This build is outdated.
+    UnsafeVersion
+    {
+        /// How many versions behind this build is.
+        newer_versions: usize,
+        /// Our version.
+        current_version: Version,
+        /// The newest version.
+        newest_version: String,
+    },                                                           //OLD VERSION
+    /// The server asks for a username.
+    Username
+    {
+        /// Whether registration is disabled.
+        disabled_registration: bool,
+        /// The minimum username length.
+        min_uname: u64,
+        /// The maximum username length.
+        max_uname: u64,
+    },                                                           //USERNAME PROMPT
     /// We joined voice.
     VoiceEnabled,                                                //VOICE CHAT ENABLED
     /// Switching audio devices failed; the previous ones are back.
@@ -242,96 +419,356 @@ pub enum ClientEvent
     VoiceHandshakeFailed,                                        //THE SERVER NEVER ANSWERED THE UDP HANDSHAKE
     /// We left voice.
     VoiceDisabled,                                               //VOICE CHAT DISABLED
-    /// The user list: connected, and offline if the server discloses them.
-    List(Vec<OnlineUser>, Option<Vec<OfflineUser>>),             //LIST OF USERS, CONNECTED AND NOT
+    /// The user list.
+    List
+    {
+        /// Connected users.
+        users: Vec<OnlineUser>,
+        /// Offline users, if the server discloses them.
+        offline: Option<Vec<OfflineUser>>,
+    },                                                           //LIST OF USERS, CONNECTED AND NOT
     /// Every key of `server.toml`, and whether this acknowledges a save.
-    ServerSettings(Vec<ServerSetting>, bool),                    //server.toml AS THE SERVER HOLDS IT
+    ServerSettings
+    {
+        /// The settings as the server holds them.
+        settings: Vec<ServerSetting>,
+        /// Whether this acknowledges a save.
+        saved: bool,
+    },                                                           //server.toml AS THE SERVER HOLDS IT
     /// A password change was answered; `false` means the old password was wrong.
-    Passwd(bool),                                                //A PASSWORD CHANGE ANSWERED
+    Passwd
+    {
+        /// Whether the password was changed.
+        changed: bool,
+    },                                                           //A PASSWORD CHANGE ANSWERED
     /// An account deletion was answered; `false` means the password was wrong.
-    AccountDeleted(bool),                                        //AN ACCOUNT DELETION ANSWERED
-    /// A profile: username, profile, whether it is ours, whether this acknowledges a save.
-    Profile(String, UserProfile, bool, bool),                    //A PROFILE (WHOSE, IT, OURS, A SAVE ACK)
+    AccountDeleted
+    {
+        /// Whether the account was deleted.
+        deleted: bool,
+    },                                                           //AN ACCOUNT DELETION ANSWERED
+    /// A profile.
+    Profile
+    {
+        /// Whose profile it is.
+        username: String,
+        /// The profile itself.
+        profile: UserProfile,
+        /// Whether it is ours.
+        own: bool,
+        /// Whether this acknowledges a save.
+        saved: bool,
+    },                                                           //A PROFILE (WHOSE, IT, OURS, A SAVE ACK)
     /// A color change landed on the server.
-    Colors(Option<MessageColors>),                               //A /color LANDED ON THE SERVER OR INIT COLORS
+    Colors
+    {
+        /// The new colors, or `None` for a `/color` acknowledgement.
+        colors: Option<MessageColors>,
+    },                                                           //A /color LANDED ON THE SERVER OR INIT COLORS
     /// The server icon, and whether this acknowledges our own change.
-    ServerIcon(Option<[u8; 32]>, bool),                          //THE SERVER'S PICTURE (HASH, A SAVE ACK)
-    /// The ban list: usernames, addresses.
-    ServerBans(Vec<BanEntry>, Vec<BanEntry>),                    //server_bans.toml (USERNAMES, ADDRESSES)
-    /// Our file upload started: upload id, name, size.
-    Upload(u64, String, u64),                                    //UPLOADING FILE (UID, NAME, SIZE)
-    /// Our picture upload started: upload id, name, size.
-    Image(u64, String, u64),                                     //UPLOADING IMAGE (UID, NAME, SIZE)
-    /// A picture, decoded and ready to draw: username, filename, message id, timestamp, frames,
-    /// username color.
-    ImageDisplay(String, String, u64, Option<u64>, Animation, Option<u8>), //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
+    ServerIcon
+    {
+        /// The icon's hash, if there is one.
+        hash: Option<[u8; 32]>,
+        /// Whether this acknowledges a save.
+        save: bool,
+    },                                                           //THE SERVER'S PICTURE (HASH, A SAVE ACK)
+    /// The ban list.
+    ServerBans
+    {
+        /// Banned usernames.
+        usernames: Vec<BanEntry>,
+        /// Banned addresses.
+        addresses: Vec<BanEntry>,
+    },                                                           //server_bans.toml (USERNAMES, ADDRESSES)
+    /// Our file upload started.
+    Upload
+    {
+        /// The upload id.
+        uid: u64,
+        /// The file name.
+        filename: String,
+        /// The file size.
+        size: u64,
+    },                                                           //UPLOADING FILE (UID, NAME, SIZE)
+    /// Our picture upload started.
+    Image
+    {
+        /// The upload id.
+        uid: u64,
+        /// The file name.
+        filename: String,
+        /// The file size.
+        size: u64,
+    },                                                           //UPLOADING IMAGE (UID, NAME, SIZE)
+    /// A picture, decoded and ready to draw.
+    ImageDisplay
+    {
+        /// The sender's username.
+        username: String,
+        /// The picture's file name.
+        filename: String,
+        /// The message's id.
+        message_id: u64,
+        /// When it was sent, in Unix seconds.
+        timestamp: Option<u64>,
+        /// The decoded frames.
+        image: Animation,
+        /// The sender's username color.
+        username_color: Option<u8>,
+    },                                                           //SOMEBODY'S IMAGE, DECODED AND READY TO DRAW
     /// A picture that was asked for, by hash; `None` means it is not coming.
-    ImageData([u8; 32], Option<Animation>),                      //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
-    /// A picture on its way from the server: username, filename, message id, timestamp, hash,
-    /// username color.
-    ImagePending(String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
-    /// A picture waiting to be asked for (`auto_show_images` off): username, filename, message id,
-    /// timestamp, hash, username color.
-    ImageOffer(String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
-    /// A picture posted in another channel: channel, username, filename, message id, timestamp,
-    /// hash, username color.
-    ImageParked(String, String, String, u64, Option<u64>, [u8; 32], Option<u8>), //SOMEBODY'S IMAGE IN ANOTHER CHANNEL (CHANNEL FIRST)
+    ImageData
+    {
+        /// The picture's SHA-256.
+        hash: [u8; 32],
+        /// The decoded frames, if it is coming.
+        image: Option<Animation>,
+    },                                                           //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
+    /// A picture on its way from the server.
+    ImagePending
+    {
+        /// The sender's username.
+        username: String,
+        /// The picture's file name.
+        filename: String,
+        /// The message's id.
+        message_id: u64,
+        /// When it was sent, in Unix seconds.
+        timestamp: Option<u64>,
+        /// The picture's SHA-256.
+        hash: [u8; 32],
+        /// The sender's username color.
+        username_color: Option<u8>,
+    },                                                           //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
+    /// A picture waiting to be asked for (`auto_show_images` off).
+    ImageOffer
+    {
+        /// The sender's username.
+        username: String,
+        /// The picture's file name.
+        filename: String,
+        /// The message's id.
+        message_id: u64,
+        /// When it was sent, in Unix seconds.
+        timestamp: Option<u64>,
+        /// The picture's SHA-256.
+        hash: [u8; 32],
+        /// The sender's username color.
+        username_color: Option<u8>,
+    },                                                           //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
+    /// A picture posted in another channel.
+    ImageParked
+    {
+        /// The channel it was posted in.
+        channel: String,
+        /// The sender's username.
+        username: String,
+        /// The picture's file name.
+        filename: String,
+        /// The message's id.
+        message_id: u64,
+        /// When it was sent, in Unix seconds.
+        timestamp: Option<u64>,
+        /// The picture's SHA-256.
+        hash: [u8; 32],
+        /// The sender's username color.
+        username_color: Option<u8>,
+    },                                                           //SOMEBODY'S IMAGE IN ANOTHER CHANNEL (CHANNEL FIRST)
     /// A picture the cache could not answer; the front end should request it from the server.
-    ImageRequest([u8; 32]),                                      //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
+    ImageRequest
+    {
+        /// The picture's SHA-256.
+        hash: [u8; 32],
+    },                                                           //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
     /// Cutting our avatar or the server icon failed, with the reason.
-    AvatarFailed(String),                                        //CUTTING OUR AVATAR OR SERVER ICON FAILED
-    /// A picture that would not decode: username, filename, message id, username color.
-    ImageFailed(String, String, u64, Option<u8>),                //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
-    /// A voice message: username, message id, timestamp, clip, username color, channel.
-    VoiceMessage(String, u64, Option<u64>, VoiceNote, Option<u8>, Option<Option<String>>), //SOMEBODY'S VOICE MESSAGE AND ITS CHANNEL
+    AvatarFailed
+    {
+        /// Why it failed.
+        error: String,
+    },                                                           //CUTTING OUR AVATAR OR SERVER ICON FAILED
+    /// A picture that would not decode.
+    ImageFailed
+    {
+        /// The sender's username.
+        username: String,
+        /// The picture's file name.
+        filename: String,
+        /// The message's id.
+        message_id: u64,
+        /// The sender's username color.
+        username_color: Option<u8>,
+    },                                                           //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
+    /// A voice message.
+    VoiceMessage
+    {
+        /// The sender's username.
+        username: String,
+        /// The message's id.
+        message_id: u64,
+        /// When it was sent, in Unix seconds.
+        timestamp: Option<u64>,
+        /// The clip.
+        voice: VoiceNote,
+        /// The sender's username color.
+        username_color: Option<u8>,
+        /// The channel it was posted in.
+        channel: Option<Option<String>>,
+    },                                                           //SOMEBODY'S VOICE MESSAGE AND ITS CHANNEL
     /// A voice clip that was asked for arrived, by hash; `false` means it is not coming.
-    VoiceData([u8; 32], bool),                                   //A VOICE MESSAGE THAT WAS ASKED FOR (FALSE = NOT COMING)
+    VoiceData
+    {
+        /// The clip's SHA-256.
+        hash: [u8; 32],
+        /// Whether it is coming.
+        valid: bool,
+    },                                                           //A VOICE MESSAGE THAT WAS ASKED FOR (FALSE = NOT COMING)
     /// Recording or playing a voice message failed, with the reason.
-    VoiceMessageFailed(String),                                  //RECORDING OR PLAYING A VOICE MESSAGE FAILED
-    /// A user shared a file: filename, username.
-    Uploaded(String, String),                                    //USER UPLOADED FILE
-    /// Our upload is complete: upload id, name.
-    UploadDone(u64, String),                                     //OUR OWN UPLOAD IS ON THE WIRE
-    /// A download started: transfer id, name, size.
-    Download(u64, String, u64),                                  //DOWNLOADING FILE (UID, NAME, SIZE)
-    /// A download completed and verified: transfer id, name.
-    Downloaded(u64, String),                                     //DOWNLOADED FILE
-    /// A download failed verification: transfer id, name.
-    DownloadFailed(u64, String),                                 //DOWNLOADING FAILED
-    /// How far a transfer has got: transfer id, bytes.
-    TransferProgress(u64, u64),                                  //HOW FAR A TRANSFER HAS GOT (UID, BYTES)
+    VoiceMessageFailed
+    {
+        /// Why it failed.
+        reason: String,
+    },                                                           //RECORDING OR PLAYING A VOICE MESSAGE FAILED
+    /// A user shared a file.
+    Uploaded
+    {
+        /// The sender's username.
+        username: String,
+        /// The file name.
+        filename: String,
+    },                                                           //USER UPLOADED FILE
+    /// Our upload is complete.
+    UploadDone
+    {
+        /// The upload id.
+        uid: u64,
+        /// The file name.
+        filename: String,
+    },                                                           //OUR OWN UPLOAD IS ON THE WIRE
+    /// A download started.
+    Download
+    {
+        /// The transfer id.
+        uid: u64,
+        /// The file name.
+        filename: String,
+        /// The file size.
+        size: u64,
+    },                                                           //DOWNLOADING FILE (UID, NAME, SIZE)
+    /// A download completed and verified.
+    Downloaded
+    {
+        /// The transfer id.
+        uid: u64,
+        /// The file name.
+        filename: String,
+    },                                                           //DOWNLOADED FILE
+    /// A download failed verification.
+    DownloadFailed
+    {
+        /// The transfer id.
+        uid: u64,
+        /// The file name.
+        filename: String,
+    },                                                           //DOWNLOADING FAILED
+    /// How far a transfer has got.
+    TransferProgress
+    {
+        /// The transfer id.
+        uid: u64,
+        /// Bytes transferred so far.
+        done: u64,
+    },                                                           //HOW FAR A TRANSFER HAS GOT (UID, BYTES)
     /// User got banned.
-    Banned(String),                                              //BANNED
+    Banned
+    {
+        /// The banned username.
+        username: String,
+    },                                                           //BANNED
     /// The shared files.
-    Files(Vec<UserFile>),                                        //FILE LIST
+    Files
+    {
+        /// One entry per user with files.
+        users: Vec<UserFile>,
+    },                                                           //FILE LIST
     /// The running screen shares.
-    Screens(Vec<UserScreen>),                                    //SCREENSHARE LIST
+    Screens
+    {
+        /// One entry per user sharing a screen.
+        users: Vec<UserScreen>,
+    },                                                           //SCREENSHARE LIST
     /// We have too many uploads in flight.
     UploadLimit,                                                 //MAX CONCURRENT UPLOADS REACHED
     /// Our screen share started (`true`) or stopped.
-    Screen(bool),                                                //TOGGLED SCREENSHARE
+    Screen
+    {
+        /// Whether it started.
+        enabled: bool,
+    },                                                           //TOGGLED SCREENSHARE
     /// Screen capture failed, with the reason.
-    ScreenFailed(String),                                        //SCREEN CAPTURE FAILED
-    /// We started watching a share: the sharer's username.
-    Attach(String),                                              //ATTACHED SCREENSHARE
-    /// We stopped watching a share: the sharer's username.
-    Deattach(String),                                            //DEATTACHED SCREENSHARE
+    ScreenFailed
+    {
+        /// Why it failed.
+        reason: String,
+    },                                                           //SCREEN CAPTURE FAILED
+    /// We started watching a share.
+    Attach
+    {
+        /// The sharer's username.
+        username: String,
+    },                                                           //ATTACHED SCREENSHARE
+    /// We stopped watching a share.
+    Deattach
+    {
+        /// The sharer's username.
+        username: String,
+    },                                                           //DEATTACHED SCREENSHARE
     /// Somebody started watching our share.
-    Attached(String),                                            //SOMEBODY ATTACHED OUR SCREENSHARE
+    Attached
+    {
+        /// The watcher's username.
+        username: String,
+    },                                                           //SOMEBODY ATTACHED OUR SCREENSHARE
     /// Somebody stopped watching our share.
-    Deattached(String),                                          //SOMEBODY DEATTACHED OUR SCREENSHARE
+    Deattached
+    {
+        /// The watcher's username.
+        username: String,
+    },                                                           //SOMEBODY DEATTACHED OUR SCREENSHARE
     /// The watched share's sound was muted (`true`) or unmuted.
-    MuteScreen(bool),                                            //TOGGLED ATTACHED SCREENSHARE MUTE
+    MuteScreen
+    {
+        /// Whether it is muted.
+        muted: bool,
+    },                                                           //TOGGLED ATTACHED SCREENSHARE MUTE
     /// Somebody started sharing their screen.
-    Screenshare(String),                                         //SOMEBODY STARTED SCREENSHARING
+    Screenshare
+    {
+        /// The sharer's username.
+        username: String,
+    },                                                           //SOMEBODY STARTED SCREENSHARING
     /// Somebody stopped sharing their screen.
-    ScreenshareEnd(String),                                      //SOMEBODY STOPPED SCREENSHARING
-    /// The server runs an incompatible version: ours, theirs.
-    IncompatibleVersion(String, String),                         //INCOMPATIBLE SERVER VERSION
+    ScreenshareEnd
+    {
+        /// The sharer's username.
+        username: String,
+    },                                                           //SOMEBODY STOPPED SCREENSHARING
+    /// The server runs an incompatible version.
+    IncompatibleVersion
+    {
+        /// Our version.
+        client_version: String,
+        /// The server's version.
+        server_version: String,
+    },                                                           //INCOMPATIBLE SERVER VERSION
     /// The server rejected our username.
     UsernameRejected,                                            //USERNAME REJECTED BY SERVER
     /// The server rejected our password; the minimum length.
-    PasswordRejected(u64),                                       //PASSWORD REJECTED BY SERVER
+    PasswordRejected
+    {
+        /// The minimum password length.
+        min_pass: u64,
+    },                                                           //PASSWORD REJECTED BY SERVER
     /// We are sending messages too fast.
     SpamWarning,                                                 //SPAM WARNING
     /// Voice is unavailable over SOCKS5.
@@ -339,7 +776,11 @@ pub enum ClientEvent
     /// The requested feature is disabled on this server.
     DisabledFeature,                                             //DISABLED FEATURE
     /// The session ended; `true` if the server ended it gracefully.
-    Quit(bool),                                                  //SERVER QUIT COMMUNICATION
+    Quit
+    {
+        /// Whether the server ended it gracefully.
+        graceful: bool,
+    },                                                           //SERVER QUIT COMMUNICATION
 }
 
 //LISTS
@@ -442,13 +883,23 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //REGULAR MESSAGE
             PacketCode::Message { text, username, id, message_id, colors, channel, timestamp, reply } =>
             {
-                tx.send(ClientEvent::Message(text, username, id, message_id, colors, channel, timestamp, reply)).await.unwrap();
+                tx.send(ClientEvent::Message
+                {
+                    message: text,
+                    username,
+                    id,
+                    message_id,
+                    colors,
+                    channel,
+                    timestamp,
+                    reply,
+                }).await.unwrap();
             }
 
             //THE LOBBY'S STORED MESSAGES
             PacketCode::History { messages, start, more, kept, older } =>
             {
-                tx.send(ClientEvent::History(messages, start, more, kept, older)).await.unwrap();
+                tx.send(ClientEvent::History { messages, start, more, kept, older }).await.unwrap();
 
                 continue;
             }
@@ -461,7 +912,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 //NON MATCHING VERSION (WILL GET DISCONNECTED)
                 if version != local_version
                 {
-                    tx.send(ClientEvent::IncompatibleVersion(local_version.clone(), version)).await.unwrap();
+                    tx.send(ClientEvent::IncompatibleVersion { client_version: local_version.clone(), server_version: version }).await.unwrap();
                 }
 
                 //RESPOND
@@ -486,10 +937,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 if !client_hash.is_empty() && !git_hash.is_empty() && !client_hash.starts_with(&git_hash) && !git_hash.starts_with(client_hash)
                 {
                     //DISPLAY VERSION MISMATCH
-                    tx.send(ClientEvent::VersionMismatch(client_hash.to_string(), git_hash.to_string())).await.unwrap();
+                    tx.send(ClientEvent::VersionMismatch { client_version: client_hash.to_string(), server_version: git_hash.to_string() }).await.unwrap();
                 }
 
-                tx.send(ClientEvent::Connected(server_name)).await.unwrap();
+                tx.send(ClientEvent::Connected { server_name }).await.unwrap();
             },
 
             //REKEY - CHANGE KEYS
@@ -516,7 +967,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 }
 
                 options::set_login_state(LoginState::Username);
-                tx.send(ClientEvent::Username(disabled_registration, min_uname.unwrap(), max_uname.unwrap())).await.unwrap();
+                tx.send(ClientEvent::Username { disabled_registration, min_uname: min_uname.unwrap(), max_uname: max_uname.unwrap() }).await.unwrap();
             },
 
             //REGISTER
@@ -527,7 +978,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 //INVALID PASS
                 if invalid_password
                 {
-                    tx.send(ClientEvent::PasswordRejected(min_pass.unwrap())).await.unwrap();
+                    tx.send(ClientEvent::PasswordRejected { min_pass: min_pass.unwrap() }).await.unwrap();
                 } else
                 {
                     invalid_password = true;
@@ -554,13 +1005,13 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //START CHATTING
             PacketCode::Accept { id: sid, role, colors } =>
             {
-                tx.send(ClientEvent::Authenticated(role)).await.unwrap();
+                tx.send(ClientEvent::Authenticated { role }).await.unwrap();
 
                 //SET SERVER-SIDE ID
                 id = sid;
 
                 //SET COLORS
-                tx.send(ClientEvent::Colors(Some(colors))).await.unwrap();
+                tx.send(ClientEvent::Colors { colors: Some(colors) }).await.unwrap();
 
                 //ALLOW MESSAGE HISTORY & COMMANDS
                 options::set_sending_messages(true);
@@ -577,13 +1028,13 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     username = Some(user.clone());
                 }
 
-                tx.send(ClientEvent::Join(user, username_color, id, device, role)).await.unwrap();
+                tx.send(ClientEvent::Join { username: user, username_color, id, device, role }).await.unwrap();
             }
 
             //LEAVE MESSAGE (CLIENT DISCONNECTED)
             PacketCode::Leave { username, id, registered } =>
             {
-                tx.send(ClientEvent::Leave(username, id, registered)).await.unwrap();
+                tx.send(ClientEvent::Leave { username, id, registered }).await.unwrap();
 
                 #[cfg(feature = "client_voice")]
                 voice_client::remove_consumer(&id);
@@ -598,25 +1049,25 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                 options::set_channel(channel.clone().unwrap_or_default());
 
-                tx.send(ClientEvent::ChannelChanged(channel)).await.unwrap();
+                tx.send(ClientEvent::ChannelChanged { channel }).await.unwrap();
             },
 
             //CHANNEL CREATED
             PacketCode::ChannelCreated { name } =>
             {
-                tx.send(ClientEvent::ChannelCreated(name)).await.unwrap();
+                tx.send(ClientEvent::ChannelCreated { channel: name }).await.unwrap();
             },
 
             //CHANNEL ABANDONED
             PacketCode::ChannelDestroyed { name } =>
             {
-                tx.send(ClientEvent::ChannelDestroyed(name)).await.unwrap();
+                tx.send(ClientEvent::ChannelDestroyed { channel: name }).await.unwrap();
             },
 
             //SOMEBODY IS WRITING
             PacketCode::Typing { username } =>
             {
-                tx.send(ClientEvent::Typing(username)).await.unwrap();
+                tx.send(ClientEvent::Typing { username }).await.unwrap();
             },
 
             //SERVER ALLOWED VOICE
@@ -661,7 +1112,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     }
                 }
 
-                tx.send(ClientEvent::VoiceRoster(clients)).await.unwrap();
+                tx.send(ClientEvent::VoiceRoster { clients }).await.unwrap();
             }
 
             //CLIENT JOINED VOICE
@@ -676,7 +1127,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     voice_client::add_consumer(sid, username.clone());
                 }
 
-                tx.send(ClientEvent::VoiceJoin(sid, username)).await.unwrap();
+                tx.send(ClientEvent::VoiceJoin { id: sid, username }).await.unwrap();
             },
 
             //CLIENT LEFT VOICE
@@ -688,67 +1139,67 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 #[cfg(feature = "client_voice")]
                 voice_client::remove_consumer(&id);
 
-                tx.send(ClientEvent::VoiceLeave(id)).await.unwrap();
+                tx.send(ClientEvent::VoiceLeave { id }).await.unwrap();
             },
 
             //SERVER MESSAGE
             PacketCode::ServerSay { message } =>
             {
-                tx.send(ClientEvent::ServerSay(message)).await.unwrap();
+                tx.send(ClientEvent::ServerSay { message }).await.unwrap();
             }
 
             //A ROLE WAS SET, ON US OR ON SOMEBODY ELSE
             PacketCode::ServerRole { username, role } =>
             {
-                tx.send(ClientEvent::Role(role, username)).await.unwrap();
+                tx.send(ClientEvent::Role { role, username }).await.unwrap();
             },
 
             //server.toml, ASKED FOR OR JUST STORED
             PacketCode::ServerSettings { settings, save } =>
             {
-                tx.send(ClientEvent::ServerSettings(settings, save)).await.unwrap();
+                tx.send(ClientEvent::ServerSettings { settings, saved: save }).await.unwrap();
             },
 
             //A PASSWORD CHANGE ANSWERED
             PacketCode::AccountPasswd { valid } =>
             {
-                tx.send(ClientEvent::Passwd(valid)).await.unwrap();
+                tx.send(ClientEvent::Passwd { changed: valid }).await.unwrap();
             },
 
             //AN ACCOUNT DELETION ANSWERED
             PacketCode::AccountDelete { valid } =>
             {
-                tx.send(ClientEvent::AccountDeleted(valid)).await.unwrap();
+                tx.send(ClientEvent::AccountDeleted { deleted: valid }).await.unwrap();
             },
 
             //A PROFILE, ASKED FOR OR JUST STORED
             PacketCode::Profile { username, profile, own, save } =>
             {
-                tx.send(ClientEvent::Profile(username, profile, own, save)).await.unwrap();
+                tx.send(ClientEvent::Profile { username, profile, own, saved: save }).await.unwrap();
             },
 
             //THE SERVER'S PICTURE, ASKED FOR OR CHANGED
             PacketCode::ServerIcon { hash, save } =>
             {
-                tx.send(ClientEvent::ServerIcon(hash, save)).await.unwrap();
+                tx.send(ClientEvent::ServerIcon { hash, save }).await.unwrap();
             },
 
             //THE BAN LIST, ASKED FOR OR JUST LIFTED
             PacketCode::ServerBans { users, ips } =>
             {
-                tx.send(ClientEvent::ServerBans(users, ips)).await.unwrap();
+                tx.send(ClientEvent::ServerBans { usernames: users, addresses: ips }).await.unwrap();
             },
 
             //THE SERVER STORED A COLOR
             PacketCode::Color =>
             {
-                tx.send(ClientEvent::Colors(None)).await.unwrap();
+                tx.send(ClientEvent::Colors { colors: None }).await.unwrap();
             },
 
             //LIST OF USERS
             PacketCode::List { online, offline } =>
             {
-                tx.send(ClientEvent::List(online, offline)).await.unwrap();
+                tx.send(ClientEvent::List { users: online, offline }).await.unwrap();
             },
 
             //UPLOAD APPROVAL
@@ -787,7 +1238,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //USER GOT BANNED
             PacketCode::Banned { username } =>
             {
-                tx.send(ClientEvent::Banned(username)).await.unwrap();
+                tx.send(ClientEvent::Banned { username }).await.unwrap();
             },
 
             //SOMEBODY'S IMAGE
@@ -810,7 +1261,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                         }).await.expect("Hashing voice message panicked");
 
                         let valid = digest == hash && !data.is_empty();
-                        image_tx.send(ClientEvent::VoiceData(hash, valid)).await.unwrap();
+                        image_tx.send(ClientEvent::VoiceData { hash, valid }).await.unwrap();
 
                         if !valid { return; }
 
@@ -827,7 +1278,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     let (digest, image) = image::digest_and_decode(data.clone()).await;
                     if digest == hash { cache::store(&hash, &data).await; }
 
-                    image_tx.send(ClientEvent::ImageData(hash, image)).await.unwrap();
+                    image_tx.send(ClientEvent::ImageData { hash, image }).await.unwrap();
                 });
 
                 continue;
@@ -859,8 +1310,25 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                         image_tx.send(match elsewhere
                         {
-                            Some(channel) => ClientEvent::ImageParked(channel, username, filename, message_id, timestamp, hash, username_color),
-                            None => ClientEvent::ImageOffer(username, filename, message_id, timestamp, hash, username_color),
+                            Some(channel) => ClientEvent::ImageParked
+                            {
+                                channel,
+                                username,
+                                filename,
+                                message_id,
+                                timestamp,
+                                hash,
+                                username_color,
+                            },
+                            None => ClientEvent::ImageOffer
+                            {
+                                username,
+                                filename,
+                                message_id,
+                                timestamp,
+                                hash,
+                                username_color,
+                            },
                         }).await.unwrap();
                     });
 
@@ -879,7 +1347,15 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     let Some(data) = data else
                     {
                         //ASK FROM THE EVENT LOOP, WHICH OWNS THE WRITE HALF
-                        image_tx.send(ClientEvent::ImagePending(username, filename, message_id, timestamp, hash, username_color)).await.unwrap();
+                        image_tx.send(ClientEvent::ImagePending
+                        {
+                            username,
+                            filename,
+                            message_id,
+                            timestamp,
+                            hash,
+                            username_color,
+                        }).await.unwrap();
 
                         return;
                     };
@@ -903,8 +1379,16 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                     image_tx.send(match image
                     {
-                        Some(image) => ClientEvent::ImageDisplay(username, filename, message_id, timestamp, image, username_color),
-                        None => ClientEvent::ImageFailed(username, filename, message_id, username_color),
+                        Some(image) => ClientEvent::ImageDisplay
+                        {
+                            username,
+                            filename,
+                            message_id,
+                            timestamp,
+                            image,
+                            username_color,
+                        },
+                        None => ClientEvent::ImageFailed { username, filename, message_id, username_color },
                     }).await.unwrap();
                 });
 
@@ -930,7 +1414,15 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                         if digest == voice.hash { cache::store(&digest, &data).await; }
                     }
 
-                    voice_tx.send(ClientEvent::VoiceMessage(username, message_id, timestamp, voice, username_color, channel)).await.unwrap();
+                    voice_tx.send(ClientEvent::VoiceMessage
+                    {
+                        username,
+                        message_id,
+                        timestamp,
+                        voice,
+                        username_color,
+                        channel,
+                    }).await.unwrap();
                 });
 
                 continue;
@@ -939,19 +1431,19 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //UPLOADED ANNOUNCEMENT
             PacketCode::Uploaded { filename, username } =>
             {
-                tx.send(ClientEvent::Uploaded(username, filename)).await.unwrap();
+                tx.send(ClientEvent::Uploaded { username, filename }).await.unwrap();
             },
 
             //FILE LIST
             PacketCode::Files { users } =>
             {
-                tx.send(ClientEvent::Files(users)).await.unwrap();
+                tx.send(ClientEvent::Files { users }).await.unwrap();
             },
 
             //SCREENSHARE LIST
             PacketCode::Screens { users } =>
             {
-                tx.send(ClientEvent::Screens(users)).await.unwrap();
+                tx.send(ClientEvent::Screens { users }).await.unwrap();
             },
 
             //MAX PARALLEL UPLOADS
@@ -976,10 +1468,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     {
                         //SPAWN UPLOAD TASK
                         tokio::spawn(screen::screen(token, tx.clone()));
-                        ClientEvent::Screen(true)
+                        ClientEvent::Screen { enabled: true }
                     },
 
-                    None => ClientEvent::Screen(false),
+                    None => ClientEvent::Screen { enabled: false },
                 }).await.unwrap();
             },
 
@@ -993,7 +1485,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 //SPAWN DOWNLOAD TASK
                 let main_stream = streams.1.clone();
                 tokio::spawn(screen::attach(token, main_stream));
-                tx.send(ClientEvent::Attach(username)).await.unwrap();
+                tx.send(ClientEvent::Attach { username }).await.unwrap();
             },
 
             //SCREENSHARE DEATTACH
@@ -1003,54 +1495,54 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 //DISABLE ATTACH
                 screen_options::set_attach_screen(false);
 
-                tx.send(ClientEvent::Deattach(username)).await.unwrap();
+                tx.send(ClientEvent::Deattach { username }).await.unwrap();
             },
 
             //ATTACHED SCREENSHARE MUTE ACK
             #[cfg(feature = "client_screen")]
             PacketCode::MuteScreen { muted } =>
             {
-                tx.send(ClientEvent::MuteScreen(muted)).await.unwrap();
+                tx.send(ClientEvent::MuteScreen { muted }).await.unwrap();
             },
 
             //SOMEBODY STARTED SCREENSHARING
             #[cfg(feature = "client_screen")]
             PacketCode::Screenshare { username } =>
             {
-                tx.send(ClientEvent::Screenshare(username)).await.unwrap();
+                tx.send(ClientEvent::Screenshare { username }).await.unwrap();
             },
 
             //SOMEBODY STOPPED SCREENSHARING
             #[cfg(feature = "client_screen")]
             PacketCode::ScreenshareEnd { username } =>
             {
-                tx.send(ClientEvent::ScreenshareEnd(username)).await.unwrap();
+                tx.send(ClientEvent::ScreenshareEnd { username }).await.unwrap();
             },
 
             //SOMEBODY ATTACHED OUR SCREENSHARE
             #[cfg(feature = "client_screen")]
             PacketCode::Attached { username } =>
             {
-                tx.send(ClientEvent::Attached(username)).await.unwrap();
+                tx.send(ClientEvent::Attached { username }).await.unwrap();
             },
 
             //SOMEBODY DEATTACHED OUR SCREENSHARE
             #[cfg(feature = "client_screen")]
             PacketCode::Deattached { username } =>
             {
-                tx.send(ClientEvent::Deattached(username)).await.unwrap();
+                tx.send(ClientEvent::Deattached { username }).await.unwrap();
             },
 
             //PRIVATE MESSAGE INCOMING
             PacketCode::PrivateMessage { text, username, id, colors } =>
             {
-                tx.send(ClientEvent::PrivateMessageRecv(username, id, text, colors)).await.unwrap();
+                tx.send(ClientEvent::PrivateMessageRecv { message: text, username, id, colors }).await.unwrap();
             },
 
             //PRIVATE MESSAGE INCOMING
             PacketCode::PrivateMessageBack { text, username, id, colors } =>
             {
-                tx.send(ClientEvent::PrivateMessageSent(username, id, text, colors)).await.unwrap();
+                tx.send(ClientEvent::PrivateMessageSent { message: text, username, id, colors }).await.unwrap();
             },
 
             //SPAM WARNING
@@ -1074,31 +1566,31 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //A MESSAGE WAS DELETED
             PacketCode::Deleted { message_id } =>
             {
-                tx.send(ClientEvent::Deleted(message_id)).await.unwrap();
+                tx.send(ClientEvent::Deleted { message_id }).await.unwrap();
             },
 
             //A MESSAGE WAS REWORDED
             PacketCode::Edited { message_id, text } =>
             {
-                tx.send(ClientEvent::Edited(message_id, text)).await.unwrap();
+                tx.send(ClientEvent::Edited { message_id, text }).await.unwrap();
             },
 
             //A MESSAGE'S HEARTS CHANGED
             PacketCode::Heart { message_id, hearts } =>
             {
-                tx.send(ClientEvent::Hearts(message_id, hearts)).await.unwrap();
+                tx.send(ClientEvent::Hearts { message_id, hearts }).await.unwrap();
             },
 
             //A MESSAGE WAS PINNED OR UNPINNED
             PacketCode::Pinned { message_id, pinned } =>
             {
-                tx.send(ClientEvent::Pinned(message_id, pinned)).await.unwrap();
+                tx.send(ClientEvent::Pinned { message_id, pinned }).await.unwrap();
             },
 
             //THE PINNED MESSAGES
             PacketCode::Pins { messages } =>
             {
-                tx.send(ClientEvent::Pins(messages)).await.unwrap();
+                tx.send(ClientEvent::Pins { messages }).await.unwrap();
             },
 
             //CLIENT MESSED SOME COMMAND UP
@@ -1116,7 +1608,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //SERVER DOESN'T LIKE YA ANYMORE - EXIT
             PacketCode::Disconnect =>
             {
-                tx.send(ClientEvent::Quit(!dropped)).await.unwrap();
+                tx.send(ClientEvent::Quit { graceful: !dropped }).await.unwrap();
                 return;
             },
 
