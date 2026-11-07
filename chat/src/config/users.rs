@@ -22,6 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! ```toml
 //! [alice]
+//! id = 0
 //! password = "$argon2id$..."
 //! role = "owner"
 //! username_color = "red"
@@ -37,10 +38,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! The profile lives in its own subtable so that nothing reading or writing a profile can reach
 //! the password hash. A missing key reads as empty, so entries that predate a field need no
-//! migration.
+//! migration; ids are the exception and are assigned to older entries at startup.
 
 use toml_edit::
 {
+    DocumentMut,
     Item,
     Table,
     Value,
@@ -59,6 +61,8 @@ use crate::
     },
 };
 
+/// The key an account's id is stored under.
+const ID_KEY: &str = "id";                    //THE ACCOUNT'S STABLE NUMBER
 /// The color keys, username color first.
 const COLOR_KEYS: [&str; 2] = ["username_color", "message_color"]; //THE COLORS AS server_users.toml SPELLS THEM
 /// The subtable a profile sits in.
@@ -73,6 +77,13 @@ fn user_field(username: &str, key: &str) -> Option<String> //READ ONE FIELD OF u
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(username)?
         .as_table_like()?.get(key)?.as_str().map(str::to_string))
+}
+
+/// Reads one top-level integer field of an account.
+fn user_integer(username: &str, key: &str) -> Option<i64> //READ ONE INTEGER FIELD OF username
+{
+    super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(username)?
+        .as_table_like()?.get(key)?.as_integer())
 }
 
 /// Reads one profile field of an account.
@@ -126,6 +137,58 @@ fn write_profile_field(username: &str, key: &str, value: Value) //WRITE ONE PROF
     });
 }
 
+/// Returns the id a new account should get: one past the highest id in use.
+fn next_id(doc: &DocumentMut) -> usize //THE NEXT FREE ACCOUNT ID
+{
+    doc.as_table().iter()
+        .filter_map(|(_, user)| user.as_table_like()?.get(ID_KEY)?.as_integer())
+        .max()
+        .map_or(0, |id| id as usize + 1)
+}
+
+/// Gives accounts that predate ids one, oldest first.
+///
+/// Accounts are appended as they register, so the file's order is oldest first.
+pub fn migrate() //NUMBER THE ACCOUNTS FROM AN OLDER server_users.toml
+{
+    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
+    {
+        let mut next = next_id(doc);
+
+        for (_, entry) in doc.as_table_mut().iter_mut()
+        {
+            let Some(user) = entry.as_table_like_mut() else { continue };
+
+            //AN ACCOUNT THAT ALREADY HAS AN ID KEEPS IT
+            if user.get(ID_KEY).is_some() { continue; }
+
+            user.insert(ID_KEY, Item::Value((next as i64).into()));
+            next += 1;
+        }
+    });
+}
+
+/// Gives an account the next free id.
+///
+/// The id is picked and written under one lock, so concurrent registrations cannot share one.
+fn assign_id(username: &str) //GIVE username A NEW ID
+{
+    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
+    {
+        let id = next_id(doc);
+        let users = doc.as_table_mut();
+
+        //A MISSING ENTRY BECOMES A SUBTABLE
+        if users.get(username).and_then(Item::as_table_like).is_none()
+        {
+            users.insert(username, Item::Table(Table::new()));
+        }
+
+        users.get_mut(username).and_then(Item::as_table_like_mut)
+            .expect("User entry is not a table").insert(ID_KEY, Item::Value((id as i64).into()));
+    });
+}
+
 /// Returns the number of registered accounts.
 pub fn len() -> usize //COUNT USERS
 {
@@ -137,6 +200,12 @@ pub fn all() -> Vec<String> //RETURN EVERY REGISTERED USERNAME
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.iter()
         .map(|(username, _)| username.to_string()).collect())
+}
+
+/// Returns the stable id of an account.
+pub fn id(username: &str) -> Option<usize> //RETURN THE ID OF username
+{
+    usize::try_from(user_integer(username, ID_KEY)?).ok()
 }
 
 /// Returns the password hash of an account.
@@ -249,6 +318,7 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
 {
     let first_user = len() == 0; //SELF-EXPLANATORY, INNIT?
 
+    assign_id(username); //ID
     set_password(username, hash); //PASSWORD
     set_role(username, if first_user { Role::Owner } else { Role::User }); //ROLE (OWNER IF THIS IS THE FIRST USER)
 

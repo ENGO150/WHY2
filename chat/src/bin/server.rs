@@ -141,6 +141,8 @@ async fn main()
         .init()
         .unwrap();
 
+    config::users::migrate(); //GIVE OLDER ACCOUNTS THEIR IDS
+
     log::info!("WHY2 server v{}{}, log level {level}", misc::get_version(), if !env!("WHY2_GIT_HASH").is_empty()
     {
         format!(" ({})", env!("WHY2_GIT_HASH"))
