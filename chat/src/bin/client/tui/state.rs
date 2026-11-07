@@ -447,6 +447,8 @@ pub struct App
     pub offline: BTreeMap<usize, (String, Option<u8>)>, //OFFLINE ACCOUNTS BY ID, WITH NAMES AND COLORS
     /// Whether the server discloses offline users at all.
     pub offline_listed: bool, //WHETHER THE SERVER SENDS THEM AT ALL
+    /// Usernames banned this session, kept out of the offline roster.
+    pub banned: BTreeSet<String>, //BANNED THIS SESSION
     /// What each user joined on, by username.
     pub devices: HashMap<String, Device>, //WHAT EACH USER JOINED ON, KEYED BY USERNAME
     /// Named channels that currently exist.
@@ -628,6 +630,7 @@ impl App
             online: Vec::new(),
             offline: BTreeMap::new(),
             offline_listed: false,
+            banned: BTreeSet::new(),
             devices: HashMap::new(),
             channels: BTreeSet::new(),
             voice: Vec::new(),
@@ -1726,6 +1729,7 @@ impl App
         self.online.clear();
         self.offline.clear();
         self.offline_listed = false;
+        self.banned.clear();
         self.devices.clear();
         self.channels.clear();
         self.voice.clear();

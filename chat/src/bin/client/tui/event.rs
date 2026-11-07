@@ -235,6 +235,7 @@ impl App
                 ]));
 
                 self.offline.remove(&id); //THEY ARE HERE NOW
+                self.banned.remove(&uname);
 
                 //Join NAMES THE USER, SO ADD THEM HERE - THE ROSTER MAY HOLD THEM ALREADY
                 if !self.online.iter().any(|user| user.id == id)
@@ -268,11 +269,37 @@ impl App
                 self.devices.remove(&uname);
                 self.stopped_typing(&uname);
 
-                //A DELETED ACCOUNT IS NOT OFFLINE
-                if self.offline_listed && registered { self.offline.insert(id, (uname, color)); }
+                //DELETED OR BANNED ACCOUNTS ARE NOT OFFLINE
+                if self.offline_listed && registered && !self.banned.contains(&uname) { self.offline.insert(id, (uname, color)); }
 
                 //A DISCONNECT CARRIES NO VoiceLeave
                 if self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
+
+                //A CHANNEL EXISTS WHILE SOMEBODY IS IN IT
+                self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
+                self.prune_panes();
+            },
+
+            //A BAN DROPS THE ACCOUNT FROM THE ROSTER, WHEREVER IT IS
+            ClientEvent::Banned(username) =>
+            {
+                self.push(Line::from(vec!
+                [
+                    Span::styled(format!("[{}] ", options::get_server_username()), theme::dim()),
+                    Span::styled(t!("event.banned", username = &username), theme::notice()),
+                ]));
+
+                //THE ID IS ONLY KNOWN WHILE THEY ARE ONLINE
+                let id = self.online.iter().find(|user| user.username == username).map(|user| user.id);
+
+                self.banned.insert(username.clone());
+                self.online.retain(|user| user.username != username);
+                self.offline.retain(|_, (name, _)| *name != username);
+                self.devices.remove(&username);
+                self.stopped_typing(&username);
+
+                //A DISCONNECT CARRIES NO VoiceLeave
+                if let Some(id) = id && self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
 
                 //A CHANNEL EXISTS WHILE SOMEBODY IS IN IT
                 self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
