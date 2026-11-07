@@ -443,8 +443,8 @@ pub struct App
     pub color: Option<u8>, //OUR OWN USERNAME COLOR
     /// Who is connected.
     pub online: Vec<OnlineUser>,
-    /// Registered users nobody is connected as, with their ids and colors.
-    pub offline: BTreeMap<String, (usize, Option<u8>)>, //REGISTERED USERS NOBODY IS CONNECTED AS, WITH THEIR IDS AND COLORS
+    /// Registered users nobody is connected as, keyed by id with their names and colors.
+    pub offline: BTreeMap<usize, (String, Option<u8>)>, //OFFLINE ACCOUNTS BY ID, WITH NAMES AND COLORS
     /// Whether the server discloses offline users at all.
     pub offline_listed: bool, //WHETHER THE SERVER SENDS THEM AT ALL
     /// What each user joined on, by username.
@@ -1642,13 +1642,11 @@ impl App
         self.dirty = true;
     }
 
-    //HIGHEST ROLE FIRST, US FIRST IN OURS, THE REST BY ID
-    /// Sorts the roster: highest role first, ourselves first in ours, the rest by id.
+    //HIGHEST ROLE FIRST, THEN BY ID
+    /// Sorts the roster: highest role first, then by id.
     pub fn sort_online(&mut self)
     {
-        let me = self.username.clone();
-
-        self.online.sort_by_key(|user| (Reverse(user.role), user.username != me, user.id));
+        self.online.sort_by_key(|user| (Reverse(user.role), user.id));
     }
 
     //THE ROSTER SPLIT BY ROLE
@@ -1812,7 +1810,7 @@ impl App
     pub fn refresh_palette(&mut self)
     {
         let mut users = self.online.iter().map(|user| user.username.clone())
-            .chain(self.offline.keys().cloned())
+            .chain(self.offline.values().map(|(name, _)| name.clone()))
             .filter(|user| *user != self.username)
             .collect::<Vec<String>>();
 

@@ -234,7 +234,7 @@ impl App
                     Span::styled(t!("event.joined", username = &uname), theme::ok()),
                 ]));
 
-                self.offline.remove(&uname); //THEY ARE HERE NOW
+                self.offline.remove(&id); //THEY ARE HERE NOW
 
                 //Join NAMES THE USER, SO ADD THEM HERE - THE ROSTER MAY HOLD THEM ALREADY
                 if !self.online.iter().any(|user| user.id == id)
@@ -269,7 +269,7 @@ impl App
                 self.stopped_typing(&uname);
 
                 //A DELETED ACCOUNT IS NOT OFFLINE
-                if self.offline_listed && registered { self.offline.insert(uname, (id, color)); }
+                if self.offline_listed && registered { self.offline.insert(id, (uname, color)); }
 
                 //A DISCONNECT CARRIES NO VoiceLeave
                 if self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
@@ -643,7 +643,7 @@ impl App
                 self.online = users;
                 self.offline_listed = registered.is_some();
                 self.offline = registered.unwrap_or_default().into_iter()
-                    .map(|user| (user.username, (user.id, user.username_color))).collect();
+                    .map(|user| (user.id, (user.username, user.username_color))).collect();
                 self.sort_online();
                 self.dirty = true;
 

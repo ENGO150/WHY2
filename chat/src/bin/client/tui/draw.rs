@@ -823,10 +823,10 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
     frame.render_widget(block, area);
 
     //ID COLUMN, RIGHT-ALIGNED
-    let width = app.offline.values().map(|(id, _)| id.to_string().len()).max().unwrap_or(1);
+    let width = app.offline.keys().map(|id| id.to_string().len()).max().unwrap_or(1);
     let room = inner.width as usize;
 
-    let lines = app.offline.iter().map(|(username, (id, color))|
+    let lines = app.offline.iter().map(|(id, (username, color))|
     {
         let name = truncate(username, room.saturating_sub(width + 2));
 
