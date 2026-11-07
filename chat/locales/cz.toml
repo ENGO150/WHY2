@@ -99,6 +99,7 @@ image_failed = "{username} poslal/a obrázek, který se nepodařilo zobrazit ({f
 reconnect_failed = "Opětovné připojení k serveru selhalo."
 joined = "{username} se připojil/a."
 left = "{username} se odpojil/a."
+banned = "{username} byl/a zabanován/a."
 muted = "Byli jste umlčeni moderátorem."
 voice_enabled = "Hlasová komunikace zapnuta."
 device_failed = "Změna audio zařízení selhala - stále se používá to předchozí."
