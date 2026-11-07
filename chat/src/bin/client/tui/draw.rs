@@ -822,18 +822,24 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
+    //ID COLUMN, RIGHT-ALIGNED
+    let width = app.offline.values().map(|(id, _)| id.to_string().len()).max().unwrap_or(1);
     let room = inner.width as usize;
 
-    let lines = app.offline.iter().map(|(username, color)|
+    let lines = app.offline.iter().map(|(username, (id, color))|
     {
-        let name = truncate(username, room);
+        let name = truncate(username, room.saturating_sub(width + 2));
 
         //THEIR OWN COLOR, ELSE DIM
-        Line::from(match color
-        {
-            Some(_) => Span::styled(name, app.theme.style(*color).add_modifier(Modifier::BOLD)),
-            None => Span::styled(name, theme::dim().add_modifier(Modifier::BOLD)),
-        })
+        Line::from(vec!
+        [
+            Span::styled(format!("{id:>width$}  "), theme::dim()),
+            match color
+            {
+                Some(_) => Span::styled(name, app.theme.style(*color).add_modifier(Modifier::BOLD)),
+                None => Span::styled(name, theme::dim().add_modifier(Modifier::BOLD)),
+            },
+        ])
     }).collect::<Vec<Line>>();
 
     frame.render_widget(Paragraph::new(lines), inner);

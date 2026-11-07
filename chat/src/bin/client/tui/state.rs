@@ -443,8 +443,8 @@ pub struct App
     pub color: Option<u8>, //OUR OWN USERNAME COLOR
     /// Who is connected.
     pub online: Vec<OnlineUser>,
-    /// Registered users nobody is connected as, with their colors.
-    pub offline: BTreeMap<String, Option<u8>>, //REGISTERED USERS NOBODY IS CONNECTED AS, AND THEIR COLORS
+    /// Registered users nobody is connected as, with their ids and colors.
+    pub offline: BTreeMap<String, (usize, Option<u8>)>, //REGISTERED USERS NOBODY IS CONNECTED AS, WITH THEIR IDS AND COLORS
     /// Whether the server discloses offline users at all.
     pub offline_listed: bool, //WHETHER THE SERVER SENDS THEM AT ALL
     /// What each user joined on, by username.
