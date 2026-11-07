@@ -296,7 +296,7 @@ impl<'a, 's> ClientSession<'a, 's>
             PacketCode::ServerKick { id } => self.server_kick(id).await,
 
             //BAN USER
-            PacketCode::ServerBan { target } => self.server_ban(target).await,
+            PacketCode::ServerBan { id } => self.server_ban(id).await,
 
             //BAN USER'S IP
             PacketCode::ServerBanIp { id } => self.server_ban_ip(id).await,
@@ -312,7 +312,7 @@ impl<'a, 's> ClientSession<'a, 's>
             PacketCode::ColorRequest { username, color } => self.color(username, color).await,
 
             //A PROFILE, ASKED FOR OR WRITTEN
-            PacketCode::ProfileRequest { target } => self.profile_request(target).await,
+            PacketCode::ProfileRequest { id } => self.profile_request(id).await,
             PacketCode::ProfileSave { profile } => self.profile_save(profile).await,
 
             //THE PROFILE PICTURE, SET OR DROPPED
@@ -337,7 +337,7 @@ impl<'a, 's> ClientSession<'a, 's>
             PacketCode::ServerSay { message } => self.server_say(message).await,
 
             //SET A USER'S ROLE
-            PacketCode::ServerRoleRequest { target, role } => self.server_role(target, role).await,
+            PacketCode::ServerRoleRequest { id, role } => self.server_role(id, role).await,
 
             //SERVER CONFIGURATION
             PacketCode::ServerSettingsRequest => self.server_settings(None).await,
@@ -1288,7 +1288,7 @@ impl<'a, 's> ClientSession<'a, 's>
     }
 
     //BAN USER
-    async fn server_ban(&mut self, target: String) -> PacketFlow
+    async fn server_ban(&mut self, id: usize) -> PacketFlow
     {
         //VERIFY PERMISSIONS
         if self.role < Role::Owner
@@ -1299,10 +1299,10 @@ impl<'a, 's> ClientSession<'a, 's>
             return PacketFlow::Continue;
         }
 
-        //FIND TARGET USER
-        if let Some(target) = server::resolve_user(&target).filter(|target| target != &self.username)
+        //FIND TARGET ACCOUNT
+        if id != self.id && let Some(target) = config::users::username(id)
         {
-            let session = server::session_of(&target);
+            let session = server::session_of(id);
 
             log::info!("Ban by {}: {}", self.peer_addr,
                 session.map_or("offline user".to_string(), |addr| addr.to_string()));
@@ -1432,7 +1432,7 @@ impl<'a, 's> ClientSession<'a, 's>
     }
 
     //A PROFILE, ASKED FOR
-    async fn profile_request(&mut self, target: Option<String>) -> PacketFlow
+    async fn profile_request(&mut self, target: Option<usize>) -> PacketFlow
     {
         //CHECK DISABLED FEATURE
         if self.profiles_disabled().await { return PacketFlow::Continue; }
@@ -1440,7 +1440,7 @@ impl<'a, 's> ClientSession<'a, 's>
         //WHOSE PROFILE IS BEING READ
         let target = match target
         {
-            Some(target) => match server::resolve_user(&target)
+            Some(id) => match config::users::username(id)
             {
                 Some(found) => found,
                 None =>
@@ -1808,7 +1808,7 @@ impl<'a, 's> ClientSession<'a, 's>
     }
 
     //SET A USER'S ROLE
-    async fn server_role(&mut self, target: String, new_role: Role) -> PacketFlow
+    async fn server_role(&mut self, id: usize, new_role: Role) -> PacketFlow
     {
         //VERIFY PERMISSIONS
         if self.role < Role::Owner || new_role > self.role
@@ -1819,10 +1819,12 @@ impl<'a, 's> ClientSession<'a, 's>
             return PacketFlow::Continue;
         }
 
-        //FIND TARGET USER
-        let target = server::resolve_user(&target)
-            .filter(|target| target != &self.username)
-            .and_then(|target| Some((config::users::role(&target)?, target)));
+        //FIND TARGET ACCOUNT
+        let target = if id != self.id
+        {
+            config::users::username(id)
+                .and_then(|username| Some((config::users::role(&username)?, username)))
+        } else { None };
 
         //CHECK FOR VALID TARGET
         let Some((target_role, target_username)) = target else
@@ -1840,14 +1842,14 @@ impl<'a, 's> ClientSession<'a, 's>
 
         log::info!("Role change by {}: {} is now {new_role} (was {target_role})",
             self.peer_addr,
-            server::session_of(&target_username).map_or("offline user".to_string(), |addr| addr.to_string()));
+            server::session_of(id).map_or("offline user".to_string(), |addr| addr.to_string()));
 
         //STORE
         config::users::set_role(&target_username, new_role);
 
         //APPLY TO THEIR LIVE SESSION
         for mut entry in server::CONNECTIONS.iter_mut()
-            .filter(|entry| entry.username() == Some(&target_username) && entry.role().is_some())
+            .filter(|entry| entry.id() == Some(&id) && entry.role().is_some())
         {
             entry.set_role(new_role);
         }

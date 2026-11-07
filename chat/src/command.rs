@@ -293,8 +293,8 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "arg.user",
-                description: "command.server.ban.args.user",
+                name: "arg.id",
+                description: "command.server.ban.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
@@ -392,8 +392,8 @@ pub const SERVER_SUBCOMMANDS: &[SubcommandInfo] =
         &[
             CommandArg
             {
-                name: "arg.user",
-                description: "command.server.role.args.user",
+                name: "arg.id",
+                description: "command.server.role.args.id",
                 required: true,
                 values: ArgValues::Free,
             },
@@ -967,8 +967,8 @@ pub const COMMAND_LIST: &[CommandInfo] =
         &[
             CommandArg
             {
-                name: "arg.user",
-                description: "command.profile.args.user",
+                name: "arg.id",
+                description: "command.profile.args.id",
                 required: false,
                 values: ArgValues::Free,
             },
@@ -1115,11 +1115,12 @@ impl SubcommandInfo
     pub fn available(&self, role: Role) -> bool { role >= self.minimal_role }
 
     //WHETHER THE WHOLE PARAMETER IS A TARGET ID
-    /// Returns whether the action's whole parameter is a target session id.
+    /// Returns whether the action's whole parameter is a single id.
     pub fn takes_id(&self) -> bool
     {
         matches!(self.subcommand, Subcommand::Mute
             | Subcommand::Kick
+            | Subcommand::Ban
             | Subcommand::BanIp
             | Subcommand::Pardon
             | Subcommand::PardonIp)
@@ -1243,10 +1244,16 @@ impl Command
             Command::Channel => Some(Ok(PacketCode::Channel { channel: parameters.map(str::to_string) })),
 
             //THE SERVER OPENS THE BOX, SINCE IT DECIDES WHAT WE MAY SEE
-            Command::Profile => Some(Ok(PacketCode::ProfileRequest
+            Command::Profile => Some(match parameters.map(str::trim).filter(|target| !target.is_empty())
             {
-                target: parameters.map(str::trim).filter(|target| !target.is_empty()).map(str::to_string),
-            })),
+                Some(target) => match target.parse::<usize>()
+                {
+                    Ok(id) => Ok(PacketCode::ProfileRequest { id: Some(id) }),
+                    Err(_) => Err(()),
+                },
+
+                None => Ok(PacketCode::ProfileRequest { id: None }),
+            }),
 
             Command::List => Some(Ok(PacketCode::ListRequest)),
             Command::Files => Some(Ok(PacketCode::FilesRequest)),

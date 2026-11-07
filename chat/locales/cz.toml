@@ -544,7 +544,7 @@ description = "Upraví Vaši zprávu v historii"
 description = "Otevře nastavení audia a prostředí"
 
 [command.profile]
-args.user = "Uživatelské jméno nebo ID, vynechte pro vlastní"
+args.id = "ID uživatele, vynechte pro vlastní"
 description = "Otevře profil uživatele"
 
 [command.ucolor]
@@ -568,7 +568,7 @@ args.id = "Zvolený uživatel"
 description = "Odpojí uživatele od serveru"
 
 [command.server.ban]
-args.user = "Uživatelské jméno nebo ID zvoleného uživatele"
+args.id = "ID zvoleného uživatele"
 description = "Udělí ban uživateli"
 
 [command.server.banip]
@@ -591,7 +591,7 @@ args.message = "Zpráva ke zveřejnění"
 description = "Zveřejní zprávu jako server"
 
 [command.server.role]
-args.user = "Uživatelské jméno nebo ID zvoleného uživatele"
+args.id = "ID zvoleného uživatele"
 args.role = "Role k přidělení"
 description = "Nastaví roli uživatele na serveru"
 

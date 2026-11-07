@@ -539,7 +539,7 @@ description = "编辑你在历史中的消息"
 description = "打开音频和界面设置"
 
 [command.profile]
-args.user = "用户名或 ID，留空则为你自己"
+args.id = "用户 ID，留空则为你自己"
 description = "打开用户个人资料"
 
 [command.ucolor]
@@ -563,7 +563,7 @@ args.id = "目标用户"
 description = "将用户从服务器断开"
 
 [command.server.ban]
-args.user = "目标用户的用户名或 ID"
+args.id = "目标用户的 ID"
 description = "封禁用户"
 
 [command.server.banip]
@@ -586,7 +586,7 @@ args.message = "要广播的消息"
 description = "以服务器身份广播消息"
 
 [command.server.role]
-args.user = "目标用户的用户名或 ID"
+args.id = "目标用户的 ID"
 args.role = "要授予的角色"
 description = "设置用户在服务器上的角色"
 

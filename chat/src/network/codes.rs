@@ -395,8 +395,8 @@ pub enum PacketCode //CONTROL CODES
     /// *Client → server.* Sets a user's role.
     ServerRoleRequest
     {
-        /// A username, or a live session id.
-        target: String,
+        /// The account's id.
+        id: usize,
         role: Role,
     },
 
@@ -460,8 +460,8 @@ pub enum PacketCode //CONTROL CODES
         save: bool, //FALSE = READ ANSWER, TRUE = SAVE ACK
     },
 
-    /// *Client → server.* Reads a profile; `None` for our own.
-    ProfileRequest { target: Option<String> },         //CLIENT -> SERVER | READ A PROFILE | None = OUR OWN
+    /// *Client → server.* Reads a profile by account id; `None` for our own.
+    ProfileRequest { id: Option<usize> },              //CLIENT -> SERVER | READ A PROFILE | None = OUR OWN
     /// *Client → server.* Stores our profile's typed fields.
     ProfileSave { profile: UserProfile },              //CLIENT -> SERVER | WRITE OUR OWN PROFILE
     /// *Client → server.* Sets our avatar to a picture; `None` drops it.
@@ -565,8 +565,8 @@ pub enum PacketCode //CONTROL CODES
     ServerKick { id: usize },                            //CLIENT -> SERVER | KICK USER
     /// *Client → server.* Toggles a session's server-side mute.
     ServerMute { id: usize },                            //CLIENT -> SERVER | MUTE USER
-    /// *Client → server.* Bans an account, by username or live session id.
-    ServerBan { target: String },                        //CLIENT -> SERVER | BAN USER
+    /// *Client → server.* Bans an account, by id.
+    ServerBan { id: usize },                             //CLIENT -> SERVER | BAN USER
     /// *Client → server.* Bans a session's address.
     ServerBanIp { id: usize },                           //CLIENT -> SERVER | BAN USER'S IP
     /// *Client → server.* Lifts the username ban numbered `id`.

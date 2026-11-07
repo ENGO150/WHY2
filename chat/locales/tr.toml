@@ -539,7 +539,7 @@ description = "Geçmişteki mesajınızı düzenler"
 description = "Ses ve arayüz ayarlarını açar"
 
 [command.profile]
-args.user = "Kullanıcı adı veya ID, kendiniz için boş"
+args.id = "Kullanıcının ID'si, kendiniz için boş"
 description = "Bir kullanıcı profilini açar"
 
 [command.ucolor]
@@ -563,7 +563,7 @@ args.id = "Hedef kullanıcı"
 description = "Bir kullanıcının sunucuyla bağlantısını keser"
 
 [command.server.ban]
-args.user = "Hedef kullanıcının adı veya ID'si"
+args.id = "Hedef kullanıcının ID'si"
 description = "Bir kullanıcıyı sunucudan yasaklar"
 
 [command.server.banip]
@@ -586,7 +586,7 @@ args.message = "Yayınlanacak mesaj"
 description = "Sunucu olarak mesaj yayınlar"
 
 [command.server.role]
-args.user = "Hedef kullanıcının adı veya ID'si"
+args.id = "Hedef kullanıcının ID'si"
 args.role = "Verilecek rol"
 description = "Bir kullanıcının sunucudaki rolünü ayarlar"
 

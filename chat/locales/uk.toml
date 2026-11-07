@@ -544,7 +544,7 @@ description = "Редагує ваше повідомлення в історі�
 description = "Відкриває налаштування звуку та інтерфейсу"
 
 [command.profile]
-args.user = "Ім'я користувача або ID, порожньо для власного"
+args.id = "ID користувача, порожньо для власного"
 description = "Відкриває профіль користувача"
 
 [command.ucolor]
@@ -568,7 +568,7 @@ args.id = "Користувач"
 description = "Відключає користувача від сервера"
 
 [command.server.ban]
-args.user = "Ім'я користувача або ID"
+args.id = "ID цільового користувача"
 description = "Банить користувача на сервері"
 
 [command.server.banip]
@@ -591,7 +591,7 @@ args.message = "Повідомлення для розсилки"
 description = "Розсилає повідомлення від імені сервера"
 
 [command.server.role]
-args.user = "Ім'я користувача або ID"
+args.id = "ID цільового користувача"
 args.role = "Роль, що надається"
 description = "Задає роль користувача на сервері"
 

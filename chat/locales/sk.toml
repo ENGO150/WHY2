@@ -544,7 +544,7 @@ description = "Upraví Vašu správu v histórii"
 description = "Otvorí nastavenia zvuku a rozhrania"
 
 [command.profile]
-args.user = "Používateľské meno alebo ID, vynechajte pre vlastný"
+args.id = "ID používateľa, vynechajte pre vlastný"
 description = "Otvorí profil používateľa"
 
 [command.ucolor]
@@ -568,7 +568,7 @@ args.id = "Zvolený používateľ"
 description = "Odpojí používateľa zo servera"
 
 [command.server.ban]
-args.user = "Používateľské meno alebo ID zvoleného používateľa"
+args.id = "ID zvoleného používateľa"
 description = "Udelí používateľovi ban"
 
 [command.server.banip]
@@ -591,7 +591,7 @@ args.message = "Správa na zverejnenie"
 description = "Zverejní správu ako server"
 
 [command.server.role]
-args.user = "Používateľské meno alebo ID zvoleného používateľa"
+args.id = "ID zvoleného používateľa"
 args.role = "Rola na pridelenie"
 description = "Nastaví rolu používateľa na serveri"
 

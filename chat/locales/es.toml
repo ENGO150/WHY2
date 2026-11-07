@@ -541,7 +541,7 @@ description = "Edita tu mensaje en el historial"
 description = "Abre la configuración de audio e interfaz"
 
 [command.profile]
-args.user = "Nombre de usuario o ID, nada para el tuyo"
+args.id = "ID del usuario, nada para el tuyo"
 description = "Abre el perfil de un usuario"
 
 [command.ucolor]
@@ -565,7 +565,7 @@ args.id = "Usuario objetivo"
 description = "Desconecta a un usuario del servidor"
 
 [command.server.ban]
-args.user = "Nombre de usuario o ID del usuario objetivo"
+args.id = "ID del usuario objetivo"
 description = "Bloquea a un usuario en el servidor"
 
 [command.server.banip]
@@ -588,7 +588,7 @@ args.message = "Mensaje a difundir"
 description = "Difunde un mensaje como servidor"
 
 [command.server.role]
-args.user = "Nombre de usuario o ID del usuario objetivo"
+args.id = "ID del usuario objetivo"
 args.role = "Rol a conceder"
 description = "Establece el rol de un usuario en el servidor"
 

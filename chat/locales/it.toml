@@ -541,7 +541,7 @@ description = "Modifica il tuo messaggio nella cronologia"
 description = "Apre le impostazioni audio e dell'interfaccia"
 
 [command.profile]
-args.user = "Nome utente o ID, niente per il tuo"
+args.id = "ID dell'utente, niente per il tuo"
 description = "Apre il profilo di un utente"
 
 [command.ucolor]
@@ -565,7 +565,7 @@ args.id = "Utente"
 description = "Disconnette un utente dal server"
 
 [command.server.ban]
-args.user = "Nome utente o ID dell'utente"
+args.id = "ID dell'utente"
 description = "Banna un utente dal server"
 
 [command.server.banip]
@@ -588,7 +588,7 @@ args.message = "Messaggio da trasmettere"
 description = "Trasmette un messaggio come server"
 
 [command.server.role]
-args.user = "Nome utente o ID dell'utente"
+args.id = "ID dell'utente"
 args.role = "Ruolo da assegnare"
 description = "Imposta il ruolo di un utente sul server"
 

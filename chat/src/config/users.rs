@@ -208,6 +208,17 @@ pub fn id(username: &str) -> Option<usize> //RETURN THE ID OF username
     usize::try_from(user_integer(username, ID_KEY)?).ok()
 }
 
+/// Returns the username an account id belongs to.
+pub fn username(id: usize) -> Option<String> //RETURN THE USERNAME HOLDING id
+{
+    super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.iter()
+        .find(|(_, entry)| entry.as_table_like()
+            .and_then(|user| user.get(ID_KEY))
+            .and_then(Item::as_integer)
+            .and_then(|value| usize::try_from(value).ok()) == Some(id))
+        .map(|(username, _)| username.to_string()))
+}
+
 /// Returns the password hash of an account.
 pub fn password(username: &str) -> Option<String> //RETURN PASSWORD HASH OF username
 {

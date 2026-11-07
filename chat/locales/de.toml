@@ -541,7 +541,7 @@ description = "Bearbeitet deine Nachricht im Verlauf"
 description = "Öffnet die Audio- und Oberflächeneinstellungen"
 
 [command.profile]
-args.user = "Benutzername oder ID, leer für dein eigenes"
+args.id = "ID des Benutzers, leer für dein eigenes"
 description = "Öffnet ein Benutzerprofil"
 
 [command.ucolor]
@@ -565,7 +565,7 @@ args.id = "Zielbenutzer"
 description = "Trennt einen Benutzer vom Server"
 
 [command.server.ban]
-args.user = "Benutzername oder ID des Zielbenutzers"
+args.id = "ID des Zielbenutzers"
 description = "Sperrt einen Benutzer vom Server"
 
 [command.server.banip]
@@ -588,7 +588,7 @@ args.message = "Zu sendende Nachricht"
 description = "Sendet eine Nachricht als Server"
 
 [command.server.role]
-args.user = "Benutzername oder ID des Zielbenutzers"
+args.id = "ID des Zielbenutzers"
 args.role = "Zu vergebende Rolle"
 description = "Setzt die Rolle eines Benutzers auf dem Server"
 

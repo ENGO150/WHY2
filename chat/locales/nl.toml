@@ -541,7 +541,7 @@ description = "Bewerkt je bericht in de geschiedenis"
 description = "Opent de audio- en interface-instellingen"
 
 [command.profile]
-args.user = "Gebruikersnaam of ID, leeg voor je eigen"
+args.id = "ID van de gebruiker, leeg voor je eigen"
 description = "Opent een gebruikersprofiel"
 
 [command.ucolor]
@@ -565,7 +565,7 @@ args.id = "Doelgebruiker"
 description = "Verbreekt de verbinding van een gebruiker met de server"
 
 [command.server.ban]
-args.user = "Gebruikersnaam of ID van de doelgebruiker"
+args.id = "ID van de doelgebruiker"
 description = "Verbant een gebruiker van de server"
 
 [command.server.banip]
@@ -588,7 +588,7 @@ args.message = "Te verzenden bericht"
 description = "Verzendt een bericht als de server"
 
 [command.server.role]
-args.user = "Gebruikersnaam of ID van de doelgebruiker"
+args.id = "ID van de doelgebruiker"
 args.role = "Toe te kennen rol"
 description = "Stelt de rol van een gebruiker op de server in"
 

@@ -539,7 +539,7 @@ description = "履歴にある自分のメッセージを編集します"
 description = "オーディオとインターフェースの設定を開きます"
 
 [command.profile]
-args.user = "ユーザー名または ID。空なら自分"
+args.id = "ユーザーの ID。空なら自分"
 description = "ユーザーのプロフィールを開きます"
 
 [command.ucolor]
@@ -563,7 +563,7 @@ args.id = "対象ユーザー"
 description = "ユーザーをサーバーから切断します"
 
 [command.server.ban]
-args.user = "対象ユーザーのユーザー名または ID"
+args.id = "対象ユーザーの ID"
 description = "ユーザーをサーバーから BAN します"
 
 [command.server.banip]
@@ -586,7 +586,7 @@ args.message = "配信するメッセージ"
 description = "サーバーとしてメッセージを配信します"
 
 [command.server.role]
-args.user = "対象ユーザーのユーザー名または ID"
+args.id = "対象ユーザーの ID"
 args.role = "付与するロール"
 description = "サーバー上のユーザーのロールを設定します"
 

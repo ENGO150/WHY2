@@ -99,7 +99,7 @@ use crate::
     options,
     role::Role,
     crypto::password,
-    config::{ self, users },
+    config,
     consts::
     {
         self,
@@ -145,20 +145,11 @@ struct AuthenticatedClient
 }
 
 //FUNCTIONS
-/// Resolves a username, or the id of a live session, to a username.
-fn resolve_user(target: &str) -> Option<String> //A USERNAME, OR THE ID OF A SESSION THEY HAVE OPEN
-{
-    if users::contains(target) { return Some(target.to_string()); }
-
-    let id = target.parse::<usize>().ok()?;
-    CONNECTIONS.iter().find(|entry| entry.value().id() == Some(&id)).and_then(|entry| entry.username().cloned())
-}
-
-/// Returns the address of the authenticated session `username` has open, if any.
-fn session_of(username: &str) -> Option<SocketAddr> //THE SESSION username HAS OPEN
+/// Returns the address of the live session an account has open, if any.
+fn session_of(id: usize) -> Option<SocketAddr> //THE SESSION THE ACCOUNT HAS OPEN
 {
     CONNECTIONS.iter()
-        .find(|entry| entry.role().is_some() && entry.username().is_some_and(|name| name == username))
+        .find(|entry| entry.role().is_some() && entry.id() == Some(&id))
         .map(|entry| *entry.key())
 }
 

@@ -539,7 +539,7 @@ description = "기록에 있는 내 메시지를 수정합니다"
 description = "오디오 및 인터페이스 설정을 엽니다"
 
 [command.profile]
-args.user = "사용자 이름 또는 ID, 비우면 내 프로필"
+args.id = "사용자 ID, 비우면 내 프로필"
 description = "사용자 프로필을 엽니다"
 
 [command.ucolor]
@@ -563,7 +563,7 @@ args.id = "대상 사용자"
 description = "사용자를 서버에서 내보냅니다"
 
 [command.server.ban]
-args.user = "대상 사용자의 이름 또는 ID"
+args.id = "대상 사용자의 ID"
 description = "사용자를 서버에서 차단합니다"
 
 [command.server.banip]
@@ -586,7 +586,7 @@ args.message = "방송할 메시지"
 description = "서버 이름으로 메시지를 방송합니다"
 
 [command.server.role]
-args.user = "대상 사용자의 이름 또는 ID"
+args.id = "대상 사용자의 ID"
 args.role = "부여할 역할"
 description = "서버에서 사용자의 역할을 설정합니다"
 
