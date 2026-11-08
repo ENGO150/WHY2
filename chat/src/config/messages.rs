@@ -77,10 +77,10 @@ struct Record //ONE MESSAGE RECORD
     id: u64,
     /// Author's username.
     username: String,
-    /// Message text, or the filename of a picture.
+    /// Message text, or the filename of an attachment.
     text: String,
-    /// Hash of the stored picture, if this is one.
-    image: Option<[u8; 32]>,
+    /// Hash of the stored attachment, if this is one.
+    attachment: Option<[u8; 32]>,
     timestamp: Option<u64>,   //UNIX SECONDS
     reply: Option<u64>,       //ID OF THE MESSAGE REPLIED TO
     hearts: Vec<String>,      //USERNAMES THAT HEARTED IT
@@ -96,7 +96,7 @@ struct VoiceRecord //A RECORD BEFORE PINS (remove with next version bump)
     id: u64,
     username: String,
     text: String,
-    image: Option<[u8; 32]>,
+    attachment: Option<[u8; 32]>,
     timestamp: Option<u64>,
     reply: Option<u64>,
     hearts: Vec<String>,
@@ -147,7 +147,7 @@ impl From<VoiceRecord> for Record //NOT PINNED (remove with next version bump)
             id: message.id,
             username: message.username,
             text: message.text,
-            image: message.image,
+            attachment: message.attachment,
             timestamp: message.timestamp,
             reply: message.reply,
             hearts: message.hearts,
@@ -160,10 +160,10 @@ impl From<VoiceRecord> for Record //NOT PINNED (remove with next version bump)
 
 impl Record
 {
-    /// Returns the hash of the file in `server_images/` this record names, picture or voice clip.
+    /// Returns the hash of the file in `server_images/` this record names, attachment or voice clip.
     fn stored(&self) -> Option<[u8; 32]> //THE FILE IN server_images/ IT NAMES
     {
-        self.image.or(self.voice.as_ref().map(|voice| voice.hash))
+        self.attachment.or(self.voice.as_ref().map(|voice| voice.hash))
     }
 }
 
@@ -325,8 +325,8 @@ pub fn store(username: &str, text: &str, timestamp: Option<u64>, reply: Option<u
     push(username, text, None, None, timestamp, reply)
 }
 
-/// Stores a picture message; returns its id.
-pub fn store_image(username: &str, filename: &str, hash: &[u8; 32], timestamp: Option<u64>) -> u64
+/// Stores an attachment message; returns its id.
+pub fn store_attachment(username: &str, filename: &str, hash: &[u8; 32], timestamp: Option<u64>) -> u64
 {
     push(username, filename, Some(*hash), None, timestamp, None)
 }
@@ -344,7 +344,7 @@ pub fn store_voice(username: &str, voice: &VoiceNote, timestamp: Option<u64>) ->
 ///
 /// # Returns
 /// The message id.
-fn push(username: &str, text: &str, image: Option<[u8; 32]>, voice: Option<VoiceNote>, timestamp: Option<u64>, reply: Option<u64>) -> u64
+fn push(username: &str, text: &str, attachment: Option<[u8; 32]>, voice: Option<VoiceNote>, timestamp: Option<u64>, reply: Option<u64>) -> u64
 {
     let limit: usize = super::read_config("max_persistent_messages");
 
@@ -359,7 +359,7 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>, voice: Option<Voice
         id,
         username: username.to_string(),
         text: text.to_string(),
-        image,
+        attachment,
         timestamp,
         reply,
         hearts: Vec::new(),
@@ -372,23 +372,23 @@ fn push(username: &str, text: &str, image: Option<[u8; 32]>, voice: Option<Voice
     let over = guard.records.len().saturating_sub(limit);
     let dropped: Vec<[u8; 32]> = guard.records.drain(..over).filter_map(|message| message.stored()).collect();
 
-    //A PICTURE ANOTHER ENTRY - OR A PROFILE - STILL NAMES STAYS
+    //AN ATTACHMENT ANOTHER ENTRY - OR A PROFILE - STILL NAMES STAYS
     let orphans = guard.orphans(dropped);
 
     guard.save();
     drop(guard); //THE FILES ARE NOT THE HISTORY'S BUSINESS
 
-    remove_images(orphans);
+    remove_attachments(orphans);
 
     id
 }
 
 /// Deletes stored files by hash.
-fn remove_images(orphans: Vec<[u8; 32]>) //DELETE PICTURES NOTHING NAMES
+fn remove_attachments(orphans: Vec<[u8; 32]>) //DELETE ATTACHMENTS NOTHING NAMES
 {
     if !orphans.is_empty() { log::info!("Dropping {} stored files with no history entry left", orphans.len()); }
 
-    for hash in orphans { let _ = fs::remove_file(misc::get_image_dir().join(misc::hex(&hash))); }
+    for hash in orphans { let _ = fs::remove_file(misc::get_attachment_dir().join(misc::hex(&hash))); }
 }
 
 /// Returns whether message `id` is in the history.
@@ -402,7 +402,7 @@ pub fn attachment(id: u64) -> Option<([u8; 32], String)>
 {
     let history = HISTORY.lock().unwrap();
     let record = &history.records[history.find(id)?];
-    Some((record.image?, record.text.clone()))
+    Some((record.attachment?, record.text.clone()))
 }
 
 /// Returns the author of message `id`, if kept.
@@ -431,7 +431,7 @@ pub fn delete(id: u64) -> bool //REMOVE MESSAGE id AND REWRITE THE FILE
     guard.save();
     drop(guard);
 
-    remove_images(orphans);
+    remove_attachments(orphans);
 
     true
 }
@@ -513,10 +513,10 @@ pub fn pinned() -> Vec<StoredMessage> //EVERY PINNED MESSAGE, OLDEST FIRST
     wire(records)
 }
 
-/// Returns whether any record names this picture.
-pub fn has_image(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS PICTURE?
+/// Returns whether any record names this attachment.
+pub fn has_attachment(hash: &[u8; 32]) -> bool //DOES THE HISTORY NAME THIS ATTACHMENT?
 {
-    HISTORY.lock().unwrap().records.iter().any(|message| message.image.as_ref() == Some(hash))
+    HISTORY.lock().unwrap().records.iter().any(|message| message.attachment.as_ref() == Some(hash))
 }
 
 /// Returns the stored voice message whose clip has this hash.
@@ -525,18 +525,18 @@ pub fn voice(hash: &[u8; 32]) -> Option<VoiceNote> //THE STORED VOICE MESSAGE WI
     HISTORY.lock().unwrap().records.iter().find_map(|message| message.voice.as_ref().filter(|voice| voice.hash == *hash)).cloned()
 }
 
-/// Returns whether the server keeps this file at all: as a history picture, an avatar or the
+/// Returns whether the server keeps this file at all: as a history attachment, an avatar or the
 /// server icon.
-pub fn stored(hash: &[u8; 32]) -> bool //IS THIS PICTURE ONE THE SERVER KEEPS AT ALL?
+pub fn stored(hash: &[u8; 32]) -> bool //IS THIS ATTACHMENT ONE THE SERVER KEEPS AT ALL?
 {
-    has_image(hash) || super::users::names_avatar(hash) || super::server_icon().as_ref() == Some(hash)
+    has_attachment(hash) || super::users::names_avatar(hash) || super::server_icon().as_ref() == Some(hash)
 }
 
 //DELETE EVERY PICTURE THE HISTORY DOES NOT NAME
 /// Deletes every file in `server_images/` that nothing names any more.
-pub fn sweep_images()
+pub fn sweep_attachments()
 {
-    let Ok(directory) = fs::read_dir(misc::get_image_dir()) else { return }; //NO DIRECTORY, NOTHING TO SWEEP
+    let Ok(directory) = fs::read_dir(misc::get_attachment_dir()) else { return }; //NO DIRECTORY, NOTHING TO SWEEP
 
     let files: Vec<_> = directory.flatten().map(|entry| entry.path()).collect();
 
@@ -605,7 +605,7 @@ pub fn page(before: Option<u64>, count: usize, budget: usize) -> Page
 //RECORDS AS THE WIRE CARRIES THEM
 /// Converts records into wire messages, attaching each sender's current colors.
 ///
-/// A picture or voice line keeps only the username color, and stored timestamps are hidden
+/// An attachment or voice line keeps only the username color, and stored timestamps are hidden
 /// while `message_timestamps` is off.
 fn wire(records: Vec<Record>) -> Vec<StoredMessage>
 {
@@ -630,7 +630,7 @@ fn wire(records: Vec<Record>) -> Vec<StoredMessage>
                 true => MessageColors { username_color: stored.username_color, message_color: None },
                 false => stored.clone(),
             },
-            image: message.image,
+            attachment: message.attachment,
             timestamp: message.timestamp.filter(|_| timestamps), //HIDDEN WHILE TURNED OFF
             reply: message.reply,
             hearts: message.hearts,

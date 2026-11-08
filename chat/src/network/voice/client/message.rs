@@ -535,7 +535,7 @@ pub fn cancel_recording() //THROW IT AWAY
 //PLAYBACK
 /// Plays a clip from the cache, or requests it from the server.
 ///
-/// A cache miss parks the hash and raises [`ClientEvent::ImageRequest`]; the answer is routed
+/// A cache miss parks the hash and raises [`ClientEvent::AttachmentRequest`]; the answer is routed
 /// back here through [`awaited`] and [`play_data`].
 pub fn play(hash: [u8; 32], tx: Sender<ClientEvent>) //OUT OF THE CACHE, ELSE ASK THE SERVER
 {
@@ -553,7 +553,7 @@ pub fn play(hash: [u8; 32], tx: Sender<ClientEvent>) //OUT OF THE CACHE, ELSE AS
             None =>
             {
                 AWAITED.lock().unwrap().push((hash, generation));
-                tx.send(ClientEvent::ImageRequest { hash }).await.ok();
+                tx.send(ClientEvent::AttachmentRequest { hash }).await.ok();
             },
         }
     });

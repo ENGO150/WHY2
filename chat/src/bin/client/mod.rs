@@ -495,7 +495,7 @@ pub enum Upload
     /// A fileshare.
     File,
     /// A persistent chat attachment.
-    Persistent,
+    Attachment,
     /// Our avatar.
     Avatar,
     /// The server icon.
@@ -554,7 +554,7 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
         {
             Upload::Avatar => PacketCode::AvatarRequest { hash: Some(hash) },
             Upload::Icon => PacketCode::ServerIconSave { hash: Some(hash) },
-            Upload::Persistent => PacketCode::UploadRequest { hash, filename, persistent: true },
+            Upload::Attachment => PacketCode::UploadRequest { hash, filename, persistent: true },
             Upload::File => PacketCode::UploadRequest { hash, filename, persistent: false },
         };
 
@@ -637,7 +637,7 @@ fn cut_avatar(mut file: File) -> Result<([u8; 32], PathBuf), String>
 /// Opens a file to upload and refuses what the server would.
 ///
 /// A fileshare or persistent attachment only has to exist; an avatar or icon must also be under
-/// [`MAX_IMAGE_SIZE`](consts::MAX_IMAGE_SIZE) and have a recognised image header.
+/// [`MAX_ATTACHMENT_SIZE`](consts::MAX_ATTACHMENT_SIZE) and have a recognised image header.
 ///
 /// # Returns
 /// The open file (rewound) and its path, or `Err` with a message for the user.
@@ -654,7 +654,7 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
         return Err(t!("upload.not_found").to_owned());
     }
 
-    if matches!(kind, Upload::File | Upload::Persistent) { return Ok((file, path)); }
+    if matches!(kind, Upload::File | Upload::Attachment) { return Ok((file, path)); }
 
     //READ THE HEADER BEFORE ASKING THE SERVER
     let mut header = Vec::new();
@@ -665,9 +665,9 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
     file.rewind().ok();
 
     //REFUSE AN OVERSIZED IMAGE HERE
-    if path.metadata().map(|m| m.len()).unwrap_or(0) > consts::MAX_IMAGE_SIZE as u64
+    if path.metadata().map(|m| m.len()).unwrap_or(0) > consts::MAX_ATTACHMENT_SIZE as u64
     {
-        return Err(t!("upload.image_too_large", limit = consts::MAX_IMAGE_SIZE / consts::MEGABYTE));
+        return Err(t!("upload.image_too_large", limit = consts::MAX_ATTACHMENT_SIZE / consts::MEGABYTE));
     }
 
     if !misc::is_image(&header) { return Err(t!("upload.not_image").to_owned()); }
@@ -702,7 +702,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                 parameters.as_deref().and_then(|p| p.parse::<u64>().ok()).and_then(|message_id|
                     app.messages.iter().find_map(|entry| match entry
                     {
-                        Entry::Image { message_id: id, hash: Some(hash), filename, .. } if *id == message_id =>
+                        Entry::Attachment { message_id: id, hash: Some(hash), filename, .. } if *id == message_id =>
                             Some((message_id, *hash, filename.clone())),
                         _ => None,
                     }))
@@ -872,7 +872,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             Some(path) =>
                             {
                                 let (path, persistent) = command::upload_parameters(&path);
-                                let kind = if persistent { Upload::Persistent } else { Upload::File };
+                                let kind = if persistent { Upload::Attachment } else { Upload::File };
 
                                 if let Err(error) = upload(write_stream, &path, kind, None) { app.push_styled(error, theme::error()); }
                             },

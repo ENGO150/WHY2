@@ -296,7 +296,7 @@ pub async fn digest_and_decode(data: Arc<Vec<u8>>) -> ([u8; 32], Option<Animatio
 /// Loads a picture from the cache, or asks for it to be fetched from the server.
 ///
 /// Spawns a task that answers with [`ClientEvent::ImageData`] on a cache hit, or
-/// [`ClientEvent::ImageRequest`] on a miss, which the UI turns into a server request.
+/// [`ClientEvent::AttachmentRequest`] on a miss, which the UI turns into a server request.
 ///
 /// # Parameters
 /// - `hash`: The picture's SHA-256.
@@ -316,7 +316,7 @@ pub fn fetch_image(hash: [u8; 32], tx: Sender<ClientEvent>)
         tx.send(match cached
         {
             Some(image) => ClientEvent::ImageData { hash, image: Some(image) },
-            None => ClientEvent::ImageRequest { hash },
+            None => ClientEvent::AttachmentRequest { hash },
         }).await.unwrap();
     });
 }

@@ -35,7 +35,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! time from its dimensions alone; it is only fitted to the pane and handed to the terminal while
 //! within reach of the view ([`App::load_visible`]), and put down again when it leaves. Pictures
 //! not yet loaded are fetched from the cache or the server as they come within reach, a few at a
-//! time ([`App::take_image_requests`]).
+//! time ([`App::take_attachment_requests`]).
 
 use std::
 {
@@ -173,9 +173,9 @@ pub enum Entry //ONE ROW OF HISTORY
     /// A file transfer and its progress.
     Transfer(Transfer),
 
-    //A PICTURE AND ITS CAPTION
-    /// A picture and its caption.
-    Image
+    //AN ATTACHMENT AND ITS OPTIONAL IMAGE PREVIEW
+    /// An attachment and its optional image preview.
+    Attachment
     {
         username: String,
         filename: String,
@@ -212,7 +212,7 @@ impl Entry
     {
         match self
         {
-            Entry::Message { message_id, .. } | Entry::History { message_id, .. } | Entry::Image { message_id, .. }
+            Entry::Message { message_id, .. } | Entry::History { message_id, .. } | Entry::Attachment { message_id, .. }
                 | Entry::Voice { message_id, .. } => Some(*message_id),
             _ => None,
         }
@@ -223,7 +223,7 @@ impl Entry
     {
         match self
         {
-            Entry::Message { username, .. } | Entry::History { username, .. } | Entry::Image { username, .. }
+            Entry::Message { username, .. } | Entry::History { username, .. } | Entry::Attachment { username, .. }
                 | Entry::Voice { username, .. } => Some(username),
             _ => None,
         }
@@ -234,7 +234,7 @@ impl Entry
     {
         match self
         {
-            Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. }
+            Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Attachment { hearts, .. }
                 | Entry::Voice { hearts, .. } => hearts,
             _ => &[],
         }
@@ -243,21 +243,21 @@ impl Entry
     /// Replaces who hearted it.
     fn set_hearts(&mut self, new: Vec<String>) //REPLACE WHO HEARTED IT
     {
-        if let Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Image { hearts, .. }
+        if let Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Attachment { hearts, .. }
             | Entry::Voice { hearts, .. } = self { *hearts = new; }
     }
 
     /// Returns whether a moderator pinned it.
     pub fn pinned(&self) -> bool //PINNED BY A MODERATOR
     {
-        matches!(self, Entry::Message { pinned: true, .. } | Entry::History { pinned: true, .. } | Entry::Image { pinned: true, .. }
+        matches!(self, Entry::Message { pinned: true, .. } | Entry::History { pinned: true, .. } | Entry::Attachment { pinned: true, .. }
             | Entry::Voice { pinned: true, .. })
     }
 
     /// Pins or unpins it.
     fn set_pinned(&mut self, new: bool) //PIN OR UNPIN IT
     {
-        if let Entry::Message { pinned, .. } | Entry::History { pinned, .. } | Entry::Image { pinned, .. }
+        if let Entry::Message { pinned, .. } | Entry::History { pinned, .. } | Entry::Attachment { pinned, .. }
             | Entry::Voice { pinned, .. } = self { *pinned = new; }
     }
 
@@ -290,7 +290,7 @@ impl Entry
     /// Returns whether it takes part in the alternating stripes (somebody's message, not our output).
     pub fn striped(&self) -> bool //WHETHER IT TAKES PART IN THE STRIPES
     {
-        matches!(self, Entry::Message { .. } | Entry::History { .. } | Entry::Private { .. } | Entry::Image { .. } | Entry::Voice { .. })
+        matches!(self, Entry::Message { .. } | Entry::History { .. } | Entry::Private { .. } | Entry::Attachment { .. } | Entry::Voice { .. })
     }
 }
 
@@ -333,8 +333,6 @@ pub struct Transfer //A FILE ON ITS WAY, IN OR OUT
     pub uid: u64,              //WHAT A PROGRESS TICK NAMES
     /// Whether it is an upload.
     pub upload: bool,          //WHICH WAY IT GOES
-    /// Whether it is a picture.
-    pub image: bool,           //WHAT TO CALL IT
     /// The file's name.
     pub filename: String,
     /// Bytes done.
@@ -536,7 +534,7 @@ pub struct App
 
     //PICTURES TO ASK THE SERVER FOR
     /// Pictures to request from the server.
-    pub image_requests: Vec<[u8; 32]>,
+    pub attachment_requests: Vec<[u8; 32]>,
 
     //PICTURES THAT SCROLLED INTO VIEW, TO LOAD OUT OF THE CACHE
     /// Pictures that came within reach, to load from the cache.
@@ -669,7 +667,7 @@ impl App
             list_requested: false,
             #[cfg(feature = "client_screen")]
             screens_requested: false,
-            image_requests: Vec::new(),
+            attachment_requests: Vec::new(),
             image_loads: Vec::new(),
             image_fetching: Vec::new(),
             history_anchor: None,
@@ -978,9 +976,9 @@ impl App
     ///
     /// A request whose caption has left reach is dropped and its caption goes back to
     /// [`Picture::Deferred`].
-    pub fn take_image_requests(&mut self) -> Vec<[u8; 32]>
+    pub fn take_attachment_requests(&mut self) -> Vec<[u8; 32]>
     {
-        if self.image_requests.is_empty() { return Vec::new(); }
+        if self.attachment_requests.is_empty() { return Vec::new(); }
 
         let drawn = self.pane.height > 0;
         let visible = match drawn
@@ -992,10 +990,10 @@ impl App
         let mut send = Vec::new();
         let mut queued = Vec::new();
 
-        for hash in mem::take(&mut self.image_requests)
+        for hash in mem::take(&mut self.attachment_requests)
         {
             let waiting: Vec<usize> = self.messages.iter().enumerate()
-                .filter(|(_, entry)| matches!(entry, Entry::Image { hash: Some(h), picture: Picture::Waiting, .. } if *h == hash))
+                .filter(|(_, entry)| matches!(entry, Entry::Attachment { hash: Some(h), picture: Picture::Waiting, .. } if *h == hash))
                 .map(|(entry, _)| entry)
                 .collect();
 
@@ -1004,7 +1002,7 @@ impl App
             {
                 for entry in waiting
                 {
-                    if let Some(Entry::Image { picture, .. }) = self.messages.get_mut(entry) { *picture = Picture::Deferred; }
+                    if let Some(Entry::Attachment { picture, .. }) = self.messages.get_mut(entry) { *picture = Picture::Deferred; }
                 }
 
                 continue;
@@ -1022,7 +1020,7 @@ impl App
             }
         }
 
-        self.image_requests = queued;
+        self.attachment_requests = queued;
 
         send
     }
@@ -1053,14 +1051,14 @@ impl App
     {
         let picture = self.fit(image);
 
-        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new(), pinned: false });
+        self.push_entry(Entry::Attachment { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new(), pinned: false });
     }
 
     //A TRANSFER STARTING
     /// Appends a transfer to the pane.
-    pub fn push_transfer(&mut self, uid: u64, filename: String, total: u64, upload: bool, image: bool)
+    pub fn push_transfer(&mut self, uid: u64, filename: String, total: u64, upload: bool)
     {
-        self.push_entry(Entry::Transfer(Transfer { uid, upload, image, filename, done: 0, total, outcome: None }));
+        self.push_entry(Entry::Transfer(Transfer { uid, upload, filename, done: 0, total, outcome: None }));
     }
 
     //MOVE A TRANSFER'S BAR ALONG
@@ -1109,7 +1107,7 @@ impl App
     pub fn push_caption(&mut self, username: String, filename: String, message_id: u64, timestamp: Option<u64>,
         hash: [u8; 32], picture: Picture, username_color: Option<u8>)
     {
-        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new(), pinned: false });
+        self.push_entry(Entry::Attachment { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new(), pinned: false });
     }
 
     //A VOICE MESSAGE, HERE OR IN ITS OWN CHANNEL'S PANE
@@ -1233,7 +1231,7 @@ impl App
     /// Handles a click on a caption: marks it waiting and returns the hash to fetch.
     pub fn request_image(&mut self, entry: usize) -> Option<[u8; 32]>
     {
-        let Some(Entry::Image { hash, picture, .. }) = self.messages.get_mut(entry) else { return None };
+        let Some(Entry::Attachment { hash, picture, .. }) = self.messages.get_mut(entry) else { return None };
 
         if !matches!(picture, Picture::Absent | Picture::Gone) { return None; }
 
@@ -1259,7 +1257,7 @@ impl App
 
         let waiting = self.messages.iter().position(|entry| match entry
         {
-            Entry::Image { hash: Some(h), picture: slot, .. } if *h == hash => match asked
+            Entry::Attachment { hash: Some(h), picture: slot, .. } if *h == hash => match asked
             {
                 true => matches!(slot, Picture::Waiting),
                 false => matches!(slot, Picture::Absent | Picture::Waiting),
@@ -1270,7 +1268,7 @@ impl App
 
         let Some(entry) = waiting else { return };
 
-        if let Some(Entry::Image { picture: slot, .. }) = self.messages.get_mut(entry) { *slot = picture; }
+        if let Some(Entry::Attachment { picture: slot, .. }) = self.messages.get_mut(entry) { *slot = picture; }
 
         self.generation += 1;
         self.dirty = true;
@@ -1441,7 +1439,7 @@ impl App
 
         for entry in visible
         {
-            let Some(Entry::Image { picture: Picture::Ready(ready), .. }) = self.messages.get_mut(entry)
+            let Some(Entry::Attachment { picture: Picture::Ready(ready), .. }) = self.messages.get_mut(entry)
                 else { continue };
 
             //A STILL NEVER ADVANCES
@@ -1491,7 +1489,7 @@ impl App
         {
             let visible = in_reach(&placement, offset, height);
 
-            let Some(Entry::Image { hash, picture, .. }) = self.messages.get_mut(placement.entry)
+            let Some(Entry::Attachment { hash, picture, .. }) = self.messages.get_mut(placement.entry)
                 else { continue };
 
             match picture
@@ -1626,7 +1624,7 @@ impl App
         //AN ANSWER WOULD LAND IN THE WRONG PANE
         for entry in parked.iter_mut()
         {
-            if let Entry::Image { picture: picture @ Picture::Waiting, .. } = entry { *picture = Picture::Deferred; }
+            if let Entry::Attachment { picture: picture @ Picture::Waiting, .. } = entry { *picture = Picture::Deferred; }
         }
 
         if !parked.is_empty() { self.panes.insert(mem::take(&mut self.channel), parked); }
@@ -1748,7 +1746,7 @@ impl App
         self.list_requested = false;
         #[cfg(feature = "client_screen")]
         { self.screens_requested = false; }
-        self.image_requests.clear();
+        self.attachment_requests.clear();
         self.image_loads.clear();
         self.image_fetching.clear();
         self.history_anchor = None;
@@ -1835,7 +1833,7 @@ impl App
 
     //WHICH IMAGE'S CAPTION IS UNDER THE POINTER
     /// Returns the picture entry whose caption is under a pane cell.
-    pub fn image_at(&mut self, column: u16, row: u16) -> Option<usize>
+    pub fn attachment_at(&mut self, column: u16, row: u16) -> Option<usize>
     {
         let pane = self.pane;
 
@@ -2200,7 +2198,7 @@ impl App
             tints[row as usize..].fill(tint);
 
             //AN IMAGE RESERVES ITS ROWS AS BLANK LINES
-            if let Entry::Image { picture, .. } = &mut self.messages[entry]
+            if let Entry::Attachment { picture, .. } = &mut self.messages[entry]
             {
                 let caption = row;
                 let row = lines.len() as u16;

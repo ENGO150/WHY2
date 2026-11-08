@@ -201,13 +201,10 @@ older = "%d-%m-%Y %H:%M"
 
 [transfer]
 uploading_file = "Bestand \"{filename}\" uploaden"
-uploading_image = "Afbeelding \"{filename}\" uploaden"
 downloading = "Bestand \"{filename}\" downloaden"
 uploaded_file = "Bestand \"{filename}\" geüpload"
-uploaded_image = "Afbeelding \"{filename}\" geüpload"
 downloaded = "Bestand \"{filename}\" gedownload"
 failed_file = "Overdracht van bestand \"{filename}\" mislukt"
-failed_image = "Overdracht van afbeelding \"{filename}\" mislukt"
 unknown_file = "Onbekend"
 
 [pane]

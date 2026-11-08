@@ -157,7 +157,7 @@ clients. Only the first drop of a run is logged. Known gap: this sits after `voi
 bounds fan-out, not per-datagram decrypt; a source-address bucket ahead of decrypt would be needed.
 
 Auxiliary TCP sockets (file, screen, attach) have no packets-per-second cap: a packet is payload
-there, so a cap would be a throughput cap. They are bounded by `max_upload_size`, `MAX_IMAGE_SIZE`,
+there, so a cap would be a throughput cap. They are bounded by `max_upload_size`, `MAX_ATTACHMENT_SIZE`,
 `max_client_parallel_uploads`, `VIEWER_CHANNEL_BOUND`, `SOCKET_BUFFER`, and by requiring a token
 minted over the main connection.
 
@@ -188,7 +188,7 @@ no channel filter on the server.
 
 Images:
 
-- `MAX_IMAGE_SIZE` (8 MB) bounds bytes on the wire, not decode cost. Decode through `ImageReader`
+- `MAX_ATTACHMENT_SIZE` (8 MB) bounds bytes on the wire, not decode cost. Decode through `ImageReader`
   with `MAX_IMAGE_DIMENSION` and `MAX_IMAGE_ALLOC`; **never** `load_from_memory` (its 512 MB
   default caps one picture, not a flood). `PacketCode::Image` stays in the spam window.
 - Decoded results are `Animation` (`Vec<ImageFrame>`). GIF, animated WebP and APNG use
@@ -200,15 +200,15 @@ Images:
   `crypto::disk_tag`); fileshares are not, because their key is ephemeral and they stream out.
 - **Chunking is part of the format:** `UPLOAD_CHUNK_SIZE` is 1,000,000 bytes (10^6, not 2^20), so
   it is 1953.125 grids of 512 bytes. A `RexStream` finalized mid-file advances the counter, so
-  `read_image` must break the file exactly where the upload did. Do not assume one `update` over
+  `read_attachment` must break the file exactly where the upload did. Do not assume one `update` over
   the whole file is equivalent.
 - `ImageDisplay` carries a hash and optional payload. Known pictures are sent as `data: None`
   (clients fetch if missing); unknown ones go whole. The client cache is keyed by content and
   scoped by the server fingerprint (`options::get_fingerprint`), so one server cannot probe
   another's cache. The hash is re-taken over received bytes, never trusted. Cache files are
   encrypted/authenticated under `fingerprint || hash`; an invalid file is deleted so the next fetch
-  refills it. `MAX_IMAGE_CACHE` evicts by mtime.
-- Replayed pictures load when looked at (cache first, then `ImageDataRequest`), using
+  refills it. `MAX_ATTACHMENT_CACHE` evicts by mtime.
+- Replayed pictures load when looked at (cache first, then `AttachmentDataRequest`), using
   `PRELOAD_SCREENS` lookahead. With `auto_show_images` off, live and replayed pictures appear as
   `[ show ]` captions (`Picture::Absent`) and clicks go through the cache first.
 
@@ -222,7 +222,7 @@ Voice messages reuse the image machinery (`/record`, `/play`):
   server-side. `MAX_VOICE_MESSAGE_SIZE` is 6 MB.
 - Voice messages have their own packets/history field (`VoiceMessage*`, `Record::voice`,
   `StoredMessage::voice`), not an image flag. `messages::stored()` stays pictures-only;
-  `messages::voice(hash)` answers clips; `ImageDataRequest` serves either.
+  `messages::voice(hash)` answers clips; `AttachmentDataRequest` serves either.
 - Recording bypasses denoise/VAD/AGC (only mic volume applies). It taps the call when one exists;
   otherwise it opens `input_device` on a blocking thread. Encoding happens in the capture callback
   with `try_lock`, never blocking realtime audio.

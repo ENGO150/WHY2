@@ -200,13 +200,10 @@ older = "%d.%m.%Y %H:%M"
 
 [transfer]
 uploading_file = "\"{filename}\" dosyası yükleniyor"
-uploading_image = "\"{filename}\" resmi yükleniyor"
 downloading = "\"{filename}\" dosyası indiriliyor"
 uploaded_file = "\"{filename}\" dosyası yüklendi"
-uploaded_image = "\"{filename}\" resmi yüklendi"
 downloaded = "\"{filename}\" dosyası indirildi"
 failed_file = "\"{filename}\" dosyasının aktarımı başarısız oldu"
-failed_image = "\"{filename}\" resminin aktarımı başarısız oldu"
 unknown_file = "Bilinmiyor"
 
 [pane]

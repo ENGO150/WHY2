@@ -214,13 +214,10 @@ older = "%Y-%m-%d %H:%M"
 
 [transfer]
 uploading_file = "Uploading file \"{filename}\""
-uploading_image = "Uploading image \"{filename}\""
 downloading = "Downloading file \"{filename}\""
 uploaded_file = "Uploaded file \"{filename}\""
-uploaded_image = "Uploaded image \"{filename}\""
 downloaded = "Downloaded file \"{filename}\""
 failed_file = "Transferring file \"{filename}\" failed"
-failed_image = "Transferring image \"{filename}\" failed"
 unknown_file = "Unknown"
 
 [pane]

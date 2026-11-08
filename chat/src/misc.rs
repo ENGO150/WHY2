@@ -268,11 +268,11 @@ pub fn get_upload_dir(username: &str) -> PathBuf //GET USER'S TEMP DIR FOR UPLOA
     env::temp_dir().join(consts::UPLOADS_DIR).join(username)
 }
 
-/// Returns the directory holding the server's sealed persistent pictures.
+/// Returns the directory holding the server's sealed persistent attachments.
 #[cfg(feature = "server")]
-pub fn get_image_dir() -> PathBuf //DIRECTORY FOR PERSISTENT IMAGES
+pub fn get_attachment_dir() -> PathBuf //DIRECTORY FOR PERSISTENT ATTACHMENTS
 {
-    PathBuf::from(get_why2_dir() + consts::SERVER_IMAGES_DIR)
+    PathBuf::from(get_why2_dir() + consts::SERVER_ATTACHMENTS_DIR)
 }
 
 /// Decodes a 64-character hex string into a 32-byte hash.
@@ -334,11 +334,11 @@ pub fn drop_upload_temp(path: &Path) //REMOVE ONE, IF THAT IS WHAT path IS
     if ours { let _ = fs::remove_file(path); }
 }
 
-/// Returns the image cache directory scoped to one server fingerprint.
+/// Returns the attachment cache directory scoped to one server fingerprint.
 #[cfg(feature = "client_base")]
-pub fn get_image_cache_dir(fingerprint: &str) -> PathBuf //DIRECTORY FOR ONE SERVER'S CACHED IMAGES
+pub fn get_attachment_cache_dir(fingerprint: &str) -> PathBuf //DIRECTORY FOR ONE SERVER'S CACHED ATTACHMENTS
 {
-    PathBuf::from(get_why2_dir() + consts::CLIENT_IMAGES_DIR).join(fingerprint)
+    PathBuf::from(get_why2_dir() + consts::CLIENT_ATTACHMENTS_DIR).join(fingerprint)
 }
 
 /// Restarts the server process with the same arguments.

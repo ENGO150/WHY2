@@ -560,7 +560,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
             },
 
             Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, device, role,
-                id, attached_screen, last_activity, last_image, last_typing, last_pm, channel, seq, server_seq, peer_addr, alive,
+                id, attached_screen, last_activity, last_attachment, last_typing, last_pm, channel, seq, server_seq, peer_addr, alive,
                 muted, credit, refill, throttles, .. } =>
             {
                 Connection::Authenticated
@@ -578,7 +578,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     attached_screen,
                     last_activity,
                     last_key_exchange: Instant::now(),
-                    last_image,
+                    last_attachment,
                     last_typing,
                     last_pm,
                     spam_violations: 0,
@@ -599,7 +599,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
 /// Promotes a connection to [`Authenticated`](Connection::Authenticated) and gives it a shared
 /// file list.
 ///
-/// The rate limits start fresh: the message gap and image and typing timers start satisfied, and
+/// The rate limits start fresh: the message gap and attachment and typing timers start satisfied, and
 /// the packet bucket full.
 fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<Device>, role: Role, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
 {
@@ -621,7 +621,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<D
             attached_screen: None,
             last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
             last_key_exchange: old_connection.last_key_exchange().copied().unwrap_or_else(Instant::now),
-            last_image: Instant::now() - consts::IMAGE_REQUEST_DELAY,
+            last_attachment: Instant::now() - consts::ATTACHMENT_REQUEST_DELAY,
             last_typing: Instant::now() - consts::TYPING_INTERVAL,
             last_pm: old_connection.last_pm(),
             spam_violations: 0,
@@ -670,7 +670,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             attached_screen: old_connection.attached_screen().clone(),
             last_activity: Instant::now(),
             last_key_exchange: *old_connection.last_key_exchange().unwrap(),
-            last_image: *old_connection.last_image().unwrap(),
+            last_attachment: *old_connection.last_attachment().unwrap(),
             last_typing: *old_connection.last_typing().unwrap(),
             last_pm: old_connection.last_pm(),
             spam_violations: *old_connection.spam_violations().unwrap(),

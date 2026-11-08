@@ -29,7 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! never needs to see a [`PacketCode`].
 //!
 //! # Pictures
-//! An [`ImageDisplay`](PacketCode::ImageDisplay) is resolved here as far as the protocol can
+//! An [`AttachmentDisplay`](PacketCode::AttachmentDisplay) is resolved here as far as the protocol can
 //! take it: bytes that arrived are hashed and cached, then decoded off the async runtime when
 //! `auto_show_images` is on, or offered to be requested on demand when it is off; a picture without bytes is
 //! looked up in the cache before the UI is asked to fetch it. A picture for another channel is
@@ -493,8 +493,8 @@ pub enum ClientEvent
         /// The file size.
         size: u64,
     },                                                           //UPLOADING FILE (UID, NAME, SIZE)
-    /// Our picture upload started.
-    Image
+    /// Our persistent attachment upload started.
+    Attachment
     {
         /// The upload id.
         uid: u64,
@@ -502,7 +502,7 @@ pub enum ClientEvent
         filename: String,
         /// The file size.
         size: u64,
-    },                                                           //UPLOADING IMAGE (UID, NAME, SIZE)
+    },                                                           //UPLOADING ATTACHMENT (UID, NAME, SIZE)
     /// A picture, decoded and ready to draw.
     ImageDisplay
     {
@@ -529,60 +529,60 @@ pub enum ClientEvent
         /// The decoded frames, if it is coming.
         image: Option<Animation>,
     },                                                           //A HISTORY IMAGE THAT WAS ASKED FOR (None = NOT COMING)
-    /// A picture on its way from the server.
-    ImagePending
+    /// An attachment on its way from the server.
+    AttachmentPending
     {
         /// The sender's username.
         username: String,
-        /// The picture's file name.
+        /// The attachment's file name.
         filename: String,
         /// The message's id.
         message_id: u64,
         /// When it was sent, in Unix seconds.
         timestamp: Option<u64>,
-        /// The picture's SHA-256.
+        /// The attachment's SHA-256.
         hash: [u8; 32],
         /// The sender's username color.
         username_color: Option<u8>,
-    },                                                           //SOMEBODY'S IMAGE, ASKED FOR AND ON ITS WAY
-    /// A picture waiting to be asked for (`auto_show_images` off).
-    ImageOffer
+    },                                                           //SOMEBODY'S ATTACHMENT, ASKED FOR AND ON ITS WAY
+    /// An attachment waiting to be fetched (`auto_show_images` off).
+    AttachmentOffer
     {
         /// The sender's username.
         username: String,
-        /// The picture's file name.
+        /// The attachment's file name.
         filename: String,
         /// The message's id.
         message_id: u64,
         /// When it was sent, in Unix seconds.
         timestamp: Option<u64>,
-        /// The picture's SHA-256.
+        /// The attachment's SHA-256.
         hash: [u8; 32],
         /// The sender's username color.
         username_color: Option<u8>,
-    },                                                           //SOMEBODY'S IMAGE, WAITING TO BE ASKED FOR
-    /// A picture posted in another channel.
-    ImageParked
+    },                                                           //SOMEBODY'S ATTACHMENT, WAITING TO BE ASKED FOR
+    /// An attachment posted in another channel.
+    AttachmentParked
     {
         /// The channel it was posted in.
         channel: String,
         /// The sender's username.
         username: String,
-        /// The picture's file name.
+        /// The attachment's file name.
         filename: String,
         /// The message's id.
         message_id: u64,
         /// When it was sent, in Unix seconds.
         timestamp: Option<u64>,
-        /// The picture's SHA-256.
+        /// The attachment's SHA-256.
         hash: [u8; 32],
         /// The sender's username color.
         username_color: Option<u8>,
-    },                                                           //SOMEBODY'S IMAGE IN ANOTHER CHANNEL (CHANNEL FIRST)
-    /// A picture the cache could not answer; the front end should request it from the server.
-    ImageRequest
+    },                                                           //SOMEBODY'S ATTACHMENT IN ANOTHER CHANNEL (CHANNEL FIRST)
+    /// An attachment the cache could not answer; the front end should request it from the server.
+    AttachmentRequest
     {
-        /// The picture's SHA-256.
+        /// The attachment's SHA-256.
         hash: [u8; 32],
     },                                                           //A CLICKED CAPTION THE CACHE COULD NOT ANSWER
     /// Cutting our avatar or the server icon failed, with the reason.
@@ -591,12 +591,12 @@ pub enum ClientEvent
         /// Why it failed.
         error: String,
     },                                                           //CUTTING OUR AVATAR OR SERVER ICON FAILED
-    /// A picture that would not decode.
-    ImageFailed
+    /// An attachment without a decodable image preview.
+    AttachmentPreviewUnavailable
     {
         /// The sender's username.
         username: String,
-        /// The picture's file name.
+        /// The attachment's file name.
         filename: String,
         /// The message's id.
         message_id: u64,
@@ -606,7 +606,7 @@ pub enum ClientEvent
         timestamp: Option<u64>,
         /// The sender's username color.
         username_color: Option<u8>,
-    },                                                           //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
+    },                                                           //AN ATTACHMENT WITHOUT AN IMAGE PREVIEW
     /// A voice message.
     VoiceMessage
     {
@@ -1206,12 +1206,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //UPLOAD APPROVAL
-            PacketCode::Upload { hash, token, uid } | PacketCode::Image { hash, token, uid, .. }
+            PacketCode::Upload { hash, token, uid } | PacketCode::Attachment { hash, token, uid, .. }
                 | PacketCode::VoiceMessageUpload { hash, token, uid } =>
             {
                 let kind = match read
                 {
-                    PacketCode::Image { .. } => UploadKind::Image,
+                    PacketCode::Attachment { .. } => UploadKind::Attachment,
                     PacketCode::VoiceMessageUpload { .. } => UploadKind::Voice,
                     _ => UploadKind::File,
                 };
@@ -1222,8 +1222,8 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 continue;
             },
 
-            //DUPLICATE IMAGE
-            PacketCode::ImageDuplicate { hash } =>
+            //DUPLICATE ATTACHMENT
+            PacketCode::AttachmentDuplicate { hash } =>
             {
                 if let Some(path) = ACTIVE_UPLOADS.lock().unwrap().remove(&hash) { misc::drop_upload_temp(&path); }
                 continue;
@@ -1244,11 +1244,11 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 tx.send(ClientEvent::Banned { username }).await.unwrap();
             },
 
-            //SOMEBODY'S IMAGE
+            //SOMEBODY'S ATTACHMENT
             //ONE OF THOSE, DECODED OFF THE LOOP
-            PacketCode::ImageData { hash, data } =>
+            PacketCode::AttachmentData { hash, data } =>
             {
-                let image_tx = tx.clone();
+                let attachment_tx = tx.clone();
 
                 //A CLIP ASKED FOR TO PLAY
                 #[cfg(feature = "client_voice")]
@@ -1264,12 +1264,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                         }).await.expect("Hashing voice message panicked");
 
                         let valid = digest == hash && !data.is_empty();
-                        image_tx.send(ClientEvent::VoiceData { hash, valid }).await.unwrap();
+                        attachment_tx.send(ClientEvent::VoiceData { hash, valid }).await.unwrap();
 
                         if !valid { return; }
 
                         cache::store(&hash, &data).await;
-                        voice_message::play_data(hash, Arc::unwrap_or_clone(data), generation, image_tx).await;
+                        voice_message::play_data(hash, Arc::unwrap_or_clone(data), generation, attachment_tx).await;
                     });
 
                     continue;
@@ -1281,16 +1281,16 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     let (digest, image) = image::digest_and_decode(data.clone()).await;
                     if digest == hash { cache::store(&hash, &data).await; }
 
-                    image_tx.send(ClientEvent::ImageData { hash, image }).await.unwrap();
+                    attachment_tx.send(ClientEvent::ImageData { hash, image }).await.unwrap();
                 });
 
                 continue;
             },
 
             //EITHER THE PICTURE OR THE OFFER OF IT
-            PacketCode::ImageDisplay { username, filename, message_id, hash, data, username_color, channel, timestamp } =>
+            PacketCode::AttachmentDisplay { username, filename, message_id, hash, data, username_color, channel, timestamp } =>
             {
-                let image_tx = tx.clone();
+                let attachment_tx = tx.clone();
 
                 //ANOTHER CHANNEL'S PICTURE: CACHE IT, DECODE NOTHING
                 let elsewhere = channel.map(Option::unwrap_or_default).filter(|channel| *channel != options::get_channel());
@@ -1311,9 +1311,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                             cache::store(&digest, &data).await;
                         }
 
-                        image_tx.send(match elsewhere
+                        attachment_tx.send(match elsewhere
                         {
-                            Some(channel) => ClientEvent::ImageParked
+                            Some(channel) => ClientEvent::AttachmentParked
                             {
                                 channel,
                                 username,
@@ -1323,7 +1323,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                                 hash,
                                 username_color,
                             },
-                            None => ClientEvent::ImageOffer
+                            None => ClientEvent::AttachmentOffer
                             {
                                 username,
                                 filename,
@@ -1350,7 +1350,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     let Some(data) = data else
                     {
                         //ASK FROM THE EVENT LOOP, WHICH OWNS THE WRITE HALF
-                        image_tx.send(ClientEvent::ImagePending
+                        attachment_tx.send(ClientEvent::AttachmentPending
                         {
                             username,
                             filename,
@@ -1380,7 +1380,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                             .await.expect("Decoding image panicked"),
                     };
 
-                    image_tx.send(match image
+                    attachment_tx.send(match image
                     {
                         Some(image) => ClientEvent::ImageDisplay
                         {
@@ -1392,7 +1392,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                             image,
                             username_color,
                         },
-                        None => ClientEvent::ImageFailed { username, filename, message_id, hash, timestamp, username_color },
+                        None => ClientEvent::AttachmentPreviewUnavailable { username, filename, message_id, hash, timestamp, username_color },
                     }).await.unwrap();
                 });
 

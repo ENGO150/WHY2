@@ -16,26 +16,26 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//! # Client Image Cache
+//! # Client Attachment Cache
 //!
-//! Every picture (and voice clip) the client has seen, stored by content hash so a replayed or
+//! Every attachment (and voice clip) the client has seen, stored by content hash so a replayed or
 //! reposted one needs no transfer at all.
 //!
 //! # Scoping
 //! The cache is split per server, by the fingerprint of its identity
 //! ([`options::get_fingerprint`]). Over one shared cache a server could name any hash and watch
-//! whether the client fetches it — an oracle over every picture seen anywhere. Keying on the
-//! identity rather than the address also keeps a server's pictures when it moves.
+//! whether the client fetches it — an oracle over every attachment seen anywhere. Keying on the
+//! identity rather than the address also keeps a server's attachments when it moves.
 //!
 //! # At-Rest Protection
 //! Each file is a [`RexStream`] ciphertext followed by an HMAC-SHA256 tag, under keys derived
 //! from `fingerprint || hash` ([`crypto::cache_keys`]). The tag proves three things at once:
-//! that this client wrote the file, that it is whole, and that it is the picture its name
+//! that this client wrote the file, that it is whole, and that it is the attachment its name
 //! promises. A file that fails to verify is deleted, so a half-written or tampered file is
 //! refilled on the next fetch instead of poisoning that hash forever.
 //!
 //! # Bound
-//! The cache is capped at [`MAX_IMAGE_CACHE`](consts::MAX_IMAGE_CACHE). A write that exceeds
+//! The cache is capped at [`MAX_ATTACHMENT_CACHE`](consts::MAX_ATTACHMENT_CACHE). A write that exceeds
 //! it evicts the least recently used files, by modification time; every hit touches its file.
 
 use std::
@@ -77,14 +77,14 @@ fn scope(hash: &[u8; 32]) -> Option<(String, PathBuf)>
 
     if fingerprint.is_empty() { return None; }
 
-    let path = misc::get_image_cache_dir(&fingerprint).join(misc::hex(hash));
+    let path = misc::get_attachment_cache_dir(&fingerprint).join(misc::hex(hash));
 
     Some((fingerprint, path))
 }
 
 //DROP THE OLDEST FILES UNTIL THE CACHE FITS
 /// Deletes the oldest files in a cache directory until it fits
-/// [`MAX_IMAGE_CACHE`](consts::MAX_IMAGE_CACHE).
+/// [`MAX_ATTACHMENT_CACHE`](consts::MAX_ATTACHMENT_CACHE).
 async fn evict(directory: &PathBuf)
 {
     let Ok(mut entries) = fs::read_dir(directory).await else { return };
@@ -103,20 +103,20 @@ async fn evict(directory: &PathBuf)
         files.push((modified, metadata.len(), entry.path()));
     }
 
-    if total <= consts::MAX_IMAGE_CACHE { return; }
+    if total <= consts::MAX_ATTACHMENT_CACHE { return; }
 
     files.sort_by_key(|(modified, ..)| *modified);
 
     for (_, size, path) in files
     {
-        if total <= consts::MAX_IMAGE_CACHE { break; }
+        if total <= consts::MAX_ATTACHMENT_CACHE { break; }
 
         if fs::remove_file(&path).await.is_ok() { total = total.saturating_sub(size); }
     }
 }
 
-//SEAL ONE PICTURE FOR DISK: ENCRYPT-THEN-MAC
-/// Encrypts and authenticates one picture for disk: `ciphertext || tag`.
+//SEAL ONE ATTACHMENT FOR DISK: ENCRYPT-THEN-MAC
+/// Encrypts and authenticates one attachment for disk: `ciphertext || tag`.
 fn seal(fingerprint: &str, hash: &[u8; 32], data: &[u8]) -> Option<Vec<u8>>
 {
     let (key, nonce, mac_key) = crypto::cache_keys(fingerprint, hash);
@@ -137,17 +137,17 @@ fn seal(fingerprint: &str, hash: &[u8; 32], data: &[u8]) -> Option<Vec<u8>>
 }
 
 //PUBLIC
-//READ ONE CACHED PICTURE BACK, VERIFYING IT
-/// Reads one cached picture back, verifying it.
+//READ ONE CACHED ATTACHMENT BACK, VERIFYING IT
+/// Reads one cached attachment back, verifying it.
 ///
 /// A file that does not verify is deleted. A hit refreshes the file's modification time for the
 /// eviction order.
 ///
 /// # Parameters
-/// - `hash`: The SHA-256 of the picture.
+/// - `hash`: The SHA-256 of the attachment.
 ///
 /// # Returns
-/// - `Some(bytes)` with the original picture.
+/// - `Some(bytes)` with the original attachment.
 /// - `None` on a miss, before a handshake, or if the file failed verification.
 pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
 {
@@ -170,8 +170,8 @@ pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
     let mut decrypted = disk_stream.update(&crypto::bytes_to_i64(ciphertext)).ok()?;
     decrypted.extend(disk_stream.finalize().ok()?);
 
-    let mut image = crypto::i64_to_bytes(&decrypted);
-    image.truncate(ciphertext.len());
+    let mut data = crypto::i64_to_bytes(&decrypted);
+    data.truncate(ciphertext.len());
 
     //TOUCH THE FILE FOR THE EVICTION ORDER
     if let Ok(file) = std::fs::File::options().write(true).open(&path)
@@ -179,7 +179,7 @@ pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
         let _ = file.set_times(FileTimes::new().set_modified(SystemTime::now()));
     }
 
-    Some(image)
+    Some(data)
 }
 
 //COPY A VERIFIED CACHED FILE WITHOUT KEEPING ITS PLAINTEXT IN MEMORY
@@ -260,14 +260,14 @@ pub async fn copy(hash: &[u8; 32], target: &Path) -> Option<io::Result<u64>>
 }
 
 //SEAL AND STORE THE BYTES OFF THE WIRE
-/// Seals and stores a picture under its hash, then evicts if the cache is over its bound.
+/// Seals and stores a attachment under its hash, then evicts if the cache is over its bound.
 ///
 /// An existing file is never overwritten, since its name is its content. Failures are silent:
-/// a picture that did not make it into the cache is simply fetched again.
+/// a attachment that did not make it into the cache is simply fetched again.
 ///
 /// # Parameters
 /// - `hash`: The SHA-256 of `data`; the caller is responsible for having verified it.
-/// - `data`: The picture bytes.
+/// - `data`: The attachment bytes.
 pub async fn store(hash: &[u8; 32], data: &[u8])
 {
     let Some((fingerprint, path)) = scope(hash) else { return };

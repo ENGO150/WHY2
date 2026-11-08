@@ -53,7 +53,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! past sessions.
 //!
 //! # At-Rest Keys
-//! The history, picture store and image cache keys (`history_key`, `image_key`,
+//! The history, attachment store and cache keys (`history_key`, `attachment_key`,
 //! `cache_key`) are random 32-byte files in the configuration root, created on first use
 //! with mode `0600`. They are deliberately not derived from the identity, so the identity can
 //! be rotated without losing stored data, and deleting a key file discards what it protected.
@@ -408,16 +408,16 @@ pub fn history_key() -> Zeroizing<[u8; 32]> //THE MESSAGE HISTORY'S AT-REST KEY,
     media_key(consts_chat::SERVER_HISTORY_KEY)
 }
 
-/// Returns the persistent picture store's at-rest key, creating it on first use.
+/// Returns the persistent attachment store's at-rest key, creating it on first use.
 #[cfg(feature = "server")]
-pub fn image_key() -> Zeroizing<[u8; 32]> //PERSISTENT IMAGE KEY FILE
+pub fn attachment_key() -> Zeroizing<[u8; 32]> //PERSISTENT ATTACHMENT KEY FILE
 {
-    media_key(consts_chat::SERVER_IMAGE_KEY)
+    media_key(consts_chat::SERVER_ATTACHMENT_KEY)
 }
 
-/// Returns the client image cache's at-rest key, creating it on first use.
+/// Returns the client attachment cache's at-rest key, creating it on first use.
 #[cfg(feature = "client_base")]
-pub fn cache_key() -> Zeroizing<[u8; 32]> //CACHED IMAGE AT-REST KEY FILE
+pub fn cache_key() -> Zeroizing<[u8; 32]> //CACHED ATTACHMENT AT-REST KEY FILE
 {
     media_key(consts_chat::CLIENT_CACHE_KEY)
 }

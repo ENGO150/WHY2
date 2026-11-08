@@ -200,13 +200,10 @@ older = "%Y-%m-%d %H:%M"
 
 [transfer]
 uploading_file = "正在上传文件 \"{filename}\""
-uploading_image = "正在上传图片 \"{filename}\""
 downloading = "正在下载文件 \"{filename}\""
 uploaded_file = "已上传文件 \"{filename}\""
-uploaded_image = "已上传图片 \"{filename}\""
 downloaded = "已下载文件 \"{filename}\""
 failed_file = "文件 \"{filename}\" 传输失败"
-failed_image = "图片 \"{filename}\" 传输失败"
 unknown_file = "未知"
 
 [pane]

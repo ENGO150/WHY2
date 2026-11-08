@@ -62,12 +62,13 @@ pub const SERVER_USERS_CONFIG: &str    = "/server_users.toml";                  
 pub const SERVER_BANS_CONFIG: &str     = "/server_bans.toml";                         //SERVER BANS CONFIG FILE
 /// Encrypted lobby message history (`config::messages`).
 pub const SERVER_MESSAGES_FILE: &str   = "/server_messages.bin";                      //SERVER MESSAGE HISTORY FILE
-/// Directory holding sealed persistent pictures and voice messages.
-pub const SERVER_IMAGES_DIR: &str      = "/server_images";                            //PERSISTENT IMAGE DIRECTORY
+/// Directory holding sealed persistent attachments and voice messages.
+/// Retains its legacy path so existing files remain readable.
+pub const SERVER_ATTACHMENTS_DIR: &str = "/server_images";                            //PERSISTENT ATTACHMENT DIRECTORY
 /// File holding the hash of the server icon.
 pub const SERVER_ICON_FILE: &str       = "/server_icon";                              //SERVER ICON HASH FILE
-/// Client image cache directory, one subdirectory per server fingerprint.
-pub const CLIENT_IMAGES_DIR: &str      = "/client_images";                            //CACHED IMAGE DIRECTORY
+/// Client attachment cache directory, one subdirectory per server fingerprint.
+pub const CLIENT_ATTACHMENTS_DIR: &str = "/client_images";                            //CACHED ATTACHMENT DIRECTORY
 /// Directory searched for user-supplied translations.
 pub const LOCALES_DIR: &str            = "/locales";                                  //USER TRANSLATION DIRECTORY
 
@@ -78,10 +79,10 @@ pub const SERVER_KEYS_DIR: &str        = "/server_keys";                        
 
 /// At-rest key of the message history.
 pub const SERVER_HISTORY_KEY: &str     = "/server_history_key";                       //MESSAGE HISTORY AT-REST KEY FILE
-/// At-rest key of the persistent picture store.
-pub const SERVER_IMAGE_KEY: &str       = "/server_image_key";                         //PERSISTENT IMAGE KEY FILE
-/// At-rest key of the client image cache.
-pub const CLIENT_CACHE_KEY: &str       = "/client_cache_key";                         //CACHED IMAGE AT-REST KEY FILE
+/// At-rest key of the persistent attachment store.
+pub const SERVER_ATTACHMENT_KEY: &str  = "/server_image_key";                         //PERSISTENT ATTACHMENT KEY FILE
+/// At-rest key of the client attachment cache.
+pub const CLIENT_CACHE_KEY: &str       = "/client_cache_key";                         //CACHED ATTACHMENT AT-REST KEY FILE
 /// Server private key file, inside [`SERVER_KEYS_DIR`].
 pub const SERVER_SKEY: &str            = "/private";                                  //SERVER PRIVATE KEY FILE
 /// Server public key file, inside [`SERVER_KEYS_DIR`].
@@ -135,8 +136,8 @@ pub const MEGABYTE: usize              = 1_000_000;                             
 pub const UPLOAD_CHUNK_SIZE: usize     = MEGABYTE;                                    //FILE UPLOAD CHUNK (1MB)
 /// Bytes of a file needed to recognise its image format.
 pub const IMAGE_HEADER_SIZE: usize     = 16;                                          //BYTES AN IMAGE IS RECOGNISED BY
-/// Largest picture the server accepts and passes on.
-pub const MAX_IMAGE_SIZE: usize        = 8 * MEGABYTE;                                //BIGGEST IMAGE THE SERVER PASSES ON (8MB)
+/// Largest attachment the server accepts and passes on.
+pub const MAX_ATTACHMENT_SIZE: usize   = 8 * MEGABYTE;                                //BIGGEST ATTACHMENT THE SERVER PASSES ON (8MB)
 /// Largest avatar or server icon the server keeps.
 pub const MAX_AVATAR_SIZE: usize       = 2 * MEGABYTE;                                //BIGGEST AVATAR THE SERVER KEEPS (2MB)
 /// Side of the square a still avatar is cut to, in pixels.
@@ -159,8 +160,8 @@ pub const MAX_IMAGE_DIMENSION: u32     = 16_384;                                
 /// Size of the HMAC-SHA256 tag trailing an encrypted file.
 pub const DISK_TAG_SIZE: usize         = 32;                                          //HMAC-SHA256 TAG ON AN ENCRYPTED FILE
 
-/// Most disk space the client image cache may take.
-pub const MAX_IMAGE_CACHE: u64         = 512 * MEGABYTE as u64;                       //MOST DISK THE IMAGE CACHE MAY TAKE
+/// Most disk space the client attachment cache may take.
+pub const MAX_ATTACHMENT_CACHE: u64    = 512 * MEGABYTE as u64;                       //MOST DISK THE ATTACHMENT CACHE MAY TAKE
 /// Most memory a single image decode may allocate.
 pub const MAX_IMAGE_ALLOC: u64         = 256 * MEGABYTE as u64;                       //MOST MEMORY ONE DECODE MAY TAKE (256MB)
 
@@ -174,8 +175,8 @@ pub const MIN_FRAME_DELAY: Duration        = Duration::from_millis(20);         
 /// Delay given to a frame that asks for less than [`MIN_FRAME_DELAY`].
 pub const DEFAULT_FRAME_DELAY: Duration    = Duration::from_millis(100);              //WHAT A FRAME ASKING FOR LESS GETS
 
-/// Minimum spacing of one client's image fetches on the server.
-pub const IMAGE_REQUEST_DELAY: Duration    = Duration::from_millis(500);              //SPACING OF ONE CLIENT'S IMAGE FETCHES
+/// Minimum spacing of one client's attachment fetches on the server.
+pub const ATTACHMENT_REQUEST_DELAY: Duration = Duration::from_millis(500);             //SPACING OF ONE CLIENT'S ATTACHMENT FETCHES
 
 /// How often a typing client restates that it is typing.
 pub const TYPING_INTERVAL: Duration        = Duration::from_secs(3);                  //HOW OFTEN A WRITING CLIENT RESTATES IT

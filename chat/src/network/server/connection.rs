@@ -101,8 +101,8 @@ pub enum ConnectionType //TYPES OF TCP CHANNEL
     {
         uid: u64,
     },
-    /// Receives a chat picture upload.
-    Image
+    /// Receives a persistent attachment upload.
+    Attachment
     {
         uid: u64,
     },
@@ -169,8 +169,8 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         last_activity: Instant,                                  //TIME OF LAST MESSAGE (USED FOR TIMEOUT)
         /// When the keys were last rotated.
         last_key_exchange: Instant,                              //TIME OF LAST REKEY
-        /// When an image fetch was last served.
-        last_image: Instant,                                     //TIME OF LAST SERVED IMAGE FETCH
+        /// When an attachment fetch was last served.
+        last_attachment: Instant,                                //TIME OF LAST SERVED ATTACHMENT FETCH
         /// When a typing notice was last forwarded.
         last_typing: Instant,                                    //TIME OF LAST FORWARDED TYPING NOTICE
         /// Session id of whoever last sent this client a private message.
@@ -354,24 +354,24 @@ impl Connection
         }
     }
 
-    //GET LAST SERVED IMAGE FETCH FROM Connection
-    /// Returns when an image fetch was last served.
-    pub fn last_image(&self) -> Option<&Instant>
+    //GET LAST SERVED ATTACHMENT FETCH FROM Connection
+    /// Returns when an attachment fetch was last served.
+    pub fn last_attachment(&self) -> Option<&Instant>
     {
         match self
         {
-            Self::Authenticated { last_image, .. } => Some(last_image),
+            Self::Authenticated { last_attachment, .. } => Some(last_attachment),
             Self::NonAuthenticated { .. } => None,
         }
     }
 
-    //GET LAST SERVED IMAGE FETCH AS MUTABLE
-    /// Returns when an image fetch was last served, for setting.
-    pub fn last_image_mut(&mut self) -> Option<&mut Instant>
+    //GET LAST SERVED ATTACHMENT FETCH AS MUTABLE
+    /// Returns when an attachment fetch was last served, for setting.
+    pub fn last_attachment_mut(&mut self) -> Option<&mut Instant>
     {
         match self
         {
-            Self::Authenticated { last_image, .. } => Some(last_image),
+            Self::Authenticated { last_attachment, .. } => Some(last_attachment),
             Self::NonAuthenticated { .. } => None,
         }
     }

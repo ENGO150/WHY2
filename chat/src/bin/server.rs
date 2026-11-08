@@ -151,7 +151,7 @@ async fn main()
     //CONFIGURATION
     misc::check_version().await; //CHECK WHY2 VERSION
     kex::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
-    config::messages::sweep_images(); //DROP THE PICTURES NOTHING NAMES ANY MORE
+    config::messages::sweep_attachments(); //DROP THE PICTURES NOTHING NAMES ANY MORE
 
     //CHECK IF VOICE IS ENABLED
     if config::read_config("enable_voice_chat")
@@ -289,12 +289,12 @@ async fn main()
 
                             match conn_type
                             {
-                                ConnectionType::FileUpload { uid } | ConnectionType::Image { uid } | ConnectionType::Avatar { uid }
+                                ConnectionType::FileUpload { uid } | ConnectionType::Attachment { uid } | ConnectionType::Avatar { uid }
                                     | ConnectionType::Icon { uid } | ConnectionType::Voice { uid } =>
                                 {
                                     let kind = match conn_type
                                     {
-                                        ConnectionType::Image { .. } => UploadKind::Image,
+                                        ConnectionType::Attachment { .. } => UploadKind::Attachment,
                                         ConnectionType::Avatar { .. } => UploadKind::Avatar,
                                         ConnectionType::Icon { .. } => UploadKind::Icon,
                                         ConnectionType::Voice { .. } => UploadKind::Voice,

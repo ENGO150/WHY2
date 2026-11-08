@@ -81,7 +81,7 @@ use crate::
 };
 
 //ENUMS
-//WHAT AN UPLOAD IS FOR - A FILESHARE, A CHAT PICTURE, A PROFILE PICTURE, THE SERVER'S OR A CLIP
+//WHAT AN UPLOAD IS FOR - A FILESHARE, AN ATTACHMENT, A PROFILE PICTURE, THE SERVER'S OR A CLIP
 /// What an upload is for.
 #[derive(Clone, Copy, PartialEq)]
 pub enum UploadKind
@@ -89,7 +89,7 @@ pub enum UploadKind
     /// A fileshare, kept in a temp directory for the session.
     File,
     /// A persistent chat attachment, optionally displayed as a picture.
-    Image,
+    Attachment,
     /// A profile picture.
     Avatar,
     /// The server icon.
@@ -146,7 +146,7 @@ impl UploadKind
         match self
         {
             Self::File => "file",
-            Self::Image => "attachment",
+            Self::Attachment => "attachment",
             Self::Avatar => "avatar",
             Self::Icon => "icon",
             Self::Voice => "voice",

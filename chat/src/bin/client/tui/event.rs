@@ -141,7 +141,7 @@ impl App
                 self.push_image(username, filename, message_id, timestamp, hash, image, color),
 
             //A PICTURE WE DO NOT HOLD: CAPTION IT NOW
-            ClientEvent::ImagePending
+            ClientEvent::AttachmentPending
             {
                 username,
                 filename,
@@ -152,11 +152,11 @@ impl App
             } =>
             {
                 self.push_caption(username, filename, message_id, timestamp, hash, state::Picture::Waiting, color);
-                self.image_requests.push(hash);
+                self.attachment_requests.push(hash);
             },
 
             //THE SAME LINE WITH THE BUTTON ON IT
-            ClientEvent::ImageOffer
+            ClientEvent::AttachmentOffer
             {
                 username,
                 filename,
@@ -168,7 +168,7 @@ impl App
                 self.push_caption(username, filename, message_id, timestamp, hash, state::Picture::Absent, color),
 
             //LOADED ONCE ITS PANE IS LOOKED AT
-            ClientEvent::ImageParked
+            ClientEvent::AttachmentParked
             {
                 channel,
                 username,
@@ -189,14 +189,14 @@ impl App
                 match channel == self.channel
                 {
                     true => self.push_caption(username, filename, message_id, timestamp, hash, picture, username_color),
-                    false => self.park_entry(channel, state::Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new(), pinned: false }),
+                    false => self.park_entry(channel, state::Entry::Attachment { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new(), pinned: false }),
                 }
             },
 
             //A CLICK THE CACHE COULD NOT ANSWER
-            ClientEvent::ImageRequest { hash } => self.image_requests.push(hash),
+            ClientEvent::AttachmentRequest { hash } => self.attachment_requests.push(hash),
 
-            ClientEvent::ImageFailed { username, filename, message_id, hash, timestamp, username_color } =>
+            ClientEvent::AttachmentPreviewUnavailable { username, filename, message_id, hash, timestamp, username_color } =>
                 self.push_caption(username, filename, message_id, timestamp, hash, state::Picture::Gone, username_color),
 
             //A VOICE MESSAGE, FILED BY CHANNEL
@@ -470,7 +470,7 @@ impl App
                 //A PICTURE IS LOADED WHEN IT IS LOOKED AT
                 let auto_show = client_image::auto_show_images();
 
-                let entries = messages.into_iter().map(|message| match (message.image, message.voice)
+                let entries = messages.into_iter().map(|message| match (message.attachment, message.voice)
                 {
                     (_, Some(voice)) => state::Entry::Voice
                     {
@@ -484,7 +484,7 @@ impl App
                         pinned: message.pinned,
                     },
 
-                    (Some(hash), None) => state::Entry::Image
+                    (Some(hash), None) => state::Entry::Attachment
                     {
                         username: message.username,
                         filename: message.text,
@@ -782,12 +782,12 @@ impl App
 
             ClientEvent::Upload { uid, filename, size } =>
             {
-                self.push_transfer(uid, filename, size, true, false);
+                self.push_transfer(uid, filename, size, true);
             },
 
-            ClientEvent::Image { uid, filename, size } =>
+            ClientEvent::Attachment { uid, filename, size } =>
             {
-                self.push_transfer(uid, filename, size, true, true);
+                self.push_transfer(uid, filename, size, true);
             },
 
             ClientEvent::UploadDone { uid, .. } =>
@@ -811,7 +811,7 @@ impl App
 
             ClientEvent::Download { uid, filename, size } =>
             {
-                self.push_transfer(uid, filename, size, false, false);
+                self.push_transfer(uid, filename, size, false);
             },
 
             ClientEvent::Downloaded { uid, .. } =>

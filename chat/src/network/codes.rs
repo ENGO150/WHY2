@@ -281,23 +281,23 @@ pub enum PacketCode //CONTROL CODES
         file_id: usize,
     },
 
-    //SERVER -> CLIENT | IMAGE UPLOAD APPROVAL
-    /// *Server → client.* A picture upload was approved; the upload goes over a new socket
+    //SERVER -> CLIENT | ATTACHMENT UPLOAD APPROVAL
+    /// *Server → client.* An attachment upload was approved; the upload goes over a new socket
     /// authenticated by `token`.
-    Image
+    Attachment
     {
         hash: [u8; 32],
         token: [u8; 32],
         uid: u64,
     },
 
-    //SERVER -> CLIENT | A STORED IMAGE, AS IT WAS UPLOADED
-    /// *Server → client.* A picture posted to the chat.
+    //SERVER -> CLIENT | A STORED ATTACHMENT, AS IT WAS UPLOADED
+    /// *Server → client.* An attachment posted to the chat.
     ///
-    /// `data` carries the picture the first time the server broadcasts it; a repost of a picture
+    /// `data` carries the attachment the first time the server broadcasts it; a repost of an attachment
     /// the server already holds goes out as `None`, and a client without it in its cache fetches it
-    /// with [`ImageDataRequest`](PacketCode::ImageDataRequest).
-    ImageDisplay
+    /// with [`AttachmentDataRequest`](PacketCode::AttachmentDataRequest).
+    AttachmentDisplay
     {
         /// The poster's username.
         username: String,
@@ -305,9 +305,9 @@ pub enum PacketCode //CONTROL CODES
         filename: String,
         /// Server-assigned message id.
         message_id: u64,
-        /// SHA-256 of the picture.
+        /// SHA-256 of the attachment.
         hash: [u8; 32],
-        /// The picture bytes, if sent.
+        /// The attachment bytes, if sent.
         data: Option<Vec<u8>>,
         /// The poster's username color.
         username_color: Option<u8>,
@@ -319,7 +319,7 @@ pub enum PacketCode //CONTROL CODES
 
     //SERVER -> CLIENT | A VOICE MESSAGE, AS IT WAS RECORDED
     /// *Server → client.* A voice message posted to the chat; `data` follows the same rule as in
-    /// [`ImageDisplay`](PacketCode::ImageDisplay).
+    /// [`AttachmentDisplay`](PacketCode::AttachmentDisplay).
     VoiceMessage
     {
         username: String,
@@ -340,12 +340,12 @@ pub enum PacketCode //CONTROL CODES
         uid: u64,
     },
 
-    //SERVER -> CLIENT | ASK FOR A STORED PICTURE
-    /// *Server → client.* A stored picture or clip, answering
-    /// [`ImageDataRequest`](PacketCode::ImageDataRequest).
+    //SERVER -> CLIENT | ASK FOR A STORED ATTACHMENT
+    /// *Server → client.* A stored attachment or clip, answering
+    /// [`AttachmentDataRequest`](PacketCode::AttachmentDataRequest).
     ///
     /// Empty `data` means the server holds nothing under that hash.
-    ImageData
+    AttachmentData
     {
         hash: [u8; 32],
         data: Vec<u8>,
@@ -513,10 +513,10 @@ pub enum PacketCode //CONTROL CODES
     Download { token: [u8; 32] },                      //SERVER -> CLIENT | DOWNLOAD FILE FROM SERVER
     /// *Server → client.* User was banned.
     Banned { username: String },                       //SERVER -> CLIENT | USER WAS BANNED
-    /// *Server → client.* The server already holds this picture, so nothing needs uploading.
-    ImageDuplicate { hash: [u8; 32] },                 //SERVER -> CLIENT | IMAGE ALREADY UPLOADED
-    /// *Client → server.* Fetches a stored picture or clip.
-    ImageDataRequest { hash: [u8; 32] },               //CLIENT -> SERVER | ASK FOR A STORED PICTURE
+    /// *Server → client.* The server already holds this attachment, so nothing needs uploading.
+    AttachmentDuplicate { hash: [u8; 32] },                 //SERVER -> CLIENT | ATTACHMENT ALREADY UPLOADED
+    /// *Client → server.* Fetches a stored attachment or clip.
+    AttachmentDataRequest { hash: [u8; 32] },               //CLIENT -> SERVER | ASK FOR A STORED ATTACHMENT
     /// *Client → server.* Asks to post a voice message.
     VoiceMessageRequest { hash: [u8; 32] },            //CLIENT -> SERVER | REQUEST VOICE MESSAGE UPLOAD
     /// *Client → server.* Asks for the shared files.
@@ -656,11 +656,11 @@ impl PacketCode
             Self::Banned { .. }                => "Banned",
             Self::AttachmentDownload { .. }    => "AttachmentDownload",
             Self::AttachmentUnavailable { .. } => "AttachmentUnavailable",
-            Self::ImageDuplicate { .. }        => "ImageDuplicate",
-            Self::Image { .. }                 => "Image",
-            Self::ImageDisplay { .. }          => "ImageDisplay",
-            Self::ImageDataRequest { .. }      => "ImageDataRequest",
-            Self::ImageData { .. }             => "ImageData",
+            Self::AttachmentDuplicate { .. }   => "AttachmentDuplicate",
+            Self::Attachment { .. }            => "Attachment",
+            Self::AttachmentDisplay { .. }     => "AttachmentDisplay",
+            Self::AttachmentDataRequest { .. } => "AttachmentDataRequest",
+            Self::AttachmentData { .. }        => "AttachmentData",
             Self::VoiceMessageRequest { .. }   => "VoiceMessageRequest",
             Self::VoiceMessageUpload { .. }    => "VoiceMessageUpload",
             Self::VoiceMessage { .. }          => "VoiceMessage",
@@ -859,12 +859,12 @@ pub struct StoredMessage
     pub message_id: u64,
     /// The author's username.
     pub username: String,
-    /// The message, or the filename when this is a picture.
-    pub text: String,             //THE MESSAGE - OR THE FILENAME, WHEN THIS LINE IS AN IMAGE
+    /// The message, or the filename when this is an attachment.
+    pub text: String,             //THE MESSAGE - OR THE FILENAME, WHEN THIS LINE IS AN ATTACHMENT
     /// The author's current colors.
     pub colors: MessageColors,
-    /// SHA-256 of the picture, if this is one.
-    pub image: Option<[u8; 32]>,  //CONTENT HASH OF THE PICTURE
+    /// SHA-256 of the attachment, if this is one.
+    pub attachment: Option<[u8; 32]>,  //CONTENT HASH OF THE ATTACHMENT
     /// When it was sent, in Unix seconds.
     pub timestamp: Option<u64>,   //UNIX SECONDS
     /// The id of the message this replies to.

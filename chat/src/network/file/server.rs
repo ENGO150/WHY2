@@ -172,11 +172,11 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
     /// The temp path the upload is being built at.
     pub path: PathBuf,          //WHERE THE UPLOAD IS BEING BUILT
     /// The plaintext, kept only for a persistent upload, which is broadcast or parsed afterwards.
-    pub image: Option<Vec<u8>>, //THE PLAINTEXT, KEPT ONLY FOR AN IMAGE OR A CLIP
+    pub data: Option<Vec<u8>>, //THE PLAINTEXT, KEPT ONLY FOR AN ATTACHMENT OR A CLIP
     /// The at-rest stream the file is encrypted with.
     pub stream: RexStream,
 
-    //THE DISK TAG BEING BUILT, FOR AN IMAGE ONLY
+    //THE DISK TAG BEING BUILT, FOR A PERSISTENT UPLOAD
     /// The at-rest tag being built, for a persistent upload only.
     pub mac: Option<Hmac<Sha256>>,
 }
@@ -279,7 +279,7 @@ pub async fn download
     {
         UploadKind::Avatar | UploadKind::Icon => consts::MAX_AVATAR_SIZE,
         UploadKind::Voice => consts::MAX_VOICE_MESSAGE_SIZE,
-        _ => consts::MAX_IMAGE_SIZE,
+        _ => consts::MAX_ATTACHMENT_SIZE,
     };
 
     if persistent && size > ceiling as u64
@@ -294,7 +294,7 @@ pub async fn download
     {
         true =>
         {
-            let (key, nonce, mac_key) = crypto::image_keys(&hash);
+            let (key, nonce, mac_key) = crypto::attachment_keys(&hash);
 
             (key, nonce, Some(crypto::disk_mac(&mac_key)))
         },
@@ -312,7 +312,7 @@ pub async fn download
     //WHERE THE UPLOAD IS BUILT, AND WHERE IT STAYS
     let target_dir = match persistent
     {
-        true => misc::get_image_dir(),
+        true => misc::get_attachment_dir(),
         false => misc::get_upload_dir(&username),
     };
 
@@ -356,7 +356,7 @@ pub async fn download
             filename,
             client_id: id,
             path: upload_path,
-            image: persistent.then(|| Vec::with_capacity(size as usize)),
+            data: persistent.then(|| Vec::with_capacity(size as usize)),
             stream: disk_stream,
             mac: disk_mac,
         });
@@ -373,7 +373,7 @@ pub async fn download
     }
 
     //A FILESHARE IS WHAT THE UPLOADER SAYS IT IS
-    let mut checked = matches!(kind, UploadKind::File | UploadKind::Image);
+    let mut checked = matches!(kind, UploadKind::File | UploadKind::Attachment);
 
     //LOOP READING CHUNKS
     loop
@@ -385,7 +385,7 @@ pub async fn download
             _ => return
         };
 
-        //CHECK FOR VALID IMAGE ON PERSISTENT UPLOADS
+        //CHECK THE HEADER FOR A VOICE CLIP, AVATAR OR ICON
         if !checked
         {
             checked = true;
@@ -401,7 +401,7 @@ pub async fn download
                 }
             } else if !misc::is_image(&data)
             {
-                log::warn!("Image rejected (not an image): {peer_addr}");
+                log::warn!("Avatar or icon rejected (not an image): {peer_addr}");
                 server::notify(id, PacketCode::InvalidUsage).await;
                 return;
             }
@@ -465,8 +465,8 @@ pub async fn download
             //AND THE TAG, OVER WHAT THE DISK TOOK
             if let Some(mac) = active.mac.as_mut() { mac.update(&encrypted_bytes); }
 
-            //KEEP AN IMAGE'S PLAINTEXT FOR THE CHANNEL
-            if let Some(buffer) = active.image.as_mut() { buffer.extend_from_slice(&data); }
+            //KEEP THE ATTACHMENT'S PLAINTEXT FOR THE CHANNEL
+            if let Some(buffer) = active.data.as_mut() { buffer.extend_from_slice(&data); }
 
             //CHECK SIZE
             active.current_size == active.size
@@ -475,7 +475,7 @@ pub async fn download
         if !done { continue; } //UPLOAD STILL RUNNING
 
         //UPLOAD DONE, COLLECT FINAL STATE
-        let (final_hash, expected_hash, upload_filename, final_size, image, mac) =
+        let (final_hash, expected_hash, upload_filename, final_size, data, mac) =
         {
             let mut active = match ACTIVE_FILESHARES.get_mut(&uid)
             {
@@ -484,7 +484,7 @@ pub async fn download
             };
 
             let final_hash: [u8; 32] = active.hasher.clone().finalize().into();
-            (final_hash, active.hash, active.filename.clone(), active.current_size, active.image.take(),
+            (final_hash, active.hash, active.filename.clone(), active.current_size, active.data.take(),
                 active.mac.take())
         };
 
@@ -509,7 +509,7 @@ pub async fn download
         //PARSE THE CLIP
         let voice = match kind
         {
-            UploadKind::Voice => match image.as_deref().and_then(Clip::decode)
+            UploadKind::Voice => match data.as_deref().and_then(Clip::decode)
             {
                 Some(clip) => Some(VoiceNote { hash: final_hash, duration: clip.duration() }),
                 None =>
@@ -532,7 +532,7 @@ pub async fn download
             .unwrap_or(OsStr::new("unnamed_file"))
             .to_os_string();
 
-        //AN IMAGE IS NAMED AFTER ITS CONTENT INSTEAD
+        //A PERSISTENT UPLOAD IS NAMED AFTER ITS CONTENT
         let new_path = match persistent
         {
             true => target_dir.join(misc::hex(&final_hash)),
@@ -553,7 +553,7 @@ pub async fn download
         {
             //THE PICTURE THIS ONE REPLACES MAY HAVE NOTHING LEFT NAMING IT
             config::users::set_avatar(&username, Some(&final_hash));
-            config::messages::sweep_images();
+            config::messages::sweep_attachments();
 
             log::info!("Avatar set: {peer_addr}");
 
@@ -568,14 +568,14 @@ pub async fn download
         } else if kind == UploadKind::Icon //THE SERVER'S PICTURE, KEPT LIKE AN AVATAR
         {
             config::set_server_icon(Some(&final_hash));
-            config::messages::sweep_images();
+            config::messages::sweep_attachments();
 
             log::info!("Server icon set: {peer_addr}");
 
             server::icon_changed(id).await;
         } else if let Some(voice) = voice //A VOICE MESSAGE
         {
-            if let Some(data) = image
+            if let Some(data) = data
             {
                 let channel = server::CONNECTIONS.iter()
                     .find(|conn| conn.id() == Some(&id))
@@ -605,9 +605,9 @@ pub async fn download
                     timestamp,
                 });
             }
-        } else if persistent //AN IMAGE IS SHOWN, NOT ANNOUNCED
+        } else if persistent //AN ATTACHMENT IS POSTED TO THE CHANNEL
         {
-            if let Some(data) = image
+            if let Some(data) = data
             {
                 let channel = server::CONNECTIONS.iter()
                     .find(|conn| conn.id() == Some(&id))
@@ -619,15 +619,15 @@ pub async fn download
                 let timestamp = config::messages::timestamp();
                 let message_id = match kept
                 {
-                    true => config::messages::store_image(&username, &filename, &final_hash, timestamp),
+                    true => config::messages::store_attachment(&username, &filename, &final_hash, timestamp),
                     false => config::messages::next_id(),
                 };
 
-                //DELETE A PICTURE NOTHING KEPT
+                //DELETE AN ATTACHMENT NOTHING KEPT
                 if !kept && insert { let _ = fs::remove_file(&new_path).await; }
 
-                //A FRESH PICTURE GOES OUT WHOLE
-                server::send_to_all(PacketCode::ImageDisplay
+                //A FRESH ATTACHMENT GOES OUT WHOLE
+                server::send_to_all(PacketCode::AttachmentDisplay
                 {
                     username: username.clone(),
                     filename,
@@ -734,7 +734,7 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
 
     if file.persistent
     {
-        let (_, _, mac_key) = crypto::image_keys(&file.hash);
+        let (_, _, mac_key) = crypto::attachment_keys(&file.hash);
 
         if crypto::disk_verify(&mut source, &mac_key).await != Some(file.size)
         {
@@ -768,17 +768,17 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
     log::info!("Download done: {peer_addr}");
 }
 
-//THE PLAINTEXT SIZE OF A STORED PICTURE, TAG TAKEN OFF
-/// Returns the plaintext size of a stored picture or clip, without reading it.
-pub async fn image_size(hash: &[u8; 32]) -> Option<u64>
+//THE PLAINTEXT SIZE OF A STORED ATTACHMENT, TAG TAKEN OFF
+/// Returns the plaintext size of a stored attachment or clip, without reading it.
+pub async fn attachment_size(hash: &[u8; 32]) -> Option<u64>
 {
-    let sealed = fs::metadata(misc::get_image_dir().join(misc::hex(hash))).await.ok()?.len();
+    let sealed = fs::metadata(misc::get_attachment_dir().join(misc::hex(hash))).await.ok()?.len();
 
     Some(sealed.saturating_sub(consts::DISK_TAG_SIZE as u64))
 }
 
-//READ ONE STORED IMAGE BACK OFF DISK
-/// Reads one stored picture or clip back off disk, verifying it.
+//READ ONE STORED ATTACHMENT BACK OFF DISK
+/// Reads one stored attachment or clip back off disk, verifying it.
 ///
 /// The file is decrypted in [`UPLOAD_CHUNK_SIZE`](consts::UPLOAD_CHUNK_SIZE) chunks, finalizing
 /// the stream after each, to mirror how it was written.
@@ -786,30 +786,30 @@ pub async fn image_size(hash: &[u8; 32]) -> Option<u64>
 /// # Returns
 /// - `Some(bytes)` with the original file.
 /// - `None` if it is missing or fails verification.
-pub async fn read_image(hash: &[u8; 32]) -> Option<Vec<u8>>
+pub async fn read_attachment(hash: &[u8; 32]) -> Option<Vec<u8>>
 {
-    let sealed = match fs::read(misc::get_image_dir().join(misc::hex(hash))).await
+    let sealed = match fs::read(misc::get_attachment_dir().join(misc::hex(hash))).await
     {
         Ok(bytes) => bytes,
         Err(error) =>
         {
-            log::warn!("Stored image unreadable: {error}");
+            log::warn!("Stored attachment unreadable: {error}");
             return None;
         }
     };
 
-    let (key, nonce, mac_key) = crypto::image_keys(hash);
+    let (key, nonce, mac_key) = crypto::attachment_keys(hash);
 
     let Some(ciphertext) = crypto::disk_open(&mac_key, &sealed) else
     {
-        log::error!("Stored image failed verification, it is not the picture it is named after");
+        log::error!("Stored attachment failed verification");
         return None;
     };
 
     let mut disk_stream: RexStream = RexStream::new(&Grid::from_key(&key).ok()?, Grid::from_flat(&nonce).ok()?).ok()?;
 
     //THE READ HAS TO MIRROR THE WRITE CHUNK FOR CHUNK
-    let mut image = Vec::with_capacity(ciphertext.len());
+    let mut data = Vec::with_capacity(ciphertext.len());
 
     for chunk in ciphertext.chunks(consts::UPLOAD_CHUNK_SIZE)
     {
@@ -819,8 +819,8 @@ pub async fn read_image(hash: &[u8; 32]) -> Option<Vec<u8>>
         let mut bytes = crypto::i64_to_bytes(&decrypted);
         bytes.truncate(chunk.len());
 
-        image.extend_from_slice(&bytes);
+        data.extend_from_slice(&bytes);
     }
 
-    Some(image)
+    Some(data)
 }

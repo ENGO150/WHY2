@@ -200,13 +200,10 @@ older = "%Y/%m/%d %H:%M"
 
 [transfer]
 uploading_file = "ファイル \"{filename}\" をアップロード中"
-uploading_image = "画像 \"{filename}\" をアップロード中"
 downloading = "ファイル \"{filename}\" をダウンロード中"
 uploaded_file = "ファイル \"{filename}\" をアップロードしました"
-uploaded_image = "画像 \"{filename}\" をアップロードしました"
 downloaded = "ファイル \"{filename}\" をダウンロードしました"
 failed_file = "ファイル \"{filename}\" の転送に失敗しました"
-failed_image = "画像 \"{filename}\" の転送に失敗しました"
 unknown_file = "不明"
 
 [pane]

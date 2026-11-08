@@ -203,13 +203,10 @@ older = "%-d. %-m. %Y %H:%M"
 
 [transfer]
 uploading_file = "Nahrávanie súboru \"{filename}\""
-uploading_image = "Nahrávanie obrázka \"{filename}\""
 downloading = "Sťahovanie súboru \"{filename}\""
 uploaded_file = "Súbor \"{filename}\" bol nahraný"
-uploaded_image = "Obrázok \"{filename}\" bol nahraný"
 downloaded = "Súbor \"{filename}\" bol stiahnutý"
 failed_file = "Prenos súboru \"{filename}\" zlyhal"
-failed_image = "Prenos obrázka \"{filename}\" zlyhal"
 unknown_file = "Neznámy"
 
 [pane]

@@ -200,13 +200,10 @@ older = "%Y. %m. %d. %H:%M"
 
 [transfer]
 uploading_file = "파일 \"{filename}\" 업로드 중"
-uploading_image = "이미지 \"{filename}\" 업로드 중"
 downloading = "파일 \"{filename}\" 다운로드 중"
 uploaded_file = "파일 \"{filename}\" 업로드 완료"
-uploaded_image = "이미지 \"{filename}\" 업로드 완료"
 downloaded = "파일 \"{filename}\" 다운로드 완료"
 failed_file = "파일 \"{filename}\" 전송 실패"
-failed_image = "이미지 \"{filename}\" 전송 실패"
 unknown_file = "알 수 없음"
 
 [pane]

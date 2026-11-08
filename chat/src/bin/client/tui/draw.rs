@@ -406,7 +406,7 @@ fn draw_pictures(frame: &mut Frame, app: &mut App, overlays: &[Rect]) -> Vec<u16
         {
             Some(entry) => match app.messages.get_mut(entry)
             {
-                Some(state::Entry::Image { picture: state::Picture::Ready(ready), .. }) => Some(ready),
+                Some(state::Entry::Attachment { picture: state::Picture::Ready(ready), .. }) => Some(ready),
                 _ => None,
             },
 
@@ -1675,7 +1675,7 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
             Value::Avatar(Some(path)) => spans.push(Span::styled(t!("profile.avatar.uploaded", path), theme::text())),
 
             Value::Avatar(None) => spans.push(Span::styled(t!("profile.avatar.help",
-                limit = chat_consts::MAX_IMAGE_SIZE / chat_consts::MEGABYTE), theme::dim())),
+                limit = chat_consts::MAX_ATTACHMENT_SIZE / chat_consts::MEGABYTE), theme::dim())),
 
             Value::Text(text) if text.is_empty() =>
                 spans.push(Span::styled(i18n::get(&format!("profile.empty.{}", item.key)).map(str::to_owned)

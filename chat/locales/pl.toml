@@ -203,13 +203,10 @@ older = "%d.%m.%Y %H:%M"
 
 [transfer]
 uploading_file = "Przesyłanie pliku \"{filename}\""
-uploading_image = "Przesyłanie obrazu \"{filename}\""
 downloading = "Pobieranie pliku \"{filename}\""
 uploaded_file = "Przesłano plik \"{filename}\""
-uploaded_image = "Przesłano obraz \"{filename}\""
 downloaded = "Pobrano plik \"{filename}\""
 failed_file = "Przesyłanie pliku \"{filename}\" nie powiodło się"
-failed_image = "Przesyłanie obrazu \"{filename}\" nie powiodło się"
 unknown_file = "Nieznany"
 
 [pane]

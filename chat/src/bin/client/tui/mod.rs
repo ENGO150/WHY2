@@ -429,7 +429,7 @@ pub async fn run
                 //THE OFFERED PICTURES WE DO NOT HOLD
                 if let Some(write_stream) = write_stream.as_ref()
                 {
-                    let requests = app.take_image_requests();
+                    let requests = app.take_attachment_requests();
 
                     if !requests.is_empty()
                     {
@@ -438,7 +438,7 @@ pub async fn run
 
                         for hash in requests
                         {
-                            network::send(&mut *stream, PacketCode::ImageDataRequest { hash }, keys.as_ref()).await;
+                            network::send(&mut *stream, PacketCode::AttachmentDataRequest { hash }, keys.as_ref()).await;
                         }
                     }
                 }
@@ -614,7 +614,7 @@ async fn handle_terminal_event
                         }
                         //A CLICK ON A CAPTION FETCHES THE PICTURE
                         else if write_stream.is_some()
-                            && let Some(entry) = app.image_at(mouse.column, mouse.row)
+                            && let Some(entry) = app.attachment_at(mouse.column, mouse.row)
                             && let Some(hash) = app.request_image(entry)
                         {
                             client_image::fetch_image(hash, tx.clone());

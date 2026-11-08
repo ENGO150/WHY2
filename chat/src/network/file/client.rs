@@ -103,7 +103,7 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
     {
         UploadKind::File => tx.send(ClientEvent::Upload { uid, filename: filename.clone(), size }).await.unwrap(),
         UploadKind::Voice => {},
-        _ => tx.send(ClientEvent::Image { uid, filename: filename.clone(), size }).await.unwrap(),
+        _ => tx.send(ClientEvent::Attachment { uid, filename: filename.clone(), size }).await.unwrap(),
     }
 
     //LOCAL SEQ COUNTER

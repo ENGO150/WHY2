@@ -271,7 +271,7 @@ impl<'a, 's> ClientSession<'a, 's>
             PacketCode::HistoryRequest { before } => self.history(before).await,
 
             //ONE OF THE HISTORY'S PICTURES
-            PacketCode::ImageDataRequest { hash } => self.image_data(hash).await,
+            PacketCode::AttachmentDataRequest { hash } => self.attachment_data(hash).await,
 
             //LIST SCREENSHARES
             PacketCode::ScreensRequest => self.screens().await,
@@ -593,7 +593,7 @@ impl<'a, 's> ClientSession<'a, 's>
         PacketFlow::Continue
     }
 
-    //NEW FILE OR IMAGE UPLOAD
+    //NEW FILE OR ATTACHMENT UPLOAD
     async fn upload(&mut self, hash: [u8; 32], filename: Option<String>) -> PacketFlow
     {
         //SILENCE MUTED USERS
@@ -603,10 +603,10 @@ impl<'a, 's> ClientSession<'a, 's>
             return PacketFlow::Continue;
         }
 
-        let image = filename.is_some();
+        let persistent = filename.is_some();
 
-        //CHECK IF IMAGE WAS ALREADY UPLOADED
-        if image && config::messages::stored(&hash)
+        //CHECK IF ATTACHMENT WAS ALREADY UPLOADED
+        if persistent && config::messages::stored(&hash)
         {
             let filename = filename.as_deref()
                 .and_then(|filename| Path::new(filename).file_name())
@@ -619,12 +619,12 @@ impl<'a, 's> ClientSession<'a, 's>
             //KEEP IT, ON AN UPLOAD'S TERMS
             let message_id = match self.channel.is_none() && config::read_config::<bool>("persistent_messages")
             {
-                true => config::messages::store_image(&self.username, &filename, &hash, timestamp),
+                true => config::messages::store_attachment(&self.username, &filename, &hash, timestamp),
                 false => config::messages::next_id(),
             };
 
-            //AN IMAGE LINE IS COLORED LIKE A MESSAGE
-            server::send_to_all(PacketCode::ImageDisplay
+            //AN ATTACHMENT LINE IS COLORED LIKE A MESSAGE
+            server::send_to_all(PacketCode::AttachmentDisplay
             {
                 username: self.username.clone(),
                 filename: filename.clone(),
@@ -637,9 +637,9 @@ impl<'a, 's> ClientSession<'a, 's>
             });
 
             //TELL THE UPLOADER THERE IS NOTHING TO SEND
-            self.send(PacketCode::ImageDuplicate { hash }).await;
+            self.send(PacketCode::AttachmentDuplicate { hash }).await;
 
-            log::info!("Image already stored, upload skipped: {}", self.peer_addr);
+            log::info!("Attachment already stored, upload skipped: {}", self.peer_addr);
             return PacketFlow::Continue;
         }
 
@@ -655,20 +655,20 @@ impl<'a, 's> ClientSession<'a, 's>
 
         //GENERATE RANDOM UID
         let uid = rand::random::<u64>();
-        let token = server::open_connection(self.id, if image
+        let token = server::open_connection(self.id, if persistent
         {
-            ConnectionType::Image { uid }
+            ConnectionType::Attachment { uid }
         } else
         {
             ConnectionType::FileUpload { uid }
         });
 
         //LOG FILE UPLOAD
-        log::info!("Upload request ({}): {}", if image { "image" } else { "file" }, self.peer_addr);
+        log::info!("Upload request ({}): {}", if persistent { "attachment" } else { "file" }, self.peer_addr);
 
-        let packet = if image
+        let packet = if persistent
         {
-            PacketCode::Image
+            PacketCode::Attachment
             {
                 hash,
                 token,
@@ -721,7 +721,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 timestamp,
             });
 
-            self.send(PacketCode::ImageDuplicate { hash }).await;
+            self.send(PacketCode::AttachmentDuplicate { hash }).await;
 
             log::info!("Voice message already stored, upload skipped: {}", self.peer_addr);
             return PacketFlow::Continue;
@@ -750,15 +750,15 @@ impl<'a, 's> ClientSession<'a, 's>
     async fn attachment_download(&mut self, message_id: u64) -> PacketFlow
     {
         if let Some((hash, filename)) = config::messages::attachment(message_id)
-            && let Some(size) = file::image_size(&hash).await
+            && let Some(size) = file::attachment_size(&hash).await
         {
             //DERIVE THE DISK KEYS WITHOUT READING THE FILE
-            let (key, nonce, _) = crypto::image_keys(&hash);
+            let (key, nonce, _) = crypto::attachment_keys(&hash);
 
             let file = AvailableFile
             {
                 hash,
-                path: misc::get_image_dir().join(misc::hex(&hash)),
+                path: misc::get_attachment_dir().join(misc::hex(&hash)),
                 filename,
                 size,
                 key,
@@ -1015,40 +1015,40 @@ impl<'a, 's> ClientSession<'a, 's>
     }
 
     //ONE OF THE HISTORY'S PICTURES
-    async fn image_data(&mut self, hash: [u8; 32]) -> PacketFlow
+    async fn attachment_data(&mut self, hash: [u8; 32]) -> PacketFlow
     {
-        //ONE REQUEST PER IMAGE_REQUEST_DELAY
+        //ONE REQUEST PER ATTACHMENT_REQUEST_DELAY
         let wait = server::CONNECTIONS.get(&self.peer_addr)
-            .and_then(|conn| conn.last_image().map(|last| consts::IMAGE_REQUEST_DELAY
+            .and_then(|conn| conn.last_attachment().map(|last| consts::ATTACHMENT_REQUEST_DELAY
                 .saturating_sub(last.elapsed())))
             .unwrap_or_default(); //GUARD DROPPED HERE - NEVER HELD ACROSS THE SLEEP
 
         if !wait.is_zero()
         {
-            log::debug!("Image fetch held for {}ms: {}", wait.as_millis(), self.peer_addr);
+            log::debug!("Attachment fetch held for {}ms: {}", wait.as_millis(), self.peer_addr);
             time::sleep(wait).await;
         }
 
         if let Some(mut conn) = server::CONNECTIONS.get_mut(&self.peer_addr)
-            && let Some(last) = conn.last_image_mut() { *last = Instant::now(); }
+            && let Some(last) = conn.last_attachment_mut() { *last = Instant::now(); }
 
-        //A PICTURE OR A CLIP
-        let image = match config::messages::stored(&hash) || config::messages::voice(&hash).is_some()
+        //AN ATTACHMENT OR A CLIP
+        let attachment = match config::messages::stored(&hash) || config::messages::voice(&hash).is_some()
         {
-            true => file::read_image(&hash).await,
+            true => file::read_attachment(&hash).await,
             false => None,
         };
 
-        if let Some(data) = image
+        if let Some(data) = attachment
         {
-            log::info!("Image fetch served ({} bytes): {}", data.len(), self.peer_addr);
-            self.send(PacketCode::ImageData { hash, data }).await;
+            log::info!("Attachment fetch served ({} bytes): {}", data.len(), self.peer_addr);
+            self.send(PacketCode::AttachmentData { hash, data }).await;
         } else
         {
-            log::warn!("Image fetch refused (nothing names it): {}", self.peer_addr);
+            log::warn!("Attachment fetch refused (nothing names it): {}", self.peer_addr);
 
             //AN EMPTY ANSWER SO THE CAPTION STOPS WAITING
-            self.send(PacketCode::ImageData
+            self.send(PacketCode::AttachmentData
             {
                 hash,
                 data: Vec::new(),
@@ -1433,7 +1433,7 @@ impl<'a, 's> ClientSession<'a, 's>
 
         //DELETE THE ACCOUNT AND ITS AVATAR
         config::users::remove(&self.username);
-        config::messages::sweep_images();
+        config::messages::sweep_attachments();
 
         log::info!("Account deleted: {}", self.peer_addr);
 
@@ -1615,7 +1615,7 @@ impl<'a, 's> ClientSession<'a, 's>
             Some(hash) if config::messages::stored(&hash) =>
             {
                 //THE CEILING IS THE CEILING EITHER WAY - A CHAT PICTURE IS ALLOWED TO BE BIGGER
-                let size = file::image_size(&hash).await.unwrap_or_default();
+                let size = file::attachment_size(&hash).await.unwrap_or_default();
 
                 if size > consts::MAX_AVATAR_SIZE as u64
                 {
@@ -1627,7 +1627,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 }
 
                 //A CHAT PICTURE IS NOT CUT, SO IT HAS TO BE A SQUARE ALREADY
-                if !file::read_image(&hash).await.is_some_and(|image| misc::is_avatar(&image))
+                if !file::read_attachment(&hash).await.is_some_and(|image| misc::is_avatar(&image))
                 {
                     log::warn!("Avatar refused (not a square of at most {}px): {}",
                         consts::AVATAR_DIMENSION, self.peer_addr);
@@ -1637,11 +1637,11 @@ impl<'a, 's> ClientSession<'a, 's>
                 }
 
                 config::users::set_avatar(&self.username, Some(&hash));
-                config::messages::sweep_images();
+                config::messages::sweep_attachments();
 
                 log::info!("Avatar set (already stored): {}", self.peer_addr);
 
-                self.send(PacketCode::ImageDuplicate { hash }).await;
+                self.send(PacketCode::AttachmentDuplicate { hash }).await;
             },
 
             //ANYTHING ELSE IS AN UPLOAD, AND THE PROFILE IS WRITTEN WHEN IT LANDS
@@ -1662,7 +1662,7 @@ impl<'a, 's> ClientSession<'a, 's>
 
                 log::info!("Upload request (avatar): {}", self.peer_addr);
 
-                self.send(PacketCode::Image { hash, token, uid }).await;
+                self.send(PacketCode::Attachment { hash, token, uid }).await;
                 return PacketFlow::Continue;
             },
 
@@ -1670,7 +1670,7 @@ impl<'a, 's> ClientSession<'a, 's>
             None =>
             {
                 config::users::set_avatar(&self.username, None);
-                config::messages::sweep_images();
+                config::messages::sweep_attachments();
 
                 log::info!("Avatar dropped: {}", self.peer_addr);
             },
@@ -1718,7 +1718,7 @@ impl<'a, 's> ClientSession<'a, 's>
             //A PICTURE THE SERVER ALREADY KEEPS COSTS NO UPLOAD
             Some(hash) if config::messages::stored(&hash) =>
             {
-                let size = file::image_size(&hash).await.unwrap_or_default();
+                let size = file::attachment_size(&hash).await.unwrap_or_default();
 
                 if size > consts::MAX_AVATAR_SIZE as u64
                 {
@@ -1730,7 +1730,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 }
 
                 //CUT LIKE AN AVATAR
-                if !file::read_image(&hash).await.is_some_and(|image| misc::is_avatar(&image))
+                if !file::read_attachment(&hash).await.is_some_and(|image| misc::is_avatar(&image))
                 {
                     log::warn!("Server icon refused (not a square of at most {}px): {}",
                         consts::AVATAR_DIMENSION, self.peer_addr);
@@ -1740,11 +1740,11 @@ impl<'a, 's> ClientSession<'a, 's>
                 }
 
                 config::set_server_icon(Some(&hash));
-                config::messages::sweep_images();
+                config::messages::sweep_attachments();
 
                 log::info!("Server icon set (already stored): {}", self.peer_addr);
 
-                self.send(PacketCode::ImageDuplicate { hash }).await;
+                self.send(PacketCode::AttachmentDuplicate { hash }).await;
             },
 
             //ANYTHING ELSE IS AN UPLOAD, AND THE ICON IS WRITTEN WHEN IT LANDS
@@ -1765,7 +1765,7 @@ impl<'a, 's> ClientSession<'a, 's>
 
                 log::info!("Upload request (icon): {}", self.peer_addr);
 
-                self.send(PacketCode::Image { hash, token, uid }).await;
+                self.send(PacketCode::Attachment { hash, token, uid }).await;
                 return PacketFlow::Continue;
             },
 
@@ -1773,7 +1773,7 @@ impl<'a, 's> ClientSession<'a, 's>
             None =>
             {
                 config::set_server_icon(None);
-                config::messages::sweep_images();
+                config::messages::sweep_attachments();
 
                 log::info!("Server icon dropped: {}", self.peer_addr);
             },

@@ -42,7 +42,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!   the reverse direction of the same
 //!   socket hashes the token under its own label ([`init_reverse_stream`]).
 //! - A file's key, nonce and MAC key are derived from a per-purpose master key salted with the
-//!   file's content hash (`image_keys`, `cache_keys`).
+//!   file's content hash (`attachment_keys`, `cache_keys`).
 //!
 //! Writing $\mathrm{HKDF}(s, k, l)$ for HKDF-SHA256 with salt $s$, input key material $k$ and
 //! label $l$, $\Vert$ for concatenation, $K$ and $K\_m$ for the session's grid key and HMAC key,
@@ -54,7 +54,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! $$ \tau^{\prime} = \mathrm{SHA256}(\texttt{WHY2-REVERSE-STREAM} \Vert \tau) $$
 //!
-//! and for a file named by its hash $h$, in a store with master key $M$ (the server's image
+//! and for a file named by its hash $h$, in a store with master key $M$ (the server's attachment
 //! key, or the client's cache key), salted with $s = h$ on the server and
 //! $s = \mathrm{fp} \Vert h$ in the client's cache:
 //!
@@ -470,17 +470,17 @@ fn disk_keys(salt: &[u8], ikm: &[u8]) -> DiskKeys
     (Zeroizing::new(to_i64(&key_bytes)), to_i64(&nonce_bytes), mac_bytes)
 }
 
-/// Returns the at-rest keys of one stored server picture or voice message.
+/// Returns the at-rest keys of one stored server attachment or voice message.
 ///
 /// # Parameters
 /// - `hash`: The SHA-256 the file is named after.
 #[cfg(feature = "server")]
-pub fn image_keys(hash: &[u8; 32]) -> DiskKeys //AT-REST KEYS FOR ONE IMAGE
+pub fn attachment_keys(hash: &[u8; 32]) -> DiskKeys //AT-REST KEYS FOR ONE ATTACHMENT
 {
-    disk_keys(hash, kex::image_key().as_ref())
+    disk_keys(hash, kex::attachment_key().as_ref())
 }
 
-/// Returns the at-rest keys of one cached picture.
+/// Returns the at-rest keys of one cached attachment.
 ///
 /// Salting with the server fingerprint as well as the hash means two servers' copies of the
 /// same picture share no keystream, and a file moved between scopes fails to verify.

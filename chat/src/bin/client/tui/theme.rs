@@ -244,11 +244,11 @@ impl Theme
             Entry::Transfer(transfer) => state::wrap_line(&Line::from(progress(transfer, width)), width),
 
             //ONLY THE CAPTION; THE PICTURE IS DRAWN UNDER IT
-            Entry::Image { username, filename, message_id, timestamp, username_color, picture, .. } =>
+            Entry::Attachment { username, filename, message_id, timestamp, username_color, picture, .. } =>
             {
                 let caption = match picture
                 {
-                    Picture::Ready(..) => t!("message.image"),
+                    Picture::Ready(..) => t!("message.attachment"),
                     _ => t!("message.file"),
                 };
                 let (before, after) = i18n::split(caption, "username");
@@ -328,11 +328,11 @@ impl Theme
                 spans.push(Span::styled(format!(": {}", text.lines().next().unwrap_or_default()), dim()));
             },
 
-            Some(Entry::Image { username, filename, username_color, picture, .. }) =>
+            Some(Entry::Attachment { username, filename, username_color, picture, .. }) =>
             {
                 let caption = match picture
                 {
-                    Picture::Ready(..) => t!("message.image"),
+                    Picture::Ready(..) => t!("message.attachment"),
                     _ => t!("message.file"),
                 };
                 let (before, after) = i18n::split(caption, "username");
@@ -485,18 +485,15 @@ pub fn stripe(terminal: Option<(u8, u8, u8)>) -> Color
 /// Returns a transfer's row: what it is, its progress bar and how much has moved.
 fn progress(transfer: &Transfer, width: u16) -> Vec<Span<'static>>
 {
-    let Transfer { upload, image, filename, done, total, outcome, .. } = transfer;
+    let Transfer { upload, filename, done, total, outcome, .. } = transfer;
 
-    let (label, style) = match (outcome, upload, image)
+    let (label, style) = match (outcome, upload)
     {
-        (None, true, false) => (t!("transfer.uploading_file", filename), dim()),
-        (None, true, true) => (t!("transfer.uploading_image", filename), dim()),
-        (None, false, _) => (t!("transfer.downloading", filename), dim()),
-        (Some(true), true, false) => (t!("transfer.uploaded_file", filename), ok()),
-        (Some(true), true, true) => (t!("transfer.uploaded_image", filename), ok()),
-        (Some(true), false, _) => (t!("transfer.downloaded", filename), ok()),
-        (Some(false), _, false) => (t!("transfer.failed_file", filename), error()),
-        (Some(false), _, true) => (t!("transfer.failed_image", filename), error()),
+        (None, true) => (t!("transfer.uploading_file", filename), dim()),
+        (None, false) => (t!("transfer.downloading", filename), dim()),
+        (Some(true), true) => (t!("transfer.uploaded_file", filename), ok()),
+        (Some(true), false) => (t!("transfer.downloaded", filename), ok()),
+        (Some(false), _) => (t!("transfer.failed_file", filename), error()),
     };
 
     let percent = state::percent(*done, *total);
