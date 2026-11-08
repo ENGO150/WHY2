@@ -30,7 +30,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! name being matched, the rest is the directory read. Directories are offered with their
 //! separator, so Tab walks into them; dotfiles only once a `.` is typed; and `~` is the home
 //! directory ([`expand_home`]). Values are matched case-insensitively but inserted as spelled on
-//! disk.
+//! disk. Spaces are kept inside paths; after an existing file, the upload flag is
+//! completed separately.
 
 use std::
 {
@@ -436,11 +437,10 @@ impl Palette
     fn hint(&mut self, entry: Entry, tail: &str, input: &str)
     {
         let args = entry.args();
-        let active = active_arg(args, tail);
+        let (active, typed) = argument_input(args, tail);
 
         if let Some(arg) = active.and_then(|i| args.get(i)) && arg.values != ArgValues::Free
         {
-            let typed = partial(tail);
             let candidate = typed.to_lowercase();
 
             let matches = vocabulary(arg.values, typed).into_iter()
@@ -570,6 +570,33 @@ fn active_arg(args: &'static [CommandArg], tail: &str) -> Option<usize>
     }
 
     Some(index)
+}
+
+/// Keeps spaces inside path arguments, while recognizing an upload's trailing flag.
+fn argument_input<'a>(args: &'static [CommandArg], tail: &'a str) -> (Option<usize>, &'a str)
+{
+    if args.first().is_some_and(|arg| matches!(arg.values, ArgValues::Paths | ArgValues::Images))
+    {
+        let path = tail.trim_start();
+
+        if args.get(1).is_some_and(|arg| arg.values == ArgValues::Bools)
+            && let Some((file, flag)) = path.rsplit_once(char::is_whitespace)
+        {
+            //A COMPLETED FILE CAN BE FOLLOWED BY A HALF-TYPED FLAG.
+            //A COMPLETE FLAG HAS THE SAME MEANING AS IN upload_parameters.
+            let complete_flag = flag.parse::<bool>().is_ok();
+            let flag_prefix = "true".starts_with(flag) || "false".starts_with(flag);
+
+            if complete_flag || (flag_prefix && expand_home(file.trim_end()).is_file())
+            {
+                return (Some(1), flag);
+            }
+        }
+
+        return (Some(0), path);
+    }
+
+    (active_arg(args, tail), partial(tail))
 }
 
 //THE HALF-TYPED VALUE THE CARET IS ON
