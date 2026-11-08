@@ -1,6 +1,39 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.5.0:
+- 41ec7ab8: upgrade chat dependencies
+- 1d4d230d: fix invisibility in voice channel glitch
+- a3f965fc: fix path helper
+- 642be4ff: fix duplicate hash video player
+- 1222c41b: add support for most common video codecs
+- da079749: add czech video player translations
+- 7098ae53: add video player translations
+- 5ae6b5ac: add minimalistic TUI video player
+- 7672473b: rename persistent files from Image to Attachment
+- 3a998f10: add czech persistent files translation
+- 95db4e87: add persistent files translations
+- 87626bcb: allow non-image persistent uploads
+- 21448706: do not draw online user section when noone is online
+- 3b027774: add czech online_status translations
+- b9df67b4: implement online status on TUI
+- 739b9144: hide "offline" online users
+- 9508f815: add online_status field to UserProfile
+- 342a5318: send username in Accept packet
+- a73f326d: change ClientEvents into structs
+- a60a9e0e: add czech banned event translation
+- a2e80b18: add ban notification translations
+- 1a622346: implement ClientEvent::Banned on TUI
+- 7d433444: notify all users about ban
+- 0e6dbace: do not send banned users in list
+- ece762c4: reference all users by id
+- 55072882: sort users by id
+- 239aac79: render offline user ids
+- 2be7941c: add id field to OfflineUser
+- 30876cb5: split server::listen_client into session dispatcher
+- 3f57ef35: use constant IDs on server
+- f47706a7: add constant IDs to users
+
 v2.4.3:
 - 495e0856: fix command parameters helpers
 - 87337b17: improve screen share quality on constrained links
