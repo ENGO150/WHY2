@@ -33,12 +33,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! pronouns = ""
 //! website = ""
 //! status = ""
+//! online_status = true
 //! avatar = ""
 //! ```
 //!
 //! The profile lives in its own subtable so that nothing reading or writing a profile can reach
 //! the password hash. A missing key reads as empty, so entries that predate a field need no
-//! migration; ids are the exception and are assigned to older entries at startup.
+//! migration; a missing online status reads as `true`. Ids are the exception and are assigned to
+//! older entries at startup.
 
 use toml_edit::
 {
@@ -71,6 +73,8 @@ const PROFILE_TABLE: &str = "profile";        //THE SUBTABLE A PROFILE SITS IN, 
 const PROFILE_KEYS: [&str; 4] = UserProfile::KEYS; //THE PROFILE AS server_users.toml SPELLS IT
 /// The profile key holding the avatar's hash.
 const AVATAR_KEY: &str = "avatar";            //THE PICTURE'S HASH, WHICH IS NOT A TYPED FIELD
+/// The profile key holding the online status.
+const ONLINE_STATUS_KEY: &str = UserProfile::ONLINE_STATUS_KEY; //WHETHER OTHERS SEE THE ACCOUNT ONLINE
 
 /// Reads one top-level string field of an account.
 fn user_field(username: &str, key: &str) -> Option<String> //READ ONE FIELD OF username
@@ -91,6 +95,13 @@ fn profile_field(username: &str, key: &str) -> Option<String> //READ ONE PROFILE
 {
     super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(username)?
         .as_table_like()?.get(PROFILE_TABLE)?.as_table_like()?.get(key)?.as_str().map(str::to_string))
+}
+
+/// Reads one boolean profile field of an account.
+fn profile_boolean(username: &str, key: &str) -> Option<bool> //READ ONE TOGGLE OF username
+{
+    super::with_cached(&super::config_path(consts::SERVER_USERS_CONFIG), |users| users.get(username)?
+        .as_table_like()?.get(PROFILE_TABLE)?.as_table_like()?.get(key)?.as_bool())
 }
 
 /// Writes one top-level field of an account, creating the entry if missing.
@@ -254,9 +265,16 @@ pub fn profile(username: &str) -> UserProfile //RETURN PROFILE OF username
         pronouns: fields.next().unwrap_or_default(),
         website: fields.next().unwrap_or_default(),
         status: fields.next().unwrap_or_default(),
+        online_status: online_status(username),
         avatar: avatar(username),
         role: role(username).unwrap_or_default(),
     }
+}
+
+/// Returns whether an account is shown as online to others; a missing key reads as `true`.
+pub fn online_status(username: &str) -> bool //WHETHER THE ACCOUNT IS LISTED AS ONLINE
+{
+    profile_boolean(username, ONLINE_STATUS_KEY).unwrap_or(true)
 }
 
 /// Returns the avatar hash of an account, if one is set.
@@ -284,13 +302,15 @@ pub fn avatars() -> Vec<[u8; 32]> //EVERY PICTURE THE ACCOUNTS NAME
 }
 
 //STORE username's TYPED FIELDS - THE PICTURE IS SET BY AN UPLOAD, NOT BY A SAVE
-/// Stores the typed profile fields of an account; the avatar and role are left untouched.
+/// Stores the typed profile fields and the online status; the avatar and role are left untouched.
 pub fn set_profile(username: &str, profile: &UserProfile)
 {
     for (key, value) in PROFILE_KEYS.iter().zip(profile.fields())
     {
         write_profile_field(username, key, value.into());
     }
+
+    write_profile_field(username, ONLINE_STATUS_KEY, profile.online_status.into());
 }
 
 //STORE ONE OF username's COLORS, BY NAME
@@ -336,6 +356,7 @@ pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON
     //NO COLORS OR PROFILE YET, BUT THE KEYS ARE THERE
     for key in COLOR_KEYS { write_user_field(username, key, colors::NONE.into()); }
     for key in PROFILE_KEYS { write_profile_field(username, key, "".into()); }
+    write_profile_field(username, ONLINE_STATUS_KEY, true.into());
     write_profile_field(username, AVATAR_KEY, "".into());
 
     first_user

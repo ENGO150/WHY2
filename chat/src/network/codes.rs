@@ -746,9 +746,12 @@ impl UserProfile
     //THE KEYS server_users.toml STORES THE FIELDS UNDER, IN THEIR OWN ORDER
     /// The keys the typed profile fields are stored under, in order.
     ///
-    /// This is the single list of profile fields: the storage, the wire and the client's profile
-    /// box all walk it.
+    /// This is the single list of typed profile fields: the storage, the wire and the client's
+    /// profile box all walk it. The avatar, role and online status are apart from it.
     pub const KEYS: [&'static str; 4] = [ "bio", "pronouns", "website", "status" ];
+
+    /// The key the online status is stored under.
+    pub const ONLINE_STATUS_KEY: &'static str = "online_status"; //WHETHER OTHERS SEE THE ACCOUNT ONLINE
 
     //THE FIELDS IN THE ORDER server_users.toml SPELLS THEM
     /// Returns the typed profile fields, in [`KEYS`](Self::KEYS) order.
@@ -806,7 +809,7 @@ pub enum SettingValue
 
 //ONE USER'S PROFILE AS server_users.toml KEEPS IT
 /// One user's profile.
-#[derive(SchemaWrite, SchemaRead, Clone, PartialEq, Default)]
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
 pub struct UserProfile
 {
     /// What the user says about themselves.
@@ -817,10 +820,30 @@ pub struct UserProfile
     pub website: String,          //A LINK OF THEIRS, http/https ONLY
     /// What they are up to, until they change it.
     pub status: String,           //WHAT THEY ARE UP TO, UNTIL THEY CHANGE IT
+    /// Whether they are listed as online and their arrival is announced.
+    pub online_status: bool,      //SHOWN ONLINE TO OTHERS
     /// Hash of their avatar; set by upload, never by a profile save.
     pub avatar: Option<[u8; 32]>, //PROFILE PICTURE
     /// Their rank; filled in by the server.
     pub role: Role,               //THEIR RANK
+}
+
+//AN EMPTY PROFILE, VISIBLE BY DEFAULT
+impl Default for UserProfile
+{
+    fn default() -> Self
+    {
+        Self
+        {
+            bio: String::new(),
+            pronouns: String::new(),
+            website: String::new(),
+            status: String::new(),
+            online_status: true,
+            avatar: None,
+            role: Role::default(),
+        }
+    }
 }
 
 //ONE MESSAGE AS server_messages.bin KEEPS IT
