@@ -81,7 +81,7 @@ pub enum Command
     #[cfg(feature = "client_voice")] Mute,        //TOGGLE-MUTE USER/YOURSELF
     /// Starts or stops recording a voice message.
     #[cfg(feature = "client_voice")] Record,      //RECORD A VOICE MESSAGE
-    /// Plays a voice message.
+    /// Plays a voice message or an audio/video attachment.
     #[cfg(feature = "client_voice")] Play,        //PLAY A VOICE MESSAGE
     /// Switches channel; without a name, returns to the lobby.
     Channel,                                      //SWITCH CHANNEL

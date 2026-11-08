@@ -43,7 +43,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! | Feature             | Enables                                                             |
 //! |---------------------|---------------------------------------------------------------------|
 //! | `client_base`       | Core client networking, the image cache, commands and translations. |
-//! | `client_voice`      | Voice chat and voice messages (on top of `client_base`).            |
+//! | `client_voice`      | Voice chat, voice messages and attachment media playback (on top of `client_base`).            |
 //! | `client_screen`     | Screen sharing (implies `client_voice`).                            |
 //! | `client`            | All client features (the default).                                  |
 //! | `server`            | The server half of every protocol.                                  |

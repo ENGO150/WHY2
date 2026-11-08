@@ -43,6 +43,7 @@ use std::sync::
 {
     Arc,
     Mutex,
+    mpsc::{ Receiver, TryRecvError },
     atomic::{ AtomicBool, AtomicUsize, Ordering },
 };
 
@@ -129,8 +130,8 @@ struct Player //A VOICE MESSAGE BEING PLAYED
 /// How far a playback has got, shared with its output callback.
 struct Progress //WHERE THE PLAYBACK IS
 {
-    /// Frames decoded.
-    frames: AtomicUsize, //FRAMES DECODED
+    /// Milliseconds consumed by the output callback.
+    millis: AtomicUsize, //MILLISECONDS PLAYED
     /// Whether the clip ran out.
     done: AtomicBool,    //RAN OUT OF FRAMES
 }
@@ -252,7 +253,7 @@ impl Playhead
             self.buffer.truncate(decoded * self.channels);
             self.read = 0;
 
-            self.progress.frames.store(self.next, Ordering::Relaxed);
+            self.progress.millis.store(self.next * consts::FRAME_MS as usize, Ordering::Relaxed);
         }
 
         let left = self.buffer[self.read];
@@ -318,20 +319,15 @@ fn open_input(generation: usize) -> bool //CAPTURE OF OUR OWN (BLOCKING)
 /// `Err` with the translation key of the failure.
 fn open_output(hash: [u8; 32], data: &[u8], generation: usize) -> Result<(), &'static str> //START PLAYING (BLOCKING)
 {
+    if !current(generation) { return Ok(()); }
+
     let clip = Clip::decode(data).ok_or("voice_message.unreadable")?;
-
-    let _stderr_gag = Gag::stderr().ok();
-
-    let device = super::pick_device(&config::read_config::<String>("output_device"), false).ok_or("voice_message.play_failed")?;
-    let (Ok(supported), Ok(default)) = (device.supported_output_configs(), device.default_output_config()) else { return Err("voice_message.play_failed") };
-
-    let config = super::configure_device(&device, supported, default, false);
 
     let channels = if clip.channels == 1 { Channels::Mono } else { Channels::Stereo };
     let decoder = Decoder::new(<SampleRate as TryFrom<i32>>::try_from(consts::SAMPLE_RATE as i32).unwrap(), channels)
         .map_err(|_| "voice_message.play_failed")?;
 
-    let progress = Arc::new(Progress { frames: AtomicUsize::new(0), done: AtomicBool::new(false) });
+    let progress = Arc::new(Progress { millis: AtomicUsize::new(0), done: AtomicBool::new(false) });
 
     let mut playhead = Playhead
     {
@@ -344,18 +340,49 @@ fn open_output(hash: [u8; 32], data: &[u8], generation: usize) -> Result<(), &'s
         progress: progress.clone(),
     };
 
+    open_player(hash, generation, consts::SAMPLE_RATE, progress, move || playhead.next())
+}
+
+//THE SHARED VOICE AND MEDIA OUTPUT STREAM
+/// Opens the configured device, resampling stereo samples and applying the output gain.
+fn open_player
+(
+    hash: [u8; 32],
+    generation: usize,
+    rate: u32,
+    progress: Arc<Progress>,
+    mut next_sample: impl FnMut() -> Option<(f32, f32)> + Send + 'static,
+) -> Result<(), &'static str>
+{
+    if !current(generation) { return Ok(()); }
+
+    let _stderr_gag = Gag::stderr().ok();
+
+    let device = super::pick_device(&config::read_config::<String>("output_device"), false).ok_or("voice_message.play_failed")?;
+    let (Ok(supported), Ok(default)) = (device.supported_output_configs(), device.default_output_config()) else { return Err("voice_message.play_failed") };
+
+    let config = super::configure_device(&device, supported, default, false);
+
     //OUTPUT RESAMPLING
     let output_channels = config.channels as usize;
-    let step = consts::SAMPLE_RATE as f32 / config.sample_rate as f32;
+    let step = rate as f32 / config.sample_rate as f32;
 
     let mut position = 0.;
     let mut current = (0., 0.);
     let mut next = (0., 0.);
 
     let callback_progress = progress.clone();
+    let error_progress = progress.clone();
 
     let stream = device.build_output_stream(config, move |data: &mut [f32], _: &_|
     {
+        if PLAY_GENERATION.load(Ordering::Relaxed) != generation
+        {
+            data.fill(0.);
+            callback_progress.done.store(true, Ordering::Relaxed);
+            return;
+        }
+
         let gain = options::get_output_gain(); //ONCE PER CALLBACK, NOT PER SAMPLE
 
         for frame in data.chunks_mut(output_channels)
@@ -363,7 +390,7 @@ fn open_output(hash: [u8; 32], data: &[u8], generation: usize) -> Result<(), &'s
             while position >= 1.
             {
                 current = next;
-                next = match playhead.next()
+                next = match next_sample()
                 {
                     Some(sample) => sample,
                     None =>
@@ -391,7 +418,8 @@ fn open_output(hash: [u8; 32], data: &[u8], generation: usize) -> Result<(), &'s
                 },
             }
         }
-    }, |_| {}, None).map_err(|_| "voice_message.play_failed")?;
+    }, move |_| error_progress.done.store(true, Ordering::Relaxed), None)
+        .map_err(|_| "voice_message.play_failed")?;
 
     stream.play().map_err(|_| "voice_message.play_failed")?;
 
@@ -532,6 +560,57 @@ pub fn cancel_recording() //THROW IT AWAY
     RECORDING.lock().unwrap().take();
 }
 
+//RESERVE THE PLAYER FOR A NEW VOICE MESSAGE OR MEDIA FILE
+/// Stops the old output and returns the generation that owns the next playback.
+pub(crate) fn begin_playback() -> usize
+{
+    let generation = PLAY_GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
+
+    PLAYER.lock().unwrap().take();
+    AWAITED.lock().unwrap().clear();
+
+    generation
+}
+
+/// Returns whether a decoder still owns the shared player.
+pub(crate) fn current(generation: usize) -> bool
+{
+    PLAY_GENERATION.load(Ordering::Relaxed) == generation
+}
+
+//PLAY DECODED MEDIA THROUGH THE VOICE MESSAGE OUTPUT
+/// Opens the shared player for bounded packets of stereo PCM. The callback never waits.
+pub(crate) fn open_pcm(hash: [u8; 32], generation: usize, rate: u32, receiver: Receiver<Vec<f32>>)
+    -> Result<(), &'static str>
+{
+    let progress = Arc::new(Progress { millis: AtomicUsize::new(0), done: AtomicBool::new(false) });
+    let callback_progress = progress.clone();
+    let mut buffer = Vec::new();
+    let mut read = 0;
+    let mut played = 0u64;
+
+    open_player(hash, generation, rate, progress, move ||
+    {
+        //UNDERRUNS PRODUCE SILENCE WITHOUT ADVANCING THE MEDIA CLOCK
+        while read >= buffer.len()
+        {
+            match receiver.try_recv()
+            {
+                Ok(packet) => { buffer = packet; read = 0; },
+                Err(TryRecvError::Empty) => return Some((0., 0.)),
+                Err(TryRecvError::Disconnected) => return None,
+            }
+        }
+
+        let sample = (buffer[read], buffer[read + 1]);
+        read += 2;
+        played += 1;
+        callback_progress.millis.store((played * 1000 / rate as u64) as usize, Ordering::Relaxed);
+
+        Some(sample)
+    })
+}
+
 //PLAYBACK
 /// Plays a clip from the cache, or requests it from the server.
 ///
@@ -539,10 +618,7 @@ pub fn cancel_recording() //THROW IT AWAY
 /// back here through [`awaited`] and [`play_data`].
 pub fn play(hash: [u8; 32], tx: Sender<ClientEvent>) //OUT OF THE CACHE, ELSE ASK THE SERVER
 {
-    let generation = PLAY_GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
-
-    //ONE AT A TIME
-    PLAYER.lock().unwrap().take();
+    let generation = begin_playback();
 
     tokio::spawn(async move
     {
@@ -611,5 +687,5 @@ pub fn playing() -> Option<([u8; 32], u32)> //(CLIP, MS PLAYED)
         return None;
     }
 
-    Some((player.hash, player.progress.frames.load(Ordering::Relaxed) as u32 * consts::FRAME_MS))
+    Some((player.hash, player.progress.millis.load(Ordering::Relaxed).min(u32::MAX as usize) as u32))
 }

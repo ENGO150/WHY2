@@ -606,6 +606,14 @@ async fn handle_terminal_event
                             return;
                         }
 
+                        //A MEDIA CAPTION USES THE SHARED PLAYER
+                        #[cfg(feature = "client_voice")]
+                        if let Some(entry) = app.attachment_at(mouse.column, mouse.row)
+                            && voice_message::click_media(app, entry, tx)
+                        {
+                            return;
+                        }
+
                         //A CLICK ON A URL HANDS IT TO THE BROWSER
                         if let Some(url) = app.link_at(mouse.column, mouse.row)
                         {

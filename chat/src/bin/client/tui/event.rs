@@ -27,6 +27,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use ratatui::text::{ Line, Span };
 
+#[cfg(feature = "client_voice")]
+use crate::network::client::media;
+
 use crate::
 {
     t,
@@ -198,6 +201,24 @@ impl App
 
             ClientEvent::AttachmentPreviewUnavailable { username, filename, message_id, hash, timestamp, username_color } =>
                 self.push_caption(username, filename, message_id, timestamp, hash, state::Picture::Gone, username_color),
+
+            #[cfg(feature = "client_voice")]
+            ClientEvent::MediaFrame { hash, generation, frame } =>
+            {
+                media::frame_consumed(generation);
+
+                if media::current(generation) { self.deliver_media_frame(hash, frame); }
+            },
+
+            #[cfg(feature = "client_voice")]
+            ClientEvent::MediaFetched { hash } =>
+            {
+                self.fetched(&hash);
+                self.deliver_image(hash, None);
+            },
+
+            #[cfg(feature = "client_voice")]
+            ClientEvent::MediaFailed { reason } => self.push_styled(reason, theme::error()),
 
             //A VOICE MESSAGE, FILED BY CHANNEL
             ClientEvent::VoiceMessage

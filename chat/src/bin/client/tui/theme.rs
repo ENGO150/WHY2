@@ -65,6 +65,9 @@ use ratatui::
     },
 };
 
+#[cfg(feature = "client_voice")]
+use crate::network::client::media;
+
 use crate::
 {
     t,
@@ -244,13 +247,9 @@ impl Theme
             Entry::Transfer(transfer) => state::wrap_line(&Line::from(progress(transfer, width)), width),
 
             //ONLY THE CAPTION; THE PICTURE IS DRAWN UNDER IT
-            Entry::Attachment { username, filename, message_id, timestamp, username_color, picture, .. } =>
+            Entry::Attachment { username, filename, message_id, timestamp, username_color, picture, hash, .. } =>
             {
-                let caption = match picture
-                {
-                    Picture::Ready(..) => t!("message.attachment"),
-                    _ => t!("message.file"),
-                };
+                let caption = attachment_caption(filename, picture);
                 let (before, after) = i18n::split(caption, "username");
 
                 let mut spans = vec!
@@ -260,6 +259,21 @@ impl Theme
                     self.sender(username, *username_color),
                     Span::styled(i18n::format(after, &[("filename", filename)]), dim()),
                 ];
+
+                #[cfg(feature = "client_voice")]
+                if media::supported(filename)
+                {
+                    let playing = media::playing().filter(|(playing, _)| Some(*playing) == *hash);
+
+                    spans.push(match playing
+                    {
+                        Some((_, millis)) => Span::styled(format!(" [ ■ {} ] {}", t!("message.stop"), clock(millis / 1000)), accent()),
+                        None => Span::styled(format!(" [ ▶ {} ]", t!("message.play")), accent()),
+                    });
+                }
+
+                #[cfg(not(feature = "client_voice"))]
+                let _ = hash;
 
                 match picture
                 {
@@ -330,11 +344,7 @@ impl Theme
 
             Some(Entry::Attachment { username, filename, username_color, picture, .. }) =>
             {
-                let caption = match picture
-                {
-                    Picture::Ready(..) => t!("message.attachment"),
-                    _ => t!("message.file"),
-                };
+                let caption = attachment_caption(filename, picture);
                 let (before, after) = i18n::split(caption, "username");
 
                 spans.push(Span::styled(i18n::format(before, &[("filename", filename)]), dim()));
@@ -479,6 +489,25 @@ pub fn stripe(terminal: Option<(u8, u8, u8)>) -> Color
     let nudge = |c: u8| (c as f32 + (target - c as f32) * STRIPE_LIFT).round() as u8;
 
     Color::Rgb(nudge(r), nudge(g), nudge(b))
+}
+
+//A PREVIEW DOES NOT TURN A VIDEO ATTACHMENT INTO AN IMAGE MESSAGE
+/// Chooses an existing localized caption for images, videos and other files.
+fn attachment_caption(filename: &str, picture: &Picture) -> &'static str
+{
+    let image = matches!(picture, Picture::Ready(..));
+
+    #[cfg(feature = "client_voice")]
+    let image = image && !media::supported(filename);
+
+    #[cfg(not(feature = "client_voice"))]
+    let _ = filename;
+
+    match image
+    {
+        true => t!("message.image"),
+        false => t!("message.file"),
+    }
 }
 
 //A TRANSFER'S ROW - WHAT IT IS, ITS BAR, AND WHAT IT HAS MOVED

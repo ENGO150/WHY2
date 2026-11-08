@@ -124,6 +124,32 @@ pub const SERVER_RESTART_SETTINGS: &[&str] =                                    
     &["server_ip", "server_port", "enable_voice_chat", "server_username",             //RESTART TO BE APPLIED
       "log_level"];
 
+//EMBEDDED ATTACHMENT PLAYBACK
+/// Largest video frame accepted by the embedded decoder.
+#[cfg(feature = "client_voice")]
+pub const MAX_MEDIA_PIXELS: usize          = 4096 * 2160;
+/// Largest MP4 sample table kept for presentation ordering.
+#[cfg(feature = "client_voice")]
+pub const MAX_MEDIA_SAMPLES: u32           = 60000;
+/// Most encoded video samples visited while looking for a thumbnail.
+#[cfg(feature = "client_voice")]
+pub const MEDIA_THUMBNAIL_SAMPLES: u32     = 128;
+/// Most decoded samples per channel in one audio packet.
+#[cfg(feature = "client_voice")]
+pub const MAX_MEDIA_AUDIO_FRAMES: usize    = 65536;
+/// Most decoded stereo packets waiting for the audio callback.
+#[cfg(feature = "client_voice")]
+pub const MEDIA_AUDIO_QUEUE: usize         = 4;
+/// Largest frame sent to the terminal renderer, before fitting to pane cells.
+#[cfg(feature = "client_voice")]
+pub const MEDIA_PREVIEW_SIZE: (u32, u32)   = (960, 540);
+/// Decoder polling interval while waiting for playback or bounded queues.
+#[cfg(feature = "client_voice")]
+pub const MEDIA_POLL_DELAY: Duration       = Duration::from_millis(5);
+/// How late a video frame may be before it is dropped.
+#[cfg(feature = "client_voice")]
+pub const MEDIA_FRAME_LATENESS: u64        = 150;
+
 //DO NOT CHANGE CONSTS BELOW UNLESS YOU ARE ABSOLUTELY SURE WHAT ARE YOU DOING
 /// Decimal megabyte (10^6 bytes), not a mebibyte.
 pub const MEGABYTE: usize              = 1_000_000;                                   //MEGABYTE DEFINITION

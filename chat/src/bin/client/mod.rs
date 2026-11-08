@@ -76,7 +76,7 @@ use tui::
 };
 
 #[cfg(feature = "client_voice")]
-use tui::settings::DeviceEntry;
+use tui::{ settings::DeviceEntry, state::PlaybackSource };
 
 use why2_chat::
 {
@@ -903,9 +903,10 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         Command::Play => match parameters.map(|p| p.parse::<u64>())
                         {
                             None => tui::voice_message::stop(app),
-                            Some(Ok(message_id)) => match app.voice_of(message_id)
+                            Some(Ok(message_id)) => match app.playable_of(message_id)
                             {
-                                Ok(hash) => tui::voice_message::play(app, hash, tx),
+                                Ok(PlaybackSource::Voice(hash)) => tui::voice_message::play(app, hash, tx),
+                                Ok(PlaybackSource::Attachment(hash)) => tui::voice_message::play_media(app, hash, tx),
                                 Err(error) => app.push_styled(error, theme::error()),
                             },
                             Some(Err(_)) => invalid_usage(app, None),

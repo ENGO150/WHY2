@@ -41,6 +41,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //MODULES
 pub mod image;
+
+#[cfg(feature = "client_voice")]
+pub mod media;
 pub mod handshake;
 
 use std::
@@ -72,6 +75,9 @@ use zeroize::Zeroizing;
 use semver::Version;
 
 use image::Animation;
+
+#[cfg(feature = "client_voice")]
+use image::ImageFrame;
 
 use handshake::Handshake;
 
@@ -607,6 +613,20 @@ pub enum ClientEvent
         /// The sender's username color.
         username_color: Option<u8>,
     },                                                           //AN ATTACHMENT WITHOUT AN IMAGE PREVIEW
+    /// A bounded video frame ready for the terminal renderer.
+    #[cfg(feature = "client_voice")]
+    MediaFrame
+    {
+        hash: [u8; 32],
+        generation: usize,
+        frame: ImageFrame,
+    },
+    /// A requested media attachment arrived.
+    #[cfg(feature = "client_voice")]
+    MediaFetched { hash: [u8; 32] },
+    /// Embedded media decoding or output failed.
+    #[cfg(feature = "client_voice")]
+    MediaFailed { reason: String },
     /// A voice message.
     VoiceMessage
     {
@@ -1250,6 +1270,19 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 let attachment_tx = tx.clone();
 
+                //MEDIA ATTACHMENTS USE THE SAME HASH FETCH AS VOICE MESSAGES
+                #[cfg(feature = "client_voice")]
+                if let Some(generation) = media::awaited(&hash)
+                {
+                    tokio::spawn(async move
+                    {
+                        if !data.is_empty() && crypto::sha256(&data) == hash { cache::store(&hash, &data).await; }
+                        media::play_data(hash, data, generation, attachment_tx).await;
+                    });
+
+                    continue;
+                }
+
                 //A CLIP ASKED FOR TO PLAY
                 #[cfg(feature = "client_voice")]
                 if let Some(generation) = voice_message::awaited(&hash)
@@ -1376,7 +1409,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                         },
 
                         //OUT OF THE CACHE, ALREADY FILED UNDER THIS HASH
-                        false => task::spawn_blocking(move || image::decode_image(&data))
+                        false => task::spawn_blocking(move || image::decode_attachment(&data))
                             .await.expect("Decoding image panicked"),
                     };
 

@@ -76,6 +76,9 @@ use crate::
     network::client::ClientEvent,
 };
 
+#[cfg(feature = "client_voice")]
+use super::media;
+
 //STRUCTS
 /// One frame of a decoded picture.
 #[derive(Clone)]
@@ -280,17 +283,30 @@ pub fn make_avatar(data: &[u8]) -> Option<(Vec<u8>, &'static str)>
     }
 }
 
-/// Hashes and decodes a picture on a blocking thread.
+/// Hashes and decodes an attachment preview on a blocking thread.
 ///
 /// # Returns
-/// The picture's SHA-256 and its decoded frames, if it decodes.
+/// The attachment's SHA-256 and its image frames or video poster, if supported.
 ///
 /// # Panics
 /// If the blocking task panics.
 pub async fn digest_and_decode(data: Arc<Vec<u8>>) -> ([u8; 32], Option<Animation>)
 {
-    task::spawn_blocking(move || (crypto::sha256(&data), decode_image(&data)))
+    task::spawn_blocking(move || (crypto::sha256(&data), decode_attachment(&data)))
         .await.expect("Decoding image panicked")
+}
+
+//DECODE AN IMAGE OR A VIDEO POSTER WITHOUT STARTING ITS PLAYER
+/// Decodes an attachment preview; video posters are available with `client_voice`.
+pub fn decode_attachment(data: &[u8]) -> Option<Animation>
+{
+    if let Some(image) = decode_image(data) { return Some(image); }
+
+    #[cfg(feature = "client_voice")]
+    { media::thumbnail(data) }
+
+    #[cfg(not(feature = "client_voice"))]
+    { None }
 }
 
 /// Loads a picture from the cache, or asks for it to be fetched from the server.
@@ -305,18 +321,19 @@ pub fn fetch_image(hash: [u8; 32], tx: Sender<ClientEvent>)
 {
     tokio::spawn(async move
     {
-        let cached = match cache::load(&hash).await
+        let event = match cache::load(&hash).await
         {
-            Some(data) => task::spawn_blocking(move || decode_image(&data))
-                .await.expect("Decoding image panicked"),
+            Some(data) =>
+            {
+                let image = task::spawn_blocking(move || decode_attachment(&data))
+                    .await.expect("Decoding attachment preview panicked");
 
-            None => None,
+                ClientEvent::ImageData { hash, image }
+            },
+
+            None => ClientEvent::AttachmentRequest { hash },
         };
 
-        tx.send(match cached
-        {
-            Some(image) => ClientEvent::ImageData { hash, image: Some(image) },
-            None => ClientEvent::AttachmentRequest { hash },
-        }).await.unwrap();
+        tx.send(event).await.unwrap();
     });
 }

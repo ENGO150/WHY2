@@ -310,6 +310,14 @@ pub enum Picture
     Ready(Box<Fitted>),
 }
 
+//THE CONTENT A PLAY COMMAND RESOLVED
+/// A voice clip or an ordinary audio/video attachment.
+pub enum PlaybackSource
+{
+    Voice([u8; 32]),
+    Attachment([u8; 32]),
+}
+
 //WHERE A VOICE MESSAGE'S PLAYBACK IS
 /// Where a voice message's playback is.
 #[derive(Clone, Copy, PartialEq)]
@@ -1124,21 +1132,22 @@ impl App
         }
     }
 
-    //THE CLIP OF A LOADED VOICE MESSAGE
-    /// Returns the clip of a loaded voice message.
+    //THE HASH AND SOURCE OF A LOADED PLAYABLE MESSAGE
+    /// Returns the content hash with its voice or attachment source.
     ///
     /// # Returns
     /// `Err` with a message for the user if it is not in the pane or the parked lobby.
-    pub fn voice_of(&self, message_id: u64) -> Result<[u8; 32], String>
+    pub fn playable_of(&self, message_id: u64) -> Result<PlaybackSource, String>
     {
         let entry = self.messages.iter().chain(self.panes.get("").into_iter().flatten())
             .find(|entry| entry.message_id() == Some(message_id))
-            .ok_or_else(|| t!("voice_message.not_loaded", message_id))?;
+            .ok_or_else(|| t!("media.not_loaded", message_id))?;
 
         match entry
         {
-            Entry::Voice { voice, .. } => Ok(voice.hash),
-            _ => Err(t!("voice_message.not_voice", message_id)),
+            Entry::Voice { voice, .. } => Ok(PlaybackSource::Voice(voice.hash)),
+            Entry::Attachment { hash: Some(hash), .. } => Ok(PlaybackSource::Attachment(*hash)),
+            _ => Err(t!("media.unsupported").to_owned()),
         }
     }
 
@@ -1225,6 +1234,23 @@ impl App
         if let Some((hash, seconds)) = now { self.set_playback(&hash, Playback::Playing(seconds)); }
 
         self.playing = now;
+        self.generation += 1;
+        self.dirty = true;
+    }
+
+    //REPLACE ONE VIDEO FRAME THROUGH THE EXISTING IMAGE RENDERER
+    #[cfg(feature = "client_voice")]
+    pub fn deliver_media_frame(&mut self, hash: [u8; 32], frame: ImageFrame)
+    {
+        let entry = self.messages.iter().position(|entry|
+            matches!(entry, Entry::Attachment { hash: Some(stored), .. } if *stored == hash));
+        let Some(entry) = entry else { return };
+        let picture = self.fit(vec![frame]);
+
+        if let Some(Entry::Attachment { picture: slot, .. }) = self.messages.get_mut(entry) { *slot = picture; }
+
+        self.generation += 1;
+        self.dirty = true;
     }
 
     //A CLICKED CAPTION

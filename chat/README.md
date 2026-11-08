@@ -105,7 +105,7 @@ Aliases are available for every command. `Ctrl+<key>` runs the ones with a short
 | `/pm <id> <text>`, `/re <text>` | Private messages |
 | `/channel [name]` | Switch channel; no name returns to the lobby |
 | `/voice`, `/mute [id]` | Voice chat; mute a user or yourself |
-| `/record`, `/play <id>` | Record and play voice messages |
+| `/record`, `/play [id]` | Record voice messages; play voice, audio, and video attachments; omit the ID to stop |
 | `/upload <path> [persistent]` | Upload any file; `true` keeps it in chat history and previews images |
 | `/files`, `/download <user> <file>`, `/download <message-id>` | File transfer |
 | `/screen [monitor] [sound]`, `/screens`, `/attach <id>`, `/deattach`, `/mutescreen` | Screen sharing |
@@ -114,6 +114,8 @@ Aliases are available for every command. `Ctrl+<key>` runs the ones with a short
 | `/settings`, `/account passwd`, `/account delete`, `/logout`, `/exit` | Settings, account and session |
 
 `persistent` defaults to `true`. Use `/upload report.pdf` to attach a file to chat history, then `/download <message-id>` to retrieve it, including after a server restart. Downloads use a verified local cache when available, otherwise they request the file from the server. Use `/upload report.pdf false` for a temporary file share. Images are rendered inline as before. Persistent attachments use the existing 8 MB limit and are kept in the lobby when `persistent_messages` is enabled.
+
+With `client_voice`, click an audio/video attachment caption or use `/play <message-id>` to play it inline. The embedded player supports MP3, WAV/PCM, FLAC, AAC/M4A, ALAC, Ogg/Vorbis, and MP4/M4V video with H.264 (up to 4096 × 2160, 60,000 samples). Videos show a still thumbnail before playback, following the image-preview setting. Video uses terminal image rendering; audio shares the voice-message output device and volume. It needs neither an external player nor `client_screen`. Decode support is the same on Linux, Windows, and macOS; terminal graphics support determines how video is displayed. Encoded attachments are shared in memory for seeking, while decoded audio and video use bounded queues. Playback has play/stop controls; pause and seeking are not implemented.
 
 <details>
 <summary>Moderation commands</summary>

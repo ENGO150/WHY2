@@ -51,7 +51,7 @@ use crate::
     t,
     network::
     {
-        client::ClientEvent,
+        client::{ ClientEvent, media },
         voice::client::message,
     },
 };
@@ -62,6 +62,7 @@ use super::
     state::
     {
         App,
+        Entry,
         Playback,
         Recording,
     },
@@ -170,7 +171,7 @@ pub fn cancel(app: &mut App) //THROW THE RECORDING AWAY
 /// limit, or whose key repeats stopped, and updates the shown duration.
 pub fn tick(app: &mut App, write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>, tx: &Sender<ClientEvent>)
 {
-    app.sync_playing(message::playing());
+    app.sync_playing(media::playing().or_else(message::playing));
 
     let Some(recording) = app.recording.as_mut() else { return };
 
@@ -224,6 +225,32 @@ pub fn play(app: &mut App, hash: [u8; 32], tx: &Sender<ClientEvent>)
     app.set_playback(&hash, Playback::Loading);
 
     message::play(hash, tx.clone());
+}
+
+//PLAY AN AUDIO OR VIDEO ATTACHMENT
+pub fn play_media(app: &mut App, hash: [u8; 32], tx: &Sender<ClientEvent>)
+{
+    app.stop_loading();
+    media::play(hash, tx.clone());
+    app.dirty = true;
+}
+
+/// Toggles a playable attachment caption, returning whether the click was handled.
+pub fn click_media(app: &mut App, entry: usize, tx: &Sender<ClientEvent>) -> bool
+{
+    let Some(Entry::Attachment { hash: Some(hash), filename, .. }) = app.messages.get(entry)
+        else { return false };
+
+    if !media::supported(filename) { return false; }
+    let hash = *hash;
+
+    match media::playing().is_some_and(|(playing, _)| playing == hash)
+    {
+        true => stop(app),
+        false => play_media(app, hash, tx),
+    }
+
+    true
 }
 
 /// Stops playback.
