@@ -482,7 +482,15 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         //DISCONNECT FROM VOICE CHAT
         if options::voice_chat_enabled()
         {
-            voice_server::remove_connection(connection.id().unwrap());
+            let id = *connection.id().unwrap();
+
+            //VOICE MEMBERSHIP ENDS INDEPENDENTLY OF ONLINE VISIBILITY
+            if voice_server::CONNECTIONS.contains_key(&id)
+            {
+                send_to_all(PacketCode::VoiceLeave { id, channel: connection.channel().clone() });
+            }
+
+            voice_server::remove_connection(&id);
         }
 
         //REMOVE UPLOADS

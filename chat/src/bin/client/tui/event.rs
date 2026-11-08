@@ -348,9 +348,6 @@ impl App
                     self.offline.insert(id, (uname, color));
                 }
 
-                //A DISCONNECT CARRIES NO VoiceLeave
-                if self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
-
                 //A CHANNEL EXISTS WHILE SOMEBODY IS IN IT
                 self.channels = self.online.iter().filter_map(|user| user.channel.clone()).collect();
                 self.prune_panes();
@@ -374,7 +371,7 @@ impl App
                 self.devices.remove(&username);
                 self.stopped_typing(&username);
 
-                //A DISCONNECT CARRIES NO VoiceLeave
+                //REMOVE BANNED ACCOUNTS FROM VOICE TOO
                 if let Some(id) = id && self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }
 
                 //A CHANNEL EXISTS WHILE SOMEBODY IS IN IT

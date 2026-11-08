@@ -1054,13 +1054,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 tx.send(ClientEvent::Join { username: user, username_color, id, device, role }).await.unwrap();
             }
 
-            //LEAVE MESSAGE (CLIENT DISCONNECTED)
+            //ONLINE VISIBILITY CHANGED OR CLIENT DISCONNECTED; VoiceLeave ENDS VOICE
             PacketCode::Leave { username, id, registered } =>
             {
                 tx.send(ClientEvent::Leave { username, id, registered }).await.unwrap();
-
-                #[cfg(feature = "client_voice")]
-                voice_client::remove_consumer(&id);
             },
 
             //CHANNEL CHANGE
