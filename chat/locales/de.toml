@@ -271,6 +271,12 @@ unreadable = "Diese Sprachnachricht konnte nicht gelesen werden."
 not_loaded = "Sprachnachricht #{message_id} ist nicht geladen."
 not_voice = "Nachricht #{message_id} ist keine Sprachnachricht."
 
+[media]
+unsupported = "Dieser Anhang ist keine unterstützte Audio- oder Videodatei."
+failed = "Diese Mediendatei konnte nicht abgespielt werden."
+not_loaded = "Nachricht #{message_id} ist nicht geladen."
+output_failed = "Wiedergabe fehlgeschlagen - kein nutzbares Ausgabegerät."
+
 [upload]
 read_failed = "Lesen der Datei fehlgeschlagen!"
 unreadable_image = "Dieses Bild konnte nicht gelesen werden!"
@@ -458,8 +464,8 @@ description = "Schaltet einen Benutzer/dich stumm oder hebt es auf"
 description = "Nimmt eine Sprachnachricht auf - Tastenkürzel halten zum Sprechen, oder antippen zum Starten und erneut zum Senden"
 
 [command.play]
-args.id = "ID der Sprachnachricht"
-description = "Spielt eine Sprachnachricht ab oder stoppt die Wiedergabe, wenn ID fehlt"
+args.id = "ID einer Sprachnachricht oder eines Medienanhangs"
+description = "Spielt eine Sprachnachricht oder einen Audio-/Videoanhang ab; ohne ID wird die Wiedergabe gestoppt"
 
 [command.channel]
 args.name = "Name des Kanals"

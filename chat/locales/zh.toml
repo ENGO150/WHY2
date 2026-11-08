@@ -270,6 +270,12 @@ unreadable = "无法读取该语音消息。"
 not_loaded = "语音消息 #{message_id} 未加载。"
 not_voice = "消息 #{message_id} 不是语音消息。"
 
+[media]
+unsupported = "此附件不是受支持的音频或视频文件。"
+failed = "无法播放此媒体文件。"
+not_loaded = "消息 #{message_id} 尚未加载。"
+output_failed = "播放失败：没有可用的输出设备。"
+
 [upload]
 read_failed = "读取文件失败！"
 unreadable_image = "无法读取该图片！"
@@ -456,8 +462,8 @@ description = "静音或取消静音某个用户/你自己"
 description = "录制语音消息 - 按住快捷键说话，或按一下开始、再按一下发送"
 
 [command.play]
-args.id = "语音消息的 ID"
-description = "播放语音消息，若省略 ID 则停止播放"
+args.id = "语音消息或媒体附件的 ID"
+description = "播放语音消息或音频/视频附件；省略 ID 则停止播放"
 
 [command.channel]
 args.name = "频道名称"

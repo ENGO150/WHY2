@@ -270,6 +270,12 @@ unreadable = "Bu sesli mesaj okunamadı."
 not_loaded = "#{message_id} numaralı sesli mesaj yüklenmedi."
 not_voice = "#{message_id} numaralı mesaj bir sesli mesaj değil."
 
+[media]
+unsupported = "Bu ek, desteklenen bir ses veya video dosyası değil."
+failed = "Bu medya dosyası oynatılamadı."
+not_loaded = "#{message_id} mesajı yüklenmedi."
+output_failed = "Oynatma başarısız: kullanılabilir çıkış aygıtı yok."
+
 [upload]
 read_failed = "Dosya okunamadı!"
 unreadable_image = "O resim okunamadı!"
@@ -456,8 +462,8 @@ description = "Bir kullanıcıyı/kendinizi susturur veya susturmayı kaldırır
 description = "Sesli mesaj kaydeder - konuşmak için kısayolu basılı tutun ya da başlatmak için bir kez, göndermek için tekrar basın"
 
 [command.play]
-args.id = "Sesli mesajın ID'si"
-description = "Sesli mesajı oynatır, ID verilmezse oynatmayı durdurur"
+args.id = "Sesli mesajın veya medya ekinin kimliği"
+description = "Sesli mesajı veya ses/video ekini oynatır; oynatmayı durdurmak için kimliği belirtmeyin"
 
 [command.channel]
 args.name = "Kanal adı"

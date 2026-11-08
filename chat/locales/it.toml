@@ -271,6 +271,12 @@ unreadable = "Impossibile leggere quel messaggio vocale."
 not_loaded = "Il messaggio vocale #{message_id} non è caricato."
 not_voice = "Il messaggio #{message_id} non è un messaggio vocale."
 
+[media]
+unsupported = "Questo allegato non è un file audio o video supportato."
+failed = "Impossibile riprodurre questo file multimediale."
+not_loaded = "Il messaggio #{message_id} non è caricato."
+output_failed = "Riproduzione non riuscita: nessun dispositivo di uscita disponibile."
+
 [upload]
 read_failed = "Lettura del file non riuscita!"
 unreadable_image = "Impossibile leggere quell'immagine!"
@@ -458,8 +464,8 @@ description = "Silenzia o riattiva un utente/te stesso"
 description = "Registra un messaggio vocale - tieni premuta la scorciatoia per parlare, oppure premila per iniziare e di nuovo per inviare"
 
 [command.play]
-args.id = "ID del messaggio vocale"
-description = "Riproduce un messaggio vocale, o ferma la riproduzione se ID è omesso"
+args.id = "ID di un messaggio vocale o di un allegato multimediale"
+description = "Riproduce un messaggio vocale o un allegato audio/video; ometti l’ID per interrompere la riproduzione"
 
 [command.channel]
 args.name = "Nome del canale"

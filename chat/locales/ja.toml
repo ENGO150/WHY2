@@ -270,6 +270,12 @@ unreadable = "そのボイスメッセージを読み込めませんでした。
 not_loaded = "ボイスメッセージ #{message_id} は読み込まれていません。"
 not_voice = "メッセージ #{message_id} はボイスメッセージではありません。"
 
+[media]
+unsupported = "この添付ファイルは対応する音声・動画ファイルではありません。"
+failed = "このメディアファイルを再生できませんでした。"
+not_loaded = "メッセージ #{message_id} は読み込まれていません。"
+output_failed = "再生に失敗しました。使用可能な出力デバイスがありません。"
+
 [upload]
 read_failed = "ファイルの読み込みに失敗しました！"
 unreadable_image = "その画像を読み込めませんでした！"
@@ -456,8 +462,8 @@ description = "ユーザー/自分のミュートを切り替えます"
 description = "ボイスメッセージを録音します - ショートカットを押し続けて話すか、一度押して開始し、もう一度押して送信します"
 
 [command.play]
-args.id = "ボイスメッセージのID"
-description = "ボイスメッセージを再生します。IDを省略すると再生を停止します"
+args.id = "音声メッセージまたはメディア添付ファイルの ID"
+description = "音声メッセージや音声・動画の添付ファイルを再生します。ID を省略すると再生を停止します"
 
 [command.channel]
 args.name = "チャンネル名"

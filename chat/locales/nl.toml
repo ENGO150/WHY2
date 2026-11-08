@@ -271,6 +271,12 @@ unreadable = "Dat spraakbericht kon niet worden gelezen."
 not_loaded = "Spraakbericht #{message_id} is niet geladen."
 not_voice = "Bericht #{message_id} is geen spraakbericht."
 
+[media]
+unsupported = "Deze bijlage is geen ondersteund audio- of videobestand."
+failed = "Dit mediabestand kon niet worden afgespeeld."
+not_loaded = "Bericht #{message_id} is niet geladen."
+output_failed = "Afspelen mislukt - geen bruikbaar uitvoerapparaat."
+
 [upload]
 read_failed = "Lezen van het bestand mislukt!"
 unreadable_image = "Die afbeelding kon niet worden gelezen!"
@@ -458,8 +464,8 @@ description = "Dempt een gebruiker/jezelf of heft het op"
 description = "Neemt een spraakbericht op - houd de sneltoets ingedrukt om te praten, of tik erop om te beginnen en nogmaals om te versturen"
 
 [command.play]
-args.id = "ID van het spraakbericht"
-description = "Speelt een spraakbericht af, of stopt het afspelen als ID ontbreekt"
+args.id = "ID van een spraakbericht of mediabijlage"
+description = "Speelt een spraakbericht of audio-/videobijlage af; laat de ID weg om het afspelen te stoppen"
 
 [command.channel]
 args.name = "Naam van het kanaal"

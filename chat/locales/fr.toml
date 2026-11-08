@@ -271,6 +271,12 @@ unreadable = "Ce message vocal n'a pas pu être lu."
 not_loaded = "Le message vocal #{message_id} n'est pas chargé."
 not_voice = "Le message #{message_id} n'est pas un message vocal."
 
+[media]
+unsupported = "Cette pièce jointe n’est pas un fichier audio ou vidéo pris en charge."
+failed = "Impossible de lire ce fichier multimédia."
+not_loaded = "Le message #{message_id} n’est pas chargé."
+output_failed = "Échec de la lecture : aucun périphérique de sortie utilisable."
+
 [upload]
 read_failed = "La lecture du fichier a échoué !"
 unreadable_image = "Cette image n'a pas pu être lue !"
@@ -458,8 +464,8 @@ description = "Rend muet un utilisateur/vous-même, ou rétablit le son"
 description = "Enregistre un message vocal - maintenez le raccourci pour parler, ou appuyez une fois pour commencer et à nouveau pour envoyer"
 
 [command.play]
-args.id = "ID du message vocal"
-description = "Lit un message vocal, ou arrête la lecture si ID est omis"
+args.id = "ID d’un message vocal ou d’une pièce jointe multimédia"
+description = "Lit un message vocal ou une pièce jointe audio/vidéo ; sans ID, arrête la lecture"
 
 [command.channel]
 args.name = "Nom du salon"

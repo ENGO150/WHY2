@@ -270,6 +270,12 @@ unreadable = "해당 음성 메시지를 읽을 수 없습니다."
 not_loaded = "음성 메시지 #{message_id}이(가) 로드되지 않았습니다."
 not_voice = "메시지 #{message_id}은(는) 음성 메시지가 아닙니다."
 
+[media]
+unsupported = "이 첨부 파일은 지원되는 오디오 또는 동영상 파일이 아닙니다."
+failed = "이 미디어 파일을 재생할 수 없습니다."
+not_loaded = "메시지 #{message_id}이(가) 로드되지 않았습니다."
+output_failed = "재생 실패: 사용할 수 있는 출력 장치가 없습니다."
+
 [upload]
 read_failed = "파일을 읽지 못했습니다!"
 unreadable_image = "그 이미지를 읽을 수 없습니다!"
@@ -456,8 +462,8 @@ description = "사용자/자신의 음소거를 전환합니다"
 description = "음성 메시지를 녹음합니다 - 단축키를 누른 채로 말하거나, 한 번 눌러 시작하고 다시 눌러 전송합니다"
 
 [command.play]
-args.id = "음성 메시지 ID"
-description = "음성 메시지를 재생하거나, ID를 생략하면 재생을 멈춥니다"
+args.id = "음성 메시지 또는 미디어 첨부 파일의 ID"
+description = "음성 메시지 또는 오디오/동영상 첨부 파일을 재생합니다. ID를 생략하면 재생을 중지합니다"
 
 [command.channel]
 args.name = "채널 이름"

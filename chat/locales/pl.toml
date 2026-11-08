@@ -273,6 +273,12 @@ unreadable = "Nie udało się odczytać tej wiadomości głosowej."
 not_loaded = "Wiadomość głosowa #{message_id} nie jest wczytana."
 not_voice = "Wiadomość #{message_id} nie jest wiadomością głosową."
 
+[media]
+unsupported = "Ten załącznik nie jest obsługiwanym plikiem audio ani wideo."
+failed = "Nie udało się odtworzyć tego pliku multimedialnego."
+not_loaded = "Wiadomość #{message_id} nie jest wczytana."
+output_failed = "Odtwarzanie nie powiodło się - brak dostępnego urządzenia wyjściowego."
+
 [upload]
 read_failed = "Odczyt pliku nie powiódł się!"
 unreadable_image = "Nie udało się odczytać tego obrazu!"
@@ -461,8 +467,8 @@ description = "Wycisza użytkownika/ciebie lub wyłącza wyciszenie"
 description = "Nagrywa wiadomość głosową - przytrzymaj skrót, aby mówić, lub naciśnij go, aby zacząć, i ponownie, aby wysłać"
 
 [command.play]
-args.id = "ID wiadomości głosowej"
-description = "Odtwarza wiadomość głosową lub zatrzymuje odtwarzanie, jeśli pominięto ID"
+args.id = "ID wiadomości głosowej lub załącznika multimedialnego"
+description = "Odtwarza wiadomość głosową lub załącznik audio/wideo; pomiń ID, aby zatrzymać odtwarzanie"
 
 [command.channel]
 args.name = "Nazwa kanału"

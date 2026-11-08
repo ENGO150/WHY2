@@ -284,6 +284,12 @@ unreadable = "That voice message could not be read."
 not_loaded = "Voice message #{message_id} is not loaded."
 not_voice = "Message #{message_id} is not a voice message."
 
+[media]
+unsupported = "This attachment is not a supported audio or video file."
+failed = "Could not play this media file."
+not_loaded = "Message #{message_id} is not loaded."
+output_failed = "Playback failed - no usable output device."
+
 [upload]
 read_failed = "Reading the file failed!"
 unreadable_image = "That image could not be read!"
@@ -471,8 +477,8 @@ description = "Toggle-mutes user/yourself"
 description = "Records a voice message - hold the shortcut to talk, or tap it to start and again to send"
 
 [command.play]
-args.id = "ID of the voice message"
-description = "Plays a voice message, or stops playback if ID is omitted"
+args.id = "ID of a voice message or media attachment"
+description = "Plays a voice message or audio/video attachment; omit ID to stop playback"
 
 [command.channel]
 args.name = "Name of channel"
