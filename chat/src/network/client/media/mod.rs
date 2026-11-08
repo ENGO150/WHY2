@@ -18,18 +18,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! # Attachment Media Player
 //!
-//! Embedded audio decoding and MP4/H.264 video playback. Audio uses the voice-message
+//! Embedded audio and video attachment playback. Audio uses the voice-message
 //! output device, resampler and volume. Decoders run away from the UI and audio callbacks:
 //! only four audio packets and one pending video frame may wait for their consumers.
 //! The encoded attachment is shared by both demuxers for seeking; decoded movies are never
 //! accumulated in memory.
+
+//MODULES
+mod video;
 
 use std::
 {
     io::{ Cursor, ErrorKind },
     path::Path,
     thread,
-    time::{ Duration, Instant },
+    time::Instant,
     sync::
     {
         Arc,
@@ -41,33 +44,36 @@ use std::
 
 use tokio::{ task, sync::mpsc::Sender };
 
-use image::{ DynamicImage, RgbImage };
-
-use mp4::{ Mp4Reader, MediaType, TrackType };
-
-use openh264::
-{
-    decoder::{ Decoder as VideoDecoder, DecodeOptions, DecodedYUV, Flush },
-    formats::YUVSource,
-};
-
 use symphonia::
 {
     default,
     core::
     {
         errors::Error,
-        probe::Hint,
         io::MediaSourceStream,
         meta::MetadataOptions,
-        audio::{ Channels, SampleBuffer },
-        formats::{ FormatReader, FormatOptions },
-        codecs::
+        packet::Packet,
+        audio::{ Channels, Position },
+        formats::
         {
-            Decoder as AudioDecoder,
-            DecoderOptions,
+            FormatReader,
+            FormatOptions,
+            probe::Hint,
+        },
+        codecs::audio::
+        {
+            well_known,
+            AudioDecoder,
+            AudioDecoderOptions,
         },
     },
+};
+
+use audiopus::
+{
+    Channels as OpusChannels,
+    SampleRate,
+    coder::Decoder as OpusDecoder,
 };
 
 use crate::
@@ -87,6 +93,8 @@ use crate::
     },
 };
 
+use video::Video;
+
 //STRUCTS
 /// The shared lifetime and clocks of one media playback.
 struct Session
@@ -104,20 +112,23 @@ struct Session
 struct Audio
 {
     format: Box<dyn FormatReader>,
-    decoder: Box<dyn AudioDecoder>,
+    decoder: AudioCodec,
     track: u32,
     rate: u32,
 }
 
-/// One MP4 video track and its presentation timestamps, with no predecoded frames.
-struct Video
+/// Audio decoders share the same PCM queue and output stream.
+enum AudioCodec
 {
-    reader: Mp4Reader<Cursor<Arc<[u8]>>>,
-    decoder: VideoDecoder,
-    track: u32,
-    length_size: usize,
-    count: u32,
-    times: Vec<u64>,
+    Symphonia(Box<dyn AudioDecoder>),
+    Opus { decoder: OpusDecoder, channels: usize, skip: usize },
+}
+
+struct AudioPacket
+{
+    samples: Vec<f32>,
+    channels: Channels,
+    rate: u32,
 }
 
 //GLOBAL VARIABLES
@@ -136,19 +147,87 @@ impl Session
     }
 }
 
+impl AudioCodec
+{
+    fn decode(&mut self, packet: &Packet) -> Result<AudioPacket, &'static str>
+    {
+        match self
+        {
+            Self::Symphonia(decoder) =>
+            {
+                let decoded = decoder.decode(packet).map_err(|_| "media.failed")?;
+                let spec = decoded.spec();
+
+                if decoded.frames() > consts::MAX_MEDIA_AUDIO_FRAMES || spec.channels().count() > 8
+                {
+                    return Err("media.unsupported");
+                }
+
+                let channels = spec.channels().clone();
+                let rate = spec.rate();
+                let mut samples = vec![0.; decoded.samples_interleaved()];
+                decoded.copy_to_slice_interleaved(&mut samples);
+
+                Ok(AudioPacket { samples, channels, rate })
+            },
+
+            Self::Opus { decoder, channels, skip } =>
+            {
+                //OPUS PACKETS ARE AT MOST 120 MS AT THE 48 KHZ DECODE RATE
+                let mut samples = vec![0.; 5760 * *channels];
+                let frames = decoder.decode_float(Some(packet.data.as_ref()), &mut samples, false)
+                    .map_err(|_| "media.failed")?;
+                samples.truncate(frames * *channels);
+
+                let start = (*skip).max(packet.trim_start.get() as usize).min(frames);
+                *skip = skip.saturating_sub(start);
+                let end = frames.saturating_sub(packet.trim_end.get() as usize).max(start);
+                let samples = samples[start * *channels..end * *channels].to_vec();
+                let channels = match *channels
+                {
+                    1 => Channels::Positioned(Position::FRONT_CENTER),
+                    _ => Channels::Positioned(Position::FRONT_LEFT | Position::FRONT_RIGHT),
+                };
+
+                Ok(AudioPacket { samples, channels, rate: 48000 })
+            },
+        }
+    }
+}
+
 impl Audio
 {
-    /// Selects the first supported audio track without decoding the entire file.
+    /// Selects a supported audio track; Opus reuses the voice-message decoder library.
     fn open(data: Arc<[u8]>) -> Option<Self>
     {
         let source = MediaSourceStream::new(Box::new(Cursor::new(data)), Default::default());
-        let format = default::get_probe().format(&Hint::new(), source,
-            &FormatOptions::default(), &MetadataOptions::default()).ok()?.format;
+        let format = default::get_probe().probe(&Hint::new(), source,
+            FormatOptions::default(), MetadataOptions::default()).ok()?;
 
         for track in format.tracks()
         {
-            let Some(rate) = track.codec_params.sample_rate.filter(|rate| (8000..=192000).contains(rate)) else { continue };
-            let Ok(decoder) = default::get_codecs().make(&track.codec_params, &DecoderOptions::default()) else { continue };
+            let Some(params) = track.codec_params.as_ref().and_then(|params| params.audio()) else { continue };
+            let Some(mut rate) = params.sample_rate.filter(|rate| (8000..=192000).contains(rate)) else { continue };
+
+            let decoder = if params.codec == well_known::CODEC_ID_OPUS
+            {
+                let channels = params.channels.as_ref()?.count();
+                let mode = match channels
+                {
+                    1 => OpusChannels::Mono,
+                    2 => OpusChannels::Stereo,
+                    _ => continue,
+                };
+                let decoder = OpusDecoder::new(SampleRate::Hz48000, mode).ok()?;
+                let skip = track.delay.unwrap_or_default() as usize;
+                rate = 48000;
+
+                AudioCodec::Opus { decoder, channels, skip }
+            } else
+            {
+                let Ok(decoder) = default::get_codecs().make_audio_decoder(params, &AudioDecoderOptions::default()) else { continue };
+                AudioCodec::Symphonia(decoder)
+            };
             let id = track.id;
 
             return Some(Self { format, decoder, track: id, rate });
@@ -157,56 +236,66 @@ impl Audio
         None
     }
 
-    /// Decodes packets into a bounded stereo queue; a new play or stop cancels backpressure.
+    /// Decodes packets into a bounded stereo queue; stop cancels producer backpressure.
     fn run(mut self, session: &Session, sender: SyncSender<Vec<f32>>) -> Result<(), &'static str>
     {
         while message::current(session.generation)
         {
             let packet = match self.format.next_packet()
             {
-                Ok(packet) => packet,
+                Ok(Some(packet)) => packet,
+                Ok(None) => return Ok(()),
                 Err(Error::IoError(error)) if error.kind() == ErrorKind::UnexpectedEof => return Ok(()),
                 Err(_) => return Err("media.failed"),
             };
 
-            if packet.track_id() != self.track { continue; }
+            if packet.track_id != self.track { continue; }
 
-            let decoded = self.decoder.decode(&packet).map_err(|_| "media.failed")?;
-            let spec = *decoded.spec();
-            let channels = spec.channels.count();
+            let decoded = self.decoder.decode(&packet)?;
+            let channels = decoded.channels.count();
 
-            if channels == 0 || channels > 8 || spec.rate != self.rate || decoded.capacity() > consts::MAX_MEDIA_AUDIO_FRAMES
+            if channels == 0 || channels > 8 || decoded.rate != self.rate
+                || decoded.samples.len() / channels > consts::MAX_MEDIA_AUDIO_FRAMES
             {
                 return Err("media.unsupported");
             }
 
-            let mut samples = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-            samples.copy_interleaved_ref(decoded);
-
-            let mut stereo = Vec::with_capacity(samples.len() / channels * 2);
-
-            for frame in samples.samples().chunks_exact(channels)
+            //MAP POSITIONED CHANNELS TO STEREO, INCLUDING CENTRE DIALOGUE
+            let mut weights = vec![(0., 0.); channels];
+            for (position, left, right) in
+            [
+                (Position::FRONT_LEFT, 1., 0.), (Position::FRONT_RIGHT, 0., 1.),
+                (Position::FRONT_CENTER, 0.707, 0.707),
+                (Position::REAR_LEFT, 0.5, 0.), (Position::SIDE_LEFT, 0.5, 0.),
+                (Position::REAR_RIGHT, 0., 0.5), (Position::SIDE_RIGHT, 0., 0.5),
+            ]
             {
-                if channels == 1
-                {
-                    stereo.extend_from_slice(&[frame[0], frame[0]]);
-                    continue;
-                }
+                if !matches!(&decoded.channels, Channels::Positioned(positions) if positions.contains(position)) { continue; }
 
+                if let Some(index) = decoded.channels.get_canonical_index_for_positioned_channel(position)
+                {
+                    weights[index] = (left, right);
+                }
+            }
+
+            if channels == 1 { weights[0] = (1., 1.); }
+            else if weights.iter().all(|weight| *weight == (0., 0.))
+            {
+                weights[0] = (1., 0.);
+                weights[1] = (0., 1.);
+            }
+
+            let mut stereo = Vec::with_capacity(decoded.samples.len() / channels * 2);
+            for frame in decoded.samples.chunks_exact(channels)
+            {
                 let mut left = 0.;
                 let mut right = 0.;
 
-                for (sample, channel) in frame.iter().zip(spec.channels.iter())
+                for (sample, (left_gain, right_gain)) in frame.iter().zip(&weights)
                 {
-                    match channel
-                    {
-                        Channels::FRONT_LEFT => left += sample,
-                        Channels::FRONT_RIGHT => right += sample,
-                        Channels::REAR_LEFT | Channels::SIDE_LEFT => left += sample * 0.5,
-                        Channels::REAR_RIGHT | Channels::SIDE_RIGHT => right += sample * 0.5,
-                        Channels::LFE1 | Channels::LFE2 => {},
-                        _ => { left += sample * 0.707; right += sample * 0.707; },
-                    }
+                    let sample = if sample.is_finite() { *sample } else { 0. };
+                    left += sample * left_gain;
+                    right += sample * right_gain;
                 }
 
                 stereo.extend_from_slice(&[left, right]);
@@ -232,153 +321,10 @@ impl Audio
     }
 }
 
-impl Video
-{
-    /// Reads AVC configuration, with presentation timing only when playback needs it.
-    fn open(data: Arc<[u8]>, timed: bool) -> Result<Option<Self>, &'static str>
-    {
-        let size = data.len() as u64;
-        let Ok(mut reader) = Mp4Reader::read_header(Cursor::new(data), size) else { return Ok(None) };
-        let Some(track) = reader.tracks().values().find(|track| track.track_type().ok() == Some(TrackType::Video))
-            else { return Ok(None) };
-
-        if track.media_type().ok() != Some(MediaType::H264) || track.width() == 0 || track.height() == 0
-            || track.width() as usize * track.height() as usize > consts::MAX_MEDIA_PIXELS
-            || track.sample_count() > consts::MAX_MEDIA_SAMPLES || track.timescale() == 0
-        {
-            return Err("media.unsupported");
-        }
-
-        let avc = &track.trak.mdia.minf.stbl.stsd.avc1.as_ref().ok_or("media.unsupported")?.avcc;
-        let length_size = (avc.length_size_minus_one & 3) as usize + 1;
-        let id = track.track_id();
-        let count = track.sample_count();
-        let scale = track.timescale() as u64;
-        let mut decoder = VideoDecoder::new().map_err(|_| "media.failed")?;
-        let mut configuration = Vec::new();
-
-        for parameter in [track.sequence_parameter_set(), track.picture_parameter_set()]
-        {
-            configuration.extend_from_slice(&[0, 0, 0, 1]);
-            configuration.extend_from_slice(parameter.map_err(|_| "media.unsupported")?);
-        }
-
-        decoder.decode(&configuration).map_err(|_| "media.failed")?;
-
-        //DECODE ORDER AND PRESENTATION ORDER DIFFER FOR B-FRAMES
-        let mut times = Vec::new();
-
-        if timed
-        {
-            times.reserve(count as usize);
-
-            for sample in 1..=count
-            {
-                let sample = reader.read_sample(id, sample).map_err(|_| "media.failed")?.ok_or("media.failed")?;
-                let time = (sample.start_time as i128 + sample.rendering_offset as i128).max(0) as u64;
-                times.push(time.saturating_mul(1000) / scale);
-            }
-
-            times.sort_unstable();
-            let first = times.first().copied().unwrap_or_default();
-            for time in &mut times { *time -= first; }
-        }
-
-        Ok(Some(Self { reader, decoder, track: id, length_size, count, times }))
-    }
-
-    /// Converts one length-prefixed MP4 sample to Annex B without decoding other samples.
-    fn packet(&mut self, index: u32) -> Result<Vec<u8>, &'static str>
-    {
-        let sample = self.reader.read_sample(self.track, index).map_err(|_| "media.failed")?.ok_or("media.failed")?;
-        let mut bytes = sample.bytes.as_ref();
-        let mut annex = Vec::with_capacity(bytes.len());
-
-        //MP4 PREFIXES NALS WITH LENGTHS; OPENH264 EXPECTS ANNEX B START CODES
-        while !bytes.is_empty()
-        {
-            let prefix = bytes.get(..self.length_size).ok_or("media.failed")?;
-            let size = prefix.iter().fold(0usize, |size, byte| (size << 8) | *byte as usize);
-            bytes = &bytes[self.length_size..];
-            let nal = bytes.get(..size).ok_or("media.failed")?;
-            annex.extend_from_slice(&[0, 0, 0, 1]);
-            annex.extend_from_slice(nal);
-            bytes = &bytes[size..];
-        }
-
-        Ok(annex)
-    }
-
-    /// Decodes only enough samples for a poster frame; no clock or audio stream is started.
-    fn thumbnail(mut self) -> Option<ImageFrame>
-    {
-        for index in 1..=self.count.min(consts::MEDIA_THUMBNAIL_SAMPLES)
-        {
-            let packet = self.packet(index).ok()?;
-
-            if let Some(frame) = self.decoder.decode_with_options(&packet,
-                DecodeOptions::new().flush_after_decode(Flush::NoFlush)).ok()?
-            {
-                return preview(frame).ok();
-            }
-        }
-
-        self.decoder.flush_remaining().ok()?.into_iter().next().and_then(|frame| preview(frame).ok())
-    }
-
-    /// Decodes one sample at a time, presenting against the audio clock when available.
-    fn run(mut self, session: &Session, tx: &Sender<ClientEvent>) -> Result<(), &'static str>
-    {
-        let mut shown = 0;
-
-        for index in 1..=self.count
-        {
-            if !message::current(session.generation) { return Ok(()); }
-
-            let annex = self.packet(index)?;
-
-            if let Some(frame) = self.decoder.decode_with_options(&annex,
-                DecodeOptions::new().flush_after_decode(Flush::NoFlush)).map_err(|_| "media.failed")?
-            {
-                present(frame, self.times.get(shown).copied().unwrap_or_default(), session, tx)?;
-                shown += 1;
-            }
-        }
-
-        //DRAIN DELAYED FRAMES WITHOUT KEEPING THE MOVIE IN MEMORY
-        for frame in self.decoder.flush_remaining().map_err(|_| "media.failed")?
-        {
-            present(frame, self.times.get(shown).copied().unwrap_or_default(), session, tx)?;
-            shown += 1;
-        }
-
-        Ok(())
-    }
-}
-
 //FUNCTIONS
 //PRIVATE
-/// Converts one decoded frame to a bounded still image shared by previews and playback.
-fn preview(frame: DecodedYUV<'_>) -> Result<ImageFrame, &'static str>
-{
-    let (width, height) = frame.dimensions();
-    if width == 0 || height == 0 || width * height > consts::MAX_MEDIA_PIXELS { return Err("media.unsupported"); }
-
-    let mut rgb = vec![0; width * height * 3];
-    frame.write_rgb8(&mut rgb);
-    let image = RgbImage::from_raw(width as u32, height as u32, rgb).ok_or("media.failed")?;
-    let image = DynamicImage::ImageRgb8(image);
-    let image = match width as u32 > consts::MEDIA_PREVIEW_SIZE.0 || height as u32 > consts::MEDIA_PREVIEW_SIZE.1
-    {
-        true => image.thumbnail(consts::MEDIA_PREVIEW_SIZE.0, consts::MEDIA_PREVIEW_SIZE.1),
-        false => image,
-    };
-
-    Ok(ImageFrame { image, delay: Duration::ZERO })
-}
-
 /// Keeps at most one converted frame in the UI queue and drops late frames.
-fn present(frame: DecodedYUV<'_>, time: u64, session: &Session, tx: &Sender<ClientEvent>) -> Result<(), &'static str>
+fn present(frame: ImageFrame, time: u64, session: &Session, tx: &Sender<ClientEvent>) -> Result<(), &'static str>
 {
     loop
     {
@@ -391,8 +337,6 @@ fn present(frame: DecodedYUV<'_>, time: u64, session: &Session, tx: &Sender<Clie
     }
 
     if session.elapsed() as u64 > time.saturating_add(consts::MEDIA_FRAME_LATENESS) || session.frame_pending.swap(true, Ordering::Relaxed) { return Ok(()); }
-
-    let frame = preview(frame)?;
 
     if tx.try_send(ClientEvent::MediaFrame
     {
@@ -418,12 +362,13 @@ fn failed(generation: usize, key: &'static str, tx: &Sender<ClientEvent>)
 
 //PUBLIC
 //DECODE A STILL VIDEO PREVIEW WITHOUT STARTING PLAYBACK
-/// Returns one frame of a supported MP4 attachment, or `None` for other files.
+/// Returns one still frame of a supported video attachment.
 pub fn thumbnail(data: &[u8]) -> Option<Animation>
 {
-    if data.len() > consts::MAX_ATTACHMENT_SIZE || data.get(4..8) != Some(b"ftyp") { return None; }
+    if data.len() > consts::MAX_ATTACHMENT_SIZE || !video::recognizes(data) { return None; }
 
-    let video = Video::open(Arc::from(data), false).ok()??;
+    let data = video::prepare(Arc::from(data)).ok()?;
+    let video = Video::open(data, false).ok()??;
 
     Some(vec![video.thumbnail()?])
 }
@@ -433,7 +378,7 @@ pub fn thumbnail(data: &[u8]) -> Option<Animation>
 pub fn supported(filename: &str) -> bool
 {
     Path::new(filename).extension().and_then(|extension| extension.to_str()).is_some_and(|extension|
-        matches!(extension.to_ascii_lowercase().as_str(), "mp3" | "wav" | "flac" | "ogg" | "oga" | "aac" | "m4a" | "mp4" | "m4v"))
+        matches!(extension.to_ascii_lowercase().as_str(), "mp3" | "wav" | "flac" | "ogg" | "oga" | "aac" | "m4a" | "mp4" | "m4v" | "mov" | "mkv" | "webm" | "opus"))
 }
 
 //START FROM THE CACHE, OTHERWISE REQUEST THE ATTACHMENT
@@ -492,7 +437,11 @@ pub async fn play_data(hash: [u8; 32], data: Vec<u8>, generation: usize, tx: Sen
             return;
         }
 
-        let data: Arc<[u8]> = data.into();
+        let data = match video::prepare(data.into())
+        {
+            Ok(data) => data,
+            Err(key) => { failed(generation, key, &tx); return; },
+        };
         let audio = Audio::open(data.clone());
         let video = match Video::open(data, true)
         {
