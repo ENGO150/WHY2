@@ -906,7 +906,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             Some(Ok(message_id)) => match app.playable_of(message_id)
                             {
                                 Ok(PlaybackSource::Voice(hash)) => tui::voice_message::play(app, hash, tx),
-                                Ok(PlaybackSource::Attachment(hash)) => tui::voice_message::play_media(app, hash, tx),
+                                Ok(PlaybackSource::Attachment(hash)) => tui::voice_message::play_media(app, hash, message_id, tx),
                                 Err(error) => app.push_styled(error, theme::error()),
                             },
                             Some(Err(_)) => invalid_usage(app, None),

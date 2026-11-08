@@ -99,6 +99,7 @@ use video::Video;
 /// The shared lifetime and clocks of one media playback.
 struct Session
 {
+    message_id: u64,
     hash: [u8; 32],
     generation: usize,
     started: Mutex<Instant>,
@@ -133,7 +134,7 @@ struct AudioPacket
 
 //GLOBAL VARIABLES
 static SESSION: Mutex<Option<Arc<Session>>> = Mutex::new(None);
-static AWAITED: Mutex<Option<([u8; 32], usize)>> = Mutex::new(None);
+static AWAITED: Mutex<Option<([u8; 32], u64, usize)>> = Mutex::new(None);
 
 //IMPLEMENTATIONS
 impl Session
@@ -340,7 +341,7 @@ fn present(frame: ImageFrame, time: u64, session: &Session, tx: &Sender<ClientEv
 
     if tx.try_send(ClientEvent::MediaFrame
     {
-        hash: session.hash,
+        message_id: session.message_id,
         generation: session.generation,
         frame,
     }).is_err()
@@ -382,7 +383,7 @@ pub fn supported(filename: &str) -> bool
 }
 
 //START FROM THE CACHE, OTHERWISE REQUEST THE ATTACHMENT
-pub fn play(hash: [u8; 32], tx: Sender<ClientEvent>)
+pub fn play(hash: [u8; 32], message_id: u64, tx: Sender<ClientEvent>)
 {
     let generation = message::begin_playback();
     *SESSION.lock().unwrap() = None;
@@ -392,13 +393,13 @@ pub fn play(hash: [u8; 32], tx: Sender<ClientEvent>)
     {
         match cache::load(&hash).await
         {
-            Some(data) => play_data(hash, data, generation, tx).await,
+            Some(data) => play_data(hash, message_id, data, generation, tx).await,
             None if message::current(generation) =>
             {
                 {
                     let mut awaited = AWAITED.lock().unwrap();
                     if !message::current(generation) { return; }
-                    *awaited = Some((hash, generation));
+                    *awaited = Some((hash, message_id, generation));
                 }
 
                 tx.send(ClientEvent::AttachmentRequest { hash }).await.ok();
@@ -409,19 +410,19 @@ pub fn play(hash: [u8; 32], tx: Sender<ClientEvent>)
 }
 
 /// Takes a requested media attachment off the pending slot.
-pub fn awaited(hash: &[u8; 32]) -> Option<usize>
+pub fn awaited(hash: &[u8; 32]) -> Option<(u64, usize)>
 {
     let mut awaited = AWAITED.lock().unwrap();
-    if awaited.as_ref().is_some_and(|(requested, _)| requested == hash)
+    if awaited.as_ref().is_some_and(|(requested, _, _)| requested == hash)
     {
-        return awaited.take().map(|(_, generation)| generation).filter(|generation| message::current(*generation));
+        return awaited.take().map(|(_, message_id, generation)| (message_id, generation)).filter(|(_, generation)| message::current(*generation));
     }
 
     None
 }
 
 //START THE EMBEDDED DECODERS
-pub async fn play_data(hash: [u8; 32], data: Vec<u8>, generation: usize, tx: Sender<ClientEvent>)
+pub async fn play_data(hash: [u8; 32], message_id: u64, data: Vec<u8>, generation: usize, tx: Sender<ClientEvent>)
 {
     if !message::current(generation) { return; }
 
@@ -461,6 +462,7 @@ pub async fn play_data(hash: [u8; 32], data: Vec<u8>, generation: usize, tx: Sen
 
         let session = Arc::new(Session
         {
+            message_id,
             hash,
             generation,
             started: Mutex::new(Instant::now()),
@@ -518,7 +520,7 @@ pub async fn play_data(hash: [u8; 32], data: Vec<u8>, generation: usize, tx: Sen
 }
 
 //FOLLOW PLAYBACK WITHOUT RETAINING COMPLETED DECODERS
-pub fn playing() -> Option<([u8; 32], u32)>
+pub fn playing() -> Option<(u64, [u8; 32], u32)>
 {
     let mut guard = SESSION.lock().unwrap();
     let Some(session) = guard.as_ref() else
@@ -527,7 +529,7 @@ pub fn playing() -> Option<([u8; 32], u32)>
 
         //THE CAPTION CAN STOP A PLAY THAT IS STILL WAITING FOR THE SERVER
         let mut awaited = AWAITED.lock().unwrap();
-        let (hash, generation) = (*awaited)?;
+        let (hash, message_id, generation) = (*awaited)?;
 
         if !message::current(generation)
         {
@@ -535,7 +537,7 @@ pub fn playing() -> Option<([u8; 32], u32)>
             return None;
         }
 
-        return Some((hash, 0));
+        return Some((message_id, hash, 0));
     };
 
     if !message::current(session.generation)
@@ -546,7 +548,7 @@ pub fn playing() -> Option<([u8; 32], u32)>
         return None;
     }
 
-    Some((session.hash, session.elapsed()))
+    Some((session.message_id, session.hash, session.elapsed()))
 }
 
 /// Returns whether a queued UI frame still belongs to the shared player.

@@ -517,8 +517,8 @@ pub struct App
     pub notice: Option<(String, Instant)>,
 
     //VOICE MESSAGES
-    /// Which clip is playing, and how many seconds in.
-    pub playing: Option<([u8; 32], u32)>, //WHICH CLIP IS PLAYING, AND HOW MANY SECONDS IN
+    /// The attachment message id (or none for voice), clip hash and elapsed seconds.
+    pub playing: Option<(Option<u64>, [u8; 32], u32)>, //WHICH CLIP IS PLAYING, AND HOW MANY SECONDS IN
     /// Whether the terminal reports key releases.
     pub key_release: bool,                //THE TERMINAL REPORTS KEYS BEING LET GO
     /// Push-to-talk state.
@@ -1219,19 +1219,20 @@ impl App
 
     //FOLLOW WHAT THE PLAYER IS DOING
     /// Follows the player, bumping the generation only when the shown second changes.
-    pub fn sync_playing(&mut self, now: Option<([u8; 32], u32)>)
+    pub fn sync_playing(&mut self, now: Option<(Option<u64>, [u8; 32], u32)>)
     {
-        let now = now.map(|(hash, ms)| (hash, ms / 1000));
+        let now = now.map(|(message_id, hash, ms)| (message_id, hash, ms / 1000));
 
         if now == self.playing { return; }
 
         //RESET THE ONE THAT STOPPED
-        if let Some((hash, _)) = self.playing.filter(|(hash, _)| now.is_none_or(|(playing, _)| playing != *hash))
+        if let Some((None, hash, _)) = self.playing.filter(|(source, hash, _)|
+            now.is_none_or(|(playing_source, playing, _)| playing_source != *source || playing != *hash))
         {
             self.set_playback(&hash, Playback::Idle);
         }
 
-        if let Some((hash, seconds)) = now { self.set_playback(&hash, Playback::Playing(seconds)); }
+        if let Some((None, hash, seconds)) = now { self.set_playback(&hash, Playback::Playing(seconds)); }
 
         self.playing = now;
         self.generation += 1;
@@ -1240,10 +1241,10 @@ impl App
 
     //REPLACE ONE VIDEO FRAME THROUGH THE EXISTING IMAGE RENDERER
     #[cfg(feature = "client_voice")]
-    pub fn deliver_media_frame(&mut self, hash: [u8; 32], frame: ImageFrame)
+    pub fn deliver_media_frame(&mut self, message_id: u64, frame: ImageFrame)
     {
         let entry = self.messages.iter().position(|entry|
-            matches!(entry, Entry::Attachment { hash: Some(stored), .. } if *stored == hash));
+            matches!(entry, Entry::Attachment { message_id: stored, .. } if *stored == message_id));
         let Some(entry) = entry else { return };
         let picture = self.fit(vec![frame]);
 

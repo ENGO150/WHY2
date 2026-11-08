@@ -203,11 +203,11 @@ impl App
                 self.push_caption(username, filename, message_id, timestamp, hash, state::Picture::Gone, username_color),
 
             #[cfg(feature = "client_voice")]
-            ClientEvent::MediaFrame { hash, generation, frame } =>
+            ClientEvent::MediaFrame { message_id, generation, frame } =>
             {
                 media::frame_consumed(generation);
 
-                if media::current(generation) { self.deliver_media_frame(hash, frame); }
+                if media::current(generation) { self.deliver_media_frame(message_id, frame); }
             },
 
             #[cfg(feature = "client_voice")]

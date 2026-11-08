@@ -247,7 +247,7 @@ impl Theme
             Entry::Transfer(transfer) => state::wrap_line(&Line::from(progress(transfer, width)), width),
 
             //ONLY THE CAPTION; THE PICTURE IS DRAWN UNDER IT
-            Entry::Attachment { username, filename, message_id, timestamp, username_color, picture, hash, .. } =>
+            Entry::Attachment { username, filename, message_id, timestamp, username_color, picture, .. } =>
             {
                 let caption = attachment_caption(filename, picture);
                 let (before, after) = i18n::split(caption, "username");
@@ -263,17 +263,14 @@ impl Theme
                 #[cfg(feature = "client_voice")]
                 if media::supported(filename)
                 {
-                    let playing = media::playing().filter(|(playing, _)| Some(*playing) == *hash);
+                    let playing = media::playing().filter(|(playing, _, _)| *playing == *message_id);
 
                     spans.push(match playing
                     {
-                        Some((_, millis)) => Span::styled(format!(" [ ■ {} ] {}", t!("message.stop"), clock(millis / 1000)), accent()),
+                        Some((_, _, millis)) => Span::styled(format!(" [ ■ {} ] {}", t!("message.stop"), clock(millis / 1000)), accent()),
                         None => Span::styled(format!(" [ ▶ {} ]", t!("message.play")), accent()),
                     });
                 }
-
-                #[cfg(not(feature = "client_voice"))]
-                let _ = hash;
 
                 match picture
                 {

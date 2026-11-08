@@ -617,7 +617,7 @@ pub enum ClientEvent
     #[cfg(feature = "client_voice")]
     MediaFrame
     {
-        hash: [u8; 32],
+        message_id: u64,
         generation: usize,
         frame: ImageFrame,
     },
@@ -1272,12 +1272,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
                 //MEDIA ATTACHMENTS USE THE SAME HASH FETCH AS VOICE MESSAGES
                 #[cfg(feature = "client_voice")]
-                if let Some(generation) = media::awaited(&hash)
+                if let Some((message_id, generation)) = media::awaited(&hash)
                 {
                     tokio::spawn(async move
                     {
                         if !data.is_empty() && crypto::sha256(&data) == hash { cache::store(&hash, &data).await; }
-                        media::play_data(hash, data, generation, attachment_tx).await;
+                        media::play_data(hash, message_id, data, generation, attachment_tx).await;
                     });
 
                     continue;
