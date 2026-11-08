@@ -642,19 +642,24 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) -> Rect
     }
 
     //max_clients BOUNDS THE ONLINE LIST, SO THE OFFLINE ONE TAKES THE REST
-    match app.offline.is_empty()
+    if !app.online.is_empty()
     {
-        true =>
+        let constraint = if app.offline.is_empty()
         {
-            constraints.push(Constraint::Min(3));
-            panels.push(Panel::Online);
-        },
+            Constraint::Min(3)
+        } else
+        {
+            Constraint::Length((online_rows(app) + 2).clamp(3, limit))
+        };
 
-        false =>
-        {
-            constraints.extend([Constraint::Length((online_rows(app) + 2).clamp(3, limit)), Constraint::Min(3)]);
-            panels.extend([Panel::Online, Panel::Offline]);
-        },
+        constraints.push(constraint);
+        panels.push(Panel::Online);
+    }
+
+    if !app.offline.is_empty()
+    {
+        constraints.push(Constraint::Min(3));
+        panels.push(Panel::Offline);
     }
 
     if area.height >= consts::CHANNELS_MIN_HEIGHT && !app.channels.is_empty()
