@@ -92,6 +92,7 @@ new = "Saisissez le nouveau mot de passe."
 confirm = "Confirmez le nouveau mot de passe."
 
 [event]
+attachment_unavailable = "Le message {message_id} ne contient aucune pièce jointe téléchargeable ou son fichier est indisponible sur le serveur."
 first_user = "Vous êtes le premier utilisateur inscrit, le rôle de propriétaire vous a été attribué."
 login_ok = "Connexion réussie. Appuyez sur Ctrl+H pour l'aide."
 connected = "Connecté à {server_name}."
@@ -184,6 +185,7 @@ other = "{count} personnes écrivent…"
 [message]
 pm = "MP"
 image = "{username} a envoyé une image ({filename})"
+file = "{username} a envoyé un fichier ({filename})"
 show = "afficher"
 loading = "chargement..."
 unavailable = "indisponible"
@@ -426,6 +428,7 @@ one = "{count} ligne copiée dans le presse-papiers"
 other = "{count} lignes copiées dans le presse-papiers"
 
 [arg]
+persistent = "persistant"
 id = "ID"
 user = "UTILISATEUR"
 message = "MESSAGE"
@@ -466,17 +469,14 @@ args.name = "Nom du salon"
 description = "Rejoint un salon, ou le lobby si NOM est omis"
 
 [command.upload]
+args.persistent = "Conserver le fichier dans l’historique du chat (true/false ; true par défaut)"
 args.path = "Chemin du fichier"
-description = "Envoie un fichier au serveur"
+description = "Envoie un fichier ; les fichiers persistants sont conservés avec l’historique du chat (limite de 8 Mo)"
 
 [command.download]
-args.user_id = "ID de l'expéditeur"
+args.user_id = "ID de l’expéditeur ou ID du message si l’ID du fichier est omis"
 args.file_id = "ID du fichier"
-description = "Télécharge un fichier depuis le serveur"
-
-[command.image]
-args.path = "Chemin de l'image"
-description = "Envoie une image persistante"
+description = "Télécharge un fichier partagé à partir des ID de l’utilisateur et du fichier, ou une pièce jointe enregistrée à partir de l’ID du message"
 
 [command.screen]
 args.monitor = "Index ou nom de l'écran à partager"

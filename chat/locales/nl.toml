@@ -92,6 +92,7 @@ new = "Voer het nieuwe wachtwoord in."
 confirm = "Bevestig het nieuwe wachtwoord."
 
 [event]
+attachment_unavailable = "Bericht {message_id} heeft geen downloadbare bijlage of het bestand is niet beschikbaar op de server."
 first_user = "Je bent de eerste geregistreerde gebruiker, je hebt de rol eigenaar gekregen."
 login_ok = "Inloggen gelukt. Druk op Ctrl+H voor hulp."
 connected = "Verbonden met {server_name}."
@@ -184,6 +185,7 @@ other = "{count} mensen zijn aan het typen…"
 [message]
 pm = "PB"
 image = "{username} heeft een afbeelding gestuurd ({filename})"
+file = "{username} heeft een bestand gestuurd ({filename})"
 show = "tonen"
 loading = "laden..."
 unavailable = "niet beschikbaar"
@@ -426,6 +428,7 @@ one = "{count} regel naar het klembord gekopieerd"
 other = "{count} regels naar het klembord gekopieerd"
 
 [arg]
+persistent = "blijvend"
 id = "ID"
 user = "GEBRUIKER"
 message = "BERICHT"
@@ -466,17 +469,14 @@ args.name = "Naam van het kanaal"
 description = "Gaat naar een kanaal, of naar de lobby als NAAM ontbreekt"
 
 [command.upload]
+args.persistent = "Het bestand in de chatgeschiedenis bewaren (true/false; standaard true)"
 args.path = "Pad van het bestand"
-description = "Uploadt een bestand naar de server"
+description = "Uploadt een bestand; blijvende bestanden worden met de chatgeschiedenis bewaard (limiet van 8 MB)"
 
 [command.download]
-args.user_id = "ID van de uploader"
+args.user_id = "ID van de uploader of bericht-ID als het bestands-ID wordt weggelaten"
 args.file_id = "ID van het bestand"
-description = "Downloadt een bestand van de server"
-
-[command.image]
-args.path = "Pad van de afbeelding"
-description = "Uploadt een blijvende afbeelding"
+description = "Downloadt een gedeeld bestand via gebruikers- en bestands-ID, of een opgeslagen bijlage via bericht-ID"
 
 [command.screen]
 args.monitor = "Index of naam van de te delen monitor"

@@ -92,6 +92,7 @@ new = "Yeni parolayı girin."
 confirm = "Yeni parolayı onaylayın."
 
 [event]
+attachment_unavailable = "{message_id} mesajında indirilebilir bir ek yok veya dosyası sunucuda kullanılamıyor."
 first_user = "Kayıt olan ilk kullanıcısınız, size sahip rolü verildi."
 login_ok = "Giriş başarılı. Yardım için Ctrl+H tuşuna basın."
 connected = "{server_name} sunucusuna bağlanıldı."
@@ -183,6 +184,7 @@ other = "{count} kişi yazıyor…"
 [message]
 pm = "ÖM"
 image = "{username} bir resim gönderdi ({filename})"
+file = "{username} bir dosya gönderdi ({filename})"
 show = "göster"
 loading = "yükleniyor..."
 unavailable = "kullanılamıyor"
@@ -424,6 +426,7 @@ opening = "{url} açılıyor"
 other = "{count} satır panoya kopyalandı"
 
 [arg]
+persistent = "kalıcı"
 id = "ID"
 user = "KULLANICI"
 message = "MESAJ"
@@ -464,17 +467,14 @@ args.name = "Kanal adı"
 description = "Bir kanala geçer, AD verilmezse lobiye döner"
 
 [command.upload]
+args.persistent = "Dosyayı sohbet geçmişinde sakla (true/false; varsayılan true)"
 args.path = "Hedef dosyanın yolu"
-description = "Sunucuya dosya yükler"
+description = "Bir dosya yükler; kalıcı dosyalar sohbet geçmişiyle birlikte saklanır (8 MB sınırı)"
 
 [command.download]
-args.user_id = "Yükleyenin ID'si"
+args.user_id = "Yükleyenin kimliği veya dosya kimliği belirtilmezse mesaj kimliği"
 args.file_id = "Hedef dosyanın ID'si"
-description = "Sunucudan dosya indirir"
-
-[command.image]
-args.path = "Hedef resmin yolu"
-description = "Kalıcı bir resim yükler"
+description = "Paylaşılan bir dosyayı kullanıcı ve dosya kimliğiyle veya kayıtlı bir eki mesaj kimliğiyle indirir"
 
 [command.screen]
 args.monitor = "Paylaşılacak monitörün sırası veya adı"

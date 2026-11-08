@@ -105,6 +105,7 @@ new = "Enter the new password."
 confirm = "Confirm the new password."
 
 [event]
+attachment_unavailable = "Message {message_id} has no downloadable attachment, or its server file is unavailable."
 first_user = "You are the first user to register, owner role has been granted to you."
 login_ok = "Login successful. Press Ctrl+H for help."
 connected = "Successfully connected to {server_name}."
@@ -197,6 +198,7 @@ other = "{count} people are typing…"
 [message]
 pm = "PM"
 image = "{username} sent an image ({filename})"
+file = "{username} sent a file ({filename})"
 show = "show"
 loading = "loading..."
 unavailable = "unavailable"
@@ -439,6 +441,7 @@ one = "Copied {count} line to the clipboard"
 other = "Copied {count} lines to the clipboard"
 
 [arg]
+persistent = "persistent"
 id = "ID"
 user = "USER"
 message = "MESSAGE"
@@ -479,17 +482,14 @@ args.name = "Name of channel"
 description = "Switches to channel/lobby if NAME is omitted"
 
 [command.upload]
+args.persistent = "Keep the file in chat history (true/false; default true)"
 args.path = "Path of target file"
-description = "Uploads file to server"
+description = "Uploads a file; persistent files are kept with chat history (8 MB limit)"
 
 [command.download]
-args.user_id = "ID of uploader"
+args.user_id = "ID of uploader, or message ID when file ID is omitted"
 args.file_id = "ID of target file"
-description = "Downloads file from server"
-
-[command.image]
-args.path = "Path of target image"
-description = "Uploads a persistent image"
+description = "Downloads a shared file by user and file ID, or a stored attachment by message ID"
 
 [command.screen]
 args.monitor = "Index or name of the monitor to share"

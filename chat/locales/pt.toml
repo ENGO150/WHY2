@@ -92,6 +92,7 @@ new = "Digite a nova senha."
 confirm = "Confirme a nova senha."
 
 [event]
+attachment_unavailable = "A mensagem {message_id} não tem um anexo para baixar ou seu arquivo não está disponível no servidor."
 first_user = "Você é o primeiro usuário registrado, o cargo de dono foi concedido a você."
 login_ok = "Login realizado. Pressione Ctrl+H para ajuda."
 connected = "Conectado a {server_name}."
@@ -184,6 +185,7 @@ other = "{count} pessoas estão digitando…"
 [message]
 pm = "MP"
 image = "{username} enviou uma imagem ({filename})"
+file = "{username} enviou um arquivo ({filename})"
 show = "mostrar"
 loading = "carregando..."
 unavailable = "indisponível"
@@ -426,6 +428,7 @@ one = "{count} linha copiada para a área de transferência"
 other = "{count} linhas copiadas para a área de transferência"
 
 [arg]
+persistent = "persistente"
 id = "ID"
 user = "USUÁRIO"
 message = "MENSAGEM"
@@ -466,17 +469,14 @@ args.name = "Nome do canal"
 description = "Muda para um canal, ou para o lobby se NOME for omitido"
 
 [command.upload]
+args.persistent = "Manter o arquivo no histórico do chat (true/false; padrão true)"
 args.path = "Caminho do arquivo"
-description = "Envia um arquivo ao servidor"
+description = "Envia um arquivo; arquivos persistentes são mantidos com o histórico do chat (limite de 8 MB)"
 
 [command.download]
-args.user_id = "ID de quem enviou"
+args.user_id = "ID de quem enviou ou ID da mensagem quando o ID do arquivo é omitido"
 args.file_id = "ID do arquivo"
-description = "Baixa um arquivo do servidor"
-
-[command.image]
-args.path = "Caminho da imagem"
-description = "Envia uma imagem persistente"
+description = "Baixa um arquivo compartilhado pelos IDs de usuário e arquivo, ou um anexo salvo pelo ID da mensagem"
 
 [command.screen]
 args.monitor = "Índice ou nome do monitor a compartilhar"

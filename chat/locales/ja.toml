@@ -92,6 +92,7 @@ new = "新しいパスワードを入力してください。"
 confirm = "新しいパスワードを確認してください。"
 
 [event]
+attachment_unavailable = "メッセージ {message_id} にダウンロード可能な添付ファイルがないか、サーバー上のファイルを利用できません。"
 first_user = "あなたは最初の登録ユーザーです。オーナーのロールが付与されました。"
 login_ok = "ログインしました。Ctrl+H でヘルプを表示します。"
 connected = "{server_name} に接続しました。"
@@ -183,6 +184,7 @@ other = "{count} 人が入力中…"
 [message]
 pm = "DM"
 image = "{username} が画像を送信しました（{filename}）"
+file = "{username} がファイルを送信しました（{filename}）"
 show = "表示"
 loading = "読み込み中..."
 unavailable = "利用不可"
@@ -424,6 +426,7 @@ opening = "{url} を開いています"
 other = "{count} 行をクリップボードにコピーしました"
 
 [arg]
+persistent = "永続化"
 id = "ID"
 user = "ユーザー"
 message = "メッセージ"
@@ -464,17 +467,14 @@ args.name = "チャンネル名"
 description = "チャンネルに移動します。名前を省略するとロビーに戻ります"
 
 [command.upload]
+args.persistent = "ファイルをチャット履歴に保存するかどうか（true/false、既定値は true）"
 args.path = "対象ファイルのパス"
-description = "ファイルをサーバーにアップロードします"
+description = "ファイルをアップロードします。永続化したファイルはチャット履歴とともに保存されます（上限 8 MB）"
 
 [command.download]
-args.user_id = "アップロードした人の ID"
+args.user_id = "アップロードした人の ID。ファイル ID を省略した場合はメッセージ ID"
 args.file_id = "対象ファイルの ID"
-description = "ファイルをサーバーからダウンロードします"
-
-[command.image]
-args.path = "対象画像のパス"
-description = "保存される画像をアップロードします"
+description = "ユーザー ID とファイル ID で共有ファイルを、またはメッセージ ID で保存済みの添付ファイルをダウンロードします"
 
 [command.screen]
 args.monitor = "共有するモニターの番号または名前"

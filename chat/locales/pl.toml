@@ -92,6 +92,7 @@ new = "Wpisz nowe hasło."
 confirm = "Potwierdź nowe hasło."
 
 [event]
+attachment_unavailable = "Wiadomość {message_id} nie ma załącznika do pobrania lub jej plik jest niedostępny na serwerze."
 first_user = "Jesteś pierwszym zarejestrowanym użytkownikiem, przyznano ci rolę właściciela."
 login_ok = "Zalogowano pomyślnie. Naciśnij Ctrl+H, aby uzyskać pomoc."
 connected = "Połączono z {server_name}."
@@ -186,6 +187,7 @@ many = "{count} osób pisze…"
 [message]
 pm = "PW"
 image = "{username} wysłał(a) obraz ({filename})"
+file = "{username} wysłał(a) plik ({filename})"
 show = "pokaż"
 loading = "ładowanie..."
 unavailable = "niedostępny"
@@ -429,6 +431,7 @@ few = "Skopiowano {count} wiersze do schowka"
 many = "Skopiowano {count} wierszy do schowka"
 
 [arg]
+persistent = "trwały"
 id = "ID"
 user = "UŻYTKOWNIK"
 message = "WIADOMOŚĆ"
@@ -469,17 +472,14 @@ args.name = "Nazwa kanału"
 description = "Przełącza na kanał lub do lobby, jeśli pominięto NAZWA"
 
 [command.upload]
+args.persistent = "Zachowaj plik w historii czatu (true/false; domyślnie true)"
 args.path = "Ścieżka do pliku"
-description = "Przesyła plik na serwer"
+description = "Przesyła plik; trwałe pliki są zachowywane wraz z historią czatu (limit 8 MB)"
 
 [command.download]
-args.user_id = "ID przesyłającego"
+args.user_id = "ID przesyłającego lub ID wiadomości, jeśli pominięto ID pliku"
 args.file_id = "ID pliku"
-description = "Pobiera plik z serwera"
-
-[command.image]
-args.path = "Ścieżka do obrazu"
-description = "Przesyła trwały obraz"
+description = "Pobiera udostępniony plik według ID użytkownika i pliku lub zapisany załącznik według ID wiadomości"
 
 [command.screen]
 args.monitor = "Indeks lub nazwa monitora do udostępnienia"

@@ -92,6 +92,7 @@ new = "Inserisci la nuova password."
 confirm = "Conferma la nuova password."
 
 [event]
+attachment_unavailable = "Il messaggio {message_id} non contiene un allegato scaricabile oppure il suo file non è disponibile sul server."
 first_user = "Sei il primo utente registrato, ti è stato assegnato il ruolo di proprietario."
 login_ok = "Accesso riuscito. Premi Ctrl+H per l'aiuto."
 connected = "Connesso a {server_name}."
@@ -184,6 +185,7 @@ other = "{count} persone stanno scrivendo…"
 [message]
 pm = "MP"
 image = "{username} ha inviato un'immagine ({filename})"
+file = "{username} ha inviato un file ({filename})"
 show = "mostra"
 loading = "caricamento..."
 unavailable = "non disponibile"
@@ -426,6 +428,7 @@ one = "{count} riga copiata negli appunti"
 other = "{count} righe copiate negli appunti"
 
 [arg]
+persistent = "persistente"
 id = "ID"
 user = "UTENTE"
 message = "MESSAGGIO"
@@ -466,17 +469,14 @@ args.name = "Nome del canale"
 description = "Passa a un canale, o alla lobby se NOME è omesso"
 
 [command.upload]
+args.persistent = "Conserva il file nella cronologia della chat (true/false; valore predefinito true)"
 args.path = "Percorso del file"
-description = "Carica un file sul server"
+description = "Carica un file; i file persistenti vengono conservati con la cronologia della chat (limite di 8 MB)"
 
 [command.download]
-args.user_id = "ID di chi l'ha caricato"
+args.user_id = "ID di chi ha caricato il file oppure ID del messaggio se si omette l’ID del file"
 args.file_id = "ID del file"
-description = "Scarica un file dal server"
-
-[command.image]
-args.path = "Percorso dell'immagine"
-description = "Carica un'immagine persistente"
+description = "Scarica un file condiviso tramite gli ID dell’utente e del file, oppure un allegato salvato tramite l’ID del messaggio"
 
 [command.screen]
 args.monitor = "Indice o nome del monitor da condividere"

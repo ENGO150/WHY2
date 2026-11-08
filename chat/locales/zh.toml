@@ -92,6 +92,7 @@ new = "请输入新密码。"
 confirm = "请确认新密码。"
 
 [event]
+attachment_unavailable = "消息 {message_id} 没有可下载的附件，或其文件在服务器上不可用。"
 first_user = "你是第一个注册的用户，已被授予所有者角色。"
 login_ok = "登录成功。按 Ctrl+H 查看帮助。"
 connected = "已成功连接到 {server_name}。"
@@ -183,6 +184,7 @@ other = "{count} 人正在输入…"
 [message]
 pm = "私信"
 image = "{username} 发送了一张图片（{filename}）"
+file = "{username} 发送了文件（{filename}）"
 show = "显示"
 loading = "加载中..."
 unavailable = "不可用"
@@ -424,6 +426,7 @@ opening = "正在打开 {url}"
 other = "已复制 {count} 行到剪贴板"
 
 [arg]
+persistent = "持久保存"
 id = "ID"
 user = "用户"
 message = "消息"
@@ -464,17 +467,14 @@ args.name = "频道名称"
 description = "切换到频道；省略名称则回到大厅"
 
 [command.upload]
+args.persistent = "将文件保存在聊天记录中（true/false；默认为 true）"
 args.path = "目标文件路径"
-description = "上传文件到服务器"
+description = "上传文件；持久保存的文件会随聊天记录保留（上限为 8 MB）"
 
 [command.download]
-args.user_id = "上传者的 ID"
+args.user_id = "上传者的 ID；省略文件 ID 时则为消息 ID"
 args.file_id = "目标文件的 ID"
-description = "从服务器下载文件"
-
-[command.image]
-args.path = "目标图片路径"
-description = "上传一张持久保存的图片"
+description = "通过用户 ID 和文件 ID 下载共享文件，或通过消息 ID 下载已保存的附件"
 
 [command.screen]
 args.monitor = "要共享的显示器的序号或名称"

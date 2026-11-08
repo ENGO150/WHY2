@@ -92,6 +92,7 @@ new = "Gib das neue Passwort ein."
 confirm = "Bestätige das neue Passwort."
 
 [event]
+attachment_unavailable = "Die Nachricht {message_id} hat keinen herunterladbaren Anhang, oder ihre Datei ist auf dem Server nicht verfügbar."
 first_user = "Du bist der erste registrierte Benutzer, dir wurde die Rolle Eigentümer zugewiesen."
 login_ok = "Anmeldung erfolgreich. Drücke Strg+H für Hilfe."
 connected = "Erfolgreich mit {server_name} verbunden."
@@ -184,6 +185,7 @@ other = "{count} Personen tippen…"
 [message]
 pm = "PN"
 image = "{username} hat ein Bild gesendet ({filename})"
+file = "{username} hat eine Datei gesendet ({filename})"
 show = "anzeigen"
 loading = "lädt..."
 unavailable = "nicht verfügbar"
@@ -426,6 +428,7 @@ one = "{count} Zeile in die Zwischenablage kopiert"
 other = "{count} Zeilen in die Zwischenablage kopiert"
 
 [arg]
+persistent = "dauerhaft"
 id = "ID"
 user = "BENUTZER"
 message = "NACHRICHT"
@@ -466,17 +469,14 @@ args.name = "Name des Kanals"
 description = "Wechselt in einen Kanal, oder in die Lobby, wenn NAME fehlt"
 
 [command.upload]
+args.persistent = "Datei im Chatverlauf aufbewahren (true/false; Standard true)"
 args.path = "Pfad der Zieldatei"
-description = "Lädt eine Datei auf den Server hoch"
+description = "Lädt eine Datei hoch; dauerhafte Dateien werden mit dem Chatverlauf aufbewahrt (maximal 8 MB)"
 
 [command.download]
-args.user_id = "ID des Hochladenden"
+args.user_id = "ID des Hochladenden oder Nachrichten-ID, wenn die Datei-ID weggelassen wird"
 args.file_id = "ID der Zieldatei"
-description = "Lädt eine Datei vom Server herunter"
-
-[command.image]
-args.path = "Pfad des Zielbildes"
-description = "Lädt ein dauerhaftes Bild hoch"
+description = "Lädt eine freigegebene Datei anhand von Benutzer- und Datei-ID oder einen gespeicherten Anhang anhand der Nachrichten-ID herunter"
 
 [command.screen]
 args.monitor = "Index oder Name des freizugebenden Monitors"
