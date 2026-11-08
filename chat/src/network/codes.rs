@@ -281,14 +281,6 @@ pub enum PacketCode //CONTROL CODES
         file_id: usize,
     },
 
-    //CLIENT -> SERVER | REQUEST IMAGE UPLOAD
-    /// *Client → server.* Asks to post a picture.
-    ImageRequest
-    {
-        hash: [u8; 32],
-        filename: String,
-    },
-
     //SERVER -> CLIENT | IMAGE UPLOAD APPROVAL
     /// *Server → client.* A picture upload was approved; the upload goes over a new socket
     /// authenticated by `token`.
@@ -462,6 +454,19 @@ pub enum PacketCode //CONTROL CODES
         save: bool, //FALSE = READ ANSWER, TRUE = SAVE ACK
     },
 
+    //CLIENT -> SERVER | REQUEST FILE UPLOAD
+    /// *Client → server.* Asks to share a file.
+    UploadRequest
+    {
+        hash: [u8; 32],
+        filename: String,
+        persistent: bool,
+    },
+
+    /// *Client → server.* Downloads an attachment from a stored message.
+    AttachmentDownload { message_id: u64 },
+    /// *Server → client.* The requested message has no readable attachment.
+    AttachmentUnavailable { message_id: u64 },
     /// *Client → server.* Reads a profile by account id; `None` for our own.
     ProfileRequest { id: Option<usize> },              //CLIENT -> SERVER | READ A PROFILE | None = OUR OWN
     /// *Client → server.* Stores our profile's typed fields.
@@ -504,8 +509,6 @@ pub enum PacketCode //CONTROL CODES
     VoiceClients { clients: Vec<(usize, String)> },    //SERVER -> CLIENT | THE CHANNEL'S VOICE ROSTER
     /// *Server → client.* A user left voice in `channel`.
     VoiceLeave { id: usize, channel: Option<String> }, //SERVER -> CLIENT | CLIENT LEFT VOICE
-    /// *Client → server.* Asks to share a file.
-    UploadRequest { hash: [u8; 32] },                  //CLIENT -> SERVER | REQUEST FILE UPLOAD
     /// *Server → client.* A download was approved; the client connects with `token`.
     Download { token: [u8; 32] },                      //SERVER -> CLIENT | DOWNLOAD FILE FROM SERVER
     /// *Server → client.* User was banned.
@@ -651,7 +654,8 @@ impl PacketCode
             Self::DownloadRequest { .. }       => "DownloadRequest",
             Self::Download { .. }              => "Download",
             Self::Banned { .. }                => "Banned",
-            Self::ImageRequest { .. }          => "ImageRequest",
+            Self::AttachmentDownload { .. }    => "AttachmentDownload",
+            Self::AttachmentUnavailable { .. } => "AttachmentUnavailable",
             Self::ImageDuplicate { .. }        => "ImageDuplicate",
             Self::Image { .. }                 => "Image",
             Self::ImageDisplay { .. }          => "ImageDisplay",

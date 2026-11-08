@@ -46,6 +46,7 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
+#[cfg(feature = "client_base")]
 use std::path::PathBuf;
 
 use tokio::
@@ -87,7 +88,7 @@ pub enum UploadKind
 {
     /// A fileshare, kept in a temp directory for the session.
     File,
-    /// A chat picture.
+    /// A persistent chat attachment, optionally displayed as a picture.
     Image,
     /// A profile picture.
     Avatar,
@@ -145,7 +146,7 @@ impl UploadKind
         match self
         {
             Self::File => "file",
-            Self::Image => "image",
+            Self::Image => "attachment",
             Self::Avatar => "avatar",
             Self::Icon => "icon",
             Self::Voice => "voice",
@@ -166,38 +167,73 @@ impl SequencedPacket for FilePacket
 /// before it is sent; the chunking matches how it was written.
 ///
 /// # Parameters
-/// - `path`: The file to send.
+/// - `path`: The file to send (client only).
+/// - `file`: The open, verified file to send (server only).
 /// - `write_stream`: The transfer socket's write half; dropped (closing it) when done.
 /// - `uid`: The upload id stamped on every packet.
 /// - `rex_stream`: The transfer's packet stream.
 /// - `seq`: A local sequence counter.
 /// - `disk_stream`: The file's at-rest stream (server only).
+/// - `size`: The plaintext size, excluding the at-rest tag (server only).
 /// - `progress`: Called with the total bytes sent after each chunk.
 ///
 /// # Panics
 /// If the file cannot be opened, or the at-rest stream fails.
 pub async fn send_file //CHUNK FILE AND SEND TO STREAM
 (
-    path: PathBuf,
+    #[cfg(feature = "client_base")] path: PathBuf,
+    #[cfg(feature = "server")] file: File,
     mut write_stream: OwnedWriteHalf,
     uid: u64,
     rex_stream: &mut RexPacketStream,
     mut seq: Option<&mut usize>,
     #[cfg(feature = "server")] disk_stream: &mut RexStream,
+    #[cfg(feature = "server")] size: u64,
     mut progress: impl FnMut(u64), //BYTES SENT SO FAR
 )
 {
+    #[cfg(feature = "client_base")]
     let mut file = File::open(path).await.expect("Cannot open file for upload");
+
+    //NEVER SEND A PERSISTENT FILE'S TRAILING TAG
+    #[cfg(feature = "server")]
+    let mut file = file.take(size);
     let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
     let mut sent = 0u64;
 
     //LOOP READING
     loop
     {
-        match file.read(&mut buffer).await
+        //FILL THE CHUNK TO PRESERVE THE AT-REST CIPHER BOUNDARIES
+        let mut count = 0;
+
+        while count < buffer.len()
         {
-            Ok(0) => break, //EOF
-            Ok(bytes) =>
+            match file.read(&mut buffer[count..]).await
+            {
+                Ok(0) => break,
+                Ok(bytes) => count += bytes,
+                Err(_) => return,
+            }
+        }
+
+        match count
+        {
+            0 =>
+            {
+                if sent == 0
+                {
+                    if network::send_tcp(&mut write_stream, FilePacket
+                    {
+                        uid,
+                        code: FilePacketCode::Data { data: Vec::new() },
+                        seq: 0,
+                    }, EncryptionMode::Stream(rex_stream), seq.as_deref_mut()).await.is_err() { return; }
+                }
+
+                break;
+            },
+            bytes =>
             {
                 let plaintext =
                 {
@@ -219,18 +255,17 @@ pub async fn send_file //CHUNK FILE AND SEND TO STREAM
                 };
 
                 //SEND FILE CHUNK
-                let _ = network::send_tcp(&mut write_stream, FilePacket
+                if network::send_tcp(&mut write_stream, FilePacket
                 {
                     uid,
                     code: FilePacketCode::Data { data: plaintext },
                     seq: 0,
-                }, EncryptionMode::Stream(rex_stream), seq.as_deref_mut()).await;
+                }, EncryptionMode::Stream(rex_stream), seq.as_deref_mut()).await.is_err() { return; }
 
                 //REPORT PROGRESS
                 sent += bytes as u64;
                 progress(sent);
             },
-            Err(_) => {}, //TODO: Implement
         }
     }
 }

@@ -130,6 +130,7 @@ impl App
             //A PICTURE IS AN ENTRY OF ITS OWN
             ClientEvent::ImageDisplay
             {
+                hash,
                 username,
                 filename,
                 message_id,
@@ -137,7 +138,7 @@ impl App
                 image,
                 username_color: color,
             } =>
-                self.push_image(username, filename, message_id, timestamp, image, color),
+                self.push_image(username, filename, message_id, timestamp, hash, image, color),
 
             //A PICTURE WE DO NOT HOLD: CAPTION IT NOW
             ClientEvent::ImagePending
@@ -195,8 +196,8 @@ impl App
             //A CLICK THE CACHE COULD NOT ANSWER
             ClientEvent::ImageRequest { hash } => self.image_requests.push(hash),
 
-            ClientEvent::ImageFailed { username, filename, .. } => self.push_styled(
-                t!("event.image_failed", username, filename), theme::error()),
+            ClientEvent::ImageFailed { username, filename, message_id, hash, timestamp, username_color } =>
+                self.push_caption(username, filename, message_id, timestamp, hash, state::Picture::Gone, username_color),
 
             //A VOICE MESSAGE, FILED BY CHANNEL
             ClientEvent::VoiceMessage
@@ -372,6 +373,9 @@ impl App
             ClientEvent::Edited { message_id, text } => self.edit_message(message_id, text),
 
             ClientEvent::Pinned { message_id, pinned } => self.set_pinned(message_id, pinned),
+
+            ClientEvent::AttachmentUnavailable { message_id } =>
+                self.push_styled(t!("event.attachment_unavailable", message_id), theme::error()),
 
             ClientEvent::InvalidUsage =>
             {

@@ -99,8 +99,6 @@ pub enum Command
     Upload,                                       //UPLOAD FILE TO SERVER
     /// Downloads a shared file.
     Download,                                     //DOWNLOAD FILE FROM SERVER
-    /// Posts a picture to the chat.
-    Image,                                        //PERSISTENT IMAGE UPLOAD
     /// Starts, stops or switches the monitor of a screen share.
     #[cfg(feature = "client_screen")] Screen,     //TOGGLE SCREEN SHARING
     /// Watches somebody's screen share.
@@ -595,6 +593,13 @@ pub const COMMAND_LIST: &[CommandInfo] =
                 required: true,
                 values: ArgValues::Paths,
             },
+            CommandArg
+            {
+                name: "arg.persistent",
+                description: "command.upload.args.persistent",
+                required: false,
+                values: ArgValues::Bools,
+            },
         ],
         description: "command.upload.description",
     },
@@ -619,31 +624,11 @@ pub const COMMAND_LIST: &[CommandInfo] =
             {
                 name: "arg.file_id",
                 description: "command.download.args.file_id",
-                required: true,
+                required: false,
                 values: ArgValues::Free,
             },
         ],
         description: "command.download.description",
-    },
-
-    CommandInfo
-    {
-        command: Command::Image,
-        triggers: &[ "IMAGE", "PICTURE", "PIC" ],
-        shortcut: None,
-        minimal_role: Role::User,
-        subcommands: &[],
-        args:
-        &[
-            CommandArg
-            {
-                name: "arg.path",
-                description: "command.image.args.path",
-                required: true,
-                values: ArgValues::Images,
-            },
-        ],
-        description: "command.image.description",
     },
 
     #[cfg(feature = "client_screen")]
@@ -1198,6 +1183,11 @@ impl Command
 
             Command::Download =>
             {
+                if let Some(message_id) = parameters.and_then(|p| p.parse::<u64>().ok())
+                {
+                    return Some(Ok(PacketCode::AttachmentDownload { message_id }));
+                }
+
                 let parsed = parameters
                     .and_then(|p| p.split_once(' '))
                     .and_then(|(uid, fid)| Some((uid.parse::<usize>().ok()?, fid.parse::<usize>().ok()?)));
@@ -1353,6 +1343,15 @@ pub fn screen_parameters(parameters: Option<&str>) -> (Option<&str>, Option<bool
         Ok(sound) => (monitor, Some(sound)),
         Err(_) => (Some(parameters), None),
     }
+}
+
+/// Splits an upload path from its optional trailing persistence flag.
+/// Paths may contain spaces; an omitted flag defaults to a persistent upload.
+pub fn upload_parameters(parameters: &str) -> (&str, bool)
+{
+    parameters.rsplit_once(char::is_whitespace)
+        .and_then(|(path, flag)| flag.parse::<bool>().ok().map(|flag| (path.trim_end(), flag)))
+        .unwrap_or((parameters, true))
 }
 
 /// Parses a line of input into a command and its parameters.

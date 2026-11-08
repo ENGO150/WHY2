@@ -48,7 +48,7 @@ use crate::
     misc,
     options,
     role::Role,
-    crypto::password,
+    crypto::{ self, password },
     consts::
     {
         self,
@@ -64,7 +64,7 @@ use crate::
         {
             self,
             handshake,
-            connection::ConnectionType,
+            connection::{ ConnectionType, AvailableFile },
         },
         codes::
         {
@@ -249,8 +249,8 @@ impl<'a, 's> ClientSession<'a, 's>
             PacketCode::ListRequest => self.list().await,
 
             //NEW FILE UPLOAD
-            PacketCode::UploadRequest { hash } => self.upload(hash, None).await,
-            PacketCode::ImageRequest { hash, filename } => self.upload(hash, Some(filename)).await,
+            PacketCode::UploadRequest { hash, filename, persistent } => self.upload(hash, persistent.then_some(filename)).await,
+            PacketCode::AttachmentDownload { message_id } => self.attachment_download(message_id).await,
 
             //NEW VOICE MESSAGE
             PacketCode::VoiceMessageRequest { hash } => self.voice_message(hash).await,
@@ -747,6 +747,38 @@ impl<'a, 's> ClientSession<'a, 's>
     }
 
     //DOWNLOAD
+    async fn attachment_download(&mut self, message_id: u64) -> PacketFlow
+    {
+        if let Some((hash, filename)) = config::messages::attachment(message_id)
+            && let Some(size) = file::image_size(&hash).await
+        {
+            //DERIVE THE DISK KEYS WITHOUT READING THE FILE
+            let (key, nonce, _) = crypto::image_keys(&hash);
+
+            let file = AvailableFile
+            {
+                hash,
+                path: misc::get_image_dir().join(misc::hex(&hash)),
+                filename,
+                size,
+                key,
+                nonce,
+                persistent: true,
+            };
+
+            //OPEN THE TRANSFER; ITS SOCKET VERIFIES AND STREAMS THE FILE
+            let token = server::open_connection(self.id, ConnectionType::FileDownload { uid: rand::random(), file });
+
+            self.send(PacketCode::Download { token }).await;
+        } else
+        {
+            log::warn!("Attachment download refused (MID {message_id}, no readable attachment): {}", self.peer_addr);
+            self.send(PacketCode::AttachmentUnavailable { message_id }).await;
+        }
+
+        PacketFlow::Continue
+    }
+
     async fn download(&mut self, owner_id: usize, file_id: usize) -> PacketFlow
     {
         //FIND USERNAME BY ID

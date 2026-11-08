@@ -27,7 +27,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! 1. The metadata is checked against the client's parallel-upload limit, the kind's size
 //!    ceiling and `max_upload_size`.
-//! 2. The first chunk of a persistent upload must be an image (or a voice clip), and an avatar
+//! 2. The first chunk of a voice upload must be a voice clip, and an avatar
 //!    or icon must be a square no larger than [`AVATAR_DIMENSION`](consts::AVATAR_DIMENSION);
 //!    nothing is decoded.
 //! 3. Each chunk is encrypted with the file's at-rest [`RexStream`] and written to a temp name;
@@ -37,7 +37,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! 5. Only then is the file renamed into place: under its hash for a persistent upload, under
 //!    its sanitised name for a fileshare.
 //!
-//! A persistent picture or clip is then stored in the history (lobby only, with
+//! A persistent attachment or clip is then stored in the history (lobby only, with
 //! `persistent_messages` on) and broadcast whole; an avatar or icon is answered with the
 //! updated profile or icon instead.
 
@@ -373,7 +373,7 @@ pub async fn download
     }
 
     //A FILESHARE IS WHAT THE UPLOADER SAYS IT IS
-    let mut checked = !persistent;
+    let mut checked = matches!(kind, UploadKind::File | UploadKind::Image);
 
     //LOOP READING CHUNKS
     loop
@@ -653,6 +653,7 @@ pub async fn download
                 //ADD FILE TO AVAILABLE FILES
                 server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
                 {
+                    persistent: false,
                     hash: final_hash,
                     path: new_path,
                     filename,
@@ -720,6 +721,28 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
     //INIT REX STREAM
     let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
 
+    //OPEN AND VERIFY THE SAME FILE THE TRANSFER WILL READ
+    let mut source = match File::open(&file.path).await
+    {
+        Ok(source) => source,
+        Err(error) =>
+        {
+            log::warn!("Download failed (cannot open file: {error}): {peer_addr}");
+            return;
+        },
+    };
+
+    if file.persistent
+    {
+        let (_, _, mac_key) = crypto::image_keys(&file.hash);
+
+        if crypto::disk_verify(&mut source, &mac_key).await != Some(file.size)
+        {
+            log::warn!("Download failed (stored file verification): {peer_addr}");
+            return;
+        }
+    }
+
     //SEND FIRST PACKET (METADATA)
     let _ = network::send_tcp(&mut write_stream, FilePacket
     {
@@ -739,7 +762,7 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
     log::info!("Download started ({} bytes): {peer_addr}", file.size);
 
     //START UPLOAD
-    file::send_file(file.path, write_stream, uid, &mut rex_stream, Some(&mut seq), &mut disk_stream, |_| {}).await;
+    file::send_file(source, write_stream, uid, &mut rex_stream, Some(&mut seq), &mut disk_stream, file.size, |_| {}).await;
 
     //LOG END
     log::info!("Download done: {peer_addr}");

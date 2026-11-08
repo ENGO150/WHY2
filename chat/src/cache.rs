@@ -42,10 +42,17 @@ use std::
 {
     fs::FileTimes,
     time::SystemTime,
-    path::PathBuf,
+    path::{ Path, PathBuf },
+    io::{ self, ErrorKind },
 };
 
-use tokio::fs;
+use tokio::
+{
+    fs::{ self, File },
+    io::{ AsyncReadExt, AsyncWriteExt },
+};
+
+use sha2::{ Sha256, Digest };
 
 use why2::
 {
@@ -173,6 +180,83 @@ pub async fn load(hash: &[u8; 32]) -> Option<Vec<u8>>
     }
 
     Some(image)
+}
+
+//COPY A VERIFIED CACHED FILE WITHOUT KEEPING ITS PLAINTEXT IN MEMORY
+/// Copies a cached attachment to disk using bounded buffers.
+/// A missing or unauthenticated cache entry returns `None`; output errors are returned separately.
+pub async fn copy(hash: &[u8; 32], target: &Path) -> Option<io::Result<u64>>
+{
+    //OPEN AND AUTHENTICATE THE SAME FILE THAT WILL BE DECRYPTED
+    let (fingerprint, path) = scope(hash)?;
+    let mut source = File::open(&path).await.ok()?;
+    let (key, nonce, mac_key) = crypto::cache_keys(&fingerprint, hash);
+    let size = match crypto::disk_verify(&mut source, &mac_key).await
+    {
+        Some(size) => size,
+        None =>
+        {
+            let _ = fs::remove_file(&path).await;
+            return None;
+        },
+    };
+
+    let mut stream: RexStream = RexStream::new(&Grid::from_key(&key).ok()?, Grid::from_flat(&nonce).ok()?).ok()?;
+
+    //KEEP A FAILED COPY FROM REPLACING AN EXISTING DOWNLOAD
+    let temporary = target.with_extension(format!("{}.part", rand::random::<u64>()));
+
+    let result = async
+    {
+        let mut output = File::create(&temporary).await?;
+        let mut buffer = vec![0; consts::UPLOAD_CHUNK_SIZE];
+        let mut remaining = size;
+        let mut written = 0;
+        let mut hasher = Sha256::new();
+
+        //THE CACHE FINALIZES ITS CIPHER ONLY AT THE END OF THE WHOLE FILE
+        while remaining > 0
+        {
+            let count = remaining.min(buffer.len() as u64) as usize;
+            source.read_exact(&mut buffer[..count]).await?;
+            remaining -= count as u64;
+
+            let mut decrypted = stream.update(&crypto::bytes_to_i64(&buffer[..count]))
+                .map_err(|_| io::Error::new(ErrorKind::InvalidData, "Cache decryption failed"))?;
+
+            if remaining == 0
+            {
+                decrypted.extend(stream.finalize()
+                    .map_err(|_| io::Error::new(ErrorKind::InvalidData, "Cache decryption failed"))?);
+            }
+
+            let mut bytes = crypto::i64_to_bytes(&decrypted);
+            bytes.truncate((size - written) as usize);
+
+            output.write_all(&bytes).await?;
+            hasher.update(&bytes);
+            written += bytes.len() as u64;
+        }
+
+        //VERIFY THE PLAINTEXT BEFORE NAMING THE DOWNLOAD
+        let digest: [u8; 32] = hasher.finalize().into();
+
+        if digest != *hash
+        {
+            return Err(io::Error::new(ErrorKind::InvalidData, "Cached file hash mismatch"));
+        }
+
+        output.flush().await?;
+        drop(output);
+        fs::rename(&temporary, target).await?;
+
+        Ok(size)
+    }.await;
+
+    //REMOVE AN UNFINISHED COPY
+    if result.is_err() { let _ = fs::remove_file(&temporary).await; }
+
+    Some(result)
 }
 
 //SEAL AND STORE THE BYTES OFF THE WIRE

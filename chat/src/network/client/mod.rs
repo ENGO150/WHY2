@@ -345,6 +345,8 @@ pub enum ClientEvent
     Muted,                                                       //HAHA
     /// A command had invalid parameters or was not permitted.
     InvalidUsage,                                                //INVALID COMMAND USAGE
+    /// A message has no readable attachment on the server.
+    AttachmentUnavailable { message_id: u64 },
     /// A message was deleted.
     Deleted
     {
@@ -504,6 +506,8 @@ pub enum ClientEvent
     /// A picture, decoded and ready to draw.
     ImageDisplay
     {
+        /// The original attachment content hash.
+        hash: [u8; 32],
         /// The sender's username.
         username: String,
         /// The picture's file name.
@@ -596,6 +600,10 @@ pub enum ClientEvent
         filename: String,
         /// The message's id.
         message_id: u64,
+        /// The attachment's content hash.
+        hash: [u8; 32],
+        /// The message timestamp.
+        timestamp: Option<u64>,
         /// The sender's username color.
         username_color: Option<u8>,
     },                                                           //SOMEBODY'S IMAGE, WHICH WOULD NOT DECODE
@@ -1376,6 +1384,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     {
                         Some(image) => ClientEvent::ImageDisplay
                         {
+                            hash,
                             username,
                             filename,
                             message_id,
@@ -1383,7 +1392,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                             image,
                             username_color,
                         },
-                        None => ClientEvent::ImageFailed { username, filename, message_id, username_color },
+                        None => ClientEvent::ImageFailed { username, filename, message_id, hash, timestamp, username_color },
                     }).await.unwrap();
                 });
 
@@ -1589,6 +1598,11 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //CLIENT MESSED SOME COMMAND UP
+            PacketCode::AttachmentUnavailable { message_id } =>
+            {
+                tx.send(ClientEvent::AttachmentUnavailable { message_id }).await.unwrap();
+            },
+
             PacketCode::InvalidUsage =>
             {
                 tx.send(ClientEvent::InvalidUsage).await.unwrap();

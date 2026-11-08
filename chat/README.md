@@ -106,12 +106,14 @@ Aliases are available for every command. `Ctrl+<key>` runs the ones with a short
 | `/channel [name]` | Switch channel; no name returns to the lobby |
 | `/voice`, `/mute [id]` | Voice chat; mute a user or yourself |
 | `/record`, `/play <id>` | Record and play voice messages |
-| `/image <path>` | Post a picture |
-| `/upload <path>`, `/files`, `/download <user> <file>` | File transfer |
+| `/upload <path> [persistent]` | Upload any file; `true` keeps it in chat history and previews images |
+| `/files`, `/download <user> <file>`, `/download <message-id>` | File transfer |
 | `/screen [monitor] [sound]`, `/screens`, `/attach <id>`, `/deattach`, `/mutescreen` | Screen sharing |
 | `/reply <id> <text>`, `/heart <id>`, `/pin <id>` (Moderator), `/edit <id> <text>`, `/delete <id>` | Message actions |
 | `/profile [user]`, `/color <color>`, `/ucolor <color>` | Profiles and colors |
 | `/settings`, `/account passwd`, `/account delete`, `/logout`, `/exit` | Settings, account and session |
+
+`persistent` defaults to `true`. Use `/upload report.pdf` to attach a file to chat history, then `/download <message-id>` to retrieve it, including after a server restart. Downloads use a verified local cache when available, otherwise they request the file from the server. Use `/upload report.pdf false` for a temporary file share. Images are rendered inline as before. Persistent attachments use the existing 8 MB limit and are kept in the lobby when `persistent_messages` is enabled.
 
 <details>
 <summary>Moderation commands</summary>

@@ -75,6 +75,13 @@ use why2::
 
 use zeroize::Zeroizing;
 
+#[cfg(feature = "chat")]
+use tokio::
+{
+    fs::File,
+    io::{ AsyncReadExt, AsyncSeekExt },
+};
+
 use hkdf::Hkdf;
 use sha2::{ Sha256, Digest };
 
@@ -569,4 +576,37 @@ pub fn history_keys() -> SharedKeys //AT-REST KEYS FOR THE MESSAGE HISTORY
     hkdf.expand(b"WHY2-HISTORY-MAC", &mut mac_key).expect("HKDF expand failed");
 
     (Zeroizing::new(key), mac_key)
+}
+
+//VERIFY A SEALED FILE WITHOUT LOADING IT INTO MEMORY
+/// Verifies a sealed file in bounded chunks and rewinds it for streaming.
+/// Returns the ciphertext size without the trailing tag, or `None` on failure.
+#[cfg(feature = "chat")]
+pub async fn disk_verify(file: &mut File, mac_key: &[u8; 32]) -> Option<u64>
+{
+    //READ THE LENGTH AND RESET THE CURSOR
+    let size = file.metadata().await.ok()?.len().checked_sub(consts_chat::DISK_TAG_SIZE as u64)?;
+    file.rewind().await.ok()?;
+
+    //AUTHENTICATE THE CIPHERTEXT IN CHUNKS
+    let mut mac = disk_mac(mac_key);
+    let mut buffer = vec![0; consts_chat::UPLOAD_CHUNK_SIZE];
+    let mut remaining = size;
+
+    while remaining > 0
+    {
+        let count = remaining.min(buffer.len() as u64) as usize;
+        file.read_exact(&mut buffer[..count]).await.ok()?;
+        mac.update(&buffer[..count]);
+        remaining -= count as u64;
+    }
+
+    //CHECK THE TAG AND REWIND THE SAME OPEN FILE
+    let mut tag = [0; consts_chat::DISK_TAG_SIZE];
+    file.read_exact(&mut tag).await.ok()?;
+    mac.update(&size.to_be_bytes());
+    mac.verify_slice(&tag).ok()?;
+    file.rewind().await.ok()?;
+
+    Some(size)
 }

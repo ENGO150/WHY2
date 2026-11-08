@@ -1049,11 +1049,11 @@ impl App
     //A PICTURE THAT CAME WITH ITS BYTES
     /// Appends a decoded picture to the pane.
     pub fn push_image(&mut self, username: String, filename: String, message_id: u64, timestamp: Option<u64>,
-        image: Animation, username_color: Option<u8>)
+        hash: [u8; 32], image: Animation, username_color: Option<u8>)
     {
         let picture = self.fit(image);
 
-        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: None, picture, hearts: Vec::new(), pinned: false });
+        self.push_entry(Entry::Image { username, filename, message_id, timestamp, username_color, hash: Some(hash), picture, hearts: Vec::new(), pinned: false });
     }
 
     //A TRANSFER STARTING

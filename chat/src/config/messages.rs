@@ -397,6 +397,14 @@ pub fn exists(id: u64) -> bool //IS MESSAGE id IN THE HISTORY?
     HISTORY.lock().unwrap().find(id).is_some()
 }
 
+/// Returns the content hash and filename of a stored attachment.
+pub fn attachment(id: u64) -> Option<([u8; 32], String)>
+{
+    let history = HISTORY.lock().unwrap();
+    let record = &history.records[history.find(id)?];
+    Some((record.image?, record.text.clone()))
+}
+
 /// Returns the author of message `id`, if kept.
 pub fn author(id: u64) -> Option<String> //WHO SAID MESSAGE id
 {

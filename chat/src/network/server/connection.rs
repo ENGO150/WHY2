@@ -62,6 +62,8 @@ use crate::
 #[derive(Clone)]
 pub struct AvailableFile //UPLOADED FILE
 {
+    /// Whether the file has a persistent at-rest authentication tag.
+    pub persistent: bool,
     /// SHA-256 of the file.
     pub hash: [u8; 32],   //FILE HASH
     /// Where the sealed file is on disk.
@@ -70,7 +72,7 @@ pub struct AvailableFile //UPLOADED FILE
     pub filename: String, //FILENAME
     /// Plaintext size in bytes.
     pub size: u64,        //FILE SIZE
-    /// The file's at-rest grid key, random and never stored.
+    /// The file's at-rest grid key, derived for persistent files and random for temporary ones.
     pub key: Zeroizing<Vec<i64>>,
     /// The file's at-rest nonce.
     pub nonce: Vec<i64>,

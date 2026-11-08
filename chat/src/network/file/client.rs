@@ -44,6 +44,7 @@ use crate::
 {
     t,
     misc,
+    cache,
     config,
     options,
     crypto as chat_crypto,
@@ -136,6 +137,41 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
 
     //DONE
     tx.send(ClientEvent::UploadDone { uid, filename }).await.unwrap();
+}
+
+//COPY AN ATTACHMENT FROM THE VERIFIED DISK CACHE
+/// Downloads a cached attachment in chunks, returning false on a cache miss.
+/// Output errors are reported as download failures rather than retried over the network.
+pub async fn download_cached(hash: [u8; 32], filename: &str, tx: Sender<ClientEvent>) -> bool
+{
+    //REDUCE THE NAME TO ITS LAST COMPONENT
+    let filename = Path::new(filename).file_name().and_then(|name| name.to_str())
+        .unwrap_or("unnamed_file").to_owned();
+    let directory = config::read_config::<String>("download_directory")
+        .replace("{HOME}", dirs::home_dir().expect("Could not determine home directory")
+            .to_str().expect("Invalid home directory"));
+    let uid = rand::random();
+
+    //CREATE THE OUTPUT DIRECTORY BEFORE COPYING
+    let result = match fs::create_dir_all(&directory).await
+    {
+        Ok(()) => cache::copy(&hash, &Path::new(&directory).join(&filename)).await,
+        Err(error) => Some(Err(error)),
+    };
+
+    let Some(result) = result else { return false };
+    let size = result.as_ref().copied().unwrap_or_default();
+
+    //REPORT THE LOCAL TRANSFER THROUGH THE SAME UI EVENTS
+    tx.send(ClientEvent::Download { uid, filename: filename.clone(), size }).await.ok();
+
+    tx.send(match result
+    {
+        Ok(_) => ClientEvent::Downloaded { uid, filename },
+        Err(_) => ClientEvent::DownloadFailed { uid, filename },
+    }).await.ok();
+
+    true
 }
 
 /// Downloads a file the server approved into the `download_directory`.

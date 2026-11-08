@@ -68,6 +68,7 @@ use tui::
 {
     theme,
     palette,
+    state::Entry,
     account::{ Account, Kind },
     App,
     TerminalGuard,
@@ -97,6 +98,7 @@ use why2_chat::
     {
         self,
         client::{ self, ClientEvent, image as client_image },
+        file::client as file_client,
         codes::
         {
             PacketCode,
@@ -492,8 +494,8 @@ pub enum Upload
 {
     /// A fileshare.
     File,
-    /// A chat picture.
-    Image,
+    /// A persistent chat attachment.
+    Persistent,
     /// Our avatar.
     Avatar,
     /// The server icon.
@@ -552,8 +554,8 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
         {
             Upload::Avatar => PacketCode::AvatarRequest { hash: Some(hash) },
             Upload::Icon => PacketCode::ServerIconSave { hash: Some(hash) },
-            Upload::Image => PacketCode::ImageRequest { hash, filename },
-            Upload::File => PacketCode::UploadRequest { hash },
+            Upload::Persistent => PacketCode::UploadRequest { hash, filename, persistent: true },
+            Upload::File => PacketCode::UploadRequest { hash, filename, persistent: false },
         };
 
         network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
@@ -634,7 +636,7 @@ fn cut_avatar(mut file: File) -> Result<([u8; 32], PathBuf), String>
 //OPEN A FILE AND REFUSE WHAT THE SERVER WOULD
 /// Opens a file to upload and refuses what the server would.
 ///
-/// A fileshare only has to exist; a picture must also be under
+/// A fileshare or persistent attachment only has to exist; an avatar or icon must also be under
 /// [`MAX_IMAGE_SIZE`](consts::MAX_IMAGE_SIZE) and have a recognised image header.
 ///
 /// # Returns
@@ -652,7 +654,7 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
         return Err(t!("upload.not_found").to_owned());
     }
 
-    if kind == Upload::File { return Ok((file, path)); }
+    if matches!(kind, Upload::File | Upload::Persistent) { return Ok((file, path)); }
 
     //READ THE HEADER BEFORE ASKING THE SERVER
     let mut header = Vec::new();
@@ -694,8 +696,39 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         let mut command_used = false;
         if let (Some(command), parameters) = command::get_command(&input)
         {
-            //SEND A SIMPLE COMMAND'S CODE, ELSE CONTINUE
-            let sent = command::send_command_code(&mut *write_stream.lock().await, &command, &parameters).await;
+            //RESOLVE A VISIBLE ATTACHMENT BEFORE ASKING THE SERVER
+            let attachment = if command == Command::Download
+            {
+                parameters.as_deref().and_then(|p| p.parse::<u64>().ok()).and_then(|message_id|
+                    app.messages.iter().find_map(|entry| match entry
+                    {
+                        Entry::Image { message_id: id, hash: Some(hash), filename, .. } if *id == message_id =>
+                            Some((message_id, *hash, filename.clone())),
+                        _ => None,
+                    }))
+            } else { None };
+
+            //USE THE VERIFIED DISK CACHE, OR SEND THE DOWNLOAD REQUEST
+            let sent = if let Some((message_id, hash, filename)) = attachment
+            {
+                let write_stream = write_stream.clone();
+                let tx = tx.clone();
+                let keys = options::get_keys();
+
+                tokio::spawn(async move
+                {
+                    if !file_client::download_cached(hash, &filename, tx).await
+                    {
+                        network::send(&mut *write_stream.lock().await,
+                            PacketCode::AttachmentDownload { message_id }, keys.as_ref()).await;
+                    }
+                });
+
+                Some(true)
+            } else
+            {
+                command::send_command_code(&mut *write_stream.lock().await, &command, &parameters).await
+            };
 
             //ECHO A REQUEST/RESPONSE ANSWER INTO THE PANE
             if sent == Some(true)
@@ -834,11 +867,12 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             if !valid { invalid_usage(app, None); }
                         },
 
-                        Command::Upload | Command::Image => match parameters
+                        Command::Upload => match parameters
                         {
                             Some(path) =>
                             {
-                                let kind = if command == Command::Image { Upload::Image } else { Upload::File };
+                                let (path, persistent) = command::upload_parameters(&path);
+                                let kind = if persistent { Upload::Persistent } else { Upload::File };
 
                                 if let Err(error) = upload(write_stream, &path, kind, None) { app.push_styled(error, theme::error()); }
                             },

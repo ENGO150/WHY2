@@ -244,9 +244,14 @@ impl Theme
             Entry::Transfer(transfer) => state::wrap_line(&Line::from(progress(transfer, width)), width),
 
             //ONLY THE CAPTION; THE PICTURE IS DRAWN UNDER IT
-            Entry::Image { username, filename, timestamp, username_color, picture, .. } =>
+            Entry::Image { username, filename, message_id, timestamp, username_color, picture, .. } =>
             {
-                let (before, after) = i18n::split(t!("message.image"), "username");
+                let caption = match picture
+                {
+                    Picture::Ready(..) => t!("message.image"),
+                    _ => t!("message.file"),
+                };
+                let (before, after) = i18n::split(caption, "username");
 
                 let mut spans = vec!
                 [
@@ -260,10 +265,10 @@ impl Theme
                 {
                     Picture::Absent => spans.push(Span::styled(format!(" [ {} ]", t!("message.show")), accent())),
                     Picture::Waiting | Picture::Deferred => spans.push(Span::styled(format!(" [ {} ]", t!("message.loading")), dim())),
-                    Picture::Gone => spans.push(Span::styled(format!(" [ {} ]", t!("message.unavailable")), error())),
-                    Picture::Ready(..) => {},
+                    Picture::Gone | Picture::Ready(..) => {},
                 }
 
+                spans.push(Span::styled(format!(" [ /download {message_id} ]"), accent()));
                 state::wrap_line(&Line::from(spans), width)
             },
 
@@ -323,9 +328,14 @@ impl Theme
                 spans.push(Span::styled(format!(": {}", text.lines().next().unwrap_or_default()), dim()));
             },
 
-            Some(Entry::Image { username, filename, username_color, .. }) =>
+            Some(Entry::Image { username, filename, username_color, picture, .. }) =>
             {
-                let (before, after) = i18n::split(t!("message.image"), "username");
+                let caption = match picture
+                {
+                    Picture::Ready(..) => t!("message.image"),
+                    _ => t!("message.file"),
+                };
+                let (before, after) = i18n::split(caption, "username");
 
                 spans.push(Span::styled(i18n::format(before, &[("filename", filename)]), dim()));
                 spans.push(self.colorize(username.clone(), *username_color));
