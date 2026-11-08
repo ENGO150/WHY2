@@ -273,6 +273,12 @@ unreadable = "Hlasovou zprávu nelze přehrát."
 not_loaded = "Hlasová zpráva #{message_id} není načtena."
 not_voice = "Zpráva #{message_id} není hlasová zpráva."
 
+[media]
+unsupported = "Tato příloha není podporovaný zvukový soubor ani video."
+failed = "Tento mediální soubor se nepodařilo přehrát."
+not_loaded = "Zpráva #{message_id} není načtená."
+output_failed = "Přehrávání selhalo - není dostupné výstupní zařízení."
+
 [upload]
 read_failed = "Čtení souboru selhalo!"
 unreadable_image = "Tento obrázek nemohl být přečten!"
@@ -461,8 +467,8 @@ description = "Umlčí uživatele/Vás, nebo umlčení zruší"
 description = "Nahraje hlasovou zprávu - podržte zkratku pro mluvení, nebo ji stiskněte pro začátek a poté pro odeslání"
 
 [command.play]
-args.id = "ID hlasové zprávy"
-description = "Přehraje hlasovou zprávu, nebo zastaví přehrávání, pokud je ID vynecháno"
+args.id = "ID hlasové zprávy nebo mediální přílohy"
+description = "Přehraje hlasovou zprávu nebo zvukovou či video přílohu; bez ID přehrávání zastaví"
 
 [command.channel]
 args.name = "Jméno kanálu"
