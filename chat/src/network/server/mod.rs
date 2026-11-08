@@ -159,8 +159,13 @@ fn clean(text: &str) -> String //WHAT A CLIENT MAY PUT IN A PROFILE
     text.chars().filter(|character| !character.is_control()).collect::<String>().trim().to_string()
 }
 
-/// Sends the user list: everybody connected, plus the offline accounts if
+/// Sends the user list: everybody connected who is not hidden, plus the offline accounts if
 /// `show_offline_users` is on.
+///
+/// # Parameters
+/// - `write_stream`: The client's write half.
+/// - `peer_addr`: The client's address.
+/// - `keys`: The client's session keys.
 async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &SocketAddr, keys: &SharedKeys) //SEND LIST OF USERS
 {
     let mut users = Vec::new();
@@ -170,6 +175,9 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
     {
         if let Connection::Authenticated { username: uname, id: user_id, channel, device, .. } = connection_enum.value()
         {
+            //SKIP "OFFLINE" ONLINE USERS
+            if !config::users::online_status(uname) { continue; }
+
             users.push(OnlineUser
             {
                 username: uname.clone(),
@@ -489,13 +497,16 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
             conn.unset_last_pm();
         }
 
-        //SEND LEAVE MESSAGE
-        send_to_all(PacketCode::Leave
+        //SEND LEAVE MESSAGE, UNLESS THE ACCOUNT WAS HIDDEN
+        if config::users::online_status(username)
         {
-            username: username.to_string(),
-            id: *connection.id().unwrap(),
-            registered: config::users::contains(username),
-        });
+            send_to_all(PacketCode::Leave
+            {
+                username: username.to_string(),
+                id: *connection.id().unwrap(),
+                registered: config::users::contains(username),
+            });
+        }
     }
 
     log::info!
@@ -1171,6 +1182,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     network::send(&mut *streams.1.lock().await, PacketCode::Accept
     {
         id,
+        username: username.clone(),
         role,
         colors: config::users::colors(&username),
     }, Some(&keys)).await;
@@ -1178,15 +1190,18 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //SEND LIST OF USERS
     send_list(&streams.1, &peer_addr, &keys).await;
 
-    //SEND JOIN MESSAGE
-    send_to_all(PacketCode::Join
+    //SEND JOIN ANNOUNCEMENT, IF NOT HIDDEN
+    if config::users::online_status(&username)
     {
-        username: username.clone(),
-        username_color: config::users::colors(&username).username_color,
-        id,
-        device,
-        role,
-    });
+        send_to_all(PacketCode::Join
+        {
+            username: username.clone(),
+            username_color: config::users::colors(&username).username_color,
+            id,
+            device,
+            role,
+        });
+    }
 
     //TELL THE CLIENT WHO IS ALREADY IN VOICE
     if options::voice_chat_enabled()

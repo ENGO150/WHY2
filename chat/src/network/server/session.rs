@@ -1504,15 +1504,45 @@ impl<'a, 's> ClientSession<'a, 's>
             if let Some(field) = stored.field_mut(key) { *field = value; }
         }
 
+        //THE ONLINE STATUS IS A TOGGLE, NOT A TYPED FIELD
+        stored.online_status = profile.online_status;
+
         if refused
         {
             self.send(PacketCode::InvalidUsage).await;
         } else
         {
             let length: usize = stored.fields().iter().map(|field| field.chars().count()).sum();
+            let was_online = config::users::online_status(&self.username);
 
             log::info!("Profile saved ({length} chars): {}", self.peer_addr);
             config::users::set_profile(&self.username, &stored);
+
+            //A CHANGE OF VISIBILITY IS A JOIN OR A LEAVE TO EVERYBODY
+            if stored.online_status != was_online
+            {
+                let device = server::CONNECTIONS.get(&self.peer_addr).and_then(|conn| conn.device().clone());
+
+                if stored.online_status
+                {
+                    server::send_to_all(PacketCode::Join
+                    {
+                        username: self.username.clone(),
+                        username_color: config::users::colors(&self.username).username_color,
+                        id: self.id,
+                        device,
+                        role: self.role,
+                    });
+                } else
+                {
+                    server::send_to_all(PacketCode::Leave
+                    {
+                        username: self.username.clone(),
+                        id: self.id,
+                        registered: config::users::contains(&self.username),
+                    });
+                }
+            }
         }
 
         //THE WHOLE PROFILE COMES BACK, SO A REFUSED DESCRIPTION SNAPS BACK
