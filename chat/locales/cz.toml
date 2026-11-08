@@ -92,6 +92,7 @@ new = "Zadejte nové heslo."
 confirm = "Zadejte potvrzení nového hesla."
 
 [event]
+attachment_unavailable = "Zpráva {message_id} nemá přílohu ke stažení nebo její soubor není na serveru dostupný."
 first_user = "Jste první uživatel na serveru, byla Vám přidělena role vlastníka."
 login_ok = "Přihlášení proběhlo úspěšně. Stiskněte Ctrl+H pro nápovědu."
 connected = "Úspěšně připojeno k {server_name}."
@@ -186,6 +187,7 @@ other = "{count} uživatelů píše…"
 [message]
 pm = "PM"
 image = "{username} poslal/a obrázek ({filename})"
+file = "{username} poslal/a soubor ({filename})"
 show = "zobrazit"
 loading = "načítání..."
 unavailable = "nedostupný"
@@ -429,6 +431,7 @@ few = "Zkopírovány {count} řádky do schránky"
 other = "Zkopírováno {count} řádků do schránky"
 
 [arg]
+persistent = "trvalý"
 id = "ID"
 user = "UŽIVATEL"
 message = "ZPRÁVA"
@@ -469,17 +472,14 @@ args.name = "Jméno kanálu"
 description = "Přepne do kanálu, nebo do lobby, pokud je JMÉNO vynecháno"
 
 [command.upload]
+args.persistent = "Uchovat soubor v historii chatu (true/false; výchozí true)"
 args.path = "Cesta k souboru"
-description = "Nahraje soubor na server"
+description = "Nahraje soubor; trvalé soubory se uchovávají s historií chatu (limit 8 MB)"
 
 [command.download]
-args.user_id = "ID uživatele, který soubor nahrál"
+args.user_id = "ID uživatele, který soubor nahrál, nebo ID zprávy, pokud není uvedeno ID souboru"
 args.file_id = "ID zvoleného souboru"
-description = "Stáhne soubor ze serveru"
-
-[command.image]
-args.path = "Cesta k obrázku"
-description = "Nahraje přetrvávající obrázek"
+description = "Stáhne sdílený soubor podle ID uživatele a souboru nebo uloženou přílohu podle ID zprávy"
 
 [command.screen]
 args.monitor = "Index/jméno monitoru ke sdílení"
