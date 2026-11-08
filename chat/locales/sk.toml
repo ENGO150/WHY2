@@ -370,6 +370,8 @@ bio = "Popis"
 pronouns = "Zámená"
 website = "Webová stránka"
 status = "Stav"
+online_status = "Zobrazovať ako online"
+online_status_hint = "Keď je vypnuté, nie ste uvedení ako online a váš príchod sa neoznamuje."
 bad_website = "Webová stránka musí začínať http:// alebo https://"
 empty_field = "{field}: prázdne."
 

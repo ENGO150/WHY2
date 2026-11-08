@@ -1678,6 +1678,8 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
 
             Value::Text(text) => spans.push(Span::styled(text.clone(), theme::text())),
 
+            Value::Toggle { .. } => spans.push(Span::styled(t!("profile.online_status_hint"), theme::dim())),
+
             _ => {},
         },
 

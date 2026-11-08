@@ -368,6 +368,8 @@ bio = "Beschreibung"
 pronouns = "Pronomen"
 website = "Webseite"
 status = "Status"
+online_status = "Als online anzeigen"
+online_status_hint = "Wenn aus, wirst du nicht als online gelistet und dein Beitritt wird nicht angekündigt."
 bad_website = "Eine Webseite muss mit http:// oder https:// beginnen"
 empty_field = "{field}: leer."
 

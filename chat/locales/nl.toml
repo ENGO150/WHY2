@@ -368,6 +368,8 @@ bio = "Beschrijving"
 pronouns = "Voornaamwoorden"
 website = "Website"
 status = "Status"
+online_status = "Als online tonen"
+online_status_hint = "Als dit uit staat, word je niet als online vermeld en wordt je aankomst niet aangekondigd."
 bad_website = "Een website moet beginnen met http:// of https://"
 empty_field = "{field}: leeg."
 

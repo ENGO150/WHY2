@@ -367,6 +367,8 @@ bio = "説明"
 pronouns = "代名詞"
 website = "ウェブサイト"
 status = "ステータス"
+online_status = "オンラインとして表示"
+online_status_hint = "オフにすると、オンライン一覧に表示されず、参加も通知されません。"
 bad_website = "ウェブサイトは http:// または https:// で始まる必要があります"
 empty_field = "{field}：未設定。"
 

@@ -320,8 +320,11 @@ impl App
                 self.devices.remove(&uname);
                 self.stopped_typing(&uname);
 
-                //DELETED OR BANNED ACCOUNTS ARE NOT OFFLINE
-                if self.offline_listed && registered && !self.banned.contains(&uname) { self.offline.insert(id, (uname, color)); }
+                //DELETED OR BANNED ACCOUNTS ARE NOT OFFLINE, AND NEITHER ARE WE TO OURSELVES
+                if self.offline_listed && registered && uname != self.username && !self.banned.contains(&uname)
+                {
+                    self.offline.insert(id, (uname, color));
+                }
 
                 //A DISCONNECT CARRIES NO VoiceLeave
                 if self.voice_roster.remove(&id).is_some() { self.rebuild_voice(); }

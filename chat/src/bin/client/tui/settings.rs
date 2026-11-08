@@ -481,6 +481,20 @@ impl Settings
             restart: false,
         })));
 
+        //OUR OWN VISIBILITY IS A TOGGLE
+        if own
+        {
+            rows.push(Row::Item(Item
+            {
+                label: field_label(UserProfile::ONLINE_STATUS_KEY),
+                key: String::from(UserProfile::ONLINE_STATUS_KEY),
+                value: Value::Toggle { on: profile.online_status, invert: false },
+                hint: String::new(),
+                changed: false,
+                restart: false,
+            }));
+        }
+
         //NOTHING LEAVES THIS BOX UNTIL THIS IS PRESSED
         if own { rows.push(Row::Action(consts::SAVE_LABEL)); }
 
@@ -1282,6 +1296,13 @@ fn save_profile(app: &mut App)
             {
                 if let Some(field) = profile.field_mut(&item.key) { *field = text.clone(); }
 
+                fields |= item.changed;
+            },
+
+            //THE VISIBILITY TOGGLE RIDES WITH THE PROFILE
+            Value::Toggle { on, .. } if item.key == UserProfile::ONLINE_STATUS_KEY =>
+            {
+                profile.online_status = *on;
                 fields |= item.changed;
             },
 

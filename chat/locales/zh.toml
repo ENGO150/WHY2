@@ -367,6 +367,8 @@ bio = "简介"
 pronouns = "代词"
 website = "网站"
 status = "状态"
+online_status = "显示为在线"
+online_status_hint = "关闭后，你不会被列为在线，你的加入也不会被通知。"
 bad_website = "网站必须以 http:// 或 https:// 开头"
 empty_field = "{field}：空。"
 

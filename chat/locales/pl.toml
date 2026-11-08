@@ -370,6 +370,8 @@ bio = "Opis"
 pronouns = "Zaimki"
 website = "Strona internetowa"
 status = "Status"
+online_status = "Pokaż jako online"
+online_status_hint = "Gdy wyłączone, nie jesteś wymieniany jako online, a twoje przybycie nie jest ogłaszane."
 bad_website = "Strona internetowa musi zaczynać się od http:// lub https://"
 empty_field = "{field}: puste."
 

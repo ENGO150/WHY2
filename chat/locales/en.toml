@@ -381,6 +381,8 @@ bio = "Description"
 pronouns = "Pronouns"
 website = "Website"
 status = "Status"
+online_status = "Show as online"
+online_status_hint = "When off, you are not listed as online and your arrival is not announced."
 bad_website = "A website has to start with http:// or https://"
 empty_field = "No {field}."
 

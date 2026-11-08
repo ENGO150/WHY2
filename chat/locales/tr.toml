@@ -367,6 +367,8 @@ bio = "Açıklama"
 pronouns = "Zamirler"
 website = "Web sitesi"
 status = "Durum"
+online_status = "Çevrimiçi olarak göster"
+online_status_hint = "Kapalıyken çevrimiçi olarak listelenmezsiniz ve geldiğiniz duyurulmaz."
 bad_website = "Web sitesi http:// veya https:// ile başlamalıdır"
 empty_field = "{field}: boş."
 

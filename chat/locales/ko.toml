@@ -367,6 +367,8 @@ bio = "설명"
 pronouns = "대명사"
 website = "웹사이트"
 status = "상태"
+online_status = "온라인으로 표시"
+online_status_hint = "끄면 온라인 목록에 표시되지 않고 접속도 알리지 않습니다."
 bad_website = "웹사이트는 http:// 또는 https://로 시작해야 합니다"
 empty_field = "{field}: 비어 있음."
 

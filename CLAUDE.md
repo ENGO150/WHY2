@@ -327,10 +327,15 @@ padding in the shader. Never write through an sRGB view (double gamma). Letterbo
   `server_users.toml`. The server paints every message from the account's current color; clients
   neither store nor send colors. `colors::COLORS` is the wire order; names survive reordering.
 - Profiles (`bio`, `pronouns`, `website`, `status`) live in `[user.profile]` in
-  `server_users.toml`; `UserProfile::KEYS` is the single field list. The client only asks and
-  displays. Bounds (`max_profile_bio`, `max_profile_field`) refuse rather than truncate; URLs must
-  be http/https. `avatar` is a hash outside `KEYS`; the client crops/re-encodes, the server only
-  checks the header (`is_avatar`) and `MAX_AVATAR_SIZE`. Avatars are ordinary stored pictures,
+  `server_users.toml`; `UserProfile::KEYS` is the single list of typed fields. `online_status` is a
+  boolean beside them (missing reads as `true`): `send_list` is the same for every client and
+  leaves hidden accounts out of its online section, a hidden account broadcasts no `Join`/`Leave`
+  at login, and a change of visibility sends every client the matching `Join`/`Leave`. The
+  client's own username comes in `Accept`, not `Join`, so the hidden client can be skipped too.
+  The client only asks and displays. Bounds (`max_profile_bio`,
+  `max_profile_field`) refuse rather than truncate; URLs must be http/https. `avatar` is a hash
+  outside `KEYS`; the client crops/re-encodes, the server only checks the header (`is_avatar`) and
+  `MAX_AVATAR_SIZE`. Avatars are ordinary stored pictures,
   retained by `messages::stored` when a profile names them. The server icon is the same machinery
   with the hash in `config::server_icon`, owner-set, requested rather than pushed.
 
