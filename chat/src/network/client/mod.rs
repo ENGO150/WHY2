@@ -837,14 +837,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
     let mut disabled_registration = false; //PRINT "Registration disabled!"
 
-    //FIRST Join PACKET CARRIES OUR OWN USERNAME
-    #[cfg(feature = "client_voice")]
-    let mut first_message = true;
-
     //CONNECTION PROPERTIES
     let mut id = 0usize; //ID SET BY SERVER
     #[cfg(feature = "client_voice")]
-    let mut username: Option<String> = None;
+    let mut username: Option<String> = None; //OUR OWN NAME, FOR THE VOICE PANEL
 
     //LOOP READING
     loop
@@ -1003,12 +999,18 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //START CHATTING
-            PacketCode::Accept { id: sid, role, colors } =>
+            PacketCode::Accept { id: sid, username: uname, role, colors } =>
             {
                 tx.send(ClientEvent::Authenticated { role }).await.unwrap();
 
                 //SET SERVER-SIDE ID
                 id = sid;
+
+                //OUR OWN NAME IS ONLY FOR THE VOICE PANEL
+                #[cfg(feature = "client_voice")]
+                {
+                    username = Some(uname);
+                }
 
                 //SET COLORS
                 tx.send(ClientEvent::Colors { colors: Some(colors) }).await.unwrap();
@@ -1021,13 +1023,6 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             //JOIN MESSAGE (CLIENT CONNECTED)
             PacketCode::Join { username: user, username_color, id, device, role } =>
             {
-                #[cfg(feature = "client_voice")]
-                if first_message
-                {
-                    first_message = false;
-                    username = Some(user.clone());
-                }
-
                 tx.send(ClientEvent::Join { username: user, username_color, id, device, role }).await.unwrap();
             }
 

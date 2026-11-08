@@ -137,6 +137,8 @@ pub enum PacketCode //CONTROL CODES
     {
         /// The client's session id.
         id: usize,
+        /// The account's username.
+        username: String,
         /// The account's role.
         role: Role,
         /// The account's colors.
