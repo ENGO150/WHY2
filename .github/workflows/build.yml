@@ -106,12 +106,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          # ACTIONS_ID_TOKEN_REQUEST_{URL,TOKEN} are injected by `id-token: write`.
-          # A fresh token per file: the endpoint accepts each `jti` exactly once.
+          # ACTIONS_ID_TOKEN_REQUEST_{URL,TOKEN} ARE INJECTED BY `id-token: write`.
+          # A FRESH TOKEN PER REQUEST: THE ENDPOINT ACCEPTS EACH `jti` EXACTLY ONCE.
           #
-          # The answer is parsed separately rather than piped straight into jq: under
-          # `pipefail` a non-JSON answer makes jq exit non-zero, which killed the whole
-          # step from inside the retry loop that was meant to survive it.
+          # THE ANSWER IS PARSED SEPARATELY RATHER THAN PIPED STRAIGHT INTO jq: UNDER
+          # `pipefail` A NON-JSON ANSWER MAKES jq EXIT NON-ZERO, WHICH KILLED THE
+          # WHOLE STEP FROM INSIDE THE RETRY LOOP THAT WAS MEANT TO SURVIVE IT
           mint() {
             local answer token
 
@@ -125,45 +125,65 @@ jobs:
             printf '%s' "$token"
           }
 
-          # Retried by hand rather than with --retry: the endpoint spends a
-          # token's `jti` the first time it sees it, so curl's own retry would
-          # resend a spent one and report the resulting 401 instead of the real
-          # error. Each attempt mints its own.
-          publish() {
-            local file="$1" variant="$2" sum token attempt=1
-            sum="$(sha256sum "$file" | cut -d' ' -f1)"
-
-            while true; do
+          # EVERY CHUNK AND COMPLETION RETRY NEEDS A FRESH SINGLE-USE TOKEN.
+          upload_request() {
+            local file="$1" url="$2" sum="$3" size="$4" chunk_sum="$5"
+            local token attempt status response
+            response="$(mktemp)"
+            for attempt in 1 2 3 4; do
+              status=""
               if token="$(mint)"; then
                 echo "::add-mask::$token"
+                if status="$(curl -sS --fail-with-body --output "$response" \
+                     --write-out '%{http_code}' \
+                     -X PUT "$url" \
+                     -H "Authorization: Bearer $token" \
+                     -H "X-Content-SHA256: $sum" \
+                     -H "X-Upload-Size: $size" \
+                     -H "X-Chunk-SHA256: $chunk_sum" \
+                     --data-binary "@$file")"; then
+                  rm -f "$response"
+                  return 0
+                fi
+                cat "$response" >&2
               else
-                echo "could not mint a token for $variant" >&2
-                token=""
+                echo "could not mint an upload token" >&2
               fi
-
-              # --fail-with-body, not -f: the endpoint's rejection reason is in
-              # the body, and -f discards it.
-              if [ -n "$token" ] && curl -sS --fail-with-body \
-                   -X PUT "$ENDPOINT/$variant" \
-                   -H "Authorization: Bearer $token" \
-                   -H "X-Content-SHA256: $sum" \
-                   --data-binary "@$file"; then
-                echo "published $variant ($sum)"
-                return 0
-              fi
-
-              if [ "$attempt" -ge 4 ]; then
-                echo "giving up on $variant after $attempt attempts" >&2
+              # A SIZE LIMIT IS PERMANENT; RETRYING THE SAME BODY CANNOT FIX IT.
+              if [ "$status" = 413 ] || [ "$attempt" -eq 4 ]; then
+                echo "upload failed: $url (HTTP ${status:-unknown})" >&2
+                rm -f "$response"
                 return 1
               fi
-
-              # Backed off rather than retried flat: a Cloudflare 524 means the Pi is
-              # still busy with the files sent a moment ago, and coming back in five
-              # seconds asks the same busy disk.
               sleep $((attempt * 15))
-
-              attempt=$((attempt + 1))
             done
+          }
+
+          publish() {
+            local file="$1" variant="$2" sum size chunks chunk chunk_sum index=0
+            sum="$(sha256sum "$file" | cut -d' ' -f1)"
+            size="$(stat -c '%s' "$file")"
+            chunks="$(mktemp -d)"
+            # 64 MiB PER REQUEST, INCLUDING THE LAST PART, LEAVES HEADROOM BELOW
+            # CLOUDFLARE'S 100 MB LIMIT. HTTP TRANSFER CHUNKING ALONE WOULD NOT.
+            if ! split -b 67108864 -d -a 6 -- "$file" "$chunks/part-"; then
+              rm -rf "$chunks"
+              return 1
+            fi
+            for chunk in "$chunks"/part-*; do
+              chunk_sum="$(sha256sum "$chunk" | cut -d' ' -f1)"
+              echo "uploading $variant chunk $index ($size bytes total)"
+              if ! upload_request "$chunk" "${ENDPOINT%/}/$variant/chunks/$index" "$sum" "$size" "$chunk_sum"; then
+                rm -rf "$chunks"
+                return 1
+              fi
+              index=$((index + 1))
+            done
+            rm -rf "$chunks"
+            if ! upload_request /dev/null "${ENDPOINT%/}/$variant/complete" "$sum" "$size" ""; then
+              return 1
+            fi
+            echo "published $variant <- ${file##*/} ($sum)"
           }
 
           publish dist/why2-chat-ubuntu-latest/why2              client-linux
