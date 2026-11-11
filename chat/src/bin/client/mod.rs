@@ -288,21 +288,21 @@ fn account_command(app: &mut App, parameters: Option<String>)
 /// Lists who hearted a message in the pane, from the hearts the client already holds.
 fn hearts(app: &mut App, parameters: Option<String>) //LIST WHO HEARTED A MESSAGE
 {
-    let Some(message_id) = parameters.and_then(|p| p.parse::<u64>().ok()) else { return invalid_usage(app, None) };
+    let Some(message_id) = parameters.as_deref().and_then(command::parse_message_id) else { return invalid_usage(app, None) };
 
     let Some(hearts) = app.hearts_of(message_id) else
     {
-        app.push_styled(t!("hearts.not_loaded", message_id), theme::error());
+        app.push_styled(t!("hearts.not_loaded", message_id = command::format_message_id(message_id)), theme::error());
         return;
     };
 
     if hearts.is_empty()
     {
-        app.push_styled(t!("hearts.none", message_id), theme::notice());
+        app.push_styled(t!("hearts.none", message_id = command::format_message_id(message_id)), theme::notice());
         return;
     }
 
-    app.push_styled(t!("hearts.title", message_id, count = hearts.len()), theme::title());
+    app.push_styled(t!("hearts.title", message_id = command::format_message_id(message_id), count = hearts.len()), theme::title());
 
     let last = hearts.len() - 1;
 

@@ -184,11 +184,11 @@ pub enum PacketCode //CONTROL CODES
     },
 
     //CLIENT -> SERVER | SEND MESSAGE ONLY TO ONE CLIENT
-    /// *Client → server.* Sends a private message to one session.
+    /// *Client → server.* Sends a private message to one account.
     PrivateMessageRequest
     {
         text: String,
-        /// The recipient's session id.
+        /// The recipient's account id.
         id: usize,
     },
 
@@ -196,6 +196,9 @@ pub enum PacketCode //CONTROL CODES
     /// *Server → client.* A private message to us.
     PrivateMessage
     {
+        message_id: u64,
+        timestamp: Option<u64>,
+        reply: Option<u64>,
         text: String,
         username: String,
         id: usize,
@@ -209,6 +212,9 @@ pub enum PacketCode //CONTROL CODES
     /// is painted the way it is drawn.
     PrivateMessageBack
     {
+        message_id: u64,
+        timestamp: Option<u64>,
+        reply: Option<u64>,
         text: String,
         username: String,
         id: usize,
@@ -614,6 +620,26 @@ pub enum PacketCode //CONTROL CODES
     KeepAlive,        //SERVER <> CLIENT | A BIT LESS STUPID KEEP-ALIVE
     /// *Client → server.* Restarts the server process.
     ServerRestart,    //CLIENT -> SERVER | RESTART THE SERVER PROCESS
+
+    //SERVER -> CLIENT | A PAGE OF OUR STORED PRIVATE MESSAGES
+    /// *Server → client.* A page of our private messages, oldest first.
+    PrivateHistory
+    {
+        /// The messages, from our point of view.
+        messages: Vec<StoredPrivateMessage>,
+        /// Id of the first message; the cursor for the next older page.
+        start: u64,  //ID OF THE FIRST ONE
+        /// Whether older messages remain.
+        more: bool,  //OLDER ONES LEFT
+        /// Total number of our messages kept.
+        kept: u64,   //MESSAGES KEPT
+        /// Whether this answers a [`PrivateHistoryRequest`](PacketCode::PrivateHistoryRequest)
+        /// rather than being the login page.
+        older: bool, //AN ANSWER TO PrivateHistoryRequest
+    },
+
+    /// *Client → server.* Asks for our private history page before message `before`.
+    PrivateHistoryRequest { before: u64 }, //CLIENT -> SERVER | THE PRIVATE PAGE BEFORE THIS MESSAGE ID
 }
 
 //IMPLEMENTATIONS
@@ -741,6 +767,8 @@ impl PacketCode
             Self::InvalidFeature { .. }        => "InvalidFeature",
             Self::KeepAlive { .. }             => "KeepAlive",
             Self::ServerRestart { .. }         => "ServerRestart",
+            Self::PrivateHistory { .. }        => "PrivateHistory",
+            Self::PrivateHistoryRequest { .. } => "PrivateHistoryRequest",
         }
     }
 }
@@ -877,6 +905,35 @@ pub struct StoredMessage
     pub voice: Option<VoiceNote>, //THE CLIP, WHEN THIS LINE IS A VOICE MESSAGE
     /// Whether a moderator pinned it.
     pub pinned: bool,             //PINNED BY A MODERATOR
+}
+
+//ONE PRIVATE MESSAGE AS server_private_messages.bin KEEPS IT
+/// One stored private message, as sent in a private history page.
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub struct StoredPrivateMessage
+{
+    /// Private message id in the receiving account's own sequence.
+    pub message_id: u64,
+    /// The next lobby id when this was sent; this message precedes that lobby message.
+    pub before: u64,
+    /// The private message this answers.
+    pub reply: Option<u64>,
+    /// Participants who hearted it.
+    pub hearts: Vec<String>,
+    /// Whether the author edited it.
+    pub edited: bool,
+    /// The other account's username.
+    pub username: String,         //THE OTHER SIDE
+    /// The other account's id.
+    pub id: usize,                //THE OTHER SIDE'S ACCOUNT ID
+    /// `true` if we sent it to `username`, `false` if it came from them.
+    pub sent: bool,               //TO username, ELSE FROM
+    /// The message text.
+    pub text: String,
+    /// The colors the line is painted with.
+    pub colors: MessageColors,
+    /// When it was sent, in Unix seconds.
+    pub timestamp: Option<u64>,   //UNIX SECONDS
 }
 
 //ONE STORED VOICE MESSAGE

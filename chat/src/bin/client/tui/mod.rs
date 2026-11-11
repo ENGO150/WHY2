@@ -443,6 +443,13 @@ pub async fn run
                     }
                 }
 
+                //THE NEXT PAGE UP OF OUR PRIVATE HISTORY
+                if let Some(write_stream) = write_stream.as_ref() && let Some(before) = app.private_request.take()
+                {
+                    network::send(&mut *write_stream.lock().await,
+                        PacketCode::PrivateHistoryRequest { before }, options::get_keys().as_ref()).await;
+                }
+
                 //THE NEXT PAGE UP OF THE LOBBY'S HISTORY
                 if let Some(write_stream) = write_stream.as_ref() && let Some(before) = app.history_request.take()
                 {

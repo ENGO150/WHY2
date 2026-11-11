@@ -98,6 +98,7 @@ use crate::
             PacketCode,
             MessageColors,
             StoredMessage,
+            StoredPrivateMessage,
             VoiceNote,
             UserFile,
             OnlineUser,
@@ -202,6 +203,12 @@ pub enum ClientEvent
     /// A private message we sent.
     PrivateMessageSent
     {
+        /// The private message id.
+        message_id: u64,
+        /// When it was sent, if timestamps are on.
+        timestamp: Option<u64>,
+        /// The private message being answered.
+        reply: Option<u64>,
         /// The message text.
         message: String,
         /// The recipient's username.
@@ -214,6 +221,12 @@ pub enum ClientEvent
     /// A private message we received.
     PrivateMessageRecv
     {
+        /// The private message id.
+        message_id: u64,
+        /// When it was sent, if timestamps are on.
+        timestamp: Option<u64>,
+        /// The private message being answered.
+        reply: Option<u64>,
         /// The message text.
         message: String,
         /// The sender's username.
@@ -323,6 +336,20 @@ pub enum ClientEvent
         /// Whether this answers a request for an older page.
         older: bool,
     },                                                           //A PAGE OF STORED MESSAGES (START, MORE, KEPT, OLDER)
+    /// A page of our private history.
+    PrivateHistory
+    {
+        /// The stored messages, from our point of view.
+        messages: Vec<StoredPrivateMessage>,
+        /// The id the page starts at.
+        start: u64,
+        /// Whether more pages exist.
+        more: bool,
+        /// How many of our messages were kept.
+        kept: u64,
+        /// Whether this answers a request for an older page.
+        older: bool,
+    },                                                           //A PAGE OF OUR STORED PRIVATE MESSAGES
     /// We switched channel; `None` is the lobby.
     ChannelChanged
     {
@@ -924,6 +951,14 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::History { messages, start, more, kept, older } =>
             {
                 tx.send(ClientEvent::History { messages, start, more, kept, older }).await.unwrap();
+
+                continue;
+            }
+
+            //OUR OWN STORED PRIVATE MESSAGES
+            PacketCode::PrivateHistory { messages, start, more, kept, older } =>
+            {
+                tx.send(ClientEvent::PrivateHistory { messages, start, more, kept, older }).await.unwrap();
 
                 continue;
             }
@@ -1568,15 +1603,15 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //PRIVATE MESSAGE INCOMING
-            PacketCode::PrivateMessage { text, username, id, colors } =>
+            PacketCode::PrivateMessage { message_id, timestamp, reply, text, username, id, colors } =>
             {
-                tx.send(ClientEvent::PrivateMessageRecv { message: text, username, id, colors }).await.unwrap();
+                tx.send(ClientEvent::PrivateMessageRecv { message_id, timestamp, reply, message: text, username, id, colors }).await.unwrap();
             },
 
             //PRIVATE MESSAGE INCOMING
-            PacketCode::PrivateMessageBack { text, username, id, colors } =>
+            PacketCode::PrivateMessageBack { message_id, timestamp, reply, text, username, id, colors } =>
             {
-                tx.send(ClientEvent::PrivateMessageSent { message: text, username, id, colors }).await.unwrap();
+                tx.send(ClientEvent::PrivateMessageSent { message_id, timestamp, reply, message: text, username, id, colors }).await.unwrap();
             },
 
             //SPAM WARNING

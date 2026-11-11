@@ -50,6 +50,7 @@ use tokio::net::tcp::OwnedWriteHalf;
 
 use crate::
 {
+    consts,
     options,
     role::Role,
     network::
@@ -65,6 +66,31 @@ use crate::network::screen::client::
     capture as screen_capture,
     options as screen_options,
 };
+
+//FUNCTIONS
+/// Parses a public id (`12`) or a private id (`p12`), with an optional leading `#`.
+pub fn parse_message_id(value: &str) -> Option<u64> //PRIVATE IDS HAVE THEIR OWN NAMESPACE
+{
+    let value = value.strip_prefix('#').unwrap_or(value);
+    let (private, digits) = match value.strip_prefix('p')
+    {
+        Some(digits) => (true, digits),
+        None => (false, value),
+    };
+
+    let id = digits.parse::<u64>().ok().filter(|id| *id < consts::PRIVATE_MESSAGE_ID)?;
+    Some(if private { id | consts::PRIVATE_MESSAGE_ID } else { id })
+}
+
+/// Displays a private id as `pN`, and a public id as its number.
+pub fn format_message_id(id: u64) -> String //THE ID THE USER CAN PASS BACK TO A COMMAND
+{
+    match id & consts::PRIVATE_MESSAGE_ID != 0
+    {
+        true => format!("p{}", id & !consts::PRIVATE_MESSAGE_ID),
+        false => id.to_string(),
+    }
+}
 
 //ENUMS
 /// A slash command, identified by what it does rather than by how it was typed.
@@ -1145,13 +1171,13 @@ impl Command
                 })
             },
 
-            Command::Heart => Some(match parameters.and_then(|p| p.parse::<u64>().ok())
+            Command::Heart => Some(match parameters.and_then(parse_message_id)
             {
                 Some(message_id) => Ok(PacketCode::HeartRequest { message_id }),
                 None => Err(()),
             }),
 
-            Command::Pin => Some(match parameters.and_then(|p| p.parse::<u64>().ok())
+            Command::Pin => Some(match parameters.and_then(parse_message_id)
             {
                 Some(message_id) => Ok(PacketCode::PinRequest { message_id }),
                 None => Err(()),
@@ -1163,7 +1189,7 @@ impl Command
             {
                 let parsed = parameters
                     .and_then(|p| p.split_once(' '))
-                    .and_then(|(reply, text)| Some((reply.parse::<u64>().ok()?, text.to_string())));
+                    .and_then(|(reply, text)| Some((parse_message_id(reply)?, text.to_string())));
 
                 Some(match parsed
                 {
@@ -1183,7 +1209,7 @@ impl Command
 
             Command::Download =>
             {
-                if let Some(message_id) = parameters.and_then(|p| p.parse::<u64>().ok())
+                if let Some(message_id) = parameters.and_then(parse_message_id)
                 {
                     return Some(Ok(PacketCode::AttachmentDownload { message_id }));
                 }
@@ -1212,7 +1238,7 @@ impl Command
                 })
             },
 
-            Command::Delete => Some(match parameters.and_then(|p| p.parse::<u64>().ok())
+            Command::Delete => Some(match parameters.and_then(parse_message_id)
             {
                 Some(message_id) => Ok(PacketCode::DeleteRequest { message_id }),
                 None => Err(()),
@@ -1222,7 +1248,7 @@ impl Command
             {
                 let parsed = parameters
                     .and_then(|p| p.split_once(' '))
-                    .and_then(|(message_id, text)| Some((message_id.parse::<u64>().ok()?, text.to_string())));
+                    .and_then(|(message_id, text)| Some((parse_message_id(message_id)?, text.to_string())));
 
                 Some(match parsed
                 {

@@ -246,9 +246,9 @@ impl App
                 self.push_styled(reason, theme::error());
             },
 
-            ClientEvent::PrivateMessageSent { message: msg, username: to, id, colors } => self.push_private(true, to, id, msg, colors),
+            ClientEvent::PrivateMessageSent { message_id, timestamp, reply, message: msg, username: to, id, colors } => self.push_private(true, to, id, message_id, timestamp, msg, colors, reply),
 
-            ClientEvent::PrivateMessageRecv { message: msg, username: from, id, colors } => self.push_private(false, from, id, msg, colors),
+            ClientEvent::PrivateMessageRecv { message_id, timestamp, reply, message: msg, username: from, id, colors } => self.push_private(false, from, id, message_id, timestamp, msg, colors, reply),
 
             ClientEvent::TofuPrompt { request } =>
             {
@@ -483,7 +483,7 @@ impl App
             },
 
             //THE LOBBY'S STORED MESSAGES
-            ClientEvent::History { messages, start, more, kept, older } =>
+            ClientEvent::History { messages, start, more, kept: _, older } =>
             {
                 //A PICTURE IS LOADED WHEN IT IS LOOKED AT
                 let auto_show = client_image::auto_show_images();
@@ -536,12 +536,32 @@ impl App
                 match older
                 {
                     true => self.prepend_history(entries, start, more),
+                    false => self.start_history(entries, start, more),
+                }
+            },
 
-                    false =>
-                    {
-                        self.push_styled(t!("event.history", count = kept), theme::title());
-                        self.start_history(entries, start, more);
-                    },
+            //OUR OWN STORED PRIVATE MESSAGES
+            ClientEvent::PrivateHistory { messages, start, more, kept: _, older } =>
+            {
+                let entries = messages.into_iter().map(|message| state::Entry::Private
+                {
+                    sent: message.sent,
+                    message_id: message.message_id,
+                    reply: message.reply,
+                    hearts: message.hearts,
+                    edited: message.edited,
+                    position: Some((message.before, message.message_id)),
+                    username: message.username,
+                    id: message.id,
+                    timestamp: message.timestamp,
+                    text: message.text,
+                    colors: message.colors,
+                }).collect();
+
+                match older
+                {
+                    true => self.prepend_private_history(entries, start, more),
+                    false => self.start_private_history(entries, start, more),
                 }
             },
 

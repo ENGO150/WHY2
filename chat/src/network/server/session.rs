@@ -270,6 +270,9 @@ impl<'a, 's> ClientSession<'a, 's>
             //AN OLDER PAGE OF THE HISTORY
             PacketCode::HistoryRequest { before } => self.history(before).await,
 
+            //AN OLDER PAGE OF OUR PRIVATE HISTORY
+            PacketCode::PrivateHistoryRequest { before } => self.private_history(before).await,
+
             //ONE OF THE HISTORY'S PICTURES
             PacketCode::AttachmentDataRequest { hash } => self.attachment_data(hash).await,
 
@@ -277,8 +280,8 @@ impl<'a, 's> ClientSession<'a, 's>
             PacketCode::ScreensRequest => self.screens().await,
 
             //PRIVATE MESSAGE (OR REPLY)
-            PacketCode::PrivateMessageRequest { text, id } => self.private_message(Some(id), text).await,
-            PacketCode::Re { message } => self.private_message(None, message).await,
+            PacketCode::PrivateMessageRequest { text, id } => self.private_message(Some(id), text, None).await,
+            PacketCode::Re { message } => self.private_message(None, message, None).await,
 
             //MESSAGE HEART REACTION
             PacketCode::HeartRequest { message_id } => self.heart(message_id).await,
@@ -363,6 +366,21 @@ impl<'a, 's> ClientSession<'a, 's>
 
             self.send(PacketCode::Muted).await;
             return PacketFlow::Continue;
+        }
+
+        //A REPLY TO A PRIVATE ID STAYS BETWEEN ITS TWO PARTICIPANTS
+        if let Some(reply) = reply && reply & consts::PRIVATE_MESSAGE_ID != 0
+        {
+            let recipient = config::private_messages::peer(reply, &self.username)
+                .and_then(|peer| config::users::id(&peer));
+
+            let Some(recipient) = recipient else
+            {
+                self.send(PacketCode::InvalidUsage).await;
+                return PacketFlow::Continue;
+            };
+
+            return self.private_message(Some(recipient), text, Some(reply)).await;
         }
 
         //CHECK REPLY VALIDITY
@@ -532,6 +550,17 @@ impl<'a, 's> ClientSession<'a, 's>
     //DELETE A STORED MESSAGE
     async fn delete_message(&mut self, message_id: u64) -> PacketFlow
     {
+        if message_id & consts::PRIVATE_MESSAGE_ID != 0
+        {
+            match config::private_messages::delete(message_id, &self.username)
+            {
+                Some(participants) => server::send_to_accounts(&participants, |message_id| PacketCode::Deleted { message_id }),
+                None => self.send(PacketCode::InvalidUsage).await,
+            }
+
+            return PacketFlow::Continue;
+        }
+
         let author = config::messages::author(message_id);
         let own = author.as_deref() == Some(self.username.as_str());
 
@@ -568,6 +597,18 @@ impl<'a, 's> ClientSession<'a, 's>
         }
 
         let text = text.trim().to_owned();
+
+        if message_id & consts::PRIVATE_MESSAGE_ID != 0
+        {
+            match config::private_messages::edit(message_id, &self.username, &text)
+            {
+                Some(participants) => server::send_to_accounts(&participants, |message_id|
+                    PacketCode::Edited { message_id, text: text.clone() }),
+                None => self.send(PacketCode::InvalidUsage).await,
+            }
+
+            return PacketFlow::Continue;
+        }
 
         //OWN TEXT MESSAGES ONLY
         if !text.is_empty() && config::messages::edit(message_id, &self.username, &text)
@@ -1014,6 +1055,13 @@ impl<'a, 's> ClientSession<'a, 's>
         PacketFlow::Continue
     }
 
+    //AN OLDER PAGE OF OUR PRIVATE HISTORY
+    async fn private_history(&mut self, before: u64) -> PacketFlow
+    {
+        server::send_private_history(&self.streams.1, &self.keys, &self.username, Some(before)).await;
+        PacketFlow::Continue
+    }
+
     //ONE OF THE HISTORY'S PICTURES
     async fn attachment_data(&mut self, hash: [u8; 32]) -> PacketFlow
     {
@@ -1087,7 +1135,7 @@ impl<'a, 's> ClientSession<'a, 's>
     }
 
     //PRIVATE MESSAGE (OR REPLY)
-    async fn private_message(&mut self, recipient: Option<usize>, text: String) -> PacketFlow
+    async fn private_message(&mut self, recipient: Option<usize>, text: String, reply: Option<u64>) -> PacketFlow
     {
         //SILENCE MUTED USERS
         if self.muted()
@@ -1115,72 +1163,104 @@ impl<'a, 's> ClientSession<'a, 's>
             },
         };
 
-        //FIND RECIPIENT BY ID
-        let recipient_addr = server::CONNECTIONS.iter()
+        //A LIVE SESSION, OR - WITH THE PRIVATE HISTORY ON - AN OFFLINE ACCOUNT
+        let persistent = config::read_config::<bool>("persistent_private_messages");
+
+        let live = server::CONNECTIONS.iter()
             .find(|entry| entry.value().id() == Some(&recipient_id))
             .map(|entry| *entry.key());
 
-        if let Some(recipient_addr) = recipient_addr
-        {
-            log::info!("Private message ({} chars): {} -> {}",
-                text.chars().count(), self.peer_addr, recipient_addr);
-
-            //GET COLORS
-            let colors = config::users::colors(&self.username);
-
-            //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
-            if recipient_id != self.id
+        let recipient = live.and_then(|addr|
+            server::CONNECTIONS.get(&addr).and_then(|conn| conn.username().cloned())
+                .map(|username| (Some(addr), username))) //GUARD DROPPED HERE
+            .or_else(||
             {
-                let recipient_data = if let Some(mut recipient) =
-                    server::CONNECTIONS.get_mut(&recipient_addr)
-                {
-                    //SAVE ID TO RECIPIENT'S last_pm
-                    recipient.set_last_pm(self.id);
+                //AN OFFLINE MESSAGE NEEDS ROOM IN THE HISTORY
+                if !persistent || config::read_config::<usize>("max_persistent_private_messages") == 0 { return None; }
 
-                    Some((recipient.write_stream().clone(), recipient.keys().cloned()))
-                } else
-                {
-                    None
-                };
+                config::users::username(recipient_id).map(|username| (None, username))
+            });
 
-                //SEND
-                if let Some((recipient_stream, recipient_keys)) = recipient_data
-                {
-                    network::send(&mut *recipient_stream.lock().await, PacketCode::PrivateMessage
-                    {
-                        text: text.clone(),
-                        username: self.username.clone(),
-                        id: self.id,
-                        colors: colors.clone(),
-                    }, recipient_keys.as_ref()).await;
-                }
-            }
-
-            //SEND CONFIRMATION BACK TO SENDER
-            let Some(recipient_uname) = server::CONNECTIONS.get(&recipient_addr)
-                .and_then(|e| e.username().cloned()) else { return PacketFlow::Continue }; //RECIPIENT LEFT MID-SEND
-
-            //GET TARGET USERNAME COLOR
-            let recipient_color = config::users::colors(&recipient_uname).username_color;
-
-            self.send(PacketCode::PrivateMessageBack
-            {
-                text,
-                id: recipient_id,
-                username: recipient_uname,
-                colors: MessageColors //ADJUST COLORS TO USE TARGET UNAME COLOR
-                {
-                    username_color: recipient_color,
-                    message_color: colors.message_color,
-                },
-            }).await;
-        } else
+        let Some((recipient_addr, recipient_uname)) = recipient else
         {
             log::warn!("Private message refused (no such recipient): {}", self.peer_addr);
 
             //INVALID PM FORMAT
             self.send(PacketCode::InvalidUsage).await;
+            return PacketFlow::Continue;
+        };
+
+        match recipient_addr
+        {
+            Some(addr) => log::info!("Private message ({} chars): {} -> {}", text.chars().count(), self.peer_addr, addr),
+            None => log::info!("Private message ({} chars) kept for an offline account: {}", text.chars().count(), self.peer_addr),
         }
+
+        let text = text.trim().to_owned();
+        if text.is_empty()
+        {
+            self.send(PacketCode::InvalidUsage).await;
+            return PacketFlow::Continue;
+        }
+
+        let timestamp = config::messages::timestamp();
+        let Some(delivery) = config::private_messages::store(&self.username, &recipient_uname, &text, timestamp, reply, persistent) else
+        {
+            self.send(PacketCode::InvalidUsage).await;
+            return PacketFlow::Continue;
+        };
+
+        //GET COLORS
+        let colors = config::users::colors(&self.username);
+
+        //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
+        if let Some(addr) = recipient_addr && recipient_id != self.id
+        {
+            let recipient_data = if let Some(mut recipient) = server::CONNECTIONS.get_mut(&addr)
+            {
+                //SAVE ID TO RECIPIENT'S last_pm
+                recipient.set_last_pm(self.id);
+
+                Some((recipient.write_stream().clone(), recipient.keys().cloned()))
+            } else
+            {
+                None
+            };
+
+            //SEND
+            if let Some((recipient_stream, recipient_keys)) = recipient_data
+            {
+                network::send(&mut *recipient_stream.lock().await, PacketCode::PrivateMessage
+                {
+                    message_id: delivery.participants.message_id(&recipient_uname).unwrap(),
+                    timestamp,
+                    reply: delivery.recipient_reply,
+                    text: text.clone(),
+                    username: self.username.clone(),
+                    id: self.id,
+                    colors: colors.clone(),
+                }, recipient_keys.as_ref()).await;
+            }
+        }
+
+        //GET TARGET USERNAME COLOR
+        let recipient_color = config::users::colors(&recipient_uname).username_color;
+
+        //SEND CONFIRMATION BACK TO SENDER
+        self.send(PacketCode::PrivateMessageBack
+        {
+            message_id: delivery.participants.message_id(&self.username).unwrap(),
+            timestamp,
+            reply: delivery.sender_reply,
+            text,
+            id: recipient_id,
+            username: recipient_uname,
+            colors: MessageColors //ADJUST COLORS TO USE TARGET UNAME COLOR
+            {
+                username_color: recipient_color,
+                message_color: colors.message_color,
+            },
+        }).await;
 
         PacketFlow::Continue
     }
@@ -1194,6 +1274,17 @@ impl<'a, 's> ClientSession<'a, 's>
             log::debug!("Message dropped (muted): {}", self.peer_addr);
 
             self.send(PacketCode::Muted).await;
+            return PacketFlow::Continue;
+        }
+
+        if message_id & consts::PRIVATE_MESSAGE_ID != 0
+        {
+            match config::private_messages::heart(message_id, &self.username)
+            {
+                Some((participants, hearts)) => server::send_to_accounts(&participants, |message_id| PacketCode::Heart { message_id, hearts: hearts.clone() }),
+                None => self.send(PacketCode::InvalidUsage).await,
+            }
+
             return PacketFlow::Continue;
         }
 

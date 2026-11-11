@@ -121,6 +121,7 @@ voice_handshake_failed = "The server never answered the voice handshake - is UDP
 voice_disabled = "Voice disabled."
 role = "You are now {role}."
 history = "Message history ({count}):"
+timeline = "Message history:"
 server_settings_saved = "Server settings saved."
 server_icon_set = "Server icon set."
 server_icon_removed = "Server icon removed."

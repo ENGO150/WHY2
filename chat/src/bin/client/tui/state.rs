@@ -162,9 +162,17 @@ pub enum Entry //ONE ROW OF HISTORY
     Private
     {
         /// `true` if we sent it to `username`, `false` if it came from them.
-        sent: bool, //TO username, ELSE FROM
+        sent: bool,
+        message_id: u64,
+        reply: Option<u64>,
+        hearts: Vec<String>,
+        edited: bool, //TO username, ELSE FROM
         username: String,
         id: usize,
+        /// Its lobby cursor and private id, for a replayed one.
+        position: Option<(u64, u64)>,
+        /// When it was sent, for a replayed one.
+        timestamp: Option<u64>,
         text: String,
         colors: MessageColors,
     },
@@ -213,7 +221,19 @@ impl Entry
         match self
         {
             Entry::Message { message_id, .. } | Entry::History { message_id, .. } | Entry::Attachment { message_id, .. }
-                | Entry::Voice { message_id, .. } => Some(*message_id),
+                | Entry::Voice { message_id, .. } | Entry::Private { message_id, .. } => Some(*message_id),
+            _ => None,
+        }
+    }
+
+    /// Returns a replayed entry's place in the shared timeline.
+    fn history_position(&self) -> Option<(u64, bool, u64)> //PRIVATE MESSAGES PRECEDE THEIR LOBBY CURSOR
+    {
+        match self
+        {
+            Entry::Private { position: Some((before, id)), .. } => Some((*before, false, *id)),
+            Entry::History { message_id, .. } | Entry::Attachment { message_id, .. }
+                | Entry::Voice { message_id, .. } => Some((*message_id, true, 0)),
             _ => None,
         }
     }
@@ -224,7 +244,7 @@ impl Entry
         match self
         {
             Entry::Message { username, .. } | Entry::History { username, .. } | Entry::Attachment { username, .. }
-                | Entry::Voice { username, .. } => Some(username),
+                | Entry::Voice { username, .. } | Entry::Private { username, .. } => Some(username),
             _ => None,
         }
     }
@@ -235,7 +255,7 @@ impl Entry
         match self
         {
             Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Attachment { hearts, .. }
-                | Entry::Voice { hearts, .. } => hearts,
+                | Entry::Voice { hearts, .. } | Entry::Private { hearts, .. } => hearts,
             _ => &[],
         }
     }
@@ -244,7 +264,7 @@ impl Entry
     fn set_hearts(&mut self, new: Vec<String>) //REPLACE WHO HEARTED IT
     {
         if let Entry::Message { hearts, .. } | Entry::History { hearts, .. } | Entry::Attachment { hearts, .. }
-            | Entry::Voice { hearts, .. } = self { *hearts = new; }
+            | Entry::Voice { hearts, .. } | Entry::Private { hearts, .. } = self { *hearts = new; }
     }
 
     /// Returns whether a moderator pinned it.
@@ -264,13 +284,13 @@ impl Entry
     /// Returns whether it was edited since it was sent.
     pub fn edited(&self) -> bool //CHANGED SINCE SENT
     {
-        matches!(self, Entry::Message { edited: true, .. } | Entry::History { edited: true, .. })
+        matches!(self, Entry::Message { edited: true, .. } | Entry::History { edited: true, .. } | Entry::Private { edited: true, .. })
     }
 
     /// Rewords it and marks it edited.
     fn set_text(&mut self, new: String) //REWORD IT
     {
-        if let Entry::Message { text, edited, .. } | Entry::History { text, edited, .. } = self
+        if let Entry::Message { text, edited, .. } | Entry::History { text, edited, .. } | Entry::Private { text, edited, .. } = self
         {
             *text = new;
             *edited = true;
@@ -282,7 +302,7 @@ impl Entry
     {
         match self
         {
-            Entry::Message { reply, .. } | Entry::History { reply, .. } => *reply,
+            Entry::Message { reply, .. } | Entry::History { reply, .. } | Entry::Private { reply, .. } => *reply,
             _ => None,
         }
     }
@@ -562,6 +582,15 @@ pub struct App
     /// The page the tick should request.
     pub history_request: Option<u64>, //THE PAGE THE TICK ASKS FOR
 
+    /// The end of the shared replayed history, before live messages and notices.
+    history_end: usize,               //ONE PAST THE REPLAYED ENTRIES
+
+    //PRIVATE HISTORY PAGING
+    /// The cursor of the next older private page, while there are older ones.
+    private_cursor: Option<u64>,      //ITS SERVER INDEX, WHILE OLDER ONES ARE LEFT
+    /// The private page the tick should request.
+    pub private_request: Option<u64>, //THE PAGE THE TICK ASKS FOR
+
     //LIFECYCLE
     /// Whether the user asked to quit.
     pub leaving: bool,      //THE USER ASKED TO LEAVE
@@ -682,6 +711,9 @@ impl App
             history_cursor: None,
             history_pending: false,
             history_request: None,
+            history_end: 0,
+            private_cursor: None,
+            private_request: None,
             leaving: false,
             logging_out: false,
             disconnect_reason: None,
@@ -774,66 +806,145 @@ impl App
             //THE REPLAYED ENTRIES MOVE UP, OR GO
             if lobby
             {
-                self.history_anchor = self.history_anchor.and_then(|anchor| anchor.checked_sub(1));
-                if self.history_anchor.is_none() { self.history_cursor = None; }
+                self.history_anchor = self.history_anchor.map(|anchor| anchor.saturating_sub(1));
+                self.history_end = self.history_end.saturating_sub(1);
+
+                if self.history_end == 0
+                {
+                    self.history_anchor = None;
+                    self.history_cursor = None;
+                    self.private_cursor = None;
+                }
             }
         }
     }
 
     //STORE A PRIVATE MESSAGE UNRENDERED
     /// Appends a private message to the pane.
-    pub fn push_private(&mut self, sent: bool, username: String, id: usize, text: String, colors: MessageColors)
+    pub fn push_private(&mut self, sent: bool, username: String, id: usize, message_id: u64, timestamp: Option<u64>, text: String, colors: MessageColors, reply: Option<u64>)
     {
-        self.push_entry(Entry::Private { sent, username, id, text, colors });
+        self.push_entry(Entry::Private { sent, username, id, message_id, position: None, timestamp, text, colors, reply, hearts: Vec::new(), edited: false });
     }
 
     //THE NEWEST PAGE OF THE LOBBY'S HISTORY
-    /// Puts the newest page of lobby history under its heading.
+    /// Merges the newest lobby page into the timeline.
     pub fn start_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
     {
-        self.history_anchor = Some(self.messages.len());
-        self.history_cursor = more.then_some(start);
-
-        for entry in entries { self.push_entry(entry); }
+        let room = self.merge_history(entries, false);
+        self.history_cursor = (more && room).then_some(start);
     }
 
-    //AN OLDER PAGE, ABOVE WHAT IS ALREADY THERE
-    /// Inserts an older page of lobby history above what is there, keeping the view on what it was
-    /// showing.
+    //AN OLDER LOBBY PAGE
+    /// Merges an older lobby page without moving the view off what it was showing.
     pub fn prepend_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
     {
         self.history_pending = false;
-
-        //ONLY THE LOBBY'S PANE HAS A HISTORY
         if !self.channel.is_empty() { return; }
 
-        let Some(anchor) = self.history_anchor else { return };
+        let room = self.merge_history(entries, true);
+        self.history_cursor = (more && room).then_some(start);
+    }
 
-        //THE PANE'S CAP ENDS THE PAGING
+    //THE NEWEST PAGE OF OUR PRIVATE HISTORY
+    /// Merges the newest private page into the same timeline as the lobby.
+    pub fn start_private_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
+    {
+        let room = self.merge_history(entries, false);
+        self.private_cursor = (more && room).then_some(start);
+    }
+
+    //AN OLDER PRIVATE PAGE
+    /// Merges an older private page without moving the view off what it was showing.
+    pub fn prepend_private_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
+    {
+        self.history_pending = false;
+        if !self.channel.is_empty() { return; }
+
+        let room = self.merge_history(entries, true);
+        self.private_cursor = (more && room).then_some(start);
+    }
+
+    //BOTH PACKET TYPES BELONG TO ONE TIMELINE
+    /// Inserts replayed entries by their lobby position, preserving the view and selection.
+    /// Returns whether the pane had room for the whole page.
+    fn merge_history(&mut self, entries: Vec<Entry>, older: bool) -> bool
+    {
+        if self.history_anchor.is_none()
+        {
+            self.push_styled(t!("event.timeline"), theme::title());
+            self.history_anchor = Some(self.messages.len());
+            self.history_end = self.messages.len();
+        }
+
+        self.wrapped_rows();
+
+        //REMEMBER THE ENTRY AND THE ROW WITHIN IT, NOT ITS OLD SCREEN POSITION
+        let locate = |row: u16| self.wrapped.as_ref().and_then(|wrapped|
+        {
+            let index = wrapped.4.partition_point(|first| *first <= row).saturating_sub(1);
+            Some((index, row.saturating_sub(*wrapped.4.get(index)?)))
+        });
+
+        let mut tracked =
+        [
+            self.scroll.and_then(locate),
+            self.selection.as_ref().and_then(|selection| locate(selection.anchor.0)),
+            self.selection.as_ref().and_then(|selection| locate(selection.cursor.0)),
+        ];
+
         let room = consts::HISTORY_LIMIT.saturating_sub(self.messages.len());
-        let skip = entries.len().saturating_sub(room);
+        let skip = if older { entries.len().saturating_sub(room) } else { 0 };
+        let anchor = self.history_anchor.unwrap();
 
-        self.history_cursor = (more && skip == 0).then_some(start);
+        for entry in entries.into_iter().skip(skip)
+        {
+            let Some(position) = entry.history_position() else { continue };
+            let index = anchor + self.messages.range(anchor..self.history_end)
+                .take_while(|other| other.history_position().is_some_and(|key| key < position)).count();
 
-        let before = self.wrapped_rows();
+            //A PAGE MAY HAVE BEEN REQUESTED AGAIN AFTER A CHANNEL SWITCH
+            if self.messages.get(index).and_then(Entry::history_position) == Some(position) { continue; }
 
-        let tail = self.messages.split_off(anchor);
-        self.messages.extend(entries.into_iter().skip(skip));
-        self.messages.extend(tail);
+            self.messages.insert(index, entry);
+            self.history_end += 1;
+
+            for tracked in tracked.iter_mut().flatten()
+            {
+                if tracked.0 >= index { tracked.0 += 1; }
+            }
+        }
+
+        //LOGIN PAGES KEEP THE NEWEST ENTRIES ACROSS BOTH STREAMS
+        let trimmed = self.messages.len().saturating_sub(consts::HISTORY_LIMIT);
+        for _ in 0..trimmed
+        {
+            self.messages.remove(anchor);
+            self.history_end -= 1;
+
+            for tracked in tracked.iter_mut().flatten()
+            {
+                if tracked.0 > anchor { tracked.0 -= 1; }
+                else if tracked.0 == anchor { tracked.1 = 0; }
+            }
+        }
 
         self.generation += 1;
         self.dirty = true;
+        self.wrapped_rows();
 
-        //KEEP THE VIEW ON WHAT IT WAS SHOWING
-        let grown = self.wrapped_rows().saturating_sub(before);
+        let restore = |tracked: Option<(usize, u16)>| tracked.and_then(|(index, within)|
+            self.wrapped.as_ref()?.4.get(index).map(|first| first.saturating_add(within)));
 
-        if let Some(scroll) = self.scroll.as_mut() { *scroll = scroll.saturating_add(grown); }
+        if let Some(row) = restore(tracked[0]) { self.scroll = Some(row); }
 
+        let selection_rows = (restore(tracked[1]), restore(tracked[2]));
         if let Some(selection) = self.selection.as_mut()
         {
-            selection.anchor.0 = selection.anchor.0.saturating_add(grown);
-            selection.cursor.0 = selection.cursor.0.saturating_add(grown);
+            if let Some(row) = selection_rows.0 { selection.anchor.0 = row; }
+            if let Some(row) = selection_rows.1 { selection.cursor.0 = row; }
         }
+
+        skip == 0 && trimmed == 0
     }
 
     //DROP A DELETED MESSAGE FROM WHICHEVER PANE HOLDS IT
@@ -846,12 +957,12 @@ impl App
         {
             self.remove_entry(index, lobby);
         }
-        //A PARKED PANE ONLY LOSES THE ENTRY
-        else if let Some(pane) = self.panes.get_mut("")
-            && let Some(index) = pane.iter().position(|entry| entry.message_id() == Some(message_id))
+        //PRIVATE MESSAGES MAY ALSO BE PARKED IN ANOTHER CHANNEL
+        else if let Some((channel, index)) = self.panes.iter().find_map(|(channel, pane)|
+            Some((channel.clone(), pane.iter().position(|entry| entry.message_id() == Some(message_id))?)))
         {
-            pane.remove(index);
-            self.shift_anchor(index);
+            self.panes.get_mut(&channel).unwrap().remove(index);
+            if channel.is_empty() { self.shift_anchor(index); }
         }
     }
 
@@ -859,7 +970,7 @@ impl App
     /// Returns who hearted a message, if it is loaded.
     pub fn hearts_of(&self, message_id: u64) -> Option<Vec<String>>
     {
-        self.messages.iter().chain(self.panes.get("").into_iter().flatten())
+        self.messages.iter().chain(self.panes.values().flatten())
             .find(|entry| entry.message_id() == Some(message_id))
             .map(|entry| entry.hearts().to_vec())
     }
@@ -893,7 +1004,7 @@ impl App
         let Some(index) = self.messages.iter().position(|entry| entry.message_id() == Some(message_id)) else
         {
             //A PARKED PANE ONLY UPDATES THE ENTRY
-            if let Some(entry) = self.panes.get_mut("").and_then(|pane| pane.iter_mut().find(|entry| entry.message_id() == Some(message_id)))
+            if let Some(entry) = self.panes.values_mut().flatten().find(|entry| entry.message_id() == Some(message_id))
             {
                 change(entry);
             }
@@ -968,6 +1079,7 @@ impl App
     fn shift_anchor(&mut self, index: usize) //THE REPLAYED ENTRIES MOVE UP WITH IT
     {
         if let Some(anchor) = self.history_anchor.as_mut() && index < *anchor { *anchor -= 1; }
+        if index < self.history_end { self.history_end -= 1; }
     }
 
     //ROWS THE PANE WRAPS TO AT ITS LAST WIDTH
@@ -1504,12 +1616,34 @@ impl App
     {
         let font = self.picker.font_size();
 
-        //THE TOP OF THE LOBBY'S HISTORY IS WITHIN REACH
-        if offset < height.saturating_mul(consts::PRELOAD_SCREENS + 1) && self.channel.is_empty() && !self.history_pending
-            && let Some(cursor) = self.history_cursor
+        //EACH STREAM NEEDS AN OLDER PAGE AS ITS FIRST ENTRY COMES WITHIN REACH
+        if self.channel.is_empty() && !self.history_pending
         {
-            self.history_pending = true;
-            self.history_request = Some(cursor);
+            let first_row = |private: bool| self.messages.iter().enumerate().find_map(|(index, entry)|
+            {
+                let (_, lobby, _) = entry.history_position()?;
+                if lobby == private { return None; }
+                self.wrapped.as_ref()?.4.get(index).copied()
+            }).or_else(|| self.wrapped.as_ref()?.4.get(self.history_anchor?).copied());
+
+            let lobby = self.history_cursor.and_then(|cursor| Some((first_row(false)?, cursor)));
+            let private = self.private_cursor.and_then(|cursor| Some((first_row(true)?, cursor)));
+            let near = |row: u16| offset < row.saturating_add(height.saturating_mul(consts::PRELOAD_SCREENS + 1));
+
+            //FILL THE STREAM WHOSE OLDEST LOADED MESSAGE IS NEWER FIRST
+            if let Some((row, cursor)) = private && near(row) && lobby.is_none_or(|(other, _)| row >= other)
+            {
+                self.history_pending = true;
+                self.private_request = Some(cursor);
+            } else if let Some((row, cursor)) = lobby && near(row)
+            {
+                self.history_pending = true;
+                self.history_request = Some(cursor);
+            } else if let Some((row, cursor)) = private && near(row)
+            {
+                self.history_pending = true;
+                self.private_request = Some(cursor);
+            }
         }
 
         for placement in self.placements(width)
@@ -1596,8 +1730,15 @@ impl App
             //THE REPLAYED ENTRIES MOVE UP, OR GO
             if self.channel.is_empty()
             {
-                self.history_anchor = self.history_anchor.and_then(|anchor| anchor.checked_sub(1));
-                if self.history_anchor.is_none() { self.history_cursor = None; }
+                self.history_anchor = self.history_anchor.map(|anchor| anchor.saturating_sub(1));
+                self.history_end = self.history_end.saturating_sub(1);
+
+                if self.history_end == 0
+                {
+                    self.history_anchor = None;
+                    self.history_cursor = None;
+                    self.private_cursor = None;
+                }
             }
         }
 
@@ -1634,6 +1775,8 @@ impl App
         {
             self.history_anchor = None;
             self.history_cursor = None;
+            self.history_end = 0;
+            self.private_cursor = None;
         }
 
         self.generation += 1;
@@ -1780,6 +1923,9 @@ impl App
         self.history_cursor = None;
         self.history_pending = false;
         self.history_request = None;
+        self.history_end = 0;
+        self.private_cursor = None;
+        self.private_request = None;
         self.logging_out = false; //THE NEXT DROP IS THE NEXT SESSION'S TO EXPLAIN
         self.disconnect_reason = None;
 

@@ -25,7 +25,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! - `server_users.toml` — accounts (`users`).
 //! - `server_bans.toml` — bans (`bans`).
 //! - `server_keys.toml` — the client's pinned server identities (`keys`).
-//! - `server_messages.bin` — the lobby history, the one non-TOML file (`messages`).
+//! - `server_messages.bin` — the lobby history (`messages`).
+//! - `server_private_messages.bin` — the private history (`private_messages`).
 //!
 //! # Caching
 //! Every file is parsed once and kept in a process-wide cache keyed by path. A read checks the
@@ -49,6 +50,9 @@ pub mod settings;
 
 #[cfg(feature = "server")]
 pub mod messages;
+
+#[cfg(feature = "server")]
+pub mod private_messages;
 
 #[cfg(feature = "client_base")]
 pub mod keys;

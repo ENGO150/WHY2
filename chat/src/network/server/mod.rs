@@ -99,7 +99,11 @@ use crate::
     options,
     role::Role,
     crypto::password,
-    config,
+    config::
+    {
+        self,
+        private_messages::Participants,
+    },
     consts::
     {
         self,
@@ -266,6 +270,42 @@ async fn send_history(write_stream: &Arc<Mutex<OwnedWriteHalf>>, keys: &SharedKe
     }, Some(keys)).await;
 }
 
+/// Sends one page of `username`'s private history, if `persistent_private_messages` is on.
+///
+/// # Parameters
+/// - `write_stream`: The client's write half.
+/// - `keys`: The client's session keys.
+/// - `username`: The account the page is built for.
+/// - `before`: The page cursor, or `None` for the newest page (sent at login, and skipped when
+///   nothing is stored).
+async fn send_private_history
+(
+    write_stream: &Arc<Mutex<OwnedWriteHalf>>,
+    keys: &SharedKeys,
+    username: &str,
+    before: Option<u64>,
+) //SEND A PAGE OF OUR STORED PRIVATE MESSAGES
+{
+    if !config::read_config::<bool>("persistent_private_messages") { return; }
+
+    let count: usize = config::read_config("history_page");
+    let page = config::private_messages::page(username, before, count.max(1), consts::MAX_HISTORY_SIZE);
+
+    //NOTHING STORED IS NOT WORTH A HEADING
+    if before.is_none() && page.messages.is_empty() { return; }
+
+    log::debug!("Replaying private history ({} messages)", page.messages.len());
+
+    network::send(&mut *write_stream.lock().await, PacketCode::PrivateHistory
+    {
+        messages: page.messages,
+        start: page.start,
+        more: page.more,
+        kept: page.kept,
+        older: before.is_some(),
+    }, Some(keys)).await;
+}
+
 /// Removes every connection from one address.
 async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTIONS BY IP
 {
@@ -350,6 +390,25 @@ where
 pub fn send_to_all(code: PacketCode) //SEND PACKET TO ALL CLIENTS
 {
     send_to_all_but(code, None);
+}
+
+/// Sends a private update to every connected session of its two participants.
+fn send_to_accounts(participants: &Participants, packet: impl Fn(u64) -> PacketCode) //NEVER BROADCAST PRIVATE UPDATES
+{
+    let entries: Vec<_> = CONNECTIONS.iter().filter_map(|entry|
+    {
+        let id = participants.message_id(entry.username()?)?;
+        Some((entry.write_stream().clone(), entry.keys().cloned(), id))
+    }).collect();
+
+    for (stream, keys, id) in entries
+    {
+        let code = packet(id);
+        tokio::spawn(async move
+        {
+            network::send(&mut *stream.lock().await, code, keys.as_ref()).await;
+        });
+    }
 }
 
 /// Sends a packet to every authenticated client except one.
@@ -1185,6 +1244,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
     //SEND WHAT WAS SAID IN THE LOBBY BEFORE THIS
     send_history(&streams.1, &keys, None).await;
+    send_private_history(&streams.1, &keys, &username, None).await; //OFC ONLY USER'S OWN PMS
 
     //TELL CLIENT ALL REQUIRED DATA
     network::send(&mut *streams.1.lock().await, PacketCode::Accept

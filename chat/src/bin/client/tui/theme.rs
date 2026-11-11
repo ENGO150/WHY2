@@ -232,10 +232,11 @@ impl Theme
                 Span::styled(": ", dim()),
             ], text, self.style(colors.message_color), width, self.render_math),
 
-            Entry::Private { sent, username, id, text, colors } =>
+            Entry::Private { sent, username, id, timestamp, text, colors, .. } =>
             {
                 let prefix = vec!
                 [
+                    self.timestamp(*timestamp),
                     Span::styled(format!("{} {} ", t!("message.pm"), if *sent { "→" } else { "←" }), accent()),
                     self.name(username.clone(), colors.username_color),
                     Span::styled(format!(" ({id}): "), dim()),
@@ -339,6 +340,13 @@ impl Theme
                 spans.push(Span::styled(format!(": {}", text.lines().next().unwrap_or_default()), dim()));
             },
 
+            Some(Entry::Private { sent, username, text, colors, .. }) =>
+            {
+                spans.push(Span::styled(format!("{} {} ", t!("message.pm"), if *sent { "→" } else { "←" }), accent()));
+                spans.push(self.colorize(username.clone(), colors.username_color));
+                spans.push(Span::styled(format!(": {}", text.lines().next().unwrap_or_default()), dim()));
+            },
+
             Some(Entry::Attachment { username, filename, username_color, picture, .. }) =>
             {
                 let caption = attachment_caption(filename, picture);
@@ -360,7 +368,7 @@ impl Theme
             },
 
             //NOT IN THE PANE
-            _ => spans.push(Span::styled(format!("#{reply}"), dim())),
+            _ => spans.push(Span::styled(format!("#{}", crate::command::format_message_id(reply)), dim())),
         }
 
         //ALWAYS ONE ROW
@@ -422,7 +430,7 @@ impl Theme
         if self.show_message_ids
         {
             if !tag.is_empty() { tag.push(Span::raw(" ")); }
-            tag.push(Span::styled(format!("#{message_id}"), dim()));
+            tag.push(Span::styled(format!("#{}", crate::command::format_message_id(message_id)), dim()));
         }
 
         if tag.is_empty() { return lines; }

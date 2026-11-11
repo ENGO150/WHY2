@@ -23,7 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! somebody is in it.
 //!
 //! # Storage
-//! `server_messages.bin` is the one file under the configuration directory that is not TOML:
+//! `server_messages.bin` is the lobby's file under the configuration directory that is not TOML:
 //! it is a format marker followed by a `wincode`-encoded `Vec<Record>`, sealed as a whole with
 //! [`crypto::encrypt_packet`] under [`crypto::history_keys`]. Every write uses a fresh nonce,
 //! since the file is replaced rather than appended to.
@@ -308,6 +308,33 @@ pub fn timestamp() -> Option<u64> //NOW, IF TIMESTAMPS ARE ON
 pub fn next_id() -> u64 //ID FOR A MESSAGE THAT IS NOT KEPT
 {
     HISTORY.lock().unwrap().take_id()
+}
+
+/// Returns the next lobby id without assigning it to a message.
+pub fn cursor() -> u64 //WHERE A PRIVATE MESSAGE FITS IN THE LOBBY
+{
+    HISTORY.lock().unwrap().next
+}
+
+/// Continues past cursors saved in private history, even when no lobby history was kept.
+pub fn resume_cursor(next: u64) //DO NOT REUSE AN OLDER LOBBY POSITION AFTER A RESTART
+{
+    let mut history = HISTORY.lock().unwrap();
+    history.next = history.next.max(next);
+}
+
+/// Finds places for older private messages that have no saved lobby cursors.
+pub fn cursors_at(timestamps: impl Iterator<Item = Option<u64>>) -> Vec<u64> //BEST EFFORT FOR THE OLD PRIVATE FORMAT
+{
+    let history = HISTORY.lock().unwrap();
+    let mut timeline: Vec<(u64, u64)> = history.records.iter()
+        .filter_map(|message| Some((message.timestamp?, message.id))).collect();
+
+    timeline.sort_unstable();
+
+    timestamps.map(|timestamp| timestamp.and_then(|timestamp|
+        timeline.get(timeline.partition_point(|(time, _)| *time <= timestamp))
+            .map(|(_, id)| *id)).unwrap_or(history.next)).collect()
 }
 
 /// Stores a text message.

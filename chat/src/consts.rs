@@ -52,6 +52,8 @@ pub const METADATA_URL: &str           = "https://crates.io/api/v1/crates/why2-c
 pub const CONFIG_DIR: &str             = env!("WHY2_CONFIG_DIR");                     //DIRECTORY FOR CONFIG FILES
 /// Per-user temp directory name the server stages uploads in.
 pub const UPLOADS_DIR: &str            = "WHY2-Uploads";                              //DIRECTORY FOR FILE UPLOADS
+/// High bit reserved for private message ids; the client displays them as `pN`.
+pub const PRIVATE_MESSAGE_ID: u64 = 1 << 63; //SEPARATE PRIVATE AND PUBLIC MESSAGE IDS
 /// Server configuration file.
 pub const SERVER_CONFIG: &str          = "/server.toml";                              //SERVER CONFIG FILE
 /// Client configuration file.
@@ -62,6 +64,8 @@ pub const SERVER_USERS_CONFIG: &str    = "/server_users.toml";                  
 pub const SERVER_BANS_CONFIG: &str     = "/server_bans.toml";                         //SERVER BANS CONFIG FILE
 /// Encrypted lobby message history (`config::messages`).
 pub const SERVER_MESSAGES_FILE: &str   = "/server_messages.bin";                      //SERVER MESSAGE HISTORY FILE
+/// Encrypted private message history (`config::private_messages`).
+pub const SERVER_PRIVATE_MESSAGES_FILE: &str = "/server_private_messages.bin";        //SERVER PRIVATE MESSAGE HISTORY FILE
 /// Directory holding sealed persistent attachments and voice messages.
 /// Retains its legacy path so existing files remain readable.
 pub const SERVER_ATTACHMENTS_DIR: &str = "/server_images";                            //PERSISTENT ATTACHMENT DIRECTORY

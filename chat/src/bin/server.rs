@@ -180,12 +180,13 @@ async fn main()
     //WHAT THIS SERVER WILL AND WILL NOT DO
     log::info!
     (
-        "Voice: {}, screenshare: {}, registration: {}, version check: {}, history: {}, spam protection: {}",
+        "Voice: {}, screenshare: {}, registration: {}, version check: {}, history: {}, private history: {}, spam protection: {}",
         options::voice_chat_enabled(),
         config::read_config::<bool>("enable_screenshare"),
         config::read_config::<bool>("allow_register"),
         config::read_config::<bool>("check_client_version"),
         config::read_config::<bool>("persistent_messages"),
+        config::read_config::<bool>("persistent_private_messages"),
         config::read_config::<bool>("spam_protection"),
     );
 
