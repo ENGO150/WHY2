@@ -1144,6 +1144,16 @@ impl<'a, 's> ClientSession<'a, 's>
             return PacketFlow::Continue;
         }
 
+        //A LIVE SESSION, OR - WITH THE PRIVATE HISTORY ON - AN OFFLINE ACCOUNT
+        let persistent = config::read_config::<bool>("persistent_private_messages");
+
+        //PREVENT "OFFLINE" USERS FROM SENDING PMs (IF PERSISTENT PMs ARE DISABLED)
+        if !persistent && !config::users::online_status(&self.username)
+        {
+            self.send(PacketCode::InvalidUsage).await;
+            return PacketFlow::Continue;
+        }
+
         //GET RECIPIENT
         let recipient_id = match recipient
         {
@@ -1162,9 +1172,6 @@ impl<'a, 's> ClientSession<'a, 's>
                 }
             },
         };
-
-        //A LIVE SESSION, OR - WITH THE PRIVATE HISTORY ON - AN OFFLINE ACCOUNT
-        let persistent = config::read_config::<bool>("persistent_private_messages");
 
         let live = server::CONNECTIONS.iter()
             .find(|entry| entry.value().id() == Some(&recipient_id))
