@@ -108,6 +108,7 @@ voice_handshake_failed = "Сервер не ответил на установк
 voice_disabled = "Голос выключен."
 role = "Ваша роль теперь {role}."
 history = "История сообщений ({count}):"
+timeline = "История сообщений:"
 server_settings_saved = "Настройки сервера сохранены."
 server_icon_set = "Значок сервера установлен."
 server_icon_removed = "Значок сервера удалён."

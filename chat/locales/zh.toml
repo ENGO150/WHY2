@@ -108,6 +108,7 @@ voice_handshake_failed = "服务器始终没有响应语音握手 - UDP 是否�
 voice_disabled = "语音已关闭。"
 role = "你现在的角色是 {role}。"
 history = "消息历史（{count}）："
+timeline = "消息历史："
 server_settings_saved = "服务器设置已保存。"
 server_icon_set = "服务器图标已设置。"
 server_icon_removed = "服务器图标已移除。"

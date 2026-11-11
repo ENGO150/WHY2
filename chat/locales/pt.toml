@@ -108,6 +108,7 @@ voice_handshake_failed = "O servidor nunca respondeu ao handshake de voz - o UDP
 voice_disabled = "Voz desativada."
 role = "Seu cargo agora é {role}."
 history = "Histórico de mensagens ({count}):"
+timeline = "Histórico de mensagens:"
 server_settings_saved = "Configurações do servidor salvas."
 server_icon_set = "Ícone do servidor definido."
 server_icon_removed = "Ícone do servidor removido."

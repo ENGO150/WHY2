@@ -108,6 +108,7 @@ voice_handshake_failed = "Server neodpovedal na nadviazanie hlasového spojenia 
 voice_disabled = "Hlasová komunikácia vypnutá."
 role = "Vaša rola je teraz {role}."
 history = "História správ ({count}):"
+timeline = "História správ:"
 server_settings_saved = "Nastavenia servera uložené."
 server_icon_set = "Ikona servera nastavená."
 server_icon_removed = "Ikona servera odstránená."

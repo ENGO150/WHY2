@@ -108,6 +108,7 @@ voice_handshake_failed = "サーバーがボイスのハンドシェイクに応
 voice_disabled = "ボイスを無効にしました。"
 role = "あなたのロールは {role} になりました。"
 history = "メッセージ履歴（{count}）："
+timeline = "メッセージ履歴："
 server_settings_saved = "サーバー設定を保存しました。"
 server_icon_set = "サーバーアイコンを設定しました。"
 server_icon_removed = "サーバーアイコンを削除しました。"

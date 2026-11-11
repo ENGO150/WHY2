@@ -108,6 +108,7 @@ voice_handshake_failed = "De server heeft nooit op de spraakhandshake geantwoord
 voice_disabled = "Spraak uitgeschakeld."
 role = "Je rol is nu {role}."
 history = "Berichtgeschiedenis ({count}):"
+timeline = "Berichtgeschiedenis:"
 server_settings_saved = "Serverinstellingen opgeslagen."
 server_icon_set = "Serverpictogram ingesteld."
 server_icon_removed = "Serverpictogram verwijderd."

@@ -108,6 +108,7 @@ voice_handshake_failed = "Der Server hat nie auf den Sprach-Handshake geantworte
 voice_disabled = "Sprachchat deaktiviert."
 role = "Deine Rolle ist jetzt {role}."
 history = "Nachrichtenverlauf ({count}):"
+timeline = "Nachrichtenverlauf:"
 server_settings_saved = "Servereinstellungen gespeichert."
 server_icon_set = "Server-Symbol gesetzt."
 server_icon_removed = "Server-Symbol entfernt."

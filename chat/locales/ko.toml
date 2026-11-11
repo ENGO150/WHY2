@@ -108,6 +108,7 @@ voice_handshake_failed = "서버가 음성 핸드셰이크에 응답하지 않�
 voice_disabled = "음성이 꺼졌습니다."
 role = "이제 역할이 {role}입니다."
 history = "메시지 기록 ({count}):"
+timeline = "메시지 기록:"
 server_settings_saved = "서버 설정을 저장했습니다."
 server_icon_set = "서버 아이콘을 설정했습니다."
 server_icon_removed = "서버 아이콘을 삭제했습니다."

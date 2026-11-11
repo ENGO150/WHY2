@@ -108,6 +108,7 @@ voice_handshake_failed = "Sunucu ses el sıkışmasına hiç yanıt vermedi - UD
 voice_disabled = "Ses kapatıldı."
 role = "Rolünüz artık {role}."
 history = "Mesaj geçmişi ({count}):"
+timeline = "Mesaj geçmişi:"
 server_settings_saved = "Sunucu ayarları kaydedildi."
 server_icon_set = "Sunucu simgesi ayarlandı."
 server_icon_removed = "Sunucu simgesi kaldırıldı."

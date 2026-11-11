@@ -108,6 +108,7 @@ voice_handshake_failed = "Le serveur n'a jamais répondu à la négociation voca
 voice_disabled = "Vocal désactivé."
 role = "Votre rôle est maintenant {role}."
 history = "Historique des messages ({count}) :"
+timeline = "Historique des messages :"
 server_settings_saved = "Paramètres du serveur enregistrés."
 server_icon_set = "Icône du serveur définie."
 server_icon_removed = "Icône du serveur supprimée."
