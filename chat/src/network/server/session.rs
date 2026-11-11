@@ -1148,7 +1148,8 @@ impl<'a, 's> ClientSession<'a, 's>
         let persistent = config::read_config::<bool>("persistent_private_messages");
 
         //PREVENT "OFFLINE" USERS FROM SENDING PMs (IF PERSISTENT PMs ARE DISABLED)
-        if !persistent && !config::users::online_status(&self.username)
+        if !persistent && !config::users::online_status(&self.username) &&
+            config::read_config::<bool>("disable_ghost_pms")
         {
             self.send(PacketCode::InvalidUsage).await;
             return PacketFlow::Continue;
@@ -1179,7 +1180,8 @@ impl<'a, 's> ClientSession<'a, 's>
 
         let recipient = live.and_then(|addr|
             server::CONNECTIONS.get(&addr).and_then(|conn| conn.username().cloned())
-                .filter(|username| config::users::online_status(username)) //PRETEND THE USER IS ACTUALLY OFFLINE
+                .filter(|username| persistent || config::users::online_status(username) || //PRETEND THE USER IS ACTUALLY OFFLINE
+                    !config::read_config::<bool>("disable_ghost_pms"))
                 .map(|username| (Some(addr), username))) //GUARD DROPPED HERE
             .or_else(||
             {
