@@ -65,9 +65,9 @@ message_timestamps = true # Tell clients when each message was sent (and keep it
 log_level = "info" # Log verbosity: off, error, warn, info, debug or trace (debug logs every packet)
 
 # History
-persistent_messages = false # Keep lobby messages on disk (encrypted) and send them to every client on login
+persistent_messages = true # Keep lobby messages on disk (encrypted) and send them to every client on login
 max_persistent_messages = 100000 # Number of lobby messages kept (the oldest go as new ones arrive)
-persistent_private_messages = false # Keep private messages on disk (encrypted) and replay them to their two accounts on login
+persistent_private_messages = true # Keep private messages on disk (encrypted) and replay them to their two accounts on login
 max_persistent_private_messages = 100000 # Number of private messages kept (the oldest go as new ones arrive)
 history_page = 100 # Stored messages sent at a time (on login, then more as the client scrolls up)
 max_pinned_messages = 50 # Number of lobby messages that can be pinned at once
