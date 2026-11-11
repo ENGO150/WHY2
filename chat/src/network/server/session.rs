@@ -1172,6 +1172,7 @@ impl<'a, 's> ClientSession<'a, 's>
 
         let recipient = live.and_then(|addr|
             server::CONNECTIONS.get(&addr).and_then(|conn| conn.username().cloned())
+                .filter(|username| config::users::online_status(username)) //PRETEND THE USER IS ACTUALLY OFFLINE
                 .map(|username| (Some(addr), username))) //GUARD DROPPED HERE
             .or_else(||
             {
