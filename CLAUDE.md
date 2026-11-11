@@ -362,6 +362,15 @@ padding in the shader. Never write through an sRGB view (double gamma). Letterbo
 - History is paged newest-first (`history_page`, `MAX_HISTORY_SIZE`); the cursor is a message id
   found by binary search and stays stable across inserts/trims/deletes. Only the lobby persists;
   channels die with their last member.
+- Private messages persist separately (`persistent_private_messages`, default off), stored as
+  `server_private_messages.bin` under the same history keys in `config::private_messages`. A
+  record is `{ sender, recipient, text, timestamp }` and is visible only to those two accounts;
+  ids are a counter of their own. Each side gets its own `PrivateHistory` page on login (before
+  the lobby page) and on `PrivateHistoryRequest`. With persistence on, `/pm ID` also resolves an
+  offline account id and the message is kept for their next login; with it off, offline
+  recipients are refused as before. `max_persistent_private_messages` trims the oldest globally.
+  The client keeps a second anchor/cursor (`private_anchor`, `private_cursor`) above the lobby
+  block and fills it before asking for older lobby pages.
 - Chat entries are striped (`App::stripe_bg`, `message_stripes`), derived from the terminal
   background; mentions win over stripes; the logo treats painted cells as claimed.
 
