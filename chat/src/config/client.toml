@@ -53,9 +53,9 @@ show_timestamps = true # Show when each message was sent (if the server tells)
 message_stripes = true # Shade every other message's background
 mouse_capture = true # Capture the mouse for wheel scrolling and drag-select (replaces the terminal's own)
 disable_logo = false # Hide the logo drawn behind the chat
-auto_show_images = false # Show pictures as they are posted
+auto_show_images = true # Show pictures as they are posted
 render_math = true # Render $math$ and $$math$$ in messages
 
 # Privacy
-share_device = false # Tell others which client you are using (TUI, Desktop, Phone)
+share_device = true # Tell others which client you are using (TUI, Desktop, Phone)
 typing_indicator = true # Tell the channel while you are writing a message, and show when others are
