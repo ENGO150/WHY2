@@ -558,12 +558,6 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         file::ACTIVE_FILESHARES.retain(|_, u| u.client_id != *connection.id().unwrap());
         AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
 
-        //REMOVE FROM last_pm
-        for mut conn in CONNECTIONS.iter_mut().filter(|c| c.last_pm().as_ref() == connection.id())
-        {
-            conn.unset_last_pm();
-        }
-
         //SEND LEAVE MESSAGE, UNLESS THE ACCOUNT WAS HIDDEN
         if config::users::online_status(username)
         {
@@ -627,7 +621,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
             },
 
             Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, device, role,
-                id, attached_screen, last_activity, last_attachment, last_typing, last_pm, channel, seq, server_seq, peer_addr, alive,
+                id, attached_screen, last_activity, last_attachment, last_typing, channel, seq, server_seq, peer_addr, alive,
                 muted, credit, refill, throttles, .. } =>
             {
                 Connection::Authenticated
@@ -647,7 +641,6 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     last_key_exchange: Instant::now(),
                     last_attachment,
                     last_typing,
-                    last_pm,
                     spam_violations: 0,
                     credit,
                     refill,
@@ -690,7 +683,6 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<D
             last_key_exchange: old_connection.last_key_exchange().copied().unwrap_or_else(Instant::now),
             last_attachment: Instant::now() - consts::ATTACHMENT_REQUEST_DELAY,
             last_typing: Instant::now() - consts::TYPING_INTERVAL,
-            last_pm: old_connection.last_pm(),
             spam_violations: 0,
             credit: config::read_config::<f32>("max_packet_burst"),
             refill: Instant::now(),
@@ -739,7 +731,6 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             last_key_exchange: *old_connection.last_key_exchange().unwrap(),
             last_attachment: *old_connection.last_attachment().unwrap(),
             last_typing: *old_connection.last_typing().unwrap(),
-            last_pm: old_connection.last_pm(),
             spam_violations: *old_connection.spam_violations().unwrap(),
             credit: *old_connection.credit().unwrap(),
             refill: *old_connection.refill().unwrap(),

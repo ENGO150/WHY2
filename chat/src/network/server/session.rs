@@ -279,9 +279,8 @@ impl<'a, 's> ClientSession<'a, 's>
             //LIST SCREENSHARES
             PacketCode::ScreensRequest => self.screens().await,
 
-            //PRIVATE MESSAGE (OR REPLY)
-            PacketCode::PrivateMessageRequest { text, id } => self.private_message(Some(id), text, None).await,
-            PacketCode::Re { message } => self.private_message(None, message, None).await,
+            //PRIVATE MESSAGE
+            PacketCode::PrivateMessageRequest { text, id } => self.private_message(id, text, None).await,
 
             //MESSAGE HEART REACTION
             PacketCode::HeartRequest { message_id } => self.heart(message_id).await,
@@ -380,7 +379,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 return PacketFlow::Continue;
             };
 
-            return self.private_message(Some(recipient), text, Some(reply)).await;
+            return self.private_message(recipient, text, Some(reply)).await;
         }
 
         //CHECK REPLY VALIDITY
@@ -1135,7 +1134,7 @@ impl<'a, 's> ClientSession<'a, 's>
     }
 
     //PRIVATE MESSAGE (OR REPLY)
-    async fn private_message(&mut self, recipient: Option<usize>, text: String, reply: Option<u64>) -> PacketFlow
+    async fn private_message(&mut self, recipient_id: usize, text: String, reply: Option<u64>) -> PacketFlow
     {
         //SILENCE MUTED USERS
         if self.muted()
@@ -1154,25 +1153,6 @@ impl<'a, 's> ClientSession<'a, 's>
             self.send(PacketCode::InvalidUsage).await;
             return PacketFlow::Continue;
         }
-
-        //GET RECIPIENT
-        let recipient_id = match recipient
-        {
-            Some(id) => id,
-
-            //REPLY
-            None =>
-            {
-                if let Some(recipient_id) = server::CONNECTIONS.get(&self.peer_addr).and_then(|c| c.last_pm())
-                {
-                    recipient_id
-                } else
-                {
-                    self.send(PacketCode::InvalidUsage).await;
-                    return PacketFlow::Continue;
-                }
-            },
-        };
 
         let live = server::CONNECTIONS.iter()
             .find(|entry| entry.value().id() == Some(&recipient_id))
@@ -1226,21 +1206,10 @@ impl<'a, 's> ClientSession<'a, 's>
         //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
         if let Some(addr) = recipient_addr && recipient_id != self.id
         {
-            let recipient_data = if let Some(mut recipient) = server::CONNECTIONS.get_mut(&addr)
-            {
-                //SAVE ID TO RECIPIENT'S last_pm
-                recipient.set_last_pm(self.id);
-
-                Some((recipient.write_stream().clone(), recipient.keys().cloned()))
-            } else
-            {
-                None
-            };
-
             //SEND
-            if let Some((recipient_stream, recipient_keys)) = recipient_data
+            if let Some(recipient) = server::CONNECTIONS.get(&addr)
             {
-                network::send(&mut *recipient_stream.lock().await, PacketCode::PrivateMessage
+                network::send(&mut *recipient.write_stream().lock().await, PacketCode::PrivateMessage
                 {
                     message_id: delivery.participants.message_id(&recipient_uname).unwrap(),
                     timestamp,
@@ -1249,7 +1218,7 @@ impl<'a, 's> ClientSession<'a, 's>
                     username: self.username.clone(),
                     id: self.id,
                     colors: colors.clone(),
-                }, recipient_keys.as_ref()).await;
+                }, recipient.keys()).await;
             }
         }
 

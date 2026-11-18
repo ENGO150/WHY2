@@ -173,8 +173,6 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         last_attachment: Instant,                                //TIME OF LAST SERVED ATTACHMENT FETCH
         /// When a typing notice was last forwarded.
         last_typing: Instant,                                    //TIME OF LAST FORWARDED TYPING NOTICE
-        /// Session id of whoever last sent this client a private message.
-        last_pm: Option<usize>,                                  //ID OF LAST PM SENDER
         /// Consecutive message-gap violations.
         spam_violations: usize,                                  //SPAM VIOLATIONS (unexpected, huh?)
         /// Tokens left in the packet-rate bucket.
@@ -395,39 +393,6 @@ impl Connection
         {
             Self::Authenticated { last_typing, .. } => Some(last_typing),
             Self::NonAuthenticated { .. } => None,
-        }
-    }
-
-    //GET LAST PM SENDER
-    /// Returns the session id of whoever last sent this client a private message.
-    pub fn last_pm(&self) -> Option<usize>
-    {
-        match self
-        {
-            Self::Authenticated { last_pm, .. } => *last_pm,
-            Self::NonAuthenticated { .. } => None,
-        }
-    }
-
-    //SET LAST PM SENDER
-    /// Records who last sent this client a private message.
-    pub fn set_last_pm(&mut self, id: usize)
-    {
-        match self
-        {
-            Self::Authenticated { last_pm, .. } => *last_pm = Some(id),
-            _ => {},
-        }
-    }
-
-    //UNSET LAST PM SENDER
-    /// Forgets who last sent this client a private message.
-    pub fn unset_last_pm(&mut self)
-    {
-        match self
-        {
-            Self::Authenticated { last_pm, .. } => *last_pm = None,
-            _ => {},
         }
     }
 

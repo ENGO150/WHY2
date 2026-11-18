@@ -499,8 +499,6 @@ pub enum PacketCode //CONTROL CODES
     DeleteRequest { message_id: u64 },                 //CLIENT -> SERVER | DELETE A STORED MESSAGE
     /// *Server → client.* A stored message was deleted.
     Deleted { message_id: u64 },                       //SERVER -> CLIENT | A MESSAGE WAS DELETED
-    /// *Client → server.* Answers the last private message.
-    Re { message: String },                            //CLIENT -> SERVER | REPLY TO LAST PM
     /// *Client → server.* Toggles our heart on a message.
     HeartRequest { message_id: u64 },                  //CLIENT -> SERVER | REQUEST HEART REACTION TO MESSAGE
     /// *Client → server.* Toggles a message's pin.
@@ -664,7 +662,6 @@ impl PacketCode
             Self::PrivateMessageRequest { .. } => "PrivateMessageRequest",
             Self::PrivateMessage { .. }        => "PrivateMessage",
             Self::PrivateMessageBack { .. }    => "PrivateMessageBack",
-            Self::Re { .. }                    => "Re",
             Self::EditRequest { .. }           => "EditRequest",
             Self::Edited { .. }                => "Edited",
             Self::HeartRequest { .. }          => "HeartRequest",

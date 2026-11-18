@@ -149,8 +149,6 @@ pub enum Command
     Pins,                                         //LIST PINNED MESSAGES
     /// Replies to a message.
     Reply,                                        //REPLY TO MESSAGE
-    /// Answers the last private message.
-    Re,                                           //REPLY TO PRIVATE MESSAGE
     /// Opens the client settings.
     Settings,                                     //OPEN THE SETTINGS OVERLAY
     /// Opens a user profile.
@@ -884,26 +882,6 @@ pub const COMMAND_LIST: &[CommandInfo] =
 
     CommandInfo
     {
-        command: Command::Re,
-        triggers: &[ "RE", "ANSWER" ],
-        shortcut: None,
-        minimal_role: Role::User,
-        subcommands: &[],
-        args:
-        &[
-            CommandArg
-            {
-                name: "arg.message",
-                description: "command.re.args.message",
-                required: true,
-                values: ArgValues::Free,
-            },
-        ],
-        description: "command.re.description",
-    },
-
-    CommandInfo
-    {
         command: Command::Delete,
         triggers: &[ "DELETE", "DEL", "RM" ],
         shortcut: None,
@@ -1190,15 +1168,6 @@ impl Command
                     None => Err(()),
                 })
             },
-
-            Command::Re =>
-            {
-                Some(match parameters
-                {
-                    Some(parameters) => Ok(PacketCode::Re { message: parameters.to_string() }),
-                    None => Err(()),
-                })
-            }
 
             Command::Download =>
             {

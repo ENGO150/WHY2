@@ -536,7 +536,7 @@ pub async fn receive
             //STRIP CONTROL CHARACTERS
             #[cfg(feature = "server")]
             if let PacketCode::MessageRequest { text, .. } | PacketCode::PrivateMessageRequest { text, .. } |
-                PacketCode::Re { message: text } | PacketCode::EditRequest { text, .. } = &mut packet.code &&
+                PacketCode::EditRequest { text, .. } = &mut packet.code &&
                 text.chars().any(|c| c.is_control() && c != '\n')
             {
                 *text = text.chars().filter_map(|c| match c

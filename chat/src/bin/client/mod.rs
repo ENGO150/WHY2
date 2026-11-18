@@ -733,11 +733,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                     return;
                 }
             }
-            if command == Command::Re
-            {
-                app.push_styled("Open a conversation with /pm ID, then type your message.", theme::notice());
-                return;
-            }
+
             if app.pm_username().is_some() && matches!(command, Command::Upload)
             {
                 app.push_styled("File sharing in PMs is not available yet.", theme::error());
