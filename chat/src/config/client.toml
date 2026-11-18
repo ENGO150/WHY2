@@ -46,7 +46,8 @@ disable_colors = false # Disable message colors
 
 # Interface
 language = "en" # Interface language: en, cs, de, es, fr, it, pt, nl, pl, sk, ru, uk, tr, zh, ja, ko, or the name of a <language>.toml in the config's locales directory
-theme = "why2" # Color theme: why2, catppuccin-mocha, catppuccin-latte, dracula, nord, gruvbox-dark, tokyo-night, one-dark, solarized-dark, rose-pine, github-dark, github-light, horizon
+theme = "why2" # Color theme: why2, catppuccin-mocha, catppuccin-latte, dracula, nord, gruvbox-dark, tokyo-night, one-dark, solarized-dark, rose-pine, github-dark, github-light, horizon, custom
+custom_theme = "" # Theme builder overrides, stored as role=#RRGGBB pairs separated by commas
 show_id = false # Show client IDs in chat
 show_message_ids = true # Show message IDs in chat (for /delete)
 show_timestamps = true # Show when each message was sent (if the server tells)

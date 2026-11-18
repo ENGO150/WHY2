@@ -104,8 +104,10 @@ pub enum Value
     /// The avatar path to upload: `None` is untouched, empty drops the avatar.
     Avatar(Option<String>),
 
-    /// A palette, by index into [`PALETTES`](super::theme::PALETTES).
-    Theme(usize), //INDEX INTO theme::PALETTES
+    /// A built-in palette index or the custom slot.
+    Theme(usize),
+    /// An editable palette color.
+    ThemeColor(ratatui::style::Color),
     /// A language, by locale code.
     Language(String), //A LOCALE CODE
 
@@ -343,8 +345,21 @@ impl Settings
         rows.push(Row::Item(Item::client(t!("settings.row.language"), "language",
             Value::Language(config::read_config::<String>("language").trim().to_owned()))));
 
-        rows.push(Row::Item(Item::client(t!("settings.row.theme"), "theme",
-            Value::Theme(theme::palette_index(&config::read_config::<String>("theme"))))));
+        let palette = theme::palette_index(&config::read_config::<String>("theme"));
+        let mut theme_row = Item::client(t!("settings.row.theme"), "theme", Value::Theme(palette));
+        theme_row.hint = t!("settings.custom_theme.selector_hint").to_owned();
+        rows.push(Row::Item(theme_row));
+
+        if palette == theme::CUSTOM_INDEX
+        {
+            for (role, color) in theme::custom_colors()
+            {
+                let label = i18n::get(&format!("settings.custom_theme.{role}")).unwrap_or(role);
+                let mut item = Item::client(label, role, Value::ThemeColor(color));
+                item.hint = t!("settings.custom_theme.edit_hint").to_owned();
+                rows.push(Row::Item(item));
+            }
+        }
 
         rows.push(Row::Item(Item::client(t!("settings.row.disable_colors"), "disable_colors", toggle_value("disable_colors", true))));
         rows.push(Row::Item(Item::client(t!("settings.row.disable_logo"), "disable_logo", toggle_value("disable_logo", true))));
@@ -906,9 +921,25 @@ fn handle_edit_key(app: &mut App, key: KeyEvent)
 
     match key.code
     {
-        KeyCode::Esc => app.settings.edit = None,
+        KeyCode::Esc =>
+        {
+            app.settings.edit = None;
+
+            if let Some(Row::Item(item)) = app.settings.rows.get_mut(app.settings.selected)
+                && matches!(item.value, Value::ThemeColor(_))
+            {
+                item.hint = t!("settings.custom_theme.edit_hint").to_owned();
+            }
+        },
 
         KeyCode::Enter => commit_edit(app),
+
+        KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL)
+            && matches!(app.settings.rows.get(app.settings.selected), Some(Row::Item(item))
+                if matches!(item.value, Value::ThemeColor(_))) =>
+        {
+            if let Some(edit) = app.settings.edit.as_mut() { edit.clear(); }
+        },
 
         KeyCode::Backspace => { if let Some(edit) = app.settings.edit.as_mut() { edit.pop(); } },
 
@@ -945,11 +976,41 @@ fn handle_edit_key(app: &mut App, key: KeyEvent)
     if app.settings.edit.is_none() { app.settings.paths.clear(); }
 }
 
+/// Replaces the current color edit with a pasted hex value.
+pub fn paste_theme_color(app: &mut App, text: &str) -> bool
+{
+    let Some(Row::Item(item)) = app.settings.rows.get(app.settings.selected) else { return false };
+    if !app.settings.open || !matches!(item.value, Value::ThemeColor(_)) { return false; }
+
+    let Some(edit) = app.settings.edit.as_mut() else { return false };
+    *edit = text.trim().to_owned();
+    true
+}
+
 /// Keeps what was typed, if the row can hold it: a number must parse, and a website must be
 /// `http` or `https`.
 fn commit_edit(app: &mut App) //KEEP WHAT WAS TYPED, IF THE ROW CAN HOLD IT
 {
     let Some(edit) = app.settings.edit.take() else { return };
+
+    if let Some(Row::Item(item)) = app.settings.rows.get_mut(app.settings.selected)
+        && matches!(item.value, Value::ThemeColor(_))
+    {
+        let value = edit.trim();
+        let color = theme::parse_color(value);
+
+        if !value.is_empty() && color.is_none()
+        {
+            item.hint = t!("settings.custom_theme.invalid").to_owned();
+            app.settings.edit = Some(edit);
+            return;
+        }
+
+        theme::save_custom_color(&item.key, color);
+        app.settings.relabel();
+        app.reload_theme();
+        return;
+    }
 
     //A WEBSITE IS REFUSED WHERE IT IS TYPED, NOT AFTER THE SERVER HAS SEEN IT
     if selected_key(&app.settings) == Some("website") && !edit.trim().is_empty()
@@ -1028,6 +1089,7 @@ enum Selected
     Text(String),
     Action(&'static str), //WHICH BUTTON - THE SERVER ROWS HAVE TWO OF THEM
     Theme(usize),
+    ThemeColor(ratatui::style::Color),
     Language(String),
 
     #[cfg(feature = "client_voice")]
@@ -1052,6 +1114,7 @@ fn selected(app: &App) -> Option<Selected>
             Value::Text(text) => Selected::Text(text.clone()),
             Value::Avatar(path) => Selected::Text(path.clone().unwrap_or_default()),
             Value::Theme(index) => Selected::Theme(*index),
+            Value::ThemeColor(color) => Selected::ThemeColor(*color),
             Value::Language(code) => Selected::Language(code.clone()),
 
             #[cfg(feature = "client_voice")]
@@ -1089,11 +1152,12 @@ fn adjust(app: &mut App, direction: i32)
 
         Some(Selected::Theme(index)) =>
         {
-            let next = (index as isize + direction as isize).rem_euclid(theme::PALETTES.len() as isize) as usize;
+            let count = theme::PALETTES.len() + 1;
+            let next = (index as isize + direction as isize).rem_euclid(count as isize) as usize;
+            let id = theme::PALETTES.get(next).map_or(theme::CUSTOM_ID, |palette| palette.id);
 
-            if let Some(Row::Item(item)) = app.settings.rows.get_mut(row) { item.value = Value::Theme(next); }
-
-            config::client_write("theme", theme::PALETTES[next].id);
+            config::client_write("theme", id);
+            app.settings.relabel();
             app.reload_theme();
         },
 
@@ -1115,7 +1179,7 @@ fn adjust(app: &mut App, direction: i32)
         },
 
         //A FREE-FORM STRING IS TYPED, NOT STEPPED
-        Some(Selected::Text(_)) | Some(Selected::Action(_)) => {},
+        Some(Selected::Text(_) | Selected::ThemeColor(_) | Selected::Action(_)) => {},
 
         #[cfg(feature = "client_voice")]
         Some(Selected::Volume(key, percent)) =>
@@ -1175,6 +1239,7 @@ fn activate(app: &mut App)
         Some(Selected::Toggle(_)) => toggle(app),
 
         Some(Selected::Number(number)) => app.settings.edit = Some(number.to_string()),
+        Some(Selected::ThemeColor(color)) => app.settings.edit = Some(theme::color_hex(color)),
         Some(Selected::Text(text)) =>
         {
             app.settings.edit = Some(text);

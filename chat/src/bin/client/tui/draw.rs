@@ -1806,7 +1806,17 @@ fn value_spans(_state: &Settings, value: &Value, _width: usize) -> Vec<Span<'sta
         Value::Avatar(Some(path)) if path.is_empty() => vec![Span::styled(t!("profile.avatar.remove"), theme::notice())],
         Value::Avatar(Some(path)) => vec![Span::styled(truncate(path, _width), theme::text())],
 
-        Value::Theme(index) => vec![Span::styled(format!("◂ {} ▸", theme::PALETTES[*index].name), theme::accent())],
+        Value::Theme(index) =>
+        {
+            let name = theme::PALETTES.get(*index).map_or_else(|| t!("settings.custom_theme.name"), |palette| palette.name);
+            vec![Span::styled(format!("◂ {name} ▸"), theme::accent())]
+        },
+        Value::ThemeColor(color) => vec!
+        [
+            Span::styled(theme::color_hex(*color), theme::text()),
+            Span::raw(" "),
+            Span::styled("   ", Style::new().bg(*color)),
+        ],
         Value::Language(code) => vec![Span::styled(format!("◂ {} ▸", i18n::language_name(code)), theme::accent())],
 
         #[cfg(feature = "client_voice")]

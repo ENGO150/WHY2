@@ -41,11 +41,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! to be relative to the background it sits on, so it is the one color derived from the user's
 //! scheme rather than fixed.
 
-use std::sync::atomic::
-{
-    AtomicUsize,
-    Ordering,
-};
+use std::sync::RwLock;
 
 use chrono::
 {
@@ -111,6 +107,7 @@ pub struct Theme //CACHED CONFIG-DRIVEN STYLING
 }
 
 /// One color theme.
+#[derive(Clone, Copy)]
 pub struct Palette //ONE COLOUR THEME
 {
     /// The id stored in `client.toml`.
@@ -159,7 +156,15 @@ impl Theme
     /// Reads the styling settings and selects the configured palette.
     pub fn load() -> Self
     {
-        ACTIVE.store(palette_index(&config::read_config::<String>("theme")), Ordering::Relaxed);
+        let index = palette_index(&config::read_config::<String>("theme"));
+        *ACTIVE.write().expect("Palette lock poisoned") = if index == CUSTOM_INDEX
+        {
+            custom_palette(&config::read_config::<String>("custom_theme"))
+        }
+        else
+        {
+            PALETTES[index]
+        };
 
         Self
         {
@@ -733,16 +738,97 @@ fn luma(r: u8, g: u8, b: u8) -> u32
 }
 
 /// Returns the active palette.
-pub fn palette() -> &'static Palette
+fn palette() -> Palette
 {
-    &PALETTES[ACTIVE.load(Ordering::Relaxed)]
+    *ACTIVE.read().expect("Palette lock poisoned")
 }
 
 /// Returns the index of a palette by id; an unknown id is the default.
-pub fn palette_index(id: &str) -> usize //A STORED ID, UNKNOWN IS THE DEFAULT
+pub fn palette_index(id: &str) -> usize
 {
-    PALETTES.iter().position(|palette| palette.id.eq_ignore_ascii_case(id.trim())).unwrap_or(0)
+    let id = id.trim();
+    if id.eq_ignore_ascii_case(CUSTOM_ID) { return CUSTOM_INDEX; }
+
+    PALETTES.iter().position(|palette| palette.id.eq_ignore_ascii_case(id)).unwrap_or(0)
 }
+
+/// The custom slot follows the built-in themes in the selector.
+pub const CUSTOM_INDEX: usize = PALETTES.len();
+pub const CUSTOM_ID: &str = "custom";
+
+/// Parses an RGB value entered in the theme builder or stored in the config.
+pub fn parse_color(value: &str) -> Option<Color>
+{
+    let hex = value.strip_prefix('#').unwrap_or(value);
+    if hex.len() != 6 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) { return None; }
+
+    u32::from_str_radix(hex, 16).ok().map(rgb)
+}
+
+/// Formats a palette color for editing.
+pub fn color_hex(color: Color) -> String
+{
+    let Color::Rgb(r, g, b) = color else { return String::new() };
+    format!("#{r:02X}{g:02X}{b:02X}")
+}
+
+/// Writes one override, or removes it to restore the default color.
+pub fn save_custom_color(role: &str, color: Option<Color>)
+{
+    let stored = config::read_config::<String>("custom_theme");
+    let mut overrides: Vec<_> = stored.split(',')
+        .filter_map(|entry| entry.split_once('='))
+        .filter(|(key, _)| *key != role)
+        .map(|(key, value)| format!("{key}={value}"))
+        .collect();
+
+    if let Some(color) = color { overrides.push(format!("{role}={}", color_hex(color))); }
+
+    config::client_write("custom_theme", &overrides.join(","));
+}
+
+// Keep the editor's role list and the palette assignments in sync.
+macro_rules! custom_palette_colors
+{
+    ($($field:ident),+ $(,)?) =>
+    {
+        fn custom_palette(stored: &str) -> Palette
+        {
+            let lookup = |role| stored.split(',')
+                .filter_map(|entry| entry.split_once('='))
+                .filter(|(key, _)| *key == role)
+                .find_map(|(_, value)| parse_color(value));
+            let defaults = PALETTES[0];
+
+            Palette
+            {
+                background: match lookup("background")
+                {
+                    Some(Color::Rgb(r, g, b)) => Some((r, g, b)),
+                    _ => defaults.background,
+                },
+                $($field: lookup(stringify!($field)).unwrap_or(defaults.$field),)+
+                ..defaults
+            }
+        }
+
+        /// The editable roles and their current colors.
+        pub fn custom_colors() -> impl Iterator<Item = (&'static str, Color)>
+        {
+            let palette = custom_palette(&config::read_config::<String>("custom_theme"));
+            [
+                ("background", palette.background.map_or(Color::Reset, |(r, g, b)| Color::Rgb(r, g, b))),
+                $((stringify!($field), palette.$field),)+
+            ].into_iter()
+        }
+    };
+}
+
+custom_palette_colors!
+(
+    text, muted, accent, highlight, error, heart, ok, logo, code_bg, selected,
+    mention, selection, arg_required, arg_optional, arg_active,
+);
 
 //CONSTS
 /// Builds a color from `0xRRGGBB`.
@@ -757,8 +843,8 @@ const fn bg(hex: u32) -> Option<(u8, u8, u8)>
     Some(((hex >> 16) as u8, (hex >> 8) as u8, hex as u8))
 }
 
-/// Index of the active palette.
-static ACTIVE: AtomicUsize = AtomicUsize::new(0);
+/// The currently applied palette.
+static ACTIVE: RwLock<Palette> = RwLock::new(PALETTES[0]);
 
 //EVERY OTHER MESSAGE, A BACKGROUND ONLY
 /// Stripe background when the terminal does not report its own.

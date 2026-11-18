@@ -653,7 +653,7 @@ async fn handle_terminal_event
             } else if app.account.is_some()
             {
                 account::insert_str(app, &text);
-            } else
+            } else if !settings::paste_theme_color(app, &text)
             {
                 app.input.insert_str(&text);
                 app.refresh_palette();
