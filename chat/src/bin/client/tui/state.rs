@@ -168,7 +168,8 @@ pub enum Entry //ONE ROW OF HISTORY
         hearts: Vec<String>,
         edited: bool, //TO username, ELSE FROM
         username: String,
-        id: usize,
+        /// The remote sender's ID for an incoming message.
+        sender_id: Option<usize>,
         /// Its lobby cursor and private id, for a replayed one.
         position: Option<(u64, u64)>,
         /// When it was sent, for a replayed one.
@@ -829,13 +830,13 @@ impl App
 
     //STORE A PRIVATE MESSAGE UNRENDERED
     /// Appends a private message to the pane.
-    pub fn push_private(&mut self, sent: bool, username: String, id: usize, message_id: u64, timestamp: Option<u64>, text: String, colors: MessageColors, reply: Option<u64>)
+    pub fn push_private(&mut self, username: String, sender_id: Option<usize>, message_id: u64, timestamp: Option<u64>, text: String, colors: MessageColors, reply: Option<u64>)
     {
-        let entry = Entry::Private { sent, username: username.clone(), id, message_id, position: None, timestamp, text, colors, reply, hearts: Vec::new(), edited: false };
+        let entry = Entry::Private { sent: sender_id.is_none(), username: username.clone(), sender_id, message_id, position: None, timestamp, text, colors, reply, hearts: Vec::new(), edited: false };
         let active = self.pm_username() == Some(username.as_str());
         self.route_private(entry);
         if active && self.scroll.is_some() { self.unread += 1; }
-        if !sent && self.pm_username() != Some(username.as_str())
+        if let Some(id) = sender_id && !active
         {
             self.notice = Some((t!("pm.received", username, id), Instant::now()));
             self.dirty = true;

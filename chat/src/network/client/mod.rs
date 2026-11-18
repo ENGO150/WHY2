@@ -213,10 +213,8 @@ pub enum ClientEvent
         message: String,
         /// The recipient's username.
         username: String,
-        /// The recipient's session id.
-        id: usize,
-        /// The sender's current colors.
-        colors: MessageColors,
+        /// The sender's message text color.
+        message_color: Option<u8>,
     },                                                           //SENT PM
     /// A private message we received.
     PrivateMessageRecv
@@ -1609,9 +1607,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //PRIVATE MESSAGE INCOMING
-            PacketCode::PrivateMessageBack { message_id, timestamp, reply, text, username, id, colors } =>
+            PacketCode::PrivateMessageBack { message_id, timestamp, reply, text, username, message_color } =>
             {
-                tx.send(ClientEvent::PrivateMessageSent { message_id, timestamp, reply, message: text, username, id, colors }).await.unwrap();
+                tx.send(ClientEvent::PrivateMessageSent { message_id, timestamp, reply, message: text, username, message_color }).await.unwrap();
             },
 
             //SPAM WARNING

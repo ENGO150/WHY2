@@ -37,7 +37,7 @@ use crate::
     options,
     network::
     {
-        codes::OnlineUser,
+        codes::{ MessageColors, OnlineUser },
         client::{ ClientEvent, image as client_image },
     },
 };
@@ -246,9 +246,11 @@ impl App
                 self.push_styled(reason, theme::error());
             },
 
-            ClientEvent::PrivateMessageSent { message_id, timestamp, reply, message: msg, username: to, id, colors } => self.push_private(true, to, id, message_id, timestamp, msg, colors, reply),
+            ClientEvent::PrivateMessageSent { message_id, timestamp, reply, message, username, message_color } =>
+                self.push_private(username, None, message_id, timestamp, message, MessageColors { username_color: None, message_color }, reply),
 
-            ClientEvent::PrivateMessageRecv { message_id, timestamp, reply, message: msg, username: from, id, colors } => self.push_private(false, from, id, message_id, timestamp, msg, colors, reply),
+            ClientEvent::PrivateMessageRecv { message_id, timestamp, reply, message, username, id, colors } =>
+                self.push_private(username, Some(id), message_id, timestamp, message, colors, reply),
 
             ClientEvent::TofuPrompt { request } =>
             {
@@ -552,7 +554,7 @@ impl App
                     edited: message.edited,
                     position: Some((message.before, message.message_id)),
                     username: message.username,
-                    id: message.id,
+                    sender_id: (!message.sent).then_some(message.id),
                     timestamp: message.timestamp,
                     text: message.text,
                     colors: message.colors,

@@ -207,9 +207,6 @@ pub enum PacketCode //CONTROL CODES
 
     //SERVER -> CLIENT | SEND MESSAGE BACK TO SENDER
     /// *Server → client.* Echo of a private message we sent, naming the recipient.
-    ///
-    /// `colors` carries the recipient's username color and the sender's message color, so the line
-    /// is painted the way it is drawn.
     PrivateMessageBack
     {
         message_id: u64,
@@ -217,8 +214,8 @@ pub enum PacketCode //CONTROL CODES
         reply: Option<u64>,
         text: String,
         username: String,
-        id: usize,
-        colors: MessageColors,
+        /// The sender's message text color.
+        message_color: Option<u8>,
     },
 
     //CLIENT -> SERVER | REWORD A STORED MESSAGE

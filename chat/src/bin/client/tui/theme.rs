@@ -233,10 +233,10 @@ impl Theme
                 Span::styled(": ", dim()),
             ], text, self.style(colors.message_color), width, self.render_math),
 
-            Entry::Private { sent, username, id, timestamp, text, colors, .. } =>
+            Entry::Private { sent, username, sender_id, timestamp, text, colors, .. } =>
             {
                 let sender = if *sent { me } else { username.as_str() };
-                let sender_id = if *sent { own.map(|user| user.0) } else { Some(*id) };
+                let sender_id = if *sent { own.map(|user| user.0) } else { *sender_id };
                 let color = if *sent { own.and_then(|user| user.1) } else { colors.username_color };
                 let id = if self.show_id { sender_id.map(|id| format!(" ({id})")).unwrap_or_default() } else { String::new() };
                 let prefix = vec!

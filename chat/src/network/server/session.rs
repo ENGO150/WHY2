@@ -69,7 +69,6 @@ use crate::
         codes::
         {
             PacketCode,
-            MessageColors,
             ServerSetting,
             UserFile,
             UserProfile,
@@ -1222,9 +1221,6 @@ impl<'a, 's> ClientSession<'a, 's>
             }
         }
 
-        //GET TARGET USERNAME COLOR
-        let recipient_color = config::users::colors(&recipient_uname).username_color;
-
         //SEND CONFIRMATION BACK TO SENDER
         self.send(PacketCode::PrivateMessageBack
         {
@@ -1232,13 +1228,8 @@ impl<'a, 's> ClientSession<'a, 's>
             timestamp,
             reply: delivery.sender_reply,
             text,
-            id: recipient_id,
             username: recipient_uname,
-            colors: MessageColors //ADJUST COLORS TO USE TARGET UNAME COLOR
-            {
-                username_color: recipient_color,
-                message_color: colors.message_color,
-            },
+            message_color: colors.message_color,
         }).await;
 
         PacketFlow::Continue
