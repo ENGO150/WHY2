@@ -534,10 +534,6 @@ args.id = "ID wiadomości"
 args.message = "Treść wiadomości"
 description = "Odpowiada na wiadomość"
 
-[command.re]
-args.message = "Treść wiadomości"
-description = "Odpowiada na ostatnią prywatną wiadomość"
-
 [command.delete]
 args.id = "ID wiadomości"
 description = "Usuwa wiadomość z historii"

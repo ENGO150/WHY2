@@ -529,10 +529,6 @@ args.id = "メッセージの ID"
 args.message = "メッセージの内容"
 description = "メッセージに返信します"
 
-[command.re]
-args.message = "メッセージの内容"
-description = "最後のダイレクトメッセージに返信します"
-
 [command.delete]
 args.id = "メッセージの ID"
 description = "履歴からメッセージを削除します"

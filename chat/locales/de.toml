@@ -531,10 +531,6 @@ args.id = "ID der Nachricht"
 args.message = "Nachrichteninhalt"
 description = "Antwortet auf eine Nachricht"
 
-[command.re]
-args.message = "Nachrichteninhalt"
-description = "Antwortet auf die letzte private Nachricht"
-
 [command.delete]
 args.id = "ID der Nachricht"
 description = "Löscht eine Nachricht aus dem Verlauf"

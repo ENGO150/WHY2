@@ -534,10 +534,6 @@ args.id = "ID повідомлення"
 args.message = "Текст повідомлення"
 description = "Відповідає на повідомлення"
 
-[command.re]
-args.message = "Текст повідомлення"
-description = "Відповідає на останнє особисте повідомлення"
-
 [command.delete]
 args.id = "ID повідомлення"
 description = "Видаляє повідомлення з історії"

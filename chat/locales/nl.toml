@@ -531,10 +531,6 @@ args.id = "ID van het bericht"
 args.message = "Inhoud van het bericht"
 description = "Reageert op een bericht"
 
-[command.re]
-args.message = "Inhoud van het bericht"
-description = "Reageert op het laatste privébericht"
-
 [command.delete]
 args.id = "ID van het bericht"
 description = "Verwijdert een bericht uit de geschiedenis"

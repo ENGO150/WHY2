@@ -529,10 +529,6 @@ args.id = "消息 ID"
 args.message = "消息内容"
 description = "回复一条消息"
 
-[command.re]
-args.message = "消息内容"
-description = "回复最近一条私信"
-
 [command.delete]
 args.id = "消息 ID"
 description = "从历史中删除一条消息"

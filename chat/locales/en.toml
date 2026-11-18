@@ -544,10 +544,6 @@ args.id = "ID of the message"
 args.message = "Message content"
 description = "Responds to message"
 
-[command.re]
-args.message = "Message content"
-description = "Responds to last private message"
-
 [command.delete]
 args.id = "ID of the message"
 description = "Deletes a message from the history"

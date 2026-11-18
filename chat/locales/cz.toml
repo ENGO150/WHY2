@@ -534,10 +534,6 @@ args.id = "ID zprávy"
 args.message = "Obsah zprávy"
 description = "Odpoví na zprávu"
 
-[command.re]
-args.message = "Obsah zprávy"
-description = "Odpoví na poslední soukromou zprávu"
-
 [command.delete]
 args.id = "ID zprávy"
 description = "Smaže zprávu z historie"

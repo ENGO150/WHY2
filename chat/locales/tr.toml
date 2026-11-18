@@ -529,10 +529,6 @@ args.id = "Mesajın ID'si"
 args.message = "Mesaj içeriği"
 description = "Bir mesajı yanıtlar"
 
-[command.re]
-args.message = "Mesaj içeriği"
-description = "Son özel mesajı yanıtlar"
-
 [command.delete]
 args.id = "Mesajın ID'si"
 description = "Geçmişten bir mesajı siler"

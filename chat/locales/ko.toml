@@ -529,10 +529,6 @@ args.id = "메시지 ID"
 args.message = "메시지 내용"
 description = "메시지에 답장합니다"
 
-[command.re]
-args.message = "메시지 내용"
-description = "마지막 개인 메시지에 답장합니다"
-
 [command.delete]
 args.id = "메시지 ID"
 description = "기록에서 메시지를 삭제합니다"
