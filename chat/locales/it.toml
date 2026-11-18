@@ -509,7 +509,7 @@ description = "Mostra tutti i client che condividono lo schermo."
 [command.pm]
 args.id = "ID dell'utente"
 args.message = "Contenuto del messaggio"
-description = "Invia un messaggio privato"
+description = "Apre una conversazione privata. Usa /pm per tornare al tuo canale."
 
 [command.heart]
 args.id = "ID del messaggio"

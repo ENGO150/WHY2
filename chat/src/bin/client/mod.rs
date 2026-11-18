@@ -696,6 +696,61 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         let mut command_used = false;
         if let (Some(command), parameters) = command::get_command(&input)
         {
+            if command == Command::PrivateMessage
+            {
+                match parameters.as_deref()
+                {
+                    None => app.close_pm(),
+                    Some(value) =>
+                    {
+                        let target = value.parse::<usize>().ok().and_then(|id|
+                            app.online.iter().find(|user| user.id == id).map(|user| user.username.clone())
+                                .or_else(|| app.offline.get(&id).map(|user| user.0.clone())));
+                        match target
+                        {
+                            Some(username) => app.open_pm(username),
+                            None => invalid_usage(app, None),
+                        }
+                    },
+                }
+                app.input.push_history(&input);
+                return;
+            }
+            if command == Command::Reply
+            {
+                let reply = parameters.as_deref().and_then(|value| value.split_whitespace().next())
+                    .and_then(command::parse_message_id);
+                let allowed = match (app.pm_username(), reply)
+                {
+                    (Some(_), Some(id)) => app.messages.iter().any(|entry|
+                        matches!(entry, Entry::Private { message_id, .. } if *message_id == id)),
+                    (None, Some(id)) => id & consts::PRIVATE_MESSAGE_ID == 0,
+                    (_, None) => true,
+                };
+                if !allowed
+                {
+                    app.push_styled("Open the message's conversation before replying.", theme::error());
+                    return;
+                }
+            }
+            if command == Command::Re
+            {
+                app.push_styled("Open a conversation with /pm ID, then type your message.", theme::notice());
+                return;
+            }
+            if app.pm_username().is_some() && matches!(command, Command::Upload)
+            {
+                app.push_styled("File sharing in PMs is not available yet.", theme::error());
+                return;
+            }
+
+            #[cfg(feature = "client_voice")]
+            if app.pm_username().is_some() && command == Command::Record
+            {
+                app.push_styled("Voice messages in PMs are not available yet.", theme::error());
+                return;
+            }
+
             //RESOLVE A VISIBLE ATTACHMENT BEFORE ASKING THE SERVER
             let attachment = if command == Command::Download
             {
@@ -971,7 +1026,16 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         },
         LoginState::Login => PacketCode::Login { password: input },
         LoginState::Register => PacketCode::Register { password: input },
-        LoginState::None => PacketCode::MessageRequest { text: input, reply: None },
+        LoginState::None => if let Some(username) = app.pm_username()
+        {
+            let Some(id) = app.online.iter().find(|user| user.username == username).map(|user| user.id)
+                .or_else(|| app.offline.iter().find(|(_, user)| user.0 == username).map(|(id, _)| *id)) else
+            {
+                app.push_styled("This PM recipient is unavailable.", theme::error());
+                return;
+            };
+            PacketCode::PrivateMessageRequest { id, text: input }
+        } else { PacketCode::MessageRequest { text: input, reply: None } },
     };
 
     network::send(&mut *write_stream.lock().await, packet, options::get_keys().as_ref()).await;

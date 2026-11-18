@@ -512,7 +512,7 @@ description = "Zobrazí uživatele sdílející obrazovku"
 [command.pm]
 args.id = "ID zvoleného uživatele"
 args.message = "Obsah zprávy"
-description = "Pošle soukromou zprávu"
+description = "Otevře soukromou konverzaci. Příkaz /pm vás vrátí do kanálu."
 
 [command.heart]
 args.id = "ID zprávy"

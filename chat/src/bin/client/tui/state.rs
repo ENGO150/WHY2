@@ -451,7 +451,9 @@ pub struct App
     //MESSAGE PANE
     /// The pane being read: the channel we are in.
     pub messages: VecDeque<Entry>, //THE PANE BEING LOOKED AT - THE CHANNEL WE ARE STANDING IN
-    /// Which channel that is; empty for the lobby.
+    /// The public channel to restore when leaving a private conversation.
+    pub pm_return: Option<String>,
+    /// Pane key: empty for the lobby, a channel name, or a NUL-prefixed PM username.
     pub channel: String,           //WHICH CHANNEL THAT IS ("" = THE LOBBY)
     /// Every other channel's scrollback, parked while we are away.
     pub panes: HashMap<String, VecDeque<Entry>>, //THE OTHER CHANNELS' SCROLLBACK, PARKED WHILE WE ARE AWAY
@@ -656,6 +658,7 @@ impl App
         {
             messages: VecDeque::new(),
             channel: String::new(),
+            pm_return: None,
             panes: HashMap::new(),
             scroll: None,
             unread: 0,
@@ -813,7 +816,6 @@ impl App
                 {
                     self.history_anchor = None;
                     self.history_cursor = None;
-                    self.private_cursor = None;
                 }
             }
         }
@@ -823,15 +825,26 @@ impl App
     /// Appends a private message to the pane.
     pub fn push_private(&mut self, sent: bool, username: String, id: usize, message_id: u64, timestamp: Option<u64>, text: String, colors: MessageColors, reply: Option<u64>)
     {
-        self.push_entry(Entry::Private { sent, username, id, message_id, position: None, timestamp, text, colors, reply, hearts: Vec::new(), edited: false });
+        let entry = Entry::Private { sent, username: username.clone(), id, message_id, position: None, timestamp, text, colors, reply, hearts: Vec::new(), edited: false };
+        let active = self.pm_username() == Some(username.as_str());
+        self.route_private(entry);
+        if active && self.scroll.is_some() { self.unread += 1; }
+        if !sent && self.pm_username() != Some(username.as_str())
+        {
+            self.notice = Some((format!("PM from {username} — /pm {id}"), Instant::now()));
+            self.dirty = true;
+        }
     }
 
     //THE NEWEST PAGE OF THE LOBBY'S HISTORY
     /// Merges the newest lobby page into the timeline.
     pub fn start_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
     {
+        let channel = self.channel.clone();
+        self.switch_channel(String::new());
         let room = self.merge_history(entries, false);
         self.history_cursor = (more && room).then_some(start);
+        self.switch_channel(channel);
     }
 
     //AN OLDER LOBBY PAGE
@@ -839,32 +852,60 @@ impl App
     pub fn prepend_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
     {
         self.history_pending = false;
-        if !self.channel.is_empty() { return; }
-
+        let channel = self.channel.clone();
+        self.switch_channel(String::new());
         let room = self.merge_history(entries, true);
         self.history_cursor = (more && room).then_some(start);
+        self.switch_channel(channel);
     }
 
     //THE NEWEST PAGE OF OUR PRIVATE HISTORY
-    /// Merges the newest private page into the same timeline as the lobby.
+    /// Routes the newest private page into conversations.
     pub fn start_private_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
     {
-        let room = self.merge_history(entries, false);
-        self.private_cursor = (more && room).then_some(start);
+        for entry in entries { self.route_private(entry); }
+        self.private_cursor = more.then_some(start);
     }
 
-    //AN OLDER PRIVATE PAGE
-    /// Merges an older private page without moving the view off what it was showing.
+    /// Routes an older page into conversations, preserving chronological order.
     pub fn prepend_private_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
     {
         self.history_pending = false;
-        if !self.channel.is_empty() { return; }
-
-        let room = self.merge_history(entries, true);
-        self.private_cursor = (more && room).then_some(start);
+        self.start_private_history(entries, start, more);
     }
 
-    //BOTH PACKET TYPES BELONG TO ONE TIMELINE
+    /// The participant of the open private conversation.
+    pub fn pm_username(&self) -> Option<&str> { self.channel.strip_prefix('\0') }
+
+    /// Opens a conversation without changing server channel membership.
+    pub fn open_pm(&mut self, username: String)
+    {
+        if self.pm_return.is_none() { self.pm_return = Some(self.channel.clone()); }
+        self.switch_channel(format!("\0{username}"));
+    }
+
+    /// Returns to the channel that was visible before opening a PM.
+    pub fn close_pm(&mut self)
+    {
+        if let Some(channel) = self.pm_return.take() { self.switch_channel(channel); }
+    }
+
+    fn route_private(&mut self, entry: Entry)
+    {
+        let Entry::Private { username, .. } = &entry else { return };
+        let channel = format!("\0{username}");
+        let active = self.channel == channel;
+        let pane = if active { &mut self.messages } else { self.panes.entry(channel).or_default() };
+        if pane.iter().any(|other| other.message_id() == entry.message_id()) { return; }
+        let timestamp = |entry: &Entry| match entry { Entry::Private { timestamp, message_id, .. } => (timestamp.unwrap_or(0), *message_id), _ => (0, 0) };
+        let key = timestamp(&entry);
+        let index = pane.iter().position(|other| timestamp(other) > key).unwrap_or(pane.len());
+        pane.insert(index, entry);
+        while pane.len() > consts::HISTORY_LIMIT { pane.pop_front(); }
+        if active { self.generation += 1; self.dirty = true; }
+    }
+
+    //INSERT PUBLIC HISTORY INTO THE LOBBY TIMELINE
     /// Inserts replayed entries by their lobby position, preserving the view and selection.
     /// Returns whether the pane had room for the whole page.
     fn merge_history(&mut self, entries: Vec<Entry>, older: bool) -> bool
@@ -1617,6 +1658,14 @@ impl App
         let font = self.picker.font_size();
 
         //EACH STREAM NEEDS AN OLDER PAGE AS ITS FIRST ENTRY COMES WITHIN REACH
+        if self.pm_username().is_some() && !self.history_pending && offset < height
+        {
+            if let Some(cursor) = self.private_cursor
+            {
+                self.history_pending = true;
+                self.private_request = Some(cursor);
+            }
+        }
         if self.channel.is_empty() && !self.history_pending
         {
             let first_row = |private: bool| self.messages.iter().enumerate().find_map(|(index, entry)|
@@ -1627,7 +1676,7 @@ impl App
             }).or_else(|| self.wrapped.as_ref()?.4.get(self.history_anchor?).copied());
 
             let lobby = self.history_cursor.and_then(|cursor| Some((first_row(false)?, cursor)));
-            let private = self.private_cursor.and_then(|cursor| Some((first_row(true)?, cursor)));
+            let private: Option<(u16, u64)> = None;
             let near = |row: u16| offset < row.saturating_add(height.saturating_mul(consts::PRELOAD_SCREENS + 1));
 
             //FILL THE STREAM WHOSE OLDEST LOADED MESSAGE IS NEWER FIRST
@@ -1737,7 +1786,6 @@ impl App
                 {
                     self.history_anchor = None;
                     self.history_cursor = None;
-                    self.private_cursor = None;
                 }
             }
         }
@@ -1776,7 +1824,6 @@ impl App
             self.history_anchor = None;
             self.history_cursor = None;
             self.history_end = 0;
-            self.private_cursor = None;
         }
 
         self.generation += 1;
@@ -1831,7 +1878,7 @@ impl App
     /// Drops the parked panes of channels that no longer exist.
     pub fn prune_panes(&mut self)
     {
-        self.panes.retain(|channel, _| channel.is_empty() || self.channels.contains(channel));
+        self.panes.retain(|channel, _| channel.is_empty() || channel.starts_with('\0') || self.channels.contains(channel));
     }
 
     //RE-READ THE STYLING AND REPAINT THE HISTORY
@@ -1878,6 +1925,7 @@ impl App
         self.clear_messages();
         self.panes.clear();
         self.channel.clear();
+        self.pm_return = None;
 
         self.input = InputBuffer::new();
         self.palette.dismiss();
@@ -2161,7 +2209,7 @@ impl App
         let text = text.trim_start();
 
         //AN EMPTY LINE OR A COMMAND IS NOT A MESSAGE
-        if text.is_empty() || text.starts_with('/')
+        if self.pm_username().is_some() || text.is_empty() || text.starts_with('/')
         {
             self.typing = false;
             self.typing_sent = None;
@@ -2177,6 +2225,7 @@ impl App
     /// [`TYPING_INTERVAL`](why2_chat::consts::TYPING_INTERVAL).
     pub fn take_typing(&mut self) -> bool
     {
+        if self.pm_username().is_some() { self.typing = false; return false; }
         if !mem::take(&mut self.typing) { return false; }
 
         //ONE PER TYPING_INTERVAL, WHATEVER WAS TYPED
@@ -2191,7 +2240,7 @@ impl App
     /// Records that somebody is typing.
     pub fn set_typing(&mut self, username: String)
     {
-        if !config::read_config::<bool>("typing_indicator") { return; }
+        if self.pm_username().is_some() || !config::read_config::<bool>("typing_indicator") { return; }
 
         //A RESTATEMENT CHANGES NOTHING ON SCREEN
         if self.typing_users.insert(username, Instant::now()).is_none() { self.dirty = true; }
@@ -2336,6 +2385,8 @@ impl App
             .filter_map(|(entry, message)| Some((message.message_id()?, entry)))
             .collect();
 
+        let own = self.online.iter().find(|user| user.username == self.username).map(|user| (user.id, self.color));
+
         for entry in 0..self.messages.len()
         {
             let row = lines.len() as u16;
@@ -2343,7 +2394,7 @@ impl App
 
             let target = self.messages[entry].reply().and_then(|id| index.get(&id)).map(|&target| &self.messages[target]);
 
-            lines.extend(self.theme.render(&self.messages[entry], width, target, &self.username));
+            lines.extend(self.theme.render(&self.messages[entry], width, target, &self.username, own));
 
             //A MESSAGE FROM SOMEBODY ELSE NAMING US, OR ANSWERING US
             let mentioned = match &self.messages[entry]
@@ -2728,5 +2779,51 @@ fn reset_session()
         screen_options::set_use_screen(false);
         screen_options::set_attach_screen(false);
         screen_options::set_monitor(None);
+    }
+}
+
+#[cfg(test)]
+mod pm_tests
+{
+    use super::*;
+
+    #[test]
+    fn conversations_are_separate_and_return_to_channel()
+    {
+        let mut app = App::new();
+        app.switch_channel("general".to_owned());
+        app.push(Line::from("public"));
+        app.open_pm("Alice".to_owned());
+        app.push(Line::from("Alice conversation"));
+        app.open_pm("Bob".to_owned());
+        assert!(app.messages.is_empty());
+        app.open_pm("Alice".to_owned());
+        assert_eq!(app.messages.len(), 1);
+        app.channels.insert("general".to_owned());
+        app.prune_panes();
+        app.close_pm();
+        assert_eq!(app.channel, "general");
+        assert_eq!(app.messages.len(), 1);
+    }
+
+    #[test]
+    fn private_history_never_enters_public_pane()
+    {
+        let mut app = App::new();
+        let entry = || Entry::Private
+        {
+            sent: false, username: "Alice".to_owned(), id: 42,
+            message_id: 1, position: Some((0, 1)), timestamp: Some(1),
+            text: "secret".to_owned(), colors: MessageColors { username_color: None, message_color: None },
+            reply: None, hearts: Vec::new(), edited: false,
+        };
+        app.start_private_history(vec![entry()], 0, false);
+        assert!(app.messages.is_empty());
+        app.open_pm("Bob".to_owned());
+        assert!(app.messages.is_empty());
+        app.open_pm("Alice".to_owned());
+        assert_eq!(app.messages.len(), 1);
+        app.prepend_private_history(vec![entry()], 0, false);
+        assert_eq!(app.messages.len(), 1);
     }
 }

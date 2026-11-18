@@ -507,7 +507,7 @@ description = "Ekran paylaşan tüm istemcileri gösterir."
 [command.pm]
 args.id = "Hedef kullanıcının ID'si"
 args.message = "Mesaj içeriği"
-description = "Özel mesaj gönderir"
+description = "Özel bir sohbet açar. Kanalınıza dönmek için /pm yazın."
 
 [command.heart]
 args.id = "Mesajın ID'si"

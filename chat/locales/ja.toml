@@ -507,7 +507,7 @@ description = "画面共有中のクライアントをすべて表示します�
 [command.pm]
 args.id = "対象ユーザーの ID"
 args.message = "メッセージの内容"
-description = "ダイレクトメッセージを送信します"
+description = "ダイレクトメッセージの会話を開きます。/pm で元のチャンネルに戻ります。"
 
 [command.heart]
 args.id = "メッセージの ID"

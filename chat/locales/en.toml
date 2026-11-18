@@ -522,7 +522,7 @@ description = "Shows all screensharing clients."
 [command.pm]
 args.id = "ID of target user"
 args.message = "Message content"
-description = "Sends private message"
+description = "Opens a private conversation; /pm returns to your channel."
 
 [command.heart]
 args.id = "ID of the message"

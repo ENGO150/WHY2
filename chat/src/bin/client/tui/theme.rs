@@ -186,12 +186,13 @@ impl Theme
     /// - `entry`: The entry.
     /// - `width`: The pane width.
     /// - `target`: The entry a reply quotes, if it is in the pane.
-    /// - `me`: Our username, for tinting replies to us and hearts we gave.
-    pub fn render(&self, entry: &Entry, width: u16, target: Option<&Entry>, me: &str) -> Vec<Line<'static>>
+    /// - `me`: Our username, for sent PMs, replies and hearts we gave.
+    /// - `own`: Our session id and username color, when present in the roster.
+    pub fn render(&self, entry: &Entry, width: u16, target: Option<&Entry>, me: &str, own: Option<(usize, Option<u8>)>) -> Vec<Line<'static>>
     {
-        let mut lines: Vec<Line<'static>> = entry.reply().map(|reply| self.reply_row(reply, target, width)).into_iter().collect();
+        let mut lines: Vec<Line<'static>> = entry.reply().map(|reply| self.reply_row(reply, target, width, me, own)).into_iter().collect();
 
-        let rows = self.render_entry(entry, width);
+        let rows = self.render_entry(entry, width, me, own);
 
         lines.extend(match entry.message_id()
         {
@@ -203,7 +204,7 @@ impl Theme
     }
 
     /// Renders an entry's body.
-    fn render_entry(&self, entry: &Entry, width: u16) -> Vec<Line<'static>>
+    fn render_entry(&self, entry: &Entry, width: u16, me: &str, own: Option<(usize, Option<u8>)>) -> Vec<Line<'static>>
     {
         match entry
         {
@@ -234,12 +235,16 @@ impl Theme
 
             Entry::Private { sent, username, id, timestamp, text, colors, .. } =>
             {
+                let sender = if *sent { me } else { username.as_str() };
+                let sender_id = if *sent { own.map(|user| user.0) } else { Some(*id) };
+                let color = if *sent { own.and_then(|user| user.1) } else { colors.username_color };
+                let id = if self.show_id { sender_id.map(|id| format!(" ({id})")).unwrap_or_default() } else { String::new() };
                 let prefix = vec!
                 [
                     self.timestamp(*timestamp),
-                    Span::styled(format!("{} {} ", t!("message.pm"), if *sent { "→" } else { "←" }), accent()),
-                    self.name(username.clone(), colors.username_color),
-                    Span::styled(format!(" ({id}): "), dim()),
+                    self.name(sender.to_owned(), color),
+                    Span::styled(id, dim()),
+                    Span::styled(": ", dim()),
                 ];
 
                 markup::render(prefix, text, self.style(colors.message_color), width, self.render_math)
@@ -328,7 +333,7 @@ impl Theme
 
     //ONE ROW NAMING THE MESSAGE A REPLY ANSWERS
     /// Returns the one-row quote naming the message a reply answers, cut to the width.
-    fn reply_row(&self, reply: u64, target: Option<&Entry>, width: u16) -> Line<'static>
+    fn reply_row(&self, reply: u64, target: Option<&Entry>, width: u16, me: &str, own: Option<(usize, Option<u8>)>) -> Line<'static>
     {
         let mut spans = vec![Span::styled(consts::REPLY, border())];
 
@@ -342,8 +347,9 @@ impl Theme
 
             Some(Entry::Private { sent, username, text, colors, .. }) =>
             {
-                spans.push(Span::styled(format!("{} {} ", t!("message.pm"), if *sent { "→" } else { "←" }), accent()));
-                spans.push(self.colorize(username.clone(), colors.username_color));
+                let sender = if *sent { me } else { username.as_str() };
+                let color = if *sent { own.and_then(|user| user.1) } else { colors.username_color };
+                spans.push(self.colorize(sender.to_owned(), color));
                 spans.push(Span::styled(format!(": {}", text.lines().next().unwrap_or_default()), dim()));
             },
 

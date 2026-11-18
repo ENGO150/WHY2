@@ -777,14 +777,7 @@ pub const COMMAND_LIST: &[CommandInfo] =
             {
                 name: "arg.id",
                 description: "command.pm.args.id",
-                required: true,
-                values: ArgValues::Free,
-            },
-            CommandArg
-            {
-                name: "arg.message",
-                description: "command.pm.args.message",
-                required: true,
+                required: false,
                 values: ArgValues::Free,
             },
         ],

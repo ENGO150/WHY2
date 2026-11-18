@@ -73,6 +73,11 @@ use super::
 /// Starts a recording, reporting a failure to start.
 fn start(app: &mut App, tx: &Sender<ClientEvent>)
 {
+    if app.pm_username().is_some()
+    {
+        app.notify("Voice messages in PMs are not available yet.");
+        return;
+    }
     if !message::start_recording(tx.clone())
     {
         app.notify(t!("voice_message.busy"));
@@ -91,6 +96,8 @@ fn send(app: &mut App, write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>, t
 {
     app.recording = None;
     app.dirty = true;
+
+    if app.pm_username().is_some() { return message::cancel_recording(); }
 
     let Some(write_stream) = write_stream else { return message::cancel_recording() };
 

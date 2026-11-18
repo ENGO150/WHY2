@@ -512,7 +512,7 @@ description = "Показывает всех клиентов, транслир�
 [command.pm]
 args.id = "ID пользователя"
 args.message = "Текст сообщения"
-description = "Отправляет личное сообщение"
+description = "Открывает личную переписку. Команда /pm возвращает вас в канал."
 
 [command.heart]
 args.id = "ID сообщения"

@@ -258,6 +258,8 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
     if !app.address.is_empty() { parts.push(app.address.clone()); }
     if options::socks5_enabled() { parts.push(String::from("SOCKS5")); }
 
+    if let Some(username) = app.pm_username() { parts.push(format!("PM: {username} ( /pm to return )")); }
+
     let title = format!(" {} ", parts.join(" ── "));
 
     let mut block = Block::bordered()

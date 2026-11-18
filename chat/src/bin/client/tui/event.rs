@@ -1113,6 +1113,7 @@ impl App
             //SIDEBAR-ONLY, NOTHING IS ASKED OF THE SERVER
             ClientEvent::ChannelChanged { channel } =>
             {
+                self.close_pm();
                 self.switch_channel(channel.clone().unwrap_or_default());
 
                 if let Some(name) = channel.clone() { self.channels.insert(name); }

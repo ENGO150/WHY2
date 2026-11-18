@@ -507,7 +507,7 @@ description = "显示所有正在共享屏幕的客户端。"
 [command.pm]
 args.id = "目标用户的 ID"
 args.message = "消息内容"
-description = "发送私信"
+description = "打开私信会话。输入 /pm 可返回原频道。"
 
 [command.heart]
 args.id = "消息 ID"

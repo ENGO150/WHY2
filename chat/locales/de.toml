@@ -509,7 +509,7 @@ description = "Zeigt alle Clients mit Bildschirmfreigabe."
 [command.pm]
 args.id = "ID des Zielbenutzers"
 args.message = "Nachrichteninhalt"
-description = "Sendet eine private Nachricht"
+description = "Öffnet eine private Unterhaltung. Mit /pm kehrst du zu deinem Kanal zurück."
 
 [command.heart]
 args.id = "ID der Nachricht"
