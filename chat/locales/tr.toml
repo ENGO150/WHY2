@@ -207,6 +207,14 @@ downloaded = "\"{filename}\" dosyası indirildi"
 failed_file = "\"{filename}\" dosyasının aktarımı başarısız oldu"
 unknown_file = "Bilinmiyor"
 
+[pm]
+title = "Özel sohbet: {username} (dönmek için /pm)"
+received = "{username} adlı kullanıcıdan özel mesaj — /pm {id}"
+reply_context = "Yanıtlamadan önce mesajın bulunduğu sohbeti açın."
+files_unavailable = "Özel sohbetlerde dosya paylaşımı henüz kullanılamıyor."
+voice_unavailable = "Özel sohbetlerde sesli mesajlar henüz kullanılamıyor."
+recipient_unavailable = "Bu kullanıcıya özel mesaj gönderilemiyor."
+
 [pane]
 unread = "{count} yeni"
 

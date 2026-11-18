@@ -210,6 +210,14 @@ downloaded = "Файл \"{filename}\" скачан"
 failed_file = "Не удалось передать файл \"{filename}\""
 unknown_file = "Неизвестно"
 
+[pm]
+title = "Личная переписка: {username} (/pm для возврата)"
+received = "Личное сообщение от {username} — /pm {id}"
+reply_context = "Перед ответом откройте переписку, в которой находится сообщение."
+files_unavailable = "Обмен файлами в личной переписке пока недоступен."
+voice_unavailable = "Голосовые сообщения в личной переписке пока недоступны."
+recipient_unavailable = "Получатель личного сообщения недоступен."
+
 [pane]
 unread = "Новых: {count}"
 

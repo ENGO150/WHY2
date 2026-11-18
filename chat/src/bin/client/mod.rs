@@ -742,21 +742,21 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                 };
                 if !allowed
                 {
-                    app.push_styled("Open the message's conversation before replying.", theme::error());
+                    app.push_styled(t!("pm.reply_context"), theme::error());
                     return;
                 }
             }
 
             if app.pm_username().is_some() && matches!(command, Command::Upload)
             {
-                app.push_styled("File sharing in PMs is not available yet.", theme::error());
+                app.push_styled(t!("pm.files_unavailable"), theme::error());
                 return;
             }
 
             #[cfg(feature = "client_voice")]
             if app.pm_username().is_some() && command == Command::Record
             {
-                app.push_styled("Voice messages in PMs are not available yet.", theme::error());
+                app.push_styled(t!("pm.voice_unavailable"), theme::error());
                 return;
             }
 
@@ -1041,7 +1041,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
             let Some(id) = app.online.iter().find(|user| user.username == username).map(|user| user.id)
                 .or_else(|| app.offline.iter().find(|(_, user)| user.0 == username).map(|(id, _)| *id)) else
             {
-                app.push_styled("This PM recipient is unavailable.", theme::error());
+                app.push_styled(t!("pm.recipient_unavailable"), theme::error());
                 return;
             };
             PacketCode::PrivateMessageRequest { id, text: input }

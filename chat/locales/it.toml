@@ -208,6 +208,14 @@ downloaded = "File \"{filename}\" scaricato"
 failed_file = "Trasferimento del file \"{filename}\" non riuscito"
 unknown_file = "Sconosciuto"
 
+[pm]
+title = "Conversazione privata: {username} (usa /pm per tornare)"
+received = "Messaggio privato da {username} — /pm {id}"
+reply_context = "Apri la conversazione del messaggio prima di rispondere."
+files_unavailable = "La condivisione di file nelle conversazioni private non è ancora disponibile."
+voice_unavailable = "I messaggi vocali nelle conversazioni private non sono ancora disponibili."
+recipient_unavailable = "Il destinatario di questo messaggio privato non è disponibile."
+
 [pane]
 unread = "{count} nuovi"
 

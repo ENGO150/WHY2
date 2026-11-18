@@ -208,6 +208,14 @@ downloaded = "Bestand \"{filename}\" gedownload"
 failed_file = "Overdracht van bestand \"{filename}\" mislukt"
 unknown_file = "Onbekend"
 
+[pm]
+title = "Privégesprek: {username} (terug met /pm)"
+received = "Privébericht van {username} — /pm {id}"
+reply_context = "Open het gesprek waarin het bericht staat voordat je reageert."
+files_unavailable = "Bestanden delen in privégesprekken is nog niet mogelijk."
+voice_unavailable = "Spraakberichten versturen in privégesprekken is nog niet mogelijk."
+recipient_unavailable = "De ontvanger van dit privébericht is niet bereikbaar."
+
 [pane]
 unread = "{count} nieuw"
 

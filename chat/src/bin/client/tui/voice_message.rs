@@ -75,7 +75,7 @@ fn start(app: &mut App, tx: &Sender<ClientEvent>)
 {
     if app.pm_username().is_some()
     {
-        app.notify("Voice messages in PMs are not available yet.");
+        app.notify(t!("pm.voice_unavailable"));
         return;
     }
     if !message::start_recording(tx.clone())

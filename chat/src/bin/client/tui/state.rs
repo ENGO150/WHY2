@@ -837,7 +837,7 @@ impl App
         if active && self.scroll.is_some() { self.unread += 1; }
         if !sent && self.pm_username() != Some(username.as_str())
         {
-            self.notice = Some((format!("PM from {username} — /pm {id}"), Instant::now()));
+            self.notice = Some((t!("pm.received", username, id), Instant::now()));
             self.dirty = true;
         }
     }

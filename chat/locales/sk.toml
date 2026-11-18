@@ -210,6 +210,14 @@ downloaded = "Súbor \"{filename}\" bol stiahnutý"
 failed_file = "Prenos súboru \"{filename}\" zlyhal"
 unknown_file = "Neznámy"
 
+[pm]
+title = "Súkromná konverzácia: {username} (návrat príkazom /pm)"
+received = "Súkromná správa od {username} — /pm {id}"
+reply_context = "Pred odpoveďou otvorte konverzáciu, v ktorej je správa."
+files_unavailable = "Zdieľanie súborov v súkromných konverzáciách zatiaľ nie je dostupné."
+voice_unavailable = "Hlasové správy v súkromných konverzáciách zatiaľ nie sú dostupné."
+recipient_unavailable = "Príjemca súkromnej správy nie je dostupný."
+
 [pane]
 unread = "Nové: {count}"
 

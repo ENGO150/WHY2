@@ -207,6 +207,14 @@ downloaded = "ファイル \"{filename}\" をダウンロードしました"
 failed_file = "ファイル \"{filename}\" の転送に失敗しました"
 unknown_file = "不明"
 
+[pm]
+title = "ダイレクトメッセージ：{username}（/pm で戻る）"
+received = "{username} からのダイレクトメッセージ — /pm {id}"
+reply_context = "返信する前に、そのメッセージの会話を開いてください。"
+files_unavailable = "ダイレクトメッセージでのファイル共有はまだ利用できません。"
+voice_unavailable = "ダイレクトメッセージでの音声メッセージはまだ利用できません。"
+recipient_unavailable = "この相手にはダイレクトメッセージを送信できません。"
+
 [pane]
 unread = "新着 {count} 件"
 

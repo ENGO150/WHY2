@@ -221,6 +221,14 @@ downloaded = "Downloaded file \"{filename}\""
 failed_file = "Transferring file \"{filename}\" failed"
 unknown_file = "Unknown"
 
+[pm]
+title = "PM: {username} (/pm to return)"
+received = "PM from {username} — /pm {id}"
+reply_context = "Open the message's conversation before replying."
+files_unavailable = "File sharing in PMs is not available yet."
+voice_unavailable = "Voice messages in PMs are not available yet."
+recipient_unavailable = "This PM recipient is unavailable."
+
 [pane]
 unread = "{count} new"
 

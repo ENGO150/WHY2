@@ -208,6 +208,14 @@ downloaded = "Datei \"{filename}\" heruntergeladen"
 failed_file = "Übertragung der Datei \"{filename}\" fehlgeschlagen"
 unknown_file = "Unbekannt"
 
+[pm]
+title = "Private Unterhaltung: {username} (zurück mit /pm)"
+received = "Private Nachricht von {username} — /pm {id}"
+reply_context = "Öffne die Unterhaltung, in der die Nachricht steht, bevor du antwortest."
+files_unavailable = "In privaten Unterhaltungen können noch keine Dateien geteilt werden."
+voice_unavailable = "In privaten Unterhaltungen können noch keine Sprachnachrichten gesendet werden."
+recipient_unavailable = "Dieser Empfänger ist für private Nachrichten nicht erreichbar."
+
 [pane]
 unread = "{count} neu"
 
