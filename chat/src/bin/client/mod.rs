@@ -694,10 +694,16 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
         //USER COMMANDS
         let mut command_used = false;
+        let mut share_history = false;
         if let (Some(command), parameters) = command::get_command(&input)
         {
             if command == Command::PrivateMessage
             {
+                if parameters.as_deref().is_none_or(|value| value.parse::<usize>().is_ok())
+                {
+                    app.push_command_history(&input);
+                }
+                else { app.input.push_history(&input); }
                 match parameters.as_deref()
                 {
                     None => app.close_pm(),
@@ -713,9 +719,16 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         }
                     },
                 }
-                app.input.push_history(&input);
                 return;
             }
+            share_history = match command
+            {
+                Command::Edit | Command::Reply => app.pm_username().is_none() &&
+                    parameters.as_deref().and_then(|value| value.split_whitespace().next())
+                        .and_then(command::parse_message_id).is_some_and(|id| id & consts::PRIVATE_MESSAGE_ID == 0),
+                Command::Invalid => false,
+                _ => true,
+            };
             if command == Command::Reply
             {
                 let reply = parameters.as_deref().and_then(|value| value.split_whitespace().next())
@@ -999,7 +1012,8 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         //ADD INPUT
         if !options::get_asking_password()
         {
-            app.input.push_history(&input);
+            if share_history { app.push_command_history(&input); }
+            else { app.input.push_history(&input); }
         }
 
         if command_used { return }; //DO NOT SEND COMMAND STRING

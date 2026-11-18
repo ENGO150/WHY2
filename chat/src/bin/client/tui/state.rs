@@ -509,8 +509,12 @@ pub struct App
     pub icon_request: bool, //THE TICK ASKS FOR IT
 
     //INPUT
-    /// The input line.
+    /// The current view's input, including its draft and recall history.
     pub input: InputBuffer,
+    /// Input buffers parked by pane key for the rest of this session.
+    pane_inputs: HashMap<String, InputBuffer>,
+    /// Shared commands used to initialize views opened later in the session.
+    command_history: Vec<String>,
     /// The slash-command palette.
     pub palette: Palette,
     /// The settings overlay.
@@ -683,6 +687,8 @@ impl App
             icon_area: Rect::ZERO,
             icon_request: false,
             input: InputBuffer::new(),
+            pane_inputs: HashMap::new(),
+            command_history: Vec::new(),
             palette: Palette::new(),
             settings: Settings::new(),
             login: Some(Login::new()),
@@ -841,10 +847,10 @@ impl App
     pub fn start_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
     {
         let channel = self.channel.clone();
-        self.switch_channel(String::new());
+        self.switch_pane(String::new());
         let room = self.merge_history(entries, false);
         self.history_cursor = (more && room).then_some(start);
-        self.switch_channel(channel);
+        self.switch_pane(channel);
     }
 
     //AN OLDER LOBBY PAGE
@@ -853,10 +859,10 @@ impl App
     {
         self.history_pending = false;
         let channel = self.channel.clone();
-        self.switch_channel(String::new());
+        self.switch_pane(String::new());
         let room = self.merge_history(entries, true);
         self.history_cursor = (more && room).then_some(start);
-        self.switch_channel(channel);
+        self.switch_pane(channel);
     }
 
     //THE NEWEST PAGE OF OUR PRIVATE HISTORY
@@ -1831,8 +1837,33 @@ impl App
     }
 
     //PARK THE OLD PANE, PUT BACK THE NEW ONE
-    /// Switches channel: parks the current pane and restores the new one's.
+    /// Switches views, restoring the destination's input and messages.
     pub fn switch_channel(&mut self, channel: String)
+    {
+        if channel == self.channel { return; }
+
+        let input = self.pane_inputs.remove(&channel)
+            .unwrap_or_else(|| InputBuffer::with_history(self.command_history.clone()));
+        self.pane_inputs.insert(self.channel.clone(), mem::replace(&mut self.input, input));
+        self.palette.dismiss();
+        self.typing = false;
+        self.typing_sent = None;
+        self.switch_pane(channel);
+    }
+
+    /// Records a command in every view's recall history.
+    pub fn push_command_history(&mut self, input: &str)
+    {
+        self.input.push_history(input);
+        for buffer in self.pane_inputs.values_mut() { buffer.append_history(input); }
+        if self.command_history.last().map(String::as_str) != Some(input)
+        {
+            self.command_history.push(input.to_owned());
+        }
+    }
+
+    /// Switches message panes, including when handling lobby history in the background.
+    fn switch_pane(&mut self, channel: String)
     {
         if channel == self.channel { return; }
 
@@ -1928,6 +1959,8 @@ impl App
         self.pm_return = None;
 
         self.input = InputBuffer::new();
+        self.pane_inputs.clear();
+        self.command_history.clear();
         self.palette.dismiss();
         self.settings.close();
         self.tofu = None;
@@ -2786,6 +2819,60 @@ fn reset_session()
 mod pm_tests
 {
     use super::*;
+
+    #[test]
+    fn commands_are_visible_in_existing_and_new_views()
+    {
+        let mut app = App::new();
+        app.push_command_history("/pm 42");
+        app.open_pm("Alice".to_owned());
+        app.input.up();
+        assert_eq!(app.input.take(), "/pm 42");
+        app.input.push_history("message for Alice");
+        app.push_command_history("/pm");
+        app.close_pm();
+
+        app.input.up();
+        assert_eq!(app.input.text(), "/pm");
+        app.input.up();
+        assert_eq!(app.input.text(), "/pm 42");
+
+        app.open_pm("Bob".to_owned());
+        app.input.up();
+        assert_eq!(app.input.text(), "/pm");
+        app.input.up();
+        assert_eq!(app.input.text(), "/pm 42");
+    }
+
+    #[test]
+    fn each_view_recalls_only_its_own_input()
+    {
+        let mut app = App::new();
+        app.input.push_history("lobby message");
+        app.switch_channel("general".to_owned());
+        app.input.push_history("channel message");
+        app.open_pm("Alice".to_owned());
+        app.input.up();
+        assert!(app.input.is_empty());
+        app.input.push_history("message for Alice");
+        app.input.insert_str("draft for Alice");
+        app.open_pm("Bob".to_owned());
+        app.input.up();
+        assert!(app.input.is_empty());
+        app.input.push_history("message for Bob");
+
+        app.open_pm("Alice".to_owned());
+        assert_eq!(app.input.take(), "draft for Alice");
+        app.input.up();
+        assert_eq!(app.input.text(), "message for Alice");
+
+        app.close_pm();
+        app.input.up();
+        assert_eq!(app.input.text(), "channel message");
+        app.switch_channel(String::new());
+        app.input.up();
+        assert_eq!(app.input.text(), "lobby message");
+    }
 
     #[test]
     fn conversations_are_separate_and_return_to_channel()

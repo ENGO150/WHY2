@@ -63,6 +63,12 @@ impl InputBuffer
         Self { chars: Vec::new(), cursor: 0, history: Vec::new(), history_pos: 0, stash: None, prefix: None, revision: 0 }
     }
 
+    /// Starts an empty draft with the session's command history.
+    pub(super) fn with_history(history: Vec<String>) -> Self
+    {
+        Self { history_pos: history.len(), history, ..Self::new() }
+    }
+
     //QUERIES
     /// Returns whether the buffer is empty.
     pub fn is_empty(&self) -> bool { self.chars.is_empty() }
@@ -253,14 +259,18 @@ impl InputBuffer
     /// Records a sent line, skipping an immediate repeat.
     pub fn push_history(&mut self, input: &str)
     {
+        self.append_history(input);
+        self.reset_history_position();
+    }
+
+    /// Adds a shared command without interrupting a parked draft's history search.
+    pub(super) fn append_history(&mut self, input: &str)
+    {
         if self.history.last().map(String::as_str) != Some(input)
         {
+            if self.history_pos == self.history.len() { self.history_pos += 1; }
             self.history.push(input.to_owned());
         }
-
-        self.history_pos = self.history.len();
-        self.stash = None;
-        self.prefix = None;
     }
 
     /// Ends a history search.
