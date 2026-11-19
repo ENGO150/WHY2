@@ -305,6 +305,7 @@ unreadable_image = "That image could not be read!"
 avatar_too_large = "Avatar is too large even cut down! (limit is {limit}MB)"
 avatar_write_failed = "Writing the cut avatar failed!"
 not_found = "File not found!"
+file_too_large = "File is too large! (limit is {limit}MB)"
 image_too_large = "Image is too large! (limit is {limit}MB)"
 not_image = "Not an image!"
 
