@@ -1205,10 +1205,13 @@ impl<'a, 's> ClientSession<'a, 's>
         //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
         if let Some(addr) = recipient_addr && recipient_id != self.id
         {
-            //SEND
-            if let Some(recipient) = server::CONNECTIONS.get(&addr)
+            //RELEASE THE CONNECTION GUARD BEFORE SEND UPDATES THE SEQUENCE NUMBER
+            let recipient = server::CONNECTIONS.get(&addr)
+                .map(|conn| (conn.write_stream().clone(), conn.keys().cloned()));
+
+            if let Some((write_stream, keys)) = recipient
             {
-                network::send(&mut *recipient.write_stream().lock().await, PacketCode::PrivateMessage
+                network::send(&mut *write_stream.lock().await, PacketCode::PrivateMessage
                 {
                     message_id: delivery.participants.message_id(&recipient_uname).unwrap(),
                     timestamp,
@@ -1217,7 +1220,7 @@ impl<'a, 's> ClientSession<'a, 's>
                     username: self.username.clone(),
                     id: self.id,
                     colors: colors.clone(),
-                }, recipient.keys()).await;
+                }, keys.as_ref()).await;
             }
         }
 
