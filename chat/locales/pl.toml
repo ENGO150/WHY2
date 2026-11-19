@@ -294,6 +294,7 @@ unreadable_image = "Nie udało się odczytać tego obrazu!"
 avatar_too_large = "Awatar jest za duży nawet po przycięciu! (limit to {limit}MB)"
 avatar_write_failed = "Zapis przyciętego awatara nie powiódł się!"
 not_found = "Nie znaleziono pliku!"
+file_too_large = "Plik jest za duży! (limit to {limit}MB)"
 image_too_large = "Obraz jest za duży! (limit to {limit}MB)"
 not_image = "To nie jest obraz!"
 

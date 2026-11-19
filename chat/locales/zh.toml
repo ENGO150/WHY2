@@ -291,6 +291,7 @@ unreadable_image = "无法读取该图片！"
 avatar_too_large = "头像即使裁剪后也太大了！（上限为 {limit}MB）"
 avatar_write_failed = "写入裁剪后的头像失败！"
 not_found = "未找到文件！"
+file_too_large = "文件太大了！（上限为 {limit}MB）"
 image_too_large = "图片太大了！（上限为 {limit}MB）"
 not_image = "这不是图片！"
 

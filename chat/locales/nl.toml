@@ -292,6 +292,7 @@ unreadable_image = "Die afbeelding kon niet worden gelezen!"
 avatar_too_large = "De avatar is zelfs bijgesneden te groot! (limiet is {limit}MB)"
 avatar_write_failed = "Opslaan van de bijgesneden avatar mislukt!"
 not_found = "Bestand niet gevonden!"
+file_too_large = "Het bestand is te groot! (limiet is {limit}MB)"
 image_too_large = "Afbeelding is te groot! (limiet is {limit}MB)"
 not_image = "Geen afbeelding!"
 

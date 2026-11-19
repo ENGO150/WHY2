@@ -294,6 +294,7 @@ unreadable_image = "Tento obrázok sa nepodarilo prečítať!"
 avatar_too_large = "Avatar je príliš veľký aj po orezaní! (limit je {limit}MB)"
 avatar_write_failed = "Uloženie orezaného avatara zlyhalo!"
 not_found = "Súbor nebol nájdený!"
+file_too_large = "Súbor je príliš veľký! (limit je {limit}MB)"
 image_too_large = "Obrázok je príliš veľký! (limit je {limit}MB)"
 not_image = "Toto nie je obrázok!"
 

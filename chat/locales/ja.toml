@@ -291,6 +291,7 @@ unreadable_image = "その画像を読み込めませんでした！"
 avatar_too_large = "切り抜いてもアバターが大きすぎます！（上限は {limit}MB）"
 avatar_write_failed = "切り抜いたアバターの書き込みに失敗しました！"
 not_found = "ファイルが見つかりません！"
+file_too_large = "ファイルが大きすぎます！（上限は {limit}MB）"
 image_too_large = "画像が大きすぎます！（上限は {limit}MB）"
 not_image = "画像ではありません！"
 

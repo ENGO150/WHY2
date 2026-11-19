@@ -292,6 +292,7 @@ unreadable_image = "Impossibile leggere quell'immagine!"
 avatar_too_large = "L'avatar è troppo grande anche ritagliato! (il limite è {limit}MB)"
 avatar_write_failed = "Salvataggio dell'avatar ritagliato non riuscito!"
 not_found = "File non trovato!"
+file_too_large = "Il file è troppo grande! (il limite è {limit}MB)"
 image_too_large = "L'immagine è troppo grande! (il limite è {limit}MB)"
 not_image = "Non è un'immagine!"
 

@@ -291,6 +291,7 @@ unreadable_image = "O resim okunamadı!"
 avatar_too_large = "Avatar kırpıldıktan sonra bile çok büyük! (sınır {limit}MB)"
 avatar_write_failed = "Kırpılmış avatar kaydedilemedi!"
 not_found = "Dosya bulunamadı!"
+file_too_large = "Dosya çok büyük! (sınır {limit}MB)"
 image_too_large = "Resim çok büyük! (sınır {limit}MB)"
 not_image = "Bu bir resim değil!"
 

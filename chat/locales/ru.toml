@@ -294,6 +294,7 @@ unreadable_image = "Не удалось прочитать это изображ
 avatar_too_large = "Аватар слишком большой даже после обрезки! (лимит {limit}MB)"
 avatar_write_failed = "Не удалось записать обрезанный аватар!"
 not_found = "Файл не найден!"
+file_too_large = "Файл слишком большой! (лимит {limit}MB)"
 image_too_large = "Изображение слишком большое! (лимит {limit}MB)"
 not_image = "Это не изображение!"
 

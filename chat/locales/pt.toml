@@ -292,6 +292,7 @@ unreadable_image = "Não foi possível ler essa imagem!"
 avatar_too_large = "O avatar é grande demais mesmo recortado! (o limite é {limit}MB)"
 avatar_write_failed = "Falha ao gravar o avatar recortado!"
 not_found = "Arquivo não encontrado!"
+file_too_large = "O arquivo é grande demais! (o limite é {limit}MB)"
 image_too_large = "A imagem é grande demais! (o limite é {limit}MB)"
 not_image = "Não é uma imagem!"
 
