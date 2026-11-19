@@ -213,6 +213,9 @@ pub const TYPING_TIMEOUT: Duration         = Duration::from_secs(6);            
 
 /// Largest packet accepted on the file and screen side channels.
 pub const MAX_AUXILIARY_PACKET_SIZE: usize = UPLOAD_CHUNK_SIZE * 2;                   //FILE/SCREEN SIDE CHANNELS (2MB)
+/// Largest inline attachment, with room for packet metadata and encryption overhead.
+#[cfg(feature = "server")]
+pub const MAX_INLINE_ATTACHMENT_SIZE: usize = 12 * MEGABYTE;
 /// Absolute packet size ceiling, applied even with spam protection off.
 pub const MAX_PACKET_CEILING: usize        = 16 * MEGABYTE;                           //ABSOLUTE CEILING WHEN SPAM PROTECTION IS OFF (16MB)
 

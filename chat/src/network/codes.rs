@@ -651,11 +651,25 @@ pub enum PacketCode //CONTROL CODES
 
     /// *Client → server.* Asks for our private history page before message `before`.
     PrivateHistoryRequest { before: u64 }, //CLIENT -> SERVER | THE PRIVATE PAGE BEFORE THIS MESSAGE ID
+
+    /// *Server → client.* A full chunk preceding an attachment or voice payload on this connection.
+    AttachmentChunk { data: Vec<u8> },
 }
 
 //IMPLEMENTATIONS
 impl PacketCode
 {
+    /// Returns the inline file data shared by live messages and attachment fetch replies.
+    pub(super) fn attachment_payload_mut(&mut self) -> Option<&mut Vec<u8>>
+    {
+        match self
+        {
+            Self::AttachmentData { data, .. } => Some(data),
+            Self::AttachmentDisplay { data, .. } | Self::VoiceMessage { data, .. } => data.as_mut(),
+            _ => None,
+        }
+    }
+
     //THE VARIANT'S NAME, FOR THE SERVER LOG
     /// Returns the variant's name, for logging.
     ///
@@ -696,6 +710,7 @@ impl PacketCode
             Self::Attachment { .. }            => "Attachment",
             Self::AttachmentDisplay { .. }     => "AttachmentDisplay",
             Self::AttachmentDataRequest { .. } => "AttachmentDataRequest",
+            Self::AttachmentChunk { .. }       => "AttachmentChunk",
             Self::AttachmentData { .. }        => "AttachmentData",
             Self::VoiceMessageRequest { .. }   => "VoiceMessageRequest",
             Self::VoiceMessageUpload { .. }    => "VoiceMessageUpload",

@@ -88,7 +88,7 @@ use crate::
     role::Role,
     crypto,
     options::{ self, LoginState },
-    consts::Streams,
+    consts::{ self, SharedKeys, Streams },
     network::
     {
         self,
@@ -841,6 +841,48 @@ pub enum ClientEvent
 pub static ACTIVE_UPLOADS: Mutex<BTreeMap<[u8; 32], PathBuf>> = Mutex::new(BTreeMap::new()); //ACTIVE UPLOADS
 //FUNCTIONS
 //PUBLIC
+/// Assembles attachment chunks before dispatching the original packet.
+async fn receive_with_attachments(streams: &mut Streams<'_>, keys: &SharedKeys) -> Option<PacketCode>
+{
+    let limits = options::upload_limits();
+    //Also allow stored attachments from before a server lowered its upload settings.
+    let max_size = consts::MAX_ATTACHMENT_CACHE.max(limits.file);
+    let mut assembled = Vec::new();
+
+    loop
+    {
+        let mut code = network::receive(streams, Some(keys), None).await?;
+        if let PacketCode::AttachmentChunk { data } = code
+        {
+            if data.len() != consts::UPLOAD_CHUNK_SIZE
+                || (assembled.len() as u64 + data.len() as u64) > max_size
+            {
+                return None;
+            }
+
+            assembled.try_reserve(data.len()).ok()?;
+            assembled.extend_from_slice(&data);
+            continue;
+        }
+
+        if !assembled.is_empty()
+        {
+            let tail = code.attachment_payload_mut()?;
+            if tail.len() >= consts::UPLOAD_CHUNK_SIZE
+                || (assembled.len() as u64 + tail.len() as u64) > max_size
+            {
+                return None;
+            }
+
+            assembled.try_reserve(tail.len()).ok()?;
+            assembled.extend_from_slice(tail);
+            *tail = assembled;
+        }
+
+        return Some(code);
+    }
+}
+
 /// Runs the client side of a session: the handshake, then every packet until the connection
 /// ends.
 ///
@@ -901,7 +943,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
         //SERVER DIED CHECK
         let mut dropped = false;
 
-        let read = match network::receive(streams, Some(&keys), None).await
+        let read = match receive_with_attachments(streams, &keys).await
         {
             Some(code) => code,
             None =>

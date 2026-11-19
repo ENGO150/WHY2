@@ -23,17 +23,19 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! the client because the server parses it too — to validate an upload and to measure its
 //! duration — without decoding any audio.
 
-use wincode::{ SchemaRead, SchemaWrite };
+use wincode::{ SchemaRead, SchemaWrite, config::Configuration };
 
-use crate::
-{
-    consts as chat_consts,
-    network::voice::consts,
-};
+use crate::network::voice::consts;
 
 //CONSTS
 /// Marker at the start of every clip.
 const MAGIC: &[u8; 8] = b"WHY2VOX\x01"; //FORMAT MARKER
+
+/// The clip's maximum frame storage, including nested vectors and encoded lengths.
+const CLIP_ALLOCATION_LIMIT: usize = 64 + consts::MESSAGE_MAX_FRAMES
+    * (consts::MESSAGE_MAX_PACKET + size_of::<Vec<u8>>() + size_of::<u64>());
+const CLIP_CONFIG: Configuration<true, CLIP_ALLOCATION_LIMIT> =
+    Configuration::default().with_preallocation_size_limit::<CLIP_ALLOCATION_LIMIT>();
 
 //STRUCTS
 /// One recorded voice message.
@@ -53,7 +55,7 @@ impl Clip
     pub fn encode(&self) -> Vec<u8> //MARKER + WINCODE
     {
         let mut bytes = MAGIC.to_vec();
-        bytes.extend(wincode::config::serialize(self, chat_consts::PACKET_CONFIG).expect("Encoding voice message failed"));
+        bytes.extend(wincode::config::serialize(self, CLIP_CONFIG).expect("Encoding voice message failed"));
 
         bytes
     }
@@ -68,7 +70,7 @@ impl Clip
     /// `None` if the marker is missing, the clip does not decode, or it is out of bounds.
     pub fn decode(bytes: &[u8]) -> Option<Self> //PARSE AND CHECK THE BOUNDS
     {
-        let clip = wincode::config::deserialize::<Self, _>(bytes.strip_prefix(MAGIC)?, chat_consts::PACKET_CONFIG).ok()?;
+        let clip = wincode::config::deserialize::<Self, _>(bytes.strip_prefix(MAGIC)?, CLIP_CONFIG).ok()?;
 
         let valid = matches!(clip.channels, 1 | 2)
             && !clip.frames.is_empty()

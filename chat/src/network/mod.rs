@@ -473,6 +473,8 @@ pub async fn read_tcp
 //UTILS
 /// Sends a [`PacketCode`] on the main connection with the global sequence counter.
 ///
+/// Large attachment payloads are sent as consecutive chunks followed by their original packet.
+///
 /// # Parameters
 /// - `write_stream`: The connection's write half.
 /// - `code`: What to send.
@@ -480,10 +482,32 @@ pub async fn read_tcp
 pub async fn send //SEND packet TO stream
 (
     write_stream: &mut OwnedWriteHalf,
-    code: PacketCode,
+    #[allow(unused_mut)] mut code: PacketCode,
     keys: Option<&SharedKeys>,
 )
 {
+    #[cfg(feature = "server")]
+    if let Some(payload) = code.attachment_payload_mut()
+        && payload.len() > chat_consts::MAX_INLINE_ATTACHMENT_SIZE
+    {
+        //The caller holds the connection's write lock through the final packet.
+        let data = std::mem::take(payload);
+        let mut chunks = data.chunks_exact(chat_consts::UPLOAD_CHUNK_SIZE);
+        for chunk in &mut chunks
+        {
+            if send_tcp(write_stream, Packet
+            {
+                code: PacketCode::AttachmentChunk { data: chunk.to_vec() },
+                seq: 0,
+            }, EncryptionMode::OneShot(keys), None).await.is_err()
+            {
+                return;
+            }
+        }
+
+        payload.extend_from_slice(chunks.remainder());
+    }
+
     let _ = send_tcp
     (
         write_stream,
@@ -692,5 +716,58 @@ pub async fn receive
 
             return None;
         }
+    }
+}
+
+#[cfg(all(test, feature = "server"))]
+mod tests
+{
+    use super::*;
+    use tokio::net::{ TcpListener, TcpStream };
+
+    #[tokio::test]
+    async fn large_attachment_fetch_fits_in_bounded_packets()
+    {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let mut client = TcpStream::connect(listener.local_addr().unwrap()).await.unwrap();
+        let (server, _) = listener.accept().await.unwrap();
+        let (_, mut writer) = server.into_split();
+
+        let hash = [42; 32];
+        let data: Vec<u8> = (0..31_224_705).map(|index| (index % 251) as u8).collect();
+        let expected = data.clone();
+        let sender = tokio::spawn(async move
+        {
+            send(&mut writer, PacketCode::AttachmentData { hash, data }, None).await;
+        });
+
+        let mut received = Vec::new();
+        loop
+        {
+            let size = client.read_u32().await.unwrap() as usize;
+            assert!(size <= chat_consts::MAX_PACKET_CEILING);
+            let mut bytes = vec![0; size];
+            client.read_exact(&mut bytes).await.unwrap();
+
+            let packet: Packet = wincode::config::deserialize(&bytes, chat_consts::PACKET_CONFIG).unwrap();
+            match packet.code
+            {
+                PacketCode::AttachmentChunk { data } =>
+                {
+                    assert_eq!(data.len(), chat_consts::UPLOAD_CHUNK_SIZE);
+                    received.extend(data);
+                },
+                PacketCode::AttachmentData { hash: returned_hash, data } =>
+                {
+                    assert_eq!(returned_hash, hash);
+                    received.extend(data);
+                    break;
+                },
+                _ => panic!("Unexpected packet during attachment fetch"),
+            }
+        }
+
+        sender.await.unwrap();
+        assert_eq!(received, expected);
     }
 }
