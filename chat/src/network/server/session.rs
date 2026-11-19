@@ -2057,8 +2057,7 @@ impl<'a, 's> ClientSession<'a, 's>
         //IN ITS OWN TASK - disconnect_all ABORTS THIS ONE
         tokio::spawn(async
         {
-            //SEND EVERYONE OFF FIRST
-            server::disconnect_all().await;
+            server::disconnect_all(false).await;
 
             misc::restart();
         });

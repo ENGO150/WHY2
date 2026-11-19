@@ -121,7 +121,7 @@ async fn bind<T>(what: &str, address: &str, bind: impl AsyncFn() -> Result<T>) -
 async fn quit() //DISCONNECT ALL USERS
 {
     log::info!("Exiting ({} connections open)...", server::CONNECTIONS.len());
-    server::disconnect_all().await; //DISCONNECT ALL USERS
+    server::disconnect_all(true).await; //DISCONNECT ALL USERS
 }
 
 /// Runs the server.

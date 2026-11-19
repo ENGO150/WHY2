@@ -1273,7 +1273,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 }
 
 /// Gracefully disconnects every client.
-pub async fn disconnect_all() //DISCONNECT ALL CLIENTS
+pub async fn disconnect_all(grace: bool) //DISCONNECT ALL CLIENTS
 {
     //ITERATE OVER ALL ADDRESSES, REMOVE CONNECTIONS
     let addrs: Vec<SocketAddr> = CONNECTIONS.iter().map(|conn| *conn.peer_addr()).collect();
@@ -1281,7 +1281,7 @@ pub async fn disconnect_all() //DISCONNECT ALL CLIENTS
     log::info!("Disconnecting {} connections", addrs.len());
     for addr in &addrs
     {
-        remove_connection(addr, true, None).await; //REMOVE GRACEFULLY
+        remove_connection(addr, grace, None).await; //REMOVE GRACEFULLY
     }
 }
 
