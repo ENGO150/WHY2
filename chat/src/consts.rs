@@ -130,9 +130,9 @@ pub const SERVER_RESTART_SETTINGS: &[&str] =                                    
       "max_voice_message_size"];
 
 //EMBEDDED ATTACHMENT PLAYBACK
-/// Largest encoded file the client processes for embedded playback or a video thumbnail.
+/// Largest encoded file the client processes for a video thumbnail.
 #[cfg(feature = "client_voice")]
-pub const MAX_EMBEDDED_MEDIA_SIZE: usize = 8 * MEGABYTE;
+pub const MAX_VIDEO_THUMBNAIL_SIZE: usize = 8 * MEGABYTE;
 /// Largest video frame accepted by the embedded decoder.
 #[cfg(feature = "client_voice")]
 pub const MAX_MEDIA_PIXELS: usize          = 4096 * 2160;
