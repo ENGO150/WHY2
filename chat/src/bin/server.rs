@@ -131,6 +131,8 @@ async fn main()
     //THE CONFIG COMES FIRST - THE LOG LEVEL IS IN IT
     config::init_config(); //CREATE server.toml CONFIGURATION
 
+    let upload_limits = config::upload_limits();
+
     //INIT LOGGER
     let level = LevelFilter::from_str(&config::read_config::<String>("log_level")).unwrap_or(LevelFilter::Info);
 
@@ -196,7 +198,7 @@ async fn main()
         config::read_config::<usize>("max_clients"),
         config::read_config::<usize>("max_unauth_clients"),
         config::read_config::<usize>("max_ip_clients"),
-        config::read_config::<u64>("max_upload_size"),
+        upload_limits.file / consts::MEGABYTE as u64,
         config::read_config::<usize>("max_client_parallel_uploads"),
     );
 

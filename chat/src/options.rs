@@ -40,7 +40,7 @@ use std::
 };
 
 #[cfg(feature = "client_base")]
-use crate::consts::SharedKeys;
+use crate::{ consts::SharedKeys, network::codes::UploadLimits };
 
 //ENUMS
 /// Which login prompt the server last asked the client for.
@@ -57,6 +57,10 @@ pub enum LoginState //STATE OF LOGIN
 //SETTINGS
 /// Name the server signs its own messages with.
 static SERVER_USERNAME: RwLock<String> = RwLock::new(String::new());
+
+/// Upload ceilings advertised by the connected server.
+#[cfg(feature = "client_base")]
+static UPLOAD_LIMITS: RwLock<UploadLimits> = RwLock::new(UploadLimits { file: 0, attachment: 0, avatar: 0, voice: 0 });
 
 /// Whether the server runs the UDP voice listener.
 #[cfg(feature = "server")]
@@ -125,6 +129,20 @@ pub fn get_server_username() -> String //GET SERVER USERNAME
 pub fn set_server_username(username: &str) //SET SERVER USERNAME
 {
     *SERVER_USERNAME.write().unwrap() = username.to_owned();
+}
+
+/// Returns the connected server's upload ceilings.
+#[cfg(feature = "client_base")]
+pub fn upload_limits() -> UploadLimits
+{
+    *UPLOAD_LIMITS.read().unwrap()
+}
+
+/// Stores the upload ceilings received in the welcome packet.
+#[cfg(feature = "client_base")]
+pub fn set_upload_limits(limits: UploadLimits)
+{
+    *UPLOAD_LIMITS.write().unwrap() = limits;
 }
 
 //VOICE CHAT

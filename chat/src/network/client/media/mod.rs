@@ -366,7 +366,7 @@ fn failed(generation: usize, key: &'static str, tx: &Sender<ClientEvent>)
 /// Returns one still frame of a supported video attachment.
 pub fn thumbnail(data: &[u8]) -> Option<Animation>
 {
-    if data.len() > consts::MAX_ATTACHMENT_SIZE || !video::recognizes(data) { return None; }
+    if data.len() > consts::MAX_EMBEDDED_MEDIA_SIZE || !video::recognizes(data) { return None; }
 
     let data = video::prepare(Arc::from(data)).ok()?;
     let video = Video::open(data, false).ok()??;
@@ -432,7 +432,7 @@ pub async fn play_data(hash: [u8; 32], message_id: u64, data: Vec<u8>, generatio
     {
         if !message::current(generation) { return; }
 
-        if data.len() > consts::MAX_ATTACHMENT_SIZE || data.is_empty() || crypto::sha256(&data) != hash
+        if data.len() > consts::MAX_EMBEDDED_MEDIA_SIZE || data.is_empty() || crypto::sha256(&data) != hash
         {
             failed(generation, "media.failed", &tx);
             return;

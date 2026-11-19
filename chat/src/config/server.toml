@@ -36,7 +36,10 @@ check_client_version = true # Allow only clients with same version as server
 max_clients = 20 # Maximal number of clients connected at the same time
 max_unauth_clients = 10 # Maximal number of non-authenticated clients
 max_ip_clients = 3 # Maximal number of clients from same IP
-max_upload_size = 50 # Maximal size (MB) of file uploads
+max_upload_size = 50 # Maximal size (MB) of a new file upload
+max_attachment_size = 8 # Maximal size (MB) of a persistent chat attachment
+max_avatar_size = 2 # Maximal size (MB) of an avatar or server icon
+max_voice_message_size = 6 # Maximal size (MB) of a voice message
 max_client_parallel_uploads = 1 # Maximal number of concurrent client uploads
 disable_ghost_pms = true # Block PMs by "offline" users when persistent_private_messages is turned off
 

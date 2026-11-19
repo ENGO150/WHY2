@@ -344,6 +344,30 @@ where
     }
 }
 
+/// Returns the upload ceilings read at server startup.
+#[cfg(feature = "server")]
+pub fn upload_limits() -> crate::network::codes::UploadLimits
+{
+    use crate::network::codes::UploadLimits;
+    use std::sync::OnceLock;
+
+    static LIMITS: OnceLock<UploadLimits> = OnceLock::new();
+
+    *LIMITS.get_or_init(||
+    {
+        let bytes = |key| read_config::<u64>(key).checked_mul(consts::MEGABYTE as u64)
+            .unwrap_or_else(|| panic!("{key} is too large"));
+
+        UploadLimits
+        {
+            file: bytes("max_upload_size"),
+            attachment: bytes("max_attachment_size"),
+            avatar: bytes("max_avatar_size"),
+            voice: bytes("max_voice_message_size"),
+        }
+    })
+}
+
 /// Writes a string value to `client.toml`.
 #[cfg(feature = "client_base")]
 pub fn client_write(key: &str, value: &str) //WRITE TO client.toml

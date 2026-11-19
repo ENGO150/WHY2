@@ -49,6 +49,20 @@ use crate::
     },
 };
 
+/// Server-configured upload ceilings in bytes.
+#[derive(Clone, Copy, Default, SchemaWrite, SchemaRead)]
+pub struct UploadLimits
+{
+    /// Ceiling for new uploads, including non-persistent fileshares.
+    pub file: u64,
+    /// Ceiling specific to persistent chat attachments.
+    pub attachment: u64,
+    /// Ceiling specific to avatars and server icons.
+    pub avatar: u64,
+    /// Ceiling specific to voice messages.
+    pub voice: u64,
+}
+
 //ENUMS
 /// Every message of the main-connection protocol.
 #[derive(SchemaWrite, SchemaRead, Clone)]
@@ -105,7 +119,7 @@ pub enum PacketCode //CONTROL CODES
     },
 
     //SERVER -> CLIENT | INFORMATIONS
-    /// *Server → client.* The server's name and login rules, sent once keys are established.
+    /// *Server → client.* The server's name, login rules and upload limits, sent once keys are established.
     Welcome
     {
         /// Minimum password length.
@@ -120,6 +134,8 @@ pub enum PacketCode //CONTROL CODES
         server_uname: String,
         /// Git commit the server was built from.
         git_hash: String,
+        /// Upload ceilings advertised for this server session.
+        upload_limits: UploadLimits,
     },
 
     //CLIENT -> SERVER | PICK USERNAME

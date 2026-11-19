@@ -2797,6 +2797,7 @@ fn reset_session()
     options::set_asking_password(false);
     options::set_channel(String::new());
     options::set_server_username("");
+    options::set_upload_limits(Default::default());
 
     //A HALF-FINISHED UPLOAD IS GONE WITH THE SOCKET
     client::ACTIVE_UPLOADS.lock().unwrap().clear();

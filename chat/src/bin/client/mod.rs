@@ -620,9 +620,12 @@ fn cut_avatar(mut file: File) -> Result<([u8; 32], PathBuf), String>
 
     let (avatar, extension) = client_image::make_avatar(&data).ok_or_else(|| t!("upload.unreadable_image").to_owned())?;
 
-    if avatar.len() > consts::MAX_AVATAR_SIZE
+    let limits = options::upload_limits();
+    let limit = limits.avatar.min(limits.file);
+
+    if avatar.len() as u64 > limit
     {
-        return Err(t!("upload.avatar_too_large", limit = consts::MAX_AVATAR_SIZE / consts::MEGABYTE));
+        return Err(t!("upload.avatar_too_large", limit = limit / consts::MEGABYTE as u64));
     }
 
     let hash: [u8; 32] = Sha256::digest(&avatar).into();
@@ -636,8 +639,8 @@ fn cut_avatar(mut file: File) -> Result<([u8; 32], PathBuf), String>
 //OPEN A FILE AND REFUSE WHAT THE SERVER WOULD
 /// Opens a file to upload and refuses what the server would.
 ///
-/// A fileshare or persistent attachment only has to exist; an avatar or icon must also be under
-/// [`MAX_ATTACHMENT_SIZE`](consts::MAX_ATTACHMENT_SIZE) and have a recognised image header.
+/// Checks files and attachments against the advertised upload ceilings. An avatar or icon
+/// source must fit the attachment ceiling and have a recognised image header.
 ///
 /// # Returns
 /// The open file (rewound) and its path, or `Err` with a message for the user.
@@ -654,7 +657,24 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
         return Err(t!("upload.not_found").to_owned());
     }
 
-    if matches!(kind, Upload::File | Upload::Attachment) { return Ok((file, path)); }
+    let limits = options::upload_limits();
+    let limit = match kind
+    {
+        Upload::File => limits.file,
+        Upload::Attachment => limits.attachment.min(limits.file),
+        Upload::Avatar | Upload::Icon => limits.attachment,
+    };
+    let size = file.metadata().map_err(|_| t!("upload.read_failed").to_owned())?.len();
+
+    if matches!(kind, Upload::File | Upload::Attachment)
+    {
+        if size > limit
+        {
+            return Err(t!("upload.file_too_large", limit = limit / consts::MEGABYTE as u64));
+        }
+
+        return Ok((file, path));
+    }
 
     //READ THE HEADER BEFORE ASKING THE SERVER
     let mut header = Vec::new();
@@ -665,9 +685,9 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
     file.rewind().ok();
 
     //REFUSE AN OVERSIZED IMAGE HERE
-    if path.metadata().map(|m| m.len()).unwrap_or(0) > consts::MAX_ATTACHMENT_SIZE as u64
+    if size > limit
     {
-        return Err(t!("upload.image_too_large", limit = consts::MAX_ATTACHMENT_SIZE / consts::MEGABYTE));
+        return Err(t!("upload.image_too_large", limit = limit / consts::MEGABYTE as u64));
     }
 
     if !misc::is_image(&header) { return Err(t!("upload.not_image").to_owned()); }

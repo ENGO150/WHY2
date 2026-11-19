@@ -81,7 +81,7 @@ use crate::
     i18n,
     cache,
     config,
-    consts as chat_consts,
+    options as chat_options,
     network::
     {
         client::ClientEvent,
@@ -104,6 +104,8 @@ struct Recording //A VOICE MESSAGE BEING RECORDED
     frames: Vec<Vec<u8>>, //OPUS PACKETS SO FAR
     /// What the packets will take on the wire.
     size: usize,          //WHAT THEY WILL TAKE ON THE WIRE
+    /// The server's effective voice upload ceiling in bytes.
+    limit: u64,
     /// Resampled stereo audio not yet a whole frame.
     pending: Vec<f32>,    //RESAMPLED STEREO, NOT A WHOLE FRAME YET
     /// Fractional resampler position.
@@ -228,7 +230,7 @@ impl Recording
         }
 
         self.full = self.frames.len() >= consts::MESSAGE_MAX_FRAMES
-            || self.size + consts::MESSAGE_MAX_PACKET + size_of::<u64>() > chat_consts::MAX_VOICE_MESSAGE_SIZE;
+            || (self.size + consts::MESSAGE_MAX_PACKET + size_of::<u64>()) as u64 > self.limit;
     }
 }
 
@@ -451,6 +453,8 @@ pub fn start_recording(tx: Sender<ClientEvent>) -> bool //BEGIN RECORDING
 
     let Some(encoder) = stereo() else { return false };
 
+    let limits = chat_options::upload_limits();
+
     //TAP A RUNNING CALL
     let voice = options::get_use_voice() && super::LOCAL_STREAMS.lock().unwrap().is_some();
     let generation = RECORD_GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
@@ -460,6 +464,7 @@ pub fn start_recording(tx: Sender<ClientEvent>) -> bool //BEGIN RECORDING
         encoder,
         frames: Vec::new(),
         size: 0,
+        limit: limits.voice.min(limits.file),
         pending: Vec::with_capacity(consts::FRAME_SIZE * 4),
         position: 0.,
         voice,
@@ -548,7 +553,7 @@ pub fn finish_recording() -> Option<Vec<u8>> //THE CLIP, None IF TOO SHORT
     {
         channels: consts::MESSAGE_CHANNELS,
         frames: recording.frames,
-    }.encode())
+    }.encode()).filter(|clip| clip.len() as u64 <= recording.limit)
 }
 
 /// Discards the recording.

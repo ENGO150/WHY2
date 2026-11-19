@@ -126,9 +126,13 @@ pub const EVENT_CHANNEL_BOUND: usize   = 1024;                                  
 /// `server.toml` keys only read at startup; a change to one applies after a restart.
 pub const SERVER_RESTART_SETTINGS: &[&str] =                                          //SERVER SETTINGS THAT REQUIRE
     &["server_ip", "server_port", "enable_voice_chat", "server_username",             //RESTART TO BE APPLIED
-      "log_level"];
+      "log_level", "max_upload_size", "max_attachment_size", "max_avatar_size",
+      "max_voice_message_size"];
 
 //EMBEDDED ATTACHMENT PLAYBACK
+/// Largest encoded file the client processes for embedded playback or a video thumbnail.
+#[cfg(feature = "client_voice")]
+pub const MAX_EMBEDDED_MEDIA_SIZE: usize = 8 * MEGABYTE;
 /// Largest video frame accepted by the embedded decoder.
 #[cfg(feature = "client_voice")]
 pub const MAX_MEDIA_PIXELS: usize          = 4096 * 2160;
@@ -166,10 +170,6 @@ pub const MEGABYTE: usize              = 1_000_000;                             
 pub const UPLOAD_CHUNK_SIZE: usize     = MEGABYTE;                                    //FILE UPLOAD CHUNK (1MB)
 /// Bytes of a file needed to recognise its image format.
 pub const IMAGE_HEADER_SIZE: usize     = 16;                                          //BYTES AN IMAGE IS RECOGNISED BY
-/// Largest attachment the server accepts and passes on.
-pub const MAX_ATTACHMENT_SIZE: usize   = 8 * MEGABYTE;                                //BIGGEST ATTACHMENT THE SERVER PASSES ON (8MB)
-/// Largest avatar or server icon the server keeps.
-pub const MAX_AVATAR_SIZE: usize       = 2 * MEGABYTE;                                //BIGGEST AVATAR THE SERVER KEEPS (2MB)
 /// Side of the square a still avatar is cut to, in pixels.
 pub const AVATAR_DIMENSION: u32        = 512;                                         //SIDE OF THE SQUARE AN AVATAR IS CUT TO
 /// Side of the square an animated avatar is cut to, in pixels.
@@ -178,8 +178,6 @@ pub const ANIMATED_AVATAR_DIMENSION: u32 = 256;                                 
 pub const AVATAR_TEMP_PREFIX: &str     = "why2_avatar_";                              //TEMP FILE A CUT AVATAR IS UPLOADED FROM
 /// GIF quantiser speed for animated avatars (1 best, 30 fastest).
 pub const AVATAR_GIF_SPEED: i32        = 10;                                          //GIF QUANTISER SPEED (1 BEST, 30 FASTEST)
-/// Largest voice message the server keeps.
-pub const MAX_VOICE_MESSAGE_SIZE: usize = 6 * MEGABYTE;                               //BIGGEST VOICE MESSAGE THE SERVER KEEPS (6MB)
 /// Temp file name prefix of a recorded voice message awaiting upload.
 pub const VOICE_TEMP_PREFIX: &str      = "why2_voice_";                               //TEMP FILE A VOICE MESSAGE IS UPLOADED FROM
 /// Largest history page the server sends in one packet.

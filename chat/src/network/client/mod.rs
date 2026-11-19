@@ -981,9 +981,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
 
             //WELCOME CODE - SERVER INFORMATIONS
             PacketCode::Welcome { min_pass: smin_pass, max_uname: smax_uname,
-                min_uname: smin_uname, server_name, server_uname, git_hash } =>
+                min_uname: smin_uname, server_name, server_uname, git_hash, upload_limits } =>
             {
                 options::set_server_username(&server_uname);
+                options::set_upload_limits(upload_limits);
 
                 min_pass = Some(smin_pass);
                 max_uname = Some(smax_uname);

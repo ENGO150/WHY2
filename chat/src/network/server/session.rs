@@ -1687,10 +1687,12 @@ impl<'a, 's> ClientSession<'a, 's>
                 //THE CEILING IS THE CEILING EITHER WAY - A CHAT PICTURE IS ALLOWED TO BE BIGGER
                 let size = file::attachment_size(&hash).await.unwrap_or_default();
 
-                if size > consts::MAX_AVATAR_SIZE as u64
+                let ceiling = config::upload_limits().avatar;
+
+                if size > ceiling
                 {
                     log::warn!("Avatar refused ({size} bytes over the {} ceiling): {}",
-                        consts::MAX_AVATAR_SIZE, self.peer_addr);
+                        ceiling, self.peer_addr);
 
                     self.send(PacketCode::InvalidUsage).await;
                     return PacketFlow::Continue;
@@ -1790,10 +1792,12 @@ impl<'a, 's> ClientSession<'a, 's>
             {
                 let size = file::attachment_size(&hash).await.unwrap_or_default();
 
-                if size > consts::MAX_AVATAR_SIZE as u64
+                let ceiling = config::upload_limits().avatar;
+
+                if size > ceiling
                 {
                     log::warn!("Server icon refused ({size} bytes over the {} ceiling): {}",
-                        consts::MAX_AVATAR_SIZE, self.peer_addr);
+                        ceiling, self.peer_addr);
 
                     self.send(PacketCode::InvalidUsage).await;
                     return PacketFlow::Continue;

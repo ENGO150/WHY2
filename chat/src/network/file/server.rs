@@ -263,8 +263,6 @@ pub async fn download
 
     log::info!("Upload started ({size} bytes, {}): {peer_addr}", kind.name());
 
-    let mut valid = false;
-
     //CHECK FOR CONCURRENT UPLOADS
     if ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count() >=
         config::read_config("max_client_parallel_uploads")
@@ -275,17 +273,25 @@ pub async fn download
     }
 
     //A PICTURE IS ALSO PUSHED TO SOMEBODY ELSE, AND A KEPT ONE IS SMALLER STILL
+    let limits = config::upload_limits();
     let ceiling = match kind
     {
-        UploadKind::Avatar | UploadKind::Icon => consts::MAX_AVATAR_SIZE,
-        UploadKind::Voice => consts::MAX_VOICE_MESSAGE_SIZE,
-        _ => consts::MAX_ATTACHMENT_SIZE,
+        UploadKind::Avatar | UploadKind::Icon => limits.avatar,
+        UploadKind::Voice => limits.voice,
+        UploadKind::Attachment => limits.attachment,
+        UploadKind::File => limits.file,
     };
 
-    if persistent && size > ceiling as u64
+    if persistent && size > ceiling
     {
         log::warn!("Upload rejected ({}, {size} bytes over the {ceiling} ceiling): {peer_addr}", kind.name());
         server::notify(id, PacketCode::InvalidUsage).await;
+        return;
+    }
+
+    if size > limits.file
+    {
+        log::warn!("Upload rejected ({size} bytes over the {} byte limit): {peer_addr}", limits.file);
         return;
     }
 
@@ -316,61 +322,48 @@ pub async fn download
         false => misc::get_upload_dir(&username),
     };
 
-    if !valid && size / consts::MEGABYTE as u64 <= config::read_config::<u64>("max_upload_size")
+    //CREATE UPLOAD DIRECTORY
+    if let Err(e) = fs::create_dir_all(&target_dir).await
     {
-        //CREATE UPLOAD DIRECTORY
-        if let Err(e) = fs::create_dir_all(&target_dir).await
-        {
-            log::error!("Creating upload directory failed ({e}): {peer_addr}");
-            return;
-        }
-
-        //CREATE REXSTREAM FOR FILE ENCRYPTION ON DISK
-        let disk_stream = RexStream::new(&Grid::from_key(&disk_key).unwrap(),
-            Grid::from_flat(&disk_nonce).unwrap()).unwrap();
-
-        //CREATE THE FILE, NAMED ONLY ONCE IT IS VERIFIED
-        let upload_path = target_dir.join(uid.to_string());
-        let upload_file = match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&upload_path)
-            .await
-        {
-            Ok(f) => f,
-            Err(e) =>
-            {
-                log::error!("Creating upload file failed ({e}): {peer_addr}");
-                return;
-            }
-        };
-
-        //ADD ACTIVE UPLOAD
-        ACTIVE_FILESHARES.insert(uid, ActiveFileshare
-        {
-            file: Arc::new(Mutex::new(upload_file)),
-            size,
-            current_size: 0,
-            hash,
-            hasher: Sha256::new(),
-            filename,
-            client_id: id,
-            path: upload_path,
-            data: persistent.then(|| Vec::with_capacity(size as usize)),
-            stream: disk_stream,
-            mac: disk_mac,
-        });
-
-        valid = true;
-    }
-
-    if !valid
-    {
-        //LOG FILE REJECT
-        log::warn!("Upload rejected ({size} bytes over the {}MB limit): {peer_addr}",
-            config::read_config::<u64>("max_upload_size"));
+        log::error!("Creating upload directory failed ({e}): {peer_addr}");
         return;
     }
+
+    //CREATE REXSTREAM FOR FILE ENCRYPTION ON DISK
+    let disk_stream = RexStream::new(&Grid::from_key(&disk_key).unwrap(),
+        Grid::from_flat(&disk_nonce).unwrap()).unwrap();
+
+    //CREATE THE FILE, NAMED ONLY ONCE IT IS VERIFIED
+    let upload_path = target_dir.join(uid.to_string());
+    let upload_file = match OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&upload_path)
+        .await
+    {
+        Ok(f) => f,
+        Err(e) =>
+        {
+            log::error!("Creating upload file failed ({e}): {peer_addr}");
+            return;
+        }
+    };
+
+    //ADD ACTIVE UPLOAD
+    ACTIVE_FILESHARES.insert(uid, ActiveFileshare
+    {
+        file: Arc::new(Mutex::new(upload_file)),
+        size,
+        current_size: 0,
+        hash,
+        hasher: Sha256::new(),
+        filename,
+        client_id: id,
+        path: upload_path,
+        data: persistent.then(Vec::new),
+        stream: disk_stream,
+        mac: disk_mac,
+    });
 
     //A FILESHARE IS WHAT THE UPLOADER SAYS IT IS
     let mut checked = matches!(kind, UploadKind::File | UploadKind::Attachment);

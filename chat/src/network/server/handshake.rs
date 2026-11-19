@@ -240,7 +240,7 @@ pub(super) async fn key_exchange //KEY EXCHANGE FOR SERVER-SIDE
     *keys = new_keys;
 }
 
-/// Sends the server's name and login rules.
+/// Sends the server's name, login rules and upload limits.
 pub(super) async fn send_welcome_packet(write_stream: &mut OwnedWriteHalf, keys: &SharedKeys) //send welcome packet you idiot
 {
     //SEND
@@ -252,6 +252,7 @@ pub(super) async fn send_welcome_packet(write_stream: &mut OwnedWriteHalf, keys:
         server_name: config::read_config::<String>("server_name"),
         server_uname: options::get_server_username(),
         git_hash: env!("WHY2_GIT_HASH").to_owned(),
+        upload_limits: config::upload_limits(),
     }, Some(keys)).await;
 }
 

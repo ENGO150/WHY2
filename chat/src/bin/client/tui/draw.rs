@@ -1677,7 +1677,7 @@ fn description_lines(state: &Settings, row: &Row, width: u16) -> Vec<Line<'stati
             Value::Avatar(Some(path)) => spans.push(Span::styled(t!("profile.avatar.uploaded", path), theme::text())),
 
             Value::Avatar(None) => spans.push(Span::styled(t!("profile.avatar.help",
-                limit = chat_consts::MAX_ATTACHMENT_SIZE / chat_consts::MEGABYTE), theme::dim())),
+                limit = options::upload_limits().attachment / chat_consts::MEGABYTE as u64), theme::dim())),
 
             Value::Text(text) if text.is_empty() =>
                 spans.push(Span::styled(i18n::get(&format!("profile.empty.{}", item.key)).map(str::to_owned)
