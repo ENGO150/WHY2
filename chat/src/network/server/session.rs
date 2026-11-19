@@ -510,19 +510,25 @@ impl<'a, 's> ClientSession<'a, 's>
         if tchannel.iter().all(|s| !s.is_empty() && s.len() <= config::read_config("max_channel_length") &&
             s.chars().all(|c| c.is_ascii_alphanumeric() && c != ' '))
         {
+            //A SAME-CHANNEL REQUEST MUST NOT CHANGE OTHER CLIENTS' VOICE ROSTERS
+            let channel_changed = self.channel != tchannel;
+
             //SEND VoiceLeave CODE TO OLD CHANNEL
-            if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&self.id)
+            if channel_changed && options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&self.id)
             {
                 server::send_to_all(PacketCode::VoiceLeave { id: self.id, channel: self.channel.clone() });
             }
 
             //UPDATE CHANNEL
-            server::update_client_channel(&self.peer_addr, &tchannel);
-            self.channel = tchannel.clone();
+            if channel_changed
+            {
+                server::update_client_channel(&self.peer_addr, &tchannel);
+                self.channel = tchannel.clone();
+            }
             self.send(PacketCode::Channel { channel: tchannel }).await;
 
             //SEND CODE TO CHANNEL
-            if options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&self.id)
+            if channel_changed && options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&self.id)
             {
                 server::send_to_all(PacketCode::VoiceJoin
                 {
