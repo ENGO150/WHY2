@@ -54,7 +54,11 @@ use crate::
     config,
     role::Role,
     consts::SharedKeys,
-    network::codes::Device,
+    network::
+    {
+        codes::Device,
+        file::server::UploadTarget,
+    },
 };
 
 //STRUCTS
@@ -96,30 +100,11 @@ pub struct Attach //SCREEN ATTACHMENT
 /// What an auxiliary connection is for, as recorded with its token.
 pub enum ConnectionType //TYPES OF TCP CHANNEL
 {
-    /// Receives a fileshare upload.
-    FileUpload
+    /// Receives an upload on an auxiliary socket.
+    Upload
     {
         uid: u64,
-    },
-    /// Receives a persistent attachment upload.
-    Attachment
-    {
-        uid: u64,
-    },
-    /// Receives an avatar upload.
-    Avatar
-    {
-        uid: u64,
-    },
-    /// Receives a server icon upload.
-    Icon
-    {
-        uid: u64,
-    },
-    /// Receives a voice message upload.
-    Voice
-    {
-        uid: u64,
+        target: UploadTarget,
     },
     /// Sends a shared file.
     FileDownload

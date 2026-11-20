@@ -282,16 +282,6 @@ pub enum PacketCode //CONTROL CODES
         channel: Option<String>,
     },
 
-    //SERVER -> CLIENT | FILE UPLOAD APPROVAL
-    /// *Server → client.* A file upload was approved; the upload goes over a new socket
-    /// authenticated by `token`.
-    Upload
-    {
-        hash: [u8; 32],
-        token: [u8; 32],
-        uid: u64,
-    },
-
     //CLIENT -> SERVER | DOWNLOAD FILE FROM SERVER
     /// *Client → server.* Downloads file `file_id` shared by session `id`.
     DownloadRequest
@@ -348,15 +338,6 @@ pub enum PacketCode //CONTROL CODES
         username_color: Option<u8>,
         channel: Option<Option<String>>,
         timestamp: Option<u64>, //UNIX SECONDS
-    },
-
-    //SERVER -> CLIENT | VOICE MESSAGE UPLOAD APPROVAL
-    /// *Server → client.* A voice message upload was approved.
-    VoiceMessageUpload
-    {
-        hash: [u8; 32],
-        token: [u8; 32],
-        uid: u64,
     },
 
     //SERVER -> CLIENT | ASK FOR A STORED ATTACHMENT
@@ -473,15 +454,6 @@ pub enum PacketCode //CONTROL CODES
         save: bool, //FALSE = READ ANSWER, TRUE = SAVE ACK
     },
 
-    //CLIENT -> SERVER | REQUEST FILE UPLOAD
-    /// *Client → server.* Asks to share a file.
-    UploadRequest
-    {
-        hash: [u8; 32],
-        filename: String,
-        persistent: bool,
-    },
-
     /// *Client → server.* Downloads an attachment from a stored message.
     AttachmentDownload { message_id: u64 },
     /// *Server → client.* The requested message has no readable attachment.
@@ -534,8 +506,7 @@ pub enum PacketCode //CONTROL CODES
     AttachmentDuplicate { hash: [u8; 32] },                 //SERVER -> CLIENT | ATTACHMENT ALREADY UPLOADED
     /// *Client → server.* Fetches a stored attachment or clip.
     AttachmentDataRequest { hash: [u8; 32] },               //CLIENT -> SERVER | ASK FOR A STORED ATTACHMENT
-    /// *Client → server.* Asks to post a voice message.
-    VoiceMessageRequest { hash: [u8; 32] },            //CLIENT -> SERVER | REQUEST VOICE MESSAGE UPLOAD
+
     /// *Client → server.* Asks for the shared files.
     FilesRequest,                                      //CLIENT -> SERVER | REQUEST FILE LIST
     /// *Client → server.* Asks for the user list.
@@ -654,6 +625,13 @@ pub enum PacketCode //CONTROL CODES
 
     /// *Server → client.* A full chunk preceding an attachment or voice payload on this connection.
     AttachmentChunk { data: Vec<u8> },
+
+    /// Requests an upload to public chat.
+    ChatUploadRequest { request: u64, hash: [u8; 32], media: ChatUpload },
+
+    /// Resolves a chat upload request. No transfer is needed for a rejection or repost.
+    ChatUploadReply { request: u64, transfer: Option<([u8; 32], u64)> },
+
 }
 
 //IMPLEMENTATIONS
@@ -699,8 +677,6 @@ impl PacketCode
             Self::Pins { .. }                  => "Pins",
             Self::VoiceJoin { .. }             => "VoiceJoin",
             Self::VoiceLeave { .. }            => "VoiceLeave",
-            Self::UploadRequest { .. }         => "UploadRequest",
-            Self::Upload { .. }                => "Upload",
             Self::DownloadRequest { .. }       => "DownloadRequest",
             Self::Download { .. }              => "Download",
             Self::Banned { .. }                => "Banned",
@@ -712,8 +688,6 @@ impl PacketCode
             Self::AttachmentDataRequest { .. } => "AttachmentDataRequest",
             Self::AttachmentChunk { .. }       => "AttachmentChunk",
             Self::AttachmentData { .. }        => "AttachmentData",
-            Self::VoiceMessageRequest { .. }   => "VoiceMessageRequest",
-            Self::VoiceMessageUpload { .. }    => "VoiceMessageUpload",
             Self::VoiceMessage { .. }          => "VoiceMessage",
             Self::Uploaded { .. }              => "Uploaded",
             Self::AttachRequest { .. }         => "AttachRequest",
@@ -794,6 +768,8 @@ impl PacketCode
             Self::ServerRestart { .. }         => "ServerRestart",
             Self::PrivateHistory { .. }        => "PrivateHistory",
             Self::PrivateHistoryRequest { .. } => "PrivateHistoryRequest",
+            Self::ChatUploadRequest { .. }     => "ChatUploadRequest",
+            Self::ChatUploadReply { .. }       => "ChatUploadReply",
         }
     }
 }
@@ -959,6 +935,39 @@ pub struct StoredPrivateMessage
     pub colors: MessageColors,
     /// When it was sent, in Unix seconds.
     pub timestamp: Option<u64>,   //UNIX SECONDS
+}
+
+/// The media a client intends to upload to a chat.
+#[derive(SchemaWrite, SchemaRead, Clone)]
+pub enum ChatUpload
+{
+    /// A file, with the sender's requested retention.
+    File { filename: String, persistent: bool },
+    /// A recorded voice note.
+    Voice,
+}
+
+/// The media in a chat message. A file's name is carried in the message text.
+#[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
+pub enum MessageMedia
+{
+    /// The file's content hash.
+    File([u8; 32]),
+    /// A recorded voice note.
+    Voice(VoiceNote),
+}
+
+impl MessageMedia
+{
+    /// The content hash used for storage and playback.
+    pub fn hash(&self) -> [u8; 32]
+    {
+        match self
+        {
+            Self::File(hash) => *hash,
+            Self::Voice(voice) => voice.hash,
+        }
+    }
 }
 
 //ONE STORED VOICE MESSAGE

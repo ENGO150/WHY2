@@ -23,7 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! # Protocol
 //! A transfer is approved over the main connection, which mints a one-time token
-//! ([`PacketCode::Upload`](crate::network::codes::PacketCode::Upload) and friends). The client
+//! ([`PacketCode::ChatUploadReply`](crate::network::codes::PacketCode::ChatUploadReply)). The client
 //! then opens a new socket, presents the token, and the file flows as a sequence of
 //! [`FilePacket`]s — one [`Metadata`](FilePacketCode::Metadata) and then
 //! [`UPLOAD_CHUNK_SIZE`](consts::UPLOAD_CHUNK_SIZE) chunks of [`Data`](FilePacketCode::Data) —
@@ -34,7 +34,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! token.
 //!
 //! # At Rest
-//! On the server, a persistent upload (see [`UploadKind::persistent`]) is sealed into
+//! On the server, a persistent upload (see [`UploadKind::sealed`]) is sealed into
 //! `server_images/` and read back in the same chunks it was written in: the at-rest
 //! `RexStream` is finalized per chunk, so a reader that breaks the file anywhere else falls off
 //! the keystream.
@@ -70,6 +70,7 @@ use crate::
         self,
         EncryptionMode,
         SequencedPacket,
+        codes::ChatUpload,
     },
 };
 
@@ -133,12 +134,26 @@ pub struct FilePacket //FILE CHUNK
 }
 
 //IMPLEMENTATIONS
+impl ChatUpload
+{
+    /// Selects the transfer kind for this upload.
+    pub fn transfer_kind(&self) -> UploadKind
+    {
+        match self
+        {
+            ChatUpload::Voice => UploadKind::Voice,
+            ChatUpload::File { persistent: false, .. } => UploadKind::File,
+            ChatUpload::File { .. } => UploadKind::Attachment,
+        }
+    }
+}
+
 impl UploadKind
 {
     //A PICTURE IS NAMED AFTER ITS CONTENT AND SEALED UNDER ITS HASH
-    /// Returns whether the upload is persistent: named after its content, sealed under its hash and
-    /// kept in `server_images/`. Only a fileshare is not.
-    pub fn persistent(&self) -> bool { !matches!(self, Self::File) }
+    /// Whether the upload uses authenticated, content-addressed storage.
+    /// Retention is decided separately when the upload is delivered.
+    pub fn sealed(&self) -> bool { !matches!(self, Self::File) }
 
     /// Returns the kind's name, for logging.
     pub fn name(&self) -> &'static str

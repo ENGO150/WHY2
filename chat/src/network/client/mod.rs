@@ -98,6 +98,7 @@ use crate::
             PacketCode,
             MessageColors,
             StoredMessage,
+            ChatUpload,
             StoredPrivateMessage,
             VoiceNote,
             UserFile,
@@ -839,6 +840,18 @@ pub enum ClientEvent
 //LISTS
 /// Files waiting for an upload approval, by SHA-256.
 pub static ACTIVE_UPLOADS: Mutex<BTreeMap<[u8; 32], PathBuf>> = Mutex::new(BTreeMap::new()); //ACTIVE UPLOADS
+/// Chat upload paths awaiting a reply, keyed by request id.
+pub static CHAT_UPLOADS: Mutex<BTreeMap<u64, ([u8; 32], PathBuf, UploadKind)>> = Mutex::new(BTreeMap::new());
+
+/// Registers a local chat upload and builds the request for its destination.
+pub fn request_chat_upload(path: PathBuf, hash: [u8; 32], media: ChatUpload) -> PacketCode
+{
+    let request = rand::random();
+    let kind = media.transfer_kind();
+    CHAT_UPLOADS.lock().unwrap().insert(request, (hash, path, kind));
+    PacketCode::ChatUploadRequest { request, hash, media }
+}
+
 //FUNCTIONS
 //PUBLIC
 /// Assembles attachment chunks before dispatching the original packet.
@@ -1298,20 +1311,25 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 tx.send(ClientEvent::List { users: online, offline }).await.unwrap();
             },
 
-            //UPLOAD APPROVAL
-            PacketCode::Upload { hash, token, uid } | PacketCode::Attachment { hash, token, uid, .. }
-                | PacketCode::VoiceMessageUpload { hash, token, uid } =>
+            //PROFILE PICTURE OR SERVER ICON UPLOAD APPROVAL
+            PacketCode::Attachment { hash, token, uid } =>
             {
-                let kind = match read
+                if let Some(path) = ACTIVE_UPLOADS.lock().unwrap().remove(&hash)
                 {
-                    PacketCode::Attachment { .. } => UploadKind::Attachment,
-                    PacketCode::VoiceMessageUpload { .. } => UploadKind::Voice,
-                    _ => UploadKind::File,
-                };
+                    tokio::spawn(file::upload(token, uid, hash, path, tx.clone(), UploadKind::Attachment));
+                }
+                continue;
+            },
 
-                //SPAWN UPLOAD TASK
-                let file_tx = tx.clone(); //CLONE TX
-                tokio::spawn(file::upload(token, uid, hash, file_tx, kind));
+            PacketCode::ChatUploadReply { request, transfer } =>
+            {
+                if let Some((hash, path, kind)) = CHAT_UPLOADS.lock().unwrap().remove(&request)
+                {
+                    if let Some((token, uid)) = transfer
+                    {
+                        tokio::spawn(file::upload(token, uid, hash, path, tx.clone(), kind));
+                    } else { misc::drop_upload_temp(&path); }
+                }
                 continue;
             },
 

@@ -70,7 +70,7 @@ use why2_chat::
     crypto::kex,
     network::
     {
-        file::{ server as file, UploadKind },
+        file::server as file,
         screen::{ self, server as screen_server },
         voice::server as voice_server,
         server::
@@ -292,26 +292,15 @@ async fn main()
 
                             match conn_type
                             {
-                                ConnectionType::FileUpload { uid } | ConnectionType::Attachment { uid } | ConnectionType::Avatar { uid }
-                                    | ConnectionType::Icon { uid } | ConnectionType::Voice { uid } =>
+                                ConnectionType::Upload { uid, target } =>
                                 {
-                                    let kind = match conn_type
-                                    {
-                                        ConnectionType::Attachment { .. } => UploadKind::Attachment,
-                                        ConnectionType::Avatar { .. } => UploadKind::Avatar,
-                                        ConnectionType::Icon { .. } => UploadKind::Icon,
-                                        ConnectionType::Voice { .. } => UploadKind::Voice,
-                                        _ => UploadKind::File,
-                                    };
-
-                                    log::info!("Auxiliary connection ({} upload): {owner}", kind.name());
-
+                                    log::info!("Auxiliary connection ({} upload): {owner}", target.kind.name());
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (mut read_stream, write_stream) = stream.into_split();
-                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), uid, task, kind).await;
+                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))),
+                                            uid, task, target).await;
                                     });
-                                    return;
                                 },
 
                                 ConnectionType::FileDownload { uid, file: file_data } =>

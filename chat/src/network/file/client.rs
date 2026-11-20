@@ -24,7 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     sync::Arc,
-    path::Path,
+    path::{ Path, PathBuf },
 };
 
 use tokio::
@@ -54,7 +54,6 @@ use crate::
         EncryptionMode,
         client::
         {
-            self,
             ClientEvent,
             handshake,
         },
@@ -70,20 +69,19 @@ use crate::
 
 /// Uploads a file the server approved.
 ///
-/// The path is taken from [`ACTIVE_UPLOADS`](client::ACTIVE_UPLOADS), where the request that
-/// asked for the upload parked it under its hash. A cut avatar or recorded clip is removed from
-/// the temp directory once sent.
+/// A cut avatar or recorded clip is removed from the temp directory once sent.
 ///
 /// # Parameters
 /// - `token`: The transfer token from the approval.
 /// - `uid`: The upload id from the approval.
-/// - `file_hash`: SHA-256 of the file, which names it in `ACTIVE_UPLOADS`.
+/// - `file_hash`: SHA-256 of the file.
+/// - `path`: The local file to send.
 /// - `tx`: The UI event channel.
 /// - `kind`: What the upload is for; decides what is reported.
 ///
 /// # Panics
-/// If the socket cannot be opened, the hash was never requested, or the file cannot be read.
-pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<ClientEvent>, kind: UploadKind)
+/// If the socket cannot be opened or the file cannot be read.
+pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], path: PathBuf, tx: Sender<ClientEvent>, kind: UploadKind)
 {
     //INIT FILE CONNECTION
     let (_read_stream, mut write_stream) = handshake::connect(options::get_server_address()).await.expect("File connection failed");
@@ -92,7 +90,6 @@ pub async fn upload(token: [u8; 32], uid: u64, file_hash: [u8; 32], tx: Sender<C
     write_stream.write_all(&token).await.unwrap();
 
     //GET FILE PATH
-    let path = client::ACTIVE_UPLOADS.lock().unwrap().remove(&file_hash).unwrap(); //(CRASHES IF SERVER REQUESTS FILE THAT ISN'T FOR UPLOAD)
     let filename = path.clone().file_name().and_then(|n| n.to_str()
         .map(|s| s.to_string())).unwrap_or_else(|| t!("transfer.unknown_file").to_owned()); //GET FILENAME FOR CONSOLE LOG
 

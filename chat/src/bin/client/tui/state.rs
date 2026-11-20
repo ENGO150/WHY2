@@ -75,6 +75,7 @@ use crate::
 {
     t,
     tn,
+    consts as chat_consts,
     config,
     misc,
     role::Role,
@@ -2263,7 +2264,7 @@ impl App
         if !mem::take(&mut self.typing) { return false; }
 
         //ONE PER TYPING_INTERVAL, WHATEVER WAS TYPED
-        if self.typing_sent.is_some_and(|sent| sent.elapsed() < crate::consts::TYPING_INTERVAL) { return false; }
+        if self.typing_sent.is_some_and(|sent| sent.elapsed() < chat_consts::TYPING_INTERVAL) { return false; }
 
         self.typing_sent = Some(Instant::now());
 
@@ -2293,7 +2294,7 @@ impl App
     {
         let before = self.typing_users.len();
 
-        self.typing_users.retain(|_, seen| seen.elapsed() < crate::consts::TYPING_TIMEOUT);
+        self.typing_users.retain(|_, seen| seen.elapsed() < chat_consts::TYPING_TIMEOUT);
 
         if self.typing_users.len() != before { self.dirty = true; }
     }
@@ -2801,6 +2802,10 @@ fn reset_session()
 
     //A HALF-FINISHED UPLOAD IS GONE WITH THE SOCKET
     client::ACTIVE_UPLOADS.lock().unwrap().clear();
+    for (_, (_, path, _)) in std::mem::take(&mut *client::CHAT_UPLOADS.lock().unwrap())
+    {
+        misc::drop_upload_temp(&path);
+    }
 
     #[cfg(feature = "client_voice")]
     {

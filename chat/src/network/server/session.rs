@@ -59,7 +59,7 @@ use crate::
     {
         self,
         voice::server as voice_server,
-        file::server as file,
+        file::{ server as file, UploadKind },
         server::
         {
             self,
@@ -69,6 +69,8 @@ use crate::
         codes::
         {
             PacketCode,
+            MessageMedia,
+            ChatUpload,
             ServerSetting,
             UserFile,
             UserProfile,
@@ -247,12 +249,18 @@ impl<'a, 's> ClientSession<'a, 's>
             //CLIENT REQUESTED LIST OF ONLINE USERS
             PacketCode::ListRequest => self.list().await,
 
-            //NEW FILE UPLOAD
-            PacketCode::UploadRequest { hash, filename, persistent } => self.upload(hash, persistent.then_some(filename)).await,
-            PacketCode::AttachmentDownload { message_id } => self.attachment_download(message_id).await,
+            PacketCode::ChatUploadRequest { request, hash, media } =>
+            {
+                let transfer = match self.prepare_chat_upload(hash, media)
+                {
+                    Ok(transfer) => transfer,
+                    Err(error) => { self.send(error).await; None },
+                };
 
-            //NEW VOICE MESSAGE
-            PacketCode::VoiceMessageRequest { hash } => self.voice_message(hash).await,
+                self.send(PacketCode::ChatUploadReply { request, transfer }).await;
+                PacketFlow::Continue
+            },
+            PacketCode::AttachmentDownload { message_id } => self.attachment_download(message_id).await,
 
             //DOWNLOAD
             PacketCode::DownloadRequest { id, file_id } => self.download(id, file_id).await,
@@ -638,157 +646,47 @@ impl<'a, 's> ClientSession<'a, 's>
         PacketFlow::Continue
     }
 
-    //NEW FILE OR ATTACHMENT UPLOAD
-    async fn upload(&mut self, hash: [u8; 32], filename: Option<String>) -> PacketFlow
+    fn prepare_chat_upload(&self, hash: [u8; 32], media: ChatUpload) -> Result<Option<([u8; 32], u64)>, PacketCode>
     {
-        //SILENCE MUTED USERS
-        if self.muted()
+        if self.muted() { return Err(PacketCode::Muted); }
+
+        let repost = match &media
         {
-            self.send(PacketCode::Muted).await;
-            return PacketFlow::Continue;
-        }
-
-        let persistent = filename.is_some();
-
-        //CHECK IF ATTACHMENT WAS ALREADY UPLOADED
-        if persistent && config::messages::stored(&hash)
-        {
-            let filename = filename.as_deref()
-                .and_then(|filename| Path::new(filename).file_name())
-                .and_then(|f| f.to_str())
-                .unwrap_or("unnamed_file")
-                .to_string();
-
-            let timestamp = config::messages::timestamp();
-
-            //KEEP IT, ON AN UPLOAD'S TERMS
-            let message_id = match self.channel.is_none() && config::read_config::<bool>("persistent_messages")
+            ChatUpload::File { filename, persistent: true } if config::messages::stored(&hash) =>
             {
-                true => config::messages::store_attachment(&self.username, &filename, &hash, timestamp),
-                false => config::messages::next_id(),
-            };
+                let filename = Path::new(filename).file_name().and_then(|name| name.to_str())
+                    .unwrap_or("unnamed_file").to_owned();
+                Some((filename, MessageMedia::File(hash)))
+            },
 
-            //AN ATTACHMENT LINE IS COLORED LIKE A MESSAGE
-            server::send_to_all(PacketCode::AttachmentDisplay
+            ChatUpload::Voice =>
             {
-                username: self.username.clone(),
-                filename: filename.clone(),
-                message_id,
-                hash,
-                data: None,
-                username_color: config::users::colors(&self.username).username_color,
-                channel: Some(self.channel.clone()),
-                timestamp,
-            });
-
-            //TELL THE UPLOADER THERE IS NOTHING TO SEND
-            self.send(PacketCode::AttachmentDuplicate { hash }).await;
-
-            log::info!("Attachment already stored, upload skipped: {}", self.peer_addr);
-            return PacketFlow::Continue;
-        }
-
-        //PREVENT TOKEN SPAM
-        let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == self.id).count();
-        if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
-        {
-            log::warn!("Upload refused ({active_count} already running): {}", self.peer_addr);
-
-            self.send(PacketCode::UploadLimit).await;
-            return PacketFlow::Continue;
-        }
-
-        //GENERATE RANDOM UID
-        let uid = rand::random::<u64>();
-        let token = server::open_connection(self.id, if persistent
-        {
-            ConnectionType::Attachment { uid }
-        } else
-        {
-            ConnectionType::FileUpload { uid }
-        });
-
-        //LOG FILE UPLOAD
-        log::info!("Upload request ({}): {}", if persistent { "attachment" } else { "file" }, self.peer_addr);
-
-        let packet = if persistent
-        {
-            PacketCode::Attachment
-            {
-                hash,
-                token,
-                uid,
-            }
-        } else
-        {
-            PacketCode::Upload
-            {
-                hash,
-                token,
-                uid,
-            }
+                config::messages::voice(&hash).map(|voice| (String::new(), MessageMedia::Voice(voice)))
+            },
+            _ => None,
         };
 
-        //SEND APPROVAL TO CLIENT
-        self.send(packet).await;
-        PacketFlow::Continue
-    }
-
-    //NEW VOICE MESSAGE
-    async fn voice_message(&mut self, hash: [u8; 32]) -> PacketFlow
-    {
-        //SILENCE MUTED USERS
-        if self.muted()
+        if let Some((filename, media)) = repost
         {
-            self.send(PacketCode::Muted).await;
-            return PacketFlow::Continue;
+            file::publish_public(&self.username, filename, media, None, self.channel.clone(),
+                file::keep_public_media(&self.channel));
+
+            log::info!("Chat media already stored, upload skipped: {}", self.peer_addr);
+            return Ok(None);
         }
 
-        //CLIP ALREADY STORED
-        if let Some(voice) = config::messages::voice(&hash)
-        {
-            let timestamp = config::messages::timestamp();
-
-            let message_id = match self.channel.is_none() && config::read_config::<bool>("persistent_messages")
-            {
-                true => config::messages::store_voice(&self.username, &voice, timestamp),
-                false => config::messages::next_id(),
-            };
-
-            server::send_to_all(PacketCode::VoiceMessage
-            {
-                username: self.username.clone(),
-                message_id,
-                voice,
-                data: None,
-                username_color: config::users::colors(&self.username).username_color,
-                channel: Some(self.channel.clone()),
-                timestamp,
-            });
-
-            self.send(PacketCode::AttachmentDuplicate { hash }).await;
-
-            log::info!("Voice message already stored, upload skipped: {}", self.peer_addr);
-            return PacketFlow::Continue;
-        }
-
-        //PREVENT TOKEN SPAM
-        let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == self.id).count();
+        let active_count = file::ACTIVE_FILESHARES.iter().filter(|upload| upload.client_id == self.id).count();
         if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
         {
             log::warn!("Upload refused ({active_count} already running): {}", self.peer_addr);
-
-            self.send(PacketCode::UploadLimit).await;
-            return PacketFlow::Continue;
+            return Err(PacketCode::UploadLimit);
         }
 
-        let uid = rand::random::<u64>();
-        let token = server::open_connection(self.id, ConnectionType::Voice { uid });
-
-        log::info!("Upload request (voice): {}", self.peer_addr);
-
-        self.send(PacketCode::VoiceMessageUpload { hash, token, uid }).await;
-        PacketFlow::Continue
+        let kind = media.transfer_kind();
+        let uid = rand::random();
+        let target = file::UploadTarget { kind, hash };
+        let token = server::open_connection(self.id, ConnectionType::Upload { uid, target });
+        Ok(Some((token, uid)))
     }
 
     //DOWNLOAD
@@ -1730,7 +1628,11 @@ impl<'a, 's> ClientSession<'a, 's>
                 }
 
                 let uid = rand::random::<u64>();
-                let token = server::open_connection(self.id, ConnectionType::Avatar { uid });
+                let token = server::open_connection(self.id, ConnectionType::Upload
+                {
+                    uid,
+                    target: file::UploadTarget { kind: UploadKind::Avatar, hash },
+                });
 
                 log::info!("Upload request (avatar): {}", self.peer_addr);
 
@@ -1835,7 +1737,11 @@ impl<'a, 's> ClientSession<'a, 's>
                 }
 
                 let uid = rand::random::<u64>();
-                let token = server::open_connection(self.id, ConnectionType::Icon { uid });
+                let token = server::open_connection(self.id, ConnectionType::Upload
+                {
+                    uid,
+                    target: file::UploadTarget { kind: UploadKind::Icon, hash },
+                });
 
                 log::info!("Upload request (icon): {}", self.peer_addr);
 

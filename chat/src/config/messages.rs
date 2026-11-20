@@ -64,6 +64,7 @@ use crate::
     {
         MessageColors,
         StoredMessage,
+        MessageMedia,
         VoiceNote,
     },
 };
@@ -352,16 +353,14 @@ pub fn store(username: &str, text: &str, timestamp: Option<u64>, reply: Option<u
     push(username, text, None, None, timestamp, reply)
 }
 
-/// Stores an attachment message; returns its id.
-pub fn store_attachment(username: &str, filename: &str, hash: &[u8; 32], timestamp: Option<u64>) -> u64
+/// Stores a file or voice message. The history record keeps its existing disk layout.
+pub fn store_media(username: &str, filename: &str, media: &MessageMedia, timestamp: Option<u64>) -> u64
 {
-    push(username, filename, Some(*hash), None, timestamp, None)
-}
-
-/// Stores a voice message; returns its id.
-pub fn store_voice(username: &str, voice: &VoiceNote, timestamp: Option<u64>) -> u64
-{
-    push(username, "", None, Some(voice.clone()), timestamp, None)
+    match media
+    {
+        MessageMedia::File(hash) => push(username, filename, Some(*hash), None, timestamp, None),
+        MessageMedia::Voice(voice) => push(username, "", None, Some(voice.clone()), timestamp, None),
+    }
 }
 
 //APPEND ONE ENTRY AND REWRITE THE FILE

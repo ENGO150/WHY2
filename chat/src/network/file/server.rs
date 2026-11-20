@@ -37,12 +37,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! 5. Only then is the file renamed into place: under its hash for a persistent upload, under
 //!    its sanitised name for a fileshare.
 //!
-//! A persistent attachment or clip is then stored in the history (lobby only, with
-//! `persistent_messages` on) and broadcast whole; an avatar or icon is answered with the
-//! updated profile or icon instead.
+//! Chat media is delivered to its audience and retained when that conversation allows it.
+//! A public fileshare enters the sender’s files list. Avatar and icon uploads update their
+//! respective settings.
 
 use std::
 {
+    fs as sfs,
     sync::Arc,
     ffi::OsStr,
     path::
@@ -99,6 +100,7 @@ use crate::
         codes::
         {
             PacketCode,
+            MessageMedia,
             VoiceNote,
         },
         server::
@@ -139,19 +141,22 @@ impl Drop for FileTransferGuard
         {
             //REMOVE FILE STREAM
             conn.remove_file_stream(self.uid);
-
-            //REMOVE JUNK FILE
-            if let Some((_, active)) = ACTIVE_FILESHARES.remove(&self.uid)
-            {
-                let _ = std::fs::remove_file(&active.path);
-
-                log::warn!("Upload failed at {}/{} bytes: {}", active.current_size, active.size, conn.peer_addr());
-            }
+        }
+        if let Some((_, active)) = ACTIVE_FILESHARES.remove(&self.uid)
+        {
+            let _ = sfs::remove_file(&active.path);
         }
     }
 }
 
 //PUBLIC
+/// The media and destination bound to an upload token.
+pub struct UploadTarget
+{
+    pub kind: UploadKind,
+    pub hash: [u8; 32],
+}
+
 /// An upload in progress.
 pub struct ActiveFileshare //ACTIVE FILE UPLOAD
 {
@@ -196,7 +201,7 @@ pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock
 /// - `streams`: The transfer socket's halves.
 /// - `uid`: The upload id.
 /// - `task`: The abort handle of this transfer's task, registered on the connection.
-/// - `kind`: What the upload is for.
+/// - `target`: The upload metadata bound to the transfer token.
 pub async fn download
 (
     token: [u8; 32],
@@ -204,7 +209,7 @@ pub async fn download
     streams: &mut Streams<'_>,
     uid: u64,
     task: AbortHandle,
-    kind: UploadKind,
+    target: UploadTarget,
 )
 {
     //GET CLIENT INFO
@@ -255,11 +260,14 @@ pub async fn download
     //WAIT FOR FIRST PACKET (METADATA)
     let (size, hash, filename) = match file::receive_file(streams, &mut rex_stream, &mut seq).await
     {
-        Some((_, FilePacketCode::Metadata { size, filename, hash })) => (size, hash, filename),
+        Some((packet_uid, FilePacketCode::Metadata { size, filename, hash })) if packet_uid == uid => (size, hash, filename),
         _ => return
     };
 
-    let persistent = kind.persistent();
+    if target.hash != hash { return; }
+    let UploadTarget { kind, .. } = target;
+
+    let sealed = kind.sealed();
 
     log::info!("Upload started ({size} bytes, {}): {peer_addr}", kind.name());
 
@@ -282,7 +290,7 @@ pub async fn download
         UploadKind::File => limits.file,
     };
 
-    if persistent && size > ceiling
+    if sealed && size > ceiling
     {
         log::warn!("Upload rejected ({}, {size} bytes over the {ceiling} ceiling): {peer_addr}", kind.name());
         server::notify(id, PacketCode::InvalidUsage).await;
@@ -296,7 +304,7 @@ pub async fn download
     }
 
     //CREATE KEY & NONCE FOR ENCRYPTION ON DISK
-    let (disk_key, disk_nonce, disk_mac) = match persistent
+    let (disk_key, disk_nonce, disk_mac) = match sealed
     {
         true =>
         {
@@ -316,11 +324,7 @@ pub async fn download
     };
 
     //WHERE THE UPLOAD IS BUILT, AND WHERE IT STAYS
-    let target_dir = match persistent
-    {
-        true => misc::get_attachment_dir(),
-        false => misc::get_upload_dir(&username),
-    };
+    let target_dir = if sealed { misc::get_attachment_dir() } else { misc::get_upload_dir(&username) };
 
     //CREATE UPLOAD DIRECTORY
     if let Err(e) = fs::create_dir_all(&target_dir).await
@@ -360,7 +364,7 @@ pub async fn download
         filename,
         client_id: id,
         path: upload_path,
-        data: persistent.then(Vec::new),
+        data: sealed.then(Vec::new),
         stream: disk_stream,
         mac: disk_mac,
     });
@@ -374,7 +378,7 @@ pub async fn download
         //READ
         let (uid, data) = match file::receive_file(streams, &mut rex_stream, &mut seq).await
         {
-            Some((uid, FilePacketCode::Data { data })) => (uid, data),
+            Some((packet_uid, FilePacketCode::Data { data })) if packet_uid == uid => (uid, data),
             _ => return
         };
 
@@ -413,7 +417,8 @@ pub async fn download
         {
             match ACTIVE_FILESHARES.get_mut(&uid)
             {
-                Some(mut active) if active.client_id == id && data.len() <= consts::UPLOAD_CHUNK_SIZE =>
+                Some(mut active) if active.client_id == id &&
+                    data.len() as u64 == (active.size - active.current_size).min(consts::UPLOAD_CHUNK_SIZE as u64) =>
                 {
                     //ENCRYPT
                     let input_i64 = crypto::bytes_to_i64(&data);
@@ -430,13 +435,9 @@ pub async fn download
         };
 
         //WRITE
-        let (upload_file, encrypted_bytes) = match prepared
-        {
-            Some(p) => p,
-            None => continue
-        };
+        let Some((upload_file, encrypted_bytes)) = prepared else { return };
 
-        if upload_file.lock().await.write_all(&encrypted_bytes).await.is_err() { continue; }
+        if upload_file.lock().await.write_all(&encrypted_bytes).await.is_err() { return; }
 
         //UPDATE UPLOAD STATE
         let done =
@@ -490,7 +491,7 @@ pub async fn download
         }
 
         //FLUSH TO DISK BEFORE RENAMING
-        upload_file.lock().await.flush().await.ok();
+        if upload_file.lock().await.flush().await.is_err() { return; }
 
         //CHECK HASHES
         if expected_hash != final_hash
@@ -525,8 +526,30 @@ pub async fn download
             .unwrap_or(OsStr::new("unnamed_file"))
             .to_os_string();
 
+        if matches!(kind, UploadKind::Attachment | UploadKind::Voice) && let Some(data) = data
+        {
+            let media = voice.map_or(MessageMedia::File(final_hash), MessageMedia::Voice);
+            let filename: String = filename.to_string_lossy().chars()
+                .filter(|character| !character.is_control()).take(255).collect();
+            let filename = if filename.trim().is_empty() { "unnamed_file".to_owned() } else { filename };
+
+            log::info!("Upload done ({final_size} bytes, {}): {peer_addr}", kind.name());
+
+            let channel = server::CONNECTIONS.iter().find(|conn| conn.id() == Some(&id))
+                .and_then(|conn| conn.channel().clone());
+
+            let kept = keep_public_media(&channel);
+            if kept && fs::rename(&current_path, target_dir.join(misc::hex(&final_hash))).await.is_err()
+            {
+                return;
+            }
+
+            publish_public(&username, filename, media, Some(data), channel, kept);
+            return;
+        }
+
         //A PERSISTENT UPLOAD IS NAMED AFTER ITS CONTENT
-        let new_path = match persistent
+        let new_path = match sealed
         {
             true => target_dir.join(misc::hex(&final_hash)),
             false => target_dir.join(&filename),
@@ -566,72 +589,6 @@ pub async fn download
             log::info!("Server icon set: {peer_addr}");
 
             server::icon_changed(id).await;
-        } else if let Some(voice) = voice //A VOICE MESSAGE
-        {
-            if let Some(data) = data
-            {
-                let channel = server::CONNECTIONS.iter()
-                    .find(|conn| conn.id() == Some(&id))
-                    .and_then(|conn| conn.channel().clone());
-
-                let kept = channel.is_none() && config::read_config::<bool>("persistent_messages");
-
-                let timestamp = config::messages::timestamp();
-                let message_id = match kept
-                {
-                    true => config::messages::store_voice(&username, &voice, timestamp),
-                    false => config::messages::next_id(),
-                };
-
-                //DELETE A CLIP NOTHING KEPT
-                if !kept && insert { let _ = fs::remove_file(&new_path).await; }
-
-                //A FRESH CLIP GOES OUT WHOLE
-                server::send_to_all(PacketCode::VoiceMessage
-                {
-                    username: username.clone(),
-                    message_id,
-                    voice,
-                    data: Some(data),
-                    username_color: config::users::colors(&username).username_color,
-                    channel: Some(channel.clone()),
-                    timestamp,
-                });
-            }
-        } else if persistent //AN ATTACHMENT IS POSTED TO THE CHANNEL
-        {
-            if let Some(data) = data
-            {
-                let channel = server::CONNECTIONS.iter()
-                    .find(|conn| conn.id() == Some(&id))
-                    .and_then(|conn| conn.channel().clone());
-
-                //KEEP IT, ON THE SAME TERMS AS A MESSAGE
-                let kept = channel.is_none() && config::read_config::<bool>("persistent_messages");
-
-                let timestamp = config::messages::timestamp();
-                let message_id = match kept
-                {
-                    true => config::messages::store_attachment(&username, &filename, &final_hash, timestamp),
-                    false => config::messages::next_id(),
-                };
-
-                //DELETE AN ATTACHMENT NOTHING KEPT
-                if !kept && insert { let _ = fs::remove_file(&new_path).await; }
-
-                //A FRESH ATTACHMENT GOES OUT WHOLE
-                server::send_to_all(PacketCode::AttachmentDisplay
-                {
-                    username: username.clone(),
-                    filename,
-                    message_id,
-                    hash: final_hash,
-                    data: Some(data),
-                    username_color: config::users::colors(&username).username_color,
-                    channel: Some(channel.clone()),
-                    timestamp,
-                });
-            }
         } else
         {
             //ANNOUNCE FILE UPLOAD
@@ -661,6 +618,58 @@ pub async fn download
         ACTIVE_FILESHARES.remove(&uid);
         return;
     }
+}
+
+/// Determines whether public chat media belongs in lobby history.
+pub(crate) fn keep_public_media(channel: &Option<String>) -> bool
+{
+    channel.is_none() && config::read_config::<bool>("persistent_messages")
+}
+
+/// Posts a fresh or already stored file or voice note to public chat.
+pub(crate) fn publish_public
+(
+    username: &str,
+    filename: String,
+    media: MessageMedia,
+    data: Option<Vec<u8>>,
+    channel: Option<String>,
+    kept: bool,
+)
+{
+    let timestamp = config::messages::timestamp();
+    let message_id = if kept { config::messages::store_media(username, &filename, &media, timestamp) }
+        else { config::messages::next_id() };
+    let username_color = config::users::colors(username).username_color;
+    let username = username.to_owned();
+    let channel = Some(channel);
+
+    let packet = match media
+    {
+        MessageMedia::File(hash) => PacketCode::AttachmentDisplay
+        {
+            username,
+            filename,
+            message_id,
+            hash,
+            data,
+            username_color,
+            channel,
+            timestamp,
+        },
+
+        MessageMedia::Voice(voice) => PacketCode::VoiceMessage
+        {
+            username,
+            message_id,
+            voice,
+            data,
+            username_color,
+            channel,
+            timestamp,
+        },
+    };
+    server::send_to_all(packet);
 }
 
 /// Sends a shared file to a client on an auxiliary socket.

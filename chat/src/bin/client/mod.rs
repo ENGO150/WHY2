@@ -102,6 +102,7 @@ use why2_chat::
         codes::
         {
             PacketCode,
+            ChatUpload,
             Device,
         },
     },
@@ -492,10 +493,8 @@ async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>
 #[derive(Clone, Copy, PartialEq)]
 pub enum Upload
 {
-    /// A fileshare.
-    File,
-    /// A persistent chat attachment.
-    Attachment,
+    /// A file shared in public chat.
+    File { persistent: bool },
     /// Our avatar.
     Avatar,
     /// The server icon.
@@ -506,8 +505,7 @@ pub enum Upload
 /// Checks a file and asks the server to upload it.
 ///
 /// The file is hashed — or, for an avatar or icon, cut to a square first — on a blocking thread,
-/// parked in [`ACTIVE_UPLOADS`](client::ACTIVE_UPLOADS) under its hash, and requested with the
-/// packet for its kind.
+/// registered as a pending upload, and sent after the server approves the request.
 ///
 /// # Parameters
 /// - `write_stream`: The main connection.
@@ -544,18 +542,18 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
             },
         };
 
-        //STORE UPLOAD IN ACTIVE UPLOADS LIST
-        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("unnamed_file").to_string();
-
-        client::ACTIVE_UPLOADS.lock().unwrap().insert(hash, path.canonicalize().unwrap_or(path));
-
-        //SEND UPLOAD REQUEST
+        let filename = path.file_name().and_then(|name| name.to_str()).unwrap_or("unnamed_file").to_owned();
+        let path = path.canonicalize().unwrap_or(path);
         let request = match kind
         {
-            Upload::Avatar => PacketCode::AvatarRequest { hash: Some(hash) },
-            Upload::Icon => PacketCode::ServerIconSave { hash: Some(hash) },
-            Upload::Attachment => PacketCode::UploadRequest { hash, filename, persistent: true },
-            Upload::File => PacketCode::UploadRequest { hash, filename, persistent: false },
+            Upload::File { persistent } =>
+                client::request_chat_upload(path, hash, ChatUpload::File { filename, persistent }),
+            Upload::Avatar | Upload::Icon =>
+            {
+                client::ACTIVE_UPLOADS.lock().unwrap().insert(hash, path);
+                if kind == Upload::Avatar { PacketCode::AvatarRequest { hash: Some(hash) } }
+                else { PacketCode::ServerIconSave { hash: Some(hash) } }
+            },
         };
 
         network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
@@ -575,7 +573,8 @@ pub fn send_voice(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, clip: Vec<u8>,
     tokio::spawn(async move
     {
         let hash: [u8; 32] = Sha256::digest(&clip).into();
-        let path = misc::voice_temp(&hash);
+        let suffix = rand::random::<u64>();
+        let path = misc::voice_temp(&hash).with_extension(suffix.to_string());
 
         if tokio::fs::write(&path, &clip).await.is_err()
         {
@@ -583,9 +582,8 @@ pub fn send_voice(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, clip: Vec<u8>,
             return;
         }
 
-        client::ACTIVE_UPLOADS.lock().unwrap().insert(hash, path);
-
-        network::send(&mut *write_stream.lock().await, PacketCode::VoiceMessageRequest { hash }, keys.as_ref()).await;
+        let request = client::request_chat_upload(path, hash, ChatUpload::Voice);
+        network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
     });
 }
 
@@ -660,13 +658,13 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
     let limits = options::upload_limits();
     let limit = match kind
     {
-        Upload::File => limits.file,
-        Upload::Attachment => limits.attachment.min(limits.file),
+        Upload::File { persistent: false } => limits.file,
+        Upload::File { .. } => limits.attachment.min(limits.file),
         Upload::Avatar | Upload::Icon => limits.attachment,
     };
     let size = file.metadata().map_err(|_| t!("upload.read_failed").to_owned())?.len();
 
-    if matches!(kind, Upload::File | Upload::Attachment)
+    if matches!(kind, Upload::File { .. })
     {
         if size > limit
         {
@@ -956,7 +954,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             Some(path) =>
                             {
                                 let (path, persistent) = command::upload_parameters(&path);
-                                let kind = if persistent { Upload::Attachment } else { Upload::File };
+                                let kind = Upload::File { persistent };
 
                                 if let Err(error) = upload(write_stream, &path, kind, None) { app.push_styled(error, theme::error()); }
                             },
