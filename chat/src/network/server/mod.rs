@@ -393,17 +393,18 @@ pub fn send_to_all(code: PacketCode) //SEND PACKET TO ALL CLIENTS
 }
 
 /// Sends a private update to every connected session of its two participants.
-fn send_to_accounts(participants: &Participants, packet: impl Fn(u64) -> PacketCode) //NEVER BROADCAST PRIVATE UPDATES
+pub(crate) fn send_to_accounts(participants: &Participants, packet: impl Fn(&str, u64) -> PacketCode) //NEVER BROADCAST PRIVATE UPDATES
 {
     let entries: Vec<_> = CONNECTIONS.iter().filter_map(|entry|
     {
-        let id = participants.message_id(entry.username()?)?;
-        Some((entry.write_stream().clone(), entry.keys().cloned(), id))
+        let username = entry.username()?;
+        let id = participants.message_id(username)?;
+        Some((entry.write_stream().clone(), entry.keys().cloned(), username.clone(), id))
     }).collect();
 
-    for (stream, keys, id) in entries
+    for (stream, keys, username, id) in entries
     {
-        let code = packet(id);
+        let code = packet(&username, id);
         tokio::spawn(async move
         {
             network::send(&mut *stream.lock().await, code, keys.as_ref()).await;

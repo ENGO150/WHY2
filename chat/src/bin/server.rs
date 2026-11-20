@@ -153,6 +153,7 @@ async fn main()
     //CONFIGURATION
     misc::check_version().await; //CHECK WHY2 VERSION
     kex::generate_server_keys(); //GENERATE STATIC ECC KEYPAIR
+    config::private_messages::sweep_media();
     config::messages::sweep_attachments(); //DROP THE PICTURES NOTHING NAMES ANY MORE
 
     //CHECK IF VOICE IS ENABLED

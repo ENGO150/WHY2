@@ -101,6 +101,7 @@ use crate::
         {
             PacketCode,
             MessageMedia,
+            StoredPrivateMessage,
             VoiceNote,
         },
         server::
@@ -155,6 +156,23 @@ pub struct UploadTarget
 {
     pub kind: UploadKind,
     pub hash: [u8; 32],
+    pub private: Option<PrivateDestination>,
+}
+
+/// The recipient and retention policy of a private upload.
+pub struct PrivateDestination
+{
+    pub recipient: String,
+    pub persistent: bool,
+}
+
+/// Checks whether a transient private upload can reach its recipient.
+pub fn private_recipient_online(recipient: &str, sender: &str) -> bool
+{
+    let ghosts = !config::read_config::<bool>("disable_ghost_pms") ||
+        (config::users::online_status(recipient) && config::users::online_status(sender));
+
+    ghosts && server::CONNECTIONS.iter().any(|conn| conn.username().is_some_and(|name| name == recipient))
 }
 
 /// An upload in progress.
@@ -265,7 +283,7 @@ pub async fn download
     };
 
     if target.hash != hash { return; }
-    let UploadTarget { kind, .. } = target;
+    let UploadTarget { kind, private, .. } = target;
 
     let sealed = kind.sealed();
 
@@ -324,7 +342,12 @@ pub async fn download
     };
 
     //WHERE THE UPLOAD IS BUILT, AND WHERE IT STAYS
-    let target_dir = if sealed { misc::get_attachment_dir() } else { misc::get_upload_dir(&username) };
+    let target_dir = match (&private, sealed)
+    {
+        (Some(_), _) => config::private_messages::media_dir().join("pending"),
+        (None, true) => misc::get_attachment_dir(),
+        (None, false) => misc::get_upload_dir(&username),
+    };
 
     //CREATE UPLOAD DIRECTORY
     if let Err(e) = fs::create_dir_all(&target_dir).await
@@ -534,17 +557,22 @@ pub async fn download
             let filename = if filename.trim().is_empty() { "unnamed_file".to_owned() } else { filename };
 
             log::info!("Upload done ({final_size} bytes, {}): {peer_addr}", kind.name());
-
-            let channel = server::CONNECTIONS.iter().find(|conn| conn.id() == Some(&id))
-                .and_then(|conn| conn.channel().clone());
-
-            let kept = keep_public_media(&channel);
-            if kept && fs::rename(&current_path, target_dir.join(misc::hex(&final_hash))).await.is_err()
+            match private
             {
-                return;
-            }
+                Some(target) => publish_private(id, &username, target, &filename, media, &current_path, data).await,
+                None =>
+                {
+                    let channel = server::CONNECTIONS.iter().find(|conn| conn.id() == Some(&id))
+                        .and_then(|conn| conn.channel().clone());
+                    let kept = keep_public_media(&channel);
+                    if kept && fs::rename(&current_path, target_dir.join(misc::hex(&final_hash))).await.is_err()
+                    {
+                        return;
+                    }
 
-            publish_public(&username, filename, media, Some(data), channel, kept);
+                    publish_public(&username, filename, media, Some(data), channel, kept);
+                },
+            }
             return;
         }
 
@@ -672,6 +700,66 @@ pub(crate) fn publish_public
     server::send_to_all(packet);
 }
 
+async fn publish_private
+(
+    id: usize,
+    sender: &str,
+    target: PrivateDestination,
+    filename: &str,
+    media: MessageMedia,
+    pending: &Path,
+    data: Vec<u8>,
+)
+{
+    let sender_connected = server::CONNECTIONS.iter().any(|conn|
+        conn.id() == Some(&id) && conn.username().is_some_and(|name| name == sender) && !*conn.muted());
+    if !sender_connected { return; }
+
+    let recipient = &target.recipient;
+    if (target.persistent && !config::private_messages::media_persistence_enabled()) ||
+        (!target.persistent && !private_recipient_online(recipient, sender))
+    {
+        server::notify(id, PacketCode::InvalidUsage).await;
+        return;
+    }
+
+    let timestamp = config::messages::timestamp();
+    let text = if matches!(media, MessageMedia::File(_)) { filename } else { "" };
+    let Some(delivery) = config::private_messages::store_media(sender, recipient, text, timestamp,
+        media.clone(), pending, target.persistent) else
+    {
+        server::notify(id, PacketCode::InvalidUsage).await;
+        return;
+    };
+
+    let colors = config::users::colors(sender);
+    let sender_id = config::users::id(sender).unwrap_or(id);
+    let recipient_id = config::users::id(recipient).unwrap_or_default();
+    server::send_to_accounts(&delivery.participants, |account, message_id|
+    {
+        let sent = account == sender;
+        PacketCode::PrivateMedia
+        {
+            message: StoredPrivateMessage
+            {
+                message_id,
+                before: config::messages::cursor(),
+                reply: None,
+                hearts: Vec::new(),
+                edited: false,
+                username: if sent { recipient.to_string() } else { sender.to_string() },
+                id: if sent { recipient_id } else { sender_id },
+                sent,
+                text: text.to_string(),
+                media: Some(media.clone()),
+                colors: colors.clone(),
+                timestamp,
+            },
+            data: Some(data.clone()),
+        }
+    });
+}
+
 /// Sends a shared file to a client on an auxiliary socket.
 ///
 /// # Parameters
@@ -774,7 +862,13 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
 /// Returns the plaintext size of a stored attachment or clip, without reading it.
 pub async fn attachment_size(hash: &[u8; 32]) -> Option<u64>
 {
-    let sealed = fs::metadata(misc::get_attachment_dir().join(misc::hex(hash))).await.ok()?.len();
+    sealed_size(&misc::get_attachment_dir().join(misc::hex(hash))).await
+}
+
+/// Returns the plaintext size of a sealed file.
+pub async fn sealed_size(path: &Path) -> Option<u64>
+{
+    let sealed = fs::metadata(path).await.ok()?.len();
 
     Some(sealed.saturating_sub(consts::DISK_TAG_SIZE as u64))
 }
@@ -790,7 +884,13 @@ pub async fn attachment_size(hash: &[u8; 32]) -> Option<u64>
 /// - `None` if it is missing or fails verification.
 pub async fn read_attachment(hash: &[u8; 32]) -> Option<Vec<u8>>
 {
-    let sealed = match fs::read(misc::get_attachment_dir().join(misc::hex(hash))).await
+    read_sealed_attachment(&misc::get_attachment_dir().join(misc::hex(hash)), hash).await
+}
+
+/// Reads a sealed file after its caller has authorized the path.
+pub async fn read_sealed_attachment(path: &Path, hash: &[u8; 32]) -> Option<Vec<u8>>
+{
+    let sealed = match fs::read(path).await
     {
         Ok(bytes) => bytes,
         Err(error) =>

@@ -626,12 +626,14 @@ pub enum PacketCode //CONTROL CODES
     /// *Server → client.* A full chunk preceding an attachment or voice payload on this connection.
     AttachmentChunk { data: Vec<u8> },
 
-    /// Requests an upload to public chat.
-    ChatUploadRequest { request: u64, hash: [u8; 32], media: ChatUpload },
+    /// Requests a chat upload. A recipient addresses it to a private conversation.
+    ChatUploadRequest { request: u64, recipient: Option<usize>, hash: [u8; 32], media: ChatUpload },
 
     /// Resolves a chat upload request. No transfer is needed for a rejection or repost.
     ChatUploadReply { request: u64, transfer: Option<([u8; 32], u64)> },
 
+    /// Delivers a private attachment or voice note to one participant.
+    PrivateMedia { message: StoredPrivateMessage, data: Option<Vec<u8>> },
 }
 
 //IMPLEMENTATIONS
@@ -643,6 +645,7 @@ impl PacketCode
         match self
         {
             Self::AttachmentData { data, .. } => Some(data),
+            Self::PrivateMedia { data, .. } => data.as_mut(),
             Self::AttachmentDisplay { data, .. } | Self::VoiceMessage { data, .. } => data.as_mut(),
             _ => None,
         }
@@ -770,6 +773,7 @@ impl PacketCode
             Self::PrivateHistoryRequest { .. } => "PrivateHistoryRequest",
             Self::ChatUploadRequest { .. }     => "ChatUploadRequest",
             Self::ChatUploadReply { .. }       => "ChatUploadReply",
+            Self::PrivateMedia { .. }          => "PrivateMedia",
         }
     }
 }
@@ -931,6 +935,8 @@ pub struct StoredPrivateMessage
     pub sent: bool,               //TO username, ELSE FROM
     /// The message text.
     pub text: String,
+    /// An attachment or voice note sent to this conversation.
+    pub media: Option<MessageMedia>,
     /// The colors the line is painted with.
     pub colors: MessageColors,
     /// When it was sent, in Unix seconds.
@@ -947,7 +953,7 @@ pub enum ChatUpload
     Voice,
 }
 
-/// The media in a chat message. A file's name is carried in the message text.
+/// The media in a public or private chat message. A file's name is carried in the message text.
 #[derive(SchemaWrite, SchemaRead, Clone, PartialEq)]
 pub enum MessageMedia
 {

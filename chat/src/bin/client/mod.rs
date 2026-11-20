@@ -493,8 +493,8 @@ async fn run_client(tx: Sender<ClientEvent>, mut rx: mpsc::Receiver<ClientEvent>
 #[derive(Clone, Copy, PartialEq)]
 pub enum Upload
 {
-    /// A file shared in public chat.
-    File { persistent: bool },
+    /// A file shared in public chat or with a private recipient.
+    File { recipient: Option<usize>, persistent: bool },
     /// Our avatar.
     Avatar,
     /// The server icon.
@@ -546,8 +546,8 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
         let path = path.canonicalize().unwrap_or(path);
         let request = match kind
         {
-            Upload::File { persistent } =>
-                client::request_chat_upload(path, hash, ChatUpload::File { filename, persistent }),
+            Upload::File { recipient, persistent } =>
+                client::request_chat_upload(path, hash, recipient, ChatUpload::File { filename, persistent }),
             Upload::Avatar | Upload::Icon =>
             {
                 client::ACTIVE_UPLOADS.lock().unwrap().insert(hash, path);
@@ -565,7 +565,7 @@ pub fn upload(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, path: &str, kind: 
 //UPLOAD A RECORDED CLIP
 /// Parks a recorded clip in the temp directory and asks the server to upload it.
 #[cfg(feature = "client_voice")]
-pub fn send_voice(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, clip: Vec<u8>, tx: Sender<ClientEvent>)
+pub fn send_voice(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, clip: Vec<u8>, recipient: Option<usize>, tx: Sender<ClientEvent>)
 {
     let write_stream = write_stream.clone();
     let keys = options::get_keys();
@@ -582,7 +582,7 @@ pub fn send_voice(write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, clip: Vec<u8>,
             return;
         }
 
-        let request = client::request_chat_upload(path, hash, ChatUpload::Voice);
+        let request = client::request_chat_upload(path, hash, recipient, ChatUpload::Voice);
         network::send(&mut *write_stream.lock().await, request, keys.as_ref()).await;
     });
 }
@@ -658,7 +658,7 @@ pub fn check_upload(path: &str, kind: Upload) -> Result<(File, PathBuf), String>
     let limits = options::upload_limits();
     let limit = match kind
     {
-        Upload::File { persistent: false } => limits.file,
+        Upload::File { recipient: None, persistent: false } => limits.file,
         Upload::File { .. } => limits.attachment.min(limits.file),
         Upload::Avatar | Upload::Icon => limits.attachment,
     };
@@ -754,7 +754,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                 let allowed = match (app.pm_username(), reply)
                 {
                     (Some(_), Some(id)) => app.messages.iter().any(|entry|
-                        matches!(entry, Entry::Private { message_id, .. } if *message_id == id)),
+                        id & consts::PRIVATE_MESSAGE_ID != 0 && entry.message_id() == Some(id)),
                     (None, Some(id)) => id & consts::PRIVATE_MESSAGE_ID == 0,
                     (_, None) => true,
                 };
@@ -765,23 +765,10 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                 }
             }
 
-            if app.pm_username().is_some() && matches!(command, Command::Upload)
-            {
-                app.push_styled(t!("pm.files_unavailable"), theme::error());
-                return;
-            }
-
-            #[cfg(feature = "client_voice")]
-            if app.pm_username().is_some() && command == Command::Record
-            {
-                app.push_styled(t!("pm.voice_unavailable"), theme::error());
-                return;
-            }
-
             //RESOLVE A VISIBLE ATTACHMENT BEFORE ASKING THE SERVER
             let attachment = if command == Command::Download
             {
-                parameters.as_deref().and_then(|p| p.parse::<u64>().ok()).and_then(|message_id|
+                parameters.as_deref().and_then(command::parse_message_id).and_then(|message_id|
                     app.messages.iter().find_map(|entry| match entry
                     {
                         Entry::Attachment { message_id: id, hash: Some(hash), filename, .. } if *id == message_id =>
@@ -954,7 +941,13 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                             Some(path) =>
                             {
                                 let (path, persistent) = command::upload_parameters(&path);
-                                let kind = Upload::File { persistent };
+                                let recipient = app.pm_recipient();
+                                if app.pm_username().is_some() && recipient.is_none()
+                                {
+                                    app.push_styled(t!("pm.recipient_unavailable"), theme::error());
+                                    return;
+                                }
+                                let kind = Upload::File { recipient, persistent };
 
                                 if let Err(error) = upload(write_stream, &path, kind, None) { app.push_styled(error, theme::error()); }
                             },
@@ -982,16 +975,16 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
 
                         //NO ID STOPS WHATEVER PLAYS
                         #[cfg(feature = "client_voice")]
-                        Command::Play => match parameters.map(|p| p.parse::<u64>())
+                        Command::Play => match parameters.as_deref().map(command::parse_message_id)
                         {
                             None => tui::voice_message::stop(app),
-                            Some(Ok(message_id)) => match app.playable_of(message_id)
+                            Some(Some(message_id)) => match app.playable_of(message_id)
                             {
                                 Ok(PlaybackSource::Voice(hash)) => tui::voice_message::play(app, hash, tx),
                                 Ok(PlaybackSource::Attachment(hash)) => tui::voice_message::play_media(app, hash, message_id, tx),
                                 Err(error) => app.push_styled(error, theme::error()),
                             },
-                            Some(Err(_)) => invalid_usage(app, None),
+                            Some(None) => invalid_usage(app, None),
                         },
 
                         //A SWAP OR SOUND CHANGE SENT NOTHING
@@ -1054,10 +1047,9 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
         },
         LoginState::Login => PacketCode::Login { password: input },
         LoginState::Register => PacketCode::Register { password: input },
-        LoginState::None => if let Some(username) = app.pm_username()
+        LoginState::None => if app.pm_username().is_some()
         {
-            let Some(id) = app.online.iter().find(|user| user.username == username).map(|user| user.id)
-                .or_else(|| app.offline.iter().find(|(_, user)| user.0 == username).map(|(id, _)| *id)) else
+            let Some(id) = app.pm_recipient() else
             {
                 app.push_styled(t!("pm.recipient_unavailable"), theme::error());
                 return;

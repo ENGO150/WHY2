@@ -335,7 +335,10 @@ pub enum ClientEvent
         /// Whether this answers a request for an older page.
         older: bool,
     },                                                           //A PAGE OF STORED MESSAGES (START, MORE, KEPT, OLDER)
-    /// A page of our private history.
+    /// A file or voice note addressed to this account.
+    PrivateMedia(StoredPrivateMessage),
+
+    /// A page of private message history.
     PrivateHistory
     {
         /// The stored messages, from our point of view.
@@ -844,12 +847,12 @@ pub static ACTIVE_UPLOADS: Mutex<BTreeMap<[u8; 32], PathBuf>> = Mutex::new(BTree
 pub static CHAT_UPLOADS: Mutex<BTreeMap<u64, ([u8; 32], PathBuf, UploadKind)>> = Mutex::new(BTreeMap::new());
 
 /// Registers a local chat upload and builds the request for its destination.
-pub fn request_chat_upload(path: PathBuf, hash: [u8; 32], media: ChatUpload) -> PacketCode
+pub fn request_chat_upload(path: PathBuf, hash: [u8; 32], recipient: Option<usize>, media: ChatUpload) -> PacketCode
 {
     let request = rand::random();
-    let kind = media.transfer_kind();
+    let kind = media.transfer_kind(recipient.is_some());
     CHAT_UPLOADS.lock().unwrap().insert(request, (hash, path, kind));
-    PacketCode::ChatUploadRequest { request, hash, media }
+    PacketCode::ChatUploadRequest { request, recipient, hash, media }
 }
 
 //FUNCTIONS
@@ -1009,6 +1012,22 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             }
 
             //OUR OWN STORED PRIVATE MESSAGES
+            PacketCode::PrivateMedia { message, data } =>
+            {
+                let Some(media) = &message.media else { continue };
+                if let Some(data) = data
+                {
+                    let hash = media.hash();
+                    let data = task::spawn_blocking(move || (crypto::sha256(&data) == hash).then_some(data))
+                        .await.ok().flatten();
+
+                    if let Some(data) = data { cache::store(&hash, &data).await; }
+                }
+
+                tx.send(ClientEvent::PrivateMedia(message)).await.ok();
+                continue;
+            },
+
             PacketCode::PrivateHistory { messages, start, more, kept, older } =>
             {
                 tx.send(ClientEvent::PrivateHistory { messages, start, more, kept, older }).await.unwrap();

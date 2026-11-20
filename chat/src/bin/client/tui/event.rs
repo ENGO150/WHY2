@@ -37,7 +37,7 @@ use crate::
     options,
     network::
     {
-        codes::{ MessageColors, OnlineUser },
+        codes::{ MessageColors, MessageMedia, OnlineUser, StoredPrivateMessage },
         client::{ ClientEvent, image as client_image },
     },
 };
@@ -487,41 +487,16 @@ impl App
             //THE LOBBY'S STORED MESSAGES
             ClientEvent::History { messages, start, more, kept: _, older } =>
             {
-                //A PICTURE IS LOADED WHEN IT IS LOOKED AT
-                let auto_show = client_image::auto_show_images();
-
-                let entries = messages.into_iter().map(|message| match (message.attachment, message.voice)
+                let entries = messages.into_iter().map(|message|
                 {
-                    (_, Some(voice)) => state::Entry::Voice
+                    let media = message.voice.map(MessageMedia::Voice)
+                        .or_else(|| message.attachment.map(MessageMedia::File));
+                    if let Some(media) = media
                     {
-                        username: message.username,
-                        message_id: message.message_id,
-                        timestamp: message.timestamp,
-                        username_color: message.colors.username_color,
-                        voice,
-                        playback: state::Playback::Idle,
-                        hearts: message.hearts,
-                        pinned: message.pinned,
-                    },
-
-                    (Some(hash), None) => state::Entry::Attachment
-                    {
-                        username: message.username,
-                        filename: message.text,
-                        message_id: message.message_id,
-                        timestamp: message.timestamp,
-                        username_color: message.colors.username_color,
-                        hash: Some(hash),
-                        picture: match auto_show
-                        {
-                            true => state::Picture::Deferred,
-                            false => state::Picture::Absent,
-                        },
-                        hearts: message.hearts,
-                        pinned: message.pinned,
-                    },
-
-                    (None, None) => state::Entry::History
+                        return media_entry(media, message.username, message.text, message.message_id,
+                            message.timestamp, message.colors.username_color, message.hearts, message.pinned);
+                    }
+                    state::Entry::History
                     {
                         username: message.username,
                         message_id: message.message_id,
@@ -532,7 +507,7 @@ impl App
                         hearts: message.hearts,
                         edited: message.edited,
                         pinned: message.pinned,
-                    },
+                    }
                 }).collect();
 
                 match older
@@ -543,22 +518,18 @@ impl App
             },
 
             //OUR OWN STORED PRIVATE MESSAGES
+            ClientEvent::PrivateMedia(message) =>
+            {
+                let peer = message.username.clone();
+                let sender_id = (!message.sent).then_some(message.id);
+                let entry = private_entry(message, &self.username);
+                self.push_private_media(&peer, sender_id, entry);
+            },
+
             ClientEvent::PrivateHistory { messages, start, more, kept: _, older } =>
             {
-                let entries = messages.into_iter().map(|message| state::Entry::Private
-                {
-                    sent: message.sent,
-                    message_id: message.message_id,
-                    reply: message.reply,
-                    hearts: message.hearts,
-                    edited: message.edited,
-                    position: Some((message.before, message.message_id)),
-                    username: message.username,
-                    sender_id: (!message.sent).then_some(message.id),
-                    timestamp: message.timestamp,
-                    text: message.text,
-                    colors: message.colors,
-                }).collect();
+                let entries = messages.into_iter().map(|message|
+                    (message.username.clone(), private_entry(message, &self.username))).collect();
 
                 match older
                 {
@@ -1172,4 +1143,63 @@ fn id_width(ids: impl Iterator<Item = usize>) -> usize
 fn id_column(id: usize, width: usize) -> Vec<Span<'static>>
 {
     vec![Span::styled(format!("{id:>width$}  "), theme::dim())]
+}
+
+/// Creates a playable or downloadable entry for either kind of conversation.
+fn media_entry(media: MessageMedia, username: String, filename: String, message_id: u64,
+    timestamp: Option<u64>, username_color: Option<u8>, hearts: Vec<String>, pinned: bool) -> state::Entry
+{
+    match media
+    {
+        MessageMedia::File(hash) => state::Entry::Attachment
+        {
+            username,
+            filename,
+            message_id,
+            timestamp,
+            username_color,
+            hash: Some(hash),
+            picture: if client_image::auto_show_images() { state::Picture::Deferred } else { state::Picture::Absent },
+            hearts,
+            pinned,
+        },
+        MessageMedia::Voice(voice) => state::Entry::Voice
+        {
+            username,
+            message_id,
+            timestamp,
+            username_color,
+            voice,
+            playback: state::Playback::Idle,
+            hearts,
+            pinned,
+        },
+    }
+}
+
+fn private_entry(message: StoredPrivateMessage, own: &str) -> state::Entry
+{
+    match message.media
+    {
+        Some(media) =>
+        {
+            let author = if message.sent { own.to_owned() } else { message.username };
+            media_entry(media, author, message.text, message.message_id, message.timestamp,
+                message.colors.username_color, message.hearts, false)
+        },
+        None => state::Entry::Private
+        {
+            sent: message.sent,
+            message_id: message.message_id,
+            reply: message.reply,
+            hearts: message.hearts,
+            edited: message.edited,
+            position: Some((message.before, message.message_id)),
+            username: message.username,
+            sender_id: (!message.sent).then_some(message.id),
+            timestamp: message.timestamp,
+            text: message.text,
+            colors: message.colors,
+        },
+    }
 }

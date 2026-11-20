@@ -73,11 +73,6 @@ use super::
 /// Starts a recording, reporting a failure to start.
 fn start(app: &mut App, tx: &Sender<ClientEvent>)
 {
-    if app.pm_username().is_some()
-    {
-        app.notify(t!("pm.voice_unavailable"));
-        return;
-    }
     if !message::start_recording(tx.clone())
     {
         app.notify(t!("voice_message.busy"));
@@ -87,23 +82,31 @@ fn start(app: &mut App, tx: &Sender<ClientEvent>)
     let now = Instant::now();
 
     //HELD ONLY IF RELEASES ARE REPORTED
-    app.recording = Some(Recording { started: now, pressed: now, held: app.key_release, shown: 0 });
+    app.recording = Some(Recording { channel: app.channel.clone(), started: now, pressed: now, held: app.key_release, shown: 0 });
     app.dirty = true;
 }
 
 /// Ends the recording and uploads it, unless it was too short to send.
 fn send(app: &mut App, write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>>, tx: &Sender<ClientEvent>)
 {
-    app.recording = None;
+    let recording = app.recording.take();
     app.dirty = true;
 
-    if app.pm_username().is_some() { return message::cancel_recording(); }
+    if recording.is_none_or(|recording| recording.channel != app.channel) { return message::cancel_recording(); }
+
+    let recipient = app.pm_recipient();
+    if app.pm_username().is_some() && recipient.is_none()
+    {
+        message::cancel_recording();
+        app.notify(t!("pm.recipient_unavailable"));
+        return;
+    }
 
     let Some(write_stream) = write_stream else { return message::cancel_recording() };
 
     match message::finish_recording()
     {
-        Some(clip) => crate::send_voice(write_stream, clip, tx.clone()),
+        Some(clip) => crate::send_voice(write_stream, clip, recipient, tx.clone()),
         None => app.notify(t!("voice_message.too_short")),
     }
 }
@@ -217,7 +220,7 @@ pub fn tick(app: &mut App, write_stream: Option<&Arc<MutexAsync<OwnedWriteHalf>>
 /// Returns what the pane's border says while recording.
 pub fn status(app: &App) -> Option<String>
 {
-    let recording = app.recording?;
+    let recording = app.recording.as_ref()?;
 
     let duration = format!("{}:{:02}", recording.shown / 60, recording.shown % 60);
     let send = if recording.held { t!("voice_message.hold") } else { t!("voice_message.toggle") };

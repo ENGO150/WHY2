@@ -136,13 +136,13 @@ pub struct FilePacket //FILE CHUNK
 //IMPLEMENTATIONS
 impl ChatUpload
 {
-    /// Selects the transfer kind for this upload.
-    pub fn transfer_kind(&self) -> UploadKind
+    /// Selects the transfer kind for this upload and audience.
+    pub fn transfer_kind(&self, private: bool) -> UploadKind
     {
         match self
         {
             ChatUpload::Voice => UploadKind::Voice,
-            ChatUpload::File { persistent: false, .. } => UploadKind::File,
+            ChatUpload::File { persistent: false, .. } if !private => UploadKind::File,
             ChatUpload::File { .. } => UploadKind::Attachment,
         }
     }

@@ -290,7 +290,7 @@ impl Theme
                     Picture::Gone | Picture::Ready(..) => {},
                 }
 
-                spans.push(Span::styled(format!(" [ /download {message_id} ]"), accent()));
+                spans.push(Span::styled(format!(" [ /download {} ]", crate::command::format_message_id(*message_id)), accent()));
                 state::wrap_line(&Line::from(spans), width)
             },
 

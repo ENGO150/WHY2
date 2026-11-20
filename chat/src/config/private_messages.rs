@@ -53,7 +53,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     fs,
-    collections::{ HashMap, BTreeMap },
+    collections::{ HashMap, BTreeMap, HashSet },
+    path::{ Path, PathBuf },
     sync::{ LazyLock, Mutex },
 };
 
@@ -68,6 +69,7 @@ use crate::
     network::codes::
     {
         MessageColors,
+        MessageMedia,
         StoredPrivateMessage,
     },
 };
@@ -98,11 +100,25 @@ pub struct Delivery
 #[derive(SchemaWrite, SchemaRead, Clone)]
 struct Record //ONE PRIVATE MESSAGE RECORD
 {
-    id: u64,                  //INTERNAL ID, NEVER SENT TO A CLIENT
+    id: u64,                   //INTERNAL ID, NEVER SENT TO A CLIENT
     participants: Participants,
     text: String,
     timestamp: Option<u64>,    //UNIX SECONDS
-    before: u64,              //THE NEXT LOBBY ID WHEN THIS WAS SENT
+    before: u64,               //THE NEXT LOBBY ID WHEN THIS WAS SENT
+    reply: Option<(u64, u64)>, //THE REPLIED-TO IDS FOR SENDER AND RECIPIENT
+    hearts: Vec<String>,
+    edited: bool,
+    media: Option<MessageMedia>,
+}
+
+#[derive(SchemaRead)]
+struct RecordV4
+{
+    id: u64,                   //INTERNAL ID, NEVER SENT TO A CLIENT
+    participants: Participants,
+    text: String,
+    timestamp: Option<u64>,    //UNIX SECONDS
+    before: u64,               //THE NEXT LOBBY ID WHEN THIS WAS SENT
     reply: Option<(u64, u64)>, //THE REPLIED-TO IDS FOR SENDER AND RECIPIENT
     hearts: Vec<String>,
     edited: bool,
@@ -158,9 +174,17 @@ struct OldRecord //THE FIRST PRIVATE FORMAT (remove with next version bump)
 #[derive(SchemaWrite, SchemaRead)]
 struct History //THE RECORDS AND THE NEXT ID
 {
-    next: u64,                   //NEXT INTERNAL MESSAGE ID
+    next: u64,                    //NEXT INTERNAL MESSAGE ID
     users: BTreeMap<String, u64>, //NEXT PRIVATE ID IN EACH ACCOUNT
     records: Vec<Record>,
+}
+
+#[derive(SchemaRead)]
+struct HistoryV4
+{
+    next: u64,                    //NEXT INTERNAL MESSAGE ID
+    users: BTreeMap<String, u64>, //NEXT PRIVATE ID IN EACH ACCOUNT
+    records: Vec<RecordV4>,
 }
 
 //ONE PAGE OF THE PRIVATE HISTORY
@@ -179,7 +203,8 @@ pub struct Page
 
 //CONSTS
 /// Marker at the start of the current file format.
-const MAGIC: &[u8; 8] = b"WHY2PM04"; //FORMAT MARKER
+const MAGIC: &[u8; 8] = b"WHY2PM05"; //FORMAT MARKER
+const MAGIC_V4: &[u8; 8] = b"WHY2PM04";
 /// The format with shared message ids.
 const MAGIC_V3: &[u8; 8] = b"WHY2PM03"; //OLDER FORMAT
 /// The format before message actions.
@@ -283,6 +308,7 @@ impl History
                 before: message.before,
                 hearts: message.hearts,
                 edited: message.edited,
+                media: None,
             }
         }).collect();
 
@@ -411,6 +437,29 @@ fn load() -> History //READ THE PRIVATE HISTORY OFF DISK
         return history;
     }
 
+    if let Some(records) = plaintext.strip_prefix(MAGIC_V4)
+    {
+        let Ok(old) = wincode::config::deserialize::<HistoryV4, _>(records, config)
+            else { return unreadable() };
+        return History
+        {
+            next: old.next,
+            users: old.users,
+            records: old.records.into_iter().map(|record| Record
+            {
+                id: record.id,
+                participants: record.participants,
+                text: record.text,
+                timestamp: record.timestamp,
+                before: record.before,
+                reply: record.reply,
+                hearts: record.hearts,
+                edited: record.edited,
+                media: None,
+            }).collect(),
+        };
+    }
+
     //NO MARKER IS UNREADABLE
     let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };
 
@@ -454,6 +503,7 @@ pub fn delete(id: u64, username: &str) -> Option<Participants> //ONLY THE AUTHOR
 
     let record = history.records.remove(index);
     history.save();
+    history.remove_media(record.media.iter().map(MessageMedia::hash));
     Some(record.participants)
 }
 
@@ -465,7 +515,7 @@ pub fn edit(id: u64, username: &str, text: &str) -> Option<Participants> //ONLY 
     let mut history = HISTORY.lock().unwrap();
     let index = history.find(id, username)?;
     let record = &mut history.records[index];
-    if record.participants.sender != username { return None; }
+    if record.participants.sender != username || record.media.is_some() { return None; }
 
     record.text = text.to_string();
     record.edited = true;
@@ -497,7 +547,44 @@ pub fn heart(id: u64, username: &str) -> Option<(Participants, Vec<String>)> //O
 /// `reply` is resolved in the sender's account; both sides' references are saved so replies
 /// keep pointing to the same message even after the original is deleted. With `persistent`
 /// off, or a zero history limit, only the in-memory id counters advance.
-pub fn store(sender: &str, recipient: &str, text: &str, timestamp: Option<u64>, reply: Option<u64>, persistent: bool) -> Option<Delivery>
+pub fn store
+(
+    sender: &str,
+    recipient: &str,
+    text: &str,
+    timestamp: Option<u64>,
+    reply: Option<u64>,
+    persistent: bool,
+) -> Option<Delivery>
+{
+    store_message(sender, recipient, text, timestamp, reply, persistent, None)
+}
+
+/// Stores a private upload, committing its sealed file only if it will be retained.
+pub fn store_media
+(
+    sender: &str,
+    recipient: &str,
+    text: &str,
+    timestamp: Option<u64>,
+    media: MessageMedia,
+    pending: &Path,
+    persistent: bool,
+) -> Option<Delivery>
+{
+    store_message(sender, recipient, text, timestamp, None, persistent, Some((media, pending)))
+}
+
+fn store_message
+(
+    sender: &str,
+    recipient: &str,
+    text: &str,
+    timestamp: Option<u64>,
+    reply: Option<u64>,
+    persistent: bool,
+    upload: Option<(MessageMedia, &Path)>,
+) -> Option<Delivery>
 {
     let limit: usize = if persistent { super::read_config("max_persistent_private_messages") } else { 0 };
     let mut history = HISTORY.lock().unwrap();
@@ -512,6 +599,12 @@ pub fn store(sender: &str, recipient: &str, text: &str, timestamp: Option<u64>, 
         },
         None => None,
     };
+
+    if persistent && let Some((media, pending)) = &upload
+    {
+        if limit == 0 { return None; }
+        fs::rename(pending, media_path(&media.hash())).ok()?;
+    }
 
     let sender_id = history.take_user_id(sender);
     let recipient_id = if sender == recipient { sender_id } else { history.take_user_id(recipient) };
@@ -532,11 +625,15 @@ pub fn store(sender: &str, recipient: &str, text: &str, timestamp: Option<u64>, 
         reply,
         hearts: Vec::new(),
         edited: false,
+        media: upload.map(|(media, _)| media),
     });
 
     let over = history.records.len().saturating_sub(limit);
-    history.records.drain(..over);
+    let removed: Vec<_> = history.records.drain(..over)
+        .filter_map(|record| record.media.map(|media| media.hash())).collect();
+
     history.save();
+    history.remove_media(removed.into_iter());
     Some(delivery)
 }
 
@@ -644,8 +741,84 @@ fn wire(records: Vec<Record>, username: &str) -> Vec<StoredPrivateMessage>
             username: peer,
             sent,
             text: message.text,
+            media: message.media,
             colors,
             timestamp: message.timestamp.filter(|_| timestamps), //HIDDEN WHILE TURNED OFF
         }
     }).collect()
+}
+
+/// The separate directory used for sealed private attachments.
+pub fn media_path(hash: &[u8; 32]) -> PathBuf
+{
+    media_dir().join(crate::misc::hex(hash))
+}
+
+/// The storage root for private uploads.
+pub fn media_dir() -> PathBuf
+{
+    PathBuf::from(super::config_path("server_private_media"))
+}
+
+/// Whether new private uploads can be retained by the server.
+pub fn media_persistence_enabled() -> bool
+{
+    super::read_config::<bool>("persistent_messages") &&
+        super::read_config::<bool>("persistent_private_messages") &&
+        super::read_config::<usize>("max_persistent_private_messages") > 0
+}
+
+/// Removes interrupted uploads and unreferenced sealed files at startup.
+pub fn sweep_media()
+{
+    let dir = media_dir();
+    let _ = fs::remove_dir_all(dir.join("pending"));
+    let Ok(files) = fs::read_dir(dir) else { return };
+    let history = HISTORY.lock().unwrap();
+    let kept: HashSet<_> = history.records.iter().filter_map(|record|
+        record.media.as_ref().map(MessageMedia::hash)).collect();
+
+    for hash in files.flatten().filter_map(|file| file.file_name().to_str().and_then(crate::misc::unhex))
+    {
+        if !kept.contains(&hash) { let _ = fs::remove_file(media_path(&hash)); }
+    }
+}
+
+/// Looks up a downloadable file by the requesting participant's own message id.
+pub fn attachment(id: u64, username: &str) -> Option<([u8; 32], String)>
+{
+    HISTORY.lock().unwrap().attachment(id, username)
+}
+
+/// Checks whether the requesting account can fetch a private file or clip by hash.
+pub fn can_fetch(hash: &[u8; 32], username: &str) -> bool
+{
+    HISTORY.lock().unwrap().can_fetch(hash, username)
+}
+
+impl History
+{
+    fn attachment(&self, id: u64, username: &str) -> Option<([u8; 32], String)>
+    {
+        let record = &self.records[self.find(id, username)?];
+        let MessageMedia::File(hash) = record.media.as_ref()? else { return None };
+        Some((*hash, record.text.clone()))
+    }
+
+    fn can_fetch(&self, hash: &[u8; 32], username: &str) -> bool
+    {
+        self.records.iter().any(|record|
+            record.involves(username) && record.media.as_ref().is_some_and(|media| media.hash() == *hash))
+    }
+
+    fn remove_media(&self, hashes: impl Iterator<Item = [u8; 32]>)
+    {
+        for hash in hashes
+        {
+            if !self.records.iter().any(|record| record.media.as_ref().is_some_and(|media| media.hash() == hash))
+            {
+                let _ = fs::remove_file(media_path(&hash));
+            }
+        }
+    }
 }

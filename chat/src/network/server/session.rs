@@ -249,9 +249,9 @@ impl<'a, 's> ClientSession<'a, 's>
             //CLIENT REQUESTED LIST OF ONLINE USERS
             PacketCode::ListRequest => self.list().await,
 
-            PacketCode::ChatUploadRequest { request, hash, media } =>
+            PacketCode::ChatUploadRequest { request, recipient, hash, media } =>
             {
-                let transfer = match self.prepare_chat_upload(hash, media)
+                let transfer = match self.prepare_chat_upload(recipient, hash, media)
                 {
                     Ok(transfer) => transfer,
                     Err(error) => { self.send(error).await; None },
@@ -566,7 +566,7 @@ impl<'a, 's> ClientSession<'a, 's>
         {
             match config::private_messages::delete(message_id, &self.username)
             {
-                Some(participants) => server::send_to_accounts(&participants, |message_id| PacketCode::Deleted { message_id }),
+                Some(participants) => server::send_to_accounts(&participants, |_, message_id| PacketCode::Deleted { message_id }),
                 None => self.send(PacketCode::InvalidUsage).await,
             }
 
@@ -614,7 +614,7 @@ impl<'a, 's> ClientSession<'a, 's>
         {
             match config::private_messages::edit(message_id, &self.username, &text)
             {
-                Some(participants) => server::send_to_accounts(&participants, |message_id|
+                Some(participants) => server::send_to_accounts(&participants, |_, message_id|
                     PacketCode::Edited { message_id, text: text.clone() }),
                 None => self.send(PacketCode::InvalidUsage).await,
             }
@@ -646,33 +646,59 @@ impl<'a, 's> ClientSession<'a, 's>
         PacketFlow::Continue
     }
 
-    fn prepare_chat_upload(&self, hash: [u8; 32], media: ChatUpload) -> Result<Option<([u8; 32], u64)>, PacketCode>
+    fn prepare_chat_upload
+    (
+        &self,
+        recipient: Option<usize>,
+        hash: [u8; 32],
+        media: ChatUpload,
+    ) -> Result<Option<([u8; 32], u64)>, PacketCode>
     {
         if self.muted() { return Err(PacketCode::Muted); }
 
-        let repost = match &media
+        let private = if let Some(recipient) = recipient
         {
-            ChatUpload::File { filename, persistent: true } if config::messages::stored(&hash) =>
+            let can_keep = config::private_messages::media_persistence_enabled();
+            let persistent = match &media
             {
-                let filename = Path::new(filename).file_name().and_then(|name| name.to_str())
-                    .unwrap_or("unnamed_file").to_owned();
-                Some((filename, MessageMedia::File(hash)))
-            },
+                ChatUpload::File { persistent: true, .. } if !can_keep => return Err(PacketCode::InvalidFeature),
+                ChatUpload::File { persistent, .. } => *persistent,
+                ChatUpload::Voice => can_keep,
+            };
 
-            ChatUpload::Voice =>
-            {
-                config::messages::voice(&hash).map(|voice| (String::new(), MessageMedia::Voice(voice)))
-            },
-            _ => None,
-        };
+            let recipient = config::users::username(recipient)
+                .filter(|name| persistent || file::private_recipient_online(name, &self.username))
+                .ok_or(PacketCode::InvalidUsage)?;
 
-        if let Some((filename, media)) = repost
+            Some(file::PrivateDestination { recipient, persistent })
+        } else { None };
+
+        if private.is_none()
         {
-            file::publish_public(&self.username, filename, media, None, self.channel.clone(),
-                file::keep_public_media(&self.channel));
+            let repost = match &media
+            {
+                ChatUpload::File { filename, persistent: true } if config::messages::stored(&hash) =>
+                {
+                    let filename = Path::new(filename).file_name().and_then(|name| name.to_str())
+                        .unwrap_or("unnamed_file").to_owned();
+                    Some((filename, MessageMedia::File(hash)))
+                },
 
-            log::info!("Chat media already stored, upload skipped: {}", self.peer_addr);
-            return Ok(None);
+                ChatUpload::Voice =>
+                {
+                    config::messages::voice(&hash).map(|voice| (String::new(), MessageMedia::Voice(voice)))
+                },
+                _ => None,
+            };
+
+            if let Some((filename, media)) = repost
+            {
+                file::publish_public(&self.username, filename, media, None, self.channel.clone(),
+                    file::keep_public_media(&self.channel));
+
+                log::info!("Chat media already stored, upload skipped: {}", self.peer_addr);
+                return Ok(None);
+            }
         }
 
         let active_count = file::ACTIVE_FILESHARES.iter().filter(|upload| upload.client_id == self.id).count();
@@ -682,9 +708,9 @@ impl<'a, 's> ClientSession<'a, 's>
             return Err(PacketCode::UploadLimit);
         }
 
-        let kind = media.transfer_kind();
+        let kind = media.transfer_kind(private.is_some());
         let uid = rand::random();
-        let target = file::UploadTarget { kind, hash };
+        let target = file::UploadTarget { kind, hash, private };
         let token = server::open_connection(self.id, ConnectionType::Upload { uid, target });
         Ok(Some((token, uid)))
     }
@@ -692,8 +718,16 @@ impl<'a, 's> ClientSession<'a, 's>
     //DOWNLOAD
     async fn attachment_download(&mut self, message_id: u64) -> PacketFlow
     {
-        if let Some((hash, filename)) = config::messages::attachment(message_id)
-            && let Some(size) = file::attachment_size(&hash).await
+        let private = message_id & consts::PRIVATE_MESSAGE_ID != 0;
+        let attachment = if private
+        {
+            config::private_messages::attachment(message_id, &self.username)
+        } else { config::messages::attachment(message_id) };
+
+        if let Some((hash, filename)) = attachment
+            && let path = if private { config::private_messages::media_path(&hash) }
+                else { misc::get_attachment_dir().join(misc::hex(&hash)) }
+            && let Some(size) = file::sealed_size(&path).await
         {
             //DERIVE THE DISK KEYS WITHOUT READING THE FILE
             let (key, nonce, _) = crypto::attachment_keys(&hash);
@@ -701,7 +735,7 @@ impl<'a, 's> ClientSession<'a, 's>
             let file = AvailableFile
             {
                 hash,
-                path: misc::get_attachment_dir().join(misc::hex(&hash)),
+                path,
                 filename,
                 size,
                 key,
@@ -986,6 +1020,8 @@ impl<'a, 's> ClientSession<'a, 's>
         let attachment = match config::messages::stored(&hash) || config::messages::voice(&hash).is_some()
         {
             true => file::read_attachment(&hash).await,
+            false if config::private_messages::can_fetch(&hash, &self.username) =>
+                file::read_sealed_attachment(&config::private_messages::media_path(&hash), &hash).await,
             false => None,
         };
 
@@ -1158,7 +1194,7 @@ impl<'a, 's> ClientSession<'a, 's>
         {
             match config::private_messages::heart(message_id, &self.username)
             {
-                Some((participants, hearts)) => server::send_to_accounts(&participants, |message_id| PacketCode::Heart { message_id, hearts: hearts.clone() }),
+                Some((participants, hearts)) => server::send_to_accounts(&participants, |_, message_id| PacketCode::Heart { message_id, hearts: hearts.clone() }),
                 None => self.send(PacketCode::InvalidUsage).await,
             }
 
@@ -1631,7 +1667,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 let token = server::open_connection(self.id, ConnectionType::Upload
                 {
                     uid,
-                    target: file::UploadTarget { kind: UploadKind::Avatar, hash },
+                    target: file::UploadTarget { kind: UploadKind::Avatar, hash, private: None },
                 });
 
                 log::info!("Upload request (avatar): {}", self.peer_addr);
@@ -1740,7 +1776,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 let token = server::open_connection(self.id, ConnectionType::Upload
                 {
                     uid,
-                    target: file::UploadTarget { kind: UploadKind::Icon, hash },
+                    target: file::UploadTarget { kind: UploadKind::Icon, hash, private: None },
                 });
 
                 log::info!("Upload request (icon): {}", self.peer_addr);

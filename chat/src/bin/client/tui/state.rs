@@ -433,9 +433,10 @@ pub struct Selection
 //PUSH-TO-TALK STATE
 /// Push-to-talk state.
 #[cfg(feature = "client_voice")]
-#[derive(Clone, Copy)]
 pub struct Recording
 {
+    /// The pane in which the recording began.
+    pub channel: String,
     /// When the recording started.
     pub started: Instant,
     /// Last press of the key, repeats included.
@@ -835,7 +836,12 @@ impl App
     {
         let entry = Entry::Private { sent: sender_id.is_none(), username: username.clone(), sender_id, message_id, position: None, timestamp, text, colors, reply, hearts: Vec::new(), edited: false };
         let active = self.pm_username() == Some(username.as_str());
-        self.route_private(entry);
+        self.route_private(&username, entry);
+        self.private_notice(&username, sender_id, active);
+    }
+
+    fn private_notice(&mut self, username: &str, sender_id: Option<usize>, active: bool)
+    {
         if active && self.scroll.is_some() { self.unread += 1; }
         if let Some(id) = sender_id && !active
         {
@@ -869,14 +875,14 @@ impl App
 
     //THE NEWEST PAGE OF OUR PRIVATE HISTORY
     /// Routes the newest private page into conversations.
-    pub fn start_private_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
+    pub fn start_private_history(&mut self, entries: Vec<(String, Entry)>, start: u64, more: bool)
     {
-        for entry in entries { self.route_private(entry); }
+        for (peer, entry) in entries { self.route_private(&peer, entry); }
         self.private_cursor = more.then_some(start);
     }
 
     /// Routes an older page into conversations, preserving chronological order.
-    pub fn prepend_private_history(&mut self, entries: Vec<Entry>, start: u64, more: bool)
+    pub fn prepend_private_history(&mut self, entries: Vec<(String, Entry)>, start: u64, more: bool)
     {
         self.history_pending = false;
         self.start_private_history(entries, start, more);
@@ -884,6 +890,22 @@ impl App
 
     /// The participant of the open private conversation.
     pub fn pm_username(&self) -> Option<&str> { self.channel.strip_prefix('\0') }
+
+    /// Resolves the open PM pane's account id.
+    pub fn pm_recipient(&self) -> Option<usize>
+    {
+        let username = self.pm_username()?;
+        self.online.iter().find(|user| user.username == username).map(|user| user.id)
+            .or_else(|| self.offline.iter().find(|(_, user)| user.0 == username).map(|(id, _)| *id))
+    }
+
+    /// Routes a live upload to the participant's conversation.
+    pub fn push_private_media(&mut self, peer: &str, sender_id: Option<usize>, entry: Entry)
+    {
+        let active = self.pm_username() == Some(peer);
+        self.route_private(peer, entry);
+        self.private_notice(peer, sender_id, active);
+    }
 
     /// Opens a conversation without changing server channel membership.
     pub fn open_pm(&mut self, username: String)
@@ -898,14 +920,18 @@ impl App
         if let Some(channel) = self.pm_return.take() { self.switch_channel(channel); }
     }
 
-    fn route_private(&mut self, entry: Entry)
+    fn route_private(&mut self, peer: &str, entry: Entry)
     {
-        let Entry::Private { username, .. } = &entry else { return };
-        let channel = format!("\0{username}");
+        let channel = format!("\0{peer}");
         let active = self.channel == channel;
         let pane = if active { &mut self.messages } else { self.panes.entry(channel).or_default() };
         if pane.iter().any(|other| other.message_id() == entry.message_id()) { return; }
-        let timestamp = |entry: &Entry| match entry { Entry::Private { timestamp, message_id, .. } => (timestamp.unwrap_or(0), *message_id), _ => (0, 0) };
+        let timestamp = |entry: &Entry| match entry
+        {
+            Entry::Private { timestamp, message_id, .. } | Entry::Attachment { timestamp, message_id, .. } |
+                Entry::Voice { timestamp, message_id, .. } => (timestamp.unwrap_or(0), *message_id),
+            _ => (0, 0),
+        };
         let key = timestamp(&entry);
         let index = pane.iter().position(|other| timestamp(other) > key).unwrap_or(pane.len());
         pane.insert(index, entry);
