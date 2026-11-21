@@ -145,10 +145,11 @@ use gag::Gag;
 use crate::
 {
     config,
-    command::{ self, Command },
     options as chat_options,
     network::
     {
+        self,
+        codes::PacketCode,
         client::{ ClientEvent, VoiceUser },
         voice::
         {
@@ -942,6 +943,15 @@ fn replace_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> bo
     false
 }
 
+async fn cancel_voice(write_stream: &MutexAsync<OwnedWriteHalf>, token: [u8; 32])
+{
+    let mut stream = write_stream.lock().await;
+    if let Some(keys) = chat_options::get_keys()
+    {
+        network::send(&mut stream, PacketCode::VoiceCancel { token }, Some(&keys)).await;
+    }
+}
+
 //PUBLIC
 /// Runs a voice session until the client leaves voice.
 ///
@@ -951,7 +961,7 @@ fn replace_streams(current_generation: usize, packet_tx: &Sender<Vec<u8>>) -> bo
 /// frames, probe latency, report activity and apply device changes.
 ///
 /// # Parameters
-/// - `id`: Our session id.
+/// - `id`: Our account ID.
 /// - `username`: Our username, for the voice panel.
 /// - `tx`: The UI event channel.
 /// - `write_stream`: The main connection, for leaving voice on failure.
@@ -1017,7 +1027,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
         None => //NO USABLE DEVICE
         {
             //LEAVE VOICE
-            command::send_command_code(&mut *write_stream.lock().await, &Command::Voice, &None).await;
+            cancel_voice(&write_stream, token).await;
             return;
         }
     };
@@ -1044,7 +1054,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
                 if Instant::now() >= deadline
                 {
                     tx.send(ClientEvent::VoiceHandshakeFailed).await.ok();
-                    command::send_command_code(&mut *write_stream.lock().await, &Command::Voice, &None).await;
+                    cancel_voice(&write_stream, token).await;
 
                     return;
                 }
@@ -1124,7 +1134,7 @@ pub async fn listen_server_voice //SERVER -> CLIENT
     loop
     {
         //READ
-        let (network_buffer, _) = match voice::receive(&socket).await
+        let (network_buffer, _) = match voice::receive(&socket, || AUDIO_GENERATION.load(Ordering::Relaxed) == current_generation).await
         {
             Some(r) => r,
             None => //READING FAILED, TIMEOUT OR CRASH PROBABLY

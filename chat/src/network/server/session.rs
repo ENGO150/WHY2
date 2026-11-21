@@ -245,6 +245,11 @@ impl<'a, 's> ClientSession<'a, 's>
 
             //VOICE CALL
             PacketCode::VoiceRequest => self.voice().await,
+            PacketCode::VoiceCancel { token } =>
+            {
+                server::PRESENCE.lock().unwrap().close_voice(self.peer_addr, self.id, Some(&token));
+                PacketFlow::Continue
+            },
 
             //SWITCH CHANNEL
             PacketCode::Channel { channel } => self.change_channel(channel).await,
@@ -494,38 +499,10 @@ impl<'a, 's> ClientSession<'a, 's>
             log::warn!("Voice refused (disabled): {}", self.peer_addr);
 
             self.send(PacketCode::InvalidFeature).await;
-        } else if !voice_server::CONNECTIONS.contains_key(&self.id) //IS NOT USING VOICE
-        {
-            log::info!("Voice slot opened: {}", self.peer_addr);
-
-            //OPEN THE VOICE SLOT AND SEND ITS TOKEN
-            let token = voice_server::open_connection(self.id, self.username.clone());
-            self.send(PacketCode::Voice { token: Some(token) }).await;
-
-            //SEND CODE TO CHANNEL
-            server::send_to_all(PacketCode::VoiceJoin
-            {
-                username: self.username.clone(),
-                id: self.id,
-                channel: self.channel.clone(),
-            });
-
-            //SEND CONNECTED CLIENTS
-            server::send_voice_clients(&mut *self.streams.1.lock().await, &self.keys, self.id).await;
-        } else //IS USING VOICE
-        {
-            log::info!("Voice leave: {}", self.peer_addr);
-
-            //ACKNOWLEDGE THE LEAVE
-            self.send(PacketCode::Voice { token: None }).await;
-
-            //SEND CODE TO LAST CHANNEL
-            server::send_to_all(PacketCode::VoiceLeave { id: self.id, channel: self.channel.clone() });
-
-            //REMOVE FROM VOICE
-            voice_server::remove_connection(&self.id);
+            return PacketFlow::Continue;
         }
 
+        server::PRESENCE.lock().unwrap().toggle_voice(self.peer_addr, self.id, &self.username, &self.channel);
         PacketFlow::Continue
     }
 
@@ -536,27 +513,23 @@ impl<'a, 's> ClientSession<'a, 's>
         if tchannel.iter().all(|s| !s.is_empty() && s.len() <= config::read_config("max_channel_length") &&
             s.chars().all(|c| c.is_ascii_alphanumeric() && c != ' '))
         {
-            //A SAME-CHANNEL REQUEST MUST NOT CHANGE OTHER CLIENTS' VOICE ROSTERS
+            let mut presence = server::PRESENCE.lock().unwrap();
+            if !presence.clients.contains_key(&self.peer_addr) { return PacketFlow::Continue; }
+
             let channel_changed = self.channel != tchannel;
-
-            //SEND VoiceLeave CODE TO OLD CHANNEL
-            if channel_changed && options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&self.id)
-            {
-                server::send_to_all(PacketCode::VoiceLeave { id: self.id, channel: self.channel.clone() });
-            }
-
-            //UPDATE CHANNEL
             if channel_changed
             {
                 server::update_client_channel(&self.peer_addr, &tchannel);
-                self.channel = tchannel.clone();
+                self.channel = tchannel;
             }
-            self.send(PacketCode::Channel { channel: tchannel }).await;
+            presence.send(&self.peer_addr, PacketCode::Channel { channel: self.channel.clone() });
 
-            //SEND CODE TO CHANNEL
-            if channel_changed && options::voice_chat_enabled() && voice_server::CONNECTIONS.contains_key(&self.id)
+            //ONLY THE VOICE OWNER MOVES THE SLOT
+            if channel_changed &&
+                let Some(old_channel) = voice_server::move_connection(self.id, self.peer_addr, self.channel.clone())
             {
-                server::send_to_all(PacketCode::VoiceJoin
+                presence.broadcast(PacketCode::VoiceLeave { id: self.id, channel: old_channel });
+                presence.broadcast(PacketCode::VoiceJoin
                 {
                     username: self.username.clone(),
                     id: self.id,
@@ -564,8 +537,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 });
             }
 
-            //SEND CONNECTED CLIENTS
-            server::send_voice_clients(&mut *self.streams.1.lock().await, &self.keys, self.id).await;
+            presence.send_voice_roster(&self.peer_addr, self.id, &self.channel);
         } else //INVALID CHANNEL
         {
             log::warn!("Channel refused (invalid name): {}", self.peer_addr);

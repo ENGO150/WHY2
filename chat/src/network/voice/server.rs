@@ -39,6 +39,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    mem,
     sync::LazyLock,
     net::SocketAddr,
     time::{ Instant, Duration },
@@ -75,8 +76,6 @@ pub struct Connection
 {
     /// The client's UDP address.
     addr: SocketAddr,          //ADDRESS OF CONNECTION
-    /// The client's session id on the main connection.
-    id: usize,                 //ID ON TEXT CHAT
     /// Last sequence number received.
     seq: usize,                //SEQUENCE NUMBER
     /// Last sequence number sent.
@@ -91,11 +90,26 @@ pub struct Connection
     throttled: bool,           //THE LAST PACKET WAS ALREADY OVER THE RATE
 }
 
-//LISTS
-//CONNECTION (NONE UNTIL Hello), USERNAME, TOKEN
-/// Every voice session, by session id: the bound connection (`None` until a valid `Hello`),
-/// the username and the token.
-pub static CONNECTIONS: LazyLock<DashMap<usize, (Option<Connection>, String, [u8; 32])>> = LazyLock::new(|| DashMap::new()); //LIST FOR EACH CLIENT CONNECTION
+/// The current voice slot for one account.
+pub struct VoiceSlot
+{
+    pub owner_addr: SocketAddr,
+    pub username: String,
+    pub channel: Option<String>,
+    pub(super) token: [u8; 32],
+    pub(super) connection: Option<Connection>,
+}
+
+struct Recipient
+{
+    id: usize,
+    addr: SocketAddr,
+    token: [u8; 32],
+    keys: SharedKeys,
+}
+
+/// Voice slots by account ID.
+pub(super) static CONNECTIONS: LazyLock<DashMap<usize, VoiceSlot>> = LazyLock::new(|| DashMap::new());
 
 //IMPLEMENTATIONS
 impl Connection
@@ -149,6 +163,21 @@ impl Connection
         self.refill = Instant::now();
 
         self.credit >= 0.0
+    }
+}
+
+impl Recipient
+{
+    fn from_slot(id: usize, slot: &VoiceSlot) -> Option<Self>
+    {
+        let addr = slot.connection.as_ref()?.addr;
+        let keys = server::CONNECTIONS.get(&slot.owner_addr)?.keys()?.clone();
+        Some(Self { id, addr, token: slot.token, keys })
+    }
+
+    async fn send(&self, socket: &UdpSocket, sender: usize, code: VoicePacketCode)
+    {
+        voice::send(socket, sender, code, &self.addr, &self.id, &self.token, &self.keys).await.ok();
     }
 }
 
@@ -210,56 +239,70 @@ fn tokens_match(a: &[u8; 32], b: &[u8; 32]) -> bool //COMPARE WITHOUT LEAKING WH
 }
 
 //PUBLIC
-/// Opens a voice session for a client and returns the token its `Hello` must carry.
-pub fn open_connection(id: usize, username: String) -> [u8; 32] //OPEN A VOICE SLOT AND HAND OUT ITS TOKEN
+/// Opens a voice session and returns its token and any displaced slot.
+pub fn open_connection(id: usize, owner_addr: SocketAddr, username: String, channel: Option<String>) -> ([u8; 32], Option<VoiceSlot>)
 {
-    //GENERATE RANDOM TOKEN
     let mut token = [0u8; 32];
     SysRng.try_fill_bytes(&mut token).unwrap();
 
-    //THE SLOT STAYS UNBOUND UNTIL A Hello ARRIVES
-    CONNECTIONS.insert(id, (None, username, token));
-
-    token
-}
-
-/// Returns the session keys of client `id`.
-pub fn find_key(id: &usize) -> Option<SharedKeys>
-{
-    server::CONNECTIONS.iter()
-        .find(|entry| entry.value().id() == Some(id))
-        .map(|c| c.keys().unwrap().clone())
-}
-
-/// Returns the channel of client `id`; the outer `None` means the client is gone.
-pub fn find_channel(id: &usize) -> Option<Option<String>>
-{
-    server::CONNECTIONS.iter()
-        .find(|entry| entry.value().id() == Some(id))
-        .map(|c| c.channel().clone())
-}
-
-/// Closes a voice session.
-pub fn remove_connection(id: &usize) //REMOVE CONNECTION
-{
-    //KEY THE LINE BY THE TCP CONNECTION
-    if let Some((_, (conn, _, _))) = CONNECTIONS.remove(id)
+    let previous = CONNECTIONS.insert(id, VoiceSlot
     {
-        log::info!("Close voice connection ({}): {}",
-            if conn.is_some() { "bound" } else { "never bound" }, server::log_addr(id));
-    }
+        owner_addr,
+        username,
+        channel,
+        token,
+        connection: None,
+    });
+
+    (token, previous)
 }
 
-/// Resets the main connection's inactivity timer, so a user talking in voice is not dropped for
-/// not typing.
-pub fn reset_last_activity(id: &usize)
+/// Gets the slot token together with its owner's current keys.
+pub(super) fn find_key(id: &usize) -> Option<([u8; 32], SharedKeys)>
 {
-    if let Some(mut conn) = server::CONNECTIONS.iter_mut()
-        .find(|entry| entry.value().id() == Some(id))
+    let slot = CONNECTIONS.get(id)?;
+    let conn = server::CONNECTIONS.get(&slot.owner_addr)?;
+    Some((slot.token, conn.keys()?.clone()))
+}
+
+/// Closes a voice slot if the requesting connection still owns it.
+pub fn remove_connection(id: usize, owner_addr: SocketAddr, token: Option<&[u8; 32]>) -> Option<VoiceSlot>
+{
+    let (_, slot) = CONNECTIONS.remove_if(&id, |_, slot|
+        slot.owner_addr == owner_addr && token.is_none_or(|token| tokens_match(token, &slot.token)))?;
+
+    log::info!("Close voice connection ({}): {owner_addr}", if slot.connection.is_some() { "bound" } else { "never bound" });
+    Some(slot)
+}
+
+/// Moves the owner's voice slot to another channel and returns the previous channel.
+pub fn move_connection(id: usize, owner_addr: SocketAddr, channel: Option<String>) -> Option<Option<String>>
+{
+    let mut slot = CONNECTIONS.get_mut(&id)?;
+    if slot.owner_addr != owner_addr { return None; }
+    Some(mem::replace(&mut slot.channel, channel))
+}
+
+/// Builds a voice roster for a main connection's current channel.
+pub fn roster(id: usize, channel: &Option<String>) -> Vec<(usize, String)>
+{
+    CONNECTIONS.iter().filter(|slot| *slot.key() != id && &slot.channel == channel)
+        .map(|slot| (*slot.key(), slot.username.clone())).collect()
+}
+
+fn reset_last_activity(owner_addr: &SocketAddr)
+{
+    if let Some(mut conn) = server::CONNECTIONS.get_mut(owner_addr)
     {
         *conn.last_activity_mut() = Instant::now() -
             Duration::from_millis(config::read_config("min_message_delay"));
     }
+}
+
+fn recipients(sender: usize, channel: &Option<String>) -> Vec<Recipient>
+{
+    CONNECTIONS.iter().filter(|slot| *slot.key() != sender && &slot.channel == channel)
+        .filter_map(|slot| Recipient::from_slot(*slot.key(), slot.value())).collect()
 }
 
 //MAIN FUNCTION
@@ -276,38 +319,44 @@ pub async fn listen_client_voice(socket: UdpSocket)
     //LOOP RECEIVING
     loop
     {
-        let (received, addr) = voice::receive(&socket).await.unwrap();
+        let (received, addr, slot_token) = voice::receive(&socket).await.unwrap();
 
-        //CLIENT USERNAME
-        let username: String;
+        let (owner_addr, username, channel);
 
         //CHECK IF ID IS IN CONNECTIONS
         if let Some(mut entry) = CONNECTIONS.get_mut(&received.id)
         {
+            //DROP PACKETS DECRYPTED BEFORE THE SLOT CHANGED OWNERS
+            if !tokens_match(&slot_token, &entry.token) { continue; }
+            owner_addr = entry.owner_addr;
+
             //ONLY A Hello WITH THE RIGHT TOKEN CLAIMS A SLOT
             let valid_hello = match received.code
             {
-                VoicePacketCode::Hello { ref token } => tokens_match(token, &entry.2),
+                VoicePacketCode::Hello { ref token } =>
+                {
+                    if !tokens_match(token, &entry.token) { continue; }
+                    true
+                },
                 _ => false
             };
 
             //FOUND, CHECK ADDRESS
-            if let Some(conn) = entry.0.as_mut()
+            if let Some(conn) = entry.connection.as_mut()
             {
                 if conn.addr != addr
                 {
                     //ANYTHING ELSE ONLY FOLLOWS A NAT SHIFT
                     if valid_hello || conn.addr.ip() == addr.ip()
                     {
-                        log::debug!("Voice session moved ({}): main connection {}",
-                            if valid_hello { "hello" } else { "NAT port shift" }, server::log_addr(&received.id));
+                        log::debug!("Voice session moved ({}): main connection {owner_addr}",
+                            if valid_hello { "hello" } else { "NAT port shift" });
 
                         conn.addr = addr;
                     } else
                     {
                         //IGNORE NON-MATCHING ADDRESS (SPOOFING)
-                        log::warn!("Voice packet from an unexpected address ignored: main connection {}",
-                            server::log_addr(&received.id));
+                        log::warn!("Voice packet from an unexpected address ignored: main connection {owner_addr}");
 
                         continue;
                     }
@@ -323,8 +372,7 @@ pub async fn listen_client_voice(socket: UdpSocket)
                     if !conn.throttled
                     {
                         conn.throttled = true;
-                        log::warn!("Voice packets over the rate dropped: main connection {}",
-                            server::log_addr(&received.id));
+                        log::warn!("Voice packets over the rate dropped: main connection {owner_addr}");
                     }
 
                     continue;
@@ -337,17 +385,16 @@ pub async fn listen_client_voice(socket: UdpSocket)
                 if conn.packet_accumulator >= consts::ACTIVITY_TRESHOLD
                 {
                     conn.packet_accumulator = 0; //RESET ACCUM
-                    reset_last_activity(&received.id); //RESET ACTIVITY TIMER
+                    reset_last_activity(&owner_addr); //RESET ACTIVITY TIMER
                 }
             } else //NOT BOUND YET, ADD ADDRESS
             {
                 //WITHOUT THE TOKEN THERE IS NOTHING TO BIND TO
                 if !valid_hello { continue; }
 
-                entry.0 = Some(Connection
+                entry.connection = Some(Connection
                 {
                     addr: addr,
-                    id: received.id,
                     seq: received.seq,
                     server_seq: 0,
                     packet_accumulator: 0,
@@ -356,135 +403,63 @@ pub async fn listen_client_voice(socket: UdpSocket)
                     throttled: false,
                 });
 
-                log::info!("New voice connection: {}", server::log_addr(&received.id));
+                log::info!("New voice connection: {owner_addr}");
             }
 
             //SET USERNAME
-            username = entry.1.clone();
+            username = entry.username.clone();
+            channel = entry.channel.clone();
         } else { continue; } //IGNORE UNRECOGNIZED CONNECTIONS
 
-        //CODES
         match received.code
         {
-            //HANDSHAKE - ANSWER EVERY Hello, REPEATS INCLUDED
             VoicePacketCode::Hello { .. } =>
             {
-                if let Some(ref keys) = find_key(&received.id)
+                let recipient = CONNECTIONS.get(&received.id)
+                    .filter(|slot| tokens_match(&slot_token, &slot.token))
+                    .and_then(|slot| Recipient::from_slot(received.id, slot.value()));
+                if let Some(recipient) = recipient
                 {
-                    voice::send(&socket, received.id, VoicePacketCode::HelloAck, &addr, &received.id, keys).await.ok();
+                    recipient.send(&socket, received.id, VoicePacketCode::HelloAck).await;
                 }
-
-                continue;
             },
 
-            //AUDIO
             VoicePacketCode::Audio { data, .. } =>
             {
-                //SILENCE MUTED USERS
-                if server::CONNECTIONS.iter().find(|c| c.id() == Some(&received.id))
-                    .is_none_or(|c| *c.muted()) { continue; } //GONE COUNTS AS MUTED
-
-                //VALIDATE PACKET IF IT CONTAINS AUDIO
+                if server::CONNECTIONS.get(&owner_addr).is_none_or(|conn| *conn.muted()) { continue; }
                 if !validate_opus_packet(&data)
                 {
-                    log::debug!("Malformed opus packet dropped: main connection {}", server::log_addr(&received.id));
+                    log::debug!("Malformed opus packet dropped: main connection {owner_addr}");
                     continue;
                 }
 
-                //FIND SENDER'S CHANNEL
-                let sender_channel = find_channel(&received.id);
-
-                //COLLECT ALL ADDRESSES
-                let mut addresses: Vec<(SocketAddr, SharedKeys, usize)> = Vec::new();
-                for connection in CONNECTIONS.iter()
+                for recipient in recipients(received.id, &channel)
                 {
-                    if let (Some(conn), _, _) = connection.value()
-                    {
-                        //DO NOT SEND BACK TO SENDER (LOOPBACK)
-                        if conn.addr != addr
-                        {
-                            //SEND ONLY TO SAME CHANNEL
-                            if sender_channel != find_channel(&conn.id) { continue; }
-
-                            //FIND CONNECTION KEYS
-                            if let Some(keys) = find_key(&conn.id)
-                            {
-                                addresses.push((conn.addr, keys, conn.id));
-                            }
-                        }
-                    }
-                }
-
-                //SEND TO ALL
-                for (addr, keys, recipient_id) in addresses.iter()
-                {
-                    voice::send(&socket, received.id, VoicePacketCode::Audio
+                    recipient.send(&socket, received.id, VoicePacketCode::Audio
                     {
                         data: data.clone(),
                         username: Some(username.clone()),
-                    }, addr, recipient_id, keys).await.ok();
+                    }).await;
                 }
-            }
+            },
 
-            //PING - BROADCAST TO ALL CLIENTS IN SAME CHANNEL
             VoicePacketCode::Ping { timestamp } =>
             {
-                //FIND SENDER'S CHANNEL
-                let sender_channel = find_channel(&received.id);
-
-                //COLLECT ALL ADDRESSES
-                let mut addresses: Vec<(SocketAddr, SharedKeys, usize)> = Vec::new();
-                for connection in CONNECTIONS.iter()
+                for recipient in recipients(received.id, &channel)
                 {
-                    if let (Some(conn), _, _) = connection.value()
-                    {
-                        //DO NOT SEND BACK TO SENDER (LOOPBACK)
-                        if conn.addr != addr
-                        {
-                            //SEND ONLY TO SAME CHANNEL
-                            if sender_channel != find_channel(&conn.id) { continue; }
-
-                            //FIND CONNECTION KEYS
-                            if let Some(keys) = find_key(&conn.id)
-                            {
-                                addresses.push((conn.addr, keys, conn.id));
-                            }
-                        }
-                    }
+                    recipient.send(&socket, received.id, VoicePacketCode::Ping { timestamp }).await;
                 }
+            },
 
-                //SEND TO ALL
-                for (addr, keys, recipient_id) in addresses.iter()
-                {
-                    voice::send(&socket, received.id, VoicePacketCode::Ping
-                    {
-                        timestamp,
-                    }, addr, recipient_id, keys).await.ok();
-                }
-            }
-
-            //FORWARD PONG (UNICAST)
             VoicePacketCode::Pong { target_id, timestamp } =>
             {
-                if let Some(ref keys) = find_key(&target_id)
+                let recipient = CONNECTIONS.get(&target_id)
+                    .filter(|slot| slot.channel == channel)
+                    .and_then(|slot| Recipient::from_slot(target_id, slot.value()));
+                if let Some(recipient) = recipient
                 {
-                    //FIND ADDRESS OF RECIPIENT (DA PINGA)
-                    let addr = match CONNECTIONS.get(&target_id)
-                        .and_then(|entry| entry.0.as_ref().map(|conn| conn.addr))
-                    {
-                        Some(a) => a,
-                        None => continue
-                    };
-
-                    //FORWARD
-                    voice::send(&socket, received.id, VoicePacketCode::Pong
-                    {
-                        target_id,
-                        timestamp,
-                    }, &addr, &target_id, keys).await.ok();
+                    recipient.send(&socket, received.id, VoicePacketCode::Pong { target_id, timestamp }).await;
                 }
-
-                continue;
             },
 
             _ => {},

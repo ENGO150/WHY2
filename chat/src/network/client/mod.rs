@@ -460,7 +460,7 @@ pub enum ClientEvent
     /// The server never answered the voice handshake.
     VoiceHandshakeFailed,                                        //THE SERVER NEVER ANSWERED THE UDP HANDSHAKE
     /// We left voice.
-    VoiceDisabled,                                               //VOICE CHAT DISABLED
+    VoiceDisabled { moved: bool },                               //VOICE CHAT DISABLED
     /// The user list.
     List
     {
@@ -1234,8 +1234,15 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                         ClientEvent::VoiceEnabled
                     },
 
-                    None => ClientEvent::VoiceDisabled,
+                    None => ClientEvent::VoiceDisabled { moved: false },
                 }).await.unwrap();
+            },
+
+            #[cfg(feature = "client_voice")]
+            PacketCode::VoiceMoved =>
+            {
+                voice_options::set_use_voice(false);
+                tx.send(ClientEvent::VoiceDisabled { moved: true }).await.unwrap();
             },
 
             //THE WHOLE VOICE ROSTER

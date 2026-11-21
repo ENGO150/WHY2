@@ -139,10 +139,11 @@ pub struct VoicePacket //VOICE PACKET (WHAT IS BEING SENT)
 ///
 /// # Parameters
 /// - `socket`: The UDP socket.
-/// - `id`: The session id the packet is from or about.
+/// - `id`: The account ID the packet is from or about.
 /// - `code`: The payload.
 /// - `addr`: The recipient's address (server only).
-/// - `recipient_id`: The recipient's session id (server only).
+/// - `recipient_id`: The recipient's account ID (server only).
+/// - `recipient_token`: The recipient's current voice slot token (server only).
 /// - `keys`: The session keys.
 ///
 /// # Returns
@@ -154,6 +155,7 @@ pub async fn send //SEND DATA TO UDP
     code: VoicePacketCode,
     #[cfg(feature = "server")] addr: &SocketAddr,
     #[cfg(feature = "server")] recipient_id: &usize,
+    #[cfg(feature = "server")] recipient_token: &[u8; 32],
     keys: &SharedKeys
 ) -> Result<usize, Error>
 {
@@ -168,12 +170,13 @@ pub async fn send //SEND DATA TO UDP
     //SET SERVER SEQ
     #[cfg(feature = "server")]
     {
-        if let Some(mut conn) = server::CONNECTIONS.get_mut(recipient_id) &&
-            let Some(conn) = conn.0.as_mut()
-        {
-            packet.seq = conn.server_seq() + 1;
-            *conn.server_seq_mut() = packet.seq;
-        }
+        let Some(mut slot) = server::CONNECTIONS.get_mut(recipient_id) else { return Ok(0); };
+        if &slot.token != recipient_token { return Ok(0); }
+        let Some(conn) = slot.connection.as_mut() else { return Ok(0); };
+        if conn.peer_addr() != addr { return Ok(0); }
+
+        packet.seq = conn.server_seq() + 1;
+        *conn.server_seq_mut() = packet.seq;
     }
 
     //SET SEQ
@@ -212,22 +215,31 @@ pub async fn send //SEND DATA TO UDP
     }
 }
 
+#[cfg(feature = "server")]
+type ReceivedVoice = (VoicePacket, SocketAddr, [u8; 32]);
+#[cfg(not(feature = "server"))]
+type ReceivedVoice = (VoicePacket, SocketAddr);
+
 /// Receives the next valid voice packet.
 ///
 /// A datagram that is too short, names an unknown session, fails verification or does not
 /// decode is skipped. On the client the wait is polled so it notices voice being turned off.
 ///
 /// # Returns
-/// - `Some((packet, sender address))`.
+/// - The packet and sender address, plus the voice slot token on the server.
 /// - `None` once the client has left voice.
-pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //RECEIVE UDP PACKET & DECODE
+pub async fn receive //RECEIVE UDP PACKET & DECODE
+(
+    socket: &UdpSocket,
+    #[cfg(not(feature = "server"))] is_current: impl Fn() -> bool,
+) -> Option<ReceivedVoice>
 {
     let mut buffer = [0u8; 2048];
     loop //WAIT UNTIL PACKET ARRIVES
     {
         //CHECK FOR VOICE DISABLE
         #[cfg(feature = "client_base")]
-        if !options::get_use_voice() { break None; }
+        if !options::get_use_voice() || !is_current() { break None; }
 
         let (len, addr) =
         {
@@ -255,7 +267,7 @@ pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //
 
         //ID THE KEYS WERE PICKED BY (SERVER ONLY)
         #[cfg(feature = "server")]
-        let sender_id: usize;
+        let (sender_id, slot_token);
 
         //GET ID ON SERVER
         let keys =
@@ -276,7 +288,11 @@ pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //
 
                 match server::find_key(&id)
                 {
-                    Some(k) => k,
+                    Some((token, keys)) =>
+                    {
+                        slot_token = token;
+                        keys
+                    },
                     None => continue
                 }
             }
@@ -306,6 +322,10 @@ pub async fn receive(socket: &UdpSocket) -> Option<(VoicePacket, SocketAddr)> //
         #[cfg(feature = "server")]
         if packet.id != sender_id { continue; }
 
-        return Some((packet, addr))
+        #[cfg(feature = "server")]
+        return Some((packet, addr, slot_token));
+
+        #[cfg(not(feature = "server"))]
+        return is_current().then_some((packet, addr));
     }
 }

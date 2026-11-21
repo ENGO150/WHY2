@@ -649,6 +649,10 @@ pub enum PacketCode //CONTROL CODES
 
     /// Marks incoming messages from a peer through an account-local id as read.
     PrivateRead { peer: String, through: u64 },
+    /// Cancels a voice slot when the client cannot start audio or complete its handshake.
+    VoiceCancel { token: [u8; 32] },
+    /// Tells the previous voice owner that another device took over.
+    VoiceMoved,
 }
 
 //IMPLEMENTATIONS
@@ -760,6 +764,8 @@ impl PacketCode
             Self::MuteScreenRequest { .. }     => "MuteScreenRequest",
             Self::MuteScreen { .. }            => "MuteScreen",
             Self::VoiceRequest { .. }          => "VoiceRequest",
+            Self::VoiceCancel { .. }           => "VoiceCancel",
+            Self::VoiceMoved { .. }            => "VoiceMoved",
             Self::Voice { .. }                 => "Voice",
             Self::Join { .. }                  => "Join",
             Self::ListRequest { .. }           => "ListRequest",

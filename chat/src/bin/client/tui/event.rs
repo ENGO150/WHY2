@@ -450,13 +450,14 @@ impl App
                 self.push_styled(t!("event.voice_handshake_failed"), theme::error());
             },
 
-            ClientEvent::VoiceDisabled =>
+            ClientEvent::VoiceDisabled { moved } =>
             {
                 //ONLY OUR OWN HALF OF THE PANEL GOES
                 self.voice_enabled = false;
                 self.voice_activity.clear();
                 self.rebuild_voice();
-                self.push_styled(t!("event.voice_disabled"), theme::dim());
+                let message = if moved { t!("event.voice_moved") } else { t!("event.voice_disabled") };
+                self.push_styled(message, theme::dim());
             },
 
             //SERVER MESSAGE

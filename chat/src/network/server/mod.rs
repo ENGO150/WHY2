@@ -151,6 +151,48 @@ type PresencePacket = (PacketCode, Option<Sender<()>>);
 //IMPLEMENTATIONS
 impl Presence
 {
+    fn send(&self, peer_addr: &SocketAddr, code: PacketCode)
+    {
+        if let Some(sender) = self.clients.get(peer_addr)
+        {
+            let _ = sender.send((code, None));
+        }
+    }
+
+    fn send_voice_roster(&self, peer_addr: &SocketAddr, id: usize, channel: &Option<String>)
+    {
+        self.send(peer_addr, PacketCode::VoiceClients { clients: voice_server::roster(id, channel) });
+    }
+
+    fn close_voice(&mut self, peer_addr: SocketAddr, id: usize, token: Option<&[u8; 32]>) -> bool
+    {
+        let Some(slot) = voice_server::remove_connection(id, peer_addr, token) else { return false; };
+        self.send(&peer_addr, PacketCode::Voice { token: None });
+        self.broadcast(PacketCode::VoiceLeave { id, channel: slot.channel });
+        true
+    }
+
+    fn toggle_voice(&mut self, peer_addr: SocketAddr, id: usize, username: &str, channel: &Option<String>)
+    {
+        if !self.clients.contains_key(&peer_addr) || self.close_voice(peer_addr, id, None) { return; }
+
+        //REPLACE THE SLOT BEFORE NOTIFYING EITHER DEVICE
+        let (token, previous) = voice_server::open_connection(id, peer_addr, username.to_string(), channel.clone());
+        if let Some(previous) = previous
+        {
+            log::info!("Voice moved from {} to {peer_addr}", previous.owner_addr);
+            self.send(&previous.owner_addr, PacketCode::VoiceMoved);
+            self.broadcast(PacketCode::VoiceLeave { id, channel: previous.channel });
+        } else
+        {
+            log::info!("Voice slot opened: {peer_addr}");
+        }
+
+        self.send(&peer_addr, PacketCode::Voice { token: Some(token) });
+        self.broadcast(PacketCode::VoiceJoin { username: username.to_string(), id, channel: channel.clone() });
+        self.send_voice_roster(&peer_addr, id, channel);
+    }
+
     fn broadcast(&mut self, code: PacketCode)
     {
         self.clients.retain(|_, sender| sender.send((code.clone(), None)).is_ok());
@@ -437,17 +479,6 @@ pub struct PendingToken
 }
 
 //FUNCTIONS
-//A CLIENT'S MAIN ADDRESS (NEVER UNDER A GUARD)
-/// Returns the main-connection address of client `id`, for logging an auxiliary connection.
-///
-/// Walks [`CONNECTIONS`], so it must never be called while a guard on that map is held.
-pub fn log_addr(id: &usize) -> String
-{
-    CONNECTIONS.iter().find(|conn| conn.id() == Some(id))
-        .map(|conn| conn.peer_addr().to_string())
-        .unwrap_or_else(|| String::from("<gone>"))
-}
-
 /// Spawns a task that is handed its own [`AbortHandle`].
 ///
 /// The handle is passed through a oneshot before the task body runs, so a task can register
@@ -601,6 +632,11 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         }) else { return; };
 
         presence.clients.remove(peer_addr);
+        if let Some(&id) = connection.id()
+        {
+            presence.close_voice(*peer_addr, id, None);
+        }
+
         if let (Some(username), Some(id)) = (connection.username(), connection.id()) && !user_connected(username)
         {
             //UNLIST SHARED FILES ON THE FINAL DISCONNECT
@@ -659,20 +695,6 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
             {
                 username: connection.username().unwrap().to_owned(),
             }).await;
-        }
-
-        //DISCONNECT FROM VOICE CHAT
-        if options::voice_chat_enabled()
-        {
-            let id = *connection.id().unwrap();
-
-            //VOICE MEMBERSHIP ENDS INDEPENDENTLY OF ONLINE VISIBILITY
-            if voice_server::CONNECTIONS.contains_key(&id)
-            {
-                send_to_all(PacketCode::VoiceLeave { id, channel: connection.channel().clone() });
-            }
-
-            voice_server::remove_connection(&id);
         }
     }
 
@@ -910,48 +932,6 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             });
         }
     }
-}
-
-/// Sends client `id` the voice roster of its channel, itself excluded.
-async fn send_voice_clients(stream: &mut OwnedWriteHalf, keys: &SharedKeys, id: usize)
-{
-    //FIND CHANNEL
-    let sender_channel = match CONNECTIONS.iter().find(|e| e.value().id() == Some(&id))
-    {
-        Some(entry) => entry.value().channel().clone(),
-        None => return,
-    };
-
-    let mut clients: Vec<(usize, String)> = Vec::new();
-
-    //COLLECT VOICE CLIENTS
-    for entry in CONNECTIONS.iter()
-    {
-        let conn = entry.value();
-
-        let uid = match conn.id()
-        {
-            Some(i) => *i,
-            None => continue
-        };
-
-        //FILTERS
-        if uid == id { continue; } // IGNORE SELF
-        if conn.channel() != &sender_channel { continue; } //IGNORE ANOTHER CHANNELS
-
-        //CHECK IF IS IN VOICE
-        if voice_server::CONNECTIONS.contains_key(&uid)
-        {
-            //ADD USERNAMES
-            if let Some(username) = conn.username()
-            {
-                 clients.push((uid, username.clone()));
-            }
-        }
-    }
-
-    //SEND
-    network::send(stream, PacketCode::VoiceClients { clients }, Some(keys)).await;
 }
 
 /// Mints a one-time token for an auxiliary connection of client peer address.
@@ -1407,7 +1387,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //TELL THE CLIENT WHO IS ALREADY IN VOICE
     if options::voice_chat_enabled()
     {
-        send_voice_clients(&mut *streams.1.lock().await, &keys, id).await;
+        PRESENCE.lock().unwrap().send_voice_roster(&peer_addr, id, &None);
     }
 
     //THE PACKET LOOP LIVES IN ITS OWN MODULE
