@@ -59,7 +59,16 @@ use crate::
     {
         self,
         voice::server as voice_server,
-        file::{ server as file, UploadKind },
+        file::
+        {
+            UploadKind,
+            server::
+            {
+                self as file,
+                UploadTarget,
+                PrivateDestination,
+            },
+        },
         server::
         {
             self,
@@ -679,7 +688,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 .filter(|name| persistent || file::private_recipient_online(name, &self.username))
                 .ok_or(PacketCode::PrivateUploadUnavailable)?;
 
-            Some(file::PrivateDestination { recipient, persistent })
+            Some(PrivateDestination { recipient, persistent })
         } else { None };
 
         if private.is_none()
@@ -719,7 +728,7 @@ impl<'a, 's> ClientSession<'a, 's>
 
         let kind = media.transfer_kind(private.is_some());
         let uid = rand::random();
-        let target = file::UploadTarget { kind, hash, private };
+        let target = UploadTarget { kind, hash, private };
         let token = server::open_connection(self.id, ConnectionType::Upload { uid, target });
         Ok(Some((token, uid)))
     }
@@ -1678,7 +1687,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 let token = server::open_connection(self.id, ConnectionType::Upload
                 {
                     uid,
-                    target: file::UploadTarget { kind: UploadKind::Avatar, hash, private: None },
+                    target: UploadTarget { kind: UploadKind::Avatar, hash, private: None },
                 });
 
                 log::info!("Upload request (avatar): {}", self.peer_addr);
@@ -1787,7 +1796,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 let token = server::open_connection(self.id, ConnectionType::Upload
                 {
                     uid,
-                    target: file::UploadTarget { kind: UploadKind::Icon, hash, private: None },
+                    target: UploadTarget { kind: UploadKind::Icon, hash, private: None },
                 });
 
                 log::info!("Upload request (icon): {}", self.peer_addr);
