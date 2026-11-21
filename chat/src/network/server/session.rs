@@ -668,7 +668,7 @@ impl<'a, 's> ClientSession<'a, 's>
 
             let recipient = config::users::username(recipient)
                 .filter(|name| persistent || file::private_recipient_online(name, &self.username))
-                .ok_or(PacketCode::InvalidUsage)?;
+                .ok_or(PacketCode::PrivateUploadUnavailable)?;
 
             Some(file::PrivateDestination { recipient, persistent })
         } else { None };
@@ -1085,22 +1085,13 @@ impl<'a, 's> ClientSession<'a, 's>
         //A LIVE SESSION, OR - WITH THE PRIVATE HISTORY ON - AN OFFLINE ACCOUNT
         let persistent = config::read_config::<bool>("persistent_private_messages");
 
-        //PREVENT "OFFLINE" USERS FROM SENDING PMs (IF PERSISTENT PMs ARE DISABLED)
-        if !persistent && !config::users::online_status(&self.username) &&
-            config::read_config::<bool>("disable_ghost_pms")
-        {
-            self.send(PacketCode::InvalidUsage).await;
-            return PacketFlow::Continue;
-        }
-
         let live = server::CONNECTIONS.iter()
             .find(|entry| entry.value().id() == Some(&recipient_id))
             .map(|entry| *entry.key());
 
         let recipient = live.and_then(|addr|
             server::CONNECTIONS.get(&addr).and_then(|conn| conn.username().cloned())
-                .filter(|username| persistent || config::users::online_status(username) || //PRETEND THE USER IS ACTUALLY OFFLINE
-                    !config::read_config::<bool>("disable_ghost_pms"))
+                .filter(|username| server::private_live_allowed(&self.username, username))
                 .map(|username| (Some(addr), username))) //GUARD DROPPED HERE
             .or_else(||
             {

@@ -157,6 +157,14 @@ fn session_of(id: usize) -> Option<SocketAddr> //THE SESSION THE ACCOUNT HAS OPE
         .map(|entry| *entry.key())
 }
 
+/// Whether both accounts may exchange live PMs under the server's presence settings.
+pub(crate) fn private_live_allowed(sender: &str, recipient: &str) -> bool
+{
+    !config::read_config::<bool>("disable_ghost_pms") ||
+        config::read_config::<bool>("persistent_private_messages") ||
+        (config::users::online_status(sender) && config::users::online_status(recipient))
+}
+
 /// Strips control characters from profile text and trims it.
 fn clean(text: &str) -> String //WHAT A CLIENT MAY PUT IN A PROFILE
 {

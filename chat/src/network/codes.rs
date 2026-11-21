@@ -634,6 +634,9 @@ pub enum PacketCode //CONTROL CODES
 
     /// Delivers a private attachment or voice note to one participant.
     PrivateMedia { message: StoredPrivateMessage, data: Option<Vec<u8>> },
+
+    /// The PM destination cannot receive the requested upload.
+    PrivateUploadUnavailable,
 }
 
 //IMPLEMENTATIONS
@@ -774,6 +777,7 @@ impl PacketCode
             Self::ChatUploadRequest { .. }     => "ChatUploadRequest",
             Self::ChatUploadReply { .. }       => "ChatUploadReply",
             Self::PrivateMedia { .. }          => "PrivateMedia",
+            Self::PrivateUploadUnavailable     => "PrivateUploadUnavailable",
         }
     }
 }

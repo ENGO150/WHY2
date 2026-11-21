@@ -382,6 +382,8 @@ pub enum ClientEvent
     InvalidUsage,                                                //INVALID COMMAND USAGE
     /// A message has no readable attachment on the server.
     AttachmentUnavailable { message_id: u64 },
+    /// The recipient could not receive a private upload.
+    PrivateUploadUnavailable,
     /// A message was deleted.
     Deleted
     {
@@ -1744,6 +1746,11 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             PacketCode::AttachmentUnavailable { message_id } =>
             {
                 tx.send(ClientEvent::AttachmentUnavailable { message_id }).await.unwrap();
+            },
+
+            PacketCode::PrivateUploadUnavailable =>
+            {
+                tx.send(ClientEvent::PrivateUploadUnavailable).await.unwrap();
             },
 
             PacketCode::InvalidUsage =>

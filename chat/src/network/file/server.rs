@@ -169,10 +169,9 @@ pub struct PrivateDestination
 /// Checks whether a transient private upload can reach its recipient.
 pub fn private_recipient_online(recipient: &str, sender: &str) -> bool
 {
-    let ghosts = !config::read_config::<bool>("disable_ghost_pms") ||
-        (config::users::online_status(recipient) && config::users::online_status(sender));
-
-    ghosts && server::CONNECTIONS.iter().any(|conn| conn.username().is_some_and(|name| name == recipient))
+    server::private_live_allowed(sender, recipient) &&
+        server::CONNECTIONS.iter().any(|conn|
+            matches!(conn.value(), server::connection::Connection::Authenticated { username, .. } if username == recipient))
 }
 
 /// An upload in progress.
@@ -716,10 +715,14 @@ async fn publish_private
     if !sender_connected { return; }
 
     let recipient = &target.recipient;
-    if (target.persistent && !config::private_messages::media_persistence_enabled()) ||
-        (!target.persistent && !private_recipient_online(recipient, sender))
+    if target.persistent && !config::private_messages::media_persistence_enabled()
     {
-        server::notify(id, PacketCode::InvalidUsage).await;
+        server::notify(id, PacketCode::InvalidFeature).await;
+        return;
+    }
+    if !target.persistent && !private_recipient_online(recipient, sender)
+    {
+        server::notify(id, PacketCode::PrivateUploadUnavailable).await;
         return;
     }
 

@@ -79,6 +79,7 @@ docker compose -f chat/docker-compose.yml up -d
 | `server_history_key`, `server_image_key` | At-rest keys |
 | `server_messages.bin`, `server_images/` | Stored lobby history and pictures |
 | `server_private_messages.bin` | Stored private message history |
+| `server_private_media/` | Encrypted files and voice notes referenced by private history |
 | `server_keys.toml` | Pinned servers (client) |
 | `WHY2-Uploads/` under temp | Uploaded files |
 
@@ -116,7 +117,9 @@ Aliases are available for every command. `Ctrl+<key>` runs the ones with a short
 
 `persistent` defaults to `true`. Use `/upload report.pdf` to attach a file to chat history, then `/download <message-id>` to retrieve it, including after a server restart. Downloads use a verified local cache when available, otherwise they request the file from the server. Use `/upload report.pdf false` for a temporary file share. Images are rendered inline as before. Persistent attachments use the existing 8 MB limit and are kept in the lobby when `persistent_messages` is enabled.
 
-With `persistent_private_messages` enabled, private messages are kept encrypted on the server and replayed to both accounts on login, and `/pm` can address an offline account id so the message is delivered on their next login. Offline messages require `max_persistent_private_messages` to be greater than zero and remain subject to that history limit. Private history appears in a separate conversation for each account, including older pages. Open it with `/pm <id>`, then type messages normally; use `/pm` to return to your previous channel. Incoming messages show a notification without displaying their contents in public panes. Files, images and voice messages are not supported in PM views yet. Existing private history is migrated using its saved timestamps where available.
+With `persistent_private_messages` enabled, private messages are kept encrypted on the server and replayed to both accounts on login, and `/pm` can address an offline account id so the message is delivered on their next login. Offline messages require `max_persistent_private_messages` to be greater than zero and remain subject to that history limit. Private history appears in a separate conversation for each account, including older pages. Open it with `/pm <id>`, then type messages normally; use `/pm` to return to your previous channel. Incoming messages show a notification without displaying their contents in public panes. Existing private history is migrated using its saved timestamps where available.
+
+Inside a PM, use `/upload report.pdf` to keep a file in private history or `/upload report.pdf false` to send it live. Use `/download p<id>` to save a received file. Both accounts can open the file. Persistent uploads require both `persistent_messages` and `persistent_private_messages`, plus a nonzero `max_persistent_private_messages`. Private files use the chat attachment size limit. Live transfers require both accounts to be connected and are available from the local attachment cache after delivery. Voice notes sent with `/record` are retained when both persistence settings allow it and sent live otherwise.
 
 PM message IDs have a `p` prefix, such as `#p12`, and are local to each account. The same PM can have different IDs for its two participants; unrelated conversations do not advance your counter. Stored PMs support `/heart p12`, `/hearts p12`, `/edit p12 new text`, `/delete p12`, and `/reply p12 answer`. Only the author may edit or delete a PM; either participant may react. Replies and action updates stay between the two accounts, and changes are kept for offline participants. Existing PMs keep their contents and actions when migrated, but receive new per-account IDs.
 

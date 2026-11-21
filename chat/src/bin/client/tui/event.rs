@@ -397,6 +397,9 @@ impl App
             ClientEvent::AttachmentUnavailable { message_id } =>
                 self.push_styled(t!("event.attachment_unavailable", message_id), theme::error()),
 
+            ClientEvent::PrivateUploadUnavailable =>
+                self.push_styled(t!("pm.recipient_unavailable"), theme::error()),
+
             ClientEvent::InvalidUsage =>
             {
                 //A REFUSED SAVE LEAVES THE BOX EDITABLE
