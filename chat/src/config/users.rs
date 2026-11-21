@@ -38,9 +38,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! ```
 //!
 //! The profile lives in its own subtable so that nothing reading or writing a profile can reach
-//! the password hash. A missing key reads as empty, so entries that predate a field need no
-//! migration; a missing online status reads as `true`. Ids are the exception and are assigned to
-//! older entries at startup.
+//! the password hash. Missing profile fields read as empty strings, and a missing online
+//! status reads as `true`.
 
 use toml_edit::
 {
@@ -116,18 +115,12 @@ fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD O
     });
 }
 
-/// Writes a profile field of an existing account, creating the profile if missing.
+/// Writes a profile field of an existing account.
 fn write_profile_field(username: &str, key: &str, value: Value) //WRITE ONE PROFILE FIELD TO server_users.toml
 {
     super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
     {
         let Some(user) = doc.get_mut(username).and_then(Item::as_table_like_mut) else { return; };
-
-        //CREATE THE PROFILE FOR OLDER ACCOUNTS
-        if user.get(PROFILE_TABLE).and_then(Item::as_table_like).is_none()
-        {
-            user.insert(PROFILE_TABLE, Item::Table(Table::new()));
-        }
 
         user.get_mut(PROFILE_TABLE).and_then(Item::as_table_like_mut)
             .expect("Profile entry is not a table").insert(key, Item::Value(value));
@@ -141,28 +134,6 @@ fn next_id(doc: &DocumentMut) -> usize //THE NEXT FREE ACCOUNT ID
         .filter_map(|(_, user)| user.as_table_like()?.get(ID_KEY)?.as_integer())
         .max()
         .map_or(0, |id| id as usize + 1)
-}
-
-/// Gives accounts that predate ids one, oldest first.
-///
-/// Accounts are appended as they register, so the file's order is oldest first.
-pub fn migrate() //NUMBER THE ACCOUNTS FROM AN OLDER server_users.toml
-{
-    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
-    {
-        let mut next = next_id(doc);
-
-        for (_, entry) in doc.as_table_mut().iter_mut()
-        {
-            let Some(user) = entry.as_table_like_mut() else { continue };
-
-            //AN ACCOUNT THAT ALREADY HAS AN ID KEEPS IT
-            if user.get(ID_KEY).is_some() { continue; }
-
-            user.insert(ID_KEY, Item::Value((next as i64).into()));
-            next += 1;
-        }
-    });
 }
 
 /// Returns the number of registered accounts.

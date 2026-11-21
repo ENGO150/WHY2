@@ -33,10 +33,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! file's modification time and length and reparses only when they changed, so an edit made by
 //! hand is still picked up, while our own writes update the stamp and cost no reparse.
 //!
-//! # Migration
-//! A key missing from an existing file is not an error: [`read_config`] rebuilds the file from
-//! the built-in default, keeping every value the old file had, and reads again. A new setting
-//! therefore appears in users' files the first time it is read.
+//! Missing main configuration settings use the built-in defaults.
 
 //MODULES
 #[cfg(feature = "server")]
@@ -172,7 +169,7 @@ fn with_cached_mut<F: FnOnce(&mut DocumentMut) -> R, R>(path: &str, f: F) -> R
     result
 }
 
-/// Reads one key from a configuration file, migrating the file if the key is missing.
+/// Reads one key from a configuration file, using built-in defaults for main settings.
 ///
 /// # Type Parameters
 /// - `T`: The type the value is parsed into.
@@ -182,19 +179,28 @@ fn with_cached_mut<F: FnOnce(&mut DocumentMut) -> R, R>(path: &str, f: F) -> R
 /// - `key`: The top-level key.
 ///
 /// # Panics
-/// If the value has an unsupported datatype, does not parse as `T`, or the key is missing from
-/// the built-in default as well.
+/// If the value has an unsupported datatype, does not parse as `T`, or has no saved or
+/// default value.
 fn config_read<T: FromStr>(filename: &str, key: &str) -> T //READ CONFIG
 where
     T::Err: Debug,
 {
     let path = config_path(filename);
 
-    //READ
-    let found = with_cached(&path, |data| data.get(key).map(|value|
+    static DEFAULT_CONFIG: LazyLock<DocumentMut> = LazyLock::new(||
+        get_config().parse().expect("Failed to parse default config"));
+
+    let value = with_cached(&path, |data|
     {
-        //USE APPROPRIATE DATATYPE
-        match value.as_value().expect("Invalid config")
+        let default = || match filename
+        {
+            consts::CLIENT_CONFIG | consts::SERVER_CONFIG => DEFAULT_CONFIG.get(key),
+            _ => None,
+        };
+
+        let item = data.get(key).or_else(default).unwrap_or_else(|| panic!("Missing config key: {key}"));
+
+        match item.as_value().expect("Invalid config")
         {
             Value::String(s) => s.value().to_string(),
             Value::Integer(i) => i.value().to_string(),
@@ -202,30 +208,9 @@ where
 
             _ => panic!("Unsupported config datatype")
         }
-    }));
-
-    if let Some(string_value) = found //FOUND IN CONFIG
-    {
-        return string_value.parse::<T>().expect("Parsing config value failed");
-    }
-
-    //KEY NOT IN CONFIG, INSERT IT
-    let mut default_config: DocumentMut = get_config().parse().expect("Failed to parse config");
-    with_cached(&path, |data| for (key, old_value) in data.as_table()
-    {
-        //KEY IS IN BOTH, USE THE OLD VALUE
-        if let Some(item) = default_config.get_mut(key)
-        {
-            //COPY OLD VALUE
-            *item.as_value_mut().expect("Updating config failed") = old_value.as_value().expect("Invalid config").clone();
-        }
     });
 
-    //UPDATE
-    with_cached_mut(&path, |doc| *doc = default_config);
-
-    //REPEAT
-    config_read(filename, key)
+    value.parse::<T>().expect("Parsing config value failed")
 }
 
 /// Assigns one key, keeping the comments that decorate the old value.

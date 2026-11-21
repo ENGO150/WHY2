@@ -362,7 +362,7 @@ fn collect_devices(host: &Host, input: bool, cards: bool, out: &mut Vec<AudioDev
 }
 
 //THE DEVICE wanted NAMES, OR THE SYSTEM DEFAULT
-/// Finds a device by id (or, for an old config, by description); an empty id is the default.
+/// Finds a device by id. An empty id selects the system default.
 fn pick_device(wanted: &str, input: bool) -> Option<Device>
 {
     let hosts = audio_hosts();
@@ -380,8 +380,6 @@ fn pick_device(wanted: &str, input: bool) -> Option<Device>
         .collect();
 
     devices.iter().find(|device| device_id(device) == wanted)
-        //AN OLD CONFIG STILL HOLDS A DESCRIPTION
-        .or_else(|| devices.iter().find(|device| device.description().is_ok_and(|desc| desc.to_string() == wanted)))
         .cloned()
 }
 

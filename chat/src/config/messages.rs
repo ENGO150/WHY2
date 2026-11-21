@@ -90,21 +90,6 @@ struct Record //ONE MESSAGE RECORD
     pinned: bool,             //PINNED BY A MODERATOR
 }
 
-/// A [`Record`] in the format before pins, kept to migrate older files.
-#[derive(SchemaRead)]
-struct VoiceRecord //A RECORD BEFORE PINS (remove with next version bump)
-{
-    id: u64,
-    username: String,
-    text: String,
-    attachment: Option<[u8; 32]>,
-    timestamp: Option<u64>,
-    reply: Option<u64>,
-    hearts: Vec<String>,
-    edited: bool,
-    voice: Option<VoiceNote>,
-}
-
 /// The stored records and the next message id.
 struct History //THE RECORDS AND THE NEXT ID
 {
@@ -129,8 +114,6 @@ pub struct Page
 //CONSTS
 /// Marker at the start of the current file format.
 const MAGIC: &[u8; 8] = b"WHY2MSG\x07"; //FORMAT MARKER
-/// Marker of the format before pins.
-const MAGIC_V6: &[u8; 8] = b"WHY2MSG\x06"; //MARKER BEFORE PINS (remove with next version bump)
 
 //GLOBAL VARIABLES
 /// The in-memory history, loaded from disk on first touch.
@@ -139,26 +122,6 @@ static HISTORY: LazyLock<Mutex<History>> = LazyLock::new(|| Mutex::new(History::
 static KEYS: LazyLock<SharedKeys> = LazyLock::new(crypto::history_keys);                                       //AT-REST KEYS
 
 //IMPLEMENTATIONS
-impl From<VoiceRecord> for Record //NOT PINNED (remove with next version bump)
-{
-    fn from(message: VoiceRecord) -> Self
-    {
-        Self
-        {
-            id: message.id,
-            username: message.username,
-            text: message.text,
-            attachment: message.attachment,
-            timestamp: message.timestamp,
-            reply: message.reply,
-            hearts: message.hearts,
-            edited: message.edited,
-            voice: message.voice,
-            pinned: false,
-        }
-    }
-}
-
 impl Record
 {
     /// Returns the hash of the file in `server_images/` this record names, attachment or voice clip.
@@ -233,7 +196,7 @@ fn path() -> String //WHERE THE HISTORY IS KEPT
     super::config_path(consts::SERVER_MESSAGES_FILE)
 }
 
-/// Reads and verifies the history file, migrating an older format.
+/// Reads and verifies the history file.
 ///
 /// # Returns
 /// The stored records, or an empty history if the file is missing or unreadable.
@@ -254,13 +217,6 @@ fn load() -> Vec<Record> //READ THE HISTORY OFF DISK
         log::error!("Message history failed verification, it is being ignored");
         return Vec::new();
     };
-
-    //AN OLDER MARKER IS AN OLDER FORMAT
-    if let Some(records) = plaintext.strip_prefix(MAGIC_V6)
-    {
-        return migrate(wincode::config::deserialize::<Vec<VoiceRecord>, _>(records, consts::PACKET_CONFIG)
-            .map(|history| history.into_iter().map(Record::from).collect()));
-    }
 
     //NO MARKER IS UNREADABLE
     let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };
@@ -285,15 +241,6 @@ fn unreadable() -> Vec<Record> //KEEP A COPY, START EMPTY
 
     log::error!("Message history could not be read, it is being ignored (copy kept as {backup})");
     Vec::new()
-}
-
-/// Accepts records decoded from an older format.
-fn migrate<E>(history: Result<Vec<Record>, E>) -> Vec<Record> //LOAD AN OLDER FORMAT (remove with next version bump)
-{
-    let Ok(history) = history else { return unreadable() };
-
-    log::info!("Migrated {} stored messages from an older format", history.len());
-    history
 }
 
 //PUBLIC
@@ -322,20 +269,6 @@ pub fn resume_cursor(next: u64) //DO NOT REUSE AN OLDER LOBBY POSITION AFTER A R
 {
     let mut history = HISTORY.lock().unwrap();
     history.next = history.next.max(next);
-}
-
-/// Finds places for older private messages that have no saved lobby cursors.
-pub fn cursors_at(timestamps: impl Iterator<Item = Option<u64>>) -> Vec<u64> //BEST EFFORT FOR THE OLD PRIVATE FORMAT
-{
-    let history = HISTORY.lock().unwrap();
-    let mut timeline: Vec<(u64, u64)> = history.records.iter()
-        .filter_map(|message| Some((message.timestamp?, message.id))).collect();
-
-    timeline.sort_unstable();
-
-    timestamps.map(|timestamp| timestamp.and_then(|timestamp|
-        timeline.get(timeline.partition_point(|(time, _)| *time <= timestamp))
-            .map(|(_, id)| *id)).unwrap_or(history.next)).collect()
 }
 
 /// Stores a text message.

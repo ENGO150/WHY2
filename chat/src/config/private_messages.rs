@@ -40,8 +40,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //!
 //! Each record also keeps the next lobby id at send time. Private pages stay separate on the
 //! wire, but the client uses that cursor to merge them into the lobby timeline, even when
-//! timestamps are off. The first private format had no cursor; those records are placed using
-//! their saved timestamps where possible.
+//! timestamps are off.
 //!
 //! # Actions
 //! Private ids use the high bit, displayed as `pN` by the client, so they cannot address a
@@ -113,89 +112,14 @@ struct Record //ONE PRIVATE MESSAGE RECORD
     media: Option<MessageMedia>,
 }
 
-#[derive(SchemaRead)]
-struct RecordV4
-{
-    id: u64,                   //INTERNAL ID, NEVER SENT TO A CLIENT
-    participants: Participants,
-    text: String,
-    timestamp: Option<u64>,    //UNIX SECONDS
-    before: u64,               //THE NEXT LOBBY ID WHEN THIS WAS SENT
-    reply: Option<(u64, u64)>, //THE REPLIED-TO IDS FOR SENDER AND RECIPIENT
-    hearts: Vec<String>,
-    edited: bool,
-}
-
-/// A private message with a shared id, before account-local ids.
-#[derive(SchemaRead)]
-struct ActionRecord //THE THIRD PRIVATE FORMAT (remove with next version bump)
-{
-    id: u64,
-    sender: String,
-    recipient: String,
-    text: String,
-    timestamp: Option<u64>,
-    before: u64,
-    reply: Option<u64>,
-    hearts: Vec<String>,
-    edited: bool,
-}
-
-/// The history before account-local ids.
-#[derive(SchemaRead)]
-struct SharedHistory //THE THIRD PRIVATE FORMAT (remove with next version bump)
-{
-    next: u64,
-    records: Vec<ActionRecord>,
-}
-
-/// A private message before reactions, edits and replies.
-#[derive(SchemaRead)]
-struct CursorRecord //THE SECOND PRIVATE FORMAT (remove with next version bump)
-{
-    id: u64,
-    sender: String,
-    recipient: String,
-    text: String,
-    timestamp: Option<u64>,
-    before: u64,
-}
-
-/// A private message before the lobby cursor was stored.
-#[derive(SchemaRead)]
-struct OldRecord //THE FIRST PRIVATE FORMAT (remove with next version bump)
-{
-    id: u64,
-    sender: String,
-    recipient: String,
-    text: String,
-    timestamp: Option<u64>,
-}
-
 /// The stored records and the next message id.
-#[derive(SchemaWrite, SchemaRead)]
+#[derive(Default, SchemaWrite, SchemaRead)]
 struct History //THE RECORDS AND THE NEXT ID
 {
     next: u64,                    //NEXT INTERNAL MESSAGE ID
     users: BTreeMap<String, u64>, //NEXT PRIVATE ID IN EACH ACCOUNT
     records: Vec<Record>,
     read_through: BTreeMap<String, BTreeMap<String, u64>>,
-}
-
-#[derive(SchemaRead)]
-struct HistoryV5
-{
-    next: u64,
-    users: BTreeMap<String, u64>,
-    records: Vec<Record>,
-}
-
-#[derive(SchemaRead)]
-struct HistoryV4
-{
-    next: u64,                    //NEXT INTERNAL MESSAGE ID
-    users: BTreeMap<String, u64>, //NEXT PRIVATE ID IN EACH ACCOUNT
-    records: Vec<RecordV4>,
 }
 
 //ONE PAGE OF THE PRIVATE HISTORY
@@ -215,14 +139,6 @@ pub struct Page
 //CONSTS
 /// Marker at the start of the current file format.
 const MAGIC: &[u8; 8] = b"WHY2PM06"; //FORMAT MARKER
-const MAGIC_V5: &[u8; 8] = b"WHY2PM05";
-const MAGIC_V4: &[u8; 8] = b"WHY2PM04";
-/// The format with shared message ids.
-const MAGIC_V3: &[u8; 8] = b"WHY2PM03"; //OLDER FORMAT
-/// The format before message actions.
-const MAGIC_V2: &[u8; 8] = b"WHY2PM02"; //OLDER FORMAT
-/// The format before lobby cursors.
-const MAGIC_V1: &[u8; 8] = b"WHY2PM01"; //OLDER FORMAT
 
 //GLOBAL VARIABLES
 /// The in-memory history, loaded from disk on first touch.
@@ -266,64 +182,6 @@ impl History
     {
         let history = load();
         super::messages::resume_cursor(history.records.iter().map(|message| message.before).max().unwrap_or(0));
-        history
-    }
-
-    /// Assigns account-local ids to an older history, preserving reply references.
-    fn from_records(records: Vec<ActionRecord>) -> Self //MIGRATE THE SHARED ID SEQUENCE
-    {
-        let next = records.last().map_or(0, |message| message.id + 1);
-        let mut history = Self { next, users: BTreeMap::new(), records: Vec::new(), read_through: BTreeMap::new() };
-        let mut messages: BTreeMap<u64, Vec<String>> = BTreeMap::new();
-
-        //RESERVE IDS FOR REPLIED-TO MESSAGES EVEN WHEN THEIR TEXT WAS DELETED
-        for message in &records
-        {
-            for id in [Some(message.id), message.reply].into_iter().flatten()
-            {
-                let users = messages.entry(id).or_default();
-                for name in [&message.sender, &message.recipient]
-                {
-                    if !users.contains(name) { users.push(name.clone()); }
-                }
-            }
-        }
-
-        let mut ids = HashMap::new();
-        for (id, users) in messages
-        {
-            for user in users
-            {
-                let local = history.take_user_id(&user);
-                ids.insert((id, user), local);
-            }
-        }
-
-        history.records = records.into_iter().map(|message|
-        {
-            let local = |id, user: &str| ids[&(id, user.to_string())];
-            let participants = Participants
-            {
-                sender_id: local(message.id, &message.sender),
-                recipient_id: local(message.id, &message.recipient),
-                sender: message.sender.clone(),
-                recipient: message.recipient.clone(),
-            };
-
-            Record
-            {
-                id: message.id,
-                participants,
-                reply: message.reply.map(|id| (local(id, &message.sender), local(id, &message.recipient))),
-                text: message.text,
-                timestamp: message.timestamp,
-                before: message.before,
-                hearts: message.hearts,
-                edited: message.edited,
-                media: None,
-            }
-        }).collect();
-
         history
     }
 
@@ -414,7 +272,7 @@ fn load() -> History //READ THE PRIVATE HISTORY OFF DISK
     let Ok(bytes) = fs::read(path()) else
     {
         log::info!("No private message history on disk, starting empty");
-        return History::from_records(Vec::new());
+        return History::default();
     };
 
     //A HISTORY THAT WILL NOT VERIFY IS DROPPED
@@ -423,99 +281,11 @@ fn load() -> History //READ THE PRIVATE HISTORY OFF DISK
     else
     {
         log::error!("Private message history failed verification, it is being ignored");
-        return History::from_records(Vec::new());
+        return History::default();
     };
 
     //THE VERIFIED FILE MAY HOLD MORE RECORDS THAN A NETWORK PACKET CAN PREALLOCATE
     let config = consts::PACKET_CONFIG.disable_preallocation_size_limit();
-
-    //THE FIRST FORMAT HAS ONLY TIMESTAMPS TO PLACE ITS MESSAGES
-    if let Some(records) = plaintext.strip_prefix(MAGIC_V1)
-    {
-        let Ok(history) = wincode::config::deserialize::<Vec<OldRecord>, _>(records, config)
-            else { return unreadable() };
-
-        log::info!("Migrated {} stored private messages from an older format", history.len());
-
-        let cursors = super::messages::cursors_at(history.iter().map(|message| message.timestamp));
-
-        return History::from_records(history.into_iter().zip(cursors).map(|(message, before)| ActionRecord
-        {
-            before,
-            id: message.id | consts::PRIVATE_MESSAGE_ID,
-            sender: message.sender,
-            recipient: message.recipient,
-            text: message.text,
-            timestamp: message.timestamp,
-            reply: None,
-            hearts: Vec::new(),
-            edited: false,
-        }).collect());
-    }
-
-    //THE SECOND FORMAT ALREADY HAS THE LOBBY CURSOR
-    if let Some(records) = plaintext.strip_prefix(MAGIC_V2)
-    {
-        let Ok(history) = wincode::config::deserialize::<Vec<CursorRecord>, _>(records, config)
-            else { return unreadable() };
-
-        log::info!("Migrated {} stored private messages from an older format", history.len());
-
-        return History::from_records(history.into_iter().map(|message| ActionRecord
-        {
-            id: message.id | consts::PRIVATE_MESSAGE_ID,
-            sender: message.sender,
-            recipient: message.recipient,
-            text: message.text,
-            timestamp: message.timestamp,
-            before: message.before,
-            reply: None,
-            hearts: Vec::new(),
-            edited: false,
-        }).collect());
-    }
-
-    if let Some(records) = plaintext.strip_prefix(MAGIC_V3)
-    {
-        let Ok(old) = wincode::config::deserialize::<SharedHistory, _>(records, config)
-            else { return unreadable() };
-
-        log::info!("Migrated {} stored private messages to account-local ids", old.records.len());
-        let mut history = History::from_records(old.records);
-        history.next = history.next.max(old.next);
-        return history;
-    }
-
-    if let Some(records) = plaintext.strip_prefix(MAGIC_V4)
-    {
-        let Ok(old) = wincode::config::deserialize::<HistoryV4, _>(records, config)
-            else { return unreadable() };
-        return History
-        {
-            next: old.next,
-            users: old.users,
-            read_through: BTreeMap::new(),
-            records: old.records.into_iter().map(|record| Record
-            {
-                id: record.id,
-                participants: record.participants,
-                text: record.text,
-                timestamp: record.timestamp,
-                before: record.before,
-                reply: record.reply,
-                hearts: record.hearts,
-                edited: record.edited,
-                media: None,
-            }).collect(),
-        };
-    }
-
-    if let Some(records) = plaintext.strip_prefix(MAGIC_V5)
-    {
-        let Ok(old) = wincode::config::deserialize::<HistoryV5, _>(records, config)
-            else { return unreadable() };
-        return History { next: old.next, users: old.users, records: old.records, read_through: BTreeMap::new() };
-    }
 
     //NO MARKER IS UNREADABLE
     let Some(records) = plaintext.strip_prefix(MAGIC) else { return unreadable() };
@@ -539,7 +309,7 @@ fn unreadable() -> History //KEEP A COPY, START EMPTY
     let _ = fs::copy(path(), &backup);
 
     log::error!("Private message history could not be read, it is being ignored (copy kept as {backup})");
-    History::from_records(Vec::new())
+    History::default()
 }
 
 //PUBLIC
