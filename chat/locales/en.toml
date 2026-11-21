@@ -223,7 +223,6 @@ unknown_file = "Unknown"
 
 [pm]
 title = "PM: {username} (/pm to return)"
-received = "PM from {username} — /pm {id}"
 reply_context = "Open the message's conversation before replying."
 recipient_unavailable = "This PM recipient is unavailable."
 

@@ -212,7 +212,6 @@ unknown_file = "Nieznany"
 
 [pm]
 title = "Prywatna rozmowa: {username} (powrót poleceniem /pm)"
-received = "Prywatna wiadomość od {username} — /pm {id}"
 reply_context = "Przed udzieleniem odpowiedzi otwórz rozmowę, w której znajduje się wiadomość."
 recipient_unavailable = "Odbiorca tej prywatnej wiadomości jest niedostępny."
 

@@ -209,7 +209,6 @@ unknown_file = "不明"
 
 [pm]
 title = "ダイレクトメッセージ：{username}（/pm で戻る）"
-received = "{username} からのダイレクトメッセージ — /pm {id}"
 reply_context = "返信する前に、そのメッセージの会話を開いてください。"
 recipient_unavailable = "この相手にはダイレクトメッセージを送信できません。"
 

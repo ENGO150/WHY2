@@ -210,7 +210,6 @@ unknown_file = "Desconhecido"
 
 [pm]
 title = "Conversa privada: {username} (use /pm para voltar)"
-received = "Mensagem privada de {username} — /pm {id}"
 reply_context = "Abra a conversa da mensagem antes de responder."
 recipient_unavailable = "O destinatário desta mensagem privada não está disponível."
 

@@ -212,7 +212,6 @@ unknown_file = "Neznámy"
 
 [pm]
 title = "Súkromná konverzácia: {username} (návrat príkazom /pm)"
-received = "Súkromná správa od {username} — /pm {id}"
 reply_context = "Pred odpoveďou otvorte konverzáciu, v ktorej je správa."
 recipient_unavailable = "Príjemca súkromnej správy nie je dostupný."
 

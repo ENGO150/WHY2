@@ -209,7 +209,6 @@ unknown_file = "未知"
 
 [pm]
 title = "私信会话：{username}（输入 /pm 返回）"
-received = "来自 {username} 的私信 — /pm {id}"
 reply_context = "请先打开该消息所在的会话，再回复。"
 recipient_unavailable = "目前无法向此用户发送私信。"
 

@@ -210,7 +210,6 @@ unknown_file = "Onbekend"
 
 [pm]
 title = "Privégesprek: {username} (terug met /pm)"
-received = "Privébericht van {username} — /pm {id}"
 reply_context = "Open het gesprek waarin het bericht staat voordat je reageert."
 recipient_unavailable = "De ontvanger van dit privébericht is niet bereikbaar."
 

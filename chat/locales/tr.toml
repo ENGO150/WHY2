@@ -209,7 +209,6 @@ unknown_file = "Bilinmiyor"
 
 [pm]
 title = "Özel sohbet: {username} (dönmek için /pm)"
-received = "{username} adlı kullanıcıdan özel mesaj — /pm {id}"
 reply_context = "Yanıtlamadan önce mesajın bulunduğu sohbeti açın."
 recipient_unavailable = "Bu kullanıcıya özel mesaj gönderilemiyor."
 
