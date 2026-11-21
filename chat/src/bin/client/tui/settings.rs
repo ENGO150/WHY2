@@ -329,6 +329,9 @@ impl Settings
             rows.push(Row::Item(Item::client(t!("settings.row.output_volume"), "output_volume",
                 Value::Volume(voice_options::clamp_volume(config::read_config::<u32>("output_volume"))))));
 
+            rows.push(Row::Item(Item::client(t!("settings.row.media_normalisation"), "media_normalisation",
+                toggle_value("media_normalisation", false))));
+
             #[cfg(feature = "client_screen")]
             rows.push(Row::Item(Item::client(t!("settings.row.screen_volume"), "screen_volume",
                 Value::Volume(voice_options::clamp_volume(config::read_config::<u32>("screen_volume"))))));
@@ -1424,6 +1427,7 @@ fn toggle(app: &mut App)
     {
         "noise_suppression" => voice_options::set_noise_suppression(next),
         "automatic_gain" => voice_options::set_automatic_gain(next),
+        "media_normalisation" => voice_options::set_media_normalisation(next),
         _ => {},
     }
 }

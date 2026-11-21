@@ -33,6 +33,7 @@ output_device = ""
 # Voice chat audio (set via /settings)
 input_volume = 100 # Microphone volume in percent (0-200)
 output_volume = 100 # Playback volume in percent (0-200)
+media_normalisation = true # Normalise playback loudness of voice messages and audio/video attachments
 noise_suppression = true # Remove background noise from the microphone
 automatic_gain = true # Normalize the microphone level automatically
 screen_volume = 100 # Volume of an attached screen share's audio in percent (0-200)

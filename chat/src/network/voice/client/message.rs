@@ -346,7 +346,7 @@ fn open_output(hash: [u8; 32], data: &[u8], generation: usize) -> Result<(), &'s
 }
 
 //THE SHARED VOICE AND MEDIA OUTPUT STREAM
-/// Opens the configured device, resampling stereo samples and applying the output gain.
+/// Opens the output device, resampling and optionally normalising stereo audio before applying volume.
 fn open_player
 (
     hash: [u8; 32],
@@ -369,6 +369,14 @@ fn open_player
     let output_channels = config.channels as usize;
     let step = rate as f32 / config.sample_rate as f32;
 
+    const TARGET_RMS: f32 = 0.2;
+    const SILENCE_POWER: f32 = 0.001 * 0.001;
+    let mut mean_power = TARGET_RMS * TARGET_RMS;
+    let smoothing = 1. - (-1. / (0.3 * config.sample_rate as f32)).exp();
+
+    // Load the preference before starting the callback.
+    options::media_normalisation();
+
     let mut position = 0.;
     let mut current = (0., 0.);
     let mut next = (0., 0.);
@@ -385,7 +393,9 @@ fn open_player
             return;
         }
 
-        let gain = options::get_output_gain(); //ONCE PER CALLBACK, NOT PER SAMPLE
+        let output_gain = options::get_output_gain();
+        let normalise = options::media_normalisation();
+        if !normalise { mean_power = TARGET_RMS * TARGET_RMS; }
 
         for frame in data.chunks_mut(output_channels)
         {
@@ -405,9 +415,24 @@ fn open_player
                 position -= 1.;
             }
 
-            let left = ((current.0 + (next.0 - current.0) * position) * gain).tanh();
-            let right = ((current.1 + (next.1 - current.1) * position) * gain).tanh();
+            let left = current.0 + (next.0 - current.0) * position;
+            let right = current.1 + (next.1 - current.1) * position;
             position += step;
+
+            let mut gain = output_gain;
+            if normalise
+            {
+                // Keep the stereo balance and hold the estimate across silence or underruns.
+                let power = (left * left + right * right) * 0.5;
+                if power.is_finite() && power > SILENCE_POWER
+                {
+                    mean_power += smoothing * (power - mean_power);
+                }
+                gain *= (TARGET_RMS / mean_power.sqrt()).clamp(0.1, 4.);
+            }
+
+            let left = if left.is_finite() { (left * gain).tanh() } else { 0. };
+            let right = if right.is_finite() { (right * gain).tanh() } else { 0. };
 
             match frame.len()
             {

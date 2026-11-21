@@ -57,6 +57,8 @@ static OUTPUT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(
 static NOISE_SUPPRESSION: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(config::read_config::<bool>("noise_suppression")));
 /// Whether captured frames are normalised.
 static AUTOMATIC_GAIN: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(config::read_config::<bool>("automatic_gain")));
+/// Whether voice messages and attachments are normalised during playback.
+static MEDIA_NORMALISATION: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(config::read_config::<bool>("media_normalisation")));
 
 /// Bumped whenever the configured devices change; the session rebuilds its streams when it moves.
 static DEVICE_GENERATION: AtomicUsize = AtomicUsize::new(0); //BUMPED WHENEVER THE CONFIGURED DEVICES CHANGE
@@ -114,6 +116,7 @@ pub fn init_audio() //TOUCH EVERY PREFERENCE
     get_output_volume();
     noise_suppression();
     automatic_gain();
+    media_normalisation();
 }
 
 /// Returns the microphone volume, in percent.
@@ -150,6 +153,18 @@ pub fn get_input_gain() -> f32 //MICROPHONE VOLUME AS A MULTIPLIER
 pub fn get_output_gain() -> f32 //PLAYBACK VOLUME AS A MULTIPLIER
 {
     get_output_volume() as f32 / 100.
+}
+
+/// Returns whether playback of voice messages and attachments is normalised.
+pub fn media_normalisation() -> bool
+{
+    MEDIA_NORMALISATION.load(Ordering::Relaxed)
+}
+
+/// Sets whether playback of voice messages and attachments is normalised.
+pub fn set_media_normalisation(value: bool)
+{
+    MEDIA_NORMALISATION.store(value, Ordering::Relaxed);
 }
 
 /// Returns whether captured frames are denoised.
