@@ -179,27 +179,6 @@ pub fn migrate() //NUMBER THE ACCOUNTS FROM AN OLDER server_users.toml
     });
 }
 
-/// Gives an account the next free id.
-///
-/// The id is picked and written under one lock, so concurrent registrations cannot share one.
-fn assign_id(username: &str) //GIVE username A NEW ID
-{
-    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
-    {
-        let id = next_id(doc);
-        let users = doc.as_table_mut();
-
-        //A MISSING ENTRY BECOMES A SUBTABLE
-        if users.get(username).and_then(Item::as_table_like).is_none()
-        {
-            users.insert(username, Item::Table(Table::new()));
-        }
-
-        users.get_mut(username).and_then(Item::as_table_like_mut)
-            .expect("User entry is not a table").insert(ID_KEY, Item::Value((id as i64).into()));
-    });
-}
-
 /// Returns the number of registered accounts.
 pub fn len() -> usize //COUNT USERS
 {
@@ -339,27 +318,45 @@ pub fn set_password(username: &str, hash: &str) //SET USER PASSWORD
     write_user_field(username, "password", hash.into());
 }
 
-/// Registers a new account with empty colors and profile.
+/// Registers a new account with empty colors and profile if the username is available.
 ///
 /// The first account on a server becomes its [`Role::Owner`].
 ///
 /// # Returns
-/// `true` if this was the first account.
-pub fn add(username: &str, hash: &str) -> bool //CREATE NEW USER, RETURN TRUE ON FIRST USER
+/// The new account's role, or `None` if the username is already registered.
+pub fn add(username: &str, hash: &str) -> Option<Role>
 {
-    let first_user = len() == 0; //SELF-EXPLANATORY, INNIT?
+    super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
+    {
+        if doc.get(username).is_some() { return None; }
 
-    assign_id(username); //ID
-    set_password(username, hash); //PASSWORD
-    set_role(username, if first_user { Role::Owner } else { Role::User }); //ROLE (OWNER IF THIS IS THE FIRST USER)
+        let id = next_id(doc);
+        let users = doc.as_table_mut();
+        let role = if users.is_empty() { Role::Owner } else { Role::User };
 
-    //NO COLORS OR PROFILE YET, BUT THE KEYS ARE THERE
-    for key in COLOR_KEYS { write_user_field(username, key, colors::NONE.into()); }
-    for key in PROFILE_KEYS { write_profile_field(username, key, "".into()); }
-    write_profile_field(username, ONLINE_STATUS_KEY, true.into());
-    write_profile_field(username, AVATAR_KEY, "".into());
+        let mut user = Table::new();
+        user.insert(ID_KEY, Item::Value((id as i64).into()));
+        user.insert("password", Item::Value(hash.into()));
+        user.insert("role", Item::Value(role.name().into()));
 
-    first_user
+        for key in COLOR_KEYS
+        {
+            user.insert(key, Item::Value(colors::NONE.into()));
+        }
+
+        let mut profile = Table::new();
+        for key in PROFILE_KEYS
+        {
+            profile.insert(key, Item::Value("".into()));
+        }
+
+        profile.insert(ONLINE_STATUS_KEY, Item::Value(true.into()));
+        profile.insert(AVATAR_KEY, Item::Value("".into()));
+        user.insert(PROFILE_TABLE, Item::Table(profile));
+        users.insert(username, Item::Table(user));
+
+        Some(role)
+    })
 }
 
 /// Deletes an account.

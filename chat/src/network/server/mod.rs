@@ -1112,8 +1112,14 @@ async fn register_account
     let hash = task::spawn_blocking(move || password::hash_password(password.as_ref().unwrap().as_str()))
         .await.expect("Hashing password failed");
 
-    //SAVE PASSWORD
-    if config::users::add(username, &hash)
+    let Some(role) = config::users::add(username, &hash) else
+    {
+        log::warn!("Registration refused (username already registered): {peer_addr}");
+        remove_connection(peer_addr, true, Some("registration")).await;
+        return false;
+    };
+
+    if role == Role::Owner
     {
         //FIRST USER, NOTIFY ABOUT OWNER ROLE
         log::info!("First user registered, granting {}: {peer_addr}", Role::Owner);

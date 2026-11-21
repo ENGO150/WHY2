@@ -156,19 +156,20 @@ fn with_cached<F: FnOnce(&DocumentMut) -> R, R>(path: &str, f: F) -> R //READ TH
     f(&load(&mut cache, path).doc)
 }
 
-/// Runs `f` over the cached document for `path` and writes the result back to disk.
+/// Runs `f` over the cached document for `path`, writes the document back to disk, and returns the callback's result.
 ///
 /// # Panics
 /// If the file cannot be written.
-fn with_cached_mut<F: FnOnce(&mut DocumentMut)>(path: &str, f: F)
+fn with_cached_mut<F: FnOnce(&mut DocumentMut) -> R, R>(path: &str, f: F) -> R
 {
     let mut cache = CONFIG_CACHE.lock().unwrap();
     let cached = load(&mut cache, path);
 
-    f(&mut cached.doc);
+    let result = f(&mut cached.doc);
 
     fs::write(path, cached.doc.to_string()).expect("Saving config failed"); //WRITE
     cached.stamp = stamp(path); //OUR OWN WRITE IS NOT A CHANGE
+    result
 }
 
 /// Reads one key from a configuration file, migrating the file if the key is missing.
