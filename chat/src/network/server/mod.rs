@@ -180,7 +180,7 @@ fn clean(text: &str) -> String //WHAT A CLIENT MAY PUT IN A PROFILE
 /// - `keys`: The client's session keys.
 async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &SocketAddr, keys: &SharedKeys) //SEND LIST OF USERS
 {
-    let mut users = Vec::new();
+    let mut users: Vec<OnlineUser> = Vec::new();
 
     //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
     for connection_enum in CONNECTIONS.iter()
@@ -189,6 +189,9 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
         {
             //SKIP "OFFLINE" ONLINE USERS
             if !config::users::online_status(uname) { continue; }
+
+            //SKIP USERS CONNECTED TWICE
+            if users.iter().any(|u| &u.username == uname) { continue; }
 
             users.push(OnlineUser
             {
