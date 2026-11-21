@@ -574,7 +574,7 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
 
         //SEND LEAVE MESSAGE, UNLESS THE ACCOUNT WAS HIDDEN
-        if config::users::online_status(username)
+        if config::users::online_status(username) && !user_connected(username)
         {
             send_to_all(PacketCode::Leave
             {
@@ -602,12 +602,12 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
     connection.task().abort();
 }
 
-/// Returns whether a session with this username is connected.
+/// Returns whether a session with this username is connected (and authenticated).
 fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CONNECTED
 {
     CONNECTIONS.iter().any(|conn|
     {
-        conn.username().map_or(false, |u| u == &username.to_string())
+        conn.is_authenticated() && conn.username().map_or(false, |u| u == &username.to_string())
     })
 }
 
@@ -1246,6 +1246,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
     let id = config::users::id(&username).unwrap_or_default(); //CONSTANT USER ID
     let role = config::users::role(&username).unwrap_or_default(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
+    let duplicate = user_connected(&username); //IS THE USER CONNECTING FROM ANOTHER DEVICE?
 
     //AUTHENTICATE CLIENT
     authenticate_client(&peer_addr, &username, &device, role, id);
@@ -1276,7 +1277,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     send_list(&streams.1, &peer_addr, &keys).await;
 
     //SEND JOIN ANNOUNCEMENT, IF NOT HIDDEN
-    if config::users::online_status(&username)
+    if config::users::online_status(&username) && !duplicate
     {
         send_to_all(PacketCode::Join
         {
