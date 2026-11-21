@@ -34,6 +34,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     fs,
+    mem,
     path::PathBuf,
     net::SocketAddr,
     time::{ Instant, Duration },
@@ -85,6 +86,25 @@ pub struct AvailableFile //UPLOADED FILE
     pub key: Zeroizing<Vec<i64>>,
     /// The file's at-rest nonce.
     pub nonce: Vec<i64>,
+}
+
+/// Files shared by an account from its first login until its final disconnect.
+pub struct SharedFiles
+{
+    /// A directory dedicated to this period of activity, including unfinished uploads.
+    pub directory: PathBuf,
+    /// The files in the account's download list.
+    pub files: MutexSync<Vec<AvailableFile>>,
+}
+
+impl Drop for SharedFiles
+{
+    fn drop(&mut self)
+    {
+        //DELETE THE DIRECTORY AFTER ITS LAST HOLDER DROPS IT
+        let directory = mem::take(&mut self.directory);
+        tokio::task::spawn_blocking(move || { let _ = fs::remove_dir_all(directory); });
+    }
 }
 
 /// A private file owned by one live session.
@@ -161,6 +181,8 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         task: AbortHandle,                                       //HANDLER TASK (USED TO FORCE-CLOSE THE CONNECTION)
         /// Tasks of active file transfers, by upload id.
         file_streams: Arc<MutexSync<HashMap<u64, AbortHandle>>>, //ACTIVE FILE TRANSFER TASKS
+        /// The account's shared files, held by all currently connected sessions.
+        shared_files: Arc<SharedFiles>,
         /// Temporary PM files posted by this session.
         private_files: Arc<MutexSync<Vec<TemporaryPrivateFile>>>,
         /// Task receiving this client's screen share.
@@ -651,6 +673,16 @@ impl Connection
         {
             Self::Authenticated { alive, .. } => alive,
             Self::NonAuthenticated { .. } => &false,
+        }
+    }
+
+    /// Returns the shared file collection for this login.
+    pub fn shared_files(&self) -> Option<&Arc<SharedFiles>>
+    {
+        match self
+        {
+            Self::Authenticated { shared_files, .. } => Some(shared_files),
+            _ => None,
         }
     }
 

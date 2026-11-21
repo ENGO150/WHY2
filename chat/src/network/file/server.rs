@@ -238,7 +238,7 @@ pub async fn download
 )
 {
     //GET CLIENT INFO
-    let (keys, username, id) =
+    let (keys, username, id, shared_files) =
     {
         //FIND THE MAIN CONNECTION
         let conn = server::CONNECTIONS.get(&peer_addr).filter(|conn| conn.task().id() == owner_task);
@@ -259,11 +259,12 @@ pub async fn download
                 };
 
                 let Some(id) = c.id().copied() else { return };
+                let Some(shared_files) = c.shared_files().cloned() else { return };
 
                 //ADD FILE STREAM
                 c.add_file_stream(uid, task);
 
-                (keys, username, id)
+                (keys, username, id, shared_files)
             },
             None => return
         }
@@ -356,11 +357,22 @@ pub async fn download
     {
         (Some(_), _) => config::private_messages::media_dir().join("pending"),
         (None, true) => misc::get_attachment_dir(),
-        (None, false) => misc::get_upload_dir(&username),
+        (None, false) => shared_files.directory.clone(),
     };
 
     //CREATE UPLOAD DIRECTORY
-    if let Err(e) = fs::create_dir_all(&target_dir).await
+    let created = if sealed
+    {
+        fs::create_dir_all(&target_dir).await
+    } else
+    {
+        //THE BLOCKING OPERATION HOLDS THE DIRECTORY ALIVE EVEN IF THE UPLOAD IS ABORTED
+        let shared_files = shared_files.clone();
+        tokio::task::spawn_blocking(move || sfs::create_dir_all(&shared_files.directory))
+            .await.expect("Upload directory task failed")
+    };
+
+    if let Err(e) = created
     {
         log::error!("Creating upload directory failed ({e}): {peer_addr}");
         return;
@@ -602,15 +614,14 @@ pub async fn download
             return;
         }
 
-        //A PERSISTENT UPLOAD IS NAMED AFTER ITS CONTENT
+        //SHARED UPLOADS HAVE UNIQUE DISK PATHS EVEN WHEN THEIR DISPLAY NAMES MATCH
         let new_path = match sealed
         {
             true => target_dir.join(misc::hex(&final_hash)),
-            false => target_dir.join(&filename),
+            false => current_path.with_extension("shared"),
         };
 
         //RENAME FILE
-        let insert = !fs::try_exists(&new_path).await.unwrap_or(false);
         if fs::rename(&current_path, &new_path).await.is_err() { return; }
 
         //LOG FILE UPLOAD
@@ -645,27 +656,29 @@ pub async fn download
             server::icon_changed(&peer_addr).await;
         } else
         {
-            //ANNOUNCE FILE UPLOAD
-            server::send_to_all(PacketCode::Uploaded
             {
-                username: username.clone(),
-                filename: filename.clone(),
-            });
+                //PUBLISH ONLY TO THE CURRENT SHARED FILE LIST
+                let Some(active) = server::AVAILABLE_FILES.get(&username) else { return; };
+                if !Arc::ptr_eq(active.value(), &shared_files) { return; }
 
-            if insert
-            {
-                //ADD FILE TO AVAILABLE FILES
-                server::AVAILABLE_FILES.get_mut(username.as_str()).unwrap().push(AvailableFile
+                shared_files.files.lock().unwrap().push(AvailableFile
                 {
                     persistent: false,
                     hash: final_hash,
                     path: new_path,
-                    filename,
+                    filename: filename.clone(),
                     size: final_size,
                     key: disk_key.clone(),
                     nonce: disk_nonce.clone(),
                 });
             }
+
+            //ANNOUNCE FILE UPLOAD
+            server::send_to_all(PacketCode::Uploaded
+            {
+                username: username.clone(),
+                filename,
+            });
         }
 
         //REMOVE ACTIVE UPLOAD

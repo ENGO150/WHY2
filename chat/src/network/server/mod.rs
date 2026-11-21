@@ -70,10 +70,19 @@ use std::
 
 use tokio::
 {
-    fs,
-    sync::{ Mutex, oneshot },
     net::tcp::OwnedWriteHalf,
-    task::{ self, AbortHandle, Id },
+    sync::
+    {
+        Mutex,
+        mpsc::{ self, UnboundedSender },
+        oneshot::{ self, Sender },
+    },
+    task::
+    {
+        self,
+        Id,
+        AbortHandle,
+    },
 };
 
 use rand::
@@ -88,7 +97,7 @@ use dashmap::DashMap;
 
 use connection::
 {
-    AvailableFile,
+    SharedFiles,
     ConnectionType,
     Connection,
 };
@@ -131,10 +140,32 @@ pub static PENDING_TOKENS: LazyLock<DashMap<[u8; 32], PendingToken>> = LazyLock:
 /// Every connection, by peer address.
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
 /// Every user's shared files, by username.
-pub static AVAILABLE_FILES: LazyLock<DashMap<String, Vec<AvailableFile>>> = LazyLock::new(|| DashMap::new()); //LIST FOR UPLOADED FILES
+pub static AVAILABLE_FILES: LazyLock<DashMap<String, Arc<SharedFiles>>> = LazyLock::new(|| DashMap::new());
+
+/// Serializes account presence changes and queues roster packets in the same order.
+static PRESENCE: LazyLock<MutexSync<Presence>> = LazyLock::new(|| MutexSync::new(Presence::default()));
+
+//TYPES
+type PresencePacket = (PacketCode, Option<Sender<()>>);
+
+//IMPLEMENTATIONS
+impl Presence
+{
+    fn broadcast(&mut self, code: PacketCode)
+    {
+        self.clients.retain(|_, sender| sender.send((code.clone(), None)).is_ok());
+    }
+}
 
 //PRIVATE
 //STRUCTS
+#[derive(Default)]
+struct Presence
+{
+    /// Clients start receiving updates when their initial list is queued.
+    clients: HashMap<SocketAddr, UnboundedSender<PresencePacket>>,
+}
+
 /// A client that has completed the handshake and the login prompts.
 struct AuthenticatedClient
 {
@@ -175,33 +206,79 @@ fn clean(text: &str) -> String //WHAT A CLIENT MAY PUT IN A PROFILE
 /// # Parameters
 /// - `write_stream`: The client's write half.
 /// - `peer_addr`: The client's address.
-/// - `keys`: The client's session keys.
-async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &SocketAddr, keys: &SharedKeys) //SEND LIST OF USERS
+async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &SocketAddr) //SEND LIST OF USERS
 {
-    let mut users: Vec<OnlineUser> = Vec::new();
-
-    //ITERATE OVER CONNECTIONS, CREATE JSON OF USERS
-    for connection_enum in CONNECTIONS.iter()
+    let sent =
     {
-        if let Connection::Authenticated { username: uname, id: user_id, channel, device, .. } = connection_enum.value()
+        let mut presence = PRESENCE.lock().unwrap();
+        if !CONNECTIONS.get(peer_addr).is_some_and(|conn| Arc::ptr_eq(conn.write_stream(), write_stream))
         {
-            //SKIP "OFFLINE" ONLINE USERS
-            if !config::users::online_status(uname) { continue; }
-
-            //SKIP USERS CONNECTED TWICE
-            if users.iter().any(|u| &u.username == uname) { continue; }
-
-            users.push(OnlineUser
-            {
-                username: uname.clone(),
-                username_color: config::users::colors(uname).username_color,
-                id: *user_id,
-                channel: channel.clone(),
-                device: device.clone(),
-                role: config::users::role(uname).unwrap_or_default(),
-            });
+            return;
         }
-    }
+
+        let (sent, delivered) = oneshot::channel();
+
+        //QUEUE THE SNAPSHOT BEFORE LATER PRESENCE EVENTS
+        let list = user_list(peer_addr);
+        let sender = presence.clients.entry(*peer_addr).or_insert_with(||
+        {
+            let (sender, mut receiver) = mpsc::unbounded_channel::<PresencePacket>();
+            let write_stream = write_stream.clone();
+            let peer_addr = *peer_addr;
+
+            tokio::spawn(async move
+            {
+                while let Some((packet, sent)) = receiver.recv().await
+                {
+                    let mut stream = write_stream.lock().await;
+
+                    //READ CURRENT KEYS AFTER TAKING THE WRITE LOCK
+                    let keys = CONNECTIONS.get(&peer_addr)
+                        .filter(|conn| Arc::ptr_eq(conn.write_stream(), &write_stream))
+                        .and_then(|conn| conn.keys().cloned());
+
+                    let Some(keys) = keys else { break; };
+                    network::send(&mut *stream, packet, Some(&keys)).await;
+                    if let Some(sent) = sent { let _ = sent.send(()); }
+                }
+            });
+            sender
+        });
+
+        if sender.send((list, Some(sent))).is_err() { return; }
+        delivered
+    };
+
+    let _ = sent.await;
+}
+
+/// Builds a roster snapshot while presence transitions are locked.
+fn user_list(peer_addr: &SocketAddr) -> PacketCode
+{
+    let mut sessions: Vec<_> = CONNECTIONS.iter().filter_map(|entry|
+    {
+        let Connection::Authenticated { username, id, channel, device, .. } = entry.value() else { return None; };
+        Some((*entry.key(), username.clone(), *id, channel.clone(), device.clone()))
+    }).collect();
+
+    //PICK THE LOWEST PEER ADDRESS FOR EACH USER
+    sessions.sort_unstable_by_key(|(addr, ..)| *addr);
+
+    let mut usernames = HashSet::new();
+    let users: Vec<_> = sessions.into_iter().filter_map(|(_, username, id, channel, device)|
+    {
+        if !usernames.insert(username.clone()) || !config::users::online_status(&username) { return None; }
+
+        Some(OnlineUser
+        {
+            username_color: config::users::colors(&username).username_color,
+            role: config::users::role(&username).unwrap_or_default(),
+            username,
+            id,
+            channel,
+            device,
+        })
+    }).collect();
 
     //GET NON-BANNED OFFLINE USERS (IF ENABLED)
     let offline = if config::read_config::<bool>("show_offline_users")
@@ -232,12 +309,11 @@ async fn send_list(write_stream: &Arc<Mutex<OwnedWriteHalf>>, peer_addr: &Socket
         format!(", {} offline", offline.len())
     } else { String::new() });
 
-    //SEND LIST BACK TO CLIENT
-    network::send(&mut *write_stream.lock().await, PacketCode::List
+    PacketCode::List
     {
         online: users,
         offline,
-    }, Some(&keys)).await;
+    }
 }
 
 /// Sends the whole ban list.
@@ -515,22 +591,32 @@ pub fn send_to_others(code: PacketCode, channel: Option<&str>, except: usize) //
 /// - `info`: A short reason for the log.
 pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTION BY PEER ADDRESS
 {
-    //REMOVE CONNECTION
-    let mut connection = match CONNECTIONS.remove_if(peer_addr, |_, _|
+    let mut connection =
     {
-        PENDING_TOKENS.retain(|_, pending| pending.owner_addr != *peer_addr);
-        true
-    })
-    {
-        Some((_, conn)) => conn,
-        None => return
-    };
+        let mut presence = PRESENCE.lock().unwrap();
+        let Some((_, connection)) = CONNECTIONS.remove_if(peer_addr, |_, _|
+        {
+            PENDING_TOKENS.retain(|_, pending| pending.owner_addr != *peer_addr);
+            true
+        }) else { return; };
 
-    //CHECK IF SAME USER IS STILL CONNECTED
-    let duplicate = if let Some(username) = connection.username()
-    {
-        user_connected(username)
-    } else { false };
+        presence.clients.remove(peer_addr);
+        if let (Some(username), Some(id)) = (connection.username(), connection.id()) && !user_connected(username)
+        {
+            //UNLIST SHARED FILES ON THE FINAL DISCONNECT
+            AVAILABLE_FILES.remove(username);
+            if config::users::online_status(username)
+            {
+                presence.broadcast(PacketCode::Leave
+                {
+                    username: username.clone(),
+                    id: *id,
+                    registered: config::users::contains(username),
+                });
+            }
+        }
+        connection
+    };
 
     //CLOSE ALL FILE STREAMS
     if let Some(streams) = connection.file_streams()
@@ -588,26 +674,6 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
 
             voice_server::remove_connection(&id);
         }
-
-        let username = connection.username().unwrap();
-
-        //REMOVE UPLOADS
-        if !duplicate
-        {
-            let _ = fs::remove_dir_all(misc::get_upload_dir(username)).await; //REMOVE FILES
-            AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
-        }
-
-        //SEND LEAVE MESSAGE, UNLESS THE ACCOUNT WAS HIDDEN
-        if config::users::online_status(username) && !duplicate
-        {
-            send_to_all(PacketCode::Leave
-            {
-                username: username.to_string(),
-                id: *connection.id().unwrap(),
-                registered: config::users::contains(username),
-            });
-        }
     }
 
     log::info!
@@ -632,7 +698,7 @@ fn user_connected(username: &str) -> bool //CHECK IF CLIENT WITH username IS CON
 {
     CONNECTIONS.iter().any(|conn|
     {
-        conn.is_authenticated() && conn.username().map_or(false, |u| u == &username.to_string())
+        conn.is_authenticated() && conn.username().is_some_and(|u| u == username)
     })
 }
 
@@ -660,7 +726,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                 }
             },
 
-            Connection::Authenticated { write_stream, task, file_streams, private_files, screen_stream, username, device, role,
+            Connection::Authenticated { write_stream, task, file_streams, shared_files, private_files, screen_stream, username, device, role,
                 id, attached_screen, last_activity, last_attachment, last_typing, channel, seq, server_seq, peer_addr, alive,
                 muted, credit, refill, throttles, .. } =>
             {
@@ -669,6 +735,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     write_stream,
                     task,
                     file_streams,
+                    shared_files,
                     private_files,
                     screen_stream,
                     peer_addr,
@@ -702,45 +769,65 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
 ///
 /// The rate limits start fresh: the message gap and attachment and typing timers start satisfied, and
 /// the packet bucket full.
-fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<Device>, role: Role, id: usize) //MOVE CONNECTION FROM NonAuthenticated TO Authenticated
+fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<Device>, role: Role, id: usize) -> bool
 {
-    //UPDATE CONNECTION
-    CONNECTIONS.alter(&peer_addr, |_, old_connection|
+    let mut presence = PRESENCE.lock().unwrap();
+    let first_session = !user_connected(username);
+    let Some(mut connection) = CONNECTIONS.get_mut(peer_addr) else { return false; };
+    let old_connection = connection.value();
+
+    //GIVE EACH ONLINE PERIOD ITS OWN DIRECTORY
+    let shared_files = AVAILABLE_FILES.entry(username.to_string()).or_insert_with(|| Arc::new(SharedFiles
     {
-        Connection::Authenticated
+        directory: misc::get_upload_dir(username).join(format!("{:032x}", rand::random::<u128>())),
+        files: MutexSync::new(Vec::new()),
+    })).clone();
+
+    *connection = Connection::Authenticated
+    {
+        write_stream: old_connection.write_stream().clone(),
+        task: old_connection.task().clone(),
+        file_streams: Arc::new(MutexSync::new(HashMap::new())),
+        shared_files,
+        private_files: Arc::new(MutexSync::new(Vec::new())),
+        screen_stream: None,
+        peer_addr: *old_connection.peer_addr(),
+        username: username.to_string(),
+        device: device.clone(),
+        role,
+        id,
+        keys: old_connection.keys().unwrap().to_owned(),
+        attached_screen: None,
+        last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
+        last_key_exchange: old_connection.last_key_exchange().copied().unwrap_or_else(Instant::now),
+        last_attachment: Instant::now() - consts::ATTACHMENT_REQUEST_DELAY,
+        last_typing: Instant::now() - consts::TYPING_INTERVAL,
+        spam_violations: 0,
+        credit: config::read_config::<f32>("max_packet_burst"),
+        refill: Instant::now(),
+        throttles: 0,
+        channel: None,
+        seq: *old_connection.seq(),
+        server_seq: 0,
+        alive: true,
+        muted: false,
+    };
+    drop(connection);
+
+    if first_session && config::users::online_status(username)
+    {
+        presence.broadcast(PacketCode::Join
         {
-            write_stream: old_connection.write_stream().clone(),
-            task: old_connection.task().clone(),
-            file_streams: Arc::new(MutexSync::new(HashMap::new())),
-            private_files: Arc::new(MutexSync::new(Vec::new())),
-            screen_stream: None,
-            peer_addr: *old_connection.peer_addr(),
             username: username.to_string(),
+            username_color: config::users::colors(username).username_color,
+            id,
             device: device.clone(),
             role,
-            id,
-            keys: old_connection.keys().unwrap().to_owned(),
-            attached_screen: None,
-            last_activity: Instant::now() - Duration::from_millis(config::read_config("min_message_delay")),
-            last_key_exchange: old_connection.last_key_exchange().copied().unwrap_or_else(Instant::now),
-            last_attachment: Instant::now() - consts::ATTACHMENT_REQUEST_DELAY,
-            last_typing: Instant::now() - consts::TYPING_INTERVAL,
-            spam_violations: 0,
-            credit: config::read_config::<f32>("max_packet_burst"),
-            refill: Instant::now(),
-            throttles: 0,
-            channel: None,
-            seq: *old_connection.seq(),
-            server_seq: 0,
-            alive: true,
-            muted: false,
-        }
-    });
-
-    //CREATE AVAILABLE FILES ENTRY
-    AVAILABLE_FILES.entry(username.to_string()).or_default();
+        });
+    }
 
     log::info!("Authenticate connection: {peer_addr} (id {id}, role {role})");
+    true
 }
 
 /// Moves a client to a channel, announcing a channel that was created or abandoned.
@@ -761,6 +848,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             write_stream: old_connection.write_stream().clone(),
             task: old_connection.task().clone(),
             file_streams: old_connection.file_streams().unwrap().clone(),
+            shared_files: old_connection.shared_files().unwrap().clone(),
             private_files: old_connection.private_files().unwrap().clone(),
             screen_stream: old_connection.screen_stream().clone(),
             peer_addr: *old_connection.peer_addr(),
@@ -1289,10 +1377,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
 
     let id = config::users::id(&username).unwrap_or_default(); //CONSTANT USER ID
     let role = config::users::role(&username).unwrap_or_default(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
-    let duplicate = user_connected(&username); //IS THE USER CONNECTING FROM ANOTHER DEVICE?
-
-    //AUTHENTICATE CLIENT
-    authenticate_client(&peer_addr, &username, &device, role, id);
+    if !authenticate_client(&peer_addr, &username, &device, role, id) { return; }
 
     //SEND WHAT WAS SAID IN THE LOBBY BEFORE THIS
     send_history(&streams.1, &keys, None).await;
@@ -1317,20 +1402,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     }, Some(&keys)).await;
 
     //SEND LIST OF USERS
-    send_list(&streams.1, &peer_addr, &keys).await;
-
-    //SEND JOIN ANNOUNCEMENT, IF NOT HIDDEN
-    if config::users::online_status(&username) && !duplicate
-    {
-        send_to_all(PacketCode::Join
-        {
-            username: username.clone(),
-            username_color: config::users::colors(&username).username_color,
-            id,
-            device,
-            role,
-        });
-    }
+    send_list(&streams.1, &peer_addr).await;
 
     //TELL THE CLIENT WHO IS ALREADY IN VOICE
     if options::voice_chat_enabled()

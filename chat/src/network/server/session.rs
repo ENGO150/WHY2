@@ -660,7 +660,7 @@ impl<'a, 's> ClientSession<'a, 's>
     //LIST OF ONLINE USERS
     async fn list(&mut self) -> PacketFlow
     {
-        server::send_list(&self.streams.1, &self.peer_addr, &self.keys).await;
+        server::send_list(&self.streams.1, &self.peer_addr).await;
         PacketFlow::Continue
     }
 
@@ -794,7 +794,7 @@ impl<'a, 's> ClientSession<'a, 's>
 
         //GET USER UPLOADS
         if let Some(username) = username &&
-            let Some(file) = server::AVAILABLE_FILES.get(&username).and_then(|f| f.value().get(file_id).cloned())
+            let Some(file) = server::AVAILABLE_FILES.get(&username).and_then(|f| f.files.lock().unwrap().get(file_id).cloned())
         {
             //GENERATE RANDOM SHARE UID
             let uid = rand::random::<u64>();
@@ -990,14 +990,12 @@ impl<'a, 's> ClientSession<'a, 's>
         {
             //GET VALUES
             let username = entry.key();
-            let uploads = entry.value();
+            let uploads = entry.files.lock().unwrap();
 
             if !uploads.is_empty() //DO NOT ADD USERS WITH NO UPLOADS
             {
                 //GET ID TO THE USERNAME
-                let Some(id) = server::CONNECTIONS.iter()
-                    .find(|c| c.username().is_some_and(|name| name == username))
-                    .and_then(|c| c.id().copied()) else { continue }; //ALREADY GONE
+                let Some(id) = config::users::id(username) else { continue };
 
                 //GET USER'S UPLOADS
                 let upload: Vec<(String, usize)> = uploads.iter().enumerate()
@@ -1576,19 +1574,20 @@ impl<'a, 's> ClientSession<'a, 's>
         } else
         {
             let length: usize = stored.fields().iter().map(|field| field.chars().count()).sum();
+            let mut presence = server::PRESENCE.lock().unwrap();
             let was_online = config::users::online_status(&self.username);
 
             log::info!("Profile saved ({length} chars): {}", self.peer_addr);
             config::users::set_profile(&self.username, &stored);
 
             //A CHANGE OF VISIBILITY IS A JOIN OR A LEAVE TO EVERYBODY
-            if stored.online_status != was_online
+            if stored.online_status != was_online && server::user_connected(&self.username)
             {
                 let device = server::CONNECTIONS.get(&self.peer_addr).and_then(|conn| conn.device().clone());
 
                 if stored.online_status
                 {
-                    server::send_to_all(PacketCode::Join
+                    presence.broadcast(PacketCode::Join
                     {
                         username: self.username.clone(),
                         username_color: config::users::colors(&self.username).username_color,
@@ -1598,7 +1597,7 @@ impl<'a, 's> ClientSession<'a, 's>
                     });
                 } else
                 {
-                    server::send_to_all(PacketCode::Leave
+                    presence.broadcast(PacketCode::Leave
                     {
                         username: self.username.clone(),
                         id: self.id,
