@@ -1,6 +1,10 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.6.1:
+- eb55856c: fix PM media_dir path concatenation bug
+- 304fd900: remove chat 2.5.0..2.6.0 migration code
+
 v2.6.0:
 - 4e582391: upgrade dependencies
 - 3c918094: fix PM arriving to only one device of user
