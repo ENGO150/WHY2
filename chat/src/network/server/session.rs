@@ -212,7 +212,7 @@ impl<'a, 's> ClientSession<'a, 's>
 
         last.is_some_and(|last|
             Instant::now().duration_since(last) >= Duration::from_secs(consts::REKEY_INTERVAL)) &&
-            !file::ACTIVE_FILESHARES.iter().any(|entry| entry.client_id == self.id)
+            !file::ACTIVE_FILESHARES.iter().any(|entry| entry.peer_addr == self.peer_addr)
     }
 
     //REKEY THE SESSION
@@ -719,7 +719,7 @@ impl<'a, 's> ClientSession<'a, 's>
             }
         }
 
-        let active_count = file::ACTIVE_FILESHARES.iter().filter(|upload| upload.client_id == self.id).count();
+        let active_count = file::ACTIVE_FILESHARES.iter().filter(|upload| upload.peer_addr == self.peer_addr).count();
         if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
         {
             log::warn!("Upload refused ({active_count} already running): {}", self.peer_addr);
@@ -729,7 +729,7 @@ impl<'a, 's> ClientSession<'a, 's>
         let kind = media.transfer_kind(private.is_some());
         let uid = rand::random();
         let target = UploadTarget { kind, hash, private };
-        let token = server::open_connection(self.id, ConnectionType::Upload { uid, target });
+        let token = server::open_connection(self.peer_addr, ConnectionType::Upload { uid, target });
         Ok(Some((token, uid)))
     }
 
@@ -739,7 +739,7 @@ impl<'a, 's> ClientSession<'a, 's>
         let private = message_id & consts::PRIVATE_MESSAGE_ID != 0;
         if private && file::private_file(&self.username, message_id, None).is_some()
         {
-            let token = server::open_connection(self.id, ConnectionType::FileDownload
+            let token = server::open_connection(self.peer_addr, ConnectionType::FileDownload
             {
                 uid: rand::random(),
                 source: DownloadSource::PrivateMessage(message_id),
@@ -773,7 +773,7 @@ impl<'a, 's> ClientSession<'a, 's>
             };
 
             //OPEN THE TRANSFER; ITS SOCKET VERIFIES AND STREAMS THE FILE
-            let token = server::open_connection(self.id, ConnectionType::FileDownload { uid: rand::random(), source: DownloadSource::File(file) });
+            let token = server::open_connection(self.peer_addr, ConnectionType::FileDownload { uid: rand::random(), source: DownloadSource::File(file) });
 
             self.send(PacketCode::Download { token }).await;
         } else
@@ -802,7 +802,11 @@ impl<'a, 's> ClientSession<'a, 's>
             let file_size = file.size;
 
             //OPEN NEW CONNECTION
-            let token = server::open_connection(self.id, ConnectionType::FileDownload { uid, source: DownloadSource::File(file) });
+            let token = server::open_connection(self.peer_addr, ConnectionType::FileDownload
+            {
+                uid,
+                source: DownloadSource::File(file),
+            });
 
             //SEND APPROVAL
             self.send(PacketCode::Download { token }).await;
@@ -823,11 +827,11 @@ impl<'a, 's> ClientSession<'a, 's>
     async fn screen(&mut self) -> PacketFlow
     {
         //CHECK FOR DISABLING SCREEN SHARE
-        if let Some((Some(removed_id), Some(username))) = server::CONNECTIONS.get_mut(&self.peer_addr)
+        if let Some((true, Some(username))) = server::CONNECTIONS.get_mut(&self.peer_addr)
             .and_then(|mut conn| Some((conn.remove_screen_stream(), conn.username().cloned())))
         {
             //DEATTACH ALL CLIENTS
-            server::deattach(removed_id, &username).await;
+            server::deattach(self.peer_addr, &username).await;
 
             log::info!("Screen share stopped: {}", self.peer_addr);
 
@@ -846,7 +850,7 @@ impl<'a, 's> ClientSession<'a, 's>
             //SEND SCREEN ACCEPT
             self.send(PacketCode::Screen
             {
-                token: Some(server::open_connection(self.id, ConnectionType::Screen))
+                token: Some(server::open_connection(self.peer_addr, ConnectionType::Screen))
             }).await;
 
             //NOTIFY USERS ABOUT SCREEN
@@ -869,17 +873,21 @@ impl<'a, 's> ClientSession<'a, 's>
     {
         //FIND SHARER ADDRESS BY ID
         let sharer_info = server::CONNECTIONS.iter()
-            .find(|entry| entry.value().id() == Some(&sharer_id) && entry.screen_stream().is_some())
-            .and_then(|conn| conn.username().map(|u| (sharer_id, u.to_owned())));
+            .filter_map(|conn|
+            {
+                if conn.id() != Some(&sharer_id) || conn.screen_stream().is_none() { return None; }
+                Some((*conn.key(), conn.username()?.clone()))
+            })
+            .min_by_key(|(addr, _)| *addr);
 
-        if let Some((sharer_id, sharer_username)) = sharer_info &&
+        if let Some((sharer_addr, sharer_username)) = sharer_info &&
             server::CONNECTIONS.get(&self.peer_addr).is_some_and(|c| c.attached_screen().as_ref()
-                .is_none_or(|s| s.target_id != sharer_id)) //PROHIBIT ATTACHING THE SAME SCREEN TWICE
+                .is_none_or(|s| s.target_peer_addr != sharer_addr)) //PROHIBIT ATTACHING THE SAME SCREEN TWICE
         { //VALID SHARER FOUND
             //OPEN NEW CONNECTION
-            let token = server::open_connection(self.id, ConnectionType::Attach
+            let token = server::open_connection(self.peer_addr, ConnectionType::Attach
             {
-                id: sharer_id,
+                sharer_addr,
             });
 
             //SEND ACCEPT
@@ -890,13 +898,13 @@ impl<'a, 's> ClientSession<'a, 's>
             }).await;
 
             //TELL THE SHARER WHO IS WATCHING
-            server::notify(sharer_id, PacketCode::Attached
+            server::notify(&sharer_addr, PacketCode::Attached
             {
                 username: self.username.clone(),
             }).await;
 
             //LOG START
-            log::info!("Screen attach: {} watching {}", self.peer_addr, server::log_addr(&sharer_id));
+            log::info!("Screen attach: {} watching {}", self.peer_addr, sharer_addr);
         } else
         {
             log::warn!("Screen attach refused (no such share): {}", self.peer_addr);
@@ -912,20 +920,19 @@ impl<'a, 's> ClientSession<'a, 's>
     async fn deattach_screen(&mut self) -> PacketFlow
     {
         //DEATTACH
-        let sharer_id = if let Some(mut conn) = server::CONNECTIONS.get_mut(&self.peer_addr)
+        let sharer_addr = if let Some(mut conn) = server::CONNECTIONS.get_mut(&self.peer_addr)
         {
-            if let Some(target_id) = conn.attached_screen().as_ref().map(|a| a.target_id)
+            if let Some(target_addr) = conn.attached_screen().as_ref().map(|a| a.target_peer_addr)
             {
                 conn.deattach_screen();
-                Some(target_id)
+                Some(target_addr)
             } else { None }
         } else { None };
 
-        if let Some(sharer_id) = sharer_id
+        if let Some(sharer_addr) = sharer_addr
         {
             //FIND SHARER USERNAME
-            let sharer_uname = server::CONNECTIONS.iter()
-                .find(|c| c.value().id() == Some(&sharer_id))
+            let sharer_uname = server::CONNECTIONS.get(&sharer_addr)
                 .and_then(|c| c.value().username().cloned())
                 .unwrap_or_default();
 
@@ -933,7 +940,7 @@ impl<'a, 's> ClientSession<'a, 's>
             self.send(PacketCode::Deattach { username: sharer_uname }).await;
 
             //TELL THE SHARER WHO STOPPED WATCHING
-            server::notify(sharer_id, PacketCode::Deattached
+            server::notify(&sharer_addr, PacketCode::Deattached
             {
                 username: self.username.clone(),
             }).await;
@@ -1085,7 +1092,7 @@ impl<'a, 's> ClientSession<'a, 's>
 
             let Some(username) = conn.username().cloned() else { continue; };
             let Some(id) = conn.id().copied() else { continue; };
-            if conn.screen_stream().is_none() { continue; }
+            if conn.screen_stream().is_none() || users.iter().any(|user: &UserScreen| user.id == id) { continue; }
 
             users.push(UserScreen
             {
@@ -1674,7 +1681,7 @@ impl<'a, 's> ClientSession<'a, 's>
             Some(hash) =>
             {
                 //PREVENT TOKEN SPAM
-                let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == self.id).count();
+                let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.peer_addr == self.peer_addr).count();
                 if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
                 {
                     log::warn!("Upload refused ({active_count} already running): {}", self.peer_addr);
@@ -1684,7 +1691,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 }
 
                 let uid = rand::random::<u64>();
-                let token = server::open_connection(self.id, ConnectionType::Upload
+                let token = server::open_connection(self.peer_addr, ConnectionType::Upload
                 {
                     uid,
                     target: UploadTarget { kind: UploadKind::Avatar, hash, private: None },
@@ -1783,7 +1790,7 @@ impl<'a, 's> ClientSession<'a, 's>
             Some(hash) =>
             {
                 //PREVENT TOKEN SPAM
-                let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.client_id == self.id).count();
+                let active_count = file::ACTIVE_FILESHARES.iter().filter(|u| u.peer_addr == self.peer_addr).count();
                 if active_count >= config::read_config::<usize>("max_client_parallel_uploads")
                 {
                     log::warn!("Upload refused ({active_count} already running): {}", self.peer_addr);
@@ -1793,7 +1800,7 @@ impl<'a, 's> ClientSession<'a, 's>
                 }
 
                 let uid = rand::random::<u64>();
-                let token = server::open_connection(self.id, ConnectionType::Upload
+                let token = server::open_connection(self.peer_addr, ConnectionType::Upload
                 {
                     uid,
                     target: UploadTarget { kind: UploadKind::Icon, hash, private: None },
@@ -1815,7 +1822,7 @@ impl<'a, 's> ClientSession<'a, 's>
             },
         }
 
-        server::icon_changed(self.id).await;
+        server::icon_changed(&self.peer_addr).await;
         PacketFlow::Continue
     }
 

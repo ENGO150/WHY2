@@ -216,7 +216,7 @@ async fn main()
             server::disconnect_inactive().await;
 
             //REMOVE OLD PENDING TOKENS
-            server::PENDING_TOKENS.retain(|_, (_, _, created)| created.elapsed().as_secs() < 5);
+            server::PENDING_TOKENS.retain(|_, pending_token| pending_token.created.elapsed().as_secs() < 5);
 
             //SEND KEEPALIVE PACKET TO ALL CLIENTS
             n = (n + 1) % 6;
@@ -286,39 +286,37 @@ async fn main()
                             Err(_) => return
                         }
 
-                        if let Some((_, (id, conn_type, _))) = server::PENDING_TOKENS.remove(&token)
+                        if let Some((pending_token, owner_task)) = server::take_pending_token(&token)
                         {
-                            //LOG AN AUXILIARY SOCKET AS ITS MAIN CONNECTION
-                            let owner = server::log_addr(&id);
-
-                            match conn_type
+                            let owner = pending_token.owner_addr;
+                            match pending_token.kind
                             {
                                 ConnectionType::Upload { uid, target } =>
                                 {
-                                    log::info!("Auxiliary connection ({} upload): {owner}", target.kind.name());
+                                    log::info!("Auxiliary connection ({} upload): {}", target.kind.name(), owner);
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (mut read_stream, write_stream) = stream.into_split();
-                                        file::download(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))),
+                                        file::download(token, owner, owner_task, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))),
                                             uid, task, target).await;
                                     });
                                 },
 
                                 ConnectionType::FileDownload { uid, source } =>
                                 {
-                                    log::info!("Auxiliary connection (file download): {owner}");
+                                    log::info!("Auxiliary connection (file download): {}", owner);
 
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (_read_stream, write_stream) = stream.into_split();
-                                        file::upload(token, id, write_stream, source, uid, task).await;
+                                        file::upload(token, owner, owner_task, write_stream, source, uid, task).await;
                                     });
                                     return;
                                 },
 
                                 ConnectionType::Screen =>
                                 {
-                                    log::info!("Auxiliary connection (screen share): {owner}");
+                                    log::info!("Auxiliary connection (screen share): {}", owner);
 
                                     //A SHARE'S BACKLOG IS LATENCY, NOT CAPACITY
                                     screen::cap_socket_buffers(&stream, screen::consts::SOCKET_TARGET);
@@ -326,12 +324,12 @@ async fn main()
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (mut read_stream, write_stream) = stream.into_split();
-                                        screen_server::screen(token, id, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), task).await;
+                                        screen_server::screen(token, owner, owner_task, &mut (&mut read_stream, Arc::new(Mutex::new(write_stream))), task).await;
                                     });
                                     return;
                                 },
 
-                                ConnectionType::Attach { id: sharer_id } =>
+                                ConnectionType::Attach { sharer_addr } =>
                                 {
                                     //A SHARE'S BACKLOG IS LATENCY, NOT CAPACITY
                                     screen::cap_socket_buffers(&stream, screen::consts::SOCKET_TARGET);
@@ -339,12 +337,12 @@ async fn main()
                                     //THE READ HALF CARRIES THE VIEWER'S REPORTS
                                     let (read_stream, write_stream) = stream.into_split();
 
-                                    let attached = if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
+                                    let attached = if let Some(mut conn) = server::CONNECTIONS.get_mut(&owner).filter(|conn| conn.task().id() == owner_task)
                                     {
                                         let stream = Arc::new(Mutex::new(write_stream));
                                         let keys = conn.keys().cloned();
 
-                                        conn.attach_screen(sharer_id, stream.clone(), token);
+                                        conn.attach_screen(sharer_addr, stream.clone(), token);
 
                                         keys.map(|keys| (stream, keys))
                                     } else { None };
@@ -353,12 +351,19 @@ async fn main()
                                     match attached
                                     {
                                         //BUILD THE VIEWER'S TASKS HERE
-                                        Some((stream, keys)) => match screen_server::attach(sharer_id, id, &keys, read_stream, stream, token)
+                                        Some((stream, keys)) => match screen_server::attach(sharer_addr, owner, &keys, read_stream, stream, token)
                                         {
-                                            true => log::info!("Auxiliary connection (screen viewer): {owner} watching {}",
-                                                server::log_addr(&sharer_id)),
+                                            true => log::info!("Auxiliary connection (screen viewer): {owner} watching {sharer_addr}"),
 
-                                            false => log::warn!("Screen viewer dropped (share gone): {owner}"),
+                                            false =>
+                                            {
+                                                if let Some(mut conn) = server::CONNECTIONS.get_mut(&owner) &&
+                                                    conn.attached_screen().as_ref().is_some_and(|attached| attached.token == token)
+                                                {
+                                                    conn.deattach_screen();
+                                                }
+                                                log::warn!("Screen viewer dropped (share gone): {owner}");
+                                            },
                                         },
 
                                         None => log::warn!("Screen viewer dropped (connection gone): {owner}"),

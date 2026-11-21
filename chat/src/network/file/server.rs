@@ -132,8 +132,10 @@ use crate::
 /// unfinished upload.
 struct FileTransferGuard
 {
-    /// The client's session id.
-    id: usize,
+    /// The client's address.
+    peer_addr: SocketAddr,
+    /// The task of the main connection.
+    owner_task: Id,
     /// The upload id.
     uid: u64,
 }
@@ -143,7 +145,7 @@ impl Drop for FileTransferGuard
 {
     fn drop(&mut self)
     {
-        if let Some(conn) = server::CONNECTIONS.iter().find(|c| c.id() == Some(&self.id))
+        if let Some(conn) = server::CONNECTIONS.get(&self.peer_addr) && conn.task().id() == self.owner_task
         {
             //REMOVE FILE STREAM
             conn.remove_file_stream(self.uid);
@@ -194,8 +196,8 @@ pub struct ActiveFileshare //ACTIVE FILE UPLOAD
     pub hasher: Sha256,         //HASHER
     /// The uploaded file's name.
     pub filename: String,       //FILENAME
-    /// Session id of the uploader.
-    pub client_id: usize,       //ID OF SENDER
+    /// Peer address of the uploader.
+    pub peer_addr: SocketAddr,
     /// The temp path the upload is being built at.
     pub path: PathBuf,          //WHERE THE UPLOAD IS BEING BUILT
     /// The plaintext, kept only for a persistent upload, which is broadcast or parsed afterwards.
@@ -219,7 +221,7 @@ pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock
 ///
 /// # Parameters
 /// - `token`: The transfer token the socket presented.
-/// - `id`: The uploader's session id.
+/// - `peer_addr`: The uploader's main connection address.
 /// - `streams`: The transfer socket's halves.
 /// - `uid`: The upload id.
 /// - `task`: The abort handle of this transfer's task, registered on the connection.
@@ -227,7 +229,8 @@ pub static ACTIVE_FILESHARES: LazyLock<DashMap<u64, ActiveFileshare>> = LazyLock
 pub async fn download
 (
     token: [u8; 32],
-    id: usize,
+    peer_addr: SocketAddr,
+    owner_task: Id,
     streams: &mut Streams<'_>,
     uid: u64,
     task: AbortHandle,
@@ -235,12 +238,10 @@ pub async fn download
 )
 {
     //GET CLIENT INFO
-    let (keys, username, peer_addr, session) =
+    let (keys, username, id) =
     {
-        //FIND CONNECTION BY ID
-        let conn = server::CONNECTIONS.iter()
-            .find(|e| e.value().id() == Some(&id));
-
+        //FIND THE MAIN CONNECTION
+        let conn = server::CONNECTIONS.get(&peer_addr).filter(|conn| conn.task().id() == owner_task);
         match conn
         {
             Some(c) =>
@@ -257,10 +258,12 @@ pub async fn download
                     None => return
                 };
 
+                let Some(id) = c.id().copied() else { return };
+
                 //ADD FILE STREAM
                 c.add_file_stream(uid, task);
 
-                (keys, username, *c.peer_addr(), c.task().id())
+                (keys, username, id)
             },
             None => return
         }
@@ -269,7 +272,8 @@ pub async fn download
     //DISCONNECT GUARD
     let _guard = FileTransferGuard
     {
-        id,
+        peer_addr,
+        owner_task,
         uid,
     };
 
@@ -296,7 +300,7 @@ pub async fn download
     log::info!("Upload started ({size} bytes, {}): {peer_addr}", kind.name());
 
     //CHECK FOR CONCURRENT UPLOADS
-    if ACTIVE_FILESHARES.iter().filter(|u| u.client_id == id).count() >=
+    if ACTIVE_FILESHARES.iter().filter(|u| u.peer_addr == peer_addr).count() >=
         config::read_config("max_client_parallel_uploads")
     {
         //REJECT INSTEAD OF CONSUMING DATA
@@ -317,7 +321,7 @@ pub async fn download
     if sealed && size > ceiling
     {
         log::warn!("Upload rejected ({}, {size} bytes over the {ceiling} ceiling): {peer_addr}", kind.name());
-        server::notify(id, PacketCode::InvalidUsage).await;
+        server::notify(&peer_addr, PacketCode::InvalidUsage).await;
         return;
     }
 
@@ -391,7 +395,7 @@ pub async fn download
         hash,
         hasher: Sha256::new(),
         filename,
-        client_id: id,
+        peer_addr,
         path: upload_path,
         data: (sealed && !temporary_file).then(Vec::new),
         stream: disk_stream,
@@ -422,13 +426,13 @@ pub async fn download
                 if !voice_message::is_clip(&data)
                 {
                     log::warn!("Voice message rejected (not a clip): {peer_addr}");
-                    server::notify(id, PacketCode::InvalidUsage).await;
+                    server::notify(&peer_addr, PacketCode::InvalidUsage).await;
                     return;
                 }
             } else if !misc::is_image(&data)
             {
                 log::warn!("Avatar or icon rejected (not an image): {peer_addr}");
-                server::notify(id, PacketCode::InvalidUsage).await;
+                server::notify(&peer_addr, PacketCode::InvalidUsage).await;
                 return;
             }
 
@@ -436,7 +440,7 @@ pub async fn download
             if matches!(kind, UploadKind::Avatar | UploadKind::Icon) && !misc::is_avatar(&data)
             {
                 log::warn!("Upload rejected ({}, not a square of at most {}px): {peer_addr}", kind.name(), consts::AVATAR_DIMENSION);
-                server::notify(id, PacketCode::InvalidUsage).await;
+                server::notify(&peer_addr, PacketCode::InvalidUsage).await;
                 return;
             }
         }
@@ -446,7 +450,7 @@ pub async fn download
         {
             match ACTIVE_FILESHARES.get_mut(&uid)
             {
-                Some(mut active) if active.client_id == id &&
+                Some(mut active) if active.peer_addr == peer_addr &&
                     data.len() as u64 == (active.size - active.current_size).min(consts::UPLOAD_CHUNK_SIZE as u64) =>
                 {
                     //ENCRYPT
@@ -538,7 +542,7 @@ pub async fn download
                 None =>
                 {
                     log::warn!("Voice message rejected (malformed clip): {peer_addr}");
-                    server::notify(id, PacketCode::InvalidUsage).await;
+                    server::notify(&peer_addr, PacketCode::InvalidUsage).await;
                     return;
                 },
             },
@@ -578,13 +582,13 @@ pub async fn download
                         nonce: disk_nonce,
                     });
 
-                    publish_private(id, peer_addr, session, &username, target, &filename, media,
+                    publish_private(id, peer_addr, owner_task, &username, target, &filename, media,
                         &current_path, data, temporary).await;
                 },
 
                 None =>
                 {
-                    let channel = server::CONNECTIONS.iter().find(|conn| conn.id() == Some(&id))
+                    let channel = server::CONNECTIONS.get(&peer_addr)
                         .and_then(|conn| conn.channel().clone());
                     let kept = keep_public_media(&channel);
                     if kept && fs::rename(&current_path, target_dir.join(misc::hex(&final_hash))).await.is_err()
@@ -624,7 +628,7 @@ pub async fn download
             log::info!("Avatar set: {peer_addr}");
 
             //THE WHOLE PROFILE COMES BACK, LIKE A SAVE'S
-            server::notify(id, PacketCode::Profile
+            server::notify(&peer_addr, PacketCode::Profile
             {
                 profile: config::users::profile(&username),
                 username: username.clone(),
@@ -638,7 +642,7 @@ pub async fn download
 
             log::info!("Server icon set: {peer_addr}");
 
-            server::icon_changed(id).await;
+            server::icon_changed(&peer_addr).await;
         } else
         {
             //ANNOUNCE FILE UPLOAD
@@ -743,12 +747,12 @@ async fn publish_private
     let recipient = &target.recipient;
     if target.persistent && !config::private_messages::media_persistence_enabled()
     {
-        server::notify(id, PacketCode::InvalidFeature).await;
+        server::notify(&peer_addr, PacketCode::InvalidFeature).await;
         return;
     }
     if !target.persistent && !private_recipient_online(recipient, sender)
     {
-        server::notify(id, PacketCode::PrivateUploadUnavailable).await;
+        server::notify(&peer_addr, PacketCode::PrivateUploadUnavailable).await;
         return;
     }
 
@@ -757,7 +761,7 @@ async fn publish_private
     let Some(delivery) = config::private_messages::store_media(sender, recipient, text, timestamp,
         media.clone(), pending, target.persistent) else
     {
-        server::notify(id, PacketCode::InvalidUsage).await;
+        server::notify(&peer_addr, PacketCode::InvalidUsage).await;
         return;
     };
 
@@ -776,7 +780,7 @@ async fn publish_private
 
         if !stored
         {
-            server::notify(id, PacketCode::InvalidUsage).await;
+            server::notify(&peer_addr, PacketCode::InvalidUsage).await;
             return;
         }
     }
@@ -811,11 +815,10 @@ async fn publish_private
 }
 
 /// Finds a live private file by the requesting account's local message id.
-pub fn private_file(username: &str, message_id: u64, transfer: Option<(u64, AbortHandle)>) -> Option<(AvailableFile, usize)>
+pub fn private_file(username: &str, message_id: u64, transfer: Option<(u64, AbortHandle)>) -> Option<(AvailableFile, SocketAddr, Id)>
 {
     server::CONNECTIONS.iter().find_map(|owner|
     {
-        let id = *owner.id()?;
         let files = owner.private_files()?.lock().unwrap();
         let entry = files.iter().find(|entry| entry.participants.message_id(username) == Some(message_id))?;
         if let Some((uid, task)) = &transfer
@@ -823,7 +826,7 @@ pub fn private_file(username: &str, message_id: u64, transfer: Option<(u64, Abor
             owner.add_file_stream(*uid, task.clone());
         }
 
-        Some((entry.file.clone(), id))
+        Some((entry.file.clone(), *owner.key(), owner.task().id()))
     })
 }
 
@@ -831,19 +834,19 @@ pub fn private_file(username: &str, message_id: u64, transfer: Option<(u64, Abor
 ///
 /// # Parameters
 /// - `token`: The transfer token the socket presented.
-/// - `id`: The downloader's session id.
+/// - `peer_addr`: The downloader's main connection address.
+/// - `owner_task`: The task of the main connection when the token was consumed.
 /// - `write_stream`: The transfer socket's write half.
 /// - `source`: The file or the live PM whose access is checked again on this socket.
 /// - `uid`: The transfer id.
 /// - `task`: The abort handle of this transfer's task, registered on the connection.
-pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf, source: DownloadSource, uid: u64, task: AbortHandle)
+pub async fn upload(token: [u8; 32], peer_addr: SocketAddr, owner_task: Id, mut write_stream: OwnedWriteHalf, source: DownloadSource, uid: u64, task: AbortHandle)
 {
     //GET CLIENT INFO
-    let (keys, peer_addr, username) =
+    let (keys, username) =
     {
-        //FIND CONNECTION BY ID
-        let conn = server::CONNECTIONS.iter()
-            .find(|e| e.value().id() == Some(&id));
+        //FIND THE MAIN CONNECTION
+        let conn = server::CONNECTIONS.get(&peer_addr).filter(|conn| conn.task().id() == owner_task);
 
         match conn
         {
@@ -859,7 +862,7 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
                 let Some(username) = c.username().cloned() else { return };
                 c.add_file_stream(uid, task.clone());
 
-                (keys, *c.peer_addr(), username)
+                (keys, username)
             },
 
             None => return
@@ -869,7 +872,8 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
     //DISCONNECT GUARD
     let _guard = FileTransferGuard
     {
-        id,
+        peer_addr,
+        owner_task,
         uid,
     };
 
@@ -878,12 +882,17 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
         DownloadSource::File(file) => (file, None),
         DownloadSource::PrivateMessage(message_id) =>
         {
-            let Some((file, owner)) = private_file(&username, message_id, Some((uid, task))) else
+            let Some((file, owner_addr, file_owner_task)) = private_file(&username, message_id, Some((uid, task))) else
             {
-                server::notify(id, PacketCode::AttachmentUnavailable { message_id }).await;
+                server::notify(&peer_addr, PacketCode::AttachmentUnavailable { message_id }).await;
                 return;
             };
-            (file, (owner != id).then(|| FileTransferGuard { id: owner, uid }))
+            (file, (file_owner_task != owner_task).then(|| FileTransferGuard
+            {
+                peer_addr: owner_addr,
+                owner_task: file_owner_task,
+                uid,
+            }))
         },
     };
 

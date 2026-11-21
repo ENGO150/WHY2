@@ -50,6 +50,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    net::SocketAddr,
     collections::{ HashMap, VecDeque },
     time::{ Duration, Instant },
     sync::
@@ -71,7 +72,7 @@ use dashmap::DashMap;
 use tokio::
 {
     time,
-    task::AbortHandle,
+    task::{ AbortHandle, Id },
     net::tcp::{ OwnedReadHalf, OwnedWriteHalf },
     sync::
     {
@@ -106,16 +107,18 @@ use crate::
 static MUTED_ANIMATION: LazyLock<Vec<Vec<u8>>> = LazyLock::new(|| split_access_units(include_bytes!("./assets/muted.h264")));
 
 //EVERY RUNNING SHARE, REACHABLE FROM AN ATTACH
-/// Every running share, by sharer id, where an attach can reach it.
-static SHARES: LazyLock<DashMap<usize, Arc<Share>>> = LazyLock::new(|| DashMap::new());
+/// Every running share, by sharer address, where an attach can reach it.
+static SHARES: LazyLock<DashMap<SocketAddr, Arc<Share>>> = LazyLock::new(|| DashMap::new());
 
 //STRUCTS
 /// Tears a share down when its task ends: unlists it, stops its reporter and clears the
 /// connection's screen stream.
 struct ScreenTransferGuard
 {
-    /// The sharer's session id.
-    id: usize,
+    /// The sharer's main connection address.
+    owner_addr: SocketAddr,
+    task_id: Id,
+    share: Arc<Share>,
     /// The task reporting backlog to the sharer.
     feedback: AbortHandle, //THE TASK REPORTING BACK TO THE SHARER
 }
@@ -126,7 +129,7 @@ struct Share //WHAT A SHARE LEAVES WHERE AN ATTACHING VIEWER CAN REACH IT
     /// The last access unit that stands on its own.
     keyframe: MutexSync<Option<Vec<u8>>>,     //THE LAST PICTURE THAT STANDS ON ITS OWN
     /// Viewers built at their attach, waiting for the share loop to adopt them.
-    pending: MutexSync<Vec<(usize, Viewer)>>, //VIEWERS BUILT AT THE ATTACH, WAITING TO BE PICKED UP
+    pending: MutexSync<Vec<(SocketAddr, Viewer)>>, //VIEWERS BUILT AT THE ATTACH, WAITING TO BE PICKED UP
     /// Every served viewer's backlog figures.
     stats: MutexSync<Vec<Arc<Backlog>>>,      //EVERY SERVED VIEWER'S BACKLOG
     /// Whether anybody asked the sharer for a keyframe.
@@ -204,11 +207,12 @@ impl Drop for ScreenTransferGuard
     fn drop(&mut self)
     {
         //NOTHING MAY ATTACH TO A SHARE THAT IS OVER
-        SHARES.remove(&self.id);
+        SHARES.remove_if(&self.owner_addr, |_, share| Arc::ptr_eq(share, &self.share));
 
         self.feedback.abort();
 
-        if let Some(mut conn) = server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&self.id))
+        if let Some(mut conn) = server::CONNECTIONS.get_mut(&self.owner_addr) &&
+            conn.screen_stream().as_ref().is_some_and(|task| task.id() == self.task_id)
         {
             //REMOVE SCREEN STREAM
             conn.remove_screen_stream();
@@ -533,29 +537,30 @@ fn muted_frame(started: &Instant) -> Option<usize> //INDEX OF THE PLACEHOLDER FR
 }
 
 /// Ends a share whose upload socket closed: detaches every viewer and tells the sharer.
-async fn end_share(id: usize) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
+async fn end_share(owner_addr: SocketAddr, task_id: Id) //TEAR THE SHARE DOWN AND TELL EVERYONE ABOUT IT
 {
     //TAKE THE SHARE STATE WITHOUT ABORTING
     let (write_stream, keys, username) =
     {
-        let mut conn = match server::CONNECTIONS.iter_mut().find(|c| c.id() == Some(&id))
+        let mut conn = match server::CONNECTIONS.get_mut(&owner_addr)
         {
             Some(c) => c,
             None => return
         };
 
         //ALREADY TORN DOWN BY SOMEBODY ELSE
-        if conn.take_screen_stream().is_none() { return; }
+        if !conn.screen_stream().as_ref().is_some_and(|task| task.id() == task_id) { return; }
+        conn.take_screen_stream();
 
         (conn.write_stream().clone(), conn.keys().cloned(), conn.username().cloned())
     };
 
-    log::info!("Screen share ended (upload socket closed): {}", server::log_addr(&id));
+    log::info!("Screen share ended (upload socket closed): {}", owner_addr);
 
     //DEATTACH EVERY VIEWER
     if let Some(username) = username
     {
-        server::deattach(id, &username).await;
+        server::deattach(owner_addr, &username).await;
     }
 
     //TELL THE SHARER ITS SHARE IS GONE
@@ -638,8 +643,8 @@ async fn feedback //TELL THE SHARER HOW FAR BEHIND ITS VIEWERS ARE
 /// leave it looking at an old picture.
 ///
 /// # Parameters
-/// - `sharer_id`: The sharer's session id.
-/// - `client_id`: The viewer's session id.
+/// - `sharer_addr`: The sharer's main connection address.
+/// - `viewer_addr`: The viewer's main connection address.
 /// - `keys`: The viewer's session keys.
 /// - `read_stream`: The viewer socket's read half, for its reports.
 /// - `stream`: The viewer socket's write half.
@@ -649,8 +654,8 @@ async fn feedback //TELL THE SHARER HOW FAR BEHIND ITS VIEWERS ARE
 /// `false` if the share is not running or the viewer could not be built.
 pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
 (
-    sharer_id: usize,
-    client_id: usize,
+    sharer_addr: SocketAddr,
+    viewer_addr: SocketAddr,
     keys: &SharedKeys,
     read_stream: OwnedReadHalf,
     stream: Arc<Mutex<OwnedWriteHalf>>,
@@ -658,7 +663,7 @@ pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
 ) -> bool
 {
     //THE SHARE IS OVER (OR NEVER STARTED)
-    let Some(share) = SHARES.get(&sharer_id).map(|share| share.clone()) else { return false; };
+    let Some(share) = SHARES.get(&sharer_addr).map(|share| share.clone()) else { return false; };
 
     let Some(viewer) = spawn_viewer(stream, read_stream, keys, token, share.clone()) else { return false; };
 
@@ -676,7 +681,7 @@ pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
     {
         Ok(mut pending) =>
         {
-            pending.push((client_id, viewer));
+            pending.push((viewer_addr, viewer));
 
             true
         },
@@ -689,47 +694,25 @@ pub fn attach //BUILD A VIEWER WHERE IT ATTACHES
 ///
 /// # Parameters
 /// - `token`: The share's token.
-/// - `id`: The sharer's session id.
+/// - `owner_addr`: The sharer's main connection address.
+/// - `owner_task`: The task of the main connection when the token was consumed.
 /// - `streams`: The upload socket's halves.
 /// - `task`: This task's abort handle, registered on the connection.
-pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task: AbortHandle)
+pub async fn screen(token: [u8; 32], owner_addr: SocketAddr, owner_task: Id, streams: &mut Streams<'_>, task: AbortHandle)
 {
-    //GET CLIENT KEYS
-    let keys =
+    let keys = match server::CONNECTIONS.get(&owner_addr)
+        .filter(|conn| conn.task().id() == owner_task)
+        .and_then(|conn| conn.keys().cloned())
     {
-        //FIND CONNECTION BY ID
-        let conn = server::CONNECTIONS.iter_mut()
-            .find(|e| e.value().id() == Some(&id));
-
-        match conn
-        {
-            Some(mut c) =>
-            {
-                let keys = match c.keys()
-                {
-                    Some(k) => k.clone(),
-                    None => return
-                };
-
-                //ADD SCREEN STREAM
-                c.set_screen_stream(task);
-
-                keys
-            },
-            None => return
-        }
+        Some(keys) => keys,
+        None => return,
     };
-
-    //AN AUXILIARY SOCKET IS LOGGED AS THE MAIN ONE
-    let owner = server::log_addr(&id);
-
-    log::info!("Screen share started: {owner}");
 
     //LOCAL SEQ
     let mut seq = 0usize;
 
     //ONE ENTRY PER ATTACHED VIEWER
-    let mut viewers = HashMap::<usize, Viewer>::new();
+    let mut viewers = HashMap::<SocketAddr, Viewer>::new();
 
     //INIT REX STREAMS, ONE EACH WAY
     let mut rex_stream = crypto::init_rex_stream(&keys, &token).unwrap();
@@ -753,9 +736,18 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
     let reporter = tokio::spawn(feedback(share.clone(), streams.1.clone(), reverse_stream)).abort_handle();
 
     //DISCONNECT GUARD
-    let _guard = ScreenTransferGuard { id, feedback: reporter };
+    let task_id = task.id();
+    let _guard = ScreenTransferGuard { owner_addr, task_id, share: share.clone(), feedback: reporter };
 
-    SHARES.insert(id, share.clone());
+    {
+        let Some(mut conn) = server::CONNECTIONS.get_mut(&owner_addr) else { return; };
+        if conn.task().id() != owner_task || conn.screen_stream().is_some() { return; }
+
+        conn.set_screen_stream(task);
+        SHARES.insert(owner_addr, share.clone());
+    }
+
+    log::info!("Screen share started: {owner_addr}");
 
     //LOOP READING
     loop
@@ -768,8 +760,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         };
 
         //IS THE SHARER MUTED? (DROP THE GUARD)
-        let muted = server::CONNECTIONS.iter()
-            .find(|c| c.id() == Some(&id))
+        let muted = server::CONNECTIONS.get(&owner_addr)
             .map(|c| *c.muted())
             .unwrap_or(false);
 
@@ -805,24 +796,24 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         //TAKE ON WHOEVER ATTACHED SINCE THE LAST FRAME
         let arrivals = share.pending.lock().map(|mut pending| pending.drain(..).collect::<Vec<_>>()).unwrap_or_default();
 
-        for (client_id, viewer) in arrivals
+        for (viewer_addr, viewer) in arrivals
         {
-            viewers.insert(client_id, viewer);
+            viewers.insert(viewer_addr, viewer);
 
-            log::info!("Screen viewer serving ({} attached): share of {owner}", viewers.len());
+            log::info!("Screen viewer serving ({} attached): share of {owner_addr}", viewers.len());
         }
 
         //COLLECT WHO IS STILL ATTACHED TO US
-        let entries: Vec<(usize, [u8; 32], bool)> = server::CONNECTIONS.iter().filter_map(|entry|
+        let entries: Vec<(SocketAddr, [u8; 32], bool)> = server::CONNECTIONS.iter().filter_map(|entry|
         {
             match entry.value()
             {
-                Connection::Authenticated { id: client_id, attached_screen, .. } =>
+                Connection::Authenticated { peer_addr: viewer_addr, attached_screen, .. } =>
                 {
                     //FILTER ATTACHED CLIENTS
-                    if let Some(attached_screen) = attached_screen && attached_screen.target_id == id
+                    if let Some(attached_screen) = attached_screen && attached_screen.target_peer_addr == owner_addr
                     {
-                        Some((*client_id, attached_screen.token, attached_screen.muted))
+                        Some((*viewer_addr, attached_screen.token, attached_screen.muted))
                     } else { None }
                 },
                 _ => None,
@@ -830,16 +821,16 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
         }).collect();
 
         //RETIRE WHOEVER LEFT OR WHOSE SOCKET FAILED
-        viewers.retain(|client_id, viewer|
+        viewers.retain(|viewer_addr, viewer|
         {
             if viewer.queue.is_closed()
             {
-                log::warn!("Screen viewer dropped (write failed): share of {owner}");
+                log::warn!("Screen viewer dropped (write failed): share of {owner_addr}");
 
                 return false;
             }
 
-            match entries.iter().find(|(e, token, _)| e == client_id && *token == viewer.token)
+            match entries.iter().find(|(e, token, _)| e == viewer_addr && *token == viewer.token)
             {
                 Some((_, _, muted)) =>
                 {
@@ -878,7 +869,7 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
                     if let VideoPush::Shed = viewer.queue.push_video(data.clone(), keyframe)
                     {
                         //ONLY THE FIRST SHED FRAME OF A RUN IS LOGGED
-                        if !viewer.needs_key { log::warn!("Screen viewer shed (link too slow): share of {owner}"); }
+                        if !viewer.needs_key { log::warn!("Screen viewer shed (link too slow): share of {owner_addr}"); }
 
                         viewer.needs_key = true;
                         viewer.stats.shed.store(true, Ordering::Relaxed);
@@ -895,10 +886,10 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
 
             ScreenPacketCode::Audio { data } =>
             {
-                for (client_id, viewer) in viewers.iter_mut()
+                for (viewer_addr, viewer) in viewers.iter_mut()
                 {
                     //PREVENT FEEDBACK
-                    if *client_id == id { continue; }
+                    if *viewer_addr == owner_addr { continue; }
 
                     //SKIP USERS WHO MUTED THE STREAM
                     if viewer.muted { continue; }
@@ -912,5 +903,5 @@ pub async fn screen(token: [u8; 32], id: usize, streams: &mut Streams<'_>, task:
     }
 
     //THE UPLOAD SOCKET DIED
-    end_share(id).await;
+    end_share(owner_addr, task_id).await;
 }

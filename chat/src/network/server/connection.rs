@@ -115,8 +115,8 @@ pub struct Attach //SCREEN ATTACHMENT
 {
     /// The viewer's socket, frames are written to.
     pub stream: Arc<Mutex<OwnedWriteHalf>>, //RECEIVE STREAM
-    /// Session id of the sharer.
-    pub target_id: usize,                   //ID OF SCREENSHARER
+    /// Main connection address of the sharer.
+    pub target_peer_addr: SocketAddr,       //ADDRESS OF SCREENSHARER
     /// The attachment's token, which keys its packet stream.
     pub token: [u8; 32],                    //TOKEN FOR REXSTREAM
     /// Whether the viewer muted the share's audio.
@@ -141,10 +141,10 @@ pub enum ConnectionType //TYPES OF TCP CHANNEL
     },
     /// Receives a screen share.
     Screen,
-    /// Sends a screen share to a viewer; `id` is the sharer.
+    /// Sends a screen share to a viewer of the given main connection.
     Attach
     {
-        id: usize,
+        sharer_addr: SocketAddr,
     },
 }
 
@@ -703,16 +703,16 @@ impl Connection
     /// Attaches this client to a screen share, unmuted.
     ///
     /// # Parameters
-    /// - `target_id`: The sharer's session id.
+    /// - `target_peer_addr`: The sharer's main connection address.
     /// - `stream`: The viewer socket's write half.
     /// - `token`: The attachment's token.
-    pub fn attach_screen(&mut self, target_id: usize, stream: Arc<Mutex<OwnedWriteHalf>>, token: [u8; 32])
+    pub fn attach_screen(&mut self, target_peer_addr: SocketAddr, stream: Arc<Mutex<OwnedWriteHalf>>, token: [u8; 32])
     {
         match self
         {
             Self::Authenticated { attached_screen, .. } => *attached_screen = Some(Attach
             {
-                target_id,
+                target_peer_addr,
                 stream,
                 token,
                 muted: false,
@@ -753,9 +753,9 @@ impl Connection
         {
             Self::Authenticated { attached_screen, .. } =>
             {
-                let target = attached_screen.take().map(|attached| attached.target_id);
+                let target = attached_screen.take().map(|attached| attached.target_peer_addr);
 
-                log::info!("Stop screen attach: {} (was watching id {})", self.peer_addr(),
+                log::info!("Stop screen attach: {} (was watching {})", self.peer_addr(),
                     target.map(|id| id.to_string()).unwrap_or_else(|| String::from("nobody")));
             },
             _ => {},
@@ -779,16 +779,16 @@ impl Connection
     /// Unregisters the screen share task without aborting it.
     ///
     /// # Returns
-    /// The session id and the task, if a share was running.
-    pub fn take_screen_stream(&mut self) -> Option<(usize, AbortHandle)>
+    /// The task, if a share was running.
+    pub fn take_screen_stream(&mut self) -> Option<AbortHandle>
     {
-        if let Self::Authenticated { screen_stream, peer_addr, id, .. } = self
+        if let Self::Authenticated { screen_stream, peer_addr, .. } = self
         {
             if let Some(old_task) = screen_stream.take()
             {
                 log::info!("Stop screenshare: {}", peer_addr);
 
-                return Some((*id, old_task));
+                return Some(old_task);
             }
         }
 
@@ -799,13 +799,13 @@ impl Connection
     /// Unregisters and aborts the screen share task.
     ///
     /// # Returns
-    /// The session id, if a share was running.
-    pub fn remove_screen_stream(&mut self) -> Option<usize>
+    /// Whether a share was running.
+    pub fn remove_screen_stream(&mut self) -> bool
     {
-        self.take_screen_stream().map(|(id, old_task)|
+        self.take_screen_stream().is_some_and(|task|
         {
-            old_task.abort();
-            id
+            task.abort();
+            true
         })
     }
 

@@ -73,7 +73,7 @@ use tokio::
     fs,
     sync::{ Mutex, oneshot },
     net::tcp::OwnedWriteHalf,
-    task::{ self, AbortHandle },
+    task::{ self, AbortHandle, Id },
 };
 
 use rand::
@@ -114,7 +114,6 @@ use crate::
     {
         self,
         voice::server as voice_server,
-        file::server as file,
         server::session::ClientSession,
         codes::
         {
@@ -127,9 +126,8 @@ use crate::
 };
 
 //LISTS
-/// Tokens minted for auxiliary connections, awaiting their socket: `token → (client id, kind,
-/// minted at)`.
-pub static PENDING_TOKENS: LazyLock<DashMap<[u8; 32], (usize, ConnectionType, Instant)>> = LazyLock::new(|| DashMap::new());
+/// Tokens minted for auxiliary connections, awaiting their socket
+pub static PENDING_TOKENS: LazyLock<DashMap<[u8; 32], PendingToken>> = LazyLock::new(|| DashMap::new());
 /// Every connection, by peer address.
 pub static CONNECTIONS: LazyLock<DashMap<SocketAddr, Connection>> = LazyLock::new(|| DashMap::new());     //LIST FOR EACH CLIENT CONNECTION
 /// Every user's shared files, by username.
@@ -353,6 +351,16 @@ async fn verify_password(username: &str, password: Zeroizing<String>) -> bool
 }
 
 //PUBLIC
+//STRUCTS
+/// A token for opening an auxiliary connection
+pub struct PendingToken
+{
+    pub owner_addr: SocketAddr,
+    pub kind: ConnectionType,
+    pub created: Instant,
+}
+
+//FUNCTIONS
 //A CLIENT'S MAIN ADDRESS (NEVER UNDER A GUARD)
 /// Returns the main-connection address of client `id`, for logging an auxiliary connection.
 ///
@@ -430,15 +438,15 @@ pub(crate) fn send_to_accounts(participants: &Participants, packet: impl Fn(&str
 ///
 /// # Parameters
 /// - `code`: The packet.
-/// - `except`: The session id to skip.
-pub fn send_to_all_but(code: PacketCode, except: Option<usize>) //SEND PACKET TO ALL CLIENTS, ONE EXCLUDED
+/// - `except`: The peer address to skip.
+pub fn send_to_all_but(code: PacketCode, except: Option<SocketAddr>) //SEND PACKET TO ALL CLIENTS, ONE EXCLUDED
 {
     //COLLECT EACH CLIENT
     let entries: Vec<Connection> = CONNECTIONS.iter().filter_map(|entry|
     {
         match entry.value()
         {
-            Connection::Authenticated { id, .. } if except != Some(*id) =>
+            Connection::Authenticated { peer_addr, .. } if except != Some(*peer_addr) =>
             {
                 //FOUND, COLLECT
                 Some(entry.value().clone())
@@ -508,7 +516,11 @@ pub fn send_to_others(code: PacketCode, channel: Option<&str>, except: usize) //
 pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTION BY PEER ADDRESS
 {
     //REMOVE CONNECTION
-    let mut connection = match CONNECTIONS.remove(peer_addr)
+    let mut connection = match CONNECTIONS.remove_if(peer_addr, |_, _|
+    {
+        PENDING_TOKENS.retain(|_, pending| pending.owner_addr != *peer_addr);
+        true
+    })
     {
         Some((_, conn)) => conn,
         None => return
@@ -533,7 +545,7 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
     }
 
     //REMOVE PM NON-PERSISTENT UPLOADS
-    if !duplicate && let Some(files) = connection.private_files()
+    if let Some(files) = connection.private_files()
     {
         files.lock().unwrap().clear();
     }
@@ -545,19 +557,19 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
     }
 
     //CLOSE SCREEN UPLOAD STREAM
-    if let Some(id) = connection.remove_screen_stream()
+    if connection.remove_screen_stream()
     {
         //DEATTACH ALL ATTACHED CLIENTS
-        deattach(id, connection.username().unwrap()).await;
+        deattach(*peer_addr, connection.username().unwrap()).await;
     }
 
     //AUTHENTICATED ACTIONS
     if connection.is_authenticated()
     {
         //TELL THE SHARER WE STOPPED WATCHING
-        if let Some(target_id) = connection.attached_screen().as_ref().map(|a| a.target_id)
+        if let Some(target_addr) = connection.attached_screen().as_ref().map(|a| a.target_peer_addr)
         {
-            notify(target_id, PacketCode::Deattached
+            notify(&target_addr, PacketCode::Deattached
             {
                 username: connection.username().unwrap().to_owned(),
             }).await;
@@ -583,7 +595,6 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         if !duplicate
         {
             let _ = fs::remove_dir_all(misc::get_upload_dir(username)).await; //REMOVE FILES
-            file::ACTIVE_FILESHARES.retain(|_, u| u.client_id != *connection.id().unwrap());
             AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
         }
 
@@ -727,7 +738,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<D
     });
 
     //CREATE AVAILABLE FILES ENTRY
-    AVAILABLE_FILES.insert(username.to_string(), Vec::new());
+    AVAILABLE_FILES.entry(username.to_string()).or_default();
 
     log::info!("Authenticate connection: {peer_addr} (id {id}, role {role})");
 }
@@ -855,26 +866,38 @@ async fn send_voice_clients(stream: &mut OwnedWriteHalf, keys: &SharedKeys, id: 
     network::send(stream, PacketCode::VoiceClients { clients }, Some(keys)).await;
 }
 
-/// Mints a one-time token for an auxiliary connection of client `id`.
-fn open_connection(id: usize, conn_type: ConnectionType) -> [u8; 32] //ADD NEW TOKEN
+/// Mints a one-time token for an auxiliary connection of client peer address.
+fn open_connection(owner_addr: SocketAddr, kind: ConnectionType) -> [u8; 32] //ADD NEW TOKEN
 {
     //GENERATE RANDOM TOKEN
     let mut token = [0u8; 32];
     SysRng.try_fill_bytes(&mut token).unwrap();
 
-    //OPEN NEW CONNECTION
-    PENDING_TOKENS.insert(token, (id, conn_type, Instant::now()));
+    //HOLD THE CONNECTION GUARD SO TEARDOWN CANNOT MISS THE NEW TOKEN
+    if let Some(conn) = CONNECTIONS.get(&owner_addr) && conn.is_authenticated()
+    {
+        PENDING_TOKENS.insert(token, PendingToken { owner_addr, kind, created: Instant::now() });
+    }
 
     token
 }
 
 //PUBLIC
-/// Sends a packet to the client with session id `id`, if connected.
-pub async fn notify(id: usize, code: PacketCode) //SEND PACKET TO THE CLIENT WITH id
+/// Consumes an auxiliary token and captures the current main connection's task identity.
+pub fn take_pending_token(token: &[u8; 32]) -> Option<(PendingToken, Id)>
+{
+    let owner_addr = PENDING_TOKENS.get(token)?.owner_addr;
+    let conn = CONNECTIONS.get(&owner_addr)?;
+    let (_, pending) = PENDING_TOKENS.remove(token)?;
+    (conn.is_authenticated() && pending.created.elapsed() < Duration::from_secs(5))
+        .then(|| (pending, conn.task().id()))
+}
+
+/// Sends a packet to the client with peer address `peer_addr`, if connected.
+pub async fn notify(peer_addr: &SocketAddr, code: PacketCode) //SEND PACKET TO THE CLIENT WITH id
 {
     //COLLECT INTO LOCALS - NO GUARD ACROSS THE await
-    let target = CONNECTIONS.iter().find(|conn| conn.id() == Some(&id))
-        .map(|conn| (conn.write_stream().clone(), conn.keys().cloned()));
+    let target = CONNECTIONS.get(peer_addr).map(|conn| (conn.write_stream().clone(), conn.keys().cloned()));
 
     if let Some((write_stream, keys)) = target
     {
@@ -882,26 +905,26 @@ pub async fn notify(id: usize, code: PacketCode) //SEND PACKET TO THE CLIENT WIT
     }
 }
 
-/// Broadcasts the current server icon, acknowledging the change to client `id`.
-pub async fn icon_changed(id: usize) //TELL EVERYBODY THE SERVER'S PICTURE, AND id THAT IT WAS SAVED
+/// Broadcasts the server icon and acknowledges the change to the requesting connection.
+pub async fn icon_changed(peer_addr: &SocketAddr) //TELL EVERYBODY THE SERVER'S PICTURE, AND id THAT IT WAS SAVED
 {
     let hash = config::server_icon();
 
-    send_to_all_but(PacketCode::ServerIcon { hash, save: false }, Some(id));
-    notify(id, PacketCode::ServerIcon { hash, save: true }).await;
+    send_to_all_but(PacketCode::ServerIcon { hash, save: false }, Some(*peer_addr));
+    notify(peer_addr, PacketCode::ServerIcon { hash, save: true }).await;
 }
 
 /// Detaches every viewer from a screen share and tells them.
 ///
 /// # Parameters
-/// - `sharer_id`: The sharer's session id.
+/// - `sharer_addr`: The sharer's main connection address.
 /// - `sharer_uname`: The sharer's username, as shown to the viewers.
-pub async fn deattach(sharer_id: usize, sharer_uname: &String) //DEATTACH ALL ATTACHED CLIENTS
+pub async fn deattach(sharer_addr: SocketAddr, sharer_uname: &str) //DEATTACH ALL ATTACHED CLIENTS
 {
     let mut to_notify = Vec::new();
 
     for mut conn in CONNECTIONS.iter_mut()
-        .filter(|conn| conn.attached_screen().as_ref().is_some_and(|a| a.target_id == sharer_id))
+        .filter(|conn| conn.attached_screen().as_ref().is_some_and(|a| a.target_peer_addr == sharer_addr))
     {
         conn.deattach_screen();
         to_notify.push((conn.write_stream().clone(), conn.keys().cloned()));
