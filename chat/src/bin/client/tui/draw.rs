@@ -776,21 +776,25 @@ fn draw_online(frame: &mut Frame, app: &App, area: Rect)
 
             //WHAT THEY ARE ON, IF THEY SHARE IT
             let device = app.devices.get(&user.username).map(|device| super::device_label(device)).unwrap_or_default();
-            let reserved = if device.is_empty() { 0 } else { device.width() + 2 };
-
-            //THE NAME GIVES WAY TO THE DEVICE
-            let name = truncate(&user.username, room.saturating_sub(width + 2 + reserved));
+            let unread = unread_pm_badge(app, &user.username);
+            let unread_width = unread.width();
+            let name_room = room.saturating_sub(width + 2 + unread_width);
+            let show_device = !device.is_empty() && device.width() + 2 < name_room;
+            let reserved = if show_device { device.width() + 2 } else { 0 };
+            let name = truncate(&user.username, name_room.saturating_sub(reserved));
+            let name_width = name.width();
 
             let mut spans = vec!
             [
                 Span::styled(format!("{id:>width$}  ", id = user.id), theme::dim()),
-                Span::styled(name.clone(), style),
+                Span::styled(name, style),
+                unread,
             ];
 
             //DEVICE ON THE RIGHT EDGE
-            if !device.is_empty()
+            if show_device
             {
-                let pad = room.saturating_sub(width + 3 + name.width() + device.width());
+                let pad = room.saturating_sub(width + 3 + name_width + unread_width + device.width());
 
                 spans.push(Span::styled(format!("{:pad$}{device} ", ""), theme::dim()));
             }
@@ -835,7 +839,8 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
 
     let lines = app.offline.iter().map(|(id, (username, color))|
     {
-        let name = truncate(username, room.saturating_sub(width + 2));
+        let unread = unread_pm_badge(app, username);
+        let name = truncate(username, room.saturating_sub(width + 2 + unread.width()));
 
         //THEIR OWN COLOR, ELSE DIM
         Line::from(vec!
@@ -846,10 +851,18 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
                 Some(_) => Span::styled(name, app.theme.style(*color).add_modifier(Modifier::BOLD)),
                 None => Span::styled(name, theme::dim().add_modifier(Modifier::BOLD)),
             },
+            unread,
         ])
     }).collect::<Vec<Line>>();
 
     frame.render_widget(Paragraph::new(lines), inner);
+}
+
+/// Shows a sender's unread PM count immediately after their username.
+fn unread_pm_badge(app: &App, username: &str) -> Span<'static>
+{
+    app.unread_pms.get(username).map_or_else(Span::default, |count|
+        Span::styled(format!(" ({count})"), theme::notice()))
 }
 
 /// Draws the named channels.
