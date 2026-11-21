@@ -1,6 +1,60 @@
 WHY2 (Chat) Changelog
 =====================
 
+v2.6.0:
+- 4e582391: upgrade dependencies
+- 3c918094: fix PM arriving to only one device of user
+- 5e152313: implement moderation for double-connected users
+- e211d8fd: add voice_moved translations
+- e9f9e182: fix voice connect on double-connection
+- 64d2d3e3: fix duplicate presence events
+- 939f8bb8: tag auxiliary connections with ip addr instead of ID
+- afbcb520: fix session file imports
+- 9e18a893: do not clean non-persistent files on double-connected user disconnect
+- 7a5b0b80: make registrations atomic
+- 2153d428: fix list containing same user twice
+- 27036194: do not send Join/Leave codes on double-connect
+- ce6b8a74: allow same username to connect twice at the same time
+- 229e058a: add persistent PM unread counter
+- 5470b412: remove pm.received translations
+- 31454a04: add unread PM counter to user list
+- 1f5dfa21: add media volume & normalisation translations
+- 671f4396: implement media volume option
+- e478d05d: implement media volume normalisation
+- 58f2ec24: fix possible non-persistent private files leak
+- d414f98b: remove unused PM fileshare unavailable translations
+- dc081bc2: allow non-persistent filesharing in PMs
+- abd1f998: implement filesharing for private messages
+- dac2a2f2: simplify filesharing architecture
+- 9636fedb: disconnect clients without notice on server restart
+- d09b71c3: fix client media file playback error
+- 06bc9157: chunk message attachments
+- c49c487f: add file too large czech & english translations
+- 21870832: generate file too large translations
+- 1a6b0110: move server upload consts into server config
+- ada8ba6a: fix channel change vanish glitch
+- 42d89615: fix PM server deadlock
+- 525b4319: add czech & english theme builder translations
+- b2ff4b9a: add theme builder translations
+- f22e93c7: add custom theme builder
+- dddf940c: remove redundant PrivateMessageBack code fields
+- 194deb19: complete PM view translations
+- 066935f0: remove TUI state unit tests
+- e714b983: split input history per pm recipient
+- 4e991296: remove RE command translations
+- 54520e20: remove /re command
+- a138d70c: update PM mentions in chat readme
+- 65676fc1: add separate private message client view
+- 0b7f8e6c: upgrade chat dependencies
+- 24e1f7ad: add server config entry (disable_ghost_pms) to allow PMs by "offline" online users
+- fe54df7c: prohibit sending PM by "offline" online user when persistent PMs are off
+- 85afdd9b: prohibit sending PM to "offline" online user when persistent PMs are off
+- cbc23912: mention persistent private messages in prose files
+- 24079bb0: enable client's auto_show_images & share_device by default
+- 4eb094dd: enable message persistence by default
+- 1d736aa8: add event.timeline translations
+- da60de4d: add persistent private messages
+
 v2.5.0:
 - 41ec7ab8: upgrade chat dependencies
 - 1d4d230d: fix invisibility in voice channel glitch
