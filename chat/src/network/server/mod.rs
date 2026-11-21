@@ -406,6 +406,7 @@ pub(crate) fn send_to_accounts(participants: &Participants, packet: impl Fn(&str
     let entries: Vec<_> = CONNECTIONS.iter().filter_map(|entry|
     {
         let username = entry.username()?;
+        entry.id()?;
         let id = participants.message_id(username)?;
         Some((entry.write_stream().clone(), entry.keys().cloned(), username.clone(), id))
     }).collect();
@@ -510,12 +511,6 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         None => return
     };
 
-    //SEND DISCONNECT CODE IF GRACEFUL
-    if grace
-    {
-        network::send(&mut *connection.write_stream().lock().await, PacketCode::Disconnect, connection.keys()).await;
-    }
-
     //CLOSE ALL FILE STREAMS
     if let Some(streams) = connection.file_streams()
     {
@@ -526,6 +521,17 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         {
             connection.remove_file_stream(uid);
         }
+    }
+
+    if let Some(files) = connection.private_files()
+    {
+        files.lock().unwrap().clear();
+    }
+
+    //SEND DISCONNECT CODE IF GRACEFUL
+    if grace
+    {
+        network::send(&mut *connection.write_stream().lock().await, PacketCode::Disconnect, connection.keys()).await;
     }
 
     //CLOSE SCREEN UPLOAD STREAM
@@ -629,7 +635,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                 }
             },
 
-            Connection::Authenticated { write_stream, task, file_streams, screen_stream, username, device, role,
+            Connection::Authenticated { write_stream, task, file_streams, private_files, screen_stream, username, device, role,
                 id, attached_screen, last_activity, last_attachment, last_typing, channel, seq, server_seq, peer_addr, alive,
                 muted, credit, refill, throttles, .. } =>
             {
@@ -638,6 +644,7 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
                     write_stream,
                     task,
                     file_streams,
+                    private_files,
                     screen_stream,
                     peer_addr,
                     username,
@@ -680,6 +687,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<D
             write_stream: old_connection.write_stream().clone(),
             task: old_connection.task().clone(),
             file_streams: Arc::new(MutexSync::new(HashMap::new())),
+            private_files: Arc::new(MutexSync::new(Vec::new())),
             screen_stream: None,
             peer_addr: *old_connection.peer_addr(),
             username: username.to_string(),
@@ -728,6 +736,7 @@ fn update_client_channel(peer_addr: &SocketAddr, channel: &Option<String>) //MOV
             write_stream: old_connection.write_stream().clone(),
             task: old_connection.task().clone(),
             file_streams: old_connection.file_streams().unwrap().clone(),
+            private_files: old_connection.private_files().unwrap().clone(),
             screen_stream: old_connection.screen_stream().clone(),
             peer_addr: *old_connection.peer_addr(),
             username: old_connection.username().unwrap().clone(),

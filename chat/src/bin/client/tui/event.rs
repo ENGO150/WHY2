@@ -521,11 +521,16 @@ impl App
             },
 
             //OUR OWN STORED PRIVATE MESSAGES
-            ClientEvent::PrivateMedia(message) =>
+            ClientEvent::PrivateMedia { message, temporary_file } =>
             {
                 let peer = message.username.clone();
                 let sender_id = (!message.sent).then_some(message.id);
-                let entry = private_entry(message, &self.username);
+                let mut entry = private_entry(message, &self.username);
+                if temporary_file && let state::Entry::Attachment { hash, picture, .. } = &mut entry
+                {
+                    *hash = None;
+                    *picture = state::Picture::Gone;
+                }
                 self.push_private_media(&peer, sender_id, entry);
             },
 

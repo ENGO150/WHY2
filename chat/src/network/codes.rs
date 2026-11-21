@@ -633,7 +633,13 @@ pub enum PacketCode //CONTROL CODES
     ChatUploadReply { request: u64, transfer: Option<([u8; 32], u64)> },
 
     /// Delivers a private attachment or voice note to one participant.
-    PrivateMedia { message: StoredPrivateMessage, data: Option<Vec<u8>> },
+    PrivateMedia
+    {
+        message: StoredPrivateMessage,
+        data: Option<Vec<u8>>,
+        /// File bytes must be requested by message id while the sender is connected.
+        temporary_file: bool,
+    },
 
     /// The PM destination cannot receive the requested upload.
     PrivateUploadUnavailable,

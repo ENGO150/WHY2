@@ -336,7 +336,7 @@ pub enum ClientEvent
         older: bool,
     },                                                           //A PAGE OF STORED MESSAGES (START, MORE, KEPT, OLDER)
     /// A file or voice note addressed to this account.
-    PrivateMedia(StoredPrivateMessage),
+    PrivateMedia { message: StoredPrivateMessage, temporary_file: bool },
 
     /// A page of private message history.
     PrivateHistory
@@ -1014,10 +1014,10 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             }
 
             //OUR OWN STORED PRIVATE MESSAGES
-            PacketCode::PrivateMedia { message, data } =>
+            PacketCode::PrivateMedia { message, data, temporary_file } =>
             {
                 let Some(media) = &message.media else { continue };
-                if let Some(data) = data
+                if !temporary_file && let Some(data) = data
                 {
                     let hash = media.hash();
                     let data = task::spawn_blocking(move || (crypto::sha256(&data) == hash).then_some(data))
@@ -1026,7 +1026,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     if let Some(data) = data { cache::store(&hash, &data).await; }
                 }
 
-                tx.send(ClientEvent::PrivateMedia(message)).await.ok();
+                tx.send(ClientEvent::PrivateMedia { message, temporary_file }).await.ok();
                 continue;
             },
 

@@ -64,7 +64,7 @@ use crate::
         {
             self,
             handshake,
-            connection::{ ConnectionType, AvailableFile },
+            connection::{ ConnectionType, AvailableFile, DownloadSource },
         },
         codes::
         {
@@ -719,6 +719,17 @@ impl<'a, 's> ClientSession<'a, 's>
     async fn attachment_download(&mut self, message_id: u64) -> PacketFlow
     {
         let private = message_id & consts::PRIVATE_MESSAGE_ID != 0;
+        if private && file::private_file(&self.username, message_id, None).is_some()
+        {
+            let token = server::open_connection(self.id, ConnectionType::FileDownload
+            {
+                uid: rand::random(),
+                source: DownloadSource::PrivateMessage(message_id),
+            });
+            self.send(PacketCode::Download { token }).await;
+            return PacketFlow::Continue;
+        }
+
         let attachment = if private
         {
             config::private_messages::attachment(message_id, &self.username)
@@ -744,7 +755,7 @@ impl<'a, 's> ClientSession<'a, 's>
             };
 
             //OPEN THE TRANSFER; ITS SOCKET VERIFIES AND STREAMS THE FILE
-            let token = server::open_connection(self.id, ConnectionType::FileDownload { uid: rand::random(), file });
+            let token = server::open_connection(self.id, ConnectionType::FileDownload { uid: rand::random(), source: DownloadSource::File(file) });
 
             self.send(PacketCode::Download { token }).await;
         } else
@@ -773,7 +784,7 @@ impl<'a, 's> ClientSession<'a, 's>
             let file_size = file.size;
 
             //OPEN NEW CONNECTION
-            let token = server::open_connection(self.id, ConnectionType::FileDownload { uid, file });
+            let token = server::open_connection(self.id, ConnectionType::FileDownload { uid, source: DownloadSource::File(file) });
 
             //SEND APPROVAL
             self.send(PacketCode::Download { token }).await;

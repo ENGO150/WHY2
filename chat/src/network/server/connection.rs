@@ -33,6 +33,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::
 {
+    fs,
     path::PathBuf,
     net::SocketAddr,
     time::{ Instant, Duration },
@@ -51,9 +52,13 @@ use zeroize::Zeroizing;
 
 use crate::
 {
-    config,
     role::Role,
     consts::SharedKeys,
+    config::
+    {
+        self,
+        private_messages::Participants,
+    },
     network::
     {
         codes::Device,
@@ -80,6 +85,28 @@ pub struct AvailableFile //UPLOADED FILE
     pub key: Zeroizing<Vec<i64>>,
     /// The file's at-rest nonce.
     pub nonce: Vec<i64>,
+}
+
+/// A private file owned by one live session.
+pub struct TemporaryPrivateFile
+{
+    pub participants: Participants,
+    pub file: AvailableFile,
+}
+
+impl Drop for TemporaryPrivateFile
+{
+    fn drop(&mut self)
+    {
+        let _ = fs::remove_file(&self.file.path);
+    }
+}
+
+/// The source to authorize when a download socket connects.
+pub enum DownloadSource
+{
+    File(AvailableFile),
+    PrivateMessage(u64),
 }
 
 /// A viewer's attachment to a screen share.
@@ -110,7 +137,7 @@ pub enum ConnectionType //TYPES OF TCP CHANNEL
     FileDownload
     {
         uid: u64,
-        file: AvailableFile,
+        source: DownloadSource,
     },
     /// Receives a screen share.
     Screen,
@@ -134,6 +161,8 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
         task: AbortHandle,                                       //HANDLER TASK (USED TO FORCE-CLOSE THE CONNECTION)
         /// Tasks of active file transfers, by upload id.
         file_streams: Arc<MutexSync<HashMap<u64, AbortHandle>>>, //ACTIVE FILE TRANSFER TASKS
+        /// Temporary PM files posted by this session.
+        private_files: Arc<MutexSync<Vec<TemporaryPrivateFile>>>,
         /// Task receiving this client's screen share.
         screen_stream: Option<AbortHandle>,                      //SCREEN UPLOAD TASK
         /// The client's address.
@@ -205,6 +234,16 @@ pub enum Connection //CLIENT CONNECTION (WHAT IS PUSHED TO connections LIST)
 //IMPLEMENTATIONS
 impl Connection
 {
+    /// Temporary PM files posted by this session.
+    pub fn private_files(&self) -> Option<&Arc<MutexSync<Vec<TemporaryPrivateFile>>>>
+    {
+        match self
+        {
+            Self::Authenticated { private_files, .. } => Some(private_files),
+            Self::NonAuthenticated { .. } => None,
+        }
+    }
+
     //GET STREAM FROM Connection
     /// Returns the shared write half.
     pub fn write_stream(&self) -> &Arc<Mutex<OwnedWriteHalf>>

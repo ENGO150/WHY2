@@ -304,14 +304,14 @@ async fn main()
                                     });
                                 },
 
-                                ConnectionType::FileDownload { uid, file: file_data } =>
+                                ConnectionType::FileDownload { uid, source } =>
                                 {
                                     log::info!("Auxiliary connection (file download): {owner}");
 
                                     server::spawn_with_abort(move |task| async move
                                     {
                                         let (_read_stream, write_stream) = stream.into_split();
-                                        file::upload(token, id, write_stream, file_data, uid, task).await;
+                                        file::upload(token, id, write_stream, source, uid, task).await;
                                     });
                                     return;
                                 },

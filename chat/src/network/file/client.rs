@@ -30,7 +30,7 @@ use std::
 use tokio::
 {
     io::AsyncWriteExt,
-    fs::{ self, File },
+    fs::{ self, OpenOptions },
     sync::
     {
         Mutex,
@@ -176,14 +176,14 @@ pub async fn download_cached(hash: [u8; 32], filename: &str, tx: Sender<ClientEv
 /// The file name is reduced to its last component, so a server cannot write outside the
 /// download directory. The download is reported as
 /// [`Downloaded`](ClientEvent::Downloaded) or [`DownloadFailed`](ClientEvent::DownloadFailed)
-/// by whether its SHA-256 matches the metadata.
+/// after verifying its size and SHA-256 and moving the completed file into place.
 ///
 /// # Parameters
 /// - `token`: The transfer token from the approval.
 /// - `tx`: The UI event channel.
 ///
 /// # Panics
-/// If the socket cannot be opened, or the download directory or file cannot be created.
+/// If the socket cannot be opened or the download directory cannot be created.
 pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
 {
     //INIT FILE CONNECTION
@@ -226,52 +226,47 @@ pub async fn download(token: [u8; 32], tx: Sender<ClientEvent>)
     //LOG
     tx.send(ClientEvent::Download { uid, filename: filename.clone(), size }).await.unwrap();
 
-    //INIT COUNTERS
-    let mut current_size = 0u64;
-    let mut file = File::create(Path::new(&download_dir).join(&filename)).await.expect("Creating download file failed");
-    let mut hasher = Sha256::new();
-
-    //LOOP READING
-    loop
+    //Publish a completed file only after the transfer and hash check succeed.
+    let directory = Path::new(&download_dir);
+    let pending = directory.join(format!(".why2-download-{:016x}.part", rand::random::<u64>()));
+    let target = directory.join(&filename);
+    let outcome = if let Ok(mut file) = OpenOptions::new().write(true).create_new(true).open(&pending).await
     {
-        //READ
-        let data = match file::receive_file(&mut streams, &mut rex_stream, &mut seq).await
+        let mut remaining = size;
+        let mut hasher = Sha256::new();
+        let verified = loop
         {
-            Some((_, FilePacketCode::Data { data })) => data,
-            _ => return
-        };
+            let Some((packet_uid, FilePacketCode::Data { data })) =
+                file::receive_file(&mut streams, &mut rex_stream, &mut seq).await
+            else { break false; };
 
-        //WRITE
-        if file.write_all(&data).await.is_ok()
-        {
-            //UPDATE SIZE
-            current_size += data.len() as u64;
-
-            //UPDATE HASHER
-            hasher.update(&data);
-
-            //REPORT PROGRESS
-            tx.try_send(ClientEvent::TransferProgress { uid, done: current_size }).ok();
-
-            //CHECK IF DOWNLOADING FINISHED
-            if current_size == size
+            if packet_uid != uid || data.len() as u64 > remaining || file.write_all(&data).await.is_err()
             {
-                let final_hash: [u8; 32] = hasher.clone().finalize().into();
-
-                //FLUSH TO DISK
-                file.flush().await.ok();
-
-                //CHECK HASHES
-                tx.send(if hash == final_hash
-                {
-                    ClientEvent::Downloaded { uid, filename }
-                } else
-                {
-                    ClientEvent::DownloadFailed { uid, filename }
-                }).await.unwrap();
-
-                return;
+                break false;
             }
+
+            remaining -= data.len() as u64;
+            hasher.update(&data);
+            tx.try_send(ClientEvent::TransferProgress { uid, done: size - remaining }).ok();
+
+            if remaining == 0
+            {
+                let final_hash: [u8; 32] = hasher.finalize().into();
+                break final_hash == hash && file.flush().await.is_ok();
+            }
+        };
+        drop(file);
+
+        if verified && fs::rename(&pending, target).await.is_ok()
+        {
+            true
+        } else
+        {
+            let _ = fs::remove_file(&pending).await;
+            false
         }
-    }
+    } else { false };
+
+    tx.send(if outcome { ClientEvent::Downloaded { uid, filename } }
+        else { ClientEvent::DownloadFailed { uid, filename } }).await.ok();
 }

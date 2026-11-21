@@ -44,22 +44,22 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::
 {
     fs as sfs,
-    sync::Arc,
     ffi::OsStr,
+    net::SocketAddr,
+    sync::{ Arc, LazyLock },
     path::
     {
         Path,
         PathBuf,
     },
-    sync::LazyLock,
 };
 
 use tokio::
 {
     sync::Mutex,
-    task::AbortHandle,
     io::AsyncWriteExt,
     net::tcp::OwnedWriteHalf,
+    task::{ AbortHandle, Id },
     fs::
     {
         self,
@@ -107,7 +107,12 @@ use crate::
         server::
         {
             self,
-            connection::AvailableFile,
+            connection::
+            {
+                AvailableFile,
+                DownloadSource,
+                TemporaryPrivateFile,
+            },
         },
         file::
         {
@@ -230,7 +235,7 @@ pub async fn download
 )
 {
     //GET CLIENT INFO
-    let (keys, username, peer_addr) =
+    let (keys, username, peer_addr, session) =
     {
         //FIND CONNECTION BY ID
         let conn = server::CONNECTIONS.iter()
@@ -255,7 +260,7 @@ pub async fn download
                 //ADD FILE STREAM
                 c.add_file_stream(uid, task);
 
-                (keys, username, c.peer_addr().clone())
+                (keys, username, *c.peer_addr(), c.task().id())
             },
             None => return
         }
@@ -285,6 +290,8 @@ pub async fn download
     let UploadTarget { kind, private, .. } = target;
 
     let sealed = kind.sealed();
+    let temporary_file = kind == UploadKind::Attachment &&
+        private.as_ref().is_some_and(|target| !target.persistent);
 
     log::info!("Upload started ({size} bytes, {}): {peer_addr}", kind.name());
 
@@ -386,7 +393,7 @@ pub async fn download
         filename,
         client_id: id,
         path: upload_path,
-        data: sealed.then(Vec::new),
+        data: (sealed && !temporary_file).then(Vec::new),
         stream: disk_stream,
         mac: disk_mac,
     });
@@ -548,7 +555,7 @@ pub async fn download
             .unwrap_or(OsStr::new("unnamed_file"))
             .to_os_string();
 
-        if matches!(kind, UploadKind::Attachment | UploadKind::Voice) && let Some(data) = data
+        if matches!(kind, UploadKind::Attachment | UploadKind::Voice)
         {
             let media = voice.map_or(MessageMedia::File(final_hash), MessageMedia::Voice);
             let filename: String = filename.to_string_lossy().chars()
@@ -558,7 +565,23 @@ pub async fn download
             log::info!("Upload done ({final_size} bytes, {}): {peer_addr}", kind.name());
             match private
             {
-                Some(target) => publish_private(id, &username, target, &filename, media, &current_path, data).await,
+                Some(target) =>
+                {
+                    let temporary = temporary_file.then(|| AvailableFile
+                    {
+                        persistent: true,
+                        hash: final_hash,
+                        path: current_path.with_extension("shared"),
+                        filename: filename.clone(),
+                        size: final_size,
+                        key: disk_key,
+                        nonce: disk_nonce,
+                    });
+
+                    publish_private(id, peer_addr, session, &username, target, &filename, media,
+                        &current_path, data, temporary).await;
+                },
+
                 None =>
                 {
                     let channel = server::CONNECTIONS.iter().find(|conn| conn.id() == Some(&id))
@@ -569,7 +592,7 @@ pub async fn download
                         return;
                     }
 
-                    publish_public(&username, filename, media, Some(data), channel, kept);
+                    publish_public(&username, filename, media, data, channel, kept);
                 },
             }
             return;
@@ -702,16 +725,19 @@ pub(crate) fn publish_public
 async fn publish_private
 (
     id: usize,
+    peer_addr: SocketAddr,
+    session: Id,
     sender: &str,
     target: PrivateDestination,
     filename: &str,
     media: MessageMedia,
     pending: &Path,
-    data: Vec<u8>,
+    data: Option<Vec<u8>>,
+    temporary: Option<AvailableFile>,
 )
 {
-    let sender_connected = server::CONNECTIONS.iter().any(|conn|
-        conn.id() == Some(&id) && conn.username().is_some_and(|name| name == sender) && !*conn.muted());
+    let sender_connected = server::CONNECTIONS.get(&peer_addr).is_some_and(|conn|
+        conn.task().id() == session && !*conn.muted());
     if !sender_connected { return; }
 
     let recipient = &target.recipient;
@@ -734,6 +760,26 @@ async fn publish_private
         server::notify(id, PacketCode::InvalidUsage).await;
         return;
     };
+
+    let temporary_file = temporary.is_some();
+    if let Some(file) = temporary
+    {
+        let stored = server::CONNECTIONS.get(&peer_addr).is_some_and(|conn|
+        {
+            if conn.task().id() != session || *conn.muted() { return false; }
+            let Some(files) = conn.private_files() else { return false; };
+            if sfs::rename(pending, &file.path).is_err() { return false; }
+
+            files.lock().unwrap().push(TemporaryPrivateFile { participants: delivery.participants.clone(), file });
+            true
+        });
+
+        if !stored
+        {
+            server::notify(id, PacketCode::InvalidUsage).await;
+            return;
+        }
+    }
 
     let colors = config::users::colors(sender);
     let sender_id = config::users::id(sender).unwrap_or(id);
@@ -758,9 +804,27 @@ async fn publish_private
                 colors: colors.clone(),
                 timestamp,
             },
-            data: Some(data.clone()),
+            data: data.clone(),
+            temporary_file,
         }
     });
+}
+
+/// Finds a live private file by the requesting account's local message id.
+pub fn private_file(username: &str, message_id: u64, transfer: Option<(u64, AbortHandle)>) -> Option<(AvailableFile, usize)>
+{
+    server::CONNECTIONS.iter().find_map(|owner|
+    {
+        let id = *owner.id()?;
+        let files = owner.private_files()?.lock().unwrap();
+        let entry = files.iter().find(|entry| entry.participants.message_id(username) == Some(message_id))?;
+        if let Some((uid, task)) = &transfer
+        {
+            owner.add_file_stream(*uid, task.clone());
+        }
+
+        Some((entry.file.clone(), id))
+    })
 }
 
 /// Sends a shared file to a client on an auxiliary socket.
@@ -769,13 +833,13 @@ async fn publish_private
 /// - `token`: The transfer token the socket presented.
 /// - `id`: The downloader's session id.
 /// - `write_stream`: The transfer socket's write half.
-/// - `file`: The shared file, with its at-rest key and nonce.
+/// - `source`: The file or the live PM whose access is checked again on this socket.
 /// - `uid`: The transfer id.
 /// - `task`: The abort handle of this transfer's task, registered on the connection.
-pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf, file: AvailableFile, uid: u64, task: AbortHandle)
+pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf, source: DownloadSource, uid: u64, task: AbortHandle)
 {
     //GET CLIENT INFO
-    let (keys, peer_addr) =
+    let (keys, peer_addr, username) =
     {
         //FIND CONNECTION BY ID
         let conn = server::CONNECTIONS.iter()
@@ -792,9 +856,10 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
                 };
 
                 //ADD FILE STREAM
-                c.add_file_stream(uid, task);
+                let Some(username) = c.username().cloned() else { return };
+                c.add_file_stream(uid, task.clone());
 
-                (keys, c.peer_addr().clone())
+                (keys, *c.peer_addr(), username)
             },
 
             None => return
@@ -806,6 +871,20 @@ pub async fn upload(token: [u8; 32], id: usize, mut write_stream: OwnedWriteHalf
     {
         id,
         uid,
+    };
+
+    let (file, _owner_guard) = match source
+    {
+        DownloadSource::File(file) => (file, None),
+        DownloadSource::PrivateMessage(message_id) =>
+        {
+            let Some((file, owner)) = private_file(&username, message_id, Some((uid, task))) else
+            {
+                server::notify(id, PacketCode::AttachmentUnavailable { message_id }).await;
+                return;
+            };
+            (file, (owner != id).then(|| FileTransferGuard { id: owner, uid }))
+        },
     };
 
     //INIT SEQ COUNTER
