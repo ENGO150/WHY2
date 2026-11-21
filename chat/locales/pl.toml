@@ -214,8 +214,6 @@ unknown_file = "Nieznany"
 title = "Prywatna rozmowa: {username} (powrót poleceniem /pm)"
 received = "Prywatna wiadomość od {username} — /pm {id}"
 reply_context = "Przed udzieleniem odpowiedzi otwórz rozmowę, w której znajduje się wiadomość."
-files_unavailable = "Udostępnianie plików w prywatnych rozmowach nie jest jeszcze dostępne."
-voice_unavailable = "Wiadomości głosowe w prywatnych rozmowach nie są jeszcze dostępne."
 recipient_unavailable = "Odbiorca tej prywatnej wiadomości jest niedostępny."
 
 [pane]

@@ -214,8 +214,6 @@ unknown_file = "Neznámý"
 title = "Soukromá konverzace: {username} (návrat příkazem /pm)"
 received = "Soukromá zpráva od {username} — /pm {id}"
 reply_context = "Před odpovědí otevřete konverzaci, ve které je zpráva."
-files_unavailable = "Sdílení souborů v soukromých konverzacích zatím není dostupné."
-voice_unavailable = "Hlasové zprávy v soukromých konverzacích zatím nejsou dostupné."
 recipient_unavailable = "Příjemce soukromé zprávy není dostupný."
 
 [pane]
