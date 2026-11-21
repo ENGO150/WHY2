@@ -31,6 +31,7 @@ use std::
 {
     path::Path,
     net::SocketAddr,
+    collections::HashSet,
     time::{ Instant, Duration },
 };
 
@@ -174,9 +175,9 @@ impl<'a, 's> ClientSession<'a, 's>
             }
 
             //RE-READ THE ROLE RATHER THAN LATCH IT
-            self.role = server::CONNECTIONS.get(&self.peer_addr)
-                .and_then(|entry| entry.role().copied())
-                .unwrap_or(self.role);
+            let Some(role) = server::CONNECTIONS.get(&self.peer_addr).and_then(|entry| entry.role().copied())
+                else { return; };
+            self.role = role;
 
             //WHAT ARRIVED, NEVER WHAT WAS IN IT
             log::debug!("Packet {}: {}", read.name(), self.peer_addr);
@@ -1260,20 +1261,27 @@ impl<'a, 's> ClientSession<'a, 's>
             return PacketFlow::Continue;
         }
 
-        //FIND TARGET USER
-        let muted = if let Some(mut conn) = server::CONNECTIONS.iter_mut()
-            .find(|entry| entry.value().id() == Some(&id)) && conn.role() < Some(&self.role)
+        let muted =
         {
-            //TOGGLE MUTE
-            conn.toggle_mute();
+            let _presence = server::PRESENCE.lock().unwrap();
+            let target = server::CONNECTIONS.iter()
+                .find(|conn| conn.id() == Some(&id) && conn.role() < Some(&self.role))
+                .map(|conn| !*conn.muted());
 
-            Some((*conn.peer_addr(), *conn.muted()))
-        } else { None }; //USER NOT FOUND
+            if let Some(muted) = target
+            {
+                for mut conn in server::CONNECTIONS.iter_mut().filter(|conn| conn.id() == Some(&id))
+                {
+                    conn.set_muted(muted);
+                }
+            }
+            target
+        };
 
         match muted
         {
             //THE GUARD IS DROPPED BEFORE THIS
-            Some((target, muted)) => log::info!("{} by {}: {target}",
+            Some(muted) => log::info!("{} by {}: account {id}",
                 if muted { "Mute" } else { "Unmute" }, self.peer_addr),
 
             None =>
@@ -1299,18 +1307,20 @@ impl<'a, 's> ClientSession<'a, 's>
             return PacketFlow::Continue;
         }
 
-        //FIND TARGET USER
-        let target = server::CONNECTIONS.iter()
-            .find(|entry| entry.value().id() == Some(&id))
-            .map(|entry| (*entry.key(), entry.role().cloned()));
-
-        if let Some((addr, Some(trole))) = target && trole < self.role
+        let sessions =
         {
-            log::info!("Kick by {}: {addr}", self.peer_addr);
+            let mut presence = server::PRESENCE.lock().unwrap();
+            let addresses = server::CONNECTIONS.iter()
+                .filter(|conn| conn.id() == Some(&id) && conn.role() < Some(&self.role))
+                .map(|conn| *conn.key()).collect();
+            presence.take_sessions(addresses)
+        };
 
-            //KICK
-            server::remove_connection(&addr, true, Some("kick")).await;
-        } else //USER NOT FOUND
+        if !sessions.is_empty()
+        {
+            log::info!("Kick by {}: account {id} ({} sessions)", self.peer_addr, sessions.len());
+            server::disconnect_sessions(sessions, "kick").await;
+        } else
         {
             log::warn!("Kick refused (no such user, or a peer): {}", self.peer_addr);
 
@@ -1332,23 +1342,22 @@ impl<'a, 's> ClientSession<'a, 's>
             return PacketFlow::Continue;
         }
 
-        //FIND TARGET ACCOUNT
-        if id != self.id && let Some(target) = config::users::username(id)
+        let sessions =
         {
-            let session = server::session_of(id);
-
-            log::info!("Ban by {}: {}", self.peer_addr,
-                session.map_or("offline user".to_string(), |addr| addr.to_string()));
-
-            config::bans::ban(&target);
-
-            if let Some(addr) = session
+            let mut presence = server::PRESENCE.lock().unwrap();
+            if id != self.id && let Some(target) = config::users::username(id)
             {
-                server::remove_connection(&addr, true, Some("ban")).await;
-            }
+                config::bans::ban(&target);
+                let sessions = presence.take_sessions(server::account_addresses(id));
+                presence.broadcast(PacketCode::Banned { username: target });
+                Some(sessions)
+            } else { None }
+        };
 
-            //NOTIFY ALL USERS ABOUT THE BAN
-            server::send_to_all(PacketCode::Banned { username: target });
+        if let Some(sessions) = sessions
+        {
+            log::info!("Ban by {}: account {id} ({} sessions)", self.peer_addr, sessions.len());
+            server::disconnect_sessions(sessions, "ban").await;
 
             server::send_bans(&self.streams.1, &self.keys).await;
         } else //USER NOT FOUND
@@ -1373,18 +1382,26 @@ impl<'a, 's> ClientSession<'a, 's>
             return PacketFlow::Continue;
         }
 
-        //FIND TARGET USER
-        let target = server::CONNECTIONS.iter()
-            .find(|entry| entry.value().id() == Some(&uid))
-            .map(|entry| *entry.key());
-
-        if let Some(addr) = target
+        let sessions =
         {
-            log::info!("IP ban by {}: {}", self.peer_addr, addr.ip());
+            let mut presence = server::PRESENCE.lock().unwrap();
+            let ips: HashSet<_> = server::account_addresses(uid).iter().map(SocketAddr::ip).collect();
+            for ip in &ips
+            {
+                log::info!("IP ban by {}: {ip}", self.peer_addr);
+                config::bans::ban_ip(ip);
+            }
 
-            config::bans::ban_ip(&addr.ip());
-            server::remove_connections(&addr.ip(), true, Some("ip ban")).await;
-        } else //USER NOT FOUND
+            let addresses = server::CONNECTIONS.iter()
+                .filter(|conn| ips.contains(&conn.key().ip()))
+                .map(|conn| *conn.key()).collect();
+            presence.take_sessions(addresses)
+        };
+
+        if !sessions.is_empty()
+        {
+            server::disconnect_sessions(sessions, "ip ban").await;
+        } else
         {
             log::warn!("IP ban refused (no such user): {}", self.peer_addr);
 
@@ -1402,19 +1419,20 @@ impl<'a, 's> ClientSession<'a, 's>
 
         //VERIFY BOTH PASSWORDS
         let valid = if server::validate_password(&new_password) &&
-            server::verify_password(&self.username, old_password).await
+            let Some(old_hash) = server::verify_password(&self.username, old_password).await
         {
-            //HASH PASSWORD
             let hash = task::spawn_blocking(move || password::hash_password(&new_password))
                 .await.expect("Hashing password failed");
 
-            //SAVE PASSWORD
-            config::users::set_password(&self.username, &hash);
-
-            //LOG
-            log::info!("Password changed: {}", self.peer_addr);
-
-            true
+            let _presence = server::PRESENCE.lock().unwrap();
+            let current = server::CONNECTIONS.contains_key(&self.peer_addr) &&
+                config::users::password(&self.username).is_some_and(|hash| hash == *old_hash);
+            if current
+            {
+                config::users::set_password(&self.username, &hash);
+                log::info!("Password changed: {}", self.peer_addr);
+            }
+            current
         } else { false };
 
         //REPLY TO USER
@@ -1425,24 +1443,41 @@ impl<'a, 's> ClientSession<'a, 's>
     //ACCOUNT DELETION
     async fn account_delete(&mut self, password: String) -> PacketFlow
     {
-        let valid = server::verify_password(&self.username, Zeroizing::new(password)).await;
+        let hash = server::verify_password(&self.username, Zeroizing::new(password)).await;
+        let mut stream = self.streams.1.lock().await;
+        let removed =
+        {
+            let mut presence = server::PRESENCE.lock().unwrap();
+            if let Some(hash) = hash && server::CONNECTIONS.contains_key(&self.peer_addr) &&
+                config::users::password(&self.username).is_some_and(|current| current == *hash)
+            {
+                config::users::remove(&self.username);
+                let addresses = server::account_addresses(self.id).into_iter()
+                    .filter(|addr| *addr != self.peer_addr).collect();
+                let siblings = presence.take_sessions(addresses);
+                presence.take_connection(&self.peer_addr).map(|connection| (connection, siblings))
+            } else { None }
+        };
 
-        //REPLY TO USER
-        self.send(PacketCode::AccountDelete { valid }).await;
+        let Some((connection, siblings)) = removed else
+        {
+            network::send(&mut stream, PacketCode::AccountDelete { valid: false }, Some(&self.keys)).await;
+            return PacketFlow::Continue;
+        };
 
-        if !valid { return PacketFlow::Continue; }
-
-        //DELETE THE ACCOUNT AND ITS AVATAR
-        config::users::remove(&self.username);
+        tokio::spawn(server::disconnect_sessions(siblings, "account deleted"));
         config::messages::sweep_attachments();
-
         log::info!("Account deleted: {}", self.peer_addr);
 
-        PacketFlow::Disconnect
-        {
-            grace: true,
-            reason: Some("account deleted"),
-        }
+        //SEND THE ACK WITH THE REMOVED CONNECTION'S SEQUENCE COUNTER
+        let mut seq = connection.server_seq().copied().unwrap_or_default();
+        let packet = network::Packet { code: PacketCode::AccountDelete { valid: true }, seq: 0 };
+        let _ = network::send_tcp(&mut stream, packet, network::EncryptionMode::OneShot(Some(&self.keys)),
+            Some(&mut seq)).await;
+        drop(stream);
+
+        server::finish_disconnect(connection, true, Some("account deleted")).await;
+        PacketFlow::Continue
     }
 
     //A /color OR /ucolor

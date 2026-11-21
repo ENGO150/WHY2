@@ -57,7 +57,7 @@ mod session;
 use std::
 {
     future::Future,
-    net::{ IpAddr, SocketAddr },
+    net::SocketAddr,
     time::{ Instant, Duration },
     collections::{ HashSet, HashMap },
     sync::
@@ -151,6 +151,43 @@ type PresencePacket = (PacketCode, Option<Sender<()>>);
 //IMPLEMENTATIONS
 impl Presence
 {
+    fn take_connection(&mut self, peer_addr: &SocketAddr) -> Option<Connection>
+    {
+        let (_, connection) = CONNECTIONS.remove_if(peer_addr, |_, _|
+        {
+            PENDING_TOKENS.retain(|_, pending| pending.owner_addr != *peer_addr);
+            true
+        })?;
+
+        self.clients.remove(peer_addr);
+        if let Some(&id) = connection.id()
+        {
+            self.close_voice(*peer_addr, id, None);
+        }
+
+        if let (Some(username), Some(id)) = (connection.username(), connection.id()) && !user_connected(username)
+        {
+            //UNLIST SHARED FILES ON THE FINAL DISCONNECT
+            AVAILABLE_FILES.remove(username);
+            if config::users::online_status(username)
+            {
+                self.broadcast(PacketCode::Leave
+                {
+                    username: username.clone(),
+                    id: *id,
+                    registered: config::users::contains(username),
+                });
+            }
+        }
+
+        Some(connection)
+    }
+
+    fn take_sessions(&mut self, addresses: Vec<SocketAddr>) -> Vec<Connection>
+    {
+        addresses.iter().filter_map(|addr| self.take_connection(addr)).collect()
+    }
+
     fn send(&self, peer_addr: &SocketAddr, code: PacketCode)
     {
         if let Some(sender) = self.clients.get(peer_addr)
@@ -217,6 +254,8 @@ struct AuthenticatedClient
     username: String,
     /// What the client says it runs on.
     device: Option<Device>,
+    /// The account credentials checked during authentication.
+    password_hash: Zeroizing<String>,
 }
 
 //FUNCTIONS
@@ -226,6 +265,12 @@ fn session_of(id: usize) -> Option<SocketAddr> //THE SESSION THE ACCOUNT HAS OPE
     CONNECTIONS.iter()
         .find(|entry| entry.role().is_some() && entry.id() == Some(&id))
         .map(|entry| *entry.key())
+}
+
+/// Collects all authenticated sessions for an account.
+fn account_addresses(id: usize) -> Vec<SocketAddr>
+{
+    CONNECTIONS.iter().filter(|conn| conn.id() == Some(&id)).map(|conn| *conn.key()).collect()
 }
 
 /// Whether both accounts may exchange live PMs under the server's presence settings.
@@ -433,39 +478,18 @@ async fn send_private_history
     }, Some(keys)).await;
 }
 
-/// Removes every connection from one address.
-async fn remove_connections(addr: &IpAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTIONS BY IP
-{
-    let addrs: Vec<SocketAddr> = CONNECTIONS.iter()
-        .filter(|conn| conn.key().ip() == *addr)
-        .map(|conn| *conn.key()).collect();
-
-    for addr in addrs
-    {
-        remove_connection(&addr, grace, info).await;
-    }
-}
-
 /// Checks a new password against `min_password_length`.
 fn validate_password(password: &str) -> bool //CHECK PASSWORD LENGTH (AND POSSIBLY STRENGTH IN THE FUTURE)
 {
     password.len() >= config::read_config("min_password_length")
 }
 
-/// Verifies a login password on a blocking thread.
-///
-/// # Returns
-/// `false` for an unknown user as well as for a wrong password.
-async fn verify_password(username: &str, password: Zeroizing<String>) -> bool
+/// Returns the verified password hash, or `None` if the account or password is invalid.
+async fn verify_password(username: &str, password: Zeroizing<String>) -> Option<Zeroizing<String>>
 {
-    if let Some(hashed) = config::users::password(username)
-    {
-        task::spawn_blocking(move || password::compare_password_hash(&hashed, &password))
-            .await.expect("Comparing password failed")
-    } else //UNKNOWN USER (OR FAKE LOGIN)
-    {
-        false
-    }
+    let hash = Zeroizing::new(config::users::password(username)?);
+    task::spawn_blocking(move || password::compare_password_hash(&hash, &password).then_some(hash))
+        .await.expect("Comparing password failed")
 }
 
 //PUBLIC
@@ -622,37 +646,29 @@ pub fn send_to_others(code: PacketCode, channel: Option<&str>, except: usize) //
 /// - `info`: A short reason for the log.
 pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option<&str>) //REMOVE CONNECTION BY PEER ADDRESS
 {
-    let mut connection =
+    let connection = PRESENCE.lock().unwrap().take_connection(peer_addr);
+    if let Some(connection) = connection
     {
-        let mut presence = PRESENCE.lock().unwrap();
-        let Some((_, connection)) = CONNECTIONS.remove_if(peer_addr, |_, _|
-        {
-            PENDING_TOKENS.retain(|_, pending| pending.owner_addr != *peer_addr);
-            true
-        }) else { return; };
+        finish_disconnect(connection, grace, info).await;
+    }
+}
 
-        presence.clients.remove(peer_addr);
-        if let Some(&id) = connection.id()
-        {
-            presence.close_voice(*peer_addr, id, None);
-        }
+/// Completes moderation cleanup independently for every removed session.
+async fn disconnect_sessions(connections: Vec<Connection>, reason: &'static str)
+{
+    let tasks: Vec<_> = connections.into_iter()
+        .map(|connection| tokio::spawn(finish_disconnect(connection, true, Some(reason))))
+        .collect();
 
-        if let (Some(username), Some(id)) = (connection.username(), connection.id()) && !user_connected(username)
-        {
-            //UNLIST SHARED FILES ON THE FINAL DISCONNECT
-            AVAILABLE_FILES.remove(username);
-            if config::users::online_status(username)
-            {
-                presence.broadcast(PacketCode::Leave
-                {
-                    username: username.clone(),
-                    id: *id,
-                    registered: config::users::contains(username),
-                });
-            }
-        }
-        connection
-    };
+    for task in tasks
+    {
+        let _ = task.await;
+    }
+}
+
+async fn finish_disconnect(mut connection: Connection, grace: bool, info: Option<&str>)
+{
+    let peer_addr = *connection.peer_addr();
 
     //CLOSE ALL FILE STREAMS
     if let Some(streams) = connection.file_streams()
@@ -682,7 +698,7 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
     if connection.remove_screen_stream()
     {
         //DEATTACH ALL ATTACHED CLIENTS
-        deattach(*peer_addr, connection.username().unwrap()).await;
+        deattach(peer_addr, connection.username().unwrap()).await;
     }
 
     //AUTHENTICATED ACTIONS
@@ -791,11 +807,26 @@ fn update_client_keys(peer_addr: &SocketAddr, keys: &SharedKeys) //ADD KEY TO No
 ///
 /// The rate limits start fresh: the message gap and attachment and typing timers start satisfied, and
 /// the packet bucket full.
-fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<Device>, role: Role, id: usize) -> bool
+fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<Device>, password_hash: &str)
+    -> Option<(usize, Role)>
 {
     let mut presence = PRESENCE.lock().unwrap();
-    let first_session = !user_connected(username);
-    let Some(mut connection) = CONNECTIONS.get_mut(peer_addr) else { return false; };
+
+    //RECHECK ACCOUNT AND BANS AFTER PASSWORD VERIFICATION
+    if config::bans::banned(username) || config::bans::banned_ip(&peer_addr.ip()) ||
+        config::users::password(username).is_none_or(|hash| hash != password_hash)
+    {
+        return None;
+    }
+
+    let id = config::users::id(username)?;
+    let role = config::users::role(username).unwrap_or_default();
+
+    //INHERIT THE MUTE WHILE ANOTHER SESSION IS CONNECTED
+    let (first_session, muted) = CONNECTIONS.iter()
+        .find(|conn| conn.id() == Some(&id))
+        .map_or((true, false), |conn| (false, *conn.muted()));
+    let mut connection = CONNECTIONS.get_mut(peer_addr)?;
     let old_connection = connection.value();
 
     //GIVE EACH ONLINE PERIOD ITS OWN DIRECTORY
@@ -832,7 +863,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<D
         seq: *old_connection.seq(),
         server_seq: 0,
         alive: true,
-        muted: false,
+        muted,
     };
     drop(connection);
 
@@ -849,7 +880,7 @@ fn authenticate_client(peer_addr: &SocketAddr, username: &str, device: &Option<D
     }
 
     log::info!("Authenticate connection: {peer_addr} (id {id}, role {role})");
-    true
+    Some((id, role))
 }
 
 /// Moves a client to a channel, announcing a channel that was created or abandoned.
@@ -1161,14 +1192,14 @@ async fn ask_username
 /// Refusals remove the connection.
 ///
 /// # Returns
-/// `true` if the account was created and the client may continue.
+/// The new account's password hash if the client may continue.
 async fn register_account
 (
     streams: &mut Streams<'_>,
     peer_addr: &SocketAddr,
     keys: &SharedKeys,
     username: &str,
-) -> bool
+) -> Option<Zeroizing<String>>
 {
     let max_tries = config::read_config::<usize>("max_auth_tries"); //MAX n
     let mut password: Option<Zeroizing<String>> = None;
@@ -1197,7 +1228,7 @@ async fn register_account
             _ =>
             {
                 remove_connection(peer_addr, false, Some("register")).await;
-                return false;
+                return None;
             }
         };
     }
@@ -1205,20 +1236,33 @@ async fn register_account
     if password.is_none()
     {
         remove_connection(peer_addr, true, Some("register")).await;
-        return false;
+        return None;
     }
 
     log::info!("Registering new user: {peer_addr}");
 
     //HASH PASSWORD (ARGON2 IS CPU HEAVY)
-    let hash = task::spawn_blocking(move || password::hash_password(password.as_ref().unwrap().as_str()))
-        .await.expect("Hashing password failed");
+    let hash = Zeroizing::new(task::spawn_blocking(move || password::hash_password(password.as_ref().unwrap().as_str()))
+        .await.expect("Hashing password failed"));
 
-    let Some(role) = config::users::add(username, &hash) else
+    let role =
     {
-        log::warn!("Registration refused (username already registered): {peer_addr}");
+        let _presence = PRESENCE.lock().unwrap();
+        if !CONNECTIONS.contains_key(peer_addr) ||
+            config::bans::banned(username) || config::bans::banned_ip(&peer_addr.ip())
+        {
+            None
+        } else
+        {
+            config::users::add(username, &hash)
+        }
+    };
+
+    let Some(role) = role else
+    {
+        log::warn!("Registration refused: {peer_addr}");
         remove_connection(peer_addr, true, Some("registration")).await;
-        return false;
+        return None;
     };
 
     if role == Role::Owner
@@ -1229,7 +1273,7 @@ async fn register_account
         network::send(&mut *streams.1.lock().await, PacketCode::FirstUser, Some(keys)).await;
     }
 
-    true
+    Some(hash)
 }
 
 /// Logs an existing account in.
@@ -1237,14 +1281,14 @@ async fn register_account
 /// Refusals remove the connection.
 ///
 /// # Returns
-/// `true` if the password was accepted and the client may continue.
+/// The verified password hash, if the client may continue.
 async fn login_account
 (
     streams: &mut Streams<'_>,
     peer_addr: &SocketAddr,
     keys: &SharedKeys,
     username: &str,
-) -> bool
+) -> Option<Zeroizing<String>>
 {
     //SEND LOGIN CODE
     network::send(&mut *streams.1.lock().await, PacketCode::LoginRequest, Some(keys)).await;
@@ -1259,28 +1303,28 @@ async fn login_account
             _ =>
             {
                 remove_connection(peer_addr, false, Some("login")).await;
-                return false;
+                return None;
             },
         }
     };
 
     //VERIFY PASSWORD (ARGON2 IS CPU HEAVY)
-    let valid = if password.is_empty() || config::bans::banned(username)
+    let hash = if password.is_empty() || config::bans::banned(username)
     {
-        false
+        None
     } else { verify_password(username, password).await };
 
     //INVALID PASSWORD, DISCONNECT CLIENT
-    if !valid
+    let Some(hash) = hash else
     {
         log::warn!("Login refused: {peer_addr}");
 
         remove_connection(peer_addr, true, Some("login")).await;
-        return false;
-    }
+        return None;
+    };
 
     log::debug!("Login accepted: {peer_addr}");
-    true
+    Some(hash)
 }
 
 /// Runs the key exchange and the login prompts for a new connection.
@@ -1310,21 +1354,20 @@ async fn authenticate_connection
     let user_exists = config::users::contains(&username);
 
     //REGISTRATION (OR "FAKE" LOGIN ON DISABLED REGISTER) OR LOGIN
-    let allowed = if !user_exists && !disabled_registration
+    let password_hash = if !user_exists && !disabled_registration
     {
         register_account(streams, peer_addr, &keys, &username).await
     } else
     {
         login_account(streams, peer_addr, &keys, &username).await
-    };
-
-    if !allowed { return None; }
+    }?;
 
     Some(AuthenticatedClient
     {
         keys,
         username,
         device,
+        password_hash,
     })
 }
 
@@ -1353,11 +1396,13 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     //HANDSHAKE, VERSION CHECK & LOGIN
     let Some(client) = authenticate_connection(streams, &peer_addr, &obfuscation_key).await else { return; };
 
-    let AuthenticatedClient { keys, username, device } = client;
-
-    let id = config::users::id(&username).unwrap_or_default(); //CONSTANT USER ID
-    let role = config::users::role(&username).unwrap_or_default(); //WHAT THIS CLIENT IS ALLOWED TO ASK FOR
-    if !authenticate_client(&peer_addr, &username, &device, role, id) { return; }
+    let AuthenticatedClient { keys, username, device, password_hash } = client;
+    let Some((id, role)) = authenticate_client(&peer_addr, &username, &device, &password_hash) else
+    {
+        remove_connection(&peer_addr, true, Some("login")).await;
+        return;
+    };
+    drop(password_hash);
 
     //SEND WHAT WAS SAID IN THE LOBBY BEFORE THIS
     send_history(&streams.1, &keys, None).await;

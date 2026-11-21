@@ -104,40 +104,26 @@ fn profile_boolean(username: &str, key: &str) -> Option<bool> //READ ONE TOGGLE 
         .as_table_like()?.get(PROFILE_TABLE)?.as_table_like()?.get(key)?.as_bool())
 }
 
-/// Writes one top-level field of an account, creating the entry if missing.
+/// Writes a top-level field of an existing account.
 fn write_user_field(username: &str, key: &str, value: Value) //WRITE ONE FIELD OF username TO server_users.toml
 {
     super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
     {
-        let users = doc.as_table_mut();
-
-        //A MISSING ENTRY BECOMES A SUBTABLE
-        if users.get(username).and_then(Item::as_table_like).is_none()
+        if let Some(user) = doc.get_mut(username).and_then(Item::as_table_like_mut)
         {
-            users.insert(username, Item::Table(Table::new()));
+            user.insert(key, Item::Value(value));
         }
-
-        users.get_mut(username).and_then(Item::as_table_like_mut)
-            .expect("User entry is not a table").insert(key, Item::Value(value));
     });
 }
 
-/// Writes one profile field of an account, creating the entry and profile if missing.
+/// Writes a profile field of an existing account, creating the profile if missing.
 fn write_profile_field(username: &str, key: &str, value: Value) //WRITE ONE PROFILE FIELD TO server_users.toml
 {
     super::with_cached_mut(&super::config_path(consts::SERVER_USERS_CONFIG), |doc|
     {
-        let users = doc.as_table_mut();
+        let Some(user) = doc.get_mut(username).and_then(Item::as_table_like_mut) else { return; };
 
-        //A MISSING ENTRY BECOMES A SUBTABLE
-        if users.get(username).and_then(Item::as_table_like).is_none()
-        {
-            users.insert(username, Item::Table(Table::new()));
-        }
-
-        let user = users.get_mut(username).and_then(Item::as_table_like_mut).expect("User entry is not a table");
-
-        //AND SO DOES A MISSING PROFILE
+        //CREATE THE PROFILE FOR OLDER ACCOUNTS
         if user.get(PROFILE_TABLE).and_then(Item::as_table_like).is_none()
         {
             user.insert(PROFILE_TABLE, Item::Table(Table::new()));

@@ -842,12 +842,12 @@ impl Connection
     }
 
     //MUTE
-    /// Toggles the client's server-side mute.
-    pub fn toggle_mute(&mut self)
+    /// Sets the client's server-side mute.
+    pub fn set_muted(&mut self, value: bool)
     {
         if let Self::Authenticated { muted, .. } = self
         {
-            *muted = !*muted;
+            *muted = value;
         }
     }
 
