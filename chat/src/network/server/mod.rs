@@ -514,6 +514,12 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         None => return
     };
 
+    //CHECK IF SAME USER IS STILL CONNECTED
+    let duplicate = if let Some(username) = connection.username()
+    {
+        user_connected(username)
+    } else { false };
+
     //CLOSE ALL FILE STREAMS
     if let Some(streams) = connection.file_streams()
     {
@@ -526,7 +532,8 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
         }
     }
 
-    if let Some(files) = connection.private_files()
+    //REMOVE PM NON-PERSISTENT UPLOADS
+    if !duplicate && let Some(files) = connection.private_files()
     {
         files.lock().unwrap().clear();
     }
@@ -570,14 +577,18 @@ pub async fn remove_connection(peer_addr: &SocketAddr, grace: bool, info: Option
             voice_server::remove_connection(&id);
         }
 
-        //REMOVE UPLOADS
         let username = connection.username().unwrap();
-        let _ = fs::remove_dir_all(misc::get_upload_dir(username)).await; //REMOVE FILES
-        file::ACTIVE_FILESHARES.retain(|_, u| u.client_id != *connection.id().unwrap());
-        AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
+
+        //REMOVE UPLOADS
+        if !duplicate
+        {
+            let _ = fs::remove_dir_all(misc::get_upload_dir(username)).await; //REMOVE FILES
+            file::ACTIVE_FILESHARES.retain(|_, u| u.client_id != *connection.id().unwrap());
+            AVAILABLE_FILES.remove(username); //REMOVE AVAILABLE FILES
+        }
 
         //SEND LEAVE MESSAGE, UNLESS THE ACCOUNT WAS HIDDEN
-        if config::users::online_status(username) && !user_connected(username)
+        if config::users::online_status(username) && !duplicate
         {
             send_to_all(PacketCode::Leave
             {
