@@ -1255,6 +1255,15 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     send_history(&streams.1, &keys, None).await;
     send_private_history(&streams.1, &keys, &username, None).await; //OFC ONLY USER'S OWN PMS
 
+    if config::read_config::<bool>("persistent_private_messages") &&
+        config::read_config::<usize>("max_persistent_private_messages") > 0
+    {
+        //Snapshot under the same write lock used for live PM delivery.
+        let mut stream = streams.1.lock().await;
+        let (next, senders) = config::private_messages::unread(&username);
+        network::send(&mut *stream, PacketCode::PrivateUnread { next, senders }, Some(&keys)).await;
+    }
+
     //TELL CLIENT ALL REQUIRED DATA
     network::send(&mut *streams.1.lock().await, PacketCode::Accept
     {

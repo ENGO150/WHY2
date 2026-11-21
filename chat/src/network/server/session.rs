@@ -279,6 +279,15 @@ impl<'a, 's> ClientSession<'a, 's>
 
             //AN OLDER PAGE OF OUR PRIVATE HISTORY
             PacketCode::PrivateHistoryRequest { before } => self.private_history(before).await,
+            PacketCode::PrivateRead { peer, through } =>
+            {
+                if config::read_config::<bool>("persistent_private_messages")
+                {
+                    config::private_messages::mark_read(&self.username, &peer, through);
+                }
+
+                PacketFlow::Continue
+            },
 
             //ONE OF THE HISTORY'S PICTURES
             PacketCode::AttachmentDataRequest { hash } => self.attachment_data(hash).await,

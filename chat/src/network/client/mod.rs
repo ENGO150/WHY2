@@ -338,6 +338,9 @@ pub enum ClientEvent
     /// A file or voice note addressed to this account.
     PrivateMedia { message: StoredPrivateMessage, temporary_file: bool },
 
+    /// The unread private message counts at login.
+    PrivateUnread { next: u64, senders: Vec<(String, u64, u64)> },
+
     /// A page of private message history.
     PrivateHistory
     {
@@ -1034,6 +1037,12 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             {
                 tx.send(ClientEvent::PrivateHistory { messages, start, more, kept, older }).await.unwrap();
 
+                continue;
+            }
+
+            PacketCode::PrivateUnread { next, senders } =>
+            {
+                tx.send(ClientEvent::PrivateUnread { next, senders }).await.unwrap();
                 continue;
             }
 

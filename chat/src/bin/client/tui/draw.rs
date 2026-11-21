@@ -341,6 +341,7 @@ fn draw_messages(frame: &mut Frame, app: &mut App, area: Rect)
 
     //ONLY THE PICTURES ON SCREEN ARE HELD
     app.load_visible(inner.width, offset, viewport);
+    app.mark_visible_private_read();
 
     //SHOW THE BACKLOG
     draw_scrollbar(frame, area, total as usize, viewport as usize, offset as usize);
@@ -861,7 +862,7 @@ fn draw_offline(frame: &mut Frame, app: &App, area: Rect)
 /// Shows a sender's unread PM count immediately after their username.
 fn unread_pm_badge(app: &App, username: &str) -> Span<'static>
 {
-    app.unread_pms.get(username).map_or_else(Span::default, |count|
+    app.unread_private_count(username).map_or_else(Span::default, |count|
         Span::styled(format!(" ({count})"), theme::notice()))
 }
 

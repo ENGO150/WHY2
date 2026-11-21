@@ -456,8 +456,12 @@ pub struct App
     pub messages: VecDeque<Entry>, //THE PANE BEING LOOKED AT - THE CHANNEL WE ARE STANDING IN
     /// The public channel to restore when leaving a private conversation.
     pub pm_return: Option<String>,
-    /// Unread PM counts by sender username.
-    pub unread_pms: HashMap<String, usize>,
+    //Counts and newest unread message ids, by sender.
+    unread_pms: HashMap<String, (u64, u64)>,
+    //The login snapshot already accounts for persisted messages below this id.
+    private_unread_next: Option<u64>,
+    /// Read positions waiting to be sent to the server.
+    pub private_reads: HashMap<String, u64>,
     /// Pane key: empty for the lobby, a channel name, or a NUL-prefixed PM username.
     pub channel: String,           //WHICH CHANNEL THAT IS ("" = THE LOBBY)
     /// Every other channel's scrollback, parked while we are away.
@@ -669,6 +673,8 @@ impl App
             channel: String::new(),
             pm_return: None,
             unread_pms: HashMap::new(),
+            private_unread_next: None,
+            private_reads: HashMap::new(),
             panes: HashMap::new(),
             scroll: None,
             unread: 0,
@@ -839,17 +845,57 @@ impl App
     {
         let entry = Entry::Private { sent: sender_id.is_none(), username: username.clone(), sender_id, message_id, position: None, timestamp, text, colors, reply, hearts: Vec::new(), edited: false };
         let active = self.pm_username() == Some(username.as_str());
-        if self.route_private(&username, entry) { self.track_private_unread(&username, sender_id, active); }
+        if self.route_private(&username, entry) && sender_id.is_some()
+        {
+            self.track_private_unread(&username, message_id, active);
+        }
     }
 
-    fn track_private_unread(&mut self, username: &str, sender_id: Option<usize>, active: bool)
+    /// Applies the login summary independently of which history pages are loaded.
+    pub fn restore_private_unread(&mut self, next: u64, senders: Vec<(String, u64, u64)>)
     {
+        self.private_unread_next = Some(next);
+        self.unread_pms = senders.into_iter().map(|(sender, count, newest)| (sender, (count, newest))).collect();
+        self.dirty = true;
+    }
+
+    /// Returns the number of unread PMs from a sender.
+    pub fn unread_private_count(&self, username: &str) -> Option<u64>
+    {
+        self.unread_pms.get(username).map(|(count, _)| *count)
+    }
+
+    fn track_private_unread(&mut self, username: &str, message_id: u64, active: bool)
+    {
+        if self.private_unread_next.is_some_and(|next| message_id < next) { return; }
+
         if active && self.scroll.is_some() { self.unread += 1; }
-        if sender_id.is_some() && !active
-        {
-            *self.unread_pms.entry(username.to_owned()).or_default() += 1;
-            self.dirty = true;
-        }
+        let (count, newest) = self.unread_pms.entry(username.to_owned()).or_default();
+        *count += 1;
+        *newest = (*newest).max(message_id);
+        self.dirty = true;
+    }
+
+    fn queue_private_read(&mut self, peer: &str, message_id: u64)
+    {
+        if self.private_unread_next.is_none() { return; }
+        let through = self.private_reads.entry(peer.to_owned()).or_default();
+        *through = (*through).max(message_id);
+    }
+
+    /// Clears the badge after the newest unread message loads and the conversation is drawn at the bottom.
+    pub fn mark_visible_private_read(&mut self)
+    {
+        if self.scroll.is_some() || self.login.is_some() || self.settings.open ||
+            self.account.is_some() || self.tofu.is_some() || self.palette.is_visible() { return; }
+
+        let Some(peer) = self.pm_username() else { return; };
+        let Some(&(_, newest)) = self.unread_pms.get(peer) else { return; };
+        if !self.messages.iter().any(|entry| entry.message_id() == Some(newest)) { return; }
+
+        let peer = peer.to_owned();
+        self.unread_pms.remove(&peer);
+        self.queue_private_read(&peer, newest);
     }
 
     //THE NEWEST PAGE OF THE LOBBY'S HISTORY
@@ -888,6 +934,8 @@ impl App
     {
         self.history_pending = false;
         self.start_private_history(entries, start, more);
+        //An older page can contain no messages for the open conversation.
+        if more && self.pm_username().is_some() { self.dirty = true; }
     }
 
     /// The participant of the open private conversation.
@@ -905,14 +953,18 @@ impl App
     pub fn push_private_media(&mut self, peer: &str, sender_id: Option<usize>, entry: Entry)
     {
         let active = self.pm_username() == Some(peer);
-        if self.route_private(peer, entry) { self.track_private_unread(peer, sender_id, active); }
+        let incoming = entry.message_id().filter(|_| sender_id.is_some());
+        if self.route_private(peer, entry) && let Some(message_id) = incoming
+        {
+            self.track_private_unread(peer, message_id, active);
+        }
     }
 
     /// Opens a conversation without changing server channel membership.
     pub fn open_pm(&mut self, username: String)
     {
+        if self.pm_username() == Some(username.as_str()) { return; }
         if self.pm_return.is_none() { self.pm_return = Some(self.channel.clone()); }
-        self.unread_pms.remove(&username);
         self.switch_channel(format!("\0{username}"));
     }
 
@@ -1989,6 +2041,8 @@ impl App
         self.channel.clear();
         self.pm_return = None;
         self.unread_pms.clear();
+        self.private_unread_next = None;
+        self.private_reads.clear();
 
         self.input = InputBuffer::new();
         self.pane_inputs.clear();

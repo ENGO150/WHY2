@@ -643,6 +643,12 @@ pub enum PacketCode //CONTROL CODES
 
     /// The PM destination cannot receive the requested upload.
     PrivateUploadUnavailable,
+
+    /// The login snapshot of unread PMs, as (sender, count, newest unread id).
+    PrivateUnread { next: u64, senders: Vec<(String, u64, u64)> },
+
+    /// Marks incoming messages from a peer through an account-local id as read.
+    PrivateRead { peer: String, through: u64 },
 }
 
 //IMPLEMENTATIONS
@@ -784,6 +790,8 @@ impl PacketCode
             Self::ChatUploadReply { .. }       => "ChatUploadReply",
             Self::PrivateMedia { .. }          => "PrivateMedia",
             Self::PrivateUploadUnavailable     => "PrivateUploadUnavailable",
+            Self::PrivateUnread { .. }         => "PrivateUnread",
+            Self::PrivateRead { .. }           => "PrivateRead",
         }
     }
 }

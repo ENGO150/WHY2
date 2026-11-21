@@ -177,6 +177,15 @@ struct History //THE RECORDS AND THE NEXT ID
     next: u64,                    //NEXT INTERNAL MESSAGE ID
     users: BTreeMap<String, u64>, //NEXT PRIVATE ID IN EACH ACCOUNT
     records: Vec<Record>,
+    read_through: BTreeMap<String, BTreeMap<String, u64>>,
+}
+
+#[derive(SchemaRead)]
+struct HistoryV5
+{
+    next: u64,
+    users: BTreeMap<String, u64>,
+    records: Vec<Record>,
 }
 
 #[derive(SchemaRead)]
@@ -203,7 +212,8 @@ pub struct Page
 
 //CONSTS
 /// Marker at the start of the current file format.
-const MAGIC: &[u8; 8] = b"WHY2PM05"; //FORMAT MARKER
+const MAGIC: &[u8; 8] = b"WHY2PM06"; //FORMAT MARKER
+const MAGIC_V5: &[u8; 8] = b"WHY2PM05";
 const MAGIC_V4: &[u8; 8] = b"WHY2PM04";
 /// The format with shared message ids.
 const MAGIC_V3: &[u8; 8] = b"WHY2PM03"; //OLDER FORMAT
@@ -261,7 +271,7 @@ impl History
     fn from_records(records: Vec<ActionRecord>) -> Self //MIGRATE THE SHARED ID SEQUENCE
     {
         let next = records.last().map_or(0, |message| message.id + 1);
-        let mut history = Self { next, users: BTreeMap::new(), records: Vec::new() };
+        let mut history = Self { next, users: BTreeMap::new(), records: Vec::new(), read_through: BTreeMap::new() };
         let mut messages: BTreeMap<u64, Vec<String>> = BTreeMap::new();
 
         //RESERVE IDS FOR REPLIED-TO MESSAGES EVEN WHEN THEIR TEXT WAS DELETED
@@ -328,6 +338,43 @@ impl History
     fn find(&self, id: u64, username: &str) -> Option<usize> //NEVER INTERPRET ANOTHER ACCOUNT'S ID
     {
         self.records.iter().position(|message| message.participants.message_id(username) == Some(id))
+    }
+
+    fn unread(&self, username: &str) -> (u64, Vec<(String, u64, u64)>)
+    {
+        let next = self.users.get(username).copied().unwrap_or(consts::PRIVATE_MESSAGE_ID);
+        let read = self.read_through.get(username);
+        let mut counts = BTreeMap::<&str, (u64, u64)>::new();
+
+        for record in &self.records
+        {
+            let Participants { sender, recipient, recipient_id, .. } = &record.participants;
+            if recipient != username || sender == username ||
+                read.and_then(|peers| peers.get(sender)).is_some_and(|id| recipient_id <= id) { continue; }
+
+            let (count, newest) = counts.entry(sender).or_default();
+            *count += 1;
+            *newest = (*newest).max(*recipient_id);
+        }
+
+        (next, counts.into_iter().map(|(sender, (count, newest))| (sender.to_owned(), count, newest)).collect())
+    }
+
+    fn mark_read(&mut self, username: &str, peer: &str, through: u64) -> bool
+    {
+        let previous = self.read_through.get(username).and_then(|peers| peers.get(peer)).copied().unwrap_or(0);
+        if through <= previous { return false; }
+
+        let newest = self.records.iter().rev().find_map(|record|
+        {
+            let Participants { sender, recipient, recipient_id, .. } = &record.participants;
+            (recipient == username && sender == peer && sender != username && *recipient_id <= through)
+                .then_some(*recipient_id)
+        });
+
+        let Some(newest) = newest.filter(|id| *id > previous) else { return false; };
+        self.read_through.entry(username.to_owned()).or_default().insert(peer.to_owned(), newest);
+        true
     }
 
     /// Seals the whole history and writes it to disk.
@@ -445,6 +492,7 @@ fn load() -> History //READ THE PRIVATE HISTORY OFF DISK
         {
             next: old.next,
             users: old.users,
+            read_through: BTreeMap::new(),
             records: old.records.into_iter().map(|record| Record
             {
                 id: record.id,
@@ -458,6 +506,13 @@ fn load() -> History //READ THE PRIVATE HISTORY OFF DISK
                 media: None,
             }).collect(),
         };
+    }
+
+    if let Some(records) = plaintext.strip_prefix(MAGIC_V5)
+    {
+        let Ok(old) = wincode::config::deserialize::<HistoryV5, _>(records, config)
+            else { return unreadable() };
+        return History { next: old.next, users: old.users, records: old.records, read_through: BTreeMap::new() };
     }
 
     //NO MARKER IS UNREADABLE
@@ -486,6 +541,19 @@ fn unreadable() -> History //KEEP A COPY, START EMPTY
 }
 
 //PUBLIC
+/// Returns the next account-local id and the unread count and newest unread id for each sender.
+pub fn unread(username: &str) -> (u64, Vec<(String, u64, u64)>)
+{
+    HISTORY.lock().unwrap().unread(username)
+}
+
+/// Records a read position for the recipient of an incoming message.
+pub fn mark_read(username: &str, peer: &str, through: u64)
+{
+    let mut history = HISTORY.lock().unwrap();
+    if history.mark_read(username, peer, through) { history.save(); }
+}
+
 /// Returns the other participant, only when `username` may read the message.
 pub fn peer(id: u64, username: &str) -> Option<String> //RESOLVE THE ACCOUNT'S OWN MESSAGE ID
 {

@@ -546,6 +546,8 @@ impl App
                 }
             },
 
+            ClientEvent::PrivateUnread { next, senders } => self.restore_private_unread(next, senders),
+
             //THE ANSWER TO A CLICKED CAPTION, THE PROFILE BOX OR THE SIDEBAR
             ClientEvent::ImageData { hash, image } =>
             {

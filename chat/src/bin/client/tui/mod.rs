@@ -475,6 +475,17 @@ pub async fn run
             },
         }
 
+        if let Some(write_stream) = write_stream.as_ref() && !app.private_reads.is_empty()
+        {
+            let keys = options::get_keys();
+            let mut stream = write_stream.lock().await;
+
+            for (peer, through) in app.private_reads.drain()
+            {
+                network::send(&mut *stream, PacketCode::PrivateRead { peer, through }, keys.as_ref()).await;
+            }
+        }
+
         if app.should_quit { break; }
     }
 }
