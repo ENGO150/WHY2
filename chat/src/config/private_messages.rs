@@ -63,6 +63,7 @@ use why2::consts as why2_consts;
 
 use crate::
 {
+    misc,
     crypto,
     consts::{ self, SharedKeys },
     network::codes::
@@ -599,13 +600,13 @@ fn wire(records: Vec<Record>, username: &str) -> Vec<StoredPrivateMessage>
 /// The separate directory used for sealed private attachments.
 pub fn media_path(hash: &[u8; 32]) -> PathBuf
 {
-    media_dir().join(crate::misc::hex(hash))
+    media_dir().join(misc::hex(hash))
 }
 
 /// The storage root for private uploads.
 pub fn media_dir() -> PathBuf
 {
-    PathBuf::from(super::config_path("server_private_media"))
+    PathBuf::from(misc::get_why2_dir()).join("server_private_media")
 }
 
 /// Whether new private uploads can be retained by the server.
@@ -626,7 +627,7 @@ pub fn sweep_media()
     let kept: HashSet<_> = history.records.iter().filter_map(|record|
         record.media.as_ref().map(MessageMedia::hash)).collect();
 
-    for hash in files.flatten().filter_map(|file| file.file_name().to_str().and_then(crate::misc::unhex))
+    for hash in files.flatten().filter_map(|file| file.file_name().to_str().and_then(misc::unhex))
     {
         if !kept.contains(&hash) { let _ = fs::remove_file(media_path(&hash)); }
     }
