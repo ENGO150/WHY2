@@ -53,6 +53,8 @@ static USE_VOICE: AtomicBool = AtomicBool::new(false);
 static INPUT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(clamp_volume(config::read_config::<u32>("input_volume")) as usize));
 /// Playback volume, in percent.
 static OUTPUT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(clamp_volume(config::read_config::<u32>("output_volume")) as usize));
+/// Preferred media playback volume, before the output volume cap.
+static MEDIA_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(clamp_volume(config::read_config::<u32>("media_volume")) as usize));
 /// Whether captured frames are denoised.
 static NOISE_SUPPRESSION: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(config::read_config::<bool>("noise_suppression")));
 /// Whether captured frames are normalised.
@@ -113,7 +115,7 @@ pub fn clamp_volume(percent: u32) -> u32 //KEEP A VOLUME INSIDE THE SUPPORTED RA
 pub fn init_audio() //TOUCH EVERY PREFERENCE
 {
     get_input_volume();
-    get_output_volume();
+    get_media_volume();
     noise_suppression();
     automatic_gain();
     media_normalisation();
@@ -141,6 +143,18 @@ pub fn get_output_volume() -> u32 //PLAYBACK VOLUME (PERCENT)
 pub fn set_output_volume(percent: u32)
 {
     OUTPUT_VOLUME.store(clamp_volume(percent) as usize, Ordering::Relaxed);
+}
+
+/// Returns the effective media playback volume, capped by output volume.
+pub fn get_media_volume() -> u32
+{
+    (MEDIA_VOLUME.load(Ordering::Relaxed) as u32).min(get_output_volume())
+}
+
+/// Sets the preferred media playback volume.
+pub fn set_media_volume(percent: u32)
+{
+    MEDIA_VOLUME.store(clamp_volume(percent) as usize, Ordering::Relaxed);
 }
 
 /// Returns the microphone volume as a multiplier.

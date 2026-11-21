@@ -393,7 +393,7 @@ fn open_player
             return;
         }
 
-        let output_gain = options::get_output_gain();
+        let output_gain = options::get_media_volume() as f32 / 100.;
         let normalise = options::media_normalisation();
         if !normalise { mean_power = TARGET_RMS * TARGET_RMS; }
 

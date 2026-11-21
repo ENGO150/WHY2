@@ -327,7 +327,10 @@ impl Settings
                 Value::Volume(voice_options::clamp_volume(config::read_config::<u32>("input_volume"))))));
 
             rows.push(Row::Item(Item::client(t!("settings.row.output_volume"), "output_volume",
-                Value::Volume(voice_options::clamp_volume(config::read_config::<u32>("output_volume"))))));
+                Value::Volume(voice_options::get_output_volume()))));
+
+            rows.push(Row::Item(Item::client(t!("settings.row.media_volume"), "media_volume",
+                Value::Volume(voice_options::get_media_volume()))));
 
             rows.push(Row::Item(Item::client(t!("settings.row.media_normalisation"), "media_normalisation",
                 toggle_value("media_normalisation", false))));
@@ -1195,12 +1198,14 @@ fn adjust(app: &mut App, direction: i32)
                 percent.saturating_sub(consts::VOLUME_STEP)
             };
 
+            let next = if key == "media_volume" { next.min(voice_options::get_output_volume()) } else { next };
+
             if next == percent { return; }
 
             if let Some(Row::Item(item)) = app.settings.rows.get_mut(row) { item.value = Value::Volume(next); }
 
             config::client_write_int(&key, next as i64);
-            apply_volume(&key, next);
+            apply_volume(app, &key, next);
         },
 
         #[cfg(feature = "client_voice")]
@@ -1477,12 +1482,24 @@ fn device_entries(app: &App, input: bool) -> Vec<DeviceEntry>
 
 /// Applies a volume to the running audio streams.
 #[cfg(feature = "client_voice")]
-fn apply_volume(key: &str, percent: u32) //LIVE-UPDATE THE RUNNING AUDIO STREAMS
+fn apply_volume(app: &mut App, key: &str, percent: u32) //LIVE-UPDATE THE RUNNING AUDIO STREAMS
 {
     match key
     {
         "input_volume" => voice_options::set_input_volume(percent),
-        "output_volume" => voice_options::set_output_volume(percent),
+        "output_volume" =>
+        {
+            voice_options::set_output_volume(percent);
+            for row in &mut app.settings.rows
+            {
+                if let Row::Item(item) = row && item.key == "media_volume"
+                {
+                    item.value = Value::Volume(voice_options::get_media_volume());
+                    break;
+                }
+            }
+        },
+        "media_volume" => voice_options::set_media_volume(percent),
 
         #[cfg(feature = "client_screen")]
         "screen_volume" => screen_options::set_screen_volume(percent),
