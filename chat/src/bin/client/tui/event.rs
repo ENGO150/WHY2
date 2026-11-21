@@ -247,10 +247,10 @@ impl App
             },
 
             ClientEvent::PrivateMessageSent { message_id, timestamp, reply, message, username, message_color } =>
-                self.push_private(username, None, message_id, timestamp, message, MessageColors { username_color: None, message_color }, reply),
+                self.push_private(username, None, message_id, timestamp, message, MessageColors { username_color: None, message_color }, reply, false),
 
-            ClientEvent::PrivateMessageRecv { message_id, timestamp, reply, message, username, id, colors } =>
-                self.push_private(username, Some(id), message_id, timestamp, message, colors, reply),
+            ClientEvent::PrivateMessageRecv { message_id, timestamp, reply, message, username, id, colors, persistent } =>
+                self.push_private(username, Some(id), message_id, timestamp, message, colors, reply, persistent),
 
             ClientEvent::TofuPrompt { request } =>
             {
@@ -522,7 +522,7 @@ impl App
             },
 
             //OUR OWN STORED PRIVATE MESSAGES
-            ClientEvent::PrivateMedia { message, temporary_file } =>
+            ClientEvent::PrivateMedia { message, temporary_file, persistent } =>
             {
                 let peer = message.username.clone();
                 let sender_id = (!message.sent).then_some(message.id);
@@ -532,7 +532,7 @@ impl App
                     *hash = None;
                     *picture = state::Picture::Gone;
                 }
-                self.push_private_media(&peer, sender_id, entry);
+                self.push_private_media(&peer, sender_id, entry, persistent);
             },
 
             ClientEvent::PrivateHistory { messages, start, more, kept: _, older } =>

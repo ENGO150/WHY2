@@ -296,9 +296,11 @@ impl<'a, 's> ClientSession<'a, 's>
             PacketCode::PrivateHistoryRequest { before } => self.private_history(before).await,
             PacketCode::PrivateRead { peer, through } =>
             {
-                if config::read_config::<bool>("persistent_private_messages")
+                if config::read_config::<bool>("persistent_private_messages") &&
+                    config::private_messages::mark_read(&self.username, &peer, through)
                 {
-                    config::private_messages::mark_read(&self.username, &peer, through);
+                    let username = self.username.clone();
+                    server::send_to_account(&self.username, move || server::private_unread_packet(&username));
                 }
 
                 PacketFlow::Continue
@@ -1089,39 +1091,20 @@ impl<'a, 's> ClientSession<'a, 's>
             return PacketFlow::Continue;
         }
 
-        //A LIVE SESSION, OR - WITH THE PRIVATE HISTORY ON - AN OFFLINE ACCOUNT
         let persistent = config::read_config::<bool>("persistent_private_messages");
+        let can_store_offline = persistent && config::read_config::<usize>("max_persistent_private_messages") > 0;
+        let recipient = config::users::username(recipient_id).and_then(|username|
+        {
+            let live = server::private_live_allowed(&self.username, &username) && server::user_connected(&username);
+            (live || can_store_offline).then_some((username, live))
+        });
 
-        let live = server::CONNECTIONS.iter()
-            .find(|entry| entry.value().id() == Some(&recipient_id))
-            .map(|entry| *entry.key());
-
-        let recipient = live.and_then(|addr|
-            server::CONNECTIONS.get(&addr).and_then(|conn| conn.username().cloned())
-                .filter(|username| server::private_live_allowed(&self.username, username))
-                .map(|username| (Some(addr), username))) //GUARD DROPPED HERE
-            .or_else(||
-            {
-                //AN OFFLINE MESSAGE NEEDS ROOM IN THE HISTORY
-                if !persistent || config::read_config::<usize>("max_persistent_private_messages") == 0 { return None; }
-
-                config::users::username(recipient_id).map(|username| (None, username))
-            });
-
-        let Some((recipient_addr, recipient_uname)) = recipient else
+        let Some((recipient_uname, live)) = recipient else
         {
             log::warn!("Private message refused (no such recipient): {}", self.peer_addr);
-
-            //INVALID PM FORMAT
             self.send(PacketCode::InvalidUsage).await;
             return PacketFlow::Continue;
         };
-
-        match recipient_addr
-        {
-            Some(addr) => log::info!("Private message ({} chars): {} -> {}", text.chars().count(), self.peer_addr, addr),
-            None => log::info!("Private message ({} chars) kept for an offline account: {}", text.chars().count(), self.peer_addr),
-        }
 
         let text = text.trim().to_owned();
         if text.is_empty()
@@ -1137,33 +1120,26 @@ impl<'a, 's> ClientSession<'a, 's>
             return PacketFlow::Continue;
         };
 
-        //GET COLORS
+        log::info!("Private message ({} chars): {} -> account {recipient_id}", text.chars().count(), self.peer_addr);
         let colors = config::users::colors(&self.username);
 
-        //SEND TO RECIPIENT (IF NOT SELF-MESSAGE)
-        if let Some(addr) = recipient_addr && recipient_id != self.id
+        if live && recipient_id != self.id
         {
-            //RELEASE THE CONNECTION GUARD BEFORE SEND UPDATES THE SEQUENCE NUMBER
-            let recipient = server::CONNECTIONS.get(&addr)
-                .map(|conn| (conn.write_stream().clone(), conn.keys().cloned()));
-
-            if let Some((write_stream, keys)) = recipient
+            let packet = PacketCode::PrivateMessage
             {
-                network::send(&mut *write_stream.lock().await, PacketCode::PrivateMessage
-                {
-                    message_id: delivery.participants.message_id(&recipient_uname).unwrap(),
-                    timestamp,
-                    reply: delivery.recipient_reply,
-                    text: text.clone(),
-                    username: self.username.clone(),
-                    id: self.id,
-                    colors: colors.clone(),
-                }, keys.as_ref()).await;
-            }
+                message_id: delivery.participants.message_id(&recipient_uname).unwrap(),
+                timestamp,
+                reply: delivery.recipient_reply,
+                text: text.clone(),
+                username: self.username.clone(),
+                id: self.id,
+                colors: colors.clone(),
+                persistent: delivery.persistent,
+            };
+            server::send_to_account(&recipient_uname, move || packet.clone());
         }
 
-        //SEND CONFIRMATION BACK TO SENDER
-        self.send(PacketCode::PrivateMessageBack
+        let packet = PacketCode::PrivateMessageBack
         {
             message_id: delivery.participants.message_id(&self.username).unwrap(),
             timestamp,
@@ -1171,7 +1147,8 @@ impl<'a, 's> ClientSession<'a, 's>
             text,
             username: recipient_uname,
             message_color: colors.message_color,
-        }).await;
+        };
+        server::send_to_account(&self.username, move || packet.clone());
 
         PacketFlow::Continue
     }

@@ -90,6 +90,8 @@ pub struct Delivery
 {
     /// The two account-local ids.
     pub participants: Participants,
+    /// Whether the message was retained in history.
+    pub persistent: bool,
     /// The sender's id of the message being answered.
     pub sender_reply: Option<u64>,
     /// The recipient's id of the message being answered.
@@ -547,11 +549,13 @@ pub fn unread(username: &str) -> (u64, Vec<(String, u64, u64)>)
     HISTORY.lock().unwrap().unread(username)
 }
 
-/// Records a read position for the recipient of an incoming message.
-pub fn mark_read(username: &str, peer: &str, through: u64)
+/// Records a read position and returns whether it advanced.
+pub fn mark_read(username: &str, peer: &str, through: u64) -> bool
 {
     let mut history = HISTORY.lock().unwrap();
-    if history.mark_read(username, peer, through) { history.save(); }
+    let advanced = history.mark_read(username, peer, through);
+    if advanced { history.save(); }
+    advanced
 }
 
 /// Returns the other participant, only when `username` may read the message.
@@ -677,7 +681,13 @@ fn store_message
     let sender_id = history.take_user_id(sender);
     let recipient_id = if sender == recipient { sender_id } else { history.take_user_id(recipient) };
     let participants = Participants { sender: sender.to_string(), recipient: recipient.to_string(), sender_id, recipient_id };
-    let delivery = Delivery { participants: participants.clone(), sender_reply: reply.map(|ids| ids.0), recipient_reply: reply.map(|ids| ids.1) };
+    let delivery = Delivery
+    {
+        participants: participants.clone(),
+        persistent: limit > 0,
+        sender_reply: reply.map(|ids| ids.0),
+        recipient_reply: reply.map(|ids| ids.1),
+    };
 
     let id = history.next;
     history.next += 1;

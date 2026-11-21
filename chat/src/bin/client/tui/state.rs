@@ -458,7 +458,9 @@ pub struct App
     pub pm_return: Option<String>,
     //Counts and newest unread message ids, by sender.
     unread_pms: HashMap<String, (u64, u64)>,
-    //The login snapshot already accounts for persisted messages below this id.
+    //UNREAD LIVE-ONLY MESSAGES ARE ABSENT FROM SERVER SNAPSHOTS
+    unread_live_pms: HashMap<String, (u64, u64)>,
+    //SERVER SNAPSHOTS ACCOUNT FOR PERSISTED MESSAGES BELOW THIS ID
     private_unread_next: Option<u64>,
     /// Read positions waiting to be sent to the server.
     pub private_reads: HashMap<String, u64>,
@@ -673,6 +675,7 @@ impl App
             channel: String::new(),
             pm_return: None,
             unread_pms: HashMap::new(),
+            unread_live_pms: HashMap::new(),
             private_unread_next: None,
             private_reads: HashMap::new(),
             panes: HashMap::new(),
@@ -841,17 +844,17 @@ impl App
 
     //STORE A PRIVATE MESSAGE UNRENDERED
     /// Appends a private message to the pane.
-    pub fn push_private(&mut self, username: String, sender_id: Option<usize>, message_id: u64, timestamp: Option<u64>, text: String, colors: MessageColors, reply: Option<u64>)
+    pub fn push_private(&mut self, username: String, sender_id: Option<usize>, message_id: u64, timestamp: Option<u64>, text: String, colors: MessageColors, reply: Option<u64>, persistent: bool)
     {
         let entry = Entry::Private { sent: sender_id.is_none(), username: username.clone(), sender_id, message_id, position: None, timestamp, text, colors, reply, hearts: Vec::new(), edited: false };
         let active = self.pm_username() == Some(username.as_str());
         if self.route_private(&username, entry) && sender_id.is_some()
         {
-            self.track_private_unread(&username, message_id, active);
+            self.track_private_unread(&username, message_id, active, persistent);
         }
     }
 
-    /// Applies the login summary independently of which history pages are loaded.
+    /// Applies the server's unread summary independently of which history pages are loaded.
     pub fn restore_private_unread(&mut self, next: u64, senders: Vec<(String, u64, u64)>)
     {
         self.private_unread_next = Some(next);
@@ -862,15 +865,18 @@ impl App
     /// Returns the number of unread PMs from a sender.
     pub fn unread_private_count(&self, username: &str) -> Option<u64>
     {
-        self.unread_pms.get(username).map(|(count, _)| *count)
+        let count = self.unread_pms.get(username).map_or(0, |(count, _)| *count) +
+            self.unread_live_pms.get(username).map_or(0, |(count, _)| *count);
+        (count != 0).then_some(count)
     }
 
-    fn track_private_unread(&mut self, username: &str, message_id: u64, active: bool)
+    fn track_private_unread(&mut self, username: &str, message_id: u64, active: bool, persistent: bool)
     {
-        if self.private_unread_next.is_some_and(|next| message_id < next) { return; }
+        if persistent && self.private_unread_next.is_some_and(|next| message_id < next) { return; }
 
         if active && self.scroll.is_some() { self.unread += 1; }
-        let (count, newest) = self.unread_pms.entry(username.to_owned()).or_default();
+        let unread = if persistent { &mut self.unread_pms } else { &mut self.unread_live_pms };
+        let (count, newest) = unread.entry(username.to_owned()).or_default();
         *count += 1;
         *newest = (*newest).max(message_id);
         self.dirty = true;
@@ -890,12 +896,17 @@ impl App
             self.account.is_some() || self.tofu.is_some() || self.palette.is_visible() { return; }
 
         let Some(peer) = self.pm_username() else { return; };
-        let Some(&(_, newest)) = self.unread_pms.get(peer) else { return; };
+        let newest = self.unread_pms.get(peer).into_iter().chain(self.unread_live_pms.get(peer))
+            .map(|(_, newest)| *newest).max();
+        let Some(newest) = newest else { return; };
         if !self.messages.iter().any(|entry| entry.message_id() == Some(newest)) { return; }
 
         let peer = peer.to_owned();
-        self.unread_pms.remove(&peer);
-        self.queue_private_read(&peer, newest);
+        self.unread_live_pms.remove(&peer);
+        if let Some((_, newest)) = self.unread_pms.remove(&peer)
+        {
+            self.queue_private_read(&peer, newest);
+        }
     }
 
     //THE NEWEST PAGE OF THE LOBBY'S HISTORY
@@ -950,13 +961,13 @@ impl App
     }
 
     /// Routes a live upload to the participant's conversation.
-    pub fn push_private_media(&mut self, peer: &str, sender_id: Option<usize>, entry: Entry)
+    pub fn push_private_media(&mut self, peer: &str, sender_id: Option<usize>, entry: Entry, persistent: bool)
     {
         let active = self.pm_username() == Some(peer);
         let incoming = entry.message_id().filter(|_| sender_id.is_some());
         if self.route_private(peer, entry) && let Some(message_id) = incoming
         {
-            self.track_private_unread(peer, message_id, active);
+            self.track_private_unread(peer, message_id, active, persistent);
         }
     }
 
@@ -2041,6 +2052,7 @@ impl App
         self.channel.clear();
         self.pm_return = None;
         self.unread_pms.clear();
+        self.unread_live_pms.clear();
         self.private_unread_next = None;
         self.private_reads.clear();
 

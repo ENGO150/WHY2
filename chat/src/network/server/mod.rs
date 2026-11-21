@@ -542,6 +542,39 @@ pub fn send_to_all(code: PacketCode) //SEND PACKET TO ALL CLIENTS
     send_to_all_but(code, None);
 }
 
+/// Sends an account-local packet to each of its current sessions.
+fn send_to_account(username: &str, packet: impl Fn() -> PacketCode + Clone + Send + 'static)
+{
+    let sessions: Vec<_> = CONNECTIONS.iter().filter_map(|conn|
+    {
+        if conn.id().is_none() || conn.username().is_none_or(|name| name != username) { return None; }
+        Some((*conn.key(), conn.write_stream().clone()))
+    }).collect();
+
+    for (addr, write_stream) in sessions
+    {
+        let packet = packet.clone();
+        tokio::spawn(async move
+        {
+            let mut stream = write_stream.lock().await;
+            let keys = CONNECTIONS.get(&addr)
+                .filter(|conn| Arc::ptr_eq(conn.write_stream(), &write_stream))
+                .and_then(|conn| conn.keys().cloned());
+            if let Some(keys) = keys
+            {
+                //BUILD UNREAD SNAPSHOTS IN TCP WRITE ORDER
+                network::send(&mut stream, packet(), Some(&keys)).await;
+            }
+        });
+    }
+}
+
+fn private_unread_packet(username: &str) -> PacketCode
+{
+    let (next, senders) = config::private_messages::unread(username);
+    PacketCode::PrivateUnread { next, senders }
+}
+
 /// Sends a private update to every connected session of its two participants.
 pub(crate) fn send_to_accounts(participants: &Participants, packet: impl Fn(&str, u64) -> PacketCode) //NEVER BROADCAST PRIVATE UPDATES
 {
@@ -1413,8 +1446,7 @@ pub async fn listen_client //CLIENT -> SERVER COMMUNICATION
     {
         //Snapshot under the same write lock used for live PM delivery.
         let mut stream = streams.1.lock().await;
-        let (next, senders) = config::private_messages::unread(&username);
-        network::send(&mut *stream, PacketCode::PrivateUnread { next, senders }, Some(&keys)).await;
+        network::send(&mut *stream, private_unread_packet(&username), Some(&keys)).await;
     }
 
     //TELL CLIENT ALL REQUIRED DATA

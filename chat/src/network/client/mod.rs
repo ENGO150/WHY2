@@ -234,6 +234,7 @@ pub enum ClientEvent
         id: usize,
         /// The sender's current colors.
         colors: MessageColors,
+        persistent: bool,
     },                                                           //RECEIVED PM
     /// The user refused the server's identity.
     TofuError,                                                   //TOFU VERIFICATION REJECTED BY THE USER
@@ -336,9 +337,9 @@ pub enum ClientEvent
         older: bool,
     },                                                           //A PAGE OF STORED MESSAGES (START, MORE, KEPT, OLDER)
     /// A file or voice note addressed to this account.
-    PrivateMedia { message: StoredPrivateMessage, temporary_file: bool },
+    PrivateMedia { message: StoredPrivateMessage, temporary_file: bool, persistent: bool },
 
-    /// The unread private message counts at login.
+    /// The current stored unread private message counts.
     PrivateUnread { next: u64, senders: Vec<(String, u64, u64)> },
 
     /// A page of private message history.
@@ -1017,7 +1018,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             }
 
             //OUR OWN STORED PRIVATE MESSAGES
-            PacketCode::PrivateMedia { message, data, temporary_file } =>
+            PacketCode::PrivateMedia { message, data, temporary_file, persistent } =>
             {
                 let Some(media) = &message.media else { continue };
                 if !temporary_file && let Some(data) = data
@@ -1029,7 +1030,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     if let Some(data) = data { cache::store(&hash, &data).await; }
                 }
 
-                tx.send(ClientEvent::PrivateMedia { message, temporary_file }).await.ok();
+                tx.send(ClientEvent::PrivateMedia { message, temporary_file, persistent }).await.ok();
                 continue;
             },
 
@@ -1699,9 +1700,9 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
 
             //PRIVATE MESSAGE INCOMING
-            PacketCode::PrivateMessage { message_id, timestamp, reply, text, username, id, colors } =>
+            PacketCode::PrivateMessage { message_id, timestamp, reply, text, username, id, colors, persistent } =>
             {
-                tx.send(ClientEvent::PrivateMessageRecv { message_id, timestamp, reply, message: text, username, id, colors }).await.unwrap();
+                tx.send(ClientEvent::PrivateMessageRecv { message_id, timestamp, reply, message: text, username, id, colors, persistent }).await.unwrap();
             },
 
             //PRIVATE MESSAGE INCOMING

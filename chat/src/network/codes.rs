@@ -208,7 +208,7 @@ pub enum PacketCode //CONTROL CODES
         id: usize,
     },
 
-    //SERVER -> CLIENT | SEND MESSAGE ONLY TO ONE CLIENT
+    //SERVER -> CLIENT | DELIVER A PRIVATE MESSAGE
     /// *Server → client.* A private message to us.
     PrivateMessage
     {
@@ -219,6 +219,8 @@ pub enum PacketCode //CONTROL CODES
         username: String,
         id: usize,
         colors: MessageColors,
+        /// Whether this message is included in unread history snapshots.
+        persistent: bool,
     },
 
     //SERVER -> CLIENT | SEND MESSAGE BACK TO SENDER
@@ -639,12 +641,14 @@ pub enum PacketCode //CONTROL CODES
         data: Option<Vec<u8>>,
         /// File bytes must be requested by message id while the sender is connected.
         temporary_file: bool,
+        /// Whether this message is included in unread history snapshots.
+        persistent: bool,
     },
 
     /// The PM destination cannot receive the requested upload.
     PrivateUploadUnavailable,
 
-    /// The login snapshot of unread PMs, as (sender, count, newest unread id).
+    /// A snapshot of stored unread PMs, as (sender, count, newest unread id).
     PrivateUnread { next: u64, senders: Vec<(String, u64, u64)> },
 
     /// Marks incoming messages from a peer through an account-local id as read.

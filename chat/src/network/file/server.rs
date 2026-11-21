@@ -823,6 +823,7 @@ async fn publish_private
             },
             data: data.clone(),
             temporary_file,
+            persistent: delivery.persistent,
         }
     });
 }
