@@ -137,6 +137,8 @@ pub fn play_private_message()
         let step = consts::SAMPLE_RATE as f64 / config.sample_rate as f64;
         let samples = &*PM_SOUND;
         let mut position = 0_f64;
+        options::get_sound_effect_volume();
+        options::get_output_volume();
         let (done, finished) = mpsc::sync_channel(1);
         let failed = done.clone();
 
@@ -149,7 +151,7 @@ pub fn play_private_message()
                 return;
             }
 
-            let gain = options::get_output_gain() * consts::SOUND_EFFECT_VOLUME;
+            let gain = options::get_output_gain() * options::get_sound_effect_gain();
             for frame in data.chunks_mut(channels)
             {
                 let index = position as usize;
@@ -197,19 +199,19 @@ pub fn clear_effects() //STOP ALL SOUNDS
     }
 }
 
-/// Mixes the next sample of every playing effect into `mixed_sample`, at
-/// [`SOUND_EFFECT_VOLUME`](consts::SOUND_EFFECT_VOLUME), and drops effects that have ended.
+/// Mixes the next sample of every playing effect at the configured volume and drops effects that have ended.
 ///
 /// Takes the lock with `try_lock`, so the realtime callback never blocks.
 pub fn play_effects(mixed_sample: &mut f32) //PLAY ALL SOUND IN ACTIVE_EFFECTS
 {
-    if let Ok(mut effects) = ACTIVE_EFFECTS.try_lock()
+    if let Ok(mut effects) = ACTIVE_EFFECTS.try_lock() && !effects.is_empty()
     {
+        let gain = options::get_sound_effect_gain();
         effects.retain_mut(|effect|
         {
             if effect.position < effect.buffer.len() //SOUND STILL PLAYING
             {
-                *mixed_sample += effect.buffer[effect.position] * consts::SOUND_EFFECT_VOLUME;
+                *mixed_sample += effect.buffer[effect.position] * gain;
                 effect.position += 1;
 
                 true

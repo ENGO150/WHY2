@@ -71,8 +71,6 @@ pub const HOLD_FRAMES: usize        = 10;                                       
 pub const MIXING_TRESHOLD: f32      = 0.001;                                    //SPEAKER DETECTION NOISE TRESHOLD
 /// Frames between activity reports to the server (about 2 s).
 pub const ACTIVITY_TRESHOLD: usize  = 100;                                      //SERVER ACTIVITY TIMER RESET TRESHOLD (~2000ms)
-/// Volume of the join and leave sound effects.
-pub const SOUND_EFFECT_VOLUME: f32  = 0.1;                                      //VOLUME OF SOUND EFFECTS (10%)
 
 /// Samples a speaker stays marked active after they stop (about 100 ms).
 pub const ACTIVITY_HOLD: usize      = (SAMPLE_RATE / 10) as usize;              //HOW LONG AFTER SPEAKING CLIENT BECOMES INACTIVE (~100ms)

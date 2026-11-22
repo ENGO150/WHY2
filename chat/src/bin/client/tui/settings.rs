@@ -332,6 +332,9 @@ impl Settings
             rows.push(Row::Item(Item::client(t!("settings.row.media_volume"), "media_volume",
                 Value::Volume(voice_options::get_media_volume()))));
 
+            rows.push(Row::Item(Item::client(t!("settings.row.sound_effect_volume"), "sound_effect_volume",
+                Value::Volume(voice_options::get_sound_effect_volume()))));
+
             rows.push(Row::Item(Item::client(t!("settings.row.media_normalisation"), "media_normalisation",
                 toggle_value("media_normalisation", false))));
 
@@ -1500,6 +1503,7 @@ fn apply_volume(app: &mut App, key: &str, percent: u32) //LIVE-UPDATE THE RUNNIN
             }
         },
         "media_volume" => voice_options::set_media_volume(percent),
+        "sound_effect_volume" => voice_options::set_sound_effect_volume(percent),
 
         #[cfg(feature = "client_screen")]
         "screen_volume" => screen_options::set_screen_volume(percent),

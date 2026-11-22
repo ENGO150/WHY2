@@ -55,6 +55,8 @@ static INPUT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(c
 static OUTPUT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(clamp_volume(config::read_config::<u32>("output_volume")) as usize));
 /// Preferred media playback volume, before the output volume cap.
 static MEDIA_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(clamp_volume(config::read_config::<u32>("media_volume")) as usize));
+/// Sound effect volume, in percent.
+static SOUND_EFFECT_VOLUME: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(clamp_volume(config::read_config::<u32>("sound_effect_volume")) as usize));
 /// Whether captured frames are denoised.
 static NOISE_SUPPRESSION: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(config::read_config::<bool>("noise_suppression")));
 /// Whether captured frames are normalised.
@@ -116,6 +118,7 @@ pub fn init_audio() //TOUCH EVERY PREFERENCE
 {
     get_input_volume();
     get_media_volume();
+    get_sound_effect_volume();
     noise_suppression();
     automatic_gain();
     media_normalisation();
@@ -155,6 +158,24 @@ pub fn get_media_volume() -> u32
 pub fn set_media_volume(percent: u32)
 {
     MEDIA_VOLUME.store(clamp_volume(percent) as usize, Ordering::Relaxed);
+}
+
+/// Returns the sound effect volume, in percent.
+pub fn get_sound_effect_volume() -> u32
+{
+    SOUND_EFFECT_VOLUME.load(Ordering::Relaxed) as u32
+}
+
+/// Sets the sound effect volume, in percent.
+pub fn set_sound_effect_volume(percent: u32)
+{
+    SOUND_EFFECT_VOLUME.store(clamp_volume(percent) as usize, Ordering::Relaxed);
+}
+
+/// Returns the sound effect volume as a multiplier.
+pub fn get_sound_effect_gain() -> f32
+{
+    get_sound_effect_volume() as f32 / 100.
 }
 
 /// Returns the microphone volume as a multiplier.
