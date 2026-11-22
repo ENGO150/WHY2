@@ -246,6 +246,11 @@ impl<'a, 's> ClientSession<'a, 's>
 
             //VOICE CALL
             PacketCode::VoiceRequest => self.voice().await,
+            PacketCode::MuteVoiceRequest { muted } =>
+            {
+                server::PRESENCE.lock().unwrap().mute_voice(self.peer_addr, self.id, muted);
+                PacketFlow::Continue
+            },
             PacketCode::VoiceCancel { token } =>
             {
                 server::PRESENCE.lock().unwrap().close_voice(self.peer_addr, self.id, Some(&token));
@@ -529,7 +534,7 @@ impl<'a, 's> ClientSession<'a, 's>
 
             //ONLY THE VOICE OWNER MOVES THE SLOT
             if channel_changed &&
-                let Some(old_channel) = voice_server::move_connection(self.id, self.peer_addr, self.channel.clone())
+                let Some((old_channel, muted)) = voice_server::move_connection(self.id, self.peer_addr, self.channel.clone())
             {
                 presence.broadcast(PacketCode::VoiceLeave { id: self.id, channel: old_channel });
                 presence.broadcast(PacketCode::VoiceJoin
@@ -537,6 +542,7 @@ impl<'a, 's> ClientSession<'a, 's>
                     username: self.username.clone(),
                     id: self.id,
                     channel: self.channel.clone(),
+                    muted,
                 });
             }
 

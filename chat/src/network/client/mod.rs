@@ -264,11 +264,11 @@ pub enum ClientEvent
         /// One row per user in the voice session.
         users: Vec<VoiceUser>,
     },                                                           //VOICE OVERLAY
-    /// Our channel's whole voice roster, as `(id, username)`, ourselves excluded.
+    /// Our channel's whole voice roster, as `(id, username, muted)`, ourselves excluded.
     VoiceRoster
     {
-        /// The roster, as `(id, username)`.
-        clients: Vec<(usize, String)>,
+        /// The roster, as `(id, username, muted)`.
+        clients: Vec<(usize, String, bool)>,
     },                                                           //THE CHANNEL'S WHOLE VOICE ROSTER, SELF EXCLUDED
     /// Somebody joined voice in our channel.
     VoiceJoin
@@ -277,7 +277,17 @@ pub enum ClientEvent
         id: usize,
         /// The joiner's username.
         username: String,
+        /// Whether the joiner muted their microphone.
+        muted: bool,
     },                                                           //SOMEBODY JOINED VOICE IN OUR CHANNEL
+    /// A voice participant in our channel updated their microphone mute state.
+    MuteVoice
+    {
+        /// The participant's session id.
+        id: usize,
+        /// Whether the participant muted their microphone.
+        muted: bool,
+    },
     /// Somebody left voice in our channel.
     VoiceLeave
     {
@@ -1228,6 +1238,16 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 {
                     Some(token) =>
                     {
+                        //SYNC A MICROPHONE MUTE THAT PREDATES THIS VOICE SESSION
+                        {
+                            let mut write_stream = streams.1.lock().await;
+                            if options::is_muted(None)
+                            {
+                                network::send(&mut *write_stream, PacketCode::MuteVoiceRequest { muted: true },
+                                    options::get_keys().as_ref()).await;
+                            }
+                        }
+
                         let username = username.clone();
                         let voice_tx = tx.clone();
                         let stream = streams.1.clone();
@@ -1253,7 +1273,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                 #[cfg(feature = "client_voice")]
                 if voice_options::get_use_voice()
                 {
-                    for (id, username) in clients.iter()
+                    for (id, username, _) in clients.iter()
                     {
                         voice_client::add_consumer(*id, username.clone());
                     }
@@ -1263,7 +1283,7 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             }
 
             //CLIENT JOINED VOICE
-            PacketCode::VoiceJoin { username, id: sid, channel } =>
+            PacketCode::VoiceJoin { username, id: sid, channel, muted } =>
             {
                 //OUR OWN JOIN COMES BACK TO US TOO
                 if id == sid || channel.unwrap_or_default() != options::get_channel() { continue; }
@@ -1274,7 +1294,14 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
                     voice_client::add_consumer(sid, username.clone());
                 }
 
-                tx.send(ClientEvent::VoiceJoin { id: sid, username }).await.unwrap();
+                tx.send(ClientEvent::VoiceJoin { id: sid, username, muted }).await.unwrap();
+            },
+
+            PacketCode::MuteVoice { id, channel, muted } =>
+            {
+                if channel.unwrap_or_default() != options::get_channel() { continue; }
+
+                tx.send(ClientEvent::MuteVoice { id, muted }).await.unwrap();
             },
 
             //CLIENT LEFT VOICE

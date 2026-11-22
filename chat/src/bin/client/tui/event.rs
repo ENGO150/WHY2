@@ -283,14 +283,23 @@ impl App
             //THE WHOLE ROSTER - IT REPLACES WHAT WE HELD
             ClientEvent::VoiceRoster { clients } =>
             {
-                self.voice_roster = clients.into_iter().collect();
+                self.voice_roster = clients.into_iter().map(|(id, username, muted)| (id, (username, muted))).collect();
                 self.rebuild_voice();
             },
 
-            ClientEvent::VoiceJoin { id, username } =>
+            ClientEvent::VoiceJoin { id, username, muted } =>
             {
-                self.voice_roster.insert(id, username);
+                self.voice_roster.insert(id, (username, muted));
                 self.rebuild_voice();
+            },
+
+            ClientEvent::MuteVoice { id, muted } =>
+            {
+                if let Some((_, roster_muted)) = self.voice_roster.get_mut(&id)
+                {
+                    *roster_muted = muted;
+                }
+                self.dirty = true;
             },
 
             ClientEvent::VoiceLeave { id } =>

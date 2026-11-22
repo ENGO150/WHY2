@@ -226,8 +226,16 @@ impl Presence
         }
 
         self.send(&peer_addr, PacketCode::Voice { token: Some(token) });
-        self.broadcast(PacketCode::VoiceJoin { username: username.to_string(), id, channel: channel.clone() });
+        self.broadcast(PacketCode::VoiceJoin { username: username.to_string(), id, channel: channel.clone(), muted: false });
         self.send_voice_roster(&peer_addr, id, channel);
+    }
+
+    fn mute_voice(&mut self, peer_addr: SocketAddr, id: usize, muted: bool)
+    {
+        if let Some(channel) = voice_server::set_muted(id, peer_addr, muted)
+        {
+            self.broadcast(PacketCode::MuteVoice { id, channel, muted });
+        }
     }
 
     fn broadcast(&mut self, code: PacketCode)

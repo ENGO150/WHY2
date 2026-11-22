@@ -282,6 +282,7 @@ pub enum PacketCode //CONTROL CODES
         username: String,
         id: usize,
         channel: Option<String>,
+        muted: bool,
     },
 
     //CLIENT -> SERVER | DOWNLOAD FILE FROM SERVER
@@ -496,8 +497,8 @@ pub enum PacketCode //CONTROL CODES
     ChannelCreated { name: String },                   //SERVER -> CLIENT | CHANNEL CREATED
     /// *Server → client.* A channel was abandoned.
     ChannelDestroyed { name: String },                 //SERVER -> CLIENT | CHANNEL ABANDONED
-    /// *Server → client.* The voice roster of our channel, as `(id, username)`, ourselves excluded.
-    VoiceClients { clients: Vec<(usize, String)> },    //SERVER -> CLIENT | THE CHANNEL'S VOICE ROSTER
+    /// *Server → client.* The voice roster of our channel, as `(id, username, muted)`, ourselves excluded.
+    VoiceClients { clients: Vec<(usize, String, bool)> },    //SERVER -> CLIENT | THE CHANNEL'S VOICE ROSTER
     /// *Server → client.* A user left voice in `channel`.
     VoiceLeave { id: usize, channel: Option<String> }, //SERVER -> CLIENT | CLIENT LEFT VOICE
     /// *Server → client.* A download was approved; the client connects with `token`.
@@ -531,10 +532,10 @@ pub enum PacketCode //CONTROL CODES
     AttachRequest { id: usize },                       //CLIENT -> SERVER | ATTACH CLIENT SCREENSHARE
     /// *Client → server.* Joins or leaves voice.
     VoiceRequest,                                      //CLIENT -> SERVER | ESTABLISH VOICE CONNECTION
-    /// *Client → server.* Lets other users know you muted yourself.
-    MuteVoiceRequest,                                  //CLIENT -> SERVER | INFORM ABOUT LOCAL MUTE
-    /// *Server → client.* Lets other users know a user has muted themselves.
-    MuteVoice { id: usize },                           //SERVER -> CLIENT | INFORM ABOUT LOCAL MUTE
+    /// *Client → server.* Reports the local microphone mute state.
+    MuteVoiceRequest { muted: bool },                                  //CLIENT -> SERVER | INFORM ABOUT LOCAL MUTE
+    /// *Server → client.* Reports a voice participant's microphone mute state.
+    MuteVoice { id: usize, channel: Option<String>, muted: bool },                           //SERVER -> CLIENT | INFORM ABOUT LOCAL MUTE
     /// *Client → server.* Reads the ban list.
     ServerBansRequest,                                 //CLIENT -> SERVER | READ server_bans.toml
     /// *Client → server.* Reads `server.toml`.

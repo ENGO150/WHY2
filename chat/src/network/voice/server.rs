@@ -96,6 +96,7 @@ pub struct VoiceSlot
     pub owner_addr: SocketAddr,
     pub username: String,
     pub channel: Option<String>,
+    pub muted: bool,
     pub(super) token: [u8; 32],
     pub(super) connection: Option<Connection>,
 }
@@ -250,6 +251,7 @@ pub fn open_connection(id: usize, owner_addr: SocketAddr, username: String, chan
         owner_addr,
         username,
         channel,
+        muted: false,
         token,
         connection: None,
     });
@@ -275,19 +277,29 @@ pub fn remove_connection(id: usize, owner_addr: SocketAddr, token: Option<&[u8; 
     Some(slot)
 }
 
-/// Moves the owner's voice slot to another channel and returns the previous channel.
-pub fn move_connection(id: usize, owner_addr: SocketAddr, channel: Option<String>) -> Option<Option<String>>
+/// Updates the owner's microphone mute state and returns the slot's channel.
+pub(crate) fn set_muted(id: usize, owner_addr: SocketAddr, muted: bool) -> Option<Option<String>>
 {
     let mut slot = CONNECTIONS.get_mut(&id)?;
     if slot.owner_addr != owner_addr { return None; }
-    Some(mem::replace(&mut slot.channel, channel))
+
+    slot.muted = muted;
+    Some(slot.channel.clone())
+}
+
+/// Moves the owner's voice slot and returns the previous channel and mute state.
+pub fn move_connection(id: usize, owner_addr: SocketAddr, channel: Option<String>) -> Option<(Option<String>, bool)>
+{
+    let mut slot = CONNECTIONS.get_mut(&id)?;
+    if slot.owner_addr != owner_addr { return None; }
+    Some((mem::replace(&mut slot.channel, channel), slot.muted))
 }
 
 /// Builds a voice roster for a main connection's current channel.
-pub fn roster(id: usize, channel: &Option<String>) -> Vec<(usize, String)>
+pub fn roster(id: usize, channel: &Option<String>) -> Vec<(usize, String, bool)>
 {
     CONNECTIONS.iter().filter(|slot| *slot.key() != id && &slot.channel == channel)
-        .map(|slot| (*slot.key(), slot.username.clone())).collect()
+        .map(|slot| (*slot.key(), slot.username.clone(), slot.muted)).collect()
 }
 
 fn reset_last_activity(owner_addr: &SocketAddr)

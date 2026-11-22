@@ -495,7 +495,7 @@ pub struct App
     /// What the voice panel draws, built from the roster and the activity.
     pub voice: Vec<VoiceUser>, //WHAT THE VOICE PANEL DRAWS
     /// Who the server says is in voice in our channel, ourselves excluded.
-    pub voice_roster: BTreeMap<usize, String>, //WHO THE SERVER SAYS IS IN VOICE IN OUR CHANNEL (US EXCLUDED)
+    pub voice_roster: BTreeMap<usize, (String, bool)>, //OTHER VOICE PARTICIPANTS AND THEIR MICROPHONE MUTE STATE
     /// Who the local voice session is hearing, and their ping.
     pub voice_activity: Vec<VoiceUser>, //WHO WE ARE ACTUALLY HEARING
     /// Whether we are in voice.
@@ -781,7 +781,7 @@ impl App
         }
 
         //EVERYBODY ELSE, IN ID ORDER
-        for (id, username) in self.voice_roster.iter()
+        for (id, (username, _)) in self.voice_roster.iter()
         {
             let heard = self.voice_activity.iter().find(|user| !user.is_local && user.id == *id);
 

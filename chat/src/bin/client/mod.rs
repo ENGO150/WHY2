@@ -328,7 +328,8 @@ async fn mute(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, par
     } else { None };
 
     //INFO LOG
-    let message = match (options::toggle_mute(id), id)
+    let muted = options::toggle_mute(id);
+    let message = match (muted, id)
     {
         (true, Some(id)) => t!("mute.muted_id", id),
         (false, Some(id)) => t!("mute.unmuted_id", id),
@@ -336,8 +337,10 @@ async fn mute(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, par
         (false, None) => t!("mute.unmuted").to_owned(),
     };
 
-    //LET OTHERS KNOW
-    network::send(&mut *write_stream.lock().await, PacketCode::MuteVoiceRequest, options::get_keys().as_ref()).await;
+    if id.is_none()
+    {
+        network::send(&mut *write_stream.lock().await, PacketCode::MuteVoiceRequest { muted }, options::get_keys().as_ref()).await;
+    }
 
     app.push_styled(message, theme::ok());
 }

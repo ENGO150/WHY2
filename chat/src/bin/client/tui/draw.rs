@@ -909,12 +909,10 @@ fn draw_voice(frame: &mut Frame, app: &App, area: Rect)
 
     let lines = app.voice.iter().map(|user|
     {
-        //MUTE ONLY SHOWS WHILE WE LISTEN
-        #[cfg(feature = "client_voice")]
-        let muted = app.voice_enabled && options::is_muted(if user.is_local { None } else { Some(user.id) });
+        let muted = !user.is_local && app.voice_roster.get(&user.id).is_some_and(|(_, muted)| *muted);
 
-        #[cfg(not(feature = "client_voice"))]
-        let muted = false;
+        #[cfg(feature = "client_voice")]
+        let muted = muted || (app.voice_enabled && options::is_muted(if user.is_local { None } else { Some(user.id) }));
 
         let marker = if muted { "✕" } else if user.is_speaking { "●" } else { "○" };
         let style = if muted
