@@ -103,6 +103,7 @@ use crate::network::voice::client::
 {
     options as voice_options,
     message as voice_message,
+    sfx,
 };
 
 #[cfg(feature = "client_screen")]
@@ -873,6 +874,9 @@ impl App
     fn track_private_unread(&mut self, username: &str, message_id: u64, active: bool, persistent: bool)
     {
         if persistent && self.private_unread_next.is_some_and(|next| message_id < next) { return; }
+
+        #[cfg(feature = "client_voice")]
+        if !active { sfx::play_private_message(); }
 
         if active && self.scroll.is_some() { self.unread += 1; }
         let unread = if persistent { &mut self.unread_pms } else { &mut self.unread_live_pms };
