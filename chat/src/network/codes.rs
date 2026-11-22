@@ -531,6 +531,8 @@ pub enum PacketCode //CONTROL CODES
     AttachRequest { id: usize },                       //CLIENT -> SERVER | ATTACH CLIENT SCREENSHARE
     /// *Client → server.* Joins or leaves voice.
     VoiceRequest,                                      //CLIENT -> SERVER | ESTABLISH VOICE CONNECTION
+    /// *Both ways.* Lets other users know you muted yourself.
+    MuteVoice,                                         //CLIENT <> SERVER | NOTICE YOUR LOCAL MUTE
     /// *Client → server.* Reads the ban list.
     ServerBansRequest,                                 //CLIENT -> SERVER | READ server_bans.toml
     /// *Client → server.* Reads `server.toml`.
@@ -768,6 +770,7 @@ impl PacketCode
             Self::MuteScreenRequest { .. }     => "MuteScreenRequest",
             Self::MuteScreen { .. }            => "MuteScreen",
             Self::VoiceRequest { .. }          => "VoiceRequest",
+            Self::MuteVoice { .. }             => "MuteVoice",
             Self::VoiceCancel { .. }           => "VoiceCancel",
             Self::VoiceMoved { .. }            => "VoiceMoved",
             Self::Voice { .. }                 => "Voice",
