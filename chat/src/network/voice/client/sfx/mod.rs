@@ -18,23 +18,37 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! # Sound Effects
 //!
-//! The join and leave sounds, decoded once from embedded Ogg Vorbis and mixed into the voice
-//! output by its callback.
+//! Sounds decoded once from embedded Ogg Vorbis. Join and leave sounds are mixed into
+//! voice output, and private message notifications have their own output stream.
 
 use std::
 {
     io::Cursor,
+    time::Duration,
     sync::
     {
         Arc,
         Mutex,
         LazyLock,
+        mpsc,
     },
 };
 
+use tokio::task;
+
+use cpal::traits::{ DeviceTrait, StreamTrait };
 use lewton::inside_ogg::OggStreamReader;
 
-use crate::network::voice::consts;
+use crate::
+{
+    config,
+    network::voice::
+    {
+        client as voice,
+        options,
+        consts,
+    },
+};
 
 //STRUCTS
 /// A sound effect being played.
@@ -75,6 +89,9 @@ pub static LEAVE_SOUND: LazyLock<Arc<Vec<f32>>> = LazyLock::new(|| //(DI DING).r
     Arc::new(decode_ogg_from_bytes(bytes))
 });
 
+/// The decoded private message sound, mono.
+static PM_SOUND: LazyLock<Vec<f32>> = LazyLock::new(|| decode_ogg_from_bytes(include_bytes!("./pm.ogg"))); //(DI DING).fuck_up()
+
 //FUNCTIONS
 //PRIVATE
 /// Decodes Ogg Vorbis to mono samples in `[-1, 1]`.
@@ -108,6 +125,50 @@ fn decode_ogg_from_bytes(bytes: &[u8]) -> Vec<f32> //DECODING HELPER
 }
 
 //PUBLIC
+/// Plays a private message notification, including outside a voice call.
+pub fn play_private_message()
+{
+    task::spawn_blocking(||
+    {
+        let Some(device) = voice::pick_device(&config::read_config::<String>("output_device"), false) else { return; };
+        let (Ok(supported), Ok(default)) = (device.supported_output_configs(), device.default_output_config()) else { return; };
+        let config = voice::configure_device(&device, supported, default, false);
+        let channels = config.channels as usize;
+        let step = consts::SAMPLE_RATE as f64 / config.sample_rate as f64;
+        let samples = &*PM_SOUND;
+        let mut position = 0_f64;
+        let (done, finished) = mpsc::sync_channel(1);
+        let failed = done.clone();
+
+        let Ok(stream) = device.build_output_stream(config, move |data: &mut [f32], _: &_|
+        {
+            if position as usize >= samples.len()
+            {
+                data.fill(0.);
+                let _ = done.try_send(());
+                return;
+            }
+
+            let gain = options::get_output_gain() * consts::SOUND_EFFECT_VOLUME;
+            for frame in data.chunks_mut(channels)
+            {
+                let index = position as usize;
+                let current = samples.get(index).copied().unwrap_or(0.);
+                let next = samples.get(index + 1).copied().unwrap_or(0.);
+                let sample = current + (next - current) * position.fract() as f32;
+                frame.fill((sample * gain).tanh());
+                position += step;
+            }
+        }, move |_| { let _ = failed.try_send(()); }, None) else { return; };
+
+        if stream.play().is_ok()
+        {
+            let duration = Duration::from_secs_f64(samples.len() as f64 / consts::SAMPLE_RATE as f64);
+            let _ = finished.recv_timeout(duration + Duration::from_secs(2));
+        }
+    });
+}
+
 /// Starts playing a sound effect.
 pub fn queue_effect(effect: SoundEffect) //ADD SOUND TO ACTIVE_EFFECTS
 {
