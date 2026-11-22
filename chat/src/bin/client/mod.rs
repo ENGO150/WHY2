@@ -337,7 +337,7 @@ async fn mute(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, par
     };
 
     //LET OTHERS KNOW
-    network::send(&mut *write_stream.lock().await, PacketCode::MuteVoice, options::get_keys().as_ref()).await;
+    network::send(&mut *write_stream.lock().await, PacketCode::MuteVoiceRequest, options::get_keys().as_ref()).await;
 
     app.push_styled(message, theme::ok());
 }
