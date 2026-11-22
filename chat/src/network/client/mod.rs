@@ -985,13 +985,6 @@ pub async fn listen_server(streams: &mut Streams<'_>, tx: Sender<ClientEvent>) /
             },
         };
 
-        //CHECK FOR MUTED CLIENT
-        #[cfg(feature = "client_voice")]
-        if let PacketCode::Message { id, .. } = read
-        {
-            if options::is_muted(Some(id)) { continue; }
-        }
-
         //KEEPALIVE
         if matches!(read, PacketCode::KeepAlive)
         {
