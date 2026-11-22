@@ -315,7 +315,7 @@ fn hearts(app: &mut App, parameters: Option<String>) //LIST WHO HEARTED A MESSAG
 
 /// Toggles the mute of a peer by id, or of the local microphone.
 #[cfg(feature = "client_voice")]
-fn mute(app: &mut App, parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
+async fn mute(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>>, parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
 {
     //GET ID PARAMETER
     let id = if let Some(parameters) = parameters
@@ -335,6 +335,9 @@ fn mute(app: &mut App, parameters: Option<String>) //MUTE LOCAL/PEER CLIENT
         (true, None) => t!("mute.muted").to_owned(),
         (false, None) => t!("mute.unmuted").to_owned(),
     };
+
+    //LET OTHERS KNOW
+    network::send(&mut *write_stream.lock().await, PacketCode::MuteVoice, options::get_keys().as_ref()).await;
 
     app.push_styled(message, theme::ok());
 }
@@ -968,7 +971,7 @@ pub async fn submit(app: &mut App, write_stream: &Arc<MutexAsync<OwnedWriteHalf>
                         Command::MessageColor => color_handler(app, write_stream, false, parameters).await,
 
                         #[cfg(feature = "client_voice")]
-                        Command::Mute => mute(app, parameters),
+                        Command::Mute => mute(app, write_stream, parameters).await,
 
                         #[cfg(feature = "client_voice")]
                         Command::Record => tui::voice_message::toggle(app, write_stream, tx),
